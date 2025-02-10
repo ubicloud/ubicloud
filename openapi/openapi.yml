@@ -384,122 +384,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/location/{location}/firewall/id/{firewall_id}':
-    parameters:
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_id'
-    delete:
-      operationId: deleteLocationFirewallWithId
-      summary: Delete a specific firewall
-      responses:
-        '204':
-          $ref: '#/components/responses/Delete'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Firewall
-    get:
-      operationId: getLocationFirewallDetailsWithId
-      summary: Get details of a specific firewall
-      responses:
-        '200':
-          $ref: '#/components/responses/Firewall'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Firewall
-  '/project/{project_id}/location/{location}/firewall/id/{firewall_name}/firewall-rule':
-    parameters:
-      - $ref: '#/components/parameters/firewall_name'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/project_id'
-    post:
-      operationId: createLocationFirewallRuleWithId
-      summary: Create a new firewall rule
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                cidr:
-                  description: CIDR of the firewall rule
-                  type: string
-                firewall_id:
-                  type: string
-                port_range:
-                  description: Port range of the firewall rule
-                  type: string
-                project_id:
-                  type: string
-              additionalProperties: false
-              required:
-                - cidr
-      responses:
-        '200':
-          $ref: '#/components/responses/FirewallRule'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Firewall Rule
-  '/project/{project_id}/location/{location}/firewall/id/{firewall_name}/firewall-rule/{firewall_rule_id}':
-    parameters:
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_name'
-      - $ref: '#/components/parameters/firewall_rule_id'
-    delete:
-      operationId: deleteLocationFirewallFirewallRuleWithId
-      summary: Delete a specific firewall rule
-      responses:
-        '204':
-          $ref: '#/components/responses/Delete'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Firewall Rule
-    get:
-      operationId: getLocationFirewallFirewallRuleDetailsWithId
-      summary: Get details of a firewall rule
-      responses:
-        '200':
-          $ref: '#/components/responses/FirewallRule'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Firewall Rule
-    post:
-      operationId: createLocationFirewallFirewallRuleWithId
-      summary: Create a new firewall rule
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                cidr:
-                  description: CIDR of the firewall rule
-                  type: string
-                firewall_id:
-                  type: string
-                port_range:
-                  description: Port range of the firewall rule
-                  type: string
-                project_id:
-                  type: string
-              additionalProperties: false
-              required:
-                - cidr
-      responses:
-        '200':
-          $ref: '#/components/responses/FirewallRule'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Firewall Rule
   '/project/{project_id}/location/{location}/firewall/{firewall_name}':
     parameters:
       - $ref: '#/components/parameters/location'
@@ -650,31 +534,6 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/LoadBalancers'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Load Balancer
-  '/project/{project_id}/location/{location}/load-balancer/id/{load_balancer_id}':
-    parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/load_balancer_id'
-    delete:
-      operationId: deleteLoadBalancerWithID
-      summary: Delete a specific Load Balancer with ID
-      responses:
-        '204':
-          $ref: '#/components/responses/Delete'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Load Balancer
-    get:
-      operationId: getLoadBalancerDetailsWithId
-      summary: Get details of a specific Load Balancer in a location with ID
-      responses:
-        '200':
-          $ref: '#/components/responses/LoadBalancer'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -913,162 +772,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Firewall Rule
-  '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}':
-    parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_id'
-    delete:
-      operationId: deletePostgresDatabaseWithID
-      summary: Delete a specific Postgres Database with ID
-      responses:
-        '204':
-          $ref: '#/components/responses/Delete'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Database
-    get:
-      operationId: getPostgresDetailsWithId
-      summary: Get details of a specific Postgres Database in a location with ID
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresDatabase'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/ca-certificates':
-    parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_id'
-    get:
-      operationId: getPostgresCACertificatesByID
-      summary: Download CA certificates for a specific Postgres Database in a location with ID
-      responses:
-        '200':
-          description: CA certificate file
-          headers:
-            Content-Disposition:
-              schema:
-                type: string
-                example: attachment; filename="postgres-ca-certificate.pem"
-          content:
-            application/x-pem-file:
-              schema:
-                type: string
-                format: binary
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/firewall-rule/{firewall_rule_id}':
-    parameters:
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_id'
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/postgres_firewall_rule_id'
-    delete:
-      operationId: deleteLocationPostgresFirewallRuleWithId
-      summary: Delete a specific Postgres firewall rule
-      responses:
-        '204':
-          $ref: '#/components/responses/Delete'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Firewall Rule
-    get:
-      operationId: getLocationPostgresFirewallRuleDetailsWithId
-      summary: Get details of a Postgres firewall rule
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresFirewallRule'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Firewall Rule
-    post:
-      operationId: createLocationPostgresFirewallRuleWithIdWithId
-      summary: Create a new Postgres firewall rule
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                cidr:
-                  description: CIDR of the Postgres firewall rule
-                  type: string
-              additionalProperties: false
-              required:
-                - cidr
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresFirewallRule'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Firewall Rule
-  '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/reset-superuser-password':
-    post:
-      operationId: resetSuperuserPasswordWithID
-      summary: Reset super-user password of the Postgres Database
-      parameters:
-        - $ref: '#/components/parameters/project_id'
-        - $ref: '#/components/parameters/location'
-        - $ref: '#/components/parameters/postgres_database_id'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                password:
-                  type: string
-              additionalProperties: false
-              required:
-                - password
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresDatabase'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/restore':
-    post:
-      operationId: restorePostgresDatabaseWithID
-      summary: Restore a new Postgres Database in a specific location of a project with ID
-      parameters:
-        - $ref: '#/components/parameters/project_id'
-        - $ref: '#/components/parameters/location'
-        - $ref: '#/components/parameters/postgres_database_id'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                restore_target:
-                  type: string
-              additionalProperties: false
-              required:
-                - name
-                - restore_target
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresDatabase'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/{postgres_database_name}':
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -1321,31 +1024,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
-  '/project/{project_id}/location/{location}/private-subnet/id/{private_subnet_id}':
-    parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/private_subnet_id'
-    delete:
-      operationId: deletePSWithId
-      summary: Delete a specific Private Subnet with ID
-      responses:
-        '204':
-          $ref: '#/components/responses/Delete'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Private Subnet
-    get:
-      operationId: getPSDetailsWithId
-      summary: Get details of a specific Private Subnet in a location with ID
-      responses:
-        '200':
-          $ref: '#/components/responses/PrivateSubnet'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Private Subnet
   '/project/{project_id}/location/{location}/private-subnet/{private_subnet_name}':
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -1404,31 +1082,6 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Vms'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Virtual Machine
-  '/project/{project_id}/location/{location}/vm/id/{vm_id}':
-    parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/vm_id'
-    delete:
-      operationId: deleteVMWithId
-      summary: Delete a specific VM with ID
-      responses:
-        '204':
-          $ref: '#/components/responses/Delete'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Virtual Machine
-    get:
-      operationId: getVMDetailsWithId
-      summary: Get details of a specific VM in a location with ID
-      responses:
-        '200':
-          $ref: '#/components/responses/Vm'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1574,15 +1227,6 @@ components:
         type: string
         example: fraz0q3vbrpa7pkg7zbmah9csn
         pattern: '^fr[0-9a-hj-km-np-tv-z]{24}$'
-    load_balancer_id:
-      description: ID of the load balancer
-      in: path
-      name: load_balancer_id
-      required: true
-      schema:
-        type: string
-        example: 1bhw8r4pn73t1m5f7rn7a5pej2
-        pattern: '^1b[0-9a-hj-km-np-tv-z]{24}$'
     load_balancer_name:
       description: Name of the load balancer
       in: path
@@ -1648,15 +1292,6 @@ components:
         type: string
         example: pfmjgkgbktw62k53005jpx8tt7
         pattern: '^pf[0-9a-hj-km-np-tv-z]{24}$'
-    private_subnet_id:
-      description: Private subnet ID
-      in: path
-      name: private_subnet_id
-      required: true
-      schema:
-        type: string
-        example: ps3dngttwvje2kmr2sn8x12x4r
-        pattern: '^ps[0-9a-hj-km-np-tv-z]{24}$'
     private_subnet_name:
       description: Private subnet name
       in: path
@@ -1680,15 +1315,6 @@ components:
       required: false
       schema:
         type: string
-    vm_id:
-      description: Virtual machine ID
-      in: path
-      name: vm_id
-      required: true
-      schema:
-        type: string
-        example: vmhfy8gff8c67hasb0eez2k1pd
-        pattern: '^vm[0-9a-hj-km-np-tv-z]{24}$'
     vm_name:
       description: Virtual machine name
       in: path
