@@ -15,7 +15,7 @@ unless (token = ENV["UBI_TOKEN"])
 end
 
 url = ENV["UBI_URL"] || "http://api.localhost:9292/cli"
-allowed_progs = %w[ssh scp sftp psql]
+allowed_progs = %w[ssh scp sftp psql pg_dump pg_dumpall]
 
 get_prog = lambda do |prog|
   return unless allowed_progs.include?(prog)
