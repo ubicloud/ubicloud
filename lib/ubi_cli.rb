@@ -66,6 +66,14 @@ class UbiCli
     end
   end
 
+  def self.destroy(cmd, label, fragment: cmd)
+    UbiRodish.on(cmd).run_is("destroy") do
+      delete(project_path("location/#{@location}/#{fragment}/#{@name}")) do |_, res|
+        ["#{label}, if it exists, is now scheduled for destruction"]
+      end
+    end
+  end
+
   def initialize(env)
     @env = env
   end
