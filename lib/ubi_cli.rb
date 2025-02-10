@@ -18,7 +18,7 @@ class UbiCli
 
       args(2...)
 
-      instance_exec(&block) if block
+      instance_exec(&block)
 
       run do |(ref, *argv), opts, command|
         @location, @name, extra = ref.split("/", 3)
@@ -74,6 +74,32 @@ class UbiCli
     end
   end
 
+  def self.pg_cmd(cmd)
+    UbiRodish.on("pg").run_on(cmd) do
+      skip_option_parsing
+
+      args(0...)
+
+      run do |argv, opts|
+        get(project_path("location/#{@location}/postgres/#{@name}")) do |data, res|
+          conn_string = URI(data["connection_string"])
+          if (opts = opts[:pg_psql])
+            if (user = opts[:username])
+              conn_string.user = user
+              conn_string.password = nil
+            end
+
+            if (database = opts[:dbname])
+              conn_string.path = "/#{database}"
+            end
+          end
+
+          execute_argv([cmd, *argv, "--", conn_string], res)
+        end
+      end
+    end
+  end
+
   def initialize(env)
     @env = env
   end
@@ -103,14 +129,17 @@ class UbiCli
 
       if address
         user ||= data["unix_user"]
-        args = yield(user:, address:)
-        res[1]["ubi-command-execute"] = args.shift
-        [args.join("\0")]
+        execute_argv(yield(user:, address:), res)
       else
         res[0] = 400
         ["No valid IPv4 address for requested VM"]
       end
     end
+  end
+
+  def execute_argv(args, res)
+    res[1]["ubi-command-execute"] = args.shift
+    [args.join("\0")]
   end
 
   def check_fields(given_fields, allowed_fields, option_name)
