@@ -80,7 +80,7 @@ RSpec/SpecFilePathFormat:
     - 'spec/routes/**/*.rb'
 
 RSpec/MultipleMemoizedHelpers:
-  Max: 6
+  Enabled: false
 
 Sequel/IrreversibleMigration:
   Enabled: false
