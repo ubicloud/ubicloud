@@ -182,6 +182,8 @@ module Scheduling::Allocator
       ds = ds.where(allocation_state: request.allocation_state_filter) unless request.allocation_state_filter.empty?
       ds = ds.exclude(total_cores: 14, total_cpus: 14) unless request.family == "standard-gpu"
 
+      ds = ds.where(accepts_slices: false) if !request.use_slices
+
       # Emit the allocation query if the project is flagged for
       # diagnostics.
       if request.diagnostics
@@ -261,6 +263,9 @@ module Scheduling::Allocator
 
       # penalty for AX161, TODO: remove after migration to AX162
       score += 0.5 if @candidate_host[:total_cores] == 32
+
+      # penalty for hosts that do not accept slices if the request wants to use one
+      score += 1 if @request.use_slices && !@candidate_host[:accepts_slices]
 
       # penalty of 5 if host has a GPU but VM doesn't require a GPU
       score += 5 unless @request.gpu_count > 0 || @candidate_host[:num_gpus] == 0
