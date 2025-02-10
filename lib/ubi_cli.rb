@@ -7,6 +7,44 @@ class UbiCli
     [e.failure? ? 400 : 200, {"content-type" => "text/plain"}, [e.message]]
   end
 
+  def self.list(cmd, label, fields, fragment: cmd)
+    fields.freeze.each(&:freeze)
+    key = :"#{cmd}_list"
+
+    UbiRodish.on(cmd, "list") do
+      options("ubi #{cmd} list [options]", key:) do
+        on("-f", "--fields=fields", "show specific fields (default: #{fields.join(",")})")
+        on("-l", "--location=location", "only show #{label} in given location")
+        on("-N", "--no-headers", "do not show headers")
+      end
+
+      run do |opts|
+        opts = opts[key]
+        path = if opts && (location = opts[:location])
+          if LocationNameConverter.to_internal_name(location)
+            "location/#{location}/#{fragment}"
+          else
+            raise Rodish::CommandFailure, "invalid location provided in #{cmd} list -l option"
+          end
+        else
+          fragment
+        end
+
+        get(project_path(path)) do |data|
+          keys = fields
+          headers = true
+
+          if opts
+            keys = check_fields(opts[:fields], fields, "#{cmd} list -f option")
+            headers = false if opts[:"no-headers"] == false
+          end
+
+          format_rows(keys, data["items"], headers:)
+        end
+      end
+    end
+  end
+
   def initialize(env)
     @env = env
   end
