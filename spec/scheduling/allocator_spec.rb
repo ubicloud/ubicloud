@@ -782,6 +782,76 @@ RSpec.describe Al do
     end
   end
 
+  describe "project and host selection with slices" do
+    let(:vol) {
+      [{"size_gib" => 5, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => false, "boot" => false}]
+    }
+
+    before do
+      vmh = create_vm_host(total_mem_gib: 64, total_sockets: 2, total_dies: 2, total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2, net6: "fd10:9b0b:6b4b:8fbb::/64")
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
+      StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
+      SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { _1.id = vmh.id }
+      Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
+      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
+      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
+      (0..16).each do |i|
+        VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, spdk: i < 2)
+      end
+    end
+
+    it "creates a VM with no slice if slices not accepted" do
+      vmh = VmHost.first
+      expect(vmh.accepts_slices).to be(false)
+
+      vm = create_vm
+      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
+      expect(al).not_to be_nil
+      al.update(vm)
+
+      # The VM should be allocated with no slice
+      expect(vm.vm_host_slice).to be_nil
+    end
+
+    it "creates a VM in slice if slices are accepted" do
+      vmh = VmHost.first
+      vmh.allow_slices
+      expect(vmh.accepts_slices).to be(true)
+
+      vm = create_vm
+      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
+      expect(al).not_to be_nil
+      al.update(vm)
+
+      # The VM should be allocated with no slice
+      expect(vm.vm_host_slice).not_to be_nil
+    end
+
+    it "creates a VM with no slice on a host that does not accept slices" do
+      vmh = VmHost.first
+      expect(vmh.accepts_slices).to be(false)
+
+      vm = create_vm
+      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: false))
+      expect(al).not_to be_nil
+      al.update(vm)
+
+      # The VM should be allocated with no slice
+      expect(vm.vm_host_slice).to be_nil
+    end
+
+    it "fails to create a VM with no slice if no host available" do
+      vmh = VmHost.first
+      vmh.allow_slices
+      expect(vmh.accepts_slices).to be(true)
+
+      vm = create_vm
+      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: false))
+      expect(al).to be_nil
+    end
+  end
+
   describe "slice selection" do
     let(:vol) {
       [{"size_gib" => 5, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => false, "boot" => false}]
