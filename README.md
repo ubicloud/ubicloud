@@ -10,7 +10,7 @@ to cloud providers, like what Linux is to proprietary operating systems.
 
 Ubicloud provides IaaS cloud features on bare metal providers, such as Hetzner, Leaseweb, 
 and AWS Bare Metal. You can set it up yourself on these providers or you can use our 
-managed service. We're currently in public beta.
+[managed service](https://console.ubicloud.com).
 
 ## Quick start
 
@@ -84,9 +84,8 @@ cloud for portability, security, or compliance reasons.
 
 ## Status
 
-Ubicloud is in public beta. You can provide us your feedback, get help, or ask
-us to support your network environment in the
-[Community Forum](https://github.com/ubicloud/ubicloud/discussions).
+You can provide us your feedback, get help, or ask us questions regarding your
+Ubicloud installations in the [Community Forum](https://github.com/ubicloud/ubicloud/discussions).
 
 We follow an established architectural pattern in building public cloud services. 
 A control plane manages a data plane, where the data plane leverages open source 
