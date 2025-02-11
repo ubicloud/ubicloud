@@ -278,7 +278,7 @@ class UbiCli
         error_message << "\nDetails: #{error}"
         if (details = parsed_body.dig("error", "details"))
           details.each do |k, v|
-            error_message << "\n  " << k << ": " << v
+            error_message << "\n  " << k.to_s << ": " << v.to_s
           end
         end
       end
