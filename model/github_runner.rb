@@ -65,11 +65,15 @@ class GithubRunner < Sequel::Model
     rescue
       "down"
     end
-    aggregate_readings(previous_pulse: previous_pulse, reading: reading, data: {available_memory: available_memory})
+    aggregate_readings(previous_pulse: previous_pulse, reading: reading, data: {available_memory: available_memory}) unless is_destroying?
   end
 
   def self.redacted_columns
     super + [:workflow_job]
+  end
+
+  def is_destroying?
+    destroy_set? || %w[destroy wait_vm_destroy].include?(strand&.label)
   end
 end
 

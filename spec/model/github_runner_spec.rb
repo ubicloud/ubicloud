@@ -35,7 +35,7 @@ RSpec.describe GithubRunner do
     github_runner.init_health_monitor_session
   end
 
-  it "checks pulse" do
+  it "checks pulse when not destroying" do
     session = {
       ssh_session: instance_double(Net::SSH::Connection::Session)
     }
@@ -50,5 +50,35 @@ RSpec.describe GithubRunner do
 
     expect(session[:ssh_session]).to receive(:exec!).and_raise Sshable::SshError
     github_runner.check_pulse(session: session, previous_pulse: pulse)
+  end
+
+  it "checks pulse when destroying" do
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session)
+    }
+    pulse = {
+      reading: "up",
+      reading_rpt: 5,
+      reading_chg: Time.now - 30
+    }
+    expect(session[:ssh_session]).to receive(:exec!).and_raise Sshable::SshError
+    expect(github_runner).to receive(:destroy_set?).and_return(true)
+    expect(github_runner.check_pulse(session: session, previous_pulse: pulse)).to be_nil
+
+    expect(session[:ssh_session]).to receive(:exec!).and_raise Sshable::SshError
+    expect(github_runner).to receive(:destroy_set?).and_return(false)
+    expect(github_runner).to receive(:strand).and_return(instance_double(Strand, label: "wait_vm_destroy"))
+    expect(github_runner.check_pulse(session: session, previous_pulse: pulse)).to be_nil
+
+    expect(session[:ssh_session]).to receive(:exec!).and_raise Sshable::SshError
+    expect(github_runner).to receive(:destroy_set?).and_return(false)
+    expect(github_runner).to receive(:strand).and_return(instance_double(Strand, label: "destroy"))
+    expect(github_runner.check_pulse(session: session, previous_pulse: pulse)).to be_nil
+
+    expect(session[:ssh_session]).to receive(:exec!).and_raise Sshable::SshError
+    expect(github_runner).to receive(:destroy_set?).and_return(false)
+    expect(github_runner).to receive(:strand).and_return(nil).at_least(:once)
+    expect(Time).to receive(:now).and_return(pulse[:reading_chg] + 31)
+    expect(github_runner.check_pulse(session: session, previous_pulse: pulse)).to eq(available_memory: nil, reading: "down", reading_rpt: 1, reading_chg: pulse[:reading_chg] + 31)
   end
 end
