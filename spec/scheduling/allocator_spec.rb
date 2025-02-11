@@ -751,14 +751,43 @@ RSpec.describe Al do
       expect { Al::Allocation.update_vm(vmh, vm) }.to raise_error(RuntimeError, /no ip4 addresses left/)
     end
 
-    it "allocates correctly on GEX44 host" do
+    it "allocates standard-gpu VM correctly on GEX44 host" do
       vmh = VmHost.first
       # Set the host to match GEX44 specs - it is an x64 host, but with one thread per core
       vmh.update(arch: "x64", total_dies: 1, total_sockets: 1, total_cpus: 14, total_cores: 14, used_cores: 2)
-
-      vm = create_vm
-      vm.family = "standard-gpu"
       used_cores = vmh.used_cores
+      used_memory = vmh.used_hugepages_1g
+
+      vm = create_vm_from_size("standard-gpu-6", "x64")
+      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])
+      vmh.reload
+      vm.reload
+
+      expect(vm.vcpus).to eq(6)
+      expect(vm.cores).to eq(6)
+      expect(vm.memory_gib).to eq(32)
+      expect(vmh.used_cores).to eq(used_cores + vm.cores)
+      expect(vmh.used_hugepages_1g).to eq(used_memory + vm.memory_gib)
+    end
+
+    it "allocates standard VM correctly on arm64 host" do
+      vmh = create_vm_host(arch: "arm64", total_cpus: 8, total_cores: 8, used_cores: 1, total_hugepages_1g: 26, used_hugepages_1g: 3, net6: "2001:db8::/64")
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
+      StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
+      SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { _1.id = vmh.id }
+      Address.create_with_id(cidr: "2.1.1.0/30", routed_to_host_id: vmh.id)
+      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
+      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
+      (0..8).each do |i|
+        VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, spdk: i < 1)
+      end
+
+      used_cores = vmh.used_cores
+      used_memory = vmh.used_hugepages_1g
+
+      vm = create_vm_from_size("standard-2", "arm64")
       described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
         {"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])
       vmh.reload
@@ -767,7 +796,9 @@ RSpec.describe Al do
       # Expect the number of vcpus to match the number of cores
       expect(vm.vcpus).to eq(2)
       expect(vm.cores).to eq(2)
-      expect(used_cores + vm.cores).to eq(vmh.used_cores)
+      expect(vm.memory_gib).to eq(6)
+      expect(vmh.used_cores).to eq(used_cores + vm.cores)
+      expect(vmh.used_hugepages_1g).to eq(used_memory + vm.memory_gib)
     end
 
     it "only allocates standard-gpu vms on GEX44 host" do
@@ -891,6 +922,8 @@ RSpec.describe Al do
     it "creates a vm with a slice" do
       vm = create_vm_with_use_slice_enabled
       vmh = VmHost.first
+      used_cores = vmh.used_cores
+      used_hugepages_1g = vmh.used_hugepages_1g
 
       al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
       al.update(vm)
@@ -924,6 +957,9 @@ RSpec.describe Al do
       expect(slice.total_cpu_percent).to eq(200)
       expect(slice.total_memory_gib).to eq(8)
       expect(slice.vm_host_id).to eq(vmh.id)
+
+      expect(vmh.used_cores).to eq(used_cores + slice.cores)
+      expect(vmh.used_hugepages_1g).to eq(used_hugepages_1g + slice.total_memory_gib)
     end
 
     it "allows multiple allocations with slice" do
@@ -939,9 +975,9 @@ RSpec.describe Al do
       al1.update(vm1)
       al2.update(vm2)
       vmh.reload
-      expect(used_cores + vm1.vm_host_slice.cores + vm2.vm_host_slice.cores).to eq(vmh.used_cores)
-      expect(used_hugepages_1g + vm1.vm_host_slice.total_memory_gib + vm2.vm_host_slice.total_memory_gib).to eq(vmh.used_hugepages_1g)
-      expect(available_storage - 10).to eq(vmh.storage_devices.sum { _1.available_storage_gib })
+      expect(vmh.used_cores).to eq(used_cores + vm1.vm_host_slice.cores + vm2.vm_host_slice.cores)
+      expect(vmh.used_hugepages_1g).to eq(used_hugepages_1g + vm1.vm_host_slice.total_memory_gib + vm2.vm_host_slice.total_memory_gib)
+      expect(vmh.storage_devices.sum { _1.available_storage_gib }).to eq(available_storage - 10)
     end
 
     it "finds a disjoined cpuset" do
@@ -987,25 +1023,66 @@ RSpec.describe Al do
       expect(vm.cores).to eq(1)
     end
 
-    it "memory_gib_for_cores handles standard family" do
+    it "allocates VMs in slice correctly on arm64 host" do
+      # create an arm64 host
+      vmh = create_vm_host(accepts_slices: true, arch: "arm64", total_cpus: 12, total_cores: 12, used_cores: 1, total_hugepages_1g: 43, used_hugepages_1g: 3, net6: "2001:db8::/64")
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
+      StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
+      SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { _1.id = vmh.id }
+      Address.create_with_id(cidr: "2.1.1.0/30", routed_to_host_id: vmh.id)
+      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
+      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
+      (0..12).each do |i|
+        VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, spdk: i < 1)
+      end
+
+      used_cores = vmh.used_cores
+      used_memory = vmh.used_hugepages_1g
+
+      # Create a standard VM in a slice
+      vm = create_vm_from_size("standard-2", "arm64")
+      vm.project.set_ff_use_slices_for_allocation(true)
+      described_class.allocate(vm, [{"size_gib" => 40, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 40, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])
+      vmh.reload
+      vm.reload
+
+      # Verify everything
+      expect(vm.vcpus).to eq(2)
+      expect(vm.cores).to eq(0)
+      expect(vm.memory_gib).to eq(6)
+      slice = vm.vm_host_slice
+      expect(slice).not_to be_nil
+      expect(slice.cores).to eq(2)
+      expect(slice.total_memory_gib).to eq(6)
+      expect(slice.total_cpu_percent).to eq(200)
+      expect(slice.used_cpu_percent).to eq(200)
+      expect(slice.used_memory_gib).to eq(6)
+
+      expect(vmh.used_cores).to eq(used_cores + slice.cores)
+      expect(vmh.used_hugepages_1g).to eq(used_memory + slice.total_memory_gib)
+    end
+
+    it "memory_gib_for_vcpus handles standard family" do
       vm = create_vm
       req = create_req(vm, vol)
 
-      expect(req.memory_gib_for_cores(req.cores_for_vcpus(2))).to eq 8
+      expect(req.memory_gib_for_vcpus(vm.vcpus)).to eq 8
     end
 
-    it "memory_gib_for_cores returns correct ratio for standard-gpu" do
-      vm = create_vm(family: "standard-gpu")
+    it "memory_gib_for_vcpus returns correct ratio for standard-gpu" do
+      vm = create_vm(family: "standard-gpu", arch: "x64", vcpus: 6, cpu_percent_limit: 600)
       req = create_req(vm, vol)
 
-      expect(req.memory_gib_for_cores(req.cores_for_vcpus(2))).to eq 10
+      expect(req.memory_gib_for_vcpus(vm.vcpus)).to eq 32
     end
 
-    it "memory_gib_for_cores handles arm64" do
-      vm = create_vm(arch: "arm64")
+    it "memory_gib_for_vcpus handles arm64" do
+      vm = create_vm(family: "standard", arch: "arm64", vcpus: "2")
       req = create_req(vm, vol)
 
-      expect(req.memory_gib_for_cores(req.cores_for_vcpus(1))).to eq 6
+      expect(req.memory_gib_for_vcpus(vm.vcpus)).to eq 6
     end
 
     it "select_cpuset fails if not enough cpus" do

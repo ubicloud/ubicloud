@@ -249,6 +249,21 @@ RSpec.configure do |config|
     Vm.create(**args)
   end
 
+  def create_vm_from_size(size, arch, **args)
+    vm_size = Validation.validate_vm_size(size, arch)
+    args_from_size = {
+      family: vm_size.family,
+      vcpus: vm_size.vcpus,
+      cpu_percent_limit: vm_size.cpu_percent_limit,
+      cpu_burst_percent_limit: vm_size.cpu_burst_percent_limit,
+      memory_gib: vm_size.memory_gib,
+      arch: arch
+    }
+
+    args = args_from_size.merge(args)
+    create_vm(**args)
+  end
+
   def add_ipv4_to_vm(vm, ipv4)
     host = VmHost.new_with_id(allocation_state: "accepting", location: "hetzner-fsn1", total_cores: 10, used_cores: 3)
     Sshable.create(id: host.id)

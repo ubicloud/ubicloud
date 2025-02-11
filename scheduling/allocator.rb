@@ -68,16 +68,16 @@ module Scheduling::Allocator
       self.diagnostics ||= false
     end
 
-    def memory_gib_for_cores(cores)
-      memory_gib_ratio = if arch_filter == "arm64"
+    def memory_gib_for_vcpus(cpus)
+      memory_to_cpu_ratio = if arch_filter == "arm64"
         3.2
       elsif family == "standard-gpu"
-        10.68
+        5.34
       else
-        8
+        4
       end
 
-      (cores * memory_gib_ratio).to_i
+      (cpus * memory_to_cpu_ratio).to_i
     end
 
     def cores_for_vcpus(threads_per_core)
@@ -213,10 +213,9 @@ module Scheduling::Allocator
       @candidate_host = candidate_host
       @request = request
       request_cores = request.cores_for_vcpus(candidate_host[:total_cpus] / candidate_host[:total_cores])
-      request_memory = request.memory_gib_for_cores(request_cores)
 
       @vm_host_allocations = [VmHostCpuAllocation.new(:used_cores, candidate_host[:total_cores], candidate_host[:used_cores], request_cores),
-        VmHostAllocation.new(:used_hugepages_1g, candidate_host[:total_hugepages_1g], candidate_host[:used_hugepages_1g], request_memory)]
+        VmHostAllocation.new(:used_hugepages_1g, candidate_host[:total_hugepages_1g], candidate_host[:used_hugepages_1g], request.memory_gib)]
       @device_allocations = [StorageAllocation.new(candidate_host, request)]
       @device_allocations << GpuAllocation.new(candidate_host, request) if request.gpu_count > 0
 
@@ -309,7 +308,7 @@ module Scheduling::Allocator
     # for the VM. Only do this when we do not host the VM inside a slice.
     def update(vm, vm_host)
       super
-      vm.update(cores: requested) unless vm.vm_host_slice_id
+      vm.update(cores: requested)
     end
   end
 
@@ -344,7 +343,7 @@ module Scheduling::Allocator
           vm_host,
           family: vm.family,
           allowed_cpus: cpus,
-          memory_gib: @request.memory_gib_for_cores(@request.cores_for_vcpus(vm_host.total_cpus / vm_host.total_cores)),
+          memory_gib: @request.memory_gib_for_vcpus(cpus.count),
           is_shared: false
         )
 
@@ -359,8 +358,13 @@ module Scheduling::Allocator
         )
 
         # Update the host utilization
-        # This needs to be done after the slice is created and assigned to the VM
-        @vm_host_allocations.each { _1.update(vm, vm_host) }
+        # Use the values of memory and cores from the slice, not from the request
+        # as that is what we are taking away from the host when reserving a slice
+        # Slice destruction will return those to the host
+        VmHost.dataset.where(id: vm_host.id).update(
+          used_cores: Sequel[:used_cores] + st.subject.cores,
+          used_hugepages_1g: Sequel[:used_hugepages_1g] + st.subject.total_memory_gib
+        )
       end
     end
 
