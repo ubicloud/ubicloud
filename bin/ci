@@ -34,7 +34,7 @@ def main(options)
     Semaphore.incr(hetzner_server_st.id, "disallow_slices")
     wait_until(hetzner_server_st, "wait")
 
-    unencrypted_vms_st = Prog::Test::VmGroup.assemble(boot_images: test_case["images"], storage_encrypted: false, test_reboot: false)
+    unencrypted_vms_st = Prog::Test::VmGroup.assemble(boot_images: test_case["images"], storage_encrypted: false, test_reboot: false, verify_host_capacity: false)
     log(unencrypted_vms_st, "storage_encrypted: false")
     tests_to_wait << unencrypted_vms_st
   end

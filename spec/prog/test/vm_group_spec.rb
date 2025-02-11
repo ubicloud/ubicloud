@@ -90,7 +90,13 @@ RSpec.describe Prog::Test::VmGroup do
         vms: [instance_double(Vm, cores: 2), instance_double(Vm, cores: 0)],
         slices: [instance_double(VmHostSlice, cores: 1)],
         cpus: [])
-      expect(vg_test).to receive_messages(vm_host: vm_host)
+      expect(vg_test).to receive_messages(vm_host: vm_host, frame: {"verify_host_capacity" => true})
+      expect { vg_test.verify_host_capacity }.to hop("verify_vm_host_slices")
+    end
+
+    it "skips if verify_host_capacity is not set" do
+      expect(vg_test).to receive(:frame).and_return({"verify_host_capacity" => false})
+      expect(vg_test).not_to receive(:vm_host)
       expect { vg_test.verify_host_capacity }.to hop("verify_vm_host_slices")
     end
 
@@ -102,11 +108,11 @@ RSpec.describe Prog::Test::VmGroup do
         vms: [instance_double(Vm, cores: 2), instance_double(Vm, cores: 0)],
         slices: [instance_double(VmHostSlice, cores: 1)],
         cpus: [])
-      expect(vg_test).to receive_messages(vm_host: vm_host)
+      expect(vg_test).to receive_messages(vm_host: vm_host, frame: {"verify_host_capacity" => true})
 
       strand = instance_double(Strand)
       allow(vg_test).to receive_messages(strand: strand)
-      expect(strand).to receive(:update).with(exitval: {msg: "Host used cores does not match the allocated VMs cores"})
+      expect(strand).to receive(:update).with(exitval: {msg: "Host used cores does not match the allocated VMs cores (vm_cores=2, slice_cores=1, spdk_cores=0, used_cores=5)"})
 
       expect { vg_test.verify_host_capacity }.to hop("failed")
     end
