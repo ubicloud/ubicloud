@@ -20,6 +20,12 @@ class BillingRate
     }.max_by { _1["active_from"] }
   end
 
+  def self.from_resource_type(resource_type)
+    rates.select {
+      _1["resource_type"] == resource_type
+    }
+  end
+
   def self.from_id(billing_rate_id)
     rates.find { _1["id"] == billing_rate_id }
   end

@@ -46,13 +46,14 @@ end
 
 # Table: billing_record
 # Columns:
-#  id              | uuid      | PRIMARY KEY
-#  project_id      | uuid      | NOT NULL
-#  resource_id     | uuid      | NOT NULL
-#  resource_name   | text      | NOT NULL
-#  span            | tstzrange | NOT NULL DEFAULT tstzrange(now(), NULL::timestamp with time zone, '[)'::text)
-#  amount          | numeric   | NOT NULL
-#  billing_rate_id | uuid      | NOT NULL
+#  id                | uuid      | PRIMARY KEY
+#  project_id        | uuid      | NOT NULL
+#  resource_id       | uuid      | NOT NULL
+#  resource_name     | text      | NOT NULL
+#  span              | tstzrange | NOT NULL DEFAULT tstzrange(now(), NULL::timestamp with time zone, '[)'::text)
+#  amount            | numeric   | NOT NULL
+#  billing_rate_id   | uuid      | NOT NULL
+#  free_quota_amount | numeric   | NOT NULL DEFAULT 0
 # Indexes:
 #  billing_record_pkey              | PRIMARY KEY btree (id)
 #  billing_record_project_id_index  | btree (project_id)
