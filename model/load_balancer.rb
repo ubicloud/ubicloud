@@ -10,11 +10,12 @@ class LoadBalancer < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :private_subnet
   one_to_many :load_balancers_vms, key: :load_balancer_id, class: :LoadBalancersVms
+  one_to_many :load_balancers_ports, key: :load_balancer_id, class: :LoadBalancersPorts
   many_to_many :certs, join_table: :certs_load_balancers, left_key: :load_balancer_id, right_key: :cert_id
   one_to_many :certs_load_balancers, key: :load_balancer_id, class: :CertsLoadBalancers
   many_to_one :custom_hostname_dns_zone, class: :DnsZone, key: :custom_hostname_dns_zone_id
 
-  plugin :association_dependencies, load_balancers_vms: :destroy, certs_load_balancers: :destroy
+  plugin :association_dependencies, load_balancers_vms: :destroy, certs_load_balancers: :destroy, load_balancers_ports: :destroy
 
   include ResourceMethods
   include SemaphoreMethods
@@ -90,33 +91,18 @@ end
 
 # Table: load_balancer
 # Columns:
-#  id                          | uuid           | PRIMARY KEY
-#  name                        | text           | NOT NULL
-#  algorithm                   | lb_algorithm   | NOT NULL DEFAULT 'round_robin'::lb_algorithm
-#  src_port                    | integer        | NOT NULL
-#  dst_port                    | integer        | NOT NULL
-#  private_subnet_id           | uuid           | NOT NULL
-#  health_check_endpoint       | text           | NOT NULL
-#  health_check_interval       | integer        | NOT NULL DEFAULT 10
-#  health_check_timeout        | integer        | NOT NULL DEFAULT 5
-#  health_check_up_threshold   | integer        | NOT NULL DEFAULT 5
-#  health_check_down_threshold | integer        | NOT NULL DEFAULT 3
-#  health_check_protocol       | lb_hc_protocol | NOT NULL DEFAULT 'http'::lb_hc_protocol
-#  custom_hostname             | text           |
-#  custom_hostname_dns_zone_id | uuid           |
-#  stack                       | lb_stack       | NOT NULL DEFAULT 'dual'::lb_stack
-#  project_id                  | uuid           | NOT NULL
+#  id                          | uuid         | PRIMARY KEY
+#  name                        | text         | NOT NULL
+#  algorithm                   | lb_algorithm | NOT NULL DEFAULT 'round_robin'::lb_algorithm
+#  private_subnet_id           | uuid         | NOT NULL
+#  custom_hostname             | text         |
+#  custom_hostname_dns_zone_id | uuid         |
+#  stack                       | lb_stack     | NOT NULL DEFAULT 'dual'::lb_stack
+#  project_id                  | uuid         | NOT NULL
 # Indexes:
 #  load_balancer_pkey                        | PRIMARY KEY btree (id)
 #  load_balancer_custom_hostname_key         | UNIQUE btree (custom_hostname)
 #  load_balancer_private_subnet_id_name_uidx | UNIQUE btree (private_subnet_id, name)
-# Check constraints:
-#  health_check_down_threshold_gt_0              | (health_check_down_threshold > 0)
-#  health_check_interval_gt_0                    | (health_check_interval > 0)
-#  health_check_interval_lt_600                  | (health_check_interval < 600)
-#  health_check_timeout_gt_0                     | (health_check_timeout > 0)
-#  health_check_timeout_lt_health_check_interval | (health_check_timeout <= health_check_interval)
-#  health_check_up_threshold_gt_0                | (health_check_up_threshold > 0)
 # Foreign key constraints:
 #  load_balancer_custom_hostname_dns_zone_id_fkey | (custom_hostname_dns_zone_id) REFERENCES dns_zone(id)
 #  load_balancer_private_subnet_id_fkey           | (private_subnet_id) REFERENCES private_subnet(id)
@@ -125,4 +111,5 @@ end
 #  certs_load_balancers | certs_load_balancers_load_balancer_id_fkey | (load_balancer_id) REFERENCES load_balancer(id)
 #  inference_endpoint   | inference_endpoint_load_balancer_id_fkey   | (load_balancer_id) REFERENCES load_balancer(id)
 #  kubernetes_cluster   | kubernetes_cluster_api_server_lb_id_fkey   | (api_server_lb_id) REFERENCES load_balancer(id)
+#  load_balancers_ports | load_balancers_ports_load_balancer_id_fkey | (load_balancer_id) REFERENCES load_balancer(id) ON DELETE CASCADE
 #  load_balancers_vms   | load_balancers_vms_load_balancer_id_fkey   | (load_balancer_id) REFERENCES load_balancer(id)

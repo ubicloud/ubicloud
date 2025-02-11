@@ -25,9 +25,11 @@
       ],
       ["Algorithm", (@lb[:algorithm] == "round_robin") ? "Round Robin" : "Hash Based"],
       ["Stack", @lb[:stack].gsub("ip", "IP")],
-      ["Load Balancer Port", @lb[:src_port]],
-      ["Application Port", @lb[:dst_port]],
-      ["HTTP Health Check Endpoint", @lb[:health_check_endpoint]]
+      ["Ports", "<ul class='list-disc pl-5'>" +
+      @lb[:ports].map do |port|
+        "<li>LB Port: #{port[:src_port]}, App Port: #{port[:dst_port]}, Endpoint: #{port[:health_check_endpoint]}, Protocol: #{port[:health_check_protocol]}</li>"
+      end.join +
+      "</ul>", { escape: false }]
     ]
   ) %>
   <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">

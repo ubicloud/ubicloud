@@ -24,7 +24,7 @@ class Clover
   def load_balancer_post(name)
     authorize("LoadBalancer:create", @project.id)
 
-    required_parameters = %w[private_subnet_id algorithm src_port dst_port health_check_protocol stack]
+    required_parameters = %w[private_subnet_id algorithm ports stack]
     required_parameters << "name" if web?
     optional_parameters = %w[health_check_endpoint]
     request_body_params = validate_request_params(required_parameters, optional_parameters)
@@ -39,10 +39,7 @@ class Clover
       name:,
       algorithm: request_body_params["algorithm"],
       stack: Validation.validate_load_balancer_stack(request_body_params["stack"]),
-      src_port: Validation.validate_port(:src_port, request_body_params["src_port"]),
-      dst_port: Validation.validate_port(:dst_port, request_body_params["dst_port"]),
-      health_check_endpoint: request_body_params["health_check_endpoint"],
-      health_check_protocol: request_body_params["health_check_protocol"]
+      load_balancers_ports: request_body_params["ports"]
     ).subject
 
     if api?
