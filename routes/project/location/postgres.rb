@@ -92,7 +92,7 @@ class Clover
           end
 
           if api?
-            Serializers::PostgresFirewallRule.serialize(firewall_rule, {detailed: true})
+            Serializers::PostgresFirewallRule.serialize(firewall_rule)
           else
             flash["notice"] = "Firewall rule is created"
             r.redirect "#{@project.path}#{pg.path}"
