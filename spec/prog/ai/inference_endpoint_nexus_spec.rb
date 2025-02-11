@@ -42,6 +42,10 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
       described_class.assemble_with_model(project_id: 1, location: "hetzner-fsn1", name: "test-endpoint", model_id: "model_id")
     end
 
+    it "the model it is assembled with has unique id" do
+      expect(Option::AI_MODELS.map { _1["id"] }.size).to eq(Option::AI_MODELS.map { _1["id"] }.uniq.size)
+    end
+
     it "raises an error if model is not found" do
       expect(described_class).to receive(:model_for_id).and_return(nil)
       expect {
