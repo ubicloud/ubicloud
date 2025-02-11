@@ -36,7 +36,7 @@ RSpec.describe Prog::BootstrapRhizome do
 
     it "runs initializing shell wih public keys" do
       sshable = instance_double(Sshable, host: "hostname", keys: [instance_double(SshKey, public_key: "test key", private_key: "test private key")])
-      allow(br).to receive(:sshable).and_return(sshable)
+      expect(br).to receive(:sshable).and_return(sshable).at_least(:once)
       expect(Util).to receive(:rootish_ssh).with "hostname", "root", ["test private key"], <<'FIXTURE'
 set -ueo pipefail
 sudo apt update && sudo apt-get -y install ruby-bundler
