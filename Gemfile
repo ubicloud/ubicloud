@@ -75,9 +75,9 @@ group :test, :development do
   gem "sequel-annotate"
 end
 
-gem "webauthn", "~> 3.2"
+gem "webauthn", "~> 3.3"
 
-gem "aws-sdk-s3", "~> 1.177"
+gem "aws-sdk-s3", "~> 1.180"
 
 gem "acme-client", "~> 2.0"
 
