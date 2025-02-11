@@ -34,7 +34,7 @@ RSpec.describe Prog::BootstrapRhizome do
   describe "#setup" do
     before { br.strand.label = "setup" }
 
-    it "runs initializing shell wih public keys" do
+    it "runs initializing shell with public keys" do
       sshable = instance_double(Sshable, host: "hostname", keys: [instance_double(SshKey, public_key: "test key", private_key: "test private key")])
       expect(br).to receive(:sshable).and_return(sshable).at_least(:once)
       expect(Util).to receive(:rootish_ssh).with "hostname", "root", ["test private key"], <<'FIXTURE'
