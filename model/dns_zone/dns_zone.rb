@@ -85,6 +85,7 @@ end
 #  project_id     | uuid                     | NOT NULL
 #  name           | text                     | NOT NULL
 #  last_purged_at | timestamp with time zone | NOT NULL DEFAULT now()
+#  neg_ttl        | integer                  | NOT NULL DEFAULT 3600
 # Indexes:
 #  dns_zone_pkey                 | PRIMARY KEY btree (id)
 #  dns_zone_project_id_name_uidx | UNIQUE btree (project_id, name)
