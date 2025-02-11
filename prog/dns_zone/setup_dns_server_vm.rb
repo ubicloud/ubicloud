@@ -133,7 +133,7 @@ zone:
 
     ds.dns_zones.each do |dz|
       zone_config = <<-CONF
-#{dz.name}.          3600    SOA     ns.#{dz.name}. #{dz.name}. 37 86400 7200 1209600 3600
+#{dz.name}.          3600    SOA     ns.#{dz.name}. #{dz.name}. 37 86400 7200 1209600 #{dz.neg_ttl}
 #{dz.name}.          3600    NS      #{ds.name}.
       CONF
       sshable.cmd("sudo -u knot tee /var/lib/knot/#{dz.name}.zone > /dev/null", stdin: zone_config)
