@@ -39,4 +39,3 @@ DB.load_schema_cache?("cache/schema.cache")
 DB.load_index_cache?("cache/index.cache")
 
 DB.extension :temporarily_release_connection if ENV["SHARED_CONNECTION"] == "1"
-DB.extension :query_blocker if Config.test? && ENV["CLOVER_FREEZE"] == "1"
