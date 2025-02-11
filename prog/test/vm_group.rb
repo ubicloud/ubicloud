@@ -3,7 +3,7 @@
 require "net/ssh"
 
 class Prog::Test::VmGroup < Prog::Test::Base
-  def self.assemble(boot_images:, storage_encrypted: true, test_reboot: true, test_slices: false)
+  def self.assemble(boot_images:, storage_encrypted: true, test_reboot: true, test_slices: false, verify_host_capacity: true)
     Strand.create_with_id(
       prog: "Test::VmGroup",
       label: "start",
@@ -12,7 +12,8 @@ class Prog::Test::VmGroup < Prog::Test::Base
         "test_reboot" => test_reboot,
         "test_slices" => test_slices,
         "vms" => [],
-        "boot_images" => boot_images
+        "boot_images" => boot_images,
+        "verify_host_capacity" => verify_host_capacity
       }]
     )
   end
@@ -71,11 +72,13 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def verify_host_capacity
+    hop_verify_vm_host_slices if !frame["verify_host_capacity"]
+
     vm_cores = vm_host.vms.sum(&:cores)
     slice_cores = vm_host.slices.sum(&:cores)
     spdk_cores = vm_host.cpus.count { _1.spdk } * vm_host.total_cores / vm_host.total_cpus
 
-    fail_test "Host used cores does not match the allocated VMs cores" if vm_cores + slice_cores + spdk_cores != vm_host.used_cores
+    fail_test "Host used cores does not match the allocated VMs cores (vm_cores=#{vm_cores}, slice_cores=#{slice_cores}, spdk_cores=#{spdk_cores}, used_cores=#{vm_host.used_cores})" if vm_cores + slice_cores + spdk_cores != vm_host.used_cores
 
     hop_verify_vm_host_slices
   end
