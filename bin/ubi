@@ -38,8 +38,13 @@ response = Net::HTTP.post(uri, data, headers)
 
 case response.code.to_i
 when 200...300
-  if (prog = response["ubi-command-execute"])
-    unless (prog = get_prog[prog])
+  if (prog_type = response["ubi-command-execute"])
+    unless ARGV.include?(prog_type)
+      warn "Invalid server response, not executing program not in original argv"
+      exit 1
+    end
+
+    unless (prog = get_prog[prog_type])
       warn "Invalid server response, unsupported program requested"
       exit 1
     end
