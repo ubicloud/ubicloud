@@ -121,6 +121,14 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       nx.cleanup_cache
     end
 
+    it "deletes cache entries created 30 minutes ago but not committed yet" do
+      create_cache_entry(created_at: Time.now - 15 * 60, committed_at: nil)
+      thirty_five_minutes_old = create_cache_entry(created_at: Time.now - 35 * 60, committed_at: nil)
+      expect(blob_storage_client).to receive(:delete_object).with(bucket: github_repository.bucket_name, key: thirty_five_minutes_old.blob_key)
+      expect(blob_storage_client).to receive(:abort_multipart_upload).with(bucket: github_repository.bucket_name, key: thirty_five_minutes_old.blob_key, upload_id: thirty_five_minutes_old.upload_id)
+      nx.cleanup_cache
+    end
+
     it "deletes cache entries that older than 7 days not accessed yet" do
       six_days_old = create_cache_entry(last_accessed_at: nil, created_at: Time.now - 6 * 24 * 60 * 60)
       ten_days_old = create_cache_entry(last_accessed_at: nil, created_at: Time.now - 10 * 24 * 60 * 60)
