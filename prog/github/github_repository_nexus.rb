@@ -91,6 +91,17 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
       .limit(200)
       .destroy
 
+    # Destroy cache entries if it is created 30 minutes ago
+    # but couldn't committed yet. 30 minutes decided as during
+    # our performance tests uploading 10GB of data (which is
+    # the max size for a single cache entry) takes ~8 minutes at most.
+    # To be on the safe side, ~2x buffer is added.
+    github_repository.cache_entries_dataset
+      .where { created_at < Time.now - 30 * 60 }
+      .where { committed_at =~ nil }
+      .limit(200)
+      .destroy
+
     # Destroy oldest cache entries if the total usage exceeds the limit.
     dataset = github_repository.cache_entries_dataset.exclude(size: nil)
     total_usage = dataset.sum(:size).to_i
