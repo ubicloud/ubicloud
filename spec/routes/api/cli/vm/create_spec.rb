@@ -43,6 +43,13 @@ RSpec.describe Clover, "cli vm create" do
     expect(body).to eq "VM created with id: #{vm.ubid}"
   end
 
+  it "translates LF to CRLF in public keys to work with multiple public keys" do
+    body = cli(%w[vm eu-north-h1/test-vm2 create] << "a\nb")
+    vm = Vm.first
+    expect(vm.public_key).to eq "a\r\nb"
+    expect(body).to eq "VM created with id: #{vm.ubid}"
+  end
+
   it "shows errors if trying to create a vm with an invalid private subnet" do
     expect(Vm.count).to eq 0
     ps = PrivateSubnet.create(project_id: @project.id, name: "test-ps", location: "hetzner-fsn1", net6: "fe80::/64", net4: "192.168.0.0/24")
