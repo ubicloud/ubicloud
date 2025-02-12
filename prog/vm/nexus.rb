@@ -203,8 +203,11 @@ class Prog::Vm::Nexus < Prog::Base
       incr_waiting_for_capacity unless vm.waiting_for_capacity_set?
       queued_vms = queued_vms.all
       utilization = VmHost.where(allocation_state: "accepting", arch: vm.arch).select_map { sum(:used_cores) * 100.0 / sum(:total_cores) }.first.to_f
-      Prog::PageNexus.assemble("No capacity left at #{vm.location} for #{vm.family} family of #{vm.arch}", ["NoCapacity", vm.location, vm.arch, vm.family], queued_vms.first(25).map(&:ubid), severity: "warning", extra_data: {queue_size: queued_vms.count, utilization: utilization})
       Clog.emit("No capacity left") { {lack_of_capacity: {location: vm.location, arch: vm.arch, family: vm.family, queue_size: queued_vms.count}} }
+
+      unless vm.location == "github-runners" && vm.created_at > Time.now - 60 * 60
+        Prog::PageNexus.assemble("No capacity left at #{vm.location} for #{vm.family} family of #{vm.arch}", ["NoCapacity", vm.location, vm.arch, vm.family], queued_vms.first(25).map(&:ubid), extra_data: {queue_size: queued_vms.count, utilization: utilization})
+      end
 
       nap 30
     end
