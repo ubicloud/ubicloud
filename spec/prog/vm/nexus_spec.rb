@@ -262,10 +262,9 @@ RSpec.describe Prog::Vm::Nexus do
     it "hops to run if prep command is succeeded" do
       sshable = instance_spy(Sshable)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("Succeeded")
-      expect(sshable).to receive(:cmd).with(/common\/bin\/daemonizer --clean prep_/)
       vmh = instance_double(VmHost, sshable: sshable)
       expect(vm).to receive(:vm_host).and_return(vmh)
-      expect { nx.prep }.to hop("wait_sshable")
+      expect { nx.prep }.to hop("clean_prep")
     end
 
     it "generates and passes a params json if prep command is not started yet" do
@@ -321,6 +320,16 @@ RSpec.describe Prog::Vm::Nexus do
       vmh = instance_double(VmHost, sshable: sshable)
       expect(vm).to receive(:vm_host).and_return(vmh)
       expect { nx.prep }.to nap(1)
+    end
+  end
+
+  describe "#clean_prep" do
+    it "cleans and hops" do
+      sshable = instance_double(Sshable)
+      expect(sshable).to receive(:cmd).with(/common\/bin\/daemonizer --clean prep_/)
+      vmh = instance_double(VmHost, sshable: sshable)
+      expect(vm).to receive(:vm_host).and_return(vmh)
+      expect { nx.clean_prep }.to hop("wait_sshable")
     end
   end
 
