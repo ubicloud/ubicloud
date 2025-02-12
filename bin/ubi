@@ -23,80 +23,98 @@ get_prog = lambda do |prog|
 end
 
 uri = URI(url)
-data = {"argv" => ARGV}.to_json
+argv = ARGV
 headers = {
   "authorization" => "Bearer: #{token}",
   "content-type" => "application/json",
   "accept" => "text/plain",
   "connection" => "close"
 }
+confirmation_prompt = false
+confirmation = nil
 
-if ENV["UBI_DEBUG"] == "1"
-  p [:sending, *ARGV]
-end
-response = Net::HTTP.post(uri, data, headers)
+1.times do
+  if ENV["UBI_DEBUG"] == "1"
+    p [:sending, *ARGV]
+  end
+  response = Net::HTTP.post(uri, {"argv" => argv}.to_json, headers)
 
-case response.code.to_i
-when 200...300
-  if (prog_type = response["ubi-command-execute"])
-    unless ARGV.include?(prog_type)
-      warn "Invalid server response, not executing program not in original argv"
-      exit 1
-    end
+  case response.code.to_i
+  when 200...300
+    if (prog_type = response["ubi-command-execute"])
+      unless ARGV.include?(prog_type)
+        warn "Invalid server response, not executing program not in original argv"
+        exit 1
+      end
 
-    unless (prog = get_prog[prog_type])
-      warn "Invalid server response, unsupported program requested"
-      exit 1
-    end
+      unless (prog = get_prog[prog_type])
+        warn "Invalid server response, unsupported program requested"
+        exit 1
+      end
 
-    argv_set = ARGV.to_set
+      argv_set = ARGV.to_set
 
-    args = response.body.split("\0")
-    invalid_message = nil
-    sep_seen = false
-    custom_arg_seen = false
-    pg_dumpall = false
+      args = response.body.split("\0")
+      invalid_message = nil
+      sep_seen = false
+      custom_arg_seen = false
+      pg_dumpall = false
 
-    args.each do |arg|
-      if arg == "--"
-        sep_seen = true
-      elsif !argv_set.include?(arg)
-        if custom_arg_seen
-          invalid_message = "Invalid server response, multiple arguments not in submitted argv"
-          break
-        elsif sep_seen
-          custom_arg_seen = true
-        elsif prog_type == "pg_dumpall" && arg.start_with?("-d")
-          pg_dumpall = true
-          custom_arg_seen = true
-        else
-          invalid_message = "Invalid server response, argument before '--' not in submitted argv"
-          break
+      args.each do |arg|
+        if arg == "--"
+          sep_seen = true
+        elsif !argv_set.include?(arg)
+          if custom_arg_seen
+            invalid_message = "Invalid server response, multiple arguments not in submitted argv"
+            break
+          elsif sep_seen
+            custom_arg_seen = true
+          elsif prog_type == "pg_dumpall" && arg.start_with?("-d")
+            pg_dumpall = true
+            custom_arg_seen = true
+          else
+            invalid_message = "Invalid server response, argument before '--' not in submitted argv"
+            break
+          end
         end
       end
-    end
 
-    unless sep_seen || pg_dumpall
-      invalid_message = "Invalid server response, no '--' in returned argv"
-    end
-
-    if invalid_message
-      if ENV["UBI_DEBUG"] == "1"
-        p [:failure, prog, *args]
+      unless sep_seen || pg_dumpall
+        invalid_message = "Invalid server response, no '--' in returned argv"
       end
-      warn invalid_message
-      exit 1
+
+      if invalid_message
+        if ENV["UBI_DEBUG"] == "1"
+          p [:failure, prog, *args]
+        end
+        warn invalid_message
+        exit 1
+      else
+        if ENV["UBI_DEBUG"] == "1"
+          p [:exec, prog, *args]
+        end
+        Process.exec(prog, *args)
+      end
     else
-      if ENV["UBI_DEBUG"] == "1"
-        p [:exec, prog, *args]
+      if (confirmation_prompt = response["ubi-confirm"])
+        if confirmation
+          warn "Invalid server response, repeated confirmation attempt"
+          exit 1
+        else
+          $stdout.puts response.body
+          $stdout.print "\n#{confirmation_prompt}: "
+          confirmation = $stdin.readline.chomp
+          argv.unshift(confirmation)
+          argv.unshift("--confirm")
+          redo
+        end
+      else
+        $stdout.puts response.body
       end
-      Process.exec(prog, *args)
+      exit 0
     end
   else
-    $stdout.puts response.body
-    exit 0
+    warn response.body
+    exit 1
   end
-else
-  warn response.body
-  exit 1
 end

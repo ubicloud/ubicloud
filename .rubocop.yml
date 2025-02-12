@@ -87,3 +87,6 @@ Sequel/IrreversibleMigration:
 
 Capybara/ClickLinkOrButtonStyle:
   EnforcedStyle: strict
+
+Lint/UselessTimes:
+  Enabled: false
