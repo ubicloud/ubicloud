@@ -31,6 +31,9 @@ headers = {
   "connection" => "close"
 }
 
+if ENV["UBI_DEBUG"] == "1"
+  p [:sending, *ARGV]
+end
 response = Net::HTTP.post(uri, data, headers)
 
 case response.code.to_i
