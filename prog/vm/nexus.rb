@@ -395,13 +395,13 @@ class Prog::Vm::Nexus < Prog::Base
 
   label def restart
     decr_restart
-    host.sshable.cmd("sudo systemctl restart #{vm.inhost_name}")
+    host.sshable.cmd("sudo host/bin/setup-vm restart #{q_vm}")
     hop_wait
   end
 
   label def stopped
     when_stop_set? do
-      host.sshable.cmd("sudo systemctl stop #{vm.inhost_name}")
+      host.sshable.cmd("sudo systemctl stop #{q_vm}")
     end
     decr_stop
 
