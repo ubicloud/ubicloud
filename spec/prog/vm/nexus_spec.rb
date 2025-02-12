@@ -901,11 +901,22 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "fails if VM cores is 0" do
+      sshable = instance_double(Sshable)
+      host = instance_double(VmHost, id: "46ca6ded-b056-4723-bd91-612959f52f6f", sshable: sshable)
+      allow(sshable).to receive(:cmd)
       expect(vm).to receive(:update).with(display_state: "deleting")
       allow(vm).to receive(:vm_storage_volumes).and_return([])
       expect(vm).to receive(:vm_host_slice).and_return(nil)
       expect(vm).to receive(:cores).and_return(0)
+      allow(nx).to receive(:host).and_return(host)
       expect { nx.destroy }.to raise_error(RuntimeError, "BUG: Number of cores cannot be zero when VM is runing without a slice")
+    end
+
+    it "skips updating host if host is nil" do
+      allow(nx).to receive(:host).and_return(nil)
+      expect(vm).to receive(:update).with(display_state: "deleting")
+      expect(vm).not_to receive(:vm_host_id)
+      expect { nx.destroy }.to hop("destroy_slice")
     end
 
     it "#destroy_slice when no slice" do
