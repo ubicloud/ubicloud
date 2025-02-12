@@ -356,6 +356,17 @@ RSpec.describe Prog::Vm::Nexus do
       expect(Page.active.count).to eq(1)
     end
 
+    it "waits for a while before creating a page for github-runners" do
+      expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host"))
+      expect(vm).to receive(:waiting_for_capacity_set?).and_return(false)
+      expect(nx).to receive(:incr_waiting_for_capacity)
+
+      vm.created_at = Time.now - 10 * 60
+      vm.location = "github-runners"
+      expect { nx.start }.to nap(30)
+      expect(Page.active.count).to eq(0)
+    end
+
     it "resolves the page if no VM left in the queue after 15 minutes" do
       # First run creates the page
       expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host"))
