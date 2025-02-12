@@ -9,8 +9,10 @@ class Prog::Test::VmHostSlices < Prog::Test::Base
 
   label def verify_separation
     slices.combination(2) do |slice1, slice2|
-      fail_test "Standard instances placed in the same slice" if slice1.id == slice2.id
-      fail_test "Standard instances are sharing at least one cpu" if !(slice1.cpus.map(&:cpu_number) & slice2.cpus.map(&:cpu_number)).empty?
+      unless slice1.is_shared && slice2.is_shared # If both slices are shared, they can be the same, but don't have to
+        fail_test "Two Vm instances placed in the same slice; slice: #{slice1.id}" if slice1.id == slice2.id
+        fail_test "Two Vm instances are sharing at least one cpu; slice1: #{slice1.id}, slice2: #{slice2.id}" if !(slice1.cpus.map(&:cpu_number) & slice2.cpus.map(&:cpu_number)).empty?
+      end
     end
 
     hop_verify_on_host

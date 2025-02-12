@@ -13,6 +13,7 @@ RSpec.describe Prog::Test::VmHostSlices do
     instance_double(VmHostSlice,
       id: "ff7539aa-e3e3-48d6-8a77-6e77cead900d",
       allowed_cpus_cgroup: "2-3",
+      is_shared: false,
       cpus: [instance_double(VmHostCpu, cpu_number: 2), instance_double(VmHostCpu, cpu_number: 3)])
   }
 
@@ -20,6 +21,7 @@ RSpec.describe Prog::Test::VmHostSlices do
     instance_double(VmHostSlice,
       id: "115dd7bb-3081-4403-8b74-eda45e0e2fb1",
       allowed_cpus_cgroup: "4-5",
+      is_shared: false,
       cpus: [instance_double(VmHostCpu, cpu_number: 4), instance_double(VmHostCpu, cpu_number: 5)])
   }
 
@@ -27,6 +29,7 @@ RSpec.describe Prog::Test::VmHostSlices do
     instance_double(VmHostSlice,
       id: "da2b7a0e-be79-440f-8797-54e367a4aabd",
       allowed_cpus_cgroup: "6-7",
+      is_shared: false,
       cpus: [instance_double(VmHostCpu, cpu_number: 6), instance_double(VmHostCpu, cpu_number: 7)])
   }
   # rubocop:enable RSpec/IndexedLet
@@ -35,7 +38,16 @@ RSpec.describe Prog::Test::VmHostSlices do
     instance_double(VmHostSlice,
       id: "7f509282-6598-4fee-8a55-481f9fd6add4",
       allowed_cpus_cgroup: "3-4",
+      is_shared: false,
       cpus: [instance_double(VmHostCpu, cpu_number: 3), instance_double(VmHostCpu, cpu_number: 4)])
+  }
+
+  let(:slice_burstable) {
+    instance_double(VmHostSlice,
+      id: "0137d721-ab5e-4551-bdb5-2163b61aa515",
+      allowed_cpus_cgroup: "8-9",
+      is_shared: true,
+      cpus: [instance_double(VmHostCpu, cpu_number: 8), instance_double(VmHostCpu, cpu_number: 9)])
   }
 
   let(:vm_host) {
@@ -60,16 +72,21 @@ RSpec.describe Prog::Test::VmHostSlices do
   describe "#verify_separation" do
     it "fails the test if the slices are the same" do
       allow(vm_host_slices).to receive_messages(slices: [slice1, slice1, slice2])
-      expect(strand).to receive(:update).with(exitval: {msg: "Standard instances placed in the same slice"})
+      expect(strand).to receive(:update).with(exitval: {msg: /Two Vm instances placed in the same slice;/})
 
       expect { vm_host_slices.verify_separation }.to hop("failed")
     end
 
     it "fails the test if the slices are on the same CPUs" do
       allow(vm_host_slices).to receive_messages(slices: [slice2, slice3, slice2_overlap])
-      expect(strand).to receive(:update).with(exitval: {msg: "Standard instances are sharing at least one cpu"})
+      expect(strand).to receive(:update).with(exitval: {msg: /Two Vm instances are sharing at least one cpu;/})
 
       expect { vm_host_slices.verify_separation }.to hop("failed")
+    end
+
+    it "handles burstable slices" do
+      allow(vm_host_slices).to receive_messages(slices: [slice2, slice_burstable, slice3, slice_burstable])
+      expect { vm_host_slices.verify_separation }.to hop("verify_on_host")
     end
 
     it "hops to verify_on_host" do
