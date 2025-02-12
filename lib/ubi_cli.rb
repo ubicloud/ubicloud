@@ -67,9 +67,27 @@ class UbiCli
   end
 
   def self.destroy(cmd, label, fragment: cmd)
-    UbiRodish.on(cmd).run_is("destroy") do
-      delete(project_path("location/#{@location}/#{fragment}/#{@name}")) do |_, res|
-        ["#{label}, if it exists, is now scheduled for destruction"]
+    UbiRodish.on(cmd).run_on("destroy") do
+      options("ubi #{cmd} location/(#{cmd}-name|_#{cmd}-ubid) destroy [options]", key: :destroy) do
+        on("-f", "--force", "do not require confirmation")
+      end
+
+      run do |opts|
+        if opts.dig(:destroy, :force) || opts[:confirm] == @name
+          delete(project_path("location/#{@location}/#{fragment}/#{@name}")) do |_, res|
+            ["#{label}, if it exists, is now scheduled for destruction"]
+          end
+        elsif opts[:confirm]
+          invalid_confirmation <<~END
+
+            Confirmation of #{label} name not successful.
+          END
+        else
+          require_confirmation("Confirmation", <<~END)
+            Destroying this #{label} is not recoverable.
+            Enter the following to confirm destruction of the #{label}: #{@name}
+          END
+        end
       end
     end
   end
@@ -238,6 +256,20 @@ class UbiCli
   end
 
   private
+
+  def invalid_confirmation(message)
+    response(message, status: 400)
+  end
+
+  def require_confirmation(prompt, confirmation)
+    response(confirmation, headers: {"ubi-confirm" => prompt})
+  end
+
+  def response(body, status: 200, headers: {})
+    headers["content-length"] = body.bytesize.to_s
+    headers["content-type"] = "text/plain"
+    [status, headers, [body]]
+  end
 
   def _req_env(method, path, params)
     env = @env.merge(
