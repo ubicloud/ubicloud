@@ -4,44 +4,18 @@ require "yaml"
 
 module Option
   ai_models = YAML.load_file("config/ai_models.yml")
-  providers = YAML.load_file("config/providers.yml")
-
-  Provider = Struct.new(:name, :display_name)
-  Location = Struct.new(:provider, :name, :display_name, :ui_name, :visible)
-
-  PROVIDERS = {}
-  LOCATIONS = []
-
-  providers.each do |provider|
-    provider_internal_name = provider["provider_internal_name"]
-    PROVIDERS[provider_internal_name] = Provider.new(provider_internal_name, provider["provider_display_name"])
-    Provider.const_set(provider_internal_name.gsub(/[^a-zA-Z]/, "_").upcase, provider_internal_name)
-
-    provider["locations"].each do |location|
-      LOCATIONS.push(Location.new(
-        PROVIDERS[provider_internal_name],
-        location["internal_name"],
-        location["display_name"],
-        location["ui_name"],
-        location["visible"]
-      ))
-    end
-  end
-
   AI_MODELS = ai_models.select { _1["enabled"] }.freeze
-  PROVIDERS.freeze
-  LOCATIONS.freeze
 
   def self.locations(only_visible: true, feature_flags: [])
-    Option::LOCATIONS.select { !only_visible || (_1.visible || feature_flags.include?("location_#{_1.name.tr("-", "_")}")) }
+    DB[:provider_location].all.select { !only_visible || (_1[:visible] || feature_flags.include?("location_#{_1[:internal_name].tr("-", "_")}")) }
   end
 
   def self.postgres_locations
-    Option::LOCATIONS.select { _1.name == "hetzner-fsn1" || _1.name == "leaseweb-wdc02" }
+    DB[:provider_location].all.select { _1[:internal_name] == "hetzner-fsn1" || _1[:internal_name] == "leaseweb-wdc02" }
   end
 
   def self.kubernetes_locations
-    Option::LOCATIONS.select { _1.name == "hetzner-fsn1" || _1.name == "leaseweb-wdc02" }
+    DB[:provider_location].all.select { _1[:internal_name] == "hetzner-fsn1" || _1[:internal_name] == "leaseweb-wdc02" }
   end
 
   BootImage = Struct.new(:name, :display_name)
@@ -78,9 +52,9 @@ module Option
     storage_size_limiter = [4096, storage_size_options.last].min.fdiv(storage_size_options.last)
     storage_size_options.map! { |size| size * storage_size_limiter }
     [
-      PostgresSize.new(_1.name, "standard-#{_2}", "standard-#{_2}", PostgresResource::Flavor::STANDARD, _2, _2 * 4, storage_size_options),
-      PostgresSize.new(_1.name, "standard-#{_2}", "standard-#{_2}", PostgresResource::Flavor::PARADEDB, _2, _2 * 4, storage_size_options),
-      PostgresSize.new(_1.name, "standard-#{_2}", "standard-#{_2}", PostgresResource::Flavor::LANTERN, _2, _2 * 4, storage_size_options)
+      PostgresSize.new(_1[:internal_name], "standard-#{_2}", "standard-#{_2}", PostgresResource::Flavor::STANDARD, _2, _2 * 4, storage_size_options),
+      PostgresSize.new(_1[:internal_name], "standard-#{_2}", "standard-#{_2}", PostgresResource::Flavor::PARADEDB, _2, _2 * 4, storage_size_options),
+      PostgresSize.new(_1[:internal_name], "standard-#{_2}", "standard-#{_2}", PostgresResource::Flavor::LANTERN, _2, _2 * 4, storage_size_options)
     ]
   }.freeze
 

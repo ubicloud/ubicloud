@@ -42,14 +42,14 @@ class Project < Sequel::Model
 
   def default_location
     location_max_capacity = DB[:vm_host]
-      .where(location: Option.locations.map { _1.name })
+      .where(location: Option.locations.map { _1[:internal_name] })
       .where(allocation_state: "accepting")
       .select_group(:location)
       .order { sum(Sequel[:total_cores] - Sequel[:used_cores]).desc }
       .first
 
     if location_max_capacity.nil?
-      Option.locations.first.name
+      Option.locations.first[:internal_name]
     else
       location_max_capacity[:location]
     end
