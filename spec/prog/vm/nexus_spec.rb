@@ -737,7 +737,7 @@ RSpec.describe Prog::Vm::Nexus do
       sshable = instance_double(Sshable)
       expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: sshable))
       expect(nx).to receive(:decr_restart)
-      expect(sshable).to receive(:cmd).with("sudo systemctl restart #{vm.inhost_name}")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm restart #{vm.inhost_name}")
       expect { nx.restart }.to hop("wait")
     end
   end
