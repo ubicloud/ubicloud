@@ -55,6 +55,7 @@ when 200...300
     invalid_message = nil
     sep_seen = false
     custom_arg_seen = false
+    pg_dumpall = false
 
     args.each do |arg|
       if arg == "--"
@@ -65,6 +66,9 @@ when 200...300
           break
         elsif sep_seen
           custom_arg_seen = true
+        elsif prog_type == "pg_dumpall" && arg.start_with?("-d")
+          pg_dumpall = true
+          custom_arg_seen = true
         else
           invalid_message = "Invalid server response, argument before '--' not in submitted argv"
           break
@@ -72,7 +76,7 @@ when 200...300
       end
     end
 
-    unless sep_seen
+    unless sep_seen || pg_dumpall
       invalid_message = "Invalid server response, no '--' in returned argv"
     end
 

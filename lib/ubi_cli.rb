@@ -94,7 +94,10 @@ class UbiCli
             end
           end
 
-          execute_argv([cmd, *argv, "--", conn_string], res)
+          argv = [cmd, *argv, "--", conn_string]
+          argv = yield(argv) if block_given?
+
+          execute_argv(argv, res)
         end
       end
     end

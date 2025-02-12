@@ -2,7 +2,7 @@
 
 require_relative "../spec_helper"
 
-%w[psql pg_dump pg_dumpall].each do |cmd|
+%w[psql pg_dump].each do |cmd|
   RSpec.describe Clover, "cli pg #{cmd}" do
     before do
       expect(Config).to receive(:postgres_service_project_id).and_return(@project.id).at_least(:once)
@@ -20,11 +20,11 @@ require_relative "../spec_helper"
       expect(Prog::Postgres::PostgresResourceNexus).to receive(:dns_zone).and_return(@dns_zone).at_least(:once)
     end
 
-    it "connects to database via psql" do
+    it "connects to database via #{cmd}" do
       expect(cli_exec(["pg", @ref, cmd])).to eq %W[#{cmd} -- postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com?channel_binding=require]
     end
 
-    it "supports psql options" do
+    it "supports #{cmd} options" do
       expect(cli_exec(["pg", @ref, cmd, "-a"])).to eq %W[#{cmd} -a -- postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com?channel_binding=require]
     end
 
