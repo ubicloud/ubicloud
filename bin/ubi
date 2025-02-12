@@ -82,7 +82,7 @@ when 200...300
       end
       warn invalid_message
       exit 1
-    elsif (prog = get_prog[prog])
+    else
       if ENV["UBI_DEBUG"] == "1"
         p [:exec, prog, *args]
       end
