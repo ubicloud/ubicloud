@@ -184,6 +184,7 @@ Environment=XDG_CACHE_HOME=/ie/workdir/.cache
 Environment=XDG_CONFIG_HOME=/ie/workdir/.config
 Environment=OUTLINES_CACHE_DIR=/ie/workdir/.outlines
 Environment=TRITON_CACHE_DIR=/ie/workdir/.triton
+Environment=HOME=/ie/workdir
 WorkingDirectory=/ie/workdir
 User=ie
 Group=ie
