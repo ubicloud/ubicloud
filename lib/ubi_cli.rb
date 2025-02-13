@@ -4,7 +4,15 @@ class UbiCli
   def self.process(argv, env)
     UbiRodish.process(argv, context: new(env))
   rescue Rodish::CommandExit => e
-    [e.failure? ? 400 : 200, {"content-type" => "text/plain"}, [e.message]]
+    if e.failure?
+      status = 400
+      message = e.message_with_usage
+    else
+      status = 200
+      message = e.message
+    end
+
+    [status, {"content-type" => "text/plain", "content-length" => message.bytesize.to_s}, [message]]
   end
 
   def self.base(cmd, &block)
@@ -94,7 +102,7 @@ class UbiCli
 
   def self.pg_cmd(cmd)
     UbiRodish.on("pg").run_on(cmd) do
-      skip_option_parsing
+      skip_option_parsing("ubi pg location-name/(pg-name|_pg-ubid) #{cmd} [#{cmd}-opts]")
 
       args(0...)
 

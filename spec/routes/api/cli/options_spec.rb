@@ -32,6 +32,8 @@ RSpec.describe Clover, "cli" do
 
   it "shows usage on invalid option" do
     expect(cli(%w[--foo], status: 400)).to eq <<~OUTPUT
+      invalid option: --foo
+
       Usage: ubi [options] [subcommand [subcommand_options] ...]
 
       Options:

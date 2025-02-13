@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
 UbiRodish.on("vm").run_on("scp") do
-  skip_option_parsing
+  skip_option_parsing("ubi vm location-name/(vm-name|_vm-ubid) [options] scp [scp-opts] (local-path :remote-path | :remote-path local-path)")
 
-  args(2...)
+  args(2..., invalid_args_message: "must provide 2 paths: either 'local-path :remote-path' or ':remote-path local-path'")
 
   run do |(*argv, path1, path2), opts|
     remote_path1 = path1[0] == ":"
