@@ -3,7 +3,7 @@
 UbiRodish.on("pg").run_on("show") do
   fields = %w[id name state location vm_size storage_size_gib version ha_type flavor connection_string primary earliest_restore_time latest_restore_time firewall_rules metric_destinations ca_certificates].freeze.each(&:freeze)
 
-  options("ubi pg location/(vm-name|_vm-ubid) show [options]", key: :pg_show) do
+  options("ubi pg location/(pg-name|_pg-ubid) show [options]", key: :pg_show) do
     on("-f", "--fields=fields", "show specific fields (default: #{fields.join(",")})")
   end
 

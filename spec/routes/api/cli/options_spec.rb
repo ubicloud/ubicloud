@@ -19,7 +19,7 @@ RSpec.describe Clover, "cli" do
 
   it "handles --help" do
     expect(cli(%w[--help])).to eq <<~OUTPUT
-      Usage: ubi [options] [subcommand [subcommand_options] ...]
+      Usage: ubi [options] [subcommand [subcommand-options] ...]
 
       Options:
               --version                    show program version
@@ -34,7 +34,7 @@ RSpec.describe Clover, "cli" do
     expect(cli(%w[--foo], status: 400)).to eq <<~OUTPUT
       invalid option: --foo
 
-      Usage: ubi [options] [subcommand [subcommand_options] ...]
+      Usage: ubi [options] [subcommand [subcommand-options] ...]
 
       Options:
               --version                    show program version

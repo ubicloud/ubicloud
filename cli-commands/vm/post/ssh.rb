@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 UbiRodish.on("vm").run_on("ssh") do
-  skip_option_parsing("ubi vm location-name/(vm-name|_vm-ubid) [options] ssh [ssh-options --] [ssh-args]")
+  skip_option_parsing("ubi vm location/(vm-name|_vm-ubid) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]")
 
   args(0...)
 
