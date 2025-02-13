@@ -14,9 +14,26 @@ module Rodish
   end
 
   class CommandFailure < CommandExit
+    def initialize(message, option_parsers = [])
+      option_parsers = [option_parsers] unless option_parsers.is_a?(Array)
+      @option_parsers = option_parsers.compact
+      super(message)
+    end
+
     def failure?
       true
     end
+
+    def message_with_usage
+      if @option_parsers.empty?
+        message
+      else
+        "#{message}\n\n#{@option_parsers.join("\n\n")}"
+      end
+    end
+  end
+
+  class ProgramBug < CommandFailure
   end
 
   class OptionParser < ::OptionParser
@@ -29,7 +46,9 @@ module Rodish
     def to_s
       string = super
 
-      unless subcommands.empty?
+      if subcommands.length > 6
+        string += "\nSubcommands:\n  #{subcommands.keys.sort.join("\n  ")}\n"
+      elsif !subcommands.empty?
         string += "\nSubcommands: #{subcommands.keys.sort.join(" ")}\n"
       end
 
@@ -45,6 +64,16 @@ module Rodish
   option_parser.set_banner("")
   option_parser.freeze
 
+  class SkipOptionParser
+    attr_reader :banner
+    attr_reader :to_s
+
+    def initialize(banner)
+      @banner = "Usage: #{banner}"
+      @to_s = @banner + "\n"
+    end
+  end
+
   class DSL
     def self.command(command_path, &block)
       command = Command.new(command_path)
@@ -56,8 +85,8 @@ module Rodish
       @command = command
     end
 
-    def skip_option_parsing
-      @command.option_parser = :skip
+    def skip_option_parsing(banner)
+      @command.option_parser = SkipOptionParser.new(banner)
     end
 
     def options(banner, key: nil, &block)
@@ -130,9 +159,11 @@ module Rodish
     def create_option_parser(banner, subcommands, &block)
       option_parser = OptionParser.new
       option_parser.set_banner("Usage: #{banner}")
-      option_parser.separator ""
-      option_parser.separator "Options:"
-      option_parser.instance_exec(&block)
+      if block
+        option_parser.separator ""
+        option_parser.separator "Options:"
+        option_parser.instance_exec(&block)
+      end
       option_parser.subcommands = subcommands
       option_parser
     end
@@ -173,12 +204,17 @@ module Rodish
     end
 
     def run_post_subcommand(context, options, argv)
-      process_options(argv, options, @post_option_key, @post_option_parser)
+      begin
+        process_options(argv, options, @post_option_key, @post_option_parser)
+      rescue ::OptionParser::InvalidOption => e
+        raise CommandFailure.new(e.message, @post_option_parser)
+      end
 
-      if argv[0] && @post_subcommands[argv[0]]
+      arg = argv[0]
+      if arg && @post_subcommands[arg]
         process_subcommand(@post_subcommands, context, options, argv)
       else
-        raise CommandFailure, "invalid post subcommand #{argv[0]}, valid post subcommands#{subcommand_name} are: #{@post_subcommands.keys.sort.join(" ")}"
+        process_command_failure(arg, @post_subcommands, @post_option_parser, "post ")
       end
     end
     alias_method :run, :run_post_subcommand
@@ -186,7 +222,8 @@ module Rodish
     def process(context, options, argv)
       process_options(argv, options, @option_key, @option_parser)
 
-      if argv[0] && @subcommands[argv[0]]
+      arg = argv[0]
+      if argv && @subcommands[arg]
         process_subcommand(@subcommands, context, options, argv)
       elsif run_block
         if valid_args?(argv)
@@ -198,18 +235,16 @@ module Rodish
             context.instance_exec(argv, options, self, &run_block)
           end
         elsif @invalid_args_message
-          raise CommandFailure, "invalid arguments#{subcommand_name} (#{@invalid_args_message})"
+          raise_failure("invalid arguments#{subcommand_name} (#{@invalid_args_message})")
         else
-          raise CommandFailure, "invalid number of arguments#{subcommand_name} (accepts: #{@num_args}, given: #{argv.length})"
+          raise_failure("invalid number of arguments#{subcommand_name} (accepts: #{@num_args}, given: #{argv.length})")
         end
-      elsif @subcommands.empty?
-        raise CommandFailure, "program bug, no run block or subcommands defined#{subcommand_name}"
       else
-        raise CommandFailure, "invalid subcommand #{argv[0]}, valid subcommands#{subcommand_name} are: #{@subcommands.keys.sort.join(" ")}"
+        process_command_failure(arg, @subcommands, @option_parser, "")
       end
-    rescue ::OptionParser::InvalidOption
-      if @option_parser
-        raise CommandFailure, @option_parser.to_s
+    rescue ::OptionParser::InvalidOption => e
+      if @option_parser || @post_option_parser
+        raise_failure(e.message)
       else
         raise
       end
@@ -217,16 +252,74 @@ module Rodish
 
     def each_subcommand(names = [], &block)
       yield names, self
-      @subcommands.each do |name, command|
-        command.each_subcommand(names + [name], &block)
+      _each_subcommand(names, @subcommands, &block)
+      _each_subcommand(names, @post_subcommands, &block)
+    end
+
+    def raise_failure(message, option_parsers = self.option_parsers)
+      raise CommandFailure.new(message, option_parsers)
+    end
+
+    def options_text
+      option_parsers = self.option_parsers
+      unless option_parsers.empty?
+        _options_text(option_parsers)
       end
+    end
+
+    def subcommand(cmd)
+      _subcommand(@subcommands, cmd)
+    end
+
+    def post_subcommand(cmd)
+      _subcommand(@post_subcommands, cmd)
+    end
+
+    def option_parsers
+      [@option_parser, @post_option_parser].compact
     end
 
     private
 
+    def _each_subcommand(names, subcommands, &block)
+      subcommands.each_key do |name|
+        command = _subcommand(subcommands, name)
+        sc_names = names + [name]
+        command.each_subcommand(sc_names, &block)
+      end
+    end
+
+    def _subcommand(subcommands, cmd)
+      subcommand = subcommands[cmd]
+
+      if subcommand.is_a?(String)
+        require subcommand
+        subcommand = subcommands[cmd]
+        unless subcommand.is_a?(Command)
+          raise ProgramBug, "program bug, autoload of subcommand #{cmd} failed"
+        end
+      end
+
+      subcommand
+    end
+
+    def _options_text(option_parsers)
+      option_parsers.join("\n\n")
+    end
+
+    def process_command_failure(arg, subcommands, option_parser, prefix)
+      if subcommands.empty?
+        raise ProgramBug, "program bug, no run block or #{prefix}subcommands defined#{subcommand_name}"
+      elsif arg
+        raise_failure("invalid #{prefix}subcommand: #{arg}", option_parser)
+      else
+        raise_failure("no #{prefix}subcommand provided", option_parser)
+      end
+    end
+
     def process_options(argv, options, option_key, option_parser)
       case option_parser
-      when :skip
+      when SkipOptionParser
         # do nothing
       when nil
         DEFAULT_OPTION_PARSER.order!(argv)
@@ -242,16 +335,7 @@ module Rodish
     end
 
     def process_subcommand(subcommands, context, options, argv)
-      subcommand = subcommands[argv[0]]
-
-      if subcommand.is_a?(String)
-        require subcommand
-        subcommand = subcommands[argv[0]]
-        unless subcommand.is_a?(Command)
-          raise CommandFailure, "program bug, autoload of subcommand #{argv[0]} failed"
-        end
-      end
-
+      subcommand = _subcommand(subcommands, argv[0])
       argv.shift
       context.instance_exec(argv, options, &before) if before
       subcommand.process(context, options, argv)
@@ -307,8 +391,9 @@ module Rodish
       usages = {}
 
       command.each_subcommand do |names, command|
-        if (parser = command.option_parser) && parser != :skip
-          usages[names.join(" ")] = parser.to_s
+        option_parsers = command.option_parsers
+        unless option_parsers.empty?
+          usages[names.join(" ")] = command.option_parsers.join("\n\n")
         end
       end
 

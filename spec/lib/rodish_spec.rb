@@ -103,7 +103,7 @@ RSpec.describe Rodish do
       end
 
       on "l" do
-        skip_option_parsing
+        skip_option_parsing "example l"
 
         args(0...)
 
@@ -180,7 +180,7 @@ RSpec.describe Rodish do
 
       it "handles invalid subcommands dispatched to during run" do
         res = []
-        expect { app.process(%w[g 1 l], context: res) }.to raise_error(Rodish::CommandFailure, "invalid post subcommand l, valid post subcommands for g subcommand are: h i")
+        expect { app.process(%w[g 1 l], context: res) }.to raise_error(Rodish::CommandFailure, "invalid post subcommand: l")
       end
 
       it "handles options at any level they are defined" do
@@ -211,15 +211,21 @@ RSpec.describe Rodish do
         expect(res).to eq [:top]
       end
 
+      it "raises CommandFailure for missing subcommand" do
+        res = []
+        expect { app.process(%w[e], context: res) }.to raise_error(Rodish::CommandFailure, "no subcommand provided")
+        expect(res).to eq [:top]
+      end
+
       it "raises CommandFailure for invalid subcommand" do
         res = []
-        expect { app.process(%w[e g], context: res) }.to raise_error(Rodish::CommandFailure, "invalid subcommand g, valid subcommands for e subcommand are: f")
+        expect { app.process(%w[e g], context: res) }.to raise_error(Rodish::CommandFailure, "invalid subcommand: g")
         expect(res).to eq [:top]
 
         app = described_class.processor do
           on("f") {}
         end
-        expect { app.process(%w[g], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid subcommand g, valid subcommands for command are: f")
+        expect { app.process(%w[g], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid subcommand: g")
         expect(res).to be_empty
       end
 
@@ -234,14 +240,18 @@ RSpec.describe Rodish do
 
       it "raises CommandFailure for unexpected options" do
         res = []
-        expect { app.process(%w[-d], context: res) }.to raise_error(Rodish::CommandFailure, /top verbose output/)
+        expect { app.process(%w[-d], context: res) }.to raise_error(Rodish::CommandFailure, "invalid option: -d")
         expect(res).to be_empty
-        expect { app.process(%w[a -d], context: res) }.to raise_error(Rodish::CommandFailure, /a verbose output/)
+        expect { app.process(%w[a -d], context: res) }.to raise_error(Rodish::CommandFailure, "invalid option: -d")
         expect(res).to eq [:top]
-        expect { app.process(%w[a b -d], context: res.clear) }.to raise_error(Rodish::CommandFailure, /b verbose output/)
+        expect { app.process(%w[a b -d], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid option: -d")
         expect(res).to eq [:top, :before_a]
-        expect { app.process(%w[d -d 1 2], context: res.clear) }.to raise_error(Rodish::CommandFailure, /top verbose output/)
+        expect { app.process(%w[d -d 1 2], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid option: -d")
         expect(res).to eq [:top]
+      end
+
+      it "raises CommandFailure for unexpected post options" do
+        expect { app.process(%w[g 1 -b h], context: []) }.to raise_error(Rodish::CommandFailure, "invalid option: -b")
       end
 
       it "raises CommandExit for blocks that use halt" do
@@ -258,9 +268,13 @@ RSpec.describe Rodish do
         USAGE
       end
 
+      it "has options_text return nil if there are no option parsers for the command" do
+        expect(app.command.subcommand("d").options_text).to be_nil
+      end
+
       it "can get usages for all options" do
         usages = app.usages
-        expect(usages.length).to eq 3
+        expect(usages.length).to eq 5
         expect(usages[""]).to eq <<~USAGE
           Usage: example [options] [subcommand [subcommand_options] [...]]
 
@@ -285,9 +299,41 @@ RSpec.describe Rodish do
           Options:
               -v                               b verbose output
         USAGE
+        expect(usages["g"]).to eq <<~USAGE
+          Usage: example g arg [options] [subcommand [subcommand_options] [...]]
+
+          Options:
+              -v                               g verbose output
+              -k, --key=foo                    set key
+
+          Subcommands: h i
+        USAGE
+        expect(usages["l"]).to eq "Usage: example l\n"
       end
 
       unless frozen
+        it "uses separate lines for more than 6 subcommands" do
+          subcommands = %w[a b c d e f g]
+          app.on("z") do
+            options "example z subcommand"
+            subcommands.each do |cmd|
+              is(cmd) {}
+            end
+          end
+          expect(app.command.subcommand("z").options_text).to eq <<~USAGE
+            Usage: example z subcommand
+
+            Subcommands:
+              a
+              b
+              c
+              d
+              e
+              f
+              g
+          USAGE
+        end
+
         it "supports adding subcommands after initialization" do
           res = []
           expect { app.process(%w[z], context: res) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for command (accepts: 0, given: 1)")
