@@ -56,22 +56,11 @@ jobs:
         CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
       run: bundle exec rake _test_up
 
-    - name: Cache ngrok binary
-      id: cache-ngrok
-      uses: actions/cache@v4
-      with:
-        path: /usr/local/bin/ngrok
-        key: ngrok-binary
+    - name: Install cloudflared
+      run: curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb && sudo dpkg -i cloudflared.deb
 
-    - name: Install ngrok
-      if: steps.cache-ngrok.outputs.cache-hit != 'true'
-      run: curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null && echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list && sudo apt update && sudo apt install ngrok
-
-    - name: Set ngrok token
-      run: ngrok config add-authtoken ${{ secrets.NGROK_TOKEN }}
-
-    - name: Local to public
-      run: ngrok http --domain=${{ secrets.NGROK_ADDRESS }} http://127.0.0.1:5000 > /dev/null &
+    - name: Set cloudflared token
+      run: sudo cloudflared service install ${{ secrets.CLOUDFLARED_TOKEN }}
 
     - name: Install foreman
       run: gem install foreman
@@ -91,7 +80,7 @@ jobs:
 
     - name: Run tests
       env:
-        BASE_URL: https://${{ secrets.NGROK_ADDRESS }}
+        BASE_URL: https://${{ secrets.CLOUDFLARED_ADDRESS }}
         RACK_ENV: production
         IS_E2E: "true"
         CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
