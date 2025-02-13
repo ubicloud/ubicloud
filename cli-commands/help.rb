@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 UbiRodish.on("help") do
-  options("ubi help [options] [command [subcommand ...]]") do
+  options("ubi help [options] [command [subcommand]]") do
     on("-r", "--recursive", "also show documentation for all subcommands of command")
     on("-u", "--usage", "only show usage")
   end

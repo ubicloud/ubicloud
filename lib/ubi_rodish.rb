@@ -3,7 +3,7 @@
 force_autoload = Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
 
 UbiRodish = Rodish.processor do
-  options("ubi [options] [subcommand [subcommand_options] ...]") do
+  options("ubi [options] [subcommand [subcommand-options] ...]") do
     on("--version", "show program version") { halt "0.0.0" }
     on("--help", "show program help") { halt to_s }
     on("--confirm=confirmation", "confirmation value (not for direct use)")
