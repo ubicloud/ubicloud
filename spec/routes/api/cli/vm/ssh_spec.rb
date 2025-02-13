@@ -78,8 +78,8 @@ RSpec.describe Clover, "cli vm ssh" do
   end
 
   it "handles invalid vm reference" do
-    expect(cli(["vm", "#{@vm.display_location}/foo", "ssh"], status: 404)).to eq "Error: unexpected response status: 404\nDetails: Sorry, we couldn’t find the resource you’re looking for."
-    expect(cli(["vm", "foo/#{@vm.name}", "ssh"], status: 404)).to eq "Error: unexpected response status: 404\nDetails: Sorry, we couldn’t find the resource you’re looking for."
-    expect(cli(["vm", "#{@vm.display_location}/#{@vm.name}/bar", "ssh"], status: 400)).to eq "invalid vm reference, should be in location/(vm-name|_vm-ubid) format"
+    expect(cli(["vm", "#{@vm.display_location}/foo", "ssh"], status: 404)).to eq "! Unexpected response status: 404\nDetails: Sorry, we couldn’t find the resource you’re looking for."
+    expect(cli(["vm", "foo/#{@vm.name}", "ssh"], status: 404)).to eq "! Unexpected response status: 404\nDetails: Sorry, we couldn’t find the resource you’re looking for."
+    expect(cli(["vm", "#{@vm.display_location}/#{@vm.name}/bar", "ssh"], status: 400)).to eq "! Invalid vm reference, should be in location/(vm-name|_vm-ubid) format"
   end
 end

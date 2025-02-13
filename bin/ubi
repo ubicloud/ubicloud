@@ -43,12 +43,12 @@ confirmation = nil
   when 200...300
     if (prog_type = response["ubi-command-execute"])
       unless ARGV.include?(prog_type)
-        warn "Invalid server response, not executing program not in original argv"
+        warn "! Invalid server response, not executing program not in original argv"
         exit 1
       end
 
       unless (prog = get_prog[prog_type])
-        warn "Invalid server response, unsupported program requested"
+        warn "! Invalid server response, unsupported program requested"
         exit 1
       end
 
@@ -65,7 +65,7 @@ confirmation = nil
           sep_seen = true
         elsif !argv_set.include?(arg)
           if custom_arg_seen
-            invalid_message = "Invalid server response, multiple arguments not in submitted argv"
+            invalid_message = "! Invalid server response, multiple arguments not in submitted argv"
             break
           elsif sep_seen
             custom_arg_seen = true
@@ -73,14 +73,14 @@ confirmation = nil
             pg_dumpall = true
             custom_arg_seen = true
           else
-            invalid_message = "Invalid server response, argument before '--' not in submitted argv"
+            invalid_message = "! Invalid server response, argument before '--' not in submitted argv"
             break
           end
         end
       end
 
       unless sep_seen || pg_dumpall
-        invalid_message = "Invalid server response, no '--' in returned argv"
+        invalid_message = "! Invalid server response, no '--' in returned argv"
       end
 
       if invalid_message
@@ -98,7 +98,7 @@ confirmation = nil
     else
       if (confirmation_prompt = response["ubi-confirm"])
         if confirmation
-          warn "Invalid server response, repeated confirmation attempt"
+          warn "! Invalid server response, repeated confirmation attempt"
           exit 1
         else
           $stdout.puts response.body

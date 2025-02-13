@@ -4,13 +4,13 @@ require_relative "spec_helper"
 
 RSpec.describe Clover, "cli" do
   it "errors if argv is not an array of strings" do
-    expect(cli([1], status: 400)).to eq "Invalid request: No or invalid argv parameter provided"
-    expect(cli("--version", status: 400)).to eq "Invalid request: No or invalid argv parameter provided"
+    expect(cli([1], status: 400)).to eq "! Invalid request: No or invalid argv parameter provided"
+    expect(cli("--version", status: 400)).to eq "! Invalid request: No or invalid argv parameter provided"
   end
 
   it "errors if token is not provided" do
     header "Authorization", "Foo"
-    expect(cli(%w[--version], status: 400)).to eq "Invalid request: No valid personal access token provided"
+    expect(cli(%w[--version], status: 400)).to eq "! Invalid request: No valid personal access token provided"
   end
 
   it "handles --version" do
@@ -32,7 +32,7 @@ RSpec.describe Clover, "cli" do
 
   it "shows usage on invalid option" do
     expect(cli(%w[--foo], status: 400)).to eq <<~OUTPUT
-      invalid option: --foo
+      ! Invalid option: --foo
 
       Usage: ubi [options] [subcommand [subcommand-options] ...]
 
