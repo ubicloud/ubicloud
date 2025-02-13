@@ -56,6 +56,18 @@ jobs:
         CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
       run: bundle exec rake _test_up
 
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: "package.json"
+        cache: "npm"
+
+    - name: Install node packages
+      run: npm ci
+
+    - name: Build assets
+      run: npm run prod
+
     - name: Install cloudflared
       run: curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb && sudo dpkg -i cloudflared.deb
 
