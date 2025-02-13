@@ -54,7 +54,7 @@ RSpec.describe Clover, "cli vm create" do
     expect(Vm.count).to eq 0
     ps = PrivateSubnet.create(project_id: @project.id, name: "test-ps", location: "hetzner-fsn1", net6: "fe80::/64", net4: "192.168.0.0/24")
     expect(cli(%W[vm eu-north-h1/test-vm2 create -p #{ps.ubid} c], status: 400)).to eq(<<~END.chomp)
-      Error: unexpected response status: 400
+      ! Unexpected response status: 400
       Details: Validation failed for following fields: private_subnet_id
         private_subnet_id: Private subnet with the given id "#{ps.ubid}" is not found in the location "eu-north-h1"
     END
@@ -63,8 +63,8 @@ RSpec.describe Clover, "cli vm create" do
 
   it "shows errors if trying to create a vm with an invalid number of arguments" do
     expect(Vm.count).to eq 0
-    expect(cli(%W[vm eu-north-h1/test-vm2 create], status: 400).b).to start_with("invalid arguments for vm create subcommand (public_key is required)")
-    expect(cli(%W[vm eu-north-h1/test-vm2 create c d], status: 400).b).to start_with("invalid arguments for vm create subcommand (public_key is required)")
+    expect(cli(%W[vm eu-north-h1/test-vm2 create], status: 400).b).to start_with("! Invalid arguments for vm create subcommand (public_key is required)")
+    expect(cli(%W[vm eu-north-h1/test-vm2 create c d], status: 400).b).to start_with("! Invalid arguments for vm create subcommand (public_key is required)")
     expect(Vm.count).to eq 0
   end
 end

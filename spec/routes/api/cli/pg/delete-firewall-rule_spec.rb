@@ -11,7 +11,7 @@ RSpec.describe Clover, "cli pg delete-firewall-rule" do
     cli(%w[pg eu-central-h1/test-pg create])
     pg = PostgresResource.first
     fwr = pg.firewall_rules_dataset.first
-    expect(cli(%w[pg eu-central-h1/test-pg delete-firewall-rule a/b], status: 400)).to eq "invalid firewall rule id format"
+    expect(cli(%w[pg eu-central-h1/test-pg delete-firewall-rule a/b], status: 400)).to eq "! Invalid firewall rule id format"
     expect(pg.firewall_rules_dataset).not_to be_empty
     expect(cli(%W[pg eu-central-h1/test-pg delete-firewall-rule #{fwr.ubid}])).to eq "Firewall rule, if it exists, has been scheduled for deletion"
     expect(pg.firewall_rules_dataset).to be_empty
