@@ -7,3 +7,5 @@ UbiCli.base("vm") do
     on("-u", "--user user", "override username")
   end
 end
+
+Unreloader.record_dependency(__FILE__, "cli-commands/vm")
