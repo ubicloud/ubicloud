@@ -48,6 +48,8 @@ class InvoiceGenerator
             line_item_content[:amount] = li[:amount].to_f
             line_item_content[:duration] = li[:duration]
             line_item_content[:cost] = li[:cost].to_f
+            line_item_content[:begin_time] = li[:begin_time]
+            line_item_content[:unit_price] = li[:unit_price].to_f
 
             resource_content[:line_items].push(line_item_content)
             resource_content[:cost] += line_item_content[:cost]
@@ -81,6 +83,26 @@ class InvoiceGenerator
           project_content[:credit] += project_content[:github_credit]
           project_content[:cost] -= project_content[:github_credit]
         end
+
+        # Each project have some free AI inference tokens every month
+        # Free AI tokens WILL be shown on the portal billing page as a separate credit.
+        free_inference_tokens_remaining = FreeQuota.free_quotas["inference-tokens"]["value"]
+        free_inference_tokens_credit = 0.0
+        project_content[:resources]
+          .flat_map { _1[:line_items] }
+          .select { _1[:resource_type] == "InferenceTokens" }
+          .sort_by { |li| [li[:begin_time].to_date, -li[:unit_price]] }
+          .each do |li|
+            used_amount = [li[:amount], free_inference_tokens_remaining].min
+            free_inference_tokens_remaining -= used_amount
+            free_inference_tokens_credit += used_amount * li[:unit_price]
+          end
+        free_inference_tokens_credit = [free_inference_tokens_credit, project_content[:cost]].min
+        if free_inference_tokens_credit > 0
+          project_content[:free_inference_tokens_credit] = free_inference_tokens_credit
+          project_content[:cost] -= project_content[:free_inference_tokens_credit]
+        end
+
         project_content[:cost] = project_content[:cost].round(3)
 
         if @save_result
@@ -137,7 +159,9 @@ class InvoiceGenerator
         resource_family: br.billing_rate["resource_family"],
         amount: br.amount,
         cost: (br.amount * duration * br.billing_rate["unit_price"]).round(3),
-        duration: duration
+        duration: duration,
+        begin_time: br.span.begin,
+        unit_price: br.billing_rate["unit_price"]
       }
     end
   end

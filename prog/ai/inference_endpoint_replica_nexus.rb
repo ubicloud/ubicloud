@@ -171,7 +171,10 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       .exists
 
     eligible_projects_ds = Project.where(api_key_ds)
+    free_quota_exhausted_projects_ds = FreeQuota.get_exhausted_projects("inference-tokens")
     eligible_projects_ds = eligible_projects_ds.where(id: inference_endpoint.project.id) unless inference_endpoint.is_public
+    eligible_projects_ds = eligible_projects_ds
+      .exclude(billing_info_id: nil, credit: 0.0, id: free_quota_exhausted_projects_ds)
 
     eligible_projects = eligible_projects_ds.all
       .select(&:active?)

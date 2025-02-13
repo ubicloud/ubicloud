@@ -14,6 +14,7 @@ class Serializers::Invoice < Serializers::Base
       end_time: inv.end_time.strftime("%b %d, %Y"),
       subtotal: "$%0.02f" % inv.content["subtotal"],
       credit: "$%0.02f" % inv.content["credit"],
+      free_inference_tokens_credit: "$%0.02f" % (inv.content["free_inference_tokens_credit"] || 0),
       discount: "$%0.02f" % inv.content["discount"],
       total: "$%0.02f" % inv.content["cost"],
       status: inv.status,

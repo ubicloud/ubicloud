@@ -304,6 +304,7 @@ RSpec.describe Clover, "billing" do
         content["billing_info"]["tax_id"] = "123XYZ"
         content["discount"] = 1
         content["credit"] = 2
+        content["free_inference_tokens_credit"] = 3
         expect(page).to have_content issuer_name
         invoice.this.update(content:)
 
@@ -313,6 +314,7 @@ RSpec.describe Clover, "billing" do
         expect(page).to have_no_content issuer_name
         expect(find_by_id("invoice-discount").text).to eq "-$1.00"
         expect(find_by_id("invoice-credit").text).to eq "-$2.00"
+        expect(find_by_id("invoice-free-inference-tokens").text).to eq "-$3.00"
       end
 
       it "show current invoice when no usage" do

@@ -217,6 +217,7 @@ class Invoice < Sequel::Model
       # :nocov:
       (data[:discount] != "$0.00") ? ["Discount:", "-#{data[:discount]}"] : nil,
       (data[:credit] != "$0.00") ? ["Credit:", "-#{data[:credit]}"] : nil,
+      (data[:free_inference_tokens_credit] != "$0.00") ? ["Free Inference Tokens:", "-#{data[:free_inference_tokens_credit]}"] : nil,
       # :nocov:
       ["Total:", data[:total]]
     ].compact
