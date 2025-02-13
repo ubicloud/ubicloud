@@ -27,6 +27,9 @@ def clean(name)
   case state
   when "InProgress", "Unknown"
     fail "Cannot clean unless the service is in Succeeded or Failed state!"
+  when "NotStarted"
+    # no-op, can occur if a previous clean was run but transition
+    # recording that it ran could not commit.
   when "Succeeded"
     r "sudo systemctl stop #{name}.service"
   when "Failed"
