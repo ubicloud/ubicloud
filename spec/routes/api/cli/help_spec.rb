@@ -5,7 +5,7 @@ require_relative "spec_helper"
 RSpec.describe Clover, "cli help" do
   it "shows help for top level command with no arguments" do
     expect(cli(%w[help])).to eq <<~OUTPUT
-      Usage: ubi [options] [subcommand [subcommand_options] ...]
+      Usage: ubi [options] [subcommand [subcommand-options] ...]
 
       Options:
               --version                    show program version
@@ -18,7 +18,7 @@ RSpec.describe Clover, "cli help" do
 
   it "shows help for specific command if given" do
     expect(cli(%w[help help])).to eq <<~OUTPUT
-      Usage: ubi help [options] [command [subcommand ...]]
+      Usage: ubi help [options] [command [subcommand]]
 
       Options:
           -r, --recursive                  also show documentation for all subcommands of command
@@ -28,13 +28,13 @@ RSpec.describe Clover, "cli help" do
 
   it "shows help for specific subcommand if given" do
     expect(cli(%w[help vm ssh])).to eq <<~OUTPUT
-      Usage: ubi vm location-name/(vm-name|_vm-ubid) [options] ssh [ssh-options --] [ssh-args]
+      Usage: ubi vm location/(vm-name|_vm-ubid) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
     OUTPUT
   end
 
   it "shows only usage if the -u flag is given" do
     expect(cli(%w[help -u help])).to eq <<~OUTPUT
-      Usage: ubi help [options] [command [subcommand ...]]
+      Usage: ubi help [options] [command [subcommand]]
     OUTPUT
   end
 
@@ -58,7 +58,7 @@ RSpec.describe Clover, "cli help" do
     expect(cli(%w[help foo], status: 400)).to eq <<~OUTPUT
       invalid command: foo
 
-      Usage: ubi [options] [subcommand [subcommand_options] ...]
+      Usage: ubi [options] [subcommand [subcommand-options] ...]
 
       Options:
               --version                    show program version
@@ -73,7 +73,7 @@ RSpec.describe Clover, "cli help" do
     expect(cli(%w[help vm ssh foo], status: 400)).to eq <<~OUTPUT
       invalid command: vm ssh foo
 
-      Usage: ubi vm location-name/(vm-name|_vm-ubid) [options] ssh [ssh-options --] [ssh-args]
+      Usage: ubi vm location/(vm-name|_vm-ubid) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
     OUTPUT
   end
 end

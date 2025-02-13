@@ -102,7 +102,7 @@ class UbiCli
 
   def self.pg_cmd(cmd)
     UbiRodish.on("pg").run_on(cmd) do
-      skip_option_parsing("ubi pg location-name/(pg-name|_pg-ubid) #{cmd} [#{cmd}-opts]")
+      skip_option_parsing("ubi pg location/(pg-name|_pg-ubid) [options] #{cmd} [#{cmd}-options]")
 
       args(0...)
 
