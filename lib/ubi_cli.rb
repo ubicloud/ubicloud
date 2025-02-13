@@ -274,9 +274,15 @@ class UbiCli
   end
 
   def response(body, status: 200, headers: {})
-    headers["content-length"] = body.bytesize.to_s
+    if body.is_a?(Array)
+      headers["content-length"] = body.sum(&:bytesize).to_s
+    else
+      headers["content-length"] = body.bytesize.to_s
+      body = [body]
+    end
+
     headers["content-type"] = "text/plain"
-    [status, headers, [body]]
+    [status, headers, body]
   end
 
   def _req_env(method, path, params)

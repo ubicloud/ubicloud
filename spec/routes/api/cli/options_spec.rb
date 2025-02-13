@@ -26,7 +26,7 @@ RSpec.describe Clover, "cli" do
               --help                       show program help
               --confirm=confirmation       confirmation value (not for direct use)
 
-      Subcommands: pg vm
+      Subcommands: help pg vm
     OUTPUT
   end
 
@@ -41,7 +41,7 @@ RSpec.describe Clover, "cli" do
               --help                       show program help
               --confirm=confirmation       confirmation value (not for direct use)
 
-      Subcommands: pg vm
+      Subcommands: help pg vm
     OUTPUT
   end
 end
