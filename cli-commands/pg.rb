@@ -6,3 +6,5 @@ UbiCli.base("pg") do
     on("-U", "--username=name", "override username")
   end
 end
+
+Unreloader.record_dependency(__FILE__, "cli-commands/pg")
