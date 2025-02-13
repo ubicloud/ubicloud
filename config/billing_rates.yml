@@ -1,5 +1,6 @@
 # Active billing rates
 - { id: fc9877ec-131c-4572-a3f2-fd512d95b348, resource_type: InferenceTokens,         resource_family: test-model,          location: global,         unit_price: 0.0000000500, billed_by: amount,   active_from: 2024-10-14T00:00:00Z }
+- { id: f74122a3-186a-4273-b60b-511e03f29f3d, resource_type: InferenceTokens,         resource_family: test-model2,         location: global,         unit_price: 0.0000002000, billed_by: amount,   active_from: 2024-10-14T00:00:00Z }
 - { id: 74eb807c-75dd-49e4-95f8-5de25163b845, resource_type: InferenceTokens,         resource_family: gemma-2-2b-it,       location: global,         unit_price: 0.0000000000, billed_by: amount,   active_from: 2024-10-14T00:00:00Z }
 - { id: 195bd918-8a0b-4c07-8b57-289de6d6163e, resource_type: InferenceTokens,         resource_family: llama-3-2-3b-it,     location: global,         unit_price: 0.0000001000, billed_by: amount,   active_from: 2024-10-14T00:00:00Z }
 - { id: c385da12-e15c-4bcf-aa5d-fb9551158eb2, resource_type: InferenceTokens,         resource_family: e5-mistral-7b-it,    location: global,         unit_price: 0.0000001000, billed_by: amount,   active_from: 2024-10-14T00:00:00Z }
