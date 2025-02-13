@@ -6,7 +6,8 @@ class UbiCli
   rescue Rodish::CommandExit => e
     if e.failure?
       status = 400
-      message = e.message_with_usage
+      message = e.message_with_usage.dup
+      message[0] = "! #{message[0].capitalize}"
     else
       status = 200
       message = e.message
@@ -319,7 +320,7 @@ class UbiCli
     else
       body = +""
       res[2].each { body << _1 }
-      error_message = "Error: unexpected response status: #{res[0]}"
+      error_message = "! Unexpected response status: #{res[0]}"
       # Temporary nocov until at least one action pushed into routes
       # :nocov:
       if (res[1]["content-type"] == "application/json") && (parsed_body = JSON.parse(body)) && (error = parsed_body.dig("error", "message"))

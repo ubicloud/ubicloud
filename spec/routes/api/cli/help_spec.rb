@@ -56,7 +56,7 @@ RSpec.describe Clover, "cli help" do
 
   it "shows error and help for top level if top level command invalid" do
     expect(cli(%w[help foo], status: 400)).to eq <<~OUTPUT
-      invalid command: foo
+      ! Invalid command: foo
 
       Usage: ubi [options] [subcommand [subcommand-options] ...]
 
@@ -71,7 +71,7 @@ RSpec.describe Clover, "cli help" do
 
   it "shows error and help for nested command if there is a partial match" do
     expect(cli(%w[help vm ssh foo], status: 400)).to eq <<~OUTPUT
-      invalid command: vm ssh foo
+      ! Invalid command: vm ssh foo
 
       Usage: ubi vm location/(vm-name|_vm-ubid) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
     OUTPUT

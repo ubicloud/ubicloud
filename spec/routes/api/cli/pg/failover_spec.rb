@@ -15,7 +15,7 @@ RSpec.describe Clover, "cli pg failover" do
     expect(pg).to be_a PostgresResource
     expect(Semaphore.where(name: "take_over")).to be_empty
     expect(cli(%w[pg eu-central-h1/test-pg failover], status: 400)).to eq <<~END.chomp
-      Error: unexpected response status: 400
+      ! Unexpected response status: 400
       Details: There is not a suitable standby server to failover!
     END
     rs = pg.representative_server
