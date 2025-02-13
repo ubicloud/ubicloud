@@ -7,8 +7,8 @@ UbiRodish.on("vm").run_on("show") do
 
   options("ubi vm location/(vm-name|_vm-ubid) show [options]", key: :vm_show) do
     on("-f", "--fields=fields", "show specific fields (default: #{fields.join(",")})")
-    on("-r", "--firewall_rule_fields=fields", "show specific fields (default: #{firewall_rule_fields.join(",")})")
-    on("-w", "--firewall_fields=fields", "show specific fields (default: #{firewall_fields.join(",")})")
+    on("-r", "--rule_fields=fields", "show specific firewall rule fields (default: #{firewall_rule_fields.join(",")})")
+    on("-w", "--firewall_fields=fields", "show specific firewall fields (default: #{firewall_fields.join(",")})")
   end
 
   run do |opts|
@@ -20,7 +20,7 @@ UbiRodish.on("vm").run_on("show") do
       if (opts = opts[:vm_show])
         keys = check_fields(opts[:fields], fields, "vm show -f option")
         firewall_keys = check_fields(opts[:firewall_fields], firewall_fields, "vm show -w option")
-        firewall_rule_keys = check_fields(opts[:firewall_rule_fields], firewall_rule_fields, "vm show -r option")
+        firewall_rule_keys = check_fields(opts[:rule_fields], firewall_rule_fields, "vm show -r option")
       end
 
       body = []
