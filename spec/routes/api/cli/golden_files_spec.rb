@@ -14,6 +14,7 @@ RSpec.describe Clover, "cli" do
     expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
     expect(Vm).to receive(:generate_ubid).and_return(UBID.parse("vmdzyppz6j166jh5e9t2dwrfas"))
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("psfzm9e26xky5m9ggetw4dpqe2"))
+    expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("nc69z0cda8jt0g5b120hamn4vf"))
     expect(Firewall).to receive(:generate_uuid).and_return("24242d92-217b-85fc-b891-7046af3c1150")
     expect(FirewallRule).to receive(:generate_uuid).and_return("51e5bc7d-245b-8df8-bf91-7c5d150cb160", "3b367895-7f18-89f8-a295-ff247e9d5192")
     expect(PostgresResource).to receive(:generate_uuid).and_return("dd0375a6-1c66-82d0-a5e8-af1e8527a8a2")
@@ -32,6 +33,7 @@ RSpec.describe Clover, "cli" do
     expect(Prog::Postgres::PostgresResourceNexus).to receive(:dns_zone).and_return(@dns_zone).at_least(:once)
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("psnqtahcasrj1hn16kh1ygekmn"))
     expect(Firewall).to receive(:generate_uuid).and_return("30a3eec9-afb5-81fc-bbb5-8691d252ef03")
+    expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("nc2kyevjaqey6h0et8qj89zvm1"))
     expect(FirewallRule).to receive(:generate_uuid).and_return("305d838d-a3cd-85f8-aa08-9a66e71a5877", "5aa5b086-37bd-81f8-8d03-dd4b0e09a436", "20c360fa-bc06-8df8-b067-33f4a1ebdbbd", "2b628450-25bd-8df8-8b42-fb5cc5d01ad1", "da42e2ef-b5f1-8df8-966d-1387afb1b2f4")
 
     cli(%w[pg eu-central-h1/test-pg create])
@@ -47,6 +49,7 @@ RSpec.describe Clover, "cli" do
     expect(PostgresResource).to receive(:generate_uuid).and_return("97eb0a77-7869-86d0-9dcb-a46416ddc5c9").at_least(:once)
     expect(PostgresFirewallRule).to receive(:generate_uuid).and_return("6d674a31-e1c1-8ecf-b5ac-363abb5b9185").at_least(:once)
     expect(PostgresMetricDestination).to receive(:generate_uuid).and_return("bc563e43-9b83-89da-b3ac-d38acc87fd63").at_least(:once)
+    expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("nc186qw3d23j1kzsgjqg2t811r")).at_least(:once)
 
     Dir["#{golden_file_dir}/*.txt"].each do |f|
       f = File.basename(f)
