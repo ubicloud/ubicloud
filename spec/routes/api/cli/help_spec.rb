@@ -27,7 +27,7 @@ RSpec.describe Clover, "cli help" do
 
   it "shows help for all subcommands of command if -r is given" do
     expect(cli(%w[help -r vm])).to include <<~OUTPUT
-      Usage: ubi vm location/vm_name create [options] public_key
+      Usage: ubi vm location/vm-name create [options] public_key
 
       Options:
           -6, --ipv6-only                  do not enable IPv4
@@ -37,7 +37,7 @@ RSpec.describe Clover, "cli help" do
   it "shows usage for all subcommands of command if -ru is given" do
     expect(cli(%w[help -ru vm])).to include <<~OUTPUT
       Usage: ubi vm list [options]
-      Usage: ubi vm location/vm_name create [options] public_key
+      Usage: ubi vm location/vm-name create [options] public_key
     OUTPUT
   end
 
