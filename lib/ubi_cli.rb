@@ -229,6 +229,10 @@ class UbiCli
     project_subpath("postgres", rest)
   end
 
+  def ps_path(rest = "")
+    project_subpath("private-subnet", rest)
+  end
+
   def format_rows(keys, rows, headers: false, col_sep: "  ")
     results = []
 
