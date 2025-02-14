@@ -1,0 +1,9 @@
+Usage: ubi vm subcommand [...]
+Usage: ubi vm location/(vm-name|_vm-ubid) [options] subcommand [...]
+Usage: ubi vm list [options]
+Usage: ubi vm location/vm_name create [options] public_key
+Usage: ubi vm location/(vm-name|_vm-ubid) destroy [options]
+Usage: ubi vm location/(vm-name|_vm-ubid) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
+Usage: ubi vm location/(vm-name|_vm-ubid) [options] sftp [sftp-options]
+Usage: ubi vm location/(vm-name|_vm-ubid) show [options]
+Usage: ubi vm location/(vm-name|_vm-ubid) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
