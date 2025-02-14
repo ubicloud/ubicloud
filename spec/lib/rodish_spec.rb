@@ -131,9 +131,9 @@ RSpec.describe Rodish do
         app.process([], context: res.clear)
         expect(res).to eq [:top, :empty]
         app.process(%w[a b 1], context: res.clear)
-        expect(res).to eq [:top, :before_a, :before_b, [:b, %w[1], {}]]
+        expect(res).to eq [:top, :before_a, :before_b, [:b, %w[1], {a: {}, b: {}}]]
         app.process(%w[a b 1 2], context: res.clear)
-        expect(res).to eq [:top, :before_a, :before_b, [:b, %w[1 2], {}]]
+        expect(res).to eq [:top, :before_a, :before_b, [:b, %w[1 2], {a: {}, b: {}}]]
         app.process(%w[a 3 4], context: res.clear)
         expect(res).to eq [:top, :before_a, [:a, "3", "4"]]
         app.process(%w[c], context: res.clear)
@@ -186,9 +186,9 @@ RSpec.describe Rodish do
       it "handles options at any level they are defined" do
         res = []
         app.process(%w[-v a b -v 1 2], context: res.clear)
-        expect(res).to eq [:top, :before_a, :before_b, [:b, %w[1 2], {b: {v: true}, v: true}]]
+        expect(res).to eq [:top, :before_a, :before_b, [:b, %w[1 2], {a: {}, b: {v: true}, v: true}]]
         app.process(%w[a -v b 1 2], context: res.clear)
-        expect(res).to eq [:top, :before_a, :before_b, [:b, %w[1 2], {a: {v: true}}]]
+        expect(res).to eq [:top, :before_a, :before_b, [:b, %w[1 2], {a: {v: true}, b: {}}]]
       end
 
       it "raises CommandFailure for unexpected number of arguments without executing code" do
