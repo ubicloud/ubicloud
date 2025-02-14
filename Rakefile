@@ -242,6 +242,11 @@ ensure
   File.delete(output_file) if File.file?(output_file)
 end
 
+desc "Update cli spec golden files"
+task "update_golden_files" do
+  sh "mv spec/routes/api/cli/spec-output-files/*.txt spec/routes/api/cli/golden-files/"
+end
+
 # Other
 
 desc "Check generated SQL for parameterization"
