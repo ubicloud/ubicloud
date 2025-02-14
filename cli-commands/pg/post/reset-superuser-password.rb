@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-UbiRodish.on("pg").run_on("reset-superuser-password") do
+UbiCli.on("pg").run_on("reset-superuser-password") do
   options("ubi pg location/(pg-name|_pg-ubid) reset-superuser-password new-password")
 
   args 1, invalid_args_message: "password is required"

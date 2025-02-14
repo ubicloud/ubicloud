@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-UbiRodish.on("pg").run_on("create") do
+UbiCli.on("pg").run_on("create") do
   options("ubi pg location/pg_name create [options]", key: :pg_create) do
     on("-f", "--flavor=type", "flavor (standard, paradedb, lantern)")
     on("-h", "--ha-type=type", "replication type (none, async, sync)")

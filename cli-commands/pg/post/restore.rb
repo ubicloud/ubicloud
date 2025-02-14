@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-UbiRodish.on("pg").run_on("restore") do
+UbiCli.on("pg").run_on("restore") do
   options("ubi pg location/(pg-name|_pg-ubid) restore new-db-name restore-time")
 
   args 2, invalid_args_message: "name and restore target are required"
