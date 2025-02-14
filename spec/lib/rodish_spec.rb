@@ -2,7 +2,9 @@
 
 RSpec.describe Rodish do
   let(:base_app) do
-    described_class.processor do
+    c = Class.new(Array)
+
+    described_class.processor(c) do
       options "example [options] [subcommand [subcommand_options] [...]]" do
         on("-v", "top verbose output")
         on("--version", "show program version") { halt "0.0.0" }
@@ -116,6 +118,8 @@ RSpec.describe Rodish do
         push :empty
       end
     end
+
+    c
   end
 
   [true, false].each do |frozen|
@@ -127,131 +131,55 @@ RSpec.describe Rodish do
       end
 
       it "executes expected command code in expected order" do
-        res = []
-        app.process([], context: res.clear)
-        expect(res).to eq [:top, :empty]
-        app.process(%w[a b 1], context: res.clear)
-        expect(res).to eq [:top, :before_a, :before_b, [:b, %w[1], {a: {}, b: {}}]]
-        app.process(%w[a b 1 2], context: res.clear)
-        expect(res).to eq [:top, :before_a, :before_b, [:b, %w[1 2], {a: {}, b: {}}]]
-        app.process(%w[a 3 4], context: res.clear)
-        expect(res).to eq [:top, :before_a, [:a, "3", "4"]]
-        app.process(%w[c], context: res.clear)
-        expect(res).to eq [:top, :c]
-        app.process(%w[d 5], context: res.clear)
-        expect(res).to eq [:top, [:d, "5"]]
-        app.process(%w[e f], context: res.clear)
-        expect(res).to eq [:top, :f]
+        expect(app.process([])).to eq [:top, :empty]
+        expect(app.process(%w[a b 1])).to eq [:top, :before_a, :before_b, [:b, %w[1], {a: {}, b: {}}]]
+        expect(app.process(%w[a b 1 2])).to eq [:top, :before_a, :before_b, [:b, %w[1 2], {a: {}, b: {}}]]
+        expect(app.process(%w[a 3 4])).to eq [:top, :before_a, [:a, "3", "4"]]
+        expect(app.process(%w[c])).to eq [:top, :c]
+        expect(app.process(%w[d 5])).to eq [:top, [:d, "5"]]
+        expect(app.process(%w[e f])).to eq [:top, :f]
       end
 
       it "supports run_on/run_is for subcommands dispatched to during run" do
-        res = []
-        app.process(%w[g j], context: res.clear)
-        expect(res).to eq [:top, :j]
-        app.process(%w[g 1 h], context: res.clear)
-        expect(res).to eq [:top, [:g, "1"], [:h, nil, nil]]
-        app.process(%w[g 1 i], context: res.clear)
-        expect(res).to eq [:top, [:g, "1"], nil, nil, :i]
-        app.process(%w[g 1 i k], context: res.clear)
-        expect(res).to eq [:top, [:g, "1"], nil, nil, :k]
+        expect(app.process(%w[g j])).to eq [:top, :j]
+        expect(app.process(%w[g 1 h])).to eq [:top, [:g, "1"], [:h, nil, nil]]
+        expect(app.process(%w[g 1 i])).to eq [:top, [:g, "1"], nil, nil, :i]
+        expect(app.process(%w[g 1 i k])).to eq [:top, [:g, "1"], nil, nil, :k]
       end
 
       it "supports post options for commands, parsed before subcommand dispatching" do
-        res = []
-        app.process(%w[g 1 -v h], context: res.clear)
-        expect(res).to eq [:top, [:g, "1"], [:h, true, nil]]
-        app.process(%w[g 1 -v i], context: res.clear)
-        expect(res).to eq [:top, [:g, "1"], true, nil, :i]
-        app.process(%w[g 1 -v i k], context: res.clear)
-        expect(res).to eq [:top, [:g, "1"], true, nil, :k]
-        app.process(%w[g 1 -k 2 h], context: res.clear)
-        expect(res).to eq [:top, [:g, "1"], [:h, nil, "2"]]
-        app.process(%w[g 1 -k 2 i], context: res.clear)
-        expect(res).to eq [:top, [:g, "1"], nil, "2", :i]
-        app.process(%w[g 1 -k 2 i k], context: res.clear)
-        expect(res).to eq [:top, [:g, "1"], nil, "2", :k]
+        expect(app.process(%w[g 1 -v h])).to eq [:top, [:g, "1"], [:h, true, nil]]
+        expect(app.process(%w[g 1 -v i])).to eq [:top, [:g, "1"], true, nil, :i]
+        expect(app.process(%w[g 1 -v i k])).to eq [:top, [:g, "1"], true, nil, :k]
+        expect(app.process(%w[g 1 -k 2 h])).to eq [:top, [:g, "1"], [:h, nil, "2"]]
+        expect(app.process(%w[g 1 -k 2 i])).to eq [:top, [:g, "1"], nil, "2", :i]
+        expect(app.process(%w[g 1 -k 2 i k])).to eq [:top, [:g, "1"], nil, "2", :k]
       end
 
       it "supports skipping option parsing" do
-        res = []
-        app.process(%w[l -A 1 b], context: res.clear)
-        expect(res).to eq [:top, [:l, %w[-A 1 b]]]
+        expect(app.process(%w[l -A 1 b])).to eq [:top, [:l, %w[-A 1 b]]]
       end
 
       it "handles invalid subcommands dispatched to during run" do
-        res = []
-        expect { app.process(%w[g 1 l], context: res) }.to raise_error(Rodish::CommandFailure, "invalid post subcommand: l")
+        expect { app.process(%w[g 1 l]) }.to raise_error(Rodish::CommandFailure, "invalid post subcommand: l")
       end
 
       it "handles options at any level they are defined" do
-        res = []
-        app.process(%w[-v a b -v 1 2], context: res.clear)
-        expect(res).to eq [:top, :before_a, :before_b, [:b, %w[1 2], {a: {}, b: {v: true}, v: true}]]
-        app.process(%w[a -v b 1 2], context: res.clear)
-        expect(res).to eq [:top, :before_a, :before_b, [:b, %w[1 2], {a: {v: true}, b: {}}]]
-      end
-
-      it "raises CommandFailure for unexpected number of arguments without executing code" do
-        res = []
-        expect { app.process(%w[6], context: res) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for command (accepts: 0, given: 1)")
-        expect(res).to be_empty
-        expect { app.process(%w[a b], context: res) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for a b subcommand (accepts: 1..., given: 0)")
-        expect(res).to eq [:top, :before_a]
-        expect { app.process(%w[a], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid arguments for a subcommand (accepts: x y)")
-        expect(res).to eq [:top]
-        expect { app.process(%w[a 1], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid arguments for a subcommand (accepts: x y)")
-        expect(res).to eq [:top]
-        expect { app.process(%w[a 1 2 3], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid arguments for a subcommand (accepts: x y)")
-        expect(res).to eq [:top]
-        expect { app.process(%w[c 1], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for c subcommand (accepts: 0, given: 1)")
-        expect(res).to eq [:top]
-        expect { app.process(%w[d], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for d subcommand (accepts: 1, given: 0)")
-        expect(res).to eq [:top]
-        expect { app.process(%w[d 1 2], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for d subcommand (accepts: 1, given: 2)")
-        expect(res).to eq [:top]
-      end
-
-      it "raises CommandFailure for missing subcommand" do
-        res = []
-        expect { app.process(%w[e], context: res) }.to raise_error(Rodish::CommandFailure, "no subcommand provided")
-        expect(res).to eq [:top]
-      end
-
-      it "raises CommandFailure for invalid subcommand" do
-        res = []
-        expect { app.process(%w[e g], context: res) }.to raise_error(Rodish::CommandFailure, "invalid subcommand: g")
-        expect(res).to eq [:top]
-
-        app = described_class.processor do
-          on("f") {}
-        end
-        expect { app.process(%w[g], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid subcommand: g")
-        expect(res).to be_empty
+        expect(app.process(%w[-v a b -v 1 2])).to eq [:top, :before_a, :before_b, [:b, %w[1 2], {a: {}, b: {v: true}, v: true}]]
+        expect(app.process(%w[a -v b 1 2])).to eq [:top, :before_a, :before_b, [:b, %w[1 2], {a: {v: true}, b: {}}]]
       end
 
       it "raises CommandFailure when there a command has no command block or subcommands" do
-        app = described_class.processor {}
+        app = described_class.processor(Class.new) {}
         expect { app.process([]) }.to raise_error(Rodish::CommandFailure, "program bug, no run block or subcommands defined for command")
-        app = described_class.processor do
+        app = described_class.processor(Class.new) do
           on("f") {}
         end
         expect { app.process(%w[f]) }.to raise_error(Rodish::CommandFailure, "program bug, no run block or subcommands defined for f subcommand")
       end
 
-      it "raises CommandFailure for unexpected options" do
-        res = []
-        expect { app.process(%w[-d], context: res) }.to raise_error(Rodish::CommandFailure, "invalid option: -d")
-        expect(res).to be_empty
-        expect { app.process(%w[a -d], context: res) }.to raise_error(Rodish::CommandFailure, "invalid option: -d")
-        expect(res).to eq [:top]
-        expect { app.process(%w[a b -d], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid option: -d")
-        expect(res).to eq [:top, :before_a]
-        expect { app.process(%w[d -d 1 2], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid option: -d")
-        expect(res).to eq [:top]
-      end
-
       it "raises CommandFailure for unexpected post options" do
-        expect { app.process(%w[g 1 -b h], context: []) }.to raise_error(Rodish::CommandFailure, "invalid option: -b")
+        expect { app.process(%w[g 1 -b h]) }.to raise_error(Rodish::CommandFailure, "invalid option: -b")
       end
 
       it "raises CommandExit for blocks that use halt" do
@@ -311,32 +239,63 @@ RSpec.describe Rodish do
         expect(usages["l"]).to eq "Usage: example l\n"
       end
 
-      unless frozen
-        it "uses separate lines for more than 6 subcommands" do
-          subcommands = %w[a b c d e f g]
-          app.on("z") do
-            options "example z subcommand"
-            subcommands.each do |cmd|
-              is(cmd) {}
-            end
-          end
-          expect(app.command.subcommand("z").options_text).to eq <<~USAGE
-            Usage: example z subcommand
+      next if frozen
 
-            Subcommands:
-              a
-              b
-              c
-              d
-              e
-              f
-              g
-          USAGE
+      describe "failure handling" do
+        let(:res) { [] }
+
+        before do
+          res = self.res
+          app.define_singleton_method(:new) { res.clear }
+        end
+
+        it "raises CommandFailure for unexpected number of arguments without executing code" do
+          expect { app.process(%w[6]) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for command (accepts: 0, given: 1)")
+          expect(res).to be_empty
+          expect { app.process(%w[a b]) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for a b subcommand (accepts: 1..., given: 0)")
+          expect(res).to eq [:top, :before_a]
+          expect { app.process(%w[a]) }.to raise_error(Rodish::CommandFailure, "invalid arguments for a subcommand (accepts: x y)")
+          expect(res).to eq [:top]
+          expect { app.process(%w[a 1]) }.to raise_error(Rodish::CommandFailure, "invalid arguments for a subcommand (accepts: x y)")
+          expect(res).to eq [:top]
+          expect { app.process(%w[a 1 2 3]) }.to raise_error(Rodish::CommandFailure, "invalid arguments for a subcommand (accepts: x y)")
+          expect(res).to eq [:top]
+          expect { app.process(%w[c 1]) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for c subcommand (accepts: 0, given: 1)")
+          expect(res).to eq [:top]
+          expect { app.process(%w[d]) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for d subcommand (accepts: 1, given: 0)")
+          expect(res).to eq [:top]
+          expect { app.process(%w[d 1 2]) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for d subcommand (accepts: 1, given: 2)")
+          expect(res).to eq [:top]
+        end
+
+        it "raises CommandFailure for missing subcommand" do
+          expect { app.process(%w[e]) }.to raise_error(Rodish::CommandFailure, "no subcommand provided")
+          expect(res).to eq [:top]
+        end
+
+        it "raises CommandFailure for invalid subcommand" do
+          expect { app.process(%w[e g]) }.to raise_error(Rodish::CommandFailure, "invalid subcommand: g")
+          expect(res).to eq [:top]
+
+          app = described_class.processor(Class.new) do
+            on("f") {}
+          end
+          expect { app.process(%w[g]) }.to raise_error(Rodish::CommandFailure, "invalid subcommand: g")
+        end
+
+        it "raises CommandFailure for unexpected options" do
+          expect { app.process(%w[-d]) }.to raise_error(Rodish::CommandFailure, "invalid option: -d")
+          expect(res).to be_empty
+          expect { app.process(%w[a -d]) }.to raise_error(Rodish::CommandFailure, "invalid option: -d")
+          expect(res).to eq [:top]
+          expect { app.process(%w[a b -d]) }.to raise_error(Rodish::CommandFailure, "invalid option: -d")
+          expect(res).to eq [:top, :before_a]
+          expect { app.process(%w[d -d 1 2]) }.to raise_error(Rodish::CommandFailure, "invalid option: -d")
+          expect(res).to eq [:top]
         end
 
         it "supports adding subcommands after initialization" do
-          res = []
-          expect { app.process(%w[z], context: res) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for command (accepts: 0, given: 1)")
+          expect { app.process(%w[z]) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for command (accepts: 0, given: 1)")
           expect(res).to be_empty
 
           app.on("z") do
@@ -345,7 +304,7 @@ RSpec.describe Rodish do
               push [:z, arg]
             end
           end
-          app.process(%w[z h], context: res.clear)
+          app.process(%w[z h])
           expect(res).to eq [:top, [:z, "h"]]
 
           app.on("z", "y") do
@@ -353,13 +312,13 @@ RSpec.describe Rodish do
               push :y
             end
           end
-          app.process(%w[z y], context: res.clear)
+          app.process(%w[z y])
           expect(res).to eq [:top, :y]
 
           app.is("z", "y", "x", args: 1) do |arg|
             push [:x, arg]
           end
-          app.process(%w[z y x j], context: res.clear)
+          app.process(%w[z y x j])
           expect(res).to eq [:top, [:x, "j"]]
         end
 
@@ -377,17 +336,38 @@ RSpec.describe Rodish do
             end
           end
 
-          res = []
-          app.process(%w[k m], context: res.clear)
+          app.process(%w[k m])
           expect(res).to eq [:top, :m]
 
-          app.process(%w[k 1 o], context: res.clear)
+          app.process(%w[k 1 o])
           expect(res).to eq [:top, [:k, "1"], :o]
 
-          expect { app.process(%w[k n], context: res) }.to raise_error(Rodish::CommandFailure, "program bug, autoload of subcommand n failed")
+          expect { app.process(%w[k n]) }.to raise_error(Rodish::CommandFailure, "program bug, autoload of subcommand n failed")
         ensure
           main.remove_instance_variable(:@ExampleRodish)
         end
+      end
+
+      it "uses separate lines for more than 6 subcommands" do
+        subcommands = %w[a b c d e f g]
+        app.on("z") do
+          options "example z subcommand"
+          subcommands.each do |cmd|
+            is(cmd) {}
+          end
+        end
+        expect(app.command.subcommand("z").options_text).to eq <<~USAGE
+          Usage: example z subcommand
+
+          Subcommands:
+            a
+            b
+            c
+            d
+            e
+            f
+            g
+        USAGE
       end
     end
   end
