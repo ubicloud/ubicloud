@@ -109,6 +109,8 @@ Subcommands: list
 
 Usage: ubi ps location/(ps-name|_ps-ubid) subcommand [...]
 
+Subcommands: create
+
 
 Usage: ubi ps list [options]
 
@@ -116,6 +118,12 @@ Options:
     -f, --fields=fields              show specific fields (default: location,name,id,net4,net6)
     -l, --location=location          only show private subnets in given location
     -N, --no-headers                 do not show headers
+
+
+Usage: ubi ps location/ps-name create [options]
+
+Options:
+    -f, --firewall-id=id             add to given firewall
 
 
 Usage: ubi vm subcommand [...]
