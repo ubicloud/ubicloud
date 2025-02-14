@@ -3,8 +3,10 @@
 require "optparse"
 
 module Rodish
-  def self.processor(&block)
-    Processor.new(DSL.command([].freeze, &block))
+  def self.processor(mod, &block)
+    mod.extend(Processor)
+    mod.instance_variable_set(:@command, DSL.command([].freeze, &block))
+    mod
   end
 
   class CommandExit < StandardError
@@ -358,15 +360,11 @@ module Rodish
     end
   end
 
-  class Processor
+  module Processor
     attr_reader :command
 
-    def initialize(command)
-      @command = command
-    end
-
-    def process(argv, options: {}, context: nil)
-      @command.process(context, options, argv)
+    def process(argv, ...)
+      @command.process(new(...), {}, argv)
     end
 
     def on(*command_names, &block)
