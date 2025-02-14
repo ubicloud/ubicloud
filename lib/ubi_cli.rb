@@ -50,7 +50,7 @@ class UbiCli
 
       run do |opts|
         opts = opts[key]
-        path = if opts && (location = opts[:location])
+        path = if (location = opts[:location])
           if LocationNameConverter.to_internal_name(location)
             "location/#{location}/#{fragment}"
           else
@@ -61,15 +61,8 @@ class UbiCli
         end
 
         get(project_path(path)) do |data|
-          keys = fields
-          headers = true
-
-          if opts
-            keys = check_fields(opts[:fields], fields, "#{cmd} list -f option")
-            headers = false if opts[:"no-headers"] == false
-          end
-
-          format_rows(keys, data["items"], headers:)
+          keys = check_fields(opts[:fields], fields, "#{cmd} list -f option")
+          format_rows(keys, data["items"], headers: opts[:"no-headers"] != false)
         end
       end
     end
@@ -110,15 +103,14 @@ class UbiCli
       run do |argv, opts|
         get(project_path("location/#{@location}/postgres/#{@name}")) do |data, res|
           conn_string = URI(data["connection_string"])
-          if (opts = opts[:pg_psql])
-            if (user = opts[:username])
-              conn_string.user = user
-              conn_string.password = nil
-            end
+          opts = opts[:pg_psql]
+          if (user = opts[:username])
+            conn_string.user = user
+            conn_string.password = nil
+          end
 
-            if (database = opts[:dbname])
-              conn_string.path = "/#{database}"
-            end
+          if (database = opts[:dbname])
+            conn_string.path = "/#{database}"
           end
 
           argv = [cmd, *argv, "--", conn_string]
@@ -140,13 +132,12 @@ class UbiCli
 
   def handle_ssh(opts)
     get(project_path("location/#{@location}/vm/#{@name}")) do |data, res|
-      if (opts = opts[:vm_ssh])
-        user = opts[:user]
-        if opts[:ip4]
-          address = data["ip4"] || false
-        elsif opts[:ip6]
-          address = data["ip6"]
-        end
+      opts = opts[:vm_ssh]
+      user = opts[:user]
+      if opts[:ip4]
+        address = data["ip4"] || false
+      elsif opts[:ip6]
+        address = data["ip6"]
       end
 
       if address.nil?

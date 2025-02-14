@@ -13,7 +13,7 @@ UbiRodish.on("vm").run_on("create") do
   args(1, invalid_args_message: "public_key is required")
 
   run do |public_key, opts|
-    params = opts[:vm_create]&.transform_keys(&:to_s) || {}
+    params = opts[:vm_create].transform_keys(&:to_s)
     unless params.delete("ipv6-only")
       params["enable_ip4"] = "1"
     end

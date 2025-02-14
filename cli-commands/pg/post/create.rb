@@ -10,7 +10,7 @@ UbiRodish.on("pg").run_on("create") do
   end
 
   run do |opts|
-    params = opts[:pg_create]&.transform_keys(&:to_s) || {}
+    params = opts[:pg_create].transform_keys(&:to_s)
     params["size"] ||= "standard-2"
     post(project_path("location/#{@location}/postgres/#{@name}"), params) do |data|
       ["PostgreSQL database created with id: #{data["id"]}"]
