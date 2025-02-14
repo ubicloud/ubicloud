@@ -26,7 +26,7 @@ class Vm < Sequel::Model
   include SemaphoreMethods
   include HealthMonitorMethods
   semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started
-  semaphore :restart, :stop
+  semaphore :restart, :stop, :recreate
 
   include ObjectTag::Cleanup
 
@@ -63,7 +63,7 @@ class Vm < Sequel::Model
   end
 
   def display_state
-    return "deleting" if destroy_set? || strand&.label == "destroy"
+    return "deleting" if (destroy_set? && !recreate_set?) || strand&.label == "destroy"
     return "restarting" if restart_set? || strand&.label == "restart"
     return "stopped" if stop_set? || strand&.label == "stopped"
     if waiting_for_capacity_set?
@@ -136,13 +136,16 @@ class Vm < Sequel::Model
   # Reverse look-up the vm_size instance that was used to create this VM
   # and use its name as a display name.
   def display_size
-    vm_size = Option::VmSizes.find {
+    vm_size.name
+  end
+
+  def vm_size
+    Option::VmSizes.find {
       _1.family == family &&
         _1.arch == arch &&
         _1.vcpus == vcpus &&
         (cpu_percent_limit.nil? || _1.cpu_percent_limit == cpu_percent_limit)
     }
-    vm_size.name
   end
 
   # Various names in linux, like interface names, are obliged to be
