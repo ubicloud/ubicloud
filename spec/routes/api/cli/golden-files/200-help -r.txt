@@ -1,0 +1,161 @@
+Usage: ubi [options] [subcommand [subcommand-options] ...]
+
+Options:
+        --version                    show program version
+        --help                       show program help
+        --confirm=confirmation       confirmation value (not for direct use)
+
+Subcommands: help pg vm
+
+
+Usage: ubi help [options] [command [subcommand]]
+
+Options:
+    -r, --recursive                  also show documentation for all subcommands of command
+    -u, --usage                      only show usage
+
+
+Usage: ubi pg subcommand [...]
+
+Subcommands: list
+
+
+Usage: ubi pg location/(pg-name|_pg-ubid) [options] subcommand [...]
+
+Options:
+    -d, --dbname=name                override database name
+    -U, --username=name              override username
+
+Subcommands:
+  add-firewall-rule
+  add-metric-destination
+  create
+  delete-firewall-rule
+  delete-metric-destination
+  destroy
+  failover
+  pg_dump
+  pg_dumpall
+  psql
+  reset-superuser-password
+  restore
+  show
+
+
+Usage: ubi pg list [options]
+
+Options:
+    -f, --fields=fields              show specific fields (default: location,name,id,version,flavor)
+    -l, --location=location          only show PostgreSQL databases in given location
+    -N, --no-headers                 do not show headers
+
+
+Usage: ubi pg location/(pg-name|_pg-ubid) add-firewall-rule cidr
+
+
+Usage: ubi pg location/(pg-name|_pg-ubid) add-metric-destination username password url
+
+
+Usage: ubi pg location/pg_name create [options]
+
+Options:
+    -f, --flavor=type                flavor (standard, paradedb, lantern)
+    -h, --ha_type=type               replication type (none, async, sync)
+    -s, --size=size                  server size (standard-{2,4,8,16,30,60})
+    -S, --storage_size=size          storage size GB (64, 128, 256)
+    -v, --version=version            PostgreSQL version (16, 17)
+
+
+Usage: ubi pg location/(pg-name|_pg-ubid) delete-firewall-rule id
+
+
+Usage: ubi pg location/(pg-name|_pg-ubid) delete-metric-destination id
+
+
+Usage: ubi pg location/(pg-name|_pg-ubid) destroy [options]
+
+Options:
+    -f, --force                      do not require confirmation
+
+
+Usage: ubi pg location/(pg-name|_pg-ubid) failover
+
+
+Usage: ubi pg location/(pg-name|_pg-ubid) [options] pg_dump [pg_dump-options]
+
+
+Usage: ubi pg location/(pg-name|_pg-ubid) [options] pg_dumpall [pg_dumpall-options]
+
+
+Usage: ubi pg location/(pg-name|_pg-ubid) [options] psql [psql-options]
+
+
+Usage: ubi pg location/(pg-name|_pg-ubid) reset-superuser-password new-password
+
+
+Usage: ubi pg location/(pg-name|_pg-ubid) restore new-db-name restore-time
+
+
+Usage: ubi pg location/(pg-name|_pg-ubid) show [options]
+
+Options:
+    -f, --fields=fields              show specific fields (default: id,name,state,location,vm-size,storage-size-gib,version,ha-type,flavor,connection-string,primary,earliest-restore-time,firewall-rules,metric-destinations,ca-certificates)
+
+
+Usage: ubi vm subcommand [...]
+
+Subcommands: list
+
+
+Usage: ubi vm location/(vm-name|_vm-ubid) [options] subcommand [...]
+
+Options:
+    -4, --ip4                        use IPv4 address
+    -6, --ip6                        use IPv6 address
+    -u, --user user                  override username
+
+Subcommands: create destroy scp sftp show ssh
+
+
+Usage: ubi vm list [options]
+
+Options:
+    -f, --fields=fields              show specific fields (default: location,name,id,ip4,ip6)
+    -l, --location=location          only show VMs in given location
+    -N, --no-headers                 do not show headers
+
+
+Usage: ubi vm location/vm_name create [options] public_key
+
+Options:
+    -6, --ipv6-only                  do not enable IPv4
+    -b, --boot_image=image_name      boot image (ubuntu-noble,ubuntu-jammy,debian-12,almalinux-9)
+    -p, --private_subnet_id=id       place VM into specific private subnet
+    -s, --size=size                  server size (standard-{2,4,8,16,30,60})
+    -S, --storage_size=size          storage size (40, 80)
+    -u, --unix_user=username         username (default: ubi)
+
+
+Usage: ubi vm location/(vm-name|_vm-ubid) destroy [options]
+
+Options:
+    -f, --force                      do not require confirmation
+
+
+Usage: ubi vm location/(vm-name|_vm-ubid) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
+
+
+Usage: ubi vm location/(vm-name|_vm-ubid) [options] sftp [sftp-options]
+
+
+Usage: ubi vm location/(vm-name|_vm-ubid) show [options]
+
+Options:
+    -f, --fields=fields              show specific fields (default: id,name,state,location,size,unix-user,storage-size-gib,ip6,ip4-enabled,ip4,private-ipv4,private-ipv6,subnet,firewalls)
+    -r, --rule-fields=fields         show specific firewall rule fields (default: id,cidr,port-range)
+    -w, --firewall-fields=fields     show specific firewall fields (default: id,name,description,location,path,firewall-rules)
+
+
+Usage: ubi vm location/(vm-name|_vm-ubid) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
+
+

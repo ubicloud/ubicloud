@@ -1,0 +1,8 @@
+! Invalid number of arguments for pg list subcommand (accepts: 0, given: 1)
+
+Usage: ubi pg list [options]
+
+Options:
+    -f, --fields=fields              show specific fields (default: location,name,id,version,flavor)
+    -l, --location=location          only show PostgreSQL databases in given location
+    -N, --no-headers                 do not show headers
