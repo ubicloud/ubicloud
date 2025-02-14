@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-UbiRodish.on("pg").run_on("delete-metric-destination") do
+UbiCli.on("pg").run_on("delete-metric-destination") do
   options("ubi pg location/(pg-name|_pg-ubid) delete-metric-destination id")
 
   args 1, invalid_args_message: "metric destination id is required"

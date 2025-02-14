@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-UbiRodish.on("help") do
+UbiCli.on("help") do
   options("ubi help [options] [command [subcommand]]") do
     on("-r", "--recursive", "also show documentation for all subcommands of command")
     on("-u", "--usage", "only show usage")
@@ -9,7 +9,7 @@ UbiRodish.on("help") do
   args(0..)
 
   run do |argv, opts|
-    orig_command = command = UbiRodish.command
+    orig_command = command = UbiCli.command
 
     argv.each do |arg|
       break unless (command = command.subcommand(arg) || command.post_subcommand(arg))
