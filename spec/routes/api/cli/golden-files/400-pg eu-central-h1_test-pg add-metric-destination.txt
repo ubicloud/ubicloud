@@ -1,0 +1,3 @@
+! Invalid arguments for pg add-metric-destination subcommand (username, password, and url arguments are required)
+
+Usage: ubi pg location/(pg-name|_pg-ubid) add-metric-destination username password url

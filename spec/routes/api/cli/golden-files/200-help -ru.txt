@@ -1,0 +1,27 @@
+Usage: ubi [options] [subcommand [subcommand-options] ...]
+Usage: ubi help [options] [command [subcommand]]
+Usage: ubi pg subcommand [...]
+Usage: ubi pg location/(pg-name|_pg-ubid) [options] subcommand [...]
+Usage: ubi pg list [options]
+Usage: ubi pg location/(pg-name|_pg-ubid) add-firewall-rule cidr
+Usage: ubi pg location/(pg-name|_pg-ubid) add-metric-destination username password url
+Usage: ubi pg location/pg_name create [options]
+Usage: ubi pg location/(pg-name|_pg-ubid) delete-firewall-rule id
+Usage: ubi pg location/(pg-name|_pg-ubid) delete-metric-destination id
+Usage: ubi pg location/(pg-name|_pg-ubid) destroy [options]
+Usage: ubi pg location/(pg-name|_pg-ubid) failover
+Usage: ubi pg location/(pg-name|_pg-ubid) [options] pg_dump [pg_dump-options]
+Usage: ubi pg location/(pg-name|_pg-ubid) [options] pg_dumpall [pg_dumpall-options]
+Usage: ubi pg location/(pg-name|_pg-ubid) [options] psql [psql-options]
+Usage: ubi pg location/(pg-name|_pg-ubid) reset-superuser-password new-password
+Usage: ubi pg location/(pg-name|_pg-ubid) restore new-db-name restore-time
+Usage: ubi pg location/(pg-name|_pg-ubid) show [options]
+Usage: ubi vm subcommand [...]
+Usage: ubi vm location/(vm-name|_vm-ubid) [options] subcommand [...]
+Usage: ubi vm list [options]
+Usage: ubi vm location/vm_name create [options] public_key
+Usage: ubi vm location/(vm-name|_vm-ubid) destroy [options]
+Usage: ubi vm location/(vm-name|_vm-ubid) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
+Usage: ubi vm location/(vm-name|_vm-ubid) [options] sftp [sftp-options]
+Usage: ubi vm location/(vm-name|_vm-ubid) show [options]
+Usage: ubi vm location/(vm-name|_vm-ubid) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
