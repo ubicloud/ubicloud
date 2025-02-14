@@ -44,6 +44,14 @@ module Option
     Option::LOCATIONS.select { _1.name == "hetzner-fsn1" || _1.name == "leaseweb-wdc02" }
   end
 
+  def self.families(use_slices: false)
+    if use_slices
+      Option::VmFamilies.select { _1.visible }
+    else
+      Option::VmFamilies.select { _1.visible && !_1.require_shared_slice }
+    end
+  end
+
   BootImage = Struct.new(:name, :display_name)
   BootImages = [
     ["ubuntu-noble", "Ubuntu Noble 24.04 LTS"],
@@ -52,11 +60,16 @@ module Option
     ["almalinux-9", "AlmaLinux 9"]
   ].map { |args| BootImage.new(*args) }.freeze
 
-  VmFamily = Data.define(:name, :require_shared_slice)
+  VmFamily = Data.define(:name, :ui_descriptor, :visible, :require_shared_slice) do
+    def display_name
+      name.capitalize
+    end
+  end
+
   VmFamilies = [
-    ["standard", false],
-    ["standard-gpu", false],
-    ["burstable", true]
+    ["standard", "Dedicated CPU", true, false],
+    ["standard-gpu", "Dedicated GPU", false, false],
+    ["burstable", "Shared CPU", true, true]
   ].map { |args| VmFamily.new(*args) }
 
   IoLimits = Struct.new(:max_ios_per_sec, :max_read_mbytes_per_sec, :max_write_mbytes_per_sec)
@@ -76,7 +89,7 @@ module Option
   }).concat([1, 2].map {
     storage_size_options = [_1 * 10, _1 * 20]
     io_limits = IoLimits.new(nil, _1 * 50, _1 * 50)
-    VmSize.new("burstable-#{_1}", "burstable", _1, _1 * 50, _1 * 50, _1 * 2, storage_size_options, io_limits, false, false, "x64")
+    VmSize.new("burstable-#{_1}", "burstable", _1, _1 * 50, _1 * 50, _1 * 2, storage_size_options, io_limits, true, false, "x64")
   }).concat([1, 2].map {
     storage_size_options = [_1 * 10, _1 * 20]
     io_limits = IoLimits.new(nil, _1 * 50, _1 * 50)
