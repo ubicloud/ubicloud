@@ -5,7 +5,7 @@ Options:
         --help                       show program help
         --confirm=confirmation       confirmation value (not for direct use)
 
-Subcommands: help pg vm
+Subcommands: help pg ps vm
 
 
 Usage: ubi help [options] [command [subcommand]]
@@ -100,6 +100,22 @@ Usage: ubi pg location/(pg-name|_pg-ubid) show [options]
 
 Options:
     -f, --fields=fields              show specific fields (default: id,name,state,location,vm-size,storage-size-gib,version,ha-type,flavor,connection-string,primary,earliest-restore-time,firewall-rules,metric-destinations,ca-certificates)
+
+
+Usage: ubi ps subcommand [...]
+
+Subcommands: list
+
+
+Usage: ubi ps location/(ps-name|_ps-ubid) subcommand [...]
+
+
+Usage: ubi ps list [options]
+
+Options:
+    -f, --fields=fields              show specific fields (default: location,name,id,net4,net6)
+    -l, --location=location          only show private subnets in given location
+    -N, --no-headers                 do not show headers
 
 
 Usage: ubi vm subcommand [...]
