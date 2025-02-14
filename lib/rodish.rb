@@ -328,7 +328,7 @@ module Rodish
 
         option_parser.order!(argv, into: command_options)
 
-        if option_key && !command_options.empty?
+        if option_key
           options[option_key] = command_options
         end
       end
