@@ -71,6 +71,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       vhost_block_backend_version: Config.vhost_block_backend_version
     ).subject
     update_stack({"vm_host_id" => vm_host.id})
+    Clog.emit("Setting up the vm host") { vm_host }
 
     hop_wait_setup_host
   end
