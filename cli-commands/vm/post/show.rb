@@ -1,14 +1,14 @@
 # frozen_string_literal: true
 
 UbiRodish.on("vm").run_on("show") do
-  fields = %w[id name state location size unix_user storage_size_gib ip6 ip4_enabled ip4 private_ipv4 private_ipv6 subnet firewalls].freeze.each(&:freeze)
-  firewall_fields = %w[id name description location path firewall_rules].freeze.each(&:freeze)
-  firewall_rule_fields = %w[id cidr port_range].freeze.each(&:freeze)
+  fields = %w[id name state location size unix-user storage-size-gib ip6 ip4-enabled ip4 private-ipv4 private-ipv6 subnet firewalls].freeze.each(&:freeze)
+  firewall_fields = %w[id name description location path firewall-rules].freeze.each(&:freeze)
+  firewall_rule_fields = %w[id cidr port-range].freeze.each(&:freeze)
 
   options("ubi vm location/(vm-name|_vm-ubid) show [options]", key: :vm_show) do
     on("-f", "--fields=fields", "show specific fields (default: #{fields.join(",")})")
-    on("-r", "--rule_fields=fields", "show specific firewall rule fields (default: #{firewall_rule_fields.join(",")})")
-    on("-w", "--firewall_fields=fields", "show specific firewall fields (default: #{firewall_fields.join(",")})")
+    on("-r", "--rule-fields=fields", "show specific firewall rule fields (default: #{firewall_rule_fields.join(",")})")
+    on("-w", "--firewall-fields=fields", "show specific firewall fields (default: #{firewall_fields.join(",")})")
   end
 
   run do |opts|
@@ -19,13 +19,15 @@ UbiRodish.on("vm").run_on("show") do
 
       if (opts = opts[:vm_show])
         keys = check_fields(opts[:fields], fields, "vm show -f option")
-        firewall_keys = check_fields(opts[:firewall_fields], firewall_fields, "vm show -w option")
-        firewall_rule_keys = check_fields(opts[:rule_fields], firewall_rule_fields, "vm show -r option")
+        firewall_keys = check_fields(opts[:"firewall-fields"], firewall_fields, "vm show -w option")
+        firewall_rule_keys = check_fields(opts[:"rule-fields"], firewall_rule_fields, "vm show -r option")
       end
 
       body = []
 
-      keys.each do |key|
+      firewall_keys = underscore_keys(firewall_keys)
+      firewall_rule_keys = underscore_keys(firewall_rule_keys)
+      underscore_keys(keys).each do |key|
         if key == "firewalls"
           data[key].each_with_index do |firewall, i|
             body << "firewall " << (i + 1).to_s << ":\n"
