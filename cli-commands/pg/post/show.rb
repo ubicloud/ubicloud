@@ -8,7 +8,7 @@ UbiRodish.on("pg").run_on("show") do
   end
 
   run do |opts|
-    get(project_path("location/#{@location}/postgres/#{@name}")) do |data|
+    get(pg_path) do |data|
       opts = opts[:pg_show]
       keys = check_fields(opts[:fields], fields, "pg show -f option")
 

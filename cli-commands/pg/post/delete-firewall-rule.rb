@@ -10,7 +10,7 @@ UbiRodish.on("pg").run_on("delete-firewall-rule") do
       raise Rodish::CommandFailure, "invalid firewall rule id format"
     end
 
-    delete(project_path("location/#{@location}/postgres/#{@name}/firewall-rule/#{ubid}")) do |data|
+    delete(pg_path("/firewall-rule/#{ubid}")) do |data|
       ["Firewall rule, if it exists, has been scheduled for deletion"]
     end
   end
