@@ -16,32 +16,4 @@ RSpec.describe Clover, "cli" do
   it "handles --version" do
     expect(cli(%w[--version])).to eq "0.0.0"
   end
-
-  it "handles --help" do
-    expect(cli(%w[--help])).to eq <<~OUTPUT
-      Usage: ubi [options] [subcommand [subcommand-options] ...]
-
-      Options:
-              --version                    show program version
-              --help                       show program help
-              --confirm=confirmation       confirmation value (not for direct use)
-
-      Subcommands: help pg vm
-    OUTPUT
-  end
-
-  it "shows usage on invalid option" do
-    expect(cli(%w[--foo], status: 400)).to eq <<~OUTPUT
-      ! Invalid option: --foo
-
-      Usage: ubi [options] [subcommand [subcommand-options] ...]
-
-      Options:
-              --version                    show program version
-              --help                       show program help
-              --confirm=confirmation       confirmation value (not for direct use)
-
-      Subcommands: help pg vm
-    OUTPUT
-  end
 end

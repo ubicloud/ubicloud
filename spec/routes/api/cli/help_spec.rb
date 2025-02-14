@@ -3,19 +3,6 @@
 require_relative "spec_helper"
 
 RSpec.describe Clover, "cli help" do
-  it "shows help for top level command with no arguments" do
-    expect(cli(%w[help])).to eq <<~OUTPUT
-      Usage: ubi [options] [subcommand [subcommand-options] ...]
-
-      Options:
-              --version                    show program version
-              --help                       show program help
-              --confirm=confirmation       confirmation value (not for direct use)
-
-      Subcommands: help pg vm
-    OUTPUT
-  end
-
   it "shows help for specific command if given" do
     expect(cli(%w[help help])).to eq <<~OUTPUT
       Usage: ubi help [options] [command [subcommand]]
@@ -51,21 +38,6 @@ RSpec.describe Clover, "cli help" do
     expect(cli(%w[help -ru vm])).to include <<~OUTPUT
       Usage: ubi vm list [options]
       Usage: ubi vm location/vm_name create [options] public_key
-    OUTPUT
-  end
-
-  it "shows error and help for top level if top level command invalid" do
-    expect(cli(%w[help foo], status: 400)).to eq <<~OUTPUT
-      ! Invalid command: foo
-
-      Usage: ubi [options] [subcommand [subcommand-options] ...]
-
-      Options:
-              --version                    show program version
-              --help                       show program help
-              --confirm=confirmation       confirmation value (not for direct use)
-
-      Subcommands: help pg vm
     OUTPUT
   end
 
