@@ -1,8 +1,22 @@
 # frozen_string_literal: true
 
 class UbiCli
+  force_autoload = Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
+
+  Rodish.processor(self) do
+    options("ubi [options] [subcommand [subcommand-options] ...]") do
+      on("--version", "show program version") { halt "0.0.0" }
+      on("--help", "show program help") { halt to_s }
+      on("--confirm=confirmation", "confirmation value (not for direct use)")
+    end
+
+    # :nocov:
+    autoload_subcommand_dir("cli-commands") unless force_autoload
+    # :nocov:
+  end
+
   def self.process(argv, env)
-    UbiRodish.process(argv, context: new(env))
+    super
   rescue Rodish::CommandExit => e
     if e.failure?
       status = 400
@@ -17,7 +31,7 @@ class UbiCli
   end
 
   def self.base(cmd, &block)
-    UbiRodish.on(cmd) do
+    on(cmd) do
       # :nocov:
       unless Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
         autoload_subcommand_dir("cli-commands/#{cmd}")
@@ -41,7 +55,7 @@ class UbiCli
     fields.freeze.each(&:freeze)
     key = :"#{cmd}_list"
 
-    UbiRodish.on(cmd, "list") do
+    on(cmd, "list") do
       options("ubi #{cmd} list [options]", key:) do
         on("-f", "--fields=fields", "show specific fields (default: #{fields.join(",")})")
         on("-l", "--location=location", "only show #{label} in given location")
@@ -69,7 +83,7 @@ class UbiCli
   end
 
   def self.destroy(cmd, label, fragment: cmd)
-    UbiRodish.on(cmd).run_on("destroy") do
+    on(cmd).run_on("destroy") do
       options("ubi #{cmd} location/(#{cmd}-name|_#{cmd}-ubid) destroy [options]", key: :destroy) do
         on("-f", "--force", "do not require confirmation")
       end
@@ -95,7 +109,7 @@ class UbiCli
   end
 
   def self.pg_cmd(cmd)
-    UbiRodish.on("pg").run_on(cmd) do
+    on("pg").run_on(cmd) do
       skip_option_parsing("ubi pg location/(pg-name|_pg-ubid) [options] #{cmd} [#{cmd}-options]")
 
       args(0...)
@@ -374,6 +388,16 @@ class UbiCli
         end
       end
     end)
+  end
+  # :nocov:
+
+  Unreloader.record_dependency("lib/rodish.rb", __FILE__)
+  Unreloader.record_dependency(__FILE__, "cli-commands")
+  if force_autoload
+    Unreloader.require("cli-commands") {}
+  # :nocov:
+  else
+    Unreloader.autoload("cli-commands") {}
   end
   # :nocov:
 end

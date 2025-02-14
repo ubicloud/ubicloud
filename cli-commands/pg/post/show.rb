@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-UbiRodish.on("pg").run_on("show") do
+UbiCli.on("pg").run_on("show") do
   fields = %w[id name state location vm-size storage-size-gib version ha-type flavor connection-string primary earliest-restore-time firewall-rules metric-destinations ca-certificates].freeze.each(&:freeze)
 
   options("ubi pg location/(pg-name|_pg-ubid) show [options]", key: :pg_show) do
