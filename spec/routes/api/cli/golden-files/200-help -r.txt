@@ -109,7 +109,7 @@ Subcommands: list
 
 Usage: ubi ps location/(ps-name|_ps-ubid) subcommand [...]
 
-Subcommands: create
+Subcommands: create show
 
 
 Usage: ubi ps list [options]
@@ -124,6 +124,15 @@ Usage: ubi ps location/ps-name create [options]
 
 Options:
     -f, --firewall-id=id             add to given firewall
+
+
+Usage: ubi ps location/(ps-name|_ps-ubid) show [options]
+
+Options:
+    -f, --fields=fields              show specific fields (default: id,name,state,location,net4,net6,firewalls,nics)
+    -n, --nic-fields=fields          show specific nic fields (default: id,name,private-ipv4,private-ipv6,vm-name)
+    -r, --rule-fields=fields         show specific firewall rule fields (default: id,cidr,port-range)
+    -w, --firewall-fields=fields     show specific firewall fields (default: id,name,description,location,path,firewall-rules)
 
 
 Usage: ubi vm subcommand [...]

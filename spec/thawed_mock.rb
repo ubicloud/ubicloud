@@ -65,7 +65,7 @@ module ThawedMock
   allow_mocking(IpsecTunnel, :[], :create)
   allow_mocking(KubernetesCluster, :[], :kubeconfig)
   allow_mocking(MinioCluster, :[])
-  allow_mocking(Nic, :[], :create)
+  allow_mocking(Nic, :[], :create, :generate_ubid)
   allow_mocking(Page, :from_tag_parts)
   allow_mocking(PrivateSubnet, :[], :from_ubid, :random_subnet, :generate_ubid)
   allow_mocking(PostgresFirewallRule, :generate_uuid)
