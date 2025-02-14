@@ -109,7 +109,7 @@ Subcommands: list
 
 Usage: ubi ps location/(ps-name|_ps-ubid) subcommand [...]
 
-Subcommands: create show
+Subcommands: create destroy show
 
 
 Usage: ubi ps list [options]
@@ -124,6 +124,12 @@ Usage: ubi ps location/ps-name create [options]
 
 Options:
     -f, --firewall-id=id             add to given firewall
+
+
+Usage: ubi ps location/(ps-name|_ps-ubid) destroy [options]
+
+Options:
+    -f, --force                      do not require confirmation
 
 
 Usage: ubi ps location/(ps-name|_ps-ubid) show [options]
