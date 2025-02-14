@@ -266,6 +266,12 @@ class UbiCli
 
   private
 
+  def underscore_keys(keys)
+    keys.map do
+      _1.tr("-", "_")
+    end
+  end
+
   def invalid_confirmation(message)
     response(message, status: 400)
   end

@@ -56,7 +56,7 @@ RSpec.describe Clover, "cli vm show" do
   end
 
   it "-r option controls which fields are shown rules for VM's firewalls" do
-    expect(cli(%W[vm #{@ref} show -f firewalls -w firewall_rules -r cidr,port_range])).to eq <<~END
+    expect(cli(%W[vm #{@ref} show -f firewalls -w firewall-rules -r cidr,port-range])).to eq <<~END
       firewall 1:
         rule 1: 0.0.0.0/0  0..65535  
         rule 2: ::/0  0..65535  
