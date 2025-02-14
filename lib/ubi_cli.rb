@@ -126,6 +126,8 @@ class UbiCli
     @env = env
   end
 
+  private
+
   def project_ubid
     @project_ubid ||= @env["clover.project_ubid"]
   end
@@ -266,8 +268,6 @@ class UbiCli
   def ipv6_request?
     @env["puma.socket"]&.local_address&.ipv6?
   end
-
-  private
 
   def underscore_keys(keys)
     if keys.is_a?(Hash)
