@@ -56,7 +56,7 @@ Usage: ubi pg location/(pg-name|_pg-ubid) add-firewall-rule cidr
 Usage: ubi pg location/(pg-name|_pg-ubid) add-metric-destination username password url
 
 
-Usage: ubi pg location/pg_name create [options]
+Usage: ubi pg location/pg-name create [options]
 
 Options:
     -f, --flavor=type                flavor (standard, paradedb, lantern)
@@ -164,7 +164,7 @@ Options:
     -N, --no-headers                 do not show headers
 
 
-Usage: ubi vm location/vm_name create [options] public_key
+Usage: ubi vm location/vm-name create [options] public_key
 
 Options:
     -6, --ipv6-only                  do not enable IPv4
