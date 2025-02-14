@@ -164,6 +164,11 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(blob_storage_client).to receive(:delete_object).with(bucket: github_repository.bucket_name, key: three_gib_cache.blob_key)
       nx.cleanup_cache
     end
+
+    it "deletes blob storage if there are no cache entries" do
+      expect(github_repository).to receive(:destroy_blob_storage)
+      nx.cleanup_cache
+    end
   end
 
   describe "#before_run" do

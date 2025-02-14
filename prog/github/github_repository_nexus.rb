@@ -113,6 +113,11 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
         total_usage -= oldest_entry.size
       end
     end
+
+    if github_repository.cache_entries.empty?
+      Clog.emit("Deleting empty bucket and tokens") { {deleting_empty_bucket: {repository_name: github_repository.name}} }
+      github_repository.destroy_blob_storage
+    end
   end
 
   def before_run
