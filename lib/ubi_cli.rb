@@ -258,8 +258,12 @@ class UbiCli
   private
 
   def underscore_keys(keys)
-    keys.map do
-      _1.tr("-", "_")
+    if keys.is_a?(Hash)
+      # Used with symbol keyed hashes that need to be
+      # converted to strings
+      keys.transform_keys { _1.to_s.tr("-", "_") }
+    else # when Hash
+      keys.map { _1.tr("-", "_") }
     end
   end
 
