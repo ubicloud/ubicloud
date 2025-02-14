@@ -40,6 +40,12 @@ RSpec.describe Clover, "cli" do
     cli(%w[pg eu-central-h1/test-pg reset-superuser-password bar456FOO123])
     cli(%w[pg eu-central-h1/test-pg add-metric-destination foo bar https://baz.example.com])
 
+    expect(Firewall).to receive(:generate_uuid).and_return("e9843761-3af7-85fc-ba6a-1709852cf736")
+    expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("pshfgpzvs0t20gpezmz2kkk8e4"))
+    expect(FirewallRule).to receive(:generate_uuid).and_return("bc9b093a-0e00-89f8-991a-5e0cd15a7942", "b5e13849-a04f-89f8-b564-ab8ad37298aa", "e46b8b76-88e2-89f8-972b-692232699d16", "e0804078-98cf-85f8-bf74-702ec92c91e8", "d62c8465-7f9b-85f8-a548-5a8772352988")
+    cli(%w[ps eu-central-h1/test-ps create])
+    PrivateSubnet["pshfgpzvs0t20gpezmz2kkk8e4"].update(net4: "10.147.204.0/26", net6: "fdab:de77:9a94:fa69::/64")
+
     expect(Vm).to receive(:generate_ubid).and_return(UBID.parse("vmz7b0dxt40t4g7rnmag9hct7c")).at_least(:once)
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("ps9a8v5tm1020qn73f0c7db0x7")).at_least(:once)
     fw_uuids = %w[2b4ae5cf-1aac-8dfc-bc80-c87e3e381e10 f5e6cb31-e580-81fc-88d6-a379f13494bf].cycle
