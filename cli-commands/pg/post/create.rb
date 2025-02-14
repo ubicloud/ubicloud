@@ -12,7 +12,7 @@ UbiRodish.on("pg").run_on("create") do
   run do |opts|
     params = underscore_keys(opts[:pg_create])
     params["size"] ||= Prog::Vm::Nexus::DEFAULT_SIZE
-    post(project_path("location/#{@location}/postgres/#{@name}"), params) do |data|
+    post(pg_path, params) do |data|
       ["PostgreSQL database created with id: #{data["id"]}"]
     end
   end

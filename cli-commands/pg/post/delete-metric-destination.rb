@@ -10,7 +10,7 @@ UbiRodish.on("pg").run_on("delete-metric-destination") do
       raise Rodish::CommandFailure, "invalid metric destination id format"
     end
 
-    delete(project_path("location/#{@location}/postgres/#{@name}/metric-destination/#{ubid}")) do |data|
+    delete(pg_path("/metric-destination/#{ubid}")) do |data|
       ["Metric destination, if it exists, has been scheduled for deletion"]
     end
   end

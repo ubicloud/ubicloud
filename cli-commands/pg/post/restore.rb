@@ -10,7 +10,7 @@ UbiRodish.on("pg").run_on("restore") do
       "name" => name,
       "restore_target" => restore_target
     }
-    post(project_path("location/#{@location}/postgres/#{@name}/restore"), params) do |data|
+    post(pg_path("/restore"), params) do |data|
       ["Restored PostgreSQL database scheduled for creation with id: #{data["id"]}"]
     end
   end
