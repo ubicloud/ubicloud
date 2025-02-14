@@ -27,7 +27,8 @@ class Clover
     required_parameters = ["public_key"]
     required_parameters << "name" << "location" if web?
     allowed_optional_parameters = ["size", "storage_size", "unix_user", "boot_image", "enable_ip4", "private_subnet_id"]
-    request_body_params = validate_request_params(required_parameters, allowed_optional_parameters)
+    ignored_parameters = ["family"]
+    request_body_params = validate_request_params(required_parameters, allowed_optional_parameters, ignored_parameters)
     assemble_params = request_body_params.slice(*allowed_optional_parameters).compact
 
     # Generally parameter validation is handled in progs while creating resources.
@@ -96,11 +97,15 @@ class Clover
     end
 
     options.add_option(name: "enable_ip4", values: ["1"], parent: "location")
-    options.add_option(name: "size", values: [2, 4, 8, 16, 30, 60].map { "standard-#{_1}" }, parent: "location")
+    options.add_option(name: "family", values: Option.families(use_slices: @project.get_ff_use_slices_for_allocation || false).map { _1.name }, parent: "location")
+    options.add_option(name: "size", values: Option::VmSizes.select { _1.visible }.map { _1.display_name }, parent: "family") do |location, family, size|
+      vm_size = Option::VmSizes.find { _1.display_name == size && _1.arch == "x64" }
+      vm_size.family == family
+    end
 
-    options.add_option(name: "storage_size", values: ["40", "80", "160", "320", "600", "640", "1200", "2400"], parent: "size") do |location, size, storage_size|
-      size = size.split("-").last.to_i
-      [size * 20, size * 40].include?(storage_size.to_i)
+    options.add_option(name: "storage_size", values: ["10", "20", "40", "80", "160", "320", "600", "640", "1200", "2400"], parent: "size") do |location, family, size, storage_size|
+      vm_size = Option::VmSizes.find { _1.display_name == size && _1.arch == "x64" }
+      vm_size.storage_size_options.include?(storage_size.to_i)
     end
 
     options.add_option(name: "boot_image", values: Option::BootImages.map(&:name))
