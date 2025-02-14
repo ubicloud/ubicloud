@@ -76,7 +76,7 @@ class UbiCli
 
       run do |opts|
         if opts.dig(:destroy, :force) || opts[:confirm] == @name
-          delete(project_path("location/#{@location}/#{fragment}/#{@name}")) do |_, res|
+          delete(project_subpath(fragment)) do |_, res|
             ["#{label}, if it exists, is now scheduled for destruction"]
           end
         elsif opts[:confirm]
@@ -101,7 +101,7 @@ class UbiCli
       args(0...)
 
       run do |argv, opts|
-        get(project_path("location/#{@location}/postgres/#{@name}")) do |data, res|
+        get(pg_path) do |data, res|
           conn_string = URI(data["connection_string"])
           opts = opts[:pg_psql]
           if (user = opts[:username])
@@ -131,7 +131,7 @@ class UbiCli
   end
 
   def handle_ssh(opts)
-    get(project_path("location/#{@location}/vm/#{@name}")) do |data, res|
+    get(vm_path) do |data, res|
       opts = opts[:vm_ssh]
       user = opts[:user]
       if opts[:ip4]
@@ -199,6 +199,18 @@ class UbiCli
 
   def project_path(rest)
     "/project/#{project_ubid}/#{rest}"
+  end
+
+  def project_subpath(fragment, rest = "")
+    project_path("location/#{@location}/#{fragment}/#{@name}#{rest}")
+  end
+
+  def vm_path(rest = "")
+    project_subpath("vm", rest)
+  end
+
+  def pg_path(rest = "")
+    project_subpath("postgres", rest)
   end
 
   def format_rows(keys, rows, headers: false, col_sep: "  ")

@@ -11,7 +11,7 @@ UbiRodish.on("pg").run_on("add-metric-destination") do
       "password" => password,
       "url" => url
     }
-    post(project_path("location/#{@location}/postgres/#{@name}/metric-destination"), params) do |data|
+    post(pg_path("/metric-destination"), params) do |data|
       body = []
       body << "Metric destination added to PostgreSQL database.\n"
       body << "Current metric destinations:\n"
