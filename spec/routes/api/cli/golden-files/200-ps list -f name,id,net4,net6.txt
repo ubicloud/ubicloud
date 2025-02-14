@@ -1,0 +1,2 @@
+name                   id                          net4              net6                    
+default-eu-central-h1  psfzm9e26xky5m9ggetw4dpqe2  172.27.99.128/26  fdd9:1ea7:125d:5fa4::/64

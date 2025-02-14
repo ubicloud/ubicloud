@@ -23,6 +23,8 @@ RSpec.describe Clover, "cli" do
     @vm = Vm.first
     add_ipv4_to_vm(@vm, "128.0.0.1")
     @vm.nics.first.update(private_ipv4: "10.67.141.133/32", private_ipv6: "fda0:d79a:93e7:d4fd:1c2::0/80")
+    @ps = PrivateSubnet.first
+    @ps.update(net4: "172.27.99.128/26", net6: "fdd9:1ea7:125d:5fa4::/64")
 
     expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
     @dns_zone = DnsZone.new

@@ -1,0 +1,8 @@
+! Invalid number of arguments for ps list subcommand (accepts: 0, given: 1)
+
+Usage: ubi ps list [options]
+
+Options:
+    -f, --fields=fields              show specific fields (default: location,name,id,net4,net6)
+    -l, --location=location          only show private subnets in given location
+    -N, --no-headers                 do not show headers
