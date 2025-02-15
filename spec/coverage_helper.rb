@@ -28,6 +28,7 @@ if (suite = ENV.delete("COVERAGE"))
       add_filter "/model.rb"
       add_filter "/loader.rb"
       add_filter "/.env.rb"
+      add_filter "/build-ubi"
     end
 
     add_group("Missing") { |src| src.covered_percent < 100 }

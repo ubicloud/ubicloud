@@ -1,0 +1,42 @@
+---
+mruby:
+  version: 3.3.0
+  release_no: 30300
+  git_commit: 32279e4128527bab4c961854b9cce727a060abea
+builds:
+  host:
+    https://github.com/mattn/mruby-json.git:
+      url: https://github.com/mattn/mruby-json.git
+      branch: master
+      commit: f99d9428025469f2400f93c53b185f65f963e507
+      version: 0.0.0
+    https://github.com/matsumotory/mruby-simplehttp.git:
+      url: https://github.com/matsumotory/mruby-simplehttp.git
+      branch: master
+      commit: 4b756cdc743dd3f21b79401e9e0c788ce3e95c98
+      version: 0.0.1
+    https://github.com/iij/mruby-env.git:
+      url: https://github.com/iij/mruby-env.git
+      branch: master
+      commit: 056ae324451ef16a50c7887e117f0ea30921b71b
+      version: 0.0.0
+    https://github.com/luisbebop/mruby-polarssl.git:
+      url: https://github.com/luisbebop/mruby-polarssl.git
+      branch: master
+      commit: 37b14f7b7378bc798eb980d8649f3fcfb1a1defe
+      version: 2.1.2
+    https://github.com/mattn/mruby-curl.git:
+      url: https://github.com/mattn/mruby-curl.git
+      branch: master
+      commit: 8da00760bc69ac8884cf94cc98c71e9a494469ec
+      version: 0.0.0
+    https://github.com/mattn/mruby-http.git:
+      url: https://github.com/mattn/mruby-http.git
+      branch: master
+      commit: 003c2af0a059c50a3546001860108ff4bf3a2cac
+      version: 0.0.0
+    https://github.com/iij/mruby-regexp-pcre.git:
+      url: https://github.com/iij/mruby-regexp-pcre.git
+      branch: master
+      commit: 71bd16ba59239f04aefb73bb6d46d5b581f27b1b
+      version: 0.0.0

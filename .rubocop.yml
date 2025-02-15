@@ -19,6 +19,7 @@ AllCops:
     - vendor/**/*
     - node_modules/**/*
     - coverage/views/*
+    - build-ubi/**/*
 
 RSpec:
   Enabled: true
@@ -89,4 +90,7 @@ Capybara/ClickLinkOrButtonStyle:
   EnforcedStyle: strict
 
 Lint/UselessTimes:
+  Enabled: false
+
+Style/StderrPuts:
   Enabled: false
