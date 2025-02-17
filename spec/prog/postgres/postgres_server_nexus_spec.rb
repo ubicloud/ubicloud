@@ -290,13 +290,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.crt && sudo chmod 640 /etc/ssl/certs/server.crt")
       expect(sshable).to receive(:cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.key && sudo chmod 640 /etc/ssl/certs/server.key")
       expect(sshable).to receive(:cmd).with("sudo -u postgres pg_ctlcluster 16 main reload")
+      expect(sshable).to receive(:cmd).with("sudo systemctl reload pgbouncer")
       expect(nx).to receive(:refresh_walg_credentials)
       expect { nx.refresh_certificates }.to hop("wait")
     end
   end
 
   describe "#configure_prometheus" do
-    it "configures prometheus and hops configure during initial provisioning" do
+    it "configures prometheus and hops configure_pgbouncer during initial provisioning" do
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
       expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
@@ -638,6 +639,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#restart" do
     it "restarts and exits" do
       expect(sshable).to receive(:cmd).with("sudo postgres/bin/restart 16")
+      expect(sshable).to receive(:cmd).with("sudo systemctl restart pgbouncer")
       expect { nx.restart }.to exit({"msg" => "postgres server is restarted"})
     end
   end
