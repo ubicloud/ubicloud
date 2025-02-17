@@ -46,6 +46,7 @@ pg_hba_entries = <<-PG_HBA
 # TYPE  DATABASE        USER            ADDRESS                 METHOD
 # Database administrative login by Unix domain socket
 local   all             postgres                                peer map=system2postgres
+local   all             pgbouncer                               peer map=system2pgbouncer
 
 # "local" is for Unix domain socket connections only
 local   all             all                                     peer
@@ -86,6 +87,7 @@ pg_ident_entries = <<-PG_IDENT
 # Authentication" for a complete description.
 # MAPNAME             SYSTEM-USERNAME         PG-USERNAME
 system2postgres       postgres                postgres
+system2pgbouncer      postgres                pgbouncer
 system2postgres       ubi                     postgres
 standby2replication   #{identity}             ubi_replication
 PG_IDENT
@@ -93,3 +95,36 @@ safe_write_to_file("/etc/postgresql/#{v}/main/pg_ident.conf", pg_ident_entries)
 
 # Reload the postmaster to apply changes
 r "pg_ctlcluster #{v} main reload || pg_ctlcluster #{v} main restart"
+
+# PgBouncer config
+pgbouncer_config = <<-PGBOUNCER_CONFIG
+# PgBouncer configuration file
+# ============================
+[databases]
+; any db over Unix socket
+* =
+
+[pgbouncer]
+listen_port = 6432
+listen_addr = 0.0.0.0
+
+unix_socket_dir = /var/run/postgresql
+
+auth_type = hba
+auth_hba_file = /etc/postgresql/#{v}/main/pg_hba.conf
+auth_ident_file = /etc/postgresql/#{v}/main/pg_ident.conf
+auth_user = pgbouncer
+auth_query = SELECT p_user, p_password FROM pgbouncer.get_auth($1)
+
+client_tls_sslmode = require
+client_tls_protocols = tlsv1.3
+client_tls_ca_file = /etc/ssl/certs/ca.crt
+client_tls_cert_file = /etc/ssl/certs/server.crt
+client_tls_key_file = /etc/ssl/certs/server.key
+
+user = postgres
+
+max_client_conn = 5000
+max_db_connections = #{configure_hash["configs"]["max_connections"]}
+PGBOUNCER_CONFIG
+safe_write_to_file("/etc/pgbouncer/pgbouncer.ini", pgbouncer_config)
