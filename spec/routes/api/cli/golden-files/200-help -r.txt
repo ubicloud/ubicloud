@@ -15,7 +15,7 @@ Subcommands: list
 
 Usage: ubi fw location/(fw-name|_fw-ubid) subcommand [...]
 
-Subcommands: create show
+Subcommands: create destroy show
 
 
 Usage: ubi fw list [options]
@@ -30,6 +30,12 @@ Usage: ubi fw location/fw-name create [options]
 
 Options:
     -d, --description=desc           description for firewall
+
+
+Usage: ubi fw location/(fw-name|_fw-ubid) destroy [options]
+
+Options:
+    -f, --force                      do not require confirmation
 
 
 Usage: ubi fw location/(fw-name|_fw-ubid) show [options]

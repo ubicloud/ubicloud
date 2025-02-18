@@ -1,0 +1,6 @@
+! Invalid number of arguments for fw destroy subcommand (accepts: 0, given: 1)
+
+Usage: ubi fw location/(fw-name|_fw-ubid) destroy [options]
+
+Options:
+    -f, --force                      do not require confirmation
