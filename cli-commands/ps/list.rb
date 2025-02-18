@@ -1,3 +1,3 @@
 # frozen_string_literal: true
 
-UbiCli.list("ps", "private subnets", %w[location name id net4 net6], fragment: "private-subnet")
+UbiCli.list("ps", "private subnets", %w[location name id net4 net6])

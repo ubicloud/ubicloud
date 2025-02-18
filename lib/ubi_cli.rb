@@ -3,6 +3,12 @@
 class UbiCli
   force_autoload = Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
 
+  FRAGMENTS = {
+    "pg" => "postgres",
+    "ps" => "private-subnet",
+    "vm" => "vm"
+  }.freeze
+
   Rodish.processor(self) do
     options("ubi [options] [subcommand [subcommand-options] ...]") do
       on("--version", "show program version") { halt "0.0.0" }
@@ -51,9 +57,10 @@ class UbiCli
     end
   end
 
-  def self.list(cmd, label, fields, fragment: cmd)
+  def self.list(cmd, label, fields)
     fields.freeze.each(&:freeze)
     key = :"#{cmd}_list"
+    fragment = FRAGMENTS[cmd]
 
     on(cmd, "list") do
       options("ubi #{cmd} list [options]", key:) do
@@ -82,7 +89,9 @@ class UbiCli
     end
   end
 
-  def self.destroy(cmd, label, fragment: cmd)
+  def self.destroy(cmd, label)
+    fragment = FRAGMENTS[cmd]
+
     on(cmd).run_on("destroy") do
       options("ubi #{cmd} location/(#{cmd}-name|_#{cmd}-ubid) destroy [options]", key: :destroy) do
         on("-f", "--force", "do not require confirmation")
@@ -221,16 +230,10 @@ class UbiCli
     project_path("location/#{@location}/#{fragment}/#{@name}#{rest}")
   end
 
-  def vm_path(rest = "")
-    project_subpath("vm", rest)
-  end
-
-  def pg_path(rest = "")
-    project_subpath("postgres", rest)
-  end
-
-  def ps_path(rest = "")
-    project_subpath("private-subnet", rest)
+  FRAGMENTS.each do |cmd, fragment|
+    define_method(:"#{cmd}_path") do |rest = ""|
+      project_subpath(fragment, rest)
+    end
   end
 
   def format_rows(keys, rows, headers: false, col_sep: "  ")
