@@ -328,6 +328,52 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
+  '/project/{project_id}/location/{location}/firewall/{firewall_name}':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_name'
+    delete:
+      operationId: deleteLocationFirewall
+      summary: Delete a specific firewall
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+    get:
+      operationId: getLocationFirewallDetails
+      summary: Get details of a specific firewall
+      responses:
+        '200':
+          $ref: '#/components/responses/FirewallDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+    post:
+      operationId: createLocationFirewall
+      summary: Create a new firewall
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description:
+                  description: Description of the firewall
+                  type: string
+              additionalProperties: false
+      responses:
+        '200':
+          $ref: '#/components/responses/Firewall'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
   '/project/{project_id}/location/{location}/firewall/{firewall_name}/attach-subnet':
     parameters:
       - $ref: '#/components/parameters/location'
@@ -380,52 +426,6 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/FirewallDetailed'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Firewall
-  '/project/{project_id}/location/{location}/firewall/{firewall_name}':
-    parameters:
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_name'
-    delete:
-      operationId: deleteLocationFirewall
-      summary: Delete a specific firewall
-      responses:
-        '204':
-          $ref: '#/components/responses/Delete'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Firewall
-    get:
-      operationId: getLocationFirewallDetails
-      summary: Get details of a specific firewall
-      responses:
-        '200':
-          $ref: '#/components/responses/FirewallDetailed'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Firewall
-    post:
-      operationId: createLocationFirewall
-      summary: Create a new firewall
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                description:
-                  description: Description of the firewall
-                  type: string
-              additionalProperties: false
-      responses:
-        '200':
-          $ref: '#/components/responses/Firewall'
         default:
           $ref: '#/components/responses/Error'
       tags:
