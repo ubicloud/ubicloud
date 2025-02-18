@@ -38,7 +38,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       version: "16",
       representative_server: postgres_server,
       metric_destinations: [instance_double(PostgresMetricDestination, ubid: "pgmetricubid", url: "url", username: "username", password: "password")],
-      ca_certificates: "root_cert_1\nroot_cert_2"
+      ca_certificates: "root_cert_1\nroot_cert_2",
+      location: "hetzner-fsn1"
     )
   }
 

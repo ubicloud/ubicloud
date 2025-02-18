@@ -320,7 +320,7 @@ SQL
     end
 
     if !is_in_recovery
-      timeline_id = Prog::Postgres::PostgresTimelineNexus.assemble(parent_id: postgres_server.timeline.id).id
+      timeline_id = Prog::Postgres::PostgresTimelineNexus.assemble(location: postgres_server.resource.location, parent_id: postgres_server.timeline.id).id
       postgres_server.timeline_id = timeline_id
       postgres_server.timeline_access = "push"
       postgres_server.save_changes
