@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-DEFAULT_SPDK_VERSION = "v23.09-ubi-0.2"
+DEFAULT_SPDK_VERSION = "v23.09-ubi-0.3"
 
 module SpdkPath
   def self.user

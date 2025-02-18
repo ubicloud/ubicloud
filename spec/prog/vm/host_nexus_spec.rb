@@ -17,8 +17,9 @@ RSpec.describe Prog::Vm::HostNexus do
   }
 
   let(:vms) { [instance_double(Vm, memory_gib: 1), instance_double(Vm, memory_gib: 2)] }
+  let(:spdk_installations) { [instance_double(SpdkInstallation, cpu_count: 4, hugepages: 4)] }
   let(:vm_host_slices) { [instance_double(VmHostSlice, name: "standard1"), instance_double(VmHostSlice, name: "standard2")] }
-  let(:vm_host) { instance_double(VmHost, vms: vms, slices: vm_host_slices, id: "1d422893-2955-4c2c-b41c-f2ec70bcd60d", spdk_cpu_count: 2) }
+  let(:vm_host) { instance_double(VmHost, spdk_installations: spdk_installations, vms: vms, slices: vm_host_slices, id: "1d422893-2955-4c2c-b41c-f2ec70bcd60d", spdk_cpu_count: 2) }
   let(:sshable) { instance_double(Sshable, raw_private_key_1: "bogus") }
 
   before do
@@ -543,11 +544,17 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.verify_hugepages }.to raise_error RuntimeError, "Not enough hugepages for VMs"
     end
 
+    it "fails if used hugepages exceed spdk hugepages" do
+      expect(sshable).to receive(:cmd).with("cat /proc/meminfo")
+        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 5")
+      expect { nx.verify_hugepages }.to raise_error RuntimeError, "Used hugepages exceed SPDK hugepages"
+    end
+
     it "updates vm_host with hugepage stats and hops" do
       expect(sshable).to receive(:cmd).with("cat /proc/meminfo")
-        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 5\nHugePages_Free: 4")
+        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 8")
       expect(vm_host).to receive(:update)
-        .with(total_hugepages_1g: 5, used_hugepages_1g: 4)
+        .with(total_hugepages_1g: 10, used_hugepages_1g: 7)
       expect { nx.verify_hugepages }.to hop("start_vms")
     end
   end
