@@ -5,6 +5,7 @@ Usage: ubi fw list [options]
 Usage: ubi fw location/(fw-name|_fw-ubid) add-rule cidr
 Usage: ubi fw location/(fw-name|_fw-ubid) attach-subnet subnet-id
 Usage: ubi fw location/fw-name create [options]
+Usage: ubi fw location/(fw-name|_fw-ubid) delete-rule rule-id
 Usage: ubi fw location/(fw-name|_fw-ubid) destroy [options]
 Usage: ubi fw location/(fw-name|_fw-ubid) detach-subnet subnet-id
 Usage: ubi fw location/(fw-name|_fw-ubid) show [options]

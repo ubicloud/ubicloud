@@ -15,7 +15,14 @@ Subcommands: list
 
 Usage: ubi fw location/(fw-name|_fw-ubid) subcommand [...]
 
-Subcommands: add-rule attach-subnet create destroy detach-subnet show
+Subcommands:
+  add-rule
+  attach-subnet
+  create
+  delete-rule
+  destroy
+  detach-subnet
+  show
 
 
 Usage: ubi fw list [options]
@@ -40,6 +47,9 @@ Usage: ubi fw location/fw-name create [options]
 
 Options:
     -d, --description=desc           description for firewall
+
+
+Usage: ubi fw location/(fw-name|_fw-ubid) delete-rule rule-id
 
 
 Usage: ubi fw location/(fw-name|_fw-ubid) destroy [options]
