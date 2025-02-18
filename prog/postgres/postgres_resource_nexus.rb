@@ -57,8 +57,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
       firewall = Firewall.create_with_id(name: "#{postgres_resource.ubid}-firewall", location: location, description: "Postgres default firewall", project_id: Config.postgres_service_project_id)
 
-      private_subnet_id = Prog::Vnet::SubnetNexus.assemble(Config.postgres_service_project_id, name: "#{postgres_resource.ubid}-subnet", location: location, firewall_id: firewall.id).id
-      postgres_resource.update(private_subnet_id: private_subnet_id)
+      # private_subnet_id = Prog::Vnet::SubnetNexus.assemble(Config.postgres_service_project_id, name: "#{postgres_resource.ubid}-subnet", location: location, firewall_id: firewall.id).id
+      postgres_resource.update(private_subnet_id: "ee1132ba-d28e-8ad9-9d0d-4a2e8323ff07")
 
       PostgresFirewallRule.create_with_id(postgres_resource_id: postgres_resource.id, cidr: "0.0.0.0/0")
       postgres_resource.set_firewall_rules
@@ -161,15 +161,15 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       billing_record_parts.push({resource_type: index.zero? ? "PostgresStorage" : "PostgresStandbyStorage", amount: postgres_resource.target_storage_size_gib})
     end
 
-    billing_record_parts.each do |brp|
-      BillingRecord.create_with_id(
-        project_id: postgres_resource.project_id,
-        resource_id: postgres_resource.id,
-        resource_name: postgres_resource.name,
-        billing_rate_id: BillingRate.from_resource_properties(brp[:resource_type], postgres_resource.flavor, postgres_resource.location)["id"],
-        amount: brp[:amount]
-      )
-    end
+    # billing_record_parts.each do |brp|
+    #   BillingRecord.create_with_id(
+    #     project_id: postgres_resource.project_id,
+    #     resource_id: postgres_resource.id,
+    #     resource_name: postgres_resource.name,
+    #     billing_rate_id: BillingRate.from_resource_properties(brp[:resource_type], postgres_resource.flavor, postgres_resource.location)["id"],
+    #     amount: brp[:amount]
+    #   )
+    # end
 
     decr_initial_provisioning
     hop_wait

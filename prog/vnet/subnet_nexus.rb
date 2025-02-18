@@ -3,7 +3,7 @@
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
 
-  def self.assemble(project_id, name: nil, location: "hetzner-fsn1", ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil)
+  def self.assemble(project_id, name: nil, location: "hetzner-fsn1", ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, customer_aws_account_id: nil)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -34,7 +34,15 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       end
       firewall.associate_with_private_subnet(ps, apply_firewalls: false)
 
-      Strand.create(prog: "Vnet::SubnetNexus", label: "wait") { _1.id = ubid.to_uuid }
+      label = if customer_aws_account_id
+        customer_aws_account = CustomerAwsAccount[customer_aws_account_id]
+        raise "Given customer aws account doesn't exist with the id #{customer_aws_account_id}" unless customer_aws_account
+        PrivateSubnetAwsResource.create(customer_aws_account_id: customer_aws_account.id) { _1.id = ubid.to_uuid }
+        "create_aws_subnet"
+      else
+        "wait"
+      end
+      Strand.create(prog: "Vnet::SubnetNexus", label: label) { _1.id = ubid.to_uuid }
     end
   end
 
@@ -47,7 +55,20 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     end
   end
 
+  label def create_aws_subnet
+    if retval&.dig("msg") == "subnet created"
+      private_subnet.update(state: "waiting")
+      hop_wait
+    end
+
+    private_subnet.update(state: "creating_aws_subnet")
+    push Prog::Aws::Allocator, {"subject_id" => private_subnet.id}, :create_aws_subnet
+
+    hop_wait
+  end
+
   label def wait
+    nap 1000000 if private_subnet.aws?
     when_refresh_keys_set? do
       private_subnet.update(state: "refreshing_keys")
       hop_refresh_keys
@@ -86,6 +107,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     register_deadline("wait", 3 * 60)
     nics_snap = nics_to_rekey
     nap 10 if nics_snap.any? { |nic| nic.lock_set? }
+    decr_add_new_nic
     nics_snap.each do |nic|
       nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
       nic.incr_start_rekey
@@ -93,7 +115,6 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       private_subnet.create_tunnels(nics_snap, nic)
     end
 
-    decr_add_new_nic
     hop_wait_inbound_setup
   end
 

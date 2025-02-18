@@ -66,6 +66,8 @@ module Prog; end
 
 module Prog::Ai; end
 
+module Prog::Aws; end
+
 module Prog::DnsZone; end
 
 module Prog::Github; end
@@ -194,6 +196,7 @@ def clover_freeze
     PostgresResource::HaType,
     Prog,
     Prog::Ai,
+    Prog::Aws,
     Prog::Base::Exit,
     Prog::Base::FlowControl,
     Prog::Base::Hop,

@@ -56,7 +56,9 @@ module Option
       PostgresSize.new(_1[:internal_name], "standard-#{_2}", "standard-#{_2}", PostgresResource::Flavor::PARADEDB, _2, _2 * 4, storage_size_options),
       PostgresSize.new(_1[:internal_name], "standard-#{_2}", "standard-#{_2}", PostgresResource::Flavor::LANTERN, _2, _2 * 4, storage_size_options)
     ]
-  }.freeze
+  }
+
+  PostgresSizes.concat([PostgresSize.new("aws-us-east-1", "standard-2", "standard-2", PostgresResource::Flavor::STANDARD, 2, 8, [100])])
 
   PostgresHaOption = Struct.new(:name, :standby_count, :title, :explanation)
   PostgresHaOptions = [[PostgresResource::HaType::NONE, 0, "No Standbys", "No replication"],

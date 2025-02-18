@@ -22,21 +22,21 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       else raise "Unknown PostgreSQL flavor: #{postgres_resource.flavor}"
       end
 
-      vm_st = Prog::Vm::Nexus.assemble_with_sshable(
-        "ubi",
-        Config.postgres_service_project_id,
-        location: postgres_resource.location,
-        name: ubid.to_s,
-        size: postgres_resource.target_vm_size,
-        storage_volumes: [
-          {encrypted: true, size_gib: 30},
-          {encrypted: true, size_gib: postgres_resource.target_storage_size_gib}
-        ],
-        boot_image: boot_image,
-        private_subnet_id: postgres_resource.private_subnet_id,
-        enable_ip4: true,
-        exclude_host_ids: exclude_host_ids
-      )
+      # vm_st = Prog::Vm::Nexus.assemble_with_sshable(
+      #   "ubi",
+      #   Config.postgres_service_project_id,
+      #   location: postgres_resource.location,
+      #   name: ubid.to_s,
+      #   size: postgres_resource.target_vm_size,
+      #   storage_volumes: [
+      #     {encrypted: true, size_gib: 30},
+      #     {encrypted: true, size_gib: postgres_resource.target_storage_size_gib}
+      #   ],
+      #   boot_image: boot_image,
+      #   private_subnet_id: postgres_resource.private_subnet_id,
+      #   enable_ip4: true,
+      #   exclude_host_ids: exclude_host_ids
+      # )
 
       synchronization_status = representative_at ? "ready" : "catching_up"
       postgres_server = PostgresServer.create(
@@ -45,7 +45,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         timeline_access: timeline_access,
         representative_at: representative_at,
         synchronization_status: synchronization_status,
-        vm_id: vm_st.id
+        vm_id: "987e7acf-93b1-8f74-8c87-abc0e3f965e6"
       ) { _1.id = ubid.to_uuid }
 
       Strand.create(prog: "Postgres::PostgresServerNexus", label: "start") { _1.id = postgres_server.id }
@@ -203,9 +203,9 @@ CONFIG
     vm.sshable.cmd("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: prometheus_config)
 
     when_initial_provisioning_set? do
-      vm.sshable.cmd("sudo systemctl enable --now postgres_exporter")
-      vm.sshable.cmd("sudo systemctl enable --now node_exporter")
-      vm.sshable.cmd("sudo systemctl enable --now prometheus")
+      # vm.sshable.cmd("sudo systemctl enable --now postgres_exporter")
+      # vm.sshable.cmd("sudo systemctl enable --now node_exporter")
+      # vm.sshable.cmd("sudo systemctl enable --now prometheus")
 
       hop_configure
     end

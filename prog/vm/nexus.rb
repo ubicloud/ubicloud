@@ -9,7 +9,7 @@ require "base64"
 class Prog::Vm::Nexus < Prog::Base
   subject_is :vm
 
-  def self.assemble(public_key, project_id, name: nil, size: "standard-2",
+  def self.assemble(public_key, project_id, customer_aws_account_id, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-fsn1", boot_image: Config.default_boot_image_name,
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
     enable_ip4: false, pool_id: nil, arch: "x64", swap_size_bytes: nil,
@@ -81,6 +81,10 @@ class Prog::Vm::Nexus < Prog::Base
           subnet = PrivateSubnet[private_subnet_id]
           raise "Given subnet doesn't exist with the id #{private_subnet_id}" unless subnet
           raise "Given subnet is not available in the given project" unless project.private_subnets.any? { |ps| ps.id == subnet.id }
+          subnet
+        elsif customer_aws_account_id
+          subnet = PrivateSubnetAwsResource[customer_aws_account_id]
+          subnet ||= Prog::Vnet::PrivateSubnetNexus.assemble(project_id, customer_aws_account_id:, location:).subject
           subnet
         else
           project.default_private_subnet(location)
@@ -172,6 +176,10 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   label def start
+    if vm.location == "aws-us-east-1"
+      hop_launch_instance
+    end
+
     queued_vms = Vm.join(:strand, id: :id).where(:location => vm.location, :arch => vm.arch, Sequel[:strand][:label] => "start")
     begin
       distinct_storage_devices = frame["distinct_storage_devices"] || false
@@ -225,6 +233,110 @@ class Prog::Vm::Nexus < Prog::Base
     clear_stack_storage_volumes
 
     hop_create_unix_user
+  end
+
+  label def launch_instance
+    if retval&.dig("msg")&.include?("instance_id")
+      hop_refill_vm_details
+    end
+
+    push Prog::Aws::Allocator, {"subject_id" => vm.private_subnets.first.id, "vm_id" => vm.id, "nic_id" => vm.nics.first.id}, :launch_instance
+  end
+
+  label def refill_vm_details
+    # {
+    #   architecture: "x86_64",
+    #   block_device_mappings: [
+    #     {
+    #       device_name: "/dev/sda1",
+    #       ebs: {
+    #         attach_time: 2025-02-18 13:00:51 UTC,
+    #         delete_on_termination: true,
+    #         status: "attached",
+    #         volume_id: "vol-0783906c686309e13",
+    #         associated_resource: nil,
+    #         volume_owner_id: nil,
+    #         operator: nil
+    #       }
+    #     }
+    #   ],
+    #   client_token: "81dbda7c-bc01-4067-a5d4-d576a2ca3549",
+    #   ebs_optimized: false,
+    #   ena_support: true,
+    #   hypervisor: "xen",
+    #   iam_instance_profile: nil,
+    #   instance_lifecycle: nil,
+    #   elastic_gpu_associations: [],
+    #   elastic_inference_accelerator_associations: [],
+    #   network_interfaces: [
+    #     {
+    #       association: {
+    #         carrier_ip: nil,
+    #         customer_owned_ip: nil,
+    #         ip_owner_id: "693791122613",
+    #         public_dns_name: "",
+    #         public_ip: "107.21.0.179"
+    #       },
+    #       attachment: {
+    #         attach_time: 2025-02-18 13:00:50 UTC,
+    #         attachment_id: "eni-attach-0f77c1ce3e9d61175",
+    #         delete_on_termination: false,
+    #         device_index: 0,
+    #         status: "attached",
+    #         network_card_index: 0,
+    #         ena_srd_specification: nil
+    #       },
+    #       description: "",
+    #       groups: [
+    #         {
+    #           group_id: "sg-0d02df5e2327fde77",
+    #           group_name: "default"
+    #         }
+    #       ],
+    #       ipv_6_addresses: [],
+    #       mac_address: "12:78:97:9d:3e:ab",
+    #       network_interface_id: "eni-09f6ecc47ebb663c8",
+    #       owner_id: "693791122613",
+    #       private_dns_name: nil,
+    #       private_ip_address: "10.0.1.117",
+    #       private_ip_addresses: [
+    #         {
+    #           association: {
+    #             carrier_ip: nil,
+    #             customer_owned_ip: nil,
+    #             ip_owner_id: "693791122613",
+    #             public_dns_name: "",
+    #             public_ip: "107.21.0.179"
+    #           },
+    #           primary: true,
+    #           private_dns_name: nil,
+    #           private_ip_address: "10.0.1.117"
+    #         }
+    #       ],
+    #       source_dest_check: true,
+    #       status: "in-use",
+    #       subnet_id: "subnet-0abe0a7663fb8f14d",
+    #       vpc_id: "vpc-0f565ceb24ec397c6",
+    #       interface_type: "interface",
+    #       ipv_4_prefixes: [],
+    #       ipv_6_prefixes: [
+    #         { ipv_6_prefix:"2600:1f18:2cdd:8300:e54c::/80" }
+    #       ],
+    #       connection_tracking_configuration:nil,
+    #       operator:{
+    #         managed:false, principal:nil
+    #       }
+    #     }
+    #   ],
+    #   outpost_arn:nil,
+    #   root_device_name:"/dev/sda1",root_device_type:"ebs",
+    AssignedVmAddress.create_with_id(
+      dst_vm_id: vm.id,
+      ip: "13.216.196.6"
+    )
+
+    vm.update(cores: 2, allocated_at: Time.now, provisioned_at: Time.now)
+    hop_wait_sshable
   end
 
   label def create_unix_user
@@ -305,7 +417,7 @@ class Prog::Vm::Nexus < Prog::Base
 
   label def create_billing_record
     vm.update(display_state: "running", provisioned_at: Time.now)
-    Clog.emit("vm provisioned") { [vm, {provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: Time.now - vm.allocated_at}}] }
+    Clog.emit("vm provisioned") { [vm, {provision: {vm_ubid: vm.ubid, vm_host_ubid: host&.ubid, duration: Time.now - vm.allocated_at}}] }
     project = vm.project
     hop_wait unless project.billable
 
@@ -383,7 +495,8 @@ class Prog::Vm::Nexus < Prog::Base
     end
 
     decr_update_firewall_rules
-    push Prog::Vnet::UpdateFirewallRules, {}, :update_firewall_rules
+    push Prog::Vnet::UpdateFirewallRules, {}, :update_firewall_rules unless vm.aws?
+    push Prog::Aws::UpdateFirewallRules, {}, :update_firewall_rules if vm.aws?
   end
 
   label def update_spdk_dependency
@@ -492,7 +605,15 @@ class Prog::Vm::Nexus < Prog::Base
 
     hop_wait_lb_expiry if vm.load_balancer
 
+    hop_destroy_aws_resources if vm.aws?
     hop_destroy_slice
+  end
+
+  label def destroy_aws_resources
+    if retval&.dig("msg") == "destroyed"
+      hop_destroy_slice
+    end
+    push Prog::Aws::Allocator, {"subject_id" => vm.private_subnets.first.id, "vm_id" => vm.id, "nic_id" => vm.nics.first.id}, :destroy
   end
 
   label def wait_lb_expiry
