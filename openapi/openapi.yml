@@ -328,11 +328,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/location/{location}/firewall/_{firewall_id}/attach-subnet':
+  '/project/{project_id}/location/{location}/firewall/{firewall_name}/attach-subnet':
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_id'
+      - $ref: '#/components/parameters/firewall_name'
     post:
       operationId: actionLocationFirewallAttachSubnet
       summary: Attach a subnet to firewall
@@ -356,11 +356,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/location/{location}/firewall/_{firewall_id}/detach-subnet':
+  '/project/{project_id}/location/{location}/firewall/{firewall_name}/detach-subnet':
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_id'
+      - $ref: '#/components/parameters/firewall_name'
     post:
       operationId: actionLocationFirewallDetachSubnet
       summary: Detach a subnet from firewall
@@ -1220,15 +1220,6 @@ paths:
         - Virtual Machine
 components:
   parameters:
-    firewall_id:
-      description: ID of the firewall
-      in: path
-      name: firewall_id
-      required: true
-      schema:
-        type: string
-        example: fwfg7td83em22qfw9pq5xyfqb7
-        pattern: '^fw[0-9a-hj-km-np-tv-z]{24}$'
     firewall_name:
       description: Name of the firewall
       in: path
