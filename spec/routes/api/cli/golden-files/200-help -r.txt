@@ -15,7 +15,7 @@ Subcommands: list
 
 Usage: ubi fw location/(fw-name|_fw-ubid) subcommand [...]
 
-Subcommands: attach-subnet create destroy show
+Subcommands: attach-subnet create destroy detach-subnet show
 
 
 Usage: ubi fw list [options]
@@ -39,6 +39,9 @@ Usage: ubi fw location/(fw-name|_fw-ubid) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation
+
+
+Usage: ubi fw location/(fw-name|_fw-ubid) detach-subnet subnet-id
 
 
 Usage: ubi fw location/(fw-name|_fw-ubid) show [options]
