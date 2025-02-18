@@ -1,0 +1,2 @@
+rule 1: fra7jvrz94be7qy8qrq8n1jrp1  0.0.0.0/0  
+rule 2: fr7cv7h5bz324maazy93ykn8s4  ::/0  
