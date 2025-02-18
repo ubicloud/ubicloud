@@ -15,7 +15,7 @@ Subcommands: list
 
 Usage: ubi fw location/(fw-name|_fw-ubid) subcommand [...]
 
-Subcommands: create destroy show
+Subcommands: attach-subnet create destroy show
 
 
 Usage: ubi fw list [options]
@@ -24,6 +24,9 @@ Options:
     -f, --fields=fields              show specific fields (default: location,name,id)
     -l, --location=location          only show firewalls in given location
     -N, --no-headers                 do not show headers
+
+
+Usage: ubi fw location/(fw-name|_fw-ubid) attach-subnet subnet-id
 
 
 Usage: ubi fw location/fw-name create [options]
