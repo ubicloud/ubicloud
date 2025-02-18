@@ -15,7 +15,7 @@ Subcommands: list
 
 Usage: ubi fw location/(fw-name|_fw-ubid) subcommand [...]
 
-Subcommands: create
+Subcommands: create show
 
 
 Usage: ubi fw list [options]
@@ -30,6 +30,15 @@ Usage: ubi fw location/fw-name create [options]
 
 Options:
     -d, --description=desc           description for firewall
+
+
+Usage: ubi fw location/(fw-name|_fw-ubid) show [options]
+
+Options:
+    -f, --fields=fields              show specific fields (default: id,name,location,description,firewall-rules,private-subnets)
+    -n, --nic-fields=fields          show specific nic fields (default: id,name,private-ipv4,private-ipv6,vm-name)
+    -p, --priv-subnet-fields=fields  show specific private subnet fields (default: id,name,state,location,net4,net6,nics)
+    -r, --rule-fields=fields         show specific firewall rule fields (default: id,cidr,port-range)
 
 
 Usage: ubi help [options] [command [subcommand]]
