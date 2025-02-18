@@ -5,7 +5,23 @@ Options:
         --help                       show program help
         --confirm=confirmation       confirmation value (not for direct use)
 
-Subcommands: help pg ps vm
+Subcommands: fw help pg ps vm
+
+
+Usage: ubi fw subcommand [...]
+
+Subcommands: list
+
+
+Usage: ubi fw location/(fw-name|_fw-ubid) subcommand [...]
+
+
+Usage: ubi fw list [options]
+
+Options:
+    -f, --fields=fields              show specific fields (default: location,name,id)
+    -l, --location=location          only show firewalls in given location
+    -N, --no-headers                 do not show headers
 
 
 Usage: ubi help [options] [command [subcommand]]

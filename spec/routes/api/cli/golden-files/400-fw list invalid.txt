@@ -1,0 +1,8 @@
+! Invalid number of arguments for fw list subcommand (accepts: 0, given: 1)
+
+Usage: ubi fw list [options]
+
+Options:
+    -f, --fields=fields              show specific fields (default: location,name,id)
+    -l, --location=location          only show firewalls in given location
+    -N, --no-headers                 do not show headers

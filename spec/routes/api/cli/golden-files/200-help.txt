@@ -5,4 +5,4 @@ Options:
         --help                       show program help
         --confirm=confirmation       confirmation value (not for direct use)
 
-Subcommands: help pg ps vm
+Subcommands: fw help pg ps vm
