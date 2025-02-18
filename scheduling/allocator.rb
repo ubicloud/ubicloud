@@ -263,9 +263,6 @@ module Scheduling::Allocator
       # penalty for AX161, TODO: remove after migration to AX162
       score += 0.5 if @candidate_host[:total_cores] == 32
 
-      # penalty for hosts that do not accept slices if the request wants to use one
-      score += 1 if @request.use_slices && !@candidate_host[:accepts_slices]
-
       # penalty of 5 if host has a GPU but VM doesn't require a GPU
       score += 5 unless @request.gpu_count > 0 || @candidate_host[:num_gpus] == 0
 
