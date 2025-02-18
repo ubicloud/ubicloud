@@ -4,6 +4,7 @@ class UbiCli
   force_autoload = Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
 
   FRAGMENTS = {
+    "fw" => "firewall",
     "pg" => "postgres",
     "ps" => "private-subnet",
     "vm" => "vm"
