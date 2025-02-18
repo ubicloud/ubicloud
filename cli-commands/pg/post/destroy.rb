@@ -1,3 +1,3 @@
 # frozen_string_literal: true
 
-UbiCli.destroy("pg", "PostgreSQL database", fragment: "postgres")
+UbiCli.destroy("pg", "PostgreSQL database")
