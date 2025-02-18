@@ -8,7 +8,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   extend Forwardable
   def_delegators :postgres_timeline, :blob_storage_client
 
-  def self.assemble(parent_id: nil, location: nil)
+  def self.assemble(location:, parent_id: nil)
     if parent_id && (PostgresTimeline[parent_id]).nil?
       fail "No existing parent"
     end
