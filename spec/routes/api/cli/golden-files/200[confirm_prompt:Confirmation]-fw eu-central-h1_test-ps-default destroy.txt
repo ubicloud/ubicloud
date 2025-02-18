@@ -1,0 +1,2 @@
+Destroying this Firewall is not recoverable.
+Enter the following to confirm destruction of the Firewall: test-ps-default
