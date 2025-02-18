@@ -41,6 +41,10 @@ RSpec.describe MinioServer do
     expect(ms.private_ipv4_address).to eq("192.168.0.0")
   end
 
+  it "returns public ipv6 address properly" do
+    expect(ms.public_ipv6_address).to eq("fdfa:b5aa:14a3:4a3d::2")
+  end
+
   it "returns minio cluster properly" do
     expect(ms.cluster.name).to eq("minio-cluster-name")
   end
@@ -115,6 +119,14 @@ RSpec.describe MinioServer do
 
   it "needs event loop for pulse check" do
     expect(ms).to be_needs_event_loop_for_pulse_check
+  end
+
+  it "generates /etc/hosts entries properly when there are multiple servers" do
+    servers = [instance_double(described_class, id: ms.id, public_ipv6_address: "fdfa:b5aa:14a3:4a3d::/64", hostname: "minio-cluster-name1.minio.ubicloud.com"),
+      instance_double(described_class, id: 2, public_ipv6_address: "fdfb:b5aa:14a3:4a3f::/64", hostname: "minio-cluster-name2.minio.ubicloud.com")]
+    mc = instance_double(MinioCluster, name: "minio-cluster-name", servers: servers)
+    expect(ms).to receive(:cluster).and_return(mc).at_least(:once)
+    expect(ms.generate_etc_hosts_entry).to eq("::1 minio-cluster-name0.minio.ubicloud.com\nfdfb:b5aa:14a3:4a3f::/64 minio-cluster-name2.minio.ubicloud.com")
   end
 
   describe "#url" do

@@ -30,15 +30,6 @@ RSpec.describe MinioCluster do
     mc
   }
 
-  it "generates /etc/hosts entries properly when there are multiple pool" do
-    server = mc.servers.first
-    expect(mc).to receive(:servers).and_return([server, server]).at_least(:once)
-    expect(server).to receive(:hostname).and_return("hostname").at_least(:once)
-    expect(server).to receive(:private_ipv4_address).and_return("10.0.0.0").at_least(:once)
-
-    expect(mc.generate_etc_hosts_entry).to eq("10.0.0.0 hostname\n10.0.0.0 hostname")
-  end
-
   it "returns minio servers properly" do
     expect(mc.servers.map(&:index)).to eq([0])
   end

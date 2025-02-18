@@ -60,6 +60,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     register_deadline("wait", 10 * 60)
 
     minio_server.cluster.dns_zone&.insert_record(record_name: cluster.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s)
+    minio_server.cluster.dns_zone&.insert_record(record_name: cluster.hostname, type: "AAAA", ttl: 10, data: vm.ephemeral_net6.nth(2).to_s)
     cert, cert_key = create_certificate
     minio_server.update(cert: cert, cert_key: cert_key)
 
@@ -206,7 +207,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
       root_cert_key = OpenSSL::PKey::EC.new(minio_server.cluster.root_cert_key_2)
     end
 
-    ip_san = (Config.development? || Config.is_e2e) ? ",IP:#{minio_server.vm.ephemeral_net4}" : nil
+    ip_san = (Config.development? || Config.is_e2e) ? ",IP:#{minio_server.vm.ephemeral_net4},IP:#{minio_server.vm.ephemeral_net6.nth(2)}" : nil
 
     Util.create_certificate(
       subject: "/C=US/O=Ubicloud/CN=#{minio_server.cluster.ubid} Server Certificate",

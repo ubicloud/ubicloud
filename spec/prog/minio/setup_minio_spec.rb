@@ -86,7 +86,7 @@ ff00::0 ip6-mcastprefix
 ff02::1 ip6-allnodes
 ff02::2 ip6-allrouters
 ff02::3 ip6-allhosts
-192.168.0.0 minio-cluster-name0.minio.ubicloud.com
+::1 minio-cluster-name0.minio.ubicloud.com
 ECHO
       JSON.generate({
         minio_config: minio_config,
@@ -102,7 +102,6 @@ ECHO
     end
 
     it "configures minio if not started" do
-      expect(nx.minio_server.cluster.servers.first).to receive(:private_ipv4_address).and_return("192.168.0.0")
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_minio").and_return("NotStarted")
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo minio/bin/configure-minio' configure_minio", stdin: config)
 
@@ -111,7 +110,6 @@ ECHO
 
     it "configures minio without server_url if dns is not configures" do
       expect(nx.minio_server.cluster).to receive(:dns_zone).and_return(false)
-      expect(nx.minio_server.cluster.servers.first).to receive(:private_ipv4_address).and_return("192.168.0.0")
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_minio").and_return("NotStarted")
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo minio/bin/configure-minio' configure_minio", stdin: config.gsub("MINIO_SERVER_URL=\\\"https://minio-cluster-name.minio.ubicloud.com:9000\\\"", ""))
 
@@ -125,7 +123,6 @@ ECHO
     end
 
     it "configures minio if failed" do
-      expect(nx.minio_server.cluster.servers.first).to receive(:private_ipv4_address).and_return("192.168.0.0")
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_minio").and_return("Failed")
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo minio/bin/configure-minio' configure_minio", stdin: config)
 
