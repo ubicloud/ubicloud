@@ -45,7 +45,8 @@ RSpec.describe Clover, "cli" do
     PrivateSubnet["pshfgpzvs0t20gpezmz2kkk8e4"].update(net4: "10.147.204.0/26", net6: "fdab:de77:9a94:fa69::/64")
 
     expect(LoadBalancer).to receive(:generate_uuid).and_return("dd91e986-6ac4-882b-ac39-1d430f899d96")
-    Prog::Vnet::LoadBalancerNexus.assemble(@ps.id, name: "test-lb", src_port: 12345, dst_port: 54321)
+    lb = Prog::Vnet::LoadBalancerNexus.assemble(@ps.id, name: "test-lb", src_port: 12345, dst_port: 54321).subject
+    lb.add_vm(@vm)
 
     expect(Vm).to receive(:generate_ubid).and_return(UBID.parse("vmz7b0dxt40t4g7rnmag9hct7c")).at_least(:once)
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("ps9a8v5tm1020qn73f0c7db0x7")).at_least(:once)
