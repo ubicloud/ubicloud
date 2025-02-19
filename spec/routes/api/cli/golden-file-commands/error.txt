@@ -1,0 +1,35 @@
+
+--confirm foo fw eu-central-h1/test-ps-default destroy
+--confirm foo pg eu-central-h1/test-pg destroy
+--confirm foo ps eu-central-h1/test-ps destroy
+--confirm foo vm eu-central-h1/test-vm destroy
+fw eu-central-h1/default-eu-central-h1-default show -f bad
+fw eu-central-h1/test2-fw create invalid
+fw eu-central-h1/test-ps-default destroy invalid
+fw list -f invalid
+fw list invalid
+help invalid
+invalid
+pg eu-central-h1/test2-pg create invalid
+pg eu-central-h1/test-pg add-firewall-rule
+pg eu-central-h1/test-pg add-metric-destination
+pg eu-central-h1/test-pg delete-firewall-rule
+pg eu-central-h1/test-pg delete-metric-destination
+pg eu-central-h1/test-pg destroy invalid
+pg eu-central-h1/test-pg failover
+pg eu-central-h1/test-pg reset-superuser-password
+pg eu-central-h1/test-pg restore
+pg eu-central-h1/test-pg show invalid
+pg eu-central-h1/test-pg -X pg_dump
+pg list -f invalid
+pg list invalid
+ps eu-central-h1/test2-ps create invalid
+ps eu-central-h1/test-ps destroy invalid
+ps list -f invalid
+ps list invalid
+vm eu-central-h1/test2-vm create
+vm eu-central-h1/test-vm destroy invalid
+vm eu-central-h1/test-vm show -f invalid
+vm eu-central-h1/test-vm -u foo scp :remote-path local-path invalid
+vm eu-central-h1/test-vm -X sftp
+vm list invalid
