@@ -84,7 +84,7 @@ Subcommands: list
 
 Usage: ubi lb location/(lb-name|_lb-ubid) subcommand [...]
 
-Subcommands: create destroy show
+Subcommands: attach-vm create destroy show
 
 
 Usage: ubi lb list [options]
@@ -93,6 +93,9 @@ Options:
     -f, --fields=fields              show specific fields (default: name,id,src-port,dst-port,hostname)
     -l, --location=location          only show load balancers in given location
     -N, --no-headers                 do not show headers
+
+
+Usage: ubi lb location/(lb-name|_lb-ubid) attach-vm vm-id
 
 
 Usage: ubi lb location/lb-name create [options] private-subnet-id src-port dst-port
