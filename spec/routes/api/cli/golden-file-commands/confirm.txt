@@ -1,4 +1,5 @@
 fw eu-central-h1/test-ps-default destroy
+lb eu-central-h1/test-lb destroy
 pg eu-central-h1/test-pg destroy
 ps eu-central-h1/test-ps destroy
 vm eu-central-h1/test-vm destroy

@@ -84,7 +84,7 @@ Subcommands: list
 
 Usage: ubi lb location/(lb-name|_lb-ubid) subcommand [...]
 
-Subcommands: create show
+Subcommands: create destroy show
 
 
 Usage: ubi lb list [options]
@@ -102,6 +102,12 @@ Options:
     -e, --check-endpoint=path        set the health check endpoint (default: /up)
     -p, --check-protocol=proto       set the health check protocol (http(default), https, tcp)
     -s, --stack=stack                set the stack (dual(default), ipv4, ipv6)
+
+
+Usage: ubi lb location/(lb-name|_lb-ubid) destroy [options]
+
+Options:
+    -f, --force                      do not require confirmation
 
 
 Usage: ubi lb location/(lb-name|_lb-ubid) show [options]
