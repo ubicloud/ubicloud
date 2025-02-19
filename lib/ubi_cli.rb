@@ -105,8 +105,7 @@ class UbiCli
           end
         elsif opts[:confirm]
           invalid_confirmation <<~END
-
-            Confirmation of #{label} name not successful.
+            ! Confirmation of #{label} name not successful.
           END
         else
           require_confirmation("Confirmation", <<~END)
@@ -179,7 +178,7 @@ class UbiCli
         execute_argv(yield(user:, address:), res)
       else
         res[0] = 400
-        ["No valid IPv4 address for requested VM"]
+        ["! No valid IPv4 address for requested VM"]
       end
     end
   end
