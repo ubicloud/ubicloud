@@ -4,10 +4,12 @@ require "acme-client"
 require "openssl"
 
 class Prog::Vnet::LoadBalancerNexus < Prog::Base
+  DEFAULT_HEALTH_CHECK_ENDPOINT = "/up"
+
   subject_is :load_balancer
 
   def self.assemble(private_subnet_id, name: nil, algorithm: "round_robin", src_port: nil, dst_port: nil,
-    health_check_endpoint: "/up", health_check_interval: 30, health_check_timeout: 15,
+    health_check_endpoint: DEFAULT_HEALTH_CHECK_ENDPOINT, health_check_interval: 30, health_check_timeout: 15,
     health_check_up_threshold: 3, health_check_down_threshold: 2, health_check_protocol: "http",
     custom_hostname_prefix: nil, custom_hostname_dns_zone_id: nil, stack: LoadBalancer::Stack::DUAL)
 

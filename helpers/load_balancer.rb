@@ -41,7 +41,7 @@ class Clover
       stack: Validation.validate_load_balancer_stack(request_body_params["stack"]),
       src_port: Validation.validate_port(:src_port, request_body_params["src_port"]),
       dst_port: Validation.validate_port(:dst_port, request_body_params["dst_port"]),
-      health_check_endpoint: request_body_params["health_check_endpoint"],
+      health_check_endpoint: request_body_params["health_check_endpoint"] || Prog::Vnet::LoadBalancerNexus::DEFAULT_HEALTH_CHECK_ENDPOINT,
       health_check_protocol: request_body_params["health_check_protocol"]
     ).subject
 
