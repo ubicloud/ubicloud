@@ -14,6 +14,7 @@ Sequel.migration do
       column :ui_name, String, null: false
       column :visible, :boolean, null: false
       column :id, :uuid, primary_key: true
+      foreign_key :account_id, :accounts, type: :uuid, null: false
       foreign_key :provider_id, :provider, type: :uuid, null: false
     end
   end

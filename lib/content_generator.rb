@@ -12,7 +12,7 @@ module ContentGenerator
 
     def self.enable_ipv4(location, value)
       location = LocationNameConverter.to_internal_name(location)
-      unit_price = BillingRate.from_resource_properties("IPAddress", "IPv4", location)["unit_price"].to_f
+      unit_price = BillingRate.from_resource_properties("IPAddress", "IPv4", location)&.unit_price&.to_f || 0
 
       "Enable Public IPv4 ($#{"%.2f" % (unit_price * 60 * 672)}/mo)"
     end
@@ -20,7 +20,7 @@ module ContentGenerator
     def self.size(location, size)
       location = LocationNameConverter.to_internal_name(location)
       size = Option::VmSizes.find { _1.display_name == size }
-      unit_price = BillingRate.from_resource_properties("VmVCpu", "standard", location)["unit_price"].to_f
+      unit_price = BillingRate.from_resource_properties("VmVCpu", "standard", location)&.unit_price&.to_f || 0
 
       [
         size.display_name,
@@ -33,7 +33,7 @@ module ContentGenerator
     def self.storage_size(location, vm_size, storage_size)
       storage_size = storage_size.to_i
       location = LocationNameConverter.to_internal_name(location)
-      unit_price = BillingRate.from_resource_properties("VmStorage", "standard", location)["unit_price"].to_f
+      unit_price = BillingRate.from_resource_properties("VmStorage", "standard", location)&.unit_price&.to_f || 0
 
       [
         "#{storage_size}GB",
@@ -56,7 +56,7 @@ module ContentGenerator
     def self.size(flavor, location, size)
       location = LocationNameConverter.to_internal_name(location)
       size = Option::PostgresSizes.find { _1.display_name == size }
-      unit_price = BillingRate.from_resource_properties("PostgresVCpu", flavor, location)["unit_price"].to_f
+      unit_price = BillingRate.from_resource_properties("PostgresVCpu", flavor, location)&.unit_price&.to_f || 0
 
       [
         size.display_name,
@@ -68,7 +68,7 @@ module ContentGenerator
 
     def self.storage_size(flavor, location, vm_size, storage_size)
       location = LocationNameConverter.to_internal_name(location)
-      unit_price = BillingRate.from_resource_properties("PostgresStorage", flavor, location)["unit_price"].to_f
+      unit_price = BillingRate.from_resource_properties("PostgresStorage", flavor, location)&.unit_price&.to_f || 0
 
       [
         "#{storage_size}GB",

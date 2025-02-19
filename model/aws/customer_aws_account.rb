@@ -6,9 +6,13 @@ class CustomerAwsAccount < Sequel::Model
   include ResourceMethods
   one_to_one :private_subnet_aws_resource, key: :customer_aws_account_id
   one_to_one :nic_aws_resource, key: :customer_aws_account_id
-
+  many_to_one :provider_location
   def self.ubid_type
     UBID::TYPE_ETC
+  end
+
+  def path
+    "/region/#{ubid}"
   end
 end
 

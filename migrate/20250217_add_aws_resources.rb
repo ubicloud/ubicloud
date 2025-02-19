@@ -7,6 +7,7 @@ Sequel.migration do
       column :aws_account_access_key, :text
       column :aws_account_secret_access_key, :text
       column :location, :text
+      foreign_key :provider_location_id, :provider_location, type: :uuid
     end
 
     create_table(:private_subnet_aws_resource) do

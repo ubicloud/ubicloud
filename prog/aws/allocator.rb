@@ -5,6 +5,12 @@ require "aws-sdk-ec2"
 class Prog::Aws::Allocator < Prog::Base
   subject_is :private_subnet_aws_resource
 
+  def before_run
+    if vm.destroy_set?
+      pop "destroy set"
+    end
+  end
+
   label def create_aws_subnet
     vpc_response = client.create_vpc({cidr_block: private_subnet_aws_resource.private_subnet.net4.to_s,
       amazon_provided_ipv_6_cidr_block: true})

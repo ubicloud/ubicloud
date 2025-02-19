@@ -613,7 +613,12 @@ class Prog::Vm::Nexus < Prog::Base
     if retval&.dig("msg") == "destroyed"
       hop_destroy_slice
     end
-    push Prog::Aws::Allocator, {"subject_id" => vm.private_subnets.first.id, "vm_id" => vm.id, "nic_id" => vm.nics.first.id}, :destroy
+
+    if vm.aws?
+      push Prog::Aws::Allocator, {"subject_id" => vm.private_subnets.first.id, "vm_id" => vm.id, "nic_id" => vm.nics.first.id}, :destroy
+    end
+
+    hop_destroy_slice
   end
 
   label def wait_lb_expiry
