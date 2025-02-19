@@ -10,6 +10,8 @@ fw list -f invalid
 fw list invalid
 help invalid
 invalid
+lb list -f invalid
+lb list invalid
 pg eu-central-h1/test2-pg create invalid
 pg eu-central-h1/test-pg add-firewall-rule
 pg eu-central-h1/test-pg add-metric-destination
