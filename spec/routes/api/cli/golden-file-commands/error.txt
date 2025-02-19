@@ -12,6 +12,7 @@ help invalid
 invalid
 lb list -f invalid
 lb list invalid
+lb eu-central-h1/test2-lb create
 pg eu-central-h1/test2-pg create invalid
 pg eu-central-h1/test-pg add-firewall-rule
 pg eu-central-h1/test-pg add-metric-destination
