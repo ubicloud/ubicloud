@@ -37,6 +37,7 @@ help -u
 help -u vm
 help vm
 help vm list
+lb eu-central-h1/test2-lb create psfzm9e26xky5m9ggetw4dpqe2 12345 54321
 lb list
 lb list -f src-port,dst-port,hostname
 lb list -l eu-central-h1
