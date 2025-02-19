@@ -52,8 +52,7 @@
                     label: "Billing Name",
                     value: @billing_info_data[:name],
                     attributes: {
-                      required: true,
-                      placeholder: "Individual or Company Name"
+                      required: true
                     }
                   ) %>
                 </div>
@@ -64,8 +63,7 @@
                     label: "Billing Email",
                     value: @billing_info_data[:email],
                     attributes: {
-                      required: true,
-                      placeholder: "Billing Email"
+                      required: true
                     }
                   ) %>
                 </div>
@@ -90,37 +88,13 @@
                   ) %>
                 </div>
                 <div class="sm:col-span-4 md:col-span-2">
-                  <%== part(
-                    "components/form/text",
-                    name: "state",
-                    label: "State",
-                    value: @billing_info_data[:state],
-                    attributes: {
-                      placeholder: "State"
-                    }
-                  ) %>
+                  <%== part("components/form/text", name: "state", label: "State", value: @billing_info_data[:state]) %>
                 </div>
                 <div class="sm:col-span-4 md:col-span-2">
-                  <%== part(
-                    "components/form/text",
-                    name: "city",
-                    label: "City",
-                    value: @billing_info_data[:city],
-                    attributes: {
-                      placeholder: "City"
-                    }
-                  ) %>
+                  <%== part("components/form/text", name: "city", label: "City", value: @billing_info_data[:city]) %>
                 </div>
                 <div class="sm:col-span-4 md:col-span-2">
-                  <%== part(
-                    "components/form/text",
-                    name: "postal_code",
-                    label: "Postal Code",
-                    value: @billing_info_data[:postal_code],
-                    attributes: {
-                      placeholder: "Postal Code"
-                    }
-                  ) %>
+                  <%== part("components/form/text", name: "postal_code", label: "Postal Code", value: @billing_info_data[:postal_code]) %>
                 </div>
                 <div class="col-span-full">
                   <%== part(
