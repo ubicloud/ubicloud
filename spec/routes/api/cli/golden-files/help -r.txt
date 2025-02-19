@@ -84,7 +84,7 @@ Subcommands: list
 
 Usage: ubi lb location/(lb-name|_lb-ubid) subcommand [...]
 
-Subcommands: attach-vm create destroy show
+Subcommands: attach-vm create destroy detach-vm show
 
 
 Usage: ubi lb list [options]
@@ -111,6 +111,9 @@ Usage: ubi lb location/(lb-name|_lb-ubid) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation
+
+
+Usage: ubi lb location/(lb-name|_lb-ubid) detach-vm vm-id
 
 
 Usage: ubi lb location/(lb-name|_lb-ubid) show [options]
