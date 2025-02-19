@@ -12,6 +12,9 @@ RSpec.configure do |config|
     expect(last_response["content-type"]).to eq("text/plain")
     expect(last_response["ubi-command-execute"]).to eq(command_execute) if command_execute
     expect(last_response["ubi-confirm"]).to eq(confirm_prompt) if confirm_prompt
+    if !last_response["ubi-command-execute"] && !last_response["ubi-confirm"]
+      expect(last_response.body).to end_with("\n")
+    end
     last_response.body
   end
 

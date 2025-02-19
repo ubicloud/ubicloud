@@ -16,7 +16,7 @@ RSpec.describe Clover, "cli lb update" do
 
   it "updates the load balancer" do
     expect(@lb.vms.map(&:ubid)).to eq [@vm1.ubid]
-    expect(cli(%W[lb eu-central-h1/test-lb update hash_based 1234 5432 /up2 #{@vm1.ubid}])).to eq "Updated load balancer with id #{@lb.ubid}"
+    expect(cli(%W[lb eu-central-h1/test-lb update hash_based 1234 5432 /up2 #{@vm1.ubid}])).to eq "Updated load balancer with id #{@lb.ubid}\n"
     @lb.reload
     expect(@lb.src_port).to eq 1234
     expect(@lb.dst_port).to eq 5432
@@ -27,7 +27,7 @@ RSpec.describe Clover, "cli lb update" do
 
   it "adds new VMs the load balancer" do
     expect(@lb.vms.map(&:ubid)).to eq [@vm1.ubid]
-    expect(cli(%W[lb eu-central-h1/test-lb update hash_based 1234 5432 /up2 #{@vm1.ubid} #{@vm2.ubid}])).to eq "Updated load balancer with id #{@lb.ubid}"
+    expect(cli(%W[lb eu-central-h1/test-lb update hash_based 1234 5432 /up2 #{@vm1.ubid} #{@vm2.ubid}])).to eq "Updated load balancer with id #{@lb.ubid}\n"
     @lb.reload
     expect(@lb.src_port).to eq 1234
     expect(@lb.dst_port).to eq 5432
@@ -38,7 +38,7 @@ RSpec.describe Clover, "cli lb update" do
 
   it "removes VMs not given from the load balancer" do
     expect(@lb.vms.map(&:ubid)).to eq [@vm1.ubid]
-    expect(cli(%W[lb eu-central-h1/test-lb update hash_based 1234 5432 /up2])).to eq "Updated load balancer with id #{@lb.ubid}"
+    expect(cli(%W[lb eu-central-h1/test-lb update hash_based 1234 5432 /up2])).to eq "Updated load balancer with id #{@lb.ubid}\n"
     @lb.reload
     expect(@lb.src_port).to eq 1234
     expect(@lb.dst_port).to eq 5432

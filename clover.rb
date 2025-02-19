@@ -631,7 +631,7 @@ class Clover < Roda
       if r.path_info == "/cli" && (!/\ABearer:?\s+pat-/i.match?(env["HTTP_AUTHORIZATION"].to_s) || !rodauth.authenticated?)
         response["content-type"] = "text/plain"
         response.status = 400
-        next "! Invalid request: No valid personal access token provided"
+        next "! Invalid request: No valid personal access token provided\n"
       end
       response.json = true
       response.skip_content_security_policy!

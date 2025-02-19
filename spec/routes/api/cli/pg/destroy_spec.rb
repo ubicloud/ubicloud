@@ -14,7 +14,7 @@ RSpec.describe Clover, "cli pg destroy" do
     pg = PostgresResource.first
     expect(pg).to be_a PostgresResource
     expect(Semaphore.where(strand_id: pg.id, name: "destroy")).to be_empty
-    expect(cli(%w[pg eu-central-h1/test-pg destroy -f])).to eq "PostgreSQL database, if it exists, is now scheduled for destruction"
+    expect(cli(%w[pg eu-central-h1/test-pg destroy -f])).to eq "PostgreSQL database, if it exists, is now scheduled for destruction\n"
     expect(Semaphore.where(strand_id: pg.id, name: "destroy")).not_to be_empty
   end
 end

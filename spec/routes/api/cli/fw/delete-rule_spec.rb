@@ -13,13 +13,13 @@ RSpec.describe Clover, "cli fw add-rule" do
 
   it "deletes rule from firewall" do
     2.times do
-      expect(cli(%W[fw eu-central-h1/test-fw delete-rule #{@fwr.ubid}])).to eq "Firewall rule, if it existed, has been deleted"
+      expect(cli(%W[fw eu-central-h1/test-fw delete-rule #{@fwr.ubid}])).to eq "Firewall rule, if it existed, has been deleted\n"
       expect(FirewallRule.count).to eq 0
     end
   end
 
   it "errors for invalid rule id format" do
-    expect(cli(%W[fw eu-central-h1/test-fw delete-rule #{@fwr.ubid}/], status: 400)).to eq "! Invalid rule id format"
+    expect(cli(%W[fw eu-central-h1/test-fw delete-rule #{@fwr.ubid}/], status: 400)).to eq "! Invalid rule id format\n"
     expect(FirewallRule.count).to eq 1
   end
 end
