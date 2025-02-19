@@ -48,7 +48,7 @@ class InvoiceGenerator
             line_item_content[:amount] = li[:amount].to_f
             line_item_content[:duration] = li[:duration]
             line_item_content[:cost] = li[:cost].to_f
-            line_item_content[:begin_time] = li[:begin_time]
+            line_item_content[:begin_time] = li[:begin_time].utc
             line_item_content[:unit_price] = li[:unit_price].to_f
 
             resource_content[:line_items].push(line_item_content)
