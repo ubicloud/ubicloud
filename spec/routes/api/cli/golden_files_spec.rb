@@ -55,24 +55,21 @@ RSpec.describe Clover, "cli" do
     expect(PostgresMetricDestination).to receive(:generate_uuid).and_return("bc563e43-9b83-89da-b3ac-d38acc87fd63").at_least(:once)
     expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("nc186qw3d23j1kzsgjqg2t811r")).at_least(:once)
 
-    Dir["#{golden_file_dir}/*.txt"].each do |f|
-      f = File.basename(f)
-      cmd = f.delete_suffix(".txt")
-      status, cmd = cmd.split("-", 2)
-      cmd.tr!("_", "/")
-      cmd.gsub!("pg/dump", "pg_dump")
-      kws = {}
-      if (kw = status[/\[(\w+:\w+)\]/, 1])
-        status.sub!(/\[(\w+:\w+)\]/, "")
-        kw, kw_value = kw.split(":", 2)
-        kw = kw.to_sym
-        kws[kw] = kw_value
-      end
-      kws[:status] = Integer(status)
+    cli_commands = []
+    cli_commands.concat File.readlines("spec/routes/api/cli/golden-file-commands/success.txt").map { [_1, {}] }
+    cli_commands.concat File.readlines("spec/routes/api/cli/golden-file-commands/error.txt").map { [_1, {status: 400}] }
+    cli_commands.concat File.readlines("spec/routes/api/cli/golden-file-commands/confirm.txt").map { [_1, {confirm_prompt: "Confirmation"}] }
+    Dir["spec/routes/api/cli/golden-file-commands/execute/*.txt"].each do |f|
+      cmd = File.basename(f).delete_suffix(".txt")
+      cli_commands.concat File.readlines(f).map { [_1, {command_execute: cmd}] }
+    end
+
+    cli_commands.each do |cmd, kws|
+      cmd.chomp!
       body = DB.transaction(savepoint: true, rollback: :always) do
         cli(cmd.split, **kws)
       end
-      File.write(File.join(output_dir, f), body)
+      File.write(File.join(output_dir, "#{cmd.tr("/", "_")}.txt"), body)
     end
 
     diff, = Open3.capture2e("diff", "-u", golden_file_dir, output_dir)
@@ -90,6 +87,7 @@ RSpec.describe Clover, "cli" do
     Dir["#{output_dir}/*.txt"].each do |f|
       File.delete(f)
     end
+    File.delete(File.join(output_dir, ".txt"))
     Dir.rmdir(output_dir)
   end
 end

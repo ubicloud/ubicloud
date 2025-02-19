@@ -1,0 +1,117 @@
+--confirm test-pg pg eu-central-h1/test-pg destroy
+--confirm test-ps-default fw eu-central-h1/test-ps-default destroy
+--confirm test-ps ps eu-central-h1/test-ps destroy
+--confirm test-vm vm eu-central-h1/test-vm destroy
+fw eu-central-h1/default-eu-central-h1-default delete-rule fr7cv7h5bz324maazy93ykn8s4
+fw eu-central-h1/default-eu-central-h1-default detach-subnet psfzm9e26xky5m9ggetw4dpqe2
+fw eu-central-h1/default-eu-central-h1-default show
+fw eu-central-h1/default-eu-central-h1-default show -f firewall-rules -r id,cidr
+fw eu-central-h1/default-eu-central-h1-default show -f firewall-rules -r port-range
+fw eu-central-h1/default-eu-central-h1-default show -f id,name,location,description
+fw eu-central-h1/default-eu-central-h1-default show -f private-subnets,firewall-rules
+fw eu-central-h1/default-eu-central-h1-default show -f private-subnets -p id,name,state,location
+fw eu-central-h1/default-eu-central-h1-default show -f private-subnets -p net4,net6,nics
+fw eu-central-h1/default-eu-central-h1-default show -f private-subnets -p nics -n id,name,vm-name
+fw eu-central-h1/default-eu-central-h1-default show -f private-subnets -p nics -n private-ipv4,private-ipv6
+fw eu-central-h1/test2-fw create
+fw eu-central-h1/test2-fw create -d test2-fw-description
+fw eu-central-h1/test-ps-default attach-subnet psfzm9e26xky5m9ggetw4dpqe2
+fw eu-central-h1/test-ps-default destroy -f
+fw list
+fw list -f location
+fw list -l eu-central-h1
+fw list -l eu-central-h1 -f name,id
+fw list -l eu-central-h1 -N -f name,id
+fw list -l eu-north-h1
+fw list -l eu-north-h1 -f name,id
+fw list -l eu-north-h1 -N -f name,id
+fw list -N
+--help
+help
+help help
+help -r
+help -ru
+help -ru vm
+help -r vm
+help -u
+help -u vm
+help vm
+help vm list
+pg eu-central-h1/test2-pg create
+pg eu-central-h1/test2-pg create -f lantern
+pg eu-central-h1/test2-pg create -h sync
+pg eu-central-h1/test2-pg create -S 128
+pg eu-central-h1/test2-pg create -s standard-4
+pg eu-central-h1/test2-pg create -v 17
+pg eu-central-h1/test-pg add-firewall-rule 1.2.3.0/24
+pg eu-central-h1/test-pg add-metric-destination foo bar https://md.example.com
+pg eu-central-h1/test-pg delete-firewall-rule pfb9g14e5ndt6qf59wfk8109bg
+pg eu-central-h1/test-pg delete-metric-destination et2t1bswsqz21m7j7njfjbp901
+pg eu-central-h1/test-pg destroy -f
+pg eu-central-h1/test-pg reset-superuser-password foo123BAR456
+pg eu-central-h1/test-pg show
+pg eu-central-h1/test-pg show -f firewall-rules,metric-destinations,ca-certificates
+pg eu-central-h1/test-pg show -f ha-type,flavor,connection-string,primary,earliest-restore-time
+pg eu-central-h1/test-pg show -f id
+pg eu-central-h1/test-pg show -f name,state,location,vm-size,storage-size-gib,version
+pg list
+pg list -f location
+pg list -f name,id,version,flavor
+pg list -l eu-central-h1
+pg list -l eu-central-h1 -f name,id
+pg list -l eu-central-h1 -N -f name,id
+pg list -l eu-north-h1
+pg list -l eu-north-h1 -f name,id
+pg list -l eu-north-h1 -N -f name,id
+pg list -N
+ps eu-central-h1/default-eu-central-h1 show
+ps eu-central-h1/default-eu-central-h1 show -f firewalls
+ps eu-central-h1/default-eu-central-h1 show -f firewalls,nics
+ps eu-central-h1/default-eu-central-h1 show -f firewalls -w id,name
+ps eu-central-h1/default-eu-central-h1 show -f id,name,state,location,net4,net6
+ps eu-central-h1/default-eu-central-h1 show -f nics -n id,name
+ps eu-central-h1/default-eu-central-h1 show -f nics -n private-ipv4,private-ipv6,vm-name
+ps eu-central-h1/default-eu-central-h1 show -w description,location,path
+ps eu-central-h1/default-eu-central-h1 show -w firewall-rules
+ps eu-central-h1/default-eu-central-h1 show -w firewall-rules -r id,cidr
+ps eu-central-h1/default-eu-central-h1 show -w firewall-rules -r port-range
+ps eu-central-h1/test2-ps create
+ps eu-central-h1/test2-ps create -f fw4gj2v4h1fe3q28q0hnf7g8n1
+ps eu-central-h1/test-ps destroy -f
+ps list
+ps list -f location
+ps list -f name,id,net4,net6
+ps list -l eu-central-h1
+ps list -l eu-central-h1 -f name,id
+ps list -l eu-central-h1 -N -f name,id
+ps list -l eu-north-h1
+ps list -l eu-north-h1 -f name,id
+ps list -l eu-north-h1 -N -f name,id
+ps list -N
+--version
+vm eu-central-h1/test2-vm create -6 pk
+vm eu-central-h1/test2-vm create -b debian-12 pk
+vm eu-central-h1/test2-vm create pk
+vm eu-central-h1/test2-vm create -p psfzm9e26xky5m9ggetw4dpqe2 pk
+vm eu-central-h1/test2-vm create -S 80 pk
+vm eu-central-h1/test2-vm create -s standard-4 pk
+vm eu-central-h1/test2-vm create -u foo pk
+vm eu-central-h1/test-vm destroy -f
+vm eu-central-h1/test-vm show
+vm eu-central-h1/test-vm show -f firewalls
+vm eu-central-h1/test-vm show -f firewalls -w description,location,path
+vm eu-central-h1/test-vm show -f firewalls -w firewall-rules
+vm eu-central-h1/test-vm show -f firewalls -w firewall-rules -r id,cidr
+vm eu-central-h1/test-vm show -f firewalls -w firewall-rules -r port-range
+vm eu-central-h1/test-vm show -f firewalls -w id,name
+vm eu-central-h1/test-vm show -f id,name,state,location,size,unix-user,storage-size-gib
+vm eu-central-h1/test-vm show -f ip6,ip4-enabled,ip4,private-ipv4,private-ipv6,subnet
+vm list
+vm list -f location
+vm list -f name,id,ip4,ip6
+vm list -l eu-central-h1
+vm list -l eu-central-h1 -f name,id
+vm list -l eu-central-h1 -N -f name,id
+vm list -l eu-north-h1
+vm list -l eu-north-h1 -f name,id
+vm list -N
