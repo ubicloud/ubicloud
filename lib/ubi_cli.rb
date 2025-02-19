@@ -81,9 +81,10 @@ class UbiCli
 
     on(cmd, "list") do
       options("ubi #{cmd} list [options]", key:) do
-        on("-f", "--fields=fields", "show specific fields (default: #{fields.join(",")})")
+        on("-f", "--fields=fields", "show specific fields (comma separated)")
         on("-l", "--location=location", "only show #{LOWERCASE_LABELS[cmd]}s in given location")
         on("-N", "--no-headers", "do not show headers")
+        wrap("Fields:", fields)
       end
 
       run do |opts|
