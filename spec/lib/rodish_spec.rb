@@ -70,6 +70,7 @@ RSpec.describe Rodish do
         post_options "example g arg [options] [subcommand [subcommand_options] [...]]", key: :g do
           on("-v", "g verbose output")
           on("-k", "--key=foo", "set key")
+          wrap("Foo:", %w[bar baz quux options subcommand subcommand_options], limit: 23)
         end
 
         args(2...)
@@ -233,6 +234,9 @@ RSpec.describe Rodish do
           Options:
               -v                               g verbose output
               -k, --key=foo                    set key
+          Foo: bar baz quux
+               options subcommand
+               subcommand_options
 
           Subcommands: h i
         USAGE
