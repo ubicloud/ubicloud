@@ -16,8 +16,8 @@ RSpec.describe Clover, "cli fw destroy" do
   it "asks for confirmation if -f option is not given" do
     expect(Semaphore.where(strand_id: @fw.id, name: "destroy")).to be_empty
     expect(cli(%w[fw eu-central-h1/test-fw destroy], confirm_prompt: "Confirmation")).to eq <<~END
-      Destroying this Firewall is not recoverable.
-      Enter the following to confirm destruction of the Firewall: #{@fw.name}
+      Destroying this firewall is not recoverable.
+      Enter the following to confirm destruction of the firewall: #{@fw.name}
     END
     expect(@fw).to be_exist
   end
@@ -28,7 +28,7 @@ RSpec.describe Clover, "cli fw destroy" do
   end
 
   it "fails on incorrect confirmation" do
-    expect(cli(%w[--confirm foo fw eu-central-h1/test-fw destroy], status: 400)).to eq "! Confirmation of Firewall name not successful.\n"
+    expect(cli(%w[--confirm foo fw eu-central-h1/test-fw destroy], status: 400)).to eq "! Confirmation of firewall name not successful.\n"
     expect(@fw).to be_exist
   end
 end
