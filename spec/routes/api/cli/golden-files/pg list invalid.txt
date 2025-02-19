@@ -3,6 +3,7 @@
 Usage: ubi pg list [options]
 
 Options:
-    -f, --fields=fields              show specific fields (default: location,name,id,version,flavor)
+    -f, --fields=fields              show specific fields (comma separated)
     -l, --location=location          only show PostgreSQL databases in given location
     -N, --no-headers                 do not show headers
+Fields: location name id version flavor
