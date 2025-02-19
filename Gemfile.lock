@@ -68,6 +68,9 @@ GEM
       aws-partitions (~> 1, >= 1.992.0)
       aws-sigv4 (~> 1.9)
       jmespath (~> 1, >= 1.6.1)
+    aws-sdk-ec2 (1.499.0)
+      aws-sdk-core (~> 3, >= 3.210.0)
+      aws-sigv4 (~> 1.5)
     aws-sdk-kms (1.96.0)
       aws-sdk-core (~> 3, >= 3.210.0)
       aws-sigv4 (~> 1.5)
@@ -440,6 +443,7 @@ DEPENDENCIES
   argon2
   argon2-kdf
   awesome_print
+  aws-sdk-ec2 (~> 1.499)
   aws-sdk-s3 (~> 1.177)
   bcrypt_pbkdf
   brakeman

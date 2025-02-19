@@ -85,7 +85,7 @@ class Clover
 
     options.add_option(name: "name")
     options.add_option(name: "flavor", values: flavor)
-    options.add_option(name: "location", values: Option.postgres_locations.map(&:display_name), parent: "flavor")
+    options.add_option(name: "location", values: Option.postgres_locations.map { _1[:display_name] }, parent: "flavor")
     options.add_option(name: "size", values: [2, 4, 8, 16, 30, 60].map { "standard-#{_1}" }, parent: "location")
 
     options.add_option(name: "storage_size", values: ["64", "128", "256", "512", "1024", "2048", "4096"], parent: "size") do |flavor, location, size, storage_size|

@@ -16,7 +16,13 @@ class Prog::Vnet::NicNexus < Prog::Base
 
     DB.transaction do
       nic = Nic.create(private_ipv6: ipv6_addr, private_ipv4: ipv4_addr, mac: gen_mac, name: name, private_subnet_id: private_subnet_id) { _1.id = ubid.to_uuid }
-      Strand.create(prog: "Vnet::NicNexus", label: "wait_allocation") { _1.id = nic.id }
+      label = if subnet.location == "aws-us-east-1"
+        NicAwsResource.create_with_id(customer_aws_account_id: PrivateSubnetAwsResource[subnet.id].customer_aws_account_id) { _1.id = nic.id }
+        "create_aws_nic"
+      else
+        "wait_allocation"
+      end
+      Strand.create(prog: "Vnet::NicNexus", label: label) { _1.id = nic.id }
     end
   end
 
@@ -24,6 +30,13 @@ class Prog::Vnet::NicNexus < Prog::Base
     when_destroy_set? do
       hop_destroy if strand.label != "destroy"
     end
+  end
+
+  label def create_aws_nic
+    if retval&.dig("msg") == "eip created"
+      hop_wait
+    end
+    push Prog::Aws::Allocator, {"subject_id" => nic.private_subnet_id, "nic_id" => nic.id}, :create_network_interface
   end
 
   label def wait_allocation

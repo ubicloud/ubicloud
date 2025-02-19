@@ -30,6 +30,10 @@ class Vm < Sequel::Model
 
   include ObjectTag::Cleanup
 
+  def aws?
+    location.start_with?("aws-")
+  end
+
   def firewalls
     private_subnets.flat_map(&:firewalls)
   end

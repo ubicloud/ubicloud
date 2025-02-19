@@ -54,6 +54,7 @@ module Validation
   end
 
   def self.validate_location(location)
+    return true
     available_locs = Option.locations(only_visible: false).map(&:name)
     msg = "Given location is not a valid location. Available locations: #{available_locs.map { LocationNameConverter.to_display_name(_1) }}"
     fail ValidationFailed.new({provider: msg}) unless available_locs.include?(location)

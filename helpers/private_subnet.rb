@@ -55,7 +55,7 @@ class Clover
   def generate_private_subnet_options
     options = OptionTreeGenerator.new
     options.add_option(name: "name")
-    options.add_option(name: "location", values: Option.locations.map(&:display_name))
+    options.add_option(name: "location", values: Option.locations.map { _1[:display_name] })
     options.serialize
   end
 end

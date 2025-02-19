@@ -46,6 +46,10 @@ class PrivateSubnet < Sequel::Model
     LocationNameConverter.to_display_name(location)
   end
 
+  def aws?
+    location.start_with?("aws-")
+  end
+
   def path
     "/location/#{display_location}/private-subnet/#{name}"
   end
@@ -163,11 +167,12 @@ end
 # Foreign key constraints:
 #  private_subnet_project_id_fkey | (project_id) REFERENCES project(id)
 # Referenced By:
-#  connected_subnet          | connected_subnet_subnet_id_1_fkey                | (subnet_id_1) REFERENCES private_subnet(id)
-#  connected_subnet          | connected_subnet_subnet_id_2_fkey                | (subnet_id_2) REFERENCES private_subnet(id)
-#  firewalls_private_subnets | firewalls_private_subnets_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
-#  inference_endpoint        | inference_endpoint_private_subnet_id_fkey        | (private_subnet_id) REFERENCES private_subnet(id)
-#  kubernetes_cluster        | kubernetes_cluster_private_subnet_id_fkey        | (private_subnet_id) REFERENCES private_subnet(id)
-#  load_balancer             | load_balancer_private_subnet_id_fkey             | (private_subnet_id) REFERENCES private_subnet(id)
-#  minio_cluster             | minio_cluster_private_subnet_id_fkey             | (private_subnet_id) REFERENCES private_subnet(id)
-#  nic                       | nic_private_subnet_id_fkey                       | (private_subnet_id) REFERENCES private_subnet(id)
+#  connected_subnet            | connected_subnet_subnet_id_1_fkey                | (subnet_id_1) REFERENCES private_subnet(id)
+#  connected_subnet            | connected_subnet_subnet_id_2_fkey                | (subnet_id_2) REFERENCES private_subnet(id)
+#  firewalls_private_subnets   | firewalls_private_subnets_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
+#  inference_endpoint          | inference_endpoint_private_subnet_id_fkey        | (private_subnet_id) REFERENCES private_subnet(id)
+#  kubernetes_cluster          | kubernetes_cluster_private_subnet_id_fkey        | (private_subnet_id) REFERENCES private_subnet(id)
+#  load_balancer               | load_balancer_private_subnet_id_fkey             | (private_subnet_id) REFERENCES private_subnet(id)
+#  minio_cluster               | minio_cluster_private_subnet_id_fkey             | (private_subnet_id) REFERENCES private_subnet(id)
+#  nic                         | nic_private_subnet_id_fkey                       | (private_subnet_id) REFERENCES private_subnet(id)
+#  private_subnet_aws_resource | private_subnet_aws_resource_id_fkey              | (id) REFERENCES private_subnet(id)
