@@ -30,6 +30,7 @@ class Serializers::Invoice < Serializers::Base
         billing_city: inv.content.dig("billing_info", "city"),
         billing_state: inv.content.dig("billing_info", "state"),
         billing_postal_code: inv.content.dig("billing_info", "postal_code"),
+        billing_in_eu_vat: inv.content.dig("billing_info", "in_eu_vat"),
         tax_id: inv.content.dig("billing_info", "tax_id"),
         company_name: inv.content.dig("billing_info", "company_name"),
         issuer_name: inv.content.dig("issuer_info", "name"),
@@ -38,6 +39,12 @@ class Serializers::Invoice < Serializers::Base
         issuer_city: inv.content.dig("issuer_info", "city"),
         issuer_state: inv.content.dig("issuer_info", "state"),
         issuer_postal_code: inv.content.dig("issuer_info", "postal_code"),
+        issuer_tax_id: inv.content.dig("issuer_info", "tax_id"),
+        issuer_trade_id: inv.content.dig("issuer_info", "trade_id"),
+        issuer_in_eu_vat: inv.content.dig("issuer_info", "in_eu_vat"),
+        vat_rate: inv.content.dig("vat_info", "rate"),
+        vat_amount: "$%0.02f" % (inv.content.dig("vat_info", "amount") || 0),
+        vat_reversed: inv.content.dig("vat_info", "reversed"),
         items: inv.content["resources"].flat_map do |resource|
                  resource["line_items"].map do |line_item|
                    {

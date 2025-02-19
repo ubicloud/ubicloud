@@ -347,7 +347,22 @@ RSpec.describe Clover, "billing" do
         expect(page).to have_content "less than $0.001"
       end
 
-      it "show finalized invoice as PDF" do
+      it "show finalized invoice as PDF from US issuer without VAT" do
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "US"}, "metadata" => {"company_name" => "Foo Companye Name", "tax_id" => "123123123"}}).at_least(:once)
+        bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run.first
+
+        visit "#{project.path}/billing/invoice/#{invoice.ubid}"
+
+        expect(page.status_code).to eq(200)
+        text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
+        expect(text).to include("Ubicloud Inc.")
+        expect(text).to include("ACME Inc. - Foo Companye Name")
+        expect(text).to include("test-vm")
+        expect(text).not_to include("VAT")
+      end
+
+      it "show finalized invoice as PDF from EU issuer with 21% VAT" do
         expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}}).at_least(:once)
         bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run.first
@@ -356,8 +371,40 @@ RSpec.describe Clover, "billing" do
 
         expect(page.status_code).to eq(200)
         text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
+        expect(text).to include("Ubicloud B.V.")
+        expect(text).to include("test-vm")
+        expect(text).to include("VAT (21%)")
+      end
+
+      it "show finalized invoice as PDF from EU issuer with reversed charge" do
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "DE"}, "metadata" => {"tax_id" => "123123123"}}).at_least(:once)
+        bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run.first
+
+        visit "#{project.path}/billing/invoice/#{invoice.ubid}"
+
+        expect(page.status_code).to eq(200)
+        text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
+        expect(text).to include("Ubicloud B.V.")
+        expect(text).to include("test-vm")
+        expect(text).to include("VAT subject to reverse charge")
+      end
+
+      it "show finalized invoice as PDF with old issuer info" do
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "US"}, "metadata" => {"company_name" => "Foo Companye Name", "tax_id" => "123123123"}}).at_least(:once)
+        bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run.first
+        invoice.content["issuer_info"].merge!("name" => nil, "tax_id" => "123123123", "in_eu_vat" => false)
+        invoice.modified!(:content)
+        invoice.save_changes
+
+        visit "#{project.path}/billing/invoice/#{invoice.ubid}"
+
+        expect(page.status_code).to eq(200)
+        text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
         expect(text).to include("ACME Inc. - Foo Companye Name")
         expect(text).to include("test-vm")
+        expect(text).to include("Tax ID: 123123123")
       end
 
       it "raises not found when invoice not exists" do

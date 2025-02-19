@@ -16,6 +16,7 @@
     (@invoice_data[:discount] != "$0.00") ? ["Discount", "-#{@invoice_data[:discount]}"] : nil,
     (@invoice_data[:credit] != "$0.00") ? ["Credit", "-#{@invoice_data[:credit]}"] : nil,
     (@invoice_data[:free_inference_tokens_credit] != "$0.00") ? ["Free Inference Tokens", "-#{@invoice_data[:free_inference_tokens_credit]}"] : nil,
+    (@invoice_data[:vat_amount] != "$0.00") ? ["VAT (#{@invoice_data[:vat_rate]}%)", @invoice_data[:vat_amount]] : nil,
     ["Total", @invoice_data[:total]]
   ].compact.map do |name, value|
     <<~CONTENT
