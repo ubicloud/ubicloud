@@ -242,6 +242,11 @@ ensure
   File.delete(output_file) if File.file?(output_file)
 end
 
+desc "Update cli spec golden files"
+task "update_golden_files" do
+  sh "mv spec/routes/api/cli/spec-output-files/*.txt spec/routes/api/cli/golden-files/"
+end
+
 # Other
 
 desc "Check generated SQL for parameterization"
@@ -307,6 +312,25 @@ task "by" do
   sh("bundle", "exec", "by-session", "./.by-session-setup.rb")
 ensure
   File.delete(by_path) if File.file?(by_path)
+end
+
+desc "Build binary version of bin/ubi"
+task "build_ubi" do
+  # Ubuntu: sudo apt-get install libcurl4-openssl-dev
+  dir = "build-ubi"
+  Dir.mkdir(dir) unless File.directory?(dir)
+  Dir.chdir(dir) do
+    unless File.directory?("mruby")
+      sh "git clone https://github.com/mruby/mruby.git"
+      sh "cd mruby && git checkout 3.3.0"
+    end
+
+    Dir.chdir("mruby") do
+      sh "MRUBY_CONFIG=../ubi_config.rb ruby ./minirake"
+      sh "bin/mrbc -o ubi.c -B ubi ../../bin/ubi"
+      sh "gcc -std=c99 -Iinclude -I. ../main.c -o ubi build/host/lib/libmruby.a -lm -lcurl"
+    end
+  end
 end
 
 namespace :linter do

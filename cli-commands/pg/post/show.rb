@@ -1,23 +1,20 @@
 # frozen_string_literal: true
 
-UbiRodish.on("pg").run_on("show") do
-  fields = %w[id name state location vm_size storage_size_gib version ha_type flavor connection_string primary earliest_restore_time latest_restore_time firewall_rules metric_destinations ca_certificates].freeze.each(&:freeze)
+UbiCli.on("pg").run_on("show") do
+  fields = %w[id name state location vm-size storage-size-gib version ha-type flavor connection-string primary earliest-restore-time firewall-rules metric-destinations ca-certificates].freeze.each(&:freeze)
 
-  options("ubi pg location/(vm-name|_vm-ubid) show [options]", key: :pg_show) do
+  options("ubi pg location/(pg-name|_pg-ubid) show [options]", key: :pg_show) do
     on("-f", "--fields=fields", "show specific fields (default: #{fields.join(",")})")
   end
 
   run do |opts|
-    get(project_path("location/#{@location}/postgres/#{@name}")) do |data|
-      keys = fields
-
-      if (opts = opts[:pg_show])
-        keys = check_fields(opts[:fields], fields, "pg show -f option")
-      end
+    get(pg_path) do |data|
+      opts = opts[:pg_show]
+      keys = check_fields(opts[:fields], fields, "pg show -f option")
 
       body = []
 
-      keys.each do |key|
+      underscore_keys(keys).each do |key|
         case key
         when "firewall_rules"
           body << "firewall rules:\n"

@@ -1,0 +1,13 @@
+Usage: ubi vm subcommand [...]
+
+Subcommands: list
+
+
+Usage: ubi vm location/(vm-name|_vm-ubid) [options] subcommand [...]
+
+Options:
+    -4, --ip4                        use IPv4 address
+    -6, --ip6                        use IPv6 address
+    -u, --user user                  override username
+
+Subcommands: create destroy scp sftp show ssh

@@ -7,7 +7,7 @@ class Clover
 
       unless (argv = r.POST["argv"]).is_a?(Array) && argv.all?(String)
         response.status = 400
-        next "Invalid request: No or invalid argv parameter provided"
+        next "! Invalid request: No or invalid argv parameter provided"
       end
 
       project_id = env["clover.project_id"] = ApiKey.where(id: rodauth.session["pat_id"]).get(:project_id)

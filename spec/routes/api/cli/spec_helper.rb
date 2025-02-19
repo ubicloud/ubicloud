@@ -3,10 +3,11 @@
 require_relative "../spec_helper"
 
 RSpec.configure do |config|
-  def cli(argv, status: 200, env: {}, confirm_prompt: nil)
+  def cli(argv, status: 200, env: {}, confirm_prompt: nil, command_execute: nil)
     post("/cli", {"argv" => argv}.to_json, env)
     expect(last_response.status).to eq(status), "status is #{last_response.status} not #{status}, body for failing status: #{last_response.body}"
     expect(last_response["content-type"]).to eq("text/plain")
+    expect(last_response["ubi-command-execute"]).to eq(command_execute) if command_execute
     expect(last_response["ubi-confirm"]).to eq(confirm_prompt) if confirm_prompt
     last_response.body
   end

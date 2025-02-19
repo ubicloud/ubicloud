@@ -1,0 +1,22 @@
+! Invalid option: -X
+
+Usage: ubi pg location/(pg-name|_pg-ubid) [options] subcommand [...]
+
+Options:
+    -d, --dbname=name                override database name
+    -U, --username=name              override username
+
+Subcommands:
+  add-firewall-rule
+  add-metric-destination
+  create
+  delete-firewall-rule
+  delete-metric-destination
+  destroy
+  failover
+  pg_dump
+  pg_dumpall
+  psql
+  reset-superuser-password
+  restore
+  show

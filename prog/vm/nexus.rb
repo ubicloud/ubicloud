@@ -7,9 +7,11 @@ require "openssl"
 require "base64"
 
 class Prog::Vm::Nexus < Prog::Base
+  DEFAULT_SIZE = "standard-2"
+
   subject_is :vm
 
-  def self.assemble(public_key, project_id, name: nil, size: "standard-2",
+  def self.assemble(public_key, project_id, name: nil, size: DEFAULT_SIZE,
     unix_user: "ubi", location: "hetzner-fsn1", boot_image: Config.default_boot_image_name,
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
     enable_ip4: false, pool_id: nil, arch: "x64", swap_size_bytes: nil,

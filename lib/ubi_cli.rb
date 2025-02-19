@@ -1,14 +1,37 @@
 # frozen_string_literal: true
 
 class UbiCli
+  force_autoload = Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
+
+  Rodish.processor(self) do
+    options("ubi [options] [subcommand [subcommand-options] ...]") do
+      on("--version", "show program version") { halt "0.0.0" }
+      on("--help", "show program help") { halt to_s }
+      on("--confirm=confirmation", "confirmation value (not for direct use)")
+    end
+
+    # :nocov:
+    autoload_subcommand_dir("cli-commands") unless force_autoload
+    # :nocov:
+  end
+
   def self.process(argv, env)
-    UbiRodish.process(argv, context: new(env))
+    super
   rescue Rodish::CommandExit => e
-    [e.failure? ? 400 : 200, {"content-type" => "text/plain"}, [e.message]]
+    if e.failure?
+      status = 400
+      message = e.message_with_usage.dup
+      message[0] = "! #{message[0].capitalize}"
+    else
+      status = 200
+      message = e.message
+    end
+
+    [status, {"content-type" => "text/plain", "content-length" => message.bytesize.to_s}, [message]]
   end
 
   def self.base(cmd, &block)
-    UbiRodish.on(cmd) do
+    on(cmd) do
       # :nocov:
       unless Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
         autoload_subcommand_dir("cli-commands/#{cmd}")
@@ -32,7 +55,7 @@ class UbiCli
     fields.freeze.each(&:freeze)
     key = :"#{cmd}_list"
 
-    UbiRodish.on(cmd, "list") do
+    on(cmd, "list") do
       options("ubi #{cmd} list [options]", key:) do
         on("-f", "--fields=fields", "show specific fields (default: #{fields.join(",")})")
         on("-l", "--location=location", "only show #{label} in given location")
@@ -41,7 +64,7 @@ class UbiCli
 
       run do |opts|
         opts = opts[key]
-        path = if opts && (location = opts[:location])
+        path = if (location = opts[:location])
           if LocationNameConverter.to_internal_name(location)
             "location/#{location}/#{fragment}"
           else
@@ -52,29 +75,22 @@ class UbiCli
         end
 
         get(project_path(path)) do |data|
-          keys = fields
-          headers = true
-
-          if opts
-            keys = check_fields(opts[:fields], fields, "#{cmd} list -f option")
-            headers = false if opts[:"no-headers"] == false
-          end
-
-          format_rows(keys, data["items"], headers:)
+          keys = check_fields(opts[:fields], fields, "#{cmd} list -f option")
+          format_rows(keys, data["items"], headers: opts[:"no-headers"] != false)
         end
       end
     end
   end
 
   def self.destroy(cmd, label, fragment: cmd)
-    UbiRodish.on(cmd).run_on("destroy") do
+    on(cmd).run_on("destroy") do
       options("ubi #{cmd} location/(#{cmd}-name|_#{cmd}-ubid) destroy [options]", key: :destroy) do
         on("-f", "--force", "do not require confirmation")
       end
 
       run do |opts|
         if opts.dig(:destroy, :force) || opts[:confirm] == @name
-          delete(project_path("location/#{@location}/#{fragment}/#{@name}")) do |_, res|
+          delete(project_subpath(fragment)) do |_, res|
             ["#{label}, if it exists, is now scheduled for destruction"]
           end
         elsif opts[:confirm]
@@ -93,23 +109,22 @@ class UbiCli
   end
 
   def self.pg_cmd(cmd)
-    UbiRodish.on("pg").run_on(cmd) do
-      skip_option_parsing
+    on("pg").run_on(cmd) do
+      skip_option_parsing("ubi pg location/(pg-name|_pg-ubid) [options] #{cmd} [#{cmd}-options]")
 
       args(0...)
 
       run do |argv, opts|
-        get(project_path("location/#{@location}/postgres/#{@name}")) do |data, res|
+        get(pg_path) do |data, res|
           conn_string = URI(data["connection_string"])
-          if (opts = opts[:pg_psql])
-            if (user = opts[:username])
-              conn_string.user = user
-              conn_string.password = nil
-            end
+          opts = opts[:pg_psql]
+          if (user = opts[:username])
+            conn_string.user = user
+            conn_string.password = nil
+          end
 
-            if (database = opts[:dbname])
-              conn_string.path = "/#{database}"
-            end
+          if (database = opts[:dbname])
+            conn_string.path = "/#{database}"
           end
 
           argv = [cmd, *argv, "--", conn_string]
@@ -125,19 +140,20 @@ class UbiCli
     @env = env
   end
 
+  private
+
   def project_ubid
     @project_ubid ||= @env["clover.project_ubid"]
   end
 
   def handle_ssh(opts)
-    get(project_path("location/#{@location}/vm/#{@name}")) do |data, res|
-      if (opts = opts[:vm_ssh])
-        user = opts[:user]
-        if opts[:ip4]
-          address = data["ip4"] || false
-        elsif opts[:ip6]
-          address = data["ip6"]
-        end
+    get(vm_path) do |data, res|
+      opts = opts[:vm_ssh]
+      user = opts[:user]
+      if opts[:ip4]
+        address = data["ip4"] || false
+      elsif opts[:ip6]
+        address = data["ip6"]
       end
 
       if address.nil?
@@ -201,6 +217,22 @@ class UbiCli
     "/project/#{project_ubid}/#{rest}"
   end
 
+  def project_subpath(fragment, rest = "")
+    project_path("location/#{@location}/#{fragment}/#{@name}#{rest}")
+  end
+
+  def vm_path(rest = "")
+    project_subpath("vm", rest)
+  end
+
+  def pg_path(rest = "")
+    project_subpath("postgres", rest)
+  end
+
+  def ps_path(rest = "")
+    project_subpath("private-subnet", rest)
+  end
+
   def format_rows(keys, rows, headers: false, col_sep: "  ")
     results = []
 
@@ -255,7 +287,15 @@ class UbiCli
     @env["puma.socket"]&.local_address&.ipv6?
   end
 
-  private
+  def underscore_keys(keys)
+    if keys.is_a?(Hash)
+      # Used with symbol keyed hashes that need to be
+      # converted to strings
+      keys.transform_keys { _1.to_s.tr("-", "_") }
+    else # when Hash
+      keys.map { _1.tr("-", "_") }
+    end
+  end
 
   def invalid_confirmation(message)
     response(message, status: 400)
@@ -266,9 +306,15 @@ class UbiCli
   end
 
   def response(body, status: 200, headers: {})
-    headers["content-length"] = body.bytesize.to_s
+    if body.is_a?(Array)
+      headers["content-length"] = body.sum(&:bytesize).to_s
+    else
+      headers["content-length"] = body.bytesize.to_s
+      body = [body]
+    end
+
     headers["content-type"] = "text/plain"
-    [status, headers, [body]]
+    [status, headers, body]
   end
 
   def _req_env(method, path, params)
@@ -305,7 +351,7 @@ class UbiCli
     else
       body = +""
       res[2].each { body << _1 }
-      error_message = "Error: unexpected response status: #{res[0]}"
+      error_message = "! Unexpected response status: #{res[0]}"
       # Temporary nocov until at least one action pushed into routes
       # :nocov:
       if (res[1]["content-type"] == "application/json") && (parsed_body = JSON.parse(body)) && (error = parsed_body.dig("error", "message"))
@@ -346,6 +392,16 @@ class UbiCli
         end
       end
     end)
+  end
+  # :nocov:
+
+  Unreloader.record_dependency("lib/rodish.rb", __FILE__)
+  Unreloader.record_dependency(__FILE__, "cli-commands")
+  if force_autoload
+    Unreloader.require("cli-commands") {}
+  # :nocov:
+  else
+    Unreloader.autoload("cli-commands") {}
   end
   # :nocov:
 end

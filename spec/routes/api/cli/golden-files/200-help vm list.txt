@@ -1,0 +1,6 @@
+Usage: ubi vm list [options]
+
+Options:
+    -f, --fields=fields              show specific fields (default: location,name,id,ip4,ip6)
+    -l, --location=location          only show VMs in given location
+    -N, --no-headers                 do not show headers

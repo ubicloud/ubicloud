@@ -1,0 +1,2 @@
+Destroying this VM is not recoverable.
+Enter the following to confirm destruction of the VM: test-vm

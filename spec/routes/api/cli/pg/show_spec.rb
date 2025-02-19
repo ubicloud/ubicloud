@@ -35,7 +35,6 @@ RSpec.describe Clover, "cli pg show" do
       connection_string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com?channel_binding=require
       primary: true
       earliest_restore_time: 
-      latest_restore_time: #{@pg.timeline.latest_restore_time.utc.iso8601}
       firewall rules:
         1: #{@pg.firewall_rules[0].ubid}  0.0.0.0/0
       metric destinations:
