@@ -16,7 +16,8 @@ class Serializers::BillingInfo < Serializers::Base
       state: bi.stripe_data["address"]["state"],
       postal_code: bi.stripe_data["address"]["postal_code"],
       tax_id: bi.stripe_data["metadata"]["tax_id"],
-      company_name: bi.stripe_data["metadata"]["company_name"]
+      company_name: bi.stripe_data["metadata"]["company_name"],
+      in_eu_vat: !!ISO3166::Country.new(bi.stripe_data["address"]["country"]).in_eu_vat?
     } : {})
   end
 end
