@@ -14,6 +14,7 @@ invalid
 lb list -f invalid
 lb list invalid
 lb eu-central-h1/test-lb show -f bad
+lb eu-central-h1/test-lb attach-vm vmdzyppz6j166jh5e9t2dwrfas
 lb eu-central-h1/test2-lb create
 pg eu-central-h1/test2-pg create invalid
 pg eu-central-h1/test-pg add-firewall-rule

@@ -8,6 +8,7 @@ Usage: ubi fw location/(fw-name|_fw-ubid) detach-subnet subnet-id
 Usage: ubi fw location/(fw-name|_fw-ubid) show [options]
 Usage: ubi help [options] [command [subcommand]]
 Usage: ubi lb list [options]
+Usage: ubi lb location/(lb-name|_lb-ubid) attach-vm vm-id
 Usage: ubi lb location/lb-name create [options] private-subnet-id src-port dst-port
 Usage: ubi lb location/(lb-name|_lb-ubid) destroy [options]
 Usage: ubi lb location/(lb-name|_lb-ubid) show [options]
