@@ -17,8 +17,8 @@ RSpec.describe Clover, "cli ps destroy" do
   it "asks for confirmation if -f option is not given" do
     expect(Semaphore.where(strand_id: @ps.id, name: "destroy")).to be_empty
     expect(cli(%w[ps eu-central-h1/test-ps destroy], confirm_prompt: "Confirmation")).to eq <<~END
-      Destroying this Private subnet is not recoverable.
-      Enter the following to confirm destruction of the Private subnet: #{@ps.name}
+      Destroying this private subnet is not recoverable.
+      Enter the following to confirm destruction of the private subnet: #{@ps.name}
     END
     expect(Semaphore.where(strand_id: @ps.id, name: "destroy")).to be_empty
   end
@@ -31,7 +31,7 @@ RSpec.describe Clover, "cli ps destroy" do
 
   it "fails on incorrect confirmation" do
     expect(Semaphore.where(strand_id: @ps.id, name: "destroy")).to be_empty
-    expect(cli(%w[--confirm foo ps eu-central-h1/test-ps destroy], status: 400)).to eq "! Confirmation of Private subnet name not successful.\n"
+    expect(cli(%w[--confirm foo ps eu-central-h1/test-ps destroy], status: 400)).to eq "! Confirmation of private subnet name not successful.\n"
     expect(Semaphore.where(strand_id: @ps.id, name: "destroy")).to be_empty
   end
 end

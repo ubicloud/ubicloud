@@ -1,3 +1,3 @@
 # frozen_string_literal: true
 
-UbiCli.destroy("vm", "VM")
+UbiCli.destroy("vm")

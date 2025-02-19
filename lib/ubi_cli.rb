@@ -10,6 +10,18 @@ class UbiCli
     "vm" => "vm"
   }.freeze
 
+  CAPITALIZED_LABELS = {
+    "fw" => "Firewall",
+    "pg" => "PostgreSQL database",
+    "ps" => "Private subnet",
+    "vm" => "VM"
+  }.freeze
+
+  LOWERCASE_LABELS = CAPITALIZED_LABELS.transform_values(&:downcase)
+  LOWERCASE_LABELS["pg"] = CAPITALIZED_LABELS["pg"]
+  LOWERCASE_LABELS["vm"] = CAPITALIZED_LABELS["vm"]
+  LOWERCASE_LABELS.freeze
+
   Rodish.processor(self) do
     options("ubi [options] [subcommand [subcommand-options] ...]") do
       on("--version", "show program version") { halt "0.0.0" }
@@ -58,7 +70,7 @@ class UbiCli
     end
   end
 
-  def self.list(cmd, label, fields)
+  def self.list(cmd, fields)
     fields.freeze.each(&:freeze)
     key = :"#{cmd}_list"
     fragment = FRAGMENTS[cmd]
@@ -66,7 +78,7 @@ class UbiCli
     on(cmd, "list") do
       options("ubi #{cmd} list [options]", key:) do
         on("-f", "--fields=fields", "show specific fields (default: #{fields.join(",")})")
-        on("-l", "--location=location", "only show #{label} in given location")
+        on("-l", "--location=location", "only show #{LOWERCASE_LABELS[cmd]}s in given location")
         on("-N", "--no-headers", "do not show headers")
       end
 
@@ -90,7 +102,7 @@ class UbiCli
     end
   end
 
-  def self.destroy(cmd, label)
+  def self.destroy(cmd)
     fragment = FRAGMENTS[cmd]
 
     on(cmd).run_on("destroy") do
@@ -101,16 +113,16 @@ class UbiCli
       run do |opts|
         if opts.dig(:destroy, :force) || opts[:confirm] == @name
           delete(project_subpath(fragment)) do |_, res|
-            ["#{label}, if it exists, is now scheduled for destruction"]
+            ["#{CAPITALIZED_LABELS[cmd]}, if it exists, is now scheduled for destruction"]
           end
         elsif opts[:confirm]
           invalid_confirmation <<~END
-            ! Confirmation of #{label} name not successful.
+            ! Confirmation of #{LOWERCASE_LABELS[cmd]} name not successful.
           END
         else
           require_confirmation("Confirmation", <<~END)
-            Destroying this #{label} is not recoverable.
-            Enter the following to confirm destruction of the #{label}: #{@name}
+            Destroying this #{LOWERCASE_LABELS[cmd]} is not recoverable.
+            Enter the following to confirm destruction of the #{LOWERCASE_LABELS[cmd]}: #{@name}
           END
         end
       end
