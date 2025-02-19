@@ -5,8 +5,9 @@ location: eu-central-h1
 net4: 172.27.99.128/26
 net6: fdd9:1ea7:125d:5fa4::/64
 firewall 1:
-  rule 1: 0..65535  
-  rule 2: 0..65535  
+  rules:
+   1: 0..65535  
+   2: 0..65535  
 nic 1:
   id: nc69z0cda8jt0g5b120hamn4vf
   name: test-vm-nic

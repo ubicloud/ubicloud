@@ -26,8 +26,9 @@ UbiCli.on("fw").run_on("show") do
       keys.each do |key|
         case key
         when "firewall_rules"
+          body << "rules:\n"
           data[key].each_with_index do |rule, i|
-            body << "rule " << (i + 1).to_s << ": "
+            body << "  " << (i + 1).to_s << ": "
             firewall_rule_keys.each do |fwr_key|
               body << rule[fwr_key].to_s << "  "
             end

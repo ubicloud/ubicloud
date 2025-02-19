@@ -28,8 +28,9 @@ UbiCli.on("vm").run_on("show") do
             body << "firewall " << (i + 1).to_s << ":\n"
             firewall_keys.each do |fw_key|
               if fw_key == "firewall_rules"
+                body << "  rules:\n"
                 firewall[fw_key].each_with_index do |rule, i|
-                  body << "  rule " << (i + 1).to_s << ": "
+                  body << "    " << (i + 1).to_s << ": "
                   firewall_rule_keys.each do |fwr_key|
                     body << rule[fwr_key].to_s << "  "
                   end

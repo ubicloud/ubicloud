@@ -34,8 +34,9 @@ RSpec.describe Clover, "cli vm show" do
         description: Default firewall
         location: eu-central-h1
         path: /location/eu-central-h1/firewall/default-eu-central-h1-default
-        rule 1: #{@fw.firewall_rules[0].ubid}  0.0.0.0/0  0..65535  
-        rule 2: #{@fw.firewall_rules[1].ubid}  ::/0  0..65535  
+        rules:
+          1: #{@fw.firewall_rules[0].ubid}  0.0.0.0/0  0..65535  
+          2: #{@fw.firewall_rules[1].ubid}  ::/0  0..65535  
     END
   end
 
@@ -58,8 +59,9 @@ RSpec.describe Clover, "cli vm show" do
   it "-r option controls which fields are shown rules for VM's firewalls" do
     expect(cli(%W[vm #{@ref} show -f firewalls -w firewall-rules -r cidr,port-range])).to eq <<~END
       firewall 1:
-        rule 1: 0.0.0.0/0  0..65535  
-        rule 2: ::/0  0..65535  
+        rules:
+          1: 0.0.0.0/0  0..65535  
+          2: ::/0  0..65535  
     END
   end
 end
