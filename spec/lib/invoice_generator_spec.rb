@@ -69,7 +69,7 @@ RSpec.describe InvoiceGenerator do
           "amount" => vm.vcpus.to_f,
           "duration" => duration_mins,
           "cost" => cost,
-          "begin_time" => begin_time.to_s,
+          "begin_time" => begin_time.utc.to_s,
           "unit_price" => br["unit_price"]
         }],
         "cost" => cost
