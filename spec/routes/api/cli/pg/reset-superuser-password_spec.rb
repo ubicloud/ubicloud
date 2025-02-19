@@ -11,7 +11,7 @@ RSpec.describe Clover, "cli pg reset-superuser-password" do
     cli(%w[pg eu-central-h1/test-pg create])
     expect(Semaphore.where(name: "update_superuser_password")).to be_empty
     pg = PostgresResource.first
-    expect(cli(%w[pg eu-central-h1/test-pg reset-superuser-password fooBar123456])).to eq "Superuser password reset scheduled for PostgreSQL database with id: #{pg.ubid}"
+    expect(cli(%w[pg eu-central-h1/test-pg reset-superuser-password fooBar123456])).to eq "Superuser password reset scheduled for PostgreSQL database with id: #{pg.ubid}\n"
     expect(Semaphore.where(name: "update_superuser_password")).not_to be_empty
     expect(pg.reload.superuser_password).to eq "fooBar123456"
   end

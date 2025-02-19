@@ -12,7 +12,7 @@ RSpec.describe Clover, "cli lb destroy" do
 
   it "destroys load balancer directly if -f option is given" do
     expect(Semaphore.where(strand_id: @lb.id, name: "destroy")).to be_empty
-    expect(cli(%w[lb eu-central-h1/test-lb destroy -f])).to eq "Load balancer, if it exists, is now scheduled for destruction"
+    expect(cli(%w[lb eu-central-h1/test-lb destroy -f])).to eq "Load balancer, if it exists, is now scheduled for destruction\n"
     expect(Semaphore.where(strand_id: @lb.id, name: "destroy")).not_to be_empty
   end
 
@@ -27,7 +27,7 @@ RSpec.describe Clover, "cli lb destroy" do
 
   it "works on correct confirmation" do
     expect(Semaphore.where(strand_id: @lb.id, name: "destroy")).to be_empty
-    expect(cli(%w[--confirm test-lb lb eu-central-h1/test-lb destroy])).to eq "Load balancer, if it exists, is now scheduled for destruction"
+    expect(cli(%w[--confirm test-lb lb eu-central-h1/test-lb destroy])).to eq "Load balancer, if it exists, is now scheduled for destruction\n"
     expect(Semaphore.where(strand_id: @lb.id, name: "destroy")).not_to be_empty
   end
 
