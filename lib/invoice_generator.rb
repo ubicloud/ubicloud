@@ -21,7 +21,13 @@ class InvoiceGenerator
         project_content[:project_id] = project.id
         project_content[:project_name] = project.name
         project_content[:billing_info] = Serializers::BillingInfo.serialize(project.billing_info)
-        project_content[:issuer_info] = {
+
+        # Invoices are issued by Ubicloud Inc. for non-EU customers without VAT applied.
+        # Invoices are issued by Ubicloud B.V. for EU customers.
+        #   - If the customer has provided a VAT number from the Netherlands, we charge 21% VAT.
+        #   - If the customer has provided a VAT number from another European country, we include a reverse charge notice along with 0% VAT.
+        #   - If the customer hasn't provided a VAT number, we charge 21% VAT until non-Dutch EU sales exceed annual threshold, than we charge local VAT.
+        issuer = {
           name: "Ubicloud Inc.",
           address: "310 Santa Ana Avenue",
           country: "US",
@@ -29,7 +35,26 @@ class InvoiceGenerator
           state: "CA",
           postal_code: "94127"
         }
-
+        vat_info = nil
+        if (country = ISO3166::Country.new(project_content.dig(:billing_info, :country))) && country.in_eu_vat?
+          issuer = {
+            name: "Ubicloud B.V.",
+            address: "Turfschip 267",
+            country: "NL",
+            city: "Amstelveen",
+            postal_code: "1186 XK",
+            tax_id: "NL864651442B01",
+            trade_id: "88492729",
+            in_eu_vat: true
+          }
+          vat_info = if ((tax_id = project_content[:billing_info][:tax_id]) && !tax_id.empty?) && country.alpha2 != "NL"
+            {rate: 0, reversed: true}
+          else
+            {rate: Config.annual_non_dutch_eu_sales_exceed_threshold ? country.vat_rates["standard"] : 21, reversed: false}
+          end
+        end
+        project_content[:issuer_info] = issuer
+        project_content[:vat_info] = vat_info
         project_content[:resources] = []
         project_content[:subtotal] = 0
         project_records.group_by { |pr| [pr[:resource_id], pr[:resource_name]] }.each do |(resource_id, resource_name), line_items|
@@ -103,6 +128,10 @@ class InvoiceGenerator
           project_content[:cost] -= project_content[:free_inference_tokens_credit]
         end
 
+        if vat_info && !vat_info[:reversed]
+          project_content[:vat_info][:amount] = (project_content[:cost] * vat_info[:rate].fdiv(100)).round(3)
+          project_content[:cost] += project_content[:vat_info][:amount]
+        end
         project_content[:cost] = project_content[:cost].round(3)
 
         if @save_result

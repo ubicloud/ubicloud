@@ -45,8 +45,6 @@ module Config
   optional :clover_session_secret, base64, clear: true
   optional :clover_runtime_token_secret, base64, clear: true
   optional :clover_column_encryption_key, base64, clear: true
-  optional :stripe_public_key, string, clear: true
-  optional :stripe_secret_key, string, clear: true
   optional :heartbeat_url, string
   optional :clover_database_root_certs, string
   override :max_monitor_threads, 32, int
@@ -199,4 +197,9 @@ module Config
 
   # Kubernetes
   optional :kubernetes_service_hostname, string
+
+  # Billing
+  optional :stripe_public_key, string, clear: true
+  optional :stripe_secret_key, string, clear: true
+  override :annual_non_dutch_eu_sales_exceed_threshold, false, bool
 end
