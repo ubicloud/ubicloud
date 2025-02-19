@@ -1,4 +1,4 @@
-<% @page_title = "#{@invoice_data[:name]} Invoice" %>
+<% @page_title = "Current Usage Summary" %>
 
 <%== part(
   "components/page_header",
@@ -6,83 +6,50 @@
     %w[Projects /project],
     [@project_data[:name], @project_data[:path]],
     ["Billing", "#{@project_data[:path]}/billing"],
-    ["#{@invoice_data[:name]} Invoice", "#"]
-  ],
-  right_items: [
-    part("components/button", text: "View PDF", link: "#{request.url}?pdf=1", attributes: {target: "_blank"})
+    ["Current Usage Summary", "#"]
   ]
 ) %>
 
-<div class="grid gap-6">
-  <!-- Invoice Card -->
-  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-    <div class="px-4 py-5 sm:p-6">
-      <div class="flex justify-between items-baseline text-gray-800">
-        <div class="text-4xl font-semibold">Current Usage Summary</div>
-        <div class="text-right text-3xl"><%= @invoice_data[:begin_time] %> to <%= @invoice_data[:end_time] %></div>
-      </div>
-      <h3 class="text-lg text-gray-500">
-        This invoice will be finalized on the first day of next month.
-      </h3>
-      <div class="mt-6">
-        <table class="min-w-full divide-y divide-gray-300 border border-gray-200">
-          <thead class="bg-gray-50">
-            <tr>
-              <th scope="col" class="py-3 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">RESOURCE</th>
-              <th scope="col" class="px-3 py-3 text-left text-sm font-semibold text-gray-900">DESCRIPTION</th>
-              <th scope="col" class="px-3 py-3 text-right text-sm font-semibold text-gray-900">USAGE</th>
-              <th scope="col" class="py-3 pl-3 pr-4 text-right text-sm font-semibold text-gray-900 sm:pr-6">AMOUNT</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200 bg-white">
-            <% if @invoice_data[:items].count > 0 %>
-            <% @invoice_data[:items].each do |item| %>
-              <tr>
-                <td class="whitespace-nowrap py-3 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= item[:name] %></td>
-                <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500"><%= item[:description] %></td>
-                <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500 text-right"><%= item[:usage] %></td>
-                <td class="whitespace-nowrap py-3 pl-3 pr-4 text-right text-sm text-gray-500 sm:pr-6"><%= item[:cost_humanized] %></td>
-              </tr>
-            <% end %>
-            <% else %>
-              <tr>
-                <td colspan="4" class="whitespace-nowrap px-3 py-3 text-center font-medium text-gray-900">No resources</td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
+<%
+  footer_content = [
+    ["Subtotal", @invoice_data[:subtotal]],
+    (@invoice_data[:discount] != "$0.00") ? ["Discount", "-#{@invoice_data[:discount]}"] : nil,
+    (@invoice_data[:credit] != "$0.00") ? ["Credit", "-#{@invoice_data[:credit]}"] : nil,
+    (@invoice_data[:free_inference_tokens_credit] != "$0.00") ? ["Free Inference Tokens", "-#{@invoice_data[:free_inference_tokens_credit]}"] : nil,
+    ["Total", @invoice_data[:total]]
+  ].compact.map do |name, value|
+    <<~CONTENT
+      <dl class="grid grid-cols-3 gap-x-3 #{(name == "Total") ? "text-2xl" : nil}">
+        <dt class="text-right font-semibold text-gray-800 col-span-2">#{name}:</dt>
+        <dd class="text-gray-500" id="invoice-#{name.downcase.tr(" ", "-")}">#{value}</dd>
+      </dl>
+    CONTENT
+  end.join
+%>
 
-        <div class="mt-8 flex justify-end">
-            <div class="grid gap-2 text-right">
-              <dl class="grid grid-cols-3 gap-x-3">
-                <dt class="text-right font-semibold text-gray-800 col-span-2">Subtotal:</dt>
-                <dd class="text-gray-500"><%= @invoice_data[:subtotal] %></dd>
-              </dl>
-              <% if @invoice_data[:discount] != "$0.00" %>
-                <dl class="grid grid-cols-3 gap-x-3">
-                  <dt class="text-right font-semibold text-gray-800 col-span-2">Discount:</dt>
-                  <dd class="text-gray-500" id="invoice-discount">-<%= @invoice_data[:discount] %></dd>
-                </dl>
-              <% end %>
-              <% if @invoice_data[:credit] != "$0.00" %>
-                <dl class="grid grid-cols-3 gap-x-3">
-                  <dt class="text-right font-semibold text-gray-800 col-span-2">Credit:</dt>
-                  <dd class="text-gray-500" id="invoice-credit">-<%= @invoice_data[:credit] %></dd>
-                </dl>
-              <% end %>
-              <% if @invoice_data[:free_inference_tokens_credit] != "$0.00" %>
-                <dl class="grid grid-cols-3 gap-x-3">
-                  <dt class="text-right font-semibold text-gray-800 col-span-2">Free Inference Tokens:</dt>
-                  <dd class="text-gray-500" id="invoice-free-inference-tokens">-<%= @invoice_data[:free_inference_tokens_credit] %></dd>
-                </dl>
-              <% end %>
-              <dl class="grid grid-cols-3 gap-x-3 text-2xl">
-                <dt class="text-right font-semibold text-gray-800 col-span-2">Total:</dt>
-                <dd class="text-gray-500"><%= @invoice_data[:total] %></dd>
-              </dl>
-            </div>
-        </div>
-      </div>
-    </div>
+<div class="grid gap-6">
+  <div class="md:flex md:items-center md:justify-between text-2xl">
+    <div class="min-w-0 flex-1">This invoice will be finalized on the first day of next month</div>
+    <div class="text-right"><%= @invoice_data[:begin_time] %> to <%= @invoice_data[:end_time] %></div>
   </div>
+
+  <!-- Invoice Card -->
+  <%== part(
+      "components/table_card",
+      headers: ["Resource", "Description", "Usage", "Amount"],
+      rows: @invoice_data[:items].map do |item|
+         [
+           [
+             item[:name],
+             item[:description],
+             [item[:usage], { extra_class: "text-right"}],
+             [item[:cost_humanized], { extra_class: "text-right"}],
+           ],
+           { id: "item-#{item[:name]}" }
+         ]
+      end,
+      empty_state: "No resources",
+      footer: "<div class=\"px-4 py-5 sm:p-6 flex justify-end\"><div class=\"grid gap-2 text-right\">#{footer_content}</div></div>"
+    )
+  %>
 </div>
