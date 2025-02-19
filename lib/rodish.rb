@@ -57,6 +57,31 @@ module Rodish
       string
     end
 
+    def wrap(prefix, values, separator: " ", limit: 80)
+      line = [prefix]
+      lines = [line]
+      prefix_length = length = prefix.length
+      sep_length = separator.length
+      indent = " " * prefix_length
+
+      values.each do |value|
+        value_length = value.length
+        new_length = sep_length + length + value_length
+        if new_length > limit
+          line = [indent, separator, value]
+          lines << line
+          length = prefix_length
+        else
+          line << separator << value
+        end
+        length += sep_length + value_length
+      end
+
+      lines.each do |line|
+        separator line.join
+      end
+    end
+
     def halt(string)
       raise CommandExit, string
     end
