@@ -158,12 +158,12 @@ class Invoice < Sequel::Model
       path = "public/logo-primary.png"
       pdf.image path, height: 25, position: :left
       pdf.move_down 10
-      # :nocov:
       pdf.text data[:issuer_name], style: :semibold, color: dark_gray if data[:issuer_name]
-      # :nocov:
       pdf.text "#{data[:issuer_address]},"
       pdf.text "#{data[:issuer_city]}, #{data[:issuer_state]} #{data[:issuer_postal_code]},"
       pdf.text data[:issuer_country]
+      pdf.text "#{data[:issuer_in_eu_vat] ? "VAT" : "Tax"} ID: #{data[:issuer_tax_id]}" if data[:issuer_tax_id]
+      pdf.text "CCI/KVK ID: #{data[:issuer_trade_id]}" if data[:issuer_trade_id]
     end
 
     # Row 1, Right Column: Invoice name and number
@@ -180,12 +180,10 @@ class Invoice < Sequel::Model
         pdf.text "Bill to:", style: :semibold, color: dark_gray, size: 14
         pdf.text [data[:billing_name], data[:company_name]].compact.join(" - "), style: :semibold, color: dark_gray, size: 14
         pdf.move_down 5
-        # :nocov:
-        pdf.text "Tax ID: #{data[:tax_id]}" if data[:tax_id]
-        # :nocov:
         pdf.text "#{data[:billing_address]},"
         pdf.text "#{data[:billing_city]}, #{data[:billing_state]} #{data[:billing_postal_code]},"
         pdf.text data[:billing_country]
+        pdf.text "#{data[:billing_in_eu_vat] ? "VAT" : "Tax"} ID: #{data[:tax_id]}" if data[:tax_id]
       end
     end
 
@@ -225,6 +223,8 @@ class Invoice < Sequel::Model
       (data[:credit] != "$0.00") ? ["Credit:", "-#{data[:credit]}"] : nil,
       (data[:free_inference_tokens_credit] != "$0.00") ? ["Free Inference Tokens:", "-#{data[:free_inference_tokens_credit]}"] : nil,
       # :nocov:
+      (data[:vat_amount] != "$0.00") ? ["VAT (#{data[:vat_rate]}%):", data[:vat_amount]] : nil,
+      (data[:total] != "$0.00" && data[:vat_reversed]) ? [{content: "VAT subject to reverse charge", colspan: 2}] : nil,
       ["Total:", data[:total]]
     ].compact
     pdf.table(totals, position: :right, cell_style: {padding: [2, 5, 2, 5], borders: []}) do
