@@ -101,7 +101,7 @@ confirmation = nil
           warn "! Invalid server response, repeated confirmation attempt"
           exit 1
         else
-          $stdout.puts response.body
+          $stdout.print response.body
           $stdout.print "\n#{confirmation_prompt}: "
           confirmation = $stdin.readline.chomp
           argv.unshift(confirmation)
@@ -109,7 +109,7 @@ confirmation = nil
           redo
         end
       else
-        $stdout.puts response.body
+        $stdout.print response.body
       end
       exit 0
     end

@@ -36,7 +36,7 @@ RSpec.describe Clover, "cli vm list" do
 
   it "-l option filters to specific location" do
     expect(cli(%w[vm list -Nleu-central-h1])).to eq "eu-central-h1  test-vm  #{@vm.ubid}  128.0.0.1  128:1234::2\n"
-    expect(cli(%w[vm list -Nleu-north-h1])).to eq ""
+    expect(cli(%w[vm list -Nleu-north-h1])).to eq "\n"
   end
 
   it "headers are shown by default" do
@@ -63,18 +63,18 @@ RSpec.describe Clover, "cli vm list" do
   end
 
   it "shows error for empty fields" do
-    expect(cli(%w[vm list -Nf] + [""], status: 400)).to eq "! No fields given in vm list -f option"
+    expect(cli(%w[vm list -Nf] + [""], status: 400)).to eq "! No fields given in vm list -f option\n"
   end
 
   it "shows error for duplicate fields" do
-    expect(cli(%w[vm list -Nfid,id], status: 400)).to eq "! Duplicate field(s) in vm list -f option"
+    expect(cli(%w[vm list -Nfid,id], status: 400)).to eq "! Duplicate field(s) in vm list -f option\n"
   end
 
   it "shows error for invalid fields" do
-    expect(cli(%w[vm list -Nffoo], status: 400)).to eq "! Invalid field(s) given in vm list -f option: foo"
+    expect(cli(%w[vm list -Nffoo], status: 400)).to eq "! Invalid field(s) given in vm list -f option: foo\n"
   end
 
   it "shows error for invalid location" do
-    expect(cli(%w[vm list -Nleu-foo-h1], status: 400)).to eq "! Invalid location provided in vm list -l option"
+    expect(cli(%w[vm list -Nleu-foo-h1], status: 400)).to eq "! Invalid location provided in vm list -l option\n"
   end
 end

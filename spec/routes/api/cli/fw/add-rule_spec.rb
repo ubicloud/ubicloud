@@ -14,7 +14,7 @@ RSpec.describe Clover, "cli fw add-rule" do
     body = cli(%W[fw eu-central-h1/test-fw add-rule 1.2.3.0/24])
     expect(FirewallRule.count).to eq 1
     fwr = FirewallRule.first
-    expect(body).to eq "Added firewall rule with id: #{fwr.ubid}"
+    expect(body).to eq "Added firewall rule with id: #{fwr.ubid}\n"
     expect(fwr.cidr.to_s).to eq "1.2.3.0/24"
     expect(fwr.port_range.to_range).to eq(0...65536)
     expect(fwr.firewall_id).to eq @fw.id
@@ -25,7 +25,7 @@ RSpec.describe Clover, "cli fw add-rule" do
     body = cli(%W[fw eu-central-h1/test-fw add-rule -s 5432 -e 5440 1.2.0.0/16])
     expect(FirewallRule.count).to eq 1
     fwr = FirewallRule.first
-    expect(body).to eq "Added firewall rule with id: #{fwr.ubid}"
+    expect(body).to eq "Added firewall rule with id: #{fwr.ubid}\n"
     expect(fwr.cidr.to_s).to eq "1.2.0.0/16"
     expect(fwr.port_range.to_range).to eq(5432...5441)
     expect(fwr.firewall_id).to eq @fw.id
@@ -36,7 +36,7 @@ RSpec.describe Clover, "cli fw add-rule" do
     body = cli(%W[fw eu-central-h1/test-fw add-rule -s 5432 1.2.3.4/32])
     expect(FirewallRule.count).to eq 1
     fwr = FirewallRule.first
-    expect(body).to eq "Added firewall rule with id: #{fwr.ubid}"
+    expect(body).to eq "Added firewall rule with id: #{fwr.ubid}\n"
     expect(fwr.cidr.to_s).to eq "1.2.3.4/32"
     expect(fwr.port_range.to_range).to eq(5432...5433)
     expect(fwr.firewall_id).to eq @fw.id

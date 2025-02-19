@@ -22,7 +22,7 @@ RSpec.describe Clover, "cli lb create" do
     expect(lb.health_check_protocol).to eq "http"
     expect(lb.health_check_endpoint).to eq "/up"
     expect(lb.stack).to eq "dual"
-    expect(body).to eq "Load balancer created with id: #{lb.ubid}"
+    expect(body).to eq "Load balancer created with id: #{lb.ubid}\n"
   end
 
   it "creates load balancer with -aeps options" do
@@ -39,6 +39,6 @@ RSpec.describe Clover, "cli lb create" do
     expect(lb.health_check_protocol).to eq "https"
     expect(lb.health_check_endpoint).to eq "/up2"
     expect(lb.stack).to eq "ipv4"
-    expect(body).to eq "Load balancer created with id: #{lb.ubid}"
+    expect(body).to eq "Load balancer created with id: #{lb.ubid}\n"
   end
 end

@@ -48,6 +48,8 @@ class UbiCli
       message = e.message
     end
 
+    message += "\n" unless message.end_with?("\n")
+
     [status, {"content-type" => "text/plain", "content-length" => message.bytesize.to_s}, [message]]
   end
 
@@ -327,15 +329,8 @@ class UbiCli
   end
 
   def response(body, status: 200, headers: {})
-    if body.is_a?(Array)
-      headers["content-length"] = body.sum(&:bytesize).to_s
-    else
-      headers["content-length"] = body.bytesize.to_s
-      body = [body]
-    end
-
-    headers["content-type"] = "text/plain"
-    [status, headers, body]
+    body = [body] unless body.is_a?(Array)
+    finalize_response([status, headers, body])
   end
 
   def _req_env(method, path, params)
@@ -363,12 +358,10 @@ class UbiCli
         body = +""
         res[2].each { body << _1 }
         res[2] = yield(JSON.parse(body), res)
-        res[1]["content-length"] = res[2].sum(&:bytesize).to_s
       end
     when 204
       res[0] = 200
       res[2] = yield(nil, res)
-      res[1]["content-length"] = res[2].sum(&:bytesize).to_s
     else
       body = +""
       res[2].each { body << _1 }
@@ -385,10 +378,19 @@ class UbiCli
         end
       end
       res[2] = [error_message]
-      res[1]["content-length"] = res[2][0].bytesize.to_s
     end
 
-    res[1]["content-type"] = "text/plain"
+    finalize_response(res)
+  end
+
+  def finalize_response(res)
+    headers = res[1]
+    body = res[2]
+    if !headers["ubi-command-execute"] && !headers["ubi-confirm"] && (body.empty? || !body[-1].end_with?("\n"))
+      body << "\n"
+    end
+    headers["content-length"] = body.sum(&:bytesize).to_s
+    headers["content-type"] = "text/plain"
     res
   end
 
