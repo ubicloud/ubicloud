@@ -49,7 +49,7 @@ RSpec.describe UBID do
   end
 
   it "fails to convert U to base32" do
-    expect { described_class.to_base32("u") }.to raise_error RuntimeError, "Invalid base32 encoding: U"
+    expect { described_class.to_base32("u") }.to raise_error UBIDParseError, "Invalid base32 encoding: U"
   end
 
   it "can convert from base32" do
@@ -68,11 +68,11 @@ RSpec.describe UBID do
   it "fails to convert from out of range numbers" do
     expect {
       described_class.from_base32(-1)
-    }.to raise_error RuntimeError, "Invalid base32 number: -1"
+    }.to raise_error UBIDParseError, "Invalid base32 number: -1"
 
     expect {
       described_class.from_base32(32)
-    }.to raise_error RuntimeError, "Invalid base32 number: 32"
+    }.to raise_error UBIDParseError, "Invalid base32 number: 32"
   end
 
   it "can calculate parity" do
@@ -106,21 +106,27 @@ RSpec.describe UBID do
   it "fails to parse if length is not 26" do
     expect {
       described_class.parse("123456")
-    }.to raise_error RuntimeError, "Invalid encoding length: 6"
+    }.to raise_error UBIDParseError, "Invalid encoding length: 6"
+  end
+
+  it "fails to parse if length is 26 but has invalid characters" do
+    expect {
+      described_class.parse("vm164pbm96-a3grq6vbsvjb3ax")
+    }.to raise_error UBIDParseError, "Invalid base32 encoding: -"
   end
 
   it "fails to parse if top bits parity is incorrect" do
     invalid_ubid = "vm164pbm96ba3grq6vbsvjb3ax"
     expect {
       described_class.parse(invalid_ubid)
-    }.to raise_error RuntimeError, "Invalid top bits parity"
+    }.to raise_error UBIDParseError, "Invalid top bits parity"
   end
 
   it "fails to parse if bottom bits parity is incorrect" do
     invalid_ubid = "vm064pbm96ba3grq6vbsvjb3az"
     expect {
       described_class.parse(invalid_ubid)
-    }.to raise_error RuntimeError, "Invalid bottom bits parity"
+    }.to raise_error UBIDParseError, "Invalid bottom bits parity"
   end
 
   it "generates random timestamp for most types" do
@@ -304,7 +310,7 @@ RSpec.describe UBID do
   it "fails to decode unknown type" do
     expect {
       described_class.decode("han2sefsk4f61k91z77vn0y978")
-    }.to raise_error RuntimeError, "Couldn't decode ubid: han2sefsk4f61k91z77vn0y978"
+    }.to raise_error UBIDParseError, "Couldn't decode ubid: han2sefsk4f61k91z77vn0y978"
   end
 
   it "can be inspected" do
