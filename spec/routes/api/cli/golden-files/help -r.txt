@@ -84,7 +84,7 @@ Subcommands: list
 
 Usage: ubi lb location/(lb-name|_lb-ubid) subcommand [...]
 
-Subcommands: attach-vm create destroy detach-vm show
+Subcommands: attach-vm create destroy detach-vm show update
 
 
 Usage: ubi lb list [options]
@@ -120,6 +120,9 @@ Usage: ubi lb location/(lb-name|_lb-ubid) show [options]
 
 Options:
     -f, --fields=fields              show specific fields (default: id,name,state,location,hostname,algorithm,stack,health-check-endpoint,health-check-protocol,src-port,dst-port,subnet,vms)
+
+
+Usage: ubi lb location/(lb-name|_lb-ubid) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]
 
 
 Usage: ubi pg subcommand [...]

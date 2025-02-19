@@ -232,6 +232,10 @@ class UbiCli
     _req(_req_env("POST", path, params), &block)
   end
 
+  def patch(path, params = {}, &block)
+    _req(_req_env("PATCH", path, params), &block)
+  end
+
   def get(path, &block)
     _req(_req_env("GET", path, nil), &block)
   end
