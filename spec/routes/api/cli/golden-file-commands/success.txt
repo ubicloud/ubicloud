@@ -38,6 +38,10 @@ help -u vm
 help vm
 help vm list
 lb eu-central-h1/test2-lb create psfzm9e26xky5m9ggetw4dpqe2 12345 54321
+lb eu-central-h1/test-lb show
+lb eu-central-h1/test-lb show -f id,name,state,location,hostname,algorithm
+lb eu-central-h1/test-lb show -f stack,health-check-endpoint,health-check-protocol
+lb eu-central-h1/test-lb show -f src-port,dst-port,subnet,vms
 lb list
 lb list -f src-port,dst-port,hostname
 lb list -l eu-central-h1
