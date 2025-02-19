@@ -186,7 +186,7 @@ class UBID
     ubid_str = ubid.to_s
     uuid = UBID.parse(ubid_str).to_uuid
     klass = class_for_ubid(ubid)
-    fail "Couldn't decode ubid: #{ubid_str}" if klass.nil?
+    fail UBIDParseError.new("Couldn't decode ubid: #{ubid_str}") if klass.nil?
 
     klass[uuid]
   end
@@ -346,7 +346,7 @@ class UBID
       end
     end
 
-    raise "Invalid base32 encoding: #{c}"
+    fail UBIDParseError.new("Invalid base32 encoding: #{c}")
   end
 
   def self.to_base32_n(s)
@@ -358,7 +358,7 @@ class UBID
   end
 
   def self.from_base32(num)
-    fail "Invalid base32 number: #{num}" if num < 0 || num >= 32
+    fail UBIDParseError.new("Invalid base32 number: #{num}") if num < 0 || num >= 32
     BASE32_DATA[num][0].downcase
   end
 
