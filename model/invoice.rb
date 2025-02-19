@@ -223,7 +223,9 @@ class Invoice < Sequel::Model
       (data[:credit] != "$0.00") ? ["Credit:", "-#{data[:credit]}"] : nil,
       (data[:free_inference_tokens_credit] != "$0.00") ? ["Free Inference Tokens:", "-#{data[:free_inference_tokens_credit]}"] : nil,
       # :nocov:
-      (data[:vat_amount] != "$0.00") ? ["VAT (#{data[:vat_rate]}%):", data[:vat_amount]] : nil,
+      if data[:vat_amount] != "$0.00"
+        ["VAT (#{data[:vat_rate]}%):", "(#{data[:vat_amount_eur]}) #{data[:vat_amount]}"]
+      end,
       (data[:total] != "$0.00" && data[:vat_reversed]) ? [{content: "VAT subject to reverse charge", colspan: 2}] : nil,
       ["Total:", data[:total]]
     ].compact

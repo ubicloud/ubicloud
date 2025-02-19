@@ -262,7 +262,7 @@ RSpec.describe Clover, "billing" do
       it "list invoices of project" do
         expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).at_least(:once)
         bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
-        InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run
+        InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run
         invoice = Invoice.first
 
         visit "#{project.path}/billing"
@@ -286,7 +286,7 @@ RSpec.describe Clover, "billing" do
         100.times do
           billing_record(Time.parse("2023-06-01"), Time.parse("2023-06-01") + 10)
         end
-        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run.first
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
         invoice.update(status: "current")
         expect(InvoiceGenerator).to receive(:new).and_return(instance_double(InvoiceGenerator, run: [invoice])).at_least(:once)
 
@@ -329,7 +329,7 @@ RSpec.describe Clover, "billing" do
         expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).at_least(:once)
         br_previous = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
         br_current = billing_record(Time.parse("2023-07-01"), Time.parse("2023-07-15"))
-        invoice_previous = InvoiceGenerator.new(br_previous.span.begin, br_previous.span.end, save_result: true).run.first
+        invoice_previous = InvoiceGenerator.new(br_previous.span.begin, br_previous.span.end, save_result: true, eur_rate: 1.1).run.first
         invoice_current = InvoiceGenerator.new(br_current.span.begin, br_current.span.end, project_ids: [project.id]).run.first
 
         visit "#{project.path}/billing"
@@ -350,7 +350,7 @@ RSpec.describe Clover, "billing" do
       it "show finalized invoice as PDF from US issuer without VAT" do
         expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "US"}, "metadata" => {"company_name" => "Foo Companye Name", "tax_id" => "123123123"}}).at_least(:once)
         bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
-        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run.first
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
 
         visit "#{project.path}/billing/invoice/#{invoice.ubid}"
 
@@ -365,7 +365,7 @@ RSpec.describe Clover, "billing" do
       it "show finalized invoice as PDF from EU issuer with 21% VAT" do
         expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}}).at_least(:once)
         bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
-        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run.first
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
 
         visit "#{project.path}/billing/invoice/#{invoice.ubid}"
 
@@ -373,13 +373,13 @@ RSpec.describe Clover, "billing" do
         text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
         expect(text).to include("Ubicloud B.V.")
         expect(text).to include("test-vm")
-        expect(text).to include("VAT (21%)")
+        expect(text).to include("VAT (21%): (€5.68) $5.17")
       end
 
       it "show finalized invoice as PDF from EU issuer with reversed charge" do
         expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "DE"}, "metadata" => {"tax_id" => "123123123"}}).at_least(:once)
         bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
-        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run.first
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
 
         visit "#{project.path}/billing/invoice/#{invoice.ubid}"
 
@@ -393,7 +393,7 @@ RSpec.describe Clover, "billing" do
       it "show finalized invoice as PDF with old issuer info" do
         expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "US"}, "metadata" => {"company_name" => "Foo Companye Name", "tax_id" => "123123123"}}).at_least(:once)
         bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
-        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run.first
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
         invoice.content["issuer_info"].merge!("name" => nil, "tax_id" => "123123123", "in_eu_vat" => false)
         invoice.modified!(:content)
         invoice.save_changes
