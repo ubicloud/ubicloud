@@ -1,3 +1,4 @@
+--confirm test-lb lb eu-central-h1/test-lb destroy
 --confirm test-pg pg eu-central-h1/test-pg destroy
 --confirm test-ps-default fw eu-central-h1/test-ps-default destroy
 --confirm test-ps ps eu-central-h1/test-ps destroy
@@ -42,6 +43,7 @@ lb eu-central-h1/test-lb show
 lb eu-central-h1/test-lb show -f id,name,state,location,hostname,algorithm
 lb eu-central-h1/test-lb show -f stack,health-check-endpoint,health-check-protocol
 lb eu-central-h1/test-lb show -f src-port,dst-port,subnet,vms
+lb eu-central-h1/test-lb destroy -f
 lb list
 lb list -f src-port,dst-port,hostname
 lb list -l eu-central-h1
