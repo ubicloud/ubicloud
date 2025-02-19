@@ -233,28 +233,7 @@ RSpec.describe Prog::Vm::Nexus do
         sudo usermod -a -G kvm #{nx.vm_name}
       COMMAND
 
-      expect { nx.create_unix_user }.to hop("wait_for_slice")
-    end
-  end
-
-  describe "#wait_for_slice" do
-    it "hop to prep if no slice" do
-      expect(vm).to receive(:vm_host_slice).and_return(nil)
-      expect { nx.wait_for_slice }.to hop("prep")
-    end
-
-    it "naps until slice is created" do
-      vm_host_slice = instance_double(VmHostSlice)
-      expect(vm).to receive(:vm_host_slice).and_return(vm_host_slice).twice
-      expect(vm_host_slice).to receive(:enabled).and_return(false)
-      expect { nx.wait_for_slice }.to nap(1)
-    end
-
-    it "hop after slice is created" do
-      vm_host_slice = instance_double(VmHostSlice)
-      expect(vm).to receive(:vm_host_slice).and_return(vm_host_slice).twice
-      expect(vm_host_slice).to receive(:enabled).and_return(true)
-      expect { nx.wait_for_slice }.to hop("prep")
+      expect { nx.create_unix_user }.to hop("prep")
     end
   end
 

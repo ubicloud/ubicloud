@@ -244,17 +244,6 @@ class Prog::Vm::Nexus < Prog::Base
 
     host.sshable.cmd(command)
 
-    hop_wait_for_slice
-  end
-
-  label def wait_for_slice
-    if vm.vm_host_slice
-      if !vm.vm_host_slice.enabled
-        # Just wait here until the slice creation is completed
-        nap 1
-      end
-    end
-
     hop_prep
   end
 
