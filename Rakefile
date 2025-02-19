@@ -244,7 +244,7 @@ end
 
 desc "Update cli spec golden files"
 task "update_golden_files" do
-  sh "mv spec/routes/api/cli/spec-output-files/*.txt spec/routes/api/cli/golden-files/"
+  sh "mv spec/routes/api/cli/spec-output-files/*.txt spec/routes/api/cli/spec-output-files/.txt spec/routes/api/cli/golden-files/"
 end
 
 # Other
