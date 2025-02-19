@@ -22,6 +22,7 @@ UbiCli.on("help") do
         body = []
         command.each_subcommand do |_, cmd|
           if usage
+            next unless cmd.subcommands.empty? && cmd.post_subcommands.empty?
             cmd.option_parsers.each do |op|
               body << op.banner << "\n"
             end

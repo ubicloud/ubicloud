@@ -1,6 +1,3 @@
-Usage: ubi [options] [subcommand [subcommand-options] ...]
-Usage: ubi fw subcommand [...]
-Usage: ubi fw location/(fw-name|_fw-ubid) subcommand [...]
 Usage: ubi fw list [options]
 Usage: ubi fw location/(fw-name|_fw-ubid) add-rule cidr
 Usage: ubi fw location/(fw-name|_fw-ubid) attach-subnet subnet-id
@@ -10,8 +7,6 @@ Usage: ubi fw location/(fw-name|_fw-ubid) destroy [options]
 Usage: ubi fw location/(fw-name|_fw-ubid) detach-subnet subnet-id
 Usage: ubi fw location/(fw-name|_fw-ubid) show [options]
 Usage: ubi help [options] [command [subcommand]]
-Usage: ubi pg subcommand [...]
-Usage: ubi pg location/(pg-name|_pg-ubid) [options] subcommand [...]
 Usage: ubi pg list [options]
 Usage: ubi pg location/(pg-name|_pg-ubid) add-firewall-rule cidr
 Usage: ubi pg location/(pg-name|_pg-ubid) add-metric-destination username password url
@@ -26,14 +21,10 @@ Usage: ubi pg location/(pg-name|_pg-ubid) [options] psql [psql-options]
 Usage: ubi pg location/(pg-name|_pg-ubid) reset-superuser-password new-password
 Usage: ubi pg location/(pg-name|_pg-ubid) restore new-db-name restore-time
 Usage: ubi pg location/(pg-name|_pg-ubid) show [options]
-Usage: ubi ps subcommand [...]
-Usage: ubi ps location/(ps-name|_ps-ubid) subcommand [...]
 Usage: ubi ps list [options]
 Usage: ubi ps location/ps-name create [options]
 Usage: ubi ps location/(ps-name|_ps-ubid) destroy [options]
 Usage: ubi ps location/(ps-name|_ps-ubid) show [options]
-Usage: ubi vm subcommand [...]
-Usage: ubi vm location/(vm-name|_vm-ubid) [options] subcommand [...]
 Usage: ubi vm list [options]
 Usage: ubi vm location/vm-name create [options] public_key
 Usage: ubi vm location/(vm-name|_vm-ubid) destroy [options]
