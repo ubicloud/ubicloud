@@ -293,8 +293,7 @@ RSpec.describe Clover, "billing" do
         visit "#{project.path}/billing/invoice/current"
 
         expect(page.status_code).to eq(200)
-        expect(page.title).to eq("Ubicloud - #{invoice.name} Invoice")
-        expect(page).to have_content invoice.name
+        expect(page.title).to eq("Ubicloud - Current Usage Summary")
         expect(page).to have_content "Aggregated"
         expect(page.has_css?("#invoice-discount")).to be false
         expect(page.has_css?("#invoice-credit")).to be false
@@ -306,7 +305,6 @@ RSpec.describe Clover, "billing" do
         invoice.this.update(content:)
 
         page.refresh
-        expect(page).to have_content invoice.name
         expect(find_by_id("invoice-discount").text).to eq "-$1.00"
         expect(find_by_id("invoice-credit").text).to eq "-$2.00"
         expect(find_by_id("invoice-free-inference-tokens").text).to eq "-$3.00"
