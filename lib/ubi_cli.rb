@@ -5,6 +5,7 @@ class UbiCli
 
   FRAGMENTS = {
     "fw" => "firewall",
+    "lb" => "load-balancer",
     "pg" => "postgres",
     "ps" => "private-subnet",
     "vm" => "vm"
@@ -12,6 +13,7 @@ class UbiCli
 
   CAPITALIZED_LABELS = {
     "fw" => "Firewall",
+    "lb" => "Load balancer",
     "pg" => "PostgreSQL database",
     "ps" => "Private subnet",
     "vm" => "VM"
@@ -95,7 +97,7 @@ class UbiCli
         end
 
         get(project_path(path)) do |data|
-          keys = check_fields(opts[:fields], fields, "#{cmd} list -f option")
+          keys = underscore_keys(check_fields(opts[:fields], fields, "#{cmd} list -f option"))
           format_rows(keys, data["items"], headers: opts[:"no-headers"] != false)
         end
       end

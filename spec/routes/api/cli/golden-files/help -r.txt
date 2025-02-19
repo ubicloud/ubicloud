@@ -5,7 +5,7 @@ Options:
         --help                       show program help
         --confirm=confirmation       confirmation value (not for direct use)
 
-Subcommands: fw help pg ps vm
+Subcommands: fw help lb pg ps vm
 
 
 Usage: ubi fw subcommand [...]
@@ -75,6 +75,22 @@ Usage: ubi help [options] [command [subcommand]]
 Options:
     -r, --recursive                  also show documentation for all subcommands of command
     -u, --usage                      only show usage
+
+
+Usage: ubi lb subcommand [...]
+
+Subcommands: list
+
+
+Usage: ubi lb location/(lb-name|_lb-ubid) subcommand [...]
+
+
+Usage: ubi lb list [options]
+
+Options:
+    -f, --fields=fields              show specific fields (default: name,id,src-port,dst-port,hostname)
+    -l, --location=location          only show load balancers in given location
+    -N, --no-headers                 do not show headers
 
 
 Usage: ubi pg subcommand [...]
