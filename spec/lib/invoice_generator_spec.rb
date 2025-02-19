@@ -28,28 +28,43 @@ RSpec.describe InvoiceGenerator do
     )
   end
 
-  def check_invoice_for_single_vm(invoices, project, vm, duration, begin_time)
+  def check_invoice_for_single_vm(invoices, project, vm, duration, begin_time, expected_vat_info: nil)
     expect(invoices.count).to eq(1)
-    expected_issuer = {
-      "name" => "Ubicloud Inc.",
-      "address" => "310 Santa Ana Avenue",
-      "country" => "US",
-      "city" => "San Francisco",
-      "state" => "CA",
-      "postal_code" => "94127"
-    }
+    expected_issuer = if expected_vat_info
+      {
+        "name" => "Ubicloud B.V.",
+        "address" => "Turfschip 267",
+        "country" => "NL",
+        "city" => "Amstelveen",
+        "postal_code" => "1186 XK",
+        "tax_id" => "NL864651442B01",
+        "trade_id" => "88492729",
+        "in_eu_vat" => true
+      }
+    else
+      {
+        "name" => "Ubicloud Inc.",
+        "address" => "310 Santa Ana Avenue",
+        "country" => "US",
+        "city" => "San Francisco",
+        "state" => "CA",
+        "postal_code" => "94127"
+      }
+    end
+
     expected_billing_info = project.billing_info ? {
       "id" => project.billing_info.id,
       "ubid" => project.billing_info.ubid,
-      "name" => "ACME Inc.",
-      "email" => nil,
-      "address" => "",
-      "country" => "NL",
-      "city" => nil,
-      "state" => nil,
-      "postal_code" => nil,
-      "tax_id" => "123456",
-      "company_name" => nil
+      "name" => project.billing_info.stripe_data["name"],
+      "email" => project.billing_info.stripe_data["email"],
+      "address" => project.billing_info.stripe_data["address"]["line1"],
+      "country" => project.billing_info.stripe_data["address"]["country"],
+      "city" => project.billing_info.stripe_data["address"]["city"],
+      "state" => project.billing_info.stripe_data["address"]["state"],
+      "postal_code" => project.billing_info.stripe_data["address"]["postal_code"],
+      "tax_id" => project.billing_info.stripe_data["metadata"]["tax_id"],
+      "company_name" => project.billing_info.stripe_data["metadata"]["company_name"],
+      "in_eu_vat" => !!expected_vat_info
     } : nil
 
     br = BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location)
@@ -77,11 +92,12 @@ RSpec.describe InvoiceGenerator do
       ["project_name", project.name],
       ["billing_info", expected_billing_info],
       ["issuer_info", expected_issuer],
+      ["vat_info", expected_vat_info],
       ["resources", expected_resources],
       ["subtotal", expected_cost],
       ["discount", 0],
       ["credit", 0],
-      ["cost", expected_cost]
+      ["cost", (expected_cost + expected_vat_info&.fetch("amount", 0).to_f).round(3)]
     ].each do |key, expected|
       expect(actual_content[key]).to eq(expected)
     end
@@ -148,15 +164,66 @@ RSpec.describe InvoiceGenerator do
     expect(invoices.count).to eq(0)
   end
 
-  it "generates invoice for project with billing info" do
-    allow(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
-    expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"country" => "NL"}}).at_least(:once)
+  context "when project has billing info" do
+    before do
+      allow(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
+    end
 
-    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
-    bi = BillingInfo.create_with_id(stripe_id: "cs_1234567890")
-    p1.update(billing_info_id: bi.id)
-    invoices = described_class.new(begin_time, end_time).run
-    check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day)
+    it "charges no VAT for non-EU customer" do
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "US"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+      invoices = described_class.new(begin_time, end_time).run
+      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day)
+    end
+
+    it "charges 21% VAT for Dutch customer with tax id" do
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "NL"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+      invoices = described_class.new(begin_time, end_time).run
+      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"amount" => 5.166, "rate" => 21, "reversed" => false})
+    end
+
+    it "charges 21% VAT for Dutch customer without tax id" do
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => {"line1" => "123 Main St", "country" => "NL"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+      invoices = described_class.new(begin_time, end_time).run
+      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"amount" => 5.166, "rate" => 21, "reversed" => false})
+    end
+
+    it "reverse charges VAT for non-Dutch EU customer with tax id" do
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+      invoices = described_class.new(begin_time, end_time).run
+      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"rate" => 0, "reversed" => true})
+    end
+
+    it "charges 21% VAT for non-Dutch EU customer without tax id until threshold" do
+      expect(Config).to receive(:annual_non_dutch_eu_sales_exceed_threshold).and_return(false)
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+      invoices = described_class.new(begin_time, end_time).run
+      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"amount" => 5.166, "rate" => 21, "reversed" => false})
+    end
+
+    it "charges local VAT for non-Dutch EU customer without tax id if threshold exceeds" do
+      expect(Config).to receive(:annual_non_dutch_eu_sales_exceed_threshold).and_return(true)
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+      invoices = described_class.new(begin_time, end_time).run
+      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"amount" => 4.674, "rate" => 19, "reversed" => false})
+    end
   end
 
   it "generates invoice for a single project" do
