@@ -3,4 +3,7 @@
 Usage: ubi pg location/(pg-name|_pg-ubid) show [options]
 
 Options:
-    -f, --fields=fields              show specific fields (default: id,name,state,location,vm-size,storage-size-gib,version,ha-type,flavor,connection-string,primary,earliest-restore-time,firewall-rules,metric-destinations,ca-certificates)
+    -f, --fields=fields              show specific fields (comma separated)
+Fields: id name state location vm-size storage-size-gib version ha-type flavor
+        connection-string primary earliest-restore-time firewall-rules
+        metric-destinations ca-certificates

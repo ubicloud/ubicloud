@@ -28,9 +28,10 @@ Subcommands:
 Usage: ubi fw list [options]
 
 Options:
-    -f, --fields=fields              show specific fields (default: location,name,id)
+    -f, --fields=fields              show specific fields (comma separated)
     -l, --location=location          only show firewalls in given location
     -N, --no-headers                 do not show headers
+Fields: location name id
 
 
 Usage: ubi fw location/(fw-name|_fw-ubid) add-rule cidr
@@ -64,10 +65,14 @@ Usage: ubi fw location/(fw-name|_fw-ubid) detach-subnet subnet-id
 Usage: ubi fw location/(fw-name|_fw-ubid) show [options]
 
 Options:
-    -f, --fields=fields              show specific fields (default: id,name,location,description,firewall-rules,private-subnets)
-    -n, --nic-fields=fields          show specific nic fields (default: id,name,private-ipv4,private-ipv6,vm-name)
-    -p, --priv-subnet-fields=fields  show specific private subnet fields (default: id,name,state,location,net4,net6,nics)
-    -r, --rule-fields=fields         show specific firewall rule fields (default: id,cidr,port-range)
+    -f, --fields=fields              show specific fields (comma separated)
+    -n, --nic-fields=fields          show specific nic fields (comma separated)
+    -p, --priv-subnet-fields=fields  show specific private subnet fields (comma separated)
+    -r, --rule-fields=fields         show specific firewall rule fields (comma separated)
+Fields: id name location description firewall-rules private-subnets
+Nic Fields: id name private-ipv4 private-ipv6 vm-name
+Private Subnet Fields: id name state location net4 net6 nics
+Firewall Rule Fields: id cidr port-range
 
 
 Usage: ubi help [options] [command [subcommand]]
@@ -90,9 +95,10 @@ Subcommands: attach-vm create destroy detach-vm show update
 Usage: ubi lb list [options]
 
 Options:
-    -f, --fields=fields              show specific fields (default: name,id,src-port,dst-port,hostname)
+    -f, --fields=fields              show specific fields (comma separated)
     -l, --location=location          only show load balancers in given location
     -N, --no-headers                 do not show headers
+Fields: name id src-port dst-port hostname
 
 
 Usage: ubi lb location/(lb-name|_lb-ubid) attach-vm vm-id
@@ -119,7 +125,9 @@ Usage: ubi lb location/(lb-name|_lb-ubid) detach-vm vm-id
 Usage: ubi lb location/(lb-name|_lb-ubid) show [options]
 
 Options:
-    -f, --fields=fields              show specific fields (default: id,name,state,location,hostname,algorithm,stack,health-check-endpoint,health-check-protocol,src-port,dst-port,subnet,vms)
+    -f, --fields=fields              show specific fields (comma separated)
+Fields: id name state location hostname algorithm stack health-check-endpoint
+        health-check-protocol src-port dst-port subnet vms
 
 
 Usage: ubi lb location/(lb-name|_lb-ubid) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]
@@ -155,9 +163,10 @@ Subcommands:
 Usage: ubi pg list [options]
 
 Options:
-    -f, --fields=fields              show specific fields (default: location,name,id,version,flavor)
+    -f, --fields=fields              show specific fields (comma separated)
     -l, --location=location          only show PostgreSQL databases in given location
     -N, --no-headers                 do not show headers
+Fields: location name id version flavor
 
 
 Usage: ubi pg location/(pg-name|_pg-ubid) add-firewall-rule cidr
@@ -209,7 +218,10 @@ Usage: ubi pg location/(pg-name|_pg-ubid) restore new-db-name restore-time
 Usage: ubi pg location/(pg-name|_pg-ubid) show [options]
 
 Options:
-    -f, --fields=fields              show specific fields (default: id,name,state,location,vm-size,storage-size-gib,version,ha-type,flavor,connection-string,primary,earliest-restore-time,firewall-rules,metric-destinations,ca-certificates)
+    -f, --fields=fields              show specific fields (comma separated)
+Fields: id name state location vm-size storage-size-gib version ha-type flavor
+        connection-string primary earliest-restore-time firewall-rules
+        metric-destinations ca-certificates
 
 
 Usage: ubi ps subcommand [...]
@@ -225,9 +237,10 @@ Subcommands: create destroy show
 Usage: ubi ps list [options]
 
 Options:
-    -f, --fields=fields              show specific fields (default: location,name,id,net4,net6)
+    -f, --fields=fields              show specific fields (comma separated)
     -l, --location=location          only show private subnets in given location
     -N, --no-headers                 do not show headers
+Fields: location name id net4 net6
 
 
 Usage: ubi ps location/ps-name create [options]
@@ -245,10 +258,14 @@ Options:
 Usage: ubi ps location/(ps-name|_ps-ubid) show [options]
 
 Options:
-    -f, --fields=fields              show specific fields (default: id,name,state,location,net4,net6,firewalls,nics)
-    -n, --nic-fields=fields          show specific nic fields (default: id,name,private-ipv4,private-ipv6,vm-name)
-    -r, --rule-fields=fields         show specific firewall rule fields (default: id,cidr,port-range)
-    -w, --firewall-fields=fields     show specific firewall fields (default: id,name,description,location,path,firewall-rules)
+    -f, --fields=fields              show specific fields (comma separated)
+    -n, --nic-fields=fields          show specific nic fields (comma separated)
+    -r, --rule-fields=fields         show specific firewall rule fields (comma separated)
+    -w, --firewall-fields=fields     show specific firewall fields (comma separated)
+Fields: id name state location net4 net6 firewalls nics
+Nic Fields: id name private-ipv4 private-ipv6 vm-name
+Firewall Rule Fields: id cidr port-range
+Firewall Fields: id name description location path firewall-rules
 
 
 Usage: ubi vm subcommand [...]
@@ -269,9 +286,10 @@ Subcommands: create destroy scp sftp show ssh
 Usage: ubi vm list [options]
 
 Options:
-    -f, --fields=fields              show specific fields (default: location,name,id,ip4,ip6)
+    -f, --fields=fields              show specific fields (comma separated)
     -l, --location=location          only show VMs in given location
     -N, --no-headers                 do not show headers
+Fields: location name id ip4 ip6
 
 
 Usage: ubi vm location/vm-name create [options] public_key
@@ -300,9 +318,13 @@ Usage: ubi vm location/(vm-name|_vm-ubid) [options] sftp [sftp-options]
 Usage: ubi vm location/(vm-name|_vm-ubid) show [options]
 
 Options:
-    -f, --fields=fields              show specific fields (default: id,name,state,location,size,unix-user,storage-size-gib,ip6,ip4-enabled,ip4,private-ipv4,private-ipv6,subnet,firewalls)
-    -r, --rule-fields=fields         show specific firewall rule fields (default: id,cidr,port-range)
-    -w, --firewall-fields=fields     show specific firewall fields (default: id,name,description,location,path,firewall-rules)
+    -f, --fields=fields              show specific fields (comma separated)
+    -r, --rule-fields=fields         show specific firewall rule fields (comma separated)
+    -w, --firewall-fields=fields     show specific firewall fields (comma separated)
+Fields: id name state location size unix-user storage-size-gib ip6 ip4-enabled
+        ip4 private-ipv4 private-ipv6 subnet firewalls
+Firewall Rule Fields: id cidr port-range
+Firewall Fields: id name description location path firewall-rules
 
 
 Usage: ubi vm location/(vm-name|_vm-ubid) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]

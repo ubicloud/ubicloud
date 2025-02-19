@@ -4,7 +4,8 @@ UbiCli.on("lb").run_on("show") do
   fields = %w[id name state location hostname algorithm stack health-check-endpoint health-check-protocol src-port dst-port subnet vms].freeze.each(&:freeze)
 
   options("ubi lb location/(lb-name|_lb-ubid) show [options]", key: :lb_show) do
-    on("-f", "--fields=fields", "show specific fields (default: #{fields.join(",")})")
+    on("-f", "--fields=fields", "show specific fields (comma separated)")
+    wrap("Fields:", fields)
   end
 
   run do |opts|
