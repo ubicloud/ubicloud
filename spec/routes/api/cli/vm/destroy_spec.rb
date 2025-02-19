@@ -35,7 +35,7 @@ RSpec.describe Clover, "cli vm destroy" do
 
   it "fails on incorrect confirmation" do
     expect(Semaphore.where(strand_id: @vm.id, name: "destroy")).to be_empty
-    expect(cli(%w[--confirm foo vm eu-central-h1/test-vm destroy], status: 400)).to eq "\nConfirmation of VM name not successful.\n"
+    expect(cli(%w[--confirm foo vm eu-central-h1/test-vm destroy], status: 400)).to eq "! Confirmation of VM name not successful.\n"
     expect(Semaphore.where(strand_id: @vm.id, name: "destroy")).to be_empty
   end
 end

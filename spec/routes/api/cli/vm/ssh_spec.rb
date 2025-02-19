@@ -37,7 +37,7 @@ RSpec.describe Clover, "cli vm ssh" do
   end
 
   it "-4 option fails if VM has no IPv4 address" do
-    expect(cli(["vm", @ref, "-4", "ssh"], status: 400)).to eq "No valid IPv4 address for requested VM"
+    expect(cli(["vm", @ref, "-4", "ssh"], status: 400)).to eq "! No valid IPv4 address for requested VM"
   end
 
   it "-4 option uses IPv4 even if connection is made via IPv6" do

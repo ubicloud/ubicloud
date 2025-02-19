@@ -28,7 +28,7 @@ RSpec.describe Clover, "cli fw destroy" do
   end
 
   it "fails on incorrect confirmation" do
-    expect(cli(%w[--confirm foo fw eu-central-h1/test-fw destroy], status: 400)).to eq "\nConfirmation of Firewall name not successful.\n"
+    expect(cli(%w[--confirm foo fw eu-central-h1/test-fw destroy], status: 400)).to eq "! Confirmation of Firewall name not successful.\n"
     expect(@fw).to be_exist
   end
 end

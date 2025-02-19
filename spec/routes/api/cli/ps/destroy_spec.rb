@@ -31,7 +31,7 @@ RSpec.describe Clover, "cli ps destroy" do
 
   it "fails on incorrect confirmation" do
     expect(Semaphore.where(strand_id: @ps.id, name: "destroy")).to be_empty
-    expect(cli(%w[--confirm foo ps eu-central-h1/test-ps destroy], status: 400)).to eq "\nConfirmation of Private subnet name not successful.\n"
+    expect(cli(%w[--confirm foo ps eu-central-h1/test-ps destroy], status: 400)).to eq "! Confirmation of Private subnet name not successful.\n"
     expect(Semaphore.where(strand_id: @ps.id, name: "destroy")).to be_empty
   end
 end
