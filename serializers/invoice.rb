@@ -44,6 +44,7 @@ class Serializers::Invoice < Serializers::Base
         issuer_in_eu_vat: inv.content.dig("issuer_info", "in_eu_vat"),
         vat_rate: inv.content.dig("vat_info", "rate"),
         vat_amount: "$%0.02f" % (inv.content.dig("vat_info", "amount") || 0),
+        vat_amount_eur: "€%0.02f" % ((inv.content.dig("vat_info", "amount") || 0) * (inv.content.dig("vat_info", "eur_rate") || 0)),
         vat_reversed: inv.content.dig("vat_info", "reversed"),
         items: inv.content["resources"].flat_map do |resource|
                  resource["line_items"].map do |line_item|

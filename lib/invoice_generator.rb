@@ -4,11 +4,15 @@ require "time"
 require "stripe"
 
 class InvoiceGenerator
-  def initialize(begin_time, end_time, save_result: false, project_ids: [])
+  def initialize(begin_time, end_time, save_result: false, project_ids: [], eur_rate: nil)
     @begin_time = begin_time
     @end_time = end_time
     @save_result = save_result
     @project_ids = project_ids
+    @eur_rate = eur_rate
+    if @save_result && !@eur_rate
+      raise ArgumentError, "eur_rate must be provided when save_result is true"
+    end
   end
 
   def run
@@ -50,7 +54,7 @@ class InvoiceGenerator
           vat_info = if ((tax_id = project_content[:billing_info][:tax_id]) && !tax_id.empty?) && country.alpha2 != "NL"
             {rate: 0, reversed: true}
           else
-            {rate: Config.annual_non_dutch_eu_sales_exceed_threshold ? country.vat_rates["standard"] : 21, reversed: false}
+            {rate: Config.annual_non_dutch_eu_sales_exceed_threshold ? country.vat_rates["standard"] : 21, reversed: false, eur_rate: @eur_rate}
           end
         end
         project_content[:issuer_info] = issuer
