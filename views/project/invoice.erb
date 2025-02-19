@@ -17,71 +17,13 @@
   <!-- Invoice Card -->
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
     <div class="px-4 py-5 sm:p-6">
-      <% if @invoice_data[:status] == "current" %>
-        <div class="flex justify-between items-baseline text-gray-800">
-          <div class="text-4xl font-semibold">Current Usage Summary</div>
-          <div class="text-right text-3xl"><%= @invoice_data[:begin_time] %> to <%= @invoice_data[:end_time] %></div>
-        </div>
-        <h3 class="text-lg text-gray-500">
-          This invoice will be finalized on the first day of next month.
-        </h3>
-      <% else %>
-        <div class="flex justify-between">
-          <div>
-            <img class="h-8 w-auto" src="/logo-primary.png" alt="Ubicloud">
-            <address class="mt-4 not-italic text-gray-800">
-              <% if @invoice_data[:issuer_name] %>
-                <span class="font-semibold"><%= @invoice_data[:issuer_name] %></span><br>
-              <% end %>
-              <%= @invoice_data[:issuer_address] %>,<br>
-              <%= @invoice_data[:issuer_city] %>,
-              <%= @invoice_data[:issuer_state] %>
-              <%= @invoice_data[:issuer_postal_code] %>,<br>
-              <%= @invoice_data[:issuer_country] %><br>
-            </address>
-          </div>
-          <div class="text-right">
-            <h2 class="text-3xl font-semibold text-gray-800">
-              Invoice for <%= @invoice_data[:name] %>
-            </h2>
-            <span class="mt-1 block text-gray-500">#<%= @invoice_data[:invoice_number] %></span>
-          </div>
-        </div>
-        <div class="mt-8 grid grid-cols-2 gap-3">
-          <div>
-            <h3 class="text-lg font-semibold text-gray-800">Bill to:</h3>
-            <h3 class="text-lg font-semibold text-gray-800">
-              <%= @invoice_data[:billing_name] %>
-              <% if @invoice_data[:company_name] %>
-                - <%= @invoice_data[:company_name] %>
-              <% end %>
-            </h3>
-            <address class="mt-2 not-italic text-gray-500">
-              <% if @invoice_data[:tax_id] %>
-                Tax ID: <%= @invoice_data[:tax_id] %> <br>
-              <% end %>
-              <%= @invoice_data[:billing_address] %>,<br>
-              <%= @invoice_data[:billing_city] %>,
-              <%= @invoice_data[:billing_state] %>
-              <%= @invoice_data[:billing_postal_code] %>,<br>
-              <%= @invoice_data[:billing_country] %><br>
-            </address>
-          </div>
-
-          <div class="text-right space-y-2">
-            <div class="grid grid-cols-1 gap-2">
-              <dl class="grid grid-cols-5 gap-x-3">
-                <dt class="col-span-3 font-semibold text-gray-800">Invoice date:</dt>
-                <dd class="col-span-2 text-gray-500"><%= @invoice_data[:date] %></dd>
-              </dl>
-              <dl class="grid grid-cols-5 gap-x-3">
-                <dt class="col-span-3 font-semibold text-gray-800">Due date:</dt>
-                <dd class="col-span-2 text-gray-500"><%= @invoice_data[:date] %></dd>
-              </dl>
-            </div>
-          </div>
-        </div>
-      <% end %>
+      <div class="flex justify-between items-baseline text-gray-800">
+        <div class="text-4xl font-semibold">Current Usage Summary</div>
+        <div class="text-right text-3xl"><%= @invoice_data[:begin_time] %> to <%= @invoice_data[:end_time] %></div>
+      </div>
+      <h3 class="text-lg text-gray-500">
+        This invoice will be finalized on the first day of next month.
+      </h3>
       <div class="mt-6">
         <table class="min-w-full divide-y divide-gray-300 border border-gray-200">
           <thead class="bg-gray-50">

@@ -280,38 +280,33 @@ RSpec.describe Clover, "billing" do
         click_link invoice.name
       end
 
-      it "show invoice details" do
+      it "show current usage details" do
         expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}}).at_least(:once)
         bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
         100.times do
           billing_record(Time.parse("2023-06-01"), Time.parse("2023-06-01") + 10)
         end
-        InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run
-        invoice = Invoice.first
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run.first
+        invoice.update(status: "current")
+        expect(InvoiceGenerator).to receive(:new).and_return(instance_double(InvoiceGenerator, run: [invoice])).at_least(:once)
 
-        visit "#{project.path}/billing/invoice/#{invoice.ubid}"
+        visit "#{project.path}/billing/invoice/current"
 
         expect(page.status_code).to eq(200)
         expect(page.title).to eq("Ubicloud - #{invoice.name} Invoice")
         expect(page).to have_content invoice.name
         expect(page).to have_content "Aggregated"
-        expect(page).to have_no_content "Tax ID:"
         expect(page.has_css?("#invoice-discount")).to be false
         expect(page.has_css?("#invoice-credit")).to be false
 
         content = invoice.content
-        issuer_name = content["issuer_info"].delete("name")
-        content["billing_info"]["tax_id"] = "123XYZ"
         content["discount"] = 1
         content["credit"] = 2
         content["free_inference_tokens_credit"] = 3
-        expect(page).to have_content issuer_name
         invoice.this.update(content:)
 
         page.refresh
         expect(page).to have_content invoice.name
-        expect(page).to have_content "Tax ID: 123XYZ"
-        expect(page).to have_no_content issuer_name
         expect(find_by_id("invoice-discount").text).to eq "-$1.00"
         expect(find_by_id("invoice-credit").text).to eq "-$2.00"
         expect(find_by_id("invoice-free-inference-tokens").text).to eq "-$3.00"
@@ -354,12 +349,12 @@ RSpec.describe Clover, "billing" do
         expect(page).to have_content "less than $0.001"
       end
 
-      it "show invoice full page for generating PDF" do
+      it "show finalized invoice as PDF" do
         expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}}).at_least(:once)
         bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run.first
 
-        visit "#{project.path}/billing/invoice/#{invoice.ubid}?pdf=1"
+        visit "#{project.path}/billing/invoice/#{invoice.ubid}"
 
         expect(page.status_code).to eq(200)
         text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
