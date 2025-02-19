@@ -108,12 +108,24 @@
                   ) %>
                 </div>
                 <div class="sm:col-span-4">
+                  <% country = ISO3166::Country.new(@billing_info_data[:country]) %>
                   <%== part(
                     "components/form/text",
                     name: "tax_id",
-                    label: ISO3166::Country.new(@billing_info_data[:country])&.in_eu_vat? ? "VAT ID" : "Tax ID",
+                    label: country&.in_eu_vat? ? "VAT ID" : "Tax ID",
                     value: @billing_info_data[:tax_id]
                   ) %>
+                  <% if country&.in_eu_vat? %>
+                    <div class="mt-2 text-sm text-gray-500">
+                      <% if country.alpha2 == "NL" %>
+                        21% VAT is collected from customers located in the Netherlands.
+                      <% elsif @billing_info_data[:tax_id].to_s.strip.empty? %>
+                        EU registered business can enter their VAT ID to remove VAT from future invoices.
+                      <% else %>
+                        VAT subject to reverse charge.
+                      <% end %>
+                    </div>
+                  <% end %>
                 </div>
                 <div class="sm:col-span-4">
                   <%== part("components/form/text", name: "company_name", label: "Company Name", value: @billing_info_data[:company_name]) %>

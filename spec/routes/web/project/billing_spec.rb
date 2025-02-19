@@ -352,7 +352,8 @@ RSpec.describe Clover, "billing" do
         bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
 
-        visit "#{project.path}/billing/invoice/#{invoice.ubid}"
+        visit "#{project.path}/billing"
+        click_link invoice.name
 
         expect(page.status_code).to eq(200)
         text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
@@ -363,11 +364,13 @@ RSpec.describe Clover, "billing" do
       end
 
       it "show finalized invoice as PDF from EU issuer with 21% VAT" do
-        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}}).at_least(:once)
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "DE"}, "metadata" => {"company_name" => "Foo Companye Name"}}).at_least(:once)
         bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
 
-        visit "#{project.path}/billing/invoice/#{invoice.ubid}"
+        visit "#{project.path}/billing"
+        expect(page).to have_content "EU registered business can enter their VAT ID to remove VAT from future invoices."
+        click_link invoice.name
 
         expect(page.status_code).to eq(200)
         text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
@@ -381,7 +384,9 @@ RSpec.describe Clover, "billing" do
         bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
 
-        visit "#{project.path}/billing/invoice/#{invoice.ubid}"
+        visit "#{project.path}/billing"
+        expect(page).to have_content "VAT subject to reverse charge."
+        click_link invoice.name
 
         expect(page.status_code).to eq(200)
         text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
