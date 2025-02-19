@@ -84,6 +84,8 @@ Subcommands: list
 
 Usage: ubi lb location/(lb-name|_lb-ubid) subcommand [...]
 
+Subcommands: create
+
 
 Usage: ubi lb list [options]
 
@@ -91,6 +93,15 @@ Options:
     -f, --fields=fields              show specific fields (default: name,id,src-port,dst-port,hostname)
     -l, --location=location          only show load balancers in given location
     -N, --no-headers                 do not show headers
+
+
+Usage: ubi lb location/lb-name create [options] private-subnet-id src-port dst-port
+
+Options:
+    -a, --algorithm=alg              set the algorithm to use (round_robin(default), hash_based)
+    -e, --check-endpoint=path        set the health check endpoint (default: /up)
+    -p, --check-protocol=proto       set the health check protocol (http(default), https, tcp)
+    -s, --stack=stack                set the stack (dual(default), ipv4, ipv6)
 
 
 Usage: ubi pg subcommand [...]
