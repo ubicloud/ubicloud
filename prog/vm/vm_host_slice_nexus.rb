@@ -92,6 +92,9 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
   label def destroy
     decr_destroy
 
+    # resolve outstanding pages, if any
+    Page.from_tag_parts("VmHostSliceUnavailable", vm_host_slice.ubid)&.incr_resolve
+
     host.sshable.cmd("sudo host/bin/setup-slice delete #{vm_host_slice.inhost_name}")
 
     VmHost.dataset.where(id: host.id).update(

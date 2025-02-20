@@ -151,6 +151,20 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
 
       expect { nx.destroy }.to exit({"msg" => "vm_host_slice destroyed"})
     end
+
+    it "resolves the unavailability page if it exists" do
+      expect(vm_host_slice).to receive(:destroy)
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-slice delete standard.slice")
+      expect(vm_host_slice).to receive(:inhost_name).and_return("standard.slice")
+
+      pg = instance_double(Page)
+      expect(Page).to receive(:from_tag_parts).with("VmHostSliceUnavailable", vm_host_slice.ubid).and_return(pg)
+      expect(pg).to receive(:incr_resolve)
+
+      expect(Page).to receive(:from_tag_parts).with("Deadline", "b231a172-8f56-8b10-bbed-8916ea4e5c28", "Prog::Vm::VmHostSliceNexus", nil).and_return(nil)
+
+      expect { nx.destroy }.to exit({"msg" => "vm_host_slice destroyed"})
+    end
   end
 
   describe "#start_after_host_reboot" do
