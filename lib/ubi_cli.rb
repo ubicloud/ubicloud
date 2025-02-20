@@ -90,10 +90,10 @@ class UbiCli
       run do |opts|
         opts = opts[key]
         path = if (location = opts[:location])
-          if LocationNameConverter.to_internal_name(location)
-            "location/#{location}/#{fragment}"
-          else
+          if !location.match(Validation::ALLOWED_NAME_PATTERN)
             raise Rodish::CommandFailure, "invalid location provided in #{cmd} list -l option"
+          else
+            "location/#{location}/#{fragment}"
           end
         else
           fragment
