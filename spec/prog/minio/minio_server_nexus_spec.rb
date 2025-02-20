@@ -399,25 +399,21 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect { nx.before_run }.to hop("destroy")
     end
 
-    it "does not hop to destroy if strand is destroy" do
-      nx.strand.update(label: "destroy")
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-
     it "does not hop to destroy if destroy is not set" do
-      expect(nx).to receive(:when_destroy_set?).and_return(false)
+      expect(nx).to receive(:when_destroy_set?)
       expect { nx.before_run }.not_to hop("destroy")
     end
 
-    it "does not hop to destroy if strand label is destroy" do
+    it "does not hop to destroy if already destroying" do
+      nx.strand.update(label: "destroy")
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
+      expect(nx).to receive(:destroying_set?).and_return(true)
       expect { nx.before_run }.not_to hop("destroy")
     end
 
     it "pops additional operations from stack" do
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
+      expect(nx).to receive(:destroying_set?).and_return(true)
       expect(nx.strand.stack).to receive(:count).and_return(2)
       expect { nx.before_run }.to exit({"msg" => "operation is cancelled due to the destruction of the minio server"})
     end

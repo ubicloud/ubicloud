@@ -37,14 +37,6 @@ class Prog::Minio::MinioPoolNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      unless ["destroy", "wait_servers_destroyed"].include?(strand.label)
-        hop_destroy
-      end
-    end
-  end
-
   def cluster
     @cluster ||= minio_pool.cluster
   end

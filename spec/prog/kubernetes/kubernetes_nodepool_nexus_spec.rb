@@ -59,19 +59,6 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     end
   end
 
-  describe "#before_run" do
-    it "hops to destroy" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "does not hop to destroy if already in the destroy state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-  end
-
   describe "#start" do
     it "naps if the kubernetes cluster is not ready" do
       expect(kn.cluster).to receive(:strand).and_return(Strand.new(label: "not-wait"))
