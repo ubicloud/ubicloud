@@ -2,10 +2,10 @@
 
 module LocationNameConverter
   def self.to_internal_name(display_name)
-    Option::LOCATIONS.find { _1.display_name == display_name }&.name
+    ProviderLocation[display_name: display_name]&.internal_name
   end
 
   def self.to_display_name(internal_name)
-    Option::LOCATIONS.find { _1.name == internal_name }&.display_name
+    ProviderLocation[internal_name: internal_name]&.display_name
   end
 end
