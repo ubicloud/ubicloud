@@ -142,7 +142,7 @@ RSpec.describe Project do
     end
 
     it "provides first location when location with highest available core capacity cannot be determined" do
-      expect(project.default_location).to eq Option.locations.first.name
+      expect(project.default_location).to eq Option.locations.first.internal_name
     end
   end
 

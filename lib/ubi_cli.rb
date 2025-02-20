@@ -85,7 +85,7 @@ class UbiCli
       run do |opts|
         opts = opts[key]
         path = if (location = opts[:location])
-          if LocationNameConverter.to_internal_name(location)
+          if ProviderLocation[display_name: location]&.internal_name
             "location/#{location}/#{fragment}"
           else
             raise Rodish::CommandFailure, "invalid location provided in #{cmd} list -l option"
@@ -394,7 +394,7 @@ class UbiCli
   if Config.test? && ENV["CLOVER_FREEZE"] == "1"
     singleton_class.prepend(Module.new do
       def process(argv, env)
-        DB.block_queries do
+        DB.allow_queries do
           super
         end
       end
