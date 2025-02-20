@@ -24,12 +24,6 @@ class MinioCluster < Sequel::Model
     enc.column :root_cert_key_2
   end
 
-  def generate_etc_hosts_entry
-    servers.map do |server|
-      "#{server.private_ipv4_address} #{server.hostname}"
-    end.join("\n")
-  end
-
   def storage_size_gib
     pools.sum(&:storage_size_gib)
   end

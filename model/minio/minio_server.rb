@@ -21,12 +21,24 @@ class MinioServer < Sequel::Model
     enc.column :cert_key
   end
 
+  def generate_etc_hosts_entry
+    entries = ["::1 #{hostname}"]
+    entries += cluster.servers.reject { _1.id == id }.map do |server|
+      "#{server.public_ipv6_address} #{server.hostname}"
+    end
+    entries.join("\n")
+  end
+
   def hostname
     "#{cluster.name}#{index}.#{Config.minio_host_name}"
   end
 
   def private_ipv4_address
     vm.private_ipv4.to_s
+  end
+
+  def public_ipv6_address
+    vm.ephemeral_net6.nth(2).to_s
   end
 
   def minio_volumes
