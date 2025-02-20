@@ -102,9 +102,9 @@ class Clover < Roda
 
   def validate_request_params(required_keys, allowed_optional_keys = [])
     params = if api?
-      request.params
+      request.params.reject { _1 == "family" }
     else
-      request.params.reject { _1 == "_csrf" }
+      request.params.reject { _1 == "_csrf" || _1 == "family" }
     end
     Validation.validate_request_params(params, required_keys, allowed_optional_keys)
   end
