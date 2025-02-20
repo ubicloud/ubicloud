@@ -50,6 +50,9 @@ config = {
     "local" => {
       "dataDir" => "/var/lib/etcd"
     }
+  },
+  "timeouts" => {
+    "controlPlaneComponentHealthCheck" => "10m0s"
   }
 }
 
