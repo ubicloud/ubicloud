@@ -75,11 +75,12 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
 
     begin
       if available?
-        Page.from_tag_parts("VmHostSliceUnavailable", vm_host_slice.ubid)&.incr_resolve
         decr_checkup
         hop_wait
       else
-        Prog::PageNexus.assemble("#{vm_host_slice.inhost_name} is unavailable", ["VmHostSliceUnavailable", vm_host_slice.ubid], vm_host_slice.ubid)
+        # Use deadlines to create a page instead of a custom page, so page
+        # resolution in different states can be handled properly.
+        register_deadline("wait", 0)
       end
     rescue Net::SSH::Disconnect, Net::SSH::ConnectionTimeout, Errno::ECONNRESET, Errno::ECONNREFUSED, IOError
       # Host is likely to be down, which will be handled by HostNexus. No need

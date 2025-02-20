@@ -169,23 +169,14 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
       expect { nx.unavailable }.to hop("start_after_host_reboot")
     end
 
-    it "creates a page if vm is unavailable" do
-      expect(Prog::PageNexus).to receive(:assemble)
+    it "registers an immediate deadline if slice is unavailable" do
+      expect(nx).to receive(:register_deadline).with("wait", 0)
       expect(nx).to receive(:available?).and_return(false)
       expect { nx.unavailable }.to nap(30)
     end
 
-    it "resolves the page if vm is available" do
-      pg = instance_double(Page)
-      expect(pg).to receive(:incr_resolve)
+    it "hops to wait if slice is available" do
       expect(nx).to receive(:available?).and_return(true)
-      expect(Page).to receive(:from_tag_parts).and_return(pg)
-      expect { nx.unavailable }.to hop("wait")
-    end
-
-    it "does not resolves the page if there is none" do
-      expect(nx).to receive(:available?).and_return(true)
-      expect(Page).to receive(:from_tag_parts).and_return(nil)
       expect { nx.unavailable }.to hop("wait")
     end
   end

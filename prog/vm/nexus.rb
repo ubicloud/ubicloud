@@ -409,11 +409,12 @@ class Prog::Vm::Nexus < Prog::Base
 
     begin
       if available?
-        Page.from_tag_parts("VmUnavailable", vm.ubid)&.incr_resolve
         decr_checkup
         hop_wait
       else
-        Prog::PageNexus.assemble("#{vm} is unavailable", ["VmUnavailable", vm.ubid], vm.ubid)
+        # Use deadlines to create a page instead of a custom page, so page
+        # resolution in different states can be handled properly.
+        register_deadline("wait", 0)
       end
     rescue Sshable::SshError
       # Host is likely to be down, which will be handled by HostNexus. No need
