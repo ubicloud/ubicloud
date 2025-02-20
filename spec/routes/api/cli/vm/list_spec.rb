@@ -75,6 +75,6 @@ RSpec.describe Clover, "cli vm list" do
   end
 
   it "shows error for invalid location" do
-    expect(cli(%w[vm list -Nleu-foo-h1], status: 400)).to eq "! Invalid location provided in vm list -l option\n"
+    expect(cli(%w[vm list -Nleu-/-h1], status: 400)).to eq "! Invalid location provided in vm list -l option\n"
   end
 end

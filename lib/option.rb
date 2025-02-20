@@ -4,44 +4,18 @@ require "yaml"
 
 module Option
   ai_models = YAML.load_file("config/ai_models.yml")
-  providers = YAML.load_file("config/providers.yml")
-
-  Provider = Struct.new(:name, :display_name)
-  Location = Struct.new(:provider, :name, :display_name, :ui_name, :visible)
-
-  PROVIDERS = {}
-  LOCATIONS = []
-
-  providers.each do |provider|
-    provider_internal_name = provider["provider_internal_name"]
-    PROVIDERS[provider_internal_name] = Provider.new(provider_internal_name, provider["provider_display_name"])
-    Provider.const_set(provider_internal_name.gsub(/[^a-zA-Z]/, "_").upcase, provider_internal_name)
-
-    provider["locations"].each do |location|
-      LOCATIONS.push(Location.new(
-        PROVIDERS[provider_internal_name],
-        location["internal_name"],
-        location["display_name"],
-        location["ui_name"],
-        location["visible"]
-      ))
-    end
-  end
-
   AI_MODELS = ai_models.select { _1["enabled"] }.freeze
-  PROVIDERS.freeze
-  LOCATIONS.freeze
 
   def self.locations(only_visible: true, feature_flags: [])
-    Option::LOCATIONS.select { !only_visible || (_1.visible || feature_flags.include?("location_#{_1.name.tr("-", "_")}")) }
+    Location.all.select { |pl| !only_visible || (pl.visible || feature_flags.include?("location_#{pl.name.tr("-", "_")}")) }
   end
 
   def self.postgres_locations
-    Option::LOCATIONS.select { _1.name == "hetzner-fsn1" || _1.name == "leaseweb-wdc02" }
+    Location.where(name: ["hetzner-fsn1", "leaseweb-wdc02"]).all
   end
 
   def self.kubernetes_locations
-    Option::LOCATIONS.select { _1.name == "hetzner-fsn1" || _1.name == "leaseweb-wdc02" }
+    Location.where(name: ["hetzner-fsn1", "leaseweb-wdc02"]).all
   end
 
   BootImage = Struct.new(:name, :display_name)
