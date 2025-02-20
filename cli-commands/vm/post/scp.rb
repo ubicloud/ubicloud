@@ -23,7 +23,7 @@ UbiCli.on("vm").run_on("scp") do
         ["scp", *argv, "--", path1, path2]
       end
     else
-      error = "! Only one path should be remote (start with ':')"
+      error = "! Only one path should be remote (start with ':')\n"
       [400, {"content-type" => "text/plain", "content-length" => error.bytesize.to_s}, [error]]
     end
   end

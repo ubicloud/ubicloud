@@ -18,6 +18,6 @@ RSpec.describe Clover, "cli pg restore" do
     body = cli(%w[pg eu-central-h1/test-pg restore test-pg-2] << Time.now.utc)
     expect(PostgresResource.select_order_map(:name)).to eq %w[test-pg test-pg-2]
     pg = PostgresResource.first(name: "test-pg-2")
-    expect(body).to eq "Restored PostgreSQL database scheduled for creation with id: #{pg.ubid}"
+    expect(body).to eq "Restored PostgreSQL database scheduled for creation with id: #{pg.ubid}\n"
   end
 end

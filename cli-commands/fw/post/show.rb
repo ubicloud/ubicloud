@@ -7,10 +7,14 @@ UbiCli.on("fw").run_on("show") do
   nic_fields = %w[id name private-ipv4 private-ipv6 vm-name].freeze.each(&:freeze)
 
   options("ubi fw location/(fw-name|_fw-ubid) show [options]", key: :fw_show) do
-    on("-f", "--fields=fields", "show specific fields (default: #{fields.join(",")})")
-    on("-n", "--nic-fields=fields", "show specific nic fields (default: #{nic_fields.join(",")})")
-    on("-p", "--priv-subnet-fields=fields", "show specific private subnet fields (default: #{private_subnet_fields.join(",")})")
-    on("-r", "--rule-fields=fields", "show specific firewall rule fields (default: #{firewall_rule_fields.join(",")})")
+    on("-f", "--fields=fields", "show specific fields (comma separated)")
+    on("-n", "--nic-fields=fields", "show specific nic fields (comma separated)")
+    on("-p", "--priv-subnet-fields=fields", "show specific private subnet fields (comma separated)")
+    on("-r", "--rule-fields=fields", "show specific firewall rule fields (comma separated)")
+    wrap("Fields:", fields)
+    wrap("Nic Fields:", nic_fields)
+    wrap("Private Subnet Fields:", private_subnet_fields)
+    wrap("Firewall Rule Fields:", firewall_rule_fields)
   end
 
   run do |opts|

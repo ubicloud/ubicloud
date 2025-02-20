@@ -37,7 +37,7 @@ RSpec.describe Clover, "cli vm ssh" do
   end
 
   it "-4 option fails if VM has no IPv4 address" do
-    expect(cli(["vm", @ref, "-4", "ssh"], status: 400)).to eq "! No valid IPv4 address for requested VM"
+    expect(cli(["vm", @ref, "-4", "ssh"], status: 400)).to eq "! No valid IPv4 address for requested VM\n"
   end
 
   it "-4 option uses IPv4 even if connection is made via IPv6" do
@@ -78,8 +78,8 @@ RSpec.describe Clover, "cli vm ssh" do
   end
 
   it "handles invalid vm reference" do
-    expect(cli(["vm", "#{@vm.display_location}/foo", "ssh"], status: 404)).to eq "! Unexpected response status: 404\nDetails: Sorry, we couldn’t find the resource you’re looking for."
-    expect(cli(["vm", "foo/#{@vm.name}", "ssh"], status: 404)).to eq "! Unexpected response status: 404\nDetails: Sorry, we couldn’t find the resource you’re looking for."
-    expect(cli(["vm", "#{@vm.display_location}/#{@vm.name}/bar", "ssh"], status: 400)).to eq "! Invalid vm reference, should be in location/(vm-name|_vm-ubid) format"
+    expect(cli(["vm", "#{@vm.display_location}/foo", "ssh"], status: 404)).to eq "! Unexpected response status: 404\nDetails: Sorry, we couldn’t find the resource you’re looking for.\n"
+    expect(cli(["vm", "foo/#{@vm.name}", "ssh"], status: 404)).to eq "! Unexpected response status: 404\nDetails: Sorry, we couldn’t find the resource you’re looking for.\n"
+    expect(cli(["vm", "#{@vm.display_location}/#{@vm.name}/bar", "ssh"], status: 400)).to eq "! Invalid vm reference, should be in location/(vm-name|_vm-ubid) format\n"
   end
 end

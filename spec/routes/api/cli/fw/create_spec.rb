@@ -10,7 +10,7 @@ RSpec.describe Clover, "cli fw create" do
     fw = Firewall.first
     expect(fw.name).to eq "test-fw"
     expect(fw.description).to eq ""
-    expect(body).to eq "Firewall created with id: #{fw.ubid}"
+    expect(body).to eq "Firewall created with id: #{fw.ubid}\n"
   end
 
   it "creates firewall with -d option" do
@@ -20,6 +20,6 @@ RSpec.describe Clover, "cli fw create" do
     fw = Firewall.first
     expect(fw.name).to eq "test-fw"
     expect(fw.description).to eq "test-description"
-    expect(body).to eq "Firewall created with id: #{fw.ubid}"
+    expect(body).to eq "Firewall created with id: #{fw.ubid}\n"
   end
 end

@@ -16,9 +16,10 @@ Subcommands: create destroy scp sftp show ssh
 Usage: ubi vm list [options]
 
 Options:
-    -f, --fields=fields              show specific fields (default: location,name,id,ip4,ip6)
+    -f, --fields=fields              show specific fields (comma separated)
     -l, --location=location          only show VMs in given location
     -N, --no-headers                 do not show headers
+Fields: location name id ip4 ip6
 
 
 Usage: ubi vm location/vm-name create [options] public_key
@@ -47,9 +48,13 @@ Usage: ubi vm location/(vm-name|_vm-ubid) [options] sftp [sftp-options]
 Usage: ubi vm location/(vm-name|_vm-ubid) show [options]
 
 Options:
-    -f, --fields=fields              show specific fields (default: id,name,state,location,size,unix-user,storage-size-gib,ip6,ip4-enabled,ip4,private-ipv4,private-ipv6,subnet,firewalls)
-    -r, --rule-fields=fields         show specific firewall rule fields (default: id,cidr,port-range)
-    -w, --firewall-fields=fields     show specific firewall fields (default: id,name,description,location,path,firewall-rules)
+    -f, --fields=fields              show specific fields (comma separated)
+    -r, --rule-fields=fields         show specific firewall rule fields (comma separated)
+    -w, --firewall-fields=fields     show specific firewall fields (comma separated)
+Fields: id name state location size unix-user storage-size-gib ip6 ip4-enabled
+        ip4 private-ipv4 private-ipv6 subnet firewalls
+Firewall Rule Fields: id cidr port-range
+Firewall Fields: id name description location path firewall-rules
 
 
 Usage: ubi vm location/(vm-name|_vm-ubid) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]

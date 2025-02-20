@@ -1,3 +1,4 @@
+--confirm test-lb lb eu-central-h1/test-lb destroy
 --confirm test-pg pg eu-central-h1/test-pg destroy
 --confirm test-ps-default fw eu-central-h1/test-ps-default destroy
 --confirm test-ps ps eu-central-h1/test-ps destroy
@@ -37,6 +38,24 @@ help -u
 help -u vm
 help vm
 help vm list
+lb eu-central-h1/test2-lb create psfzm9e26xky5m9ggetw4dpqe2 12345 54321
+lb eu-central-h1/test-lb show
+lb eu-central-h1/test-lb show -f id,name,state,location,hostname,algorithm
+lb eu-central-h1/test-lb show -f stack,health-check-endpoint,health-check-protocol
+lb eu-central-h1/test-lb show -f src-port,dst-port,subnet,vms
+lb eu-central-h1/test-lb destroy -f
+lb eu-central-h1/test-lb detach-vm vmdzyppz6j166jh5e9t2dwrfas
+lb eu-central-h1/test-lb update hash_based 1234 54321 /up2
+lb eu-central-h1/test-lb update hash_based 1234 54321 /up2 vmdzyppz6j166jh5e9t2dwrfas
+lb list
+lb list -f src-port,dst-port,hostname
+lb list -l eu-central-h1
+lb list -l eu-central-h1 -f name,id
+lb list -l eu-central-h1 -N -f name,id
+lb list -l eu-north-h1
+lb list -l eu-north-h1 -f name,id
+lb list -l eu-north-h1 -N -f name,id
+lb list -N
 pg eu-central-h1/test2-pg create
 pg eu-central-h1/test2-pg create -f lantern
 pg eu-central-h1/test2-pg create -h sync

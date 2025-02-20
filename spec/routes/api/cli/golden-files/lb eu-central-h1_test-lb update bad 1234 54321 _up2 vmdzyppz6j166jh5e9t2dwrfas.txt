@@ -1,0 +1,2 @@
+! Unexpected response status: 400
+Details: algorithm is not in range or set: ["round_robin", "hash_based"]

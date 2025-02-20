@@ -4,16 +4,16 @@ require_relative "spec_helper"
 
 RSpec.describe Clover, "cli" do
   it "errors if argv is not an array of strings" do
-    expect(cli([1], status: 400)).to eq "! Invalid request: No or invalid argv parameter provided"
-    expect(cli("--version", status: 400)).to eq "! Invalid request: No or invalid argv parameter provided"
+    expect(cli([1], status: 400)).to eq "! Invalid request: No or invalid argv parameter provided\n"
+    expect(cli("--version", status: 400)).to eq "! Invalid request: No or invalid argv parameter provided\n"
   end
 
   it "errors if token is not provided" do
     header "Authorization", "Foo"
-    expect(cli(%w[--version], status: 400)).to eq "! Invalid request: No valid personal access token provided"
+    expect(cli(%w[--version], status: 400)).to eq "! Invalid request: No valid personal access token provided\n"
   end
 
   it "handles --version" do
-    expect(cli(%w[--version])).to eq "0.0.0"
+    expect(cli(%w[--version])).to eq "0.0.0\n"
   end
 end

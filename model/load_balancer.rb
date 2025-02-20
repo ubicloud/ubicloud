@@ -81,6 +81,13 @@ class LoadBalancer < Sequel::Model
     stack == Stack::IPV6 || stack == Stack::DUAL
   end
 
+  def validate
+    super
+    validates_includes(%w[round_robin hash_based], :algorithm) if algorithm
+    validates_includes(%w[http https tcp], :health_check_protocol) if health_check_protocol
+    validates_includes(%w[dual ipv4 ipv6], :stack) if stack
+  end
+
   module Stack
     IPV4 = "ipv4"
     IPV6 = "ipv6"

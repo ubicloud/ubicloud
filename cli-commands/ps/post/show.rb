@@ -7,10 +7,14 @@ UbiCli.on("ps").run_on("show") do
   nic_fields = %w[id name private-ipv4 private-ipv6 vm-name].freeze.each(&:freeze)
 
   options("ubi ps location/(ps-name|_ps-ubid) show [options]", key: :ps_show) do
-    on("-f", "--fields=fields", "show specific fields (default: #{fields.join(",")})")
-    on("-n", "--nic-fields=fields", "show specific nic fields (default: #{nic_fields.join(",")})")
-    on("-r", "--rule-fields=fields", "show specific firewall rule fields (default: #{firewall_rule_fields.join(",")})")
-    on("-w", "--firewall-fields=fields", "show specific firewall fields (default: #{firewall_fields.join(",")})")
+    on("-f", "--fields=fields", "show specific fields (comma separated)")
+    on("-n", "--nic-fields=fields", "show specific nic fields (comma separated)")
+    on("-r", "--rule-fields=fields", "show specific firewall rule fields (comma separated)")
+    on("-w", "--firewall-fields=fields", "show specific firewall fields (comma separated)")
+    wrap("Fields:", fields)
+    wrap("Nic Fields:", nic_fields)
+    wrap("Firewall Rule Fields:", firewall_rule_fields)
+    wrap("Firewall Fields:", firewall_fields)
   end
 
   run do |opts|

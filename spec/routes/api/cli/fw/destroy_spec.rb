@@ -9,7 +9,7 @@ RSpec.describe Clover, "cli fw destroy" do
   end
 
   it "destroys fw directly if -f option is given" do
-    expect(cli(%w[fw eu-central-h1/test-fw destroy -f])).to eq "Firewall, if it exists, is now scheduled for destruction"
+    expect(cli(%w[fw eu-central-h1/test-fw destroy -f])).to eq "Firewall, if it exists, is now scheduled for destruction\n"
     expect(@fw).not_to be_exist
   end
 
@@ -23,7 +23,7 @@ RSpec.describe Clover, "cli fw destroy" do
   end
 
   it "works on correct confirmation" do
-    expect(cli(%w[--confirm test-fw fw eu-central-h1/test-fw destroy])).to eq "Firewall, if it exists, is now scheduled for destruction"
+    expect(cli(%w[--confirm test-fw fw eu-central-h1/test-fw destroy])).to eq "Firewall, if it exists, is now scheduled for destruction\n"
     expect(@fw).not_to be_exist
   end
 

@@ -29,10 +29,10 @@ RSpec.describe Clover, "cli vm scp" do
   end
 
   it "returns error if both files are local" do
-    expect(cli(["vm", @ref, "scp", "local", "local"], status: 400)).to eq "! Only one path should be remote (start with ':')"
+    expect(cli(["vm", @ref, "scp", "local", "local"], status: 400)).to eq "! Only one path should be remote (start with ':')\n"
   end
 
   it "returns error if both files are remote" do
-    expect(cli(["vm", @ref, "scp", ":remote", ":remote"], status: 400)).to eq "! Only one path should be remote (start with ':')"
+    expect(cli(["vm", @ref, "scp", ":remote", ":remote"], status: 400)).to eq "! Only one path should be remote (start with ':')\n"
   end
 end

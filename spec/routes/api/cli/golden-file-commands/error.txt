@@ -1,5 +1,6 @@
 
 --confirm foo fw eu-central-h1/test-ps-default destroy
+--confirm foo lb eu-central-h1/test-lb destroy
 --confirm foo pg eu-central-h1/test-pg destroy
 --confirm foo ps eu-central-h1/test-ps destroy
 --confirm foo vm eu-central-h1/test-vm destroy
@@ -10,6 +11,12 @@ fw list -f invalid
 fw list invalid
 help invalid
 invalid
+lb list -f invalid
+lb list invalid
+lb eu-central-h1/test-lb show -f bad
+lb eu-central-h1/test-lb attach-vm vmdzyppz6j166jh5e9t2dwrfas
+lb eu-central-h1/test-lb update bad 1234 54321 /up2 vmdzyppz6j166jh5e9t2dwrfas
+lb eu-central-h1/test2-lb create
 pg eu-central-h1/test2-pg create invalid
 pg eu-central-h1/test-pg add-firewall-rule
 pg eu-central-h1/test-pg add-metric-destination

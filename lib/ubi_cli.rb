@@ -5,6 +5,7 @@ class UbiCli
 
   FRAGMENTS = {
     "fw" => "firewall",
+    "lb" => "load-balancer",
     "pg" => "postgres",
     "ps" => "private-subnet",
     "vm" => "vm"
@@ -12,6 +13,7 @@ class UbiCli
 
   CAPITALIZED_LABELS = {
     "fw" => "Firewall",
+    "lb" => "Load balancer",
     "pg" => "PostgreSQL database",
     "ps" => "Private subnet",
     "vm" => "VM"
@@ -46,6 +48,8 @@ class UbiCli
       message = e.message
     end
 
+    message += "\n" unless message.end_with?("\n")
+
     [status, {"content-type" => "text/plain", "content-length" => message.bytesize.to_s}, [message]]
   end
 
@@ -77,9 +81,10 @@ class UbiCli
 
     on(cmd, "list") do
       options("ubi #{cmd} list [options]", key:) do
-        on("-f", "--fields=fields", "show specific fields (default: #{fields.join(",")})")
+        on("-f", "--fields=fields", "show specific fields (comma separated)")
         on("-l", "--location=location", "only show #{LOWERCASE_LABELS[cmd]}s in given location")
         on("-N", "--no-headers", "do not show headers")
+        wrap("Fields:", fields)
       end
 
       run do |opts|
@@ -95,7 +100,7 @@ class UbiCli
         end
 
         get(project_path(path)) do |data|
-          keys = check_fields(opts[:fields], fields, "#{cmd} list -f option")
+          keys = underscore_keys(check_fields(opts[:fields], fields, "#{cmd} list -f option"))
           format_rows(keys, data["items"], headers: opts[:"no-headers"] != false)
         end
       end
@@ -230,6 +235,10 @@ class UbiCli
     _req(_req_env("POST", path, params), &block)
   end
 
+  def patch(path, params = {}, &block)
+    _req(_req_env("PATCH", path, params), &block)
+  end
+
   def get(path, &block)
     _req(_req_env("GET", path, nil), &block)
   end
@@ -321,15 +330,8 @@ class UbiCli
   end
 
   def response(body, status: 200, headers: {})
-    if body.is_a?(Array)
-      headers["content-length"] = body.sum(&:bytesize).to_s
-    else
-      headers["content-length"] = body.bytesize.to_s
-      body = [body]
-    end
-
-    headers["content-type"] = "text/plain"
-    [status, headers, body]
+    body = [body] unless body.is_a?(Array)
+    finalize_response([status, headers, body])
   end
 
   def _req_env(method, path, params)
@@ -357,12 +359,10 @@ class UbiCli
         body = +""
         res[2].each { body << _1 }
         res[2] = yield(JSON.parse(body), res)
-        res[1]["content-length"] = res[2].sum(&:bytesize).to_s
       end
     when 204
       res[0] = 200
       res[2] = yield(nil, res)
-      res[1]["content-length"] = res[2].sum(&:bytesize).to_s
     else
       body = +""
       res[2].each { body << _1 }
@@ -379,10 +379,19 @@ class UbiCli
         end
       end
       res[2] = [error_message]
-      res[1]["content-length"] = res[2][0].bytesize.to_s
     end
 
-    res[1]["content-type"] = "text/plain"
+    finalize_response(res)
+  end
+
+  def finalize_response(res)
+    headers = res[1]
+    body = res[2]
+    if !headers["ubi-command-execute"] && !headers["ubi-confirm"] && (body.empty? || !body[-1].end_with?("\n"))
+      body << "\n"
+    end
+    headers["content-length"] = body.sum(&:bytesize).to_s
+    headers["content-type"] = "text/plain"
     res
   end
 

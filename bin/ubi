@@ -80,7 +80,7 @@ confirmation = nil
       end
 
       unless sep_seen || pg_dumpall
-        invalid_message = "! Invalid server response, no '--' in returned argv"
+        invalid_message ||= "! Invalid server response, no '--' in returned argv"
       end
 
       if invalid_message
@@ -101,7 +101,7 @@ confirmation = nil
           warn "! Invalid server response, repeated confirmation attempt"
           exit 1
         else
-          $stdout.puts response.body
+          $stdout.print response.body
           $stdout.print "\n#{confirmation_prompt}: "
           confirmation = $stdin.readline.chomp
           argv.unshift(confirmation)
@@ -109,7 +109,7 @@ confirmation = nil
           redo
         end
       else
-        $stdout.puts response.body
+        $stdout.print response.body
       end
       exit 0
     end

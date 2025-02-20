@@ -10,7 +10,7 @@ RSpec.describe Clover, "cli ps destroy" do
 
   it "destroys ps directly if -f option is given" do
     expect(Semaphore.where(strand_id: @ps.id, name: "destroy")).to be_empty
-    expect(cli(%w[ps eu-central-h1/test-ps destroy -f])).to eq "Private subnet, if it exists, is now scheduled for destruction"
+    expect(cli(%w[ps eu-central-h1/test-ps destroy -f])).to eq "Private subnet, if it exists, is now scheduled for destruction\n"
     expect(Semaphore.where(strand_id: @ps.id, name: "destroy")).not_to be_empty
   end
 
@@ -25,7 +25,7 @@ RSpec.describe Clover, "cli ps destroy" do
 
   it "works on correct confirmation" do
     expect(Semaphore.where(strand_id: @ps.id, name: "destroy")).to be_empty
-    expect(cli(%w[--confirm test-ps ps eu-central-h1/test-ps destroy])).to eq "Private subnet, if it exists, is now scheduled for destruction"
+    expect(cli(%w[--confirm test-ps ps eu-central-h1/test-ps destroy])).to eq "Private subnet, if it exists, is now scheduled for destruction\n"
     expect(Semaphore.where(strand_id: @ps.id, name: "destroy")).not_to be_empty
   end
 
