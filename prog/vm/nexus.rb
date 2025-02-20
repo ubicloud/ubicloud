@@ -447,6 +447,9 @@ class Prog::Vm::Nexus < Prog::Base
       hop_prevent_destroy
     end
 
+    # resolve outstanding pages, if any
+    Page.from_tag_parts("VmUnavailable", vm.ubid)&.incr_resolve
+
     vm.update(display_state: "deleting")
 
     unless host.nil?

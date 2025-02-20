@@ -862,6 +862,14 @@ RSpec.describe Prog::Vm::Nexus do
         expect { nx.destroy }.to hop("destroy_slice")
       end
 
+      it "resolves the unavailability page if it exists" do
+        pg = instance_double(Page)
+        expect(pg).to receive(:incr_resolve)
+        expect(Page).to receive(:from_tag_parts).and_return(pg)
+        allow(sshable).to receive(:cmd)
+        expect { nx.destroy }.to hop("destroy_slice")
+      end
+
       it "naps for 30 seconds" do
         lb = instance_double(LoadBalancer)
         expect(lb).to receive(:evacuate_vm).with(vm)
