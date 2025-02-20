@@ -80,7 +80,7 @@ confirmation = nil
       end
 
       unless sep_seen || pg_dumpall
-        invalid_message = "! Invalid server response, no '--' in returned argv"
+        invalid_message ||= "! Invalid server response, no '--' in returned argv"
       end
 
       if invalid_message
