@@ -40,13 +40,19 @@ class Clover
         204
       end
 
-      r.post web?, "restart" do
+      r.post "restart" do
         authorize("Postgres:edit", pg.id)
         pg.servers.each do |s|
           s.incr_restart
         rescue Sequel::ForeignKeyConstraintViolation
         end
-        r.redirect "#{@project.path}#{pg.path}"
+
+        if api?
+          Serializers::Postgres.serialize(pg, {detailed: true})
+        else
+          flash["notice"] = "'#{pg.name}' will be restarted in a few seconds"
+          r.redirect "#{@project.path}#{pg.path}"
+        end
       end
 
       r.post api?, "failover" do

@@ -68,6 +68,7 @@ pg eu-central-h1/test-pg delete-firewall-rule pfb9g14e5ndt6qf59wfk8109bg
 pg eu-central-h1/test-pg delete-metric-destination et2t1bswsqz21m7j7njfjbp901
 pg eu-central-h1/test-pg destroy -f
 pg eu-central-h1/test-pg reset-superuser-password foo123BAR456
+pg eu-central-h1/test-pg restart
 pg eu-central-h1/test-pg show
 pg eu-central-h1/test-pg show -f firewall-rules,metric-destinations,ca-certificates
 pg eu-central-h1/test-pg show -f ha-type,flavor,connection-string,primary,earliest-restore-time
