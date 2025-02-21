@@ -48,7 +48,7 @@
                       <% end %>
                     </div>
                   </fieldset>
-                  <% if (error = rodauth.field_error(rodauth.webauthn_remove_param)) %>
+                  <% if error = rodauth.field_error(rodauth.webauthn_remove_param) %>
                     <p class="mt-2 text-sm text-red-600 leading-6" id="<%= rodauth.webauthn_remove_param %>-error"><%= error %></p>
                   <% end %>
                 </div>
