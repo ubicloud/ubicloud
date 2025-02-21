@@ -59,8 +59,8 @@ class SpdkSetup
     end
 
     case @spdk_version
-    when "v23.09-ubi-0.2"
-      "https://github.com/ubicloud/bdev_ubi/releases/download/spdk-23.09-ubi-0.2b/ubicloud-spdk-#{os_version}-#{arch}.tar.gz"
+    when "v23.09-ubi-0.3"
+      "https://github.com/ubicloud/bdev_ubi/releases/download/spdk-23.09-ubi-0.3/ubicloud-spdk-#{os_version}-#{arch}.tar.gz"
     else
       fail "BUG: unsupported SPDK version"
     end
