@@ -27,7 +27,7 @@ RSpec.describe Clover, "inference-playground" do
         ["ie1", "e5-mistral-7b-it", project_wo_permissions, true, true, lb.id, {capability: "Embeddings"}],
         ["ie2", "e5-mistral-8b-it", project_wo_permissions, true, false, lb.id, {capability: "Text Generation"}],
         ["ie3", "llama-guard-3-8b", project_wo_permissions, false, true, lb.id, {capability: "Text Generation"}],
-        ["ie4", "llama-3-1-405b-it", project, false, true, lb2.id, {capability: "Text Generation"}],
+        ["ie4", "mistral-small-3", project, false, true, lb2.id, {capability: "Text Generation"}],
         ["ie5", "llama-3-2-3b-it", project, false, false, lb.id, {capability: "Text Generation"}],
         ["ie6", "test-model", project_wo_permissions, true, true, lb.id, {capability: "Text Generation"}]
       ].each do |name, model_name, project, is_public, visible, load_balancer_id, tags|
@@ -40,7 +40,7 @@ RSpec.describe Clover, "inference-playground" do
       expect(page).to have_no_content("e5-mistral-8b-it")
       expect(page).to have_no_content("llama-guard-3-8b")
       expect(page).to have_no_content("llama-3-2-3b-it")
-      expect(page).to have_select("inference_endpoint", selected: "llama-3-1-405b-it", with_options: ["llama-3-1-405b-it", "test-model"])
+      expect(page).to have_select("inference_endpoint", selected: "mistral-small-3", with_options: ["mistral-small-3", "test-model"])
     end
 
     it "gives choice of inference api keys" do

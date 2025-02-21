@@ -26,7 +26,7 @@ RSpec.describe Clover, "inference-endpoint" do
         ["ie1", "e5-mistral-7b-it", project_wo_permissions, true, true, {capability: "Embeddings", hf_model: "foo/bar"}],
         ["ie2", "e5-mistral-8b-it", project_wo_permissions, true, false, {capability: "Embeddings"}],
         ["ie3", "llama-guard-3-8b", project_wo_permissions, false, true, {capability: "Text Generation"}],
-        ["ie4", "llama-3-1-405b-it", project, false, true, {capability: "Text Generation"}],
+        ["ie4", "mistral-small-3", project, false, true, {capability: "Text Generation"}],
         ["ie5", "llama-3-2-3b-it", project, false, true, {capability: "Text Generation"}],
         ["ie6", "test-model", project_wo_permissions, false, true, {capability: "Text Generation"}],
         ["ie7", "unknown-capability", project_wo_permissions, true, true, {capability: "wrong capability"}]
@@ -41,7 +41,7 @@ RSpec.describe Clover, "inference-endpoint" do
       expect(page.all("a").any? { |a| a["href"] == "https://huggingface.co/foo/bar" }).to be true
       expect(page).to have_no_content("e5-mistral-8b-it") # not visible
       expect(page).to have_no_content("llama-guard-3-8b") # private model of another project
-      expect(page).to have_content("llama-3-1-405b-it")
+      expect(page).to have_content("mistral-small-3")
       expect(page).to have_no_content("test-model") # no permissions
       expect(page).to have_no_content("unknown-capability")
     end
