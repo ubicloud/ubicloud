@@ -12,7 +12,7 @@ Usage: ubi lb location/(lb-name|_lb-id) attach-vm vm-id
 Usage: ubi lb location/lb-name create [options] private-subnet-id src-port dst-port
 Usage: ubi lb location/(lb-name|_lb-id) destroy [options]
 Usage: ubi lb location/(lb-name|_lb-id) detach-vm vm-id
-Usage: ubi lb location/(lb-name|_lb-ubid) show [options]
+Usage: ubi lb location/(lb-name|_lb-id) show [options]
 Usage: ubi lb location/(lb-name|_lb-id) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]
 Usage: ubi pg list [options]
 Usage: ubi pg location/(pg-name|_pg-id) add-firewall-rule cidr
