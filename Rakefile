@@ -278,6 +278,11 @@ task :spec_separate do
   end
 end
 
+desc "Build binary"
+task "ubi" do
+  sh("cd cli && go build -tags osusergo,netgo")
+end
+
 desc "Regenerate screenshots for documentation site"
 task "screenshots" do
   sh("bundle", "exec", "ruby", "bin/regen-screenshots")

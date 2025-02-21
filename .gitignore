@@ -33,3 +33,6 @@
 
 # Built Visual Studio Code Extensions
 /*.vsix
+
+# CLI binary
+/cli/ubi
