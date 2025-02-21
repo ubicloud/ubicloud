@@ -1102,6 +1102,47 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
+  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_name}/connect':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/private_subnet_name'
+    post:
+      operationId: connectPrivateSubnet
+      summary: Connect private subnet to another private subnet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connected-subnet-ubid:
+                  type: string
+              additionalProperties: false
+      responses:
+        '200':
+          $ref: '#/components/responses/PrivateSubnet'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Subnet
+  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_name}/disconnect/{private_subnet_id}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/private_subnet_name'
+      - $ref: '#/components/parameters/private_subnet_id'
+    post:
+      operationId: disconnectPrivateSubnet
+      summary: Disconnect private subnet from another private subnet
+      responses:
+        '200':
+          $ref: '#/components/responses/PrivateSubnet'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Subnet
   '/project/{project_id}/location/{location}/vm':
     get:
       operationId: listLocationVMs
@@ -1338,6 +1379,15 @@ components:
       required: true
       schema:
         type: string
+    private_subnet_id:
+      description: ID of the private subnet
+      in: path
+      name: private_subnet_id
+      required: true
+      schema:
+        type: string
+        example: pskkmx0f2vke4h36nk9cm8v8q0
+        pattern: '^ps[0-9a-hj-km-np-tv-z]{24}$'
     project_id:
       description: ID of the project
       in: path

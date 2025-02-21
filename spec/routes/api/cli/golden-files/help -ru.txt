@@ -30,8 +30,10 @@ Usage: ubi pg location/(pg-name|_pg-ubid) restart
 Usage: ubi pg location/(pg-name|_pg-ubid) restore new-db-name restore-time
 Usage: ubi pg location/(pg-name|_pg-ubid) show [options]
 Usage: ubi ps list [options]
+Usage: ubi ps location/(ps-name|_ps-ubid) connect ps-id
 Usage: ubi ps location/ps-name create [options]
 Usage: ubi ps location/(ps-name|_ps-ubid) destroy [options]
+Usage: ubi ps location/(ps-name|_ps-ubid) disconnect ps-id
 Usage: ubi ps location/(ps-name|_ps-ubid) show [options]
 Usage: ubi vm list [options]
 Usage: ubi vm location/vm-name create [options] public_key

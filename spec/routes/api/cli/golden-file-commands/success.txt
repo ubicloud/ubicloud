@@ -95,6 +95,7 @@ ps eu-central-h1/default-eu-central-h1 show -w description,location,path
 ps eu-central-h1/default-eu-central-h1 show -w firewall-rules
 ps eu-central-h1/default-eu-central-h1 show -w firewall-rules -r id,cidr
 ps eu-central-h1/default-eu-central-h1 show -w firewall-rules -r port-range
+ps eu-central-h1/test-ps connect psfzm9e26xky5m9ggetw4dpqe2
 ps eu-central-h1/test2-ps create
 ps eu-central-h1/test2-ps create -f fw4gj2v4h1fe3q28q0hnf7g8n1
 ps eu-central-h1/test-ps destroy -f
