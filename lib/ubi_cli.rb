@@ -68,7 +68,7 @@ class UbiCli
 
       run do |(ref, *argv), opts, command|
         @location, @name, extra = ref.split("/", 3)
-        raise Rodish::CommandFailure, "invalid #{cmd} reference, should be in location/(#{cmd}-name|_#{cmd}-ubid) format" if extra
+        raise Rodish::CommandFailure, "invalid #{cmd} reference, should be in location/(#{cmd}-name|_#{cmd}-id) format" if extra
         command.run(self, opts, argv)
       end
     end
@@ -111,7 +111,7 @@ class UbiCli
     fragment = FRAGMENTS[cmd]
 
     on(cmd).run_on("destroy") do
-      options("ubi #{cmd} location/(#{cmd}-name|_#{cmd}-ubid) destroy [options]", key: :destroy) do
+      options("ubi #{cmd} location/(#{cmd}-name|_#{cmd}-id) destroy [options]", key: :destroy) do
         on("-f", "--force", "do not require confirmation")
       end
 
@@ -136,7 +136,7 @@ class UbiCli
 
   def self.pg_cmd(cmd)
     on("pg").run_on(cmd) do
-      skip_option_parsing("ubi pg location/(pg-name|_pg-ubid) [options] #{cmd} [#{cmd}-options]")
+      skip_option_parsing("ubi pg location/(pg-name|_pg-id) [options] #{cmd} [#{cmd}-options]")
 
       args(0...)
 

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 UbiCli.on("pg").run_on("add-metric-destination") do
-  options("ubi pg location/(pg-name|_pg-ubid) add-metric-destination username password url")
+  options("ubi pg location/(pg-name|_pg-id) add-metric-destination username password url")
 
   args 3, invalid_args_message: "username, password, and url arguments are required"
 

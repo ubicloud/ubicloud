@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 UbiCli.on("vm").run_on("scp") do
-  skip_option_parsing("ubi vm location/(vm-name|_vm-ubid) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)")
+  skip_option_parsing("ubi vm location/(vm-name|_vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)")
 
   args(2..., invalid_args_message: "must provide 2 paths: either 'local-path :remote-path' or ':remote-path local-path'")
 
