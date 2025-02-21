@@ -280,7 +280,17 @@ end
 
 desc "Build binary"
 task "ubi" do
-  sh("cd cli && go build -tags osusergo,netgo")
+  Dir.chdir("cli") do
+    sh("go build -tags osusergo,netgo")
+    os_list = %w[linux windows darwin]
+    arch_list = %w[amd64 arm64 386]
+    os_list.each do |os|
+      arch_list.each do |arch|
+        next if os == "darwin" && arch == "386"
+        sh("env GOOS=#{os} GOARCH=#{arch} go build -o ubi-#{os}-#{arch}#{".exe" if os == "windows"} -tags osusergo,netgo")
+      end
+    end
+  end
 end
 
 desc "Regenerate screenshots for documentation site"

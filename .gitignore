@@ -36,3 +36,4 @@
 
 # CLI binary
 /cli/ubi
+/cli/ubi-*
