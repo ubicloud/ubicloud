@@ -280,7 +280,14 @@ Options:
     -6, --ip6                        use IPv6 address
     -u, --user user                  override username
 
-Subcommands: create destroy scp sftp show ssh
+Subcommands:
+  create
+  destroy
+  restart
+  scp
+  sftp
+  show
+  ssh
 
 
 Usage: ubi vm list [options]
@@ -307,6 +314,9 @@ Usage: ubi vm location/(vm-name|_vm-ubid) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation
+
+
+Usage: ubi vm location/(vm-name|_vm-ubid) restart
 
 
 Usage: ubi vm location/(vm-name|_vm-ubid) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)

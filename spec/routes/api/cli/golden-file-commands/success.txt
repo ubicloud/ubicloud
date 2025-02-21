@@ -116,6 +116,7 @@ vm eu-central-h1/test2-vm create -S 80 pk
 vm eu-central-h1/test2-vm create -s standard-4 pk
 vm eu-central-h1/test2-vm create -u foo pk
 vm eu-central-h1/test-vm destroy -f
+vm eu-central-h1/test-vm restart
 vm eu-central-h1/test-vm show
 vm eu-central-h1/test-vm show -f firewalls
 vm eu-central-h1/test-vm show -f firewalls -w description,location,path
