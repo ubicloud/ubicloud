@@ -15,7 +15,7 @@ c = Class.new(Roda) do
     r.post "cli" do
       unless env["HTTP_AUTHORIZATION"] == "Bearer: a"
         response.status = 400
-        next "invalid token"
+        next "invalid token\n"
       end
 
       argv = r.POST["argv"]
@@ -28,7 +28,7 @@ c = Class.new(Roda) do
           "valid-confirm: #{argv[3..].join(" ")}"
         when "invalid"
           response.status = 400
-          "invalid-confirm: #{argv[3..].join(" ")}"
+          "invalid-confirm: #{argv[3..].join(" ")}\n"
         when "recurse"
           response["ubi-confirm"] = "Test-Confirm-Recurse"
           ""
@@ -59,7 +59,7 @@ c = Class.new(Roda) do
         rest.join("\0")
       when "error"
         response.status = 400
-        argv.join(" ")
+        argv.join(" ") << "\n"
       when "headers"
         env.values_at(*%w[HTTP_CONNECTION CONTENT_TYPE HTTP_ACCEPT HTTP_AUTHORIZATION]).join(" ")
       else
