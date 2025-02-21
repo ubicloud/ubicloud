@@ -98,7 +98,7 @@ Options:
     -f, --fields=fields              show specific fields (comma separated)
     -l, --location=location          only show load balancers in given location
     -N, --no-headers                 do not show headers
-Fields: name id src-port dst-port hostname
+Fields: location name id src-port dst-port hostname
 
 
 Usage: ubi lb location/(lb-name|_lb-ubid) attach-vm vm-id

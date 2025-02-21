@@ -5,6 +5,7 @@ class Serializers::LoadBalancer < Serializers::Base
     base = {
       id: lb.ubid,
       name: lb.name,
+      location: lb.private_subnet.display_location,
       hostname: lb.hostname,
       algorithm: lb.algorithm,
       stack: lb.stack,
@@ -20,7 +21,6 @@ class Serializers::LoadBalancer < Serializers::Base
 
     if options[:detailed]
       base[:subnet] = lb.private_subnet.name
-      base[:location] = lb.private_subnet.display_location
       base[:vms] = lb.vms.map { _1.ubid } || []
     end
 
