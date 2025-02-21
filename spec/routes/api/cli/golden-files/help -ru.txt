@@ -26,6 +26,7 @@ Usage: ubi pg location/(pg-name|_pg-ubid) [options] pg_dump [pg_dump-options]
 Usage: ubi pg location/(pg-name|_pg-ubid) [options] pg_dumpall [pg_dumpall-options]
 Usage: ubi pg location/(pg-name|_pg-ubid) [options] psql [psql-options]
 Usage: ubi pg location/(pg-name|_pg-ubid) reset-superuser-password new-password
+Usage: ubi pg location/(pg-name|_pg-ubid) restart
 Usage: ubi pg location/(pg-name|_pg-ubid) restore new-db-name restore-time
 Usage: ubi pg location/(pg-name|_pg-ubid) show [options]
 Usage: ubi ps list [options]

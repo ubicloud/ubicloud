@@ -18,5 +18,6 @@ Subcommands:
   pg_dumpall
   psql
   reset-superuser-password
+  restart
   restore
   show
