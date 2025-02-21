@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 UbiCli.on("ps").run_on("connect") do
-  options("ubi ps location/(ps-name|_ps-ubid) connect ps-id")
+  options("ubi ps location/(ps-name|_ps-id) connect ps-id")
 
   args 1
 

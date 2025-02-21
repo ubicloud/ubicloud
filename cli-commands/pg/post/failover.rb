@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 UbiCli.on("pg").run_on("failover") do
-  options("ubi pg location/(pg-name|_pg-ubid) failover")
+  options("ubi pg location/(pg-name|_pg-id) failover")
 
   run do
     post(pg_path("/failover")) do |data|

@@ -1,6 +1,6 @@
 ! Invalid option: -X
 
-Usage: ubi vm location/(vm-name|_vm-ubid) [options] subcommand [...]
+Usage: ubi vm location/(vm-name|_vm-id) [options] subcommand [...]
 
 Options:
     -4, --ip4                        use IPv4 address

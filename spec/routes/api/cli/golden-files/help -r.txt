@@ -13,7 +13,7 @@ Usage: ubi fw subcommand [...]
 Subcommands: list
 
 
-Usage: ubi fw location/(fw-name|_fw-ubid) subcommand [...]
+Usage: ubi fw location/(fw-name|_fw-id) subcommand [...]
 
 Subcommands:
   add-rule
@@ -34,14 +34,14 @@ Options:
 Fields: location name id
 
 
-Usage: ubi fw location/(fw-name|_fw-ubid) add-rule cidr
+Usage: ubi fw location/(fw-name|_fw-id) add-rule cidr
 
 Options:
     -s, --start-port=port            starting (or only) port to allow (default: 0)
     -e, --end-port=port              ending port to allow (default: 65535)
 
 
-Usage: ubi fw location/(fw-name|_fw-ubid) attach-subnet subnet-id
+Usage: ubi fw location/(fw-name|_fw-id) attach-subnet subnet-id
 
 
 Usage: ubi fw location/fw-name create [options]
@@ -50,19 +50,19 @@ Options:
     -d, --description=desc           description for firewall
 
 
-Usage: ubi fw location/(fw-name|_fw-ubid) delete-rule rule-id
+Usage: ubi fw location/(fw-name|_fw-id) delete-rule rule-id
 
 
-Usage: ubi fw location/(fw-name|_fw-ubid) destroy [options]
+Usage: ubi fw location/(fw-name|_fw-id) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation
 
 
-Usage: ubi fw location/(fw-name|_fw-ubid) detach-subnet subnet-id
+Usage: ubi fw location/(fw-name|_fw-id) detach-subnet subnet-id
 
 
-Usage: ubi fw location/(fw-name|_fw-ubid) show [options]
+Usage: ubi fw location/(fw-name|_fw-id) show [options]
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)
@@ -87,7 +87,7 @@ Usage: ubi lb subcommand [...]
 Subcommands: list
 
 
-Usage: ubi lb location/(lb-name|_lb-ubid) subcommand [...]
+Usage: ubi lb location/(lb-name|_lb-id) subcommand [...]
 
 Subcommands: attach-vm create destroy detach-vm show update
 
@@ -101,7 +101,7 @@ Options:
 Fields: location name id src-port dst-port hostname
 
 
-Usage: ubi lb location/(lb-name|_lb-ubid) attach-vm vm-id
+Usage: ubi lb location/(lb-name|_lb-id) attach-vm vm-id
 
 
 Usage: ubi lb location/lb-name create [options] private-subnet-id src-port dst-port
@@ -113,13 +113,13 @@ Options:
     -s, --stack=stack                set the stack (dual(default), ipv4, ipv6)
 
 
-Usage: ubi lb location/(lb-name|_lb-ubid) destroy [options]
+Usage: ubi lb location/(lb-name|_lb-id) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation
 
 
-Usage: ubi lb location/(lb-name|_lb-ubid) detach-vm vm-id
+Usage: ubi lb location/(lb-name|_lb-id) detach-vm vm-id
 
 
 Usage: ubi lb location/(lb-name|_lb-ubid) show [options]
@@ -130,7 +130,7 @@ Fields: id name state location hostname algorithm stack health-check-endpoint
         health-check-protocol src-port dst-port subnet vms
 
 
-Usage: ubi lb location/(lb-name|_lb-ubid) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]
+Usage: ubi lb location/(lb-name|_lb-id) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]
 
 
 Usage: ubi pg subcommand [...]
@@ -138,7 +138,7 @@ Usage: ubi pg subcommand [...]
 Subcommands: list
 
 
-Usage: ubi pg location/(pg-name|_pg-ubid) [options] subcommand [...]
+Usage: ubi pg location/(pg-name|_pg-id) [options] subcommand [...]
 
 Options:
     -d, --dbname=name                override database name
@@ -170,10 +170,10 @@ Options:
 Fields: location name id version flavor
 
 
-Usage: ubi pg location/(pg-name|_pg-ubid) add-firewall-rule cidr
+Usage: ubi pg location/(pg-name|_pg-id) add-firewall-rule cidr
 
 
-Usage: ubi pg location/(pg-name|_pg-ubid) add-metric-destination username password url
+Usage: ubi pg location/(pg-name|_pg-id) add-metric-destination username password url
 
 
 Usage: ubi pg location/pg-name create [options]
@@ -186,40 +186,40 @@ Options:
     -v, --version=version            PostgreSQL version (16, 17)
 
 
-Usage: ubi pg location/(pg-name|_pg-ubid) delete-firewall-rule id
+Usage: ubi pg location/(pg-name|_pg-id) delete-firewall-rule id
 
 
-Usage: ubi pg location/(pg-name|_pg-ubid) delete-metric-destination id
+Usage: ubi pg location/(pg-name|_pg-id) delete-metric-destination id
 
 
-Usage: ubi pg location/(pg-name|_pg-ubid) destroy [options]
+Usage: ubi pg location/(pg-name|_pg-id) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation
 
 
-Usage: ubi pg location/(pg-name|_pg-ubid) failover
+Usage: ubi pg location/(pg-name|_pg-id) failover
 
 
-Usage: ubi pg location/(pg-name|_pg-ubid) [options] pg_dump [pg_dump-options]
+Usage: ubi pg location/(pg-name|_pg-id) [options] pg_dump [pg_dump-options]
 
 
-Usage: ubi pg location/(pg-name|_pg-ubid) [options] pg_dumpall [pg_dumpall-options]
+Usage: ubi pg location/(pg-name|_pg-id) [options] pg_dumpall [pg_dumpall-options]
 
 
-Usage: ubi pg location/(pg-name|_pg-ubid) [options] psql [psql-options]
+Usage: ubi pg location/(pg-name|_pg-id) [options] psql [psql-options]
 
 
-Usage: ubi pg location/(pg-name|_pg-ubid) reset-superuser-password new-password
+Usage: ubi pg location/(pg-name|_pg-id) reset-superuser-password new-password
 
 
-Usage: ubi pg location/(pg-name|_pg-ubid) restart
+Usage: ubi pg location/(pg-name|_pg-id) restart
 
 
-Usage: ubi pg location/(pg-name|_pg-ubid) restore new-db-name restore-time
+Usage: ubi pg location/(pg-name|_pg-id) restore new-db-name restore-time
 
 
-Usage: ubi pg location/(pg-name|_pg-ubid) show [options]
+Usage: ubi pg location/(pg-name|_pg-id) show [options]
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)
@@ -233,7 +233,7 @@ Usage: ubi ps subcommand [...]
 Subcommands: list
 
 
-Usage: ubi ps location/(ps-name|_ps-ubid) subcommand [...]
+Usage: ubi ps location/(ps-name|_ps-id) subcommand [...]
 
 Subcommands: connect create destroy disconnect show
 
@@ -247,7 +247,7 @@ Options:
 Fields: location name id net4 net6
 
 
-Usage: ubi ps location/(ps-name|_ps-ubid) connect ps-id
+Usage: ubi ps location/(ps-name|_ps-id) connect ps-id
 
 
 Usage: ubi ps location/ps-name create [options]
@@ -256,16 +256,16 @@ Options:
     -f, --firewall-id=id             add to given firewall
 
 
-Usage: ubi ps location/(ps-name|_ps-ubid) destroy [options]
+Usage: ubi ps location/(ps-name|_ps-id) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation
 
 
-Usage: ubi ps location/(ps-name|_ps-ubid) disconnect ps-id
+Usage: ubi ps location/(ps-name|_ps-id) disconnect ps-id
 
 
-Usage: ubi ps location/(ps-name|_ps-ubid) show [options]
+Usage: ubi ps location/(ps-name|_ps-id) show [options]
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)
@@ -283,7 +283,7 @@ Usage: ubi vm subcommand [...]
 Subcommands: list
 
 
-Usage: ubi vm location/(vm-name|_vm-ubid) [options] subcommand [...]
+Usage: ubi vm location/(vm-name|_vm-id) [options] subcommand [...]
 
 Options:
     -4, --ip4                        use IPv4 address
@@ -320,22 +320,22 @@ Options:
     -u, --unix-user=username         username (default: ubi)
 
 
-Usage: ubi vm location/(vm-name|_vm-ubid) destroy [options]
+Usage: ubi vm location/(vm-name|_vm-id) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation
 
 
-Usage: ubi vm location/(vm-name|_vm-ubid) restart
+Usage: ubi vm location/(vm-name|_vm-id) restart
 
 
-Usage: ubi vm location/(vm-name|_vm-ubid) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
+Usage: ubi vm location/(vm-name|_vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
 
 
-Usage: ubi vm location/(vm-name|_vm-ubid) [options] sftp [sftp-options]
+Usage: ubi vm location/(vm-name|_vm-id) [options] sftp [sftp-options]
 
 
-Usage: ubi vm location/(vm-name|_vm-ubid) show [options]
+Usage: ubi vm location/(vm-name|_vm-id) show [options]
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)
@@ -347,6 +347,6 @@ Firewall Rule Fields: id cidr port-range
 Firewall Fields: id name description location path firewall-rules
 
 
-Usage: ubi vm location/(vm-name|_vm-ubid) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
+Usage: ubi vm location/(vm-name|_vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
 
 
