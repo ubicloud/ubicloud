@@ -35,6 +35,7 @@ Usage: ubi ps location/(ps-name|_ps-ubid) show [options]
 Usage: ubi vm list [options]
 Usage: ubi vm location/vm-name create [options] public_key
 Usage: ubi vm location/(vm-name|_vm-ubid) destroy [options]
+Usage: ubi vm location/(vm-name|_vm-ubid) restart
 Usage: ubi vm location/(vm-name|_vm-ubid) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
 Usage: ubi vm location/(vm-name|_vm-ubid) [options] sftp [sftp-options]
 Usage: ubi vm location/(vm-name|_vm-ubid) show [options]

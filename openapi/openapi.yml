@@ -1170,6 +1170,21 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
+  '/project/{project_id}/location/{location}/vm/{vm_name}/restart':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/vm_name'
+    post:
+      operationId: restartVM
+      summary: Restart a specific VM
+      responses:
+        '200':
+          $ref: '#/components/responses/Vm'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
   '/project/{project_id}/postgres':
     get:
       operationId: listPostgresDatabases

@@ -34,11 +34,15 @@ class Clover
         204
       end
 
-      r.post web?, "restart" do
+      r.post "restart" do
         authorize("Vm:edit", vm.id)
         vm.incr_restart
-        flash["notice"] = "'#{vm.name}' will be restarted in a few seconds"
-        r.redirect "#{@project.path}#{vm.path}"
+        if api?
+          Serializers::Vm.serialize(vm, {detailed: true})
+        else
+          flash["notice"] = "'#{vm.name}' will be restarted in a few seconds"
+          r.redirect "#{@project.path}#{vm.path}"
+        end
       end
     end
 
