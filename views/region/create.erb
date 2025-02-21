@@ -1,0 +1,77 @@
+<% @page_title = "Create a customer specific AWS region" %>
+
+<%== part("components/page_header", breadcrumbs: [%w[AWS\ Regions /region], %w[Create #]]) %>
+
+<div class="grid gap-6">
+  <form action="/region" method="POST">
+    <%== csrf_tag("/region") %>
+    <!-- Create Card -->
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+          <div class="sm:col-span-3">
+            <%== part(
+              "components/form/text",
+              name: "name",
+              label: "Ubicloud Region Name",
+              attributes: {
+                required: true,
+                placeholder: "Enter name"
+              }
+            ) %>
+          </div>
+          <div class="sm:col-span-3">
+            <%== part(
+              "components/form/text",
+              name: "aws_region_name",
+              label: "AWS Region Name",
+              attributes: {
+                required: true,
+                placeholder: "Enter AWS region name"
+              }
+            ) %>
+          </div>
+          <div class="sm:col-span-3">
+            <%== part(
+              "components/form/text",
+              name: "aws_access_key",
+              label: "AWS Access Key",
+              attributes: {
+                required: true,
+                placeholder: "Enter AWS access key"
+              }
+            ) %>
+          </div>
+          <div class="sm:col-span-3">
+            <%== part(
+              "components/form/text",
+              name: "aws_secret_key",
+              label: "AWS Secret Key",
+              attributes: {
+                required: true,
+                placeholder: "Enter AWS secret key"
+              }
+            ) %>
+          </div>
+          <div class="sm:col-span-3">
+            <%== part(
+              "components/form/select",
+              name: "project_id",
+              label: "Project ID",
+              options: @projects.map { |p| [p[:id], p[:name]] },
+              attributes: {
+                required: true
+              }
+            ) %>
+          </div>
+        </div>
+      </div>
+      <div class="px-4 py-5 sm:p-6">
+        <div class="flex items-center justify-end gap-x-6">
+          <a href="/region" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+          <%== part("components/form/submit_button", text: "Create") %>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
