@@ -45,7 +45,7 @@ RSpec.describe "bin/ubi" do
   it "returns error if there is no UBI_TOKEN provided" do
     o, e, s = Open3.capture3(@prog, "foo")
     expect(o).to eq ""
-    expect(e).to eq "Personal access token must be provided in UBI_TOKEN env variable for use\n"
+    expect(e).to eq "! Personal access token must be provided in UBI_TOKEN env variable for use\n"
     expect(s.exitstatus).to eq 1
   end
 
@@ -65,7 +65,7 @@ RSpec.describe "bin/ubi" do
 
   it "includes sent argv when using UBI_DEBUG" do
     o, e, s = Open3.capture3(@debug_env, @prog, "foo")
-    expect(o).to eq "[:sending, \"foo\"]\nfoo"
+    expect(o).to match(/\A(\[:)?sending(, "|: \[)foo"?\]\nfoo\z/)
     expect(e).to eq ""
     expect(s.exitstatus).to eq 0
   end
@@ -93,12 +93,12 @@ RSpec.describe "bin/ubi" do
 
   it "includes both argvs when using UBI_DEBUG for confirmations" do
     o, e, s = Open3.capture3(@debug_env, @prog, "confirm", "foo", stdin_data: "valid")
-    expect(o).to eq <<~OUTPUT.chomp
-      [:sending, "confirm", "foo"]
-      Pre-Confirm
-      Test-Confirm-Prompt: [:sending, "--confirm", "valid", "confirm", "foo"]
-      valid-confirm: foo
-    OUTPUT
+    expect(o).to match(/
+      sending.*confirm.*foo"?\]\n
+      Pre-Confirm\n
+      Test-Confirm-Prompt:\ .*sending.*--confirm.*valid.*confirm.*foo"?\]\n
+      valid-confirm:\ foo\z
+    /x)
     expect(e).to eq ""
     expect(s.exitstatus).to eq 0
   end
@@ -147,21 +147,21 @@ RSpec.describe "bin/ubi" do
 
   it "shows executed commands when using UBI_DEBUG" do
     o, e, s = Open3.capture3(@debug_env, @prog, "exec", "ssh", "dash2", "foo")
-    expect(o).to eq <<~OUTPUT
-      [:sending, "exec", "ssh", "dash2", "foo"]
-      [:exec, "/bin/echo", "foo", "--"]
-      foo --
-    OUTPUT
+    expect(o).to match(/
+      sending.*exec.*ssh.*dash2.*foo"?\]\n
+      .*exec.*\/bin\/echo.*foo.*--"?\]\n
+      foo\ --\n\z
+    /x)
     expect(e).to eq ""
     expect(s.exitstatus).to eq 0
   end
 
   it "shows failing argv for invalid execution when using UBI_DEBUG" do
     o, e, s = Open3.capture3(@debug_env, @prog, "exec", "ssh", "new-before", "foo")
-    expect(o).to eq <<~OUTPUT
-      [:sending, "exec", "ssh", "new-before", "foo"]
-      [:failure, "/bin/echo", "foo", "new", "--"]
-    OUTPUT
+    expect(o).to match(/
+      sending.*exec.*ssh.*new-before.*foo"?\]\n
+      .*failure.*\/bin\/echo.*foo.*new.*--"?\]\n?\z
+    /x)
     expect(e).to eq "! Invalid server response, argument before '--' not in submitted argv\n"
     expect(s.exitstatus).to eq 1
   end

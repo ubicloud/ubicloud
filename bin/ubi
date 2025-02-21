@@ -10,7 +10,7 @@ require "net/http"
 require "json"
 
 unless (token = ENV["UBI_TOKEN"])
-  warn "Personal access token must be provided in UBI_TOKEN env variable for use"
+  warn "! Personal access token must be provided in UBI_TOKEN env variable for use"
   exit 1
 end
 
@@ -35,7 +35,7 @@ confirmation = nil
 
 1.times do
   if ENV["UBI_DEBUG"] == "1"
-    p [:sending, *ARGV]
+    p [:sending, *argv]
   end
   response = Net::HTTP.post(uri, {"argv" => argv}.to_json, headers)
 
