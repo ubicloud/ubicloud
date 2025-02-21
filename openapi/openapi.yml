@@ -1432,6 +1432,9 @@ components:
           type: string
           example: 1bhw8r4pn73t1m5f7rn7a5pej2
           pattern: '^1b[0-9a-hj-km-np-tv-z]{24}$'
+        location:
+          description: Location of the Load Balancer
+          type: string
         name:
           description: Name of the Load Balancer
           type: string
@@ -1726,9 +1729,6 @@ components:
             allOf:
               - $ref: '#/components/schemas/LoadBalancer'
               - properties:
-                  location:
-                    description: Location of the Load Balancer
-                    type: string
                   subnet:
                     description: Subnet of the Load Balancer
                     type: string
