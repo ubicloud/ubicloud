@@ -832,21 +832,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/restart':
-    parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_name'
-    post:
-      operationId: restartPostgresDatabase
-      summary: Restart a specific Postgres Database
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresDatabase'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/ca-certificates':
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -1003,6 +988,21 @@ paths:
               additionalProperties: false
               required:
                 - password
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/restart':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_name'
+    post:
+      operationId: restartPostgresDatabase
+      summary: Restart a specific Postgres Database
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabase'
@@ -1372,13 +1372,6 @@ components:
         type: string
         example: pfmjgkgbktw62k53005jpx8tt7
         pattern: '^pf[0-9a-hj-km-np-tv-z]{24}$'
-    private_subnet_name:
-      description: Private subnet name
-      in: path
-      name: private_subnet_name
-      required: true
-      schema:
-        type: string
     private_subnet_id:
       description: ID of the private subnet
       in: path
@@ -1388,6 +1381,13 @@ components:
         type: string
         example: pskkmx0f2vke4h36nk9cm8v8q0
         pattern: '^ps[0-9a-hj-km-np-tv-z]{24}$'
+    private_subnet_name:
+      description: Private subnet name
+      in: path
+      name: private_subnet_name
+      required: true
+      schema:
+        type: string
     project_id:
       description: ID of the project
       in: path
