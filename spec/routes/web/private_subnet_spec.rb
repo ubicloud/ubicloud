@@ -238,7 +238,7 @@ RSpec.describe Clover, "private subnet" do
         page.driver.post btn["data-url"], {_csrf: btn["data-csrf"]}
 
         expect(page.status_code).to eq(400)
-        expect(page.body).to eq({error: {message: "Subnet to be disconnected not found"}}.to_json)
+        expect(page.body).to eq({error: {code: 400, type: "InvalidRequest", message: "Subnet to be disconnected not found"}}.to_json)
       end
     end
 

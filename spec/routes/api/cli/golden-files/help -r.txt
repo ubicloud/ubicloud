@@ -235,7 +235,7 @@ Subcommands: list
 
 Usage: ubi ps location/(ps-name|_ps-ubid) subcommand [...]
 
-Subcommands: create destroy show
+Subcommands: connect create destroy disconnect show
 
 
 Usage: ubi ps list [options]
@@ -245,6 +245,9 @@ Options:
     -l, --location=location          only show private subnets in given location
     -N, --no-headers                 do not show headers
 Fields: location name id net4 net6
+
+
+Usage: ubi ps location/(ps-name|_ps-ubid) connect ps-id
 
 
 Usage: ubi ps location/ps-name create [options]
@@ -257,6 +260,9 @@ Usage: ubi ps location/(ps-name|_ps-ubid) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation
+
+
+Usage: ubi ps location/(ps-name|_ps-ubid) disconnect ps-id
 
 
 Usage: ubi ps location/(ps-name|_ps-ubid) show [options]

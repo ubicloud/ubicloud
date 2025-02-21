@@ -22,31 +22,42 @@ class Clover
 
       next (r.delete? ? 204 : 404) unless ps
 
-      if web?
-        r.post "connect" do
-          authorize("PrivateSubnet:connect", ps.id)
-          subnet = PrivateSubnet.from_ubid(r.params["connected-subnet-ubid"])
-          unless subnet
+      r.post "connect" do
+        authorize("PrivateSubnet:connect", ps.id)
+        subnet = PrivateSubnet.from_ubid(r.params["connected-subnet-ubid"])
+        unless subnet
+          if api?
+            response.status = 400
+            next {error: {code: 400, type: "InvalidRequest", message: "Subnet to be connected not found"}}
+          else
             flash["error"] = "Subnet to be connected not found"
             r.redirect "#{@project.path}#{ps.path}"
           end
+        end
 
-          authorize("PrivateSubnet:connect", subnet.id)
-          ps.connect_subnet(subnet)
+        authorize("PrivateSubnet:connect", subnet.id)
+        ps.connect_subnet(subnet)
+        if api?
+          Serializers::PrivateSubnet.serialize(ps)
+        else
           flash["notice"] = "#{subnet.name} will be connected in a few seconds"
           r.redirect "#{@project.path}#{ps.path}"
         end
+      end
 
-        r.post "disconnect", String do |disconnecting_ps_ubid|
-          authorize("PrivateSubnet:disconnect", ps.id)
-          subnet = PrivateSubnet.from_ubid(disconnecting_ps_ubid)
-          unless subnet
-            response.status = 400
-            next {error: {message: "Subnet to be disconnected not found"}}
-          end
+      r.post "disconnect", String do |disconnecting_ps_ubid|
+        authorize("PrivateSubnet:disconnect", ps.id)
+        subnet = PrivateSubnet.from_ubid(disconnecting_ps_ubid)
+        unless subnet
+          response.status = 400
+          next {error: {code: 400, type: "InvalidRequest", message: "Subnet to be disconnected not found"}}
+        end
 
-          authorize("PrivateSubnet:disconnect", subnet.id)
-          ps.disconnect_subnet(subnet)
+        authorize("PrivateSubnet:disconnect", subnet.id)
+        ps.disconnect_subnet(subnet)
+        if api?
+          Serializers::PrivateSubnet.serialize(ps)
+        else
           flash["notice"] = "#{subnet.name} will be disconnected in a few seconds"
           204
         end
