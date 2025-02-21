@@ -125,7 +125,7 @@ RSpec.describe "bin/ubi" do
   end
 
   it "uses exit status of executed program" do
-    o, e, s = Open3.capture3(@env.merge("UBI_SSH" => "/bin/false"), @prog, "exec", "ssh", "dash2", "foo")
+    o, e, s = Open3.capture3(@env.merge("UBI_SSH" => "false"), @prog, "exec", "ssh", "dash2", "foo")
     expect(o).to eq ""
     expect(e).to eq ""
     expect(s.exitstatus).to eq 1
