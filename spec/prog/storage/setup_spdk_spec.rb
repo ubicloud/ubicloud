@@ -12,7 +12,7 @@ RSpec.describe Prog::Storage::SetupSpdk do
     ))
   }
 
-  let(:spdk_version) { "v23.09-ubi-0.2" }
+  let(:spdk_version) { "v23.09-ubi-0.3" }
   let(:sshable) { vm_host.sshable }
   let(:vm_host) { create_vm_host(used_hugepages_1g: 0, total_hugepages_1g: 20, total_cpus: 96, os_version: "ubuntu-24.04") }
 
