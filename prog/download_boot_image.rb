@@ -101,6 +101,7 @@ class Prog::DownloadBootImage < Prog::Base
       ["ai-model-llama-guard-3-8b", "x64", "20241028.1.0"] => "7f856f564626214a57f4788489b9e588ea63a537bd88aadb14e4745aab219c5c",
       ["ai-model-e5-mistral-7b-it", "x64", "20241016.1.0"] => "999b0ff41968ffede0408ce3d4a9a21ff23e391f7aeac2f2d492fd505e73826c",
       ["ai-model-llama-3-3-70b-it", "x64", "20241209.1.0"] => "b5a77810de7f01df5b76b6362fc5b4514cc16c6926ee203ecc8643233c6d2704",
+      ["ai-model-llama-3-3-70b-turbo", "x64", "20250221.1.0"] => "833e62b949c4eb8aeccabaac4c14a8af525db30c490b2eea53b33093676c7d44",
       ["ai-model-qwen-2-5-14b-it", "x64", "20250118.1.0"] => "51a7fe8c520f39b8197c88426c8f37199bd3bd2afdae579b8877a604cd474021",
       ["ai-model-qwq-32b-preview", "x64", "20241209.1.0"] => "38ca4912134ed9b115726eff258666d68ce6df92330a3585d47494099821f9b1",
       ["ai-model-ds-r1-qwen-32b", "x64", "20250121.1.0"] => "38b0d2fa870c90196e016ac69a89f5decd1ad3ea1258ae11ca039f212326f5c5",
