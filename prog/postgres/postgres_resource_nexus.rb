@@ -71,7 +71,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      if strand.label != "destroy"
+      unless destroying_set?
         postgres_resource.active_billing_records.each(&:finalize)
         hop_destroy
       end
