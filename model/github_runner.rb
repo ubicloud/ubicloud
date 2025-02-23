@@ -36,9 +36,9 @@ class GithubRunner < Sequel::Model
   end
 
   def log_duration(message, duration)
-    values = {ubid: ubid, label: label, repository_name: repository_name, duration: duration, conclusion: workflow_job&.dig("conclusion")}
+    values = {ubid:, label:, repository_name:, duration:, conclusion: workflow_job&.dig("conclusion")}
     if vm
-      values.merge!(vm_ubid: vm.ubid, arch: vm.arch, cores: vm.cores)
+      values.merge!(vm_ubid: vm.ubid, arch: vm.arch, cores: vm.cores, vcpus: vm.vcpus)
       if vm.vm_host
         values[:vm_host_ubid] = vm.vm_host.ubid
         values[:data_center] = vm.vm_host.data_center
