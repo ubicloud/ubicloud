@@ -126,7 +126,7 @@ module Config
   override :minio_version, "minio_20240406052602.0.0_amd64"
 
   # Spdk
-  override :spdk_version, "v23.09-ubi-0.2"
+  override :spdk_version, "v23.09-ubi-0.3"
 
   # Boot Images
   override :default_boot_image_name, "ubuntu-jammy", string

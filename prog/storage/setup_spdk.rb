@@ -4,8 +4,8 @@ class Prog::Storage::SetupSpdk < Prog::Base
   subject_is :sshable, :vm_host
 
   SUPPORTED_SPDK_VERSIONS = [
-    ["v23.09-ubi-0.2", "x64"],
-    ["v23.09-ubi-0.2", "arm64"]
+    ["v23.09-ubi-0.3", "x64"],
+    ["v23.09-ubi-0.3", "arm64"]
   ]
 
   def self.assemble(vm_host_id, version, start_service: false, allocation_weight: 0)
