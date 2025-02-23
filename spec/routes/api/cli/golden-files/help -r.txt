@@ -122,7 +122,7 @@ Options:
 Usage: ubi lb location/(lb-name|_lb-id) detach-vm vm-id
 
 
-Usage: ubi lb location/(lb-name|_lb-ubid) show [options]
+Usage: ubi lb location/(lb-name|_lb-id) show [options]
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)
