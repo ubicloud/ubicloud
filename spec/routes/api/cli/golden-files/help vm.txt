@@ -3,7 +3,7 @@ Usage: ubi vm subcommand [...]
 Subcommands: list
 
 
-Usage: ubi vm location/(vm-name|_vm-id) [options] subcommand [...]
+Usage: ubi vm location/(vm-name|vm-id) [options] subcommand [...]
 
 Options:
     -4, --ip4                        use IPv4 address

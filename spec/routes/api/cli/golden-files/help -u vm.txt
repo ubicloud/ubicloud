@@ -1,2 +1,2 @@
 Usage: ubi vm subcommand [...]
-Usage: ubi vm location/(vm-name|_vm-id) [options] subcommand [...]
+Usage: ubi vm location/(vm-name|vm-id) [options] subcommand [...]

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 UbiCli.on("pg").run_on("restore") do
-  options("ubi pg location/(pg-name|_pg-id) restore new-db-name restore-time")
+  options("ubi pg location/(pg-name|pg-id) restore new-db-name restore-time")
 
   args 2, invalid_args_message: "name and restore target are required"
 

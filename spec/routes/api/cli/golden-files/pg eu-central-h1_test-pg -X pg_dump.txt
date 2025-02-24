@@ -1,6 +1,6 @@
 ! Invalid option: -X
 
-Usage: ubi pg location/(pg-name|_pg-id) [options] subcommand [...]
+Usage: ubi pg location/(pg-name|pg-id) [options] subcommand [...]
 
 Options:
     -d, --dbname=name                override database name

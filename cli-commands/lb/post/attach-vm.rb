@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 UbiCli.on("lb").run_on("attach-vm") do
-  options("ubi lb location/(lb-name|_lb-id) attach-vm vm-id")
+  options("ubi lb location/(lb-name|lb-id) attach-vm vm-id")
 
   args 1
 

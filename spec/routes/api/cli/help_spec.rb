@@ -15,7 +15,7 @@ RSpec.describe Clover, "cli help" do
 
   it "shows help for specific subcommand if given" do
     expect(cli(%w[help vm ssh])).to eq <<~OUTPUT
-      Usage: ubi vm location/(vm-name|_vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
+      Usage: ubi vm location/(vm-name|vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
     OUTPUT
   end
 
@@ -45,7 +45,7 @@ RSpec.describe Clover, "cli help" do
     expect(cli(%w[help vm ssh foo], status: 400)).to eq <<~OUTPUT
       ! Invalid command: vm ssh foo
 
-      Usage: ubi vm location/(vm-name|_vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
+      Usage: ubi vm location/(vm-name|vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
     OUTPUT
   end
 end
