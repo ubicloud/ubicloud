@@ -29,7 +29,7 @@ class Serializers::Vm < Serializers::Base
     end
 
     if options[:load_balancer]
-      base[:load_balancer_state] = vm.load_balancers_vms.state
+      base[:load_balancer_state] = vm.load_balancer_ports.first&.state
     end
 
     base

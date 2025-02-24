@@ -24,7 +24,7 @@ class Clover
   def load_balancer_post(name)
     authorize("LoadBalancer:create", @project.id)
 
-    required_parameters = %w[private_subnet_id algorithm src_port dst_port health_check_protocol stack]
+    required_parameters = %w[private_subnet_id algorithm ports stack]
     required_parameters << "name" if web?
     optional_parameters = %w[health_check_endpoint]
     request_body_params = validate_request_params(required_parameters, optional_parameters)
@@ -39,10 +39,7 @@ class Clover
       name:,
       algorithm: request_body_params["algorithm"],
       stack: Validation.validate_load_balancer_stack(request_body_params["stack"]),
-      src_port: Validation.validate_port(:src_port, request_body_params["src_port"]),
-      dst_port: Validation.validate_port(:dst_port, request_body_params["dst_port"]),
-      health_check_endpoint: request_body_params["health_check_endpoint"] || Prog::Vnet::LoadBalancerNexus::DEFAULT_HEALTH_CHECK_ENDPOINT,
-      health_check_protocol: request_body_params["health_check_protocol"]
+      load_balancer_ports: request_body_params["ports"]
     ).subject
 
     if api?
@@ -60,10 +57,10 @@ class Clover
     options.add_option(name: "private_subnet_id", values: dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view").map { {value: _1.ubid, display_name: _1.name} })
     options.add_option(name: "algorithm", values: ["Round Robin", "Hash Based"].map { {value: _1.downcase.tr(" ", "_"), display_name: _1} })
     options.add_option(name: "stack", values: [LoadBalancer::Stack::IPV4, LoadBalancer::Stack::IPV6, LoadBalancer::Stack::DUAL].map { {value: _1.downcase, display_name: _1.gsub("ip", "IP")} })
-    options.add_option(name: "src_port")
-    options.add_option(name: "dst_port")
-    options.add_option(name: "health_check_endpoint")
-    options.add_option(name: "health_check_protocol", values: ["http", "https", "tcp"].map { {value: _1, display_name: _1.upcase} })
+    # options.add_option(name: "src_port")
+    # options.add_option(name: "dst_port")
+    # options.add_option(name: "health_check_endpoint")
+    # options.add_option(name: "health_check_protocol", values: ["http", "https", "tcp"].map { {value: _1, display_name: _1.upcase} })
     options.serialize
   end
 end

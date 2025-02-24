@@ -8,12 +8,17 @@ class Serializers::LoadBalancer < Serializers::Base
       location: lb.private_subnet.display_location,
       hostname: lb.hostname,
       algorithm: lb.algorithm,
-      stack: lb.stack,
-      health_check_endpoint: lb.health_check_endpoint,
-      health_check_protocol: lb.health_check_protocol,
-      src_port: lb.src_port,
-      dst_port: lb.dst_port
+      stack: lb.stack
     }
+
+    base[:ports] = lb.ports.map do |port|
+      {
+        health_check_endpoint: port.health_check_endpoint,
+        health_check_protocol: port.health_check_protocol,
+        src_port: port.src_port,
+        dst_port: port.dst_port
+      }
+    end
 
     if options[:include_path]
       base[:path] = lb.path
