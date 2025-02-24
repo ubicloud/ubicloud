@@ -15,7 +15,7 @@ RSpec.describe Al do
 
   # Creates a Request object with the given parameters
   #
-  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: false, require_shared_slice: false, diagnostics: false)
+  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: true, require_shared_slice: false, diagnostics: false)
     Al::Request.new(
       vm.id,
       vm.vcpus,
@@ -62,7 +62,6 @@ RSpec.describe Al do
 
     before do
       allow(project).to receive_messages(
-        get_ff_use_slices_for_allocation: nil,
         get_ff_allocator_diagnostics: nil
       )
       allow(vm).to receive_messages(project: project)
@@ -81,7 +80,7 @@ RSpec.describe Al do
           [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
             [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
           "ubuntu-jammy", false, 0, true, Config.allocator_target_host_utilization, "x64", ["accepting"], [], [], [], [],
-          "standard", 200
+          "standard", 200, true
         )).and_return(al)
       expect(al).to receive(:update)
 
@@ -895,12 +894,6 @@ RSpec.describe Al do
       [{"size_gib" => 5, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => false, "boot" => false}]
     }
 
-    def create_vm_with_use_slice_enabled(**args)
-      vm = create_vm(**args)
-      vm.project.set_ff_use_slices_for_allocation(true)
-      vm
-    end
-
     before do
       vmh = create_vm_host(total_mem_gib: 64, total_sockets: 2, total_dies: 2, net6: "fd10:9b0b:6b4b:8fbb::/64", total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2, accepts_slices: true) { _1.id = Sshable.create_with_id.id }
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
@@ -927,7 +920,7 @@ RSpec.describe Al do
     end
 
     it "creates a vm with a slice" do
-      vm = create_vm_with_use_slice_enabled
+      vm = create_vm
       vmh = VmHost.first
       used_cores = vmh.used_cores
       used_hugepages_1g = vmh.used_hugepages_1g
@@ -975,8 +968,8 @@ RSpec.describe Al do
       used_hugepages_1g = vmh.used_hugepages_1g
       available_storage = vmh.storage_devices.sum { _1.available_storage_gib }
 
-      vm1 = create_vm_with_use_slice_enabled
-      vm2 = create_vm_with_use_slice_enabled
+      vm1 = create_vm
+      vm2 = create_vm
       al1 = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
       al2 = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
       al1.update(vm1)
@@ -992,7 +985,7 @@ RSpec.describe Al do
       Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vh, family: "standard", allowed_cpus: (2..5), memory_gib: 16)
       Prog::Vm::VmHostSliceNexus.assemble_with_host("sl2", vh, family: "standard", allowed_cpus: (8..11), memory_gib: 16)
 
-      vm = create_vm_with_use_slice_enabled(vcpus: 4, memory_gib: 16, cpu_percent_limit: 400)
+      vm = create_vm(vcpus: 4, memory_gib: 16, cpu_percent_limit: 400)
       al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
       al.update(vm)
       vh.reload
@@ -1011,7 +1004,7 @@ RSpec.describe Al do
       used_cores = vh.used_cores
       used_hugepages_1g = vh.used_hugepages_1g
 
-      vm = create_vm_with_use_slice_enabled(family: "burstable", vcpus: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
+      vm = create_vm(family: "burstable", vcpus: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
       al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true, require_shared_slice: true))
       expect(al).not_to be_nil
 
@@ -1047,7 +1040,7 @@ RSpec.describe Al do
       used_cores = vh.used_cores
       used_hugepages_1g = vh.used_hugepages_1g
 
-      vm = create_vm_with_use_slice_enabled(family: "burstable", vcpus: 2, memory_gib: 4, cpu_percent_limit: 100, cpu_burst_percent_limit: 100)
+      vm = create_vm(family: "burstable", vcpus: 2, memory_gib: 4, cpu_percent_limit: 100, cpu_burst_percent_limit: 100)
       req = create_req(vm, vol, use_slices: true, require_shared_slice: true)
 
       candidates = Al::Allocation.candidate_hosts(req)
@@ -1090,7 +1083,7 @@ RSpec.describe Al do
       vh2.reload
 
       # Expect the first host to be picked, to fill in the available slice
-      vm = create_vm_with_use_slice_enabled(family: "burstable", vcpus: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
+      vm = create_vm(family: "burstable", vcpus: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
       al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true, require_shared_slice: true))
       expect(al).not_to be_nil
 
@@ -1106,7 +1099,7 @@ RSpec.describe Al do
       slice2.update(used_cpu_percent: 100, used_memory_gib: 4, enabled: true)
       vh.update(total_cores: 4, total_cpus: 8, used_cores: 4, total_hugepages_1g: 27, used_hugepages_1g: 26)
 
-      vm = create_vm_with_use_slice_enabled(family: "burstable", vcpus: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
+      vm = create_vm(family: "burstable", vcpus: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
       req = create_req(vm, vol, use_slices: true, require_shared_slice: true)
 
       candidates = Al::Allocation.candidate_hosts(req)
@@ -1139,7 +1132,7 @@ RSpec.describe Al do
         VmHostCpu.create(vm_host_id: vmh2.id, cpu_number: i, spdk: i < 2)
       end
 
-      vm = create_vm_with_use_slice_enabled
+      vm = create_vm
       al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
       expect(al).not_to be_nil
       al.update(vm)
@@ -1167,7 +1160,7 @@ RSpec.describe Al do
         VmHostCpu.create(vm_host_id: vmh2.id, cpu_number: i, spdk: i < 2)
       end
 
-      vm = create_vm_with_use_slice_enabled(family: "burstable", vcpus: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
+      vm = create_vm(family: "burstable", vcpus: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
       al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true, require_shared_slice: true))
       expect(al).to be_nil
     end
@@ -1191,7 +1184,6 @@ RSpec.describe Al do
 
       # Create a standard VM in a slice
       vm = create_vm_from_size("standard-2", "arm64")
-      vm.project.set_ff_use_slices_for_allocation(true)
       described_class.allocate(vm, [{"size_gib" => 40, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
         {"size_gib" => 40, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])
       vmh.reload
@@ -1214,7 +1206,6 @@ RSpec.describe Al do
 
       # Create a burstable VM in a slice
       vm_b1 = create_vm_from_size("burstable-1", "arm64")
-      vm_b1.project.set_ff_use_slices_for_allocation(true)
       described_class.allocate(vm_b1, [{"size_gib" => 20, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
         {"size_gib" => 20, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])
       vmh.reload
@@ -1238,7 +1229,6 @@ RSpec.describe Al do
 
       # Create a second burstable VM in a slice. It should go to the same slice
       vm_b2 = create_vm_from_size("burstable-2", "arm64")
-      vm_b2.project.set_ff_use_slices_for_allocation(true)
       described_class.allocate(vm_b2, [{"size_gib" => 20, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
         {"size_gib" => 20, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])
       vmh.reload

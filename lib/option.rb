@@ -18,12 +18,8 @@ module Option
     Location.where(name: ["hetzner-fsn1", "leaseweb-wdc02"]).all
   end
 
-  def self.families(use_slices: false)
-    if use_slices
-      Option::VmFamilies.select { _1.visible }
-    else
-      Option::VmFamilies.select { _1.visible && !_1.require_shared_slice }
-    end
+  def self.families
+    Option::VmFamilies.select { _1.visible }
   end
 
   BootImage = Struct.new(:name, :display_name)
