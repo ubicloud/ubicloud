@@ -10,10 +10,6 @@ class PostgresMetricDestination < Sequel::Model
   plugin :column_encryption do |enc|
     enc.column :password
   end
-
-  def self.ubid_type
-    UBID::TYPE_ETC
-  end
 end
 
 # Table: postgres_metric_destination

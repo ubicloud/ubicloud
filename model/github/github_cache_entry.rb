@@ -9,10 +9,6 @@ class GithubCacheEntry < Sequel::Model
 
   include ResourceMethods
 
-  def self.ubid_type
-    UBID::TYPE_ETC
-  end
-
   def blob_key
     "cache/#{ubid}"
   end

@@ -1330,7 +1330,7 @@ components:
       schema:
         type: string
         example: et7ekmf54nae5nya9s6vebg43f
-        pattern: '^et[0-9a-hj-km-np-tv-z]{24}$'
+        pattern: '^(et|md)[0-9a-hj-km-np-tv-z]{24}$'
     order_column:
       description: Pagination - Order column
       in: query

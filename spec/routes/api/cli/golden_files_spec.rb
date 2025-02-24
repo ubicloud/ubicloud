@@ -19,7 +19,7 @@ RSpec.describe Clover, "cli" do
     expect(FirewallRule).to receive(:generate_uuid).and_return("51e5bc7d-245b-8df8-bf91-7c5d150cb160", "3b367895-7f18-89f8-a295-ff247e9d5192", "305d838d-a3cd-85f8-aa08-9a66e71a5877", "5aa5b086-37bd-81f8-8d03-dd4b0e09a436", "20c360fa-bc06-8df8-b067-33f4a1ebdbbd", "2b628450-25bd-8df8-8b42-fb5cc5d01ad1", "da42e2ef-b5f1-8df8-966d-1387afb1b2f4", "bc9b093a-0e00-89f8-991a-5e0cd15a7942", "b5e13849-a04f-89f8-b564-ab8ad37298aa", "e46b8b76-88e2-89f8-972b-692232699d16", "e0804078-98cf-85f8-bf74-702ec92c91e8", "d62c8465-7f9b-85f8-a548-5a8772352988")
     expect(PostgresResource).to receive(:generate_uuid).and_return("dd0375a6-1c66-82d0-a5e8-af1e8527a8a2")
     expect(PostgresFirewallRule).to receive(:generate_uuid).and_return("5a601238-b56e-8ecf-bbca-9e3e680812b8")
-    expect(PostgresMetricDestination).to receive(:generate_uuid).and_return("1682bcf3-37f8-81da-a1e4-7ac9f25d9200")
+    expect(PostgresMetricDestination).to receive(:generate_uuid).and_return("45754ea1-c139-8a8d-af18-7b24e0dbc7de")
     cli(%w[vm eu-central-h1/test-vm create a])
     @vm = Vm.first
     add_ipv4_to_vm(@vm, "128.0.0.1")
@@ -56,7 +56,7 @@ RSpec.describe Clover, "cli" do
     expect(FirewallRule).to receive(:generate_uuid).and_invoke(-> { fwr_uuids.next }).at_least(:once)
     expect(PostgresResource).to receive(:generate_uuid).and_return("97eb0a77-7869-86d0-9dcb-a46416ddc5c9").at_least(:once)
     expect(PostgresFirewallRule).to receive(:generate_uuid).and_return("6d674a31-e1c1-8ecf-b5ac-363abb5b9185").at_least(:once)
-    expect(PostgresMetricDestination).to receive(:generate_uuid).and_return("bc563e43-9b83-89da-b3ac-d38acc87fd63").at_least(:once)
+    expect(PostgresMetricDestination).to receive(:generate_uuid).and_return("46d93419-abcc-8a8d-823a-55efe660727f").at_least(:once)
     expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("nc186qw3d23j1kzsgjqg2t811r")).at_least(:once)
     expect(LoadBalancer).to receive(:generate_uuid).and_return("eb8e0b21-94f2-8c2b-82c8-da57fcfe88c7").at_least(:once)
 
