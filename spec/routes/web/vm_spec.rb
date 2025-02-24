@@ -93,7 +93,6 @@ RSpec.describe Clover, "vm" do
 
       it "shows vm create page with burstable and location_latitude_fra" do
         project.set_ff_location_latitude_fra true
-        project.set_ff_use_slices_for_allocation true
         visit "#{project.path}/vm/create"
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
       end

@@ -19,12 +19,8 @@ RSpec.describe Option do
   end
 
   describe "#VmFamily options" do
-    it "families include burstables when use slices" do
-      expect(described_class.families(use_slices: true).map(&:name)).to include("burstable")
-    end
-
-    it "families exclude burstables when not using slices" do
-      expect(described_class.families(use_slices: false).map(&:name)).not_to include("burstable")
+    it "families include burstables" do
+      expect(described_class.families.map(&:name)).to include("burstable")
     end
   end
 end
