@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 UbiCli.on("fw").run_on("delete-rule") do
-  options("ubi fw location/(fw-name|fw-id) delete-rule rule-id")
+  options("ubi fw (location/fw-name|fw-id) delete-rule rule-id")
 
   args 1
 

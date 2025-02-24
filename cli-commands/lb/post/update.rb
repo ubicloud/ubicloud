@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 UbiCli.on("lb").run_on("update") do
-  options("ubi lb location/(lb-name|lb-id) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]")
+  options("ubi lb (location/lb-name|lb-id) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]")
 
   args(4...)
 

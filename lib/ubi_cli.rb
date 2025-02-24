@@ -131,7 +131,7 @@ class UbiCli
     fragment = FRAGMENTS[cmd]
 
     on(cmd).run_on("destroy") do
-      options("ubi #{cmd} location/(#{cmd}-name|#{cmd}-id) destroy [options]", key: :destroy) do
+      options("ubi #{cmd} (location/#{cmd}-name|#{cmd}-id) destroy [options]", key: :destroy) do
         on("-f", "--force", "do not require confirmation")
       end
 
@@ -156,7 +156,7 @@ class UbiCli
 
   def self.pg_cmd(cmd)
     on("pg").run_on(cmd) do
-      skip_option_parsing("ubi pg location/(pg-name|pg-id) [options] #{cmd} [#{cmd}-options]")
+      skip_option_parsing("ubi pg (location/pg-name|pg-id) [options] #{cmd} [#{cmd}-options]")
 
       args(0...)
 

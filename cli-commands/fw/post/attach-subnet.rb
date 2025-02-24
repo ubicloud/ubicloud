@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 UbiCli.on("fw").run_on("attach-subnet") do
-  options("ubi fw location/(fw-name|fw-id) attach-subnet subnet-id")
+  options("ubi fw (location/fw-name|fw-id) attach-subnet subnet-id")
 
   args 1
 
