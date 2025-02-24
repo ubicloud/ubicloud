@@ -321,13 +321,18 @@ RSpec.describe UBID do
     page = Page.create_with_id(summary: "x", tag: "y")
     project = Project.create(name: "test")
     a_type = ActionType.first
+
     api_key = ApiKey.create(owner_table: "project", owner_id: project.id, used_for: "inference_endpoint", key: "1", project_id: project.id)
+    # Backwards compatibility for old TYPE_ETC ubid (etkjnpyp1dst3n9d2mct7s71rh in this example)
+    old_api_key = ApiKey.create_with_id(owner_table: "project", owner_id: project.id, used_for: "inference_endpoint", project_id: project.id) { |ak| ak.id = "9cab6f58-2dce-85da-aa5a-2a3347c9c388" }
+
     invalid = described_class.to_uuid("han2sefsk4f61k91z77vn0y978")
-    hash = {page.id => nil, a_type.id => nil, api_key.id => nil, invalid => nil}
+    hash = {page.id => nil, a_type.id => nil, api_key.id => nil, invalid => nil, old_api_key.id => nil}
     described_class.resolve_map(hash)
     expect(hash[page.id]).to eq page
     expect(hash[a_type.id]).to eq a_type
     expect(hash[api_key.id]).to eq api_key
+    expect(hash[old_api_key.id]).to eq old_api_key
     expect(hash[invalid]).to be_nil
   end
 

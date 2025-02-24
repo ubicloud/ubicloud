@@ -1,4 +1,4 @@
 Metric destination added to PostgreSQL database.
 Current metric destinations:
-  1: et2t1bswsqz21m7j7njfjbp901  foo  https://baz.example.com
-  2: etqhb3wgwvge5pepd72pcgzyp6  foo  https://md.example.com
+  1: md8ntmx8e1764nwc7p970vf3xw  foo  https://baz.example.com
+  2: md8vck86dbsj5g8x5bvz6c1s7z  foo  https://md.example.com

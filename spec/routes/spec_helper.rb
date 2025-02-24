@@ -17,6 +17,21 @@ RSpec.configure do |config|
     Clover.app
   end
 
+  def last_response
+    lr = super
+
+    if lr && !lr.instance_variable_get(:@body_checked)
+      lr.instance_variable_set(:@body_checked, true)
+      if (match = lr.body.match(/(?<=(.{50}\W))(et[a-z0-9]{24})(?=(\W.{50}))/m))
+        unless match[1].match?(/otp_raw_secret|csrf/)
+          raise "response body contains TYPE_ETC ubid: #{match.captures.inspect}"
+        end
+      end
+    end
+
+    lr
+  end
+
   def error_response_matcher(expected_state, expected_message, expected_details, nested_error)
     message_path = nested_error ? ["error", "message"] : ["message"]
     details_path = nested_error ? ["error", "details"] : ["details"]

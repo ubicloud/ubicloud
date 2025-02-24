@@ -1,6 +1,6 @@
 firewall rules:
   1: pfb9g14e5ndt6qf59wfk8109bg  0.0.0.0/0
 metric destinations:
-  1: et2t1bswsqz21m7j7njfjbp901  foo  https://baz.example.com
+  1: md8ntmx8e1764nwc7p970vf3xw  foo  https://baz.example.com
 CA certificates:
 
