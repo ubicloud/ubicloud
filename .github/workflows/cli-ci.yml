@@ -2,7 +2,17 @@ name: cli/ubi CI
 
 on:
   push:
+    branches:
+      - main
+    paths:
+      - 'cli/**'
+      - 'bin/ubi'
+      - 'spec/cli_spec.rb'
   pull_request:
+    paths:
+      - 'cli/**'
+      - 'bin/ubi'
+      - 'spec/cli_spec.rb'
 
 jobs:
   cli-ci:
