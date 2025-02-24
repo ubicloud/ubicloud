@@ -6,7 +6,7 @@ class Clover
       firewall_list_api_response(firewall_list_dataset)
     end
 
-    r.on NAME_OR_UBID do |firewall_name, firewall_id|
+    r.on FIREWALL_NAME_OR_UBID do |firewall_name, firewall_id|
       if firewall_name
         r.post api? do
           firewall_post(firewall_name)

@@ -1,7 +1,13 @@
 # frozen_string_literal: true
 
 class Clover < Roda
-  NAME_OR_UBID = /([a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?)|_([a-z0-9]{26})/
+  def self.name_or_ubid_for(model)
+    # (\z)? to force a nil as first capture
+    [/(\z)?_?(#{model.ubid_type}[a-z0-9]{24})/, /([a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?)/]
+  end
+  [Firewall, KubernetesCluster, LoadBalancer, PostgresResource, PrivateSubnet, Vm].each do |model|
+    const_set(:"#{model.table_name.upcase}_NAME_OR_UBID", name_or_ubid_for(model))
+  end
 
   class RodaResponse
     API_DEFAULT_HEADERS = DEFAULT_HEADERS.merge("content-type" => "application/json").freeze
