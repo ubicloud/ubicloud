@@ -278,10 +278,14 @@ task :spec_separate do
   end
 end
 
-desc "Build binary"
+desc "Compile cli/ubi binary for current platform"
 task "ubi" do
+  sh("cd cli && go build -tags osusergo,netgo")
+end
+
+desc "Cross compile cli/ubi binaries for common platforms"
+task "ubi-cross" do
   Dir.chdir("cli") do
-    sh("go build -tags osusergo,netgo")
     os_list = %w[linux windows darwin]
     arch_list = %w[amd64 arm64 386]
     os_list.each do |os|
