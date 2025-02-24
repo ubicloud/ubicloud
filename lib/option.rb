@@ -6,12 +6,14 @@ module Option
   ai_models = YAML.load_file("config/ai_models.yml")
   AI_MODELS = ai_models.select { _1["enabled"] }.freeze
 
-  def self.locations(only_visible: true, feature_flags: [])
-    Location.all.select { |pl| !only_visible || (pl.visible || feature_flags.include?("location_#{pl.name.tr("-", "_")}")) }
+  def self.locations(only_visible: true, feature_flags: [], project_id: nil)
+    Location.where(customer_aws_region_id: nil).all.select { |pl|
+      !only_visible || (pl.visible || feature_flags.include?("location_#{pl.name.tr("-", "_")}"))
+    }
   end
 
-  def self.postgres_locations
-    Location.where(name: ["hetzner-fsn1", "leaseweb-wdc02"]).all
+  def self.postgres_locations(project_id: nil)
+    Location.where(name: ["hetzner-fsn1", "leaseweb-wdc02"]).all.concat([Project[project_id]&.customer_aws_regions&.map(&:location)&.flatten&.compact].flatten.compact)
   end
 
   def self.kubernetes_locations

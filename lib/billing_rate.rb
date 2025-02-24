@@ -15,9 +15,16 @@ class BillingRate
   end
 
   def self.from_resource_properties(resource_type, resource_family, location, active_at = Time.now)
-    rates.select {
-      _1["resource_type"] == resource_type && _1["resource_family"] == resource_family && _1["location"] == location && _1["active_from"] < active_at
-    }.max_by { _1["active_from"] }
+    if location.start_with?("aws")
+      {
+        "unit_price" => 0.0,
+        "active_from" => Time.now
+      }
+    else
+      rates.select {
+        _1["resource_type"] == resource_type && _1["resource_family"] == resource_family && _1["location"] == location && _1["active_from"] < active_at
+      }.max_by { _1["active_from"] }
+    end
   end
 
   def self.from_resource_type(resource_type)
