@@ -13,10 +13,6 @@ class ApiKey < Sequel::Model
     enc.column :key
   end
 
-  def self.ubid_type
-    UBID::TYPE_ETC
-  end
-
   def name
     ubid
   end

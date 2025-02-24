@@ -8,10 +8,6 @@ class UsageAlert < Sequel::Model
 
   include ResourceMethods
 
-  def self.ubid_type
-    UBID::TYPE_ETC
-  end
-
   def trigger
     send_email
     update(last_triggered_at: Time.now)
