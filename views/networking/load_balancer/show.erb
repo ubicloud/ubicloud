@@ -25,9 +25,9 @@
       ],
       ["Algorithm", (@lb[:algorithm] == "round_robin") ? "Round Robin" : "Hash Based"],
       ["Stack", @lb[:stack].gsub("ip", "IP")],
-      ["Load Balancer Port", @lb[:src_port]],
-      ["Application Port", @lb[:dst_port]],
-      ["HTTP Health Check Endpoint", @lb[:health_check_endpoint]]
+      ["Load Balancer Port", @lb[:ports].first[:src_port]],
+      ["Application Port", @lb[:ports].first[:dst_port]],
+      ["HTTP Health Check Endpoint", @lb[:ports].first[:health_check_endpoint]]
     ]
   ) %>
   <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">

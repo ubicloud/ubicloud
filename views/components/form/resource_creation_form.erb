@@ -1,4 +1,4 @@
-<%# locals: (action:, form_elements:, option_tree:, option_parents:) %>
+<%# locals: (action:, form_elements:, option_tree:, option_parents:, dynamic_template: nil, dynamic_template_id: nil, dynamic_container_id: nil, dynamic_add_button_id: nil, dynamic_button_text: nil) %>
 <% nonce = SecureRandom.base64(32)
 content_security_policy.add_script_src [:nonce, nonce] %>
 
@@ -84,6 +84,49 @@ form_elements.each do |element|
             </div>
           </div>
         </div>
+
+<% if dynamic_template && dynamic_template.strip != "" %>
+        <div id="<%= dynamic_container_id || 'dynamic-container' %>" class="mt-6"></div>
+        <template id="<%= dynamic_template_id || 'dynamic-template' %>" class="hidden">
+          <%== dynamic_template %>
+        </template>
+        <div class="mt-4">
+          <button type="button" id="<%= dynamic_add_button_id || 'new-dynamic-btn' %>" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">
+            <%= dynamic_button_text || "Add" %>
+          </button>
+        </div>
+        <script nonce="<%==nonce%>">
+          (function() {
+            var counter = 0;
+            var addButton = document.getElementById("<%= dynamic_add_button_id || 'new-dynamic-btn' %>");
+            addButton.addEventListener("click", function(e) {
+              e.preventDefault();
+              counter++;
+              var template = document.getElementById("<%= dynamic_template_id || 'dynamic-template' %>");
+              var clone;
+              if ('content' in template) {
+                clone = document.importNode(template.content, true);
+              } else {
+                clone = document.createElement("div");
+                clone.innerHTML = template.innerHTML;
+              }
+              clone.querySelectorAll("input, select, textarea").forEach(function(el, idx) {
+                var newId = "dynamic-entry-" + counter + "-" + idx;
+                el.id = newId;
+                var originalFor = el.getAttribute("data-original-id");
+                if(originalFor) {
+                  var label = clone.querySelector("label[for='" + originalFor + "']");
+                  if(label) {
+                    label.setAttribute("for", newId);
+                  }
+                }
+              });
+              document.getElementById("<%= dynamic_container_id || 'dynamic-container' %>").appendChild(clone);
+            });
+          })();
+        </script>
+<% end %>
+
       </div>
       <div class="px-4 py-5 sm:p-6">
         <div class="flex items-center justify-end gap-x-6">
