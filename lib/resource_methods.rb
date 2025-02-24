@@ -3,12 +3,7 @@
 module ResourceMethods
   def self.included(base)
     base.extend(ClassMethods)
-    ubid_type = begin
-      base.ubid_type
-    rescue NameError
-      "et"
-    end
-    base.instance_variable_set(:@ubid_format, /\A#{ubid_type}[a-z0-9]{24}\z/)
+    base.instance_variable_set(:@ubid_format, /\A#{base.ubid_type}[a-z0-9]{24}\z/)
   end
 
   def freeze

@@ -4,13 +4,13 @@ require_relative "../model"
 require_relative "../lib/system_parser"
 
 class StorageDevice < Sequel::Model
-  include ResourceMethods
-
   many_to_one :vm_host
 
   def self.ubid_type
     UBID::TYPE_ETC
   end
+
+  include ResourceMethods
 
   def set_underlying_unix_devices
     df_command_path = (name == "DEFAULT") ? "/var/storage" : "/var/storage/devices/#{name}"
