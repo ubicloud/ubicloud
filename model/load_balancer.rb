@@ -22,6 +22,10 @@ class LoadBalancer < Sequel::Model
   dataset_module Pagination
   semaphore :destroy, :update_load_balancer, :rewrite_dns_records, :refresh_cert
 
+  def display_location
+    private_subnet.display_location
+  end
+
   def path
     "/location/#{private_subnet.display_location}/load-balancer/#{name}"
   end

@@ -1241,6 +1241,20 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
+  '/project/{project_id}/object-info/{object_id}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/object_id'
+    get:
+      operationId: getObjectInfo
+      summary: 'Return information on object type, location, and name'
+      responses:
+        '200':
+          $ref: '#/components/responses/ObjectInfo'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Project
   '/project/{project_id}/postgres':
     get:
       operationId: listPostgresDatabases
@@ -1331,6 +1345,15 @@ components:
         type: string
         example: et7ekmf54nae5nya9s6vebg43f
         pattern: '^(et|md)[0-9a-hj-km-np-tv-z]{24}$'
+    object_id:
+      description: ID of a supported object
+      in: path
+      name: object_id
+      required: true
+      schema:
+        type: string
+        example: fwkkmx0f2vke4h36nk9cm8v8q0
+        pattern: '^(fw|1b|pg|ps|vm)[0-9a-hj-km-np-tv-z]{24}$'
     order_column:
       description: Pagination - Order column
       in: query
@@ -1838,6 +1861,27 @@ components:
             required:
               - count
               - items
+    ObjectInfo:
+      description: 'Type, location, and name information for object'
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              type:
+                description: Type of object
+                type: string
+              location:
+                description: Location of object
+                type: string
+              name:
+                description: Name of object
+                type: string
+            additionalProperties: false
+            required:
+              - type
+              - location
+              - name
     PostgresDatabase:
       description: A Postgres Database
       content:

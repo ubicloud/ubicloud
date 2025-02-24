@@ -43,3 +43,5 @@ vm eu-central-h1/test-vm show -f invalid
 vm eu-central-h1/test-vm -u foo scp :remote-path local-path invalid
 vm eu-central-h1/test-vm -X sftp
 vm list invalid
+vm vmdzyppz6j166jh5e9t0dwrfas show
+vm vmdzyppz6j166jh5e9t0dwrfa show
