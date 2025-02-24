@@ -83,6 +83,7 @@ class UBID
   TYPE_VM_HOST_SLICE = "vs"
   TYPE_KUBERNETES_CLUSTER = "kc"
   TYPE_KUBERNETES_NODEPOOL = "kn"
+  TYPE_DOCKER_REGISTRY_MIRROR_SERVER = "dm"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"

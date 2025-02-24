@@ -110,6 +110,7 @@ module Config
 
   # Docker Mirror Test
   optional :docker_mirror_server_vm_id, string
+  optional :docker_registry_mirror_project_id, string
 
   # GitHub Cache
   optional :github_cache_blob_storage_endpoint, string
