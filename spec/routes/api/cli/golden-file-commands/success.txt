@@ -18,6 +18,7 @@ fw eu-central-h1/test2-fw create
 fw eu-central-h1/test2-fw create -d test2-fw-description
 fw eu-central-h1/test-ps-default attach-subnet psfzm9e26xky5m9ggetw4dpqe2
 fw eu-central-h1/test-ps-default destroy -f
+fw fw4gj2v4h1fe3q28q0hnf7g8n1 show
 fw list
 fw list -f location
 fw list -l eu-central-h1
@@ -38,6 +39,7 @@ help -u
 help -u vm
 help vm
 help vm list
+lb 1bvp8yk1karj4ngwhtgrfh6esd show
 lb eu-central-h1/test2-lb create psfzm9e26xky5m9ggetw4dpqe2 12345 54321
 lb eu-central-h1/test-lb show
 lb eu-central-h1/test-lb show -f id,name,state,location,hostname,algorithm
@@ -84,6 +86,7 @@ pg list -l eu-north-h1
 pg list -l eu-north-h1 -f name,id
 pg list -l eu-north-h1 -N -f name,id
 pg list -N
+pg pgvm1qb9gwct1mqmay7m54yma5 show
 ps eu-central-h1/default-eu-central-h1 show
 ps eu-central-h1/default-eu-central-h1 show -f firewalls
 ps eu-central-h1/default-eu-central-h1 show -f firewalls,nics
@@ -109,6 +112,7 @@ ps list -l eu-north-h1
 ps list -l eu-north-h1 -f name,id
 ps list -l eu-north-h1 -N -f name,id
 ps list -N
+ps psfzm9e26xky5m9ggetw4dpqe2 show
 --version
 vm eu-central-h1/test2-vm create -6 pk
 vm eu-central-h1/test2-vm create -b debian-12 pk
@@ -138,3 +142,4 @@ vm list -l eu-central-h1 -N -f name,id
 vm list -l eu-north-h1
 vm list -l eu-north-h1 -f name,id
 vm list -N
+vm vmdzyppz6j166jh5e9t2dwrfas show

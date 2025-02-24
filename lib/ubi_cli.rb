@@ -24,6 +24,8 @@ class UbiCli
   LOWERCASE_LABELS["vm"] = CAPITALIZED_LABELS["vm"]
   LOWERCASE_LABELS.freeze
 
+  OBJECT_INFO_REGEXP = /((fw|1b|pg|ps|vm)[a-z0-9]{24})/
+
   Rodish.processor(self) do
     options("ubi [options] [subcommand [subcommand-options] ...]") do
       on("--version", "show program version") { halt "0.0.0" }
@@ -68,7 +70,25 @@ class UbiCli
 
       run do |(ref, *argv), opts, command|
         @location, @name, extra = ref.split("/", 3)
-        raise Rodish::CommandFailure, "invalid #{cmd} reference, should be in location/(#{cmd}-name|_#{cmd}-id) format" if extra
+
+        if !@name && OBJECT_INFO_REGEXP.match?(@location)
+          location = get(project_path("object-info/#{@location}")) do |data|
+            break data["location"]
+          end
+
+          if location.is_a?(Array)
+            location[0] = 400
+            next location
+          end
+
+          @name = @location
+          @location = location
+        end
+
+        if extra || !@name
+          raise Rodish::CommandFailure, "invalid #{cmd} reference, should be in location/#{cmd}-name or #{cmd}-id format"
+        end
+
         command.run(self, opts, argv)
       end
     end

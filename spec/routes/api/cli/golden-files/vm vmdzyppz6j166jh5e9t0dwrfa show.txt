@@ -1,0 +1,1 @@
+! Invalid vm reference, should be in location/vm-name or vm-id format
