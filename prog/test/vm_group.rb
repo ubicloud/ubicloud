@@ -25,7 +25,6 @@ class Prog::Test::VmGroup < Prog::Test::Base
   label def setup_vms
     project = Project.create_with_id(name: "project-1")
     test_slices = frame.fetch("test_slices")
-    project.set_ff_use_slices_for_allocation(test_slices)
 
     size_options = test_slices ? ["standard-2", "burstable-1"] : ["standard-2"]
     subnets = Array.new(2) { Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-#{_1}", location: "hetzner-fsn1") }
