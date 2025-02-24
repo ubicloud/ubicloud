@@ -380,6 +380,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(nx.minio_server.vm).to receive(:incr_destroy)
       expect(nx.minio_server).to receive(:destroy)
       expect(nx.minio_server.cluster.dns_zone).to receive(:delete_record).with(record_name: nx.cluster.hostname, type: "A", data: nil)
+      expect(nx.minio_server.cluster.dns_zone).to receive(:delete_record).with(record_name: nx.cluster.hostname, type: "AAAA", data: nil)
       expect { nx.destroy }.to exit({"msg" => "minio server destroyed"})
     end
 
@@ -391,8 +392,10 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(nx.minio_server.vm.nics.first).to receive(:incr_destroy)
       expect(nx.minio_server.vm).to receive(:incr_destroy)
       expect(nx.minio_server.vm).to receive(:ephemeral_net4).and_return("10.10.10.10")
+      expect(nx.minio_server.vm).to receive(:ephemeral_net6).and_return(NetAddr::IPv6Net.parse("2a01:4f8:10a:128b:814c::/79")).at_least(:once)
       expect(nx.minio_server).to receive(:destroy)
       expect(nx.minio_server.cluster.dns_zone).to receive(:delete_record).with(record_name: nx.cluster.hostname, type: "A", data: "10.10.10.10")
+      expect(nx.minio_server.cluster.dns_zone).to receive(:delete_record).with(record_name: nx.cluster.hostname, type: "AAAA", data: "2a01:4f8:10a:128b:814c::2")
       expect { nx.destroy }.to exit({"msg" => "minio server destroyed"})
     end
   end
