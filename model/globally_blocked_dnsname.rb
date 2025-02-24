@@ -3,11 +3,11 @@
 require_relative "../model"
 
 class GloballyBlockedDnsname < Sequel::Model
-  include ResourceMethods
-
   def self.ubid_type
     UBID::TYPE_ETC
   end
+
+  include ResourceMethods
 end
 
 # Table: globally_blocked_dnsname

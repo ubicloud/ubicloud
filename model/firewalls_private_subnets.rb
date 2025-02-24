@@ -3,6 +3,10 @@
 require_relative "../model"
 
 class FirewallsPrivateSubnets < Sequel::Model
+  def self.ubid_type
+    UBID::TYPE_ETC
+  end
+
   include ResourceMethods
 end
 
