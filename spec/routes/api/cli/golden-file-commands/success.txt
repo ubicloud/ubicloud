@@ -128,6 +128,7 @@ vm eu-central-h1/test-vm show -f firewalls -w firewall-rules -r port-range
 vm eu-central-h1/test-vm show -f firewalls -w id,name
 vm eu-central-h1/test-vm show -f id,name,state,location,size,unix-user,storage-size-gib
 vm eu-central-h1/test-vm show -f ip6,ip4-enabled,ip4,private-ipv4,private-ipv6,subnet
+vm eu-central-h1/vmdzyppz6j166jh5e9t2dwrfas show
 vm list
 vm list -f location
 vm list -f name,id,ip4,ip6
