@@ -32,7 +32,7 @@ module Scheduling::Allocator
       location_preference,
       vm.family,
       vm.cpu_percent_limit,
-      vm.project.get_ff_use_slices_for_allocation || false,
+      true, # use slices
       Option::VmFamilies.find { _1.name == vm.family }&.require_shared_slice || false,
       vm.project.get_ff_allocator_diagnostics || false
     )
@@ -68,7 +68,6 @@ module Scheduling::Allocator
   ) do
     def initialize(*args)
       super
-      self.use_slices ||= false
       self.require_shared_slice ||= false
       self.diagnostics ||= false
     end
