@@ -14,6 +14,18 @@ RSpec.describe LoadBalancer do
     Prog::Vm::Nexus.assemble("pub-key", prj.id, name: "test-vm1", private_subnet_id: lb.private_subnet.id).subject
   }
 
+  it "disallows VM ubid format as name" do
+    ps = described_class.new(name: described_class.generate_ubid.to_s)
+    ps.validate
+    expect(ps.errors[:name]).to eq ["cannot be exactly 26 numbers/lowercase characters starting with 1b to avoid overlap with id format"]
+  end
+
+  it "allows inference endpoint ubid format as name" do
+    ps = described_class.new(name: InferenceEndpoint.generate_ubid.to_s)
+    ps.validate
+    expect(ps.errors[:name]).to be_nil
+  end
+
   describe "util funcs" do
     before do
       allow(Config).to receive(:load_balancer_service_hostname).and_return("lb.ubicloud.com")

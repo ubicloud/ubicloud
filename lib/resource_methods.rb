@@ -3,6 +3,12 @@
 module ResourceMethods
   def self.included(base)
     base.extend(ClassMethods)
+    ubid_type = begin
+      base.ubid_type
+    rescue NameError
+      "et"
+    end
+    base.instance_variable_set(:@ubid_format, /\A#{ubid_type}[a-z0-9]{24}\z/)
   end
 
   def freeze
@@ -30,6 +36,14 @@ module ResourceMethods
   def set_uuid
     self.id ||= self.class.generate_uuid if new?
     self
+  end
+
+  def validate
+    super
+
+    if self.class.ubid_format.match?(values[:name])
+      errors.add(:name, "cannot be exactly 26 numbers/lowercase characters starting with #{self.class.ubid_type} to avoid overlap with id format")
+    end
   end
 
   INSPECT_CONVERTERS = {
@@ -77,6 +91,8 @@ module ResourceMethods
   end
 
   module ClassMethods
+    attr_reader :ubid_format
+
     # Adapted from sequel/model/inflections.rb's underscore, to convert
     # class names into symbols
     def self.uppercase_underscore(s)

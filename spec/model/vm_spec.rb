@@ -246,6 +246,18 @@ RSpec.describe Vm do
     vm.init_health_monitor_session
   end
 
+  it "disallows VM ubid format as name" do
+    vm = described_class.new(name: described_class.generate_ubid.to_s)
+    vm.validate
+    expect(vm.errors[:name]).to eq ["cannot be exactly 26 numbers/lowercase characters starting with vm to avoid overlap with id format"]
+  end
+
+  it "allows postgres server ubid format as name" do
+    vm = described_class.new(name: PostgresServer.generate_ubid.to_s)
+    vm.validate
+    expect(vm.errors[:name]).to be_nil
+  end
+
   it "checks pulse" do
     session = {
       ssh_session: instance_double(Net::SSH::Connection::Session)

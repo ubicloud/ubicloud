@@ -22,6 +22,18 @@ RSpec.describe PrivateSubnet do
       private_ipv6: "fd1b:9793:dcef:cd0a:c::/79")
   }
 
+  it "disallows VM ubid format as name" do
+    ps = described_class.new(name: described_class.generate_ubid.to_s)
+    ps.validate
+    expect(ps.errors[:name]).to eq ["cannot be exactly 26 numbers/lowercase characters starting with ps to avoid overlap with id format"]
+  end
+
+  it "allows inference endpoint ubid format as name" do
+    ps = described_class.new(name: InferenceEndpoint.generate_ubid.to_s)
+    ps.validate
+    expect(ps.errors[:name]).to be_nil
+  end
+
   describe "random ip generation" do
     it "returns random private ipv4" do
       private_subnet
