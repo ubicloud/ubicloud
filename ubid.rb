@@ -84,6 +84,11 @@ class UBID
   TYPE_KUBERNETES_CLUSTER = "kc"
   TYPE_KUBERNETES_NODEPOOL = "kn"
   TYPE_LOCATION = "10"
+  TYPE_API_KEY = "ak"
+  TYPE_USAGE_ALERT = "va"
+  TYPE_POSTGRES_METRIC_DESTINATION = "md"
+  TYPE_GITHUB_CACHE_ENTRY = "ge"
+
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
 
