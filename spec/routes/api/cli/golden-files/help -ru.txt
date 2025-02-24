@@ -1,45 +1,45 @@
 Usage: ubi fw list [options]
-Usage: ubi fw location/(fw-name|_fw-id) add-rule cidr
-Usage: ubi fw location/(fw-name|_fw-id) attach-subnet subnet-id
+Usage: ubi fw location/(fw-name|fw-id) add-rule cidr
+Usage: ubi fw location/(fw-name|fw-id) attach-subnet subnet-id
 Usage: ubi fw location/fw-name create [options]
-Usage: ubi fw location/(fw-name|_fw-id) delete-rule rule-id
-Usage: ubi fw location/(fw-name|_fw-id) destroy [options]
-Usage: ubi fw location/(fw-name|_fw-id) detach-subnet subnet-id
-Usage: ubi fw location/(fw-name|_fw-id) show [options]
+Usage: ubi fw location/(fw-name|fw-id) delete-rule rule-id
+Usage: ubi fw location/(fw-name|fw-id) destroy [options]
+Usage: ubi fw location/(fw-name|fw-id) detach-subnet subnet-id
+Usage: ubi fw location/(fw-name|fw-id) show [options]
 Usage: ubi help [options] [command [subcommand]]
 Usage: ubi lb list [options]
-Usage: ubi lb location/(lb-name|_lb-id) attach-vm vm-id
+Usage: ubi lb location/(lb-name|lb-id) attach-vm vm-id
 Usage: ubi lb location/lb-name create [options] private-subnet-id src-port dst-port
-Usage: ubi lb location/(lb-name|_lb-id) destroy [options]
-Usage: ubi lb location/(lb-name|_lb-id) detach-vm vm-id
-Usage: ubi lb location/(lb-name|_lb-ubid) show [options]
-Usage: ubi lb location/(lb-name|_lb-id) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]
+Usage: ubi lb location/(lb-name|lb-id) destroy [options]
+Usage: ubi lb location/(lb-name|lb-id) detach-vm vm-id
+Usage: ubi lb location/(lb-name|lb-id) show [options]
+Usage: ubi lb location/(lb-name|lb-id) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]
 Usage: ubi pg list [options]
-Usage: ubi pg location/(pg-name|_pg-id) add-firewall-rule cidr
-Usage: ubi pg location/(pg-name|_pg-id) add-metric-destination username password url
+Usage: ubi pg location/(pg-name|pg-id) add-firewall-rule cidr
+Usage: ubi pg location/(pg-name|pg-id) add-metric-destination username password url
 Usage: ubi pg location/pg-name create [options]
-Usage: ubi pg location/(pg-name|_pg-id) delete-firewall-rule id
-Usage: ubi pg location/(pg-name|_pg-id) delete-metric-destination id
-Usage: ubi pg location/(pg-name|_pg-id) destroy [options]
-Usage: ubi pg location/(pg-name|_pg-id) failover
-Usage: ubi pg location/(pg-name|_pg-id) [options] pg_dump [pg_dump-options]
-Usage: ubi pg location/(pg-name|_pg-id) [options] pg_dumpall [pg_dumpall-options]
-Usage: ubi pg location/(pg-name|_pg-id) [options] psql [psql-options]
-Usage: ubi pg location/(pg-name|_pg-id) reset-superuser-password new-password
-Usage: ubi pg location/(pg-name|_pg-id) restart
-Usage: ubi pg location/(pg-name|_pg-id) restore new-db-name restore-time
-Usage: ubi pg location/(pg-name|_pg-id) show [options]
+Usage: ubi pg location/(pg-name|pg-id) delete-firewall-rule id
+Usage: ubi pg location/(pg-name|pg-id) delete-metric-destination id
+Usage: ubi pg location/(pg-name|pg-id) destroy [options]
+Usage: ubi pg location/(pg-name|pg-id) failover
+Usage: ubi pg location/(pg-name|pg-id) [options] pg_dump [pg_dump-options]
+Usage: ubi pg location/(pg-name|pg-id) [options] pg_dumpall [pg_dumpall-options]
+Usage: ubi pg location/(pg-name|pg-id) [options] psql [psql-options]
+Usage: ubi pg location/(pg-name|pg-id) reset-superuser-password new-password
+Usage: ubi pg location/(pg-name|pg-id) restart
+Usage: ubi pg location/(pg-name|pg-id) restore new-db-name restore-time
+Usage: ubi pg location/(pg-name|pg-id) show [options]
 Usage: ubi ps list [options]
-Usage: ubi ps location/(ps-name|_ps-id) connect ps-id
+Usage: ubi ps location/(ps-name|ps-id) connect ps-id
 Usage: ubi ps location/ps-name create [options]
-Usage: ubi ps location/(ps-name|_ps-id) destroy [options]
-Usage: ubi ps location/(ps-name|_ps-id) disconnect ps-id
-Usage: ubi ps location/(ps-name|_ps-id) show [options]
+Usage: ubi ps location/(ps-name|ps-id) destroy [options]
+Usage: ubi ps location/(ps-name|ps-id) disconnect ps-id
+Usage: ubi ps location/(ps-name|ps-id) show [options]
 Usage: ubi vm list [options]
 Usage: ubi vm location/vm-name create [options] public_key
-Usage: ubi vm location/(vm-name|_vm-id) destroy [options]
-Usage: ubi vm location/(vm-name|_vm-id) restart
-Usage: ubi vm location/(vm-name|_vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
-Usage: ubi vm location/(vm-name|_vm-id) [options] sftp [sftp-options]
-Usage: ubi vm location/(vm-name|_vm-id) show [options]
-Usage: ubi vm location/(vm-name|_vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
+Usage: ubi vm location/(vm-name|vm-id) destroy [options]
+Usage: ubi vm location/(vm-name|vm-id) restart
+Usage: ubi vm location/(vm-name|vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
+Usage: ubi vm location/(vm-name|vm-id) [options] sftp [sftp-options]
+Usage: ubi vm location/(vm-name|vm-id) show [options]
+Usage: ubi vm location/(vm-name|vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]

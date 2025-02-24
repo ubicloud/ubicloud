@@ -1,6 +1,6 @@
 ! Invalid number of arguments for vm destroy subcommand (accepts: 0, given: 1)
 
-Usage: ubi vm location/(vm-name|_vm-id) destroy [options]
+Usage: ubi vm location/(vm-name|vm-id) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation

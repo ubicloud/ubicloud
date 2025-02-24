@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 UbiCli.on("fw").run_on("detach-subnet") do
-  options("ubi fw location/(fw-name|_fw-id) detach-subnet subnet-id")
+  options("ubi fw location/(fw-name|fw-id) detach-subnet subnet-id")
 
   args 1
 

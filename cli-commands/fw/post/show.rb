@@ -6,7 +6,7 @@ UbiCli.on("fw").run_on("show") do
   private_subnet_fields = %w[id name state location net4 net6 nics].freeze.each(&:freeze)
   nic_fields = %w[id name private-ipv4 private-ipv6 vm-name].freeze.each(&:freeze)
 
-  options("ubi fw location/(fw-name|_fw-id) show [options]", key: :fw_show) do
+  options("ubi fw location/(fw-name|fw-id) show [options]", key: :fw_show) do
     on("-f", "--fields=fields", "show specific fields (comma separated)")
     on("-n", "--nic-fields=fields", "show specific nic fields (comma separated)")
     on("-p", "--priv-subnet-fields=fields", "show specific private subnet fields (comma separated)")

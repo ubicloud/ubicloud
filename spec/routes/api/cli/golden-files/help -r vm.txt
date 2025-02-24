@@ -3,7 +3,7 @@ Usage: ubi vm subcommand [...]
 Subcommands: list
 
 
-Usage: ubi vm location/(vm-name|_vm-id) [options] subcommand [...]
+Usage: ubi vm location/(vm-name|vm-id) [options] subcommand [...]
 
 Options:
     -4, --ip4                        use IPv4 address
@@ -40,22 +40,22 @@ Options:
     -u, --unix-user=username         username (default: ubi)
 
 
-Usage: ubi vm location/(vm-name|_vm-id) destroy [options]
+Usage: ubi vm location/(vm-name|vm-id) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation
 
 
-Usage: ubi vm location/(vm-name|_vm-id) restart
+Usage: ubi vm location/(vm-name|vm-id) restart
 
 
-Usage: ubi vm location/(vm-name|_vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
+Usage: ubi vm location/(vm-name|vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
 
 
-Usage: ubi vm location/(vm-name|_vm-id) [options] sftp [sftp-options]
+Usage: ubi vm location/(vm-name|vm-id) [options] sftp [sftp-options]
 
 
-Usage: ubi vm location/(vm-name|_vm-id) show [options]
+Usage: ubi vm location/(vm-name|vm-id) show [options]
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)
@@ -67,6 +67,6 @@ Firewall Rule Fields: id cidr port-range
 Firewall Fields: id name description location path firewall-rules
 
 
-Usage: ubi vm location/(vm-name|_vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
+Usage: ubi vm location/(vm-name|vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
 
 

@@ -1,8 +1,8 @@
 Usage: ubi vm list [options]
 Usage: ubi vm location/vm-name create [options] public_key
-Usage: ubi vm location/(vm-name|_vm-id) destroy [options]
-Usage: ubi vm location/(vm-name|_vm-id) restart
-Usage: ubi vm location/(vm-name|_vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
-Usage: ubi vm location/(vm-name|_vm-id) [options] sftp [sftp-options]
-Usage: ubi vm location/(vm-name|_vm-id) show [options]
-Usage: ubi vm location/(vm-name|_vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
+Usage: ubi vm location/(vm-name|vm-id) destroy [options]
+Usage: ubi vm location/(vm-name|vm-id) restart
+Usage: ubi vm location/(vm-name|vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
+Usage: ubi vm location/(vm-name|vm-id) [options] sftp [sftp-options]
+Usage: ubi vm location/(vm-name|vm-id) show [options]
+Usage: ubi vm location/(vm-name|vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]

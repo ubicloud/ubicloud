@@ -5,7 +5,7 @@ UbiCli.on("vm").run_on("show") do
   firewall_fields = %w[id name description location path firewall-rules].freeze.each(&:freeze)
   firewall_rule_fields = %w[id cidr port-range].freeze.each(&:freeze)
 
-  options("ubi vm location/(vm-name|_vm-id) show [options]", key: :vm_show) do
+  options("ubi vm location/(vm-name|vm-id) show [options]", key: :vm_show) do
     on("-f", "--fields=fields", "show specific fields (comma separated)")
     on("-r", "--rule-fields=fields", "show specific firewall rule fields (comma separated)")
     on("-w", "--firewall-fields=fields", "show specific firewall fields (comma separated)")
