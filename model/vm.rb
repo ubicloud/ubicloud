@@ -15,10 +15,10 @@ class Vm < Sequel::Model
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id do |ds| ds.active end
   one_to_many :pci_devices, key: :vm_id, class: :PciDevice
   one_through_one :load_balancer, left_key: :vm_id, right_key: :load_balancer_id, join_table: :load_balancers_vms
-  one_to_one :load_balancers_vms, key: :vm_id, class: :LoadBalancersVms
+  one_to_many :load_balancer_ports, key: :vm_id, class: :LoadBalancerVmPort
   many_to_one :vm_host_slice
 
-  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancers_vms: :destroy
+  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancer_ports: :destroy
 
   dataset_module Pagination
 
@@ -295,6 +295,7 @@ end
 #  inference_endpoint_replica | inference_endpoint_replica_vm_id_fkey    | (vm_id) REFERENCES vm(id)
 #  kubernetes_clusters_cp_vms | kubernetes_clusters_cp_vms_cp_vm_id_fkey | (cp_vm_id) REFERENCES vm(id)
 #  kubernetes_nodepools_vms   | kubernetes_nodepools_vms_vm_id_fkey      | (vm_id) REFERENCES vm(id)
+#  load_balancer_vm_port      | load_balancer_vm_port_vm_id_fkey         | (vm_id) REFERENCES vm(id)
 #  load_balancers_vms         | load_balancers_vms_vm_id_fkey            | (vm_id) REFERENCES vm(id)
 #  minio_server               | minio_server_vm_id_fkey                  | (vm_id) REFERENCES vm(id)
 #  nic                        | nic_vm_id_fkey                           | (vm_id) REFERENCES vm(id)
