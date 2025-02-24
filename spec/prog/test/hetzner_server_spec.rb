@@ -180,6 +180,11 @@ RSpec.describe Prog::Test::HetznerServer do
     it "hops to verify_vm_dir_purged" do
       expect { hs_test.verify_cleanup }.to hop("verify_vm_dir_purged")
     end
+
+    it "naps if vm_host has vms" do
+      expect(vm_host).to receive(:vms).and_return([:vm1, :vm2])
+      expect { hs_test.verify_cleanup }.to nap(15)
+    end
   end
 
   describe "#verify_vm_dir_purged" do
