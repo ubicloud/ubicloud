@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 UbiCli.on("lb").run_on("detach-vm") do
-  options("ubi lb location/(lb-name|lb-id) detach-vm vm-id")
+  options("ubi lb (location/lb-name|lb-id) detach-vm vm-id")
 
   args 1
 

@@ -1,6 +1,6 @@
 ! Invalid number of arguments for pg destroy subcommand (accepts: 0, given: 1)
 
-Usage: ubi pg location/(pg-name|pg-id) destroy [options]
+Usage: ubi pg (location/pg-name|pg-id) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation
