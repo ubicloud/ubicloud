@@ -31,7 +31,12 @@ class Prog::Minio::MinioPoolNexus < Prog::Base
 
   def self.assemble_additional_pool(cluster_id, server_count, drive_count, storage_size_gib, vm_size)
     DB.transaction do
-      st = assemble(cluster_id, MinioCluster[cluster_id]&.server_count, server_count, drive_count, storage_size_gib, vm_size)
+      unless MinioCluster[cluster_id]
+        fail "No existing cluster"
+      end
+
+      start_index = MinioCluster[cluster_id].servers.max_by(&:index).index + 1
+      st = assemble(cluster_id, start_index, server_count, drive_count, storage_size_gib, vm_size)
       st.subject.incr_add_additional_pool
       st
     end

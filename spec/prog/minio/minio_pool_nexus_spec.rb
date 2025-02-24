@@ -55,6 +55,12 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
         described_class.assemble_additional_pool(SecureRandom.uuid, 0, 1, 100, "standard-2")
       }.to raise_error RuntimeError, "No existing cluster"
     end
+
+    it "correctly calculates start index for additional pool for a cluster with decommissioned pools" do
+      described_class.assemble(minio_cluster.id, 2, 2, 2, 100, "standard-2")
+      st = described_class.assemble_additional_pool(minio_cluster.id, 1, 1, 100, "standard-2")
+      expect(st.subject.start_index).to eq 4
+    end
   end
 
   describe "#wait_servers" do
