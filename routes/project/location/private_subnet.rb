@@ -6,7 +6,7 @@ class Clover
       private_subnet_list
     end
 
-    r.on NAME_OR_UBID do |ps_name, ps_id|
+    r.on PRIVATE_SUBNET_NAME_OR_UBID do |ps_name, ps_id|
       if ps_name
         r.post true do
           private_subnet_post(ps_name)

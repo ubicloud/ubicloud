@@ -6,7 +6,7 @@ class Clover
       postgres_list
     end
 
-    r.on NAME_OR_UBID do |pg_name, pg_ubid|
+    r.on POSTGRES_RESOURCE_NAME_OR_UBID do |pg_name, pg_ubid|
       if pg_name
         r.post api? do
           postgres_post(pg_name)

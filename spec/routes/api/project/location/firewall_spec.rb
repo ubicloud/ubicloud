@@ -83,22 +83,39 @@ RSpec.describe Clover, "firewall" do
       expect(last_response).to have_api_error(400, "Validation failed for following fields: name")
     end
 
-    it "success delete" do
+    it "success delete with underscore" do
       delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}"
 
       expect(last_response.status).to eq(204)
+      expect(firewall).not_to exist
     end
 
-    it "delete not exist for valid ubid format" do
-      delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{"0" * 26}"
+    it "success delete without underscore" do
+      delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}"
 
       expect(last_response.status).to eq(204)
+      expect(firewall).not_to exist
     end
 
-    it "delete not exist for invalid ubid format" do
+    it "delete for not valid ubid format" do
+      delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{"0" * 26}"
+
+      expect(last_response.status).to eq(204)
+      expect(firewall).to exist
+    end
+
+    it "delete for non-existant ubid" do
+      delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{Firewall.generate_ubid}"
+
+      expect(last_response.status).to eq(204)
+      expect(firewall).to exist
+    end
+
+    it "delete for invalid ubid format" do
       delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_foo_ubid"
 
       expect(last_response.status).to eq(204)
+      expect(firewall).to exist
     end
 
     it "attach to subnet" do

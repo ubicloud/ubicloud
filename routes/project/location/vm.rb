@@ -6,7 +6,7 @@ class Clover
       vm_list_api_response(vm_list_dataset)
     end
 
-    r.on NAME_OR_UBID do |vm_name, vm_ubid|
+    r.on VM_NAME_OR_UBID do |vm_name, vm_ubid|
       if vm_name
         r.post api? do
           vm_post(vm_name)

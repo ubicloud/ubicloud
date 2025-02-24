@@ -6,7 +6,7 @@ class Clover
       load_balancer_list
     end
 
-    r.on NAME_OR_UBID do |lb_name, lb_id|
+    r.on LOAD_BALANCER_NAME_OR_UBID do |lb_name, lb_id|
       if lb_name
         r.post api? do
           load_balancer_post(lb_name)

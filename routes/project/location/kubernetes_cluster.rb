@@ -3,7 +3,7 @@
 class Clover
   hash_branch(:project_location_prefix, "kubernetes-cluster") do |r|
     r.web do
-      r.on NAME_OR_UBID do |kc_name, kc_ubid|
+      r.on KUBERNETES_CLUSTER_NAME_OR_UBID do |kc_name, kc_ubid|
         filter = if kc_name
           {Sequel[:kubernetes_cluster][:name] => kc_name}
         else
