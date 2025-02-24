@@ -100,12 +100,10 @@ class Clover < Roda
     @current_account = Account[rodauth.session_value]
   end
 
-  def validate_request_params(required_keys, allowed_optional_keys = [])
-    params = if api?
-      request.params
-    else
-      request.params.reject { _1 == "_csrf" }
-    end
+  def validate_request_params(required_keys, allowed_optional_keys = [], ignored_keys = [])
+    params = request.params.reject { ignored_keys.include?(_1) }
+    params = params.reject { _1 == "_csrf" } unless api?
+
     Validation.validate_request_params(params, required_keys, allowed_optional_keys)
   end
 

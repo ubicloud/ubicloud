@@ -156,7 +156,7 @@ RSpec.describe Clover, "vm" do
           enable_ip4: true
         }.to_json
 
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "\"standard-gpu-6\" is not a valid virtual machine size. Available sizes: [\"standard-2\", \"standard-4\", \"standard-8\", \"standard-16\", \"standard-30\", \"standard-60\"]"})
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "\"standard-gpu-6\" is not a valid virtual machine size. Available sizes: [\"standard-2\", \"standard-4\", \"standard-8\", \"standard-16\", \"standard-30\", \"standard-60\", \"burstable-1\", \"burstable-2\"]"})
       end
 
       it "success without vm_size" do

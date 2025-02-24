@@ -10,7 +10,8 @@ class Clover
     required_parameters = ["size"]
     required_parameters << "name" << "location" if web?
     allowed_optional_parameters = ["storage_size", "ha_type", "version", "flavor"]
-    request_body_params = validate_request_params(required_parameters, allowed_optional_parameters)
+    ignored_parameters = ["family"]
+    request_body_params = validate_request_params(required_parameters, allowed_optional_parameters, ignored_parameters)
     parsed_size = Validation.validate_postgres_size(@location, request_body_params["size"])
 
     ha_type = request_body_params["ha_type"] || PostgresResource::HaType::NONE
@@ -86,18 +87,26 @@ class Clover
     options.add_option(name: "name")
     options.add_option(name: "flavor", values: flavor)
     options.add_option(name: "location", values: Option.postgres_locations.map(&:display_name), parent: "flavor")
-    options.add_option(name: "size", values: [2, 4, 8, 16, 30, 60].map { "standard-#{_1}" }, parent: "location")
-
-    options.add_option(name: "storage_size", values: ["64", "128", "256", "512", "1024", "2048", "4096"], parent: "size") do |flavor, location, size, storage_size|
-      size = size.split("-").last.to_i
-      lower_limit = [size * 32, 1024].min
-      upper_limit = (2**Math.log2(size).ceil) * 128
-      storage_size.to_i >= lower_limit && storage_size.to_i <= upper_limit
+    options.add_option(name: "family", values: Option::PostgresSizes.map(&:vm_family).uniq, parent: "location") do |flavor, location, family|
+      available_families = Option.families(use_slices: @project.get_ff_use_slices_for_allocation || false).map { _1.name }
+      available_families.include?(family)
+    end
+    options.add_option(name: "size", values: Option::PostgresSizes.map { _1.name }.uniq, parent: "family") do |flavor, location, family, size|
+      location = LocationNameConverter.to_internal_name(location)
+      pg_size = Option::PostgresSizes.find { _1.name == size && _1.flavor == flavor && _1.location == location }
+      vm_size = Option::VmSizes.find { _1.name == pg_size.vm_size && _1.arch == "x64" && _1.visible }
+      vm_size.family == family
     end
 
-    options.add_option(name: "version", values: ["16", "17"], parent: "flavor")
+    options.add_option(name: "storage_size", values: ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096"], parent: "size") do |flavor, location, family, size, storage_size|
+      location = LocationNameConverter.to_internal_name(location)
+      pg_size = Option::PostgresSizes.find { _1.name == size && _1.flavor == flavor && _1.location == location }
+      pg_size.storage_size_options.include?(storage_size.to_i)
+    end
 
-    options.add_option(name: "ha_type", values: ["none", "async", "sync"], parent: "storage_size")
+    options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS[flavor], parent: "flavor")
+
+    options.add_option(name: "ha_type", values: [PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC], parent: "storage_size")
     options.serialize
   end
 end

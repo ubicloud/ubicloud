@@ -155,10 +155,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def create_billing_record
+    vm_family = representative_server.vm.family
+
     billing_record_parts = []
     (postgres_resource.required_standby_count + 1).times do |index|
-      billing_record_parts.push({resource_type: index.zero? ? "PostgresVCpu" : "PostgresStandbyVCpu", amount: representative_server.vm.vcpus})
-      billing_record_parts.push({resource_type: index.zero? ? "PostgresStorage" : "PostgresStandbyStorage", amount: postgres_resource.target_storage_size_gib})
+      billing_record_parts.push({resource_type: index.zero? ? "PostgresVCpu" : "PostgresStandbyVCpu", resource_family: "#{postgres_resource.flavor}-#{vm_family}", amount: representative_server.vm.vcpus})
+      billing_record_parts.push({resource_type: index.zero? ? "PostgresStorage" : "PostgresStandbyStorage", resource_family: postgres_resource.flavor, amount: postgres_resource.target_storage_size_gib})
     end
 
     billing_record_parts.each do |brp|
@@ -166,7 +168,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         project_id: postgres_resource.project_id,
         resource_id: postgres_resource.id,
         resource_name: postgres_resource.name,
-        billing_rate_id: BillingRate.from_resource_properties(brp[:resource_type], postgres_resource.flavor, postgres_resource.location)["id"],
+        billing_rate_id: BillingRate.from_resource_properties(brp[:resource_type], brp[:resource_family], postgres_resource.location)["id"],
         amount: brp[:amount]
       )
     end
