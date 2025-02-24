@@ -136,6 +136,10 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   end
 
   label def verify_cleanup
+    # not all tests will wait for cleanup, so we need to wait here until the
+    # cleanup is done
+    nap 15 unless vm_host.vms.empty?
+
     hop_verify_vm_dir_purged
   end
 
