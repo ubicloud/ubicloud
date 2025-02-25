@@ -79,10 +79,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       hop_wait_endpoint_up
     when "Failed", "NotStarted"
       params = {
-        gpu_count: inference_endpoint.gpu_count,
-        inference_engine: inference_endpoint.engine,
-        inference_engine_params: inference_endpoint.engine_params,
-        model: inference_endpoint.model_name,
+        engine_start_cmd: engine_start_cmd,
         replica_ubid: inference_endpoint_replica.ubid,
         ssl_crt_path: "/ie/workdir/ssl/ubi_cert.pem",
         ssl_key_path: "/ie/workdir/ssl/ubi_key.pem",
@@ -233,6 +230,16 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       rescue Sequel::Error => ex
         Clog.emit("Failed to update billing record") { {billing_record_update_error: {project_ubid: project.ubid, model_name: inference_endpoint.model_name, replica_ubid: inference_endpoint_replica.ubid, tokens: tokens, exception: Util.exception_to_hash(ex)}} }
       end
+    end
+  end
+
+  def engine_start_cmd
+    case inference_endpoint.engine
+    when "vllm"
+      env = (inference_endpoint.gpu_count == 0) ? "vllm-cpu" : "vllm"
+      "/opt/miniconda/envs/#{env}/bin/vllm serve /ie/models/model --served-model-name #{inference_endpoint.model_name} --disable-log-requests --host 127.0.0.1 #{inference_endpoint.engine_params}"
+    else
+      fail "BUG: unsupported inference engine"
     end
   end
 end
