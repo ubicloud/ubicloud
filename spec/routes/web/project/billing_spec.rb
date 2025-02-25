@@ -223,7 +223,7 @@ RSpec.describe Clover, "billing" do
       page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
       expect(page.status_code).to eq(400)
-      expect(page.body).to eq({message: "You can't delete the last payment method of a project."}.to_json)
+      expect(page.body).to eq({error: {message: "You can't delete the last payment method of a project."}}.to_json)
       expect(billing_info.reload.payment_methods.count).to eq(1)
     end
 
