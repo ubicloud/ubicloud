@@ -140,7 +140,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   describe "#setup" do
     it "triggers setup if setup command is not sent yet or failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"gpu_count\":1,\"inference_engine\":\"vllm\",\"inference_engine_params\":\"--some-params\",\"model\":\"llama\",\"replica_ubid\":\"theubid\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"}).twice
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"engine_start_cmd\":\"/opt/miniconda/envs/vllm/bin/vllm serve /ie/models/model --served-model-name llama --disable-log-requests --host 127.0.0.1 --some-params\",\"replica_ubid\":\"theubid\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"}).twice
       expect(inference_endpoint).to receive(:gpu_count).and_return(1).twice
       expect(inference_endpoint).to receive(:engine).and_return("vllm").twice
       expect(inference_endpoint).to receive(:engine_params).and_return("--some-params").twice
@@ -156,6 +156,19 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
       expect { nx.setup }.to nap(5)
     end
 
+    it "triggers setup for vllm with cpu if setup command is not sent yet or failed" do
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"engine_start_cmd\":\"/opt/miniconda/envs/vllm-cpu/bin/vllm serve /ie/models/model --served-model-name llama --disable-log-requests --host 127.0.0.1 --some-params\",\"replica_ubid\":\"theubid\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"})
+      expect(inference_endpoint).to receive(:gpu_count).and_return(0)
+      expect(inference_endpoint).to receive(:engine).and_return("vllm")
+      expect(inference_endpoint).to receive(:engine_params).and_return("--some-params")
+      expect(inference_endpoint).to receive(:model_name).and_return("llama")
+      expect(inference_endpoint).to receive(:load_balancer).and_return(instance_double(LoadBalancer, id: "lb-id", dst_port: 8443))
+
+      # NotStarted
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
+      expect { nx.setup }.to nap(5)
+    end
+
     it "hops to wait_endpoint_up if setup command has succeeded" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("Succeeded")
       expect { nx.setup }.to hop("wait_endpoint_up")
@@ -164,6 +177,12 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
     it "naps if script return unknown status" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("Unknown")
       expect { nx.setup }.to nap(5)
+    end
+
+    it "fails if inference engine is unsupported" do
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
+      expect(inference_endpoint).to receive(:engine).and_return("unsupported engine")
+      expect { nx.setup }.to raise_error("BUG: unsupported inference engine")
     end
   end
 
