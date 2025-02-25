@@ -28,6 +28,7 @@ class Project < Sequel::Model
   one_to_many :quotas, class: :ProjectQuota, key: :project_id
   one_to_many :invitations, class: :ProjectInvitation, key: :project_id
   one_to_many :api_keys, key: :owner_id, class: :ApiKey, conditions: {owner_table: "project"}
+  one_to_many :customer_aws_regions, key: :project_id, class: :CustomerAwsRegion
 
   dataset_module Pagination
 
@@ -184,6 +185,7 @@ end
 #  access_tag           | access_tag_project_id_fkey           | (project_id) REFERENCES project(id)
 #  action_tag           | action_tag_project_id_fkey           | (project_id) REFERENCES project(id)
 #  api_key              | api_key_project_id_fkey              | (project_id) REFERENCES project(id)
+#  customer_aws_region  | customer_aws_region_project_id_fkey  | (project_id) REFERENCES project(id)
 #  firewall             | firewall_project_id_fkey             | (project_id) REFERENCES project(id)
 #  github_installation  | github_installation_project_id_fkey  | (project_id) REFERENCES project(id)
 #  inference_endpoint   | inference_endpoint_project_id_fkey   | (project_id) REFERENCES project(id)

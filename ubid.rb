@@ -84,6 +84,7 @@ class UBID
   TYPE_KUBERNETES_CLUSTER = "kc"
   TYPE_KUBERNETES_NODEPOOL = "kn"
   TYPE_LOCATION = "10"
+  TYPE_CUSTOMER_AWS_REGION = "aw"
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
 
