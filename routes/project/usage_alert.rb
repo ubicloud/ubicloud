@@ -16,15 +16,12 @@ class Clover
       end
 
       r.is String do |usage_alert_ubid|
-        usage_alert = UsageAlert.from_ubid(usage_alert_ubid)
-        unless usage_alert
-          response.status = 404
-          next {message: "Usage alert is not found."}
-        end
+        next unless (usage_alert = UsageAlert.from_ubid(usage_alert_ubid))
 
         r.delete true do
           usage_alert.destroy
-          {message: "Usage alert #{usage_alert.name} is deleted."}
+          flash["notice"] = "Usage alert #{usage_alert.name} is deleted."
+          204
         end
       end
     end
