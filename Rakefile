@@ -361,6 +361,11 @@ namespace :linter do
     ERB::Formatter::CommandLine.new(files + ["--write", "--print-width", "120"]).run
   end
 
+  desc "Run golangci-lint"
+  task :go do
+    sh "golangci-lint run cli/ubi.go"
+  end
+
   desc "Validate, lint, format OpenAPI YAML file"
   task :openapi do
     sh "npx redocly lint openapi/openapi.yml --config openapi/redocly.yml"
@@ -370,4 +375,4 @@ namespace :linter do
 end
 
 desc "Run all linters"
-task linter: ["rubocop", "brakeman", "erb_formatter", "openapi"].map { "linter:#{_1}" }
+task linter: ["rubocop", "brakeman", "erb_formatter", "openapi", "go"].map { "linter:#{_1}" }
