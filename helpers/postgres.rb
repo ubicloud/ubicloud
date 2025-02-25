@@ -86,7 +86,7 @@ class Clover
 
     options.add_option(name: "name")
     options.add_option(name: "flavor", values: flavor)
-    options.add_option(name: "location", values: Option.postgres_locations.map(&:display_name), parent: "flavor")
+    options.add_option(name: "location", values: Option.postgres_locations(project_id: @project.id).map(&:id), parent: "flavor")
     options.add_option(name: "family", values: Option::PostgresSizes.map(&:vm_family).uniq, parent: "location") do |flavor, location, family|
       available_families = Option.families(use_slices: @project.get_ff_use_slices_for_allocation || false).map { _1.name }
       available_families.include?(family)

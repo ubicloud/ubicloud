@@ -81,7 +81,7 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         name = "new-pg-db"
         fill_in "Name", with: name
-        choose option: "eu-central-h1"
+        choose option: "caa7a807-36c5-8420-a75c-f906839dad71"
         choose option: "standard-2"
         choose option: PostgresResource::HaType::NONE
 
@@ -99,7 +99,7 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         name = "new-pg-db"
         fill_in "Name", with: name
-        choose option: "eu-central-h1"
+        choose option: "caa7a807-36c5-8420-a75c-f906839dad71"
         choose option: "standard-60"
         choose option: PostgresResource::HaType::NONE
 
@@ -119,7 +119,7 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - Create ParadeDB PostgreSQL Database")
         name = "new-pg-db"
         fill_in "Name", with: name
-        choose option: "eu-central-h1"
+        choose option: "caa7a807-36c5-8420-a75c-f906839dad71"
         choose option: "standard-2"
         choose option: PostgresResource::HaType::NONE
         check "Accept Terms of Service and Privacy Policy"
@@ -147,7 +147,7 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
 
         fill_in "Name", with: pg.name
-        choose option: "eu-central-h1"
+        choose option: "caa7a807-36c5-8420-a75c-f906839dad71"
         choose option: "standard-2"
         choose option: PostgresResource::HaType::NONE
 
