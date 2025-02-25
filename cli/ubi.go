@@ -48,12 +48,16 @@ func sendRequest(args []string) {
 	requestBodyHash["argv"] = args
 	request_body, err := json.Marshal(requestBodyHash)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error encoding request body\n")
+		fmt.Fprintf(os.Stderr, "! Error encoding request body\n")
 		os.Exit(1)
 	}
 
 	client := &http.Client{}
 	req, err := http.NewRequest("POST", baseURL(), bytes.NewBuffer(request_body))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "! Error creating http request\n")
+		os.Exit(1)
+	}
 	req.Header.Set("Authorization", "Bearer: "+getToken())
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "text/plain")
@@ -62,7 +66,7 @@ func sendRequest(args []string) {
 	debugLog("sending: %+v\n", args)
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error sending http request\n")
+		fmt.Fprintf(os.Stderr, "! Error sending http request\n")
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
@@ -79,7 +83,10 @@ func processResponse(resp *http.Response, args []string) {
 	case resp.StatusCode >= 200 && resp.StatusCode < 300:
 		handleSuccess(resp, args)
 	default:
-		io.Copy(os.Stderr, resp.Body)
+		_, err := io.Copy(os.Stderr, resp.Body)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "! Error copying response body to stderr\n")
+		}
 		os.Exit(1)
 	}
 }
@@ -90,7 +97,10 @@ func handleSuccess(resp *http.Response, args []string) {
 	} else if prompt := resp.Header.Get("ubi-confirm"); prompt != "" {
 		handleConfirmation(prompt, resp.Body, args)
 	} else {
-		io.Copy(os.Stdout, resp.Body)
+		_, err := io.Copy(os.Stdout, resp.Body)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "! Error copying response body to stdout\n")
+		}
 	}
 }
 
@@ -150,7 +160,11 @@ func handleConfirmation(prompt string, body io.Reader, args []string) {
 	}
 
 	allowConfirmation = false
-	io.Copy(os.Stdout, body)
+	_, err := io.Copy(os.Stdout, body)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "! Error copying response body to stdout\n")
+		os.Exit(1)
+	}
 	fmt.Printf("\n%s: ", prompt)
 
 	scanner := bufio.NewScanner(os.Stdin)

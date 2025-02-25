@@ -54,9 +54,6 @@ jobs:
         CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
       run: bundle exec rake _test_up
 
-    - name: "Run go fmt and check it makes no changes"
-      run: "cd cli && go fmt && git diff --stat --exit-code"
-
     - name: Build cli/ubi
       run: bundle exec rake ubi
 
@@ -67,3 +64,12 @@ jobs:
         CLOVER_COLUMN_ENCRYPTION_KEY: TtlY0+hd4lvedPkNbu5qsj5H7giPKJSRX9KDBrvid7c=
         UBI_CMD: ./cli/ubi
       run: bundle exec rspec spec/cli_spec.rb
+
+    - name: Run go fmt and check it makes no changes
+      run: "cd cli && go fmt && git diff --stat --exit-code"
+
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: v1.64
+        working-directory: cli
