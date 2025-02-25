@@ -62,6 +62,31 @@ class Prog::Vm::GithubRunner < Prog::Base
     vm_st.subject
   end
 
+  def find_closest_docker_mirror_server
+    compatible_servers = DockerRegistryMirrorServer.all.select { |server| server.vm.arch == vm.arch }
+    return nil if compatible_servers.empty?
+
+    same_vm_host_server = nil
+    same_data_center_server = nil
+    same_region_server = nil
+    fallback_server = nil
+
+    compatible_servers.each do |server|
+      if server.vm.vm_host.id == vm.vm_host_id
+        same_vm_host_server = server
+        break
+      elsif server.vm.vm_host.data_center == vm.vm_host.data_center
+        same_data_center_server = server
+      elsif server.vm.vm_host.data_center&.split("-")&.first == vm.vm_host.data_center&.split("-")&.first
+        same_region_server = server
+      else
+        fallback_server = server
+      end
+    end
+
+    same_vm_host_server || same_data_center_server || same_region_server || fallback_server
+  end
+
   def update_billing_record
     # If the runner is destroyed before it's ready or doesn't pick a job, don't charge for it.
     return unless github_runner.ready_at && github_runner.workflow_job
@@ -223,7 +248,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       UBICLOUD_CACHE_URL=#{Config.base_url}/runtime/github/" | sudo tee -a /etc/environment
     COMMAND
 
-    if (mirror_vm = Vm[Config.docker_mirror_server_vm_id]) && vm.vm_host_id == mirror_vm.vm_host_id
+    if github_runner.installation.use_docker_mirror_server && (mirror_vm = find_closest_docker_mirror_server)
       mirror_address = "#{mirror_vm.load_balancer.hostname}:5000"
       command += <<~COMMAND
         # Configure Docker daemon with registry mirror
