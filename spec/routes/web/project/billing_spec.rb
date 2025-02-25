@@ -378,7 +378,7 @@ RSpec.describe Clover, "billing" do
 
     describe "usage alerts" do
       before do
-        UsageAlert.create_with_id(project_id: project.id, user_id: user.id, name: "alert-1", limit: 100)
+        UsageAlert.create_with_id(project_id: project.id, user_id: user.id, name: "alert-1", limit: 101)
         UsageAlert.create_with_id(project_id: project_wo_permissions.id, user_id: user.id, name: "alert-2", limit: 100)
       end
 
@@ -402,9 +402,12 @@ RSpec.describe Clover, "billing" do
         expect(page).to have_content "alert-1"
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript enginer.
+        # UI tests run without a JavaScript engine.
         btn = find "#alert-#{project.usage_alerts.first.ubid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+
+        visit "#{project.path}/billing"
+        expect(page).to have_flash_notice "Usage alert alert-1 is deleted."
 
         visit "#{project.path}/billing"
         expect(page).to have_no_content "alert-1"
