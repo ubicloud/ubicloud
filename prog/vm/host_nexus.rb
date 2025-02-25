@@ -311,7 +311,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def unavailable
-    Prog::PageNexus.assemble("#{vm_host} is unavailable", ["VmHostUnavailable", vm_host.ubid], vm_host.ubid)
+    Prog::PageNexus.assemble("#{vm_host} disk(s) is unhealthy", ["VmHostUnavailable", vm_host.ubid], vm_host.ubid)
     if available?
       Page.from_tag_parts("VmHostUnavailable", vm_host.ubid)&.incr_resolve
       decr_checkup

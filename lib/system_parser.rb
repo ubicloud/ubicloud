@@ -5,7 +5,7 @@ class SystemParser
 
   def self.get_device_mount_points_from_lsblk_json(json_input, device_name)
     data = JSON.parse(json_input)
-    excluded_mounts = ["[SWAP]", "/boot", nil]
+    excluded_mounts = ["[SWAP]", "/boot", "/boot/efi", nil]
 
     mount_points = {}
 
