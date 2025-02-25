@@ -27,7 +27,7 @@ form_elements.each do |element|
   options = OptionTreeGenerator.generate_allowed_options(name, option_tree, option_parents).map do |option|
     opt_val = (type == "select") ? option[name][:value] : option[name]
 
-    opt_text = content_generator.call(*option.values)
+    next unless opt_text = content_generator.call(*option.values)
 
     parents = option.reject { |k, v| k == name }
     parents_selected = parents.all? { |k, v| selected_options[k] == v }
@@ -41,6 +41,7 @@ form_elements.each do |element|
 
     [opt_val, opt_text, opt_classes, opt_attrs]
   end if has_option
+  options&.compact!
 
   if has_option && selected_options[name].nil?
     options.find{ |_, _, _, opt_attrs| opt_attrs[:disabled].nil? }&.tap do |opt_val, _, _, opt_attrs|
