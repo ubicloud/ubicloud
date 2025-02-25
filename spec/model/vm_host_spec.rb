@@ -407,7 +407,7 @@ RSpec.describe VmHost do
     }
 
     allow(vh).to receive(:disk_devices).and_return(["sda"])
-    allow(session[:ssh_session]).to receive(:exec!).with("sudo smartctl -j -H /dev/sda | jq .smart_status.passed").and_return(MockStringWithExitstatus.new("true\n", 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("sudo smartctl -j -H /dev/sda -d scsi | jq .smart_status.passed").and_return(MockStringWithExitstatus.new("true\n", 0))
     allow(session[:ssh_session]).to receive(:exec!).with("lsblk --json").and_return(MockStringWithExitstatus.new('{"blockdevices": [{"name": "fd0","maj:min": "2:0","rm": true,"size": "4K","ro": false,"type": "disk","mountpoints": [null]},{"name": "sda","maj:min": "8:0","rm": false,"size": "2.2G","ro": false,"type": "disk","mountpoints": [null],"children": [{"name": "sda1","maj:min": "8:1","rm": false,"size": "2.1G","ro": false,"type": "part","mountpoints": ["/"]},{"name": "sda14","maj:min": "8:14","rm": false,"size": "4M","ro": false,"type": "part","mountpoints": [null]}]}]}', 0))
     allow(session[:ssh_session]).to receive(:exec!).with("sudo bash -c \"head -c 1M </dev/zero > /test-file\"").and_return(MockStringWithExitstatus.new("", 0))
     allow(session[:ssh_session]).to receive(:exec!).with("sha256sum /test-file").and_return(MockStringWithExitstatus.new("30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58  /test-file\n", 0))
@@ -465,9 +465,9 @@ RSpec.describe VmHost do
       reading_rpt: 5,
       reading_chg: Time.now - 30
     }
-    allow(vh).to receive(:disk_devices).and_return(["sda"])
+    allow(vh).to receive(:disk_devices).and_return(["nvme0n1"])
 
-    allow(session[:ssh_session]).to receive(:exec!).with("sudo smartctl -j -H /dev/sda | jq .smart_status.passed").and_return(MockStringWithExitstatus.new("false\n", 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("sudo smartctl -j -H /dev/nvme0n1 | jq .smart_status.passed").and_return(MockStringWithExitstatus.new("false\n", 0))
     expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
   end
 

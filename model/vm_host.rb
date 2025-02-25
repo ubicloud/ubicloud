@@ -287,7 +287,10 @@ class VmHost < Sequel::Model
 
   def check_storage_smartctl(ssh_session, devices)
     devices.map do |device_name|
-      passed = ssh_session.exec!("sudo smartctl -j -H /dev/#{device_name} | jq .smart_status.passed").strip == "true"
+      command = "sudo smartctl -j -H /dev/#{device_name}"
+      command << " -d scsi" if device_name.start_with?("sd")
+      command << " | jq .smart_status.passed"
+      passed = ssh_session.exec!(command).strip == "true"
       Clog.emit("Device #{device_name} failed smartctl check on VmHost #{ubid}") unless passed
       passed
     end.all?(true)
