@@ -30,7 +30,7 @@ class Prog::LearnStorage < Prog::Base
   end
 
   def find_underlying_unix_devices(unix_device)
-    return [unix_device] unless unix_device.start_with?("/dev/md")
+    return [unix_device.delete_prefix("/dev/")] unless unix_device.start_with?("/dev/md")
     SystemParser.extract_underlying_raid_devices_from_mdstat(sshable.cmd("cat /proc/mdstat"), unix_device)
   end
 
