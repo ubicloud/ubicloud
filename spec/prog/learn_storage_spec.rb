@@ -19,8 +19,12 @@ Filesystem     Mounted on                   1B-blocks        Avail
 /dev/sdb       /var/storage/devices/stor2  3331416064   3331276800
 EOS
       expect { ls.start }.to exit({"msg" => "created StorageDevice records"}).and change {
-        StorageDevice.map(&:name).sort
-      }.from([]).to(%w[DEFAULT stor1 stor2])
+        StorageDevice.all.map { |d| [d.name, d.unix_device_list.sort] }.sort
+      }.from([]).to([
+        ["DEFAULT", ["sda"]],
+        ["stor1", ["sdb"]],
+        ["stor2", ["sdc"]]
+      ])
     end
 
     it "exits, updating existing StorageDevice model instances" do

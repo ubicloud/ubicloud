@@ -316,14 +316,25 @@ class VmHost < Sequel::Model
     end
 
     all_mount_points.uniq.all? do |mount_point|
-      file_name = (mount_point == "/") ? "/test-file" : Shellwords.escape("#{mount_point}/test-file")
-      write_status = ssh_session.exec!("sudo bash -c \"head -c 1M </dev/zero > #{file_name}\"").exitstatus == 0
-      hash_status = ssh_session.exec!("sha256sum #{file_name}").strip == "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58  #{file_name}"
-      delete_status = ssh_session.exec!("sudo rm #{file_name}").exitstatus == 0
+      file_name = Shellwords.escape(File.join(mount_point, "test-file"))
 
-      working = write_status && hash_status && delete_status
-      Clog.emit("failed to perform read/write on mountpoint #{mount_point} on VmHost #{ubid}") unless working
-      working
+      write_result = ssh_session.exec!("sudo bash -c \"head -c 1M </dev/zero > #{file_name}\"")
+      write_status = write_result.exitstatus == 0
+      hash_result = ssh_session.exec!("sha256sum #{file_name}")
+      hash_status = hash_result.strip == "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58  #{file_name}"
+      delete_result = ssh_session.exec!("sudo rm #{file_name}")
+      delete_status = delete_result.exitstatus == 0
+
+      unless write_status && hash_status && delete_status
+        failure_reasons = []
+        failure_reasons << "Write failed (exitstatus=#{write_result.exitstatus}, output=#{write_result.strip})" unless write_status
+        failure_reasons << "Hash check failed (expected hash mismatch, output=#{hash_result.strip})" unless hash_status
+        failure_reasons << "Delete failed (exitstatus=#{delete_result.exitstatus}, output=#{delete_result.strip})" unless delete_status
+
+        Clog.emit("Failed to perform write/read/delete on mountpoint #{mount_point} on VmHost #{ubid}: #{failure_reasons.join("; ")}")
+      end
+
+      write_status && hash_status && delete_status
     end
   end
 
