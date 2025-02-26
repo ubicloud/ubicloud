@@ -225,59 +225,6 @@ class RegenScreenshots
     click_link "Compute"
     click_link "Create Virtual Machine"
     screenshot "quick-start/managed-services-2-screenshot.png"
-
-=begin
-    click_link "Networking"
-    click_link "Load Balancers"
-
-    resize(1200)
-    private_subnet = PrivateSubnet.create_with_id(
-      net6: "fe80::/16",
-      net4: "10.0.0.0/8",
-      state: "available",
-      name: "blog-app1-subnet",
-      location: "hetzner-fsn1"
-    )
-    Project.define_method(:private_subnets_dataset) do |*a|
-      super(*a).with_extend do
-        define_method(:all) { [private_subnet] }
-        define_method(:first) { private_subnet }
-      end
-    end
-
-    click_link "Create Load Balancer"
-
-    fill_in "Name", with: "my-blog"
-    select "blog-app1-subnet"
-    fill_in "Load Balancer Port", with: "443"
-    fill_in "Application Port", with: "443"
-    fill_in "HTTP Health Check Endpoint", with: "/up"
-    select "HTTPS"
-    screenshot "quick-start/using-kamal-with-ubicloud-1-screenshot.png"
-
-    vms = Array.new(2) do |i|
-      Vm.create_with_id(
-        name: "blog-app#{i + 1}",
-        unix_user: "a",
-        public_key: "a",
-        location: "hetzner-fsn1",
-        boot_image: "a",
-        family: "a",
-        cores: 2
-      )
-    end
-    PrivateSubnet.define_method(:vms_dataset) do |*a|
-      super(*a).with_extend do
-        define_method(:all) { vms }
-      end
-    end
-    Authorization.define_singleton_method(:has_permission?) { |*| true }
-
-    resize(1100)
-    click_button "Create"
-    find("#vm_id").click
-    screenshot "quick-start/using-kamal-with-ubicloud-2-screenshot.png"
-=end
   end
 end
 
