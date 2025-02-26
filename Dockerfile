@@ -1,4 +1,4 @@
-FROM node:23.6-alpine3.21 AS frontend-builder
+FROM docker.io/library/node:23.6-alpine3.21 AS frontend-builder
 WORKDIR /app
 COPY tailwind.config.js package.json package-lock.json ./
 COPY views/ ./views/
@@ -7,7 +7,7 @@ RUN npm ci
 RUN npm run prod
 
 
-FROM ruby:3.2.7-alpine3.21 AS bundler
+FROM docker.io/library/ruby:3.2.7-alpine3.21 AS bundler
 # Install build dependencies
 # - build-base, git, curl: To ensure certain gems can be compiled
 # - postgresql-dev: Required for postgresql gem
@@ -19,7 +19,7 @@ COPY Gemfile Gemfile.lock ./
 RUN bundle install
 
 
-FROM ruby:3.2.7-alpine3.21
+FROM docker.io/library/ruby:3.2.7-alpine3.21
 # Install runtime dependencies
 # - tzdata: The public-domain time zone database
 # - curl: Required for healthcheck and some basic operations
