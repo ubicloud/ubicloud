@@ -211,14 +211,14 @@ class RegenScreenshots
     end
     screenshot "security/access-control-2-screenshot.png"
 
-    select "System-Admins", from: "ace-select-1-1"
-    select "Vm:all", from: "ace-select-1-2"
+    select "System-Admins", from: "ace-select-1-0"
+    select "Vm:all", from: "ace-select-1-1"
 
-    select "Network-Admins", from: "ace-select-2-1"
-    select "Networking", from: "ace-select-2-2"
+    select "Network-Admins", from: "ace-select-2-0"
+    select "Networking", from: "ace-select-2-1"
 
-    select "Database-Admins", from: "ace-select-3-1"
-    select "Postgres:all", from: "ace-select-3-2"
+    select "Database-Admins", from: "ace-select-3-0"
+    select "Postgres:all", from: "ace-select-3-1"
     screenshot "security/access-control-3-screenshot.png"
 
     resize(1800)
