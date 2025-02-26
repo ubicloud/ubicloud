@@ -1,0 +1,31 @@
+<% @page_title = "AWS Regions" %>
+
+<%== part(
+  "components/page_header",
+  right_items: (@regions&.count > 0) ? [
+    part("components/button", text: "Create Region", link: "/region/create")
+  ] : []
+) %>
+
+<div class="grid gap-6">
+  <%== part(
+      "components/table_card",
+      headers: ["Name", "Project"],
+      rows: @regions.map do |r|
+         [
+           [
+             [r[:name], {link: r[:path]}],
+             [r[:project_name]]
+           ],
+           { id: "region-#{r[:id]}" }
+         ]
+      end,
+      empty_state: {
+        icon: "aws",
+        title: "No regions",
+        description: "Get started by creating a new region.",
+        button_link: "/region/create",
+        button_title: "Create Region"
+      }
+    ) %>
+</div>

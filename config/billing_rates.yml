@@ -85,6 +85,38 @@
 - { id: 92889bfe-e2f8-4839-894e-e1feb15d2a9b, resource_type: PostgresStandbyStorage,  resource_family: paradedb,            location: leaseweb-wdc02, unit_price: 0.0000044642, billed_by: duration, active_from: 2025-01-01T00:00:00Z }
 - { id: fa51b67c-54ba-4b0a-80df-b0244fd90712, resource_type: PostgresStandbyStorage,  resource_family: lantern,             location: hetzner-fsn1,   unit_price: 0.0000029761, billed_by: duration, active_from: 2025-01-01T00:00:00Z }
 - { id: f9d257bd-ec0f-434a-a998-605fd82179b1, resource_type: PostgresStandbyStorage,  resource_family: lantern,             location: leaseweb-wdc02, unit_price: 0.0000033481, billed_by: duration, active_from: 2025-01-01T00:00:00Z }
+
+- { id: adcb163c-da34-8578-8e4b-26ca6bf76fba, resource_type: VmVCpu,                  resource_family: standard,            location: aws-us-west,    unit_price: 0, billed_by: duration, active_from: 2025-01-01T00:00:00Z }
+- { id: a6804650-e387-8978-bc6c-7965001f1bdc, resource_type: VmVCpu,                  resource_family: standard,            location: aws-us-east,    unit_price: 0, billed_by: duration, active_from: 2025-01-01T00:00:00Z }
+- { id: 32d84884-738c-8578-9fc0-7c9af96abf73, resource_type: VmStorage,               resource_family: standard,            location: aws-us-west,    unit_price: 0, billed_by: duration, active_from: 2025-01-01T00:00:00Z }
+- { id: 5d3d4bfe-e0e7-8978-8ac2-260b565aa737, resource_type: VmStorage,               resource_family: standard,            location: aws-us-east,    unit_price: 0, billed_by: duration, active_from: 2025-01-01T00:00:00Z }
+- { id: 6c4c05be-df27-8978-a542-2793624fca4f, resource_type: IPAddress,               resource_family: IPv4,                location: aws-us-west,    unit_price: 0, billed_by: duration, active_from: 2023-01-01T00:00:00Z }
+- { id: 48e86741-c1ca-8978-bd01-a6e85bb38963, resource_type: IPAddress,               resource_family: IPv4,                location: aws-us-east,    unit_price: 0, billed_by: duration, active_from: 2023-01-01T00:00:00Z }
+- { id: ba5cc13f-dd34-8178-91a6-314dd036bf1e, resource_type: PostgresVCpu,            resource_family: standard-standard,   location: aws-us-west,    unit_price: 0.0005518353, billed_by: duration, active_from: 2025-02-17T00:00:00Z }
+- { id: 4130391d-81fd-8178-871c-9511350c0b16, resource_type: PostgresVCpu,            resource_family: standard-standard,   location: aws-us-east,    unit_price: 0.0006696429, billed_by: duration, active_from: 2025-02-17T00:00:00Z }
+- { id: c85e1421-0801-8d78-9536-e5124f01a6d8, resource_type: PostgresVCpu,            resource_family: paradedb-standard,   location: aws-us-west,    unit_price: 0.0011036706, billed_by: duration, active_from: 2025-02-17T00:00:00Z }
+- { id: e8b2413b-1a51-8978-b8e6-8157d3491550, resource_type: PostgresVCpu,            resource_family: paradedb-standard,   location: aws-us-east,    unit_price: 0.0013392858, billed_by: duration, active_from: 2025-02-17T00:00:00Z }
+- { id: 6d88457f-4241-8178-9205-274ebea1d19f, resource_type: PostgresVCpu,            resource_family: lantern-standard,    location: aws-us-west,    unit_price: 0.0008277530, billed_by: duration, active_from: 2025-02-17T00:00:00Z }
+- { id: 025e5656-3eca-8978-879c-0958a0ae93c2, resource_type: PostgresVCpu,            resource_family: lantern-standard,    location: aws-us-east,    unit_price: 0.0010044644, billed_by: duration, active_from: 2025-02-17T00:00:00Z }
+- { id: 2a7fb1ca-02c0-8578-97bb-89df451cffe9, resource_type: PostgresStandbyVCpu,     resource_family: standard-standard,   location: aws-us-west,    unit_price: 0.0005518353, billed_by: duration, active_from: 2025-02-17T00:00:00Z }
+- { id: 603526dc-0d6c-8178-a12e-25037dd8caae, resource_type: PostgresStandbyVCpu,     resource_family: standard-standard,   location: aws-us-east,    unit_price: 0.0006696429, billed_by: duration, active_from: 2025-02-17T00:00:00Z }
+- { id: 62a394fd-0ea3-8d78-bbe5-6a4eba630e57, resource_type: PostgresStandbyVCpu,     resource_family: paradedb-standard,   location: aws-us-west,    unit_price: 0.0011036706, billed_by: duration, active_from: 2025-02-17T00:00:00Z }
+- { id: 55053c22-3124-8978-928f-d956e1213cc7, resource_type: PostgresStandbyVCpu,     resource_family: paradedb-standard,   location: aws-us-east,    unit_price: 0.0013392858, billed_by: duration, active_from: 2025-02-17T00:00:00Z }
+- { id: fb31f806-a524-8178-93a5-1ee30a6373a4, resource_type: PostgresStandbyVCpu,     resource_family: lantern-standard,    location: aws-us-west,    unit_price: 0.0008277530, billed_by: duration, active_from: 2025-02-17T00:00:00Z }
+- { id: 608c6620-0c3f-8178-a361-2b6dfde9be20, resource_type: PostgresStandbyVCpu,     resource_family: lantern-standard,    location: aws-us-east,    unit_price: 0.0010044644, billed_by: duration, active_from: 2025-02-17T00:00:00Z }
+- { id: 1de61497-fb37-8d78-98a7-7230ca5fd8fd, resource_type: PostgresStorage,         resource_family: standard,            location: aws-us-west,    unit_price: 0.0000019841, billed_by: duration, active_from: 2025-01-01T00:00:00Z }
+- { id: 2ad0bbd5-b896-8178-acc5-529b9f871887, resource_type: PostgresStorage,         resource_family: standard,            location: aws-us-east,    unit_price: 0.0000022321, billed_by: duration, active_from: 2025-01-01T00:00:00Z }
+- { id: 0b7e8bd1-f2b8-8178-adeb-549b81f0ce29, resource_type: PostgresStorage,         resource_family: paradedb,            location: aws-us-west,    unit_price: 0.0000039682, billed_by: duration, active_from: 2025-01-01T00:00:00Z }
+- { id: e2f37268-ca65-8578-9059-5ea41294b6da, resource_type: PostgresStorage,         resource_family: paradedb,            location: aws-us-east,    unit_price: 0.0000044642, billed_by: duration, active_from: 2025-01-01T00:00:00Z }
+- { id: 4a1f4166-5bb4-8978-9603-f8dc1093667a, resource_type: PostgresStorage,         resource_family: lantern,             location: aws-us-west,    unit_price: 0.0000029761, billed_by: duration, active_from: 2025-01-01T00:00:00Z }
+- { id: c81fef2d-f288-8978-85cf-20ca1ff5cf29, resource_type: PostgresStorage,         resource_family: lantern,             location: aws-us-east,    unit_price: 0.0000033481, billed_by: duration, active_from: 2025-01-01T00:00:00Z }
+- { id: 410756e5-a379-8578-ac7c-a89ece1bccdb, resource_type: PostgresStandbyStorage,  resource_family: standard,            location: aws-us-west,    unit_price: 0.0000019841, billed_by: duration, active_from: 2025-01-01T00:00:00Z }
+- { id: 8d2e044c-d592-8978-87a2-ef3017e2a1a3, resource_type: PostgresStandbyStorage,  resource_family: standard,            location: aws-us-east,    unit_price: 0.0000022321, billed_by: duration, active_from: 2025-01-01T00:00:00Z }
+- { id: cf81e92a-b776-8d78-b139-20c2bf334850, resource_type: PostgresStandbyStorage,  resource_family: paradedb,            location: aws-us-west,    unit_price: 0.0000039682, billed_by: duration, active_from: 2025-01-01T00:00:00Z }
+- { id: d07207c0-0226-8178-aa04-1941bc264dca, resource_type: PostgresStandbyStorage,  resource_family: paradedb,            location: aws-us-east,    unit_price: 0.0000044642, billed_by: duration, active_from: 2025-01-01T00:00:00Z }
+- { id: 961802a0-a0ba-8578-bd4e-594d0c649840, resource_type: PostgresStandbyStorage,  resource_family: lantern,             location: aws-us-west,    unit_price: 0.0000029761, billed_by: duration, active_from: 2025-01-01T00:00:00Z }
+- { id: ad9c7384-f7b1-8d78-ab9d-6910348f682f, resource_type: PostgresStandbyStorage,  resource_family: lantern,             location: aws-us-east,    unit_price: 0.0000033481, billed_by: duration, active_from: 2025-01-01T00:00:00Z }
+
 - { id: d772d0aa-0b40-4b7a-aceb-72f6211f7cad, resource_type: GitHubRunnerMinutes,     resource_family: standard-2,          location: global,         unit_price: 0.0008000000, billed_by: amount,   active_from: 2023-01-01T00:00:00Z }
 - { id: d885c82d-b139-40d5-890f-de3720896b3b, resource_type: GitHubRunnerMinutes,     resource_family: standard-4,          location: global,         unit_price: 0.0016000000, billed_by: amount,   active_from: 2023-01-01T00:00:00Z }
 - { id: e50e6bff-6ee9-493b-bc09-75f122863d08, resource_type: GitHubRunnerMinutes,     resource_family: standard-8,          location: global,         unit_price: 0.0032000000, billed_by: amount,   active_from: 2023-01-01T00:00:00Z }
@@ -173,3 +205,33 @@
 - { id: 311ff500-c1dc-8578-8679-9ab3eac4db01, resource_type: PostgresStandbyStorage,  resource_family: paradedb,            location: leaseweb-wdc02, unit_price: 0.0000062000, billed_by: duration, active_from: 2024-10-07T00:00:00Z }
 - { id: abeae2a0-e163-4345-8c04-20a832f9febf, resource_type: PostgresStandbyStorage,  resource_family: lantern,             location: hetzner-fsn1,   unit_price: 0.0000042150, billed_by: duration, active_from: 2024-10-10T00:00:00Z }
 - { id: 782ef01f-8976-49ff-8c05-413332d7440e, resource_type: PostgresStandbyStorage,  resource_family: lantern,             location: leaseweb-wdc02, unit_price: 0.0000046500, billed_by: duration, active_from: 2024-10-10T00:00:00Z }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

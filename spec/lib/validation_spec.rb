@@ -193,11 +193,11 @@ RSpec.describe Validation do
 
     describe "#validate_postgres_size" do
       it "valid postgres size" do
-        expect(described_class.validate_postgres_size("hetzner-fsn1", "standard-2").name).to eq("standard-2")
+        expect(described_class.validate_postgres_size(Location[name: "hetzner-fsn1"].ubid, "standard-2").name).to eq("standard-2")
       end
 
       it "invalid postgres size" do
-        expect { described_class.validate_postgres_size("hetzner-fsn1", "standard-3") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_postgres_size(Location[name: "hetzner-fsn1"].ubid, "standard-3") }.to raise_error described_class::ValidationFailed
       end
     end
 
@@ -209,7 +209,7 @@ RSpec.describe Validation do
           ["hetzner-fsn1", "standard-4", "512"],
           ["leaseweb-wdc02", "standard-4", "256"]
         ].each do |location, pg_size, storage_size|
-          expect(described_class.validate_postgres_storage_size(location, pg_size, storage_size)).to eq(storage_size.to_f)
+          expect(described_class.validate_postgres_storage_size(Location[name: location].ubid, pg_size, storage_size)).to eq(storage_size.to_f)
         end
       end
 
