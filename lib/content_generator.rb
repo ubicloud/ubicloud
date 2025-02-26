@@ -61,7 +61,7 @@ module ContentGenerator
       Location[location].ui_name
     end
 
-    def self.family(flavor, location, family)
+    def self.family(flavor, location_ubid, family)
       vm_family = Option::VmFamilies.find { _1.name == family }
 
       [
@@ -70,8 +70,9 @@ module ContentGenerator
       ]
     end
 
-    def self.size(flavor, location, family, size)
-      location = LocationNameConverter.to_internal_name(Location[location].display_name)
+    def self.size(flavor, location_ubid, family, size)
+      location = Location[location_ubid].billing_name
+
       size = Option::PostgresSizes.find { _1.display_name == size }
       unit_price = BillingRate.from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location)["unit_price"].to_f
 
@@ -83,9 +84,9 @@ module ContentGenerator
       ]
     end
 
-    def self.storage_size(flavor, location, family, vm_size, storage_size)
-      location = Location[location].display_name
-      location = LocationNameConverter.to_internal_name(location)
+    def self.storage_size(flavor, location_ubid, family, vm_size, storage_size)
+      location = Location[location_ubid].billing_name
+
       unit_price = BillingRate.from_resource_properties("PostgresStorage", flavor, location)["unit_price"].to_f
 
       [
@@ -100,9 +101,9 @@ module ContentGenerator
       "Postgres #{version}"
     end
 
-    def self.ha_type(flavor, location, family, vm_size, storage_size, ha_type)
-      location = Location[location].display_name
-      location = LocationNameConverter.to_internal_name(location)
+    def self.ha_type(flavor, location_ubid, family, vm_size, storage_size, ha_type)
+      location = Location[location_ubid].billing_name
+
       vcpu = Option::PostgresSizes.find { _1.display_name == vm_size }.vcpu
       ha_type = Option::PostgresHaOptions.find { _1.name == ha_type }
       compute_unit_price = BillingRate.from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location)["unit_price"].to_f

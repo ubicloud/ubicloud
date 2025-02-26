@@ -6,6 +6,19 @@ class CustomerAwsRegion < Sequel::Model
   include ResourceMethods
   many_to_one :project
   one_to_one :location
+
+  plugin :column_encryption do |enc|
+    enc.column :access_key
+    enc.column :secret_key
+  end
+
+  def path
+    "/region/#{ubid}"
+  end
+
+  def has_resources
+    project.has_resources
+  end
 end
 
 # Table: customer_aws_region

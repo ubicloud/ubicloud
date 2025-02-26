@@ -8,7 +8,7 @@ class Clover
 
     r.web do
       r.post true do
-        @location = LocationNameConverter.to_internal_name(Location[r.params["location"]].display_name)
+        @location = Location[r.params["location"]]
         postgres_post(r.params["name"])
       end
 

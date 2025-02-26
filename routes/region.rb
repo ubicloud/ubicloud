@@ -16,7 +16,6 @@ class Clover
     r.post true do
       required_parameters = ["name", "aws_region_name", "aws_access_key", "aws_secret_key", "project_id"]
       request_body_params = validate_request_params(required_parameters)
-      puts "request_body_params: #{request_body_params.inspect}"
       project = Project.from_ubid(request_body_params["project_id"])
       unless project
         if api?
@@ -26,11 +25,6 @@ class Clover
         end
       end
 
-      puts "project.accounts_dataset.where(Sequel[:accounts][:id] => current_account_id).empty?"
-      puts project.accounts_dataset.where(Sequel[:accounts][:id] => current_account_id).empty?
-      puts "current_account_id: #{current_account_id}"
-      puts "project.accounts_dataset: #{project.accounts}"
-      puts "project.accounts_dataset.where(Sequel[:accounts][:id] => current_account_id): #{project.accounts_dataset.where(Sequel[:accounts][:id] => current_account_id)}"
       if project.accounts_dataset.where(Sequel[:accounts][:id] => current_account_id).empty?
         fail Authorization::Unauthorized
       end
@@ -43,7 +37,7 @@ class Clover
         )
         Location.create_with_id(
           display_name: request_body_params["name"].downcase.tr(" ", "-"),
-          name: "aws-#{request_body_params["aws_region_name"]}",
+          name: "#{project.ubid}-aws-#{request_body_params["aws_region_name"]}",
           ui_name: request_body_params["name"],
           visible: true,
           provider: "aws",
@@ -60,13 +54,12 @@ class Clover
 
     r.get(web?, "create") do
       @projects = Serializers::Project.serialize(current_account.projects_dataset.where(visible: true).all)
-
+      @available_aws_regions = ["us-east-1", "us-west-1"]
       view "region/create"
     end
 
     r.on String do |region_ubid|
       @region = CustomerAwsRegion.from_ubid(region_ubid)
-      @region = nil unless @region&.visible
 
       next(r.delete? ? 204 : 404) unless @region
 
@@ -74,44 +67,35 @@ class Clover
         fail Authorization::Unauthorized
       end
 
+      @project = @region.project
       @region_data = Serializers::Region.serialize(@region)
       @region_permissions = all_permissions(@region.id) if web?
 
       r.get true do
-        authorize("Region:view", @region.id)
+        # authorize("Project:Region:view", @project.id)
 
         if api?
           Serializers::Region.serialize(@region)
         else
-          # @quotas = ["VmVCpu", "PostgresVCpu"].map {
-          #   {
-          #     resource_type: _1,
-          #     current_resource_usage: @project.current_resource_usage(_1),
-          #     quota: @project.effective_quota_value(_1)
-          #   }
-          # }
-
           view "region/show"
         end
       end
 
       r.delete true do
-        authorize("Region:delete", @region.id)
+        # authorize("Region:delete", @region.id)
 
         if @region.has_resources
           fail DependencyError.new("'#{@region.name}' region has some resources. Delete all related resources first.")
         end
 
-        @region.soft_delete
-
+        @region.location.destroy
+        @region.destroy
         204
       end
 
       if web?
-        r.get("dashboard") { view("region/dashboard") }
-
         r.post true do
-          authorize("Region:edit", @region.id)
+          authorize("Project:Region:edit", @project.id)
           @region.update(name: r.params["name"])
 
           flash["notice"] = "The region name is updated to '#{@region.name}'."

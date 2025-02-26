@@ -18,7 +18,7 @@ RSpec.describe Authorization do
   }
   let(:pg) {
     Prog::Postgres::PostgresResourceNexus.assemble(
-      project_id: projects[0].id, location: "hetzner-fsn1", name: "pg0", target_vm_size: "standard-2", target_storage_size_gib: 128
+      project_id: projects[0].id, location_id: Location[name: "hetzner-fsn1"].id, name: "pg0", target_vm_size: "standard-2", target_storage_size_gib: 128
     ).subject
   }
 

@@ -4,8 +4,8 @@ Sequel.migration do
   up do
     create_table(:customer_aws_region) do
       column :id, :uuid, primary_key: true
-      column :access_key, String, null: false
-      column :secret_key, String, null: false
+      column :access_key, String, null: false, collate: '"C"'
+      column :secret_key, String, null: false, collate: '"C"'
       foreign_key :project_id, :project, type: :uuid, null: false
     end
 

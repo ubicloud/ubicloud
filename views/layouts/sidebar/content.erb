@@ -71,13 +71,15 @@
               is_active: request.path.start_with?("/project"),
               icon: "hero-folder-open"
             ) %>
-            <%== part(
-              "layouts/sidebar/item",
-              name: "AWS Regions",
-              url: "/region",
-              is_active: request.path.start_with?("/region"),
-              icon: "hero-globe-alt"
-            ) %>
+            <% if Config.custom_aws_regions_enabled %>
+              <%== part(
+                "layouts/sidebar/item",
+                name: "AWS Regions",
+                url: "/region",
+                is_active: request.path.start_with?("/region"),
+                icon: "aws"
+              ) %>
+            <% end %>
           <% end %>
         </ul>
       </li>

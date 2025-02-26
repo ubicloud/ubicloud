@@ -10,7 +10,7 @@ RSpec.describe Clover, "postgres" do
   let(:pg) do
     Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: project.id,
-      location: "hetzner-fsn1",
+      location_id: Location[name: "hetzner-fsn1"].id,
       name: "pg-with-permission",
       target_vm_size: "standard-2",
       target_storage_size_gib: 128
@@ -70,7 +70,7 @@ RSpec.describe Clover, "postgres" do
       it "success multiple" do
         Prog::Postgres::PostgresResourceNexus.assemble(
           project_id: project.id,
-          location: "hetzner-fsn1",
+          location_id: Location[name: "hetzner-fsn1"].id,
           name: "pg-test-2",
           target_vm_size: "standard-2",
           target_storage_size_gib: 128
