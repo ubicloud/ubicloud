@@ -115,6 +115,14 @@ class RegenScreenshots
     project = Project.first
 
     resize(650)
+    click_link "Tokens"
+    screenshot "quick-start/cli-1-screenshot.png"
+
+    click_button "Create Token"
+    ApiKey.dataset.update(id: "bf444ee6-2532-8153-975e-af787dbc796e")
+    page.refresh
+    screenshot "quick-start/cli-2-screenshot.png"
+
     click_link "PostgreSQL"
     screenshot "managed-postgresql/overview-1-screenshot.png"
 
