@@ -12,7 +12,7 @@ FROM ruby:3.2.7-alpine3.21 AS bundler
 # - build-base, git, curl: To ensure certain gems can be compiled
 # - postgresql-dev: Required for postgresql gem
 RUN apk update --no-cache && \
-    apk add build-base git curl postgresql-dev --no-cache
+    apk add build-base git curl postgresql-dev libffi-dev --no-cache
 WORKDIR /app
 COPY Gemfile Gemfile.lock ./
 
@@ -27,7 +27,7 @@ FROM ruby:3.2.7-alpine3.21
 # - gcompat: Required for nokogiri gem at runtime. https://nokogiri.org/tutorials/installing_nokogiri.html#linux-musl-error-loading-shared-library
 # - foreman: Helps to start different parts of app based on Procfile
 RUN apk update --no-cache && \
-    apk add tzdata curl postgresql-client gcompat --no-cache && \
+    apk add tzdata curl postgresql-client gcompat libffi --no-cache && \
     gem install foreman
 
 RUN adduser -D ubicloud && \
