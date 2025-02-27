@@ -133,7 +133,7 @@ Description=SPDK hugepages mount #{@spdk_version}
 What=hugetlbfs
 Where=#{hugepages_dir}
 Type=hugetlbfs
-Options=uid=#{user},size=3G
+Options=uid=#{user},size=4G
 
 [Install]
 WantedBy=#{spdk_service}
@@ -145,20 +145,16 @@ SPDK_HUGEPAGES_MOUNT
     iobuf_conf = [{
       method: "iobuf_set_options",
       params: {
-        # Each bdev iobuf channel requires 128 small pool items & 16 large pool
-        # items. These are hard-coded in v23.09 and aren't configurable. Each
-        # accel iobuf channel requires 128 small pool & 16 large pool items.
-        # These values are configurable using accel_set_options.
+        # When we create an encrypted volume, SPDK pre-allocates 32 large pool
+        # items and 256 small pool items for that volumne. Depending on amount
+        # of concurrent IO requests being served, SPDK will allocate more items
+        # on demand. In my tests, this number peaked at 512 large items for a
+        # volume when doing bursts of 256k writes.
         #
-        # An unencrypted volume requires 1 bdev & 1 accel iobuff channels. An
-        # encrypted volume requires 1 bdev & 2 accel iobuff channels.
-        #
-        # So, small_pool_count must be at least #Volumes-per-host*3*128, and
-        # large_pool_count must be at least #Volumes-per-host*3*16. This config,
-        # which modifies the defaults, is enough for 150 encrypted volumes in a
-        # host.
-        small_pool_count: 57600,
-        large_pool_count: 7200,
+        # So, this config should be enough for 18 VMs doing bursts of 256k
+        # writes at the same time.
+        small_pool_count: 76800,
+        large_pool_count: 9600,
         small_bufsize: 8192,
         large_bufsize: 135168
       }
