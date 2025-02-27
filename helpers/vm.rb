@@ -97,7 +97,9 @@ class Clover
     end
 
     options.add_option(name: "enable_ip4", values: ["1"], parent: "location")
-    options.add_option(name: "family", values: Option.families(use_slices: @project.get_ff_use_slices_for_allocation || false).map { _1.name }, parent: "location")
+    options.add_option(name: "family", values: Option.families(use_slices: @project.get_ff_use_slices_for_allocation || false).map { _1.name }, parent: "location") do |location, family|
+      !!BillingRate.from_resource_properties("VmVCpu", family, LocationNameConverter.to_internal_name(location))
+    end
     options.add_option(name: "size", values: Option::VmSizes.select { _1.visible }.map { _1.display_name }, parent: "family") do |location, family, size|
       vm_size = Option::VmSizes.find { _1.display_name == size && _1.arch == "x64" }
       vm_size.family == family

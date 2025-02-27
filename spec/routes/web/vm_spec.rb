@@ -91,6 +91,13 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content("31/32 (96%)")
       end
 
+      it "shows vm create page with burstable and location_latitude_fra" do
+        project.set_ff_location_latitude_fra true
+        project.set_ff_use_slices_for_allocation true
+        visit "#{project.path}/vm/create"
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+      end
+
       it "shows expected information on index page" do
         project
 

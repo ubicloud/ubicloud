@@ -5,6 +5,16 @@ RSpec.describe BillingRate do
     expect(described_class.rates.map { _1["id"] }.size).to eq(described_class.rates.map { _1["id"] }.uniq.size)
   end
 
+  describe "#unit_price_from_resource_properties" do
+    it "returns unit price for VmVCpu" do
+      expect(described_class.unit_price_from_resource_properties("VmVCpu", "standard", "hetzner-fsn1")).to be_a(Float)
+    end
+
+    it "returns nil for unknown type" do
+      expect(described_class.unit_price_from_resource_properties("VmVCpu", "unknown", "hetzner-fsn1")).to be_nil
+    end
+  end
+
   describe ".line_item_description" do
     it "returns for VmVCpu" do
       expect(described_class.line_item_description("VmVCpu", "standard", 8)).to eq("standard-8 Virtual Machine")

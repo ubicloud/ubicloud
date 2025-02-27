@@ -20,8 +20,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     Validation.validate_location(location)
     Validation.validate_name(name)
-    Validation.validate_vm_size(target_vm_size, "x64")
+    vm_size = Validation.validate_vm_size(target_vm_size, "x64")
     Validation.validate_postgres_ha_type(ha_type)
+    Validation.validate_billing_rate("PostgresVCpu", "#{flavor}-#{vm_size.family}", location)
 
     DB.transaction do
       superuser_password, timeline_id, timeline_access, version = if parent_id.nil?

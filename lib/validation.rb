@@ -246,6 +246,12 @@ module Validation
     end
   end
 
+  def self.validate_billing_rate(resource_type, resource_family, location)
+    unless BillingRate.from_resource_properties(resource_type, resource_family, location)
+      fail ValidationFailed.new({location: "Resource family #{resource_family} is not available in location #{location}"})
+    end
+  end
+
   def self.validate_cloudflare_turnstile(cf_response)
     return unless Config.cloudflare_turnstile_site_key
 
