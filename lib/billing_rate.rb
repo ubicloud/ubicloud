@@ -20,6 +20,10 @@ class BillingRate
     }.max_by { _1["active_from"] }
   end
 
+  def self.unit_price_from_resource_properties(resource_type, resource_family, location, active_at = Time.now)
+    from_resource_properties(resource_type, resource_family, location, active_at)&.[]("unit_price")&.to_f
+  end
+
   def self.from_resource_type(resource_type)
     rates.select {
       _1["resource_type"] == resource_type
