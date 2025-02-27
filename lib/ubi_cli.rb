@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "rodish"
+
 class UbiCli
   force_autoload = Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
 
