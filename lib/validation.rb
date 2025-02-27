@@ -60,7 +60,7 @@ module Validation
   end
 
   def self.validate_postgres_location(location)
-    available_pg_locs = Option.postgres_locations.map(&:name)
+    available_pg_locs = Option.postgres_all_locations.map(&:name)
     msg = "Given location is not a valid postgres location. Available locations: #{available_pg_locs.map { LocationNameConverter.to_display_name(_1) }}"
     fail ValidationFailed.new({location: msg}) unless available_pg_locs.include?(location)
   end
@@ -127,16 +127,16 @@ module Validation
     }
   end
 
-  def self.validate_postgres_size(location, size)
-    unless (postgres_size = Option::PostgresSizes.find { _1.location == location && _1.name == size })
+  def self.validate_postgres_size(location_ubid, size)
+    unless (postgres_size = Option::PostgresSizes.find { _1.location_ubid == location_ubid && _1.name == size })
       fail ValidationFailed.new({size: "\"#{size}\" is not a valid PostgreSQL database size. Available sizes: #{Option::PostgresSizes.map(&:name)}"})
     end
     postgres_size
   end
 
-  def self.validate_postgres_storage_size(location, size, storage_size)
+  def self.validate_postgres_storage_size(location_ubid, size, storage_size)
     storage_size = storage_size.to_i
-    pg_size = validate_postgres_size(location, size)
+    pg_size = validate_postgres_size(location_ubid, size)
     fail ValidationFailed.new({storage_size: "Storage size must be one of the following: #{pg_size.storage_size_options.join(", ")}"}) unless pg_size.storage_size_options.include?(storage_size)
     storage_size
   end

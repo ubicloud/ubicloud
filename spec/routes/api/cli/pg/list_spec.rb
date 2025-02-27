@@ -9,7 +9,7 @@ RSpec.describe Clover, "cli pg list" do
     expect(Config).to receive(:postgres_service_project_id).and_return(@project.id).at_least(:once)
     @pg = Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: @project.id,
-      location: "hetzner-fsn1",
+      location_id: Location[name: "hetzner-fsn1"].id,
       name: "test-pg",
       target_vm_size: "standard-2",
       target_storage_size_gib: 64

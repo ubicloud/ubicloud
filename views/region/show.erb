@@ -1,0 +1,54 @@
+<% @page_title = @region_data[:name] %>
+
+<%== part(
+  "components/page_header",
+  title: "Region Settings",
+  back: "/region",
+  breadcrumbs: [%w[AWS\ Regions /region], [@region_data[:name], @region_data[:path]], %w[Settings #]]
+) %>
+
+<div class="grid gap-6">
+  <!-- Detail Card -->
+  <form action="<%= (@region_data[:path]) %>" method="POST">
+    <%== csrf_tag((@region_data[:path])) %>
+
+    <%== part(
+      "components/kv_data_card",
+      data: [
+        ["ID", @region_data[:id]],
+        (
+            [
+              "Name",
+              part(
+                "components/form/text",
+                name: "name",
+                value: @region_data[:name],
+                button_title: "Save",
+                attributes: {
+                  required: true
+                }
+              ),
+              { escape: false }
+            ]
+        )
+      ]
+    ) %>
+  </form>
+
+  <!-- Delete Card -->
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="sm:flex sm:items-center sm:justify-between">
+          <div>
+            <h3 class="text-base font-semibold leading-6 text-gray-900">Delete region</h3>
+            <div class="mt-2 text-sm text-gray-500">
+              <p>This action will permanently delete this region. Deleted data cannot be recovered. Use it carefully.</p>
+            </div>
+          </div>
+          <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+            <%== part("components/delete_button", confirmation: @region_data[:name], redirect: "/region") %>
+          </div>
+        </div>
+      </div>
+    </div>
+</div>

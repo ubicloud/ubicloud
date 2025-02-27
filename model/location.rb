@@ -4,6 +4,14 @@ require_relative "../model"
 
 class Location < Sequel::Model
   include ResourceMethods
+
+  def billing_name
+    if customer_aws_region_id
+      name.split("-")[1..3].join("-")
+    else
+      name
+    end
+  end
 end
 
 # Table: location

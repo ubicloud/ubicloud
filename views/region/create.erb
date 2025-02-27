@@ -22,12 +22,12 @@
           </div>
           <div class="sm:col-span-3">
             <%== part(
-              "components/form/text",
+              "components/form/select",
               name: "aws_region_name",
               label: "AWS Region Name",
+              options: @available_aws_regions.map { |r| [r, r] },
               attributes: {
-                required: true,
-                placeholder: "Enter AWS region name"
+                required: true
               }
             ) %>
           </div>

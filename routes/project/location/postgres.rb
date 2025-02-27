@@ -9,6 +9,7 @@ class Clover
     r.on NAME_OR_UBID do |pg_name, pg_ubid|
       if pg_name
         r.post api? do
+          @location = Location[name: @location]
           postgres_post(pg_name)
         end
 
@@ -169,7 +170,7 @@ class Clover
 
         st = Prog::Postgres::PostgresResourceNexus.assemble(
           project_id: @project.id,
-          location: pg.location,
+          location_id: Location[name: pg.location].id,
           name: request_body_params["name"],
           target_vm_size: pg.target_vm_size,
           target_storage_size_gib: pg.target_storage_size_gib,
@@ -231,6 +232,7 @@ class Clover
     # 204 response for invalid names
     r.is String do |pg_name|
       r.post do
+        @location = Location[name: @location]
         postgres_post(pg_name)
       end
 

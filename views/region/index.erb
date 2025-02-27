@@ -2,7 +2,7 @@
 
 <%== part(
   "components/page_header",
-  right_items: (@regions.count > 0) ? [
+  right_items: (@regions&.count > 0) ? [
     part("components/button", text: "Create Region", link: "/region/create")
   ] : []
 ) %>
@@ -10,17 +10,18 @@
 <div class="grid gap-6">
   <%== part(
       "components/table_card",
-      headers: ["Name"],
+      headers: ["Name", "Project"],
       rows: @regions.map do |r|
          [
            [
-             [r[:name]]
+             [r[:name], {link: r[:path]}],
+             [r[:project_name]]
            ],
            { id: "region-#{r[:id]}" }
          ]
       end,
       empty_state: {
-        icon: "hero-globe-alt",
+        icon: "aws",
         title: "No regions",
         description: "Get started by creating a new region.",
         button_link: "/region/create",

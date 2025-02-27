@@ -10,7 +10,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   extend Forwardable
   def_delegators :postgres_resource, :servers, :representative_server
 
-  def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:,
+  def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,
     version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
     ha_type: PostgresResource::HaType::NONE, parent_id: nil, restore_target: nil)
 
@@ -18,15 +18,20 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       fail "No existing project"
     end
 
-    Validation.validate_location(location)
+    location = Location[location_id]
+    unless location
+      fail "No existing location"
+    end
+
+    Validation.validate_location(location.name)
     Validation.validate_name(name)
     Validation.validate_vm_size(target_vm_size, "x64")
     Validation.validate_postgres_ha_type(ha_type)
 
     DB.transaction do
       superuser_password, timeline_id, timeline_access, version = if parent_id.nil?
-        target_storage_size_gib = Validation.validate_postgres_storage_size(location, target_vm_size, target_storage_size_gib)
-        [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location: location).id, "push", version]
+        target_storage_size_gib = Validation.validate_postgres_storage_size(location.ubid, target_vm_size, target_storage_size_gib)
+        [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location: location.name).id, "push", version]
       else
         unless (parent = PostgresResource[parent_id])
           fail "No existing parent"
@@ -37,7 +42,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         end
 
         if target_storage_size_gib != parent.target_storage_size_gib
-          target_storage_size_gib = Validation.validate_postgres_storage_size(location, target_vm_size, target_storage_size_gib)
+          target_storage_size_gib = Validation.validate_postgres_storage_size(location.ubid, target_vm_size, target_storage_size_gib)
         end
 
         restore_target = Validation.validate_date(restore_target, "restore_target")
@@ -49,15 +54,15 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       end
 
       postgres_resource = PostgresResource.create_with_id(
-        project_id: project_id, location: location, name: name,
+        project_id: project_id, location: location.name, name: name,
         target_vm_size: target_vm_size, target_storage_size_gib: target_storage_size_gib,
         superuser_password: superuser_password, ha_type: ha_type, version: version, flavor: flavor,
         parent_id: parent_id, restore_target: restore_target, hostname_version: "v2"
       )
 
-      firewall = Firewall.create_with_id(name: "#{postgres_resource.ubid}-firewall", location: location, description: "Postgres default firewall", project_id: Config.postgres_service_project_id)
+      firewall = Firewall.create_with_id(name: "#{postgres_resource.ubid}-firewall", location: location.name, description: "Postgres default firewall", project_id: Config.postgres_service_project_id)
 
-      private_subnet_id = Prog::Vnet::SubnetNexus.assemble(Config.postgres_service_project_id, name: "#{postgres_resource.ubid}-subnet", location: location, firewall_id: firewall.id).id
+      private_subnet_id = Prog::Vnet::SubnetNexus.assemble(Config.postgres_service_project_id, name: "#{postgres_resource.ubid}-subnet", location: location.name, firewall_id: firewall.id).id
       postgres_resource.update(private_subnet_id: private_subnet_id)
 
       PostgresFirewallRule.create_with_id(postgres_resource_id: postgres_resource.id, cidr: "0.0.0.0/0")
