@@ -448,6 +448,16 @@ RSpec.describe Validation do
     end
   end
 
+  describe "#validate_billing_rate" do
+    it "valid billing rate" do
+      expect { described_class.validate_billing_rate("VmVCpu", "standard", "hetzner-fsn1") }.not_to raise_error
+    end
+
+    it "invalid billing rate" do
+      expect { described_class.validate_billing_rate("VmVCpu", "burstable", "latitude-fra") }.to raise_error described_class::ValidationFailed
+    end
+  end
+
   describe "#validate_load_balancer_stack" do
     it "valid load balancer stack" do
       expect { described_class.validate_load_balancer_stack("ipv4") }.not_to raise_error

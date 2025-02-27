@@ -25,6 +25,7 @@ class Prog::Vm::Nexus < Prog::Base
     end
     Validation.validate_location(location)
     vm_size = Validation.validate_vm_size(size, arch)
+    Validation.validate_billing_rate("VmVCpu", vm_size.family, location)
 
     storage_volumes ||= [{
       size_gib: vm_size.storage_size_options.first,

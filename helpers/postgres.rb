@@ -89,7 +89,7 @@ class Clover
     options.add_option(name: "location", values: Option.postgres_locations.map(&:display_name), parent: "flavor")
     options.add_option(name: "family", values: Option::PostgresSizes.map(&:vm_family).uniq, parent: "location") do |flavor, location, family|
       available_families = Option.families(use_slices: @project.get_ff_use_slices_for_allocation || false).map { _1.name }
-      available_families.include?(family)
+      available_families.include?(family) && BillingRate.from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", LocationNameConverter.to_internal_name(location))
     end
     options.add_option(name: "size", values: Option::PostgresSizes.map { _1.name }.uniq, parent: "family") do |flavor, location, family, size|
       location = LocationNameConverter.to_internal_name(location)
