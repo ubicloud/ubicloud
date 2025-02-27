@@ -13,7 +13,7 @@ class Prog::LearnStorage < Prog::Base
       # reserve 5G the host.
       available_storage_gib: [rec.avail_gib - 5, 0].max,
       total_storage_gib: rec.size_gib,
-      unix_device_list: find_underlying_unix_devices(rec.unix_device)
+      unix_device_list: find_underlying_unix_device_ids(rec.unix_device)
     )]
 
     devices.each do |rec|
@@ -22,14 +22,19 @@ class Prog::LearnStorage < Prog::Base
         vm_host_id: vm_host.id, name: name,
         available_storage_gib: rec.avail_gib,
         total_storage_gib: rec.size_gib,
-        unix_device_list: find_underlying_unix_devices(rec.unix_device)
+        unix_device_list: find_underlying_unix_device_ids(rec.unix_device)
       )
     end
 
     sds
   end
 
-  def find_underlying_unix_devices(unix_device)
+  def find_underlying_unix_device_ids(unix_device)
+    device_names = find_underlying_unix_device_names(unix_device)
+    device_names.map { |device_name| StorageDevice.convert_device_name_to_device_id(sshable, device_name) }
+  end
+
+  def find_underlying_unix_device_names(unix_device)
     return [unix_device.delete_prefix("/dev/")] unless unix_device.start_with?("/dev/md")
     SystemParser.extract_underlying_raid_devices_from_mdstat(sshable.cmd("cat /proc/mdstat"), unix_device)
   end

@@ -18,12 +18,16 @@ Filesystem     Mounted on                   1B-blocks        Avail
 /dev/sda       /var/storage/devices/stor1   205520896     99571712
 /dev/sdb       /var/storage/devices/stor2  3331416064   3331276800
 EOS
+      expect(ls.sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'sda$' | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-some-random-id1")
+      expect(ls.sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'sdb$' | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-some-random-id2")
+      expect(ls.sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'sdc$' | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-some-random-id3")
+
       expect { ls.start }.to exit({"msg" => "created StorageDevice records"}).and change {
         StorageDevice.all.map { |d| [d.name, d.unix_device_list.sort] }.sort
       }.from([]).to([
-        ["DEFAULT", ["sda"]],
-        ["stor1", ["sdb"]],
-        ["stor2", ["sdc"]]
+        ["DEFAULT", ["wwn-some-random-id1"]],
+        ["stor1", ["wwn-some-random-id2"]],
+        ["stor2", ["wwn-some-random-id3"]]
       ])
     end
 
@@ -32,17 +36,20 @@ EOS
       ls = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}]))
       expect(ls.sshable).to receive(:cmd).with("df -B1 --output=source,target,size,avail ").and_return(<<EOS)
 Filesystem     Mounted on                   1B-blocks        Avail
-/dev/sda       /                           6205520896     99571712
-/dev/sdb       /var/storage/devices/stor1  6205520896   3099571712
-/dev/sdc       /var/storage/devices/stor2  3331416064   1531276800
+/dev/nvme0n1   /                           6205520896     99571712
+/dev/nvme0n2   /var/storage/devices/stor1  6205520896   3099571712
+/dev/nvme0n3   /var/storage/devices/stor2  3331416064   1531276800
 EOS
       expect(ls.sshable).to receive(:cmd).with("df -B1 --output=source,target,size,avail /var/storage").and_return(<<EOS)
 Filesystem     Mounted on                   1B-blocks        Avail
-/dev/sdb       /var/storage/devices/stor1  6205520896   3099571712
-/dev/sdc       /var/storage/devices/stor2  3331416064   1531276800
+/dev/nvme0n2   /var/storage/devices/stor1  6205520896   3099571712
+/dev/nvme0n3   /var/storage/devices/stor2  3331416064   1531276800
 EOS
 
-      StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100, unix_device_list: ["sda"])
+      allow(ls.sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'nvme0n2$' | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.some-random-id1")
+      expect(ls.sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'nvme0n3$' | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.some-random-id2")
+
+      StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100, unix_device_list: ["nvme0n1"])
       expect { ls.start }.to exit({"msg" => "created StorageDevice records"}).and change {
         StorageDevice.map { |sd|
           sd.values.slice(
@@ -93,6 +100,8 @@ Filesystem     Mounted on                   1B-blocks        Avail
 /dev/sdb       /var/storage/devices/stor1   205520896     99571712
 /dev/sdc       /var/storage/devices/stor2  3331416064   3331276800
 EOS
+      allow(ls.sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'sdb$' | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-some-random-id1")
+      expect(ls.sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'sdc$' | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-some-random-id2")
 
       expect(ls.make_model_instances.map(&:name)).to eq(%w[DEFAULT stor1 stor2])
     end
@@ -115,6 +124,7 @@ EOS
 Filesystem     Mounted on                   1B-blocks        Avail
 /dev/sda       /                         452564664320 381456842752
 EOS
+      allow(ls.sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'sda$' | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-some-random-id1")
 
       expect(ls.make_model_instances.map(&:name)).to eq(%w[DEFAULT])
     end
@@ -150,7 +160,9 @@ Filesystem     Mounted on                   1B-blocks        Avail
 /dev/md2       /                         452564664320 381456842752
 EOS
 
-      expect(ls.make_model_instances.map(&:unix_device_list)).to eq([["nvme1n1", "nvme0n1"]])
+      expect(sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'nvme1n1$' | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id1")
+      expect(sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'nvme0n1$' | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id2")
+      expect(ls.make_model_instances.map(&:unix_device_list)).to eq([["nvme-eui.random-id1", "nvme-eui.random-id2"]])
     end
   end
 end

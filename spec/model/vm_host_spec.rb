@@ -379,21 +379,43 @@ RSpec.describe VmHost do
     vh.init_health_monitor_session
   end
 
-  it "returns disk devices when StorageDevice has unix_device_list" do
-    sd = StorageDevice.create_with_id(vm_host_id: vh.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["sda", "sdb"])
+  it "returns disk device ids when StorageDevice has unix_device_list" do
+    sd = StorageDevice.create_with_id(vm_host_id: vh.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["wwn-random-id1", "wwn-random-id2"])
     allow(vh).to receive(:storage_devices).and_return([sd])
-    expect(vh.disk_devices).to eq(["sda", "sdb"])
+    expect(vh.disk_device_ids).to eq(["wwn-random-id1", "wwn-random-id2"])
   end
 
-  it "finds and returns disk devices when StorageDevice doesn't have unix_device_list" do
-    sd = StorageDevice.create_with_id(vm_host_id: vh.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100)
+  it "returns disk device names" do
+    sd = StorageDevice.create_with_id(vm_host_id: vh.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["wwn-random-id1", "wwn-random-id2"])
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session)
+    }
+    allow(vh).to receive(:storage_devices).and_return([sd])
+
+    expect(session[:ssh_session]).to receive(:exec!).with("readlink -f /dev/disk/by-id/wwn-random-id1").and_return("sda")
+    expect(session[:ssh_session]).to receive(:exec!).with("readlink -f /dev/disk/by-id/wwn-random-id2").and_return("sdb")
+
+    expect(vh.disk_device_names(session[:ssh_session])).to eq(["sda", "sdb"])
+  end
+
+  it "converts disk devices when StorageDevice has unix_device_list with the old formatting for SSD disks" do
+    sd = StorageDevice.create_with_id(vm_host_id: vh.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["sda"])
     sshable = instance_double(Sshable)
     expect(sd).to receive(:vm_host).and_return(vh)
-    expect(sshable).to receive(:cmd).with("df -B1 --output=source,target,size,avail /var/storage").and_return("Filesystem     Mounted on    1B-blocks        Avail\n" \
-    "/dev/sda       /             467909804032    433234698240\n")
+    expect(sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'sda$' | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-random-id1")
     expect(vh).to receive(:sshable).and_return(sshable)
     allow(vh).to receive(:storage_devices).and_return([sd])
-    expect(vh.disk_devices).to eq(["sda"])
+    expect(vh.disk_device_ids).to eq(["wwn-random-id1"])
+  end
+
+  it "converts disk devices when StorageDevice has unix_device_list with the old formatting for NVMe disks" do
+    sd = StorageDevice.create_with_id(vm_host_id: vh.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["nvme0n1"])
+    sshable = instance_double(Sshable)
+    expect(sd).to receive(:vm_host).and_return(vh)
+    expect(sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'nvme0n1$' | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id")
+    expect(vh).to receive(:sshable).and_return(sshable)
+    allow(vh).to receive(:storage_devices).and_return([sd])
+    expect(vh.disk_device_ids).to eq(["nvme-eui.random-id"])
   end
 
   it "checks pulse" do
@@ -406,7 +428,7 @@ RSpec.describe VmHost do
       reading_chg: Time.now - 30
     }
 
-    allow(vh).to receive(:disk_devices).and_return(["sda"])
+    allow(vh).to receive(:disk_device_names).and_return(["sda"])
     allow(session[:ssh_session]).to receive(:exec!).with("sudo smartctl -j -H /dev/sda -d scsi | jq .smart_status.passed").and_return(MockStringWithExitstatus.new("true\n", 0))
     allow(session[:ssh_session]).to receive(:exec!).with("lsblk --json").and_return(MockStringWithExitstatus.new('{"blockdevices": [{"name": "fd0","maj:min": "2:0","rm": true,"size": "4K","ro": false,"type": "disk","mountpoints": [null]},{"name": "sda","maj:min": "8:0","rm": false,"size": "2.2G","ro": false,"type": "disk","mountpoints": [null],"children": [{"name": "sda1","maj:min": "8:1","rm": false,"size": "2.1G","ro": false,"type": "part","mountpoints": ["/"]},{"name": "sda14","maj:min": "8:14","rm": false,"size": "4M","ro": false,"type": "part","mountpoints": [null]}]}]}', 0))
     allow(session[:ssh_session]).to receive(:exec!).with("sudo bash -c \"head -c 1M </dev/zero > /test-file\"").and_return(MockStringWithExitstatus.new("", 0))
@@ -430,7 +452,7 @@ RSpec.describe VmHost do
       reading_rpt: 5,
       reading_chg: Time.now - 30
     }
-    allow(vh).to receive(:disk_devices).and_return(["sda"])
+    allow(vh).to receive(:disk_device_names).and_return(["sda"])
 
     expect(vh).to receive(:check_storage_smartctl).and_return(true)
     expect(vh).to receive(:check_storage_read_write).and_return(true)
@@ -447,7 +469,7 @@ RSpec.describe VmHost do
       reading_rpt: 5,
       reading_chg: Time.now - 30
     }
-    allow(vh).to receive(:disk_devices).and_return(["sda"])
+    allow(vh).to receive(:disk_device_names).and_return(["sda"])
 
     expect(vh).to receive(:check_storage_smartctl).and_return(true)
     expect(session[:ssh_session]).to receive(:exec!).with("lsblk --json").and_return(MockStringWithExitstatus.new('{"blockdevices": [{"name": "fd0","maj:min": "2:0","rm": true,"size": "4K","ro": false,"type": "disk","mountpoints": [null]},{"name": "sda","maj:min": "8:0","rm": false,"size": "2.2G","ro": false,"type": "disk","mountpoints": [null],"children": [{"name": "sda1","maj:min": "8:1","rm": false,"size": "2.1G","ro": false,"type": "part","mountpoints": ["/"]},{"name": "sda14","maj:min": "8:14","rm": false,"size": "4M","ro": false,"type": "part","mountpoints": [null]}]}]}', 0))
@@ -466,7 +488,7 @@ RSpec.describe VmHost do
       reading_rpt: 5,
       reading_chg: Time.now - 30
     }
-    allow(vh).to receive(:disk_devices).and_return(["sda"])
+    allow(vh).to receive(:disk_device_names).and_return(["sda"])
 
     expect(vh).to receive(:check_storage_smartctl).and_return(true)
     expect(vh).to receive(:check_storage_nvme).and_return(true)
@@ -484,7 +506,7 @@ RSpec.describe VmHost do
       reading_rpt: 5,
       reading_chg: Time.now - 30
     }
-    allow(vh).to receive(:disk_devices).and_return(["nvme0n1"])
+    allow(vh).to receive(:disk_device_names).and_return(["nvme0n1"])
 
     allow(session[:ssh_session]).to receive(:exec!).with("sudo smartctl -j -H /dev/nvme0n1 | jq .smart_status.passed").and_return(MockStringWithExitstatus.new("false\n", 0))
     expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
@@ -499,7 +521,7 @@ RSpec.describe VmHost do
       reading_rpt: 5,
       reading_chg: Time.now - 30
     }
-    allow(vh).to receive(:disk_devices).and_return(["nvme0n1"])
+    allow(vh).to receive(:disk_device_names).and_return(["nvme0n1"])
 
     expect(vh).to receive(:check_storage_smartctl).and_return(true)
     allow(session[:ssh_session]).to receive(:exec!).with("sudo nvme smart-log /dev/nvme0n1 | grep \"critical_warning\" | awk '{print $3}'").and_return(MockStringWithExitstatus.new("1\n", 0))
@@ -515,7 +537,7 @@ RSpec.describe VmHost do
       reading_rpt: 5,
       reading_chg: Time.now - 30
     }
-    allow(vh).to receive(:disk_devices).and_return(["nvme0n1"])
+    allow(vh).to receive(:disk_device_names).and_return(["nvme0n1"])
 
     expect(vh).to receive(:check_storage_smartctl).and_return(true)
     allow(session[:ssh_session]).to receive(:exec!).with("sudo nvme smart-log /dev/nvme0n1 | grep \"critical_warning\" | awk '{print $3}'").and_return(MockStringWithExitstatus.new("0\n", 0))
@@ -533,7 +555,7 @@ RSpec.describe VmHost do
       reading_rpt: 5,
       reading_chg: Time.now - 30
     }
-    allow(vh).to receive(:disk_devices).and_return(["sda"])
+    allow(vh).to receive(:disk_device_names).and_return(["sda"])
 
     expect(vh).to receive(:check_storage_smartctl).and_return(true)
     expect(vh).to receive(:check_storage_nvme).and_return(true)
