@@ -12,19 +12,27 @@ class StorageDevice < Sequel::Model
 
   include ResourceMethods
 
-  def set_underlying_unix_devices
-    df_command_path = (name == "DEFAULT") ? "/var/storage" : "/var/storage/devices/#{name}"
-    df_command_output = vm_host.sshable.cmd(SystemParser.df_command(df_command_path))
+  def migrate_device_name_to_device_id
+    update(unix_device_list: unix_device_list.map { |device_name| StorageDevice.convert_device_name_to_device_id(vm_host.sshable, device_name) })
+  end
 
-    unix_device_name = SystemParser.extract_disk_info_from_df(df_command_output).first.unix_device
-    if unix_device_name.start_with?("/dev/md") # we are dealing with raided disk
-      mdstat_file_content = vm_host.sshable.cmd("cat /proc/mdstat")
-      self.unix_device_list = SystemParser.extract_underlying_raid_devices_from_mdstat(mdstat_file_content, unix_device_name)
+  # We have both raided and non-raided servers, in non-raided servers, we can call blkid to get the uuid
+  # but in the case of raided servers, all the underlying disk devices will be shown with the same uuid of the raid device
+  # (/dev/md) so we end up with duplicate uuids for different ssd or nvme disks. so we won't use /dev/disk/by-uuid
+  #
+  # to handle this, we would use /dev/disk/by-id instead.
+  # For SSD disks, there is a unique identifier which starts with wwn (World Wide Name) which is claimed to be unique across the world
+  # For NVMe disks, there is a unique identidier which starts with nvme-eui and it is also claimed to be unique
+  #
+  # All of our disks are either SSD or NVMe, so the assumptions that we can rely on these two prefixes is reliable
+  def self.convert_device_name_to_device_id(sshable, device_name)
+    if device_name.start_with?("sd")
+      sshable.cmd("ls -l /dev/disk/by-id/ | grep '#{device_name}$' | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").strip
+    elsif device_name.start_with?("nvme")
+      sshable.cmd("ls -l /dev/disk/by-id/ | grep '#{device_name}$' | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").strip
     else
-      self.unix_device_list = [unix_device_name.delete_prefix("/dev/")]
+      device_name
     end
-
-    save_changes
   end
 end
 

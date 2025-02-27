@@ -353,16 +353,25 @@ class VmHost < Sequel::Model
     }
   end
 
-  def disk_devices
-    storage_devices.each { |sd| sd.set_underlying_unix_devices if sd.unix_device_list.nil? || sd.unix_device_list.empty? }
+  def disk_device_ids
+    # we use this next line to migrate data from the old formatting (storing device names) to the new (storing id) so we trigger the convert
+    # whenever an element inside unix_device_list is not a SSD or NVMe id.
+    # SSD and NVMe ids start with wwn or nvme-eui respectively.
+    # YYY: This next line can be removed in the future after the first run of the code.
+    storage_devices.each { |sd| sd.migrate_device_name_to_device_id if sd.unix_device_list.any? { |device_name| device_name !~ /\A(wwn|nvme-eui)/i } }
     storage_devices.flat_map { |sd| sd.unix_device_list }
   end
 
+  def disk_device_names(ssh_session)
+    disk_device_ids.map { |id| ssh_session.exec!("readlink -f /dev/disk/by-id/#{id}").delete_prefix("/dev/").strip }
+  end
+
   def perform_health_checks(ssh_session)
-    check_storage_smartctl(ssh_session, disk_devices) &&
-      check_storage_nvme(ssh_session, disk_devices) &&
-      check_storage_read_write(ssh_session, disk_devices) &&
-      check_storage_kernel_logs(ssh_session, disk_devices)
+    device_names = disk_device_names(ssh_session)
+    check_storage_smartctl(ssh_session, device_names) &&
+      check_storage_nvme(ssh_session, device_names) &&
+      check_storage_read_write(ssh_session, device_names) &&
+      check_storage_kernel_logs(ssh_session, device_names)
   end
 
   def check_pulse(session:, previous_pulse:)
