@@ -292,7 +292,7 @@ task "ubi-cross" do
       arch_list.each do |arch|
         next if os == "darwin" && arch == "386"
         next if os == "windows" && arch == "386" # Windows Defender falsely flags as Trojan:Win32/Bearfoos.A!ml
-        sh("env GOOS=#{os} GOARCH=#{arch} go build -o ubi-#{os}-#{arch}#{".exe" if os == "windows"} -tags osusergo,netgo")
+        sh("env GOOS=#{os} GOARCH=#{arch} go build -ldflags '-s -w' -o ubi-#{os}-#{arch}#{".exe" if os == "windows"} -tags osusergo,netgo")
       end
     end
   end
