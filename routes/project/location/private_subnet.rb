@@ -17,8 +17,8 @@ class Clover
         filter = {Sequel[:private_subnet][:id] => UBID.to_uuid(ps_id)}
       end
 
-      filter[:location] = @location
-      ps = @project.private_subnets_dataset.first(filter)
+      filter[:location_id] = @location.id
+      ps = @project.private_subnets_dataset.eager(:location).first(filter)
 
       next (r.delete? ? 204 : 404) unless ps
 

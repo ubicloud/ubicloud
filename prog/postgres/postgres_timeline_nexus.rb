@@ -8,9 +8,13 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   extend Forwardable
   def_delegators :postgres_timeline, :blob_storage_client
 
-  def self.assemble(location:, parent_id: nil)
+  def self.assemble(location_id:, parent_id: nil)
     if parent_id && (PostgresTimeline[parent_id]).nil?
       fail "No existing parent"
+    end
+
+    unless (location = Location[location_id])
+      fail "No existing location"
     end
 
     DB.transaction do
@@ -18,7 +22,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
         parent_id: parent_id,
         access_key: SecureRandom.hex(16),
         secret_key: SecureRandom.hex(32),
-        blob_storage_id: MinioCluster.first(project_id: Config.postgres_service_project_id, location: location)&.id
+        blob_storage_id: MinioCluster.first(project_id: Config.postgres_service_project_id, location_id: location.id)&.id
       )
       Strand.create(prog: "Postgres::PostgresTimelineNexus", label: "start") { _1.id = postgres_timeline.id }
     end

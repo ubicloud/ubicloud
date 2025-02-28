@@ -10,7 +10,7 @@ RSpec.describe Clover, "private subnet" do
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
 
   let(:private_subnet) do
-    ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").id
+    ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).id
     ps = PrivateSubnet[ps_id]
     ps.update(net6: "2a01:4f8:173:1ed3::/64")
     ps.update(net4: "172.17.226.128/26")
@@ -88,7 +88,7 @@ RSpec.describe Clover, "private subnet" do
         expect(page.title).to eq("Ubicloud - Create Private Subnet")
         name = "dummy-ps"
         fill_in "Name", with: name
-        choose option: "eu-central-h1"
+        choose option: Location::HETZNER_FSN1_ID
 
         click_button "Create"
 
@@ -105,12 +105,24 @@ RSpec.describe Clover, "private subnet" do
         expect(page.title).to eq("Ubicloud - Create Private Subnet")
 
         fill_in "Name", with: private_subnet.name
-        choose option: "eu-central-h1"
+        choose option: Location::HETZNER_FSN1_ID
 
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - Create Private Subnet")
-        expect(page).to have_flash_error("project_id and location and name is already taken")
+        expect(page).to have_flash_error("project_id and location_id and name is already taken")
+      end
+
+      it "location not exist" do
+        visit "#{project.path}/private-subnet/create"
+        choose option: Location::HETZNER_FSN1_ID
+        Location[Location::HETZNER_FSN1_ID].destroy
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - ResourceNotFound")
+        expect(page.status_code).to eq(404)
+        expect(page).to have_content("ResourceNotFound")
       end
     end
 
@@ -155,7 +167,7 @@ RSpec.describe Clover, "private subnet" do
     describe "show firewalls" do
       it "can show attached firewalls" do
         private_subnet
-        fw = Firewall.create_with_id(name: "dummy-fw", description: "dummy-fw", location: "hetzner-fsn1", project_id: project.id)
+        fw = Firewall.create_with_id(name: "dummy-fw", description: "dummy-fw", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
         fw.associate_with_private_subnet(private_subnet)
 
         visit "#{project.path}#{private_subnet.path}"
@@ -169,7 +181,7 @@ RSpec.describe Clover, "private subnet" do
     describe "connected subnets" do
       it "can show connected subnets" do
         private_subnet
-        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location: "hetzner-fsn1").subject
+        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID).subject
         private_subnet.connect_subnet(ps2)
 
         visit "#{project.path}#{private_subnet.path}"
@@ -186,7 +198,7 @@ RSpec.describe Clover, "private subnet" do
 
       it "can disconnect connected subnet" do
         private_subnet
-        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location: "hetzner-fsn1").subject
+        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID).subject
         private_subnet.connect_subnet(ps2)
 
         visit "#{project.path}#{private_subnet.path}"
@@ -201,7 +213,7 @@ RSpec.describe Clover, "private subnet" do
 
       it "can connect to a subnet" do
         private_subnet
-        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location: "hetzner-fsn1").subject
+        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID).subject
         expect(private_subnet.connected_subnets.count).to eq(0)
         visit "#{project.path}#{private_subnet.path}"
 
@@ -213,7 +225,7 @@ RSpec.describe Clover, "private subnet" do
 
       it "cannot connect to a subnet when it does not exist" do
         private_subnet
-        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location: "hetzner-fsn1").subject
+        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID).subject
         visit "#{project.path}#{private_subnet.path}"
         ps2.strand.destroy
         ps2.destroy
@@ -225,7 +237,7 @@ RSpec.describe Clover, "private subnet" do
 
       it "cannot disconnect a subnet when it does not exist" do
         private_subnet
-        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location: "hetzner-fsn1").subject
+        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID).subject
         private_subnet.connect_subnet(ps2)
         visit "#{project.path}#{private_subnet.path}"
         small_id, large_id = (private_subnet.id < ps2.id) ? [private_subnet.id, ps2.id] : [ps2.id, private_subnet.id]

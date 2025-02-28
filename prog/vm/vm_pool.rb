@@ -5,18 +5,18 @@ require "net/ssh"
 class Prog::Vm::VmPool < Prog::Base
   subject_is :vm_pool
 
-  def self.assemble(size:, vm_size:, boot_image:, location:, storage_size_gib:,
+  def self.assemble(size:, vm_size:, boot_image:, location_id:, storage_size_gib:,
     storage_encrypted:, storage_skip_sync:, arch:)
     DB.transaction do
       vm_pool = VmPool.create_with_id(
-        size: size,
-        vm_size: vm_size,
-        boot_image: boot_image,
-        location: location,
-        storage_size_gib: storage_size_gib,
-        storage_encrypted: storage_encrypted,
-        storage_skip_sync: storage_skip_sync,
-        arch: arch
+        size:,
+        vm_size:,
+        boot_image:,
+        location_id:,
+        storage_size_gib:,
+        storage_encrypted:,
+        storage_skip_sync:,
+        arch:
       )
       Strand.create(prog: "Vm::VmPool", label: "create_new_vm") { _1.id = vm_pool.id }
     end
@@ -38,7 +38,7 @@ class Prog::Vm::VmPool < Prog::Base
     }
     ps = Prog::Vnet::SubnetNexus.assemble(
       Config.vm_pool_project_id,
-      location: vm_pool.location,
+      location_id: vm_pool.location_id,
       allow_only_ssh: true
     ).subject
 
@@ -47,7 +47,7 @@ class Prog::Vm::VmPool < Prog::Base
       unix_user: "runneradmin",
       sshable_unix_user: "runneradmin",
       size: vm_pool.vm_size,
-      location: vm_pool.location,
+      location_id: vm_pool.location_id,
       boot_image: vm_pool.boot_image,
       storage_volumes: [storage_params],
       enable_ip4: true,
@@ -62,7 +62,7 @@ class Prog::Vm::VmPool < Prog::Base
 
   label def wait
     if vm_pool.size - vm_pool.vms.count > 0
-      idle_cpus = VmHost.where(allocation_state: "accepting", arch: vm_pool.arch, location: ["github-runners", "hetzner-hel1", "hetzner-fsn1"]).select_map { sum((total_cores - used_cores) * total_cpus / total_cores) }.first.to_i
+      idle_cpus = VmHost.where(allocation_state: "accepting", arch: vm_pool.arch, location_id: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_HEL1_ID, Location::HETZNER_FSN1_ID]).select_map { sum((total_cores - used_cores) * total_cpus / total_cores) }.first.to_i
       waiting_cpus = Vm.where(Sequel.like(:boot_image, "github%")).where(allocated_at: nil, arch: vm_pool.arch).sum(:vcpus).to_i
       pool_vm_cpus = Validation.validate_vm_size(vm_pool.vm_size, vm_pool.arch).vcpus
       hop_create_new_vm if idle_cpus - waiting_cpus - pool_vm_cpus >= 0

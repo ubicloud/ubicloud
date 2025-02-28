@@ -21,8 +21,8 @@ RSpec.describe Clover, "private_subnet" do
     end
 
     it "success all pss" do
-      Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location: "hetzner-fsn1")
-      Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-3", location: "hetzner-fsn1")
+      Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID)
+      Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-3", location_id: Location::HETZNER_FSN1_ID)
 
       get "/project/#{project.ubid}/private-subnet"
 

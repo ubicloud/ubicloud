@@ -8,7 +8,7 @@ class Clover
       if api?
         vm_list_api_response(dataset)
       else
-        @vms = Serializers::Vm.serialize(dataset.eager(:semaphores, :assigned_vm_address, :vm_storage_volumes).reverse(:created_at).all, {include_path: true})
+        @vms = Serializers::Vm.serialize(dataset.eager(:semaphores, :assigned_vm_address, :vm_storage_volumes, :location).reverse(:created_at).all, {include_path: true})
         view "vm/index"
       end
     end

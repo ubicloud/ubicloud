@@ -5,14 +5,17 @@ require_relative "../../lib/util"
 class Prog::Minio::MinioClusterNexus < Prog::Base
   subject_is :minio_cluster
 
-  def self.assemble(project_id, cluster_name, location, admin_user,
+  def self.assemble(project_id, cluster_name, location_id, admin_user,
     storage_size_gib, pool_count, server_count, drive_count, vm_size)
     unless Project[project_id]
       fail "No existing project"
     end
 
+    unless (location = Location[location_id])
+      fail "No existing location"
+    end
+
     Validation.validate_vm_size(vm_size, "x64")
-    Validation.validate_location(location)
     Validation.validate_name(cluster_name)
     Validation.validate_minio_username(admin_user)
 
@@ -24,11 +27,11 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
       subnet_st = Prog::Vnet::SubnetNexus.assemble(
         Config.minio_service_project_id,
         name: "#{cluster_name}-subnet",
-        location: location
+        location_id: location.id
       )
       minio_cluster = MinioCluster.create(
         name: cluster_name,
-        location: location,
+        location_id: location.id,
         admin_user: admin_user,
         admin_password: SecureRandom.urlsafe_base64(15),
         private_subnet_id: subnet_st.id,

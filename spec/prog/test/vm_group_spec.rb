@@ -159,17 +159,17 @@ RSpec.describe Prog::Test::VmGroup do
 
     it "runs tests for the first connected subnet" do
       prj = Project.create_with_id(name: "project-1")
-      ps1 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps1", location: "hetzner-fsn1").subject
-      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps2", location: "hetzner-fsn1").subject
+      ps1 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps1", location_id: Location::HETZNER_FSN1_ID).subject
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps2", location_id: Location::HETZNER_FSN1_ID).subject
       expect(vg_test).to receive(:frame).and_return({"subnets" => [ps1.id, ps2.id]}).at_least(:once)
       expect { vg_test.verify_connected_subnets }.to hop("start", "Test::ConnectedSubnets")
     end
 
     it "runs tests for the second connected subnet" do
       prj = Project.create_with_id(name: "project-1")
-      ps1 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps1", location: "hetzner-fsn1").subject
+      ps1 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps1", location_id: Location::HETZNER_FSN1_ID).subject
       expect(ps1).to receive(:vms).and_return([instance_double(Vm, id: "vm1"), instance_double(Vm, id: "vm2")]).at_least(:once)
-      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps2", location: "hetzner-fsn1").subject
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps2", location_id: Location::HETZNER_FSN1_ID).subject
       expect(PrivateSubnet).to receive(:[]).and_return(ps1, ps2)
       expect(vg_test).to receive(:frame).and_return({"subnets" => [ps1.id, ps2.id]}).at_least(:once)
       expect { vg_test.verify_connected_subnets }.to hop("start", "Test::ConnectedSubnets")

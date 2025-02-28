@@ -3,7 +3,7 @@
 module ContentGenerator
   module Vm
     def self.location(location)
-      Option.locations(only_visible: false).find { _1.display_name == location }.ui_name
+      location.ui_name
     end
 
     def self.private_subnet(location, private_subnet)
@@ -11,8 +11,7 @@ module ContentGenerator
     end
 
     def self.enable_ipv4(location, value)
-      location = LocationNameConverter.to_internal_name(location)
-      unit_price = BillingRate.unit_price_from_resource_properties("IPAddress", "IPv4", location)
+      unit_price = BillingRate.unit_price_from_resource_properties("IPAddress", "IPv4", location.name)
 
       "Enable Public IPv4 ($#{"%.2f" % (unit_price * 60 * 672)}/mo)"
     end
@@ -26,9 +25,8 @@ module ContentGenerator
     end
 
     def self.size(location, family, size)
-      location = LocationNameConverter.to_internal_name(location)
       size = Option::VmSizes.find { _1.display_name == size }
-      unit_price = BillingRate.unit_price_from_resource_properties("VmVCpu", family, location)
+      unit_price = BillingRate.unit_price_from_resource_properties("VmVCpu", family, location.name)
 
       [
         size.display_name,
@@ -40,8 +38,7 @@ module ContentGenerator
 
     def self.storage_size(location, family, vm_size, storage_size)
       storage_size = storage_size.to_i
-      location = LocationNameConverter.to_internal_name(location)
-      unit_price = BillingRate.unit_price_from_resource_properties("VmStorage", family, location)
+      unit_price = BillingRate.unit_price_from_resource_properties("VmStorage", family, location.name)
 
       [
         "#{storage_size}GB",
@@ -58,10 +55,10 @@ module ContentGenerator
 
   module Postgres
     def self.location(flavor, location)
-      Option.postgres_locations.find { _1.display_name == location }.ui_name
+      location.ui_name
     end
 
-    def self.family(flavor, location, family)
+    def self.family(flavor, location_id, family)
       vm_family = Option::VmFamilies.find { _1.name == family }
 
       [
@@ -71,9 +68,8 @@ module ContentGenerator
     end
 
     def self.size(flavor, location, family, size)
-      location = LocationNameConverter.to_internal_name(location)
       size = Option::PostgresSizes.find { _1.display_name == size }
-      unit_price = BillingRate.unit_price_from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location)
+      unit_price = BillingRate.unit_price_from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name)
 
       [
         size.display_name,
@@ -84,8 +80,7 @@ module ContentGenerator
     end
 
     def self.storage_size(flavor, location, family, vm_size, storage_size)
-      location = LocationNameConverter.to_internal_name(location)
-      unit_price = BillingRate.unit_price_from_resource_properties("PostgresStorage", flavor, location)
+      unit_price = BillingRate.unit_price_from_resource_properties("PostgresStorage", flavor, location.name)
 
       [
         "#{storage_size}GB",
@@ -100,11 +95,10 @@ module ContentGenerator
     end
 
     def self.ha_type(flavor, location, family, vm_size, storage_size, ha_type)
-      location = LocationNameConverter.to_internal_name(location)
       vcpu = Option::PostgresSizes.find { _1.display_name == vm_size }.vcpu
       ha_type = Option::PostgresHaOptions.find { _1.name == ha_type }
-      compute_unit_price = BillingRate.unit_price_from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location)
-      storage_unit_price = BillingRate.unit_price_from_resource_properties("PostgresStorage", flavor, location)
+      compute_unit_price = BillingRate.unit_price_from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name)
+      storage_unit_price = BillingRate.unit_price_from_resource_properties("PostgresStorage", flavor, location.name)
       standby_count = ha_type.standby_count
 
       [
@@ -143,7 +137,7 @@ module ContentGenerator
 
   module KubernetesCluster
     def self.location(location)
-      Option.kubernetes_locations.find { _1.display_name == location }.ui_name
+      location.ui_name
     end
 
     def self.cp_nodes(cp_nodes)

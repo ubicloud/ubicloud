@@ -14,8 +14,8 @@ RSpec.describe Clover, "Kubernetes" do
       name: "myk8s",
       version: "v1.32",
       project_id: project.id,
-      private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "mysubnet", location: "hetzner-fsn1", project_id: project.id).id,
-      location: "hetzner-fsn1"
+      private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "mysubnet", location_id: Location::HETZNER_FSN1_ID, project_id: project.id).id,
+      location_id: Location::HETZNER_FSN1_ID
     ).subject
   end
 
@@ -24,8 +24,8 @@ RSpec.describe Clover, "Kubernetes" do
       name: "not-my-k8s",
       version: "v1.32",
       project_id: project_wo_permissions.id,
-      private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "othersubnet", location: "x", project_id: project_wo_permissions.id).id,
-      location: "hetzner-fsn1"
+      private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "othersubnet", location_id: Location::HETZNER_FSN1_ID, project_id: project_wo_permissions.id).id,
+      location_id: Location::HETZNER_FSN1_ID
     ).subject
   end
 
@@ -127,9 +127,23 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page.title).to eq("Ubicloud - Create Kubernetes Cluster")
       end
 
+      it "cannot create kubernetes cluster when location not exist" do
+        fill_in "Name", with: "cannotcreate"
+        choose option: 3
+        select 2, from: "worker_nodes"
+        choose option: Location::LEASEWEB_WDC02_ID
+        Location[Location::LEASEWEB_WDC02_ID].destroy
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - ResourceNotFound")
+        expect(page.status_code).to eq(404)
+        expect(page).to have_content("ResourceNotFound")
+      end
+
       it "can create new kubernetes cluster" do
         fill_in "Name", with: "k8stest"
-        choose option: "eu-central-h1"
+        choose option: Location::HETZNER_FSN1_ID
         choose option: 3
         select 2, from: "worker_nodes"
 
@@ -148,7 +162,7 @@ RSpec.describe Clover, "Kubernetes" do
 
       it "can not create kubernetes cluster with invalid name" do
         fill_in "Name", with: "invalid name"
-        choose option: "eu-central-h1"
+        choose option: Location::HETZNER_FSN1_ID
         choose option: 3
         select 2, from: "worker_nodes"
 
@@ -160,17 +174,17 @@ RSpec.describe Clover, "Kubernetes" do
 
       it "can not create kubernetes cluster with same name in same project & location" do
         fill_in "Name", with: "myk8s"
-        choose option: "eu-central-h1"
+        choose option: Location::HETZNER_FSN1_ID
         choose option: 3
         select 2, from: "worker_nodes"
 
         click_button "Create"
         expect(page.title).to eq("Ubicloud - Create Kubernetes Cluster")
-        expect(page).to have_flash_error("project_id and location and name is already taken")
+        expect(page).to have_flash_error("project_id and location_id and name is already taken")
       end
 
       it "can not select invisible location" do
-        expect { choose option: "github-runners" }.to raise_error Capybara::ElementNotFound
+        expect { choose option: Location::GITHUB_RUNNERS_ID }.to raise_error Capybara::ElementNotFound
       end
 
       it "can not create kubernetes cluster in a project when does not have permissions" do

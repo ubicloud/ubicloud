@@ -10,12 +10,12 @@ RSpec.describe Clover, "load balancer" do
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
 
   let(:lb) do
-    ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
+    ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
     LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-1", src_port: 80, dst_port: 80, health_check_endpoint: "/up", project_id: project.id)
   end
 
   let(:lb_wo_permission) {
-    ps = Prog::Vnet::SubnetNexus.assemble(project_wo_permissions.id, name: "dummy-ps-2", location: "hetzner-fsn1").subject
+    ps = Prog::Vnet::SubnetNexus.assemble(project_wo_permissions.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID).subject
     LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-2", src_port: 80, dst_port: 80, health_check_endpoint: "/up", project_id: project_wo_permissions.id)
   }
 
@@ -82,7 +82,7 @@ RSpec.describe Clover, "load balancer" do
     describe "create" do
       it "can create new load balancer" do
         project
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         visit "#{project.path}/load-balancer/create"
 
         expect(page.title).to eq("Ubicloud - Create Load Balancer")
@@ -105,7 +105,7 @@ RSpec.describe Clover, "load balancer" do
 
       it "can not create load balancer with invalid name" do
         project
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         visit "#{project.path}/load-balancer/create"
 
         expect(page.title).to eq("Ubicloud - Create Load Balancer")
@@ -127,7 +127,7 @@ RSpec.describe Clover, "load balancer" do
 
       it "handles invalid referers by redirecting to root" do
         project
-        Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
+        Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         visit "#{project.path}/load-balancer/create"
         fill_in "Name", with: "invalid name"
 
@@ -137,7 +137,7 @@ RSpec.describe Clover, "load balancer" do
       end
 
       it "can not create load balancer in a project when does not have permissions" do
-        Prog::Vnet::SubnetNexus.assemble(project_wo_permissions.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
+        Prog::Vnet::SubnetNexus.assemble(project_wo_permissions.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         visit "#{project_wo_permissions.path}/load-balancer/create"
 
         expect(page.title).to eq("Ubicloud - Forbidden")
@@ -147,7 +147,7 @@ RSpec.describe Clover, "load balancer" do
 
       it "can not create load balancer with invalid private subnet" do
         project
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         visit "#{project.path}/load-balancer/create"
 
         expect(page.title).to eq("Ubicloud - Create Load Balancer")
@@ -214,7 +214,7 @@ RSpec.describe Clover, "load balancer" do
       end
 
       it "can attach vm" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000, algorithm: "hash_based").subject
         dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
@@ -240,7 +240,7 @@ RSpec.describe Clover, "load balancer" do
       end
 
       it "can not attach vm when it is already attached to another load balancer" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         lb1 = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
         lb2 = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-4", src_port: 80, dst_port: 8000).subject
         dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
@@ -260,7 +260,7 @@ RSpec.describe Clover, "load balancer" do
       end
 
       it "can not attach vm when it does not exist" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
         vm = Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
 
@@ -276,7 +276,7 @@ RSpec.describe Clover, "load balancer" do
       end
 
       it "can detach vm" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
         dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
@@ -299,7 +299,7 @@ RSpec.describe Clover, "load balancer" do
       end
 
       it "can not detach vm when it does not exist" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
         dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
@@ -326,7 +326,7 @@ RSpec.describe Clover, "load balancer" do
 
     describe "delete" do
       it "can delete load balancer" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
 
         visit "#{project.path}#{lb.path}"
@@ -350,7 +350,7 @@ RSpec.describe Clover, "load balancer" do
       end
 
       it "can not delete load balancer when it doesn't exist" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
 
         visit "#{project.path}#{lb.path}"

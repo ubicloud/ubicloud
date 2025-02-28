@@ -38,11 +38,17 @@ let option_dirty = <%==JSON.generate(form_elements.map { _1[:name] }.each_with_o
 
     has_option = ["radio_small_cards", "select", "checkbox"].include?(type)
     options = OptionTreeGenerator.generate_allowed_options(name, option_tree, option_parents).map do |option|
-      opt_val = (type == "select") ? option[name][:value] : option[name]
+      opt_val = if option[name].is_a?(Sequel::Model)
+        option[name].id
+      elsif type == "select"
+        option[name][:value]
+      else
+        option[name]
+      end
 
       opt_text = content_generator.call(*option.values)
 
-      parents = option.reject { |k, v| k == name }
+      parents = option.reject { |k, v| k == name }.transform_values { |v| v.is_a?(Sequel::Model) ? v.id : v }
 
       parents_selected = parents.all? { |k, v| selected_options[k] == v }
       submitted_value = flash.dig("old", name)
@@ -51,9 +57,11 @@ let option_dirty = <%==JSON.generate(form_elements.map { _1[:name] }.each_with_o
       first_of_its_kind = submitted_value.nil? && selected_options[name].nil?
       checked = parents_selected && (selected_in_form_submission || selected_in_pre_selection || first_of_its_kind)
       selected_options[name] = opt_val if checked
-    
-      opt_classes = (parents.map { |k, v| "form_#{k} form_#{k}_#{v}" } + (parents_selected ? [] : ["hidden"])).join(" ")
 
+      opt_classes = parents.map { |k, v| "form_#{k} form_#{k}_#{v}" }
+      opt_classes << "hidden" unless parents_selected
+      opt_classes = opt_classes.join(" ")
+  
       opt_attrs = {}
       opt_attrs[:disabled] = "disabled" unless parents_selected
       opt_attrs[:checked] = "checked" if checked

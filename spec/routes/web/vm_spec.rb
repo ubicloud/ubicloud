@@ -67,7 +67,7 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
         name = "dummy-vm"
         fill_in "Name", with: name
-        choose option: "eu-central-h1"
+        choose option: Location::HETZNER_FSN1_ID
         uncheck "enable_ip4"
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
@@ -106,7 +106,7 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
 
         click_button "Create"
-        vm_host = VmHost.new_with_id(location: "test")
+        vm_host = VmHost.new_with_id(location_id: Location::HETZNER_FSN1_ID)
         Sshable.create { |s| s.id = vm_host.id }
         vm_host.save_changes
         address = Address.create(
@@ -173,7 +173,7 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
         name = "dummy-vm"
         fill_in "Name", with: name
-        choose option: "eu-central-h1"
+        choose option: Location::HETZNER_FSN1_ID
         check "enable_ip4"
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
@@ -198,7 +198,7 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content ps.name
         name = "dummy-vm"
         fill_in "Name", with: name
-        choose option: "eu-central-h1"
+        choose option: Location::HETZNER_FSN1_ID
         select match: :prefer_exact, text: ps.name
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
@@ -222,7 +222,7 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content "Default"
         name = "dummy-vm"
         fill_in "Name", with: name
-        choose option: "eu-central-h1"
+        choose option: Location::HETZNER_FSN1_ID
         select match: :prefer_exact, text: "Default"
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
@@ -234,12 +234,12 @@ RSpec.describe Clover, "vm" do
         expect(Vm.count).to eq(1)
         expect(Vm.first.project_id).to eq(project.id)
         expect(Vm.first.private_subnets.first.id).not_to eq(ps.id)
-        expect(Vm.first.private_subnets.first.name).to eq("default-#{LocationNameConverter.to_display_name(ps.location)}")
+        expect(Vm.first.private_subnets.first.name).to eq("default-#{ps.location.display_name}")
 
         # can create a second vm in the same location and it will use the same subnet
         visit "#{project.path}/vm/create"
         fill_in "Name", with: "dummy-vm-2"
-        choose option: "eu-central-h1"
+        choose option: Location::HETZNER_FSN1_ID
         select match: :prefer_exact, text: "Default"
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
@@ -258,7 +258,7 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
 
         fill_in "Name", with: "invalid name"
-        choose option: "eu-central-h1"
+        choose option: Location::HETZNER_FSN1_ID
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
 
@@ -276,14 +276,14 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
 
         fill_in "Name", with: vm.name
-        choose option: "eu-central-h1"
+        choose option: Location::HETZNER_FSN1_ID
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
 
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
-        expect(page).to have_flash_error("project_id and location and name is already taken")
+        expect(page).to have_flash_error("project_id and location_id and name is already taken")
       end
 
       it "can not create virtual machine if project has no valid payment method" do
@@ -296,7 +296,7 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content "Project doesn't have valid billing information"
 
         fill_in "Name", with: "dummy-vm"
-        choose option: "eu-central-h1"
+        choose option: Location::HETZNER_FSN1_ID
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
 
@@ -312,7 +312,7 @@ RSpec.describe Clover, "vm" do
 
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
 
-        expect { choose option: "github-runners" }.to raise_error Capybara::ElementNotFound
+        expect { choose option: "6b9ef786-b842-8420-8c65-c25e3d4bdf3d" }.to raise_error Capybara::ElementNotFound
       end
 
       it "can not create vm in a project when does not have permissions" do
@@ -322,6 +322,23 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - Forbidden")
         expect(page.status_code).to eq(403)
         expect(page).to have_content "Forbidden"
+      end
+
+      it "cannot create vm when location not exist" do
+        visit "#{project.path}/vm/create"
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+
+        fill_in "Name", with: "cannotcreate"
+        choose option: Location::HETZNER_FSN1_ID
+        choose option: "ubuntu-jammy"
+        choose option: "standard-2"
+
+        Location[Location::HETZNER_FSN1_ID].destroy
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - ResourceNotFound")
+        expect(page.status_code).to eq(404)
+        expect(page).to have_content("ResourceNotFound")
       end
     end
 
@@ -349,6 +366,14 @@ RSpec.describe Clover, "vm" do
 
       it "raises not found when virtual machine not exists" do
         visit "#{project.path}/location/eu-central-h1/vm/08s56d4kaj94xsmrnf5v5m3mav"
+
+        expect(page.title).to eq("Ubicloud - ResourceNotFound")
+        expect(page.status_code).to eq(404)
+        expect(page).to have_content "ResourceNotFound"
+      end
+
+      it "cannot list when location not exist" do
+        visit "#{project.path}/location/not-exist-location/vm"
 
         expect(page.title).to eq("Ubicloud - ResourceNotFound")
         expect(page.status_code).to eq(404)

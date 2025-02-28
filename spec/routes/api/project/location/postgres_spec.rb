@@ -10,7 +10,7 @@ RSpec.describe Clover, "postgres" do
   let(:pg) do
     Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: project.id,
-      location: "hetzner-fsn1",
+      location_id: Location::HETZNER_FSN1_ID,
       name: "pg-with-permission",
       target_vm_size: "standard-2",
       target_storage_size_gib: 128
@@ -69,7 +69,7 @@ RSpec.describe Clover, "postgres" do
       it "success multiple" do
         Prog::Postgres::PostgresResourceNexus.assemble(
           project_id: project.id,
-          location: "hetzner-fsn1",
+          location_id: Location::HETZNER_FSN1_ID,
           name: "pg-test-2",
           target_vm_size: "standard-2",
           target_storage_size_gib: 128
@@ -128,6 +128,15 @@ RSpec.describe Clover, "postgres" do
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: location", {"location" => "Given location is not a valid postgres location. Available locations: [\"eu-central-h1\", \"us-east-a2\"]"})
+      end
+
+      it "location not exist" do
+        post "/project/#{project.ubid}/location/not-exist-location/postgres/test-postgres", {
+          size: "standard-2",
+          ha_type: "sync"
+        }.to_json
+
+        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
       end
 
       it "invalid name" do

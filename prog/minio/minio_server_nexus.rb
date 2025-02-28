@@ -21,7 +21,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
         Config.minio_service_project_id,
         sshable_unix_user: "ubi",
-        location: minio_pool.cluster.location,
+        location_id: minio_pool.cluster.location_id,
         name: ubid.to_s,
         size: minio_pool.vm_size,
         storage_volumes: [
