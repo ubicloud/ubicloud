@@ -26,16 +26,16 @@ RSpec.describe Clover, "postgres" do
         [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres"],
         [:delete, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"],
-        [:delete, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}"],
+        [:delete, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}"],
         [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"],
-        [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}"],
+        [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule"],
         [:delete, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/foo_ubid"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore"],
-        [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/restore"],
+        [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/restore"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password"],
-        [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/reset-superuser-password"],
-        [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/failover"],
+        [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/reset-superuser-password"],
+        [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/failover"],
         [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/ca-certificates"]
       ].each do |method, path|
         send method, path
@@ -150,7 +150,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "firewall-rule pg ubid" do
-        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/firewall-rule", {
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/firewall-rule", {
           cidr: "0.0.0.0/24"
         }.to_json
 
@@ -237,7 +237,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "reset password ubid" do
-        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/reset-superuser-password", {
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/reset-superuser-password", {
           password: "DummyPassword123"
         }.to_json
 
@@ -253,7 +253,7 @@ RSpec.describe Clover, "postgres" do
         st.update(label: "wait")
         expect(PostgresServer).to receive(:run_query).and_return "16/B374D848"
 
-        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/failover"
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/failover"
 
         expect(last_response.status).to eq(200)
       end
@@ -262,7 +262,7 @@ RSpec.describe Clover, "postgres" do
         pg.save_changes
         pg.representative_server.update(timeline_access: "fetch")
 
-        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/failover"
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/failover"
 
         expect(last_response).to have_api_error(400, "Failover cannot be triggered during restore!")
       end
@@ -270,7 +270,7 @@ RSpec.describe Clover, "postgres" do
       it "failover no ff base image" do
         pg.save_changes
 
-        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/failover"
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/failover"
 
         expect(last_response).to have_api_error(400, "Failover cannot be triggered for this resource!")
       end
@@ -279,7 +279,7 @@ RSpec.describe Clover, "postgres" do
         pg.flavor = PostgresResource::Flavor::PARADEDB
         pg.save_changes
 
-        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/failover"
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/failover"
 
         expect(last_response).to have_api_error(400, "There is not a suitable standby server to failover!")
       end
@@ -305,7 +305,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "success ubid" do
-        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}"
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq(pg.name)
@@ -318,7 +318,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "show firewall" do
-        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/firewall-rule"
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/firewall-rule"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["items"][0]["cidr"]).to eq("0.0.0.0/0")
@@ -352,7 +352,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "success ubid" do
-        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}"
+        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(pg.id).set?("destroy")).to be true
@@ -373,7 +373,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "not exist ubid in location" do
-        delete "/project/#{project.ubid}/location/foo_location/postgres/_#{pg.ubid}"
+        delete "/project/#{project.ubid}/location/foo_location/postgres/#{pg.ubid}"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(pg.id).set?("destroy")).to be false
@@ -386,7 +386,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "firewall-rule ubid" do
-        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/firewall-rule/#{pg.firewall_rules.first.ubid}"
+        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/firewall-rule/#{pg.firewall_rules.first.ubid}"
 
         expect(last_response.status).to eq(204)
       end

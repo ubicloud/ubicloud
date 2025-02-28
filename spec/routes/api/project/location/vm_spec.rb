@@ -19,9 +19,9 @@ RSpec.describe Clover, "vm" do
         [:get, "/project/#{project.ubid}/location/#{vm.display_location}/vm"],
         [:post, "/project/#{project.ubid}/location/#{vm.display_location}/vm/foo_name"],
         [:delete, "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"],
-        [:delete, "/project/#{project.ubid}/location/#{vm.display_location}/vm/_#{vm.ubid}"],
+        [:delete, "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.ubid}"],
         [:get, "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"],
-        [:get, "/project/#{project.ubid}/location/#{vm.display_location}/vm/_#{vm.ubid}"]
+        [:get, "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.ubid}"]
       ].each do |method, path|
         send method, path
 
@@ -207,7 +207,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "success ubid" do
-        get "/project/#{project.ubid}/location/#{vm.display_location}/vm/_#{vm.ubid}"
+        get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.ubid}"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq(vm.name)
@@ -229,7 +229,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "success ubid" do
-        delete "/project/#{project.ubid}/location/#{vm.display_location}/vm/_#{vm.ubid}"
+        delete "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.ubid}"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(vm.id).set?("destroy")).to be true
@@ -250,7 +250,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "not exist ubid in location" do
-        delete "/project/#{project.ubid}/location/foo_location/vm/_#{vm.ubid}"
+        delete "/project/#{project.ubid}/location/foo_location/vm/#{vm.ubid}"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(vm.id).set?("destroy")).to be false

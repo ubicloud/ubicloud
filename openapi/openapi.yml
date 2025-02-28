@@ -719,59 +719,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/_{postgres_database_id}/failover':
-    parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_id'
-    post:
-      operationId: failoverPostgresDatabaseWithID
-      summary: Failover a specific Postgres Database with ID
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresDatabase'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/_{postgres_database_id}/firewall-rule':
-    parameters:
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_id'
-      - $ref: '#/components/parameters/project_id'
-    get:
-      operationId: listLocationPostgresFirewallRules
-      summary: List location Postgres firewall rules
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresFirewallRules'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Firewall Rule
-    post:
-      operationId: createLocationPostgresFirewallRuleWithId
-      summary: Create a new Postgres firewall rule
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                cidr:
-                  description: CIDR of the firewall rule
-                  type: string
-              additionalProperties: false
-              required:
-                - cidr
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresFirewallRule'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Firewall Rule
   '/project/{project_id}/location/{location}/postgres/{postgres_database_name}':
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -863,8 +810,8 @@ paths:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/postgres_database_name'
     post:
-      operationId: failoverPostgresDatabaseWithName
-      summary: Failover a specific Postgres Database with name
+      operationId: failoverPostgresDatabaseWithID
+      summary: Failover a specific Postgres Database with ID
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabase'
@@ -877,6 +824,16 @@ paths:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/postgres_database_name'
       - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: listLocationPostgresFirewallRules
+      summary: List location Postgres firewall rules
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresFirewallRules'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Firewall Rule
     post:
       operationId: createLocationPostgresFirewallRule
       summary: Create a new postgres firewall rule
@@ -1370,15 +1327,6 @@ components:
       schema:
         type: integer
         default: 10
-    postgres_database_id:
-      description: Postgres database ID
-      in: path
-      name: postgres_database_id
-      required: true
-      schema:
-        type: string
-        example: pgn30gjk1d1e2jj34v9x0dq4rp
-        pattern: '^pg[0-9a-hj-km-np-tv-z]{24}$'
     postgres_database_name:
       description: Postgres database name
       in: path

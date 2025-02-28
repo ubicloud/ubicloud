@@ -240,7 +240,7 @@ RSpec.describe Clover, "Kubernetes" do
       end
 
       it "works with ubid" do
-        visit "#{project.path}/location/#{kc.display_location}/kubernetes-cluster/_#{kc.ubid}"
+        visit "#{project.path}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}"
 
         expect(page.title).to eq("Ubicloud - #{kc.name}")
         expect(page).to have_content kc.name

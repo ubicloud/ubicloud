@@ -25,7 +25,7 @@ RSpec.describe Clover, "load-balancer" do
         [:get, "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}"],
         [:post, "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}/attach-vm", {vm_id: "vm-1"}],
         [:post, "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}/detach-vm", {vm_id: "vm-1"}],
-        [:get, "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/_#{lb.ubid}"]
+        [:get, "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.ubid}"]
       ].each do |method, path, body|
         send(method, path, body)
 
@@ -71,7 +71,7 @@ RSpec.describe Clover, "load-balancer" do
 
     describe "id" do
       it "success" do
-        get "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/_#{lb.ubid}"
+        get "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.ubid}"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq("lb-1")
