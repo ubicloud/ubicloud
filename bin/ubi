@@ -26,6 +26,7 @@ uri = URI(url)
 argv = ARGV
 headers = {
   "authorization" => "Bearer: #{token}",
+  "x-ubi-version" => File.read(File.expand_path("../../cli/version.txt", __FILE__)).chomp,
   "content-type" => "application/json",
   "accept" => "text/plain",
   "connection" => "close"

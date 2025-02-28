@@ -27,12 +27,17 @@ class UbiCli
   LOWERCASE_LABELS.freeze
 
   OBJECT_INFO_REGEXP = /((fw|1b|pg|ps|vm)[a-z0-9]{24})/
+  UBI_VERSION_REGEXP = /\A\d{1,4}\.\d{1,4}\.\d{1,4}\z/
 
   Rodish.processor(self) do
     options("ubi [options] [subcommand [subcommand-options] ...]") do
-      on("--version", "show program version") { halt "0.0.0" }
+      on("--version", "show program version")
       on("--help", "show program help") { halt to_s }
       on("--confirm=confirmation", "confirmation value (not for direct use)")
+    end
+
+    after_options do |_, opts|
+      raise Rodish::CommandExit, client_version if opts[:version]
     end
 
     # :nocov:
@@ -340,6 +345,13 @@ class UbiCli
       keys.transform_keys { _1.to_s.tr("-", "_") }
     else # when Hash
       keys.map { _1.tr("-", "_") }
+    end
+  end
+
+  def client_version
+    @client_version ||= begin
+      version_header = @env["HTTP_X_UBI_VERSION"]
+      UBI_VERSION_REGEXP.match?(version_header) ? version_header : "unknown"
     end
   end
 

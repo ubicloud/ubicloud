@@ -278,13 +278,20 @@ task :spec_separate do
   end
 end
 
+cli_version = lambda do
+  # Bump version for new releases
+  File.read("cli/version.txt").chomp
+end
+
 desc "Compile cli/ubi binary for current platform"
 task "ubi" do
-  sh("cd cli && go build -tags osusergo,netgo")
+  sh("cd cli && go build -ldflags '-X main.version=#{cli_version.call}' -tags osusergo,netgo")
 end
 
 desc "Cross compile cli/ubi binaries for common platforms"
 task "ubi-cross" do
+  version = cli_version.call
+
   Dir.chdir("cli") do
     os_list = %w[linux windows darwin]
     arch_list = %w[amd64 arm64 386]
@@ -292,7 +299,7 @@ task "ubi-cross" do
       arch_list.each do |arch|
         next if os == "darwin" && arch == "386"
         next if os == "windows" && arch == "386" # Windows Defender falsely flags as Trojan:Win32/Bearfoos.A!ml
-        sh("env GOOS=#{os} GOARCH=#{arch} go build -ldflags '-s -w' -o ubi-#{os}-#{arch}#{".exe" if os == "windows"} -tags osusergo,netgo")
+        sh("env GOOS=#{os} GOARCH=#{arch} go build -ldflags '-s -w -X main.version=#{version}' -o ubi-#{os}-#{arch}-#{version}#{".exe" if os == "windows"} -tags osusergo,netgo")
       end
     end
   end
