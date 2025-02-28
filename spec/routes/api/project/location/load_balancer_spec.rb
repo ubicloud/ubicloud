@@ -8,7 +8,7 @@ RSpec.describe Clover, "load-balancer" do
   let(:project) { project_with_default_policy(user) }
 
   let(:lb) do
-    ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location: LocationNameConverter.to_internal_name(TEST_LOCATION))
+    ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location_id: Location[display_name: TEST_LOCATION].id)
     dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
     cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
     lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "lb-1", src_port: 80, dst_port: 80).subject
@@ -86,7 +86,7 @@ RSpec.describe Clover, "load-balancer" do
 
     describe "create" do
       it "success" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location: "hetzner-fsn1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location_id: Location[display_name: TEST_LOCATION].id).subject
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/lb1", {
           private_subnet_id: ps.ubid,
           stack: LoadBalancer::Stack::IPV4,

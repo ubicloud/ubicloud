@@ -130,19 +130,19 @@ RSpec.describe Project do
   describe ".default_location" do
     it "returns the location with the highest available core capacity" do
       [
-        {allocation_state: "accepting", location: "hetzner-fsn1", total_cores: 10, used_cores: 3},
-        {allocation_state: "accepting", location: "hetzner-fsn1", total_cores: 10, used_cores: 3},
-        {allocation_state: "accepting", location: "hetzner-fsn1", total_cores: 10, used_cores: 1},
-        {allocation_state: "accepting", location: "leaseweb-wdc02", total_cores: 100, used_cores: 99},
-        {allocation_state: "draining", location: "location-4", total_cores: 100, used_cores: 0},
-        {allocation_state: "accepting", location: "github-runners", total_cores: 100, used_cores: 0}
+        {allocation_state: "accepting", location_id: Location::HETZNER_FSN1_ID, total_cores: 10, used_cores: 3},
+        {allocation_state: "accepting", location_id: Location::HETZNER_FSN1_ID, total_cores: 10, used_cores: 3},
+        {allocation_state: "accepting", location_id: Location::HETZNER_FSN1_ID, total_cores: 10, used_cores: 1},
+        {allocation_state: "accepting", location_id: Location::LEASEWEB_WDC02_ID, total_cores: 100, used_cores: 99},
+        {allocation_state: "draining", location_id: Location::HETZNER_HEL1_ID, total_cores: 100, used_cores: 0},
+        {allocation_state: "accepting", location_id: Location::GITHUB_RUNNERS_ID, total_cores: 100, used_cores: 0}
       ].each { create_vm_host(**_1) }
 
-      expect(project.default_location).to eq("hetzner-fsn1")
+      expect(project.default_location).to eq("github-runners")
     end
 
     it "provides first location when location with highest available core capacity cannot be determined" do
-      expect(project.default_location).to eq Option.locations.first.name
+      expect(project.default_location).to eq "eu-central-h1"
     end
   end
 

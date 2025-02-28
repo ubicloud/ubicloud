@@ -10,7 +10,7 @@ class Clover
           {Sequel[:kubernetes_cluster][:id] => UBID.to_uuid(kc_ubid)}
         end
 
-        filter[:location] = @location
+        filter[:location_id] = @location.id
         kc = @project.kubernetes_clusters_dataset.first(filter)
 
         next 404 unless kc

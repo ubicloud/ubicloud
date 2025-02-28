@@ -4,6 +4,11 @@ require_relative "../model"
 
 class Location < Sequel::Model
   include ResourceMethods
+
+  HETZNER_FSN1_ID = "caa7a807-36c5-8420-a75c-f906839dad71"
+  HETZNER_HEL1_ID = "1f214853-0bc4-8020-b910-dffb867ef44f"
+  GITHUB_RUNNERS_ID = "6b9ef786-b842-8420-8c65-c25e3d4bdf3d"
+  LEASEWEB_WDC02_ID = "e0865080-9a3d-8020-a812-f5817c7afe7f"
 end
 
 # Table: location

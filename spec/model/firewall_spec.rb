@@ -6,11 +6,11 @@ RSpec.describe Firewall do
   let(:project_id) { Project.create(name: "test").id }
 
   let(:fw) {
-    described_class.create_with_id(name: "test-fw", description: "test fw desc", location: "hetzner-fsn1", project_id:)
+    described_class.create_with_id(name: "test-fw", description: "test fw desc", location_id: Location::HETZNER_FSN1_ID, project_id:)
   }
 
   let(:ps) {
-    PrivateSubnet.create_with_id(name: "test-ps", location: "hetzner-fsn1", net6: "2001:db8::/64", net4: "10.0.0.0/24", project_id:)
+    PrivateSubnet.create_with_id(name: "test-ps", location_id: Location::HETZNER_FSN1_ID, net6: "2001:db8::/64", net4: "10.0.0.0/24", project_id:)
   }
 
   it "inserts firewall rules" do

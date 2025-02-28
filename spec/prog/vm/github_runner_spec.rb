@@ -18,7 +18,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   }
 
   let(:vm) {
-    Vm.new(family: "standard", cores: 1, name: "dummy-vm", location: "github-runners").tap {
+    Vm.new(family: "standard", cores: 1, name: "dummy-vm", location_id: Location[name: "github-runners"].id).tap {
       _1.id = "788525ed-d6f0-4937-a844-323d4fd91946"
     }
   }
@@ -85,9 +85,9 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "provisions a new vm if pool is valid but there is no vm" do
-      git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150, arch: "x64")
+      git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location_id: Location[name: "github-runners"].id, storage_size_gib: 150, arch: "x64")
       expect(VmPool).to receive(:where).with(
-        vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners",
+        vm_size: "standard-4", boot_image: "github-ubuntu-2204", location_id: Location[name: "github-runners"].id,
         storage_size_gib: 150, storage_encrypted: true,
         storage_skip_sync: true, arch: "x64"
       ).and_return([git_runner_pool])
@@ -102,9 +102,9 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "uses the existing vm if pool can pick one" do
-      git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150, arch: "arm64")
+      git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location_id: Location[name: "github-runners"].id, storage_size_gib: 150, arch: "arm64")
       expect(VmPool).to receive(:where).with(
-        vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners",
+        vm_size: "standard-4", boot_image: "github-ubuntu-2204", location_id: Location[name: "github-runners"].id,
         storage_size_gib: 150, storage_encrypted: true,
         storage_skip_sync: true, arch: "arm64"
       ).and_return([git_runner_pool])
@@ -292,8 +292,8 @@ RSpec.describe Prog::Vm::GithubRunner do
 
   describe "#wait_concurrency_limit" do
     before do
-      [["hetzner-fsn1", "x64"], ["github-runners", "x64"], ["github-runners", "arm64"]].each_with_index do |(location, arch), i|
-        create_vm_host(location:, arch:, total_cores: 16, used_cores: 16)
+      [[Location::HETZNER_FSN1_ID, "x64"], [Location::GITHUB_RUNNERS_ID, "x64"], [Location::GITHUB_RUNNERS_ID, "arm64"]].each_with_index do |(location_id, arch), i|
+        create_vm_host(location_id:, arch:, total_cores: 16, used_cores: 16)
       end
     end
 
@@ -368,7 +368,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   describe ".setup_info" do
     it "returns setup info with vm pool ubid" do
       expect(vm).to receive(:pool_id).and_return("ccd51c1e-2c78-8f76-b182-467e6cdc51f0").at_least(:once)
-      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-fsn1", data_center: "FSN1-DC8")).at_least(:once)
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location_id: Location::HETZNER_FSN1_ID, data_center: "FSN1-DC8")).at_least(:once)
       expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
 
       expect(nx.setup_info[:detail]).to eq("Name: #{github_runner.ubid}\nLabel: ubicloud-standard-4\nArch: \nImage: \nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\nVM Pool: vpskahr7hcf26p614czkcvh8z1\nLocation: hetzner-fsn1\nDatacenter: FSN1-DC8\nProject: pjwnadpt27b21p81d7334f11rx\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github")
@@ -379,7 +379,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "hops to register_runner" do
       expect(Config).to receive(:docker_mirror_server_vm_id).and_return(vm.id).at_least(:once)
       expect(Vm).to receive(:[]).with(vm.id).and_return(vm).at_least(:once)
-      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-fsn1", data_center: "FSN1-DC8", id: "788525ed-d6f0-4937-a844-323d4fd91946")).at_least(:once)
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location_id: Location::HETZNER_FSN1_ID, data_center: "FSN1-DC8", id: "788525ed-d6f0-4937-a844-323d4fd91946")).at_least(:once)
       expect(vm).to receive(:runtime_token).and_return("my_token")
       expect(vm).to receive(:load_balancer).and_return(instance_double(LoadBalancer, hostname: "test.lb.ubicloud.com"))
       expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
@@ -413,7 +413,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "hops to register_runner without setting up registry mirror" do
       expect(Config).to receive(:docker_mirror_server_vm_id).and_return(nil)
-      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-fsn1", data_center: "FSN1-DC8", id: "788525ed-d6f0-4937-a844-323d4fd91946")).at_least(:once)
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location_id: Location::HETZNER_FSN1_ID, data_center: "FSN1-DC8", id: "788525ed-d6f0-4937-a844-323d4fd91946")).at_least(:once)
       expect(vm).to receive(:runtime_token).and_return("my_token")
       expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
       expect(github_runner.installation).to receive(:cache_enabled).and_return(false)
@@ -430,7 +430,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "hops to register_runner with after enabling transparent cache" do
-      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-fsn1", data_center: "FSN1-DC8", id: "788525ed-d6f0-4937-a844-323d4fd91946")).at_least(:once)
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location_id: Location::HETZNER_FSN1_ID, data_center: "FSN1-DC8", id: "788525ed-d6f0-4937-a844-323d4fd91946")).at_least(:once)
       expect(vm).to receive(:runtime_token).and_return("my_token")
       expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
       expect(github_runner.installation).to receive(:cache_enabled).and_return(true)

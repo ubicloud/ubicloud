@@ -50,7 +50,7 @@ RSpec.describe Clover, "vm" do
       it "success multiple location with pagination" do
         Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-2")
         Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-3")
-        Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-4", location: "leaseweb-wdc02")
+        Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-4", location_id: "e0865080-9a3d-8020-a812-f5817c7afe7f")
 
         get "/project/#{project.ubid}/location/#{vm.display_location}/vm", {
           order_column: "name",
@@ -65,6 +65,12 @@ RSpec.describe Clover, "vm" do
 
       it "ubid not exist" do
         get "/project/#{project.ubid}/location/#{vm.display_location}/vm/_foo_ubid"
+
+        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+      end
+
+      it "location not exist" do
+        get "/project/#{project.ubid}/location/not-exist-location/vm"
 
         expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
       end
@@ -85,7 +91,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "success with private subnet" do
-        ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").ubid
+        ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location[display_name: TEST_LOCATION].id).ubid
 
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
@@ -184,7 +190,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "invalid ps id in other location" do
-        ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "leaseweb-wdc02").ubid
+        ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: "e0865080-9a3d-8020-a812-f5817c7afe7f").ubid
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
@@ -250,7 +256,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "not exist ubid in location" do
-        delete "/project/#{project.ubid}/location/foo_location/vm/#{vm.ubid}"
+        delete "/project/#{project.ubid}/location/us-east-a3/vm/#{vm.ubid}"
 
         expect(last_response.status).to eq(404)
         expect(SemSnap.new(vm.id).set?("destroy")).to be false

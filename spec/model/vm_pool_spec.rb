@@ -8,7 +8,7 @@ RSpec.describe VmPool do
       size: 3,
       vm_size: "standard-2",
       boot_image: "img",
-      location: "loc",
+      location_id: Location::HETZNER_FSN1_ID,
       storage_size_gib: 86
     )
   }

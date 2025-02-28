@@ -18,6 +18,7 @@ class VmHost < Sequel::Model
   one_to_many :boot_images, key: :vm_host_id
   one_to_many :slices, class: :VmHostSlice, key: :vm_host_id
   one_to_many :cpus, class: :VmHostCpu, key: :vm_host_id
+  many_to_one :location, key: :location_id, class: :Location
 
   plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, provider: :destroy, spdk_installations: :destroy, storage_devices: :destroy, pci_devices: :destroy, boot_images: :destroy, slices: :destroy, cpus: :destroy
 

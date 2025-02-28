@@ -10,7 +10,7 @@ RSpec.describe Clover, "postgres" do
   let(:pg) do
     Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: project.id,
-      location: "hetzner-fsn1",
+      location_id: Location::HETZNER_FSN1_ID,
       name: "pg-with-permission",
       target_vm_size: "standard-2",
       target_storage_size_gib: 128
@@ -20,7 +20,7 @@ RSpec.describe Clover, "postgres" do
   let(:pg_wo_permission) do
     Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: project_wo_permissions.id,
-      location: "hetzner-fsn1",
+      location_id: Location::HETZNER_FSN1_ID,
       name: "pg-without-permission",
       target_vm_size: "standard-2",
       target_storage_size_gib: 128
@@ -81,7 +81,7 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         name = "new-pg-db"
         fill_in "Name", with: name
-        choose option: "eu-central-h1"
+        choose option: Location::HETZNER_FSN1_ID
         choose option: "standard-2"
         choose option: PostgresResource::HaType::NONE
 
@@ -99,7 +99,7 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         name = "new-pg-db"
         fill_in "Name", with: name
-        choose option: "eu-central-h1"
+        choose option: Location::HETZNER_FSN1_ID
         choose option: "standard-60"
         choose option: PostgresResource::HaType::NONE
 
@@ -111,6 +111,22 @@ RSpec.describe Clover, "postgres" do
         expect(PostgresResource.count).to eq(0)
       end
 
+      it "cannot create new PostgreSQL database with invalid location" do
+        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}&location=invalid"
+        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
+        name = "new-pg-db"
+        fill_in "Name", with: name
+        choose option: Location::HETZNER_FSN1_ID
+        choose option: "standard-60"
+        choose option: PostgresResource::HaType::NONE
+        Location[Location::HETZNER_FSN1_ID].destroy
+
+        click_button "Create"
+        expect(page.title).to eq("Ubicloud - ResourceNotFound")
+        expect(page.status_code).to eq(404)
+        expect(page).to have_content "ResourceNotFound"
+      end
+
       it "can create new ParadeDB PostgreSQL database" do
         expect(Config).to receive(:postgres_paradedb_notification_email).and_return("dummy@mail.com")
         expect(Util).to receive(:send_email)
@@ -119,7 +135,7 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - Create ParadeDB PostgreSQL Database")
         name = "new-pg-db"
         fill_in "Name", with: name
-        choose option: "eu-central-h1"
+        choose option: Location::HETZNER_FSN1_ID
         choose option: "standard-2"
         choose option: PostgresResource::HaType::NONE
         check "Accept Terms of Service and Privacy Policy"
@@ -147,14 +163,14 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
 
         fill_in "Name", with: pg.name
-        choose option: "eu-central-h1"
+        choose option: Location::HETZNER_FSN1_ID
         choose option: "standard-2"
         choose option: PostgresResource::HaType::NONE
 
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
-        expect(page).to have_flash_error("project_id and location and name is already taken")
+        expect(page).to have_flash_error("project_id and location_id and name is already taken")
       end
 
       it "can not select invisible location" do
@@ -172,6 +188,14 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - Forbidden")
         expect(page.status_code).to eq(403)
         expect(page).to have_content "Forbidden"
+      end
+
+      it "cannot create when location not exist" do
+        visit "#{project.path}/location/not-exist-location/postgres/create"
+
+        expect(page.title).to eq("Ubicloud - ResourceNotFound")
+        expect(page.status_code).to eq(404)
+        expect(page).to have_content "ResourceNotFound"
       end
     end
 

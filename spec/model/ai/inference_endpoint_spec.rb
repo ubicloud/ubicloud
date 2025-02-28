@@ -6,7 +6,7 @@ RSpec.describe InferenceEndpoint do
   subject(:inference_endpoint) do
     described_class.new(
       name: "ie-name",
-      location: "hetzner-fsn1",
+      location_id: Location::HETZNER_FSN1_ID,
       model_name: "model-name"
     ) { _1.id = "c76fcd0c-3fb0-40cc-8732-d71869ee1341" }
   end

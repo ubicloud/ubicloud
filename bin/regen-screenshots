@@ -132,7 +132,7 @@ class RegenScreenshots
 
     pg_resource = PostgresResource.create(
       name: "postgresql-demo",
-      location: "hetzner-fsn1",
+      location_id: Location::HETZNER_FSN1_ID,
       target_vm_size: "standard-2",
       target_storage_size_gib: 10,
       superuser_password: "1",

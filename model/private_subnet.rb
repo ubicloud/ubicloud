@@ -9,6 +9,7 @@ class PrivateSubnet < Sequel::Model
   one_to_one :strand, key: :id
   many_to_many :firewalls
   one_to_many :load_balancers
+  many_to_one :location
 
   PRIVATE_SUBNET_RANGES = [
     "10.0.0.0/8",
@@ -43,7 +44,7 @@ class PrivateSubnet < Sequel::Model
   end
 
   def display_location
-    LocationNameConverter.to_display_name(location)
+    Location[location_id].display_name
   end
 
   def path

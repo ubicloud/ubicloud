@@ -302,7 +302,7 @@ RSpec.describe Prog::Base do
       st.unsynchronized_run
       page = Page.active.first
       expect(page).not_to be_nil
-      expect(page.details["location"]).to eq(vm.location)
+      expect(page.details["location"]).to eq(vm.location.display_name)
       expect(page.details["vcpus"]).to eq(vm.vcpus)
     end
 

@@ -26,7 +26,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
 
   label def start
     st = Prog::Minio::MinioClusterNexus.assemble(Config.postgres_service_project_id,
-      "postgres-minio-test-0", "hetzner-fsn1", "admin", 32, 1, 1, 1, "standard-2")
+      "postgres-minio-test-0", Location::HETZNER_FSN1_ID, "admin", 32, 1, 1, 1, "standard-2")
 
     update_stack({"minio_cluster_id" => st.id})
     hop_wait_minio_cluster
@@ -43,7 +43,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
   label def create_postgres_resource
     st = Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: frame["postgres_test_project_id"],
-      location: "hetzner-fsn1",
+      location_id: Location::HETZNER_FSN1_ID,
       name: "postgres-test-ha",
       target_vm_size: "standard-2",
       target_storage_size_gib: 128,

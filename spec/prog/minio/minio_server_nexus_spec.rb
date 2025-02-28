@@ -10,7 +10,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       minio_project.id, name: "minio-cluster-name"
     )
     mc = MinioCluster.create_with_id(
-      location: "hetzner-fsn1",
+      location_id: Location::HETZNER_FSN1_ID,
       name: "minio-cluster-name",
       admin_user: "minio-admin",
       admin_password: "dummy-password",

@@ -7,7 +7,7 @@ RSpec.describe Clover, "firewall" do
 
   let(:project) { project_with_default_policy(user) }
 
-  let(:firewall) { Firewall.create_with_id(name: "default-firewall", location: "hetzner-fsn1", project_id: project.id) }
+  let(:firewall) { Firewall.create_with_id(name: "default-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: project.id) }
 
   describe "unauthenticated" do
     it "not delete" do
@@ -41,7 +41,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "success get all location firewalls" do
-      Firewall.create_with_id(name: "#{firewall.name}-2", location: "hetzner-fsn1", project_id: project.id)
+      Firewall.create_with_id(name: "#{firewall.name}-2", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
 
       get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall"
 
@@ -112,7 +112,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "attach to subnet" do
-      ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps", location: "hetzner-fsn1").subject
+      ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps", location_id: Location::HETZNER_FSN1_ID).subject
       expect(PrivateSubnet).to receive(:from_ubid).and_return(ps)
       expect(ps).to receive(:incr_update_firewall_rules)
 
@@ -134,7 +134,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "detach from subnet" do
-      ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps", location: "hetzner-fsn1").subject
+      ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps", location_id: Location::HETZNER_FSN1_ID).subject
       expect(PrivateSubnet).to receive(:from_ubid).and_return(ps)
       expect(ps).to receive(:incr_update_firewall_rules)
 
@@ -154,7 +154,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "attach and detach" do
-      ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps", location: "hetzner-fsn1").subject
+      ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps", location_id: Location::HETZNER_FSN1_ID).subject
       expect(PrivateSubnet).to receive(:from_ubid).and_return(ps).twice
       expect(ps).to receive(:incr_update_firewall_rules).twice
 
@@ -169,6 +169,14 @@ RSpec.describe Clover, "firewall" do
       }.to_json
 
       expect(firewall.reload.private_subnets.count).to eq(0)
+    end
+
+    it "location not exist" do
+      post "/project/#{project.ubid}/location/not-exist-location/firewall/test-firewall", {
+        description: "Firewall description"
+      }.to_json
+
+      expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
     end
   end
 end

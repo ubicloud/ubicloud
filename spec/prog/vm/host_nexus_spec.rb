@@ -28,6 +28,12 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe ".assemble" do
+    it "fails if location doesn't exist" do
+      expect {
+        described_class.assemble("127.0.0.1", location_id: nil)
+      }.to raise_error RuntimeError, "No existing Location"
+    end
+
     it "creates addresses properly for a regular host" do
       st = described_class.assemble("127.0.0.1")
       expect(st).to be_a Strand

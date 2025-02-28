@@ -6,7 +6,7 @@ RSpec.describe MinioServer do
   subject(:ms) {
     vm = create_vm(ephemeral_net6: "fdfa:b5aa:14a3:4a3d::/64")
     mc = MinioCluster.create_with_id(
-      location: "hetzner-fsn1",
+      location_id: Location::HETZNER_FSN1_ID,
       name: "minio-cluster-name",
       admin_user: "minio-admin",
       admin_password: "dummy-password",

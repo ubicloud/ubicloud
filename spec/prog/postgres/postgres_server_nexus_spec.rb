@@ -39,7 +39,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       representative_server: postgres_server,
       metric_destinations: [instance_double(PostgresMetricDestination, ubid: "pgmetricubid", url: "url", username: "username", password: "password")],
       ca_certificates: "root_cert_1\nroot_cert_2",
-      location: "hetzner-fsn1"
+      location_id: Location::HETZNER_FSN1_ID
     )
   }
 
@@ -55,7 +55,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     let(:postgres_resource) {
       PostgresResource.create_with_id(
         project_id: user_project.id,
-        location: "hetzner-fsn1",
+        location_id: Location::HETZNER_FSN1_ID,
         name: "pg-name",
         target_vm_size: "standard-2",
         target_storage_size_gib: 128,

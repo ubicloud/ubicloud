@@ -6,7 +6,7 @@ RSpec.describe InvoiceGenerator do
     case resource
     when Vm
       vm = resource
-      billing_rate_id = BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location)["id"]
+      billing_rate_id = BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"]
       amount = vm.vcpus
       name = vm.name
     when GithubRunner
@@ -58,7 +58,7 @@ RSpec.describe InvoiceGenerator do
       "in_eu_vat" => !!expected_vat_info
     })
 
-    br = BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location)
+    br = BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)
     duration_mins = [672 * 60, (duration / 60).ceil].min
     expected_cost = (vm.vcpus * duration_mins * br["unit_price"]).round(3)
     expected_resources = [{
@@ -99,9 +99,9 @@ RSpec.describe InvoiceGenerator do
     Project.create_with_id(name: "cool-project")
   }
   let(:vm1) { create_vm }
-  let(:ps) { Prog::Vnet::SubnetNexus.assemble(p1.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject }
+  let(:ps) { Prog::Vnet::SubnetNexus.assemble(p1.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject }
   let(:lb) { LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-1", src_port: 80, dst_port: 80, health_check_endpoint: "/up", project_id: p1.id) }
-  let(:ie1) { InferenceEndpoint.create_with_id(name: "ie1", model_name: "test-model", project_id: p1.id, is_public: true, visible: true, location: "loc", vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id) }
+  let(:ie1) { InferenceEndpoint.create_with_id(name: "ie1", model_name: "test-model", project_id: p1.id, is_public: true, visible: true, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id) }
 
   let(:day) { 24 * 60 * 60 }
   let(:begin_time) { Time.parse("2023-06-01") }
@@ -358,7 +358,7 @@ RSpec.describe InvoiceGenerator do
   end
 
   it "handles inference quota with two different models on the same day" do
-    ie2 = InferenceEndpoint.create_with_id(name: "ie2", model_name: "test-model2", project_id: p1.id, is_public: true, visible: true, location: "loc", vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id)
+    ie2 = InferenceEndpoint.create_with_id(name: "ie2", model_name: "test-model2", project_id: p1.id, is_public: true, visible: true, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id)
     generate_billing_record(p1, ie1, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time, begin_time.to_date.to_time + day), 100000)
     generate_billing_record(p1, ie2, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time, begin_time.to_date.to_time + day), 800000)
     invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
@@ -373,7 +373,7 @@ RSpec.describe InvoiceGenerator do
   end
 
   it "handles inference quota with two different models on different days" do
-    ie2 = InferenceEndpoint.create_with_id(name: "ie2", model_name: "test-model2", project_id: p1.id, is_public: true, visible: true, location: "loc", vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id)
+    ie2 = InferenceEndpoint.create_with_id(name: "ie2", model_name: "test-model2", project_id: p1.id, is_public: true, visible: true, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id)
     generate_billing_record(p1, ie1, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time, begin_time.to_date.to_time + day), 100000)
     generate_billing_record(p1, ie2, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time + 2 * day, begin_time.to_date.to_time + 3 * day), 800000)
     invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content

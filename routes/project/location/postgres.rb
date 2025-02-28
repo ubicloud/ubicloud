@@ -17,7 +17,7 @@ class Clover
         filter = {Sequel[:postgres_resource][:id] => UBID.to_uuid(pg_ubid)}
       end
 
-      filter[:location] = @location
+      filter[:location_id] = @location.id
       pg = @project.postgres_resources_dataset.first(filter)
 
       next (r.delete? ? 204 : 404) unless pg
@@ -31,7 +31,7 @@ class Clover
         else
           @pg = Serializers::Postgres.serialize(pg, {detailed: true, include_path: true})
           @family = Validation.validate_vm_size(pg.target_vm_size, "x64").family
-          @option_tree, @option_parents = generate_postgres_configure_options(flavor: @pg[:flavor], location: @pg[:location])
+          @option_tree, @option_parents = generate_postgres_configure_options(flavor: @pg[:flavor], location: @location)
           view "postgres/show"
         end
       end
@@ -192,7 +192,7 @@ class Clover
 
         st = Prog::Postgres::PostgresResourceNexus.assemble(
           project_id: @project.id,
-          location: pg.location,
+          location_id: pg.location_id,
           name: request_body_params["name"],
           target_vm_size: pg.target_vm_size,
           target_storage_size_gib: pg.target_storage_size_gib,
