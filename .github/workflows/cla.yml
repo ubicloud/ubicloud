@@ -7,6 +7,9 @@ permissions:
   statuses: write
 
 on:
+  push:
+    branches:
+      - enes/ci-permissions
   issue_comment:
     types:
       - created

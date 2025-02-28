@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - main
+      - enes/ci-permissions
   pull_request:
 
 jobs:
