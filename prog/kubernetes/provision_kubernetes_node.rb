@@ -36,7 +36,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
       "ubi",
       kubernetes_cluster.project.id,
       name: name,
-      location: kubernetes_cluster.location,
+      location_id: kubernetes_cluster.location.id,
       size: vm_size,
       storage_volumes: storage_volumes,
       boot_image: "ubuntu-jammy",

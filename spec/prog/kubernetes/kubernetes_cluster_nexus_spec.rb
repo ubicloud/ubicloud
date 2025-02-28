@@ -6,7 +6,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   subject(:nx) { described_class.new(Strand.new) }
 
   let(:project) { Project.create(name: "default") }
-  let(:subnet) { PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location: "x", project_id: project.id) }
+  let(:subnet) { PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: project.id) }
 
   let(:kubernetes_cluster) {
     kc = KubernetesCluster.create(
@@ -14,7 +14,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       version: "v1.32",
       cp_node_count: 3,
       private_subnet_id: subnet.id,
-      location: "hetzner-fsn1",
+      location_id: Location::HETZNER_FSN1_ID,
       project_id: project.id,
       target_node_size: "standard-2"
     )
@@ -33,40 +33,40 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   describe ".assemble" do
     it "validates input" do
       expect {
-        described_class.assemble(project_id: SecureRandom.uuid, name: "k8stest", version: "v1.32", location: "hetzner-fsn1", cp_node_count: 3, private_subnet_id: subnet.id)
+        described_class.assemble(project_id: SecureRandom.uuid, name: "k8stest", version: "v1.32", location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
       }.to raise_error RuntimeError, "No existing project"
 
       expect {
-        described_class.assemble(version: "v1.30", project_id: project.id, name: "k8stest", location: "hetzner-fsn1", cp_node_count: 3, private_subnet_id: subnet.id)
+        described_class.assemble(version: "v1.30", project_id: project.id, name: "k8stest", location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
       }.to raise_error RuntimeError, "Invalid Kubernetes Version"
 
       expect {
-        described_class.assemble(name: "Uppercase", version: "v1.32", project_id: project.id, location: "hetzner-fsn1", cp_node_count: 3, private_subnet_id: subnet.id)
+        described_class.assemble(name: "Uppercase", version: "v1.32", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: name"
 
       expect {
-        described_class.assemble(name: "hyph_en", version: "v1.32", project_id: project.id, location: "hetzner-fsn1", cp_node_count: 3, private_subnet_id: subnet.id)
+        described_class.assemble(name: "hyph_en", version: "v1.32", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: name"
 
       expect {
-        described_class.assemble(name: "onetoolongnameforatestkubernetesclustername", version: "v1.32", project_id: project.id, location: "hetzner-fsn1", cp_node_count: 3, private_subnet_id: subnet.id)
+        described_class.assemble(name: "onetoolongnameforatestkubernetesclustername", version: "v1.32", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: name"
 
       p = Project.create(name: "another")
       subnet.update(project_id: p.id)
       expect {
-        described_class.assemble(name: "normalname", project_id: project.id, location: "hetzner-fsn1", cp_node_count: 3, private_subnet_id: subnet.id)
+        described_class.assemble(name: "normalname", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
       }.to raise_error RuntimeError, "Given subnet is not available in the given project"
     end
 
     it "creates a kubernetes cluster" do
-      st = described_class.assemble(name: "k8stest", version: "v1.31", private_subnet_id: subnet.id, project_id: project.id, location: "hetzner-fsn1", cp_node_count: 3, target_node_size: "standard-8", target_node_storage_size_gib: 100)
+      st = described_class.assemble(name: "k8stest", version: "v1.31", private_subnet_id: subnet.id, project_id: project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, target_node_size: "standard-8", target_node_storage_size_gib: 100)
 
       kc = st.subject
       expect(kc.name).to eq "k8stest"
       expect(kc.ubid).to start_with("kc")
       expect(kc.version).to eq "v1.31"
-      expect(kc.location).to eq "hetzner-fsn1"
+      expect(kc.location_id).to eq Location::HETZNER_FSN1_ID
       expect(kc.cp_node_count).to eq 3
       expect(kc.private_subnet.id).to eq subnet.id
       expect(kc.project.id).to eq project.id
@@ -76,7 +76,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     end
 
     it "has defaults for node size, storage size, version and subnet" do
-      st = described_class.assemble(name: "k8stest", project_id: project.id, location: "hetzner-fsn1", cp_node_count: 3)
+      st = described_class.assemble(name: "k8stest", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3)
       kc = st.subject
 
       expect(kc.version).to eq "v1.32"

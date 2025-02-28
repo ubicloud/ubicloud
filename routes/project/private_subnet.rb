@@ -8,7 +8,7 @@ class Clover
 
     r.web do
       r.post do
-        @location = LocationNameConverter.to_internal_name(r.params["location"])
+        next unless (@location = Location[r.params["location"]])
         private_subnet_post(r.params["name"])
       end
 
