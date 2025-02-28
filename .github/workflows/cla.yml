@@ -6,7 +6,7 @@ on:
     types: [opened,closed,synchronize]
 permissions:
   actions: write
-  contents: write
+  contents: read
   pull-requests: write
   statuses: write
 jobs:
@@ -28,4 +28,3 @@ jobs:
           remote-repository-name: cla-signers
           create-file-commit-message: 'Creating file for storing CLA Signatures'
           signed-commit-message: '$contributorName has signed the CLA in $owner/$repo#$pullRequestNo'
-
