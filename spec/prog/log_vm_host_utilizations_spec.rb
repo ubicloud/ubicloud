@@ -14,7 +14,7 @@ RSpec.describe Prog::LogVmHostUtilizations do
         ["hetzner-hel1", "x64", "accepting", 2, 10, 20, 100],
         ["hetzner-hel1", "x64", "accepting", 0, nil, 0, 0]
       ].each do |location, arch, allocation_state, used_cores, total_cores, used_hugepages_1g, total_hugepages_1g|
-        create_vm_host(location:, arch:, allocation_state:, used_cores:, total_cores:, used_hugepages_1g:, total_hugepages_1g:)
+        create_vm_host(location_id: Location[name: location].id, arch:, allocation_state:, used_cores:, total_cores:, used_hugepages_1g:, total_hugepages_1g:)
       end
 
       expect(Clog).to receive(:emit).with("location utilization") do |&blk|

@@ -8,6 +8,7 @@ class MinioCluster < Sequel::Model
   many_to_many :servers, join_table: :minio_pool, left_key: :cluster_id, right_key: :id, right_primary_key: :minio_pool_id, class: :MinioServer, order: :index
   one_to_one :strand, key: :id
   many_to_one :private_subnet
+  many_to_one :location, key: :location_id
 
   include ResourceMethods
   include SemaphoreMethods

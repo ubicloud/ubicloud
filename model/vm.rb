@@ -17,6 +17,7 @@ class Vm < Sequel::Model
   one_through_one :load_balancer, left_key: :vm_id, right_key: :load_balancer_id, join_table: :load_balancers_vms
   one_to_one :load_balancers_vms, key: :vm_id, class: :LoadBalancersVms
   many_to_one :vm_host_slice
+  many_to_one :location, key: :location_id
 
   plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancers_vms: :destroy
 
@@ -35,7 +36,7 @@ class Vm < Sequel::Model
   end
 
   def display_location
-    LocationNameConverter.to_display_name(location)
+    location.display_name
   end
 
   def path

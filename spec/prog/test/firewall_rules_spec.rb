@@ -29,6 +29,10 @@ RSpec.describe Prog::Test::FirewallRules do
   end
 
   describe "#start" do
+    before do
+      allow(firewall_test).to receive(:frame).and_return({"vm_to_be_connected_id" => nil})
+    end
+
     it "installs nc and sets up services" do
       ps = instance_double(PrivateSubnet, id: "ps2", vms: [vm_outside])
       expect(firewall_test).to receive(:vm1).and_return(private_subnet_1.vms.first).at_least(:once)
@@ -507,8 +511,8 @@ ExecStart=nc -l 8080 -6
     it "returns the vm outside" do
       expect(firewall_test.vm1).to receive(:private_subnets).and_return([instance_double(PrivateSubnet, id: "ps1", vms: [instance_double(Vm, inhost_name: "vm1")])])
       prj = Project.create_with_id(name: "project1")
-      ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps2", location: "hetzner-fsn1").subject
-      Prog::Vm::Nexus.assemble("", prj.id, name: "vm-outside", location: "hetzner-fsn1", private_subnet_id: ps.id).subject
+      ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps2", location_id: Location::HETZNER_FSN1_ID)
+      Prog::Vm::Nexus.assemble("", prj.id, name: "vm-outside", location_id: Location::HETZNER_FSN1_ID, private_subnet_id: ps.id).subject
       expect(firewall_test.vm_outside.name).to eq("vm-outside")
     end
   end

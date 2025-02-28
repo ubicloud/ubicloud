@@ -10,6 +10,7 @@ class KubernetesCluster < Sequel::Model
   many_to_many :cp_vms, join_table: :kubernetes_clusters_cp_vms, class: :Vm, order: :created_at
   one_to_many :nodepools, class: :KubernetesNodepool
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, &:active
+  many_to_one :location, key: :location_id
 
   dataset_module Pagination
 
@@ -31,7 +32,7 @@ class KubernetesCluster < Sequel::Model
   end
 
   def display_location
-    LocationNameConverter.to_display_name(location)
+    location.display_name
   end
 
   def path

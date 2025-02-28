@@ -13,6 +13,7 @@ class PostgresResource < Sequel::Model
   one_to_many :firewall_rules, class: :PostgresFirewallRule, key: :postgres_resource_id
   one_to_many :metric_destinations, class: :PostgresMetricDestination, key: :postgres_resource_id
   many_to_one :private_subnet
+  many_to_one :location, key: :location_id, class: :Location
 
   plugin :association_dependencies, firewall_rules: :destroy, metric_destinations: :destroy
   dataset_module Pagination
@@ -31,7 +32,7 @@ class PostgresResource < Sequel::Model
   end
 
   def display_location
-    LocationNameConverter.to_display_name(location)
+    location.display_name
   end
 
   def path

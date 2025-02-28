@@ -6,7 +6,7 @@ class Firewall < Sequel::Model
   many_to_one :project
   one_to_many :firewall_rules, key: :firewall_id
   many_to_many :private_subnets
-
+  many_to_one :location
   plugin :association_dependencies, firewall_rules: :destroy
 
   include ResourceMethods
@@ -15,7 +15,7 @@ class Firewall < Sequel::Model
   dataset_module Pagination
 
   def display_location
-    LocationNameConverter.to_display_name(location)
+    location.display_name
   end
 
   def path

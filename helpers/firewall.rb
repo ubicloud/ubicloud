@@ -6,7 +6,7 @@ class Clover
   end
 
   def firewall_list_api_response(dataset)
-    dataset = dataset.where(location: @location) if @location
+    dataset = dataset.where(location_id: @location.id) if @location
     result = dataset.eager(:firewall_rules).paginated_result(
       start_after: request.params["start_after"],
       page_size: request.params["page_size"],
@@ -30,7 +30,7 @@ class Clover
     firewall = Firewall.create_with_id(
       name: firewall_name,
       description:,
-      location: @location,
+      location_id: @location.id,
       project_id: @project.id
     )
 
@@ -49,16 +49,16 @@ class Clover
     options = OptionTreeGenerator.new
     options.add_option(name: "name")
     options.add_option(name: "description")
-    options.add_option(name: "location", values: Option.locations.map(&:display_name))
+    options.add_option(name: "location", values: Option.locations)
     subnets = dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view").map {
       {
-        location: LocationNameConverter.to_display_name(_1.location),
+        location_id: _1.location_id,
         value: _1.ubid,
         display_name: _1.name
       }
     }
     options.add_option(name: "private_subnet_id", values: subnets, parent: "location") do |location, private_subnet|
-      private_subnet[:location] == location
+      private_subnet[:location_id] == location.id
     end
     options.serialize
   end

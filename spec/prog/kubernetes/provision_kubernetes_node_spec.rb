@@ -7,13 +7,13 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
 
   let(:kubernetes_cluster) {
     project = Project.create(name: "default")
-    subnet = PrivateSubnet.create(net6: "0::0/16", net4: "127.0.0.0/8", name: "x", location: "x", project_id: project.id)
+    subnet = PrivateSubnet.create(net6: "0::0/16", net4: "127.0.0.0/8", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
     kc = KubernetesCluster.create(
       name: "k8scluster",
       version: "v1.32",
       cp_node_count: 3,
       private_subnet_id: subnet.id,
-      location: "hetzner-fsn1",
+      location_id: Location::HETZNER_FSN1_ID,
       project_id: project.id,
       target_node_size: "standard-4",
       target_node_storage_size_gib: 37
