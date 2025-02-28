@@ -14,15 +14,17 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
     Option::AI_MODELS.detect { _1["id"] == model_id }
   end
 
-  def self.assemble_with_model(project_id:, location:, name:, model_id:,
+  def self.assemble_with_model(project_id:, location_id:, name:, model_id:,
     replica_count: 1, is_public: false)
+    fail "No existing location" unless Location[location_id]
+
     model = model_for_id(model_id)
 
     fail "Model with id #{model_id} not found" unless model
 
     assemble(
       project_id:,
-      location:,
+      location_id:,
       name:,
       boot_image: model["boot_image"],
       vm_size: model["vm_size"],
@@ -40,13 +42,14 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
     )
   end
 
-  def self.assemble(project_id:, location:, boot_image:, name:, vm_size:, storage_volumes:, model_name:,
+  def self.assemble(project_id:, location_id:, boot_image:, name:, vm_size:, storage_volumes:, model_name:,
     engine:, engine_params:, replica_count:, is_public:, gpu_count:, tags:, max_requests:, max_project_rps:, max_project_tps:, external_config: {})
     unless Project[project_id]
       fail "No existing project"
     end
 
-    Validation.validate_location(location)
+    fail "No existing location" unless Location[location_id]
+
     Validation.validate_name(name)
     Validation.validate_vm_size(vm_size, "x64")
     fail "Invalid replica count" unless replica_count.is_a?(Integer) && (1..9).cover?(replica_count)
@@ -55,9 +58,9 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
       ubid = InferenceEndpoint.generate_ubid
       internal_project = Project[Config.inference_endpoint_service_project_id]
       fail "No project configured for inference endpoints" unless internal_project
-      firewall = internal_project.firewalls_dataset.where(location: location).where(Sequel[:firewall][:name] => "inference-endpoint-firewall").first
-      fail "No firewall named 'inference-endpoint-firewall' configured for inference endpoints in #{location}" unless firewall
-      subnet_s = Prog::Vnet::SubnetNexus.assemble(internal_project.id, name: ubid.to_s, location: location, firewall_id: firewall.id)
+      firewall = internal_project.firewalls_dataset.where(location_id:).where(Sequel[:firewall][:name] => "inference-endpoint-firewall").first
+      fail "No firewall named 'inference-endpoint-firewall' configured for inference endpoints in #{Location[location_id].name}" unless firewall
+      subnet_s = Prog::Vnet::SubnetNexus.assemble(internal_project.id, name: ubid.to_s, location_id:, firewall_id: firewall.id)
 
       custom_dns_zone = DnsZone.where(project_id: Config.inference_endpoint_service_project_id).where(name: "ai.ubicloud.com").first
       custom_hostname_prefix = if custom_dns_zone
@@ -67,7 +70,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
         health_check_down_threshold: 3, health_check_up_threshold: 1, custom_hostname_prefix: custom_hostname_prefix, custom_hostname_dns_zone_id: custom_dns_zone&.id, stack: "ipv4")
 
       inference_endpoint = InferenceEndpoint.create(
-        project_id:, location:, boot_image:, name:, vm_size:, storage_volumes:,
+        project_id:, location_id:, boot_image:, name:, vm_size:, storage_volumes:,
         model_name:, engine:, engine_params:, replica_count:, is_public:,
         load_balancer_id: lb_s.id, private_subnet_id: subnet_s.id, gpu_count:, tags:,
         max_requests:, max_project_rps:, max_project_tps:, external_config:

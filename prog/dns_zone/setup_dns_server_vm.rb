@@ -3,13 +3,17 @@
 class Prog::DnsZone::SetupDnsServerVm < Prog::Base
   subject_is :vm, :sshable
 
-  def self.assemble(dns_server_id, name: nil, vm_size: "standard-2", storage_size_gib: 30, location: "hetzner-fsn1")
+  def self.assemble(dns_server_id, name: nil, vm_size: "standard-2", storage_size_gib: 30, location_id: Location::HETZNER_FSN1_ID)
     unless (dns_server = DnsServer[dns_server_id])
       fail "No existing Dns Server"
     end
 
     unless Project[Config.dns_service_project_id]
       fail "No existing Project"
+    end
+
+    unless Location[location_id]
+      fail "No existing Location"
     end
 
     # The .assemble function is meant to be run by an operator manually. If/when we want to make this more programmatic
@@ -22,7 +26,7 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
         Config.dns_service_project_id,
         sshable_unix_user: "ubi",
-        location: location,
+        location_id:,
         name: name,
         size: vm_size,
         storage_volumes: [

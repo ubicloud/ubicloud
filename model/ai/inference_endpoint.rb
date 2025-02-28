@@ -8,6 +8,7 @@ class InferenceEndpoint < Sequel::Model
   one_to_many :replicas, class: :InferenceEndpointReplica, key: :inference_endpoint_id
   one_to_one :load_balancer, key: :id, primary_key: :load_balancer_id
   one_to_one :private_subnet, key: :id, primary_key: :private_subnet_id
+  many_to_one :location, key: :location_id, class: :Location
 
   dataset_module Pagination
 
@@ -18,7 +19,7 @@ class InferenceEndpoint < Sequel::Model
   semaphore :destroy, :maintenance
 
   def display_location
-    LocationNameConverter.to_display_name(location)
+    location.display_name
   end
 
   def path

@@ -25,7 +25,7 @@ class Serializers::LoadBalancer < Serializers::Base
     end
 
     if options[:vms_serialized]
-      base[:vms] = Serializers::Vm.serialize(lb.vms, {load_balancer: true})
+      base[:vms] = Serializers::Vm.serialize(lb.vms_dataset.eager(:location).all, {load_balancer: true})
     end
 
     base

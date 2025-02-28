@@ -12,7 +12,7 @@ class Prog::Vm::Nexus < Prog::Base
   subject_is :vm
 
   def self.assemble(public_key, project_id, name: nil, size: DEFAULT_SIZE,
-    unix_user: "ubi", location: "hetzner-fsn1", boot_image: Config.default_boot_image_name,
+    unix_user: "ubi", location_id: Location::HETZNER_FSN1_ID, boot_image: Config.default_boot_image_name,
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
     enable_ip4: false, pool_id: nil, arch: "x64", swap_size_bytes: nil,
     distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0)
@@ -23,7 +23,11 @@ class Prog::Vm::Nexus < Prog::Base
     if exclude_host_ids.include?(force_host_id)
       fail "Cannot force and exclude the same host"
     end
-    Validation.validate_location(location)
+
+    unless (location = Location[location_id])
+      fail "No existing location"
+    end
+
     vm_size = Validation.validate_vm_size(size, arch)
     Validation.validate_billing_rate("VmVCpu", vm_size.family, location)
 
@@ -73,7 +77,7 @@ class Prog::Vm::Nexus < Prog::Base
         nic = Nic[nic_id]
         raise("Given nic doesn't exist with the id #{nic_id}") unless nic
         raise("Given nic is assigned to a VM already") if nic.vm_id
-        raise("Given nic is created in a different location") if nic.private_subnet.location != location
+        raise("Given nic is created in a different location") if nic.private_subnet.location_id != location.id
         raise("Given nic is not available in the given project") unless project.private_subnets.any? { |ps| ps.id == nic.private_subnet_id }
 
         nic.private_subnet
@@ -101,7 +105,7 @@ class Prog::Vm::Nexus < Prog::Base
         cpu_percent_limit: vm_size.cpu_percent_limit,
         cpu_burst_percent_limit: vm_size.cpu_burst_percent_limit,
         memory_gib: vm_size.memory_gib,
-        location: location,
+        location_id: location.id,
         boot_image: boot_image,
         ip4_enabled: enable_ip4,
         pool_id: pool_id,
@@ -174,7 +178,7 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   label def start
-    queued_vms = Vm.join(:strand, id: :id).where(:location => vm.location, :arch => vm.arch, Sequel[:strand][:label] => "start")
+    queued_vms = Vm.join(:strand, id: :id).where(:location_id => vm.location_id, :arch => vm.arch, Sequel[:strand][:label] => "start")
     begin
       distinct_storage_devices = frame["distinct_storage_devices"] || false
       host_exclusion_filter = frame["exclude_host_ids"] || []
@@ -182,11 +186,11 @@ class Prog::Vm::Nexus < Prog::Base
       allocation_state_filter, location_filter, location_preference, host_filter =
         if frame["force_host_id"]
           [[], [], [], [frame["force_host_id"]]]
-        elsif vm.location == "github-runners"
-          runner_locations = (vm.vcpus == 60) ? [] : ["github-runners", "hetzner-fsn1", "hetzner-hel1"]
-          [["accepting"], runner_locations, ["github-runners"], []]
+        elsif Location[vm.location_id].name == "github-runners"
+          runner_locations = (vm.vcpus == 60) ? [] : [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID]
+          [["accepting"], runner_locations, [Location::GITHUB_RUNNERS_ID], []]
         else
-          [["accepting"], [vm.location], [], []]
+          [["accepting"], [vm.location_id], [], []]
         end
 
       Scheduling::Allocator.allocate(
@@ -205,10 +209,10 @@ class Prog::Vm::Nexus < Prog::Base
       incr_waiting_for_capacity unless vm.waiting_for_capacity_set?
       queued_vms = queued_vms.all
       utilization = VmHost.where(allocation_state: "accepting", arch: vm.arch).select_map { sum(:used_cores) * 100.0 / sum(:total_cores) }.first.to_f
-      Clog.emit("No capacity left") { {lack_of_capacity: {location: vm.location, arch: vm.arch, family: vm.family, queue_size: queued_vms.count}} }
+      Clog.emit("No capacity left") { {lack_of_capacity: {location: Location[vm.location_id].name, arch: vm.arch, family: vm.family, queue_size: queued_vms.count}} }
 
-      unless vm.location == "github-runners" && vm.created_at > Time.now - 60 * 60
-        Prog::PageNexus.assemble("No capacity left at #{vm.location} for #{vm.family} family of #{vm.arch}", ["NoCapacity", vm.location, vm.arch, vm.family], queued_vms.first(25).map(&:ubid), extra_data: {queue_size: queued_vms.count, utilization: utilization})
+      unless Location[vm.location_id].name == "github-runners" && vm.created_at > Time.now - 60 * 60
+        Prog::PageNexus.assemble("No capacity left at #{Location[vm.location_id].display_name} for #{vm.family} family of #{vm.arch}", ["NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family], queued_vms.first(25).map(&:ubid), extra_data: {queue_size: queued_vms.count, utilization: utilization})
       end
 
       nap 30
@@ -216,7 +220,7 @@ class Prog::Vm::Nexus < Prog::Base
 
     vm.nics.each(&:incr_vm_allocated)
     decr_waiting_for_capacity
-    if (page = Page.from_tag_parts("NoCapacity", vm.location, vm.arch, vm.family)) && page.created_at < Time.now - 15 * 60 && queued_vms.count <= 1
+    if (page = Page.from_tag_parts("NoCapacity", vm.location.display_name, vm.arch, vm.family)) && page.created_at < Time.now - 15 * 60 && queued_vms.count <= 1
       page.incr_resolve
     end
 
@@ -304,7 +308,7 @@ class Prog::Vm::Nexus < Prog::Base
       project_id: project.id,
       resource_id: vm.id,
       resource_name: vm.name,
-      billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location)["id"],
+      billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
       amount: vm.vcpus
     )
 
@@ -313,7 +317,7 @@ class Prog::Vm::Nexus < Prog::Base
         project_id: project.id,
         resource_id: vm.id,
         resource_name: "Disk ##{vol["disk_index"]} of #{vm.name}",
-        billing_rate_id: BillingRate.from_resource_properties("VmStorage", vm.family, vm.location)["id"],
+        billing_rate_id: BillingRate.from_resource_properties("VmStorage", vm.family, vm.location.name)["id"],
         amount: vol["size_gib"]
       )
     end
@@ -323,7 +327,7 @@ class Prog::Vm::Nexus < Prog::Base
         project_id: project.id,
         resource_id: vm.id,
         resource_name: vm.assigned_vm_address.ip,
-        billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location)["id"],
+        billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location.name)["id"],
         amount: 1
       )
     end
@@ -336,7 +340,7 @@ class Prog::Vm::Nexus < Prog::Base
         project_id: project.id,
         resource_id: vm.id,
         resource_name: "GPUs of #{vm.name}",
-        billing_rate_id: BillingRate.from_resource_properties("Gpu", gpu.device, vm.location)["id"],
+        billing_rate_id: BillingRate.from_resource_properties("Gpu", gpu.device, vm.location.name)["id"],
         amount: gpu_count
       )
     end

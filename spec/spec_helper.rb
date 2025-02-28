@@ -236,14 +236,14 @@ RSpec.configure do |config|
   end
 
   def create_vm_host(**args)
-    args = {location: "hetzner-fns1", allocation_state: "accepting", arch: "x64", total_cores: 48, used_cores: 2}.merge(args)
+    args = {location_id: Location::HETZNER_FSN1_ID, allocation_state: "accepting", arch: "x64", total_cores: 48, used_cores: 2}.merge(args)
     ubid = VmHost.generate_ubid
     Sshable.create { _1.id = ubid.to_uuid }
     VmHost.create(**args) { _1.id = ubid.to_uuid }
   end
 
   def create_vm(**args)
-    defaults = {unix_user: "ubi", public_key: "ssh-ed25519 key", name: "test-vm", family: "standard", cores: 0, vcpus: 2, cpu_percent_limit: 200, cpu_burst_percent_limit: 0, memory_gib: 8, arch: "x64", location: "hetzner-fsn1", boot_image: "ubuntu-jammy", display_state: "running", ip4_enabled: false, created_at: Time.now}
+    defaults = {unix_user: "ubi", public_key: "ssh-ed25519 key", name: "test-vm", family: "standard", cores: 0, vcpus: 2, cpu_percent_limit: 200, cpu_burst_percent_limit: 0, memory_gib: 8, arch: "x64", location_id: Location::HETZNER_FSN1_ID, boot_image: "ubuntu-jammy", display_state: "running", ip4_enabled: false, created_at: Time.now}
     args = defaults.merge(args)
     args[:project_id] ||= Project.create(name: "create-vm-project").id
     Vm.create(**args)
@@ -265,7 +265,7 @@ RSpec.configure do |config|
   end
 
   def add_ipv4_to_vm(vm, ipv4)
-    host = VmHost.new_with_id(allocation_state: "accepting", location: "hetzner-fsn1", total_cores: 10, used_cores: 3)
+    host = VmHost.new_with_id(allocation_state: "accepting", location_id: Location::HETZNER_FSN1_ID, total_cores: 10, used_cores: 3)
     Sshable.create(id: host.id)
     host.save_changes
     cidr = IPAddr.new(ipv4)

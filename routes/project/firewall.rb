@@ -8,7 +8,7 @@ class Clover
       if api?
         firewall_list_api_response(dataset)
       else
-        authorized_firewalls = dataset.all
+        authorized_firewalls = dataset.eager(:location).all
         @firewalls = Serializers::Firewall.serialize(authorized_firewalls, {include_path: true})
 
         view "networking/firewall/index"
@@ -24,7 +24,7 @@ class Clover
       end
 
       r.post true do
-        check_visible_location
+        next unless (@location = Location[r.params["location"]])
         firewall_post(r.params["name"])
       end
     end
