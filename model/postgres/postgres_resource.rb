@@ -163,9 +163,13 @@ end
 #  private_subnet_id           | uuid                     |
 #  flavor                      | postgres_flavor          | NOT NULL DEFAULT 'standard'::postgres_flavor
 #  version                     | postgres_version         | NOT NULL DEFAULT '16'::postgres_version
+#  location_id                 | uuid                     |
 # Indexes:
-#  postgres_server_pkey                            | PRIMARY KEY btree (id)
-#  postgres_resource_project_id_location_name_uidx | UNIQUE btree (project_id, location, name)
+#  postgres_server_pkey                               | PRIMARY KEY btree (id)
+#  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
+#  postgres_resource_project_id_location_name_uidx    | UNIQUE btree (project_id, location, name)
+# Foreign key constraints:
+#  postgres_resource_location_id_fkey | (location_id) REFERENCES location(id)
 # Referenced By:
 #  postgres_firewall_rule      | postgres_firewall_rule_postgres_resource_id_fkey      | (postgres_resource_id) REFERENCES postgres_resource(id)
 #  postgres_metric_destination | postgres_metric_destination_postgres_resource_id_fkey | (postgres_resource_id) REFERENCES postgres_resource(id)
