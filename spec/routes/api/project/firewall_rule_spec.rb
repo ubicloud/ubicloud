@@ -13,19 +13,19 @@ RSpec.describe Clover, "firewall" do
 
   describe "unauthenticated" do
     it "not post" do
-      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/firewall-rule"
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule"
 
       expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not delete" do
-      delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/firewall-rule/#{firewall_rule.ubid}"
+      delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule/#{firewall_rule.ubid}"
 
       expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not get" do
-      get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/firewall-rule/#{firewall_rule.ubid}"
+      get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule/#{firewall_rule.ubid}"
 
       expect(last_response).to have_api_error(401, "Please login to continue")
     end
@@ -37,7 +37,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "create firewall rule" do
-      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/firewall-rule", {
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule", {
         cidr: "0.0.0.0/0",
         port_range: "100..101"
       }.to_json
@@ -46,7 +46,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "can not create same firewall rule" do
-      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/firewall-rule", {
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule", {
         cidr: firewall_rule.cidr,
         port_range: "80..5432"
       }.to_json
@@ -55,7 +55,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "firewall rule no port range" do
-      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/firewall-rule", {
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule", {
         cidr: "0.0.0.0/1"
       }.to_json
 
@@ -63,7 +63,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "firewall rule single port" do
-      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/firewall-rule", {
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule", {
         cidr: "0.0.0.0/1",
         port_range: "11111"
       }.to_json
@@ -72,23 +72,23 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "firewall rule delete" do
-      delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/firewall-rule/#{firewall_rule.ubid}"
+      delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule/#{firewall_rule.ubid}"
       expect(last_response.status).to eq(204)
     end
 
     it "firewall rule delete does not exist" do
-      delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/firewall-rule/fr000000000000000000000000"
+      delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule/fr000000000000000000000000"
       expect(last_response.status).to eq(204)
     end
 
     it "success get firewall rule" do
-      get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/firewall-rule/#{firewall_rule.ubid}"
+      get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule/#{firewall_rule.ubid}"
 
       expect(last_response.status).to eq(200)
     end
 
     it "get does not exist" do
-      get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/firewall-rule/fr000000000000000000000000"
+      get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule/fr000000000000000000000000"
 
       expect(last_response.content_type).to eq("application/json")
       expect(last_response).to have_api_error(404)

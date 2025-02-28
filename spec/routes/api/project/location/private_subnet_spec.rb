@@ -19,9 +19,9 @@ RSpec.describe Clover, "private_subnet" do
         [:get, "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet"],
         [:post, "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/foo_name"],
         [:delete, "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"],
-        [:delete, "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/_#{ps.ubid}"],
+        [:delete, "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.ubid}"],
         [:get, "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"],
-        [:get, "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/_#{ps.ubid}"]
+        [:get, "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.ubid}"]
       ].each do |method, path|
         send method, path
 
@@ -137,7 +137,7 @@ RSpec.describe Clover, "private_subnet" do
       end
 
       it "success id" do
-        get "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/_#{ps.ubid}"
+        get "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.ubid}"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq(ps.name)
@@ -166,14 +166,14 @@ RSpec.describe Clover, "private_subnet" do
       end
 
       it "success id" do
-        delete "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/_#{ps.ubid}"
+        delete "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.ubid}"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(ps.id).set?("destroy")).to be true
       end
 
       it "not exist ubid in location" do
-        delete "/project/#{project.ubid}/location/foo_location/private-subnet/_#{ps.ubid}"
+        delete "/project/#{project.ubid}/location/foo_location/private-subnet/#{ps.ubid}"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(ps.id).set?("destroy")).to be false

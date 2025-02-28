@@ -84,13 +84,6 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "success delete with underscore" do
-      delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}"
-
-      expect(last_response.status).to eq(204)
-      expect(firewall).not_to exist
-    end
-
-    it "success delete without underscore" do
       delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}"
 
       expect(last_response.status).to eq(204)
@@ -123,7 +116,7 @@ RSpec.describe Clover, "firewall" do
       expect(PrivateSubnet).to receive(:from_ubid).and_return(ps)
       expect(ps).to receive(:incr_update_firewall_rules)
 
-      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/attach-subnet", {
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/attach-subnet", {
         private_subnet_id: ps.ubid
       }.to_json
 
@@ -133,7 +126,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "attach to subnet not exist" do
-      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/attach-subnet", {
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/attach-subnet", {
         private_subnet_id: "fooubid"
       }.to_json
 
@@ -145,7 +138,7 @@ RSpec.describe Clover, "firewall" do
       expect(PrivateSubnet).to receive(:from_ubid).and_return(ps)
       expect(ps).to receive(:incr_update_firewall_rules)
 
-      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/detach-subnet", {
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/detach-subnet", {
         private_subnet_id: ps.ubid
       }.to_json
 
@@ -153,7 +146,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "detach from subnet not exist" do
-      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/detach-subnet", {
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/detach-subnet", {
         private_subnet_id: "fooubid"
       }.to_json
 
@@ -165,13 +158,13 @@ RSpec.describe Clover, "firewall" do
       expect(PrivateSubnet).to receive(:from_ubid).and_return(ps).twice
       expect(ps).to receive(:incr_update_firewall_rules).twice
 
-      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/attach-subnet", {
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/attach-subnet", {
         private_subnet_id: ps.ubid
       }.to_json
 
       expect(firewall.private_subnets.count).to eq(1)
 
-      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/detach-subnet", {
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/detach-subnet", {
         private_subnet_id: ps.ubid
       }.to_json
 
