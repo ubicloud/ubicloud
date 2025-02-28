@@ -7,7 +7,7 @@ RSpec.describe KubernetesCluster do
     described_class.new(
       name: "kc-name",
       version: "v1.32",
-      location: "hetzner-fsn1",
+      location_id: Location::HETZNER_FSN1_ID,
       cp_node_count: 3,
       project_id: "2d720de2-91fc-82d2-bc07-a945bddb39e8",
       private_subnet_id: "c87aefff-2e77-86d9-86b5-ef9fbb4e7fee",

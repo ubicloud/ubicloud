@@ -11,7 +11,7 @@ RSpec.describe GithubRunner do
   }
 
   it "can log duration when it's from a vm pool" do
-    pool = VmPool.create_with_id(size: 1, vm_size: "standard-2", location: "hetzner-fsn1", boot_image: "github-ubuntu-2204", storage_size_gib: 86)
+    pool = VmPool.create_with_id(size: 1, vm_size: "standard-2", location_id: Location::HETZNER_FSN1_ID, boot_image: "github-ubuntu-2204", storage_size_gib: 86)
     github_runner.vm.update(pool_id: pool.id)
     expect(Clog).to receive(:emit).with("runner_tested").and_call_original
     github_runner.log_duration("runner_tested", 10)

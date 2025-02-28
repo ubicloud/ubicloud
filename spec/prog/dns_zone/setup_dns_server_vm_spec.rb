@@ -36,6 +36,10 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
         described_class.assemble(ds.id, name: "InVaLidNAME")
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: name"
 
+      expect {
+        described_class.assemble(ds.id, location_id: nil)
+      }.to raise_error RuntimeError, "No existing Location"
+
       expect(described_class.assemble(ds.id)).to be_a Strand
 
       expect(Vm.count).to eq 1

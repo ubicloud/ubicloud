@@ -30,8 +30,8 @@ class Clover
     request_body_params = validate_request_params(required_parameters, ["firewall_id"])
     firewall_id = if request_body_params["firewall_id"]
       fw = Firewall.from_ubid(request_body_params["firewall_id"])
-      unless fw && fw.location == @location
-        fail Validation::ValidationFailed.new(firewall_id: "Firewall with id \"#{request_body_params["firewall_id"]}\" and location \"#{@location}\" is not found")
+      unless fw && fw.location_id == @location.id
+        fail Validation::ValidationFailed.new(firewall_id: "Firewall with id \"#{request_body_params["firewall_id"]}\" and location \"#{@location.display_name}\" is not found")
       end
       authorize("Firewall:view", fw.id)
       fw.id
@@ -40,7 +40,7 @@ class Clover
     st = Prog::Vnet::SubnetNexus.assemble(
       @project.id,
       name:,
-      location: @location,
+      location_id: @location.id,
       firewall_id:
     )
 
@@ -55,7 +55,7 @@ class Clover
   def generate_private_subnet_options
     options = OptionTreeGenerator.new
     options.add_option(name: "name")
-    options.add_option(name: "location", values: Option.locations.map(&:display_name))
+    options.add_option(name: "location", values: Option.locations)
     options.serialize
   end
 end

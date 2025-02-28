@@ -42,16 +42,16 @@ class Project < Sequel::Model
 
   def default_location
     location_max_capacity = DB[:vm_host]
-      .where(location: Option.locations.map { _1.name })
+      .join(:location, id: :location_id)
       .where(allocation_state: "accepting")
-      .select_group(:location)
+      .select_group(:location_id)
       .order { sum(Sequel[:total_cores] - Sequel[:used_cores]).desc }
       .first
 
     if location_max_capacity.nil?
-      Option.locations.first.name
+      Location.find(visible: true).display_name
     else
-      location_max_capacity[:location]
+      Location[location_max_capacity[:location_id]].display_name
     end
   end
 
@@ -137,9 +137,9 @@ class Project < Sequel::Model
   end
 
   def default_private_subnet(location)
-    name = "default-#{LocationNameConverter.to_display_name(location)}"
-    ps = private_subnets_dataset.first(:location => location, Sequel[:private_subnet][:name] => name)
-    ps || Prog::Vnet::SubnetNexus.assemble(id, name: name, location: location).subject
+    name = "default-#{location.display_name}"
+    ps = private_subnets_dataset.first(:location_id => location.id, Sequel[:private_subnet][:name] => name)
+    ps || Prog::Vnet::SubnetNexus.assemble(id, name: name, location_id: location.id).subject
   end
 
   def self.feature_flag(*flags, into: self)

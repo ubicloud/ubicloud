@@ -28,7 +28,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     pool = VmPool.where(
       vm_size: label_data["vm_size"],
       boot_image: label_data["boot_image"],
-      location: label_data["location"],
+      location_id: Location[name: label_data["location"]].id,
       storage_size_gib: label_data["storage_size_gib"],
       storage_encrypted: true,
       storage_skip_sync: skip_sync,
@@ -41,7 +41,7 @@ class Prog::Vm::GithubRunner < Prog::Base
 
     ps = Prog::Vnet::SubnetNexus.assemble(
       Config.github_runner_service_project_id,
-      location: label_data["location"],
+      location_id: Location[name: label_data["location"]].id,
       allow_only_ssh: true
     ).subject
 
@@ -50,7 +50,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       Config.github_runner_service_project_id,
       name: github_runner.ubid.to_s,
       size: label_data["vm_size"],
-      location: label_data["location"],
+      location_id: Location[name: label_data["location"]].id,
       boot_image: label_data["boot_image"],
       storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: true, skip_sync: skip_sync}],
       enable_ip4: true,
@@ -194,7 +194,7 @@ class Prog::Vm::GithubRunner < Prog::Base
         "Image" => vm.boot_image,
         "VM Host" => vm.vm_host.ubid,
         "VM Pool" => vm.pool_id ? UBID.from_uuidish(vm.pool_id).to_s : nil,
-        "Location" => vm.vm_host.location,
+        "Location" => Location[vm.vm_host.location_id].name,
         "Datacenter" => vm.vm_host.data_center,
         "Project" => github_runner.installation.project.ubid,
         "Console URL" => "#{Config.base_url}#{github_runner.installation.project.path}/github"

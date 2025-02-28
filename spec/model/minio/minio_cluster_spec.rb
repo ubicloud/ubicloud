@@ -5,7 +5,7 @@ require_relative "../spec_helper"
 RSpec.describe MinioCluster do
   subject(:mc) {
     mc = described_class.create_with_id(
-      location: "hetzner-fsn1",
+      location_id: Location::HETZNER_FSN1_ID,
       name: "minio-cluster-name",
       admin_user: "minio-admin",
       admin_password: "dummy-password",

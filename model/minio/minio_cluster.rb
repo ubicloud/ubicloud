@@ -12,6 +12,7 @@ class MinioCluster < Sequel::Model
   end
   one_to_one :strand, key: :id
   many_to_one :private_subnet, key: :private_subnet_id
+  many_to_one :location, key: :location_id
 
   include ResourceMethods
   include SemaphoreMethods

@@ -124,7 +124,7 @@ class RegenScreenshots
 
     pg_resource = PostgresResource.create(
       name: "postgresql-demo",
-      location: "hetzner-fsn1",
+      location_id: Location::HETZNER_FSN1_ID,
       target_vm_size: "standard-2",
       target_storage_size_gib: 10,
       superuser_password: "1",
@@ -236,7 +236,7 @@ class RegenScreenshots
       net4: "10.0.0.0/8",
       state: "available",
       name: "blog-app1-subnet",
-      location: "hetzner-fsn1"
+      location_id: Location::HETZNER_FSN1_ID
     )
     Project.define_method(:private_subnets_dataset) do |*a|
       super(*a).with_extend do
@@ -260,7 +260,7 @@ class RegenScreenshots
         name: "blog-app#{i + 1}",
         unix_user: "a",
         public_key: "a",
-        location: "hetzner-fsn1",
+        location_id: Location::HETZNER_FSN1_ID,
         boot_image: "a",
         family: "a",
         cores: 2
