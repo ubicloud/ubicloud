@@ -1,8 +1,8 @@
 name: CLA Assistant
 
 permissions:
+  contents: read
   actions: write
-  contents: write
   pull-requests: write
   statuses: write
 

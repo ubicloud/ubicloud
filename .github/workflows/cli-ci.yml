@@ -1,5 +1,8 @@
 name: cli/ubi CI
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
