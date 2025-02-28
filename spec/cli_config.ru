@@ -22,6 +22,8 @@ c = Class.new(Roda) do
       response["content-type"] = "text/plain"
 
       case argv[0]
+      when "--version"
+        r.env["HTTP_X_UBI_VERSION"]
       when "--confirm"
         case argv[1]
         when "valid"

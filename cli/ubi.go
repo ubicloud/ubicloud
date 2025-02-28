@@ -13,6 +13,7 @@ import (
 	"strings"
 )
 
+var version = "undefined"
 var allowConfirmation bool = true
 var debugEnabled = os.Getenv("UBI_DEBUG") == "1"
 
@@ -59,6 +60,7 @@ func sendRequest(args []string) {
 		os.Exit(1)
 	}
 	req.Header.Set("Authorization", "Bearer: "+getToken())
+	req.Header.Set("X-Ubi-Version", version)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "text/plain")
 	req.Header.Set("Connection", "close")
