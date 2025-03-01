@@ -59,13 +59,14 @@ asdf plugin add <name> [<git-url>]      Add a plugin from the plugin repo OR,
 [...]
 ```
 
-We like to have these four plugins (you can paste these commands):
+We like to have these plugins (you can paste these commands):
 
 ```sh
 $ asdf plugin add ruby
 $ asdf plugin add direnv
 $ asdf plugin add postgres
 $ asdf plugin add nodejs
+$ asdf plugin add golang
 ```
 
 Once you have the plugins, you can start to install the software the
