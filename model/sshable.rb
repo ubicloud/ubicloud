@@ -69,11 +69,8 @@ class Sshable < Sequel::Model
       end
     end
 
-    if timeout
-      # For potential future use, we could wrap command in timeout commana
-      # to force exiting after given amount of time:
-      # cmd = "sudo timeout #{timeout}s bash -c -- #{cmd.shellescape}"
-      wait_deadline = start + timeout + 0.5
+    wait_deadline = if timeout
+      start + timeout + 0.5
     end
 
     begin
