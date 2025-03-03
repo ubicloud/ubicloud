@@ -128,8 +128,8 @@ class Sshable < Sequel::Model
     sess
   end
 
-  def start_fresh_session
-    Net::SSH.start(host, unix_user, **COMMON_SSH_ARGS.merge(key_data: keys.map(&:private_key)))
+  def start_fresh_session(&block)
+    Net::SSH.start(host, unix_user, **COMMON_SSH_ARGS.merge(key_data: keys.map(&:private_key)), &block)
   end
 
   def invalidate_cache_entry
