@@ -28,10 +28,12 @@ class Project < Sequel::Model
   one_to_many :quotas, class: :ProjectQuota, key: :project_id
   one_to_many :invitations, class: :ProjectInvitation, key: :project_id
   one_to_many :api_keys, key: :owner_id, class: :ApiKey, conditions: {owner_table: "project"}
+  one_to_many :aws_location_credentials
 
   dataset_module Pagination
 
-  plugin :association_dependencies, accounts: :nullify, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy, access_control_entries: :destroy, subject_tags: :destroy, action_tags: :destroy, object_tags: :destroy
+  plugin :association_dependencies, accounts: :nullify, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy, access_control_entries: :destroy, subject_tags: :destroy, action_tags: :destroy, object_tags: :destroy,
+    aws_location_credentials: :destroy
 
   include ResourceMethods
 

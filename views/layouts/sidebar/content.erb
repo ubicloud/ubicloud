@@ -122,6 +122,16 @@
               icon: "hero-cog-6-tooth",
               has_permission: has_project_permission("Project:view")
             ) %>
+            <% if Config.custom_aws_regions_enabled %>
+              <%== part(
+                "layouts/sidebar/item",
+                name: "Custom Regions",
+                url: "#{@project_data[:path]}/aws-region",
+                is_active: request.path.start_with?("#{@project_data[:path]}/aws-region"),
+                icon: "hero-map-pin",
+                has_permission: true
+              ) %>
+            <% end %>
           </ul>
         </li>
       <% end %>
