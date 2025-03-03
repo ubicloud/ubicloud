@@ -43,6 +43,8 @@ module Validation
   # - Same with regular name pattern, but shorter (40 chars)
   ALLOWED_KUBERNETES_NAME_PATTERN = %r{\A[a-z0-9](?:[a-z0-9\-]{0,38}[a-z0-9])?\z}
 
+  AWS_REGION_NAMES = ["us-east-1", "us-west-1"].freeze
+
   def self.validate_name(name)
     msg = "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."
     fail ValidationFailed.new({name: msg}) unless name&.match(ALLOWED_NAME_PATTERN)
@@ -53,8 +55,13 @@ module Validation
     fail ValidationFailed.new({username: msg}) unless username&.match(ALLOWED_MINIO_USERNAME_PATTERN)
   end
 
-  def self.validate_postgres_location(location)
-    available_pg_locs = Option.postgres_locations
+  def self.validate_aws_region_name(name)
+    msg = "AWS region name must be one of the following: #{AWS_REGION_NAMES.join(", ")}"
+    fail ValidationFailed.new({name: msg}) unless AWS_REGION_NAMES.include?(name)
+  end
+
+  def self.validate_postgres_location(location, project_id)
+    available_pg_locs = Option.postgres_locations(project_id:)
     msg = "Given location is not a valid postgres location. Available locations: #{available_pg_locs.map(&:display_name)}"
     fail ValidationFailed.new({location: msg}) unless available_pg_locs.include?(location)
   end

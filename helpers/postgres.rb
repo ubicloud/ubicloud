@@ -5,7 +5,7 @@ class Clover
     authorize("Postgres:create", @project.id)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
-    Validation.validate_postgres_location(@location)
+    Validation.validate_postgres_location(@location, @project.id)
 
     required_parameters = ["size"]
     required_parameters << "name" << "location" if web?
@@ -86,19 +86,19 @@ class Clover
 
     options.add_option(name: "name")
     options.add_option(name: "flavor", values: flavor)
-    options.add_option(name: "location", values: Option.postgres_locations, parent: "flavor")
-    options.add_option(name: "family", values: Option::PostgresSizes.map(&:vm_family).uniq, parent: "location") do |flavor, location, family|
+    options.add_option(name: "location", values: Option.postgres_locations(project_id: @project.id), parent: "flavor")
+    options.add_option(name: "family", values: (Option::PostgresSizes + customer_postgres_sizes_for_project(@project.id)).map(&:vm_family).uniq, parent: "location") do |flavor, location, family|
       available_families = Option.families(use_slices: @project.get_ff_use_slices_for_allocation || false).map { _1.name }
       available_families.include?(family) && BillingRate.from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name)
     end
-    options.add_option(name: "size", values: Option::PostgresSizes.map { _1.name }.uniq, parent: "family") do |flavor, location, family, size|
-      pg_size = Option::PostgresSizes.find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
+    options.add_option(name: "size", values: (Option::PostgresSizes + customer_postgres_sizes_for_project(@project.id)).map { _1.name }.uniq, parent: "family") do |flavor, location, family, size|
+      pg_size = (Option::PostgresSizes + customer_postgres_sizes_for_project(@project.id)).find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
       vm_size = Option::VmSizes.find { _1.name == pg_size.vm_size && _1.arch == "x64" && _1.visible }
       vm_size.family == family
     end
 
     options.add_option(name: "storage_size", values: ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096"], parent: "size") do |flavor, location, family, size, storage_size|
-      pg_size = Option::PostgresSizes.find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
+      pg_size = (Option::PostgresSizes + customer_postgres_sizes_for_project(@project.id)).find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
       pg_size.storage_size_options.include?(storage_size.to_i)
     end
 
@@ -106,5 +106,31 @@ class Clover
 
     options.add_option(name: "ha_type", values: [PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC], parent: "storage_size")
     options.serialize
+  end
+
+  def customer_postgres_sizes_for_project(project_id)
+    customer_locations = AwsLocationCredential.where(project_id:).all.map(&:location)
+    (
+      Option::PostgresSizes +
+      customer_locations.product([2, 4, 8, 16, 30, 60]).flat_map {
+        storage_size_options = [_2 * 32, _2 * 64, _2 * 128]
+        storage_size_options.map! { |size| size / 15 * 16 } if [30, 60].include?(_2)
+
+        storage_size_limiter = [4096, storage_size_options.last].min.fdiv(storage_size_options.last)
+        storage_size_options.map! { |size| size * storage_size_limiter }
+        [
+          Option::PostgresSize.new(_1.id, "standard-#{_2}", "standard", "standard-#{_2}", PostgresResource::Flavor::STANDARD, _2, _2 * 4, storage_size_options),
+          Option::PostgresSize.new(_1.id, "standard-#{_2}", "standard", "standard-#{_2}", PostgresResource::Flavor::PARADEDB, _2, _2 * 4, storage_size_options),
+          Option::PostgresSize.new(_1.id, "standard-#{_2}", "standard", "standard-#{_2}", PostgresResource::Flavor::LANTERN, _2, _2 * 4, storage_size_options)
+        ]
+      }.concat(customer_locations.product([1, 2]).flat_map {
+        storage_size_options = [_2 * 16, _2 * 32, _2 * 64]
+        [
+          Option::PostgresSize.new(_1.id, "burstable-#{_2}", "burstable", "burstable-#{_2}", PostgresResource::Flavor::STANDARD, _2, _2 * 2, storage_size_options),
+          Option::PostgresSize.new(_1.id, "burstable-#{_2}", "burstable", "burstable-#{_2}", PostgresResource::Flavor::PARADEDB, _2, _2 * 2, storage_size_options),
+          Option::PostgresSize.new(_1.id, "burstable-#{_2}", "burstable", "burstable-#{_2}", PostgresResource::Flavor::LANTERN, _2, _2 * 2, storage_size_options)
+        ]
+      })
+    )
   end
 end

@@ -13,14 +13,14 @@ class Clover
     end
 
     r.post true do
-      authorize("AwsRegion:create", @project.id)
+      authorize("AwsLocationCredential:create", @project.id)
       required_parameters = ["name", "aws_region_name", "aws_access_key", "aws_secret_key"]
       request_body_params = validate_request_params(required_parameters)
 
       Validation.validate_name(request_body_params["name"])
       Validation.validate_aws_region_name(request_body_params["aws_region_name"])
 
-      pl = DB.transaction do
+      loc = DB.transaction do
         alc = AwsLocationCredential.create_with_id(
           access_key: request_body_params["aws_access_key"],
           secret_key: request_body_params["aws_secret_key"],
@@ -35,18 +35,27 @@ class Clover
           provider: "aws",
           aws_location_credential_id: alc.id
         )
+        alc
       end
 
       if api?
-        Serializers::AwsRegion.serialize(pl)
+        Serializers::AwsRegion.serialize(loc)
       else
-        r.redirect "#{@project.path}/aws-region"
+        flash["notice"] = "The region is created successfully with path #{@project.path}#{loc.path}."
+        r.redirect "#{@project.path}#{loc.path}"
       end
     end
 
     r.get(web?, "create") do
-      authorize("AwsRegion:create", @project.id)
-      @available_aws_regions = ["us-east-1", "us-west-1"]
+      authorize("AwsLocationCredential:create", @project.id)
+
+      options = OptionTreeGenerator.new
+      options.add_option(name: "name")
+      options.add_option(name: "aws_region_name", values: Option::AWS_REGIONS.map { |r| {value: r, display_name: r} })
+      options.add_option(name: "aws_access_key")
+      options.add_option(name: "aws_secret_key")
+      @option_tree, @option_parents = options.serialize
+
       view "aws-region/create"
     end
 
@@ -56,7 +65,7 @@ class Clover
       next(r.delete? ? 204 : 404) unless @region
 
       r.get do
-        authorize("AwsRegion:view", @project.id)
+        authorize("AwsLocationCredential:view", @project.id)
 
         if api?
           Serializers::AwsRegion.serialize(@region)
@@ -66,7 +75,7 @@ class Clover
       end
 
       r.delete do
-        authorize("AwsRegion:delete", @project.id)
+        authorize("AwsLocationCredential:delete", @project.id)
 
         if @region.has_resources
           fail DependencyError.new("'#{@region.name}' region has some resources. Delete all related resources first.")
@@ -74,22 +83,18 @@ class Clover
 
         @region.location.destroy
         @region.destroy
-        if api?
-          204
-        else
-          r.redirect "#{@project.path}/aws-region/index"
-        end
+        204
       end
 
       r.post do
-        authorize("AwsRegion:edit", @project.id)
+        authorize("AwsLocationCredential:edit", @project.id)
         @region.location.update(ui_name: r.params["name"], display_name: r.params["name"])
 
         if api?
           Serializers::AwsRegion.serialize(@region)
         else
           flash["notice"] = "The region name is updated to '#{@region.location.ui_name}'."
-          r.redirect @region.path
+          r.redirect "#{@project.path}#{@region.path}"
         end
       end
     end

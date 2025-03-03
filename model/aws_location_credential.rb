@@ -13,7 +13,7 @@ class AwsLocationCredential < Sequel::Model
   end
 
   def path
-    "#{project.path}/aws-region/#{ubid}"
+    "/aws-region/#{ubid}"
   end
 
   def has_resources

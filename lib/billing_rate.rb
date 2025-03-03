@@ -15,6 +15,14 @@ class BillingRate
   end
 
   def self.from_resource_properties(resource_type, resource_family, location, active_at = Time.now)
+    rate = select_rate(resource_type, resource_family, location, active_at)
+    if rate.nil? && (location = Location[name: location]) && location.aws_location_credential
+      rate = select_rate(resource_type, resource_family, location.aws_location_credential.billing_location_name, active_at)
+    end
+    rate
+  end
+
+  def self.select_rate(resource_type, resource_family, location, active_at)
     rates.select {
       _1["resource_type"] == resource_type && _1["resource_family"] == resource_family && _1["location"] == location && _1["active_from"] < active_at
     }.max_by { _1["active_from"] }

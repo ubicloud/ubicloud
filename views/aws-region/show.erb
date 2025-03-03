@@ -9,8 +9,8 @@
 
 <div class="grid gap-6">
   <!-- Detail Card -->
-  <form action="<%= (@region.path) %>" method="POST">
-    <%== csrf_tag((@region.path)) %>
+  <form action="<%= (@project.path + @region.path) %>" method="POST">
+    <%== csrf_tag((@project.path + @region.path)) %>
 
     <%== part(
       "components/kv_data_card",
@@ -42,7 +42,7 @@
   </form>
 
   <!-- Delete Card -->
-  <% if has_permission?("AwsRegion:delete", @project.id) %>
+  <% if has_permission?("AwsLocationCredential:delete", @project.id) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
         <div class="sm:flex sm:items-center sm:justify-between">

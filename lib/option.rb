@@ -7,11 +7,15 @@ module Option
   AI_MODELS = ai_models.select { _1["enabled"] }.freeze
 
   def self.locations(only_visible: true, feature_flags: [])
-    Location.all.select { |pl| !only_visible || (pl.visible || feature_flags.include?("location_#{pl.name.tr("-", "_")}")) }
+    Location.where(aws_location_credential_id: nil).all.select { |pl| !only_visible || (pl.visible || feature_flags.include?("location_#{pl.name.tr("-", "_")}")) }
   end
 
-  def self.postgres_locations
-    Location.where(name: ["hetzner-fsn1", "leaseweb-wdc02"]).all
+  def self.postgres_locations(project_id: nil)
+    Location
+      .where(Sequel.|(
+        {name: ["hetzner-fsn1", "leaseweb-wdc02"]},
+        aws_location_credential_id: DB[:aws_location_credential].where(project_id:).select(:id)
+      )).all
   end
 
   def self.kubernetes_locations
@@ -86,7 +90,7 @@ module Option
     ]
   }.concat(Option.postgres_locations.product([1, 2]).flat_map {
     storage_size_options = [_2 * 16, _2 * 32, _2 * 64]
-    storage_size_options.pop if _1.name == "leaseweb-wdc02"
+    storage_size_options.pop if _1.name == "leaseweb-wdc02" || _1.name.include?("aws")
     [
       PostgresSize.new(_1.id, "burstable-#{_2}", "burstable", "burstable-#{_2}", PostgresResource::Flavor::STANDARD, _2, _2 * 2, storage_size_options),
       PostgresSize.new(_1.id, "burstable-#{_2}", "burstable", "burstable-#{_2}", PostgresResource::Flavor::PARADEDB, _2, _2 * 2, storage_size_options),
@@ -106,4 +110,6 @@ module Option
     PostgresResource::Flavor::PARADEDB => ["16", "17"],
     PostgresResource::Flavor::LANTERN => ["16"]
   }
+
+  AWS_REGIONS = ["us-east-1", "us-west-1"].freeze
 end
