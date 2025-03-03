@@ -13,16 +13,22 @@ end
 
 # Table: location
 # Columns:
-#  id           | uuid    | PRIMARY KEY
-#  display_name | text    | NOT NULL
-#  name         | text    | NOT NULL
-#  ui_name      | text    | NOT NULL
-#  visible      | boolean | NOT NULL
-#  provider     | text    | NOT NULL
+#  id                         | uuid    | PRIMARY KEY
+#  display_name               | text    | NOT NULL
+#  name                       | text    | NOT NULL
+#  ui_name                    | text    | NOT NULL
+#  visible                    | boolean | NOT NULL
+#  provider                   | text    | NOT NULL
+#  aws_location_credential_id | uuid    |
 # Indexes:
-#  location_pkey | PRIMARY KEY btree (id)
+#  location_pkey                          | PRIMARY KEY btree (id)
+#  aws_location_credential_id_name_unique | UNIQUE btree (name, aws_location_credential_id)
+#  aws_location_credential_id_unique      | UNIQUE btree (aws_location_credential_id)
+# Check constraints:
+#  aws_location_credential_id_provider_check | ((aws_location_credential_id IS NOT NULL) = (provider = 'aws'::text))
 # Foreign key constraints:
-#  location_provider_fkey | (provider) REFERENCES provider(name)
+#  location_aws_location_credential_id_fkey | (aws_location_credential_id) REFERENCES aws_location_credential(id)
+#  location_provider_fkey                   | (provider) REFERENCES provider(name)
 # Referenced By:
 #  firewall           | firewall_location_id_fkey           | (location_id) REFERENCES location(id)
 #  inference_endpoint | inference_endpoint_location_id_fkey | (location_id) REFERENCES location(id)
