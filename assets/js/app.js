@@ -56,7 +56,7 @@ $("#new-ace-btn").on("click", function (event) {
   var template = $('#ace-template').clone().removeClass('hidden').removeAttr('id');
   var pos = 0;
   var id_attr = '';
-  template.find('select, input').each(function(i, element) {
+  template.find('select, input').each(function (i, element) {
     id_attr = 'ace-select-' + num_aces + '-' + pos;
     pos++;
     $(element).attr('id', id_attr);
@@ -286,14 +286,26 @@ function setupPlayground() {
   $('#inference_tab_preview').hide();
 
   let controller = null;
-  const thinkingExtension = {
-    name: "thinking",
+
+  const reasoningExtension = {
+    name: "reasoning",
     level: "block",
+    format_reasoning(text) {
+      text = text.trim().replace(/\n+/g, '<br>');
+      if (text.length > 0) {
+        return `
+          <div class="text-sm italic p-4 bg-gray-50 ">
+            <div class="font-bold mb-4">Reasoning</div>
+            ${text}
+          </div>`;
+      }
+      return "";
+    },
     tokenizer(src) {
       const match = src.match(/^<think>([\s\S]+?)(?:<\/think>|$)/);
       if (match) {
         return {
-          type: "thinking",
+          type: "reasoning",
           raw: match[0],
           text: match[1].trim(),
         };
@@ -301,19 +313,12 @@ function setupPlayground() {
       return false;
     },
     renderer(token) {
-      if (token.type === "thinking") {
-        const text = token.text.trim().replace(/\n+/g, '<br>');
-        if (text.length > 0) {
-          return `
-            <div class="text-sm italic p-4 bg-gray-50 ">
-              <div class="font-bold mb-4">Thinking Process</div>
-              ${text}
-            </div>`;
-        }
+      if (token.type === "reasoning") {
+        return reasoningExtension.format_reasoning(token.text);
       }
     }
   };
-  marked.use({ extensions: [thinkingExtension] });
+  marked.use({ extensions: [reasoningExtension] });
 
   const generate = async () => {
     if (controller) {
@@ -349,6 +354,8 @@ function setupPlayground() {
 
     controller = new AbortController();
     const signal = controller.signal;
+    let content = "";
+    let reasoning_content = ""
 
     try {
       const response = await fetch(`${endpoint}/v1/chat/completions`, {
@@ -383,14 +390,22 @@ function setupPlayground() {
           .map((line) => JSON.parse(line));
 
         parsedLines.forEach((parsedLine) => {
-          const content = parsedLine?.choices?.[0]?.delta?.content;
-          if (content) {
-            $('#inference_response_raw').text($('#inference_response_raw').text() + content);
+          const new_content = parsedLine?.choices?.[0]?.delta?.content;
+          const new_reasoning_content = parsedLine?.choices?.[0]?.delta?.reasoning_content;
+          if (!new_content && !new_reasoning_content) {
+            return;
           }
+          content += new_content || "";
+          reasoning_content += new_reasoning_content || "";
+          const inference_response_raw = reasoning_content
+            ? `[reasoning_content]\n${reasoning_content}\n\n[content]\n${content}`
+            : content;
+          $('#inference_response_raw').text(inference_response_raw);
         });
       }
-      const parsed_response = DOMPurify.sanitize(marked.parse($('#inference_response_raw').text()));
-      $('#inference_response_preview').html(parsed_response);
+      const inference_response_preview = DOMPurify.sanitize(
+        reasoningExtension.format_reasoning(reasoning_content) + marked.parse(content));
+      $('#inference_response_preview').html(inference_response_preview);
       show_tab("preview");
     }
     catch (error) {
