@@ -253,6 +253,14 @@ class Prog::Vm::HostNexus < Prog::Base
       used_hugepages_1g: spdk_hugepages + total_vm_mem_gib
     )
 
+    hop_start_slices
+  end
+
+  label def start_slices
+    vm_host.slices.each { |slice|
+      slice.incr_start_after_host_reboot
+    }
+
     hop_start_vms
   end
 
