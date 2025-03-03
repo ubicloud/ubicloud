@@ -62,6 +62,12 @@ class BillingRate
       "Additional GitHub Runner Concurrency"
     when "InferenceTokens"
       "#{resource_family} Inference Tokens"
+    when "KubernetesCPVCpu"
+      "#{resource_family}-#{amount.to_i} backed Kubernetes Control Plane Node"
+    when "KubernetesWorkerVCpu"
+      "#{resource_family}-#{amount.to_i} backed Kubernetes Worker Node"
+    when "KubernetesWorkerStorage"
+      "#{amount.to_i} GiB Storage for Kubernetes Worker Node"
     else
       fail "BUG: Unknown resource type for line item description"
     end
