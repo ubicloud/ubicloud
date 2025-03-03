@@ -16,20 +16,19 @@ def main(options)
 
   tests_to_wait = []
   if options[:test_cases].include?("vm") && (test_case = all_test_cases["vm"])
-    encrypted_vms_st = Prog::Test::VmGroup.assemble(boot_images: test_case["images"], storage_encrypted: true, test_reboot: true)
+    # Testing slices is not parallel with other tests as it requires a specific host state
+    # YYY: Make this default when all hosts in prod support slices.
+    Semaphore.incr(hetzner_server_st.id, "allow_slices")
+    wait_until(hetzner_server_st, "wait")
+
+    # This tests encrypted VMs with slices, which will create both standard and
+    # burstable VMs. The test will also test host reboot.
+    encrypted_vms_st = Prog::Test::VmGroup.assemble(boot_images: test_case["images"], storage_encrypted: true, test_reboot: true, test_slices: true)
     log(encrypted_vms_st, "storage_encrypted: true")
     # Not running in parallel but waiting, since host is rebooted during test.
     # Rebooting makes the next test to test reboot practically as well depending
     # on when the host is rebooted and can cause flaky issues for github runner tests.
     wait_until(encrypted_vms_st)
-
-    # Testing slices is not parallel with other tests as it requires a specific host state
-    Semaphore.incr(hetzner_server_st.id, "allow_slices")
-    wait_until(hetzner_server_st, "wait")
-
-    sliced_vms_st = Prog::Test::VmGroup.assemble(boot_images: test_case["images"], storage_encrypted: true, test_reboot: false, test_slices: true)
-    log(sliced_vms_st, "test_slices: true")
-    wait_until(sliced_vms_st)
 
     Semaphore.incr(hetzner_server_st.id, "disallow_slices")
     wait_until(hetzner_server_st, "wait")
