@@ -435,6 +435,15 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.verify_spdk }.to hop("verify_hugepages")
     end
 
+    it "start_slices starts slices" do
+      slice1 = instance_double(VmHostSlice)
+      slice2 = instance_double(VmHostSlice)
+      expect(vm_host).to receive(:slices).and_return([slice1, slice2])
+      expect(slice1).to receive(:incr_start_after_host_reboot)
+      expect(slice2).to receive(:incr_start_after_host_reboot)
+      expect { nx.start_slices }.to hop("start_vms")
+    end
+
     it "start_vms starts vms & becomes accepting & hops to wait if unprepared" do
       expect(vms).to all receive(:incr_start_after_host_reboot)
       expect(vm_host).to receive(:allocation_state).and_return("unprepared")
@@ -542,7 +551,7 @@ RSpec.describe Prog::Vm::HostNexus do
         .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 8")
       expect(vm_host).to receive(:update)
         .with(total_hugepages_1g: 10, used_hugepages_1g: 7)
-      expect { nx.verify_hugepages }.to hop("start_vms")
+      expect { nx.verify_hugepages }.to hop("start_slices")
     end
   end
 
