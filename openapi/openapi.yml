@@ -1446,19 +1446,17 @@ components:
         type: string
     postgres_database_reference:
       description: Postgres database ID or name
+      examples:
+        id:
+          value: pgn30gjk1d1e2jj34v9x0dq4rp
+        name:
+          value: postgres-database-name
       in: path
       name: postgres_database_reference
       required: true
       schema:
-        oneOf:
-          - type: string
-            example: pgn30gjk1d1e2jj34v9x0dq4rp
-            pattern: '^pg[0-9a-tv-z]{24}$'
-          - type: string
-            example: postgres-database-name
-            not:
-              pattern: '^pg[0-9a-tv-z]{24}$'
-            pattern: '^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$'
+        type: string
+        pattern: '^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$'
     postgres_firewall_rule_id:
       description: ID of the postgres firewall rule
       in: path
