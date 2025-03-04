@@ -74,12 +74,12 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
 
   describe "#start" do
     it "naps if the kubernetes cluster is not ready" do
-      expect(kn.cluster).to receive(:strand).and_return(Strand.new(label: "not-wait"))
+      expect(kn.cluster).to receive(:strand).and_return(Strand.new(label: "not-wait_nodes"))
       expect { nx.start }.to nap(30)
     end
 
     it "registers a deadline and hops if the cluster is ready" do
-      expect(kn.cluster).to receive(:strand).and_return(Strand.new(label: "wait"))
+      expect(kn.cluster).to receive(:strand).and_return(Strand.new(label: "wait_nodes"))
       expect(nx).to receive(:register_deadline)
       expect { nx.start }.to hop("bootstrap_worker_vms")
     end
