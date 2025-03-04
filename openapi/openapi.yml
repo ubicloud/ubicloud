@@ -831,44 +831,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/firewall-rule':
-    parameters:
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_name'
-      - $ref: '#/components/parameters/project_id'
-    get:
-      operationId: listLocationPostgresFirewallRules
-      summary: List location Postgres firewall rules
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresFirewallRules'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Firewall Rule
-    post:
-      operationId: createLocationPostgresFirewallRule
-      summary: Create a new postgres firewall rule
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                cidr:
-                  description: CIDR of the firewall rule
-                  type: string
-              additionalProperties: false
-              required:
-                - cidr
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresFirewallRule'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Firewall Rule
   '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/firewall-rule/{firewall_rule_id}':
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -1009,6 +971,44 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/firewall-rule':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: listLocationPostgresFirewallRules
+      summary: List location Postgres firewall rules
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresFirewallRules'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Firewall Rule
+    post:
+      operationId: createLocationPostgresFirewallRule
+      summary: Create a new Postgres firewall rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cidr:
+                  description: CIDR of the firewall rule
+                  type: string
+              additionalProperties: false
+              required:
+                - cidr
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresFirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Firewall Rule
   '/project/{project_id}/location/{location}/private-subnet':
     get:
       operationId: listLocationPrivateSubnets
@@ -1444,6 +1444,19 @@ components:
       required: true
       schema:
         type: string
+    postgres_database_reference:
+      description: Postgres database ID or name
+      in: path
+      name: postgres_database_reference
+      required: true
+      schema:
+        oneOf:
+          - type: string
+            example: pgn30gjk1d1e2jj34v9x0dq4rp
+            pattern: '^pg[0-9a-tv-z]{24}$'
+          - type: string
+            example: postgres-database-name
+            pattern: '^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$'
     postgres_firewall_rule_id:
       description: ID of the postgres firewall rule
       in: path
