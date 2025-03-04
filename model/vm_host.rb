@@ -416,7 +416,6 @@ end
 #  allocation_state   | allocation_state         | NOT NULL DEFAULT 'unprepared'::allocation_state
 #  ip6                | inet                     |
 #  net6               | cidr                     |
-#  location           | text                     | NOT NULL
 #  total_mem_gib      | integer                  |
 #  total_sockets      | integer                  |
 #  total_cores        | integer                  |
@@ -432,7 +431,7 @@ end
 #  total_dies         | integer                  |
 #  os_version         | text                     |
 #  accepts_slices     | boolean                  | NOT NULL DEFAULT false
-#  location_id        | uuid                     |
+#  location_id        | uuid                     | NOT NULL
 # Indexes:
 #  vm_host_pkey     | PRIMARY KEY btree (id)
 #  vm_host_ip6_key  | UNIQUE btree (ip6)

@@ -264,7 +264,6 @@ end
 #  public_key              | text                     | NOT NULL
 #  display_state           | vm_display_state         | NOT NULL DEFAULT 'creating'::vm_display_state
 #  name                    | text                     | NOT NULL
-#  location                | text                     | NOT NULL
 #  boot_image              | text                     | NOT NULL
 #  local_vetho_ip          | text                     |
 #  ip4_enabled             | boolean                  | NOT NULL DEFAULT false
@@ -281,12 +280,11 @@ end
 #  project_id              | uuid                     | NOT NULL
 #  cpu_percent_limit       | integer                  |
 #  cpu_burst_percent_limit | integer                  |
-#  location_id             | uuid                     |
+#  location_id             | uuid                     | NOT NULL
 # Indexes:
 #  vm_pkey                             | PRIMARY KEY btree (id)
 #  vm_ephemeral_net6_key               | UNIQUE btree (ephemeral_net6)
 #  vm_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
-#  vm_project_id_location_name_uidx    | UNIQUE btree (project_id, location, name)
 #  vm_pool_id_index                    | btree (pool_id) WHERE pool_id IS NOT NULL
 # Foreign key constraints:
 #  vm_location_id_fkey      | (location_id) REFERENCES location(id)

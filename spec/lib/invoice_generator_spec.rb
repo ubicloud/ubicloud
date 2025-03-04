@@ -58,7 +58,7 @@ RSpec.describe InvoiceGenerator do
       "in_eu_vat" => !!expected_vat_info
     })
 
-    br = BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location)
+    br = BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)
     duration_mins = [672 * 60, (duration / 60).ceil].min
     expected_cost = (vm.vcpus * duration_mins * br["unit_price"]).round(3)
     expected_resources = [{

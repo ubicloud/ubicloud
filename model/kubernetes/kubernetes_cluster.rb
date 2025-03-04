@@ -70,18 +70,16 @@ end
 #  name                         | text                     | NOT NULL
 #  cp_node_count                | integer                  | NOT NULL
 #  version                      | text                     | NOT NULL
-#  location                     | text                     | NOT NULL
 #  created_at                   | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 #  project_id                   | uuid                     | NOT NULL
 #  private_subnet_id            | uuid                     | NOT NULL
 #  api_server_lb_id             | uuid                     |
 #  target_node_size             | text                     | NOT NULL
 #  target_node_storage_size_gib | bigint                   |
-#  location_id                  | uuid                     |
+#  location_id                  | uuid                     | NOT NULL
 # Indexes:
 #  kubernetes_cluster_pkey                             | PRIMARY KEY btree (id)
 #  kubernetes_cluster_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
-#  kubernetes_cluster_project_id_location_name_uidx    | UNIQUE btree (project_id, location, name)
 # Foreign key constraints:
 #  kubernetes_cluster_api_server_lb_id_fkey  | (api_server_lb_id) REFERENCES load_balancer(id)
 #  kubernetes_cluster_location_id_fkey       | (location_id) REFERENCES location(id)

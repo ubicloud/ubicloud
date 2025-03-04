@@ -279,7 +279,7 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}"
         expect(page).to have_content "Configure PostgreSQL database"
 
-        choose option: "standard-8"
+        choose option: "standard-2"
         choose option: 256
         choose option: PostgresResource::HaType::ASYNC
 

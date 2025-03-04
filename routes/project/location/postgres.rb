@@ -18,7 +18,7 @@ class Clover
       end
 
       filter[:location_id] = @location.id
-      pg = @project.postgres_resources_dataset.eager(:location).first(filter)
+      pg = @project.postgres_resources_dataset.first(filter)
 
       next (r.delete? ? 204 : 404) unless pg
 
@@ -31,7 +31,7 @@ class Clover
         else
           @pg = Serializers::Postgres.serialize(pg, {detailed: true, include_path: true})
           @family = pg.representative_server.vm.family
-          @option_tree, @option_parents = generate_postgres_configure_options(flavor: @pg[:flavor], location: @pg[:location])
+          @option_tree, @option_parents = generate_postgres_configure_options(flavor: @pg[:flavor], location: @location)
           view "postgres/show"
         end
       end
