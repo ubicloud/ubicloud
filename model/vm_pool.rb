@@ -29,12 +29,11 @@ end
 #  size              | integer | NOT NULL
 #  vm_size           | text    | NOT NULL
 #  boot_image        | text    | NOT NULL
-#  location          | text    | NOT NULL
 #  storage_size_gib  | bigint  | NOT NULL
 #  arch              | arch    | NOT NULL DEFAULT 'x64'::arch
 #  storage_encrypted | boolean | NOT NULL DEFAULT true
 #  storage_skip_sync | boolean | NOT NULL DEFAULT false
-#  location_id       | uuid    |
+#  location_id       | uuid    | NOT NULL
 # Indexes:
 #  vm_pool_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
