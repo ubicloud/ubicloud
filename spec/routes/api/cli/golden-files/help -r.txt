@@ -151,7 +151,6 @@ Subcommands:
   delete-firewall-rule
   delete-metric-destination
   destroy
-  failover
   pg_dump
   pg_dumpall
   psql
@@ -196,9 +195,6 @@ Usage: ubi pg (location/pg-name|pg-id) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation
-
-
-Usage: ubi pg (location/pg-name|pg-id) failover
 
 
 Usage: ubi pg (location/pg-name|pg-id) [options] pg_dump [pg_dump-options]

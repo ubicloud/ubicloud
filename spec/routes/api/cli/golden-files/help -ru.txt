@@ -21,7 +21,6 @@ Usage: ubi pg location/pg-name create [options]
 Usage: ubi pg (location/pg-name|pg-id) delete-firewall-rule id
 Usage: ubi pg (location/pg-name|pg-id) delete-metric-destination id
 Usage: ubi pg (location/pg-name|pg-id) destroy [options]
-Usage: ubi pg (location/pg-name|pg-id) failover
 Usage: ubi pg (location/pg-name|pg-id) [options] pg_dump [pg_dump-options]
 Usage: ubi pg (location/pg-name|pg-id) [options] pg_dumpall [pg_dumpall-options]
 Usage: ubi pg (location/pg-name|pg-id) [options] psql [psql-options]
