@@ -89,7 +89,10 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
   describe "#before_run" do
     it "hops to destroy" do
+      expect { nx.create_billing_records }.to hop("wait")
       expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(kubernetes_cluster.active_billing_records).not_to be_empty
+      expect(kubernetes_cluster.active_billing_records).to all(receive(:finalize))
       expect { nx.before_run }.to hop("destroy")
     end
 
@@ -145,10 +148,10 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.bootstrap_control_plane_vms }.to nap(5)
     end
 
-    it "hops wait if the target number of CP vms is reached" do
+    it "hops wait_nodes if the target number of CP vms is reached" do
       expect(kubernetes_cluster.api_server_lb).to receive(:hostname).and_return "endpoint"
       expect(kubernetes_cluster).to receive(:cp_vms).and_return [1, 2, 3]
-      expect { nx.bootstrap_control_plane_vms }.to hop("wait")
+      expect { nx.bootstrap_control_plane_vms }.to hop("wait_nodes")
     end
 
     it "buds ProvisionKubernetesNode prog to create VMs" do
@@ -172,6 +175,30 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(nx).to receive(:donate).and_call_original
 
       expect { nx.wait_control_plane_node }.to nap(1)
+    end
+  end
+
+  describe "#wait_nodes" do
+    it "naps until all nodepools are ready" do
+      expect(kubernetes_cluster.nodepools.first).to receive(:strand).and_return(instance_double(Strand, label: "not_wait"))
+      expect { nx.wait_nodes }.to nap(10)
+    end
+
+    it "hops to create_billing_records when all nodepools are ready" do
+      expect(kubernetes_cluster.nodepools.first).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      expect { nx.wait_nodes }.to hop("create_billing_records")
+    end
+  end
+
+  describe "#create_billing_records" do
+    it "creates billing records for all cp vms and nodepools" do
+      kubernetes_cluster.nodepools.first.add_vm(create_vm)
+
+      expect { nx.create_billing_records }.to hop("wait")
+
+      expect(kubernetes_cluster.active_billing_records.length).to eq 4
+
+      expect(kubernetes_cluster.active_billing_records.map { _1.billing_rate["resource_type"] }).to eq ["KubernetesControlPlaneVCpu", "KubernetesControlPlaneVCpu", "KubernetesWorkerVCpu", "KubernetesWorkerStorage"]
     end
   end
 

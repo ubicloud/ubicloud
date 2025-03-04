@@ -42,6 +42,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   def before_run
     when_destroy_set? do
       if strand.label != "destroy"
+        kubernetes_cluster.active_billing_records.each(&:finalize)
         hop_destroy
       end
     end
@@ -77,7 +78,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def bootstrap_control_plane_vms
     nap 5 unless kubernetes_cluster.endpoint
 
-    hop_wait if kubernetes_cluster.cp_vms.count >= kubernetes_cluster.cp_node_count
+    hop_wait_nodes if kubernetes_cluster.cp_vms.count >= kubernetes_cluster.cp_node_count
 
     bud Prog::Kubernetes::ProvisionKubernetesNode, {"subject_id" => kubernetes_cluster.id}
 
@@ -88,6 +89,34 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     reap
     hop_bootstrap_control_plane_vms if leaf?
     donate
+  end
+
+  label def wait_nodes
+    nap 10 unless kubernetes_cluster.nodepools.all? { _1.strand.label == "wait" }
+    hop_create_billing_records
+  end
+
+  label def create_billing_records
+    records =
+      kubernetes_cluster.cp_vms.map { {type: "KubernetesControlPlaneVCpu", family: _1.family, amount: _1.vcpus} } +
+      kubernetes_cluster.nodepools.flat_map(&:vms).flat_map {
+        [
+          {type: "KubernetesWorkerVCpu", family: _1.family, amount: _1.vcpus},
+          {type: "KubernetesWorkerStorage", family: "standard", amount: _1.storage_size_gib}
+        ]
+      }
+
+    records.each do |record|
+      BillingRecord.create(
+        project_id: kubernetes_cluster.project_id,
+        resource_id: kubernetes_cluster.id,
+        resource_name: kubernetes_cluster.name,
+        billing_rate_id: BillingRate.from_resource_properties(record[:type], record[:family], kubernetes_cluster.location)["id"],
+        amount: record[:amount]
+      )
+    end
+
+    hop_wait
   end
 
   label def wait

@@ -24,7 +24,7 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   end
 
   label def start
-    nap 30 unless kubernetes_nodepool.cluster.strand.label == "wait"
+    nap 30 unless kubernetes_nodepool.cluster.strand.label == "wait_nodes"
     register_deadline("wait", 120 * 60)
     hop_bootstrap_worker_vms
   end
