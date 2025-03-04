@@ -70,7 +70,6 @@ end
 # Columns:
 #  id                          | uuid                        | PRIMARY KEY
 #  name                        | text                        | NOT NULL
-#  location                    | text                        | NOT NULL
 #  created_at                  | timestamp without time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 #  admin_user                  | text                        | NOT NULL
 #  admin_password              | text                        | NOT NULL
@@ -81,11 +80,10 @@ end
 #  root_cert_key_2             | text                        |
 #  certificate_last_checked_at | timestamp with time zone    | NOT NULL DEFAULT now()
 #  project_id                  | uuid                        | NOT NULL
-#  location_id                 | uuid                        |
+#  location_id                 | uuid                        | NOT NULL
 # Indexes:
 #  minio_cluster_pkey                             | PRIMARY KEY btree (id)
 #  minio_cluster_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
-#  minio_cluster_project_id_location_name_uidx    | UNIQUE btree (project_id, location, name)
 # Foreign key constraints:
 #  minio_cluster_location_id_fkey       | (location_id) REFERENCES location(id)
 #  minio_cluster_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
