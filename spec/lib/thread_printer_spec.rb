@@ -3,11 +3,17 @@
 RSpec.describe ThreadPrinter do
   describe "#print" do
     it "can dump threads" do
-      expect(described_class).to receive(:puts).with(/--BEGIN THREAD DUMP, .*/)
-      expect(described_class).to receive(:puts).with(/Thread: #<Thread:.*>/)
-      expect(described_class).to receive(:puts).with(/backtrace/)
-      expect(described_class).to receive(:puts).with(/--END THREAD DUMP, .*/)
+      output = []
+      expect(described_class).to receive(:puts) do |str|
+        output << str
+      end.at_least(:once)
+
       described_class.run
+
+      expect(output[0]).to match(/--BEGIN THREAD DUMP, .*/)
+      expect(output[1]).to match(/Thread: #<Thread:.*>/)
+      expect(output[2]).to match(/backtrace/)
+      expect(output[-1]).to match(/--END THREAD DUMP, .*/)
     end
 
     it "can handle threads with a nil backtrace and/or a created_at" do
