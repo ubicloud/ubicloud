@@ -81,8 +81,7 @@ class PostgresResource < Sequel::Model
   end
 
   def target_standby_count
-    target_standby_count_map = {HaType::NONE => 0, HaType::ASYNC => 1, HaType::SYNC => 2}
-    target_standby_count_map[ha_type]
+    TARGET_STANDBY_COUNT_MAP[ha_type]
   end
 
   def target_server_count
@@ -116,6 +115,8 @@ class PostgresResource < Sequel::Model
     PARADEDB = "paradedb"
     LANTERN = "lantern"
   end
+
+  TARGET_STANDBY_COUNT_MAP = {HaType::NONE => 0, HaType::ASYNC => 1, HaType::SYNC => 2}.freeze
 
   DEFAULT_VERSION = "16"
 
