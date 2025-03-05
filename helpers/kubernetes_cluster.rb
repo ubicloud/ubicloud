@@ -11,7 +11,7 @@ class Clover
       kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
         name: name,
         project_id: @project.id,
-        location: @location,
+        location_id: @location.id,
         cp_node_count: request_body_params["cp_nodes"].to_i
       ).subject
 
@@ -36,7 +36,7 @@ class Clover
     options = OptionTreeGenerator.new
 
     options.add_option(name: "name")
-    options.add_option(name: "location", values: Option.kubernetes_locations.map(&:display_name))
+    options.add_option(name: "location", values: Option.kubernetes_locations)
     options.add_option(name: "cp_nodes", values: ["1", "3"])
     options.add_option(name: "worker_nodes", values: (1..6).map { {value: _1.to_s, display_name: _1.to_s} })
 

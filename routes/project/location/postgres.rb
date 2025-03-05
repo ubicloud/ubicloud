@@ -17,8 +17,8 @@ class Clover
         filter = {Sequel[:postgres_resource][:id] => UBID.to_uuid(pg_ubid)}
       end
 
-      filter[:location] = @location
-      pg = @project.postgres_resources_dataset.first(filter)
+      filter[:location_id] = @location.id
+      pg = @project.postgres_resources_dataset.eager(:location).first(filter)
 
       next (r.delete? ? 204 : 404) unless pg
 
@@ -169,7 +169,7 @@ class Clover
 
         st = Prog::Postgres::PostgresResourceNexus.assemble(
           project_id: @project.id,
-          location: pg.location,
+          location_id: pg.location_id,
           name: request_body_params["name"],
           target_vm_size: pg.target_vm_size,
           target_storage_size_gib: pg.target_storage_size_gib,

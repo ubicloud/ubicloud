@@ -70,7 +70,7 @@ module Option
     VmSize.new("burstable-#{_1}", "burstable", _1, _1 * 50, _1 * 50, (_1 * 1.6).to_i, storage_size_options, io_limits, false, false, "arm64")
   }).freeze
 
-  PostgresSize = Struct.new(:location, :name, :vm_family, :vm_size, :flavor, :vcpu, :memory, :storage_size_options) do
+  PostgresSize = Struct.new(:location_id, :name, :vm_family, :vm_size, :flavor, :vcpu, :memory, :storage_size_options) do
     alias_method :display_name, :name
   end
   PostgresSizes = Option.postgres_locations.product([2, 4, 8, 16, 30, 60]).flat_map {
@@ -80,17 +80,17 @@ module Option
     storage_size_limiter = [4096, storage_size_options.last].min.fdiv(storage_size_options.last)
     storage_size_options.map! { |size| size * storage_size_limiter }
     [
-      PostgresSize.new(_1.name, "standard-#{_2}", "standard", "standard-#{_2}", PostgresResource::Flavor::STANDARD, _2, _2 * 4, storage_size_options),
-      PostgresSize.new(_1.name, "standard-#{_2}", "standard", "standard-#{_2}", PostgresResource::Flavor::PARADEDB, _2, _2 * 4, storage_size_options),
-      PostgresSize.new(_1.name, "standard-#{_2}", "standard", "standard-#{_2}", PostgresResource::Flavor::LANTERN, _2, _2 * 4, storage_size_options)
+      PostgresSize.new(_1.id, "standard-#{_2}", "standard", "standard-#{_2}", PostgresResource::Flavor::STANDARD, _2, _2 * 4, storage_size_options),
+      PostgresSize.new(_1.id, "standard-#{_2}", "standard", "standard-#{_2}", PostgresResource::Flavor::PARADEDB, _2, _2 * 4, storage_size_options),
+      PostgresSize.new(_1.id, "standard-#{_2}", "standard", "standard-#{_2}", PostgresResource::Flavor::LANTERN, _2, _2 * 4, storage_size_options)
     ]
   }.concat(Option.postgres_locations.product([1, 2]).flat_map {
     storage_size_options = [_2 * 16, _2 * 32, _2 * 64]
     storage_size_options.pop if _1.name == "leaseweb-wdc02"
     [
-      PostgresSize.new(_1.name, "burstable-#{_2}", "burstable", "burstable-#{_2}", PostgresResource::Flavor::STANDARD, _2, _2 * 2, storage_size_options),
-      PostgresSize.new(_1.name, "burstable-#{_2}", "burstable", "burstable-#{_2}", PostgresResource::Flavor::PARADEDB, _2, _2 * 2, storage_size_options),
-      PostgresSize.new(_1.name, "burstable-#{_2}", "burstable", "burstable-#{_2}", PostgresResource::Flavor::LANTERN, _2, _2 * 2, storage_size_options)
+      PostgresSize.new(_1.id, "burstable-#{_2}", "burstable", "burstable-#{_2}", PostgresResource::Flavor::STANDARD, _2, _2 * 2, storage_size_options),
+      PostgresSize.new(_1.id, "burstable-#{_2}", "burstable", "burstable-#{_2}", PostgresResource::Flavor::PARADEDB, _2, _2 * 2, storage_size_options),
+      PostgresSize.new(_1.id, "burstable-#{_2}", "burstable", "burstable-#{_2}", PostgresResource::Flavor::LANTERN, _2, _2 * 2, storage_size_options)
     ]
   }).freeze
 

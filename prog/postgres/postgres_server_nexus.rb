@@ -25,7 +25,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
         "ubi",
         Config.postgres_service_project_id,
-        location: postgres_resource.location,
+        location_id: postgres_resource.location_id,
         name: ubid.to_s,
         size: postgres_resource.target_vm_size,
         storage_volumes: [
@@ -320,7 +320,7 @@ SQL
     end
 
     if !is_in_recovery
-      timeline_id = Prog::Postgres::PostgresTimelineNexus.assemble(location: postgres_server.resource.location, parent_id: postgres_server.timeline.id).id
+      timeline_id = Prog::Postgres::PostgresTimelineNexus.assemble(location_id: postgres_server.resource.location_id, parent_id: postgres_server.timeline.id).id
       postgres_server.timeline_id = timeline_id
       postgres_server.timeline_access = "push"
       postgres_server.save_changes

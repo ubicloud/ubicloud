@@ -43,7 +43,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       size: 1,
       vm_size: label_data["vm_size"],
       boot_image: label_data["boot_image"],
-      location: label_data["location"],
+      location_id: Location[name: label_data["location"]].id,
       storage_size_gib: label_data["storage_size_gib"],
       arch: label_data["arch"],
       storage_encrypted: true,

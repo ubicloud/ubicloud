@@ -17,8 +17,8 @@ class Clover
         filter = {Sequel[:vm][:id] => UBID.to_uuid(vm_ubid)}
       end
 
-      filter[:location] = @location
-      vm = @project.vms_dataset.first(filter)
+      filter[:location_id] = @location.id
+      vm = @project.vms_dataset.eager(:location).first(filter)
 
       next(r.delete? ? 204 : 404) unless vm
 

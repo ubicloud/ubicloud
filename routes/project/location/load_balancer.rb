@@ -17,7 +17,7 @@ class Clover
         filter = {Sequel[:load_balancer][:id] => UBID.to_uuid(lb_id)}
       end
 
-      filter[:private_subnet_id] = @project.private_subnets_dataset.where(location: @location).select(Sequel[:private_subnet][:id])
+      filter[:private_subnet_id] = @project.private_subnets_dataset.where(location_id: @location.id).select(Sequel[:private_subnet][:id])
       lb = LoadBalancer.first(filter)
 
       next (r.delete? ? 204 : 404) unless lb
@@ -58,7 +58,7 @@ class Clover
         if api?
           @lb
         else
-          vms = dataset_authorize(lb.private_subnet.vms_dataset, "Vm:view").exclude(Sequel[:vm][:id] => lb.vms_dataset.select(Sequel[:vm][:id])).all
+          vms = dataset_authorize(lb.private_subnet.vms_dataset.eager(:location), "Vm:view").exclude(Sequel[:vm][:id] => lb.vms_dataset.select(Sequel[:vm][:id])).all
           @attachable_vms = Serializers::Vm.serialize(vms)
 
           view "networking/load_balancer/show"

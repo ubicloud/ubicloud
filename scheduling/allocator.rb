@@ -140,7 +140,7 @@ module Scheduling::Allocator
           :used_cores,
           :total_hugepages_1g,
           :used_hugepages_1g,
-          :location,
+          :location_id,
           :num_storage_devices,
           :available_storage_gib,
           :total_storage_gib,
@@ -228,7 +228,7 @@ module Scheduling::Allocator
       ds = ds.where { available_gpus >= request.gpu_count } if request.gpu_count > 0
       ds = ds.where(Sequel[:vm_host][:id] => request.host_filter) unless request.host_filter.empty?
       ds = ds.exclude(Sequel[:vm_host][:id] => request.host_exclusion_filter) unless request.host_exclusion_filter.empty?
-      ds = ds.where(location: request.location_filter) unless request.location_filter.empty?
+      ds = ds.where(location_id: request.location_filter) unless request.location_filter.empty?
       ds = ds.where(allocation_state: request.allocation_state_filter) unless request.allocation_state_filter.empty?
       ds = ds.exclude(total_cores: 14, total_cpus: 14) unless request.family == "standard-gpu"
 
@@ -327,7 +327,7 @@ module Scheduling::Allocator
       score += 5 unless @request.gpu_count > 0 || @candidate_host[:num_gpus] == 0
 
       # penalty of 10 if location preference is not honored
-      score += 10 unless @request.location_preference.empty? || @request.location_preference.include?(@candidate_host[:location])
+      score += 10 unless @request.location_preference.empty? || @request.location_preference.include?(@candidate_host[:location_id])
 
       score
     end
