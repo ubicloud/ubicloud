@@ -6,7 +6,7 @@ RSpec.describe LoadBalancer do
   subject(:lb) {
     prj = Project.create_with_id(name: "test-prj")
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps")
-    Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 80).subject
+    Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080).subject
   }
 
   let(:vm1) {
@@ -62,7 +62,7 @@ RSpec.describe LoadBalancer do
       expect(lb).to receive(:incr_update_load_balancer)
       expect(lb).to receive(:incr_rewrite_dns_records)
       lb.evacuate_vm(vm1)
-      expect(lb.load_balancers_vms.first[:state]).to eq("evacuating")
+      expect(lb.vm_ports.first[:state]).to eq("evacuating")
     end
   end
 

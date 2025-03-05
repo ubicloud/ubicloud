@@ -199,6 +199,26 @@ module Validation
     port.to_i
   end
 
+  def self.validate_load_balancer_ports(ports)
+    seen_ports = {}
+
+    ports.map do |port|
+      port["src_port"] = validate_port(:src_port, port["src_port"])
+      port["dst_port"] = validate_port(:dst_port, port["dst_port"])
+      port["health_check_endpoint"] = port["health_check_endpoint"] || Prog::Vnet::LoadBalancerNexus::DEFAULT_HEALTH_CHECK_ENDPOINT
+      port["health_check_protocol"] ||= port["health_check_protocol"]
+
+      [port["src_port"], port["dst_port"]].each do |p|
+        if seen_ports[p]
+          fail ValidationFailed.new({port: "Port conflict detected: #{p} is already in use"})
+        end
+        seen_ports[p] = true
+      end
+
+      port
+    end
+  end
+
   def self.validate_request_params(request_body_params, required_keys, allowed_optional_keys = [])
     missing_required_keys = required_keys - request_body_params.keys
     unless missing_required_keys.empty?
