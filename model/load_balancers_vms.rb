@@ -69,11 +69,13 @@ end
 # Columns:
 #  load_balancer_id | uuid          | NOT NULL
 #  vm_id            | uuid          | NOT NULL
-#  state            | lb_node_state | NOT NULL DEFAULT 'down'::lb_node_state
 #  id               | uuid          | PRIMARY KEY
+#  state            | lb_node_state | DEFAULT 'down'::lb_node_state
 # Indexes:
 #  load_balancers_vms_pkey      | PRIMARY KEY btree (id)
 #  load_balancers_vms_vm_id_key | UNIQUE btree (vm_id)
 # Foreign key constraints:
 #  load_balancers_vms_load_balancer_id_fkey | (load_balancer_id) REFERENCES load_balancer(id)
 #  load_balancers_vms_vm_id_fkey            | (vm_id) REFERENCES vm(id)
+# Referenced By:
+#  load_balancer_vm_port | load_balancer_vm_port_load_balancer_vm_id_fkey | (load_balancer_vm_id) REFERENCES load_balancers_vms(id) ON DELETE CASCADE
