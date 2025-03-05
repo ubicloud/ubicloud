@@ -20,12 +20,6 @@ class Prog::Vnet::CertNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      hop_destroy unless %w[destroy].include?(strand.label)
-    end
-  end
-
   label def start
     register_deadline("wait", 10 * 60)
 
