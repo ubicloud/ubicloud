@@ -4,25 +4,36 @@ require_relative "../model"
 
 class Location < Sequel::Model
   include ResourceMethods
+  many_to_one :aws_location_credential
 
   HETZNER_FSN1_ID = "caa7a807-36c5-8420-a75c-f906839dad71"
   HETZNER_HEL1_ID = "1f214853-0bc4-8020-b910-dffb867ef44f"
   GITHUB_RUNNERS_ID = "6b9ef786-b842-8420-8c65-c25e3d4bdf3d"
   LEASEWEB_WDC02_ID = "e0865080-9a3d-8020-a812-f5817c7afe7f"
+
+  def self.billing_location_name
+    aws_location_credential_id ? aws_location_credential.billing_location_name : name
+  end
 end
 
 # Table: location
 # Columns:
-#  id           | uuid    | PRIMARY KEY
-#  display_name | text    | NOT NULL
-#  name         | text    | NOT NULL
-#  ui_name      | text    | NOT NULL
-#  visible      | boolean | NOT NULL
-#  provider     | text    | NOT NULL
+#  id                         | uuid    | PRIMARY KEY
+#  display_name               | text    | NOT NULL
+#  name                       | text    | NOT NULL
+#  ui_name                    | text    | NOT NULL
+#  visible                    | boolean | NOT NULL
+#  provider                   | text    | NOT NULL
+#  aws_location_credential_id | uuid    |
 # Indexes:
-#  location_pkey | PRIMARY KEY btree (id)
+#  location_pkey                          | PRIMARY KEY btree (id)
+#  aws_location_credential_id_name_unique | UNIQUE btree (name, aws_location_credential_id)
+#  aws_location_credential_id_unique      | UNIQUE btree (aws_location_credential_id)
+# Check constraints:
+#  aws_location_credential_id_provider_check | ((aws_location_credential_id IS NOT NULL) = (provider = 'aws'::text))
 # Foreign key constraints:
-#  location_provider_fkey | (provider) REFERENCES provider(name)
+#  location_aws_location_credential_id_fkey | (aws_location_credential_id) REFERENCES aws_location_credential(id)
+#  location_provider_fkey                   | (provider) REFERENCES provider(name)
 # Referenced By:
 #  firewall           | firewall_location_id_fkey           | (location_id) REFERENCES location(id)
 #  inference_endpoint | inference_endpoint_location_id_fkey | (location_id) REFERENCES location(id)

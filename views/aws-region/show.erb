@@ -1,0 +1,61 @@
+<% @page_title = @region.location.ui_name %>
+
+<%== part(
+  "components/page_header",
+  title: "Region Settings",
+  back: "/aws-region",
+  breadcrumbs: [%w[AWS\ Regions /aws-region], [@region.location.ui_name, @region.path], %w[Settings #]]
+) %>
+
+<div class="grid gap-6">
+  <!-- Detail Card -->
+  <form action="<%= (@project.path + @region.path) %>" method="POST">
+    <%== csrf_tag((@project.path + @region.path)) %>
+
+    <%== part(
+      "components/kv_data_card",
+      data: [
+        ["ID", @region.ubid],
+        [
+              "UI Name",
+              part(
+                "components/form/text",
+                name: "name",
+                value: @region.location.ui_name,
+                button_title: "Save",
+                attributes: {
+                  required: true
+                }
+              ),
+              { escape: false }
+        ],
+        [
+          "API Name",
+          @region.location.name
+        ],
+        [
+          "AWS Region",
+          @region.region_name
+        ]
+      ]
+    ) %>
+  </form>
+
+  <!-- Delete Card -->
+  <% if has_permission?("AwsLocationCredential:delete", @project.id) %>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="sm:flex sm:items-center sm:justify-between">
+        <div>
+          <h3 class="text-base font-semibold leading-6 text-gray-900">Delete region</h3>
+          <div class="mt-2 text-sm text-gray-500">
+            <p>This action will permanently delete this region. Deleted data cannot be recovered. Use it carefully.</p>
+          </div>
+        </div>
+        <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+          <%== part("components/delete_button", confirmation: @region.location.ui_name, redirect: "#{@project.path}/aws-region") %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>

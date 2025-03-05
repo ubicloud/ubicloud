@@ -494,4 +494,12 @@ RSpec.describe Validation do
       end
     end
   end
+
+  describe "#validate_aws_region_name" do
+    it "validates aws region names" do
+      expect { described_class.validate_aws_region_name("us-east-1") }.not_to raise_error
+      expect { described_class.validate_aws_region_name("us-west-1") }.not_to raise_error
+      expect { described_class.validate_aws_region_name("us-west-2") }.to raise_error described_class::ValidationFailed
+    end
+  end
 end

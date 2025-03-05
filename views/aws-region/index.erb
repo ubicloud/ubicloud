@@ -1,0 +1,33 @@
+<% @page_title = "AWS Regions" %>
+
+<%== part(
+  "components/page_header",
+  right_items: ((!@regions.empty?) && has_project_permission("AwsLocationCredential:create")) ? [
+    part("components/button", text: "Create AWS Region", link: "#{@project_data[:path]}/aws-region/create")
+  ] : []
+) %>
+
+<div class="grid gap-6">
+  <%== part(
+      "components/table_card",
+      headers: ["Name", "AWS Region"],
+      rows: @regions.map do |r|
+        [
+          [
+            [r.location.ui_name, {link: @project_data[:path] + r.path}],
+            [r.region_name]
+          ],
+          { id: "region-#{r[:id]}" }
+        ]
+      end,
+      empty_state: {
+        icon: "hero-map-pin",
+        title: "No AWS Regions",
+        description: "You don't have permission to create AWS Regions.",
+      }.merge(has_project_permission("AwsLocationCredential:create") ? {
+        description: "Get started by creating a new AWS Region.",
+        button_link: "#{@project_data[:path]}/aws-region/create",
+        button_title: "Create AWS Region"
+      } : {})
+    ) %>
+</div>

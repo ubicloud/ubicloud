@@ -197,4 +197,7 @@ module Config
 
   # Kubernetes
   optional :kubernetes_service_hostname, string
+
+  # UBI on AWS
+  override :custom_aws_regions_enabled, false, bool
 end
