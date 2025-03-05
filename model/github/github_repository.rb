@@ -28,12 +28,7 @@ class GithubRepository < Sequel::Model
   end
 
   def blob_storage_client
-    @blob_storage_client ||= Aws::S3::Client.new(
-      endpoint: Config.github_cache_blob_storage_endpoint,
-      access_key_id: access_key,
-      secret_access_key: secret_key,
-      region: Config.github_cache_blob_storage_region
-    )
+    @blob_storage_client ||= s3_client(access_key, secret_key)
   end
 
   def url_presigner
@@ -41,12 +36,7 @@ class GithubRepository < Sequel::Model
   end
 
   def admin_client
-    @admin_client ||= Aws::S3::Client.new(
-      endpoint: Config.github_cache_blob_storage_endpoint,
-      access_key_id: Config.github_cache_blob_storage_access_key,
-      secret_access_key: Config.github_cache_blob_storage_secret_key,
-      region: Config.github_cache_blob_storage_region
-    )
+    @admin_client ||= s3_client(Config.github_cache_blob_storage_access_key, Config.github_cache_blob_storage_secret_key)
   end
 
   def after_destroy
@@ -88,6 +78,17 @@ class GithubRepository < Sequel::Model
       token_id, token = CloudflareClient.new(Config.github_cache_blob_storage_api_key).create_token("#{bucket_name}-token", policies)
       update(access_key: token_id, secret_key: Digest::SHA256.hexdigest(token))
     end
+  end
+
+  private def s3_client(access_key_id, secret_access_key)
+    Aws::S3::Client.new(
+      endpoint: Config.github_cache_blob_storage_endpoint,
+      access_key_id:,
+      secret_access_key:,
+      region: Config.github_cache_blob_storage_region,
+      request_checksum_calculation: "when_required",
+      response_checksum_validation: "when_required"
+    )
   end
 end
 
