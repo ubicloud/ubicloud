@@ -85,6 +85,9 @@ jobs:
         CLOVER_COLUMN_ENCRYPTION_KEY: TtlY0+hd4lvedPkNbu5qsj5H7giPKJSRX9KDBrvid7c=
       run: bundle exec rake refresh_sequel_caches
 
+    - name: GIT DIFF
+      run: git diff 
+
     - name: Check that source code formatters and annotations make no changes
       run: git diff --stat --exit-code
 
