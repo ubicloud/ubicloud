@@ -104,6 +104,18 @@ class Sshable < Sequel::Model
     stdout_str
   end
 
+  def d_check(unit_name)
+    cmd("common/bin/daemonizer2 check #{unit_name}")
+  end
+
+  def d_clean(unit_name)
+    cmd("common/bin/daemonizer2 clean #{unit_name}")
+  end
+
+  def d_run(unit_name, *run_command, stdin: nil)
+    cmd("common/bin/daemonizer2 run #{unit_name} #{run_command.join(" ")}", stdin:)
+  end
+
   # A huge number of settings are needed to isolate net-ssh from the
   # host system and provide some anti-hanging assurance (keepalive,
   # timeout).
