@@ -92,6 +92,14 @@
 - { id: a3abe656-6ca2-4f17-a911-169c51a4a77a, resource_type: GitHubRunnerMinutes,     resource_family: standard-60-arm,     location: global,         unit_price: 0.0240000000, billed_by: amount,   active_from: 2023-01-01T00:00:00Z }
 - { id: 27d84309-e39d-8d78-b603-7632dafe374e, resource_type: GitHubRunnerMinutes,     resource_family: standard-gpu-6,      location: global,         unit_price: 0.0320000000, billed_by: amount,   active_from: 2023-01-01T00:00:00Z }
 - { id: c31b3640-92fa-49c3-bae8-c1011cc5f917, resource_type: GitHubRunnerConcurrency, resource_family: standard,            location: global,         unit_price: 0.0000248016, billed_by: duration, active_from: 2023-01-01T00:00:00Z }
+- { id: b1bf0809-d8b4-47b0-9a2a-c50f6037b4ca, resource_type: KubernetesCPVCpu,        resource_family: standard,            location: hetzner-fsn1,   unit_price: 0.0000000000, billed_by: duration, active_from: 2025-03-01T00:00:00Z }
+- { id: d284a720-8923-4023-9aff-16feeeba0df4, resource_type: KubernetesCPVCpu,        resource_family: standard,            location: leaseweb-wdc02, unit_price: 0.0000000000, billed_by: duration, active_from: 2025-03-01T00:00:00Z }
+- { id: 7149edf1-8c24-45a6-aaa7-1729a62288c7, resource_type: KubernetesCPVCpu,        resource_family: burstable,           location: hetzner-fsn1,   unit_price: 0.0000000000, billed_by: duration, active_from: 2025-03-01T00:00:00Z }
+- { id: 61c57d9d-dd28-47ab-bc00-a3f714c9bba7, resource_type: KubernetesWorkerVCpu,    resource_family: standard,            location: hetzner-fsn1,   unit_price: 0.0000000000, billed_by: duration, active_from: 2025-03-01T00:00:00Z }
+- { id: 7278e557-022a-48de-b308-202b7783deff, resource_type: KubernetesWorkerVCpu,    resource_family: standard,            location: leaseweb-wdc02, unit_price: 0.0000000000, billed_by: duration, active_from: 2025-03-01T00:00:00Z }
+- { id: 8f900c92-d2fe-428e-bcc2-c8ed6577c236, resource_type: KubernetesWorkerVCpu,    resource_family: burstable,           location: hetzner-fsn1,   unit_price: 0.0000000000, billed_by: duration, active_from: 2025-03-01T00:00:00Z }
+- { id: 081e1079-c56e-4fe9-af2d-6c519c668778, resource_type: KubernetesWorkerStorage, resource_family: standard,            location: hetzner-fsn1,   unit_price: 0.0000000000, billed_by: duration, active_from: 2025-03-01T00:00:00Z }
+- { id: 71a488df-8f93-453a-98af-4fbcb4327bfa, resource_type: KubernetesWorkerStorage, resource_family: standard,            location: leaseweb-wdc02, unit_price: 0.0000000000, billed_by: duration, active_from: 2025-03-01T00:00:00Z }
 
 # Deprecated billing rates
 - { id: c62a5b1d-0ed8-493c-89a5-d19db075d3c2, resource_type: PostgresVCpu,            resource_family: standard,            location: hetzner-fsn1,   unit_price: 0.0005518353, billed_by: duration, active_from: 2025-01-01T00:00:00Z }
