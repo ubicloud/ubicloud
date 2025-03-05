@@ -6,15 +6,34 @@ class LoadBalancer < Sequel::Model
   many_to_one :project
   many_to_many :vms
   many_to_many :active_vms, class: :Vm, left_key: :load_balancer_id, right_key: :vm_id, join_table: :load_balancers_vms, conditions: {state: "up"}
-  many_to_many :vms_to_dns, class: :Vm, left_key: :load_balancer_id, right_key: :vm_id, join_table: :load_balancers_vms, conditions: Sequel.~(state: Sequel.any_type(["evacuating", "detaching"], :lb_node_state))
   one_to_one :strand, key: :id
   many_to_one :private_subnet
   one_to_many :load_balancers_vms, key: :load_balancer_id, class: :LoadBalancersVms
+  one_to_many :ports, key: :load_balancer_id, class: :LoadBalancerPort
   many_to_many :certs, join_table: :certs_load_balancers, left_key: :load_balancer_id, right_key: :cert_id
   one_to_many :certs_load_balancers, key: :load_balancer_id, class: :CertsLoadBalancers
   many_to_one :custom_hostname_dns_zone, class: :DnsZone, key: :custom_hostname_dns_zone_id
+  many_to_many :vms_to_dns,
+    class: :Vm,
+    dataset: proc {
+      Vm.where(id: LoadBalancersVms.where(load_balancer_id: id)
+                                   .join(:load_balancer_vm_port, load_balancer_vm_id: :id)
+                                   .where(Sequel.~(Sequel[:load_balancer_vm_port][:state] => ["evacuating", "detaching"]))
+                                   .select(:vm_id))
+    }
+  one_to_many :active_vm_ports,
+    class: :LoadBalancerVmPort,
+    dataset: proc {
+      LoadBalancerVmPort.where(state: "up")
+        .where(load_balancer_vm_id: LoadBalancersVms.where(load_balancer_id: id).select(:id))
+    }
+  one_to_many :vm_ports,
+    class: :LoadBalancerVmPort,
+    dataset: proc {
+      LoadBalancerVmPort.where(load_balancer_vm_id: LoadBalancersVms.where(load_balancer_id: id).select(:id))
+    }
 
-  plugin :association_dependencies, load_balancers_vms: :destroy, certs_load_balancers: :destroy
+  plugin :association_dependencies, load_balancers_vms: :destroy, ports: :destroy, certs_load_balancers: :destroy
 
   include ResourceMethods
   include SemaphoreMethods
@@ -32,7 +51,8 @@ class LoadBalancer < Sequel::Model
 
   def add_vm(vm)
     DB.transaction do
-      LoadBalancersVms.create_with_id(load_balancer_id: id, vm_id: vm.id)
+      load_balancer_vm = LoadBalancersVms.create_with_id(load_balancer_id: id, vm_id: vm.id)
+      ports.each { |port| LoadBalancerVmPort.create_with_id(load_balancer_port_id: port.id, load_balancer_vm_id: load_balancer_vm.id) }
 
       Strand.create_with_id(prog: "Vnet::CertServer", label: "put_certificate", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id)
       incr_rewrite_dns_records
@@ -40,14 +60,18 @@ class LoadBalancer < Sequel::Model
   end
 
   def detach_vm(vm)
-    load_balancers_vms_dataset.where(vm_id: vm.id, state: Sequel.any_type(["up", "down", "evacuating"], :lb_node_state)).update(state: "detaching")
+    LoadBalancerVmPort.where(load_balancer_vm_id: LoadBalancersVms.where(load_balancer_id: id, vm_id: vm.id).select(:id))
+      .where(state: ["up", "down", "evacuating"])
+      .update(state: "detaching")
     Strand.create_with_id(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id)
     incr_update_load_balancer
   end
 
   def evacuate_vm(vm)
     DB.transaction do
-      load_balancers_vms_dataset.where(vm_id: vm.id, state: Sequel.any_type(["up", "down"], :lb_node_state)).update(state: "evacuating")
+      LoadBalancerVmPort.where(load_balancer_vm_id: LoadBalancersVms.where(load_balancer_id: id, vm_id: vm.id).select(:id))
+        .where(state: ["up", "down"])
+        .update(state: "evacuating")
       Strand.create_with_id(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id)
       incr_update_load_balancer
       incr_rewrite_dns_records
@@ -55,6 +79,7 @@ class LoadBalancer < Sequel::Model
   end
 
   def remove_vm(vm)
+    LoadBalancerVmPort.where(load_balancer_vm_id: LoadBalancersVms.where(load_balancer_id: id, vm_id: vm.id).select(:id)).destroy
     load_balancers_vms_dataset[vm_id: vm.id].destroy
     incr_rewrite_dns_records
   end

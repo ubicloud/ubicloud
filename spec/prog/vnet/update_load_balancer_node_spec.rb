@@ -48,12 +48,12 @@ RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
   describe "#update_load_balancer" do
     context "when no healthy vm exists" do
       it "hops to remove load balancer" do
-        expect(lb).to receive(:active_vms).and_return([])
+        expect(lb).to receive(:active_vm_ports).and_return([])
         expect { nx.update_load_balancer }.to hop("remove_load_balancer")
       end
 
       it "removes the VM from load balancer if the VM is detaching" do
-        lb.load_balancers_vms_dataset.update(state: "detaching")
+        lb.vm_ports_dataset.update(state: "detaching")
         expect(lb).to receive(:remove_vm).with(vm)
         expect { nx.update_load_balancer }.to hop("remove_load_balancer")
       end
@@ -65,13 +65,13 @@ RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
       }
 
       before do
-        lb.load_balancers_vms_dataset.update(state: "up")
+        lb.vm_ports_dataset.update(state: "up")
         allow(vm).to receive(:vm_host).and_return(vmh)
       end
 
       it "does not hop to remove load balancer and creates basic load balancing with nat" do
-        expect(lb).to receive(:active_vms).and_return([vm]).at_least(:once)
-        expect(vm.nics.first).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0/32")).at_least(:once)
+        allow(lb.active_vm_ports.first.load_balancer_vm.vm.nics.first).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0/32"))
+        allow(vm.nics.first).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0"))
         expect(vm.nics.first).to receive(:private_ipv6).and_return(NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64")).at_least(:once)
         expect(vmh.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
@@ -119,9 +119,9 @@ LOAD_BALANCER
       end
 
       it "does not hop to remove load balancer and creates basic load balancing with nat specifically for ipv4" do
-        expect(lb).to receive(:active_vms).and_return([vm]).at_least(:once)
         lb.update(stack: "ipv4")
-        expect(vm.nics.first).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0/32")).at_least(:once)
+        allow(lb.active_vm_ports.first.load_balancer_vm.vm.nics.first).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0/32"))
+        allow(vm.nics.first).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0"))
         expect(vmh.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
@@ -166,7 +166,7 @@ LOAD_BALANCER
 
       it "creates basic load balancing with hashing" do
         lb.update(algorithm: "hash_based")
-        expect(lb).to receive(:active_vms).and_return([vm]).at_least(:once)
+        allow(lb.active_vm_ports.first.load_balancer_vm.vm.nics.first).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0/32"))
         expect(vm.nics.first).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0/32")).at_least(:once)
         expect(vm.nics.first).to receive(:private_ipv6).and_return(NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64")).at_least(:once)
         expect(vmh.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
@@ -221,10 +221,13 @@ LOAD_BALANCER
       }
 
       before do
-        allow(lb).to receive(:active_vms).and_return([vm, neighbor_vm]).at_least(:once)
+        lb.add_vm(neighbor_vm)
+        lb.vm_ports_dataset.update(state: "up")
         allow(vm).to receive(:vm_host).and_return(vmh)
         allow(vm.nics.first).to receive_messages(private_ipv4: NetAddr::IPv4Net.parse("192.168.1.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64"))
+        allow(lb.active_vm_ports[0].load_balancer_vm.vm.nics.first).to receive_messages(private_ipv4: NetAddr::IPv4Net.parse("192.168.1.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64"))
         allow(neighbor_vm.nics.first).to receive_messages(private_ipv4: NetAddr::IPv4Net.parse("172.10.1.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:aaa::2/64"))
+        allow(lb.active_vm_ports[1].load_balancer_vm.vm.nics.first).to receive_messages(private_ipv4: NetAddr::IPv4Net.parse("172.10.1.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:aaa::2/64"))
       end
 
       it "creates load balancing with multiple vms if all active" do
@@ -320,7 +323,10 @@ LOAD_BALANCER
       end
 
       it "creates load balancing with multiple vms if the vm we work on is down" do
-        expect(lb).to receive(:active_vms).and_return([neighbor_vm]).at_least(:once)
+        lb.vm_ports_dataset.where(id: lb.vm_ports[0].id).first.update(state: "down")
+        lb.reload
+        allow(neighbor_vm.nics.first).to receive_messages(private_ipv4: NetAddr::IPv4Net.parse("172.10.1.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:aaa::2/64"))
+        allow(lb.active_vm_ports[0].load_balancer_vm.vm.nics.first).to receive_messages(private_ipv4: NetAddr::IPv4Net.parse("172.10.1.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:aaa::2/64"))
         expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
@@ -368,7 +374,10 @@ LOAD_BALANCER
       end
 
       it "creates load balancing with multiple vms if the vm we work on is up but the neighbor is down" do
-        expect(lb).to receive(:active_vms).and_return([vm]).at_least(:once)
+        lb.vm_ports_dataset.where(id: lb.vm_ports[1].id).first.update(state: "down")
+        lb.reload
+        allow(vm.nics.first).to receive_messages(private_ipv4: NetAddr::IPv4Net.parse("192.168.1.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64"))
+        allow(lb.active_vm_ports[0].load_balancer_vm.vm.nics.first).to receive_messages(private_ipv4: NetAddr::IPv4Net.parse("192.168.1.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64"))
         expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;

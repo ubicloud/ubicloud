@@ -8,13 +8,17 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
   subject_is :load_balancer
 
-  def self.assemble(private_subnet_id, name: nil, algorithm: "round_robin", src_port: nil, dst_port: nil,
+  def self.assemble_with_multiple_ports(private_subnet_id, name: nil, algorithm: "round_robin",
     health_check_endpoint: DEFAULT_HEALTH_CHECK_ENDPOINT, health_check_interval: 30, health_check_timeout: 15,
-    health_check_up_threshold: 3, health_check_down_threshold: 2, health_check_protocol: "http",
+    health_check_up_threshold: 3, health_check_down_threshold: 2, health_check_protocol: "http", load_balancer_ports: nil,
     custom_hostname_prefix: nil, custom_hostname_dns_zone_id: nil, stack: LoadBalancer::Stack::DUAL)
 
     unless (ps = PrivateSubnet[private_subnet_id])
       fail "Given subnet doesn't exist with the id #{private_subnet_id}"
+    end
+
+    if load_balancer_ports.nil?
+      fail "load_balancer_ports cannot be nil"
     end
 
     Validation.validate_name(name)
@@ -24,19 +28,33 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     end
 
     Validation.validate_load_balancer_stack(stack)
+    ports = Validation.validate_load_balancer_ports(load_balancer_ports)
 
     DB.transaction do
       lb = LoadBalancer.create_with_id(
-        private_subnet_id: private_subnet_id, name: name, algorithm: algorithm, src_port: src_port, dst_port: dst_port,
-        health_check_endpoint: health_check_endpoint, health_check_interval: health_check_interval,
-        health_check_timeout: health_check_timeout, health_check_up_threshold: health_check_up_threshold,
-        health_check_down_threshold: health_check_down_threshold, health_check_protocol: health_check_protocol,
+        private_subnet_id: private_subnet_id, name: name, algorithm: algorithm,
         custom_hostname: custom_hostname, custom_hostname_dns_zone_id: custom_hostname_dns_zone_id,
-        stack: stack, project_id: ps.project_id
+        stack: stack, project_id: ps.project_id,
+        health_check_endpoint: health_check_endpoint,
+        health_check_interval: health_check_interval,
+        health_check_timeout: health_check_timeout,
+        health_check_up_threshold: health_check_up_threshold,
+        health_check_down_threshold: health_check_down_threshold,
+        health_check_protocol: health_check_protocol
       )
-
+      ports.map { |port| LoadBalancerPort.create(load_balancer_id: lb.id, src_port: port["src_port"], dst_port: port["dst_port"]) }
       Strand.create(prog: "Vnet::LoadBalancerNexus", label: "wait") { _1.id = lb.id }
     end
+  end
+
+  def self.assemble(private_subnet_id, name: nil, algorithm: "round_robin",
+    health_check_endpoint: DEFAULT_HEALTH_CHECK_ENDPOINT, health_check_interval: 30, health_check_timeout: 15,
+    health_check_up_threshold: 3, health_check_down_threshold: 2, health_check_protocol: "http", src_port: nil, dst_port: nil,
+    custom_hostname_prefix: nil, custom_hostname_dns_zone_id: nil, stack: LoadBalancer::Stack::DUAL)
+
+    load_balancer_ports = [{"src_port" => src_port, "dst_port" => dst_port}]
+    assemble_with_multiple_ports(private_subnet_id, name:, algorithm:, health_check_endpoint:, health_check_interval:, health_check_timeout:,
+      health_check_up_threshold:, health_check_down_threshold:, health_check_protocol:, load_balancer_ports:, custom_hostname_prefix:, custom_hostname_dns_zone_id:, stack:)
   end
 
   def before_run
@@ -141,6 +159,9 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     if (dns_zone = load_balancer.dns_zone) && (Config.production? || dns_zone)
       dns_zone.delete_record(record_name: load_balancer.hostname)
     end
+
+    load_balancer.vm_ports.map(&:destroy)
+    load_balancer.ports.map(&:destroy)
 
     load_balancer.vms.each do |vm|
       bud Prog::Vnet::UpdateLoadBalancerNode, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :update_load_balancer

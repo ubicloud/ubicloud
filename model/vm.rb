@@ -16,9 +16,14 @@ class Vm < Sequel::Model
   one_to_many :pci_devices, key: :vm_id, class: :PciDevice
   one_through_one :load_balancer, left_key: :vm_id, right_key: :load_balancer_id, join_table: :load_balancers_vms
   one_to_one :load_balancers_vms, key: :vm_id, class: :LoadBalancersVms
+  one_to_many :load_balancer_vm_ports,
+    class: :LoadBalancerVmPort,
+    dataset: proc {
+      LoadBalancerVmPort.where(load_balancer_vm_id: LoadBalancersVms.where(vm_id: id).select(:id))
+    }
   many_to_one :vm_host_slice
 
-  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancers_vms: :destroy
+  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancer_vm_ports: :destroy, load_balancers_vms: :destroy
 
   dataset_module Pagination
 

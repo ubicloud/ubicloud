@@ -16,8 +16,8 @@ RSpec.describe Clover, "cli lb create" do
     expect(lb).to be_a LoadBalancer
     expect(lb.name).to eq "test-lb"
     expect(lb.private_subnet_id).to eq @ps.id
-    expect(lb.src_port).to eq 12345
-    expect(lb.dst_port).to eq 54321
+    expect(lb.ports.first.src_port).to eq 12345
+    expect(lb.ports.first.dst_port).to eq 54321
     expect(lb.algorithm).to eq "round_robin"
     expect(lb.health_check_protocol).to eq "http"
     expect(lb.health_check_endpoint).to eq "/up"
@@ -33,8 +33,8 @@ RSpec.describe Clover, "cli lb create" do
     expect(lb).to be_a LoadBalancer
     expect(lb.name).to eq "test-lb"
     expect(lb.private_subnet_id).to eq @ps.id
-    expect(lb.src_port).to eq 1234
-    expect(lb.dst_port).to eq 5432
+    expect(lb.ports.first.src_port).to eq 1234
+    expect(lb.ports.first.dst_port).to eq 5432
     expect(lb.algorithm).to eq "hash_based"
     expect(lb.health_check_protocol).to eq "https"
     expect(lb.health_check_endpoint).to eq "/up2"
