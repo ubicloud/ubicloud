@@ -269,7 +269,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
   describe "#create_billing_record" do
     it "creates billing record for cores and storage then hops" do
-      expect(postgres_resource).to receive(:required_standby_count).and_return(1)
+      expect(postgres_resource).to receive(:target_server_count).and_return(2)
       expect(postgres_resource).to receive(:flavor).and_return("standard").at_least(:once)
 
       expect(BillingRecord).to receive(:create_with_id).with(
@@ -310,17 +310,17 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
   describe "#wait" do
     before do
-      allow(postgres_resource).to receive_messages(certificate_last_checked_at: Time.now, required_standby_count: 0)
+      allow(postgres_resource).to receive_messages(certificate_last_checked_at: Time.now, target_server_count: 1)
     end
 
     it "exclude primary server's host while creating standbys" do
-      expect(postgres_resource).to receive(:required_standby_count).and_return(1)
+      expect(postgres_resource).to receive(:target_server_count).and_return(2)
       expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: [postgres_resource.servers.first.vm.vm_host.id]))
       expect { nx.wait }.to nap(30)
     end
 
     it "does not exclude any hosts in development" do
-      expect(postgres_resource).to receive(:required_standby_count).and_return(1)
+      expect(postgres_resource).to receive(:target_server_count).and_return(2)
       expect(Config).to receive(:development?).and_return(true)
       expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: []))
       expect { nx.wait }.to nap(30)

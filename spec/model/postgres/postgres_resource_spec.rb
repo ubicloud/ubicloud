@@ -51,9 +51,14 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.display_state).to eq("creating")
   end
 
-  it "returns required_standby_count correctly" do
+  it "returns target_standby_count correctly" do
     expect(postgres_resource).to receive(:ha_type).and_return(PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC)
-    (0..2).each { expect(postgres_resource.required_standby_count).to eq(_1) }
+    (0..2).each { expect(postgres_resource.target_standby_count).to eq(_1) }
+  end
+
+  it "returns target_server_count correctly" do
+    expect(postgres_resource).to receive(:target_standby_count).and_return(0, 1, 2)
+    (0..2).each { expect(postgres_resource.target_server_count).to eq(_1 + 1) }
   end
 
   it "sets firewall rules" do

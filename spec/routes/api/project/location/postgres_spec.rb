@@ -35,7 +35,6 @@ RSpec.describe Clover, "postgres" do
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/restore"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/reset-superuser-password"],
-        [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/failover"],
         [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/ca-certificates"]
       ].each do |method, path|
         send method, path
@@ -242,46 +241,6 @@ RSpec.describe Clover, "postgres" do
         }.to_json
 
         expect(last_response.status).to eq(200)
-      end
-
-      it "failover" do
-        pg.flavor = PostgresResource::Flavor::PARADEDB
-        pg.save_changes
-        rs = pg.representative_server
-        rs.update(timeline_access: "push")
-        st = Prog::Postgres::PostgresServerNexus.assemble(resource_id: pg.id, timeline_id: rs.timeline_id, timeline_access: "fetch")
-        st.update(label: "wait")
-        expect(PostgresServer).to receive(:run_query).and_return "16/B374D848"
-
-        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/failover"
-
-        expect(last_response.status).to eq(200)
-      end
-
-      it "failover invalid restore" do
-        pg.save_changes
-        pg.representative_server.update(timeline_access: "fetch")
-
-        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/failover"
-
-        expect(last_response).to have_api_error(400, "Failover cannot be triggered during restore!")
-      end
-
-      it "failover no ff base image" do
-        pg.save_changes
-
-        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/failover"
-
-        expect(last_response).to have_api_error(400, "Failover cannot be triggered for this resource!")
-      end
-
-      it "failover no standby" do
-        pg.flavor = PostgresResource::Flavor::PARADEDB
-        pg.save_changes
-
-        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/failover"
-
-        expect(last_response).to have_api_error(400, "There is not a suitable standby server to failover!")
       end
 
       it "invalid payment" do

@@ -54,10 +54,21 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      if strand.label != "destroy"
-        hop_destroy
-      elsif strand.stack.count > 1
-        pop "operation is cancelled due to the destruction of the postgres server"
+      should_destroy = if ["destroy", nil].include?(postgres_server.resource&.strand&.label)
+        true
+      else
+        !(@snap.set?(:take_over) || ["prepare_for_take_over", "taking_over"].include?(strand.label))
+      end
+
+      if should_destroy
+        if strand.label != "destroy"
+          hop_destroy
+        elsif strand.stack.count > 1
+          pop "operation is cancelled due to the destruction of the postgres server"
+        end
+      else
+        Clog.emit("Postgres server deletion is cancelled, because it is in the process of taking over the primary role")
+        decr_destroy
       end
     end
   end
@@ -337,7 +348,7 @@ SQL
     decr_initial_provisioning
 
     when_take_over_set? do
-      hop_wait_primary_destroy
+      hop_prepare_for_take_over
     end
 
     when_refresh_certificates_set? do
@@ -386,13 +397,16 @@ SQL
     nap 5
   end
 
-  label def wait_primary_destroy
+  label def prepare_for_take_over
     decr_take_over
-    hop_take_over if postgres_server.resource.representative_server.nil?
+    hop_taking_over if postgres_server.resource.representative_server.nil?
+
+    postgres_server.resource.representative_server.incr_destroy
+
     nap 5
   end
 
-  label def take_over
+  label def taking_over
     case vm.sshable.cmd("common/bin/daemonizer --check promote_postgres")
     when "Succeeded"
       postgres_server.update(timeline_access: "push", representative_at: Time.now)

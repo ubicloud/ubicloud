@@ -119,12 +119,11 @@ RSpec.describe PostgresServer do
       expect(postgres_server.trigger_failover).to be_falsey
     end
 
-    it "increments take over semaphore and destroy semaphore" do
+    it "increments take over semaphore" do
       standby = instance_double(described_class)
       expect(postgres_server).to receive(:primary?).and_return(true)
       expect(postgres_server).to receive(:failover_target).and_return(standby)
       expect(standby).to receive(:incr_take_over)
-      expect(postgres_server).to receive(:incr_destroy)
       expect(postgres_server.trigger_failover).to be_truthy
     end
   end
@@ -134,14 +133,25 @@ RSpec.describe PostgresServer do
       postgres_server.timeline_access = "push"
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", standby?: true, strand: instance_double(Strand, label: "wait_catch_up")),
-        instance_double(described_class, ubid: "pgubidstandby2", standby?: true, run_query: "1/5", strand: instance_double(Strand, label: "wait")),
-        instance_double(described_class, ubid: "pgubidstandby3", standby?: true, run_query: "1/10", strand: instance_double(Strand, label: "wait"))
+        instance_double(described_class, ubid: "pgubidstandby1", standby?: true, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false),
+        instance_double(described_class, ubid: "pgubidstandby2", standby?: true, run_query: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false),
+        instance_double(described_class, ubid: "pgubidstandby3", standby?: true, run_query: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false)
       ])
     end
 
     it "returns nil if there is no standby" do
       expect(resource).to receive(:servers).and_return([postgres_server]).at_least(:once)
+      expect(postgres_server.failover_target).to be_nil
+    end
+
+    it "returns nil if there is no fresh standby" do
+      standby_server = described_class.new { _1.id = "c068cac7-ed45-82db-bf38-a003582b36ef" }
+      expect(standby_server).to receive(:resource).and_return(resource)
+      expect(standby_server).to receive(:standby?).and_return(true)
+      expect(standby_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      expect(standby_server).to receive(:vm).and_return(instance_double(Vm, display_size: "standard-4"))
+      expect(resource).to receive(:servers).and_return([postgres_server, standby_server]).at_least(:once)
+      expect(resource).to receive(:target_vm_size).and_return("standard-2")
       expect(postgres_server.failover_target).to be_nil
     end
 

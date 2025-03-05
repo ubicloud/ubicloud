@@ -13,7 +13,6 @@ Subcommands:
   delete-firewall-rule
   delete-metric-destination
   destroy
-  failover
   pg_dump
   pg_dumpall
   psql

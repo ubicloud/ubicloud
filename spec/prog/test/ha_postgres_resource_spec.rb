@@ -49,12 +49,12 @@ RSpec.describe Prog::Test::HaPostgresResource do
 
   describe "#wait_postgres_resource" do
     it "hops to test_postgres if the postgres resource is ready" do
-      expect(pgr_test).to receive(:postgres_resource).exactly(3).and_return(instance_double(PostgresResource, required_standby_count: 1, servers: [instance_double(PostgresServer, strand: instance_double(Strand, label: "wait")), instance_double(PostgresServer, strand: instance_double(Strand, label: "wait"))]))
+      expect(pgr_test).to receive(:postgres_resource).exactly(3).and_return(instance_double(PostgresResource, target_server_count: 2, servers: [instance_double(PostgresServer, strand: instance_double(Strand, label: "wait")), instance_double(PostgresServer, strand: instance_double(Strand, label: "wait"))]))
       expect { pgr_test.wait_postgres_resource }.to hop("test_postgres")
     end
 
     it "naps for 10 seconds if the postgres resource is not ready" do
-      expect(pgr_test).to receive(:postgres_resource).exactly(2).and_return(instance_double(PostgresResource, required_standby_count: 1, servers: [instance_double(PostgresServer, strand: instance_double(Strand, label: "start"))]))
+      expect(pgr_test).to receive(:postgres_resource).exactly(2).and_return(instance_double(PostgresResource, target_server_count: 2, servers: [instance_double(PostgresServer, strand: instance_double(Strand, label: "start"))]))
       expect { pgr_test.wait_postgres_resource }.to nap(10)
     end
   end
