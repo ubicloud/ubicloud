@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "sequel"
-
 use_auto_parallel_tests = nil
 auto_parallel_tests_file = ".auto-parallel-tests"
 
@@ -11,6 +9,17 @@ auto_parallel_tests = lambda do
   end
 
   use_auto_parallel_tests
+end
+
+loaded_environment = nil
+load_db = lambda do |env|
+  raise "cannot load #{env} environment, already loaded #{loaded_environment} environment" if loaded_environment && loaded_environment != env
+  loaded_environment = env
+  ENV["RACK_ENV"] = env
+  require "bundler"
+  Bundler.setup(:default, :development)
+  require "logger"
+  require_relative "db"
 end
 
 ncpu = nil
@@ -32,11 +41,7 @@ end
 
 # Migrate
 migrate = lambda do |env, version|
-  ENV["RACK_ENV"] = env
-  require "bundler"
-  Bundler.setup(:default, :development)
-  require "logger"
-  require_relative "db"
+  load_db.call(env)
   Sequel.extension :migration
 
   DB.extension :pg_enum
@@ -312,7 +317,7 @@ end
 
 desc "Annotate Sequel models"
 task "annotate" do
-  ENV["RACK_ENV"] = "development"
+  load_db.call("test")
   require_relative "loader"
   require_relative "model"
   DB.loggers.clear
