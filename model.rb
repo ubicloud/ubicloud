@@ -42,7 +42,7 @@ end
 
 if ENV["CHECK_LOGGED_SQL"]
   require "logger"
-  File.unlink("sql.log")
+  File.unlink("sql.log") if File.file?("sql.log")
   f = File.open("sql.log", "ab")
 
   # Remove optimization that does not use parameterization
