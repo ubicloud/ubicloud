@@ -124,7 +124,7 @@ end
 
 desc "Refresh schema and index caches"
 task :refresh_sequel_caches do
-  %w[schema index static_cache].each do |type|
+  %w[schema index static_cache pg_auto_constraint_validations].each do |type|
     filename = "cache/#{type}.cache"
     File.delete(filename) if File.file?(filename)
   end
