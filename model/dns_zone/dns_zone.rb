@@ -61,12 +61,12 @@ class DnsZone < Sequel::Model
       dns_server_ids = dns_servers.map(&:id)
       seen_tombstoned_records = records_dataset
         .select_group(:id)
-        .join(:seen_dns_records_by_dns_servers, dns_record_id: :id, dns_server_id: Sequel.any_uuid(dns_server_ids))
+        .join(:seen_dns_records_by_dns_servers, dns_record_id: :id, dns_server_id: dns_server_ids)
         .where(tombstoned: true)
         .having { count.function.* =~ dns_server_ids.count }.all
 
       records_to_purge = obsoleted_records + seen_tombstoned_records
-      DB[:seen_dns_records_by_dns_servers].where(dns_record_id: Sequel.any_uuid(records_to_purge.map(&:id).uniq)).delete(force: true)
+      DB[:seen_dns_records_by_dns_servers].where(dns_record_id: records_to_purge.map(&:id).uniq).delete(force: true)
       records_to_purge.uniq(&:id).map(&:destroy)
 
       update(last_purged_at: Time.now)
