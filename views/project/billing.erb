@@ -134,15 +134,15 @@
                   ) %>
                 </div>
                 <div class="sm:col-span-4">
-                  <%== part("components/form/text", name: "tax_id", label: "Tax ID (Optional)", value: @billing_info_data[:tax_id]) %>
-                </div>
-                <div class="sm:col-span-4">
                   <%== part(
                     "components/form/text",
-                    name: "company_name",
-                    label: "Company Name (Optional)",
-                    value: @billing_info_data[:company_name]
+                    name: "tax_id",
+                    label: ISO3166::Country.new(@billing_info_data[:country])&.in_eu_vat? ? "VAT ID" : "Tax ID",
+                    value: @billing_info_data[:tax_id]
                   ) %>
+                </div>
+                <div class="sm:col-span-4">
+                  <%== part("components/form/text", name: "company_name", label: "Company Name", value: @billing_info_data[:company_name]) %>
                 </div>
               </div>
             </div>

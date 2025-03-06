@@ -123,14 +123,14 @@ RSpec.describe Clover, "billing" do
       expect(page.title).to eq("Ubicloud - Project Billing")
       fill_in "Billing Name", with: "New Inc."
       select "United States", from: "Country"
-      fill_in "Tax ID (Optional)", with: "456789"
+      fill_in "VAT ID", with: "456789"
 
       click_button "Update"
 
       expect(page.status_code).to eq(200)
       expect(page).to have_field("Billing Name", with: "New Inc.")
       expect(page).to have_field("Country", with: "US")
-      expect(page).to have_field("Tax ID (Optional)", with: "456789")
+      expect(page).to have_field("Tax ID", with: "456789")
     end
 
     it "shows error if billing info update failed" do
