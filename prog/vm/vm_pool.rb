@@ -22,14 +22,6 @@ class Prog::Vm::VmPool < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      unless ["destroy", "wait_vms_destroy"].include?(strand.label)
-        hop_destroy
-      end
-    end
-  end
-
   label def create_new_vm
     storage_params = {
       size_gib: vm_pool.storage_size_gib,

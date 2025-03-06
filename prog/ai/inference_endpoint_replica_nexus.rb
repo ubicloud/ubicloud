@@ -41,7 +41,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      if strand.label != "destroy"
+      if !destroying_set?
         hop_destroy
       elsif strand.stack.count > 1
         pop "operation is cancelled due to the destruction of the inference endpoint replica"
