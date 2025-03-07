@@ -98,8 +98,8 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
   end
 
   describe "#wait" do
-    it "just naps for 30 seconds for now" do
-      expect { nx.wait }.to nap(30)
+    it "just naps for long time for now" do
+      expect { nx.wait }.to nap(65536)
     end
   end
 
