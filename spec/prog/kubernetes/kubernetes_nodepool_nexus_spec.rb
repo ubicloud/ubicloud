@@ -91,9 +91,26 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       expect { nx.bootstrap_worker_vms }.to hop("wait")
     end
 
-    it "pushes ProvisionKubernetesNode prog to create VMs" do
-      expect(nx).to receive(:push).with(Prog::Kubernetes::ProvisionKubernetesNode, {"nodepool_id" => kn.id, "subject_id" => kn.cluster.id})
-      nx.bootstrap_worker_vms
+    it "buds ProvisionKubernetesNode prog to create VMs" do
+      expect(nx).to receive(:bud).with(Prog::Kubernetes::ProvisionKubernetesNode, {"nodepool_id" => kn.id, "subject_id" => kn.cluster.id})
+      expect { nx.bootstrap_worker_vms }.to hop("wait_worker_node")
+    end
+  end
+
+  describe "#wait_worker_node" do
+    before { expect(nx).to receive(:reap) }
+
+    it "hops back to bootstrap_worker_vms if there are no sub-programs running" do
+      expect(nx).to receive(:leaf?).and_return true
+
+      expect { nx.wait_worker_node }.to hop("bootstrap_worker_vms")
+    end
+
+    it "donates if there are sub-programs running" do
+      expect(nx).to receive(:leaf?).and_return false
+      expect(nx).to receive(:donate).and_call_original
+
+      expect { nx.wait_worker_node }.to nap(1)
     end
   end
 

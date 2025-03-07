@@ -151,10 +151,27 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.bootstrap_control_plane_vms }.to hop("wait")
     end
 
-    it "pushes ProvisionKubernetesNode prog to create VMs" do
+    it "buds ProvisionKubernetesNode prog to create VMs" do
       expect(kubernetes_cluster).to receive(:endpoint).and_return "endpoint"
-      expect(nx).to receive(:push).with(Prog::Kubernetes::ProvisionKubernetesNode)
-      nx.bootstrap_control_plane_vms
+      expect(nx).to receive(:bud).with(Prog::Kubernetes::ProvisionKubernetesNode, {"subject_id" => kubernetes_cluster.id})
+      expect { nx.bootstrap_control_plane_vms }.to hop("wait_control_plane_node")
+    end
+  end
+
+  describe "#wait_control_plane_node" do
+    before { expect(nx).to receive(:reap) }
+
+    it "hops back to bootstrap_control_plane_vms if there are no sub-programs running" do
+      expect(nx).to receive(:leaf?).and_return true
+
+      expect { nx.wait_control_plane_node }.to hop("bootstrap_control_plane_vms")
+    end
+
+    it "donates if there are sub-programs running" do
+      expect(nx).to receive(:leaf?).and_return false
+      expect(nx).to receive(:donate).and_call_original
+
+      expect { nx.wait_control_plane_node }.to nap(1)
     end
   end
 
