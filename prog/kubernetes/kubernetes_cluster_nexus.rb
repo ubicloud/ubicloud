@@ -95,6 +95,9 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   end
 
   label def destroy
+    reap
+    donate unless leaf?
+    decr_destroy
     kubernetes_cluster.api_server_lb.incr_destroy
     kubernetes_cluster.cp_vms.each(&:incr_destroy)
     kubernetes_cluster.remove_all_cp_vms

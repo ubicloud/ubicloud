@@ -182,6 +182,15 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   end
 
   describe "#destroy" do
+    before { expect(nx).to receive(:reap) }
+
+    it "donates if there are sub-programs running (Provision...)" do
+      expect(nx).to receive(:leaf?).and_return false
+      expect(nx).to receive(:donate).and_call_original
+
+      expect { nx.destroy }.to nap(1)
+    end
+
     it "triggers deletion of associated resources and naps until all nodepools are gone" do
       expect(kubernetes_cluster.api_server_lb).to receive(:incr_destroy)
 

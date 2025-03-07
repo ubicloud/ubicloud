@@ -121,6 +121,15 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
   end
 
   describe "#destroy" do
+    before { expect(nx).to receive(:reap) }
+
+    it "donates if there are sub-programs running (Provision...)" do
+      expect(nx).to receive(:leaf?).and_return false
+      expect(nx).to receive(:donate).and_call_original
+
+      expect { nx.destroy }.to nap(1)
+    end
+
     it "destroys the nodepool and its vms" do
       vms = [create_vm, create_vm]
       expect(kn).to receive(:vms).and_return(vms)
