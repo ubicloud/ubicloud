@@ -62,6 +62,8 @@ class BillingRate
       "Additional GitHub Runner Concurrency"
     when "InferenceTokens"
       "#{resource_family} Inference Tokens"
+    when "Gpu"
+      "#{amount.to_i}x #{PciDevice.device_name(resource_family)}"
     else
       fail "BUG: Unknown resource type for line item description"
     end
