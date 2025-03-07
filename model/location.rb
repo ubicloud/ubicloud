@@ -4,11 +4,26 @@ require_relative "../model"
 
 class Location < Sequel::Model
   include ResourceMethods
+  dataset_module Pagination
+
+  one_to_one :location_credential, key: :id
+  many_to_one :project
+
+  plugin :association_dependencies, location_credential: :destroy
 
   HETZNER_FSN1_ID = "caa7a807-36c5-8420-a75c-f906839dad71"
   HETZNER_HEL1_ID = "1f214853-0bc4-8020-b910-dffb867ef44f"
   GITHUB_RUNNERS_ID = "6b9ef786-b842-8420-8c65-c25e3d4bdf3d"
   LEASEWEB_WDC02_ID = "e0865080-9a3d-8020-a812-f5817c7afe7f"
+
+  def path
+    "/private-location/#{ui_name}"
+  end
+
+  # Private Locations only support Postgres resources for now
+  def has_resources
+    !project.postgres_resources_dataset.where(location_id: id).empty?
+  end
 end
 
 # Table: location
