@@ -135,6 +135,13 @@ module Validation
     storage_size
   end
 
+  def self.validate_provider_location_name(provider, location_name)
+    unless provider == "aws" && Option::AWS_LOCATIONS.include?(location_name)
+      msg = "AWS location name must be one of the following: #{Option::AWS_LOCATIONS.join(", ")}"
+      fail ValidationFailed.new({name: msg})
+    end
+  end
+
   def self.validate_date(date, param = "date")
     # I use DateTime.parse instead of Time.parse because it uses UTC as default
     # timezone but Time.parse uses local timezone

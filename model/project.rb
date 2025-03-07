@@ -28,10 +28,12 @@ class Project < Sequel::Model
   one_to_many :quotas, class: :ProjectQuota
   one_to_many :invitations, class: :ProjectInvitation
   one_to_many :api_keys, key: :owner_id, class: :ApiKey, conditions: {owner_table: "project"}
+  one_to_many :locations
 
   dataset_module Pagination
 
-  plugin :association_dependencies, accounts: :nullify, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy, access_control_entries: :destroy, subject_tags: :destroy, action_tags: :destroy, object_tags: :destroy
+  plugin :association_dependencies, accounts: :nullify, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy, access_control_entries: :destroy, subject_tags: :destroy, action_tags: :destroy, object_tags: :destroy,
+    locations: :destroy
 
   include ResourceMethods
 
@@ -156,7 +158,7 @@ class Project < Sequel::Model
     end
   end
 
-  feature_flag :vm_public_ssh_keys, :transparent_cache, :location_latitude_fra, :access_all_cache_scopes, :allocator_diagnostics, :kubernetes
+  feature_flag :vm_public_ssh_keys, :transparent_cache, :location_latitude_fra, :access_all_cache_scopes, :allocator_diagnostics, :kubernetes, :private_locations
 end
 
 # Table: project
