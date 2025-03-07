@@ -53,10 +53,12 @@ module Validation
     fail ValidationFailed.new({username: msg}) unless username&.match(ALLOWED_MINIO_USERNAME_PATTERN)
   end
 
-  def self.validate_postgres_location(location)
-    available_pg_locs = Option.postgres_locations
-    msg = "Given location is not a valid postgres location. Available locations: #{available_pg_locs.map(&:display_name)}"
-    fail ValidationFailed.new({location: msg}) unless available_pg_locs.include?(location)
+  def self.validate_postgres_location(location, project_id)
+    available_pg_locs = Option.postgres_locations(project_id:)
+    unless available_pg_locs.include?(location)
+      msg = "Given location is not a valid postgres location. Available locations: #{available_pg_locs.map(&:display_name)}"
+      fail ValidationFailed.new({location: msg})
+    end
   end
 
   def self.validate_vm_size(size, arch, only_visible: false)
@@ -121,18 +123,23 @@ module Validation
     }
   end
 
-  def self.validate_postgres_size(location, size)
-    unless (postgres_size = Option::PostgresSizes.find { _1.location_id == location.id && _1.name == size })
-      fail ValidationFailed.new({size: "\"#{size}\" is not a valid PostgreSQL database size. Available sizes: #{Option::PostgresSizes.map(&:name)}"})
+  def self.validate_postgres_size(location, size, project_id)
+    all_sizes_for_project = Option.customer_postgres_sizes_for_project(project_id)
+    unless (postgres_size = all_sizes_for_project.find { _1.location_id == location.id && _1.name == size })
+      fail ValidationFailed.new({size: "\"#{size}\" is not a valid PostgreSQL database size. Available sizes: #{all_sizes_for_project.map(&:name)}"})
     end
     postgres_size
   end
 
-  def self.validate_postgres_storage_size(location, size, storage_size)
+  def self.validate_postgres_storage_size(location, size, storage_size, project_id)
     storage_size = storage_size.to_i
-    pg_size = validate_postgres_size(location, size)
+    pg_size = validate_postgres_size(location, size, project_id)
     fail ValidationFailed.new({storage_size: "Storage size must be one of the following: #{pg_size.storage_size_options.join(", ")}"}) unless pg_size.storage_size_options.include?(storage_size)
     storage_size
+  end
+
+  def self.validate_location_for_project(location, project_id)
+    location.project_id.nil? || location.project_id == project_id
   end
 
   def self.validate_provider_location_name(provider, location_name)
@@ -248,8 +255,8 @@ module Validation
   end
 
   def self.validate_billing_rate(resource_type, resource_family, location)
-    unless BillingRate.from_resource_properties(resource_type, resource_family, location.name)
-      fail ValidationFailed.new({location: "Resource family #{resource_family} is not available in location #{location}"})
+    unless BillingRate.from_resource_properties(resource_type, resource_family, location)
+      fail ValidationFailed.new({location: "Resource family #{resource_family} is not available in location #{Location[name: location].display_name}"})
     end
   end
 

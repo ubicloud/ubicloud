@@ -173,11 +173,11 @@ RSpec.describe Validation do
 
     describe "#validate_postgres_size" do
       it "valid postgres size" do
-        expect(described_class.validate_postgres_size(Location[name: "hetzner-fsn1"], "standard-2").name).to eq("standard-2")
+        expect(described_class.validate_postgres_size(Location[name: "hetzner-fsn1"], "standard-2", nil).name).to eq("standard-2")
       end
 
       it "invalid postgres size" do
-        expect { described_class.validate_postgres_size(Location[name: "hetzner-fsn1"], "standard-3") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_postgres_size(Location[name: "hetzner-fsn1"], "standard-3", nil) }.to raise_error described_class::ValidationFailed
       end
     end
 
@@ -189,7 +189,7 @@ RSpec.describe Validation do
           ["hetzner-fsn1", "standard-4", "512"],
           ["leaseweb-wdc02", "standard-4", "256"]
         ].each do |location, pg_size, storage_size|
-          expect(described_class.validate_postgres_storage_size(Location[name: location], pg_size, storage_size)).to eq(storage_size.to_f)
+          expect(described_class.validate_postgres_storage_size(Location[name: location], pg_size, storage_size, nil)).to eq(storage_size.to_f)
         end
       end
 
@@ -203,7 +203,7 @@ RSpec.describe Validation do
           ["leaseweb-wdc02", "standard-4", "1024"],
           ["hetzner-fsn1", nil, "128"]
         ].each do |location, pg_size, storage_size|
-          expect { described_class.validate_postgres_storage_size(Location[name: location], pg_size, storage_size) }.to raise_error described_class::ValidationFailed
+          expect { described_class.validate_postgres_storage_size(Location[name: location], pg_size, storage_size, nil) }.to raise_error described_class::ValidationFailed
         end
       end
     end
@@ -430,11 +430,11 @@ RSpec.describe Validation do
 
   describe "#validate_billing_rate" do
     it "valid billing rate" do
-      expect { described_class.validate_billing_rate("VmVCpu", "standard", Location[name: "hetzner-fsn1"]) }.not_to raise_error
+      expect { described_class.validate_billing_rate("VmVCpu", "standard", "hetzner-fsn1") }.not_to raise_error
     end
 
     it "invalid billing rate" do
-      expect { described_class.validate_billing_rate("VmVCpu", "burstable", Location[name: "latitude-fra"]) }.to raise_error described_class::ValidationFailed
+      expect { described_class.validate_billing_rate("VmVCpu", "burstable", "latitude-fra") }.to raise_error described_class::ValidationFailed
     end
   end
 
