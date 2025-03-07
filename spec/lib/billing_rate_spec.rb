@@ -20,6 +20,10 @@ RSpec.describe BillingRate do
       expect(described_class.line_item_description("VmVCpu", "standard", 8)).to eq("standard-8 Virtual Machine")
     end
 
+    it "returns for gpu" do
+      expect(described_class.line_item_description("Gpu", "20b5", 2)).to eq("2x NVIDIA A100 80GB PCIe")
+    end
+
     it "returns for IPAddress" do
       expect(described_class.line_item_description("IPAddress", "IPv4", 1)).to eq("IPv4 Address")
     end
@@ -46,6 +50,10 @@ RSpec.describe BillingRate do
 
     it "returns usage by token" do
       expect(described_class.line_item_usage("InferenceTokens", "test-model", 10, 1)).to eq("10 tokens")
+    end
+
+    it "returns usage by duration for gpu" do
+      expect(described_class.line_item_usage("gpu", "20b5", 10, 2)).to eq("2 minutes")
     end
   end
 
