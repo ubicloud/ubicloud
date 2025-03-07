@@ -30,7 +30,7 @@ module AccessControlModelTag
   end
 
   def remove_members(member_ids)
-    applied_dataset.where(:tag_id => id, applied_column => Sequel.any_uuid(member_ids)).delete
+    applied_dataset.where(:tag_id => id, applied_column => member_ids).delete
   end
 
   def currently_included_in

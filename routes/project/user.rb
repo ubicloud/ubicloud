@@ -80,7 +80,7 @@ class Clover
           allowed_remove_tags = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:remove").to_hash(:name)
           project_account_ids = @project
             .accounts_dataset
-            .where(Sequel[:accounts][:id] => Sequel.any_uuid(account_ids))
+            .where(Sequel[:accounts][:id] => account_ids)
             .select_map(Sequel[:accounts][:id])
           subject_tag_map = SubjectTag.subject_id_map_for_project_and_accounts(@project.id, project_account_ids)
           project_account_ids.each do |account_id|
