@@ -329,6 +329,19 @@ class Prog::Vm::Nexus < Prog::Base
       )
     end
 
+    if vm.pci_devices.any? { |dev| dev.is_gpu }
+      gpu_count = vm.pci_devices.count { |dev| dev.is_gpu }
+      gpu = vm.pci_devices.find { |dev| dev.is_gpu }
+
+      BillingRecord.create_with_id(
+        project_id: project.id,
+        resource_id: vm.id,
+        resource_name: "GPUs of #{vm.name}",
+        billing_rate_id: BillingRate.from_resource_properties("Gpu", gpu.device, vm.location)["id"],
+        amount: gpu_count
+      )
+    end
+
     hop_wait
   end
 
