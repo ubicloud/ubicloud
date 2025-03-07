@@ -19,17 +19,22 @@ end
 #  ui_name      | text    | NOT NULL
 #  visible      | boolean | NOT NULL
 #  provider     | text    | NOT NULL
+#  project_id   | uuid    |
 # Indexes:
-#  location_pkey | PRIMARY KEY btree (id)
+#  location_pkey                         | PRIMARY KEY btree (id)
+#  location_project_id_display_name_uidx | UNIQUE btree (project_id, display_name)
+#  location_project_id_ui_name_uidx      | UNIQUE btree (project_id, ui_name)
 # Foreign key constraints:
-#  location_provider_fkey | (provider) REFERENCES provider(name)
+#  location_project_id_fkey | (project_id) REFERENCES project(id)
+#  location_provider_fkey   | (provider) REFERENCES provider(name)
 # Referenced By:
-#  firewall           | firewall_location_id_fkey           | (location_id) REFERENCES location(id)
-#  inference_endpoint | inference_endpoint_location_id_fkey | (location_id) REFERENCES location(id)
-#  kubernetes_cluster | kubernetes_cluster_location_id_fkey | (location_id) REFERENCES location(id)
-#  minio_cluster      | minio_cluster_location_id_fkey      | (location_id) REFERENCES location(id)
-#  postgres_resource  | postgres_resource_location_id_fkey  | (location_id) REFERENCES location(id)
-#  private_subnet     | private_subnet_location_id_fkey     | (location_id) REFERENCES location(id)
-#  vm                 | vm_location_id_fkey                 | (location_id) REFERENCES location(id)
-#  vm_host            | vm_host_location_id_fkey            | (location_id) REFERENCES location(id)
-#  vm_pool            | vm_pool_location_id_fkey            | (location_id) REFERENCES location(id)
+#  firewall            | firewall_location_id_fkey           | (location_id) REFERENCES location(id)
+#  inference_endpoint  | inference_endpoint_location_id_fkey | (location_id) REFERENCES location(id)
+#  kubernetes_cluster  | kubernetes_cluster_location_id_fkey | (location_id) REFERENCES location(id)
+#  location_credential | location_credential_id_fkey         | (id) REFERENCES location(id)
+#  minio_cluster       | minio_cluster_location_id_fkey      | (location_id) REFERENCES location(id)
+#  postgres_resource   | postgres_resource_location_id_fkey  | (location_id) REFERENCES location(id)
+#  private_subnet      | private_subnet_location_id_fkey     | (location_id) REFERENCES location(id)
+#  vm                  | vm_location_id_fkey                 | (location_id) REFERENCES location(id)
+#  vm_host             | vm_host_location_id_fkey            | (location_id) REFERENCES location(id)
+#  vm_pool             | vm_pool_location_id_fkey            | (location_id) REFERENCES location(id)
