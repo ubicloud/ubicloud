@@ -10,10 +10,26 @@ class PciDevice < Sequel::Model
     UBID::TYPE_ETC
   end
 
+  def self.device_name(device_id)
+    # https://download.nvidia.com/XFree86/Linux-x86_64/535.98/README/supportedchips.html
+    case device_id
+    when "20b5"
+      "NVIDIA A100 80GB PCIe"
+    when "27b0"
+      "NVIDIA RTX 4000 SFF Ada Generation"
+    else
+      "PCI device"
+    end
+  end
+
   include ResourceMethods
 
   def is_gpu
     ["0300", "0302"].include? device_class
+  end
+
+  def name
+    PciDevice.device_name(device)
   end
 end
 
