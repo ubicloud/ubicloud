@@ -36,7 +36,8 @@ end
 #  provider     | text    | NOT NULL
 #  project_id   | uuid    |
 # Indexes:
-#  location_pkey | PRIMARY KEY btree (id)
+#  location_pkey                         | PRIMARY KEY btree (id)
+#  location_project_id_display_name_uidx | UNIQUE btree (project_id, display_name)
 # Foreign key constraints:
 #  location_project_id_fkey | (project_id) REFERENCES project(id)
 #  location_provider_fkey   | (provider) REFERENCES provider(name)
