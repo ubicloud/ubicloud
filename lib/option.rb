@@ -10,8 +10,12 @@ module Option
     Location.all.select { |pl| !only_visible || (pl.visible || feature_flags.include?("location_#{pl.name.tr("-", "_")}")) }
   end
 
-  def self.postgres_locations
-    Location.where(name: ["hetzner-fsn1", "leaseweb-wdc02"]).all
+  def self.postgres_locations(project_id: nil)
+    Location
+      .where(Sequel.|(
+        {name: ["hetzner-fsn1", "leaseweb-wdc02"]},
+        {project_id:}
+      )).all
   end
 
   def self.kubernetes_locations
@@ -102,4 +106,6 @@ module Option
     PostgresResource::Flavor::PARADEDB => ["16", "17"],
     PostgresResource::Flavor::LANTERN => ["16"]
   }
+
+  AWS_LOCATIONS = ["us-east-1", "us-west-1"].freeze
 end
