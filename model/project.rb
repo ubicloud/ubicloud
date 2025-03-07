@@ -28,10 +28,12 @@ class Project < Sequel::Model
   one_to_many :quotas, class: :ProjectQuota, key: :project_id
   one_to_many :invitations, class: :ProjectInvitation, key: :project_id
   one_to_many :api_keys, key: :owner_id, class: :ApiKey, conditions: {owner_table: "project"}
+  one_to_many :locations
 
   dataset_module Pagination
 
-  plugin :association_dependencies, accounts: :nullify, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy, access_control_entries: :destroy, subject_tags: :destroy, action_tags: :destroy, object_tags: :destroy
+  plugin :association_dependencies, accounts: :nullify, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy, access_control_entries: :destroy, subject_tags: :destroy, action_tags: :destroy, object_tags: :destroy,
+    locations: :destroy
 
   include ResourceMethods
 
@@ -156,7 +158,7 @@ class Project < Sequel::Model
     end
   end
 
-  feature_flag :vm_public_ssh_keys, :transparent_cache, :location_latitude_fra, :access_all_cache_scopes, :allocator_diagnostics, :kubernetes
+  feature_flag :vm_public_ssh_keys, :transparent_cache, :location_latitude_fra, :access_all_cache_scopes, :allocator_diagnostics, :kubernetes, :private_locations
 end
 
 # Table: project
@@ -189,6 +191,7 @@ end
 #  inference_endpoint   | inference_endpoint_project_id_fkey   | (project_id) REFERENCES project(id)
 #  kubernetes_cluster   | kubernetes_cluster_project_id_fkey   | (project_id) REFERENCES project(id)
 #  load_balancer        | load_balancer_project_id_fkey        | (project_id) REFERENCES project(id)
+#  location             | location_project_id_fkey             | (project_id) REFERENCES project(id)
 #  minio_cluster        | minio_cluster_project_id_fkey        | (project_id) REFERENCES project(id)
 #  object_tag           | object_tag_project_id_fkey           | (project_id) REFERENCES project(id)
 #  private_subnet       | private_subnet_project_id_fkey       | (project_id) REFERENCES project(id)
