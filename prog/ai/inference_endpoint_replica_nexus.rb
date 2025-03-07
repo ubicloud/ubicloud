@@ -71,7 +71,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
 
   label def download_lb_cert
     vm.sshable.cmd("sudo inference_endpoint/bin/download-lb-cert")
-    setup_external
+    hop_setup_external
   end
 
   label def setup_external
@@ -277,15 +277,16 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
 
     return pod["id"] if pod
 
-    ssh_key_vm = vm.sshable.cmd(<<-CMD
+    ssh_keys = vm.sshable.cmd(<<-CMD
 if ! sudo test -f /ie/workdir/.ssh/runpod; then  
   sudo -u ie mkdir -p /ie/workdir/.ssh
   sudo -u ie ssh-keygen -t ed25519 -C #{inference_endpoint_replica.ubid}@ubicloud.com -f /ie/workdir/.ssh/runpod -N '' -q
 fi
 sudo cat /ie/workdir/.ssh/runpod.pub
     CMD
-                               ).rstrip
-    docker_args = "{ \"entrypoint\": [\"bash\", \"-c\"], \"cmd\": [\"apt update;DEBIAN_FRONTEND=noninteractive apt-get install openssh-server -y;mkdir -p ~/.ssh;cd $_;chmod 700 ~/.ssh;echo $SSH_KEY_VM >> authorized_keys;echo $SSH_KEY_OPERATOR >> authorized_keys;chmod 700 authorized_keys;service inference-engine start;service ssh start;vllm serve meta-llama/Llama-3.2-1B-Instruct --served-model-name llama-3-2-1b-it --disable-log-requests --max-model-len 1000 & sleep infinity\"] }"
+                             ) + Config.operator_ssh_public_keys
+
+    vllm_params = "--served-model-name #{inference_endpoint.model_name} --disable-log-requests --host 127.0.0.1 #{inference_endpoint.engine_params}"
 
     graphql_query = <<~GRAPHQL
       mutation {
@@ -300,10 +301,16 @@ sudo cat /ie/workdir/.ssh/runpod.pub
             minMemoryInGb: #{inference_endpoint.external_config["min_memory_gib"]}
             imageName: "#{inference_endpoint.external_config["image_name"]}"
             name: "#{inference_endpoint_replica.ubid}"
-            dockerArgs: #{docker_args.to_json}
             volumeInGb: 0
             ports: "22/tcp"
-            env: [{ key: "HF_TOKEN", value: "#{Config.huggingface_token}" }, { key: "SSH_KEY_VM", value: "#{ssh_key_vm}" }, { key: "SSH_KEY_OPERATOR", value: "#{Config.operator_ssh_public_keys}" }]
+            env: [
+              { key: "HF_TOKEN", value: "#{Config.huggingface_token}" },
+              { key: "HF_HUB_ENABLE_HF_TRANSFER", value: "1"},
+              { key: "MODEL_PATH", value: "/model"},
+              { key: "MODEL_NAME_HF", value: "#{inference_endpoint.external_config["model_name_hf"]}"},
+              { key: "VLLM_PARAMS", value: "#{vllm_params}"},
+              { key: "SSH_KEYS", value: "#{ssh_keys.gsub("\n", "\\n")}" }
+            ]
           }
         ) {
           id
