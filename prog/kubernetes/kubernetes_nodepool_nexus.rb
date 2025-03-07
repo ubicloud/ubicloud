@@ -35,7 +35,7 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   end
 
   label def wait
-    nap 30
+    nap 65536
   end
 
   label def destroy
