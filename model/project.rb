@@ -189,6 +189,7 @@ end
 #  inference_endpoint   | inference_endpoint_project_id_fkey   | (project_id) REFERENCES project(id)
 #  kubernetes_cluster   | kubernetes_cluster_project_id_fkey   | (project_id) REFERENCES project(id)
 #  load_balancer        | load_balancer_project_id_fkey        | (project_id) REFERENCES project(id)
+#  location             | location_project_id_fkey             | (project_id) REFERENCES project(id)
 #  minio_cluster        | minio_cluster_project_id_fkey        | (project_id) REFERENCES project(id)
 #  object_tag           | object_tag_project_id_fkey           | (project_id) REFERENCES project(id)
 #  private_subnet       | private_subnet_project_id_fkey       | (project_id) REFERENCES project(id)
