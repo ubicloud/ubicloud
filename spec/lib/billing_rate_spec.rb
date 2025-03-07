@@ -60,4 +60,25 @@ RSpec.describe BillingRate do
   it "can unambiguously find active rate" do
     expect(described_class.rates.group_by { [_1["resource_type"], _1["resource_family"], _1["location"], _1["active_from"]] }).not_to be_any { |k, v| v.count != 1 }
   end
+
+  it "can find rate for aws locations" do
+    project = Project.create_with_id(name: "test")
+
+    loc = Location.create(
+      name: "us-east-1",
+      provider: "aws",
+      ui_name: "aws-us-east-1",
+      display_name: "aws-us-east-1",
+      visible: false,
+      project_id: project.id
+    )
+
+    LocationCredential.create(
+      access_key: "test",
+      secret_key: "test"
+    ) { _1.id = loc.id }
+
+    expect(described_class.from_resource_properties("VmVCpu", "standard", loc.name, Time.now)).not_to be_nil
+    expect(described_class.from_resource_properties("PostgresVCpu", "standard-standard", loc.name, Time.now)).not_to be_nil
+  end
 end

@@ -49,8 +49,8 @@ class Clover
         ignored_parameters = ["family"]
         request_body_params = validate_request_params([], allowed_optional_parameters, ignored_parameters)
 
-        target_vm_size = Validation.validate_postgres_size(pg.location, request_body_params["size"] || pg.target_vm_size)
-        target_storage_size_gib = Validation.validate_postgres_storage_size(pg.location, target_vm_size.vm_size, request_body_params["storage_size"] || pg.target_storage_size_gib)
+        target_vm_size = Validation.validate_postgres_size(pg.location, request_body_params["size"] || pg.target_vm_size, @project.id)
+        target_storage_size_gib = Validation.validate_postgres_storage_size(pg.location, target_vm_size.vm_size, request_body_params["storage_size"] || pg.target_storage_size_gib, @project.id)
         ha_type = request_body_params["ha_type"] || PostgresResource::HaType::NONE
         Validation.validate_postgres_ha_type(ha_type)
 

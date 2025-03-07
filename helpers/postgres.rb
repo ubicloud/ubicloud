@@ -5,14 +5,14 @@ class Clover
     authorize("Postgres:create", @project.id)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
-    Validation.validate_postgres_location(@location)
+    Validation.validate_postgres_location(@location, @project.id)
 
     required_parameters = ["size"]
     required_parameters << "name" << "location" if web?
     allowed_optional_parameters = ["storage_size", "ha_type", "version", "flavor"]
     ignored_parameters = ["family"]
     request_body_params = validate_request_params(required_parameters, allowed_optional_parameters, ignored_parameters)
-    parsed_size = Validation.validate_postgres_size(@location, request_body_params["size"])
+    parsed_size = Validation.validate_postgres_size(@location, request_body_params["size"], @project.id)
 
     ha_type = request_body_params["ha_type"] || PostgresResource::HaType::NONE
     requested_standby_count = case ha_type
@@ -83,22 +83,23 @@ class Clover
 
   def generate_postgres_options(flavor: "standard")
     options = OptionTreeGenerator.new
+    all_sizes_for_project = Option.customer_postgres_sizes_for_project(@project.id)
 
     options.add_option(name: "name")
     options.add_option(name: "flavor", values: flavor)
-    options.add_option(name: "location", values: Option.postgres_locations, parent: "flavor")
-    options.add_option(name: "family", values: Option::PostgresSizes.map(&:vm_family).uniq, parent: "location") do |flavor, location, family|
+    options.add_option(name: "location", values: Option.postgres_locations(project_id: @project.id), parent: "flavor")
+    options.add_option(name: "family", values: all_sizes_for_project.map(&:vm_family).uniq, parent: "location") do |flavor, location, family|
       available_families = Option.families.map(&:name)
       available_families.include?(family) && BillingRate.from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name)
     end
-    options.add_option(name: "size", values: Option::PostgresSizes.map(&:name).uniq, parent: "family") do |flavor, location, family, size|
-      pg_size = Option::PostgresSizes.find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
+    options.add_option(name: "size", values: all_sizes_for_project.map(&:name).uniq, parent: "family") do |flavor, location, family, size|
+      pg_size = all_sizes_for_project.find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
       vm_size = Option::VmSizes.find { _1.name == pg_size.vm_size && _1.arch == "x64" && _1.visible }
       vm_size.family == family
     end
 
     options.add_option(name: "storage_size", values: ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096"], parent: "size") do |flavor, location, family, size, storage_size|
-      pg_size = Option::PostgresSizes.find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
+      pg_size = all_sizes_for_project.find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
       pg_size.storage_size_options.include?(storage_size.to_i)
     end
 
@@ -110,23 +111,24 @@ class Clover
 
   def generate_postgres_configure_options(flavor:, location:)
     options = OptionTreeGenerator.new
+    all_sizes_for_project = Option.customer_postgres_sizes_for_project(@project.id)
 
     options.add_option(name: "flavor", values: flavor)
     options.add_option(name: "location", values: location, parent: "flavor")
 
-    options.add_option(name: "family", values: Option::PostgresSizes.map(&:vm_family).uniq, parent: "location") do |flavor, location, family|
+    options.add_option(name: "family", values: all_sizes_for_project.map(&:vm_family).uniq, parent: "location") do |flavor, location, family|
       available_families = Option.families.map(&:name)
       available_families.include?(family) && BillingRate.from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name)
     end
 
-    options.add_option(name: "size", values: Option::PostgresSizes.map(&:name).uniq, parent: "family") do |flavor, location, family, size|
-      pg_size = Option::PostgresSizes.find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
+    options.add_option(name: "size", values: all_sizes_for_project.map(&:name).uniq, parent: "family") do |flavor, location, family, size|
+      pg_size = all_sizes_for_project.find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
       vm_size = Option::VmSizes.find { _1.name == pg_size.vm_size && _1.arch == "x64" && _1.visible }
       vm_size.family == family
     end
 
     options.add_option(name: "storage_size", values: ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096"], parent: "size") do |flavor, location, family, size, storage_size|
-      pg_size = Option::PostgresSizes.find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
+      pg_size = all_sizes_for_project.find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
       pg_size.storage_size_options.include?(storage_size.to_i)
     end
 
