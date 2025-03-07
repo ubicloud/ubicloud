@@ -19,6 +19,12 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     vm.sshable.cmd("sudo tee -a /etc/hosts", stdin: "#{ip} #{kubernetes_cluster.endpoint}\n")
   end
 
+  def before_run
+    if kubernetes_cluster.strand.label == "destroy" && strand.label != "destroy"
+      pop "provisioning canceled"
+    end
+  end
+
   label def start
     name, vm_size, storage_size_gib = if kubernetes_nodepool
       ["#{kubernetes_nodepool.name}-#{SecureRandom.alphanumeric(5).downcase}",
@@ -77,6 +83,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   containerd config default | sudo tee /etc/containerd/config.toml
   sudo sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
   sudo systemctl restart containerd
+  sudo rm -f '/etc/apt/keyrings/kubernetes-apt-keyring.gpg'
   curl -fsSL https://pkgs.k8s.io/core:/stable:/#{kubernetes_cluster.version}/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
   echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/#{kubernetes_cluster.version}/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
   sudo apt update
