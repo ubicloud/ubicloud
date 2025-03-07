@@ -1240,6 +1240,104 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  '/project/{project_id}/private-location':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: getPrivateLocations
+      summary: Return the list of private locations in the project
+      responses:
+        '200':
+          $ref: '#/components/responses/PrivateLocations'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Location
+    post:
+      operationId: createPrivateLocation
+      summary: Create a new private location
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  description: Name of the private location
+                  type: string
+                provider_location_name:
+                  description: Provider location name of the private location
+                  type: string
+                  enum:
+                    - us-east-1
+                    - eu-west-1
+                access_key:
+                  description: Access key for the private location
+                  type: string
+                secret_key:
+                  description: Secret key for the private location
+                  type: string
+              additionalProperties: false
+              required:
+                - name
+                - provider_location_name
+                - access_key
+                - secret_key
+      responses:
+        '200':
+          $ref: '#/components/responses/PrivateLocation'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Location
+  '/project/{project_id}/private-location/{private_location_name}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/private_location_name'
+    delete:
+      operationId: deletePrivateLocation
+      summary: Delete a specific private location
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Location
+    get:
+      operationId: getPrivateLocationDetails
+      summary: Get details of a specific private location
+      responses:
+        '200':
+          $ref: '#/components/responses/PrivateLocation'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Location
+    post:
+      operationId: updatePrivateLocation
+      summary: Update a specific private location name
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  description: Name of the private location
+                  type: string
+              additionalProperties: false
+              required:
+                - name
+      responses:
+        '200':
+          $ref: '#/components/responses/PrivateLocation'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Location
   '/project/{project_id}/private-subnet':
     get:
       operationId: listPSs
@@ -1355,6 +1453,13 @@ components:
         type: string
         example: pfmjgkgbktw62k53005jpx8tt7
         pattern: '^pf[0-9a-hj-km-np-tv-z]{24}$'
+    private_location_name:
+      description: Name of the private location
+      in: path
+      name: private_location_name
+      required: true
+      schema:
+        type: string
     private_subnet_id:
       description: ID of the private subnet
       in: path
@@ -1421,6 +1526,31 @@ components:
       additionalProperties: false
       required:
         - error
+    PrivateLocation:
+      type: object
+      properties:
+        id:
+          description: ID of the private location
+          type: string
+        name:
+          description: Name of the private location
+          type: string
+        ui_name:
+          description: UI name of the private location
+          type: string
+        provider:
+          description: Name of the private location
+          type: string
+        path:
+          description: Path of the private location
+          type: string
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - provider
+        - path
+        - ui_name
     Firewall:
       type: object
       properties:
@@ -1735,6 +1865,29 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    PrivateLocation:
+      description: A Private Location
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PrivateLocation'
+    PrivateLocations:
+      description: A list of Private Locations
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PrivateLocation'
+            additionalProperties: false
+            required:
+              - count
+              - items
     Firewall:
       description: A Firewall
       content:
@@ -2043,5 +2196,7 @@ tags:
     name: Project
   - description: Virtual Machine Operations
     name: Virtual Machine
+  - description: Private Location Operations
+    name: Private Location
 security:
   - BearerAuth: []
