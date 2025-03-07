@@ -80,4 +80,21 @@ RSpec.configure do |config|
     account.create_project_with_default_policy("Default") if with_project
     account
   end
+
+  def create_private_location(project:)
+    loc = Location.create(
+      name: "us-east-1",
+      display_name: "aws-us-east-1",
+      ui_name: "aws-us-east-1",
+      visible: true,
+      provider: "aws",
+      project_id: project.id
+    )
+
+    LocationCredential.create(
+      access_key: "access-key-id",
+      secret_key: "secret-access-key"
+    ) { _1.id = loc.id }
+    loc
+  end
 end
