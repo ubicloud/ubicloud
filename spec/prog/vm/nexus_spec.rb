@@ -585,6 +585,14 @@ RSpec.describe Prog::Vm::Nexus do
       expect { nx.create_billing_record }.to hop("wait")
     end
 
+    it "creates billing records when gpu is present" do
+      vm.location = "latitude-ai"
+      expect(vm).to receive(:pci_devices).and_return([PciDevice.new(slot: "01:00.0", iommu_group: 23, device_class: "0302", vendor: "10de", device: "20b5")]).at_least(:once)
+      expect(BillingRecord).to receive(:create_with_id).exactly(4).times
+      expect(vm).to receive(:project).and_return(prj).at_least(:once)
+      expect { nx.create_billing_record }.to hop("wait")
+    end
+
     it "creates billing records when ip4 is not enabled" do
       expect(vm).to receive(:ip4_enabled).and_return(false)
       expect(BillingRecord).to receive(:create_with_id).exactly(3).times
