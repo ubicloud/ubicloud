@@ -19,6 +19,12 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     vm.sshable.cmd("sudo tee -a /etc/hosts", stdin: "#{ip} #{kubernetes_cluster.endpoint}\n")
   end
 
+  def before_run
+    if kubernetes_cluster.strand.label == "destroy" && strand.label != "destroy"
+      pop "provisioning canceled"
+    end
+  end
+
   label def start
     name, vm_size, storage_size_gib = if kubernetes_nodepool
       ["#{kubernetes_nodepool.name}-#{SecureRandom.alphanumeric(5).downcase}",

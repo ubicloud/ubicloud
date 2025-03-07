@@ -46,6 +46,9 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   end
 
   label def destroy
+    reap
+    donate unless leaf?
+    decr_destroy
     kubernetes_nodepool.vms.each(&:incr_destroy)
     kubernetes_nodepool.remove_all_vms
     kubernetes_nodepool.destroy

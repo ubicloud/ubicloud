@@ -33,6 +33,21 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     allow(prog).to receive_messages(kubernetes_cluster: kubernetes_cluster, frame: {"vm_id" => create_vm.id})
   end
 
+  describe "#before_run" do
+    it "destroys itself if the kubernetes cluster is getting deleted" do
+      Strand.create(id: kubernetes_cluster.id, label: "something", prog: "KubernetesClusterNexus")
+      kubernetes_cluster.reload
+      expect(kubernetes_cluster.strand.label).to eq("something")
+      prog.before_run # Nothing happens
+
+      kubernetes_cluster.strand.label = "destroy"
+      expect { prog.before_run }.to exit({"msg" => "provisioning canceled"})
+
+      prog.strand.label = "destroy"
+      prog.before_run # Nothing happens
+    end
+  end
+
   describe "#write_hosts_file_if_needed" do
     it "exits early if the environment is not dev" do
       expect(prog.vm).not_to receive(:sshable)
