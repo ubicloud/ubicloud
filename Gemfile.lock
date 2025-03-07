@@ -245,7 +245,7 @@ GEM
     optparse (0.6.0)
     pagerduty (4.0.1)
     parallel (1.26.3)
-    parallel_tests (4.9.1)
+    parallel_tests (4.10.1)
       parallel
     parser (3.3.7.1)
       ast (~> 2.4.1)
