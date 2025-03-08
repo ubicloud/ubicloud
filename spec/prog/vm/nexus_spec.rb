@@ -607,8 +607,14 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "does not hop to destroy if already in the destroy state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx).to receive(:when_destroy_set?).and_yield.at_least(:once)
       expect(nx.strand).to receive(:label).and_return("destroy")
+      expect { nx.before_run }.not_to hop("destroy")
+
+      expect(nx.strand).to receive(:label).and_return("destroy_slice")
+      expect { nx.before_run }.not_to hop("destroy")
+
+      expect(nx.strand).to receive(:label).and_return("wait_lb_expiry")
       expect { nx.before_run }.not_to hop("destroy")
     end
 
