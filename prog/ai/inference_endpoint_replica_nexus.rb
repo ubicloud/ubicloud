@@ -18,7 +18,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
         "ubi",
         Config.inference_endpoint_service_project_id,
-        location: inference_endpoint.location,
+        location_id: inference_endpoint.location_id,
         name: ubid.to_s,
         size: inference_endpoint.vm_size,
         storage_volumes: inference_endpoint.storage_volumes.map { _1.transform_keys(&:to_sym) },
@@ -140,7 +140,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
     extra_data = {
       inference_endpoint_ubid: inference_endpoint.ubid,
       inference_endpoint_is_public: inference_endpoint.is_public,
-      inference_endpoint_location: inference_endpoint.location,
+      inference_endpoint_location: inference_endpoint.location.name,
       inference_endpoint_name: inference_endpoint.name,
       inference_endpoint_model_name: inference_endpoint.model_name,
       inference_endpoint_replica_count: inference_endpoint.replica_count,

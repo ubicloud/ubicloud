@@ -6,7 +6,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
   subject(:nx) { described_class.new(Strand.new(id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77")) }
 
   let(:project) { Project.create(name: "default") }
-  let(:subnet) { PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location: "x", project_id: project.id) }
+  let(:subnet) { PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: project.id) }
 
   let(:kc) {
     kc = KubernetesCluster.create(
@@ -14,7 +14,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       version: "v1.32",
       cp_node_count: 3,
       private_subnet_id: subnet.id,
-      location: "hetzner-fsn1",
+      location_id: Location::HETZNER_FSN1_ID,
       project_id: project.id,
       target_node_size: "standard-2"
     )

@@ -4,7 +4,7 @@ class Prog::LogVmHostUtilizations < Prog::Base
   label def wait
     rows = VmHost.where { (total_cores > 0) & (total_hugepages_1g > 0) }.select {
       [
-        :allocation_state, :location, :arch,
+        :allocation_state, :location_id, :arch,
         count(:id).as(:host_count),
         sum(:used_cores).as(:used_cores),
         sum(:total_cores).as(:total_cores),
@@ -13,7 +13,7 @@ class Prog::LogVmHostUtilizations < Prog::Base
         sum(:total_hugepages_1g).as(:total_hugepages_1g),
         round((sum(:used_hugepages_1g) * 100.0 / sum(:total_hugepages_1g)), 2).cast(:float).as(:hugepage_utilization)
       ]
-    }.group(:allocation_state, :location, :arch).all
+    }.group(:allocation_state, :location_id, :arch).all
 
     rows.each { |row| Clog.emit("location utilization") { {location_utilization: row.values} } }
 

@@ -7,7 +7,7 @@ RSpec.describe PrivateSubnet do
     described_class.new(
       net6: NetAddr.parse_net("fd1b:9793:dcef:cd0a::/64"),
       net4: NetAddr.parse_net("10.9.39.0/26"),
-      location: "hetzner-fsn1",
+      location_id: Location::HETZNER_FSN1_ID,
       state: "waiting",
       name: "ps",
       project_id: Project.create(name: "test").id
@@ -96,11 +96,11 @@ RSpec.describe PrivateSubnet do
     it "includes ubid if id is available" do
       ubid = described_class.generate_ubid
       private_subnet.id = ubid.to_uuid.to_s
-      expect(private_subnet.inspect).to eq "#<PrivateSubnet[\"#{ubid}\"] @values={:net6=>\"fd1b:9793:dcef:cd0a::/64\", :net4=>\"10.9.39.0/26\", :location=>\"hetzner-fsn1\", :state=>\"waiting\", :name=>\"ps\", :project_id=>\"#{private_subnet.project.ubid}\"}>"
+      expect(private_subnet.inspect).to eq "#<PrivateSubnet[\"#{ubid}\"] @values={:net6=>\"fd1b:9793:dcef:cd0a::/64\", :net4=>\"10.9.39.0/26\", :location_id=>\"10saktg1sprp3mxefj1m3kppq2\", :state=>\"waiting\", :name=>\"ps\", :project_id=>\"#{private_subnet.project.ubid}\"}>"
     end
 
     it "does not includes ubid if id is missing" do
-      expect(private_subnet.inspect).to eq "#<PrivateSubnet @values={:net6=>\"fd1b:9793:dcef:cd0a::/64\", :net4=>\"10.9.39.0/26\", :location=>\"hetzner-fsn1\", :state=>\"waiting\", :name=>\"ps\", :project_id=>\"#{private_subnet.project.ubid}\"}>"
+      expect(private_subnet.inspect).to eq "#<PrivateSubnet @values={:net6=>\"fd1b:9793:dcef:cd0a::/64\", :net4=>\"10.9.39.0/26\", :location_id=>\"10saktg1sprp3mxefj1m3kppq2\", :state=>\"waiting\", :name=>\"ps\", :project_id=>\"#{private_subnet.project.ubid}\"}>"
     end
   end
 
@@ -129,7 +129,7 @@ RSpec.describe PrivateSubnet do
 
   describe "destroy" do
     it "destroys firewalls private subnets" do
-      ps = described_class.create_with_id(name: "test-ps", location: "hetzner-fsn1", net6: "2001:db8::/64", net4: "10.0.0.0/24", project_id: Project.create(name: "test").id)
+      ps = described_class.create_with_id(name: "test-ps", location_id: Location::HETZNER_FSN1_ID, net6: "2001:db8::/64", net4: "10.0.0.0/24", project_id: Project.create(name: "test").id)
       fwps = instance_double(FirewallsPrivateSubnets)
       expect(FirewallsPrivateSubnets).to receive(:where).with(private_subnet_id: ps.id).and_return(instance_double(Sequel::Dataset, all: [fwps]))
       expect(fwps).to receive(:destroy).once
@@ -174,18 +174,18 @@ RSpec.describe PrivateSubnet do
     }
 
     let(:ps1) {
-      Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps1", location: "hetzner-fsn1").subject
+      Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps1", location_id: Location::HETZNER_FSN1_ID).subject
     }
 
     it ".connected_subnets" do
-      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location: "hetzner-fsn1").subject
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location_id: Location::HETZNER_FSN1_ID).subject
       expect(ps1.connected_subnets).to eq []
 
       ps1.connect_subnet(ps2)
       expect(ps1.connected_subnets.map(&:id)).to eq [ps2.id]
       expect(ps2.connected_subnets.map(&:id)).to eq [ps1.id]
 
-      ps3 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps3", location: "hetzner-fsn1").subject
+      ps3 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps3", location_id: Location::HETZNER_FSN1_ID).subject
       ps2.connect_subnet(ps3)
       expect(ps1.connected_subnets.map(&:id)).to eq [ps2.id]
       expect(ps2.connected_subnets.map(&:id).sort).to eq [ps1.id, ps3.id].sort
@@ -198,7 +198,7 @@ RSpec.describe PrivateSubnet do
     end
 
     it ".all_nics" do
-      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location: "hetzner-fsn1").subject
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location_id: Location::HETZNER_FSN1_ID).subject
 
       ps1_nic = Prog::Vnet::NicNexus.assemble(ps1.id, name: "test-ps1-nic1").subject
       ps2_nic = Prog::Vnet::NicNexus.assemble(ps2.id, name: "test-ps2-nic1").subject
@@ -216,7 +216,7 @@ RSpec.describe PrivateSubnet do
     end
 
     it "disconnect_subnet does not destroy in subnet tunnels" do
-      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location: "hetzner-fsn1").subject
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location_id: Location::HETZNER_FSN1_ID).subject
       ps1_nic = Prog::Vnet::NicNexus.assemble(ps1.id, name: "test-ps1-nic1").subject
       ps1_nic2 = Prog::Vnet::NicNexus.assemble(ps1.id, name: "test-ps1-nic2").subject
       ps1.create_tunnels([ps1_nic], ps1_nic2)
