@@ -9,6 +9,7 @@ class KubernetesCluster < Sequel::Model
   many_to_one :project
   many_to_many :cp_vms, join_table: :kubernetes_clusters_cp_vms, class: :Vm, order: :created_at
   one_to_many :nodepools, class: :KubernetesNodepool
+  one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, &:active
 
   dataset_module Pagination
 
@@ -25,7 +26,7 @@ class KubernetesCluster < Sequel::Model
 
   def display_state
     return "deleting" if destroy_set? || strand.label == "destroy"
-    return "running" if strand.label == "wait" && nodepools.all? { _1.strand.label == "wait" }
+    return "running" if strand.label == "wait"
     "creating"
   end
 
