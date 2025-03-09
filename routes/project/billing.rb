@@ -158,7 +158,7 @@ class Clover
           r.get true do
             @invoice_data = Serializers::Invoice.serialize(invoice, {detailed: true})
 
-            if r.params["pdf"] == "1"
+            unless invoice.status == "current"
               response["Content-Type"] = "application/pdf"
               response["Content-Disposition"] = "filename=\"#{@invoice_data[:filename]}.pdf\""
               next invoice.generate_pdf(@invoice_data)
