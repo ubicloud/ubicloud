@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 UbiCli.on("lb").run_on("update") do
-  options("ubi lb (location/lb-name|lb-id) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]")
+  desc "Update a load balancer"
+
+  banner "ubi lb (location/lb-name|lb-id) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]"
 
   args(4...)
 

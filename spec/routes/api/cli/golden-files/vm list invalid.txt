@@ -1,9 +1,12 @@
 ! Invalid number of arguments for vm list subcommand (accepts: 0, given: 1)
 
-Usage: ubi vm list [options]
+List virtual machines
+
+Usage:
+    ubi vm list [options]
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)
-    -l, --location=location          only show VMs in given location
+    -l, --location=location          only show virtual machines in given location
     -N, --no-headers                 do not show headers
 Fields: location name id ip4 ip6

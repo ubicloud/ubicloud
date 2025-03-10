@@ -1,4 +1,7 @@
-Usage: ubi help [options] [command [subcommand]]
+Get program help
+
+Usage:
+    ubi help [options] [command [subcommand]]
 
 Options:
     -r, --recursive                  also show documentation for all subcommands of command

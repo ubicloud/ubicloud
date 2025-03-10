@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 UbiCli.on("fw").run_on("create") do
+  desc "Create a firewall"
+
   options("ubi fw location/fw-name create [options]", key: :fw_create) do
     on("-d", "--description=desc", "description for firewall")
   end

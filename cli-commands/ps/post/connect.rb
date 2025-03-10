@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 UbiCli.on("ps").run_on("connect") do
-  options("ubi ps (location/ps-name|ps-id) connect ps-id")
+  desc "Connect a private subnet to another private subnet"
+
+  banner "ubi ps (location/ps-name|ps-id) connect ps-id"
 
   args 1
 

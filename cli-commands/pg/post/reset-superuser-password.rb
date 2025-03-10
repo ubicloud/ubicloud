@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 UbiCli.on("pg").run_on("reset-superuser-password") do
-  options("ubi pg (location/pg-name|pg-id) reset-superuser-password new-password")
+  desc "Reset the superuser password for a PostgreSQL database"
+
+  banner "ubi pg (location/pg-name|pg-id) reset-superuser-password new-password"
 
   args 1, invalid_args_message: "password is required"
 

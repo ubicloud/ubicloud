@@ -1,6 +1,9 @@
 ! Invalid number of arguments for ps list subcommand (accepts: 0, given: 1)
 
-Usage: ubi ps list [options]
+List private subnets
+
+Usage:
+    ubi ps list [options]
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)

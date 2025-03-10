@@ -1,3 +1,6 @@
 ! Invalid arguments for pg restore subcommand (name and restore target are required)
 
-Usage: ubi pg (location/pg-name|pg-id) restore new-db-name restore-time
+Restore a PostgreSQL database backup to a new database
+
+Usage:
+    ubi pg (location/pg-name|pg-id) restore new-db-name restore-time

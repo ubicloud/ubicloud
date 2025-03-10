@@ -1,1 +1,1 @@
-! Confirmation of VM name not successful.
+! Confirmation of virtual machine name not successful.

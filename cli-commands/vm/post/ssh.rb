@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 UbiCli.on("vm").run_on("ssh") do
+  desc "Connect to a virtual machine using `ssh`"
+
   skip_option_parsing("ubi vm (location/vm-name|vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]")
 
   args(0...)

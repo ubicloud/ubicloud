@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 UbiCli.on("pg").run_on("delete-firewall-rule") do
-  options("ubi pg (location/pg-name|pg-id) delete-firewall-rule id")
+  desc "Delete a PostgreSQL firewall rule"
+
+  banner "ubi pg (location/pg-name|pg-id) delete-firewall-rule rule-id"
 
   args 1, invalid_args_message: "rule id is required"
 

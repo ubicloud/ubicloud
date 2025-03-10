@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 UbiCli.on("pg").run_on("delete-metric-destination") do
-  options("ubi pg (location/pg-name|pg-id) delete-metric-destination id")
+  desc "Delete a PostgreSQL metric destination"
+
+  banner "ubi pg (location/pg-name|pg-id) delete-metric-destination md-id"
 
   args 1, invalid_args_message: "metric destination id is required"
 

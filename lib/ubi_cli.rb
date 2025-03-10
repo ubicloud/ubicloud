@@ -18,21 +18,22 @@ class UbiCli
     "lb" => "Load balancer",
     "pg" => "PostgreSQL database",
     "ps" => "Private subnet",
-    "vm" => "VM"
+    "vm" => "Virtual machine"
   }.freeze
 
   LOWERCASE_LABELS = CAPITALIZED_LABELS.transform_values(&:downcase)
   LOWERCASE_LABELS["pg"] = CAPITALIZED_LABELS["pg"]
-  LOWERCASE_LABELS["vm"] = CAPITALIZED_LABELS["vm"]
   LOWERCASE_LABELS.freeze
 
   OBJECT_INFO_REGEXP = /((fw|1b|pg|ps|vm)[a-z0-9]{24})/
   UBI_VERSION_REGEXP = /\A\d{1,4}\.\d{1,4}\.\d{1,4}\z/
 
   Rodish.processor(self) do
-    options("ubi [options] [subcommand [subcommand-options] ...]") do
+    desc "CLI to interact with Ubicloud"
+
+    options("ubi [options] [command [command-options] ...]") do
       on("--version", "show program version")
-      on("--help", "show program help") { halt to_s }
+      on("--help", "show program help") { halt UbiCli.command.help }
       on("--confirm=confirmation", "confirmation value (not for direct use)")
     end
 
@@ -64,6 +65,8 @@ class UbiCli
 
   def self.base(cmd, &block)
     on(cmd) do
+      desc "Manage #{LOWERCASE_LABELS[cmd]}s"
+
       # :nocov:
       unless Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
         autoload_subcommand_dir("cli-commands/#{cmd}")
@@ -107,6 +110,8 @@ class UbiCli
     fragment = FRAGMENTS[cmd]
 
     on(cmd, "list") do
+      desc "List #{LOWERCASE_LABELS[cmd]}s"
+
       options("ubi #{cmd} list [options]", key:) do
         on("-f", "--fields=fields", "show specific fields (comma separated)")
         on("-l", "--location=location", "only show #{LOWERCASE_LABELS[cmd]}s in given location")
@@ -138,6 +143,8 @@ class UbiCli
     fragment = FRAGMENTS[cmd]
 
     on(cmd).run_on("destroy") do
+      desc "Destroy a #{LOWERCASE_LABELS[cmd]}"
+
       options("ubi #{cmd} (location/#{cmd}-name|#{cmd}-id) destroy [options]", key: :destroy) do
         on("-f", "--force", "do not require confirmation")
       end
@@ -161,8 +168,10 @@ class UbiCli
     end
   end
 
-  def self.pg_cmd(cmd)
+  def self.pg_cmd(cmd, desc)
     on("pg").run_on(cmd) do
+      desc(desc)
+
       skip_option_parsing("ubi pg (location/pg-name|pg-id) [options] #{cmd} [#{cmd}-options]")
 
       args(0...)

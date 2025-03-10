@@ -1,6 +1,9 @@
 ! Invalid number of arguments for pg create subcommand (accepts: 0, given: 1)
 
-Usage: ubi pg location/pg-name create [options]
+Create a PostgreSQL database
+
+Usage:
+    ubi pg location/pg-name create [options]
 
 Options:
     -f, --flavor=type                flavor (standard, paradedb, lantern)
