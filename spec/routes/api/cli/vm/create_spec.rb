@@ -26,7 +26,7 @@ RSpec.describe Clover, "cli vm create" do
 
   it "creates vm with all options" do
     expect(Vm.count).to eq 0
-    ps = PrivateSubnet.create(project_id: @project.id, name: "test-ps", location: "hetzner-hel1", net6: "fe80::/64", net4: "192.168.0.0/24")
+    ps = PrivateSubnet.create(project_id: @project.id, name: "test-ps", location_id: Location[name: "hetzner-hel1"].id, net6: "fe80::/64", net4: "192.168.0.0/24")
     body = cli(%W[vm eu-north-h1/test-vm2 create -6 -b debian-12 -u foo -s standard-4 -S 80 -p #{ps.ubid} b])
     vm = Vm.first
     expect(Vm.count).to eq 1
@@ -52,7 +52,7 @@ RSpec.describe Clover, "cli vm create" do
 
   it "shows errors if trying to create a vm with an invalid private subnet" do
     expect(Vm.count).to eq 0
-    ps = PrivateSubnet.create(project_id: @project.id, name: "test-ps", location: "hetzner-fsn1", net6: "fe80::/64", net4: "192.168.0.0/24")
+    ps = PrivateSubnet.create(project_id: @project.id, name: "test-ps", location_id: Location::HETZNER_FSN1_ID, net6: "fe80::/64", net4: "192.168.0.0/24")
     expect(cli(%W[vm eu-north-h1/test-vm2 create -p #{ps.ubid} c], status: 400)).to eq(<<~END)
       ! Unexpected response status: 400
       Details: Validation failed for following fields: private_subnet_id

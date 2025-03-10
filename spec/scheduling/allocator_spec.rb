@@ -8,7 +8,7 @@ TestAllocation = Struct.new(:score, :is_valid)
 TestResourceAllocation = Struct.new(:utilization, :is_valid)
 RSpec.describe Al do
   let(:vm) {
-    Vm.new(family: "standard", vcpus: 2, cpu_percent_limit: 200, cpu_burst_percent_limit: 0, memory_gib: 8, name: "dummy-vm", arch: "x64", location: "loc1", ip4_enabled: "true", created_at: Time.now, unix_user: "", public_key: "", boot_image: "ubuntu-jammy").tap {
+    Vm.new(family: "standard", vcpus: 2, cpu_percent_limit: 200, cpu_burst_percent_limit: 0, memory_gib: 8, name: "dummy-vm", arch: "x64", location_id: Location::HETZNER_FSN1_ID, ip4_enabled: "true", created_at: Time.now, unix_user: "", public_key: "", boot_image: "ubuntu-jammy").tap {
       _1.id = "2464de61-7501-8374-9ab0-416caebe31da"
     }
   }
@@ -122,11 +122,11 @@ RSpec.describe Al do
     end
 
     it "disqualifies invalid candidates" do
-      vmh1 = create_vm_host(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 6, total_hugepages_1g: 10, used_hugepages_1g: 2)
-      vmh2 = create_vm_host(allocation_state: "draining", arch: "x64", location: "loc1", total_cores: 8, used_cores: 1, total_hugepages_1g: 8, used_hugepages_1g: 2)
-      vmh3 = create_vm_host(allocation_state: "accepting", arch: "arm64", location: "loc1", total_cores: 8, used_cores: 0, total_hugepages_1g: 8, used_hugepages_1g: 0)
-      vmh4 = create_vm_host(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 8, used_cores: 6, total_hugepages_1g: 8, used_hugepages_1g: 5)
-      vmh5 = create_vm_host(allocation_state: "accepting", arch: "x64", location: "github-runners", total_cores: 8, used_cores: 6, total_hugepages_1g: 80, used_hugepages_1g: 5)
+      vmh1 = create_vm_host(allocation_state: "accepting", arch: "x64", location_id: Location::HETZNER_FSN1_ID, total_cores: 7, used_cores: 6, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      vmh2 = create_vm_host(allocation_state: "draining", arch: "x64", location_id: Location::HETZNER_FSN1_ID, total_cores: 8, used_cores: 1, total_hugepages_1g: 8, used_hugepages_1g: 2)
+      vmh3 = create_vm_host(allocation_state: "accepting", arch: "arm64", location_id: Location::HETZNER_FSN1_ID, total_cores: 8, used_cores: 0, total_hugepages_1g: 8, used_hugepages_1g: 0)
+      vmh4 = create_vm_host(allocation_state: "accepting", arch: "x64", location_id: Location::HETZNER_FSN1_ID, total_cores: 8, used_cores: 6, total_hugepages_1g: 8, used_hugepages_1g: 5)
+      vmh5 = create_vm_host(allocation_state: "accepting", arch: "x64", location_id: "6b9ef786-b842-8420-8c65-c25e3d4bdf3d", total_cores: 8, used_cores: 6, total_hugepages_1g: 80, used_hugepages_1g: 5)
 
       StorageDevice.create_with_id(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
@@ -152,7 +152,7 @@ RSpec.describe Al do
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
 
       expect(Al::Allocation.candidate_hosts(req))
-        .to eq([{location: vmh.location,
+        .to eq([{location_id: vmh.location_id,
                  num_storage_devices: 2,
                  storage_devices: [{"available_storage_gib" => sd2.available_storage_gib, "id" => sd2.id, "total_storage_gib" => sd2.total_storage_gib},
                    {"available_storage_gib" => sd1.available_storage_gib, "id" => sd1.id, "total_storage_gib" => sd1.total_storage_gib}],
@@ -177,12 +177,12 @@ RSpec.describe Al do
       vmh = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 3, total_hugepages_1g: 10, used_hugepages_1g: 2)
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
       sd1 = StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 123, total_storage_gib: 345)
-      create_vm(vm_host_id: vmh.id, location: vmh.location, boot_image: "", display_state: "creating")
-      create_vm(vm_host_id: vmh.id, location: vmh.location, boot_image: "ubuntu-jammy", display_state: "creating")
+      create_vm(vm_host_id: vmh.id, location_id: vmh.location_id, boot_image: "", display_state: "creating")
+      create_vm(vm_host_id: vmh.id, location_id: vmh.location_id, boot_image: "ubuntu-jammy", display_state: "creating")
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
 
       expect(Al::Allocation.candidate_hosts(req))
-        .to eq([{location: vmh.location,
+        .to eq([{location_id: vmh.location_id,
                  num_storage_devices: 1,
                  storage_devices: [{"available_storage_gib" => sd1.available_storage_gib, "id" => sd1.id, "total_storage_gib" => sd1.total_storage_gib}],
                  total_cpus: vmh.total_cpus,
@@ -237,8 +237,8 @@ RSpec.describe Al do
     end
 
     it "applies location filter" do
-      vmh1 = create_vm_host(location: "loc1", total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
-      vmh2 = create_vm_host(location: "loc2", total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      vmh1 = create_vm_host(location_id: Location::HETZNER_FSN1_ID, total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      vmh2 = create_vm_host(location_id: "6b9ef786-b842-8420-8c65-c25e3d4bdf3d", total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create_with_id(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
@@ -246,7 +246,7 @@ RSpec.describe Al do
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
-      req.location_filter = ["loc1"]
+      req.location_filter = [Location::HETZNER_FSN1_ID]
       cand = Al::Allocation.candidate_hosts(req)
 
       expect(cand.size).to eq(1)
@@ -332,7 +332,7 @@ RSpec.describe Al do
       )
     }
     let(:vmhds) {
-      {location: "loc1",
+      {location_id: Location::HETZNER_FSN1_ID,
        num_storage_devices: 2,
        storage_devices: [{"available_storage_gib" => 10, "id" => "sd1id", "total_storage_gib" => 10},
          {"available_storage_gib" => 101, "id" => "sd2id", "total_storage_gib" => 91}],
@@ -416,7 +416,7 @@ RSpec.describe Al do
       expect(Al::VmHostCpuAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
       expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
-      vmhds[:location] = "github-runners"
+      vmhds[:location_id] = "6b9ef786-b842-8420-8c65-c25e3d4bdf3d"
       vmhds[:vm_provisioning_count] = 1
       expect(Al::Allocation.new(vmhds, req).score).to eq(0.5)
     end
@@ -425,7 +425,7 @@ RSpec.describe Al do
       expect(Al::VmHostCpuAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
       expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
-      vmhds[:location] = "github-runners"
+      vmhds[:location_id] = "6b9ef786-b842-8420-8c65-c25e3d4bdf3d"
       vmhds[:total_cores] = 32
       vmhds[:total_cpus] = 64
       expect(Al::Allocation.new(vmhds, req).score).to eq(0.5)
@@ -437,13 +437,13 @@ RSpec.describe Al do
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(0, true))
       score_no_preference = Al::Allocation.new(vmhds, req).score
 
-      req.location_preference = ["loc1"]
+      req.location_preference = [Location::HETZNER_FSN1_ID]
       expect(Al::VmHostCpuAllocation).to receive(:new).and_return(TestResourceAllocation.new(0, true))
       expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(0, true))
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(0, true))
       score_preference_met = Al::Allocation.new(vmhds, req).score
 
-      req.location_preference = ["loc2"]
+      req.location_preference = ["6b9ef786-b842-8420-8c65-c25e3d4bdf3d"]
       expect(Al::VmHostCpuAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
       expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
@@ -484,7 +484,7 @@ RSpec.describe Al do
       )
     }
     let(:vmhds) {
-      {location: "loc1",
+      {location_id: Location::HETZNER_FSN1_ID,
        num_storage_devices: 2,
        storage_devices: [{"available_storage_gib" => 10, "id" => "sd1id", "total_storage_gib" => 10},
          {"available_storage_gib" => 91, "id" => "sd2id", "total_storage_gib" => 101}],
@@ -938,7 +938,7 @@ RSpec.describe Al do
       expect(vm.vm_host_slice.id).to eq(slice.id)
 
       # All this mocking is needed to generate params_json so we can check the slice_name
-      ps = PrivateSubnet.create_with_id(name: "test-ps", location: "hetzner-fsn1", net6: "2001:db8::/64", net4: "10.0.0.0/24", project_id: vm.project.id)
+      ps = PrivateSubnet.create_with_id(name: "test-ps", location_id: Location::HETZNER_FSN1_ID, net6: "2001:db8::/64", net4: "10.0.0.0/24", project_id: vm.project.id)
       nic = instance_double(Nic, id: "n2")
       expect(nic).to receive(:private_subnet).and_return(ps)
       expect(nic).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0/32"))
@@ -1071,7 +1071,7 @@ RSpec.describe Al do
       vh1.reload
 
       # Create a second host
-      vh2 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "hetzner-fsn1", total_mem_gib: 64, total_sockets: 2, total_dies: 2, net6: "fd10:9b0b:6b4b:8fcc::/64", total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2, accepts_slices: true) { _1.id = Sshable.create_with_id.id }
+      vh2 = VmHost.create(allocation_state: "accepting", arch: "x64", location_id: Location::HETZNER_FSN1_ID, total_mem_gib: 64, total_sockets: 2, total_dies: 2, net6: "fd10:9b0b:6b4b:8fcc::/64", total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2, accepts_slices: true) { _1.id = Sshable.create_with_id.id }
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vh2.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create_with_id(vm_host_id: vh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vh2.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)

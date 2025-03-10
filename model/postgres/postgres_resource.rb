@@ -13,6 +13,7 @@ class PostgresResource < Sequel::Model
   one_to_many :firewall_rules, class: :PostgresFirewallRule, key: :postgres_resource_id
   one_to_many :metric_destinations, class: :PostgresMetricDestination, key: :postgres_resource_id
   many_to_one :private_subnet
+  many_to_one :location, key: :location_id, class: :Location
 
   plugin :association_dependencies, firewall_rules: :destroy, metric_destinations: :destroy
   dataset_module Pagination
@@ -31,7 +32,7 @@ class PostgresResource < Sequel::Model
   end
 
   def display_location
-    LocationNameConverter.to_display_name(location)
+    location.display_name
   end
 
   def path
@@ -131,7 +132,6 @@ end
 #  created_at                  | timestamp with time zone | NOT NULL DEFAULT now()
 #  updated_at                  | timestamp with time zone | NOT NULL DEFAULT now()
 #  project_id                  | uuid                     | NOT NULL
-#  location                    | text                     | NOT NULL
 #  name                        | text                     | NOT NULL
 #  target_vm_size              | text                     | NOT NULL
 #  target_storage_size_gib     | bigint                   | NOT NULL
@@ -150,9 +150,12 @@ end
 #  private_subnet_id           | uuid                     |
 #  flavor                      | postgres_flavor          | NOT NULL DEFAULT 'standard'::postgres_flavor
 #  version                     | postgres_version         | NOT NULL DEFAULT '16'::postgres_version
+#  location_id                 | uuid                     | NOT NULL
 # Indexes:
-#  postgres_server_pkey                            | PRIMARY KEY btree (id)
-#  postgres_resource_project_id_location_name_uidx | UNIQUE btree (project_id, location, name)
+#  postgres_server_pkey                               | PRIMARY KEY btree (id)
+#  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
+# Foreign key constraints:
+#  postgres_resource_location_id_fkey | (location_id) REFERENCES location(id)
 # Referenced By:
 #  postgres_firewall_rule      | postgres_firewall_rule_postgres_resource_id_fkey      | (postgres_resource_id) REFERENCES postgres_resource(id)
 #  postgres_metric_destination | postgres_metric_destination_postgres_resource_id_fkey | (postgres_resource_id) REFERENCES postgres_resource(id)
