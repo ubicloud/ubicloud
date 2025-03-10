@@ -20,6 +20,7 @@ end
 #  created_at            | timestamp with time zone | NOT NULL DEFAULT now()
 #  inference_endpoint_id | uuid                     | NOT NULL
 #  vm_id                 | uuid                     | NOT NULL
+#  external_state        | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 # Indexes:
 #  inference_endpoint_replica_pkey      | PRIMARY KEY btree (id)
 #  inference_endpoint_replica_vm_id_key | UNIQUE btree (vm_id)
