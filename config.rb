@@ -191,6 +191,7 @@ module Config
 
   # AI
   optional :inference_endpoint_service_project_id, string
+  optional :runpod_api_key, string, clear: true
 
   # DNS
   optional :dns_service_project_id, string
