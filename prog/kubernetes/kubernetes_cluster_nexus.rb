@@ -79,7 +79,15 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
     hop_wait if kubernetes_cluster.cp_vms.count >= kubernetes_cluster.cp_node_count
 
-    push Prog::Kubernetes::ProvisionKubernetesNode
+    bud Prog::Kubernetes::ProvisionKubernetesNode, {"subject_id" => kubernetes_cluster.id}
+
+    hop_wait_control_plane_node
+  end
+
+  label def wait_control_plane_node
+    reap
+    hop_bootstrap_control_plane_vms if leaf?
+    donate
   end
 
   label def wait
@@ -87,6 +95,9 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   end
 
   label def destroy
+    reap
+    donate unless leaf?
+    decr_destroy
     kubernetes_cluster.api_server_lb.incr_destroy
     kubernetes_cluster.cp_vms.each(&:incr_destroy)
     kubernetes_cluster.remove_all_cp_vms
