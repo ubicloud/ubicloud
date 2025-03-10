@@ -101,7 +101,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(kubernetes_cluster.cp_vms.count).to eq(3)
 
       new_vm = kubernetes_cluster.cp_vms.last
-      expect(new_vm.name).to start_with("k8scluster-control-plane-")
+      expect(new_vm.name).to start_with("#{kubernetes_cluster.ubid}-")
       expect(new_vm.sshable).not_to be_nil
       expect(new_vm.vcpus).to eq(4)
       expect(new_vm.strand.stack.first["storage_volumes"].first["size_gib"]).to eq(37)
@@ -116,7 +116,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(kubernetes_nodepool.reload.vms.count).to eq(1)
 
       new_vm = kubernetes_nodepool.vms.last
-      expect(new_vm.name).to start_with("k8stest-np-")
+      expect(new_vm.name).to start_with("#{kubernetes_nodepool.ubid}-")
       expect(new_vm.sshable).not_to be_nil
       expect(new_vm.vcpus).to eq(8)
       expect(new_vm.strand.stack.first["storage_volumes"].first["size_gib"]).to eq(78)
@@ -213,7 +213,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(prog.vm).to receive(:nics).and_return([instance_double(Nic, private_ipv4: "10.0.0.37")])
       expect(prog.vm.sshable).to receive(:cmd).with(
         "common/bin/daemonizer /home/ubi/kubernetes/bin/init-cluster init_kubernetes_cluster",
-        stdin: /{"cluster_name":"k8scluster","lb_hostname":"somelb\..*","port":"443","private_subnet_cidr4":"127.0.0.0\/8","private_subnet_cidr6":"::\/16","vm_cidr":"10.0.0.37"}/
+        stdin: /{"node_name":"test-vm","cluster_name":"k8scluster","lb_hostname":"somelb\..*","port":"443","private_subnet_cidr4":"127.0.0.0\/8","private_subnet_cidr6":"::\/16","vm_cidr":"10.0.0.37"}/
       )
 
       expect { prog.init_cluster }.to nap(30)
@@ -253,7 +253,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --print-join-command", log: false).and_return("discovery-token-ca-cert-hash dtcch")
       expect(prog.vm.sshable).to receive(:cmd).with(
         "common/bin/daemonizer kubernetes/bin/join-control-plane-node join_control_plane",
-        stdin: /{"cluster_endpoint":"somelb\..*:443","join_token":"jt","certificate_key":"ck","discovery_token_ca_cert_hash":"dtcch"}/,
+        stdin: /{"node_name":"test-vm","cluster_endpoint":"somelb\..*:443","join_token":"jt","certificate_key":"ck","discovery_token_ca_cert_hash":"dtcch"}/,
         log: false
       )
 
@@ -296,7 +296,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --print-join-command", log: false).and_return("discovery-token-ca-cert-hash dtcch")
       expect(prog.vm.sshable).to receive(:cmd).with(
         "common/bin/daemonizer kubernetes/bin/join-worker-node join_worker",
-        stdin: /{"endpoint":"somelb\..*:443","join_token":"jt","discovery_token_ca_cert_hash":"dtcch"}/,
+        stdin: /{"node_name":"test-vm","endpoint":"somelb\..*:443","join_token":"jt","discovery_token_ca_cert_hash":"dtcch"}/,
         log: false
       )
 
