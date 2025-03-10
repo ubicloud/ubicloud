@@ -331,7 +331,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
       expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
       expect(github_runner.installation).to receive(:project).and_return(project).at_least(:once)
-      VmHost[arch: "x64"].update(used_cores: 4)
+      VmHost[arch: "x64"].update(used_cores: 4, location: "github-runners")
       expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
     end
   end
