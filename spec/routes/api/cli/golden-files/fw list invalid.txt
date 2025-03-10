@@ -1,6 +1,9 @@
 ! Invalid number of arguments for fw list subcommand (accepts: 0, given: 1)
 
-Usage: ubi fw list [options]
+List firewalls
+
+Usage:
+    ubi fw list [options]
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)

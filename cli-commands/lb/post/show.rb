@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 UbiCli.on("lb").run_on("show") do
+  desc "Show details for a load balancer"
+
   fields = %w[id name state location hostname algorithm stack health-check-endpoint health-check-protocol src-port dst-port subnet vms].freeze.each(&:freeze)
 
   options("ubi lb (location/lb-name|lb-id) show [options]", key: :lb_show) do

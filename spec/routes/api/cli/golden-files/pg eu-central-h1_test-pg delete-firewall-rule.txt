@@ -1,3 +1,6 @@
 ! Invalid arguments for pg delete-firewall-rule subcommand (rule id is required)
 
-Usage: ubi pg (location/pg-name|pg-id) delete-firewall-rule id
+Delete a PostgreSQL firewall rule
+
+Usage:
+    ubi pg (location/pg-name|pg-id) delete-firewall-rule rule-id

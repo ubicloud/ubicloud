@@ -8,6 +8,14 @@ GIT
       rodauth (~> 2.36)
 
 GIT
+  remote: https://github.com/jeremyevans/rodish.git
+  revision: d84cdd7449eb30931b0ea9b6a3469f44a4632fad
+  ref: d84cdd7449eb30931b0ea9b6a3469f44a4632fad
+  specs:
+    rodish (1.1.0)
+      optparse
+
+GIT
   remote: https://github.com/jeremyevans/sequel.git
   revision: 2e6d8a009683040308e2385bdf6ba220a5c0ec40
   ref: 2e6d8a009683040308e2385bdf6ba220a5c0ec40
@@ -303,8 +311,6 @@ GEM
     rodauth (2.38.0)
       roda (>= 2.6.0)
       sequel (>= 4)
-    rodish (1.1.0)
-      optparse
     rotp (6.3.0)
     rqrcode (2.2.0)
       chunky_png (~> 1.0)
@@ -480,7 +486,7 @@ DEPENDENCIES
   roda (>= 3.89)
   rodauth (>= 2.38)
   rodauth-omniauth!
-  rodish (>= 1.1)
+  rodish!
   rotp
   rqrcode
   rspec

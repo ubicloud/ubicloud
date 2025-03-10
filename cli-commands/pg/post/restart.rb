@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 UbiCli.on("pg").run_on("restart") do
-  options("ubi pg (location/pg-name|pg-id) restart")
+  desc "Restart a PostgreSQL database cluster"
+
+  banner "ubi pg (location/pg-name|pg-id) restart"
 
   run do
     post(pg_path("/restart")) do |data|

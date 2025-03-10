@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 UbiCli.on("help") do
+  desc "Get program help"
+
   options("ubi help [options] [command [subcommand]]") do
     on("-r", "--recursive", "also show documentation for all subcommands of command")
     on("-u", "--usage", "only show usage")
@@ -22,23 +24,22 @@ UbiCli.on("help") do
         body = []
         command.each_subcommand do |_, cmd|
           if usage
-            next unless cmd.subcommands.empty? && cmd.post_subcommands.empty?
-            cmd.option_parsers.each do |op|
-              body << op.banner << "\n"
+            cmd.each_banner do |banner|
+              body << banner << "\n"
             end
           else
-            body << cmd.options_text << "\n\n"
+            body << cmd.help << "\n\n"
           end
         end
         response(body)
       elsif usage
         body = []
-        command.option_parsers.each do |op|
-          body << op.banner << "\n"
+        command.each_banner do |banner|
+          body << banner << "\n"
         end
         response(body)
       else
-        response(command.options_text)
+        response(command.help)
       end
     else
       orig_command.raise_failure("invalid command: #{argv.join(" ")}")

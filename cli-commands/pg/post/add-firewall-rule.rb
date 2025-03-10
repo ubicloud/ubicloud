@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 UbiCli.on("pg").run_on("add-firewall-rule") do
-  options("ubi pg (location/pg-name|pg-id) add-firewall-rule cidr")
+  desc "Add a PostgreSQL firewall rule"
+
+  banner "ubi pg (location/pg-name|pg-id) add-firewall-rule cidr"
 
   args 1, invalid_args_message: "cidr is required"
 

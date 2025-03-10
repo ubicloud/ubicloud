@@ -1,6 +1,9 @@
 ! Invalid number of arguments for pg list subcommand (accepts: 0, given: 1)
 
-Usage: ubi pg list [options]
+List PostgreSQL databases
+
+Usage:
+    ubi pg list [options]
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)

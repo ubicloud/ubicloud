@@ -1,44 +1,55 @@
-Usage: ubi fw list [options]
-Usage: ubi fw (location/fw-name|fw-id) add-rule cidr
-Usage: ubi fw (location/fw-name|fw-id) attach-subnet subnet-id
-Usage: ubi fw location/fw-name create [options]
-Usage: ubi fw (location/fw-name|fw-id) delete-rule rule-id
-Usage: ubi fw (location/fw-name|fw-id) destroy [options]
-Usage: ubi fw (location/fw-name|fw-id) detach-subnet subnet-id
-Usage: ubi fw (location/fw-name|fw-id) show [options]
-Usage: ubi help [options] [command [subcommand]]
-Usage: ubi lb list [options]
-Usage: ubi lb (location/lb-name|lb-id) attach-vm vm-id
-Usage: ubi lb location/lb-name create [options] private-subnet-id src-port dst-port
-Usage: ubi lb (location/lb-name|lb-id) destroy [options]
-Usage: ubi lb (location/lb-name|lb-id) detach-vm vm-id
-Usage: ubi lb (location/lb-name|lb-id) show [options]
-Usage: ubi lb (location/lb-name|lb-id) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]
-Usage: ubi pg list [options]
-Usage: ubi pg (location/pg-name|pg-id) add-firewall-rule cidr
-Usage: ubi pg (location/pg-name|pg-id) add-metric-destination username password url
-Usage: ubi pg location/pg-name create [options]
-Usage: ubi pg (location/pg-name|pg-id) delete-firewall-rule id
-Usage: ubi pg (location/pg-name|pg-id) delete-metric-destination id
-Usage: ubi pg (location/pg-name|pg-id) destroy [options]
-Usage: ubi pg (location/pg-name|pg-id) [options] pg_dump [pg_dump-options]
-Usage: ubi pg (location/pg-name|pg-id) [options] pg_dumpall [pg_dumpall-options]
-Usage: ubi pg (location/pg-name|pg-id) [options] psql [psql-options]
-Usage: ubi pg (location/pg-name|pg-id) reset-superuser-password new-password
-Usage: ubi pg (location/pg-name|pg-id) restart
-Usage: ubi pg (location/pg-name|pg-id) restore new-db-name restore-time
-Usage: ubi pg (location/pg-name|pg-id) show [options]
-Usage: ubi ps list [options]
-Usage: ubi ps (location/ps-name|ps-id) connect ps-id
-Usage: ubi ps location/ps-name create [options]
-Usage: ubi ps (location/ps-name|ps-id) destroy [options]
-Usage: ubi ps (location/ps-name|ps-id) disconnect ps-id
-Usage: ubi ps (location/ps-name|ps-id) show [options]
-Usage: ubi vm list [options]
-Usage: ubi vm location/vm-name create [options] public_key
-Usage: ubi vm (location/vm-name|vm-id) destroy [options]
-Usage: ubi vm (location/vm-name|vm-id) restart
-Usage: ubi vm (location/vm-name|vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
-Usage: ubi vm (location/vm-name|vm-id) [options] sftp [sftp-options]
-Usage: ubi vm (location/vm-name|vm-id) show [options]
-Usage: ubi vm (location/vm-name|vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
+ubi [options] [command [command-options] ...]
+ubi fw command [...]
+ubi fw (location/fw-name|fw-id) post-command [...]
+ubi fw list [options]
+ubi fw (location/fw-name|fw-id) add-rule cidr
+ubi fw (location/fw-name|fw-id) attach-subnet ps-id
+ubi fw location/fw-name create [options]
+ubi fw (location/fw-name|fw-id) delete-rule rule-id
+ubi fw (location/fw-name|fw-id) destroy [options]
+ubi fw (location/fw-name|fw-id) detach-subnet ps-id
+ubi fw (location/fw-name|fw-id) show [options]
+ubi help [options] [command [subcommand]]
+ubi lb command [...]
+ubi lb (location/lb-name|lb-id) post-command [...]
+ubi lb list [options]
+ubi lb (location/lb-name|lb-id) attach-vm vm-id
+ubi lb location/lb-name create [options] private-subnet-id src-port dst-port
+ubi lb (location/lb-name|lb-id) destroy [options]
+ubi lb (location/lb-name|lb-id) detach-vm vm-id
+ubi lb (location/lb-name|lb-id) show [options]
+ubi lb (location/lb-name|lb-id) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]
+ubi pg command [...]
+ubi pg (location/pg-name|pg-id) [post-options] post-command [...]
+ubi pg list [options]
+ubi pg (location/pg-name|pg-id) add-firewall-rule cidr
+ubi pg (location/pg-name|pg-id) add-metric-destination username password url
+ubi pg location/pg-name create [options]
+ubi pg (location/pg-name|pg-id) delete-firewall-rule rule-id
+ubi pg (location/pg-name|pg-id) delete-metric-destination md-id
+ubi pg (location/pg-name|pg-id) destroy [options]
+ubi pg (location/pg-name|pg-id) [options] pg_dump [pg_dump-options]
+ubi pg (location/pg-name|pg-id) [options] pg_dumpall [pg_dumpall-options]
+ubi pg (location/pg-name|pg-id) [options] psql [psql-options]
+ubi pg (location/pg-name|pg-id) reset-superuser-password new-password
+ubi pg (location/pg-name|pg-id) restart
+ubi pg (location/pg-name|pg-id) restore new-db-name restore-time
+ubi pg (location/pg-name|pg-id) show [options]
+ubi ps command [...]
+ubi ps (location/ps-name|ps-id) post-command [...]
+ubi ps list [options]
+ubi ps (location/ps-name|ps-id) connect ps-id
+ubi ps location/ps-name create [options]
+ubi ps (location/ps-name|ps-id) destroy [options]
+ubi ps (location/ps-name|ps-id) disconnect ps-id
+ubi ps (location/ps-name|ps-id) show [options]
+ubi vm command [...]
+ubi vm (location/vm-name|vm-id) [post-options] post-command [...]
+ubi vm list [options]
+ubi vm location/vm-name create [options] public_key
+ubi vm (location/vm-name|vm-id) destroy [options]
+ubi vm (location/vm-name|vm-id) restart
+ubi vm (location/vm-name|vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
+ubi vm (location/vm-name|vm-id) [options] sftp [sftp-options]
+ubi vm (location/vm-name|vm-id) show [options]
+ubi vm (location/vm-name|vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]

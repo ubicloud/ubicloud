@@ -1,6 +1,9 @@
 ! Invalid number of arguments for lb create subcommand (accepts: 3, given: 0)
 
-Usage: ubi lb location/lb-name create [options] private-subnet-id src-port dst-port
+Create a load balancer
+
+Usage:
+    ubi lb location/lb-name create [options] private-subnet-id src-port dst-port
 
 Options:
     -a, --algorithm=alg              set the algorithm to use (round_robin(default), hash_based)

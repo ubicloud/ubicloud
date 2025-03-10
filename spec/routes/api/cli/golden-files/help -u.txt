@@ -1,1 +1,1 @@
-Usage: ubi [options] [subcommand [subcommand-options] ...]
+ubi [options] [command [command-options] ...]

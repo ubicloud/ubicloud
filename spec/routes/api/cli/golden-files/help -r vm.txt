@@ -1,35 +1,43 @@
-Usage: ubi vm subcommand [...]
+Manage virtual machines
 
-Subcommands: list
+Usage:
+    ubi vm command [...]
+    ubi vm (location/vm-name|vm-id) [post-options] post-command [...]
 
+Commands:
+    list       List virtual machines
 
-Usage: ubi vm (location/vm-name|vm-id) [options] subcommand [...]
+Post Commands:
+    create     Create a virtual machine
+    destroy    Destroy a virtual machine
+    restart    Restart a virtual machine
+    scp        Copy files to or from virtual machine using `scp`
+    sftp       Copy files to or from virtual machine using `sftp`
+    show       Show details for a virtual machine
+    ssh        Connect to a virtual machine using `ssh`
 
-Options:
+Post Options:
     -4, --ip4                        use IPv4 address
     -6, --ip6                        use IPv6 address
     -u, --user user                  override username
 
-Subcommands:
-  create
-  destroy
-  restart
-  scp
-  sftp
-  show
-  ssh
 
+List virtual machines
 
-Usage: ubi vm list [options]
+Usage:
+    ubi vm list [options]
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)
-    -l, --location=location          only show VMs in given location
+    -l, --location=location          only show virtual machines in given location
     -N, --no-headers                 do not show headers
 Fields: location name id ip4 ip6
 
 
-Usage: ubi vm location/vm-name create [options] public_key
+Create a virtual machine
+
+Usage:
+    ubi vm location/vm-name create [options] public_key
 
 Options:
     -6, --ipv6-only                  do not enable IPv4
@@ -40,22 +48,37 @@ Options:
     -u, --unix-user=username         username (default: ubi)
 
 
-Usage: ubi vm (location/vm-name|vm-id) destroy [options]
+Destroy a virtual machine
+
+Usage:
+    ubi vm (location/vm-name|vm-id) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation
 
 
-Usage: ubi vm (location/vm-name|vm-id) restart
+Restart a virtual machine
+
+Usage:
+    ubi vm (location/vm-name|vm-id) restart
 
 
-Usage: ubi vm (location/vm-name|vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
+Copy files to or from virtual machine using `scp`
+
+Usage:
+    ubi vm (location/vm-name|vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
 
 
-Usage: ubi vm (location/vm-name|vm-id) [options] sftp [sftp-options]
+Copy files to or from virtual machine using `sftp`
+
+Usage:
+    ubi vm (location/vm-name|vm-id) [options] sftp [sftp-options]
 
 
-Usage: ubi vm (location/vm-name|vm-id) show [options]
+Show details for a virtual machine
+
+Usage:
+    ubi vm (location/vm-name|vm-id) show [options]
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)
@@ -67,6 +90,9 @@ Firewall Rule Fields: id cidr port-range
 Firewall Fields: id name description location path firewall-rules
 
 
-Usage: ubi vm (location/vm-name|vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
+Connect to a virtual machine using `ssh`
+
+Usage:
+    ubi vm (location/vm-name|vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
 
 
