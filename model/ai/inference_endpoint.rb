@@ -68,6 +68,7 @@ end
 #  max_requests      | integer                  | NOT NULL DEFAULT 500
 #  max_project_rps   | integer                  | NOT NULL DEFAULT 100
 #  max_project_tps   | integer                  | NOT NULL DEFAULT 10000
+#  external_config   | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 # Indexes:
 #  inference_endpoint_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
