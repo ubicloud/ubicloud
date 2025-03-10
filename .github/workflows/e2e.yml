@@ -1,5 +1,8 @@
 name: E2E CI
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
     inputs:
