@@ -21,11 +21,11 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
 
   label def start
     name, vm_size, storage_size_gib = if kubernetes_nodepool
-      ["#{kubernetes_nodepool.name}-#{SecureRandom.alphanumeric(5).downcase}",
+      ["#{kubernetes_nodepool.ubid}-#{SecureRandom.alphanumeric(5).downcase}",
         kubernetes_nodepool.target_node_size,
         kubernetes_nodepool.target_node_storage_size_gib]
     else
-      ["#{kubernetes_cluster.name.downcase}-control-plane-#{SecureRandom.alphanumeric(5).downcase}",
+      ["#{kubernetes_cluster.ubid}-#{SecureRandom.alphanumeric(5).downcase}",
         kubernetes_cluster.target_node_size,
         kubernetes_cluster.target_node_storage_size_gib]
     end
@@ -116,6 +116,7 @@ BASH
       hop_install_cni
     when "NotStarted"
       params = {
+        node_name: vm.name,
         cluster_name: kubernetes_cluster.name,
         lb_hostname: kubernetes_cluster.endpoint,
         port: "443",
@@ -143,6 +144,7 @@ BASH
     when "NotStarted"
       cp_sshable = kubernetes_cluster.sshable
       params = {
+        node_name: vm.name,
         cluster_endpoint: "#{kubernetes_cluster.endpoint}:443",
         join_token: cp_sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).chomp,
         certificate_key: cp_sshable.cmd("sudo kubeadm init phase upload-certs --upload-certs", log: false)[/certificate key:\n(.*)/, 1],
@@ -168,6 +170,7 @@ BASH
     when "NotStarted"
       cp_sshable = kubernetes_cluster.sshable
       params = {
+        node_name: vm.name,
         endpoint: "#{kubernetes_cluster.endpoint}:443",
         join_token: cp_sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).tr("\n", ""),
         discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command", log: false)[/discovery-token-ca-cert-hash (.*)/, 1]

@@ -14,6 +14,7 @@ begin
   private_subnet_cidr4 = params.fetch("private_subnet_cidr4")
   private_subnet_cidr6 = params.fetch("private_subnet_cidr6")
   vm_cidr = params.fetch("vm_cidr")
+  node_name = params.fetch("node_name")
 rescue KeyError => e
   puts "Needed #{e.key} in parameters"
   exit 1
@@ -57,7 +58,7 @@ config_path = "/tmp/kubeadm-config.yaml"
 
 safe_write_to_file(config_path, config.to_yaml)
 
-r "sudo kubeadm init --config #{config_path}"
+r "sudo kubeadm init --config #{config_path} --node-name #{node_name}"
 
 r("sudo /home/ubi/kubernetes/bin/setup-cni")
 
