@@ -121,6 +121,11 @@ class Prog::Test < Prog::Base
   label def push_subject_id
     push Prog::Test, {"subject_id" => "70b633b7-1d24-4526-a47f-d2580597d53f"}
   end
+
+  label def unavailable
+    register_deadline("unavailable", -1)
+    nap(123)
+  end
 end
 
 class Prog::Test2 < Prog::Test

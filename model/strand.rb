@@ -108,7 +108,9 @@ SQL
             {}
           end
           extra_data.compact!
-          Prog::PageNexus.assemble("#{ubid} has an expired deadline! #{effective_prog}.#{label} did not reach #{frame["deadline_target"]} on time", ["Deadline", id, effective_prog, frame["deadline_target"]], ubid, extra_data:)
+          if Strand[extra_data[:vm_host]]&.label != "unavailable" || label == "unavailable"
+            Prog::PageNexus.assemble("#{ubid} has an expired deadline! #{effective_prog}.#{label} did not reach #{frame["deadline_target"]} on time", ["Deadline", id, effective_prog, frame["deadline_target"]], ubid, extra_data:)
+          end
           modified!(:stack)
         end
       end
