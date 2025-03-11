@@ -9,6 +9,7 @@ class PrivateSubnet < Sequel::Model
   one_to_one :strand, key: :id
   many_to_many :firewalls
   one_to_many :load_balancers
+  many_to_one :location
 
   PRIVATE_SUBNET_RANGES = [
     "10.0.0.0/8",
@@ -43,7 +44,7 @@ class PrivateSubnet < Sequel::Model
   end
 
   def display_location
-    LocationNameConverter.to_display_name(location)
+    Location[location_id].display_name
   end
 
   def path
@@ -154,14 +155,15 @@ end
 #  net4          | cidr                     | NOT NULL
 #  state         | text                     | NOT NULL DEFAULT 'creating'::text
 #  name          | text                     | NOT NULL
-#  location      | text                     | NOT NULL
 #  last_rekey_at | timestamp with time zone | NOT NULL DEFAULT now()
 #  project_id    | uuid                     | NOT NULL
+#  location_id   | uuid                     | NOT NULL
 # Indexes:
-#  vm_private_subnet_pkey                       | PRIMARY KEY btree (id)
-#  private_subnet_project_id_location_name_uidx | UNIQUE btree (project_id, location, name)
+#  vm_private_subnet_pkey                          | PRIMARY KEY btree (id)
+#  private_subnet_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 # Foreign key constraints:
-#  private_subnet_project_id_fkey | (project_id) REFERENCES project(id)
+#  private_subnet_location_id_fkey | (location_id) REFERENCES location(id)
+#  private_subnet_project_id_fkey  | (project_id) REFERENCES project(id)
 # Referenced By:
 #  connected_subnet          | connected_subnet_subnet_id_1_fkey                | (subnet_id_1) REFERENCES private_subnet(id)
 #  connected_subnet          | connected_subnet_subnet_id_2_fkey                | (subnet_id_2) REFERENCES private_subnet(id)

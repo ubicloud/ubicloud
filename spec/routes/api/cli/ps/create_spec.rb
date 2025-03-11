@@ -18,8 +18,8 @@ RSpec.describe Clover, "cli ps create" do
   end
 
   it "creates ps with -f option" do
-    fw = Firewall.create(project_id: @project.id, location: "hetzner-hel1")
-    Firewall.create(project_id: @project.id, location: "hetzner-hel1", name: "test-fw")
+    fw = Firewall.create(project_id: @project.id, location_id: "1f214853-0bc4-8020-b910-dffb867ef44f")
+    Firewall.create(project_id: @project.id, location_id: "1f214853-0bc4-8020-b910-dffb867ef44f", name: "test-fw")
     body = cli(%W[ps eu-north-h1/test-ps2 create -f #{fw.ubid}])
     expect(PrivateSubnet.count).to eq 1
     ps = PrivateSubnet.first

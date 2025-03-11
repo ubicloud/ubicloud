@@ -6,7 +6,7 @@ class Clover
   end
 
   def vm_list_api_response(dataset)
-    dataset = dataset.where(location: @location) if @location
+    dataset = dataset.where(location_id: @location.id) if @location
     result = dataset.paginated_result(
       start_after: request.params["start_after"],
       page_size: request.params["page_size"],
@@ -53,8 +53,8 @@ class Clover
 
     if assemble_params["private_subnet_id"] && assemble_params["private_subnet_id"] != ""
       ps = PrivateSubnet.from_ubid(assemble_params["private_subnet_id"])
-      if !ps || ps.location != @location
-        fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{assemble_params["private_subnet_id"]}\" is not found in the location \"#{LocationNameConverter.to_display_name(@location)}\""})
+      if !ps || ps.location_id != @location.id
+        fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{assemble_params["private_subnet_id"]}\" is not found in the location \"#{@location.display_name}\""})
       end
       authorize("PrivateSubnet:view", ps.id)
     end
@@ -67,10 +67,9 @@ class Clover
       request_body_params["public_key"],
       project.id,
       name: name,
-      location: @location,
+      location_id: @location.id,
       **assemble_params.transform_keys(&:to_sym)
     )
-
     if api?
       Serializers::Vm.serialize(st.subject, {detailed: true})
     else
@@ -83,22 +82,22 @@ class Clover
     options = OptionTreeGenerator.new
 
     options.add_option(name: "name")
-    options.add_option(name: "location", values: Option.locations(feature_flags: @project.feature_flags).map(&:display_name))
+    options.add_option(name: "location", values: Option.locations(feature_flags: @project.feature_flags))
 
     subnets = dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view").map {
       {
-        location: LocationNameConverter.to_display_name(_1.location),
+        location_id: _1.location_id,
         value: _1.ubid,
         display_name: _1.name
       }
     }
     options.add_option(name: "private_subnet_id", values: subnets, parent: "location") do |location, private_subnet|
-      private_subnet[:location] == location
+      private_subnet[:location_id] == location.id
     end
 
     options.add_option(name: "enable_ip4", values: ["1"], parent: "location")
     options.add_option(name: "family", values: Option.families.map(&:name), parent: "location") do |location, family|
-      !!BillingRate.from_resource_properties("VmVCpu", family, LocationNameConverter.to_internal_name(location))
+      !!BillingRate.from_resource_properties("VmVCpu", family, location.name)
     end
     options.add_option(name: "size", values: Option::VmSizes.select { _1.visible }.map { _1.display_name }, parent: "family") do |location, family, size|
       vm_size = Option::VmSizes.find { _1.display_name == size && _1.arch == "x64" }

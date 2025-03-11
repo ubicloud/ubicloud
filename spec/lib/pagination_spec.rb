@@ -50,7 +50,7 @@ RSpec.describe Pagination do
 
       it "big page size" do
         101.times do |index|
-          ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "additional-ps-#{index}", location: "hetzner-fsn1").subject
+          ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "additional-ps-#{index}", location_id: Location::HETZNER_FSN1_ID).subject
           Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "additional-vm-#{index}", private_subnet_id: ps.id).subject
         end
 

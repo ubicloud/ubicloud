@@ -3,7 +3,7 @@
 class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   subject_is :kubernetes_cluster
 
-  def self.assemble(name:, project_id:, location:, version: "v1.32", private_subnet_id: nil, cp_node_count: 3, target_node_size: "standard-2", target_node_storage_size_gib: nil)
+  def self.assemble(name:, project_id:, location_id:, version: "v1.32", private_subnet_id: nil, cp_node_count: 3, target_node_size: "standard-2", target_node_storage_size_gib: nil)
     DB.transaction do
       unless (project = Project[project_id])
         fail "No existing project"
@@ -20,12 +20,12 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
         project.private_subnets_dataset.first(id: private_subnet_id) || fail("Given subnet is not available in the given project")
       else
         subnet_name = name + "-k8s-subnet"
-        ps = project.private_subnets_dataset.first(:location => location, Sequel[:private_subnet][:name] => subnet_name)
+        ps = project.private_subnets_dataset.first(:location_id => location_id, Sequel[:private_subnet][:name] => subnet_name)
         ps || Prog::Vnet::SubnetNexus.assemble(
           project_id,
           name: subnet_name,
-          location:,
-          ipv4_range: Prog::Vnet::SubnetNexus.random_private_ipv4(location, project, 18).to_s
+          location_id:,
+          ipv4_range: Prog::Vnet::SubnetNexus.random_private_ipv4(Location[location_id], project, 18).to_s
         ).subject
       end
 
@@ -33,7 +33,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       # TODO: Move resources (vms, subnet, LB, etc.) into our own project
       # TODO: Validate node count
 
-      kc = KubernetesCluster.create_with_id(name:, version:, cp_node_count:, location:, target_node_size:, target_node_storage_size_gib:, project_id: project.id, private_subnet_id: subnet.id)
+      kc = KubernetesCluster.create_with_id(name:, version:, cp_node_count:, location_id:, target_node_size:, target_node_storage_size_gib:, project_id: project.id, private_subnet_id: subnet.id)
 
       Strand.create(prog: "Kubernetes::KubernetesClusterNexus", label: "start") { _1.id = kc.id }
     end
