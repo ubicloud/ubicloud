@@ -7,12 +7,12 @@ class Project < Sequel::Model
   one_to_many :subject_tags, order: :name
   one_to_many :action_tags, order: :name
   one_to_many :object_tags, order: :name
-  one_to_one :billing_info, key: :id, primary_key: :billing_info_id
+  many_to_one :billing_info
   one_to_many :usage_alerts
   one_to_many :github_installations
-  many_through_many :github_runners, [[:github_installation, :project_id, :id], [:github_runner, :installation_id, :id]]
+  many_to_many :github_runners, join_table: :github_installation, right_key: :id, right_primary_key: :installation_id
 
-  many_to_many :accounts, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id
+  many_to_many :accounts, join_table: :access_tag, right_key: :hyper_tag_id
   one_to_many :vms
   one_to_many :minio_clusters
   one_to_many :private_subnets
@@ -25,8 +25,8 @@ class Project < Sequel::Model
   RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters]
 
   one_to_many :invoices, order: Sequel.desc(:created_at)
-  one_to_many :quotas, class: :ProjectQuota, key: :project_id
-  one_to_many :invitations, class: :ProjectInvitation, key: :project_id
+  one_to_many :quotas, class: :ProjectQuota
+  one_to_many :invitations, class: :ProjectInvitation
   one_to_many :api_keys, key: :owner_id, class: :ApiKey, conditions: {owner_table: "project"}
 
   dataset_module Pagination
