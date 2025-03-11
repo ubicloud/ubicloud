@@ -5,16 +5,18 @@ require_relative "../model"
 class LoadBalancer < Sequel::Model
   many_to_one :project
   many_to_many :vms
-  many_to_many :active_vms, class: :Vm, left_key: :load_balancer_id, right_key: :vm_id, join_table: :load_balancers_vms, conditions: {state: "up"}
-  many_to_many :vms_to_dns, class: :Vm, left_key: :load_balancer_id, right_key: :vm_id, join_table: :load_balancers_vms, conditions: Sequel.~(state: Sequel.any_type(["evacuating", "detaching"], :lb_node_state))
   one_to_one :strand, key: :id
   many_to_one :private_subnet
   one_to_many :load_balancers_vms, key: :load_balancer_id, class: :LoadBalancersVms
+  one_to_many :ports, key: :load_balancer_id, class: :LoadBalancerPort
   many_to_many :certs, join_table: :certs_load_balancers, left_key: :load_balancer_id, right_key: :cert_id
   one_to_many :certs_load_balancers, key: :load_balancer_id, class: :CertsLoadBalancers
   many_to_one :custom_hostname_dns_zone, class: :DnsZone, key: :custom_hostname_dns_zone_id
+  many_to_many :vm_ports, join_table: :load_balancer_port, right_key: :id, right_primary_key: :load_balancer_port_id, class: :LoadBalancerVmPort, read_only: true
+  many_to_many :active_vm_ports, join_table: :load_balancer_port, right_key: :id, right_primary_key: :load_balancer_port_id, class: :LoadBalancerVmPort, read_only: true, conditions: {state: "up"}
+  many_through_many :vms_to_dns, [[:load_balancer_port, :load_balancer_id, :id], [:load_balancer_vm_port, :load_balancer_port_id, :load_balancer_vm_id], [:load_balancers_vms, :id, :vm_id]], class: :Vm, conditions: Sequel.~(Sequel[:load_balancer_vm_port][:state] => Sequel.any_type(["evacuating", "detaching"], :lb_node_state))
 
-  plugin :association_dependencies, load_balancers_vms: :destroy, certs_load_balancers: :destroy
+  plugin :association_dependencies, load_balancers_vms: :destroy, ports: :destroy, certs_load_balancers: :destroy
 
   include ResourceMethods
   include SemaphoreMethods
@@ -30,9 +32,18 @@ class LoadBalancer < Sequel::Model
     "/location/#{private_subnet.display_location}/load-balancer/#{name}"
   end
 
+  def vm_ports_by_vm(vm)
+    vm_ports_dataset.where(load_balancer_vm_id: load_balancers_vms_dataset.where(vm_id: vm.id).select(:id))
+  end
+
+  def vm_ports_by_vm_and_state(vm, state)
+    vm_ports_dataset.where(load_balancer_vm_id: load_balancers_vms_dataset.where(vm_id: vm.id).select(:id), state:)
+  end
+
   def add_vm(vm)
     DB.transaction do
-      LoadBalancersVms.create_with_id(load_balancer_id: id, vm_id: vm.id)
+      load_balancer_vm = LoadBalancersVms.create(load_balancer_id: id, vm_id: vm.id)
+      ports.each { |port| LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: load_balancer_vm.id) }
 
       Strand.create_with_id(prog: "Vnet::CertServer", label: "put_certificate", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id)
       incr_rewrite_dns_records
@@ -40,14 +51,18 @@ class LoadBalancer < Sequel::Model
   end
 
   def detach_vm(vm)
-    load_balancers_vms_dataset.where(vm_id: vm.id, state: Sequel.any_type(["up", "down", "evacuating"], :lb_node_state)).update(state: "detaching")
-    Strand.create_with_id(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id)
-    incr_update_load_balancer
+    DB.transaction do
+      ids_to_update = vm_ports_by_vm_and_state(vm, ["up", "down", "evacuating"]).map(&:id)
+      LoadBalancerVmPort.where(id: ids_to_update).update(state: "detaching")
+      Strand.create_with_id(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id)
+      incr_update_load_balancer
+    end
   end
 
   def evacuate_vm(vm)
     DB.transaction do
-      load_balancers_vms_dataset.where(vm_id: vm.id, state: Sequel.any_type(["up", "down"], :lb_node_state)).update(state: "evacuating")
+      ids_to_update = vm_ports_by_vm_and_state(vm, ["up", "down"]).map(&:id)
+      LoadBalancerVmPort.where(id: ids_to_update).update(state: "evacuating")
       Strand.create_with_id(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id)
       incr_update_load_balancer
       incr_rewrite_dns_records
@@ -55,8 +70,21 @@ class LoadBalancer < Sequel::Model
   end
 
   def remove_vm(vm)
-    load_balancers_vms_dataset[vm_id: vm.id].destroy
-    incr_rewrite_dns_records
+    DB.transaction do
+      vm_ports_by_vm(vm).destroy
+      load_balancers_vms_dataset[vm_id: vm.id].destroy
+      incr_rewrite_dns_records
+    end
+  end
+
+  def remove_vm_port(vm_port)
+    DB.transaction do
+      LoadBalancerVmPort.where(id: vm_port.id).destroy
+      if vm_ports_dataset.where(load_balancer_vm_id: vm_port.load_balancer_vm_id).count.zero?
+        load_balancers_vms_dataset[id: vm_port.load_balancer_vm_id].destroy
+      end
+      incr_rewrite_dns_records
+    end
   end
 
   def hostname

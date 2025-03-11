@@ -20,7 +20,8 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     )
     KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
 
-    lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", src_port: 123, dst_port: 456, health_check_endpoint: "/foo", project_id: project.id)
+    lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", health_check_endpoint: "/foo", project_id: project.id)
+    LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 123, dst_port: 456)
     kc.add_cp_vm(create_vm)
     kc.add_cp_vm(create_vm)
     kc.update(api_server_lb_id: lb.id)
@@ -118,8 +119,8 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.create_load_balancer }.to hop("bootstrap_control_plane_vms")
 
       expect(kubernetes_cluster.api_server_lb.name).to eq "k8scluster-apiserver"
-      expect(kubernetes_cluster.api_server_lb.src_port).to eq 443
-      expect(kubernetes_cluster.api_server_lb.dst_port).to eq 6443
+      expect(kubernetes_cluster.api_server_lb.ports.first.src_port).to eq 443
+      expect(kubernetes_cluster.api_server_lb.ports.first.dst_port).to eq 6443
       expect(kubernetes_cluster.api_server_lb.health_check_endpoint).to eq "/healthz"
       expect(kubernetes_cluster.api_server_lb.health_check_protocol).to eq "tcp"
       expect(kubernetes_cluster.api_server_lb.stack).to eq LoadBalancer::Stack::IPV4
@@ -132,8 +133,8 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.create_load_balancer }.to hop("bootstrap_control_plane_vms")
 
       expect(kubernetes_cluster.api_server_lb.name).to eq "k8scluster-apiserver"
-      expect(kubernetes_cluster.api_server_lb.src_port).to eq 443
-      expect(kubernetes_cluster.api_server_lb.dst_port).to eq 6443
+      expect(kubernetes_cluster.api_server_lb.ports.first.src_port).to eq 443
+      expect(kubernetes_cluster.api_server_lb.ports.first.dst_port).to eq 6443
       expect(kubernetes_cluster.api_server_lb.health_check_endpoint).to eq "/healthz"
       expect(kubernetes_cluster.api_server_lb.health_check_protocol).to eq "tcp"
       expect(kubernetes_cluster.api_server_lb.stack).to eq LoadBalancer::Stack::IPV4

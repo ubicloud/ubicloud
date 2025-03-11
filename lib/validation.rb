@@ -207,6 +207,22 @@ module Validation
     port.to_i
   end
 
+  def self.validate_load_balancer_ports(ports)
+    seen_ports = Set.new
+
+    ports.each do |src_port, dst_port|
+      validate_port(:src_port, src_port)
+      validate_port(:dst_port, dst_port)
+
+      [src_port, dst_port].uniq.each do |port|
+        if seen_ports.include?(port)
+          fail ValidationFailed.new({port: "Port conflict detected: #{port} is already in use"})
+        end
+        seen_ports << port
+      end
+    end
+  end
+
   def self.validate_request_params(request_body_params, required_keys, allowed_optional_keys = [])
     missing_required_keys = required_keys - request_body_params.keys
     unless missing_required_keys.empty?

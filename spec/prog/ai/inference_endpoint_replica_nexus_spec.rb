@@ -4,46 +4,45 @@ require "spec_helper"
 require_relative "../../../prog/ai/inference_endpoint_replica_nexus"
 
 RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
-  subject(:nx) { described_class.new(Strand.create(id: "5943c405-0165-471e-93d5-20203e585aaf", prog: "Prog::Ai::InferenceEndpointReplicaNexus", label: "start")) }
+  subject(:nx) { described_class.new(Strand.create(prog: "Prog::Ai::InferenceEndpointReplicaNexus", label: "start")) }
+
+  let(:project) { Project.create(name: "test") }
+  let(:private_subnet) { PrivateSubnet.create(project_id: project.id, name: "test", location_id: Location::HETZNER_HEL1_ID, net6: "fe80::/64", net4: "192.168.0.0/24") }
+  let(:load_balancer) { Prog::Vnet::LoadBalancerNexus.assemble(private_subnet.id, name: "test", src_port: 443, dst_port: 8443).subject }
 
   let(:inference_endpoint) {
-    instance_double(InferenceEndpoint,
-      id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77",
-      replica_count: 2,
+    InferenceEndpoint.create(
       model_name: "test-model",
-      ubid: "ie-ubid",
+      replica_count: 2,
       is_public: true,
       location: Location[name: "hetzner-ai"],
       name: "ie-name",
       engine: "vllm",
       engine_params: "--some-params",
       external_config: {"some" => "config"},
+      boot_image: "image",
       max_requests: 500,
       max_project_rps: 100,
       max_project_tps: 10000,
-      load_balancer: instance_double(LoadBalancer, id: "lb-id", ubid: "lb-ubid", dst_port: 8443, health_check_down_threshold: 3, private_subnet: instance_double(PrivateSubnet, ubid: "subnet-ubid")))
-  }
-
-  let(:vm) {
-    instance_double(
-      Vm,
-      id: "fe4478f9-9454-466f-be7b-3cff302a4716",
-      ubid: "vm-ubid",
-      sshable: sshable,
-      ephemeral_net4: "1.2.3.4",
-      vm_host: instance_double(VmHost, ubid: "host-ubid", sshable: instance_double(Sshable, host: "2.3.4.5")),
-      private_subnets: [instance_double(PrivateSubnet)]
+      vm_size: "size",
+      storage_volumes: [],
+      project_id: project.id,
+      load_balancer_id: load_balancer.id,
+      private_subnet_id: private_subnet.id
     )
   }
 
+  let(:vm) {
+    vm_host = create_vm_host
+    vm = Prog::Vm::Nexus.assemble("key", project.id, name: "name", private_subnet_id: private_subnet.id).subject
+    vm.update(vm_host_id: vm_host.id)
+    vm
+  }
+
   let(:replica) {
-    instance_double(
-      InferenceEndpointReplica,
-      id: "a338f7fb-c608-49d2-aeb4-433dc1e8b9fe",
-      ubid: "theubid",
-      inference_endpoint: inference_endpoint,
-      external_state: {},
-      vm: vm
+    InferenceEndpointReplica.create(
+      inference_endpoint_id: inference_endpoint.id,
+      vm_id: vm.id
     )
   }
 
@@ -51,6 +50,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   before do
     allow(nx).to receive_messages(vm: vm, inference_endpoint: inference_endpoint, inference_endpoint_replica: replica)
+    allow(vm).to receive(:sshable).and_return(sshable)
+    load_balancer.add_vm(vm)
   end
 
   describe ".assemble" do
@@ -101,12 +102,12 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   describe "#start" do
     it "naps if vm not ready" do
-      expect(replica.vm).to receive(:strand).and_return(instance_double(Strand, label: "prep"))
+      vm.strand.update(label: "prep")
       expect { nx.start }.to nap(5)
     end
 
     it "update sshable host and hops" do
-      expect(replica.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      vm.strand.update(label: "wait")
       expect { nx.start }.to hop("bootstrap_rhizome")
     end
   end
@@ -164,7 +165,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
       stub_request(:post, "https://api.runpod.io/graphql")
         .with(
-          body: "{\"query\":\"mutation {\\n  podFindAndDeployOnDemand(\\n    input: {\\n      cloudType: ALL\\n      dataCenterId: \\\"\\\"\\n      gpuCount: \\n      gpuTypeId: \\\"\\\"\\n      containerDiskInGb: \\n      minVcpuCount: \\n      minMemoryInGb: \\n      imageName: \\\"\\\"\\n      name: \\\"theubid\\\"\\n      volumeInGb: 0\\n      ports: \\\"22/tcp\\\"\\n      env: [\\n        { key: \\\"HF_TOKEN\\\", value: \\\"\\\" },\\n        { key: \\\"HF_HUB_ENABLE_HF_TRANSFER\\\", value: \\\"1\\\"},\\n        { key: \\\"MODEL_PATH\\\", value: \\\"/model\\\"},\\n        { key: \\\"MODEL_NAME_HF\\\", value: \\\"\\\"},\\n        { key: \\\"VLLM_PARAMS\\\", value: \\\"--served-model-name test-model --disable-log-requests --host 127.0.0.1 --some-params\\\"},\\n        { key: \\\"SSH_KEYS\\\", value: \\\"vm ssh key\\\\noperator ssh key\\\" }\\n      ]\\n    }\\n  ) {\\n    id\\n    imageName\\n    env\\n    machineId\\n    machine {\\n      podHostId\\n    }\\n  }\\n}\\n\"}",
+          body: "{\"query\":\"mutation {\\n  podFindAndDeployOnDemand(\\n    input: {\\n      cloudType: ALL\\n      dataCenterId: \\\"\\\"\\n      gpuCount: \\n      gpuTypeId: \\\"\\\"\\n      containerDiskInGb: \\n      minVcpuCount: \\n      minMemoryInGb: \\n      imageName: \\\"\\\"\\n      name: \\\"#{replica.ubid}\\\"\\n      volumeInGb: 0\\n      ports: \\\"22/tcp\\\"\\n      env: [\\n        { key: \\\"HF_TOKEN\\\", value: \\\"\\\" },\\n        { key: \\\"HF_HUB_ENABLE_HF_TRANSFER\\\", value: \\\"1\\\"},\\n        { key: \\\"MODEL_PATH\\\", value: \\\"/model\\\"},\\n        { key: \\\"MODEL_NAME_HF\\\", value: \\\"\\\"},\\n        { key: \\\"VLLM_PARAMS\\\", value: \\\"--served-model-name test-model --disable-log-requests --host 127.0.0.1 --some-params\\\"},\\n        { key: \\\"SSH_KEYS\\\", value: \\\"vm ssh key\\\\noperator ssh key\\\" }\\n      ]\\n    }\\n  ) {\\n    id\\n    imageName\\n    env\\n    machineId\\n    machine {\\n      podHostId\\n    }\\n  }\\n}\\n\"}",
           headers: {
             "Accept-Encoding" => "deflate, gzip",
             "Authorization" => "Bearer ",
@@ -190,7 +191,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
             "Host" => "api.runpod.io"
           }
         )
-        .to_return(status: 200, body: {"data" => {"myself" => {"pods" => [{"name" => "theubid", "id" => "thepodid"}]}}}.to_json, headers: {})
+        .to_return(status: 200, body: {"data" => {"myself" => {"pods" => [{"name" => replica.ubid.to_s, "id" => "thepodid"}]}}}.to_json, headers: {})
 
       expect(replica).to receive(:update).with(external_state: {"pod_id" => "thepodid"})
       expect { nx.setup_external }.to nap(10)
@@ -269,12 +270,11 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   describe "#setup" do
     it "triggers setup if setup command is not sent yet or failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"engine_start_cmd\":\"/opt/miniconda/envs/vllm/bin/vllm serve /ie/models/model --served-model-name llama --disable-log-requests --host 127.0.0.1 --some-params\",\"replica_ubid\":\"theubid\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"}).twice
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"engine_start_cmd\":\"/opt/miniconda/envs/vllm/bin/vllm serve /ie/models/model --served-model-name llama --disable-log-requests --host 127.0.0.1 --some-params\",\"replica_ubid\":\"#{replica.ubid}\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"}).twice
       expect(inference_endpoint).to receive(:gpu_count).and_return(1).twice
       expect(inference_endpoint).to receive(:engine).and_return("vllm").twice
       expect(inference_endpoint).to receive(:engine_params).and_return("--some-params").twice
       expect(inference_endpoint).to receive(:model_name).and_return("llama").twice
-      expect(inference_endpoint).to receive(:load_balancer).and_return(instance_double(LoadBalancer, id: "lb-id", dst_port: 8443)).twice
 
       # NotStarted
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
@@ -286,12 +286,11 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
     end
 
     it "triggers setup for vllm with cpu if setup command is not sent yet or failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"engine_start_cmd\":\"/opt/miniconda/envs/vllm-cpu/bin/vllm serve /ie/models/model --served-model-name llama --disable-log-requests --host 127.0.0.1 --some-params\",\"replica_ubid\":\"theubid\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"})
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"engine_start_cmd\":\"/opt/miniconda/envs/vllm-cpu/bin/vllm serve /ie/models/model --served-model-name llama --disable-log-requests --host 127.0.0.1 --some-params\",\"replica_ubid\":\"#{replica.ubid}\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"})
       expect(inference_endpoint).to receive(:gpu_count).and_return(0)
       expect(inference_endpoint).to receive(:engine).and_return("vllm")
       expect(inference_endpoint).to receive(:engine_params).and_return("--some-params")
       expect(inference_endpoint).to receive(:model_name).and_return("llama")
-      expect(inference_endpoint).to receive(:load_balancer).and_return(instance_double(LoadBalancer, id: "lb-id", dst_port: 8443))
 
       # NotStarted
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
@@ -299,9 +298,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
     end
 
     it "triggers setup for runpod if setup command is not sent yet or failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"engine_start_cmd\":\"ssh -N -L 8000:localhost:8000 root@ -p  -i /ie/workdir/.ssh/runpod -o UserKnownHostsFile=/ie/workdir/.ssh/known_hosts -o StrictHostKeyChecking=accept-new\",\"replica_ubid\":\"theubid\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"}).twice
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"engine_start_cmd\":\"ssh -N -L 8000:localhost:8000 root@ -p  -i /ie/workdir/.ssh/runpod -o UserKnownHostsFile=/ie/workdir/.ssh/known_hosts -o StrictHostKeyChecking=accept-new\",\"replica_ubid\":\"#{replica.ubid}\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"}).twice
       expect(inference_endpoint).to receive(:engine).and_return("runpod").twice
-      expect(inference_endpoint).to receive(:load_balancer).and_return(instance_double(LoadBalancer, id: "lb-id", dst_port: 8443)).twice
 
       # NotStarted
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
@@ -331,16 +329,12 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   describe "#wait_endpoint_up" do
     it "naps if vm is not up" do
-      lb_vm = instance_double(LoadBalancersVms, state: "down")
-      expect(nx).to receive(:load_balancers_vm).and_return(lb_vm)
-      expect(lb_vm).to receive(:reload).and_return(lb_vm)
+      LoadBalancerVmPort.first.update(state: "down")
       expect { nx.wait_endpoint_up }.to nap(5)
     end
 
     it "sets hops to wait when vm is in active set of load balancer" do
-      lb_vm = instance_double(LoadBalancersVms, state: "up")
-      expect(nx).to receive(:load_balancers_vm).and_return(lb_vm)
-      expect(lb_vm).to receive(:reload).and_return(lb_vm)
+      LoadBalancerVmPort.first.update(state: "up")
       expect { nx.wait_endpoint_up }.to hop("wait")
     end
   end
@@ -360,20 +354,16 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   describe "#unavailable" do
     it "creates a page if replica is unavailable" do
-      lb_vm = instance_double(LoadBalancersVms, state: "down")
+      LoadBalancerVmPort.first.update(state: "down")
       expect(Prog::PageNexus).to receive(:assemble)
       expect(inference_endpoint).to receive(:maintenance_set?).and_return(false)
-      expect(nx).to receive(:load_balancers_vm).and_return(lb_vm).at_least(:once)
-      expect(lb_vm).to receive(:reload).and_return(lb_vm)
       expect { nx.unavailable }.to nap(30)
     end
 
     it "does not create a page if replica is in maintenance mode" do
-      lb_vm = instance_double(LoadBalancersVms, state: "down")
+      LoadBalancerVmPort.first.update(state: "down")
       expect(Prog::PageNexus).not_to receive(:assemble)
       expect(inference_endpoint).to receive(:maintenance_set?).and_return(true)
-      expect(nx).to receive(:load_balancers_vm).and_return(lb_vm)
-      expect(lb_vm).to receive(:reload).and_return(lb_vm)
       expect { nx.unavailable }.to nap(30)
     end
 
@@ -444,8 +434,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
       expect(inference_endpoint).to receive(:project).and_return(projects.first)
       expect(inference_endpoint).to receive(:is_public).and_return(false).twice
       expect(inference_endpoint).to receive(:ubid).and_return("ieubid")
-      expect(nx).to receive(:update_billing_records).with(JSON.parse("[{\"ubid\":\"theubid\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]"))
-      expect(sshable).to receive(:cmd).with("sudo curl -m 5 -s -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", {stdin: "{\"replica_ubid\":\"theubid\",\"public_endpoint\":false,\"projects\":[{\"ubid\":\"#{projects.first.ubid}\",\"api_keys\":[\"#{Digest::SHA2.hexdigest(projects.first.api_keys.first.key)}\"],\"quota_rps\":100,\"quota_tps\":10000}]}"}).and_return("{\"inference_endpoint\":\"1eqhk4b9gfq27gc5agxkq84bhr\",\"replica\":\"1rvtmbhd8cne6jpz3xxat7rsnr\",\"projects\":[{\"ubid\":\"theubid\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]}")
+      expect(nx).to receive(:update_billing_records).with(JSON.parse("[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]"))
+      expect(sshable).to receive(:cmd).with("sudo curl -m 5 -s -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", {stdin: "{\"replica_ubid\":\"#{replica.ubid}\",\"public_endpoint\":false,\"projects\":[{\"ubid\":\"#{projects.first.ubid}\",\"api_keys\":[\"#{Digest::SHA2.hexdigest(projects.first.api_keys.first.key)}\"],\"quota_rps\":100,\"quota_tps\":10000}]}"}).and_return("{\"inference_endpoint\":\"1eqhk4b9gfq27gc5agxkq84bhr\",\"replica\":\"1rvtmbhd8cne6jpz3xxat7rsnr\",\"projects\":[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]}")
       nx.ping_gateway
     end
 
@@ -462,8 +452,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
         json_sent = JSON.parse(options[:stdin])
         projects_sent = json_sent["projects"].sort_by { |p| p["ubid"] }
         expect(projects_sent).to eq(expected_projects)
-      end.and_return("{\"inference_endpoint\":\"1eqhk4b9gfq27gc5agxkq84bhr\",\"replica\":\"1rvtmbhd8cne6jpz3xxat7rsnr\",\"projects\":[{\"ubid\":\"theubid\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]}")
-      expect(nx).to receive(:update_billing_records).with(JSON.parse("[{\"ubid\":\"theubid\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]"))
+      end.and_return("{\"inference_endpoint\":\"1eqhk4b9gfq27gc5agxkq84bhr\",\"replica\":\"1rvtmbhd8cne6jpz3xxat7rsnr\",\"projects\":[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]}")
+      expect(nx).to receive(:update_billing_records).with(JSON.parse("[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]"))
 
       nx.ping_gateway
     end

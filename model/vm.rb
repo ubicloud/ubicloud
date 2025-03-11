@@ -16,6 +16,7 @@ class Vm < Sequel::Model
   one_to_many :pci_devices, key: :vm_id, class: :PciDevice
   one_through_one :load_balancer, left_key: :vm_id, right_key: :load_balancer_id, join_table: :load_balancers_vms
   one_to_one :load_balancers_vms, key: :vm_id, class: :LoadBalancersVms
+  many_to_many :load_balancer_vm_ports, join_table: :load_balancers_vms, right_key: :id, right_primary_key: :load_balancer_vm_id, class: :LoadBalancerVmPort, read_only: true
   many_to_one :vm_host_slice
   many_to_one :location, key: :location_id
 
