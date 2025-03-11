@@ -6,7 +6,7 @@ REPL = true
 require_relative "../loader"
 require "timeout"
 
-LOCATIONS = Option::LOCATIONS.map { |l| [l, "#{l.provider.display_name} #{l.display_name}"] }.to_h
+LOCATIONS = Location.where(visible: true).map { |l| [l, "#{l.provider} #{l.name} (#{l.display_name})"] }.to_h
 
 def get_input(msg, default = nil)
   prompt = "#{msg}#{default.nil? ? "" : " [default: #{default}]"}: "
@@ -54,7 +54,7 @@ puts "\n\nCloudifying '#{hostname}' server for '#{LOCATIONS[location]}' \n\n"
 
 strand = Prog::Vm::HostNexus.assemble(
   hostname,
-  provider_name: location.provider.name,
+  provider_name: location.provider,
   server_identifier: host_id,
   location: location.name,
   default_boot_images: ["ubuntu-jammy"]
