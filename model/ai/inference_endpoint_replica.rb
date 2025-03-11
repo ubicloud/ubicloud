@@ -6,7 +6,7 @@ class InferenceEndpointReplica < Sequel::Model
   one_to_one :strand, key: :id
   one_to_one :vm, key: :id, primary_key: :vm_id
   many_to_one :inference_endpoint
-  one_to_one :load_balancers_vm, class: LoadBalancersVms, key: :vm_id, primary_key: :vm_id
+  one_through_one :load_balancer_vm_port, left_key: :vm_id, left_primary_key: :vm_id, right_key: :id, right_primary_key: :load_balancer_vm_id, join_table: :load_balancers_vms
 
   include ResourceMethods
   include SemaphoreMethods

@@ -87,7 +87,7 @@ RSpec.describe InvoiceGenerator do
   }
   let(:vm1) { create_vm }
   let(:ps) { Prog::Vnet::SubnetNexus.assemble(p1.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject }
-  let(:lb) { LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-1", src_port: 80, dst_port: 80, health_check_endpoint: "/up", project_id: p1.id) }
+  let(:lb) { LoadBalancer.create(private_subnet_id: ps.id, name: "dummy-lb-1", health_check_endpoint: "/up", project_id: p1.id) }
   let(:ie1) { InferenceEndpoint.create_with_id(name: "ie1", model_name: "test-model", project_id: p1.id, is_public: true, visible: true, location: "loc", vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id) }
 
   let(:day) { 24 * 60 * 60 }
