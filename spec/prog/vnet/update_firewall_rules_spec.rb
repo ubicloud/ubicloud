@@ -196,8 +196,10 @@ ADD_RULES
       ])])
       expect(vm).to receive(:id).and_return(1).at_least(:once)
       vm2 = instance_double(Vm, id: 2, nics: [instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32"), private_ipv6: NetAddr::IPv6Net.parse("fd00::/124"))], private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32").network, private_ipv6: NetAddr::IPv6.parse("fd00::2"))
-      lb = instance_double(LoadBalancer, name: "lb_table", src_port: 443, dst_port: 8443, vms: [vm, vm2])
+      port = instance_double(LoadBalancerPort, src_port: 443, dst_port: 8443)
+      lb = instance_double(LoadBalancer, name: "lb_table", ports: [port], vms: [vm, vm2])
       expect(vm).to receive(:load_balancer).and_return(lb).at_least(:once)
+      allow(lb).to receive(:ports).and_return([{src_port: 443, dst_port: 8443}])
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec x nft --file -", stdin: <<ADD_RULES)
 # An nftables idiom for idempotent re-create of a named entity: merge
 # in an empty table (a no-op if the table already exists) and then
@@ -355,7 +357,9 @@ ADD_RULES
         instance_double(FirewallRule, ip6?: true, cidr: NetAddr::IPv6Net.parse("fd00::2/64"), port_range: Sequel.pg_range(80..10000))
       ])])
       expect(vm).to receive(:id).and_return(1).at_least(:once)
-      lb = instance_double(LoadBalancer, name: "lb_table", src_port: 443, dst_port: 8443, vms: [vm])
+      port = instance_double(LoadBalancerPort, src_port: 443, dst_port: 8443)
+      lb = instance_double(LoadBalancer, name: "lb_table", ports: [port], vms: [vm])
+      allow(lb).to receive(:ports).and_return([{src_port: 443, dst_port: 8443}])
       expect(vm).to receive(:load_balancer).and_return(lb).at_least(:once)
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec x nft --file -", stdin: <<ADD_RULES)
 # An nftables idiom for idempotent re-create of a named entity: merge

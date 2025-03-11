@@ -11,8 +11,8 @@ class Serializers::LoadBalancer < Serializers::Base
       stack: lb.stack,
       health_check_endpoint: lb.health_check_endpoint,
       health_check_protocol: lb.health_check_protocol,
-      src_port: lb.src_port,
-      dst_port: lb.dst_port
+      src_port: lb.ports&.first&.src_port,
+      dst_port: lb.ports&.first&.dst_port
     }
 
     if options[:include_path]

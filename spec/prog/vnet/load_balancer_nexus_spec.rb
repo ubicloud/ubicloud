@@ -7,7 +7,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
   let(:st) {
     cert = Prog::Vnet::CertNexus.assemble("test-host-name", dns_zone.id).subject
-    lb = described_class.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 80).subject
+    lb = described_class.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080).subject
     lb.add_cert(cert)
     lb.strand
   }
@@ -34,7 +34,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     end
 
     it "creates a new load balancer" do
-      lb = described_class.assemble(ps.id, name: "test-lb2", src_port: 80, dst_port: 80).subject
+      lb = described_class.assemble(ps.id, name: "test-lb2", src_port: 80, dst_port: 8080).subject
       expect(LoadBalancer.count).to eq 2
       expect(lb.project).to eq ps.project
       expect(lb.hostname).to eq "test-lb2.#{ps.ubid[-5...]}.lb.ubicloud.com"
@@ -42,7 +42,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
     it "creates a new load balancer with custom hostname" do
       dz = DnsZone.create_with_id(project_id: ps.project_id, name: "custom.ubicloud.com")
-      lb = described_class.assemble(ps.id, name: "test-lb2", src_port: 80, dst_port: 80, custom_hostname_prefix: "test-custom-hostname", custom_hostname_dns_zone_id: dz.id).subject
+      lb = described_class.assemble(ps.id, name: "test-lb2", src_port: 80, dst_port: 8080, custom_hostname_prefix: "test-custom-hostname", custom_hostname_dns_zone_id: dz.id).subject
       expect(LoadBalancer.count).to eq 2
       expect(lb.project).to eq ps.project
       expect(lb.hostname).to eq "test-custom-hostname.custom.ubicloud.com"
