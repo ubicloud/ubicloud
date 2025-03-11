@@ -3,10 +3,8 @@
 require_relative "../../model"
 
 class MinioPool < Sequel::Model
-  many_to_one :cluster, key: :cluster_id, class: :MinioCluster
-  one_to_many :servers, key: :minio_pool_id, class: :MinioServer do |ds|
-    ds.order(:index)
-  end
+  many_to_one :cluster, class: :MinioCluster
+  one_to_many :servers, key: :minio_pool_id, class: :MinioServer, order: :index
   one_to_one :strand, key: :id
 
   include ResourceMethods
