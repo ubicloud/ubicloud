@@ -48,7 +48,8 @@ class Clover
 
       fail CloverError.new(204, "NotFound", "No cache entry") if entry.nil?
 
-      entry.update(last_accessed_at: Time.now, last_accessed_by: runner.id)
+      # Entry may no longer exist, use this.update to avoid raising an error in that case
+      entry.this.update(last_accessed_at: Sequel::CURRENT_TIMESTAMP, last_accessed_by: runner.id)
       signed_url = repository.url_presigner.presigned_url(:get_object, bucket: repository.bucket_name, key: entry.blob_key, expires_in: 900)
 
       {
