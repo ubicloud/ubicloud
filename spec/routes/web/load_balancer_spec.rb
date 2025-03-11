@@ -11,12 +11,16 @@ RSpec.describe Clover, "load balancer" do
 
   let(:lb) do
     ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
-    LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-1", src_port: 80, dst_port: 80, health_check_endpoint: "/up", project_id: project.id)
+    lb = LoadBalancer.create(private_subnet_id: ps.id, name: "dummy-lb-1", health_check_endpoint: "/up", project_id: project.id)
+    LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 80, dst_port: 8080)
+    lb
   end
 
   let(:lb_wo_permission) {
     ps = Prog::Vnet::SubnetNexus.assemble(project_wo_permissions.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID).subject
-    LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-2", src_port: 80, dst_port: 80, health_check_endpoint: "/up", project_id: project_wo_permissions.id)
+    lb = LoadBalancer.create(private_subnet_id: ps.id, name: "dummy-lb-2", health_check_endpoint: "/up", project_id: project_wo_permissions.id)
+    LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 80, dst_port: 8080)
+    lb
   }
 
   describe "unauthenticated" do
@@ -295,7 +299,7 @@ RSpec.describe Clover, "load balancer" do
         expect(page).to have_flash_notice("VM is detached from the load balancer")
         expect(Strand.where(prog: "Vnet::LoadBalancerHealthProbes").all.count { |st| st.stack[0]["subject_id"] == lb.id && st.stack[0]["vm_id"] == vm.id }).to eq(0)
         expect(lb.update_load_balancer_set?).to be(true)
-        expect(lb.load_balancers_vms_dataset.where(vm_id: vm.id).first.state).to eq("detaching")
+        expect(lb.vm_ports_dataset.where(load_balancer_vm_id: LoadBalancersVms.where(vm_id: vm.id).select(:id)).first&.state).to eq("detaching")
       end
 
       it "can not detach vm when it does not exist" do

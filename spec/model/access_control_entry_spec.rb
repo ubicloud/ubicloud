@@ -90,12 +90,15 @@ RSpec.describe AccessControlEntry do
     ).id
     load_balancer_id = LoadBalancer.create_with_id(
       name: "",
-      src_port: 1024,
-      dst_port: 1025,
       private_subnet_id:,
       project_id: project2.id,
       health_check_endpoint: ""
     ).id
+    LoadBalancerPort.create(
+      load_balancer_id:,
+      src_port: 1024,
+      dst_port: 1025
+    )
     inference_endpoint = InferenceEndpoint.create_with_id(
       location_id: Location::HETZNER_FSN1_ID,
       boot_image: "",

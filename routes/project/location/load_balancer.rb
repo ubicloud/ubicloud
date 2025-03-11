@@ -74,12 +74,14 @@ class Clover
       r.patch api? do
         authorize("LoadBalancer:edit", lb.id)
         request_body_params = validate_request_params(%w[algorithm src_port dst_port health_check_endpoint vms])
-        lb.update(
-          algorithm: request_body_params["algorithm"],
-          src_port: Validation.validate_port(:src_port, request_body_params["src_port"]),
-          dst_port: Validation.validate_port(:dst_port, request_body_params["dst_port"]),
-          health_check_endpoint: request_body_params["health_check_endpoint"]
-        )
+        DB.transaction do
+          lb.update(
+            algorithm: request_body_params["algorithm"],
+            health_check_endpoint: request_body_params["health_check_endpoint"]
+          )
+          lb.ports.first.update(src_port: Validation.validate_port(:src_port, request_body_params["src_port"]),
+            dst_port: Validation.validate_port(:dst_port, request_body_params["dst_port"]))
+        end
 
         new_vms = request_body_params["vms"].map { Vm.from_ubid(_1.delete("\"")) }
         new_vms.each do |vm|

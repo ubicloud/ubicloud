@@ -9,7 +9,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
   subject_is :inference_endpoint_replica
 
   extend Forwardable
-  def_delegators :inference_endpoint_replica, :vm, :inference_endpoint, :load_balancers_vm
+  def_delegators :inference_endpoint_replica, :vm, :inference_endpoint, :load_balancer_vm_port
 
   def self.assemble(inference_endpoint_id)
     DB.transaction do
@@ -102,7 +102,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
         replica_ubid: inference_endpoint_replica.ubid,
         ssl_crt_path: "/ie/workdir/ssl/ubi_cert.pem",
         ssl_key_path: "/ie/workdir/ssl/ubi_key.pem",
-        gateway_port: inference_endpoint.load_balancer.dst_port,
+        gateway_port: inference_endpoint.load_balancer.ports.first.dst_port,
         max_requests: inference_endpoint.max_requests
       }
       params_json = JSON.generate(params)
@@ -150,7 +150,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
   end
 
   def available?
-    load_balancers_vm.reload.state == "up"
+    load_balancer_vm_port.reload.state == "up"
   end
 
   def create_page

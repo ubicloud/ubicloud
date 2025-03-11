@@ -18,8 +18,16 @@ class Prog::Vnet::UpdateFirewallRules < Prog::Base
     globally_blocked_ipv4s, globally_blocked_ipv6s = generate_globally_blocked_lists
 
     load_balancer_allow_rule = if vm.load_balancer
-      allow_ipv4_lb_neigh_incoming = "ip saddr . tcp sport { #{vm.load_balancer.vms.reject { _1.id == vm.id }.map { "#{_1.private_ipv4} . #{vm.load_balancer.src_port}" }.join(", ")} } ct state established,related,new counter accept" if vm.load_balancer.vms.reject { _1.id == vm.id }.any?
-      allow_ipv6_lb_neigh_incoming = "ip6 saddr . tcp sport { #{vm.load_balancer.vms.reject { _1.id == vm.id }.map { "#{_1.private_ipv6} . #{vm.load_balancer.src_port}" }.join(", ")} } ct state established,related,new counter accept" if vm.load_balancer.vms.reject { _1.id == vm.id }.any?
+      neighbors = vm.load_balancer.vms.reject { _1.id == vm.id }
+      ipv4_rules = neighbors.flat_map do |n|
+        vm.load_balancer.ports.map { |p| "#{n.private_ipv4} . #{p[:src_port]}" }
+      end
+      ipv6_rules = neighbors.flat_map do |n|
+        vm.load_balancer.ports.map { |p| "#{n.private_ipv6} . #{p[:src_port]}" }
+      end
+      allow_ipv4_lb_neigh_incoming = ipv4_rules.any? ? "ip saddr . tcp sport { #{ipv4_rules.join(", ")} } ct state established,related,new counter accept" : ""
+      allow_ipv6_lb_neigh_incoming = ipv6_rules.any? ? "ip6 saddr . tcp sport { #{ipv6_rules.join(", ")} } ct state established,related,new counter accept" : ""
+
       <<~LOAD_BALANCER_ALLOW_RULE
 #{allow_ipv4_lb_neigh_incoming}
 #{allow_ipv6_lb_neigh_incoming}
@@ -247,11 +255,17 @@ TEMPLATE
       end
     end.join(",")
 
-    combined_rules_lb_dest = vm.load_balancer ? combined_rules.filter_map do |r|
-      if r.port_range[:begin] <= vm.load_balancer.src_port && vm.load_balancer.src_port <= r.port_range[:end] - 1
-        "#{r.cidr} . #{vm.load_balancer.dst_port}"
-      end
-    end.join(",") : []
+    combined_rules_lb_dest = if vm.load_balancer&.ports&.any?
+      combined_rules.flat_map do |r|
+        vm.load_balancer.ports.filter_map do |port|
+          if r.port_range[:begin] <= port[:src_port] && port[:src_port] < r.port_range[:end]
+            "#{r.cidr} . #{port[:dst_port]}"
+          end
+        end
+      end.join(",")
+    else
+      []
+    end
     [combined_rules_self, combined_rules_lb_dest]
   end
 

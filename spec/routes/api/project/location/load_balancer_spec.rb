@@ -11,7 +11,7 @@ RSpec.describe Clover, "load-balancer" do
     ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location_id: Location[display_name: TEST_LOCATION].id)
     dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
     cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
-    lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "lb-1", src_port: 80, dst_port: 80).subject
+    lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "lb-1", src_port: 80, dst_port: 8080).subject
     lb.add_cert(cert)
     lb
   end
@@ -60,7 +60,7 @@ RSpec.describe Clover, "load-balancer" do
 
       it "success multiple" do
         lb
-        Prog::Vnet::LoadBalancerNexus.assemble(lb.private_subnet.id, name: "lb-2", src_port: 80, dst_port: 80).subject
+        Prog::Vnet::LoadBalancerNexus.assemble(lb.private_subnet.id, name: "lb-2", src_port: 80, dst_port: 8080).subject
 
         get "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer"
 
@@ -90,7 +90,7 @@ RSpec.describe Clover, "load-balancer" do
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/lb1", {
           private_subnet_id: ps.ubid,
           stack: LoadBalancer::Stack::IPV4,
-          src_port: "80", dst_port: "80",
+          src_port: "80", dst_port: "8080",
           health_check_endpoint: "/up", algorithm: "round_robin",
           health_check_protocol: "http"
         }.to_json
@@ -103,7 +103,7 @@ RSpec.describe Clover, "load-balancer" do
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/lb1", {
           private_subnet_id: "invalid",
           stack: LoadBalancer::Stack::IPV6,
-          src_port: "80", dst_port: "80",
+          src_port: "80", dst_port: "8080",
           health_check_endpoint: "/up", algorithm: "round_robin",
           health_check_protocol: "http"
         }.to_json
@@ -152,7 +152,7 @@ RSpec.describe Clover, "load-balancer" do
 
       it "success" do
         patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
-          src_port: "80", dst_port: "80",
+          src_port: "80", dst_port: "8080",
           health_check_endpoint: "/up", algorithm: "round_robin", vms: []
         }.to_json
 
@@ -162,7 +162,7 @@ RSpec.describe Clover, "load-balancer" do
 
       it "not found" do
         patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/invalid", {
-          src_port: "80", dst_port: "80",
+          src_port: "80", dst_port: "8080",
           health_check_endpoint: "/up", algorithm: "round_robin", vms: []
         }.to_json
 
@@ -177,7 +177,7 @@ RSpec.describe Clover, "load-balancer" do
 
       it "updates vms" do
         patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
-          src_port: "80", dst_port: "80", health_check_endpoint: "/up", algorithm: "round_robin", vms: [vm.ubid]
+          src_port: "80", dst_port: "8080", health_check_endpoint: "/up", algorithm: "round_robin", vms: [vm.ubid]
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -188,7 +188,7 @@ RSpec.describe Clover, "load-balancer" do
         lb.add_vm(vm)
 
         patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
-          src_port: "80", dst_port: "80", health_check_endpoint: "/up", algorithm: "round_robin", vms: []
+          src_port: "80", dst_port: "8080", health_check_endpoint: "/up", algorithm: "round_robin", vms: []
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -205,14 +205,14 @@ RSpec.describe Clover, "load-balancer" do
       end
 
       it "vm already attached to a different load balancer" do
-        lb2 = Prog::Vnet::LoadBalancerNexus.assemble(lb.private_subnet.id, name: "lb-2", src_port: 80, dst_port: 80).subject
+        lb2 = Prog::Vnet::LoadBalancerNexus.assemble(lb.private_subnet.id, name: "lb-2", src_port: 80, dst_port: 8080).subject
         dz = DnsZone.create_with_id(name: "test-dns-zone2", project_id: lb2.private_subnet.project_id)
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
         lb2.add_cert(cert)
         lb2.add_vm(vm)
 
         patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
-          src_port: "80", dst_port: "80", health_check_endpoint: "/up", algorithm: "round_robin", vms: [vm.ubid]
+          src_port: "80", dst_port: "8080", health_check_endpoint: "/up", algorithm: "round_robin", vms: [vm.ubid]
         }.to_json
 
         expect(last_response).to have_api_error(400)
@@ -222,7 +222,7 @@ RSpec.describe Clover, "load-balancer" do
         lb.add_vm(vm)
 
         patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
-          src_port: "80", dst_port: "80", health_check_endpoint: "/up", algorithm: "round_robin", vms: [vm.ubid]
+          src_port: "80", dst_port: "8080", health_check_endpoint: "/up", algorithm: "round_robin", vms: [vm.ubid]
         }.to_json
 
         expect(last_response.status).to eq(200)

@@ -274,6 +274,16 @@ RSpec.describe Validation do
       end
     end
 
+    describe "#validate_load_balancer_ports" do
+      it "validates list of ports" do
+        expect { described_class.validate_load_balancer_ports([[80, 80]]) }.not_to raise_error
+      end
+
+      it "validates list of ports which hold duplicates" do
+        expect { described_class.validate_load_balancer_ports([[80, 80], [443, 80]]) }.to raise_error described_class::ValidationFailed
+      end
+    end
+
     describe "#validate_cidr" do
       it "valid cidr" do
         expect { described_class.validate_cidr("0.0.0.0/0") }.not_to raise_error
