@@ -97,8 +97,8 @@ end
 #  id                          | uuid           | PRIMARY KEY
 #  name                        | text           | NOT NULL
 #  algorithm                   | lb_algorithm   | NOT NULL DEFAULT 'round_robin'::lb_algorithm
-#  src_port                    | integer        | NOT NULL
-#  dst_port                    | integer        | NOT NULL
+#  src_port                    | integer        |
+#  dst_port                    | integer        |
 #  private_subnet_id           | uuid           | NOT NULL
 #  health_check_endpoint       | text           | NOT NULL
 #  health_check_interval       | integer        | NOT NULL DEFAULT 10
@@ -129,4 +129,5 @@ end
 #  certs_load_balancers | certs_load_balancers_load_balancer_id_fkey | (load_balancer_id) REFERENCES load_balancer(id)
 #  inference_endpoint   | inference_endpoint_load_balancer_id_fkey   | (load_balancer_id) REFERENCES load_balancer(id)
 #  kubernetes_cluster   | kubernetes_cluster_api_server_lb_id_fkey   | (api_server_lb_id) REFERENCES load_balancer(id)
+#  load_balancer_port   | load_balancer_port_load_balancer_id_fkey   | (load_balancer_id) REFERENCES load_balancer(id)
 #  load_balancers_vms   | load_balancers_vms_load_balancer_id_fkey   | (load_balancer_id) REFERENCES load_balancer(id)
