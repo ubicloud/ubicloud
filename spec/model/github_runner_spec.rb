@@ -10,17 +10,79 @@ RSpec.describe GithubRunner do
     described_class.create_with_id(repository_name: "test-repo", label: "ubicloud", vm_id: vm.id, installation_id: ins.id)
   }
 
+  def clog_emit_hash
+    hash = nil
+    message = "runner_tested"
+    expect(Clog).to(receive(:emit).with(message).and_wrap_original do |original_method, *args, &block|
+      hash = block.call
+      original_method.call(*args, &block)
+    end)
+    github_runner.log_duration(message, 10)
+    hash[message]
+  end
+
+  it "can log duration with a vm" do
+    vm = github_runner.vm
+    expect(clog_emit_hash).to eq({
+      repository_name: "test-repo",
+      ubid: github_runner.ubid,
+      label: github_runner.label,
+      duration: 10,
+      conclusion: nil,
+      vm_ubid: vm.ubid,
+      arch: vm.arch,
+      cores: vm.cores,
+      vcpus: vm.vcpus,
+      vm_host_ubid: vm.vm_host.ubid,
+      data_center: vm.vm_host.data_center
+    })
+  end
+
   it "can log duration when it's from a vm pool" do
     pool = VmPool.create_with_id(size: 1, vm_size: "standard-2", location_id: Location::HETZNER_FSN1_ID, boot_image: "github-ubuntu-2204", storage_size_gib: 86)
-    github_runner.vm.update(pool_id: pool.id)
-    expect(Clog).to receive(:emit).with("runner_tested").and_call_original
-    github_runner.log_duration("runner_tested", 10)
+    vm = github_runner.vm
+    vm.update(pool_id: pool.id)
+    expect(clog_emit_hash).to eq({
+      repository_name: "test-repo",
+      ubid: github_runner.ubid,
+      label: github_runner.label,
+      duration: 10,
+      conclusion: nil,
+      vm_ubid: vm.ubid,
+      arch: vm.arch,
+      cores: vm.cores,
+      vcpus: vm.vcpus,
+      vm_host_ubid: vm.vm_host.ubid,
+      data_center: vm.vm_host.data_center,
+      vm_pool_ubid: pool.ubid
+    })
+  end
+
+  it "can log duration when vm does not have vm_host" do
+    github_runner.vm.update(vm_host_id: nil)
+    vm = github_runner.vm
+    expect(clog_emit_hash).to eq({
+      repository_name: "test-repo",
+      ubid: github_runner.ubid,
+      label: github_runner.label,
+      duration: 10,
+      conclusion: nil,
+      vm_ubid: vm.ubid,
+      arch: vm.arch,
+      cores: vm.cores,
+      vcpus: vm.vcpus
+    })
   end
 
   it "can log duration without a vm" do
     github_runner.update(vm_id: nil)
-    expect(Clog).to receive(:emit).with("runner_tested").and_call_original
-    github_runner.log_duration("runner_tested", 10)
+    expect(clog_emit_hash).to eq({
+      repository_name: "test-repo",
+      ubid: github_runner.ubid,
+      label: github_runner.label,
+      duration: 10,
+      conclusion: nil
+    })
   end
 
   it "provisions a spare runner" do
