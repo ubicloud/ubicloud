@@ -4,12 +4,14 @@
 Dir.chdir(File.dirname(__dir__))
 
 require "open3"
+require "net/http"
+require "json"
 
 works = nil
 error = +""
 queue = Queue.new
 
-Open3.popen3({"RACK_ENV" => "production"}, "bundle", "exec", "puma", "-p", "8081") do |stdin, stdout, stderr, wait_thr|
+Open3.popen3({"RACK_ENV" => "production", "PORT" => "8081", "WEB_CONCURRENCY" => "1"}, "bundle", "exec", "puma", "-C", "puma_config.rb") do |stdin, stdout, stderr, wait_thr|
   pid = wait_thr.pid
 
   timer_thread = Thread.new do
@@ -23,11 +25,15 @@ Open3.popen3({"RACK_ENV" => "production"}, "bundle", "exec", "puma", "-p", "8081
   stdout_thread = Thread.new do
     while (line = stdout.gets)
       case line
-      when /\A\* Listening on /
-        works = true
+      when /\A\[\d+\] - Worker 0 \(PID: \d+\) booted in \d+.\d+s, phase: 0/
         puts line
+        response = Net::HTTP.post(URI("http://localhost:8081/login"),
+          {"login" => "foo@example.com", "password" => "bar"}.to_json,
+          {"content-type" => "application/json", "host" => "api.localhost"})
+        works = response.is_a?(Net::HTTPUnauthorized)
         queue.push(true)
         Process.kill(:TERM, pid)
+        puts stdout.read
         break
       when /\A! Unable to load application: /
         error << line
@@ -45,9 +51,11 @@ Open3.popen3({"RACK_ENV" => "production"}, "bundle", "exec", "puma", "-p", "8081
     err = stderr.read(1)
     if !err.nil?
       error << err << stderr.read_nonblock(100000)
-      works = false
-      queue.push(true)
-      Process.kill(:TERM, pid)
+      unless /"POST \/login HTTP\/1\.1*" 401 \d+ \d\.\d+\n\z/.match?(error)
+        works = false
+        queue.push(true)
+        Process.kill(:TERM, pid)
+      end
     end
   end
 
