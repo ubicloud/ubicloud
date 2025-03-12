@@ -19,6 +19,7 @@ Sequel::Model.plugin :insert_conflict
 Sequel::Model.plugin :inspect_pk
 Sequel::Model.plugin :static_cache_cache, "cache/static_cache.cache"
 Sequel::Model.plugin :pg_auto_constraint_validations, cache_file: "cache/pg_auto_constraint_validations.cache"
+Sequel::Model.plugin :pg_auto_validate_enums, message: proc { |valid_values| "is not one of the supported values (#{valid_values.sort.join(", ")})" }
 Sequel::Model.plugin :pg_eager_any_typed_array
 
 def Sequel.any_type(array, type)

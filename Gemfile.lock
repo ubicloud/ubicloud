@@ -17,8 +17,8 @@ GIT
 
 GIT
   remote: https://github.com/jeremyevans/sequel.git
-  revision: 2e6d8a009683040308e2385bdf6ba220a5c0ec40
-  ref: 2e6d8a009683040308e2385bdf6ba220a5c0ec40
+  revision: ffb9e288528877086e9acd04c82979502da26218
+  ref: ffb9e288528877086e9acd04c82979502da26218
   specs:
     sequel (5.90.0)
       bigdecimal
