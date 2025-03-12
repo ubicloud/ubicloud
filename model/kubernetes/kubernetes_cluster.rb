@@ -14,8 +14,9 @@ class KubernetesCluster < Sequel::Model
 
   include ResourceMethods
   include SemaphoreMethods
+  include HealthMonitorMethods
 
-  semaphore :destroy
+  semaphore :destroy, :checkup, :sync_kubernetes_services
 
   def validate
     super
@@ -41,6 +42,10 @@ class KubernetesCluster < Sequel::Model
     api_server_lb.hostname
   end
 
+  def client(session: cp_vms.first.sshable.start_fresh_session)
+    Kubernetes::Client.new(self, session)
+  end
+
   def sshable
     cp_vms.first.sshable
   end
@@ -59,6 +64,28 @@ class KubernetesCluster < Sequel::Model
 
   def kubeconfig
     self.class.kubeconfig(cp_vms.first)
+  end
+
+  def init_health_monitor_session
+    {
+      ssh_session: sshable.start_fresh_session
+    }
+  end
+
+  def check_pulse(session:, previous_pulse:)
+    reading = begin
+      incr_sync_kubernetes_services if strand.label == "wait" && client(session: session[:ssh_session]).any_lb_services_modified?
+      "up"
+    rescue
+      "down"
+    end
+    pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading)
+
+    if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30 && !reload.checkup_set?
+      incr_checkup
+    end
+
+    pulse
   end
 end
 
