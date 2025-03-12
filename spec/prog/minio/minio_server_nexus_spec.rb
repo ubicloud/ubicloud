@@ -70,12 +70,10 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(vm.unix_user).to eq "rhizome"
       expect(vm.sshable.host).to eq "temp_#{vm.id}"
       expect(vm.private_subnets.first.id).to eq minio_pool.cluster.private_subnet_id
-
-      expect(vm.strand.stack[0]["storage_volumes"].length).to eq 2
-      expect(vm.strand.stack[0]["storage_volumes"][0]["encrypted"]).to be true
-      expect(vm.strand.stack[0]["storage_volumes"][0]["size_gib"]).to eq 30
-      expect(vm.strand.stack[0]["storage_volumes"][1]["encrypted"]).to be true
-      expect(vm.strand.stack[0]["storage_volumes"][1]["size_gib"]).to eq 100
+      expect(vm.strand.stack[0]["storage_volumes"].map { _1.slice("encrypted", "size_gib") }).to eq([
+        {"encrypted" => true, "size_gib" => 30},
+        {"encrypted" => true, "size_gib" => 100}
+      ])
     end
 
     it "fails if pool is not valid" do
