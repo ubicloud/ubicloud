@@ -38,8 +38,9 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
 
       expect(described_class.assemble(ds.id)).to be_a Strand
 
-      expect(Vm.count).to eq 1
-      expect(Vm.first.unix_user).to eq "rhizome"
+      vms = Vm.limit(2).all
+      expect(vms.count).to eq 1
+      expect(vms.first.unix_user).to eq "rhizome"
     end
 
     it "errors out if the dns service project id is not put into config properly" do

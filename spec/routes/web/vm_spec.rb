@@ -76,17 +76,19 @@ RSpec.describe Clover, "vm" do
 
         expect(page.title).to eq("Ubicloud - #{name}")
         expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
-        expect(Vm.count).to eq(1)
-        expect(Vm.first.project_id).to eq(project.id)
-        expect(Vm.first.private_subnets.first.id).not_to be_nil
-        expect(Vm.first.ip4_enabled).to be_falsey
+        vms = Vm.all
+        expect(vms.count).to eq(1)
+        vm = vms.first
+        expect(vm.project_id).to eq(project.id)
+        expect(vm.private_subnets.first.id).not_to be_nil
+        expect(vm.ip4_enabled).to be_falsey
 
         visit project.path
         expect(page).to have_content("2/32 (6%)")
-        Vm.first.update(vcpus: 25)
+        vm.update(vcpus: 25)
         page.refresh
         expect(page).to have_content("25/32 (78%)")
-        Vm.first.update(vcpus: 31)
+        vm.update(vcpus: 31)
         page.refresh
         expect(page).to have_content("31/32 (96%)")
       end
@@ -182,10 +184,12 @@ RSpec.describe Clover, "vm" do
 
         expect(page.title).to eq("Ubicloud - #{name}")
         expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
-        expect(Vm.count).to eq(1)
-        expect(Vm.first.project_id).to eq(project.id)
-        expect(Vm.first.private_subnets.first.id).not_to be_nil
-        expect(Vm.first.ip4_enabled).to be_truthy
+        vms = Vm.all
+        expect(vms.count).to eq(1)
+        vm = vms.first
+        expect(vm.project_id).to eq(project.id)
+        expect(vm.private_subnets.first.id).not_to be_nil
+        expect(vm.ip4_enabled).to be_truthy
       end
 
       it "can create new virtual machine with chosen private subnet" do
@@ -207,9 +211,11 @@ RSpec.describe Clover, "vm" do
 
         expect(page.title).to eq("Ubicloud - #{name}")
         expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
-        expect(Vm.count).to eq(1)
-        expect(Vm.first.project_id).to eq(project.id)
-        expect(Vm.first.private_subnets.first.id).to eq(ps.id)
+        vms = Vm.all
+        expect(vms.count).to eq(1)
+        vm = vms.first
+        expect(vm.project_id).to eq(project.id)
+        expect(vm.private_subnets.first.id).to eq(ps.id)
       end
 
       it "can create new virtual machine in default location subnet" do
@@ -231,10 +237,12 @@ RSpec.describe Clover, "vm" do
 
         expect(page.title).to eq("Ubicloud - #{name}")
         expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
-        expect(Vm.count).to eq(1)
-        expect(Vm.first.project_id).to eq(project.id)
-        expect(Vm.first.private_subnets.first.id).not_to eq(ps.id)
-        expect(Vm.first.private_subnets.first.name).to eq("default-#{LocationNameConverter.to_display_name(ps.location)}")
+        vms = Vm.all
+        expect(vms.count).to eq(1)
+        vm = vms.first
+        expect(vm.project_id).to eq(project.id)
+        expect(vm.private_subnets.first.id).not_to eq(ps.id)
+        expect(vm.private_subnets.first.name).to eq("default-#{LocationNameConverter.to_display_name(ps.location)}")
 
         # can create a second vm in the same location and it will use the same subnet
         visit "#{project.path}/vm/create"
