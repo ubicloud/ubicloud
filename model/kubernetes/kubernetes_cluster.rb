@@ -16,8 +16,9 @@ class KubernetesCluster < Sequel::Model
 
   include ResourceMethods
   include SemaphoreMethods
+  include HealthMonitorMethods
 
-  semaphore :destroy
+  semaphore :destroy, :sync_kubernetes_services
 
   def validate
     super
@@ -43,8 +44,20 @@ class KubernetesCluster < Sequel::Model
     api_server_lb.hostname
   end
 
+  def client(session: cp_vms.first.sshable.start_fresh_session)
+    Kubernetes::Client.new(self, session)
+  end
+
   def sshable
     cp_vms.first.sshable
+  end
+
+  def services_load_balancer_name
+    "#{ubid}-services"
+  end
+
+  def apiserver_load_balancer_name
+    "#{ubid}-apiserver"
   end
 
   def self.kubeconfig(vm)
@@ -61,6 +74,41 @@ class KubernetesCluster < Sequel::Model
 
   def kubeconfig
     self.class.kubeconfig(cp_vms.first)
+  end
+
+  def vm_diff_for_lb(load_balancer)
+    worker_vms = nodepools.flat_map(&:vms)
+    worker_vm_ids = worker_vms.map(&:id).to_set
+    lb_vms = load_balancer.load_balancers_vms.map(&:vm)
+    lb_vm_ids = lb_vms.map(&:id).to_set
+
+    extra_vms = lb_vms.reject { |vm| worker_vm_ids.include?(vm.id) }
+    missing_vms = worker_vms.reject { |vm| lb_vm_ids.include?(vm.id) }
+    [extra_vms, missing_vms]
+  end
+
+  def port_diff_for_lb(load_balancer, desired_ports)
+    lb_ports_hash = load_balancer.ports.to_h { |p| [[p.src_port, p.dst_port], p.id] }
+    missing_ports = desired_ports - lb_ports_hash.keys
+    extra_ports = (lb_ports_hash.keys - desired_ports).map { |p| LoadBalancerPort[id: lb_ports_hash[p]] }
+
+    [extra_ports, missing_ports]
+  end
+
+  def init_health_monitor_session
+    {
+      ssh_session: sshable.start_fresh_session
+    }
+  end
+
+  def check_pulse(session:, previous_pulse:)
+    reading = begin
+      incr_sync_kubernetes_services if client(session: session[:ssh_session]).any_lb_services_modified?
+      "up"
+    rescue
+      "down"
+    end
+    aggregate_readings(previous_pulse: previous_pulse, reading: reading)
   end
 end
 

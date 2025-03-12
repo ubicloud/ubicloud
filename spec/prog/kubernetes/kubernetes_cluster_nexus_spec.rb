@@ -118,7 +118,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
       expect { nx.create_load_balancer }.to hop("bootstrap_control_plane_vms")
 
-      expect(kubernetes_cluster.api_server_lb.name).to eq "k8scluster-apiserver"
+      expect(kubernetes_cluster.api_server_lb.name).to eq "#{kubernetes_cluster.ubid}-apiserver"
       expect(kubernetes_cluster.api_server_lb.ports.first.src_port).to eq 443
       expect(kubernetes_cluster.api_server_lb.ports.first.dst_port).to eq 6443
       expect(kubernetes_cluster.api_server_lb.health_check_endpoint).to eq "/healthz"
@@ -132,7 +132,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     it "creates a load balancer with dns zone id on development for api server and hops" do
       expect { nx.create_load_balancer }.to hop("bootstrap_control_plane_vms")
 
-      expect(kubernetes_cluster.api_server_lb.name).to eq "k8scluster-apiserver"
+      expect(kubernetes_cluster.api_server_lb.name).to eq "#{kubernetes_cluster.ubid}-apiserver"
       expect(kubernetes_cluster.api_server_lb.ports.first.src_port).to eq 443
       expect(kubernetes_cluster.api_server_lb.ports.first.dst_port).to eq 6443
       expect(kubernetes_cluster.api_server_lb.health_check_endpoint).to eq "/healthz"
@@ -203,8 +203,23 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     end
   end
 
+  describe "#sync_kubernetes_services" do
+    it "calls the sync_kubernetes_services function" do
+      client = instance_double(Kubernetes::Client)
+      expect(nx).to receive(:decr_sync_kubernetes_services)
+      expect(kubernetes_cluster).to receive(:client).and_return(client)
+      expect(client).to receive(:sync_kubernetes_services)
+      expect { nx.sync_kubernetes_services }.to hop("wait")
+    end
+  end
+
   describe "#wait" do
-    it "naps for 6 hours" do
+    it "hops to the right sync_kubernetes_service when its semaphore is set" do
+      expect(nx).to receive(:when_sync_kubernetes_services_set?).and_yield
+      expect { nx.wait }.to hop("sync_kubernetes_services")
+    end
+
+    it "naps until sync_kubernetes_service is set" do
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
   end

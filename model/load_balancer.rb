@@ -40,11 +40,30 @@ class LoadBalancer < Sequel::Model
     vm_ports_dataset.where(load_balancer_vm_id: load_balancers_vms_dataset.where(vm_id: vm.id).select(:id), state:)
   end
 
+  def add_port(src_port, dst_port)
+    DB.transaction do
+      port = LoadBalancerPort.create(load_balancer_id: id, src_port:, dst_port:)
+      load_balancers_vms.each do |lb_vm|
+        LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: lb_vm.id)
+      end
+      incr_update_load_balancer
+    end
+  end
+
+  def remove_port(port)
+    DB.transaction do
+      vm_ports_dataset.where(load_balancer_port_id: port.id).destroy
+      port.destroy
+      incr_update_load_balancer
+    end
+  end
+
   def add_vm(vm)
     DB.transaction do
       load_balancer_vm = LoadBalancersVms.create(load_balancer_id: id, vm_id: vm.id)
-      ports.each { |port| LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: load_balancer_vm.id) }
-
+      ports.each { |port|
+        LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: load_balancer_vm.id)
+      }
       Strand.create_with_id(prog: "Vnet::CertServer", label: "put_certificate", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id)
       incr_rewrite_dns_records
     end
