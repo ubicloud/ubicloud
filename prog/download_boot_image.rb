@@ -100,6 +100,7 @@ class Prog::DownloadBootImage < Prog::Base
       ["postgres16-lantern-ubuntu-2204", "x64", "20250103.1.0"] => "bfb56867513045bc88396d529a3cc186dc44ba4d691acb51dbf45fc5a0eeb7e6",
       ["postgres17-lantern-ubuntu-2204", "x64", "20250103.1.0"] => "a95b2e5d03291783dc1753228d7a87949257a06c7b1eca2c94502ab21ffdecdb",
       ["ai-ubuntu-2404-nvidia", "x64", "20250301.1.0"] => "6392a94b248c5e299325f3687a5f48ae3a50cf5a10d54efd2be3bbea89f2f634",
+      ["ai-model-empty", "x64", "20250317.1.0"] => "24529ea3cfb853c1350153dc3dd30aab62df352b8f46ad35f729cb9948190316",
       ["ai-model-gemma-2-2b-it", "x64", "20240918.1.0"] => "b726ead6d5f48fb8e6de7efb48fb22367c9a7c155cfee71a3a7e5527be5df08e",
       ["ai-model-llama-3-1-8b-it", "x64", "20250118.1.0"] => "7296f70a861c364f59c38b816e1210152ebafbec85ce797888c16b4d48a15e8f",
       ["ai-model-llama-3-2-1b-it", "x64", "20250203.1.0"] => "c32ba500156486d35d79c18a69a146278e2c408b0d433d7fb94d753b68fe5d3a",
