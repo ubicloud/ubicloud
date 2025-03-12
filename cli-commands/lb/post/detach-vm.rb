@@ -3,7 +3,7 @@
 UbiCli.on("lb").run_on("detach-vm") do
   desc "Detach a virtual machine from a load balancer"
 
-  banner "ubi lb (location/lb-name|lb-id) detach-vm vm-id"
+  banner "ubi lb (location/lb-name | lb-id) detach-vm vm-id"
 
   args 1
 

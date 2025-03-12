@@ -172,7 +172,7 @@ class UbiCli
     on("pg").run_on(cmd) do
       desc(desc)
 
-      skip_option_parsing("ubi pg (location/pg-name|pg-id) [options] #{cmd} [#{cmd}-options]")
+      skip_option_parsing("ubi pg (location/pg-name | pg-id) [options] #{cmd} [#{cmd}-options]")
 
       args(0...)
 

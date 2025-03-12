@@ -3,7 +3,7 @@
 UbiCli.on("pg").run_on("add-metric-destination") do
   desc "Add a PostgreSQL metric destination"
 
-  banner "ubi pg (location/pg-name|pg-id) add-metric-destination username password url"
+  banner "ubi pg (location/pg-name | pg-id) add-metric-destination username password url"
 
   args 3, invalid_args_message: "username, password, and url arguments are required"
 

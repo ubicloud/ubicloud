@@ -4,7 +4,7 @@ Manage PostgreSQL databases
 
 Usage:
     ubi pg command [...]
-    ubi pg (location/pg-name|pg-id) [post-options] post-command [...]
+    ubi pg (location/pg-name | pg-id) [post-options] post-command [...]
 
 Commands:
     list                         List PostgreSQL databases

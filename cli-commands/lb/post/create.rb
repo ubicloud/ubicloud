@@ -3,7 +3,7 @@
 UbiCli.on("lb").run_on("create") do
   desc "Create a load balancer"
 
-  options("ubi lb location/lb-name create [options] private-subnet-id src-port dst-port", key: :lb_create) do
+  options("ubi lb location/lb-name create [options] ps-id src-port dst-port", key: :lb_create) do
     on("-a", "--algorithm=alg", "set the algorithm to use (round_robin(default), hash_based)")
     on("-e", "--check-endpoint=path", "set the health check endpoint (default: #{Prog::Vnet::LoadBalancerNexus::DEFAULT_HEALTH_CHECK_ENDPOINT})")
     on("-p", "--check-protocol=proto", "set the health check protocol (http(default), https, tcp)")

@@ -5,7 +5,7 @@ Usage:
 
 Commands:
     fw      Manage firewalls
-    help    Get program help
+    help    Get command help
     lb      Manage load balancers
     pg      Manage PostgreSQL databases
     ps      Manage private subnets

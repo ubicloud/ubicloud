@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 UbiCli.on("help") do
-  desc "Get program help"
+  desc "Get command help"
 
   options("ubi help [options] [command [subcommand]]") do
     on("-r", "--recursive", "also show documentation for all subcommands of command")
