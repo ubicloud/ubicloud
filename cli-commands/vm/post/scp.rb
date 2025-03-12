@@ -3,7 +3,7 @@
 UbiCli.on("vm").run_on("scp") do
   desc "Copy files to or from virtual machine using `scp`"
 
-  skip_option_parsing("ubi vm (location/vm-name|vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)")
+  skip_option_parsing("ubi vm (location/vm-name | vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)")
 
   args(2..., invalid_args_message: "must provide 2 paths: either 'local-path :remote-path' or ':remote-path local-path'")
 

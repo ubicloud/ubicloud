@@ -3,7 +3,7 @@
 UbiCli.on("fw").run_on("delete-rule") do
   desc "Remove a firewall rule"
 
-  banner "ubi fw (location/fw-name|fw-id) delete-rule rule-id"
+  banner "ubi fw (location/fw-name | fw-id) delete-rule rule-id"
 
   args 1
 

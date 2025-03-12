@@ -1,4 +1,4 @@
-Get program help
+Get command help
 
 Usage:
     ubi help [options] [command [subcommand]]

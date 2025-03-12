@@ -3,7 +3,7 @@
 UbiCli.on("pg").run_on("restore") do
   desc "Restore a PostgreSQL database backup to a new database"
 
-  banner "ubi pg (location/pg-name|pg-id) restore new-db-name restore-time"
+  banner "ubi pg (location/pg-name | pg-id) restore new-db-name restore-time"
 
   args 2, invalid_args_message: "name and restore target are required"
 

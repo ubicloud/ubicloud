@@ -2,7 +2,7 @@ Manage virtual machines
 
 Usage:
     ubi vm command [...]
-    ubi vm (location/vm-name|vm-id) [post-options] post-command [...]
+    ubi vm (location/vm-name | vm-id) [post-options] post-command [...]
 
 Commands:
     list       List virtual machines
@@ -60,25 +60,25 @@ Options:
 Restart a virtual machine
 
 Usage:
-    ubi vm (location/vm-name|vm-id) restart
+    ubi vm (location/vm-name | vm-id) restart
 
 
 Copy files to or from virtual machine using `scp`
 
 Usage:
-    ubi vm (location/vm-name|vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
+    ubi vm (location/vm-name | vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
 
 
 Copy files to or from virtual machine using `sftp`
 
 Usage:
-    ubi vm (location/vm-name|vm-id) [options] sftp [sftp-options]
+    ubi vm (location/vm-name | vm-id) [options] sftp [sftp-options]
 
 
 Show details for a virtual machine
 
 Usage:
-    ubi vm (location/vm-name|vm-id) show [options]
+    ubi vm (location/vm-name | vm-id) show [options]
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)
@@ -93,6 +93,6 @@ Firewall Fields: id name description location path firewall-rules
 Connect to a virtual machine using `ssh`
 
 Usage:
-    ubi vm (location/vm-name|vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
+    ubi vm (location/vm-name | vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
 
 

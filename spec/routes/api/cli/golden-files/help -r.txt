@@ -5,7 +5,7 @@ Usage:
 
 Commands:
     fw      Manage firewalls
-    help    Get program help
+    help    Get command help
     lb      Manage load balancers
     pg      Manage PostgreSQL databases
     ps      Manage private subnets
@@ -21,7 +21,7 @@ Manage firewalls
 
 Usage:
     ubi fw command [...]
-    ubi fw (location/fw-name|fw-id) post-command [...]
+    ubi fw (location/fw-name | fw-id) post-command [...]
 
 Commands:
     list             List firewalls
@@ -51,7 +51,7 @@ Fields: location name id
 Add a firewall rule
 
 Usage:
-    ubi fw (location/fw-name|fw-id) add-rule cidr
+    ubi fw (location/fw-name | fw-id) add-rule cidr
 
 Options:
     -s, --start-port=port            starting (or only) port to allow (default: 0)
@@ -61,7 +61,7 @@ Options:
 Attach a private subnet to a firewall
 
 Usage:
-    ubi fw (location/fw-name|fw-id) attach-subnet ps-id
+    ubi fw (location/fw-name | fw-id) attach-subnet ps-id
 
 
 Create a firewall
@@ -76,7 +76,7 @@ Options:
 Remove a firewall rule
 
 Usage:
-    ubi fw (location/fw-name|fw-id) delete-rule rule-id
+    ubi fw (location/fw-name | fw-id) delete-rule rule-id
 
 
 Destroy a firewall
@@ -91,13 +91,13 @@ Options:
 Detch a private subnet from a firewall
 
 Usage:
-    ubi fw (location/fw-name|fw-id) detach-subnet ps-id
+    ubi fw (location/fw-name | fw-id) detach-subnet ps-id
 
 
 Show details for a firewall
 
 Usage:
-    ubi fw (location/fw-name|fw-id) show [options]
+    ubi fw (location/fw-name | fw-id) show [options]
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)
@@ -110,7 +110,7 @@ Private Subnet Fields: id name state location net4 net6 nics
 Firewall Rule Fields: id cidr port-range
 
 
-Get program help
+Get command help
 
 Usage:
     ubi help [options] [command [subcommand]]
@@ -124,7 +124,7 @@ Manage load balancers
 
 Usage:
     ubi lb command [...]
-    ubi lb (location/lb-name|lb-id) post-command [...]
+    ubi lb (location/lb-name | lb-id) post-command [...]
 
 Commands:
     list         List load balancers
@@ -153,13 +153,13 @@ Fields: location name id src-port dst-port hostname
 Attach a virtual machine to a load balancer
 
 Usage:
-    ubi lb (location/lb-name|lb-id) attach-vm vm-id
+    ubi lb (location/lb-name | lb-id) attach-vm vm-id
 
 
 Create a load balancer
 
 Usage:
-    ubi lb location/lb-name create [options] private-subnet-id src-port dst-port
+    ubi lb location/lb-name create [options] ps-id src-port dst-port
 
 Options:
     -a, --algorithm=alg              set the algorithm to use (round_robin(default), hash_based)
@@ -180,13 +180,13 @@ Options:
 Detach a virtual machine from a load balancer
 
 Usage:
-    ubi lb (location/lb-name|lb-id) detach-vm vm-id
+    ubi lb (location/lb-name | lb-id) detach-vm vm-id
 
 
 Show details for a load balancer
 
 Usage:
-    ubi lb (location/lb-name|lb-id) show [options]
+    ubi lb (location/lb-name | lb-id) show [options]
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)
@@ -197,14 +197,14 @@ Fields: id name state location hostname algorithm stack health-check-endpoint
 Update a load balancer
 
 Usage:
-    ubi lb (location/lb-name|lb-id) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]
+    ubi lb (location/lb-name | lb-id) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]
 
 
 Manage PostgreSQL databases
 
 Usage:
     ubi pg command [...]
-    ubi pg (location/pg-name|pg-id) [post-options] post-command [...]
+    ubi pg (location/pg-name | pg-id) [post-options] post-command [...]
 
 Commands:
     list                         List PostgreSQL databases
@@ -244,13 +244,13 @@ Fields: location name id version flavor
 Add a PostgreSQL firewall rule
 
 Usage:
-    ubi pg (location/pg-name|pg-id) add-firewall-rule cidr
+    ubi pg (location/pg-name | pg-id) add-firewall-rule cidr
 
 
 Add a PostgreSQL metric destination
 
 Usage:
-    ubi pg (location/pg-name|pg-id) add-metric-destination username password url
+    ubi pg (location/pg-name | pg-id) add-metric-destination username password url
 
 
 Create a PostgreSQL database
@@ -269,13 +269,13 @@ Options:
 Delete a PostgreSQL firewall rule
 
 Usage:
-    ubi pg (location/pg-name|pg-id) delete-firewall-rule rule-id
+    ubi pg (location/pg-name | pg-id) delete-firewall-rule rule-id
 
 
 Delete a PostgreSQL metric destination
 
 Usage:
-    ubi pg (location/pg-name|pg-id) delete-metric-destination md-id
+    ubi pg (location/pg-name | pg-id) delete-metric-destination md-id
 
 
 Destroy a PostgreSQL database
@@ -290,43 +290,43 @@ Options:
 Dump a single PostgreSQL database using `pg_dump`
 
 Usage:
-    ubi pg (location/pg-name|pg-id) [options] pg_dump [pg_dump-options]
+    ubi pg (location/pg-name | pg-id) [options] pg_dump [pg_dump-options]
 
 
 Dump a entire PostgreSQL database cluster using `pg_dumpall`
 
 Usage:
-    ubi pg (location/pg-name|pg-id) [options] pg_dumpall [pg_dumpall-options]
+    ubi pg (location/pg-name | pg-id) [options] pg_dumpall [pg_dumpall-options]
 
 
 Connect to a PostgreSQL database using `psql`
 
 Usage:
-    ubi pg (location/pg-name|pg-id) [options] psql [psql-options]
+    ubi pg (location/pg-name | pg-id) [options] psql [psql-options]
 
 
 Reset the superuser password for a PostgreSQL database
 
 Usage:
-    ubi pg (location/pg-name|pg-id) reset-superuser-password new-password
+    ubi pg (location/pg-name | pg-id) reset-superuser-password new-password
 
 
 Restart a PostgreSQL database cluster
 
 Usage:
-    ubi pg (location/pg-name|pg-id) restart
+    ubi pg (location/pg-name | pg-id) restart
 
 
 Restore a PostgreSQL database backup to a new database
 
 Usage:
-    ubi pg (location/pg-name|pg-id) restore new-db-name restore-time
+    ubi pg (location/pg-name | pg-id) restore new-db-name restore-time
 
 
 Show details for a PostgreSQL database
 
 Usage:
-    ubi pg (location/pg-name|pg-id) show [options]
+    ubi pg (location/pg-name | pg-id) show [options]
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)
@@ -339,7 +339,7 @@ Manage private subnets
 
 Usage:
     ubi ps command [...]
-    ubi ps (location/ps-name|ps-id) post-command [...]
+    ubi ps (location/ps-name | ps-id) post-command [...]
 
 Commands:
     list          List private subnets
@@ -367,7 +367,7 @@ Fields: location name id net4 net6
 Connect a private subnet to another private subnet
 
 Usage:
-    ubi ps (location/ps-name|ps-id) connect ps-id
+    ubi ps (location/ps-name | ps-id) connect ps-id
 
 
 Create a private subnet
@@ -391,13 +391,13 @@ Options:
 Disconnect a private subnet from another private subnet
 
 Usage:
-    ubi ps (location/ps-name|ps-id) disconnect ps-id
+    ubi ps (location/ps-name | ps-id) disconnect ps-id
 
 
 Show details for a private subnet
 
 Usage:
-    ubi ps (location/ps-name|ps-id) show [options]
+    ubi ps (location/ps-name | ps-id) show [options]
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)
@@ -414,7 +414,7 @@ Manage virtual machines
 
 Usage:
     ubi vm command [...]
-    ubi vm (location/vm-name|vm-id) [post-options] post-command [...]
+    ubi vm (location/vm-name | vm-id) [post-options] post-command [...]
 
 Commands:
     list       List virtual machines
@@ -472,25 +472,25 @@ Options:
 Restart a virtual machine
 
 Usage:
-    ubi vm (location/vm-name|vm-id) restart
+    ubi vm (location/vm-name | vm-id) restart
 
 
 Copy files to or from virtual machine using `scp`
 
 Usage:
-    ubi vm (location/vm-name|vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
+    ubi vm (location/vm-name | vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
 
 
 Copy files to or from virtual machine using `sftp`
 
 Usage:
-    ubi vm (location/vm-name|vm-id) [options] sftp [sftp-options]
+    ubi vm (location/vm-name | vm-id) [options] sftp [sftp-options]
 
 
 Show details for a virtual machine
 
 Usage:
-    ubi vm (location/vm-name|vm-id) show [options]
+    ubi vm (location/vm-name | vm-id) show [options]
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)
@@ -505,6 +505,6 @@ Firewall Fields: id name description location path firewall-rules
 Connect to a virtual machine using `ssh`
 
 Usage:
-    ubi vm (location/vm-name|vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
+    ubi vm (location/vm-name | vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
 
 

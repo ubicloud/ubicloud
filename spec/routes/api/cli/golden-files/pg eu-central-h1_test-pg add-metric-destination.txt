@@ -3,4 +3,4 @@
 Add a PostgreSQL metric destination
 
 Usage:
-    ubi pg (location/pg-name|pg-id) add-metric-destination username password url
+    ubi pg (location/pg-name | pg-id) add-metric-destination username password url

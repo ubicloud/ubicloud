@@ -2,7 +2,7 @@ Manage virtual machines
 
 Usage:
     ubi vm command [...]
-    ubi vm (location/vm-name|vm-id) [post-options] post-command [...]
+    ubi vm (location/vm-name | vm-id) [post-options] post-command [...]
 
 Commands:
     list       List virtual machines

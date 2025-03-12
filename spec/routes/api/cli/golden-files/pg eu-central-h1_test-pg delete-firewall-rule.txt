@@ -3,4 +3,4 @@
 Delete a PostgreSQL firewall rule
 
 Usage:
-    ubi pg (location/pg-name|pg-id) delete-firewall-rule rule-id
+    ubi pg (location/pg-name | pg-id) delete-firewall-rule rule-id

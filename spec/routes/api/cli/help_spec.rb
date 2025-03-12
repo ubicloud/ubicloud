@@ -5,7 +5,7 @@ require_relative "spec_helper"
 RSpec.describe Clover, "cli help" do
   it "shows help for specific command if given" do
     expect(cli(%w[help help])).to eq <<~OUTPUT
-      Get program help
+      Get command help
 
       Usage:
           ubi help [options] [command [subcommand]]
@@ -21,7 +21,7 @@ RSpec.describe Clover, "cli help" do
       Connect to a virtual machine using `ssh`
 
       Usage:
-          ubi vm (location/vm-name|vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
+          ubi vm (location/vm-name | vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
     OUTPUT
   end
 
@@ -55,7 +55,7 @@ RSpec.describe Clover, "cli help" do
       Connect to a virtual machine using `ssh`
 
       Usage:
-          ubi vm (location/vm-name|vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
+          ubi vm (location/vm-name | vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
     OUTPUT
   end
 end

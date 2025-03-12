@@ -3,7 +3,7 @@
 UbiCli.on("vm").run_on("restart") do
   desc "Restart a virtual machine"
 
-  banner "ubi vm (location/vm-name|vm-id) restart"
+  banner "ubi vm (location/vm-name | vm-id) restart"
 
   run do
     post(vm_path("/restart")) do |data|
