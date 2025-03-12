@@ -64,16 +64,18 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(MinioServer.count).to eq 1
       expect(st.label).to eq "start"
       expect(MinioServer.first.pool).to eq minio_pool
-      expect(Vm.count).to eq 1
-      expect(Vm.first.unix_user).to eq "rhizome"
-      expect(Vm.first.sshable.host).to eq "temp_#{Vm.first.id}"
-      expect(Vm.first.private_subnets.first.id).to eq minio_pool.cluster.private_subnet_id
+      vms = Vm.all
+      expect(vms.count).to eq 1
+      vm = vms.first
+      expect(vm.unix_user).to eq "rhizome"
+      expect(vm.sshable.host).to eq "temp_#{vm.id}"
+      expect(vm.private_subnets.first.id).to eq minio_pool.cluster.private_subnet_id
 
-      expect(Vm.first.strand.stack[0]["storage_volumes"].length).to eq 2
-      expect(Vm.first.strand.stack[0]["storage_volumes"][0]["encrypted"]).to be true
-      expect(Vm.first.strand.stack[0]["storage_volumes"][0]["size_gib"]).to eq 30
-      expect(Vm.first.strand.stack[0]["storage_volumes"][1]["encrypted"]).to be true
-      expect(Vm.first.strand.stack[0]["storage_volumes"][1]["size_gib"]).to eq 100
+      expect(vm.strand.stack[0]["storage_volumes"].length).to eq 2
+      expect(vm.strand.stack[0]["storage_volumes"][0]["encrypted"]).to be true
+      expect(vm.strand.stack[0]["storage_volumes"][0]["size_gib"]).to eq 30
+      expect(vm.strand.stack[0]["storage_volumes"][1]["encrypted"]).to be true
+      expect(vm.strand.stack[0]["storage_volumes"][1]["size_gib"]).to eq 100
     end
 
     it "fails if pool is not valid" do
