@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "excon"
 require "forwardable"
 
 require_relative "../../lib/util"
@@ -70,7 +71,26 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
 
   label def download_lb_cert
     vm.sshable.cmd("sudo inference_endpoint/bin/download-lb-cert")
-    hop_setup
+    hop_setup_external
+  end
+
+  label def setup_external
+    if inference_endpoint.engine == "runpod"
+      if inference_endpoint_replica.external_state["pod_id"]
+        pod = get_runpod_pod
+        if pod[:ip] && pod[:port]
+          inference_endpoint_replica.update(external_state: pod)
+          hop_setup
+        end
+      else
+        pod_id = create_runpod_pod
+        inference_endpoint_replica.update(external_state: {"pod_id" => pod_id})
+      end
+    else
+      hop_setup
+    end
+
+    nap 10
   end
 
   label def setup
@@ -110,6 +130,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
     decr_destroy
 
     resolve_page
+    delete_runpod_pod
     strand.children.each { _1.destroy }
     inference_endpoint.load_balancer.evacuate_vm(vm)
     inference_endpoint.load_balancer.remove_vm(vm)
@@ -238,8 +259,107 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
     when "vllm"
       env = (inference_endpoint.gpu_count == 0) ? "vllm-cpu" : "vllm"
       "/opt/miniconda/envs/#{env}/bin/vllm serve /ie/models/model --served-model-name #{inference_endpoint.model_name} --disable-log-requests --host 127.0.0.1 #{inference_endpoint.engine_params}"
+    when "runpod"
+      "ssh -N -L 8000:localhost:8000 root@#{inference_endpoint_replica.external_state["ip"]} -p #{inference_endpoint_replica.external_state["port"]} -i /ie/workdir/.ssh/runpod -o UserKnownHostsFile=/ie/workdir/.ssh/known_hosts -o StrictHostKeyChecking=accept-new"
     else
       fail "BUG: unsupported inference engine"
+    end
+  end
+
+  def create_runpod_pod
+    response = Excon.post("https://api.runpod.io/graphql",
+      headers: {"content-type" => "application/json", "authorization" => "Bearer #{Config.runpod_api_key}"},
+      body: {"query" => "query Pods { myself { pods { id name runtime  { ports { ip isIpPublic privatePort publicPort type } } } } }"}.to_json,
+      expects: 200)
+
+    pods = JSON.parse(response.body)["data"]["myself"]["pods"]
+    pod = pods.find { |pod| pod["name"] == inference_endpoint_replica.ubid }
+
+    return pod["id"] if pod
+
+    ssh_keys = vm.sshable.cmd(<<-CMD
+if ! sudo test -f /ie/workdir/.ssh/runpod; then  
+  sudo -u ie mkdir -p /ie/workdir/.ssh
+  sudo -u ie ssh-keygen -t ed25519 -C #{inference_endpoint_replica.ubid}@ubicloud.com -f /ie/workdir/.ssh/runpod -N '' -q
+fi
+sudo cat /ie/workdir/.ssh/runpod.pub
+    CMD
+                             ) + Config.operator_ssh_public_keys
+
+    vllm_params = "--served-model-name #{inference_endpoint.model_name} --disable-log-requests --host 127.0.0.1 #{inference_endpoint.engine_params}"
+
+    graphql_query = <<~GRAPHQL
+      mutation {
+        podFindAndDeployOnDemand(
+          input: {
+            cloudType: ALL
+            dataCenterId: "#{inference_endpoint.external_config["data_center"]}"
+            gpuCount: #{inference_endpoint.external_config["gpu_count"]}
+            gpuTypeId: "#{inference_endpoint.external_config["gpu_type"]}"
+            containerDiskInGb: #{inference_endpoint.external_config["disk_gib"]}
+            minVcpuCount: #{inference_endpoint.external_config["min_vcpu_count"]}
+            minMemoryInGb: #{inference_endpoint.external_config["min_memory_gib"]}
+            imageName: "#{inference_endpoint.external_config["image_name"]}"
+            name: "#{inference_endpoint_replica.ubid}"
+            volumeInGb: 0
+            ports: "22/tcp"
+            env: [
+              { key: "HF_TOKEN", value: "#{Config.huggingface_token}" },
+              { key: "HF_HUB_ENABLE_HF_TRANSFER", value: "1"},
+              { key: "MODEL_PATH", value: "/model"},
+              { key: "MODEL_NAME_HF", value: "#{inference_endpoint.external_config["model_name_hf"]}"},
+              { key: "VLLM_PARAMS", value: "#{vllm_params}"},
+              { key: "SSH_KEYS", value: "#{ssh_keys.gsub("\n", "\\n")}" }
+            ]
+          }
+        ) {
+          id
+          imageName
+          env
+          machineId
+          machine {
+            podHostId
+          }
+        }
+      }
+    GRAPHQL
+
+    response = Excon.post("https://api.runpod.io/graphql",
+      headers: {"content-type" => "application/json", "authorization" => "Bearer #{Config.runpod_api_key}"},
+      body: {"query" => graphql_query}.to_json,
+      expects: 200)
+
+    pod = JSON.parse(response.body)["data"]["podFindAndDeployOnDemand"]
+    pod["id"]
+  end
+
+  def get_runpod_pod
+    pod_id = inference_endpoint_replica.external_state.fetch("pod_id")
+    response = Excon.post("https://api.runpod.io/graphql",
+      headers: {"content-type" => "application/json", "authorization" => "Bearer #{Config.runpod_api_key}"},
+      body: {"query" => "query Pod { pod(input: {podId: \"#{pod_id}\"}) { id name runtime  { ports { ip isIpPublic privatePort publicPort type } } } }"}.to_json,
+      expects: 200)
+
+    pod = JSON.parse(response.body)["data"]["pod"]
+    fail "BUG: pod not found" unless pod
+    fail "BUG: unexpected pod id" unless pod_id == pod["id"]
+
+    port = pod["runtime"]["ports"].find { |port| port["type"] == "tcp" && port["isIpPublic"] }
+
+    {
+      pod_id: pod["id"],
+      ip: port&.fetch("ip"),
+      port: port&.fetch("publicPort")
+    }
+  end
+
+  def delete_runpod_pod
+    if (pod_id = inference_endpoint_replica.external_state["pod_id"])
+      Excon.post("https://api.runpod.io/graphql",
+        headers: {"content-type" => "application/json", "authorization" => "Bearer #{Config.runpod_api_key}"},
+        body: {"query" => "mutation { podTerminate(input: {podId: \"#{pod_id}\"}) }"}.to_json,
+        expects: 200)
+      inference_endpoint_replica.update(external_state: "{}")
     end
   end
 end
