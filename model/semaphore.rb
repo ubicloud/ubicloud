@@ -7,8 +7,15 @@ class Semaphore < Sequel::Model
 
   def self.incr(strand_id, name)
     DB.transaction do
-      Strand.dataset.where(id: strand_id).update(schedule: Sequel::CURRENT_TIMESTAMP)
-      Semaphore.create_with_id(strand_id: strand_id, name: name)
+      if Strand.where(id: strand_id).update(schedule: Sequel::CURRENT_TIMESTAMP) == 1
+        create(strand_id:, name:)
+      end
+    end
+  rescue Sequel::ValidationFailed => e
+    unless e.cause.is_a?(Sequel::ForeignKeyConstraintViolation)
+      # Strand deleted between the strand update and semaphore create,
+      # no need to create the semaphore in this case
+      raise
     end
   end
 end
