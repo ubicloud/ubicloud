@@ -82,7 +82,31 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     it "registers a deadline and hops if the cluster is ready" do
       expect(kn.cluster).to receive(:strand).and_return(Strand.new(label: "wait_nodes"))
       expect(nx).to receive(:register_deadline)
-      expect { nx.start }.to hop("bootstrap_worker_vms")
+      expect { nx.start }.to hop("create_services_load_balancer")
+    end
+  end
+
+  describe "#create_services_load_balancer" do
+    it "hops to bootstrap_worker_vms because lb already exists" do
+      Prog::Vnet::LoadBalancerNexus.assemble(subnet.id, name: kc.services_load_balancer_name, src_port: 443, dst_port: 8443)
+      expect { nx.create_services_load_balancer }.to hop("bootstrap_worker_vms")
+    end
+
+    it "creates the new services load balancer" do
+      expect { nx.create_services_load_balancer }.to hop("bootstrap_worker_vms")
+      expect(LoadBalancer[name: kc.services_load_balancer_name]).not_to be_nil
+    end
+
+    it "creates the new services load balancer with k8s DnsZone" do
+      allow(Config).to receive(:kubernetes_service_hostname).and_return("k8s.ubicloud.com")
+      dns_zone = DnsZone.create_with_id(project_id: Project.first.id, name: "k8s.ubicloud.com", last_purged_at: Time.now)
+
+      expect { nx.create_services_load_balancer }.to hop("bootstrap_worker_vms")
+      lb = LoadBalancer[name: kc.services_load_balancer_name]
+      expect(lb).not_to be_nil
+      expect(lb.name).to eq kc.services_load_balancer_name
+      expect(lb.custom_hostname_dns_zone_id).to eq dns_zone.id
+      expect(lb.custom_hostname).to eq "#{kc.ubid.to_s[-10...]}-services.k8s.ubicloud.com"
     end
   end
 
@@ -132,6 +156,17 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     end
 
     it "destroys the nodepool and its vms" do
+      Prog::Vnet::LoadBalancerNexus.assemble(subnet.id, name: kc.services_load_balancer_name, src_port: 443, dst_port: 8443)
+      vms = [create_vm, create_vm]
+      expect(kn).to receive(:vms).and_return(vms)
+
+      expect(vms).to all(receive(:incr_destroy))
+      expect(kn).to receive(:remove_all_vms)
+      expect(kn).to receive(:destroy)
+      expect { nx.destroy }.to exit({"msg" => "kubernetes nodepool is deleted"})
+    end
+
+    it "destroys the nodepool and its vms with non existing services loadbalancer" do
       vms = [create_vm, create_vm]
       expect(kn).to receive(:vms).and_return(vms)
 

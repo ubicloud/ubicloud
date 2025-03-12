@@ -4,13 +4,15 @@ require_relative "../spec_helper"
 
 RSpec.describe KubernetesCluster do
   subject(:kc) {
-    described_class.new(
+    project = Project.create(name: "test")
+    private_subnet = PrivateSubnet.create(project_id: project.id, name: "test", location_id: Location::HETZNER_FSN1_ID, net6: "fe80::/64", net4: "192.168.0.0/24")
+    described_class.create(
       name: "kc-name",
       version: "v1.32",
       location_id: Location::HETZNER_FSN1_ID,
       cp_node_count: 3,
-      project_id: "2d720de2-91fc-82d2-bc07-a945bddb39e8",
-      private_subnet_id: "c87aefff-2e77-86d9-86b5-ef9fbb4e7fee",
+      project_id: project.id,
+      private_subnet_id: private_subnet.id,
       target_node_size: "standard-2"
     )
   }
@@ -21,6 +23,72 @@ RSpec.describe KubernetesCluster do
 
   it "returns path" do
     expect(kc.path).to eq("/location/eu-central-h1/kubernetes-cluster/kc-name")
+  end
+
+  it "initiates a new health monitor session" do
+    sshable = instance_double(Sshable)
+    expect(kc).to receive(:sshable).and_return(sshable)
+    expect(sshable).to receive(:start_fresh_session)
+    kc.init_health_monitor_session
+  end
+
+  it "checks pulse" do
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session)
+    }
+    pulse = {
+      reading: "down",
+      reading_rpt: 5,
+      reading_chg: Time.now - 30
+    }
+
+    expect(kc).to receive(:incr_sync_kubernetes_services)
+    client = instance_double(Kubernetes::Client)
+    expect(kc).to receive(:client).and_return(client)
+    expect(client).to receive(:any_lb_services_modified?).and_return(true)
+
+    expect(kc.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("up")
+  end
+
+  it "checks pulse on with no changes to the internal services" do
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session)
+    }
+    pulse = {
+      reading: "up",
+      reading_rpt: 5,
+      reading_chg: Time.now - 30
+    }
+
+    client = instance_double(Kubernetes::Client)
+    expect(kc).to receive(:client).and_return(client)
+    expect(client).to receive(:any_lb_services_modified?).and_return(false)
+
+    expect(kc.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("up")
+  end
+
+  it "checks pulse and fails" do
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session)
+    }
+    pulse = {
+      reading: "down",
+      reading_rpt: 5,
+      reading_chg: Time.now - 30
+    }
+
+    client = instance_double(Kubernetes::Client)
+    expect(kc).to receive(:client).and_return(client)
+    expect(client).to receive(:any_lb_services_modified?).and_raise Sshable::SshError
+
+    expect(kc.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+  end
+
+  describe "#kubectl" do
+    it "create a new client" do
+      session = instance_double(Net::SSH::Connection::Session)
+      expect(kc.client(session: session)).to be_an_instance_of(Kubernetes::Client)
+    end
   end
 
   describe "#validate" do
@@ -67,6 +135,33 @@ RSpec.describe KubernetesCluster do
         expect(user["user"]).not_to have_key("client-key-data")
         expect(user["user"]["token"]).to eq("mocked_rbac_token")
       end
+    end
+  end
+
+  describe "vm_diff_for_lb" do
+    it "finds the extra and missing vms" do
+      lb = Prog::Vnet::LoadBalancerNexus.assemble(kc.private_subnet.id, name: kc.services_load_balancer_name, src_port: 443, dst_port: 8443).subject
+      extra_vm = Prog::Vm::Nexus.assemble("key", kc.project.id, name: "extra-vm", private_subnet_id: kc.private_subnet.id).subject
+      missing_vm = Prog::Vm::Nexus.assemble("key", kc.project.id, name: "missing-vm", private_subnet_id: kc.private_subnet.id).subject
+      lb.add_vm(extra_vm)
+      np = instance_double(KubernetesNodepool, vms: [missing_vm])
+      expect(kc).to receive(:nodepools).and_return([np])
+      extra_vms, missing_vms = kc.vm_diff_for_lb(lb)
+      expect(extra_vms.count).to eq(1)
+      expect(extra_vms[0].id).to eq(extra_vm.id)
+      expect(missing_vms.count).to eq(1)
+      expect(missing_vms[0].id).to eq(missing_vm.id)
+    end
+  end
+
+  describe "port_diff_for_lb" do
+    it "finds the extra and missing vms" do
+      lb = Prog::Vnet::LoadBalancerNexus.assemble(kc.private_subnet.id, name: kc.services_load_balancer_name, src_port: 80, dst_port: 8000).subject
+      extra_ports, missing_ports = kc.port_diff_for_lb(lb, [[443, 8443]])
+      expect(extra_ports.count).to eq(1)
+      expect(extra_ports[0].src_port).to eq(80)
+      expect(missing_ports.count).to eq(1)
+      expect(missing_ports[0][0]).to eq(443)
     end
   end
 end

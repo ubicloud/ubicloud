@@ -36,6 +36,48 @@ RSpec.describe LoadBalancer do
     end
   end
 
+  describe "add_port" do
+    before do
+      dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.project_id)
+      cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
+      lb.add_vm(vm1)
+      lb.reload
+      lb.add_cert(cert)
+    end
+
+    it "adds the new port and increments update_load_balancer" do
+      expect(lb).to receive(:incr_update_load_balancer)
+      expect(lb.vm_ports.count).to eq(1)
+      lb.add_port(443, 8443)
+      lb.reload
+      expect(lb.vm_ports.count).to eq(2)
+      expect(lb.ports.count).to eq(2)
+    end
+  end
+
+  describe "remove_port" do
+    before do
+      dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.project_id)
+      cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
+      lb.add_vm(vm1)
+      lb.reload
+      lb.add_cert(cert)
+    end
+
+    it "removes the new port and increments update_load_balancer" do
+      expect(lb).to receive(:incr_update_load_balancer).twice
+      lb.add_port(443, 8443)
+      lb.reload
+      expect(lb.vm_ports.count).to eq(2)
+      expect(lb.ports.count).to eq(2)
+
+      lb.remove_port(lb.ports[1])
+      lb.reload
+      expect(lb.ports.count).to eq(1)
+      expect(lb.vm_ports.count).to eq(1)
+    end
+  end
+
   describe "add_vm" do
     it "increments update_load_balancer and rewrite_dns_records" do
       expect(lb).to receive(:incr_rewrite_dns_records)

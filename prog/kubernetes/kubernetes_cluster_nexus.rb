@@ -58,9 +58,9 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     custom_hostname_prefix = if custom_hostname_dns_zone_id
       "#{kubernetes_cluster.name}-apiserver-#{kubernetes_cluster.ubid.to_s[-5...]}"
     end
-    load_balancer_st = Prog::Vnet::LoadBalancerNexus.assemble(
+    load_balancer = Prog::Vnet::LoadBalancerNexus.assemble(
       kubernetes_cluster.private_subnet_id,
-      name: "#{kubernetes_cluster.name}-apiserver",
+      name: kubernetes_cluster.apiserver_load_balancer_name,
       algorithm: "hash_based",
       src_port: 443,
       dst_port: 6443,
@@ -69,8 +69,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       custom_hostname_dns_zone_id:,
       custom_hostname_prefix:,
       stack: LoadBalancer::Stack::IPV4
-    )
-    kubernetes_cluster.update(api_server_lb_id: load_balancer_st.id)
+    ).subject
+    kubernetes_cluster.update(api_server_lb_id: load_balancer.id)
 
     hop_bootstrap_control_plane_vms
   end
@@ -120,7 +120,17 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   end
 
   label def wait
+    when_sync_kubernetes_services_set? do
+      hop_sync_kubernetes_services
+    end
     nap 6 * 60 * 60
+  end
+
+  label def sync_kubernetes_services
+    decr_sync_kubernetes_services
+    # TODO: timeout or other logic to avoid apoptosis should be added
+    kubernetes_cluster.client.sync_kubernetes_services
+    hop_wait
   end
 
   label def destroy
