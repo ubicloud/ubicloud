@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.describe SemSnap do
-  let(:st) { Strand.create_with_id(prog: "Test", label: "start") }
+  let(:st) { Strand.create(prog: "Test", label: "start") }
 
   it "can decrement semaphores" do
     described_class.use(st.id) do |snap|
@@ -38,5 +38,11 @@ RSpec.describe SemSnap do
   it "reads semaphores at initialization" do
     described_class.new(st.id).incr(:test)
     expect(described_class.new(st.id).set?(:test)).to be true
+  end
+
+  it ".incr returns nil if strand no longer exists" do
+    st.destroy
+    snap = described_class.new(st.id)
+    expect(snap.incr(:test)).to be_nil
   end
 end

@@ -75,7 +75,7 @@ module ThawedMock
   allow_mocking(PostgresResource, :[], :generate_uuid)
   allow_mocking(PostgresServer, :create, :run_query)
   allow_mocking(Project, :[], :from_ubid, :order_by)
-  allow_mocking(Semaphore, :where)
+  allow_mocking(Semaphore, :where, :create)
   allow_mocking(Sshable, :create, :repl?)
   allow_mocking(StorageKeyEncryptionKey, :create)
   allow_mocking(Strand, :create, :create_with_id)
