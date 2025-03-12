@@ -62,6 +62,8 @@ module Hosting; end
 
 module Minio; end
 
+module Kubernetes; end
+
 module Prog; end
 
 module Prog::Ai; end
