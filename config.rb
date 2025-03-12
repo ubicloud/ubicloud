@@ -192,6 +192,7 @@ module Config
   # AI
   optional :inference_endpoint_service_project_id, string
   optional :runpod_api_key, string, clear: true
+  optional :huggingface_token, string, clear: true
 
   # DNS
   optional :dns_service_project_id, string
