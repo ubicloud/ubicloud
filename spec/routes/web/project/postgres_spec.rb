@@ -247,6 +247,57 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "ResourceNotFound"
       end
 
+      it "can update PostgreSQL instance size configuration" do
+        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg)).at_least(:once)
+        expect(pg.representative_server).to receive(:storage_size_gib).and_return(128).at_least(:once)
+
+        visit "#{project.path}#{pg.path}"
+        expect(page).to have_content "Configure PostgreSQL database"
+
+        choose option: "standard-8"
+        choose option: 256
+        choose option: PostgresResource::HaType::ASYNC
+
+        # We send PATCH request manually instead of just clicking to button because PATCH action triggered by JavaScript.
+        # UI tests run without a JavaScript engine.
+        form = find_by_id "creation-form"
+        csrf = form.find("input[name='_csrf']", visible: false).value
+        size = form.find(:radio_button, "size", checked: true).value
+        storage_size = form.find(:radio_button, "storage_size", checked: true).value
+        ha_type = form.find(:radio_button, "ha_type", checked: true).value
+        page.driver.submit :patch, form["action"], {size: size, storage_size: storage_size, ha_type: ha_type, _csrf: csrf}
+
+        pg.reload
+        expect(pg.target_vm_size).to eq("standard-8")
+        expect(pg.target_storage_size_gib).to eq(256)
+        expect(pg.ha_type).to eq(PostgresResource::HaType::ASYNC)
+      end
+
+      it "handles errors during scale up/down" do
+        visit "#{project.path}#{pg.path}"
+        expect(page).to have_content "Configure PostgreSQL database"
+
+        choose option: "standard-8"
+        choose option: 64
+
+        # We send PATCH request manually instead of just clicking to button because PATCH action triggered by JavaScript.
+        # UI tests run without a JavaScript engine.
+        form = find_by_id "creation-form"
+        csrf = form.find("input[name='_csrf']", visible: false).value
+        size = form.find(:radio_button, "size", checked: true).value
+        storage_size = form.find(:radio_button, "storage_size", checked: true).value
+        page.driver.submit :patch, form["action"], {size: size, storage_size: storage_size, _csrf: csrf}
+
+        # Normally we follow the redirect through javascript handler. Here, we are simulating that by reloading the page.
+        visit "#{project.path}#{pg.path}"
+        expect(page).to have_flash_error "Validation failed for following fields: storage_size"
+
+        pg.reload
+        expect(pg.target_vm_size).to eq("standard-2")
+        expect(pg.target_storage_size_gib).to eq(128)
+      end
+
       it "can restore PostgreSQL database" do
         backup = Struct.new(:key, :last_modified)
         restore_target = Time.now.utc
