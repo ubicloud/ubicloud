@@ -30,6 +30,8 @@ class Clover
           Serializers::Postgres.serialize(pg, {detailed: true})
         else
           @pg = Serializers::Postgres.serialize(pg, {detailed: true, include_path: true})
+          @family = pg.representative_server.vm.family
+          @option_tree, @option_parents = generate_postgres_configure_options(flavor: @pg[:flavor], location: @pg[:location])
           view "postgres/show"
         end
       end
@@ -70,7 +72,13 @@ class Clover
 
         pg.update(target_vm_size: target_vm_size.vm_size, target_storage_size_gib:, ha_type:)
 
-        Serializers::Postgres.serialize(pg, {detailed: true})
+        if api?
+          Serializers::Postgres.serialize(pg, {detailed: true})
+        else
+          flash["notice"] = "'#{pg.name}' will be updated according to requested configuration"
+          response["Location"] = "#{@project.path}#{pg.path}"
+          200
+        end
       end
 
       r.post "restart" do
