@@ -31,4 +31,24 @@ RSpec.describe BillingInfo do
 
     billing_info.destroy
   end
+
+  describe ".validate_vat" do
+    it "returns true if VAT number is valid" do
+      stub_request(:get, "https://ec.europa.eu/taxation_customs/vies/rest-api/ms/NL/vat/123123").to_return(status: 200, body: {userError: "VALID"}.to_json)
+      expect(billing_info).to receive(:stripe_data).and_return({"country" => "NL", "tax_id" => 123123}).at_least(:once)
+      expect(billing_info.validate_vat).to be true
+    end
+
+    it "returns false if VAT number is invalid" do
+      stub_request(:get, "https://ec.europa.eu/taxation_customs/vies/rest-api/ms/NL/vat/123123").to_return(status: 200, body: {userError: "INVALID"}.to_json)
+      expect(billing_info).to receive(:stripe_data).and_return({"country" => "NL", "tax_id" => 123123}).at_least(:once)
+      expect(billing_info.validate_vat).to be false
+    end
+
+    it "fails if unexpected error code received" do
+      stub_request(:get, "https://ec.europa.eu/taxation_customs/vies/rest-api/ms/NL/vat/123123").to_return(status: 200, body: {userError: "MS_MAX_CONCURRENT_REQ"}.to_json)
+      expect(billing_info).to receive(:stripe_data).and_return({"country" => "NL", "tax_id" => 123123}).at_least(:once)
+      expect { billing_info.validate_vat }.to raise_error("Unexpected response from VAT service: MS_MAX_CONCURRENT_REQ")
+    end
+  end
 end
