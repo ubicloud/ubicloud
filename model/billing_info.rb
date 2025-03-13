@@ -47,6 +47,7 @@ end
 #  id         | uuid                     | PRIMARY KEY
 #  stripe_id  | text                     | NOT NULL
 #  created_at | timestamp with time zone | NOT NULL DEFAULT now()
+#  valid_vat  | boolean                  |
 # Indexes:
 #  billing_info_pkey          | PRIMARY KEY btree (id)
 #  billing_info_stripe_id_key | UNIQUE btree (stripe_id)
