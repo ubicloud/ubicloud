@@ -127,8 +127,12 @@ class PostgresServer < Sequel::Model
     !resource.representative_server.primary?
   end
 
+  def storage_size_gib
+    vm.vm_storage_volumes_dataset.first(boot: false)&.size_gib
+  end
+
   def needs_recycling?
-    vm.display_size != resource.target_vm_size || vm.vm_storage_volumes.none? { !_1.boot && _1.size_gib == resource.target_storage_size_gib }
+    vm.display_size != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib
   end
 
   def failover_target
