@@ -263,11 +263,11 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
     it "hops if server is ready" do
       expect(postgres_resource.servers).to all(receive(:strand).and_return(instance_double(Strand, label: "wait")))
-      expect { nx.wait_servers }.to hop("create_billing_record")
+      expect { nx.wait_servers }.to hop("update_billing_records")
     end
   end
 
-  describe "#create_billing_record" do
+  describe "#update_billing_records" do
     it "creates billing record for cores and storage then hops" do
       expect(postgres_resource).to receive(:target_server_count).and_return(2)
       expect(postgres_resource).to receive(:flavor).and_return("standard").at_least(:once)
@@ -304,7 +304,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         amount: postgres_resource.target_storage_size_gib
       )
 
-      expect { nx.create_billing_record }.to hop("wait")
+      expect { nx.update_billing_records }.to hop("wait")
     end
   end
 
@@ -318,6 +318,11 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(postgres_resource).to receive(:needs_convergence?).and_return(true)
       expect(nx).to receive(:bud).with(Prog::Postgres::ConvergePostgresResource, {}, :start)
       expect { nx.wait }.to nap(30)
+    end
+
+    it "hops to update_billing_records when update_billing_records is set" do
+      expect(nx).to receive(:when_update_billing_records_set?).and_yield
+      expect { nx.wait }.to hop("update_billing_records")
     end
 
     it "hops to refresh_dns_record when refresh_dns_record is set" do

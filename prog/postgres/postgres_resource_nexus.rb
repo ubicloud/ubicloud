@@ -152,10 +152,14 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   label def wait_servers
     nap 5 if servers.any? { _1.strand.label != "wait" }
-    hop_create_billing_record
+    hop_update_billing_records
   end
 
-  label def create_billing_record
+  label def update_billing_records
+    decr_update_billing_records
+
+    postgres_resource.active_billing_records.each(&:finalize)
+
     vm_family = representative_server.vm.family
 
     billing_record_parts = []
@@ -183,6 +187,10 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     if postgres_resource.needs_convergence? && strand.children.none? { _1.prog == "Postgres::ConvergePostgresResource" }
       bud Prog::Postgres::ConvergePostgresResource, frame, :start
+    end
+
+    when_update_billing_records_set? do
+      hop_update_billing_records
     end
 
     when_refresh_dns_record_set? do
