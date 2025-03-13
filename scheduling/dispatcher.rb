@@ -52,7 +52,9 @@ class Scheduling::Dispatcher
     end.tap { _1.name = "apoptosis:" + strand_ubid }
 
     Thread.new do
-      Thread.current[:created_at] = Time.now
+      t = Time.now
+      Thread.current[:created_at] = t
+      Thread.current[:apoptosis_at] = t + @apoptosis_timeout
       strand.run Strand::LEASE_EXPIRATION / 4
     rescue => ex
       Clog.emit("exception terminates thread") { Util.exception_to_hash(ex) }
