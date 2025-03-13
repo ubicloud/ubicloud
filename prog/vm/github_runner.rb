@@ -140,7 +140,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     hop_allocate_vm if quota_available?
 
     # check utilization, if it's high, wait for it to go down
-    utilization = VmHost.where(allocation_state: "accepting", arch: label_data["arch"]).select_map {
+    utilization = VmHost.where(allocation_state: "accepting", arch: label_data["arch"], location: "github-runners").select_map {
       sum(:used_cores) * 100.0 / sum(:total_cores)
     }.first.to_f
 
