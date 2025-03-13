@@ -311,18 +311,12 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   describe "#wait" do
     before do
       allow(postgres_resource).to receive_messages(certificate_last_checked_at: Time.now, target_server_count: 1)
+      allow(postgres_resource).to receive(:needs_convergence?).and_return(false)
     end
 
-    it "exclude primary server's host while creating standbys" do
-      expect(postgres_resource).to receive(:target_server_count).and_return(2)
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: [postgres_resource.servers.first.vm.vm_host.id]))
-      expect { nx.wait }.to nap(30)
-    end
-
-    it "does not exclude any hosts in development" do
-      expect(postgres_resource).to receive(:target_server_count).and_return(2)
-      expect(Config).to receive(:development?).and_return(true)
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: []))
+    it "buds ConvergePostgresResource prog if needs_convergence? is true" do
+      expect(postgres_resource).to receive(:needs_convergence?).and_return(true)
+      expect(nx).to receive(:bud).with(Prog::Postgres::ConvergePostgresResource, {}, :start)
       expect { nx.wait }.to nap(30)
     end
 

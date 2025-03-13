@@ -88,6 +88,18 @@ class PostgresResource < Sequel::Model
     target_standby_count + 1
   end
 
+  def has_enough_fresh_servers?
+    servers.count { !_1.needs_recycling? } >= target_server_count
+  end
+
+  def has_enough_ready_servers?
+    servers.count { !_1.needs_recycling? && _1.strand.label == "wait" } >= target_server_count
+  end
+
+  def needs_convergence?
+    servers.any? { _1.needs_recycling? } || servers.count != target_server_count
+  end
+
   def set_firewall_rules
     vm_firewall_rules = firewall_rules.map { {cidr: _1.cidr.to_s, port_range: Sequel.pg_range(5432..5432)} }
     vm_firewall_rules.concat(firewall_rules.map { {cidr: _1.cidr.to_s, port_range: Sequel.pg_range(6432..6432)} })
