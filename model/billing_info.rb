@@ -3,6 +3,7 @@
 require_relative "../model"
 require "stripe"
 require "countries"
+require "excon"
 
 class BillingInfo < Sequel::Model
   one_to_many :payment_methods
@@ -39,6 +40,18 @@ class BillingInfo < Sequel::Model
       Stripe::Customer.delete(stripe_id)
     end
     super
+  end
+
+  def validate_vat
+    response = Excon.get("https://ec.europa.eu/taxation_customs/vies/rest-api/ms/#{stripe_data["country"]}/vat/#{stripe_data["tax_id"]}", expects: 200)
+    status = JSON.parse(response.body)["userError"]
+    if status == "VALID"
+      true
+    elsif status == "INVALID" || status == "INVALID_INPUT"
+      false
+    else
+      fail "Unexpected response from VAT service: #{status}"
+    end
   end
 end
 
