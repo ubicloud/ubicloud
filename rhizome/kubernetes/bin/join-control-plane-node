@@ -11,11 +11,12 @@ begin
   join_token = params.fetch("join_token")
   discovery_token_ca_cert_hash = params.fetch("discovery_token_ca_cert_hash")
   certificate_key = params.fetch("certificate_key")
+  node_name = params.fetch("node_name")
 rescue KeyError => e
   puts "Needed #{e.key} in parameters"
   exit 1
 end
 
-r "kubeadm join #{cluster_endpoint} --control-plane --token #{join_token} --discovery-token-ca-cert-hash #{discovery_token_ca_cert_hash} --certificate-key #{certificate_key}"
+r "kubeadm join #{cluster_endpoint} --control-plane --token #{join_token} --discovery-token-ca-cert-hash #{discovery_token_ca_cert_hash} --certificate-key #{certificate_key} --node-name #{node_name}"
 
 r("sudo /home/ubi/kubernetes/bin/setup-cni")
