@@ -28,57 +28,70 @@ RSpec.describe InvoiceGenerator do
     )
   end
 
-  def check_invoice_for_single_vm(invoices, project, vm, duration, begin_time)
+  def check_invoice_for_single_vm(invoices, project, vm, duration, begin_time, expected_vat_info: nil)
     expect(invoices.count).to eq(1)
-
-    br = BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location)
-    duration_mins = [672 * 60, (duration / 60).ceil].min
-    cost = (vm.vcpus * duration_mins * br["unit_price"]).round(3)
-    expect(invoices.first.content).to eq({
-      "project_id" => project.id,
-      "project_name" => project.name,
-      "billing_info" => project.billing_info ? {
-        "id" => project.billing_info.id,
-        "ubid" => project.billing_info.ubid,
-        "name" => "ACME Inc.",
-        "email" => nil,
-        "address" => "",
+    expected_issuer = if expected_vat_info
+      {
+        "name" => "Ubicloud B.V.",
+        "address" => "Turfschip 267",
         "country" => "NL",
-        "city" => nil,
-        "state" => nil,
-        "postal_code" => nil,
-        "tax_id" => "123456",
-        "company_name" => nil
-      } : nil,
-      "issuer_info" => {
+        "city" => "Amstelveen",
+        "postal_code" => "1186 XK",
+        "tax_id" => "NL864651442B01",
+        "trade_id" => "88492729",
+        "in_eu_vat" => true
+      }
+    else
+      {
         "name" => "Ubicloud Inc.",
         "address" => "310 Santa Ana Avenue",
         "country" => "US",
         "city" => "San Francisco",
         "state" => "CA",
         "postal_code" => "94127"
-      },
-      "resources" => [{
-        "resource_id" => vm.id,
-        "resource_name" => vm.name,
-        "line_items" => [{
-          "location" => br["location"],
-          "resource_type" => "VmVCpu",
-          "resource_family" => vm.family,
-          "description" => "standard-#{vm.vcpus} Virtual Machine",
-          "amount" => vm.vcpus.to_f,
-          "duration" => duration_mins,
-          "cost" => cost,
-          "begin_time" => begin_time.utc.to_s,
-          "unit_price" => br["unit_price"]
-        }],
-        "cost" => cost
-      }],
-      "subtotal" => cost,
-      "discount" => 0,
-      "credit" => 0,
-      "cost" => cost
+      }
+    end
+
+    expected_billing_info = project.billing_info&.stripe_data&.merge({
+      "id" => project.billing_info.id,
+      "ubid" => project.billing_info.ubid,
+      "in_eu_vat" => !!expected_vat_info
     })
+
+    br = BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location)
+    duration_mins = [672 * 60, (duration / 60).ceil].min
+    expected_cost = (vm.vcpus * duration_mins * br["unit_price"]).round(3)
+    expected_resources = [{
+      "resource_id" => vm.id,
+      "resource_name" => vm.name,
+      "line_items" => [{
+        "location" => br["location"],
+        "resource_type" => "VmVCpu",
+        "resource_family" => vm.family,
+        "description" => "standard-#{vm.vcpus} Virtual Machine",
+        "amount" => vm.vcpus.to_f,
+        "duration" => duration_mins,
+        "cost" => expected_cost,
+        "begin_time" => begin_time.utc.to_s,
+        "unit_price" => br["unit_price"]
+      }],
+      "cost" => expected_cost
+    }]
+    actual_content = invoices.first.content
+    [
+      ["project_id", project.id],
+      ["project_name", project.name],
+      ["billing_info", expected_billing_info],
+      ["issuer_info", expected_issuer],
+      ["vat_info", expected_vat_info],
+      ["resources", expected_resources],
+      ["subtotal", expected_cost],
+      ["discount", 0],
+      ["credit", 0],
+      ["cost", (expected_cost + expected_vat_info&.fetch("amount", 0).to_f).round(3)]
+    ].each do |key, expected|
+      expect(actual_content[key]).to eq(expected)
+    end
   end
 
   let(:p1) {
@@ -93,6 +106,10 @@ RSpec.describe InvoiceGenerator do
   let(:day) { 24 * 60 * 60 }
   let(:begin_time) { Time.parse("2023-06-01") }
   let(:end_time) { Time.parse("2023-07-01") }
+
+  it "fails if eur_rate not provided while saving result" do
+    expect { described_class.new(begin_time, end_time, save_result: true).run }.to raise_error(ArgumentError, "eur_rate must be provided when save_result is true")
+  end
 
   it "does not generate invoice for billing record that started and terminated before this billing window" do
     generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 150 * day, begin_time - 90 * day))
@@ -142,15 +159,66 @@ RSpec.describe InvoiceGenerator do
     expect(invoices.count).to eq(0)
   end
 
-  it "generates invoice for project with billing info" do
-    allow(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
-    expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"country" => "NL"}}).at_least(:once)
+  context "when project has billing info" do
+    before do
+      allow(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
+    end
 
-    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
-    bi = BillingInfo.create_with_id(stripe_id: "cs_1234567890")
-    p1.update(billing_info_id: bi.id)
-    invoices = described_class.new(begin_time, end_time).run
-    check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day)
+    it "charges no VAT for non-EU customer" do
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "US"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+      invoices = described_class.new(begin_time, end_time).run
+      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day)
+    end
+
+    it "charges 21% VAT for Dutch customer with tax id" do
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "NL"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+      invoices = described_class.new(begin_time, end_time, eur_rate: 1.1).run
+      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"amount" => 5.166, "eur_rate" => 1.1, "rate" => 21, "reversed" => false})
+    end
+
+    it "charges 21% VAT for Dutch customer without tax id" do
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => {"line1" => "123 Main St", "country" => "NL"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+      invoices = described_class.new(begin_time, end_time, eur_rate: 1.1).run
+      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"amount" => 5.166, "eur_rate" => 1.1, "rate" => 21, "reversed" => false})
+    end
+
+    it "reverse charges VAT for non-Dutch EU customer with tax id" do
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+      invoices = described_class.new(begin_time, end_time).run
+      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"rate" => 0, "reversed" => true})
+    end
+
+    it "charges 21% VAT for non-Dutch EU customer without tax id until threshold" do
+      expect(Config).to receive(:annual_non_dutch_eu_sales_exceed_threshold).and_return(false)
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+      invoices = described_class.new(begin_time, end_time, eur_rate: 1.1).run
+      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"amount" => 5.166, "eur_rate" => 1.1, "rate" => 21, "reversed" => false})
+    end
+
+    it "charges local VAT for non-Dutch EU customer without tax id if threshold exceeds" do
+      expect(Config).to receive(:annual_non_dutch_eu_sales_exceed_threshold).and_return(true)
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+      invoices = described_class.new(begin_time, end_time, eur_rate: 1.1).run
+      check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"amount" => 4.674, "eur_rate" => 1.1, "rate" => 19, "reversed" => false})
+    end
   end
 
   it "generates invoice for a single project" do
@@ -169,7 +237,7 @@ RSpec.describe InvoiceGenerator do
     described_class.new(begin_time, end_time, save_result: false).run
     expect(Invoice.count).to eq(0)
 
-    described_class.new(begin_time, end_time, save_result: true).run
+    described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run
     expect(Invoice.count).to eq(1)
 
     expect(Invoice.first.invoice_number).to eq("#{begin_time.strftime("%y%m")}-#{p1.id[-10..]}-0001")
@@ -192,7 +260,7 @@ RSpec.describe InvoiceGenerator do
 
     cost_before, credit_before = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "credit")
     p1.update(credit: 10)
-    cost_after, credit_after = described_class.new(begin_time, end_time, save_result: true).run.first.content.values_at("cost", "credit")
+    cost_after, credit_after = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content.values_at("cost", "credit")
 
     expect(cost_after).to eq((cost_before - 10).round(3))
     expect(credit_before).to eq(0)
@@ -205,7 +273,7 @@ RSpec.describe InvoiceGenerator do
 
     before = described_class.new(begin_time, end_time).run.first.content
     p1.update(credit: 10, discount: 10)
-    after = described_class.new(begin_time, end_time, save_result: true).run.first.content
+    after = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
 
     expect(after["cost"]).to eq((before["cost"] * 0.9 - 10).round(3))
     expect(after["discount"]).to eq((before["cost"] * 0.1).round(3))
@@ -231,7 +299,7 @@ RSpec.describe InvoiceGenerator do
 
     before = described_class.new(begin_time, end_time).run.first.content
     p1.update(credit: 10, discount: 10)
-    after = described_class.new(begin_time, end_time, save_result: true).run.first.content
+    after = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
 
     expect(before["cost"]).to eq(before["subtotal"] - 1)
     expect(after["cost"]).to eq((before["subtotal"] * 0.9 - 11).round(3))
@@ -246,14 +314,14 @@ RSpec.describe InvoiceGenerator do
     generate_billing_record(p1, github_runner, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
     p1.update(credit: 0, discount: 100)
-    invoice = described_class.new(begin_time, end_time, save_result: true).run.first.content
+    invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
 
     expect(invoice["cost"]).to eq(0)
   end
 
   it "handles inference quota when not used up" do
     generate_billing_record(p1, ie1, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time, begin_time.to_date.to_time + day), 100000)
-    invoice = described_class.new(begin_time, end_time, save_result: true).run.first.content
+    invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
     billing_rate = BillingRate.from_resource_properties("InferenceTokens", ie1.model_name, "global")["unit_price"]
     expect(invoice["free_inference_tokens_credit"]).to eq(100000 * billing_rate)
     expect(invoice["cost"]).to eq(0)
@@ -261,7 +329,7 @@ RSpec.describe InvoiceGenerator do
 
   it "handles inference quota when used up" do
     generate_billing_record(p1, ie1, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time + day, begin_time.to_date.to_time + 2 * day), 600000)
-    invoice = described_class.new(begin_time, end_time, save_result: true).run.first.content
+    invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
     free_inference_tokens = FreeQuota.free_quotas["inference-tokens"]["value"]
     billing_rate = BillingRate.from_resource_properties("InferenceTokens", ie1.model_name, "global")["unit_price"]
     expect(free_inference_tokens).to eq(500000)
@@ -274,7 +342,7 @@ RSpec.describe InvoiceGenerator do
     generate_billing_record(p1, ie1, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time + day, begin_time.to_date.to_time + 2 * day), 60000000)
     before = described_class.new(begin_time, end_time).run.first.content
     p1.update(credit: 1, discount: 10)
-    after = described_class.new(begin_time, end_time, save_result: true).run.first.content
+    after = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
 
     free_inference_tokens = FreeQuota.free_quotas["inference-tokens"]["value"]
     billing_rate = BillingRate.from_resource_properties("InferenceTokens", ie1.model_name, "global")["unit_price"]
@@ -293,7 +361,7 @@ RSpec.describe InvoiceGenerator do
     ie2 = InferenceEndpoint.create_with_id(name: "ie2", model_name: "test-model2", project_id: p1.id, is_public: true, visible: true, location: "loc", vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id)
     generate_billing_record(p1, ie1, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time, begin_time.to_date.to_time + day), 100000)
     generate_billing_record(p1, ie2, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time, begin_time.to_date.to_time + day), 800000)
-    invoice = described_class.new(begin_time, end_time, save_result: true).run.first.content
+    invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
     free_inference_tokens = FreeQuota.free_quotas["inference-tokens"]["value"]
     billing_rate1 = BillingRate.from_resource_properties("InferenceTokens", ie1.model_name, "global")["unit_price"]
     billing_rate2 = BillingRate.from_resource_properties("InferenceTokens", ie2.model_name, "global")["unit_price"]
@@ -308,7 +376,7 @@ RSpec.describe InvoiceGenerator do
     ie2 = InferenceEndpoint.create_with_id(name: "ie2", model_name: "test-model2", project_id: p1.id, is_public: true, visible: true, location: "loc", vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id)
     generate_billing_record(p1, ie1, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time, begin_time.to_date.to_time + day), 100000)
     generate_billing_record(p1, ie2, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time + 2 * day, begin_time.to_date.to_time + 3 * day), 800000)
-    invoice = described_class.new(begin_time, end_time, save_result: true).run.first.content
+    invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
     free_inference_tokens = FreeQuota.free_quotas["inference-tokens"]["value"]
     billing_rate1 = BillingRate.from_resource_properties("InferenceTokens", ie1.model_name, "global")["unit_price"]
     billing_rate2 = BillingRate.from_resource_properties("InferenceTokens", ie2.model_name, "global")["unit_price"]
