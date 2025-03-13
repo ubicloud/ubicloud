@@ -269,8 +269,9 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
   describe "#update_billing_records" do
     it "creates billing record for cores and storage then hops" do
+      expect(postgres_resource).to receive(:flavor).and_return("standard")
+      expect(postgres_resource.representative_server).to receive(:storage_size_gib).and_return(128)
       expect(postgres_resource).to receive(:target_server_count).and_return(2)
-      expect(postgres_resource).to receive(:flavor).and_return("standard").at_least(:once)
 
       expect(BillingRecord).to receive(:create_with_id).with(
         project_id: postgres_resource.project_id,
@@ -293,7 +294,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         resource_id: postgres_resource.id,
         resource_name: postgres_resource.name,
         billing_rate_id: BillingRate.from_resource_properties("PostgresStorage", "standard", postgres_resource.location)["id"],
-        amount: postgres_resource.target_storage_size_gib
+        amount: 128
       )
 
       expect(BillingRecord).to receive(:create_with_id).with(
@@ -301,7 +302,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         resource_id: postgres_resource.id,
         resource_name: postgres_resource.name,
         billing_rate_id: BillingRate.from_resource_properties("PostgresStandbyStorage", "standard", postgres_resource.location)["id"],
-        amount: postgres_resource.target_storage_size_gib
+        amount: 128
       )
 
       expect { nx.update_billing_records }.to hop("wait")
