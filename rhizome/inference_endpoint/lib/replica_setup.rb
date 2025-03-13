@@ -122,7 +122,7 @@ CONFIG
 Description=Download loadbalancer SSL cert service
     
 [Service]
-ExecStart=/home/ubi/inference_endpoint/bin/download-lb-cert
+ExecStart=/home/rhizome/inference_endpoint/bin/download-lb-cert
 
 #{common_systemd_settings}
 CERT_DOWNLOAD_SERVICE
