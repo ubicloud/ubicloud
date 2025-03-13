@@ -179,6 +179,13 @@ RSpec.describe PostgresServer do
     end
   end
 
+  describe "storage_size_gib" do
+    it "returns the storage size in GiB" do
+      expect(vm).to receive(:vm_storage_volumes).and_return([instance_double(VmStorageVolume, boot: true, size_gib: 30), instance_double(VmStorageVolume, boot: false, size_gib: 64)])
+      expect(postgres_server.storage_size_gib).to eq(64)
+    end
+  end
+
   it "initiates a new health monitor session" do
     forward = instance_double(Net::SSH::Service::Forward)
     expect(forward).to receive(:local_socket)
