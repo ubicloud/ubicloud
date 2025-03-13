@@ -36,6 +36,30 @@ RSpec.describe PostgresResource do
     expect(s).to include("ubi_replication@pgc60xvcr00a5kbnggj1js4kkq.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/server.crt")
   end
 
+  it "returns has_enough_fresh_servers correctly" do
+    expect(postgres_resource.servers).to receive(:count).and_return(1, 1)
+    expect(postgres_resource).to receive(:target_server_count).and_return(1, 2)
+    expect(postgres_resource.has_enough_fresh_servers?).to be(true)
+    expect(postgres_resource.has_enough_fresh_servers?).to be(false)
+  end
+
+  it "returns has_enough_ready_servers correctly" do
+    expect(postgres_resource.servers).to receive(:count).and_return(1, 1)
+    expect(postgres_resource).to receive(:target_server_count).and_return(1, 2)
+    expect(postgres_resource.has_enough_ready_servers?).to be(true)
+    expect(postgres_resource.has_enough_ready_servers?).to be(false)
+  end
+
+  it "returns needs_convergence correctly" do
+    expect(postgres_resource.servers).to receive(:any?).and_return(true, false, false)
+    expect(postgres_resource.servers).to receive(:count).and_return(1, 2)
+    expect(postgres_resource).to receive(:target_server_count).and_return(2, 2)
+
+    expect(postgres_resource.needs_convergence?).to be(true)
+    expect(postgres_resource.needs_convergence?).to be(true)
+    expect(postgres_resource.needs_convergence?).to be(false)
+  end
+
   it "returns display state correctly" do
     expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "unavailable")))
     expect(postgres_resource.display_state).to eq("unavailable")
