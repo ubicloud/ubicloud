@@ -114,7 +114,7 @@ RSpec.describe Clover, "billing" do
     it "can update billing info" do
       expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return(
         {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
-        {"name" => "New Inc.", "address" => {"country" => "US"}, "metadata" => {"tax_id" => "456789"}}
+        {"name" => "New Inc.", "address" => {"country" => "US"}, "metadata" => {"tax_id" => "DE456789"}}
       ).twice
       expect(Stripe::Customer).to receive(:update).with(billing_info.stripe_id, anything)
 
@@ -123,14 +123,14 @@ RSpec.describe Clover, "billing" do
       expect(page.title).to eq("Ubicloud - Project Billing")
       fill_in "Billing Name", with: "New Inc."
       select "United States", from: "Country"
-      fill_in "VAT ID", with: "456789"
+      fill_in "VAT ID", with: "DE 456-789"
 
       click_button "Update"
 
       expect(page.status_code).to eq(200)
       expect(page).to have_field("Billing Name", with: "New Inc.")
       expect(page).to have_field("Country", with: "US")
-      expect(page).to have_field("Tax ID", with: "456789")
+      expect(page).to have_field("Tax ID", with: "DE456789")
     end
 
     it "shows error if billing info update failed" do
