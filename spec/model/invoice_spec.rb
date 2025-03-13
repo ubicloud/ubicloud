@@ -36,6 +36,22 @@ RSpec.describe Invoice do
     end
   end
 
+  describe ".send_success_email" do
+    it "does not send the invoice if it has no billing information" do
+      project = Project.create_with_id(name: "cool-project")
+      invoice = described_class.create_with_id(project_id: project.id, invoice_number: "001", begin_time: Time.now, end_time: Time.now, content: {
+        "resources" => [],
+        "subtotal" => 0.0,
+        "credit" => 0.0,
+        "discount" => 0.0,
+        "cost" => 0.0
+      })
+      expect(Clog).to receive(:emit).with("Couldn't send the invoice because it has no billing information").and_call_original
+      invoice.send_success_email
+      expect(Mail::TestMailer.deliveries.length).to eq 0
+    end
+  end
+
   describe ".charge" do
     it "not charge if Stripe not enabled" do
       allow(Config).to receive(:stripe_secret_key).and_return(nil)

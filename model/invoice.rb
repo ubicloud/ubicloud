@@ -88,6 +88,10 @@ class Invoice < Sequel::Model
 
   def send_success_email(below_threshold: false)
     ser = Serializers::Invoice.serialize(self, {detailed: true})
+    unless ser[:billing_email]
+      Clog.emit("Couldn't send the invoice because it has no billing information") { {invoice_no_billing_info: {ubid:}} }
+      return
+    end
     messages = if below_threshold
       ["Since the invoice total of #{ser[:total]} is below our minimum charge threshold, there will be no charges for this month."]
     else
@@ -172,15 +176,17 @@ class Invoice < Sequel::Model
     # Row 2, Left Column: Billing information
     row_y = pdf.cursor
     row = pdf.bounding_box([0, row_y], width: column_width) do
-      pdf.text "Bill to:", style: :semibold, color: dark_gray, size: 14
-      pdf.text [data[:billing_name], data[:company_name]].compact.join(" - "), style: :semibold, color: dark_gray, size: 14
-      pdf.move_down 5
-      # :nocov:
-      pdf.text "Tax ID: #{data[:tax_id]}" if data[:tax_id]
-      # :nocov:
-      pdf.text "#{data[:billing_address]},"
-      pdf.text "#{data[:billing_city]}, #{data[:billing_state]} #{data[:billing_postal_code]},"
-      pdf.text data[:billing_country]
+      if data[:billing_name]
+        pdf.text "Bill to:", style: :semibold, color: dark_gray, size: 14
+        pdf.text [data[:billing_name], data[:company_name]].compact.join(" - "), style: :semibold, color: dark_gray, size: 14
+        pdf.move_down 5
+        # :nocov:
+        pdf.text "Tax ID: #{data[:tax_id]}" if data[:tax_id]
+        # :nocov:
+        pdf.text "#{data[:billing_address]},"
+        pdf.text "#{data[:billing_city]}, #{data[:billing_state]} #{data[:billing_postal_code]},"
+        pdf.text data[:billing_country]
+      end
     end
 
     # Row 2, Right Column: Invoice dates
