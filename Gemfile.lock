@@ -484,7 +484,7 @@ DEPENDENCIES
   rotp
   rqrcode
   rspec
-  rubocop-capybara
+  rubocop-capybara (~> 2.21.0)
   rubocop-erb
   rubocop-performance
   rubocop-rake
