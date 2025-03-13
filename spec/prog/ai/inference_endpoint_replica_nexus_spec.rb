@@ -6,6 +6,8 @@ require_relative "../../../prog/ai/inference_endpoint_replica_nexus"
 RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
   subject(:nx) { described_class.new(Strand.create(id: "5943c405-0165-471e-93d5-20203e585aaf", prog: "Prog::Ai::InferenceEndpointReplicaNexus", label: "start")) }
 
+  let(:port) { instance_double(LoadBalancerPort, dst_port: 8443) }
+  let(:load_balancer) { instance_double(LoadBalancer, id: "lb-id", ubid: "lb-ubid", health_check_down_threshold: 3, private_subnet: instance_double(PrivateSubnet, ubid: "subnet-ubid"), ports: [port]) }
   let(:inference_endpoint) {
     instance_double(InferenceEndpoint,
       id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77",
@@ -18,7 +20,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
       max_requests: 500,
       max_project_rps: 100,
       max_project_tps: 10000,
-      load_balancer: instance_double(LoadBalancer, id: "lb-id", ubid: "lb-ubid", dst_port: 8443, health_check_down_threshold: 3, private_subnet: instance_double(PrivateSubnet, ubid: "subnet-ubid")))
+      load_balancer: load_balancer)
   }
 
   let(:vm) {
@@ -47,6 +49,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   before do
     allow(nx).to receive_messages(vm: vm, inference_endpoint: inference_endpoint, inference_endpoint_replica: replica)
+    allow(load_balancer).to receive(:ports).and_return([port])
   end
 
   describe ".assemble" do
@@ -145,7 +148,9 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
       expect(inference_endpoint).to receive(:engine).and_return("vllm").twice
       expect(inference_endpoint).to receive(:engine_params).and_return("--some-params").twice
       expect(inference_endpoint).to receive(:model_name).and_return("llama").twice
-      expect(inference_endpoint).to receive(:load_balancer).and_return(instance_double(LoadBalancer, id: "lb-id", dst_port: 8443)).twice
+      port = instance_double(LoadBalancerPort, dst_port: 8443)
+      lb = instance_double(LoadBalancer, id: "lb-id", ports: [port])
+      expect(inference_endpoint).to receive(:load_balancer).and_return(lb).twice
 
       # NotStarted
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
@@ -169,16 +174,16 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   describe "#wait_endpoint_up" do
     it "naps if vm is not up" do
-      lb_vm = instance_double(LoadBalancersVms, state: "down")
-      expect(nx).to receive(:load_balancers_vm).and_return(lb_vm)
-      expect(lb_vm).to receive(:reload).and_return(lb_vm)
+      lb_vm_port = instance_double(LoadBalancerVmPort, state: "down")
+      expect(nx).to receive(:load_balancer_vm_port).and_return(lb_vm_port)
+      expect(lb_vm_port).to receive(:reload).and_return(lb_vm_port)
       expect { nx.wait_endpoint_up }.to nap(5)
     end
 
     it "sets hops to wait when vm is in active set of load balancer" do
-      lb_vm = instance_double(LoadBalancersVms, state: "up")
-      expect(nx).to receive(:load_balancers_vm).and_return(lb_vm)
-      expect(lb_vm).to receive(:reload).and_return(lb_vm)
+      lb_vm_port = instance_double(LoadBalancerVmPort, state: "up")
+      expect(nx).to receive(:load_balancer_vm_port).and_return(lb_vm_port)
+      expect(lb_vm_port).to receive(:reload).and_return(lb_vm_port)
       expect { nx.wait_endpoint_up }.to hop("wait")
     end
   end
@@ -198,20 +203,20 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   describe "#unavailable" do
     it "creates a page if replica is unavailable" do
-      lb_vm = instance_double(LoadBalancersVms, state: "down")
+      lb_vm_port = instance_double(LoadBalancerVmPort, state: "down")
       expect(Prog::PageNexus).to receive(:assemble)
       expect(inference_endpoint).to receive(:maintenance_set?).and_return(false)
-      expect(nx).to receive(:load_balancers_vm).and_return(lb_vm).at_least(:once)
-      expect(lb_vm).to receive(:reload).and_return(lb_vm)
+      expect(nx).to receive(:load_balancer_vm_port).and_return(lb_vm_port).at_least(:once)
+      expect(lb_vm_port).to receive(:reload).and_return(lb_vm_port)
       expect { nx.unavailable }.to nap(30)
     end
 
     it "does not create a page if replica is in maintenance mode" do
-      lb_vm = instance_double(LoadBalancersVms, state: "down")
+      lb_vm_port = instance_double(LoadBalancerVmPort, state: "down")
       expect(Prog::PageNexus).not_to receive(:assemble)
       expect(inference_endpoint).to receive(:maintenance_set?).and_return(true)
-      expect(nx).to receive(:load_balancers_vm).and_return(lb_vm)
-      expect(lb_vm).to receive(:reload).and_return(lb_vm)
+      expect(nx).to receive(:load_balancer_vm_port).and_return(lb_vm_port)
+      expect(lb_vm_port).to receive(:reload).and_return(lb_vm_port)
       expect { nx.unavailable }.to nap(30)
     end
 

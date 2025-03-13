@@ -19,7 +19,8 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       target_node_size: "standard-2"
     )
 
-    lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", src_port: 123, dst_port: 456, health_check_endpoint: "/foo", project_id: project.id)
+    lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", health_check_endpoint: "/foo", project_id: project.id)
+    LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 123, dst_port: 456)
     kc.add_cp_vm(create_vm)
     kc.add_cp_vm(create_vm)
     kc.update(api_server_lb_id: lb.id)
