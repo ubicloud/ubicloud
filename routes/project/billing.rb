@@ -40,7 +40,7 @@ class Clover
                 line2: nil
               },
               metadata: {
-                tax_id: r.params["tax_id"],
+                tax_id: r.params["tax_id"].gsub(/[^a-zA-Z0-9]/, ""),
                 company_name: r.params["company_name"]
               }
             })
