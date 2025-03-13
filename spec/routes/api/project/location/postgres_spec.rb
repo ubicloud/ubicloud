@@ -139,6 +139,19 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(400, "Validation failed for following fields: name", {"name" => "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."})
       end
 
+      it "can update database properties" do
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          size: "standard-8",
+          storage_size: 256,
+          ha_type: "async"
+        }.to_json
+
+        expect(pg.reload.target_vm_size).to eq("standard-8")
+        expect(pg.reload.target_storage_size_gib).to eq(256)
+        expect(pg.reload.ha_type).to eq("async")
+        expect(last_response.status).to eq(200)
+      end
+
       it "firewall-rule" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule", {
           cidr: "0.0.0.0/24"
