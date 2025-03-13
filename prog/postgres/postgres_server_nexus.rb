@@ -23,7 +23,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       end
 
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
-        "ubi",
+        "rhizome",
         Config.postgres_service_project_id,
         location: postgres_resource.location,
         name: ubid.to_s,

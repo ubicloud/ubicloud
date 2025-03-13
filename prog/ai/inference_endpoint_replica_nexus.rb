@@ -16,7 +16,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
 
       inference_endpoint = InferenceEndpoint[inference_endpoint_id]
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
-        "ubi",
+        "rhizome",
         Config.inference_endpoint_service_project_id,
         location: inference_endpoint.location,
         name: ubid.to_s,
