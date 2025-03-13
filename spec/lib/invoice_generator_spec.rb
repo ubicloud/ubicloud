@@ -30,55 +30,61 @@ RSpec.describe InvoiceGenerator do
 
   def check_invoice_for_single_vm(invoices, project, vm, duration, begin_time)
     expect(invoices.count).to eq(1)
+    expected_issuer = {
+      "name" => "Ubicloud Inc.",
+      "address" => "310 Santa Ana Avenue",
+      "country" => "US",
+      "city" => "San Francisco",
+      "state" => "CA",
+      "postal_code" => "94127"
+    }
+    expected_billing_info = project.billing_info ? {
+      "id" => project.billing_info.id,
+      "ubid" => project.billing_info.ubid,
+      "name" => "ACME Inc.",
+      "email" => nil,
+      "address" => "",
+      "country" => "NL",
+      "city" => nil,
+      "state" => nil,
+      "postal_code" => nil,
+      "tax_id" => "123456",
+      "company_name" => nil
+    } : nil
 
     br = BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location)
     duration_mins = [672 * 60, (duration / 60).ceil].min
-    cost = (vm.vcpus * duration_mins * br["unit_price"]).round(3)
-    expect(invoices.first.content).to eq({
-      "project_id" => project.id,
-      "project_name" => project.name,
-      "billing_info" => project.billing_info ? {
-        "id" => project.billing_info.id,
-        "ubid" => project.billing_info.ubid,
-        "name" => "ACME Inc.",
-        "email" => nil,
-        "address" => "",
-        "country" => "NL",
-        "city" => nil,
-        "state" => nil,
-        "postal_code" => nil,
-        "tax_id" => "123456",
-        "company_name" => nil
-      } : nil,
-      "issuer_info" => {
-        "name" => "Ubicloud Inc.",
-        "address" => "310 Santa Ana Avenue",
-        "country" => "US",
-        "city" => "San Francisco",
-        "state" => "CA",
-        "postal_code" => "94127"
-      },
-      "resources" => [{
-        "resource_id" => vm.id,
-        "resource_name" => vm.name,
-        "line_items" => [{
-          "location" => br["location"],
-          "resource_type" => "VmVCpu",
-          "resource_family" => vm.family,
-          "description" => "standard-#{vm.vcpus} Virtual Machine",
-          "amount" => vm.vcpus.to_f,
-          "duration" => duration_mins,
-          "cost" => cost,
-          "begin_time" => begin_time.utc.to_s,
-          "unit_price" => br["unit_price"]
-        }],
-        "cost" => cost
+    expected_cost = (vm.vcpus * duration_mins * br["unit_price"]).round(3)
+    expected_resources = [{
+      "resource_id" => vm.id,
+      "resource_name" => vm.name,
+      "line_items" => [{
+        "location" => br["location"],
+        "resource_type" => "VmVCpu",
+        "resource_family" => vm.family,
+        "description" => "standard-#{vm.vcpus} Virtual Machine",
+        "amount" => vm.vcpus.to_f,
+        "duration" => duration_mins,
+        "cost" => expected_cost,
+        "begin_time" => begin_time.utc.to_s,
+        "unit_price" => br["unit_price"]
       }],
-      "subtotal" => cost,
-      "discount" => 0,
-      "credit" => 0,
-      "cost" => cost
-    })
+      "cost" => expected_cost
+    }]
+    actual_content = invoices.first.content
+    [
+      ["project_id", project.id],
+      ["project_name", project.name],
+      ["billing_info", expected_billing_info],
+      ["issuer_info", expected_issuer],
+      ["resources", expected_resources],
+      ["subtotal", expected_cost],
+      ["discount", 0],
+      ["credit", 0],
+      ["cost", expected_cost]
+    ].each do |key, expected|
+      expect(actual_content[key]).to eq(expected)
+    end
   end
 
   let(:p1) {
