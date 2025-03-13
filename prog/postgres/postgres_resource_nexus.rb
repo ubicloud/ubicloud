@@ -160,12 +160,15 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     postgres_resource.active_billing_records.each(&:finalize)
 
+    flavor = postgres_resource.flavor
     vm_family = representative_server.vm.family
+    vcpu_count = representative_server.vm.vcpus
+    storage_size_gib = representative_server.storage_size_gib
 
     billing_record_parts = []
     postgres_resource.target_server_count.times do |index|
-      billing_record_parts.push({resource_type: index.zero? ? "PostgresVCpu" : "PostgresStandbyVCpu", resource_family: "#{postgres_resource.flavor}-#{vm_family}", amount: representative_server.vm.vcpus})
-      billing_record_parts.push({resource_type: index.zero? ? "PostgresStorage" : "PostgresStandbyStorage", resource_family: postgres_resource.flavor, amount: postgres_resource.target_storage_size_gib})
+      billing_record_parts.push({resource_type: index.zero? ? "PostgresVCpu" : "PostgresStandbyVCpu", resource_family: "#{flavor}-#{vm_family}", amount: vcpu_count})
+      billing_record_parts.push({resource_type: index.zero? ? "PostgresStorage" : "PostgresStandbyStorage", resource_family: flavor, amount: storage_size_gib})
     end
 
     billing_record_parts.each do |brp|
