@@ -3,6 +3,10 @@ CLI to interact with Ubicloud
 Usage:
     ubi [options] [command [command-options] ...]
 
+Examples:
+    ubi vm list    # List virtual machines
+    ubi help vm    # Get help for vm subcommand
+
 Commands:
     fw      Manage firewalls
     help    Get command help
