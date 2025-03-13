@@ -153,7 +153,7 @@ class UbiCli
     on(cmd).run_on("destroy") do
       desc "Destroy a #{LOWERCASE_LABELS[cmd]}"
 
-      options("ubi #{cmd} (location/#{cmd}-name|#{cmd}-id) destroy [options]", key: :destroy) do
+      options("ubi #{cmd} (location/#{cmd}-name | #{cmd}-id) destroy [options]", key: :destroy) do
         on("-f", "--force", "do not require confirmation")
       end
 
