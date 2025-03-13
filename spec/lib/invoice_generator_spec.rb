@@ -52,20 +52,11 @@ RSpec.describe InvoiceGenerator do
       }
     end
 
-    expected_billing_info = project.billing_info ? {
+    expected_billing_info = project.billing_info&.stripe_data&.merge({
       "id" => project.billing_info.id,
       "ubid" => project.billing_info.ubid,
-      "name" => project.billing_info.stripe_data["name"],
-      "email" => project.billing_info.stripe_data["email"],
-      "address" => project.billing_info.stripe_data["address"]["line1"],
-      "country" => project.billing_info.stripe_data["address"]["country"],
-      "city" => project.billing_info.stripe_data["address"]["city"],
-      "state" => project.billing_info.stripe_data["address"]["state"],
-      "postal_code" => project.billing_info.stripe_data["address"]["postal_code"],
-      "tax_id" => project.billing_info.stripe_data["metadata"]["tax_id"],
-      "company_name" => project.billing_info.stripe_data["metadata"]["company_name"],
       "in_eu_vat" => !!expected_vat_info
-    } : nil
+    })
 
     br = BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location)
     duration_mins = [672 * 60, (duration / 60).ceil].min

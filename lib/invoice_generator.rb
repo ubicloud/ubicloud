@@ -24,7 +24,12 @@ class InvoiceGenerator
 
         project_content[:project_id] = project.id
         project_content[:project_name] = project.name
-        project_content[:billing_info] = Serializers::BillingInfo.serialize(project.billing_info)
+        country = project.billing_info&.country
+        project_content[:billing_info] = project.billing_info&.stripe_data&.merge({
+          "id" => project.billing_info.id,
+          "ubid" => project.billing_info.ubid,
+          "in_eu_vat" => !!country.in_eu_vat?
+        })
 
         # Invoices are issued by Ubicloud Inc. for non-EU customers without VAT applied.
         # Invoices are issued by Ubicloud B.V. for EU customers.
@@ -40,7 +45,7 @@ class InvoiceGenerator
           postal_code: "94127"
         }
         vat_info = nil
-        if (country = ISO3166::Country.new(project_content.dig(:billing_info, :country))) && country.in_eu_vat?
+        if country&.in_eu_vat?
           issuer = {
             name: "Ubicloud B.V.",
             address: "Turfschip 267",
@@ -51,7 +56,7 @@ class InvoiceGenerator
             trade_id: "88492729",
             in_eu_vat: true
           }
-          vat_info = if ((tax_id = project_content[:billing_info][:tax_id]) && !tax_id.empty?) && country.alpha2 != "NL"
+          vat_info = if ((tax_id = project_content[:billing_info]["tax_id"]) && !tax_id.empty?) && country.alpha2 != "NL"
             {rate: 0, reversed: true}
           else
             {rate: Config.annual_non_dutch_eu_sales_exceed_threshold ? country.vat_rates["standard"] : 21, reversed: false, eur_rate: @eur_rate}
