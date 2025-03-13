@@ -16,7 +16,6 @@ class Clover
 
       r.get true do
         if (billing_info = @project.billing_info)
-          @billing_info_data = Serializers::BillingInfo.serialize(billing_info)
           @payment_methods = Serializers::PaymentMethod.serialize(billing_info.payment_methods)
           @invoices = Serializers::Invoice.serialize(@project.invoices.prepend(@project.current_invoice))
         end

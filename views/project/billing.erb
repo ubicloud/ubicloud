@@ -1,6 +1,6 @@
 <% @page_title = "Project Billing" %>
 
-<% if @billing_info_data %>
+<% if billing_info = @project.billing_info %>
   <%== part(
     "components/page_header",
     breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Billing #]]
@@ -31,6 +31,7 @@
       </dl>
     </div>
     <!-- Billing Info Update Card -->
+    <% stripe_data = billing_info.stripe_data %>
     <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
       <div class="min-w-0 flex-1">
         <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
@@ -50,7 +51,7 @@
                     "components/form/text",
                     name: "name",
                     label: "Billing Name",
-                    value: @billing_info_data[:name],
+                    value: stripe_data["name"],
                     attributes: {
                       required: true
                     }
@@ -61,7 +62,7 @@
                     "components/form/text",
                     name: "email",
                     label: "Billing Email",
-                    value: @billing_info_data[:email],
+                    value: stripe_data["email"],
                     attributes: {
                       required: true
                     }
@@ -73,7 +74,7 @@
                     name: "country",
                     label: "Country",
                     placeholder: "Select a Country",
-                    selected: @billing_info_data[:country],
+                    selected: stripe_data["country"],
                     options:
                       ISO3166::Country
                         .all
@@ -88,38 +89,37 @@
                   ) %>
                 </div>
                 <div class="sm:col-span-4 md:col-span-2">
-                  <%== part("components/form/text", name: "state", label: "State", value: @billing_info_data[:state]) %>
+                  <%== part("components/form/text", name: "state", label: "State", value: stripe_data["state"]) %>
                 </div>
                 <div class="sm:col-span-4 md:col-span-2">
-                  <%== part("components/form/text", name: "city", label: "City", value: @billing_info_data[:city]) %>
+                  <%== part("components/form/text", name: "city", label: "City", value: stripe_data["city"]) %>
                 </div>
                 <div class="sm:col-span-4 md:col-span-2">
-                  <%== part("components/form/text", name: "postal_code", label: "Postal Code", value: @billing_info_data[:postal_code]) %>
+                  <%== part("components/form/text", name: "postal_code", label: "Postal Code", value: stripe_data["postal_code"]) %>
                 </div>
                 <div class="col-span-full">
                   <%== part(
                     "components/form/textarea",
                     name: "address",
                     label: "Address",
-                    value: @billing_info_data[:address],
+                    value: stripe_data["address"],
                     attributes: {
                       required: true
                     }
                   ) %>
                 </div>
                 <div class="sm:col-span-4">
-                  <% country = ISO3166::Country.new(@billing_info_data[:country]) %>
                   <%== part(
                     "components/form/text",
                     name: "tax_id",
-                    label: country&.in_eu_vat? ? "VAT ID" : "Tax ID",
-                    value: @billing_info_data[:tax_id]
+                    label: billing_info.country&.in_eu_vat? ? "VAT ID" : "Tax ID",
+                    value: stripe_data["tax_id"]
                   ) %>
-                  <% if country&.in_eu_vat? %>
+                  <% if billing_info.country&.in_eu_vat? %>
                     <div class="mt-2 text-sm text-gray-500">
-                      <% if country.alpha2 == "NL" %>
+                      <% if billing_info.country.alpha2 == "NL" %>
                         21% VAT is collected from customers located in the Netherlands.
-                      <% elsif @billing_info_data[:tax_id].to_s.strip.empty? %>
+                      <% elsif stripe_data["tax_id"].to_s.strip.empty? %>
                         EU registered business can enter their VAT ID to remove VAT from future invoices.
                       <% else %>
                         VAT subject to reverse charge.
@@ -128,7 +128,7 @@
                   <% end %>
                 </div>
                 <div class="sm:col-span-4">
-                  <%== part("components/form/text", name: "company_name", label: "Company Name", value: @billing_info_data[:company_name]) %>
+                  <%== part("components/form/text", name: "company_name", label: "Company Name", value: stripe_data["company_name"]) %>
                 </div>
               </div>
             </div>

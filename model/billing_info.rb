@@ -2,6 +2,7 @@
 
 require_relative "../model"
 require "stripe"
+require "countries"
 
 class BillingInfo < Sequel::Model
   one_to_many :payment_methods
@@ -11,8 +12,26 @@ class BillingInfo < Sequel::Model
 
   def stripe_data
     if (Stripe.api_key = Config.stripe_secret_key)
-      @stripe_data ||= Stripe::Customer.retrieve(stripe_id)
+      @stripe_data ||= begin
+        data = Stripe::Customer.retrieve(stripe_id)
+        address = data["address"]
+        {
+          "name" => data["name"],
+          "email" => data["email"],
+          "address" => [address["line1"], address["line2"]].compact.join(" "),
+          "country" => address["country"],
+          "city" => address["city"],
+          "state" => address["state"],
+          "postal_code" => address["postal_code"],
+          "tax_id" => data["metadata"]["tax_id"],
+          "company_name" => data["metadata"]["company_name"]
+        }
+      end
     end
+  end
+
+  def country
+    ISO3166::Country.new(stripe_data["country"])
   end
 
   def after_destroy
