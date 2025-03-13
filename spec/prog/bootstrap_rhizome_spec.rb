@@ -36,6 +36,7 @@ RSpec.describe Prog::BootstrapRhizome do
 
     it "runs initializing shell with public keys" do
       sshable = instance_double(Sshable, host: "hostname", keys: [instance_double(SshKey, public_key: "test key", private_key: "test private key")])
+      expect(Config).to receive(:operator_ssh_public_keys).and_return("operatorkey")
       expect(br).to receive(:sshable).and_return(sshable).at_least(:once)
       expect(Util).to receive(:rootish_ssh).with "hostname", "root", ["test private key"], <<'FIXTURE'
 set -ueo pipefail
@@ -72,6 +73,7 @@ echo \#\ Supported\ HostKey\ algorithms\ by\ order\ of\ preference.'
 'ClientAliveCountMax\ 4'
 ' | sudo tee /etc/ssh/sshd_config.d/10-clover.conf > /dev/null
 echo test\ key | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
+echo operatorkey | sudo tee -a ~/.ssh/authorized_keys > /dev/null
 sync
 FIXTURE
 

@@ -48,6 +48,7 @@ LOGIND
     pop "rhizome user bootstrapped and source installed" if retval&.dig("msg") == "installed rhizome"
 
     key_data = sshable.keys.map(&:private_key)
+    operator_keys = Config.operator_ssh_public_keys || ""
     Util.rootish_ssh(sshable.host, user, key_data, <<SH)
 set -ueo pipefail
 sudo apt update && sudo apt-get -y install ruby-bundler
@@ -60,6 +61,7 @@ sudo mkdir -p /etc/systemd/logind.conf.d
 echo #{LOGIND_CONFIG.shellescape} | sudo tee /etc/systemd/logind.conf.d/rhizome.conf > /dev/null
 echo #{SSHD_CONFIG.shellescape} | sudo tee /etc/ssh/sshd_config.d/10-clover.conf > /dev/null
 echo #{sshable.keys.map(&:public_key).join("\n").shellescape} | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
+echo #{operator_keys.shellescape} | sudo tee -a ~/.ssh/authorized_keys > /dev/null
 sync
 SH
 
