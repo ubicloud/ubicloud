@@ -28,7 +28,12 @@ class UbiCli
   OBJECT_INFO_REGEXP = /((fw|1b|pg|ps|vm)[a-z0-9]{24})/
   UBI_VERSION_REGEXP = /\A\d{1,4}\.\d{1,4}\.\d{1,4}\z/
 
-  Rodish.processor(self) do
+  Rodish.processor(self)
+
+  plugin :help_examples
+  plugin :default_help_order, [:desc, :banner, :examples, :commands, :options]
+
+  on do
     desc "CLI to interact with Ubicloud"
 
     options("ubi [options] [command [command-options] ...]") do
@@ -36,6 +41,9 @@ class UbiCli
       on("--help", "show program help") { halt UbiCli.command.help }
       on("--confirm=confirmation", "confirmation value (not for direct use)")
     end
+
+    help_example "ubi vm list    # List virtual machines"
+    help_example "ubi help vm    # Get help for vm subcommand"
 
     after_options do |_, opts|
       raise Rodish::CommandExit, client_version if opts[:version]
