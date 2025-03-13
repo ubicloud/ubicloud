@@ -86,7 +86,7 @@ Usage:
 Destroy a firewall
 
 Usage:
-    ubi fw (location/fw-name|fw-id) destroy [options]
+    ubi fw (location/fw-name | fw-id) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation
@@ -175,7 +175,7 @@ Options:
 Destroy a load balancer
 
 Usage:
-    ubi lb (location/lb-name|lb-id) destroy [options]
+    ubi lb (location/lb-name | lb-id) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation
@@ -285,7 +285,7 @@ Usage:
 Destroy a PostgreSQL database
 
 Usage:
-    ubi pg (location/pg-name|pg-id) destroy [options]
+    ubi pg (location/pg-name | pg-id) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation
@@ -386,7 +386,7 @@ Options:
 Destroy a private subnet
 
 Usage:
-    ubi ps (location/ps-name|ps-id) destroy [options]
+    ubi ps (location/ps-name | ps-id) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation
@@ -467,7 +467,7 @@ Options:
 Destroy a virtual machine
 
 Usage:
-    ubi vm (location/vm-name|vm-id) destroy [options]
+    ubi vm (location/vm-name | vm-id) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation

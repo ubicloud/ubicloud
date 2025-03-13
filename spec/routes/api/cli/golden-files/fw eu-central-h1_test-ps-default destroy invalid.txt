@@ -3,7 +3,7 @@
 Destroy a firewall
 
 Usage:
-    ubi fw (location/fw-name|fw-id) destroy [options]
+    ubi fw (location/fw-name | fw-id) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation

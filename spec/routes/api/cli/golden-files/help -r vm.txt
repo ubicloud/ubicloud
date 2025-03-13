@@ -51,7 +51,7 @@ Options:
 Destroy a virtual machine
 
 Usage:
-    ubi vm (location/vm-name|vm-id) destroy [options]
+    ubi vm (location/vm-name | vm-id) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation

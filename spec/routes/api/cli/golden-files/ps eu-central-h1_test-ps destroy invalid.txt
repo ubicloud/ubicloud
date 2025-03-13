@@ -3,7 +3,7 @@
 Destroy a private subnet
 
 Usage:
-    ubi ps (location/ps-name|ps-id) destroy [options]
+    ubi ps (location/ps-name | ps-id) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation

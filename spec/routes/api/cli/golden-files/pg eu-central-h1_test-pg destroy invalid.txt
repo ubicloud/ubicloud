@@ -3,7 +3,7 @@
 Destroy a PostgreSQL database
 
 Usage:
-    ubi pg (location/pg-name|pg-id) destroy [options]
+    ubi pg (location/pg-name | pg-id) destroy [options]
 
 Options:
     -f, --force                      do not require confirmation
