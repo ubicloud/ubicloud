@@ -1,4 +1,4 @@
-<%# locals: (action:, form_elements:, option_tree:, option_parents:, form_title: nil) %>
+<%# locals: (action:, form_elements:, option_tree:, option_parents:, form_title: nil, pre_selected_values: []) %>
 <% nonce = SecureRandom.base64(32)
 content_security_policy.add_script_src [:nonce, nonce] %>
 
@@ -27,6 +27,8 @@ let option_dirty = <%==JSON.generate(form_elements.map { _1[:name] }.each_with_o
           <div>
             <div class="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
               <% selected_options = {}
+pre_selected_values.each { |k, v| selected_options[k] = v.to_s }
+
 form_elements.each do |element|
   container_opening_tag = element[:opening_tag] || "<div class='col-span-full'>"
   container_closing_tag = element[:closing_tag] || "</div>"
@@ -40,9 +42,15 @@ form_elements.each do |element|
     opt_text = content_generator.call(*option.values)
 
     parents = option.reject { |k, v| k == name }
+
     parents_selected = parents.all? { |k, v| selected_options[k] == v }
-    checked = parents_selected && (flash.dig("old", name) == opt_val || (flash.dig("old", name).nil? && selected_options[name].nil?))
+    submitted_value = flash.dig("old", name)
+    selected_in_form_submission = submitted_value == opt_val
+    selected_in_pre_selection = submitted_value.nil? && selected_options[name] == opt_val
+    first_of_its_kind = submitted_value.nil? && selected_options[name].nil?
+    checked = parents_selected && (selected_in_form_submission || selected_in_pre_selection || first_of_its_kind)
     selected_options[name] = opt_val if checked
+  
     opt_classes = (parents.map { |k, v| "form_#{k} form_#{k}_#{v}" } + (parents_selected ? [] : ["hidden"])).join(" ")
 
     opt_attrs = {}
