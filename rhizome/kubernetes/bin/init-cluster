@@ -59,7 +59,7 @@ safe_write_to_file(config_path, config.to_yaml)
 
 r "sudo kubeadm init --config #{config_path}"
 
-r("sudo /home/ubi/kubernetes/bin/setup-cni")
+r("sudo /home/rhizome/kubernetes/bin/setup-cni")
 
 api_server_up = false
 5.times do

@@ -203,7 +203,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check init_kubernetes_cluster").and_return("NotStarted")
       expect(prog.vm).to receive(:nics).and_return([instance_double(Nic, private_ipv4: "10.0.0.37")])
       expect(prog.vm.sshable).to receive(:cmd).with(
-        "common/bin/daemonizer /home/ubi/kubernetes/bin/init-cluster init_kubernetes_cluster",
+        "common/bin/daemonizer /home/rhizome/kubernetes/bin/init-cluster init_kubernetes_cluster",
         stdin: /{"cluster_name":"k8scluster","lb_hostname":"somelb\..*","port":"443","private_subnet_cidr4":"127.0.0.0\/8","private_subnet_cidr6":"::\/16","vm_cidr":"10.0.0.37"}/
       )
 

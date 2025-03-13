@@ -130,7 +130,7 @@ BASH
         private_subnet_cidr6: kubernetes_cluster.private_subnet.net6,
         vm_cidr: vm.nics.first.private_ipv4
       }
-      vm.sshable.cmd("common/bin/daemonizer /home/ubi/kubernetes/bin/init-cluster init_kubernetes_cluster", stdin: JSON.generate(params))
+      vm.sshable.cmd("common/bin/daemonizer /home/rhizome/kubernetes/bin/init-cluster init_kubernetes_cluster", stdin: JSON.generate(params))
       nap 30
     when "InProgress"
       nap 10
