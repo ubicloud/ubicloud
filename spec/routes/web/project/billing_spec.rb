@@ -260,7 +260,7 @@ RSpec.describe Clover, "billing" do
       end
 
       it "list invoices of project" do
-        expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).at_least(:once)
+        expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "John Doe", "address" => {"country" => "NL"}, "metadata" => {}}).at_least(:once)
         bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
         InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run
         invoice = Invoice.first
@@ -311,7 +311,7 @@ RSpec.describe Clover, "billing" do
       end
 
       it "show current invoice when no usage" do
-        expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).at_least(:once)
+        expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "John Doe", "address" => {}, "metadata" => {}}).at_least(:once)
 
         visit "#{project.path}/billing"
 
@@ -326,7 +326,7 @@ RSpec.describe Clover, "billing" do
       end
 
       it "list current invoice with last month usage" do
-        expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).at_least(:once)
+        expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "John Doe", "address" => {"country" => "NL"}, "metadata" => {}}).at_least(:once)
         br_previous = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
         br_current = billing_record(Time.parse("2023-07-01"), Time.parse("2023-07-15"))
         invoice_previous = InvoiceGenerator.new(br_previous.span.begin, br_previous.span.end, save_result: true, eur_rate: 1.1).run.first

@@ -7,8 +7,9 @@ RSpec.describe BillingInfo do
 
   it "return Stripe Data if Stripe enabled" do
     allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
-    expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"id" => "cs_1234567890"})
-    expect(billing_info.stripe_data).to eq({"id" => "cs_1234567890"})
+    expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"line1" => "123 Main St"}, "metadata" => {}})
+    expect(billing_info.stripe_data["name"]).to eq("John Doe")
+    expect(billing_info.stripe_data["address"]).to eq("123 Main St")
   end
 
   it "not return Stripe Data if Stripe not enabled" do
