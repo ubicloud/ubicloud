@@ -779,6 +779,33 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+    patch:
+      operationId: patchPostgresDatabase
+      summary: Update a Postgres Database in a specific location of a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ha_type:
+                  description: High availability type
+                  type: string
+                size:
+                  description: Requested size for the underlying VM
+                  type: string
+                storage_size:
+                  description: Requested storage size in GiB
+                  type: integer
+              additionalProperties: false
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/ca-certificates':
     parameters:
       - $ref: '#/components/parameters/project_id'

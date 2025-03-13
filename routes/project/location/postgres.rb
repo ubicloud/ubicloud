@@ -40,6 +40,39 @@ class Clover
         204
       end
 
+      r.patch do
+        authorize("Postgres:edit", pg.id)
+
+        allowed_optional_parameters = ["size", "storage_size", "ha_type"]
+        ignored_parameters = ["family"]
+        request_body_params = validate_request_params([], allowed_optional_parameters, ignored_parameters)
+
+        target_vm_size = Validation.validate_postgres_size(pg.location, request_body_params["size"] || pg.target_vm_size)
+        target_storage_size_gib = Validation.validate_postgres_storage_size(pg.location, target_vm_size.vm_size, request_body_params["storage_size"] || pg.target_storage_size_gib)
+        ha_type = request_body_params["ha_type"] || PostgresResource::HaType::NONE
+        Validation.validate_postgres_ha_type(ha_type)
+
+        if pg.representative_server.nil? || target_storage_size_gib < pg.representative_server.storage_size_gib
+          begin
+            current_disk_usage = pg.representative_server.vm.sshable.cmd("df --output=used /dev/vdb | tail -n 1").strip.to_i / (1024 * 1024)
+          rescue
+            fail CloverError.new(400, "InvalidRequest", "Database is not ready for update", {})
+          end
+
+          if target_storage_size_gib * 0.8 < current_disk_usage
+            fail Validation::ValidationFailed.new({storage_size: "Insufficient storage size is requested. It is only possible to reduce the storage size if the current usage is less than 80% of the requested size."})
+          end
+        end
+
+        current_postgres_vcpu_count = (PostgresResource::TARGET_STANDBY_COUNT_MAP[pg.ha_type] + 1) * pg.representative_server.vm.vcpus
+        requested_postgres_vcpu_count = (PostgresResource::TARGET_STANDBY_COUNT_MAP[ha_type] + 1) * target_vm_size.vcpu
+        Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count - current_postgres_vcpu_count)
+
+        pg.update(target_vm_size: target_vm_size.vm_size, target_storage_size_gib:, ha_type:)
+
+        Serializers::Postgres.serialize(pg, {detailed: true})
+      end
+
       r.post "restart" do
         authorize("Postgres:edit", pg.id)
         pg.servers.each do |s|

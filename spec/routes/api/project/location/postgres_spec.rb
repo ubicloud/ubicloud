@@ -139,6 +139,64 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(400, "Validation failed for following fields: name", {"name" => "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."})
       end
 
+      it "can update database properties" do
+        expect(Project).to receive(:from_ubid).and_return(project)
+        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
+        expect(pg.representative_server).to receive(:storage_size_gib).and_return(128)
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          size: "standard-8",
+          storage_size: 256,
+          ha_type: "async"
+        }.to_json
+
+        expect(pg.reload.target_vm_size).to eq("standard-8")
+        expect(pg.reload.target_storage_size_gib).to eq(256)
+        expect(pg.reload.ha_type).to eq("async")
+        expect(last_response.status).to eq(200)
+      end
+
+      it "can scale down storage if the requested size is enough for existing data" do
+        expect(Project).to receive(:from_ubid).and_return(project)
+        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
+        expect(pg.representative_server).to receive(:storage_size_gib).and_return(128)
+        expect(pg.representative_server.vm.sshable).to receive(:cmd).and_return("10000000\n")
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          storage_size: 64
+        }.to_json
+
+        expect(pg.reload.target_storage_size_gib).to eq(64)
+      end
+
+      it "does not scale down storage if the requested size is too small for existing data" do
+        expect(Project).to receive(:from_ubid).and_return(project)
+        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
+        expect(pg.representative_server).to receive(:storage_size_gib).and_return(128)
+        expect(pg.representative_server.vm.sshable).to receive(:cmd).and_return("999999999\n")
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          storage_size: 64
+        }.to_json
+
+        expect(pg.reload.target_storage_size_gib).to eq(128)
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: storage_size", {"storage_size" => "Insufficient storage size is requested. It is only possible to reduce the storage size if the current usage is less than 80% of the requested size."})
+      end
+
+      it "returns error message if current usage is unknown" do
+        expect(Project).to receive(:from_ubid).and_return(project)
+        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
+        expect(pg.representative_server).to receive(:storage_size_gib).and_return(128)
+        expect(pg.representative_server.vm.sshable).to receive(:cmd).and_raise(StandardError.new("error"))
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          storage_size: 64
+        }.to_json
+
+        expect(pg.reload.target_storage_size_gib).to eq(128)
+        expect(last_response).to have_api_error(400, "Database is not ready for update")
+      end
+
       it "firewall-rule" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule", {
           cidr: "0.0.0.0/24"
