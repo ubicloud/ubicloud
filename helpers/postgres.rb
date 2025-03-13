@@ -109,4 +109,33 @@ class Clover
     options.add_option(name: "ha_type", values: [PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC], parent: "storage_size")
     options.serialize
   end
+
+  def generate_postgres_configure_options(flavor:, location:)
+    options = OptionTreeGenerator.new
+
+    options.add_option(name: "flavor", values: flavor)
+    options.add_option(name: "location", values: location, parent: "flavor")
+
+    options.add_option(name: "family", values: Option::PostgresSizes.map(&:vm_family).uniq, parent: "location") do |flavor, location, family|
+      available_families = Option.families.map(&:name)
+      available_families.include?(family) && BillingRate.from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", LocationNameConverter.to_internal_name(location))
+    end
+
+    options.add_option(name: "size", values: Option::PostgresSizes.map(&:name).uniq, parent: "family") do |flavor, location, family, size|
+      location = LocationNameConverter.to_internal_name(location)
+      pg_size = Option::PostgresSizes.find { _1.name == size && _1.flavor == flavor && _1.location == location }
+      vm_size = Option::VmSizes.find { _1.name == pg_size.vm_size && _1.arch == "x64" && _1.visible }
+      vm_size.family == family
+    end
+
+    options.add_option(name: "storage_size", values: ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096"], parent: "size") do |flavor, location, family, size, storage_size|
+      location = LocationNameConverter.to_internal_name(location)
+      pg_size = Option::PostgresSizes.find { _1.name == size && _1.flavor == flavor && _1.location == location }
+      pg_size.storage_size_options.include?(storage_size.to_i)
+    end
+
+    options.add_option(name: "ha_type", values: [PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC], parent: "storage_size")
+
+    options.serialize
+  end
 end

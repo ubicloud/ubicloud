@@ -247,6 +247,29 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "ResourceNotFound"
       end
 
+      it "can update PostgreSQL instance size configuration" do
+        visit "#{project.path}#{pg.path}"
+        expect(page).to have_content "Configure PostgreSQL database"
+
+        choose option: "standard-8"
+        choose option: 256
+        choose option: PostgresResource::HaType::ASYNC
+
+        # We send PATCH request manually instead of just clicking to button because PATCH action triggered by JavaScript.
+        # UI tests run without a JavaScript engine.
+        form = find_by_id "creation-form"
+        csrf = form.find("input[name='_csrf']", visible: false).value
+        size = form.find(:radio_button, "size", checked: true).value
+        storage_size = form.find(:radio_button, "storage_size", checked: true).value
+        ha_type = form.find(:radio_button, "ha_type", checked: true).value
+        page.driver.submit :patch, form["action"], {size: size, storage_size: storage_size, ha_type: ha_type, _csrf: csrf}
+
+        pg.reload
+        expect(pg.target_vm_size).to eq("standard-8")
+        expect(pg.target_storage_size_gib).to eq(256)
+        expect(pg.ha_type).to eq(PostgresResource::HaType::ASYNC)
+      end
+
       it "can restore PostgreSQL database" do
         backup = Struct.new(:key, :last_modified)
         restore_target = Time.now.utc

@@ -108,6 +108,60 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
       </div>
     <% end %>
   </div>
+  <!-- Update target state of the database resource -->
+  <% form_elements = [
+    {
+      name: "family",
+      type: "radio_small_cards",
+      label: "Server family",
+      required: "required",
+      content_generator: ContentGenerator::Postgres.method(:family)
+    },
+    {
+      name: "size",
+      type: "radio_small_cards",
+      label: "Server size",
+      required: "required",
+      content_generator: ContentGenerator::Postgres.method(:size)
+    },
+    {
+      name: "storage_size",
+      type: "radio_small_cards",
+      label: "Storage size",
+      required: "required",
+      content_generator: ContentGenerator::Postgres.method(:storage_size)
+    },
+    {
+      name: "ha_type",
+      type: "radio_small_cards",
+      label: "High Availability",
+      required: "required",
+      content_generator: ContentGenerator::Postgres.method(:ha_type)
+    }
+  ]
+  
+  pre_selected_values = {
+    "flavor" => @pg[:flavor],
+    "location" => @pg[:location],
+    "family" => @family,
+    "size" => @pg[:vm_size],
+    "storage_size" => @pg[:storage_size_gib],
+    "ha_type" => @pg[:ha_type]
+  } %>
+
+  <%== render(
+    "components/form/resource_creation_form",
+    locals: {
+      action: "#{@project_data[:path]}#{@pg[:path]}",
+      method: "PATCH",
+      form_title: "Configure PostgreSQL database",
+      form_elements:,
+      pre_selected_values:,
+      option_tree: @option_tree,
+      option_parents: @option_parents,
+      mode: "update"
+    }
+  ) %>
   <!-- Fork database -->
   <% if @pg[:earliest_restore_time] && @pg[:latest_restore_time] > @pg[:earliest_restore_time] %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
