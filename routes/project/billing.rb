@@ -27,6 +27,8 @@ class Clover
 
       r.post true do
         if (billing_info = @project.billing_info)
+          current_tax_id = billing_info.stripe_data["tax_id"]
+          new_tax_id = r.params["tax_id"].gsub(/[^a-zA-Z0-9]/, "")
           begin
             Stripe::Customer.update(billing_info.stripe_id, {
               name: r.params["name"],
@@ -40,10 +42,18 @@ class Clover
                 line2: nil
               },
               metadata: {
-                tax_id: r.params["tax_id"].gsub(/[^a-zA-Z0-9]/, ""),
+                tax_id: new_tax_id,
                 company_name: r.params["company_name"]
               }
             })
+            if new_tax_id != current_tax_id
+              DB.transaction do
+                billing_info.update(valid_vat: nil)
+                if new_tax_id && billing_info.country.in_eu_vat?
+                  Strand.create(prog: "ValidateVat", label: "start", stack: [{subject_id: billing_info.id}])
+                end
+              end
+            end
           rescue Stripe::InvalidRequestError => e
             flash["error"] = e.message
           end
