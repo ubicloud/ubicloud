@@ -92,6 +92,12 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   sudo systemctl enable --now kubelet
 BASH
 
+    hop_apply_nat_rules
+  end
+
+  label def apply_nat_rules
+    vm.sshable.cmd("sudo iptables-nft -t nat -A POSTROUTING -s #{vm.nics.first.private_ipv4} -o ens3 -j MASQUERADE")
+
     hop_bootstrap_rhizome
   end
 
@@ -207,18 +213,6 @@ BASH
 }
 CONFIG
     vm.sshable.cmd("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
-    vm.sshable.cmd("sudo nft -f -", stdin: <<~BASH)
-      add table ip nat;
-
-      table ip nat {
-        chain POSTROUTING {
-          type nat hook postrouting priority 100;
-          policy accept;
-          ip saddr #{vm.nics.first.private_ipv4} oifname ens3 masquerade;
-        }
-      }
-    BASH
-
     pop vm_id: vm.id
   end
 end

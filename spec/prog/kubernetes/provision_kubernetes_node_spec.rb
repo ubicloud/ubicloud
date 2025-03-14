@@ -150,7 +150,16 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(prog.vm).to receive(:strand).and_return(st)
       expect(prog.vm).to receive(:sshable).and_return(sshable)
       expect(sshable).to receive(:cmd).with(/sudo apt install -y kubelet kubeadm kubectl/)
-      expect { prog.install_software }.to hop("bootstrap_rhizome")
+      expect { prog.install_software }.to hop("apply_nat_rules")
+    end
+  end
+
+  describe "#apply_nat_rules" do
+    it "applies nat rules and hops to rhizome installation" do
+      sshable = instance_double(Sshable)
+      expect(prog.vm).to receive_messages(sshable: sshable, nics: [instance_double(Nic, private_ipv4: "10.10.20.30/26")])
+      expect(sshable).to receive(:cmd).with("sudo iptables-nft -t nat -A POSTROUTING -s 10.10.20.30/26 -o ens3 -j MASQUERADE")
+      expect { prog.apply_nat_rules }.to hop("bootstrap_rhizome")
     end
   end
 
@@ -325,17 +334,6 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       )
 
       expect(sshable).to receive(:cmd).with("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: /"type": "ubicni"/)
-      expect(sshable).to receive(:cmd).with("sudo nft -f -", stdin: <<~BASH)
-      add table ip nat;
-
-      table ip nat {
-        chain POSTROUTING {
-          type nat hook postrouting priority 100;
-          policy accept;
-          ip saddr 10.0.0.37 oifname ens3 masquerade;
-        }
-      }
-      BASH
       expect { prog.install_cni }.to exit({vm_id: prog.vm.id})
     end
   end
