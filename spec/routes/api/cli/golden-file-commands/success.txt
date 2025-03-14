@@ -28,7 +28,6 @@ fw list -l eu-north-h1
 fw list -l eu-north-h1 -f name,id
 fw list -l eu-north-h1 -N -f name,id
 fw list -N
---help
 help
 help help
 help -r
