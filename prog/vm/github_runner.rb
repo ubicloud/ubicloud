@@ -323,9 +323,9 @@ class Prog::Vm::GithubRunner < Prog::Base
     # JIT tokens are valid for 5 minutes. If the runner doesn't pick a job
     # within that time, the job may have been cancelled prior to assignment,
     # so we destroy the runner. We check if the runner is busy or not with
-    # GitHub API, but sometimes GitHub assigns a job at the last second.
-    # Therefore, we wait a few extra seconds beyond the 5 minute mark.
-    if github_runner.workflow_job.nil? && Time.now > github_runner.ready_at + 5 * 60 + 10
+    # GitHub API, but sometimes GitHub assigns a job after that (sometimes
+    # over 6 minutes). So wait for 7 minutes.
+    if github_runner.workflow_job.nil? && Time.now > github_runner.ready_at + 7 * 60
       response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
       unless response[:busy]
         Clog.emit("The runner does not pick a job") { github_runner }
