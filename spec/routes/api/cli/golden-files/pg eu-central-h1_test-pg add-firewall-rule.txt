@@ -1,4 +1,4 @@
-! Invalid arguments for pg add-firewall-rule subcommand (cidr is required)
+! Invalid number of arguments for pg add-firewall-rule subcommand (accepts: 1, given: 0)
 
 Add a PostgreSQL firewall rule
 

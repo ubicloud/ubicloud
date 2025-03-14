@@ -5,7 +5,7 @@ UbiCli.on("pg").run_on("delete-firewall-rule") do
 
   banner "ubi pg (location/pg-name | pg-id) delete-firewall-rule rule-id"
 
-  args 1, invalid_args_message: "rule id is required"
+  args 1
 
   run do |ubid|
     if ubid.include?("/")

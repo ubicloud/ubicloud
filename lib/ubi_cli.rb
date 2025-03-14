@@ -34,7 +34,6 @@ class UbiCli
   plugin :help_examples
   plugin :help_option_values
   plugin :help_order, default_help_order: [:desc, :banner, :examples, :commands, :options, :option_values]
-  plugin :invalid_args_message
   plugin :post_commands
   plugin :skip_option_parsing
 

@@ -16,7 +16,7 @@ UbiCli.on("vm").run_on("create") do
   help_option_values("Size:", vm_sizes.map(&:name).uniq)
   help_option_values("Storage Size:", vm_sizes.map(&:storage_size_options).flatten.uniq.sort)
 
-  args(1, invalid_args_message: "public_key is required")
+  args 1
 
   run do |public_key, opts|
     params = underscore_keys(opts[:vm_create])

@@ -1,4 +1,4 @@
-! Invalid arguments for vm create subcommand (public_key is required)
+! Invalid number of arguments for vm create subcommand (accepts: 1, given: 0)
 
 Create a virtual machine
 
