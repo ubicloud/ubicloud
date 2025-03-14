@@ -4,12 +4,17 @@ UbiCli.on("pg").run_on("create") do
   desc "Create a PostgreSQL database"
 
   options("ubi pg location/pg-name create [options]", key: :pg_create) do
-    on("-f", "--flavor=type", "flavor (standard, paradedb, lantern)")
-    on("-h", "--ha-type=type", "replication type (none, async, sync)")
-    on("-s", "--size=size", "server size (standard-{2,4,8,16,30,60})")
-    on("-S", "--storage-size=size", "storage size GB (64, 128, 256)")
-    on("-v", "--version=version", "PostgreSQL version (16, 17)")
+    on("-f", "--flavor=type", "flavor")
+    on("-h", "--ha-type=type", "replication type")
+    on("-s", "--size=size", "server size")
+    on("-S", "--storage-size=size", "storage size GB")
+    on("-v", "--version=version", "PostgreSQL version")
   end
+  help_option_values("Flavor:", Option::POSTGRES_VERSION_OPTIONS.keys)
+  help_option_values("Replication Type:", Option::PostgresHaOptions.map(&:name))
+  help_option_values("Size:", Option::PostgresSizes.map(&:name).uniq)
+  help_option_values("Storage Size:", Option::PostgresSizes.map(&:storage_size_options).flatten.map(&:to_i).uniq.sort)
+  help_option_values("Version:", Option::POSTGRES_VERSION_OPTIONS.values.flatten.uniq)
 
   run do |opts|
     params = underscore_keys(opts[:pg_create])

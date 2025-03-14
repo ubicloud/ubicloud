@@ -5,12 +5,16 @@ UbiCli.on("vm").run_on("create") do
 
   options("ubi vm location/vm-name create [options] public_key", key: :vm_create) do
     on("-6", "--ipv6-only", "do not enable IPv4")
-    on("-b", "--boot-image=image_name", "boot image (ubuntu-noble,ubuntu-jammy,debian-12,almalinux-9)")
+    on("-b", "--boot-image=image_name", "boot image")
     on("-p", "--private-subnet-id=id", "place VM into specific private subnet")
-    on("-s", "--size=size", "server size (standard-{2,4,8,16,30,60})")
-    on("-S", "--storage-size=size", "storage size (40, 80)")
+    on("-s", "--size=size", "server size")
+    on("-S", "--storage-size=size", "storage size")
     on("-u", "--unix-user=username", "username (default: ubi)")
   end
+  vm_sizes = Option::VmSizes.select(&:visible)
+  help_option_values("Boot Image:", Option::BootImages.map(&:name))
+  help_option_values("Size:", vm_sizes.map(&:name).uniq)
+  help_option_values("Storage Size:", vm_sizes.map(&:storage_size_options).flatten.uniq.sort)
 
   args(1, invalid_args_message: "public_key is required")
 

@@ -9,4 +9,6 @@ Options:
     -f, --fields=fields              show specific fields (comma separated)
     -l, --location=location          only show private subnets in given location
     -N, --no-headers                 do not show headers
-Fields: location name id net4 net6
+
+Allowed Option Values:
+    Fields: location name id net4 net6
