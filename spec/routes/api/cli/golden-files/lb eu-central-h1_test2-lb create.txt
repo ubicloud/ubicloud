@@ -6,7 +6,12 @@ Usage:
     ubi lb location/lb-name create [options] ps-id src-port dst-port
 
 Options:
-    -a, --algorithm=alg              set the algorithm to use (round_robin(default), hash_based)
+    -a, --algorithm=alg              set the algorithm to use
     -e, --check-endpoint=path        set the health check endpoint (default: /up)
-    -p, --check-protocol=proto       set the health check protocol (http(default), https, tcp)
-    -s, --stack=stack                set the stack (dual(default), ipv4, ipv6)
+    -p, --check-protocol=proto       set the health check protocol
+    -s, --stack=stack                set the stack
+
+Allowed Option Values:
+    Algorithm: round_robin hash_based
+    Health Check Protocol: http https tcp
+    Stack: dual ipv4 ipv6

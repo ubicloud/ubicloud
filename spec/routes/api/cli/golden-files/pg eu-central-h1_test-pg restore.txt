@@ -1,4 +1,4 @@
-! Invalid arguments for pg restore subcommand (name and restore target are required)
+! Invalid number of arguments for pg restore subcommand (accepts: 2, given: 0)
 
 Restore a PostgreSQL database backup to a new database
 

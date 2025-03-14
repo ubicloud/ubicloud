@@ -7,8 +7,8 @@ UbiCli.on("lb").run_on("show") do
 
   options("ubi lb (location/lb-name | lb-id) show [options]", key: :lb_show) do
     on("-f", "--fields=fields", "show specific fields (comma separated)")
-    wrap("Fields:", fields)
   end
+  help_option_values("Fields:", fields)
 
   run do |opts|
     get(lb_path) do |data|

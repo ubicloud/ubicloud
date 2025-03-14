@@ -31,23 +31,22 @@ class UbiCli
   Rodish.processor(self)
 
   plugin :help_examples
-  plugin :default_help_order, [:desc, :banner, :examples, :commands, :options]
+  plugin :help_option_values
+  plugin :help_order, default_help_order: [:desc, :banner, :examples, :commands, :options, :option_values]
+  plugin :post_commands
+  plugin :skip_option_parsing
 
   on do
     desc "CLI to interact with Ubicloud"
 
-    options("ubi [options] [command [command-options] ...]") do
-      on("--version", "show program version")
-      on("--help", "show program help") { halt UbiCli.command.help }
-      on("--confirm=confirmation", "confirmation value (not for direct use)")
+    options("ubi command [command-options] ...") do
+      on("--confirm=confirmation", "confirmation value")
     end
+
+    help_order(:desc, :banner, :examples, :commands)
 
     help_example "ubi vm list    # List virtual machines"
     help_example "ubi help vm    # Get help for vm subcommand"
-
-    after_options do |_, opts|
-      raise Rodish::CommandExit, client_version if opts[:version]
-    end
 
     # :nocov:
     autoload_subcommand_dir("cli-commands") unless force_autoload
@@ -56,16 +55,10 @@ class UbiCli
 
   def self.process(argv, env)
     super
-  rescue Rodish::CommandExit => e
-    if e.failure?
-      status = 400
-      message = e.message_with_usage.dup
-      message[0] = "! #{message[0].capitalize}"
-    else
-      status = 200
-      message = e.message
-    end
-
+  rescue Rodish::CommandFailure => e
+    status = 400
+    message = e.message_with_usage.dup
+    message[0] = "! #{message[0].capitalize}"
     message += "\n" unless message.end_with?("\n")
 
     [status, {"content-type" => "text/plain", "content-length" => message.bytesize.to_s}, [message]]
@@ -124,8 +117,8 @@ class UbiCli
         on("-f", "--fields=fields", "show specific fields (comma separated)")
         on("-l", "--location=location", "only show #{LOWERCASE_LABELS[cmd]}s in given location")
         on("-N", "--no-headers", "do not show headers")
-        wrap("Fields:", fields)
       end
+      help_option_values("Fields:", fields)
 
       run do |opts|
         opts = opts[key]

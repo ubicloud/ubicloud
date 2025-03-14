@@ -11,10 +11,10 @@ UbiCli.on("vm").run_on("show") do
     on("-f", "--fields=fields", "show specific fields (comma separated)")
     on("-r", "--rule-fields=fields", "show specific firewall rule fields (comma separated)")
     on("-w", "--firewall-fields=fields", "show specific firewall fields (comma separated)")
-    wrap("Fields:", fields)
-    wrap("Firewall Rule Fields:", firewall_rule_fields)
-    wrap("Firewall Fields:", firewall_fields)
   end
+  help_option_values("Fields:", fields)
+  help_option_values("Firewall Rule Fields:", firewall_rule_fields)
+  help_option_values("Firewall Fields:", firewall_fields)
 
   run do |opts|
     get(vm_path) do |data|

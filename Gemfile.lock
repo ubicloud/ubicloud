@@ -9,8 +9,8 @@ GIT
 
 GIT
   remote: https://github.com/jeremyevans/rodish.git
-  revision: 1ea987d745780d8abbc70cbaca25cebc0c7b6fcf
-  ref: 1ea987d745780d8abbc70cbaca25cebc0c7b6fcf
+  revision: 67d473336522d27356bb95e7def813b339ed7d96
+  ref: 67d473336522d27356bb95e7def813b339ed7d96
   specs:
     rodish (1.1.0)
       optparse

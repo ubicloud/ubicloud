@@ -1,4 +1,4 @@
-! Invalid arguments for pg delete-firewall-rule subcommand (rule id is required)
+! Invalid number of arguments for pg delete-firewall-rule subcommand (accepts: 1, given: 0)
 
 Delete a PostgreSQL firewall rule
 
