@@ -6,8 +6,16 @@ Usage:
     ubi pg location/pg-name create [options]
 
 Options:
-    -f, --flavor=type                flavor (standard, paradedb, lantern)
-    -h, --ha-type=type               replication type (none, async, sync)
-    -s, --size=size                  server size (standard-{2,4,8,16,30,60})
-    -S, --storage-size=size          storage size GB (64, 128, 256)
-    -v, --version=version            PostgreSQL version (16, 17)
+    -f, --flavor=type                flavor
+    -h, --ha-type=type               replication type
+    -s, --size=size                  server size
+    -S, --storage-size=size          storage size GB
+    -v, --version=version            PostgreSQL version
+
+Allowed Option Values:
+    Flavor: standard paradedb lantern
+    Replication Type: none async sync
+    Size: standard-2 standard-4 standard-8 standard-16 standard-30 standard-60
+          burstable-1 burstable-2
+    Storage Size: 16 32 64 128 256 512 1024 2048 4096
+    Version: 16 17

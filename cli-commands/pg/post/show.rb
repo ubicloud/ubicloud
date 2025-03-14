@@ -7,8 +7,8 @@ UbiCli.on("pg").run_on("show") do
 
   options("ubi pg (location/pg-name | pg-id) show [options]", key: :pg_show) do
     on("-f", "--fields=fields", "show specific fields (comma separated)")
-    wrap("Fields:", fields)
   end
+  help_option_values("Fields:", fields)
 
   run do |opts|
     get(pg_path) do |data|

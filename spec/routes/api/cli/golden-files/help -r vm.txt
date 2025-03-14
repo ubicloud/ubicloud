@@ -31,7 +31,9 @@ Options:
     -f, --fields=fields              show specific fields (comma separated)
     -l, --location=location          only show virtual machines in given location
     -N, --no-headers                 do not show headers
-Fields: location name id ip4 ip6
+
+Allowed Option Values:
+    Fields: location name id ip4 ip6
 
 
 Create a virtual machine
@@ -41,11 +43,17 @@ Usage:
 
 Options:
     -6, --ipv6-only                  do not enable IPv4
-    -b, --boot-image=image_name      boot image (ubuntu-noble,ubuntu-jammy,debian-12,almalinux-9)
+    -b, --boot-image=image_name      boot image
     -p, --private-subnet-id=id       place VM into specific private subnet
-    -s, --size=size                  server size (standard-{2,4,8,16,30,60})
-    -S, --storage-size=size          storage size (40, 80)
+    -s, --size=size                  server size
+    -S, --storage-size=size          storage size
     -u, --unix-user=username         username (default: ubi)
+
+Allowed Option Values:
+    Boot Image: ubuntu-noble ubuntu-jammy debian-12 almalinux-9
+    Size: standard-2 standard-4 standard-8 standard-16 standard-30 standard-60
+          burstable-1 burstable-2
+    Storage Size: 10 20 40 80 160 320 600 640 1200 2400
 
 
 Destroy a virtual machine
@@ -84,10 +92,12 @@ Options:
     -f, --fields=fields              show specific fields (comma separated)
     -r, --rule-fields=fields         show specific firewall rule fields (comma separated)
     -w, --firewall-fields=fields     show specific firewall fields (comma separated)
-Fields: id name state location size unix-user storage-size-gib ip6 ip4-enabled
-        ip4 private-ipv4 private-ipv6 subnet firewalls
-Firewall Rule Fields: id cidr port-range
-Firewall Fields: id name description location path firewall-rules
+
+Allowed Option Values:
+    Fields: id name state location size unix-user storage-size-gib ip6
+            ip4-enabled ip4 private-ipv4 private-ipv6 subnet firewalls
+    Firewall Rule Fields: id cidr port-range
+    Firewall Fields: id name description location path firewall-rules
 
 
 Connect to a virtual machine using `ssh`

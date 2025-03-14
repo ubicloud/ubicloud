@@ -13,11 +13,11 @@ UbiCli.on("fw").run_on("show") do
     on("-n", "--nic-fields=fields", "show specific nic fields (comma separated)")
     on("-p", "--priv-subnet-fields=fields", "show specific private subnet fields (comma separated)")
     on("-r", "--rule-fields=fields", "show specific firewall rule fields (comma separated)")
-    wrap("Fields:", fields)
-    wrap("Nic Fields:", nic_fields)
-    wrap("Private Subnet Fields:", private_subnet_fields)
-    wrap("Firewall Rule Fields:", firewall_rule_fields)
   end
+  help_option_values("Fields:", fields)
+  help_option_values("Nic Fields:", nic_fields)
+  help_option_values("Private Subnet Fields:", private_subnet_fields)
+  help_option_values("Firewall Rule Fields:", firewall_rule_fields)
 
   run do |opts|
     get(fw_path) do |data|
