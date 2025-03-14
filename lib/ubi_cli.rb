@@ -30,7 +30,6 @@ class UbiCli
 
   Rodish.processor(self)
 
-  plugin :after_options_hook
   plugin :help_examples
   plugin :help_option_values
   plugin :help_order, default_help_order: [:desc, :banner, :examples, :commands, :options, :option_values]
@@ -41,17 +40,12 @@ class UbiCli
     desc "CLI to interact with Ubicloud"
 
     options("ubi [options] [command [command-options] ...]") do
-      on("--version", "show program version")
       on("--help", "show program help") { halt UbiCli.command.help }
       on("--confirm=confirmation", "confirmation value (not for direct use)")
     end
 
     help_example "ubi vm list    # List virtual machines"
     help_example "ubi help vm    # Get help for vm subcommand"
-
-    after_options do |_, opts|
-      raise Rodish::CommandExit, client_version if opts[:version]
-    end
 
     # :nocov:
     autoload_subcommand_dir("cli-commands") unless force_autoload

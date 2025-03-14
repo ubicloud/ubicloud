@@ -113,7 +113,7 @@ ps list -l eu-north-h1 -f name,id
 ps list -l eu-north-h1 -N -f name,id
 ps list -N
 ps psfzm9e26xky5m9ggetw4dpqe2 show
---version
+version
 vm eu-central-h1/test2-vm create -6 pk
 vm eu-central-h1/test2-vm create -b debian-12 pk
 vm eu-central-h1/test2-vm create pk

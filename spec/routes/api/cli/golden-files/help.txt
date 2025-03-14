@@ -8,14 +8,14 @@ Examples:
     ubi help vm    # Get help for vm subcommand
 
 Commands:
-    fw      Manage firewalls
-    help    Get command help
-    lb      Manage load balancers
-    pg      Manage PostgreSQL databases
-    ps      Manage private subnets
-    vm      Manage virtual machines
+    fw         Manage firewalls
+    help       Get command help
+    lb         Manage load balancers
+    pg         Manage PostgreSQL databases
+    ps         Manage private subnets
+    version    Display CLI program version
+    vm         Manage virtual machines
 
 Options:
-        --version                    show program version
         --help                       show program help
         --confirm=confirmation       confirmation value (not for direct use)

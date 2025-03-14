@@ -8,15 +8,15 @@ Examples:
     ubi help vm    # Get help for vm subcommand
 
 Commands:
-    fw      Manage firewalls
-    help    Get command help
-    lb      Manage load balancers
-    pg      Manage PostgreSQL databases
-    ps      Manage private subnets
-    vm      Manage virtual machines
+    fw         Manage firewalls
+    help       Get command help
+    lb         Manage load balancers
+    pg         Manage PostgreSQL databases
+    ps         Manage private subnets
+    version    Display CLI program version
+    vm         Manage virtual machines
 
 Options:
-        --version                    show program version
         --help                       show program help
         --confirm=confirmation       confirmation value (not for direct use)
 
@@ -442,6 +442,12 @@ Allowed Option Values:
     Nic Fields: id name private-ipv4 private-ipv6 vm-name
     Firewall Rule Fields: id cidr port-range
     Firewall Fields: id name description location path firewall-rules
+
+
+Display CLI program version
+
+Usage:
+    ubi version
 
 
 Manage virtual machines

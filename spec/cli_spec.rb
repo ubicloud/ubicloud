@@ -78,7 +78,7 @@ RSpec.describe "bin/ubi" do
   end
 
   it "sends version header" do
-    o, e, s = Open3.capture3(@env, @prog, "--version")
+    o, e, s = Open3.capture3(@env, @prog, "version")
     expect(o).to match(UbiCli::UBI_VERSION_REGEXP)
     expect(e).to eq ""
     expect(s.exitstatus).to eq 0
