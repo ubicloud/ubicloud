@@ -39,9 +39,11 @@ class UbiCli
   on do
     desc "CLI to interact with Ubicloud"
 
-    options("ubi [options] [command [command-options] ...]") do
-      on("--confirm=confirmation", "confirmation value (not for direct use)")
+    options("ubi command [command-options] ...") do
+      on("--confirm=confirmation", "confirmation value")
     end
+
+    help_order(:desc, :banner, :examples, :commands)
 
     help_example "ubi vm list    # List virtual machines"
     help_example "ubi help vm    # Get help for vm subcommand"

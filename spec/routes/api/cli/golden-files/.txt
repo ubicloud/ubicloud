@@ -3,7 +3,7 @@
 CLI to interact with Ubicloud
 
 Usage:
-    ubi [options] [command [command-options] ...]
+    ubi command [command-options] ...
 
 Examples:
     ubi vm list    # List virtual machines
@@ -17,6 +17,3 @@ Commands:
     ps         Manage private subnets
     version    Display CLI program version
     vm         Manage virtual machines
-
-Options:
-        --confirm=confirmation       confirmation value (not for direct use)

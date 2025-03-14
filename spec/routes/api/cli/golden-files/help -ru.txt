@@ -1,4 +1,4 @@
-ubi [options] [command [command-options] ...]
+ubi command [command-options] ...
 ubi fw command [...]
 ubi fw (location/fw-name | fw-id) post-command [...]
 ubi fw list [options]
