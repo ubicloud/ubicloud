@@ -40,6 +40,12 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   end
 
   def before_run
+    when_sync_kubernetes_services_set? do
+      if strand.label != "sync_kubernetes_services"
+        hop_sync_kubernetes_services
+      end
+    end
+
     when_destroy_set? do
       if strand.label != "destroy"
         hop_destroy
@@ -88,6 +94,12 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     reap
     hop_bootstrap_control_plane_vms if leaf?
     donate
+  end
+
+  label def sync_kubernetes_services
+    decr_sync_kubernetes_services
+    kubernetes_cluster.client.sync_kubernetes_services
+    hop_wait
   end
 
   label def wait
