@@ -63,8 +63,8 @@ RSpec.describe Clover, "cli vm create" do
 
   it "shows errors if trying to create a vm with an invalid number of arguments" do
     expect(Vm.count).to eq 0
-    expect(cli(%W[vm eu-north-h1/test-vm2 create], status: 400).b).to start_with("! Invalid arguments for vm create subcommand (public_key is required)")
-    expect(cli(%W[vm eu-north-h1/test-vm2 create c d], status: 400).b).to start_with("! Invalid arguments for vm create subcommand (public_key is required)")
+    expect(cli(%W[vm eu-north-h1/test-vm2 create], status: 400).b).to start_with("! Invalid number of arguments for vm create subcommand (accepts: 1, given: 0)")
+    expect(cli(%W[vm eu-north-h1/test-vm2 create c d], status: 400).b).to start_with("! Invalid number of arguments for vm create subcommand (accepts: 1, given: 2)")
     expect(Vm.count).to eq 0
   end
 end

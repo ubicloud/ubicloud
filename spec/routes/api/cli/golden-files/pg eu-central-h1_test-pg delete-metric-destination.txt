@@ -1,4 +1,4 @@
-! Invalid arguments for pg delete-metric-destination subcommand (metric destination id is required)
+! Invalid number of arguments for pg delete-metric-destination subcommand (accepts: 1, given: 0)
 
 Delete a PostgreSQL metric destination
 

@@ -5,7 +5,7 @@ UbiCli.on("pg").run_on("add-metric-destination") do
 
   banner "ubi pg (location/pg-name | pg-id) add-metric-destination username password url"
 
-  args 3, invalid_args_message: "username, password, and url arguments are required"
+  args 3
 
   run do |username, password, url|
     params = {

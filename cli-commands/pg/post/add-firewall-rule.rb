@@ -5,7 +5,7 @@ UbiCli.on("pg").run_on("add-firewall-rule") do
 
   banner "ubi pg (location/pg-name | pg-id) add-firewall-rule cidr"
 
-  args 1, invalid_args_message: "cidr is required"
+  args 1
 
   run do |cidr|
     post(pg_path("/firewall-rule"), "cidr" => cidr) do |data|
