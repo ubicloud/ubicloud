@@ -502,7 +502,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
   describe "#wait" do
     it "does not destroy runner if it does not pick a job in five minutes, and busy" do
-      expect(Time).to receive(:now).and_return(github_runner.ready_at + 6 * 60)
+      expect(Time).to receive(:now).and_return(github_runner.ready_at + 8 * 60)
       expect(client).to receive(:get).and_return({busy: true})
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(github_runner).not_to receive(:incr_destroy)
@@ -512,7 +512,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "destroys runner if it does not pick a job in five minutes and not busy" do
       expect(github_runner).to receive(:workflow_job).and_return(nil)
-      expect(Time).to receive(:now).and_return(github_runner.ready_at + 6 * 60)
+      expect(Time).to receive(:now).and_return(github_runner.ready_at + 8 * 60)
       expect(client).to receive(:get).and_return({busy: false})
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(github_runner).to receive(:incr_destroy)
