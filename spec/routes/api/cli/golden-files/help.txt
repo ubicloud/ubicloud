@@ -17,5 +17,4 @@ Commands:
     vm         Manage virtual machines
 
 Options:
-        --help                       show program help
         --confirm=confirmation       confirmation value (not for direct use)
