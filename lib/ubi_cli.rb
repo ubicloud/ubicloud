@@ -40,7 +40,6 @@ class UbiCli
     desc "CLI to interact with Ubicloud"
 
     options("ubi [options] [command [command-options] ...]") do
-      on("--help", "show program help") { halt UbiCli.command.help }
       on("--confirm=confirmation", "confirmation value (not for direct use)")
     end
 
@@ -54,16 +53,10 @@ class UbiCli
 
   def self.process(argv, env)
     super
-  rescue Rodish::CommandExit => e
-    if e.failure?
-      status = 400
-      message = e.message_with_usage.dup
-      message[0] = "! #{message[0].capitalize}"
-    else
-      status = 200
-      message = e.message
-    end
-
+  rescue Rodish::CommandFailure => e
+    status = 400
+    message = e.message_with_usage.dup
+    message[0] = "! #{message[0].capitalize}"
     message += "\n" unless message.end_with?("\n")
 
     [status, {"content-type" => "text/plain", "content-length" => message.bytesize.to_s}, [message]]
