@@ -43,6 +43,7 @@ ubi ps location/ps-name create [options]
 ubi ps (location/ps-name | ps-id) destroy [options]
 ubi ps (location/ps-name | ps-id) disconnect ps-id
 ubi ps (location/ps-name | ps-id) show [options]
+ubi version
 ubi vm command [...]
 ubi vm (location/vm-name | vm-id) [post-options] post-command [...]
 ubi vm list [options]
