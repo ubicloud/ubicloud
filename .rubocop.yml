@@ -19,6 +19,7 @@ AllCops:
     - vendor/**/*
     - node_modules/**/*
     - coverage/views/*
+    - sdk/ruby/**/*
 
 RSpec:
   Enabled: true

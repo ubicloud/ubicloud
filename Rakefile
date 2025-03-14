@@ -254,6 +254,12 @@ end
 
 # Other
 
+desc "Build SDKs using openapi-generator"
+task "build-sdks" do
+  FileUtils.mkdir_p "sdk/ruby"
+  sh "npx @openapitools/openapi-generator-cli generate -i openapi/openapi.yml -g ruby -o sdk/ruby --additional-properties=gemName=ubicloud-sdk,moduleName=Ubicloud"
+end
+
 desc "Check generated SQL for parameterization"
 task "check_query_parameterization" do
   require "rbconfig"
