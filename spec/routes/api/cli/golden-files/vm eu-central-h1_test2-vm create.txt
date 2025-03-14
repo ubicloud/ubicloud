@@ -7,8 +7,14 @@ Usage:
 
 Options:
     -6, --ipv6-only                  do not enable IPv4
-    -b, --boot-image=image_name      boot image (ubuntu-noble,ubuntu-jammy,debian-12,almalinux-9)
+    -b, --boot-image=image_name      boot image
     -p, --private-subnet-id=id       place VM into specific private subnet
-    -s, --size=size                  server size (standard-{2,4,8,16,30,60})
-    -S, --storage-size=size          storage size (40, 80)
+    -s, --size=size                  server size
+    -S, --storage-size=size          storage size
     -u, --unix-user=username         username (default: ubi)
+
+Allowed Option Values:
+    Boot Image: ubuntu-noble ubuntu-jammy debian-12 almalinux-9
+    Size: standard-2 standard-4 standard-8 standard-16 standard-30 standard-60
+          burstable-1 burstable-2
+    Storage Size: 10 20 40 80 160 320 600 640 1200 2400

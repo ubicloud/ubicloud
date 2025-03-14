@@ -49,7 +49,9 @@ Options:
     -f, --fields=fields              show specific fields (comma separated)
     -l, --location=location          only show firewalls in given location
     -N, --no-headers                 do not show headers
-Fields: location name id
+
+Allowed Option Values:
+    Fields: location name id
 
 
 Add a firewall rule
@@ -108,10 +110,12 @@ Options:
     -n, --nic-fields=fields          show specific nic fields (comma separated)
     -p, --priv-subnet-fields=fields  show specific private subnet fields (comma separated)
     -r, --rule-fields=fields         show specific firewall rule fields (comma separated)
-Fields: id name location description firewall-rules private-subnets
-Nic Fields: id name private-ipv4 private-ipv6 vm-name
-Private Subnet Fields: id name state location net4 net6 nics
-Firewall Rule Fields: id cidr port-range
+
+Allowed Option Values:
+    Fields: id name location description firewall-rules private-subnets
+    Nic Fields: id name private-ipv4 private-ipv6 vm-name
+    Private Subnet Fields: id name state location net4 net6 nics
+    Firewall Rule Fields: id cidr port-range
 
 
 Get command help
@@ -151,7 +155,9 @@ Options:
     -f, --fields=fields              show specific fields (comma separated)
     -l, --location=location          only show load balancers in given location
     -N, --no-headers                 do not show headers
-Fields: location name id src-port dst-port hostname
+
+Allowed Option Values:
+    Fields: location name id src-port dst-port hostname
 
 
 Attach a virtual machine to a load balancer
@@ -166,10 +172,15 @@ Usage:
     ubi lb location/lb-name create [options] ps-id src-port dst-port
 
 Options:
-    -a, --algorithm=alg              set the algorithm to use (round_robin(default), hash_based)
+    -a, --algorithm=alg              set the algorithm to use
     -e, --check-endpoint=path        set the health check endpoint (default: /up)
-    -p, --check-protocol=proto       set the health check protocol (http(default), https, tcp)
-    -s, --stack=stack                set the stack (dual(default), ipv4, ipv6)
+    -p, --check-protocol=proto       set the health check protocol
+    -s, --stack=stack                set the stack
+
+Allowed Option Values:
+    Algorithm: round_robin hash_based
+    Health Check Protocol: http https tcp
+    Stack: dual ipv4 ipv6
 
 
 Destroy a load balancer
@@ -194,8 +205,11 @@ Usage:
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)
-Fields: id name state location hostname algorithm stack health-check-endpoint
-        health-check-protocol src-port dst-port subnet vms
+
+Allowed Option Values:
+    Fields: id name state location hostname algorithm stack
+            health-check-endpoint health-check-protocol src-port dst-port subnet
+            vms
 
 
 Update a load balancer
@@ -242,7 +256,9 @@ Options:
     -f, --fields=fields              show specific fields (comma separated)
     -l, --location=location          only show PostgreSQL databases in given location
     -N, --no-headers                 do not show headers
-Fields: location name id version flavor
+
+Allowed Option Values:
+    Fields: location name id version flavor
 
 
 Add a PostgreSQL firewall rule
@@ -263,11 +279,19 @@ Usage:
     ubi pg location/pg-name create [options]
 
 Options:
-    -f, --flavor=type                flavor (standard, paradedb, lantern)
-    -h, --ha-type=type               replication type (none, async, sync)
-    -s, --size=size                  server size (standard-{2,4,8,16,30,60})
-    -S, --storage-size=size          storage size GB (64, 128, 256)
-    -v, --version=version            PostgreSQL version (16, 17)
+    -f, --flavor=type                flavor
+    -h, --ha-type=type               replication type
+    -s, --size=size                  server size
+    -S, --storage-size=size          storage size GB
+    -v, --version=version            PostgreSQL version
+
+Allowed Option Values:
+    Flavor: standard paradedb lantern
+    Replication Type: none async sync
+    Size: standard-2 standard-4 standard-8 standard-16 standard-30 standard-60
+          burstable-1 burstable-2
+    Storage Size: 16 32 64 128 256 512 1024 2048 4096
+    Version: 16 17
 
 
 Delete a PostgreSQL firewall rule
@@ -334,9 +358,11 @@ Usage:
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)
-Fields: id name state location vm-size storage-size-gib version ha-type flavor
-        connection-string primary earliest-restore-time firewall-rules
-        metric-destinations ca-certificates
+
+Allowed Option Values:
+    Fields: id name state location vm-size storage-size-gib version ha-type
+            flavor connection-string primary earliest-restore-time
+            firewall-rules metric-destinations ca-certificates
 
 
 Manage private subnets
@@ -365,7 +391,9 @@ Options:
     -f, --fields=fields              show specific fields (comma separated)
     -l, --location=location          only show private subnets in given location
     -N, --no-headers                 do not show headers
-Fields: location name id net4 net6
+
+Allowed Option Values:
+    Fields: location name id net4 net6
 
 
 Connect a private subnet to another private subnet
@@ -408,10 +436,12 @@ Options:
     -n, --nic-fields=fields          show specific nic fields (comma separated)
     -r, --rule-fields=fields         show specific firewall rule fields (comma separated)
     -w, --firewall-fields=fields     show specific firewall fields (comma separated)
-Fields: id name state location net4 net6 firewalls nics
-Nic Fields: id name private-ipv4 private-ipv6 vm-name
-Firewall Rule Fields: id cidr port-range
-Firewall Fields: id name description location path firewall-rules
+
+Allowed Option Values:
+    Fields: id name state location net4 net6 firewalls nics
+    Nic Fields: id name private-ipv4 private-ipv6 vm-name
+    Firewall Rule Fields: id cidr port-range
+    Firewall Fields: id name description location path firewall-rules
 
 
 Manage virtual machines
@@ -447,7 +477,9 @@ Options:
     -f, --fields=fields              show specific fields (comma separated)
     -l, --location=location          only show virtual machines in given location
     -N, --no-headers                 do not show headers
-Fields: location name id ip4 ip6
+
+Allowed Option Values:
+    Fields: location name id ip4 ip6
 
 
 Create a virtual machine
@@ -457,11 +489,17 @@ Usage:
 
 Options:
     -6, --ipv6-only                  do not enable IPv4
-    -b, --boot-image=image_name      boot image (ubuntu-noble,ubuntu-jammy,debian-12,almalinux-9)
+    -b, --boot-image=image_name      boot image
     -p, --private-subnet-id=id       place VM into specific private subnet
-    -s, --size=size                  server size (standard-{2,4,8,16,30,60})
-    -S, --storage-size=size          storage size (40, 80)
+    -s, --size=size                  server size
+    -S, --storage-size=size          storage size
     -u, --unix-user=username         username (default: ubi)
+
+Allowed Option Values:
+    Boot Image: ubuntu-noble ubuntu-jammy debian-12 almalinux-9
+    Size: standard-2 standard-4 standard-8 standard-16 standard-30 standard-60
+          burstable-1 burstable-2
+    Storage Size: 10 20 40 80 160 320 600 640 1200 2400
 
 
 Destroy a virtual machine
@@ -500,10 +538,12 @@ Options:
     -f, --fields=fields              show specific fields (comma separated)
     -r, --rule-fields=fields         show specific firewall rule fields (comma separated)
     -w, --firewall-fields=fields     show specific firewall fields (comma separated)
-Fields: id name state location size unix-user storage-size-gib ip6 ip4-enabled
-        ip4 private-ipv4 private-ipv6 subnet firewalls
-Firewall Rule Fields: id cidr port-range
-Firewall Fields: id name description location path firewall-rules
+
+Allowed Option Values:
+    Fields: id name state location size unix-user storage-size-gib ip6
+            ip4-enabled ip4 private-ipv4 private-ipv6 subnet firewalls
+    Firewall Rule Fields: id cidr port-range
+    Firewall Fields: id name description location path firewall-rules
 
 
 Connect to a virtual machine using `ssh`

@@ -7,6 +7,8 @@ Usage:
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)
-Fields: id name state location vm-size storage-size-gib version ha-type flavor
-        connection-string primary earliest-restore-time firewall-rules
-        metric-destinations ca-certificates
+
+Allowed Option Values:
+    Fields: id name state location vm-size storage-size-gib version ha-type
+            flavor connection-string primary earliest-restore-time
+            firewall-rules metric-destinations ca-certificates
