@@ -48,7 +48,7 @@ group :development do
 end
 
 group :rubocop do
-  gem "rubocop-capybara", "~> 2.21.0"
+  gem "rubocop-capybara", "~> 2.22.1"
   gem "rubocop-erb"
   gem "rubocop-performance"
   gem "rubocop-rake"
