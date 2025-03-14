@@ -5,7 +5,7 @@ UbiCli.on("pg").run_on("delete-metric-destination") do
 
   banner "ubi pg (location/pg-name | pg-id) delete-metric-destination md-id"
 
-  args 1, invalid_args_message: "metric destination id is required"
+  args 1
 
   run do |ubid|
     if ubid.include?("/")

@@ -5,7 +5,7 @@ UbiCli.on("pg").run_on("reset-superuser-password") do
 
   banner "ubi pg (location/pg-name | pg-id) reset-superuser-password new-password"
 
-  args 1, invalid_args_message: "password is required"
+  args 1
 
   run do |password|
     post(pg_path("/reset-superuser-password"), "password" => password) do |data|
