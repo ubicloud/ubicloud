@@ -216,17 +216,23 @@ class Clover < Roda
     else
       @error = error
 
-      case e
-      when Sequel::ValidationFailed, DependencyError
+      if e.is_a?(Sequel::ValidationFailed) || e.is_a?(DependencyError)
         flash["error"] = message
         redirect_back_with_inputs
-      when Sequel::SerializationFailure
+      elsif e.is_a?(Sequel::SerializationFailure)
         flash["error"] = "There was a temporary error attempting to make this change, please try again."
         redirect_back_with_inputs
-      when Validation::ValidationFailed
+      elsif e.is_a?(Validation::ValidationFailed) || (request.patch? && e.is_a?(CloverError))
         flash["error"] = message
         flash["errors"] = (flash["errors"] || {}).merge(details).transform_keys(&:to_s)
-        redirect_back_with_inputs
+
+        if request.patch?
+          response["Location"] = env["HTTP_REFERER"]
+          response.status = 200
+          request.halt
+        else
+          redirect_back_with_inputs
+        end
       end
 
       # :nocov:

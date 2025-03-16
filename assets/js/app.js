@@ -3,6 +3,7 @@ $(function () {
   setupDatePicker();
   setupFormOptionUpdates();
   setupPlayground();
+  setupFormsWithPatchMethod()
 });
 
 $(".toggle-mobile-menu").on("click", function (event) {
@@ -427,4 +428,33 @@ function setupPlayground() {
   };
 
   $('#inference_submit').on("click", generate);
+}
+
+function setupFormsWithPatchMethod() {
+  $("#creation-form.PATCH").on("submit", function (event) {
+    event.preventDefault();
+
+    var form = $(this);
+    var jsonData = {};
+    form.serializeArray().forEach(function(item) {
+        jsonData[item.name] = item.value;
+    });
+
+    $.ajax({
+        url: form.attr('action'),
+        type: 'PATCH',
+        dataType: "html",
+        data: jsonData,
+        success: function (response, status, xhr) {
+          var redirectUrl = xhr.getResponseHeader('Location');
+          if (redirectUrl) {
+              window.location.href = redirectUrl;
+          }
+        },
+        error: function (xhr, ajaxOptions, thrownError) {
+          let message = thrownError;
+          alert(`Error: ${message}`);
+        }
+    });
+  });
 }

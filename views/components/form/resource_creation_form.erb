@@ -1,4 +1,4 @@
-<%# locals: (action:, form_elements:, option_tree:, option_parents:, form_title: nil, pre_selected_values: [], mode: "create") %>
+<%# locals: (action:, form_elements:, option_tree:, option_parents:, method: "POST", form_title: nil, pre_selected_values: [], mode: "create") %>
 <% nonce = SecureRandom.base64(32)
 content_security_policy.add_script_src [:nonce, nonce] %>
 
@@ -19,8 +19,8 @@ let option_dirty = <%==JSON.generate(form_elements.map { _1[:name] }.each_with_o
 <% end %>
 
 <div class="grid gap-6">
-  <form action="<%= action %>" method="POST" id="creation-form">
-    <%== csrf_tag(action) %>
+  <form action="<%= action %>" method="POST" id="creation-form" class="<%= method %>">
+    <%== csrf_tag(action, method) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
       <div class="px-4 py-5 sm:p-6">
         <div class="space-y-12">
