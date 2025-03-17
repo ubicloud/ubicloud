@@ -351,6 +351,8 @@ class Prog::Vm::GithubRunner < Prog::Base
         response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
         if response[:busy]
           Clog.emit("The runner is still running a job") { github_runner }
+          register_deadline(nil, 15 * 60, allow_extension: true)
+          register_deadline("wait_vm_destroy", 2 * 60 * 60)
           nap 15
         end
         github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
