@@ -5,12 +5,31 @@ require_relative "../../model"
 require "aws-sdk-s3"
 
 class GithubCacheEntry < Sequel::Model
+  plugin :instance_filters
+
   many_to_one :repository, key: :repository_id, class: :GithubRepository
 
   include ResourceMethods
 
+  dataset_module do
+    def destroy_where(...)
+      all do |entry|
+        entry.destroy_where(...)
+      end
+    end
+  end
+
   def blob_key
     "cache/#{ubid}"
+  end
+
+  def destroy_where(...)
+    instance_filter(...)
+    db.transaction(savepoint: true) do
+      destroy
+    end
+  rescue Sequel::NoExistingObject
+    # DELETE query modified no rows due to filter
   end
 
   def after_destroy
