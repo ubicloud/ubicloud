@@ -96,7 +96,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(kubernetes_cluster.cp_vms.count).to eq(2)
       expect(kubernetes_cluster.api_server_lb).to receive(:add_vm)
 
-      expect { prog.start }.to hop("install_software")
+      expect { prog.start }.to hop("bootstrap_rhizome")
 
       expect(kubernetes_cluster.cp_vms.count).to eq(3)
 
@@ -105,13 +105,14 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(new_vm.sshable).not_to be_nil
       expect(new_vm.vcpus).to eq(4)
       expect(new_vm.strand.stack.first["storage_volumes"].first["size_gib"]).to eq(37)
+      expect(new_vm.boot_image).to eq("kubernetes-v1_32")
     end
 
     it "creates a worker VM and hops if a nodepool is given" do
       expect(prog).to receive(:frame).and_return({"nodepool_id" => kubernetes_nodepool.id})
       expect(kubernetes_nodepool.vms.count).to eq(0)
 
-      expect { prog.start }.to hop("install_software")
+      expect { prog.start }.to hop("bootstrap_rhizome")
 
       expect(kubernetes_nodepool.reload.vms.count).to eq(1)
 
@@ -120,6 +121,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(new_vm.sshable).not_to be_nil
       expect(new_vm.vcpus).to eq(8)
       expect(new_vm.strand.stack.first["storage_volumes"].first["size_gib"]).to eq(78)
+      expect(new_vm.boot_image).to eq("kubernetes-v1_32")
     end
 
     it "assigns the default storage size if not specified" do
@@ -128,7 +130,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
 
       expect(kubernetes_cluster.cp_vms.count).to eq(2)
 
-      expect { prog.start }.to hop("install_software")
+      expect { prog.start }.to hop("bootstrap_rhizome")
 
       expect(kubernetes_cluster.cp_vms.count).to eq(3)
 
@@ -137,34 +139,20 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     end
   end
 
-  describe "#install_software" do
+  describe "#bootstrap_rhizome" do
     it "waits until the VM is ready" do
       st = instance_double(Strand, label: "non-wait")
       expect(prog.vm).to receive(:strand).and_return(st)
-      expect { prog.install_software }.to nap(5)
+      expect { prog.bootstrap_rhizome }.to nap(5)
     end
 
-    it "runs a bunch of commands to install kubernetes if the VM is ready, then hops" do
+    it "enables kubelet and buds a bootstrap rhizome process" do
+      sshable = instance_double(Sshable)
       st = instance_double(Strand, label: "wait")
-      sshable = instance_double(Sshable)
-      expect(prog.vm).to receive(:strand).and_return(st)
-      expect(prog.vm).to receive(:sshable).and_return(sshable)
-      expect(sshable).to receive(:cmd).with(/sudo apt install -y kubelet kubeadm kubectl/)
-      expect { prog.install_software }.to hop("apply_nat_rules")
-    end
-  end
-
-  describe "#apply_nat_rules" do
-    it "applies nat rules and hops to rhizome installation" do
-      sshable = instance_double(Sshable)
-      expect(prog.vm).to receive_messages(sshable: sshable, nics: [instance_double(Nic, private_ipv4: "10.10.20.30/26")])
+      expect(prog.vm).to receive_messages(sshable: sshable, strand: st, nics: [instance_double(Nic, private_ipv4: "10.10.20.30/26")])
+      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now kubelet")
       expect(sshable).to receive(:cmd).with("sudo iptables-nft -t nat -A POSTROUTING -s 10.10.20.30/26 -o ens3 -j MASQUERADE")
-      expect { prog.apply_nat_rules }.to hop("bootstrap_rhizome")
-    end
-  end
 
-  describe "#bootstrap_rhizome" do
-    it "buds a bootstrap rhizome process" do
       expect(prog).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "kubernetes", "subject_id" => prog.vm.id, "user" => "ubi"})
       expect { prog.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
     end
