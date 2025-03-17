@@ -246,6 +246,15 @@ RSpec.describe Vm do
     vm.init_health_monitor_session
   end
 
+  it "checks underlying enum value when validating" do
+    vm = create_vm
+    expect(vm.valid?).to be true
+    def vm.display_state
+      "invalid"
+    end
+    expect(vm.valid?).to be true
+  end
+
   it "disallows VM ubid format as name" do
     vm = described_class.new(name: described_class.generate_ubid.to_s)
     vm.validate
