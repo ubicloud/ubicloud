@@ -86,30 +86,30 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     # Destroy cache entries not accessed in last 7 days or
     # created more than 7 days ago and not accessed yet.
     seven_days_ago = Time.now - 7 * 24 * 60 * 60
+    cond = Sequel.expr { (last_accessed_at < seven_days_ago) | ((last_accessed_at =~ nil) & (created_at < seven_days_ago)) }
     github_repository.cache_entries_dataset
-      .where { (last_accessed_at < seven_days_ago) | ((last_accessed_at =~ nil) & (created_at < seven_days_ago)) }
+      .where(cond)
       .limit(200)
-      .for_update
-      .destroy
+      .destroy_where(cond)
 
     # Destroy cache entries if it is created 30 minutes ago
     # but couldn't committed yet. 30 minutes decided as during
     # our performance tests uploading 10GB of data (which is
     # the max size for a single cache entry) takes ~8 minutes at most.
     # To be on the safe side, ~2x buffer is added.
+    cond = Sequel.expr(committed_at: nil)
     github_repository.cache_entries_dataset
       .where { created_at < Time.now - 30 * 60 }
-      .where { committed_at =~ nil }
+      .where(cond)
       .limit(200)
-      .for_update
-      .destroy
+      .destroy_where(cond)
 
     # Destroy oldest cache entries if the total usage exceeds the limit.
     dataset = github_repository.cache_entries_dataset.exclude(size: nil)
     total_usage = dataset.sum(:size).to_i
     storage_limit = github_repository.installation.project.effective_quota_value("GithubRunnerCacheStorage") * 1024 * 1024 * 1024
     if total_usage > storage_limit
-      dataset.order(:created_at).for_update.limit(200).all do |oldest_entry|
+      dataset.order(:created_at).limit(200).all do |oldest_entry|
         oldest_entry.destroy
         total_usage -= oldest_entry.size
         break if total_usage <= storage_limit
