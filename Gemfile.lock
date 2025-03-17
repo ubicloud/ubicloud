@@ -446,11 +446,11 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
-  acme-client (~> 2.0)
+  acme-client
   argon2
   argon2-kdf
   awesome_print
-  aws-sdk-s3 (~> 1.182)
+  aws-sdk-s3
   bcrypt_pbkdf
   brakeman
   by (>= 1.1.0)
@@ -470,12 +470,12 @@ DEPENDENCIES
   netaddr
   nokogiri
   octokit
-  omniauth-github (~> 2.0)
-  omniauth-google-oauth2 (~> 1.2)
+  omniauth-github
+  omniauth-google-oauth2
   pagerduty (>= 4.0)
   pdf-reader
-  prawn (~> 2.5)
-  prawn-table (~> 0.2.2)
+  prawn
+  prawn-table
   pry
   pry-byebug
   puma (>= 6.2.2)
@@ -506,7 +506,7 @@ DEPENDENCIES
   tilt (>= 2.6)
   turbo_tests
   warning
-  webauthn (~> 3.2)
+  webauthn
   webmock
 
 RUBY VERSION
