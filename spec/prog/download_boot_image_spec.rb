@@ -41,6 +41,11 @@ RSpec.describe Prog::DownloadBootImage do
       expect(dbi.default_boot_image_version("ubuntu-noble")).to eq(Config.ubuntu_noble_version)
     end
 
+    it "escapes the image name" do
+      expect(Config).to receive(:kubernetes_v1_32_version).and_return("version")
+      expect(dbi.default_boot_image_version("kubernetes-v1_32")).to eq("version")
+    end
+
     it "fails for unknown images" do
       expect { dbi.default_boot_image_version("unknown-image") }.to raise_error RuntimeError, "Unknown boot image: unknown-image"
     end

@@ -14,7 +14,7 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   def download_from_blob_storage?
-    image_name.start_with?("github", "postgres", "ai-") || Config.production?
+    image_name.start_with?("github", "postgres", "ai-", "kubernetes") || Config.production?
   end
 
   def default_boot_image_version(image_name)
@@ -35,7 +35,8 @@ class Prog::DownloadBootImage < Prog::Base
           "ubuntu" => "img",
           "almalinux" => "qcow2",
           "debian" => "raw",
-          "ai" => "raw"
+          "ai" => "raw",
+          "kubernetes" => "raw"
         }
         image_family = image_name.split("-").first
         suffix = suffixes.fetch(image_family, nil)
@@ -115,7 +116,8 @@ class Prog::DownloadBootImage < Prog::Base
       ["ai-model-ds-r1-qwen-32b", "x64", "20250227.1.0"] => "16269ce8660413718c58b60c649042cca6cef2429f59f59e4c70bb5e951ebe74",
       ["ai-model-ds-r1-qwen-1-5b", "x64", "20250129.1.0"] => "9135a2e81fc6129d6d12bd633b5a30d4bfe2fd219ec5e370404758dda1159001",
       ["ai-model-ms-phi-4", "x64", "20250213.1.0"] => "0e998c4916c837c0992c4546404ecb51d0c5d5923f998f7cff0a9cddc5bf1689",
-      ["ai-model-mistral-small-3", "x64", "20250217.1.0"] => "01ce8d1d0b7b0f717c51c26590234f4cb7971a9a5276de92b6cb4dc2c7a085e5"
+      ["ai-model-mistral-small-3", "x64", "20250217.1.0"] => "01ce8d1d0b7b0f717c51c26590234f4cb7971a9a5276de92b6cb4dc2c7a085e5",
+      ["kubernetes-v1_32", "x64", "20250320.1.0"] => "369c7c869bba690771a1dcbbae52159defaa3fd3540f008ba6feea291e7a220a"
     }
 
     # YYY: In future all images should be checked for sha256 sum, so the nil
