@@ -8,111 +8,113 @@ let option_children = <%==JSON.generate(option_parents.each_with_object(Hash.new
 let option_dirty = <%==JSON.generate(form_elements.map { _1[:name] }.each_with_object(Hash.new { |h, k| h[k] = [] }) { |option, h| h[option] = nil })%>
 </script>
 
-<% if form_title %>
-  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
-    <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-        <%= form_title %>
-      </h3>
+<div>
+  <% if form_title %>
+    <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+      <div class="min-w-0 flex-1">
+        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+          <%= form_title %>
+        </h3>
+      </div>
     </div>
-  </div>
-<% end %>
+  <% end %>
 
-<div class="grid gap-6">
-  <form action="<%= action %>" method="POST" id="creation-form" class="<%= method %>">
-    <%== csrf_tag(action, method) %>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
-      <div class="px-4 py-5 sm:p-6">
-        <div class="space-y-12">
-          <div>
-            <div class="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
-              <% selected_options = {}
-pre_selected_values.each { |k, v| selected_options[k] = v.to_s }
+  <div class="grid gap-6">
+    <form action="<%= action %>" method="POST" id="creation-form" class="<%= method %>">
+      <%== csrf_tag(action, method) %>
+      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
+        <div class="px-4 py-5 sm:p-6">
+          <div class="space-y-12">
+            <div>
+              <div class="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+                <% selected_options = {}
+  pre_selected_values.each { |k, v| selected_options[k] = v.to_s }
 
-form_elements.each do |element|
-  container_opening_tag = element[:opening_tag] || "<div class='col-span-full'>"
-  container_closing_tag = element[:closing_tag] || "</div>"
+  form_elements.each do |element|
+    container_opening_tag = element[:opening_tag] || "<div class='col-span-full'>"
+    container_closing_tag = element[:closing_tag] || "</div>"
 
-  name, type, label, required, placeholder, content_generator = element.values_at(:name, :type, :label, :required, :placeholder, :content_generator)
+    name, type, label, required, placeholder, content_generator = element.values_at(:name, :type, :label, :required, :placeholder, :content_generator)
 
-  has_option = ["radio_small_cards", "select", "checkbox"].include?(type)
-  options = OptionTreeGenerator.generate_allowed_options(name, option_tree, option_parents).map do |option|
-    opt_val = (type == "select") ? option[name][:value] : option[name]
+    has_option = ["radio_small_cards", "select", "checkbox"].include?(type)
+    options = OptionTreeGenerator.generate_allowed_options(name, option_tree, option_parents).map do |option|
+      opt_val = (type == "select") ? option[name][:value] : option[name]
 
-    opt_text = content_generator.call(*option.values)
+      opt_text = content_generator.call(*option.values)
 
-    parents = option.reject { |k, v| k == name }
+      parents = option.reject { |k, v| k == name }
 
-    parents_selected = parents.all? { |k, v| selected_options[k] == v }
-    submitted_value = flash.dig("old", name)
-    selected_in_form_submission = submitted_value == opt_val
-    selected_in_pre_selection = submitted_value.nil? && selected_options[name] == opt_val
-    first_of_its_kind = submitted_value.nil? && selected_options[name].nil?
-    checked = parents_selected && (selected_in_form_submission || selected_in_pre_selection || first_of_its_kind)
-    selected_options[name] = opt_val if checked
-  
-    opt_classes = (parents.map { |k, v| "form_#{k} form_#{k}_#{v}" } + (parents_selected ? [] : ["hidden"])).join(" ")
+      parents_selected = parents.all? { |k, v| selected_options[k] == v }
+      submitted_value = flash.dig("old", name)
+      selected_in_form_submission = submitted_value == opt_val
+      selected_in_pre_selection = submitted_value.nil? && selected_options[name] == opt_val
+      first_of_its_kind = submitted_value.nil? && selected_options[name].nil?
+      checked = parents_selected && (selected_in_form_submission || selected_in_pre_selection || first_of_its_kind)
+      selected_options[name] = opt_val if checked
+    
+      opt_classes = (parents.map { |k, v| "form_#{k} form_#{k}_#{v}" } + (parents_selected ? [] : ["hidden"])).join(" ")
 
-    opt_attrs = {}
-    opt_attrs[:disabled] = "disabled" unless parents_selected
-    opt_attrs[:checked] = "checked" if checked
+      opt_attrs = {}
+      opt_attrs[:disabled] = "disabled" unless parents_selected
+      opt_attrs[:checked] = "checked" if checked
 
-    [opt_val, opt_text, opt_classes, opt_attrs]
-  end if has_option
+      [opt_val, opt_text, opt_classes, opt_attrs]
+    end if has_option
 
-  if has_option && selected_options[name].nil?
-    options.find{ |_, _, _, opt_attrs| opt_attrs[:disabled].nil? }&.tap do |opt_val, _, _, opt_attrs|
-      opt_attrs[:checked] = "checked"
-      selected_options[name] = opt_val
+    if has_option && selected_options[name].nil?
+      options.find{ |_, _, _, opt_attrs| opt_attrs[:disabled].nil? }&.tap do |opt_val, _, _, opt_attrs|
+        opt_attrs[:checked] = "checked"
+        selected_options[name] = opt_val
+      end
     end
-  end
 
-  case type
-  when "radio_small_cards"
-    locals = {name:, label:, options:, attributes: {required:}}
-  when "select"
-    locals = {name:, label:, options:, placeholder:, description_html: element[:description_html]}
-  when "checkbox"
-    locals = {name:, label:, options:, description: element[:description]}
-  when "text"
-    locals = {name:, label:, value: element[:value], attributes: {required:, placeholder:}}
-  when "number"
-    locals = {name:, label:, type: "number", attributes: {required:, placeholder:}}
-    type = "text"
-  when "textarea"
-    locals = {name:, label:, description: element[:description], attributes: {required:, placeholder:, rows: 3}}
-  when "hidden"
-    selected_options[name] = element[:value]
-    locals = {name:, value: element[:value]}
-    container_opening_tag, container_closing_tag = "", ""
-  when "partnership_notice"
-    description, tos_text = content_generator.call(@flavor)
-    locals = {description:, tos_text:}
-  when "section"
-    locals = {label:, content: element[:content]}
-  # :nocov:
-  else
-    raise "Unknown element type: #{type}"
-  # :nocov:
-  end %>
-                <%== container_opening_tag %>
-                <%== part("components/form/#{type}", **locals) %>
-                <%== container_closing_tag %>
-              <% end %>
+    case type
+    when "radio_small_cards"
+      locals = {name:, label:, options:, attributes: {required:}}
+    when "select"
+      locals = {name:, label:, options:, placeholder:, description_html: element[:description_html]}
+    when "checkbox"
+      locals = {name:, label:, options:, description: element[:description]}
+    when "text"
+      locals = {name:, label:, value: element[:value], attributes: {required:, placeholder:}}
+    when "number"
+      locals = {name:, label:, type: "number", attributes: {required:, placeholder:}}
+      type = "text"
+    when "textarea"
+      locals = {name:, label:, description: element[:description], attributes: {required:, placeholder:, rows: 3}}
+    when "hidden"
+      selected_options[name] = element[:value]
+      locals = {name:, value: element[:value]}
+      container_opening_tag, container_closing_tag = "", ""
+    when "partnership_notice"
+      description, tos_text = content_generator.call(@flavor)
+      locals = {description:, tos_text:}
+    when "section"
+      locals = {label:, content: element[:content]}
+    # :nocov:
+    else
+      raise "Unknown element type: #{type}"
+    # :nocov:
+    end %>
+                  <%== container_opening_tag %>
+                  <%== part("components/form/#{type}", **locals) %>
+                  <%== container_closing_tag %>
+                <% end %>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      <div class="px-4 py-5 sm:p-6">
-        <div class="flex items-center justify-end gap-x-6">
-          <% if mode == "create" %>
-            <a href="<%= action %>" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
-            <%== part("components/form/submit_button", text: "Create") %>
-          <% else %>
-            <%== part("components/form/submit_button", text: "Update") %>
-          <% end %>
+        <div class="px-4 py-5 sm:p-6">
+          <div class="flex items-center justify-end gap-x-6">
+            <% if mode == "create" %>
+              <a href="<%= action %>" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+              <%== part("components/form/submit_button", text: "Create") %>
+            <% else %>
+              <%== part("components/form/submit_button", text: "Update") %>
+            <% end %>
+          </div>
         </div>
       </div>
-    </div>
-  </form>
+    </form>
+  </div>
 </div>
