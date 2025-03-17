@@ -35,8 +35,8 @@ gem "countries"
 gem "octokit"
 gem "argon2-kdf"
 gem "rodauth-omniauth", github: "janko/rodauth-omniauth", ref: "477810179ba0cab8d459be1a0d87dca5b57ec94b"
-gem "omniauth-github", "~> 2.0"
-gem "omniauth-google-oauth2", "~> 1.2"
+gem "omniauth-github"
+gem "omniauth-google-oauth2"
 
 group :development do
   gem "awesome_print"
@@ -76,12 +76,8 @@ group :test, :development do
   gem "sequel-annotate"
 end
 
-gem "webauthn", "~> 3.2"
-
-gem "aws-sdk-s3", "~> 1.182"
-
-gem "acme-client", "~> 2.0"
-
-gem "prawn", "~> 2.5"
-
-gem "prawn-table", "~> 0.2.2"
+gem "webauthn"
+gem "aws-sdk-s3"
+gem "acme-client"
+gem "prawn"
+gem "prawn-table"
