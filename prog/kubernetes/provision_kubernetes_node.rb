@@ -38,6 +38,8 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
 
     storage_volumes = [{encrypted: true, size_gib: storage_size_gib}] if storage_size_gib
 
+    boot_image = "kubernetes-#{kubernetes_cluster.version.tr(".", "_")}"
+
     vm = Prog::Vm::Nexus.assemble_with_sshable(
       kubernetes_cluster.project.id,
       sshable_unix_user: "ubi",
@@ -45,7 +47,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
       location: kubernetes_cluster.location,
       size: vm_size,
       storage_volumes: storage_volumes,
-      boot_image: "ubuntu-jammy",
+      boot_image: boot_image,
       private_subnet_id: kubernetes_cluster.private_subnet_id,
       enable_ip4: true
     ).subject
@@ -61,47 +63,15 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
       kubernetes_cluster.api_server_lb.add_vm(vm)
     end
 
-    hop_install_software
-  end
-
-  label def install_software
-    nap 5 unless vm.strand.label == "wait"
-    vm.sshable.cmd <<BASH
-  set -ueo pipefail
-  echo "net.ipv6.conf.all.forwarding=1\nnet.ipv6.conf.all.proxy_ndp=1\nnet.ipv4.conf.all.forwarding=1\nnet.ipv4.ip_forward=1" | sudo tee /etc/sysctl.d/72-clover-forward-packets.conf
-  sudo sysctl --system
-  sudo apt update
-  sudo apt install -y ca-certificates curl apt-transport-https gpg
-  sudo install -m 0755 -d /etc/apt/keyrings
-  sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-  sudo chmod a+r /etc/apt/keyrings/docker.asc
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \\$(. /etc/os-release && echo "\\$VERSION_CODENAME") stable" \\| sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-  sudo apt update
-  sudo apt install -y containerd
-  sudo mkdir -p /etc/containerd
-  sudo touch /etc/containerd/config.toml
-  containerd config default | sudo tee /etc/containerd/config.toml
-  sudo sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
-  sudo systemctl restart containerd
-  sudo rm -f '/etc/apt/keyrings/kubernetes-apt-keyring.gpg'
-  curl -fsSL https://pkgs.k8s.io/core:/stable:/#{kubernetes_cluster.version}/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-  echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/#{kubernetes_cluster.version}/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
-  sudo apt update
-  sudo apt install -y kubelet kubeadm kubectl
-  sudo apt-mark hold kubelet kubeadm kubectl
-  sudo systemctl enable --now kubelet
-BASH
-
-    hop_apply_nat_rules
-  end
-
-  label def apply_nat_rules
-    vm.sshable.cmd("sudo iptables-nft -t nat -A POSTROUTING -s #{vm.nics.first.private_ipv4} -o ens3 -j MASQUERADE")
-
     hop_bootstrap_rhizome
   end
 
   label def bootstrap_rhizome
+    nap 5 unless vm.strand.label == "wait"
+
+    vm.sshable.cmd "sudo iptables-nft -t nat -A POSTROUTING -s #{vm.nics.first.private_ipv4} -o ens3 -j MASQUERADE"
+    vm.sshable.cmd "sudo systemctl enable --now kubelet"
+
     bud Prog::BootstrapRhizome, {"target_folder" => "kubernetes", "subject_id" => vm.id, "user" => "ubi"}
 
     hop_wait_bootstrap_rhizome
