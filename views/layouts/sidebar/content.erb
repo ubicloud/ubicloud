@@ -122,6 +122,16 @@
               icon: "hero-cog-6-tooth",
               has_permission: has_project_permission("Project:view")
             ) %>
+            <% if @project.get_ff_private_locations %>
+              <%== part(
+                "layouts/sidebar/item",
+                name: "AWS Regions",
+                url: "#{@project_data[:path]}/private-location",
+                is_active: request.path.start_with?("#{@project_data[:path]}/private-location"),
+                icon: "hero-map-pin",
+                has_permission: true
+              ) %>
+            <% end %>
           </ul>
         </li>
       <% end %>

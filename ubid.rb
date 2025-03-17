@@ -88,6 +88,7 @@ class UBID
   TYPE_USAGE_ALERT = "va"
   TYPE_POSTGRES_METRIC_DESTINATION = "md"
   TYPE_GITHUB_CACHE_ENTRY = "ge"
+  TYPE_LOCATION_CREDENTIAL = "1c"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
@@ -129,6 +130,7 @@ class UBID
     ActionTag: ta
     ObjectTag: t0
     KubernetesCluster: kc
+    Location: 10
   TYPES
   def self.generate_vanity_action_type(action)
     prefix, suffix = action.split(":")

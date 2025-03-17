@@ -47,6 +47,21 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   describe ".assemble" do
     let(:customer_project) { Project.create_with_id(name: "default") }
     let(:postgres_project) { Project.create_with_id(name: "default") }
+    let(:private_location) {
+      loc = Location.create(
+        name: "us-east-1",
+        display_name: "aws-us-east-1",
+        ui_name: "aws-us-east-1",
+        visible: true,
+        provider: "aws",
+        project_id: postgres_project.id
+      )
+      LocationCredential.create(
+        access_key: "access-key-id",
+        secret_key: "secret-access-key"
+      ) { _1.id = loc.id }
+      loc
+    }
 
     it "validates input" do
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
@@ -74,6 +89,13 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect {
         described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: "69c0f4cd-99c1-8ed0-acfe-7b013ce2fa0b")
       }.to raise_error RuntimeError, "No existing parent"
+
+      expect {
+        described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128)
+      }.to raise_error RuntimeError, "Location is not in the project"
+
+      private_location.update(project_id: customer_project.id)
+      described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128)
 
       expect {
         parent = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject

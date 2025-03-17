@@ -58,7 +58,7 @@ module ContentGenerator
       location.ui_name
     end
 
-    def self.family(flavor, location_id, family)
+    def self.family(flavor, location, family)
       vm_family = Option::VmFamilies.find { _1.name == family }
 
       [
@@ -146,6 +146,12 @@ module ContentGenerator
 
     def self.worker_nodes(worker_nodes)
       worker_nodes[:display_name]
+    end
+  end
+
+  module PrivateLocation
+    def self.select_option(select_option)
+      select_option[:display_name]
     end
   end
 end
