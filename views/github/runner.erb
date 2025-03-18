@@ -7,9 +7,10 @@
 <div class="grid gap-6">
   <%== part(
     "components/table_card",
-    headers: ["Runner", "Repository", "Label", "State", "Branch", "Workflow Job"],
+    headers: ["Runner", "Repository", "Label", "State", "Branch", "Workflow Job", ""],
     rows:
       @runners.map do |runner|
+        destroy_url = "#{@project_data[:path]}/github/runner/#{runner[:ubid]}"
         [
           [
             [runner[:ubid], { link: runner[:runner_url] }],
@@ -25,7 +26,27 @@
               CONTENT
             else
               "Runner doesn't have a job yet"
-            end
+            end,
+            [
+              "button",
+              {
+                component: {
+                  text: nil,
+                  icon: "hero-x-circle",
+                  extra_class: "delete-btn",
+                  type: "danger",
+                  attributes: {
+                    "title" => "Terminate",
+                    "data-url" => destroy_url,
+                    "data-csrf" => csrf_token(destroy_url, "DELETE"),
+                    "data-confirmation-message" => "Are you sure to terminate this runner?\nThis will cancel its current job and permanently delete all its data.",
+                    "data-redirect" => request.path,
+                    "data-method" => "DELETE"
+                  }
+                },
+                extra_class: "text-right"
+              }
+            ]
           ],
           { id: "runner-#{runner[:id]}" }
         ]
