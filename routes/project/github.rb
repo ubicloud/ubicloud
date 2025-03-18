@@ -18,10 +18,23 @@ class Clover
         r.redirect "#{@project.path}/github/runner"
       end
 
-      r.get "runner" do
-        @runners = Serializers::GithubRunner.serialize(@project.github_runners_dataset.eager(:vm, :strand).reverse(:created_at).all)
+      r.on "runner" do
+        r.get true do
+          @runners = Serializers::GithubRunner.serialize(@project.github_runners_dataset.eager(:vm, :strand).reverse(:created_at).all)
 
-        view "github/runner"
+          view "github/runner"
+        end
+
+        r.is String do |runner_ubid|
+          next unless (runner = GithubRunner.from_ubid(runner_ubid)) && runner.installation.project_id == @project.id
+
+          r.delete true do
+            runner.incr_skip_deregistration
+            runner.incr_destroy
+            flash["notice"] = "Runner '#{runner.ubid}' forcibly terminated"
+            204
+          end
+        end
       end
 
       r.get "setting" do

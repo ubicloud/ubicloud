@@ -149,6 +149,30 @@ RSpec.describe Clover, "github" do
       expect(page).to have_content runner_wo_strand.ubid
       expect(page).to have_content "not_created"
     end
+
+    it "can terminate runner" do
+      runner = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject
+
+      visit "#{project.path}/github/runner"
+
+      expect(page.status_code).to eq(200)
+      expect(page).to have_content runner.ubid
+
+      btn = find "#runner-#{runner.id} .delete-btn"
+      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+      expect(page.status_code).to eq(204)
+
+      visit "#{project.path}/github/runner"
+      expect(page).to have_flash_notice("Runner '#{runner.ubid}' forcibly terminated")
+    end
+
+    it "raises not found when runner not exists" do
+      visit "#{project.path}/github/runner/grv4tp3wnb7j7jm5d40wv72j0t"
+
+      expect(page.title).to eq("Ubicloud - ResourceNotFound")
+      expect(page.status_code).to eq(404)
+      expect(page).to have_content "ResourceNotFound"
+    end
   end
 
   describe "cache" do
