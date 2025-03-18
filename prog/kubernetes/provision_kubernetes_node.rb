@@ -39,8 +39,8 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     storage_volumes = [{encrypted: true, size_gib: storage_size_gib}] if storage_size_gib
 
     vm = Prog::Vm::Nexus.assemble_with_sshable(
-      "ubi",
       kubernetes_cluster.project.id,
+      sshable_unix_user: "ubi",
       name: name,
       location: kubernetes_cluster.location,
       size: vm_size,

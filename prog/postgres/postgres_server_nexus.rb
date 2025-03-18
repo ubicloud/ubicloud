@@ -23,8 +23,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       end
 
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
-        "ubi",
         Config.postgres_service_project_id,
+        sshable_unix_user: "ubi",
         location: postgres_resource.location,
         name: ubid.to_s,
         size: postgres_resource.target_vm_size,

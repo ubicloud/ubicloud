@@ -37,14 +37,13 @@ class Prog::Test::VmGroup < Prog::Test::Base
     ]
     vm_count = [boot_images.size, storage_options.size, size_options.size].max
     vms = Array.new(vm_count) do |index|
-      Prog::Vm::Nexus.assemble_with_sshable(
-        "ubi", project.id,
+      Prog::Vm::Nexus.assemble_with_sshable(project.id,
+        sshable_unix_user: "ubi",
         size: size_options[index % size_options.size],
         private_subnet_id: subnets[index % subnets.size].id,
         storage_volumes: storage_options[index % storage_options.size],
         boot_image: boot_images[index % boot_images.size],
-        enable_ip4: true
-      )
+        enable_ip4: true)
     end
 
     update_stack({

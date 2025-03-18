@@ -20,8 +20,8 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
 
     DB.transaction do
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
-        "ubi",
         Config.dns_service_project_id,
+        sshable_unix_user: "ubi",
         location: location,
         name: name,
         size: vm_size,

@@ -43,8 +43,8 @@ class Prog::Vm::VmPool < Prog::Base
     ).subject
 
     Prog::Vm::Nexus.assemble_with_sshable(
-      "runneradmin",
       Config.vm_pool_project_id,
+      sshable_unix_user: "runneradmin",
       size: vm_pool.vm_size,
       location: vm_pool.location,
       boot_image: vm_pool.boot_image,
