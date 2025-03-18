@@ -42,7 +42,7 @@ class Clover
         end
 
         r.on String do |installation_id|
-          next unless (installation = GithubInstallation.from_ubid(installation_id))
+          next unless (installation = GithubInstallation.from_ubid(installation_id)) && installation.project_id == @project.id
 
           r.post true do
             cache_enabled = r.params["cache_enabled"] == "true"
@@ -65,7 +65,7 @@ class Clover
         end
 
         r.is String do |entry_ubid|
-          next unless (entry = GithubCacheEntry.from_ubid(entry_ubid))
+          next unless (entry = GithubCacheEntry.from_ubid(entry_ubid)) && entry.repository.installation.project_id == @project.id
 
           r.delete true do
             entry.destroy
