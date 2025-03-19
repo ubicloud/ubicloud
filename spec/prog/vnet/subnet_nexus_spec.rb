@@ -84,6 +84,12 @@ RSpec.describe Prog::Vnet::SubnetNexus do
         described_class.assemble(prj.id, firewall_id: fw.id, allow_only_ssh: true)
       }.to raise_error RuntimeError, "Cannot specify both allow_only_ssh and firewall_id"
     end
+
+    it "hops to create_vpc if location is aws" do
+      loc = Location.create_with_id(name: "aws-us-east-1", provider: "aws", project_id: prj.id, display_name: "aws-us-east-1", ui_name: "AWS US East 1", visible: true)
+      st = described_class.assemble(prj.id, location_id: loc.id)
+      expect(st.label).to eq("create_vpc")
+    end
   end
 
   describe ".gen_spi" do
@@ -134,6 +140,38 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect(nx.strand).to receive(:label).and_return("destroy")
       expect { nx.before_run }.not_to hop("destroy")
+    end
+  end
+
+  describe "#create_vpc" do
+    it "creates a vpc" do
+      expect(nx).to receive(:hop_wait_vpc_created)
+      expect(nx).to receive(:bud).with(Prog::Aws::Vpc, {"subject_id" => ps.id}, :create_vpc)
+      expect(nx).to receive(:private_subnet).and_return(ps).at_least(:once)
+      nx.create_vpc
+    end
+
+    it "does not create the PrivateSubnetAwsResource if it already exists" do
+      expect(nx).to receive(:private_subnet).and_return(ps).at_least(:once)
+      expect(ps).to receive(:private_subnet_aws_resource).and_return(instance_double(PrivateSubnetAwsResource, id: "123")).at_least(:once)
+      expect(nx).to receive(:bud).with(Prog::Aws::Vpc, {"subject_id" => ps.id}, :create_vpc)
+      expect(nx).to receive(:hop_wait_vpc_created)
+      nx.create_vpc
+      expect(PrivateSubnetAwsResource.count).to eq(0)
+    end
+  end
+
+  describe "#wait_vpc_created" do
+    it "reaps and hops to wait if leaf" do
+      expect(nx).to receive(:reap)
+      expect(nx).to receive(:leaf?).and_return(true)
+      expect { nx.wait_vpc_created }.to hop("wait")
+    end
+
+    it "naps if not leaf" do
+      expect(nx).to receive(:reap)
+      expect(nx).to receive(:leaf?).and_return(false)
+      expect { nx.wait_vpc_created }.to nap(2)
     end
   end
 
@@ -393,6 +431,15 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect { nx.destroy }.to nap(5)
     end
 
+    it "hops to wait_aws_vpc_destroyed if location is aws" do
+      expect(ps).to receive(:location).and_return(Location.create_with_id(name: "aws-us-east-1", provider: "aws", project_id: prj.id, display_name: "aws-us-east-1", ui_name: "AWS US East 1", visible: true))
+      expect(nx).to receive(:private_subnet).and_return(ps).at_least(:once)
+      expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
+      expect(nic).to receive(:incr_destroy)
+      expect(nx).to receive(:bud).with(Prog::Aws::Vpc, {"subject_id" => ps.id}, :destroy)
+      expect { nx.destroy }.to hop("wait_aws_vpc_destroyed")
+    end
+
     it "increments the destroy semaphore of nics" do
       expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
       expect(nic).to receive(:incr_destroy).and_return(true)
@@ -416,6 +463,23 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(nx).to receive(:private_subnet).and_return(ps1).at_least(:once)
       expect(ps1).to receive(:disconnect_subnet).with(ps2).and_call_original
       expect { nx.destroy }.to exit({"msg" => "subnet destroyed"})
+    end
+  end
+
+  describe "#wait_aws_vpc_destroyed" do
+    it "deletes the vpc and pops if leaf" do
+      expect(nx).to receive(:private_subnet).and_return(ps).at_least(:once)
+      expect(ps).to receive(:destroy).and_return(true)
+      expect(ps).to receive(:private_subnet_aws_resource).and_return(instance_double(PrivateSubnetAwsResource, id: "123", destroy: true))
+      expect(nx).to receive(:reap)
+      expect(nx).to receive(:leaf?).and_return(true)
+      expect { nx.wait_aws_vpc_destroyed }.to exit({"msg" => "vpc destroyed"})
+    end
+
+    it "naps if not leaf" do
+      expect(nx).to receive(:reap)
+      expect(nx).to receive(:leaf?).and_return(false)
+      expect { nx.wait_aws_vpc_destroyed }.to nap(10)
     end
   end
 end
