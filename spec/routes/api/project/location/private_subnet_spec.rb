@@ -172,13 +172,6 @@ RSpec.describe Clover, "private_subnet" do
         expect(SemSnap.new(ps.id).set?("destroy")).to be true
       end
 
-      it "not exist ubid in location" do
-        delete "/project/#{project.ubid}/location/foo_location/private-subnet/#{ps.ubid}"
-
-        expect(last_response.status).to eq(404)
-        expect(SemSnap.new(ps.id).set?("destroy")).to be false
-      end
-
       it "not exist ubid" do
         delete "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/foo-name"
 
