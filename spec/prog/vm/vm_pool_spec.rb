@@ -47,7 +47,9 @@ RSpec.describe Prog::Vm::VmPool do
       expect { nx.create_new_vm }.to hop("wait")
       pool = VmPool[st.id]
       expect(pool.vms.count).to eq(1)
-      expect(pool.vms.first.sshable).not_to be_nil
+      vm = pool.vms.first
+      expect(vm.unix_user).to eq("runneradmin")
+      expect(vm.sshable.unix_user).to eq("runneradmin")
     end
   end
 
