@@ -2,10 +2,10 @@
 
 module LocationNameConverter
   def self.to_internal_name(display_name)
-    Location[display_name:]&.name
+    Location.where(display_name:).get(:name)
   end
 
   def self.to_display_name(internal_name)
-    Location[name: internal_name]&.display_name
+    Location.where(name: internal_name).get(:display_name)
   end
 end
