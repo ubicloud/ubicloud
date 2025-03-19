@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../model"
+require "aws-sdk-ec2"
 
 class LocationCredential < Sequel::Model
   include ResourceMethods
@@ -9,6 +10,10 @@ class LocationCredential < Sequel::Model
   plugin :column_encryption do |enc|
     enc.column :access_key
     enc.column :secret_key
+  end
+
+  def client
+    Aws::EC2::Client.new(access_key_id: access_key, secret_access_key: secret_key, region: location.name)
   end
 end
 

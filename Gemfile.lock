@@ -69,6 +69,9 @@ GEM
       aws-sigv4 (~> 1.9)
       base64
       jmespath (~> 1, >= 1.6.1)
+    aws-sdk-ec2 (1.512.0)
+      aws-sdk-core (~> 3, >= 3.216.0)
+      aws-sigv4 (~> 1.5)
     aws-sdk-kms (1.99.0)
       aws-sdk-core (~> 3, >= 3.216.0)
       aws-sigv4 (~> 1.5)
@@ -451,6 +454,7 @@ DEPENDENCIES
   argon2
   argon2-kdf
   awesome_print
+  aws-sdk-ec2 (~> 1.512)
   aws-sdk-s3
   bcrypt_pbkdf
   brakeman
