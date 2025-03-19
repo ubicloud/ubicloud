@@ -16,7 +16,8 @@ class Prog::Vnet::NicNexus < Prog::Base
 
     DB.transaction do
       nic = Nic.create(private_ipv6: ipv6_addr, private_ipv4: ipv4_addr, mac: gen_mac, name: name, private_subnet_id: private_subnet_id) { _1.id = ubid.to_uuid }
-      Strand.create(prog: "Vnet::NicNexus", label: "wait_allocation") { _1.id = nic.id }
+      label = (subnet.location.provider == "aws") ? "create_aws_nic" : "wait_allocation"
+      Strand.create(prog: "Vnet::NicNexus", label:) { _1.id = nic.id }
     end
   end
 
@@ -24,6 +25,18 @@ class Prog::Vnet::NicNexus < Prog::Base
     when_destroy_set? do
       hop_destroy if strand.label != "destroy"
     end
+  end
+
+  label def create_aws_nic
+    nap 10 unless nic.private_subnet.strand.label == "wait"
+    bud Prog::Aws::Nic, {"subject_id" => nic.id}, :create_network_interface
+    hop_wait_aws_nic_created
+  end
+
+  label def wait_aws_nic_created
+    reap
+    hop_wait if leaf?
+    nap 10
   end
 
   label def wait_allocation
@@ -99,12 +112,25 @@ class Prog::Vnet::NicNexus < Prog::Base
 
     decr_destroy
 
+    if nic.private_subnet.location.provider == "aws"
+      bud Prog::Aws::Nic, {"subject_id" => nic.id}, :destroy
+      hop_wait_aws_nic_destroyed
+    end
+
     nic.private_subnet.incr_refresh_keys
     nic.destroy
 
     pop "nic deleted"
   end
 
+  label def wait_aws_nic_destroyed
+    reap
+    if leaf?
+      nic.destroy
+      pop "nic deleted"
+    end
+    nap 10
+  end
   # Generate a MAC with the "local" (generated, non-manufacturer) bit
   # set and the multicast bit cleared in the first octet.
   #
