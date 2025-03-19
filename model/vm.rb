@@ -52,6 +52,10 @@ class Vm < Sequel::Model
     assigned_vm_address&.ip
   end
 
+  def ip6
+    (location.provider == "aws") ? ephemeral_net6.nth(0) : ephemeral_net6&.nth(2)
+  end
+
   def private_ipv4
     (nics.first.private_ipv4.netmask.prefix_len == 32) ? nics.first.private_ipv4.network : nics.first.private_ipv4.nth(1)
   end
