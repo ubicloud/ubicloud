@@ -14,7 +14,7 @@ end
 # Columns:
 #  id         | uuid | PRIMARY KEY
 #  ip         | cidr | NOT NULL
-#  address_id | uuid | NOT NULL
+#  address_id | uuid |
 #  dst_vm_id  | uuid | NOT NULL
 # Indexes:
 #  assigned_vm_address_pkey   | PRIMARY KEY btree (id)
