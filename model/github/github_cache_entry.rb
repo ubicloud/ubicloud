@@ -12,9 +12,11 @@ class GithubCacheEntry < Sequel::Model
   include ResourceMethods
 
   dataset_module do
-    def destroy_where(...)
+    # The same as Dataset#destroy, except that it adds the given condition
+    # to the WHERE clause of the DELETE statement for each destroyed row.
+    def destroy_where(cond)
       all do |entry|
-        entry.destroy_where(...)
+        entry.destroy_where(cond)
       end
     end
   end
@@ -23,13 +25,13 @@ class GithubCacheEntry < Sequel::Model
     "cache/#{ubid}"
   end
 
-  def destroy_where(...)
-    instance_filter(...)
+  def destroy_where(cond)
+    instance_filter(cond)
     db.transaction(savepoint: true) do
       destroy
     end
   rescue Sequel::NoExistingObject
-    # DELETE query modified no rows due to filter
+    # DELETE statement modified no rows due to filter
   end
 
   def after_destroy
