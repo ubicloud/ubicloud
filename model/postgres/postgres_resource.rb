@@ -118,6 +118,11 @@ class PostgresResource < Sequel::Model
     [root_cert_1, root_cert_2].join("\n") if root_cert_1 && root_cert_2
   end
 
+  def validate
+    super
+    validates_includes(0..23, :maintenance_window_start_at, allow_nil: true, message: "must be between 0 and 23")
+  end
+
   module HaType
     NONE = "none"
     ASYNC = "async"

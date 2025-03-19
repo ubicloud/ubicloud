@@ -310,6 +310,34 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(200)
       end
 
+      it "can set maintenance window" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
+          maintenance_window_start_at: "9"
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(pg.reload.maintenance_window_start_at).to eq(9)
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
+          maintenance_window_start_at: 12
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(pg.reload.maintenance_window_start_at).to eq(12)
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window"
+
+        expect(last_response.status).to eq(200)
+        expect(pg.reload.maintenance_window_start_at).to be_nil
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
+          maintenance_window_start_at: 25
+        }.to_json
+
+        expect(last_response.status).to eq(400)
+        expect(pg.reload.maintenance_window_start_at).to be_nil
+      end
+
       it "invalid payment" do
         expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
 
