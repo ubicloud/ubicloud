@@ -36,10 +36,10 @@ end
 #  disk_index               | integer | NOT NULL
 #  key_encryption_key_1_id  | uuid    |
 #  key_encryption_key_2_id  | uuid    |
-#  spdk_installation_id     | uuid    | NOT NULL
+#  spdk_installation_id     | uuid    |
 #  use_bdev_ubi             | boolean | NOT NULL DEFAULT false
 #  skip_sync                | boolean | NOT NULL DEFAULT false
-#  storage_device_id        | uuid    | NOT NULL
+#  storage_device_id        | uuid    |
 #  boot_image_id            | uuid    |
 #  max_ios_per_sec          | integer |
 #  max_read_mbytes_per_sec  | integer |
