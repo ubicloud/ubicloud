@@ -164,9 +164,12 @@ end
 #  flavor                      | postgres_flavor          | NOT NULL DEFAULT 'standard'::postgres_flavor
 #  version                     | postgres_version         | NOT NULL DEFAULT '16'::postgres_version
 #  location_id                 | uuid                     | NOT NULL
+#  maintenance_window_start_at | integer                  |
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
+# Check constraints:
+#  valid_maintenance_windows_start_at | (maintenance_window_start_at >= 0 AND maintenance_window_start_at <= 23)
 # Foreign key constraints:
 #  postgres_resource_location_id_fkey | (location_id) REFERENCES location(id)
 # Referenced By:
