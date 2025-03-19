@@ -107,7 +107,7 @@ class Clover < Roda
   end
 
   def check_visible_location(location = request.params["location"])
-    request.halt unless (@location = LocationNameConverter.to_visible_internal_name(location))
+    request.halt unless (@location = Location.where(display_name: location, visible: true).get(:name))
   end
 
   def validate_request_params(required_keys, allowed_optional_keys = [], ignored_keys = [])
