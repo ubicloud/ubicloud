@@ -78,6 +78,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       vm = nx.pick_vm
       expect(vm).not_to be_nil
       expect(vm.sshable.unix_user).to eq("runneradmin")
+      expect(vm.unix_user).to eq("runneradmin")
       expect(vm.family).to eq("standard")
       expect(vm.vcpus).to eq(4)
       expect(vm.project_id).to eq(Config.github_runner_service_project_id)
