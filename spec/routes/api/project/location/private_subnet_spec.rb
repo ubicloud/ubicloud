@@ -98,7 +98,7 @@ RSpec.describe Clover, "private_subnet" do
 
       it "not authorized" do
         project
-        post "/project/#{project_wo_permissions.ubid}/location/#{ps_wo_permission.location}/private-subnet/foo_subnet"
+        post "/project/#{project_wo_permissions.ubid}/location/#{ps_wo_permission.display_location}/private-subnet/foo_subnet"
 
         expect(last_response.content_type).to eq("application/json")
         expect(last_response).to have_api_error(403)
@@ -175,12 +175,12 @@ RSpec.describe Clover, "private_subnet" do
       it "not exist ubid in location" do
         delete "/project/#{project.ubid}/location/foo_location/private-subnet/#{ps.ubid}"
 
-        expect(last_response.status).to eq(204)
+        expect(last_response.status).to eq(404)
         expect(SemSnap.new(ps.id).set?("destroy")).to be false
       end
 
       it "not exist ubid" do
-        delete "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/_foo_ubid"
+        delete "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/foo-name"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(ps.id).set?("destroy")).to be false

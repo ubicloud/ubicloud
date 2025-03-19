@@ -106,6 +106,10 @@ class Clover < Roda
     @current_account = Account[rodauth.session_value]
   end
 
+  def check_visible_location(location = request.params["location"])
+    request.halt unless (@location = LocationNameConverter.to_visible_internal_name(location))
+  end
+
   def validate_request_params(required_keys, allowed_optional_keys = [], ignored_keys = [])
     params = request.params.reject { ignored_keys.include?(_1) }
     params = params.reject { _1 == "_csrf" } unless api?

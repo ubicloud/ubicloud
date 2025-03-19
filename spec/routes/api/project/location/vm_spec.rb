@@ -236,7 +236,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "not exist" do
-        delete "/project/#{project.ubid}/location/#{vm.display_location}/vm/foo_name"
+        delete "/project/#{project.ubid}/location/#{vm.display_location}/vm/foo-name"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
@@ -252,7 +252,7 @@ RSpec.describe Clover, "vm" do
       it "not exist ubid in location" do
         delete "/project/#{project.ubid}/location/foo_location/vm/#{vm.ubid}"
 
-        expect(last_response.status).to eq(204)
+        expect(last_response.status).to eq(404)
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
       end
     end

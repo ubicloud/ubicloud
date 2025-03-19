@@ -318,7 +318,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "not exist" do
-        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/foo_name"
+        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/foo-name"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(pg.id).set?("destroy")).to be false
@@ -334,7 +334,7 @@ RSpec.describe Clover, "postgres" do
       it "not exist ubid in location" do
         delete "/project/#{project.ubid}/location/foo_location/postgres/#{pg.ubid}"
 
-        expect(last_response.status).to eq(204)
+        expect(last_response.status).to eq(404)
         expect(SemSnap.new(pg.id).set?("destroy")).to be false
       end
 
