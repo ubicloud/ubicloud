@@ -194,7 +194,7 @@ RSpec.describe Clover, "firewall" do
       end
 
       it "raises not found when firewall not exists" do
-        visit "#{project.path}/location/hetzner-fsn1/firewall/08s56d4kaj94xsmrnf5v5m3mav"
+        visit "#{project.path}/location/eu-central-h1/firewall/08s56d4kaj94xsmrnf5v5m3mav"
 
         expect(page.title).to eq("Ubicloud - ResourceNotFound")
         expect(page.status_code).to eq(404)

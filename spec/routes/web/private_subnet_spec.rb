@@ -129,7 +129,7 @@ RSpec.describe Clover, "private subnet" do
       end
 
       it "raises not found when private subnet not exists" do
-        visit "#{project.path}/location/hetzner-fsn1/private-subnet/08s56d4kaj94xsmrnf5v5m3mav"
+        visit "#{project.path}/location/eu-central-h1/private-subnet/08s56d4kaj94xsmrnf5v5m3mav"
 
         expect(page.title).to eq("Ubicloud - ResourceNotFound")
         expect(page.status_code).to eq(404)
