@@ -162,6 +162,7 @@ end
 #  private_subnet_id           | uuid                     |
 #  flavor                      | postgres_flavor          | NOT NULL DEFAULT 'standard'::postgres_flavor
 #  version                     | postgres_version         | NOT NULL DEFAULT '16'::postgres_version
+#  maintenance_window_start_at | integer                  |
 # Indexes:
 #  postgres_server_pkey                            | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_name_uidx | UNIQUE btree (project_id, location, name)
