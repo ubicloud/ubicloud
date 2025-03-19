@@ -14,8 +14,9 @@ class KubernetesCluster < Sequel::Model
 
   include ResourceMethods
   include SemaphoreMethods
+  include HealthMonitorMethods
 
-  semaphore :destroy
+  semaphore :destroy, :sync_kubernetes_services
 
   def validate
     super
@@ -41,8 +42,20 @@ class KubernetesCluster < Sequel::Model
     api_server_lb.hostname
   end
 
+  def client(session: cp_vms.first.sshable.start_fresh_session)
+    Kubernetes::Client.new(self, session)
+  end
+
   def sshable
     cp_vms.first.sshable
+  end
+
+  def services_load_balancer_name
+    "#{ubid}-services"
+  end
+
+  def apiserver_load_balancer_name
+    "#{ubid}-apiserver"
   end
 
   def self.kubeconfig(vm)
@@ -59,6 +72,22 @@ class KubernetesCluster < Sequel::Model
 
   def kubeconfig
     self.class.kubeconfig(cp_vms.first)
+  end
+
+  def init_health_monitor_session
+    {
+      ssh_session: sshable.start_fresh_session
+    }
+  end
+
+  def check_pulse(session:, previous_pulse:)
+    reading = begin
+      incr_sync_kubernetes_services if client(session: session[:ssh_session]).any_lb_services_modified?
+      "up"
+    rescue
+      "down"
+    end
+    aggregate_readings(previous_pulse: previous_pulse, reading: reading)
   end
 end
 
