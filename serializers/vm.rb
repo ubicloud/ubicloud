@@ -10,7 +10,7 @@ class Serializers::Vm < Serializers::Base
       size: vm.display_size,
       unix_user: vm.unix_user,
       storage_size_gib: vm.storage_size_gib,
-      ip6: vm.ephemeral_net6&.nth(2),
+      ip6: vm.ip6,
       ip4_enabled: vm.ip4_enabled,
       ip4: vm.ephemeral_net4
     }

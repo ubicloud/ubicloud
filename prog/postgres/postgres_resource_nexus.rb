@@ -187,7 +187,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   label def wait
     # Only create one standby at a time to ensure that they are allocated on different hosts
-    if postgres_resource.target_server_count > servers.count && servers.none? { _1.vm.vm_host.nil? }
+    if postgres_resource.target_server_count > servers.count && servers.none? { _1.vm.display_state == "creating" }
       exclude_host_ids = (Config.development? || Config.is_e2e) ? [] : servers.map { _1.vm.vm_host.id }
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: postgres_resource.timeline.id, timeline_access: "fetch", exclude_host_ids: exclude_host_ids)
     end
