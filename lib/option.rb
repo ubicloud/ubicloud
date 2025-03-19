@@ -110,24 +110,16 @@ module Option
   AWS_LOCATIONS = ["us-east-1", "us-west-1"].freeze
 
   def self.customer_postgres_sizes_for_project(project_id)
+    return Option::PostgresSizes unless project_id
+
     customer_locations = Location.where(project_id:).all
     (
       Option::PostgresSizes +
       customer_locations.product([2, 4, 8, 16, 30, 60]).flat_map { |location, size|
-        storage_size_options = [size * 32, size * 64, size * 128]
-        storage_size_options.map! { |size| size / 15 * 16 } if size == 30 || size == 60
+        storage_size_options = [(size * 59.375).to_i]
 
-        storage_size_limiter = [4096, storage_size_options.last].min.fdiv(storage_size_options.last)
-        storage_size_options.map! { |size| size * storage_size_limiter }
-        [PostgresResource::Flavor::STANDARD, PostgresResource::Flavor::PARADEDB, PostgresResource::Flavor::LANTERN].map do |flavor|
-          Option::PostgresSize.new(location.id, "standard-#{size}", "standard", "standard-#{size}", flavor, size, size * 4, storage_size_options)
-        end
-      }.concat(customer_locations.product([1, 2]).flat_map { |location, size|
-        storage_size_options = [size * 16, size * 32, size * 64]
-        [PostgresResource::Flavor::STANDARD, PostgresResource::Flavor::PARADEDB, PostgresResource::Flavor::LANTERN].map do |flavor|
-          Option::PostgresSize.new(location.id, "burstable-#{size}", "burstable", "burstable-#{size}", flavor, size, size * 2, storage_size_options)
-        end
-      })
+        Option::PostgresSize.new(location.id, "standard-#{size}", "standard", "standard-#{size}", PostgresResource::Flavor::STANDARD, size, size * 4, storage_size_options)
+      }
     )
   end
 end

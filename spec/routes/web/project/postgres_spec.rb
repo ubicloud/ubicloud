@@ -96,6 +96,8 @@ RSpec.describe Clover, "postgres" do
       it "can create new PostgreSQL database in a custom AWS region" do
         project
         private_location = create_private_location(project: project)
+        Location.where(id: [Location::HETZNER_FSN1_ID, Location::LEASEWEB_WDC02_ID]).destroy
+
         visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
 
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
@@ -104,13 +106,16 @@ RSpec.describe Clover, "postgres" do
         choose option: private_location.id
         choose option: "standard-2"
         choose option: PostgresResource::HaType::NONE
+        choose option: "118"
 
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - #{name}")
         expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
         expect(PostgresResource.count).to eq(1)
-        expect(PostgresResource.first.project_id).to eq(project.id)
+        pg = PostgresResource.first
+        expect(pg.project_id).to eq(project.id)
+        expect(pg.target_storage_size_gib).to eq(118)
       end
 
       it "handles errors when creating new PostgreSQL database" do
@@ -132,7 +137,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "cannot create new PostgreSQL database with invalid location" do
-        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}&location=invalid"
+        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         name = "new-pg-db"
         fill_in "Name", with: name
@@ -166,6 +171,16 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
         expect(PostgresResource.count).to eq(1)
         expect(PostgresResource.first.project_id).to eq(project.id)
+      end
+
+      it "can not create new ParadeDB PostgreSQL database in a customer specific location" do
+        project
+        private_location = create_private_location(project: project)
+
+        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::PARADEDB}"
+
+        expect(page.title).to eq("Ubicloud - Create ParadeDB PostgreSQL Database")
+        expect(page).to have_no_content private_location.name
       end
 
       it "can not open create page with invalid flavor" do

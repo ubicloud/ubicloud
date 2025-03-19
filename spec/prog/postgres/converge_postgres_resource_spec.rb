@@ -13,7 +13,8 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
         instance_double(PostgresServer),
         instance_double(PostgresServer)
       ],
-      timeline: instance_double(PostgresTimeline, id: "timeline-id")
+      timeline: instance_double(PostgresTimeline, id: "timeline-id"),
+      location: instance_double(Location, provider: "hetzner")
     )
   }
 
@@ -52,8 +53,17 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.provision_servers }.to nap
     end
 
-    it "provisions a new server if there is no server with vm_host" do
+    it "provisions a new server if there is no server not running" do
       expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: ["vmh-id-1", "vmh-id-2"]))
+      expect { nx.provision_servers }.to nap
+    end
+
+    it "provisions a new server if there is no server not running and passes empty exclude_host_ids for AWS" do
+      expect(postgres_resource.location).to receive(:provider).and_return("aws")
+      allow(postgres_resource.servers[0]).to receive(:vm).and_return(instance_double(Vm, vm_host: nil))
+      allow(postgres_resource.servers[1]).to receive(:vm).and_return(instance_double(Vm, vm_host: nil))
+
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: []))
       expect { nx.provision_servers }.to nap
     end
   end

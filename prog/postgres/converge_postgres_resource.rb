@@ -13,8 +13,9 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   label def provision_servers
     hop_wait_servers_to_be_ready if postgres_resource.has_enough_fresh_servers?
 
-    if postgres_resource.servers.all? { _1.vm.vm_host }
-      exclude_host_ids = (Config.development? || Config.is_e2e) ? [] : postgres_resource.servers.map { _1.vm.vm_host.id }
+    if postgres_resource.servers.all? { _1.vm.vm_host } || postgres_resource.location.provider == "aws"
+      # vm_host might be nil for AWS VM based PG instances
+      exclude_host_ids = (Config.development? || Config.is_e2e) ? [] : postgres_resource.servers.map { _1.vm.vm_host&.id }.compact
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: postgres_resource.timeline.id, timeline_access: "fetch", exclude_host_ids: exclude_host_ids)
     end
 

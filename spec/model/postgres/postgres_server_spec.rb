@@ -22,7 +22,7 @@ RSpec.describe PostgresServer do
       sshable: instance_double(Sshable),
       memory_gib: 8,
       ephemeral_net4: "1.2.3.4",
-      ephemeral_net6: NetAddr::IPv6Net.parse("fdfa:b5aa:14a3:4a3d::/64"),
+      ip6: "fdfa:b5aa:14a3:4a3d::2",
       private_subnets: [
         instance_double(
           PrivateSubnet,

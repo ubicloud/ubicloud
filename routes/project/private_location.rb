@@ -37,7 +37,7 @@ class Clover
           display_name: request_body_params["name"],
           name: request_body_params["provider_location_name"],
           ui_name: request_body_params["name"],
-          visible: false,
+          visible: true,
           provider: "aws",
           project_id: @project.id
         )

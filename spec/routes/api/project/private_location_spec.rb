@@ -124,7 +124,7 @@ RSpec.describe Clover, "private-location" do
             name: "dummy-postgres",
             location_id: reg.id,
             target_vm_size: "standard-2",
-            target_storage_size_gib: 64
+            target_storage_size_gib: 118
           )
 
           delete "/project/#{project.ubid}/private-location/#{reg.ui_name}"
