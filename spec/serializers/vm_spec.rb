@@ -12,7 +12,7 @@ RSpec.describe Serializers::Vm do
       expect(vm).to receive(:display_size).and_return("standard-2")
       expect(vm).to receive(:display_location).and_return("hetzner")
       expect(vm).to receive(:ubid).and_return("1234")
-      expect(vm).to receive(:ephemeral_net6).and_return(nil)
+      expect(vm).to receive(:ip6).and_return(nil)
       expect(vm).to receive(:ephemeral_net4).and_return("192.168.1.0/24")
 
       expected_result = {
