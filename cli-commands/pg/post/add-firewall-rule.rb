@@ -8,8 +8,7 @@ UbiCli.on("pg").run_on("add-firewall-rule") do
   args 1
 
   run do |cidr|
-    post(pg_path("/firewall-rule"), "cidr" => cidr) do |data|
-      ["Firewall rule added to PostgreSQL database.\n  rule id: #{data["id"]}, cidr: #{data["cidr"]}"]
-    end
+    data = sdk_object.add_firewall_rule(cidr)
+    response("Firewall rule added to PostgreSQL database.\n  rule id: #{data[:id]}, cidr: #{data[:cidr]}")
   end
 end

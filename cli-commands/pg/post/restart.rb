@@ -6,8 +6,7 @@ UbiCli.on("pg").run_on("restart") do
   banner "ubi pg (location/pg-name | pg-id) restart"
 
   run do
-    post(pg_path("/restart")) do |data|
-      ["Scheduled restart of PostgreSQL database with id #{data["id"]}"]
-    end
+    id = sdk_object.restart.id
+    response("Scheduled restart of PostgreSQL database with id #{id}")
   end
 end

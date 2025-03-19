@@ -8,8 +8,7 @@ UbiCli.on("lb").run_on("attach-vm") do
   args 1
 
   run do |vm_id|
-    post(lb_path("/attach-vm"), "vm_id" => vm_id) do |data|
-      ["Attached VM with id #{vm_id} to load balancer with id #{data["id"]}"]
-    end
+    id = sdk_object.attach_vm(vm_id).id
+    response("Attached VM with id #{vm_id} to load balancer with id #{id}")
   end
 end

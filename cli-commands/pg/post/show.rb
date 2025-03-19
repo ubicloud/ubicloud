@@ -11,32 +11,31 @@ UbiCli.on("pg").run_on("show") do
   help_option_values("Fields:", fields)
 
   run do |opts|
-    get(pg_path) do |data|
-      opts = opts[:pg_show]
-      keys = check_fields(opts[:fields], fields, "pg show -f option")
+    data = sdk_object.info
+    opts = opts[:pg_show]
+    keys = check_fields(opts[:fields], fields, "pg show -f option")
 
-      body = []
+    body = []
 
-      underscore_keys(keys).each do |key|
-        case key
-        when "firewall_rules"
-          body << "firewall rules:\n"
-          data[key].each_with_index do |rule, i|
-            body << "  " << (i + 1).to_s << ": " << rule["id"] << "  " << rule["cidr"].to_s << "\n"
-          end
-        when "metric_destinations"
-          body << "metric destinations:\n"
-          data[key].each_with_index do |md, i|
-            body << "  " << (i + 1).to_s << ": " << md["id"] << "  " << md["username"].to_s << "  " << md["url"] << "\n"
-          end
-        when "ca_certificates"
-          body << "CA certificates:\n" << data[key].to_s << "\n"
-        else
-          body << key << ": " << data[key].to_s << "\n"
+    underscore_keys(keys).each do |key|
+      case key
+      when :firewall_rules
+        body << "firewall rules:\n"
+        data[key].each_with_index do |rule, i|
+          body << "  " << (i + 1).to_s << ": " << rule[:id] << "  " << rule[:cidr].to_s << "\n"
         end
+      when :metric_destinations
+        body << "metric destinations:\n"
+        data[key].each_with_index do |md, i|
+          body << "  " << (i + 1).to_s << ": " << md[:id] << "  " << md[:username].to_s << "  " << md[:url] << "\n"
+        end
+      when :ca_certificates
+        body << "CA certificates:\n" << data[key].to_s << "\n"
+      else
+        body << key.to_s << ": " << data[key].to_s << "\n"
       end
-
-      body
     end
+
+    response(body)
   end
 end

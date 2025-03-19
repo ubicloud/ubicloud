@@ -20,48 +20,47 @@ UbiCli.on("fw").run_on("show") do
   help_option_values("Firewall Rule Fields:", firewall_rule_fields)
 
   run do |opts|
-    get(fw_path) do |data|
-      opts = opts[:fw_show]
-      keys = underscore_keys(check_fields(opts[:fields], fields, "fw show -f option"))
-      firewall_rule_keys = underscore_keys(check_fields(opts[:"rule-fields"], firewall_rule_fields, "fw show -r option"))
-      private_subnet_keys = underscore_keys(check_fields(opts[:"priv-subnet-fields"], private_subnet_fields, "fw show -p option"))
-      nic_keys = underscore_keys(check_fields(opts[:"nic-fields"], nic_fields, "fw show -n option"))
+    data = sdk_object.info
+    opts = opts[:fw_show]
+    keys = underscore_keys(check_fields(opts[:fields], fields, "fw show -f option"))
+    firewall_rule_keys = underscore_keys(check_fields(opts[:"rule-fields"], firewall_rule_fields, "fw show -r option"))
+    private_subnet_keys = underscore_keys(check_fields(opts[:"priv-subnet-fields"], private_subnet_fields, "fw show -p option"))
+    nic_keys = underscore_keys(check_fields(opts[:"nic-fields"], nic_fields, "fw show -n option"))
 
-      body = []
+    body = []
 
-      keys.each do |key|
-        case key
-        when "firewall_rules"
-          body << "rules:\n"
-          data[key].each_with_index do |rule, i|
-            body << "  " << (i + 1).to_s << ": "
-            firewall_rule_keys.each do |fwr_key|
-              body << rule[fwr_key].to_s << "  "
-            end
-            body << "\n"
+    keys.each do |key|
+      case key
+      when :firewall_rules
+        body << "rules:\n"
+        data[key].each_with_index do |rule, i|
+          body << "  " << (i + 1).to_s << ": "
+          firewall_rule_keys.each do |fwr_key|
+            body << rule[fwr_key].to_s << "  "
           end
-        when "private_subnets"
-          data[key].each_with_index do |ps, i|
-            body << "private subnet " << (i + 1).to_s << ":\n"
-            private_subnet_keys.each do |ps_key|
-              if ps_key == "nics"
-                ps[ps_key].each_with_index do |nic, i|
-                  body << "  nic " << (i + 1).to_s << ":\n"
-                  nic_keys.each do |nic_key|
-                    body << "    " << nic_key << ": " << nic[nic_key].to_s << "\n"
-                  end
-                end
-              else
-                body << "  " << ps_key << ": " << ps[ps_key].to_s << "\n"
-              end
-            end
-          end
-        else
-          body << key << ": " << data[key].to_s << "\n"
+          body << "\n"
         end
+      when :private_subnets
+        data[key].each_with_index do |ps, i|
+          body << "private subnet " << (i + 1).to_s << ":\n"
+          private_subnet_keys.each do |ps_key|
+            if ps_key == :nics
+              ps[ps_key].each_with_index do |nic, i|
+                body << "  nic " << (i + 1).to_s << ":\n"
+                nic_keys.each do |nic_key|
+                  body << "    " << nic_key.to_s << ": " << nic[nic_key].to_s << "\n"
+                end
+              end
+            else
+              body << "  " << ps_key.to_s << ": " << ps[ps_key].to_s << "\n"
+            end
+          end
+        end
+      else
+        body << key.to_s << ": " << data[key].to_s << "\n"
       end
-
-      body
     end
+
+    response(body)
   end
 end

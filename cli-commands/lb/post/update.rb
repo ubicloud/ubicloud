@@ -9,8 +9,7 @@ UbiCli.on("lb").run_on("update") do
 
   run do |argv|
     algorithm, src_port, dst_port, health_check_endpoint, *vms = argv
-    patch(lb_path, {algorithm:, src_port:, dst_port:, health_check_endpoint:, vms:}.transform_keys(&:to_s)) do |data|
-      ["Updated load balancer with id #{data["id"]}"]
-    end
+    id = sdk_object.update(algorithm:, src_port:, dst_port:, health_check_endpoint:, vms:).id
+    response("Updated load balancer with id #{id}")
   end
 end

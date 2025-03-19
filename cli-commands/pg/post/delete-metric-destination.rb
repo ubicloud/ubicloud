@@ -8,12 +8,8 @@ UbiCli.on("pg").run_on("delete-metric-destination") do
   args 1
 
   run do |ubid|
-    if ubid.include?("/")
-      raise Rodish::CommandFailure, "invalid metric destination id format"
-    end
-
-    delete(pg_path("/metric-destination/#{ubid}")) do |data|
-      ["Metric destination, if it exists, has been scheduled for deletion"]
-    end
+    check_no_slash(ubid, "invalid metric destination id format")
+    sdk_object.delete_metric_destination(ubid)
+    response("Metric destination, if it exists, has been scheduled for deletion")
   end
 end

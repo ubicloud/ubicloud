@@ -8,8 +8,7 @@ UbiCli.on("ps").run_on("connect") do
   args 1
 
   run do |ps_id|
-    post(ps_path("/connect"), "connected-subnet-ubid" => ps_id) do |data|
-      ["Connected private subnets with ids #{ps_id} and #{data["id"]}"]
-    end
+    id = sdk_object.connect(ps_id).id
+    response("Connected private subnets with ids #{ps_id} and #{id}")
   end
 end
