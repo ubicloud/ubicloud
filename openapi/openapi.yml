@@ -971,6 +971,31 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/set-maintenance-window':
+    post:
+      operationId: setMaintenanceWindow
+      summary: Set maintenance window for the Postgres database
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_name'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                maintenance_window_start_at:
+                  type: integer
+              additionalProperties: false
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/firewall-rule':
     parameters:
       - $ref: '#/components/parameters/location'
@@ -1721,6 +1746,10 @@ components:
           description: CA certificates of the root CA used to issue postgres server certificates
           type: string
           nullable: true
+        maintenance_window_start_at:
+          description: Maintenance window start time
+          type: integer
+          nullable: true
       additionalProperties: false
       required:
         - flavor
@@ -1732,6 +1761,7 @@ components:
         - storage_size_gib
         - version
         - vm_size
+        - maintenance_window_start_at
     PostgresFirewallRule:
       type: object
       properties:
@@ -2038,12 +2068,16 @@ components:
                   primary:
                     description: Is the database primary
                     type: boolean
+                  maintenance_window_start_at:
+                    description: Maintenance window start time
+                    type: integer
                 required:
                   - connection_string
                   - earliest_restore_time
                   - firewall_rules
                   - latest_restore_time
                   - primary
+                  - maintenance_window_start_at
     PostgresDatabases:
       description: A list of Postgres Databases
       content:

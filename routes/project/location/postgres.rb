@@ -241,6 +241,22 @@ class Clover
         end
       end
 
+      r.post "set-maintenance-window" do
+        authorize("Postgres:edit", pg.id)
+
+        allowed_optional_parameters = ["maintenance_window_start_at"]
+        request_body_params = validate_request_params([], allowed_optional_parameters)
+
+        pg.update(maintenance_window_start_at: request_body_params["maintenance_window_start_at"])
+
+        if api?
+          Serializers::Postgres.serialize(pg, {detailed: true})
+        else
+          flash["notice"] = "Maintenance window is set"
+          r.redirect "#{@project.path}#{pg.path}"
+        end
+      end
+
       r.get "ca-certificates" do
         authorize("Postgres:view", pg.id)
 
