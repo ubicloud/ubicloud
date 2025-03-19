@@ -91,7 +91,7 @@ class UBID
   TYPE_POSTGRES_METRIC_DESTINATION = "md"
   TYPE_GITHUB_CACHE_ENTRY = "ge"
   TYPE_LOCATION_CREDENTIAL = "1c"
-
+  TYPE_PRIVATE_SUBNET_AWS_RESOURCE = "aw"
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
 

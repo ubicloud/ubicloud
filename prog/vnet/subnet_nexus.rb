@@ -37,7 +37,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       end
       firewall.associate_with_private_subnet(ps, apply_firewalls: false)
 
-      Strand.create(prog: "Vnet::SubnetNexus", label: "wait") { _1.id = ubid.to_uuid }
+      Strand.create(prog: "Vnet::SubnetNexus", label: "start") { _1.id = ubid.to_uuid }
     end
   end
 
@@ -48,6 +48,22 @@ class Prog::Vnet::SubnetNexus < Prog::Base
         hop_destroy
       end
     end
+  end
+
+  label def start
+    if private_subnet.location.provider == "aws"
+      PrivateSubnetAwsResource.create { _1.id = private_subnet.id } unless private_subnet.private_subnet_aws_resource
+      bud Prog::Aws::Vpc, {"subject_id" => private_subnet.id}, :create_vpc
+      hop_wait_vpc_created
+    else
+      hop_wait
+    end
+  end
+
+  label def wait_vpc_created
+    reap
+    hop_wait if leaf?
+    nap 2
   end
 
   label def wait
@@ -154,6 +170,12 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
     decr_destroy
     strand.children.each { _1.destroy }
+    if private_subnet.location.provider == "aws"
+      private_subnet.nics.map(&:incr_destroy)
+      private_subnet.firewalls.map(&:destroy)
+      bud Prog::Aws::Vpc, {"subject_id" => private_subnet.id}, :destroy
+      hop_wait_aws_vpc_destroyed
+    end
     private_subnet.firewalls.map { _1.disassociate_from_private_subnet(private_subnet, apply_firewalls: false) }
 
     private_subnet.connected_subnets.each do |subnet|
@@ -168,6 +190,16 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       private_subnet.load_balancers.map { |lb| lb.incr_destroy }
       nap 1
     end
+  end
+
+  label def wait_aws_vpc_destroyed
+    reap
+    if leaf?
+      private_subnet.private_subnet_aws_resource.destroy
+      private_subnet.destroy
+      pop "vpc destroyed"
+    end
+    nap 10
   end
 
   def self.random_private_ipv6(location, project)
