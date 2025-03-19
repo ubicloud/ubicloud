@@ -10,6 +10,7 @@ class PrivateSubnet < Sequel::Model
   many_to_many :firewalls
   one_to_many :load_balancers
   many_to_one :location
+  one_to_one :private_subnet_aws_resource, key: :id
 
   PRIVATE_SUBNET_RANGES = [
     "10.0.0.0/8",

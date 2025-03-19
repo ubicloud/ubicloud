@@ -68,6 +68,8 @@ module Prog; end
 
 module Prog::Ai; end
 
+module Prog::Aws; end
+
 module Prog::DnsZone; end
 
 module Prog::Github; end
