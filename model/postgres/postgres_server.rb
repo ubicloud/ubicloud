@@ -200,7 +200,7 @@ class PostgresServer < Sequel::Model
   end
 
   def health_monitor_socket_path
-    @health_monitor_socket_path ||= File.join(Dir.pwd, "var", "health_monitor_sockets", "pg_#{vm.ephemeral_net6.nth(2)}")
+    @health_monitor_socket_path ||= File.join(Dir.pwd, "var", "health_monitor_sockets", "pg_#{vm.ip6}")
   end
 
   def lsn2int(lsn)

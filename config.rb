@@ -165,6 +165,9 @@ module Config
   override :ai_ubuntu_2404_nvidia_version, "20250319.1.0", string
   override :kubernetes_v1_32_version, "20250320.1.0", string
 
+  override :aws_based_postgres_16_ubuntu_2204_ami_version, "ami-030c060f85668b37d", string
+  override :aws_based_postgres_17_ubuntu_2204_ami_version, "ami-095e7210597188ca5", string
+
   # Allocator
   override :allocator_target_host_utilization, 0.55, float
   override :allocator_max_random_score, 0.1, float
