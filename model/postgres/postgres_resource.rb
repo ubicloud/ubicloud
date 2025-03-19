@@ -139,6 +139,8 @@ class PostgresResource < Sequel::Model
 
   DEFAULT_VERSION = "17"
 
+  MAINTENANCE_DURATION_IN_HOURS = 2
+
   def self.redacted_columns
     super + [:root_cert_1, :root_cert_2, :server_cert]
   end

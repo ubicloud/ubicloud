@@ -537,6 +537,17 @@ RSpec.describe Clover, "postgres" do
       end
     end
 
+    describe "set-maintenance-window" do
+      it "sets maintenance window to nil when empty string is passed" do
+        pg.update(maintenance_window_start_at: 9)
+        visit "#{project.path}#{pg.path}"
+
+        select "No Maintenance Window", from: "maintenance_window_start_at"
+        click_button "Set"
+        expect(pg.reload.maintenance_window_start_at).to be_nil
+      end
+    end
+
     describe "delete" do
       it "can delete PostgreSQL database" do
         visit "#{project.path}#{pg.path}"
