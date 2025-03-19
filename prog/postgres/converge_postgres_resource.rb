@@ -28,6 +28,11 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   label def recycle_representative_server
     if postgres_resource.representative_server
       hop_prune_servers unless postgres_resource.representative_server.needs_recycling?
+
+      current_hour = Time.now.utc.hour
+      maintenance_window_start_at = postgres_resource.maintenance_window_start_at
+      nap 10 * 60 if maintenance_window_start_at && (current_hour - maintenance_window_start_at) % 24 >= PostgresResource::MAINTENANCE_DURATION_IN_HOURS
+
       postgres_resource.representative_server.trigger_failover
     end
 

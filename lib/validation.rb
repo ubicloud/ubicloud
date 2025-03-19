@@ -99,6 +99,17 @@ module Validation
     end
   end
 
+  def self.validate_postgres_maintenance_window_start_at(maintenance_window_start_at)
+    return nil if maintenance_window_start_at.nil?
+
+    parsed_maintenance_window_start_at = maintenance_window_start_at.to_i
+    if parsed_maintenance_window_start_at.to_s != maintenance_window_start_at.to_s || parsed_maintenance_window_start_at < 0 || parsed_maintenance_window_start_at > 23
+      fail ValidationFailed.new({maintenance_window_start_at: "Maintenance window start time must be null or an integer between 0 and 23."})
+    end
+
+    parsed_maintenance_window_start_at
+  end
+
   def self.validate_load_balancer_stack(stack)
     unless [LoadBalancer::Stack::IPV4, LoadBalancer::Stack::IPV6, LoadBalancer::Stack::DUAL].include?(stack)
       fail ValidationFailed.new({stack: "\"#{stack}\" is not a valid load balancer stack option. Available options: #{LoadBalancer::Stack::IPV4}, #{LoadBalancer::Stack::IPV6}, #{LoadBalancer::Stack::DUAL}"})
