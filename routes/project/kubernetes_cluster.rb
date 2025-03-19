@@ -10,7 +10,7 @@ class Clover
       end
 
       r.post true do
-        @location = LocationNameConverter.to_internal_name(r.params["location"])
+        check_visible_location
         kubernetes_cluster_post(r.params["name"])
       end
 

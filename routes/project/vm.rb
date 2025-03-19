@@ -15,7 +15,7 @@ class Clover
 
     r.web do
       r.post true do
-        @location = LocationNameConverter.to_internal_name(r.params["location"])
+        check_visible_location
         vm_post(r.params["name"])
       end
 

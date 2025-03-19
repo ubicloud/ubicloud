@@ -8,7 +8,7 @@ class Clover
 
     r.web do
       r.post true do
-        @location = LocationNameConverter.to_internal_name(r.params["location"])
+        check_visible_location
         private_subnet_post(r.params["name"])
       end
 

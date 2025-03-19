@@ -24,7 +24,7 @@ class Clover
       end
 
       r.post true do
-        @location = LocationNameConverter.to_internal_name(r.params["location"])
+        check_visible_location
         firewall_post(r.params["name"])
       end
     end
