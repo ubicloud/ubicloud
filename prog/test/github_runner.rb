@@ -106,15 +106,29 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   label def clean_resources
     cancel_test_runs
 
-    nap 15 if GithubRunner.any?
-
-    pool = VmPool[frame["vm_pool_id"]]
-    unless pool.vms.count.zero?
-      update_stack({"fail_message" => "The runner did not picked from the pool"})
+    if GithubRunner.any?
+      Clog.emit("Waiting runners to finish their jobs")
+      nap 15
     end
 
-    GithubRepository.each { _1.destroy }
-    pool.incr_destroy
+    if (pool = VmPool[frame["vm_pool_id"]])
+      unless pool.vms.count.zero?
+        update_stack({"fail_message" => "The runner did not picked from the pool"})
+      end
+      pool.incr_destroy
+    end
+    GithubRepository.each(&:incr_destroy)
+
+    if VmPool.any?
+      Clog.emit("Waiting vm pools to be destroyed")
+      nap 15
+    end
+
+    if GithubRepository.any?
+      Clog.emit("Waiting repositories to be destroyed")
+      nap 15
+    end
+
     Project[frame["github_service_project_id"]]&.destroy
     Project[frame["vm_pool_service_project"]]&.destroy
     Project[frame["github_test_project_id"]]&.destroy

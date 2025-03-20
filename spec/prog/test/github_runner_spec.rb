@@ -92,11 +92,29 @@ RSpec.describe Prog::Test::GithubRunner do
   end
 
   describe "#clean_resources" do
-    it "not clean with github exists" do
+    it "waits runners to finish their jobs" do
       expect(client).to receive(:workflow_runs).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{id: 10}]})
       expect(client).to receive(:cancel_workflow_run).with("ubicloud/github-e2e-test-workflows", 10)
-      expect(GithubRunner).to receive(:any?).and_return(true)
+      GithubRunner.create(repository_name: "test-repo", label: "ubicloud")
       expect { gr_test.clean_resources }.to nap(15)
+    end
+
+    it "waits vm pools to be destroyed" do
+      expect(client).to receive(:workflow_runs).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{id: 10}]})
+      expect(client).to receive(:cancel_workflow_run).with("ubicloud/github-e2e-test-workflows", 10)
+      pool = Prog::Vm::VmPool.assemble(size: 1, vm_size: "standard-2", location: "hetzner-fsn1", boot_image: "github-ubuntu-2204", storage_size_gib: 86, storage_encrypted: true,
+        storage_skip_sync: false, arch: "x64").subject
+      expect(VmPool).to receive(:[]).and_return(pool)
+      expect { gr_test.clean_resources }.to nap(15)
+    end
+
+    it "waits repositories to be destroyed" do
+      expect(client).to receive(:workflow_runs).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{id: 10}]})
+      expect(client).to receive(:cancel_workflow_run).with("ubicloud/github-e2e-test-workflows", 10)
+      installation = GithubInstallation.create(installation_id: 123, name: "test-user", type: "User")
+      repo = Prog::Github::GithubRepositoryNexus.assemble(installation, "ubicloud/ubicloud", "master").subject
+      expect { gr_test.clean_resources }.to nap(15)
+      expect(repo.destroy_set?).to be(true)
     end
 
     it "cleans resources and hop finish" do
