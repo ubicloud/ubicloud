@@ -284,6 +284,7 @@ end
 #  vm_pkey                          | PRIMARY KEY btree (id)
 #  vm_ephemeral_net6_key            | UNIQUE btree (ephemeral_net6)
 #  vm_project_id_location_name_uidx | UNIQUE btree (project_id, location, name)
+#  vm_pool_id_index                 | btree (pool_id)
 # Foreign key constraints:
 #  vm_pool_id_fkey          | (pool_id) REFERENCES vm_pool(id)
 #  vm_project_id_fkey       | (project_id) REFERENCES project(id)
