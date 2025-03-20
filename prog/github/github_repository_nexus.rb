@@ -48,7 +48,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     end
 
     queued_labels = Hash.new(0)
-    queued_runs.each do |run|
+    queued_runs.first(200).each do |run|
       jobs = client.workflow_run_attempt_jobs(github_repository.name, run[:id], run[:run_attempt])[:jobs]
 
       jobs.each do |job|
