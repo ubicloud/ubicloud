@@ -91,6 +91,16 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content("31/32 (96%)")
       end
 
+      it "shows 404 page if attempting to create a VM with an invalid location" do
+        visit "#{project.path}/vm/create"
+        fill_in "Name", with: "dummy-vm"
+        choose "Germany"
+
+        Location.where(display_name: "eu-central-h1").destroy
+        click_button "Create"
+        expect(page.status_code).to eq 404
+      end
+
       it "shows vm create page with burstable and location_latitude_fra" do
         project.set_ff_location_latitude_fra true
         visit "#{project.path}/vm/create"

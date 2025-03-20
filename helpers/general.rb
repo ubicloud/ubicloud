@@ -106,12 +106,29 @@ class Clover < Roda
     @current_account = Account[rodauth.session_value]
   end
 
-  def check_visible_location(location = request.params["location"])
-    request.halt unless (@location = Location.find(id: location, visible: true))
+  def check_visible_location
+    # If location previously retrieved in project/location route, check that it is visible
+    # This is called when creating resources in the api routes.
+    #
+    # If location not previously retrieved, require it be visible when retrieving it.
+    # This is called when creating resources in the web routes.
+    @location ||= Location.first(id: request.params["location"], visible: true)
+    handle_invalid_location unless @location&.visible
   end
 
-  def check_visible_location_name(location_name = request.params["location"])
-    request.halt unless (@location = Location.find(display_name: location_name, visible: true))
+  def handle_invalid_location
+    if api?
+      valid_locations = Location.where(visible: true).select_order_map(:display_name)
+      response.write({error: {
+        code: 404,
+        type: "InvalidLocation",
+        message: "Validation failed for following path components: location",
+        details: {location: "Given location is not a valid location. Available locations: #{valid_locations.join(", ")}"}
+      }}.to_json)
+    end
+
+    response.status = 404
+    request.halt
   end
 
   def validate_request_params(required_keys, allowed_optional_keys = [], ignored_keys = [])

@@ -136,7 +136,7 @@ RSpec.describe Clover, "postgres" do
           ha_type: "sync"
         }.to_json
 
-        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+        expect(last_response).to have_api_error(404, "Validation failed for following path components: location")
       end
 
       it "invalid name" do
