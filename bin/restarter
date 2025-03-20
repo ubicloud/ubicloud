@@ -1,0 +1,43 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+minimum_time_alive = Integer(ENV.fetch("RESTART_MINIMUM_TIME_ALIVE", "3600"), 10)
+require "json"
+
+command = ARGV.dup.freeze
+start_time = Time.now
+
+iso_start = start_time.utc.strftime("%Y-%m-%dT%H:%M:%S%:z").freeze
+puts JSON.generate(restarter: {
+  start_time: iso_start,
+  startup: {
+    command:,
+    minimum_time_alive:
+  }
+})
+
+loop do
+  system(*command)
+  status = $?
+
+  puts JSON.generate(restarter: {
+    start_time: iso_start,
+    command_exit: {
+      command:,
+      exitstatus: status.exitstatus,
+      pid: status.pid,
+      success: status.success?
+    }
+  })
+
+  sleep(rand(1..10))
+
+  if Time.now - start_time > minimum_time_alive
+    puts JSON.generate(restarter: {start_time: iso_start,
+                                   shutdown: {
+                                     command:,
+                                     minimum_time_alive:
+                                   }})
+    exit
+  end
+end
