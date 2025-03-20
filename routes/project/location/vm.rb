@@ -9,6 +9,7 @@ class Clover
     r.on VM_NAME_OR_UBID do |vm_name, vm_ubid|
       if vm_name
         r.post api? do
+          check_visible_location
           vm_post(vm_name)
         end
 

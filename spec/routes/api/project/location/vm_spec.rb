@@ -249,10 +249,21 @@ RSpec.describe Clover, "vm" do
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
       end
 
-      it "not exist ubid in location" do
+      it "returns appropriate error message for accessing invalid location" do
         delete "/project/#{project.ubid}/location/foo_location/vm/#{vm.ubid}"
 
         expect(last_response.status).to eq(404)
+        expect(JSON.parse(last_response.body)).to eq("error" => {"code" => 404, "details" => {"location" => "Given location is not a valid location. Available locations: eu-central-h1, eu-north-h1, us-east-a2"}, "message" => "Validation failed for following path components: location", "type" => "InvalidLocation"})
+        expect(SemSnap.new(vm.id).set?("destroy")).to be false
+      end
+
+      it "returns appropriate error message for trying to create in internal location" do
+        post "/project/#{project.ubid}/location/github-runners/vm/test-vm", {
+          public_key: "ssh key"
+        }.to_json
+
+        expect(last_response.status).to eq(404)
+        expect(JSON.parse(last_response.body)).to eq("error" => {"code" => 404, "details" => {"location" => "Given location is not a valid location. Available locations: eu-central-h1, eu-north-h1, us-east-a2"}, "message" => "Validation failed for following path components: location", "type" => "InvalidLocation"})
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
       end
     end
