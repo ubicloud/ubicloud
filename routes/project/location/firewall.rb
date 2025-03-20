@@ -9,6 +9,7 @@ class Clover
     r.on FIREWALL_NAME_OR_UBID do |firewall_name, firewall_id|
       if firewall_name
         r.post api? do
+          check_visible_location
           firewall_post(firewall_name)
         end
 

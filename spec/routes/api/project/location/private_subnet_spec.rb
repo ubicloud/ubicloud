@@ -130,7 +130,7 @@ RSpec.describe Clover, "private_subnet" do
       it "location not exist" do
         post "/project/#{project.ubid}/location/not-exist-location/private-subnet/test-ps", {}.to_json
 
-        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+        expect(last_response).to have_api_error(404, "Validation failed for following path components: location")
       end
     end
 
