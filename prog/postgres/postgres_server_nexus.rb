@@ -230,8 +230,6 @@ CONFIG
   end
 
   label def configure
-    decr_configure
-
     case vm.sshable.cmd("common/bin/daemonizer --check configure_postgres")
     when "Succeeded"
       vm.sshable.cmd("common/bin/daemonizer --clean configure_postgres")
@@ -370,6 +368,7 @@ SQL
     end
 
     when_configure_set? do
+      decr_configure
       hop_configure
     end
 
