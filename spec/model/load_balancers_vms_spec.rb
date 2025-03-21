@@ -50,8 +50,8 @@ RSpec.describe LoadBalancersVms do
         expect(lb_vm.health_check_cmd(:ipv6)).to eq("sudo ip netns exec #{vm.inhost_name} curl --insecure --resolve #{lb.hostname}:80:[2a01:4f8:10a:128b:814c::2] --max-time 15 --silent --output /dev/null --write-out '%{http_code}' http://#{lb.hostname}:80/up")
 
         lb.update(health_check_protocol: "tcp")
-        expect(lb_vm.health_check_cmd(:ipv4)).to eq("sudo ip netns exec #{vm.inhost_name} nc -z -w 15 192.168.1.1 80 && echo 200 || echo 400")
-        expect(lb_vm.health_check_cmd(:ipv6)).to eq("sudo ip netns exec #{vm.inhost_name} nc -z -w 15 2a01:4f8:10a:128b:814c::2 80 && echo 200 || echo 400")
+        expect(lb_vm.health_check_cmd(:ipv4)).to eq("sudo ip netns exec #{vm.inhost_name} nc -z -w 15 192.168.1.1 80 >/dev/null 2>&1 && echo 200 || echo 400")
+        expect(lb_vm.health_check_cmd(:ipv6)).to eq("sudo ip netns exec #{vm.inhost_name} nc -z -w 15 2a01:4f8:10a:128b:814c::2 80 >/dev/null 2>&1 && echo 200 || echo 400")
 
         lb.update(health_check_protocol: "https")
         expect(lb_vm.health_check_cmd(:ipv4)).to eq("sudo ip netns exec #{vm.inhost_name} curl --insecure --resolve #{lb.hostname}:80:192.168.1.1 --max-time 15 --silent --output /dev/null --write-out '%{http_code}' https://#{lb.hostname}:80/up")

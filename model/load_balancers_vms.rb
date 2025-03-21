@@ -40,7 +40,7 @@ class LoadBalancersVms < Sequel::Model
   def health_check_cmd(type)
     address = (type == :ipv4) ? vm.private_ipv4 : vm.ephemeral_net6.nth(2)
     if load_balancer.health_check_protocol == "tcp"
-      "sudo ip netns exec #{vm.inhost_name} nc -z -w #{load_balancer.health_check_timeout} #{address} #{load_balancer.dst_port} && echo 200 || echo 400"
+      "sudo ip netns exec #{vm.inhost_name} nc -z -w #{load_balancer.health_check_timeout} #{address} #{load_balancer.dst_port} >/dev/null 2>&1 && echo 200 || echo 400"
     else
       "sudo ip netns exec #{vm.inhost_name} curl --insecure --resolve #{load_balancer.hostname}:#{load_balancer.dst_port}:#{(address.version == 6) ? "[#{address}]" : address} --max-time #{load_balancer.health_check_timeout} --silent --output /dev/null --write-out '%{http_code}' #{load_balancer.health_check_protocol}://#{load_balancer.hostname}:#{load_balancer.dst_port}#{load_balancer.health_check_endpoint}"
     end
