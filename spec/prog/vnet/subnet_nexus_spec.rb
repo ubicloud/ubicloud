@@ -147,7 +147,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     it "increments refresh_keys if it passed more than a day" do
       expect(ps).to receive(:last_rekey_at).and_return(Time.now - 60 * 60 * 24 - 1)
       expect(ps).to receive(:incr_refresh_keys).and_return(true)
-      expect { nx.wait }.to nap(30)
+      expect { nx.wait }.to nap(10 * 60)
     end
 
     it "triggers update_firewall_rules if when_update_firewall_rules_set?" do
@@ -155,11 +155,11 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(ps).to receive(:vms).and_return([instance_double(Vm, id: "vm1")]).at_least(:once)
       expect(ps.vms.first).to receive(:incr_update_firewall_rules).and_return(true)
       expect(nx).to receive(:decr_update_firewall_rules).and_return(true)
-      expect { nx.wait }.to nap(30)
+      expect { nx.wait }.to nap(10 * 60)
     end
 
     it "naps if nothing to do" do
-      expect { nx.wait }.to nap(30)
+      expect { nx.wait }.to nap(10 * 60)
     end
   end
 
