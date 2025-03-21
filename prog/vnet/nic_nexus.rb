@@ -52,7 +52,7 @@ class Prog::Vnet::NicNexus < Prog::Base
       hop_start_rekey
     end
 
-    nap 30
+    nap 6 * 60 * 60
   end
 
   label def start_rekey

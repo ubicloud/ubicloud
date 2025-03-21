@@ -91,7 +91,7 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
 
   describe "#wait" do
     it "naps" do
-      expect { nx.wait }.to nap(30)
+      expect { nx.wait }.to nap(6 * 60 * 60)
     end
   end
 

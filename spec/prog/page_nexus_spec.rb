@@ -27,7 +27,7 @@ RSpec.describe Prog::PageNexus do
     end
 
     it "naps" do
-      expect { pn.wait }.to nap(30)
+      expect { pn.wait }.to nap(6 * 60 * 60)
     end
   end
 end
