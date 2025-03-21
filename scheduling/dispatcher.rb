@@ -40,6 +40,7 @@ class Scheduling::Dispatcher
       if ready.nil?
         # Timed out, dump threads and exit
         ThreadPrinter.run
+        strand.this.update(try: Sequel[:try] + 2)
         Kernel.exit!
 
         # rubocop:disable Lint/UnreachableCode
