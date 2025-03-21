@@ -294,7 +294,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
   describe "#wait" do
     it "naps" do
-      expect { nx.wait }.to nap(30)
+      expect { nx.wait }.to nap(6 * 60 * 60)
     end
 
     it "hops to prep_graceful_reboot when needed" do
@@ -319,7 +319,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
       expect(nx).to receive(:when_checkup_set?).and_yield
       expect(nx).to receive(:available?).and_return(true)
-      expect { nx.wait }.to nap(30)
+      expect { nx.wait }.to nap(6 * 60 * 60)
     end
   end
 

@@ -68,7 +68,7 @@ class Prog::Minio::MinioPoolNexus < Prog::Base
   end
 
   label def wait
-    nap 30
+    nap 6 * 60 * 60
   end
 
   label def destroy

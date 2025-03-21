@@ -203,8 +203,8 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   end
 
   describe "#wait" do
-    it "naps forever for now" do
-      expect { nx.wait }.to nap(65536)
+    it "naps for 6 hours" do
+      expect { nx.wait }.to nap(6 * 60 * 60)
     end
   end
 

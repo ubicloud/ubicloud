@@ -93,7 +93,7 @@ RSpec.describe Prog::Vnet::NicNexus do
 
   describe "#wait" do
     it "naps if nothing to do" do
-      expect { nx.wait }.to nap(30)
+      expect { nx.wait }.to nap(6 * 60 * 60)
     end
 
     it "hops to start rekey if needed" do
@@ -105,7 +105,7 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect(nx).to receive(:when_repopulate_set?).and_yield
       ps = instance_double(PrivateSubnet, incr_refresh_keys: true)
       expect(nx).to receive(:nic).and_return(instance_double(Nic, private_subnet: ps))
-      expect { nx.wait }.to nap(30)
+      expect { nx.wait }.to nap(6 * 60 * 60)
     end
   end
 

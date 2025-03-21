@@ -517,7 +517,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#wait" do
     it "naps" do
-      expect { nx.wait }.to nap(30)
+      expect { nx.wait }.to nap(6 * 60 * 60)
     end
 
     it "hops to prepare_for_take_over if take_over is set" do
@@ -544,7 +544,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "naps if checkup is set but the server is available" do
       expect(nx).to receive(:when_checkup_set?).and_yield
       expect(nx).to receive(:available?).and_return(true)
-      expect { nx.wait }.to nap(30)
+      expect { nx.wait }.to nap(6 * 60 * 60)
     end
 
     it "hops to configure_prometheus if configure_prometheus is set" do

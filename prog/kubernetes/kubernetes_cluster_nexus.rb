@@ -120,7 +120,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   end
 
   label def wait
-    nap 65536
+    nap 6 * 60 * 60
   end
 
   label def destroy
