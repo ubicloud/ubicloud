@@ -296,6 +296,30 @@ RSpec.describe Prog::Base do
       )
     end
 
+    it "does not trigger deadline while the vm host is unavailable" do
+      vm = create_vm(vm_host: create_vm_host(data_center: "FSN1-DC1"))
+      st = Strand.create(prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}]) { _1.id = vm.id }
+      vmh_st = Strand.create(prog: "Test", label: "unavailable") { _1.id = vm.vm_host_id }
+      expect {
+        st.unsynchronized_run
+      }.not_to change { Page.active.count }.from(0)
+
+      vmh_st.update(label: "available")
+      expect {
+        st.unsynchronized_run
+      }.to change { Page.active.count }.from(0).to(1)
+    end
+
+    it "triggers deadline while the vm host is unavailable if the current label is unavailable" do
+      vm = create_vm(vm_host: create_vm_host(data_center: "FSN1-DC1"))
+      st = Strand.create(prog: "Test", label: "unavailable", stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}]) { _1.id = vm.id }
+      Strand.create(prog: "Test", label: "unavailable") { _1.id = vm.vm_host_id }
+
+      expect {
+        st.unsynchronized_run
+      }.to change { Page.active.count }.from(0).to(1)
+    end
+
     it "can create a page with extra data from a vm" do
       vm = create_vm
       st = Strand.create(prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}]) { _1.id = vm.id }
