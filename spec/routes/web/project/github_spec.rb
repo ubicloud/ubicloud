@@ -158,7 +158,7 @@ RSpec.describe Clover, "github" do
       expect(page.status_code).to eq(200)
       expect(page).to have_content runner.ubid
 
-      btn = find "#runner-#{runner.id} .delete-btn"
+      btn = find "#runner-#{runner.ubid} .delete-btn"
       page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
       expect(page.status_code).to eq(204)
 
