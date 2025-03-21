@@ -10,19 +10,19 @@
     headers: ["Runner", "Repository", "Label", "State", "Branch", "Workflow Job", ""],
     rows:
       @runners.map do |runner|
-        destroy_url = "#{@project_data[:path]}/github/#{@installation.ubid}/runner/#{runner[:ubid]}"
+        destroy_url = "#{@project_data[:path]}/github/#{@installation.ubid}/runner/#{runner.ubid}"
         [
           [
-            [runner[:ubid], { link: runner[:runner_url] }],
-            runner[:repository_name],
-            runner[:label],
-            ["vm_state_label", { component: { state: runner[:state] } }],
-            runner.dig(:workflow_job, :head_branch),
-            if (workflow_job = runner[:workflow_job])
+            [runner.ubid, { link: runner.runner_url }],
+            runner.repository_name,
+            runner.label,
+            ["vm_state_label", { component: { state: runner.display_state } }],
+            runner.workflow_job&.[]("head_branch"),
+            if (workflow_job = runner.workflow_job)
               [<<~CONTENT, {escape: false}]
-                <a href="#{workflow_job[:run_url]}" class="text-orange-600 hover:text-orange-700" target="_blank">#{workflow_job[:workflow_name]}</a>
+                <a href="#{runner.run_url}" class="text-orange-600 hover:text-orange-700" target="_blank">#{workflow_job["workflow_name"]}</a>
                 -
-                <a href="#{workflow_job[:job_url]}" class="text-orange-600 hover:text-orange-700" target="_blank">#{workflow_job[:job_name]}</a>
+                <a href="#{runner.job_url}" class="text-orange-600 hover:text-orange-700" target="_blank">#{workflow_job["name"]}</a>
               CONTENT
             else
               "Runner doesn't have a job yet"
@@ -48,7 +48,7 @@
               }
             ]
           ],
-          { id: "runner-#{runner[:id]}" }
+          { id: "runner-#{runner.ubid}" }
         ]
       end,
     empty_state: <<~EMPTY

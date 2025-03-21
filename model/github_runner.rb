@@ -14,16 +14,20 @@ class GithubRunner < Sequel::Model
   include HealthMonitorMethods
   semaphore :destroy, :skip_deregistration
 
+  def repository_url
+    "http://github.com/#{repository_name}"
+  end
+
   def run_url
-    "http://github.com/#{repository_name}/actions/runs/#{workflow_job["run_id"]}"
+    "#{repository_url}/actions/runs/#{workflow_job["run_id"]}"
   end
 
   def job_url
-    "http://github.com/#{repository_name}/actions/runs/#{workflow_job["run_id"]}/job/#{workflow_job["id"]}"
+    "#{run_url}/job/#{workflow_job["id"]}"
   end
 
   def runner_url
-    "http://github.com/#{repository_name}/settings/actions/runners/#{runner_id}" if runner_id
+    "#{repository_url}/settings/actions/runners/#{runner_id}" if runner_id
   end
 
   def display_state
