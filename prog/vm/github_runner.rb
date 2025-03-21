@@ -269,7 +269,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     data = {name: github_runner.ubid.to_s, labels: [github_runner.label], runner_group_id: 1, work_folder: "/home/runner/work"}
     response = github_client.post("/repos/#{github_runner.repository_name}/actions/runners/generate-jitconfig", data)
     github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
-    github_runner.log_duration("runner_registered", Time.now - github_runner.created_at)
+    github_runner.log_duration("runner_registered", github_runner.ready_at - github_runner.allocated_at)
 
     # We initiate an API call and a SSH connection under the same label to avoid
     # having to store the encoded_jit_config.
