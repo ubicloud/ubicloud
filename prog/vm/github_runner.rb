@@ -150,20 +150,20 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def wait_concurrency_limit
-    hop_allocate_vm if quota_available?
+    unless quota_available?
+      # check utilization, if it's high, wait for it to go down
+      utilization = VmHost.where(allocation_state: "accepting", arch: label_data["arch"]).select_map {
+        sum(:used_cores) * 100.0 / sum(:total_cores)
+      }.first.to_f
 
-    # check utilization, if it's high, wait for it to go down
-    utilization = VmHost.where(allocation_state: "accepting", arch: label_data["arch"]).select_map {
-      sum(:used_cores) * 100.0 / sum(:total_cores)
-    }.first.to_f
+      unless utilization < 70
+        Clog.emit("Waiting for customer concurrency limit, utilization is high") { [github_runner, {utilization: utilization}] }
+        nap rand(5..15)
+      end
 
-    unless utilization < 70
-      Clog.emit("Waiting for customer concurrency limit, utilization is high") { [github_runner, {utilization: utilization}] }
-      nap rand(5..15)
+      Clog.emit("Concurrency limit reached but allocation is allowed because of low utilization") { [github_runner, {utilization: utilization}] }
     end
-
-    Clog.emit("Concurrency limit reached but allocation is allowed because of low utilization") { [github_runner, {utilization: utilization}] }
-
+    github_runner.log_duration("runner_capacity_waited", Time.now - github_runner.created_at)
     hop_allocate_vm
   end
 
