@@ -293,20 +293,43 @@ task "ubi" do
   sh("cd cli && go build -ldflags '-X main.version=#{cli_version.call}' -tags osusergo,netgo")
 end
 
-desc "Cross compile cli/ubi binaries for common platforms"
-task "ubi-cross" do
+desc "Build release files for cli/ubi"
+task "ubi-release" do
   version = cli_version.call
 
   Dir.chdir("cli") do
+    File.delete("ubi") if File.file?("ubi")
+
     os_list = %w[linux windows darwin]
     arch_list = %w[amd64 arm64 386]
     os_list.each do |os|
       arch_list.each do |arch|
         next if os == "darwin" && arch == "386"
         next if os == "windows" && arch == "386" # Windows Defender falsely flags as Trojan:Win32/Bearfoos.A!ml
-        sh("env GOOS=#{os} GOARCH=#{arch} go build -ldflags '-s -w -X main.version=#{version}' -o ubi-#{os}-#{arch}-#{version}#{".exe" if os == "windows"} -tags osusergo,netgo")
+
+        filename = "ubi-#{os}-#{arch}-#{version}"
+        exe_filename = "ubi#{".exe" if os == "windows"}"
+
+        sh("env GOOS=#{os} GOARCH=#{arch} go build -ldflags '-s -w -X main.version=#{version}' -o #{exe_filename} -tags osusergo,netgo")
+
+        if os == "windows"
+          sh("zip", "#{filename}.zip", "ubi.exe")
+        else
+          sh("tar", "zcf", "#{filename}.tar.gz", "ubi")
+        end
+        File.delete(exe_filename)
       end
     end
+
+    tarball_dir = "ubi-#{version}"
+    Dir.mkdir(tarball_dir)
+    sh "cp", "version.txt", "ubi.go", "go.mod", tarball_dir
+    File.write(File.join(tarball_dir, "Makefile"), "all:\n\tgo build -ldflags '-X main.version=#{version}' -tags osusergo,netgo")
+    sh "tar", "zcf", "#{tarball_dir}.tar.gz", tarball_dir
+    Dir.chdir(tarball_dir) do
+      sh "rm", "version.txt", "ubi.go", "go.mod", "Makefile"
+    end
+    Dir.rmdir(tarball_dir)
   end
 end
 
