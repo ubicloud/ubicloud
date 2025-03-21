@@ -10,6 +10,10 @@ class Prog::Vnet::UpdateFirewallRules < Prog::Base
   end
 
   label def update_firewall_rules
+    if vm.location.provider == "aws"
+      hop_update_aws_firewall_rules
+    end
+
     rules = vm.firewalls.map(&:firewall_rules).flatten
     allowed_ingress_ip4_port_set, allowed_ingress_ip4_lb_dest_set = consolidate_rules(rules.select { !_1.ip6? && _1.port_range })
     allowed_ingress_ip6_port_set, allowed_ingress_ip6_lb_dest_set = consolidate_rules(rules.select { _1.ip6? && _1.port_range })
@@ -166,6 +170,99 @@ table inet fw_table {
 TEMPLATE
 
     pop "firewall rule is added"
+  end
+
+  label def update_aws_firewall_rules
+    rules = vm.firewalls.map(&:firewall_rules).flatten
+    ip4_rules = rules.select { !_1.ip6? && _1.port_range }
+    ip6_rules = rules.select { _1.ip6? && _1.port_range }
+    ip_4_permissions = ip4_rules.map do |rule|
+      {
+        ip_protocol: "tcp",
+        from_port: rule.port_range.begin,
+        to_port: rule.port_range.end - 1,
+        ip_ranges: [{cidr_ip: rule.cidr.to_s}]
+      }
+    end
+    ip_6_permissions = ip6_rules.map do |rule|
+      {
+        ip_protocol: "tcp",
+        from_port: rule.port_range.begin,
+        to_port: rule.port_range.end - 1,
+        ipv_6_ranges: [{cidr_ipv_6: rule.cidr.to_s}]
+      }
+    end
+
+    unless (permissions = (ip_4_permissions + ip_6_permissions).flatten).empty?
+      begin
+        aws_client.authorize_security_group_ingress({
+          group_id: vm.private_subnets.first.private_subnet_aws_resource.security_group_id,
+          ip_permissions: permissions
+        })
+      rescue Aws::EC2::Errors::InvalidPermissionDuplicate
+      end
+    end
+
+    hop_remove_aws_old_rules
+  end
+
+  label def remove_aws_old_rules
+    rules = vm.firewalls.map(&:firewall_rules).flatten
+    ip4_rules = rules.select { !_1.ip6? && _1.port_range }
+    ip6_rules = rules.select { _1.ip6? && _1.port_range }
+
+    # Fetch existing security group rules
+    security_group = aws_client.describe_security_groups({
+      group_ids: [vm.private_subnets.first.private_subnet_aws_resource.security_group_id]
+    }).security_groups.first
+
+    # Remove existing rules that aren't in our current rules list
+    security_group.ip_permissions.each do |permission|
+      next unless permission.ip_protocol == "tcp"  # Skip if not TCP for now
+      # Handle IPv4 rules
+      permission.ip_ranges.each do |ip_range|
+        unless ip4_rules.any? { |r|
+          r.cidr.to_s == ip_range.cidr_ip &&
+              r.port_range.begin == permission.from_port &&
+              r.port_range.end - 1 == permission.to_port
+        }
+          aws_client.revoke_security_group_ingress({
+            group_id: vm.private_subnets.first.private_subnet_aws_resource.security_group_id,
+            ip_permissions: [{
+              ip_protocol: "tcp",
+              from_port: permission.from_port,
+              to_port: permission.to_port,
+              ip_ranges: [{cidr_ip: ip_range.cidr_ip}]
+            }]
+          })
+        end
+      end
+
+      # Handle IPv6 rules
+      permission.ipv_6_ranges.each do |ip_range|
+        unless ip6_rules.any? { |r|
+          r.cidr.to_s == ip_range.cidr_ipv_6 &&
+              r.port_range.begin == permission.from_port &&
+              r.port_range.end - 1 == permission.to_port
+        }
+          aws_client.revoke_security_group_ingress({
+            group_id: vm.private_subnets.first.private_subnet_aws_resource.security_group_id,
+            ip_permissions: [{
+              ip_protocol: "tcp",
+              from_port: permission.from_port,
+              to_port: permission.to_port,
+              ipv_6_ranges: [{cidr_ipv_6: ip_range.cidr_ipv_6}]
+            }]
+          })
+        end
+      end
+    end
+
+    pop "firewall rule is added"
+  end
+
+  def aws_client
+    @aws_client ||= vm.location.location_credential.client
   end
 
   def generate_globally_blocked_lists

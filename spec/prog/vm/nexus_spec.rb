@@ -198,6 +198,12 @@ RSpec.describe Prog::Vm::Nexus do
       st = described_class.assemble("some_ssh_key", prj.id, size: "standard-2")
       expect(st.stack[0]["gpu_count"]).to eq(0)
     end
+
+    it "hops to start_aws if location is aws" do
+      loc = Location.create_with_id(name: "us-east-1", provider: "aws", project_id: prj.id, display_name: "us-east-1", ui_name: "us-east-1", visible: true)
+      st = described_class.assemble("some_ssh_key", prj.id, location_id: loc.id)
+      expect(st.label).to eq("start_aws")
+    end
   end
 
   describe ".assemble_with_sshable" do
@@ -214,6 +220,33 @@ RSpec.describe Prog::Vm::Nexus do
       expect(Sshable).to receive(:create).with({unix_user: "test_user", host: "temp_#{st_id}", raw_private_key_1: "pair"})
 
       described_class.assemble_with_sshable("test_user", prj.id, size: "new_size")
+    end
+  end
+
+  describe "#start_aws" do
+    it "naps if vm nics are not in wait state" do
+      expect(nx).to receive(:vm).and_return(instance_double(Vm, nics: [instance_double(Nic, strand: instance_double(Strand, label: "start"))]))
+      expect { nx.start_aws }.to nap(5)
+    end
+
+    it "hops to wait_aws_vm_started if vm nics are in wait state" do
+      expect(nx).to receive(:vm).and_return(instance_double(Vm, id: "vm_id", nics: [instance_double(Nic, strand: instance_double(Strand, label: "wait"))])).at_least(:once)
+      expect(nx).to receive(:bud).with(Prog::Aws::Vm, {"subject_id" => "vm_id"}, :start)
+      expect { nx.start_aws }.to hop("wait_aws_vm_started")
+    end
+  end
+
+  describe "#wait_aws_vm_started" do
+    it "reaps and naps if not leaf" do
+      expect(nx).to receive(:reap)
+      expect(nx).to receive(:leaf?).and_return(false)
+      expect { nx.wait_aws_vm_started }.to nap(10)
+    end
+
+    it "hops to wait_sshable if leaf" do
+      expect(nx).to receive(:reap)
+      expect(nx).to receive(:leaf?).and_return(true)
+      expect { nx.wait_aws_vm_started }.to hop("wait_sshable")
     end
   end
 
@@ -606,6 +639,17 @@ RSpec.describe Prog::Vm::Nexus do
       expect(BillingRecord).not_to receive(:create_with_id)
       expect { nx.create_billing_record }.to hop("wait")
     end
+
+    it "doesn't create billing records for storage volumes, ip4 and pci devices if the location provider is aws" do
+      loc = Location.create_with_id(name: "us-east-1", provider: "aws", project_id: prj.id, display_name: "aws-us-east-1", ui_name: "AWS US East 1", visible: true)
+      vm.location = loc
+      expect(vm).to receive(:project).and_return(prj).at_least(:once)
+      expect(vm).not_to receive(:ip4_enabled)
+      expect(vm).not_to receive(:pci_devices)
+      expect(vm).not_to receive(:storage_volumes)
+      expect(BillingRecord).to receive(:create_with_id).once
+      expect { nx.create_billing_record }.to hop("wait")
+    end
   end
 
   describe "#before_run" do
@@ -953,6 +997,32 @@ RSpec.describe Prog::Vm::Nexus do
       allow(vm).to receive(:vm_storage_volumes).and_return([])
 
       expect { nx.destroy_slice }.to exit({"msg" => "vm deleted"})
+    end
+
+    it "hops to wait_aws_vm_destroyed if vm is in aws" do
+      vm = instance_double(Vm, location: instance_double(Location, provider: "aws"), id: "vm_id")
+      expect(vm).to receive(:update).with(display_state: "deleting")
+      nics = [instance_double(Nic, strand: instance_double(Strand, label: "wait"))]
+      expect(nx).to receive(:vm).and_return(vm).at_least(:once)
+      expect(vm).to receive(:nics).and_return(nics)
+      expect(nx).to receive(:bud).with(Prog::Aws::Vm, {"subject_id" => "vm_id"}, :destroy)
+      expect(nics.first).to receive(:incr_destroy)
+      expect { nx.destroy }.to hop("wait_aws_vm_destroyed")
+    end
+  end
+
+  describe "#wait_aws_vm_destroyed" do
+    it "reaps and pops if leaf" do
+      expect(nx).to receive(:reap)
+      expect(nx).to receive(:leaf?).and_return(true)
+      expect(nx).to receive(:final_clean_up)
+      expect { nx.wait_aws_vm_destroyed }.to exit({"msg" => "vm deleted"})
+    end
+
+    it "naps if not leaf" do
+      expect(nx).to receive(:reap)
+      expect(nx).to receive(:leaf?).and_return(false)
+      expect { nx.wait_aws_vm_destroyed }.to nap(10)
     end
   end
 
