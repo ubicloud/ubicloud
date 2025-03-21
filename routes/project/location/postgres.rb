@@ -9,6 +9,7 @@ class Clover
     r.on POSTGRES_RESOURCE_NAME_OR_UBID do |pg_name, pg_ubid|
       if pg_name
         r.post api? do
+          check_visible_location
           postgres_post(pg_name)
         end
 
