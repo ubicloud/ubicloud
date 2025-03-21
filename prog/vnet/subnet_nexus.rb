@@ -70,7 +70,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       private_subnet.incr_refresh_keys
     end
 
-    nap 30
+    nap 10 * 60
   end
 
   def gen_encryption_key
