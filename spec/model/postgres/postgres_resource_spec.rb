@@ -65,13 +65,16 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.display_state).to eq("unavailable")
 
     expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "wait"))).at_least(:once)
-    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, children: [instance_double(Strand, prog: "Postgres::ConvergePostgresResource")]))
+    expect(postgres_resource.display_state).to eq("converging")
+
+    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait", children: [])).twice
     expect(postgres_resource.display_state).to eq("running")
 
-    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "destroy")).exactly(3).times
+    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "destroy", children: [])).exactly(3).times
     expect(postgres_resource.display_state).to eq("deleting")
 
-    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait_server"))
+    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait_server", children: [])).exactly(3).times
     expect(postgres_resource.display_state).to eq("creating")
   end
 
