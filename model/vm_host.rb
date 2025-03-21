@@ -221,7 +221,7 @@ class VmHost < Sequel::Model
   end
 
   # Introduced for downloading a new boot image via REPL.
-  def download_boot_image(image_name, version:, custom_url: nil)
+  def download_boot_image(image_name, version: nil, custom_url: nil)
     Strand.create_with_id(prog: "DownloadBootImage", label: "start", stack: [{subject_id: id, image_name: image_name, custom_url: custom_url, version: version}])
   end
 

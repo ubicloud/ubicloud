@@ -14,12 +14,22 @@ RSpec.describe Prog::DownloadBootImage do
   before do
     allow(dbi).to receive_messages(sshable: sshable, vm_host: vm_host)
     allow(dbi_without_version).to receive_messages(sshable: sshable, vm_host: vm_host)
+    allow(dbi_with_version_nil).to receive_messages(sshable: sshable, vm_host: vm_host)
   end
 
   describe "#start" do
     it "creates database record and hops" do
       expect { dbi.start }.to hop("download")
       expect(BootImage.where(vm_host_id: vm_host.id, name: "my-image", version: "20230303").count).to eq(1)
+    end
+
+    it "uses default version if the given version is nil" do
+      [dbi_without_version, dbi_with_version_nil].each do |prog|
+        ver = SecureRandom.hex(6)
+        expect(prog).to receive(:default_boot_image_version).with("my-image").and_return(ver)
+        expect { prog.start }.to hop("download")
+        expect(BootImage.where(vm_host_id: vm_host.id, name: "my-image", version: ver).count).to eq(1)
+      end
     end
 
     it "fails if image already exists" do
@@ -29,10 +39,6 @@ RSpec.describe Prog::DownloadBootImage do
 
     it "fails if image unknown" do
       expect { dbi_without_version.start }.to raise_error RuntimeError, "Unknown boot image: my-image"
-    end
-
-    it "fails if version is nil" do
-      expect { dbi_with_version_nil.start }.to raise_error RuntimeError, "Version can not be passed as nil"
     end
   end
 
@@ -188,22 +194,6 @@ RSpec.describe Prog::DownloadBootImage do
       expect { dbi.update_available_storage_space }.to hop("activate_boot_image")
       expect(sd.reload.available_storage_gib).to eq(32)
       expect(bi.reload.size_gib).to eq(3)
-    end
-
-    it "checks the correct path if version is nil" do
-      BootImage.create_with_id(vm_host_id: vm_host.id, name: "my-image", version: nil, size_gib: 0)
-      dbi = described_class.new(Strand.new(stack: [{"image_name" => "my-image", "custom_url" => "https://example.com/my-image.raw", "version" => nil}]))
-      allow(dbi).to receive_messages(sshable: sshable, vm_host: vm_host)
-      sd = StorageDevice.create_with_id(
-        vm_host_id: vm_host.id,
-        name: "DEFAULT",
-        total_storage_gib: 50,
-        available_storage_gib: 35,
-        enabled: true
-      )
-      expect(sshable).to receive(:cmd).with("stat -c %s /var/storage/images/my-image.raw").and_return("2361393152")
-      expect { dbi.update_available_storage_space }.to hop("activate_boot_image")
-      expect(sd.reload.available_storage_gib).to eq(32)
     end
   end
 
