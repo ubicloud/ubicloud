@@ -111,22 +111,26 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
 
     def create_cache_entry(**args)
       defaults = {key: "k#{Random.rand}", version: "v1", scope: "main", repository_id: github_repository.id, created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b", committed_at: Time.now}
-      GithubCacheEntry.create_with_id(**defaults.merge(args))
+      GithubCacheEntry.create(defaults.merge!(args))
     end
 
     it "deletes cache entries that not accessed in the last 7 days" do
-      create_cache_entry(last_accessed_at: Time.now - 6 * 24 * 60 * 60)
+      cache_entry = create_cache_entry(last_accessed_at: Time.now - 6 * 24 * 60 * 60)
       ten_days_old = create_cache_entry(last_accessed_at: Time.now - 10 * 24 * 60 * 60)
       expect(blob_storage_client).to receive(:delete_object).with(bucket: github_repository.bucket_name, key: ten_days_old.blob_key)
       nx.cleanup_cache
+      expect(cache_entry).to exist
+      expect(ten_days_old).not_to exist
     end
 
     it "deletes cache entries created 30 minutes ago but not committed yet" do
-      create_cache_entry(created_at: Time.now - 15 * 60, committed_at: nil)
+      cache_entry = create_cache_entry(created_at: Time.now - 15 * 60, committed_at: nil)
       thirty_five_minutes_old = create_cache_entry(created_at: Time.now - 35 * 60, committed_at: nil)
       expect(blob_storage_client).to receive(:delete_object).with(bucket: github_repository.bucket_name, key: thirty_five_minutes_old.blob_key)
       expect(blob_storage_client).to receive(:abort_multipart_upload).with(bucket: github_repository.bucket_name, key: thirty_five_minutes_old.blob_key, upload_id: thirty_five_minutes_old.upload_id)
       nx.cleanup_cache
+      expect(cache_entry).to exist
+      expect(thirty_five_minutes_old).not_to exist
     end
 
     it "deletes cache entries that older than 7 days not accessed yet" do
@@ -135,6 +139,8 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(blob_storage_client).not_to receive(:delete_object).with(bucket: github_repository.bucket_name, key: six_days_old.blob_key)
       expect(blob_storage_client).to receive(:delete_object).with(bucket: github_repository.bucket_name, key: ten_days_old.blob_key)
       nx.cleanup_cache
+      expect(six_days_old).to exist
+      expect(ten_days_old).not_to exist
     end
 
     it "deletes oldest cache entries if the total usage exceeds the default limit" do

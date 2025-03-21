@@ -46,9 +46,11 @@ class Clover
         .order_append(Sequel.case(keys.map.with_index { |key, idx| [Sequel.like(:key, "#{DB.dataset.escape_like(key)}%"), idx] }.to_h, keys.length), Sequel.desc(:created_at))
         .first
 
-      fail CloverError.new(204, "NotFound", "No cache entry") if entry.nil?
+      entry_updated = entry && entry.this.update(last_accessed_at: Sequel::CURRENT_TIMESTAMP, last_accessed_by: runner.id) == 1
 
-      entry.update(last_accessed_at: Time.now, last_accessed_by: runner.id)
+      # If was not found or entry no longer exists, return 204 to indicate so to GitHub.
+      next 204 unless entry_updated
+
       signed_url = repository.url_presigner.presigned_url(:get_object, bucket: repository.bucket_name, key: entry.blob_key, expires_in: 900)
 
       {
