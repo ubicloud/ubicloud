@@ -3,7 +3,7 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
-  subject(:prog) { described_class.new(Strand.new) }
+  subject(:prog) { described_class.new(Strand.create(id: Strand.generate_uuid, prog: "Kubernetes::ProvisionKubernetesNode", label: "something")) }
 
   let(:kubernetes_cluster) {
     project = Project.create(name: "default")
@@ -34,13 +34,18 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   end
 
   describe "#before_run" do
-    it "destroys itself if the kubernetes cluster is getting deleted" do
+    it "destroys itself and children if the kubernetes cluster is getting deleted" do
       Strand.create(id: kubernetes_cluster.id, label: "something", prog: "KubernetesClusterNexus")
       kubernetes_cluster.reload
       expect(kubernetes_cluster.strand.label).to eq("something")
       prog.before_run # Nothing happens
 
       kubernetes_cluster.strand.label = "destroy"
+      2.times do |i|
+        prog.strand.add_child(id: Strand.generate_uuid, prog: "something", label: "something")
+      end
+      expect(prog.strand.children.count).to eq(2)
+      expect(prog.strand.children).to all(receive(:destroy))
       expect { prog.before_run }.to exit({"msg" => "provisioning canceled"})
 
       prog.strand.label = "destroy"
