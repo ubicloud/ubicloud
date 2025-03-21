@@ -12,7 +12,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   }
 
   let(:github_runner) {
-    GithubRunner.new(installation_id: "", repository_name: "test-repo", label: "ubicloud-standard-4", ready_at: Time.now, created_at: Time.now).tap {
+    GithubRunner.new(installation_id: "", repository_name: "test-repo", label: "ubicloud-standard-4", created_at: Time.now, allocated_at: Time.now + 10, ready_at: Time.now + 20).tap {
       _1.id = GithubRunner.generate_uuid
     }
   }
@@ -340,7 +340,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   describe "#allocate_vm" do
     it "picks vm and hops" do
       expect(nx).to receive(:pick_vm).and_return(vm)
-      expect(github_runner).to receive(:update).with(vm_id: vm.id)
+      expect(github_runner).to receive(:update).with(vm_id: vm.id, allocated_at: anything)
       expect(vm).to receive(:update).with(name: github_runner.ubid)
       expect(github_runner).to receive(:reload).and_return(github_runner)
       expect(Clog).to receive(:emit).with("runner_allocated").and_call_original
