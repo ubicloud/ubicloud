@@ -62,7 +62,7 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
       hop_unavailable
     end
 
-    nap 30
+    nap 6 * 60 * 60
   end
 
   label def unavailable
