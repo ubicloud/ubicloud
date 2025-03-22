@@ -117,6 +117,11 @@ class PostgresResource < Sequel::Model
     [root_cert_1, root_cert_2].join("\n") if root_cert_1 && root_cert_2
   end
 
+  def validate
+    super
+    validates_includes(0..23, :maintenance_window_start_at, allow_nil: true, message: "must be between 0 and 23")
+  end
+
   module HaType
     NONE = "none"
     ASYNC = "async"
@@ -132,6 +137,8 @@ class PostgresResource < Sequel::Model
   TARGET_STANDBY_COUNT_MAP = {HaType::NONE => 0, HaType::ASYNC => 1, HaType::SYNC => 2}.freeze
 
   DEFAULT_VERSION = "16"
+
+  MAINTENANCE_DURATION_IN_HOURS = 2
 
   def self.redacted_columns
     super + [:root_cert_1, :root_cert_2, :server_cert]
@@ -163,9 +170,12 @@ end
 #  private_subnet_id           | uuid                     |
 #  flavor                      | postgres_flavor          | NOT NULL DEFAULT 'standard'::postgres_flavor
 #  version                     | postgres_version         | NOT NULL DEFAULT '16'::postgres_version
+#  maintenance_window_start_at | integer                  |
 # Indexes:
 #  postgres_server_pkey                            | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_name_uidx | UNIQUE btree (project_id, location, name)
+# Check constraints:
+#  valid_maintenance_windows_start_at | (maintenance_window_start_at >= 0 AND maintenance_window_start_at <= 23)
 # Referenced By:
 #  postgres_firewall_rule      | postgres_firewall_rule_postgres_resource_id_fkey      | (postgres_resource_id) REFERENCES postgres_resource(id)
 #  postgres_metric_destination | postgres_metric_destination_postgres_resource_id_fkey | (postgres_resource_id) REFERENCES postgres_resource(id)
