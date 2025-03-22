@@ -166,7 +166,7 @@ RSpec.describe Clover, "project" do
 
     describe "details" do
       it "can show project details" do
-        project
+        project.add_quota(quota_id: ProjectQuota.default_quotas["VmVCpu"]["id"], value: 0)
         visit "/project"
 
         expect(page.title).to eq("Ubicloud - Projects")
@@ -176,6 +176,10 @@ RSpec.describe Clover, "project" do
 
         expect(page.title).to eq("Ubicloud - #{project.name} Dashboard")
         expect(page).to have_content project.name
+
+        find_by_id("desktop-menu").click_link "Settings"
+
+        expect(page.title).to eq("Ubicloud - #{project.name}")
       end
 
       it "raises forbidden when does not have permissions" do
