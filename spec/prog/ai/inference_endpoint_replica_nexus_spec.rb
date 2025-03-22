@@ -13,7 +13,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
       model_name: "test-model",
       ubid: "ie-ubid",
       is_public: true,
-      location: "hetzner-ai",
+      location: Location[name: "hetzner-ai"],
       name: "ie-name",
       engine: "vllm",
       engine_params: "--some-params",
@@ -57,12 +57,12 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
     it "creates replica and vm with sshable" do
       user_project = Project.create_with_id(name: "default")
       ie_project = Project.create_with_id(name: "default")
-      Firewall.create_with_id(name: "inference-endpoint-firewall", location: "hetzner-fsn1", project_id: ie_project.id)
+      Firewall.create_with_id(name: "inference-endpoint-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: ie_project.id)
 
       expect(Config).to receive(:inference_endpoint_service_project_id).and_return(ie_project.id).at_least(:once)
       st_ie = Prog::Ai::InferenceEndpointNexus.assemble_with_model(
         project_id: user_project.id,
-        location: "hetzner-fsn1",
+        location_id: Location::HETZNER_FSN1_ID,
         name: "ie1",
         model_id: "8b0b55b3-fb99-415f-8441-3abef2c2a200"
       )

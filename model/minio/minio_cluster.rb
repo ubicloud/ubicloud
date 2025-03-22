@@ -8,6 +8,7 @@ class MinioCluster < Sequel::Model
   many_to_many :servers, join_table: :minio_pool, left_key: :cluster_id, right_key: :id, right_primary_key: :minio_pool_id, class: :MinioServer, order: :index
   one_to_one :strand, key: :id
   many_to_one :private_subnet
+  many_to_one :location, key: :location_id
 
   include ResourceMethods
   include SemaphoreMethods
@@ -69,7 +70,6 @@ end
 # Columns:
 #  id                          | uuid                        | PRIMARY KEY
 #  name                        | text                        | NOT NULL
-#  location                    | text                        | NOT NULL
 #  created_at                  | timestamp without time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 #  admin_user                  | text                        | NOT NULL
 #  admin_password              | text                        | NOT NULL
@@ -80,10 +80,12 @@ end
 #  root_cert_key_2             | text                        |
 #  certificate_last_checked_at | timestamp with time zone    | NOT NULL DEFAULT now()
 #  project_id                  | uuid                        | NOT NULL
+#  location_id                 | uuid                        | NOT NULL
 # Indexes:
-#  minio_cluster_pkey                          | PRIMARY KEY btree (id)
-#  minio_cluster_project_id_location_name_uidx | UNIQUE btree (project_id, location, name)
+#  minio_cluster_pkey                             | PRIMARY KEY btree (id)
+#  minio_cluster_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 # Foreign key constraints:
+#  minio_cluster_location_id_fkey       | (location_id) REFERENCES location(id)
 #  minio_cluster_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
 #  minio_cluster_project_id_fkey        | (project_id) REFERENCES project(id)
 # Referenced By:

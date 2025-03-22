@@ -53,15 +53,9 @@ module Validation
     fail ValidationFailed.new({username: msg}) unless username&.match(ALLOWED_MINIO_USERNAME_PATTERN)
   end
 
-  def self.validate_location(location)
-    available_locs = Option.locations(only_visible: false).map(&:name)
-    msg = "Given location is not a valid location. Available locations: #{available_locs.map { LocationNameConverter.to_display_name(_1) }}"
-    fail ValidationFailed.new({provider: msg}) unless available_locs.include?(location)
-  end
-
   def self.validate_postgres_location(location)
-    available_pg_locs = Option.postgres_locations.map(&:name)
-    msg = "Given location is not a valid postgres location. Available locations: #{available_pg_locs.map { LocationNameConverter.to_display_name(_1) }}"
+    available_pg_locs = Option.postgres_locations
+    msg = "Given location is not a valid postgres location. Available locations: #{available_pg_locs.map(&:display_name)}"
     fail ValidationFailed.new({location: msg}) unless available_pg_locs.include?(location)
   end
 
@@ -128,7 +122,7 @@ module Validation
   end
 
   def self.validate_postgres_size(location, size)
-    unless (postgres_size = Option::PostgresSizes.find { _1.location == location && _1.name == size })
+    unless (postgres_size = Option::PostgresSizes.find { _1.location_id == location.id && _1.name == size })
       fail ValidationFailed.new({size: "\"#{size}\" is not a valid PostgreSQL database size. Available sizes: #{Option::PostgresSizes.map(&:name)}"})
     end
     postgres_size
@@ -247,7 +241,7 @@ module Validation
   end
 
   def self.validate_billing_rate(resource_type, resource_family, location)
-    unless BillingRate.from_resource_properties(resource_type, resource_family, location)
+    unless BillingRate.from_resource_properties(resource_type, resource_family, location.name)
       fail ValidationFailed.new({location: "Resource family #{resource_family} is not available in location #{location}"})
     end
   end

@@ -3,9 +3,13 @@
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
 
-  def self.assemble(project_id, name: nil, location: "hetzner-fsn1", ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil)
+  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil)
     unless (project = Project[project_id])
       fail "No existing project"
+    end
+
+    unless (location = Location[location_id])
+      fail "No existing location"
     end
     if allow_only_ssh && firewall_id
       fail "Cannot specify both allow_only_ssh and firewall_id"
@@ -15,20 +19,19 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     name ||= PrivateSubnet.ubid_to_name(ubid)
 
     Validation.validate_name(name)
-    Validation.validate_location(location)
 
     ipv6_range ||= random_private_ipv6(location, project).to_s
     ipv4_range ||= random_private_ipv4(location, project).to_s
     DB.transaction do
-      ps = PrivateSubnet.create(name: name, location: location, net6: ipv6_range, net4: ipv4_range, state: "waiting", project_id:) { _1.id = ubid.to_uuid }
+      ps = PrivateSubnet.create(name: name, location_id: location.id, net6: ipv6_range, net4: ipv4_range, state: "waiting", project_id:) { _1.id = ubid.to_uuid }
 
       firewall = if firewall_id
-        existing_fw = project.firewalls_dataset.where(location: location).first(Sequel[:firewall][:id] => firewall_id)
-        fail "Firewall with id #{firewall_id} and location #{location} does not exist" unless existing_fw
+        existing_fw = project.firewalls_dataset.where(location_id: location.id).first(Sequel[:firewall][:id] => firewall_id)
+        fail "Firewall with id #{firewall_id} and location #{location.name} does not exist" unless existing_fw
         existing_fw
       else
         port_range = allow_only_ssh ? 22..22 : 0..65535
-        new_fw = Firewall.create_with_id(name: "#{name}-default", location: location, project_id:)
+        new_fw = Firewall.create_with_id(name: "#{name}-default", location_id: location.id, project_id:)
         ["0.0.0.0/0", "::/0"].each { |cidr| FirewallRule.create_with_id(firewall_id: new_fw.id, cidr: cidr, port_range: Sequel.pg_range(port_range)) }
         new_fw
       end
@@ -172,7 +175,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     network_mask = NetAddr::Mask128.new(64)
     selected_addr = NetAddr::IPv6Net.new(network_address, network_mask)
 
-    selected_addr = random_private_ipv6(location, project) if project.private_subnets_dataset[Sequel[:net6] => selected_addr.to_s, :location => location]
+    selected_addr = random_private_ipv6(location, project) if project.private_subnets_dataset[net6: selected_addr.to_s, location_id: location.id]
 
     selected_addr
   end
@@ -189,7 +192,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       random_private_ipv4(location, project, cidr_size)
     end
 
-    selected_addr = random_private_ipv4(location, project, cidr_size) if PrivateSubnet::BANNED_IPV4_SUBNETS.any? { _1.rel(selected_addr) } || project.private_subnets_dataset[Sequel[:net4] => selected_addr.to_s, :location => location]
+    selected_addr = random_private_ipv4(location, project, cidr_size) if PrivateSubnet::BANNED_IPV4_SUBNETS.any? { _1.rel(selected_addr) } || project.private_subnets_dataset[net4: selected_addr.to_s, location_id: location.id]
 
     selected_addr
   end

@@ -40,7 +40,7 @@ RSpec.describe Prog::Vm::Nexus do
       cpu_burst_percent_limit: 0,
       memory_gib: 8,
       arch: "x64",
-      location: "hetzner-fsn1",
+      location_id: Location::HETZNER_FSN1_ID,
       created_at: Time.now
     ).tap {
       _1.id = "2464de61-7501-8374-9ab0-416caebe31da"
@@ -51,7 +51,7 @@ RSpec.describe Prog::Vm::Nexus do
       allow(_1).to receive(:active_billing_records).and_return([BillingRecord.new(
         project_id: "50089dcf-b472-8ad2-9ca6-b3e70d12759d",
         resource_name: _1.name,
-        billing_rate_id: BillingRate.from_resource_properties("VmVCpu", _1.family, _1.location)["id"],
+        billing_rate_id: BillingRate.from_resource_properties("VmVCpu", _1.family, "hetzner-fsn1")["id"],
         amount: _1.vcpus
       )])
     }
@@ -61,7 +61,7 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe ".assemble" do
     let(:ps) {
-      PrivateSubnet.create(name: "ps", location: "hetzner-fsn1", net6: "fd10:9b0b:6b4b:8fbb::/64",
+      PrivateSubnet.create(name: "ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64",
         net4: "1.1.1.0/26", state: "waiting", project_id: prj.id) { _1.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
     }
     let(:nic) {
@@ -79,10 +79,10 @@ RSpec.describe Prog::Vm::Nexus do
       }.to raise_error RuntimeError, "No existing project"
     end
 
-    it "fails if project's provider and location's provider not matched" do
+    it "fails if location doesn't exist" do
       expect {
-        described_class.assemble("some_ssh_key", prj.id, location: "dp-istanbul-mars")
-      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: provider"
+        described_class.assemble("some_ssh_key", prj.id, location_id: nil)
+      }.to raise_error RuntimeError, "No existing location"
     end
 
     it "creates Subnet and Nic if not passed" do
@@ -111,7 +111,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(Prog::Vnet::NicNexus).not_to receive(:assemble)
       expect(Project).to receive(:[]).with(prj.id).and_return(prj)
       expect(prj.private_subnets).to receive(:any?).and_return(true)
-      described_class.assemble("some_ssh_key", prj.id, nic_id: nic.id, location: "hetzner-fsn1")
+      described_class.assemble("some_ssh_key", prj.id, nic_id: nic.id, location_id: Location::HETZNER_FSN1_ID)
     end
 
     def requested_disk_size(st)
@@ -151,7 +151,7 @@ RSpec.describe Prog::Vm::Nexus do
     it "fails if nic subnet is in another location" do
       expect(Nic).to receive(:[]).with(nic.id).and_return(nic)
       expect(nic).to receive(:private_subnet).and_return(ps)
-      expect(ps).to receive(:location).and_return("hel2")
+      expect(ps).to receive(:location_id).and_return("hel2")
       expect {
         described_class.assemble("some_ssh_key", prj.id, nic_id: nic.id)
       }.to raise_error RuntimeError, "Given nic is created in a different location"
@@ -251,7 +251,7 @@ RSpec.describe Prog::Vm::Nexus do
       vm.unix_user = "test_user"
       vm.public_key = "test_ssh_key"
       vm.local_vetho_ip = "169.254.0.0"
-      ps = instance_double(PrivateSubnet, location: "hetzner-fsn1", net4: NetAddr::IPv4Net.parse("10.0.0.0/26"))
+      ps = instance_double(PrivateSubnet, location_id: Location::HETZNER_FSN1_ID, net4: NetAddr::IPv4Net.parse("10.0.0.0/26"))
       nic = Nic.new(private_ipv6: "fd10:9b0b:6b4b:8fbb::/64", private_ipv4: "10.0.0.3/32", mac: "5a:0f:75:80:c3:64")
       pci = PciDevice.new(slot: "01:00.0", iommu_group: 23)
       expect(nic).to receive(:ubid_to_tap_name).and_return("tap4ncdd56m")
@@ -334,7 +334,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nx).to receive(:incr_waiting_for_capacity)
       expect { nx.start }.to nap(30)
       expect(Page.active.count).to eq(1)
-      expect(Page.from_tag_parts("NoCapacity", vm.location, vm.arch, vm.family)).not_to be_nil
+      expect(Page.from_tag_parts("NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family)).not_to be_nil
 
       # Second run does not generate another page
       expect(vm).to receive(:waiting_for_capacity_set?).and_return(true)
@@ -349,7 +349,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nx).to receive(:incr_waiting_for_capacity)
 
       vm.created_at = Time.now - 10 * 60
-      vm.location = "github-runners"
+      vm.location_id = Location[name: "github-runners"].id
       expect { nx.start }.to nap(30)
       expect(Page.active.count).to eq(0)
     end
@@ -399,7 +399,7 @@ RSpec.describe Prog::Vm::Nexus do
         distinct_storage_devices: false,
         host_filter: [],
         host_exclusion_filter: [],
-        location_filter: ["hetzner-fsn1"],
+        location_filter: [Location::HETZNER_FSN1_ID],
         location_preference: [],
         gpu_count: 0
       )
@@ -407,22 +407,22 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "considers EU locations for github-runners" do
-      vm.location = "github-runners"
+      vm.location_id = Location[name: "github-runners"].id
       expect(Scheduling::Allocator).to receive(:allocate).with(
         vm, :storage_volumes,
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
         host_exclusion_filter: [],
-        location_filter: ["github-runners", "hetzner-fsn1", "hetzner-hel1"],
-        location_preference: ["github-runners"],
+        location_filter: ["6b9ef786-b842-8420-8c65-c25e3d4bdf3d", Location::HETZNER_FSN1_ID, "1f214853-0bc4-8020-b910-dffb867ef44f"],
+        location_preference: ["6b9ef786-b842-8420-8c65-c25e3d4bdf3d"],
         gpu_count: 0
       )
       expect { nx.start }.to hop("create_unix_user")
     end
 
     it "considers all locations for standard-60 runners" do
-      vm.location = "github-runners"
+      vm.location_id = Location[name: "github-runners"].id
       vm.vcpus = 60
       expect(Scheduling::Allocator).to receive(:allocate).with(
         vm, :storage_volumes,
@@ -431,7 +431,7 @@ RSpec.describe Prog::Vm::Nexus do
         host_filter: [],
         host_exclusion_filter: [],
         location_filter: [],
-        location_preference: ["github-runners"],
+        location_preference: ["6b9ef786-b842-8420-8c65-c25e3d4bdf3d"],
         gpu_count: 0
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -468,7 +468,7 @@ RSpec.describe Prog::Vm::Nexus do
         distinct_storage_devices: false,
         host_filter: [],
         host_exclusion_filter: [:vm_host_id, "another-vm-host-id"],
-        location_filter: ["hetzner-fsn1"],
+        location_filter: [Location::HETZNER_FSN1_ID],
         location_preference: [],
         gpu_count: 0
       )
@@ -494,7 +494,7 @@ RSpec.describe Prog::Vm::Nexus do
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: true,
         host_filter: [],
-        location_filter: ["hetzner-fsn1"],
+        location_filter: [Location::HETZNER_FSN1_ID],
         host_exclusion_filter: [],
         location_preference: [],
         gpu_count: 0
@@ -514,7 +514,7 @@ RSpec.describe Prog::Vm::Nexus do
         distinct_storage_devices: false,
         host_filter: [],
         host_exclusion_filter: [],
-        location_filter: ["hetzner-fsn1"],
+        location_filter: [Location::HETZNER_FSN1_ID],
         location_preference: [],
         gpu_count: 3
       )
@@ -585,7 +585,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "creates billing records when gpu is present" do
-      vm.location = "latitude-ai"
+      vm.location = Location[name: "latitude-ai"]
       expect(vm).to receive(:pci_devices).and_return([PciDevice.new(slot: "01:00.0", iommu_group: 23, device_class: "0302", vendor: "10de", device: "20b5")]).at_least(:once)
       expect(BillingRecord).to receive(:create_with_id).exactly(4).times
       expect(vm).to receive(:project).and_return(prj).at_least(:once)

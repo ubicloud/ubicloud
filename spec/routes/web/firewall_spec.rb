@@ -10,11 +10,11 @@ RSpec.describe Clover, "firewall" do
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
 
   let(:firewall) do
-    Firewall.create_with_id(name: "dummy-fw", description: "dummy-fw", location: "hetzner-fsn1", project_id: project.id)
+    Firewall.create_with_id(name: "dummy-fw", description: "dummy-fw", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
   end
 
   let(:fw_wo_permission) {
-    Firewall.create_with_id(name: "dummy-fw-2", description: "dummy-fw-2", location: "hetzner-fsn1", project_id: project_wo_permissions.id)
+    Firewall.create_with_id(name: "dummy-fw-2", description: "dummy-fw-2", location_id: Location::HETZNER_FSN1_ID, project_id: project_wo_permissions.id)
   }
 
   describe "unauthenticated" do
@@ -59,7 +59,7 @@ RSpec.describe Clover, "firewall" do
 
       it "does not show links to firewalls if user lacks Firewall:view access to them" do
         firewall
-        fw = Firewall.create_with_id(name: "viewable-fw", description: "viewable-fw", location: "hetzner-fsn1", project_id: project.id)
+        fw = Firewall.create_with_id(name: "viewable-fw", description: "viewable-fw", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
 
         visit "#{project.path}/firewall"
         link_texts = page.all("a").map(&:text)
@@ -80,7 +80,7 @@ RSpec.describe Clover, "firewall" do
         expect(page.body).not_to include "form-fw-create-rule"
 
         fw.add_firewall_rule(cidr: "127.0.0.1")
-        fw.add_private_subnet(net6: "::0/24", net4: "127.0.0.0/24", name: "dummy-ps", location: "somewhere", project_id: project.id)
+        fw.add_private_subnet(net6: "::0/24", net4: "127.0.0.0/24", name: "dummy-ps", location_id: Location[name: "hetzner-hel1"].id, project_id: project.id)
 
         page.refresh
         expect(page.body).not_to include "private_subnet_id"
@@ -122,7 +122,7 @@ RSpec.describe Clover, "firewall" do
       end
 
       it "can create new firewall with private subnet" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
 
         visit "#{project.path}/firewall/create"
 
@@ -169,6 +169,20 @@ RSpec.describe Clover, "firewall" do
         expect(page.status_code).to eq(403)
         expect(page).to have_content "Forbidden"
       end
+
+      it "cannot create firewall when location not exist" do
+        visit "#{project.path}/firewall/create"
+
+        fill_in "Name", with: "dummy-fw"
+        choose option: Location::HETZNER_FSN1_ID
+        Location[Location::HETZNER_FSN1_ID].destroy
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - ResourceNotFound")
+        expect(page.status_code).to eq(404)
+        expect(page).to have_content "ResourceNotFound"
+      end
     end
 
     describe "show" do
@@ -204,7 +218,7 @@ RSpec.describe Clover, "firewall" do
 
     describe "subnets" do
       it "can show" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         firewall.associate_with_private_subnet(ps)
 
         visit "#{project.path}#{firewall.path}"
@@ -214,7 +228,7 @@ RSpec.describe Clover, "firewall" do
       end
 
       it "can attach subnet" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
 
         visit "#{project.path}#{firewall.path}"
         select ps.name, from: "private_subnet_id"
@@ -232,7 +246,7 @@ RSpec.describe Clover, "firewall" do
       end
 
       it "can not attach subnet when it does not exist" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         visit "#{project.path}#{firewall.path}"
         select "dummy-ps-1", from: "private_subnet_id"
         ps.destroy
@@ -244,7 +258,7 @@ RSpec.describe Clover, "firewall" do
       end
 
       it "can detach subnet" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1111", location: "hetzner-fsn1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1111", location_id: Location::HETZNER_FSN1_ID).subject
         expect(page).to have_no_content ps.name
 
         firewall.associate_with_private_subnet(ps)
@@ -261,7 +275,7 @@ RSpec.describe Clover, "firewall" do
       end
 
       it "can not detach subnet when it does not exist" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         visit "#{project.path}#{firewall.path}"
         select "dummy-ps-1", from: "private_subnet_id"
         click_button "Attach"

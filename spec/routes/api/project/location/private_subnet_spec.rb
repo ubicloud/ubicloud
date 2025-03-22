@@ -105,7 +105,7 @@ RSpec.describe Clover, "private_subnet" do
       end
 
       it "with valid firewall" do
-        fw = Firewall.create_with_id(name: "default-firewall", location: "hetzner-fsn1", project_id: project.id)
+        fw = Firewall.create_with_id(name: "default-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/test-ps", {firewall_id: fw.ubid}.to_json
 
         expect(last_response.status).to eq(200)
@@ -117,7 +117,7 @@ RSpec.describe Clover, "private_subnet" do
       it "with invalid firewall id" do
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/test-ps", {firewall_id: "invalidid"}.to_json
 
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: firewall_id", {"firewall_id" => "Firewall with id \"invalidid\" and location \"hetzner-fsn1\" is not found"})
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: firewall_id", {"firewall_id" => "Firewall with id \"invalidid\" and location \"eu-central-h1\" is not found"})
       end
 
       it "with empty body" do
@@ -125,6 +125,12 @@ RSpec.describe Clover, "private_subnet" do
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq("test-ps")
+      end
+
+      it "location not exist" do
+        post "/project/#{project.ubid}/location/not-exist-location/private-subnet/test-ps", {}.to_json
+
+        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
       end
     end
 
