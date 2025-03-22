@@ -49,7 +49,11 @@ module Github
   def self.runner_labels
     @runner_labels ||= begin
       labels = YAML.load_file("config/github_runner_labels.yml").to_h { [it["name"], it] }
-      labels.transform_values { |v| (a = v["alias_for"]) ? labels[a] : v }
+      labels.transform_values do |v|
+        new = (a = v["alias_for"]) ? labels[a] : v
+        new["vm_size_data"] = Validation.validate_vm_size(new["vm_size"], new["arch"])
+        new
+      end.freeze
     end
   end
 
