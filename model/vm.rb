@@ -197,7 +197,9 @@ class Vm < Sequel::Model
   def params_json(swap_size_bytes)
     topo = cloud_hypervisor_cpu_topology
 
-    project_public_keys = project.get_ff_vm_public_ssh_keys || []
+    public_keys = public_key.split("\n").each(&:strip!)
+    public_keys.reject!(&:empty?)
+    public_keys.concat(project.get_ff_vm_public_ssh_keys || [])
 
     # we don't write secrets to params_json, because it
     # shouldn't be stored in the host for security reasons.
@@ -208,7 +210,7 @@ class Vm < Sequel::Model
       "local_ipv4" => local_vetho_ip.to_s.shellescape || "",
       "dns_ipv4" => nics.first.private_subnet.net4.nth(2).to_s,
       "unix_user" => unix_user,
-      "ssh_public_keys" => [public_key] + project_public_keys,
+      "ssh_public_keys" => public_keys,
       "nics" => nics.map { |nic| [nic.private_ipv6.to_s, nic.private_ipv4.to_s, nic.ubid_to_tap_name, nic.mac, nic.private_ipv4_gateway] },
       "boot_image" => boot_image,
       "max_vcpus" => topo.max_vcpus,
