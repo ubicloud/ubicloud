@@ -66,7 +66,19 @@
                   %>
                   class="<%= cls %> <%= col_opts[:extra_class] %>"
                 >
-                  <%== part("components/value_content", content: value, opts: col_opts) %>
+                  <% if value.is_a?(Array) %>
+                    <% (first_value, first_opts), (second_value, second_opts) = value %>
+                    <div class="font-medium text-gray-900">
+                      <%== part("components/value_content", content: first_value, opts: first_opts) %>
+                    </div>
+                    <% if second_value %>
+                      <div class="mt-1 text-gray-500 text-xs">
+                        <%== part("components/value_content", content: second_value, opts: second_opts) %>
+                      </div>
+                    <% end %>
+                  <% else %>
+                    <%== part("components/value_content", content: value, opts: col_opts) %>
+                  <% end %>
                 </td>
               <% end %>
             </tr>
