@@ -14,6 +14,10 @@ class GithubRunner < Sequel::Model
   include HealthMonitorMethods
   semaphore :destroy, :skip_deregistration
 
+  def label_data
+    @label_data ||= Github.runner_labels[label]
+  end
+
   def repository_url
     "http://github.com/#{repository_name}"
   end

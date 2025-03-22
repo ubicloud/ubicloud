@@ -24,6 +24,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   def pick_vm
+    label_data = github_runner.label_data
     pool = VmPool.where(
       vm_size: label_data["vm_size"],
       boot_image: label_data["boot_image"],
@@ -66,6 +67,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     # If the runner is destroyed before it's ready or doesn't pick a job, don't charge for it.
     return unless github_runner.ready_at && github_runner.workflow_job
 
+    label_data = github_runner.label_data
     billed_vm_size = if label_data["arch"] == "arm64"
       "#{label_data["vm_size"]}-arm"
     elsif github_runner.installation.free_runner_upgrade?
@@ -122,10 +124,6 @@ class Prog::Vm::GithubRunner < Prog::Base
     @github_client ||= Github.installation_client(github_runner.installation.installation_id)
   end
 
-  def label_data
-    @label_data ||= Github.runner_labels[github_runner.label]
-  end
-
   def before_run
     when_destroy_set? do
       unless ["destroy", "wait_vm_destroy"].include?(strand.label)
@@ -157,7 +155,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   label def wait_concurrency_limit
     unless quota_available?
       # check utilization, if it's high, wait for it to go down
-      utilization = VmHost.where(allocation_state: "accepting", arch: label_data["arch"]).select_map {
+      utilization = VmHost.where(allocation_state: "accepting", arch: github_runner.label_data["arch"]).select_map {
         sum(:used_cores) * 100.0 / sum(:total_cores)
       }.first.to_f
 
