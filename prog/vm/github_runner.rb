@@ -24,14 +24,14 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   def pick_vm
-    skip_sync = true
+    label_data = github_runner.label_data
     pool = VmPool.where(
       vm_size: label_data["vm_size"],
       boot_image: label_data["boot_image"],
       location_id: Location[name: label_data["location"]].id,
       storage_size_gib: label_data["storage_size_gib"],
       storage_encrypted: true,
-      storage_skip_sync: skip_sync,
+      storage_skip_sync: true,
       arch: label_data["arch"]
     ).first
 
@@ -53,7 +53,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       size: label_data["vm_size"],
       location_id: Location[name: label_data["location"]].id,
       boot_image: label_data["boot_image"],
-      storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: true, skip_sync: skip_sync}],
+      storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: true, skip_sync: true}],
       enable_ip4: true,
       arch: label_data["arch"],
       swap_size_bytes: 4294963200, # ~4096MB, the same value with GitHub hosted runners
@@ -68,6 +68,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     return unless github_runner.ready_at && github_runner.workflow_job
 
     project = github_runner.installation.project
+    label_data = github_runner.label_data
     rate_id = if label_data["arch"] == "arm64"
       BillingRate.from_resource_properties("GitHubRunnerMinutes", "#{label_data["vm_size"]}-arm", "global")["id"]
     else
@@ -117,10 +118,6 @@ class Prog::Vm::GithubRunner < Prog::Base
     @github_client ||= Github.installation_client(github_runner.installation.installation_id)
   end
 
-  def label_data
-    @label_data ||= Github.runner_labels[github_runner.label]
-  end
-
   def before_run
     when_destroy_set? do
       unless ["destroy", "wait_vm_destroy"].include?(strand.label)
@@ -152,7 +149,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   label def wait_concurrency_limit
     unless quota_available?
       # check utilization, if it's high, wait for it to go down
-      utilization = VmHost.where(allocation_state: "accepting", arch: label_data["arch"]).select_map {
+      utilization = VmHost.where(allocation_state: "accepting", arch: github_runner.label_data["arch"]).select_map {
         sum(:used_cores) * 100.0 / sum(:total_cores)
       }.first.to_f
 

@@ -11,7 +11,7 @@ RSpec.describe InvoiceGenerator do
       name = vm.name
     when GithubRunner
       gr = resource
-      billing_rate_id = BillingRate.from_resource_properties("GitHubRunnerMinutes", Github.runner_labels[gr.label]["vm_size"], "global")["id"]
+      billing_rate_id = BillingRate.from_resource_properties("GitHubRunnerMinutes", gr.label_data["vm_size"], "global")["id"]
       name = "foo"
     when InferenceEndpoint
       billing_rate_id = BillingRate.from_resource_properties("InferenceTokens", resource.model_name, "global")["id"]
