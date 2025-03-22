@@ -137,29 +137,41 @@ class Prog::Vm::GithubRunner < Prog::Base
     hop_allocate_vm
   end
 
+  def quota_available?
+    github_runner.installation.project_dataset.for_update.all
+    # In existing Github quota calculations, we compare total allocated cpu count
+    # with the cpu limit and allow passing the limit once. This is because we
+    # check quota and allocate VMs in different labels hence transactions and it
+    # is difficult to enforce quotas in the environment with lots of concurrent
+    # requests. There are some remedies, but it would require some refactoring
+    # that I'm not keen to do at the moment. Although it looks weird, passing 0
+    # as requested_additional_usage keeps the existing behavior.
+    github_runner.installation.project.quota_available?("GithubRunnerVCpu", 0)
+  end
+
   label def wait_concurrency_limit
-    hop_allocate_vm if quota_available?
+    unless quota_available?
+      # check utilization, if it's high, wait for it to go down
+      utilization = VmHost.where(allocation_state: "accepting", arch: label_data["arch"]).select_map {
+        sum(:used_cores) * 100.0 / sum(:total_cores)
+      }.first.to_f
 
-    # check utilization, if it's high, wait for it to go down
-    utilization = VmHost.where(allocation_state: "accepting", arch: label_data["arch"]).select_map {
-      sum(:used_cores) * 100.0 / sum(:total_cores)
-    }.first.to_f
+      unless utilization < 70
+        Clog.emit("Waiting for customer concurrency limit, utilization is high") { [github_runner, {utilization: utilization}] }
+        nap rand(5..15)
+      end
 
-    unless utilization < 70
-      Clog.emit("Waiting for customer concurrency limit, utilization is high") { [github_runner, {utilization: utilization}] }
-      nap rand(5..15)
+      Clog.emit("Concurrency limit reached but allocation is allowed because of low utilization") { [github_runner, {utilization: utilization}] }
     end
-
-    Clog.emit("Concurrency limit reached but allocation is allowed because of low utilization") { [github_runner, {utilization: utilization}] }
-
+    github_runner.log_duration("runner_capacity_waited", Time.now - github_runner.created_at)
     hop_allocate_vm
   end
 
   label def allocate_vm
     picked_vm = pick_vm
-    github_runner.update(vm_id: picked_vm.id)
+    github_runner.update(vm_id: picked_vm.id, allocated_at: Time.now)
     picked_vm.update(name: github_runner.ubid.to_s)
-    github_runner.reload.log_duration("runner_allocated", Time.now - github_runner.created_at)
+    github_runner.reload.log_duration("runner_allocated", github_runner.allocated_at - github_runner.created_at)
 
     hop_wait_vm
   end
@@ -171,18 +183,6 @@ class Prog::Vm::GithubRunner < Prog::Base
     nap 1 unless vm.provisioned_at
     register_deadline("wait", 10 * 60)
     hop_setup_environment
-  end
-
-  def quota_available?
-    github_runner.installation.project_dataset.for_update.all
-    # In existing Github quota calculations, we compare total allocated cpu count
-    # with the cpu limit and allow passing the limit once. This is because we
-    # check quota and allocate VMs in different labels hence transactions and it
-    # is difficult to enforce quotas in the environment with lots of concurrent
-    # requests. There are some remedies, but it would require some refactoring
-    # that I'm not keen to do at the moment. Although it looks weird, passing 0
-    # as requested_additional_usage keeps the existing behavior.
-    github_runner.installation.project.quota_available?("GithubRunnerVCpu", 0)
   end
 
   def setup_info
@@ -269,7 +269,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     data = {name: github_runner.ubid.to_s, labels: [github_runner.label], runner_group_id: 1, work_folder: "/home/runner/work"}
     response = github_client.post("/repos/#{github_runner.repository_name}/actions/runners/generate-jitconfig", data)
     github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
-    github_runner.log_duration("runner_registered", Time.now - github_runner.created_at)
+    github_runner.log_duration("runner_registered", github_runner.ready_at - github_runner.allocated_at)
 
     # We initiate an API call and a SSH connection under the same label to avoid
     # having to store the encoded_jit_config.

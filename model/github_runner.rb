@@ -85,6 +85,7 @@ end
 #  ready_at        | timestamp with time zone |
 #  workflow_job    | jsonb                    |
 #  repository_id   | uuid                     |
+#  allocated_at    | timestamp with time zone |
 # Indexes:
 #  github_runner_pkey      | PRIMARY KEY btree (id)
 #  github_runner_vm_id_key | UNIQUE btree (vm_id)
