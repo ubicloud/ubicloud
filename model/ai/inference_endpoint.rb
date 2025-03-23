@@ -52,7 +52,6 @@ end
 #  updated_at        | timestamp with time zone | NOT NULL DEFAULT now()
 #  is_public         | boolean                  | NOT NULL DEFAULT false
 #  visible           | boolean                  | NOT NULL DEFAULT true
-#  location          | text                     | NOT NULL
 #  boot_image        | text                     | NOT NULL
 #  name              | text                     | NOT NULL
 #  vm_size           | text                     | NOT NULL
@@ -69,7 +68,7 @@ end
 #  max_requests      | integer                  | NOT NULL DEFAULT 500
 #  max_project_rps   | integer                  | NOT NULL DEFAULT 100
 #  max_project_tps   | integer                  | NOT NULL DEFAULT 10000
-#  location_id       | uuid                     |
+#  location_id       | uuid                     | NOT NULL
 #  external_config   | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 # Indexes:
 #  inference_endpoint_pkey | PRIMARY KEY btree (id)
