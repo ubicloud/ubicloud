@@ -78,13 +78,11 @@ end
 #  name        | text                        | NOT NULL DEFAULT 'Default'::text
 #  description | text                        | NOT NULL DEFAULT 'Default firewall'::text
 #  created_at  | timestamp without time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
-#  location    | text                        | NOT NULL
 #  project_id  | uuid                        | NOT NULL
-#  location_id | uuid                        |
+#  location_id | uuid                        | NOT NULL
 # Indexes:
 #  firewall_pkey                             | PRIMARY KEY btree (id)
 #  firewall_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
-#  firewall_project_id_location_name_uidx    | UNIQUE btree (project_id, location, name)
 # Foreign key constraints:
 #  firewall_location_id_fkey | (location_id) REFERENCES location(id)
 #  firewall_project_id_fkey  | (project_id) REFERENCES project(id)

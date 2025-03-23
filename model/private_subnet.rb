@@ -155,14 +155,12 @@ end
 #  net4          | cidr                     | NOT NULL
 #  state         | text                     | NOT NULL DEFAULT 'creating'::text
 #  name          | text                     | NOT NULL
-#  location      | text                     | NOT NULL
 #  last_rekey_at | timestamp with time zone | NOT NULL DEFAULT now()
 #  project_id    | uuid                     | NOT NULL
-#  location_id   | uuid                     |
+#  location_id   | uuid                     | NOT NULL
 # Indexes:
 #  vm_private_subnet_pkey                          | PRIMARY KEY btree (id)
 #  private_subnet_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
-#  private_subnet_project_id_location_name_uidx    | UNIQUE btree (project_id, location, name)
 # Foreign key constraints:
 #  private_subnet_location_id_fkey | (location_id) REFERENCES location(id)
 #  private_subnet_project_id_fkey  | (project_id) REFERENCES project(id)
