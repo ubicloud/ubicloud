@@ -306,11 +306,11 @@ RSpec.describe Clover, "postgres" do
         # We send PATCH request manually instead of just clicking to button because PATCH action triggered by JavaScript.
         # UI tests run without a JavaScript engine.
         form = find_by_id "creation-form"
-        csrf = form.find("input[name='_csrf']", visible: false).value
+        _csrf = form.find("input[name='_csrf']", visible: false).value
         size = form.find(:radio_button, "size", checked: true).value
         storage_size = form.find(:radio_button, "storage_size", checked: true).value
         ha_type = form.find(:radio_button, "ha_type", checked: true).value
-        page.driver.submit :patch, form["action"], {size: size, storage_size: storage_size, ha_type: ha_type, _csrf: csrf}
+        page.driver.submit :patch, form["action"], {size: size, storage_size: storage_size, ha_type: ha_type, _csrf:}
 
         pg.reload
         expect(pg.target_vm_size).to eq("standard-8")
@@ -328,10 +328,10 @@ RSpec.describe Clover, "postgres" do
         # We send PATCH request manually instead of just clicking to button because PATCH action triggered by JavaScript.
         # UI tests run without a JavaScript engine.
         form = find_by_id "creation-form"
-        csrf = form.find("input[name='_csrf']", visible: false).value
+        _csrf = form.find("input[name='_csrf']", visible: false).value
         size = form.find(:radio_button, "size", checked: true).value
         storage_size = form.find(:radio_button, "storage_size", checked: true).value
-        page.driver.submit :patch, form["action"], {size: size, storage_size: storage_size, _csrf: csrf}
+        page.driver.submit :patch, form["action"], {size: size, storage_size: storage_size, _csrf:}
 
         # Normally we follow the redirect through javascript handler. Here, we are simulating that by reloading the page.
         visit "#{project.path}#{pg.path}"
