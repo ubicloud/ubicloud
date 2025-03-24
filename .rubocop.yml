@@ -2,11 +2,13 @@
 require:
   - rubocop-capybara
   - rubocop-erb
+  - standard
+
+plugins:
   - rubocop-performance
   - rubocop-rake
   - rubocop-rspec
   - rubocop-sequel
-  - standard
 
 inherit_gem:
   standard: config/base.yml
