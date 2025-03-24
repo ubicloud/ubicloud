@@ -28,7 +28,7 @@ RSpec.describe Clover, "inference-endpoint" do
         ["ie2", "e5-mistral-8b-it", project_wo_permissions, true, false, {capability: "Embeddings"}],
         ["ie3", "llama-guard-3-8b", project_wo_permissions, false, true, {capability: "Text Generation"}],
         ["ie4", "mistral-small-3", project, false, true, {capability: "Text Generation"}],
-        ["ie5", "llama-3-2-3b-it", project, false, true, {capability: "Text Generation"}],
+        ["ie5", "llama-3-3-70b-turbo", project, false, true, {capability: "Text Generation"}],
         ["ie6", "test-model", project_wo_permissions, false, true, {capability: "Text Generation"}],
         ["ie7", "unknown-capability", project_wo_permissions, true, true, {capability: "wrong capability"}]
       ].each do |name, model_name, project, is_public, visible, tags|

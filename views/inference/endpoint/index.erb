@@ -36,17 +36,6 @@ curl #{ie[:url]}#{path} \\
     <h2 class="text-lg font-bold mb-4 text-gray-800"><%= ie[:name] %></h2>
     <div class="grid sm:grid-cols-2 gap-4">
       <div>
-        <h3 class="text-sm font-semibold text-gray-900">Capability</h3>
-        <div class="flex items-center gap-1 text-gray-500">
-          <%== part("components/icon", name: model_icon, classes: "w-5 h-5 text-gray-400") %>
-          <%= ie[:tags]["capability"] %>
-        </div>
-      </div>
-      <div>
-        <h3 class="text-sm font-semibold text-gray-900">Pricing per million tokens</h3>
-        <p class="text-gray-500">$<%= "%0.02f" % ie[:price_million_tokens] %></p>
-      </div>
-      <div>
         <h3 class="text-sm font-semibold text-gray-900">Model card</h3>
         <div class="flex items-center gap-1 text-gray-500">
           <%if hf_model = ie[:tags]["hf_model"]%>
@@ -54,6 +43,21 @@ curl #{ie[:url]}#{path} \\
           <%else%>
           <p class="text-gray-500">Not available</p>
           <%end%>
+        </div>
+      </div>
+      <div>
+        <h3 class="text-sm font-semibold text-gray-900">Price</h3>
+        <p class="text-gray-500">
+          Input: $<%= "%0.02f" % ie[:input_price_million_tokens] %> / 1M tokens
+          <br>
+          Output: $<%= "%0.02f" % ie[:output_price_million_tokens] %> / 1M tokens
+        </p>
+      </div>
+      <div>
+        <h3 class="text-sm font-semibold text-gray-900">Capability</h3>
+        <div class="flex items-center gap-1 text-gray-500">
+          <%== part("components/icon", name: model_icon, classes: "w-5 h-5 text-gray-400") %>
+          <%= ie[:tags]["capability"] %>
         </div>
       </div>
       <div>
