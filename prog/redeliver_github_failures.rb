@@ -9,6 +9,6 @@ class Prog::RedeliverGithubFailures < Prog::Base
     strand.modified!(:stack)
     strand.save_changes
 
-    nap 5 * 60
+    nap 2 * 60
   end
 end
