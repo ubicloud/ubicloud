@@ -11,10 +11,9 @@ end
 
 # Table: load_balancers_vms
 # Columns:
-#  load_balancer_id | uuid          | NOT NULL
-#  vm_id            | uuid          | NOT NULL
-#  state            | lb_node_state | DEFAULT 'down'::lb_node_state
-#  id               | uuid          | PRIMARY KEY
+#  load_balancer_id | uuid | NOT NULL
+#  vm_id            | uuid | NOT NULL
+#  id               | uuid | PRIMARY KEY
 # Indexes:
 #  load_balancers_vms_pkey      | PRIMARY KEY btree (id)
 #  load_balancers_vms_vm_id_key | UNIQUE btree (vm_id)

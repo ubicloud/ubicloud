@@ -125,8 +125,6 @@ end
 #  id                          | uuid           | PRIMARY KEY
 #  name                        | text           | NOT NULL
 #  algorithm                   | lb_algorithm   | NOT NULL DEFAULT 'round_robin'::lb_algorithm
-#  src_port                    | integer        |
-#  dst_port                    | integer        |
 #  private_subnet_id           | uuid           | NOT NULL
 #  health_check_endpoint       | text           | NOT NULL
 #  health_check_interval       | integer        | NOT NULL DEFAULT 10
