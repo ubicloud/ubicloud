@@ -434,7 +434,14 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
       expect(inference_endpoint).to receive(:project).and_return(projects.first)
       expect(inference_endpoint).to receive(:is_public).and_return(false).twice
       expect(inference_endpoint).to receive(:ubid).and_return("ieubid")
-      expect(nx).to receive(:update_billing_records).with(JSON.parse("[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]"))
+      expect(nx).to receive(:update_billing_records).with(
+        JSON.parse("[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]"),
+        "input", "prompt_token_count"
+      )
+      expect(nx).to receive(:update_billing_records).with(
+        JSON.parse("[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]"),
+        "output", "completion_token_count"
+      )
       expect(sshable).to receive(:cmd).with("sudo curl -m 5 -s -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", {stdin: "{\"replica_ubid\":\"#{replica.ubid}\",\"public_endpoint\":false,\"projects\":[{\"ubid\":\"#{projects.first.ubid}\",\"api_keys\":[\"#{Digest::SHA2.hexdigest(projects.first.api_keys.first.key)}\"],\"quota_rps\":100,\"quota_tps\":10000}]}"}).and_return("{\"inference_endpoint\":\"1eqhk4b9gfq27gc5agxkq84bhr\",\"replica\":\"1rvtmbhd8cne6jpz3xxat7rsnr\",\"projects\":[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]}")
       nx.ping_gateway
     end
@@ -453,7 +460,14 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
         projects_sent = json_sent["projects"].sort_by { |p| p["ubid"] }
         expect(projects_sent).to eq(expected_projects)
       end.and_return("{\"inference_endpoint\":\"1eqhk4b9gfq27gc5agxkq84bhr\",\"replica\":\"1rvtmbhd8cne6jpz3xxat7rsnr\",\"projects\":[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]}")
-      expect(nx).to receive(:update_billing_records).with(JSON.parse("[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]"))
+      expect(nx).to receive(:update_billing_records).with(
+        JSON.parse("[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]"),
+        "input", "prompt_token_count"
+      )
+      expect(nx).to receive(:update_billing_records).with(
+        JSON.parse("[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]"),
+        "output", "completion_token_count"
+      )
 
       nx.ping_gateway
     end
@@ -463,30 +477,65 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
     p1 = Project.create_with_id(name: "default")
 
     it "updates billing records" do
-      expect(Project).to receive(:from_ubid).with(p1.ubid).and_return(p1).twice
+      expect(Project).to receive(:from_ubid).with(p1.ubid).and_return(p1).exactly(4).times
       expect(BillingRecord.count).to eq(0)
-      nx.update_billing_records([{"ubid" => p1.ubid, "request_count" => 1, "prompt_token_count" => 10, "completion_token_count" => 20}])
-      expect(BillingRecord.count).to eq(1)
-      br = BillingRecord.first
+      nx.update_billing_records(
+        [{"ubid" => p1.ubid, "request_count" => 1, "prompt_token_count" => 10, "completion_token_count" => 20}],
+        "input", "prompt_token_count"
+      )
+      nx.update_billing_records(
+        [{"ubid" => p1.ubid, "request_count" => 1, "prompt_token_count" => 10, "completion_token_count" => 20}],
+        "output", "completion_token_count"
+      )
+      expect(BillingRecord.count).to eq(2)
+      br = BillingRecord.all[0]
       expect(br.project_id).to eq(p1.id)
       expect(br.resource_id).to eq(inference_endpoint.id)
-      expect(br.billing_rate_id).to eq("fc9877ec-131c-4572-a3f2-fd512d95b348")
-      expect(br.amount).to eq(30)
-      nx.update_billing_records([{"ubid" => p1.ubid, "request_count" => 1, "prompt_token_count" => 1, "completion_token_count" => 2}])
-      expect(BillingRecord.count).to eq(1)
-      expect(Integer(br.reload.amount)).to eq(33)
+      expect(br.billing_rate_id).to eq("ba80e171-0c24-4bf9-ac4f-36bdadb259c0")
+      expect(br.amount).to eq(10)
+      br2 = BillingRecord.all[1]
+      expect(br2.project_id).to eq(p1.id)
+      expect(br2.resource_id).to eq(inference_endpoint.id)
+      expect(br2.billing_rate_id).to eq("c8886006-9e15-4046-b46a-163851626f83")
+      expect(br2.amount).to eq(20)
+      nx.update_billing_records(
+        [{"ubid" => p1.ubid, "request_count" => 1, "prompt_token_count" => 1, "completion_token_count" => 2}],
+        "input", "prompt_token_count"
+      )
+      nx.update_billing_records(
+        [{"ubid" => p1.ubid, "request_count" => 1, "prompt_token_count" => 1, "completion_token_count" => 2}],
+        "output", "completion_token_count"
+      )
+      expect(BillingRecord.count).to eq(2)
+      expect(Integer(br.reload.amount)).to eq(11)
+      expect(Integer(br2.reload.amount)).to eq(22)
     end
 
     it "does not update for zero tokens" do
       expect(BillingRecord.count).to eq(0)
-      nx.update_billing_records([{"ubid" => p1.ubid, "request_count" => 0, "prompt_token_count" => 0, "completion_token_count" => 0}])
+      nx.update_billing_records(
+        [{"ubid" => p1.ubid, "request_count" => 0, "prompt_token_count" => 0, "completion_token_count" => 0}],
+        "input", "prompt_token_count"
+      )
+      nx.update_billing_records(
+        [{"ubid" => p1.ubid, "request_count" => 0, "prompt_token_count" => 0, "completion_token_count" => 0}],
+        "output", "completion_token_count"
+      )
       expect(BillingRecord.count).to eq(0)
     end
 
     it "does not update if price is zero" do
-      expect(BillingRate).to receive(:from_resource_properties).with("InferenceTokens", inference_endpoint.model_name, "global").and_return({"unit_price" => 0.0000000000})
+      expect(BillingRate).to receive(:from_resource_properties).with("InferenceTokens", "#{inference_endpoint.model_name}-input", "global").and_return({"unit_price" => 0.0000000000})
+      expect(BillingRate).to receive(:from_resource_properties).with("InferenceTokens", "#{inference_endpoint.model_name}-output", "global").and_return({"unit_price" => 0.0000000000})
       expect(BillingRecord.count).to eq(0)
-      nx.update_billing_records([{"ubid" => p1.ubid, "request_count" => 1, "prompt_token_count" => 2, "completion_token_count" => 3}])
+      nx.update_billing_records(
+        [{"ubid" => p1.ubid, "request_count" => 1, "prompt_token_count" => 2, "completion_token_count" => 3}],
+        "input", "prompt_token_count"
+      )
+      nx.update_billing_records(
+        [{"ubid" => p1.ubid, "request_count" => 1, "prompt_token_count" => 2, "completion_token_count" => 3}],
+        "output", "completion_token_count"
+      )
       expect(BillingRecord.count).to eq(0)
     end
 
@@ -497,7 +546,10 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
       expect(BillingRecord).to receive(:create_with_id).once.ordered.with(hash_including(project_id: p1.id)).and_raise(Sequel::DatabaseConnectionError)
       expect(BillingRecord).to receive(:create_with_id).once.ordered.with(hash_including(project_id: p2.id)).and_call_original
       expect(BillingRecord.count).to eq(0)
-      nx.update_billing_records([{"ubid" => p1.ubid, "request_count" => 1, "prompt_token_count" => 2, "completion_token_count" => 3}, {"ubid" => p2.ubid, "request_count" => 1, "prompt_token_count" => 2, "completion_token_count" => 3}])
+      nx.update_billing_records(
+        [{"ubid" => p1.ubid, "request_count" => 1, "prompt_token_count" => 2, "completion_token_count" => 3}, {"ubid" => p2.ubid, "request_count" => 1, "prompt_token_count" => 2, "completion_token_count" => 3}],
+        "input", "prompt_token_count"
+      )
       expect(BillingRecord.count).to eq(1)
       br = BillingRecord.first
       expect(br.project_id).to eq(p2.id)
