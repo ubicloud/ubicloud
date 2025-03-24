@@ -95,8 +95,8 @@ RSpec.describe Clover, "personal access token management" do
     path = page.current_path
     btn = find(".delete-btn")
     data_url = btn["data-url"]
-    csrf = btn["data-csrf"]
-    page.driver.delete data_url, {_csrf: csrf}
+    _csrf = btn["data-csrf"]
+    page.driver.delete data_url, {_csrf:}
     expect(page.status_code).to eq(204)
     expect(ApiKey.all).to be_empty
     expect(DB[:applied_subject_tag].where(tag_id: project.subject_tags_dataset.first(name: "Admin").id, subject_id: @api_key.id).all).to be_empty
@@ -105,7 +105,7 @@ RSpec.describe Clover, "personal access token management" do
     visit path
     expect(page).to have_flash_notice("Personal access token deleted successfully")
 
-    page.driver.delete data_url, {_csrf: csrf}
+    page.driver.delete data_url, {_csrf:}
     expect(page.status_code).to eq(204)
     visit "#{project.path}/token"
     expect(page.html).not_to include("Personal access token deleted successfully")

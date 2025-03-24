@@ -53,6 +53,9 @@ Layout/SpaceInsideHashLiteralBraces:
 Layout/EmptyLinesAroundMethodBody:
   Enabled: false
 
+Lint/UnderscorePrefixedVariableName:
+  Enabled: false
+
 RSpec/AnyInstance:
   Enabled: false
 

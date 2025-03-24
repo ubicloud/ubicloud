@@ -91,9 +91,9 @@ RSpec.describe Clover, "github" do
       installation.update(cache_enabled: false)
 
       visit "#{project.path}/github/setting"
-      csrf_token = find("form[action='#{project.path}/github/installation/#{installation.ubid}'] input[name='_csrf']", visible: false).value
+      _csrf = find("form[action='#{project.path}/github/installation/#{installation.ubid}'] input[name='_csrf']", visible: false).value
 
-      page.driver.post "#{project.path}/github/installation/#{installation.ubid}", {cache_enabled: true, _csrf: csrf_token}
+      page.driver.post "#{project.path}/github/installation/#{installation.ubid}", {cache_enabled: true, _csrf:}
 
       expect(page.status_code).to eq(302)
       expect(installation.reload.cache_enabled).to be true
@@ -103,9 +103,9 @@ RSpec.describe Clover, "github" do
       installation.update(cache_enabled: true)
 
       visit "#{project.path}/github/setting"
-      csrf_token = find("form[action='#{project.path}/github/installation/#{installation.ubid}'] input[name='_csrf']", visible: false).value
+      _csrf = find("form[action='#{project.path}/github/installation/#{installation.ubid}'] input[name='_csrf']", visible: false).value
 
-      page.driver.post "#{project.path}/github/installation/#{installation.ubid}", {cache_enabled: false, _csrf: csrf_token}
+      page.driver.post "#{project.path}/github/installation/#{installation.ubid}", {cache_enabled: false, _csrf:}
 
       expect(page.status_code).to eq(302)
       expect(installation.reload.cache_enabled).to be false
