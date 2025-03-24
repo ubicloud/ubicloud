@@ -13,7 +13,7 @@ RSpec.describe Prog::RedeliverGithubFailures do
       expect(Github).to receive(:redeliver_failed_deliveries).with(Time.parse("2023-10-19 22:27:47 +0000"))
       expect(rgf.strand).to receive(:save_changes)
       expect {
-        expect { rgf.wait }.to nap(5 * 60)
+        expect { rgf.wait }.to nap(2 * 60)
       }.to change { rgf.strand.stack.first["last_check_at"] }.from("2023-10-19 22:27:47 +0000").to("2023-10-19 23:27:47 +0000")
     end
   end
