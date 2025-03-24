@@ -9,7 +9,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   def_delegators :postgres_timeline, :blob_storage_client
 
   def self.assemble(location_id:, parent_id: nil)
-    if parent_id && (PostgresTimeline[parent_id]).nil?
+    if parent_id && PostgresTimeline[parent_id].nil?
       fail "No existing parent"
     end
 

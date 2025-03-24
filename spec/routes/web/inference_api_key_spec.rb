@@ -41,14 +41,14 @@ RSpec.describe Clover, "inference-api-key" do
     it "inference api key page allows removing inference api keys" do
       btn = find(".delete-btn")
       data_url = btn["data-url"]
-      _csrf = btn["data-csrf"]
-      page.driver.delete data_url, {_csrf:}
+      csrf = btn["data-csrf"]
+      page.driver.delete data_url, {_csrf: csrf}
       expect(page.status_code).to eq(204)
       expect(ApiKey.all).to be_empty
       visit "#{project.path}/inference-api-key"
       expect(page).to have_flash_notice("Inference API Key deleted successfully")
 
-      page.driver.delete data_url, {_csrf:}
+      page.driver.delete data_url, {_csrf: csrf}
       expect(page.status_code).to eq(204)
       visit "#{project.path}/inference-api-key"
       expect(page.html).not_to include("Inference API Key deleted successfully")
