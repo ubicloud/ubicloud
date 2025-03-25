@@ -20,6 +20,12 @@ loop do
   system(*command)
   status = $?
 
+  # Extra newline to prevent blending with subprocess just in
+  # case. Done as a separate system call, to be extra-accommodating to
+  # loggers that may want process things one system call at a time:
+  # below PIPE_BUF each write() matches with a read().
+  puts
+
   puts JSON.generate(restarter: {
     start_time: iso_start,
     command_exit: {
