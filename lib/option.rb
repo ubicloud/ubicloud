@@ -107,7 +107,7 @@ module Option
     PostgresResource::Flavor::LANTERN => ["16"]
   }
 
-  AWS_LOCATIONS = ["us-east-1", "us-west-1"].freeze
+  AWS_LOCATIONS = ["us-east-1"].freeze
 
   KubernetesCPOption = Struct.new(:cp_node_count, :title, :explanation)
   KubernetesCPOptions = [[1, "1 Node", "Single control plane node without resilience"],
