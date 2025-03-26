@@ -107,7 +107,7 @@ module Option
     PostgresResource::Flavor::LANTERN => ["16"]
   }
 
-  AWS_LOCATIONS = ["us-east-1", "us-west-1"].freeze
+  AWS_LOCATIONS = ["us-east-1"].freeze
 
   def self.customer_postgres_sizes_for_project(project_id)
     return Option::PostgresSizes unless project_id
