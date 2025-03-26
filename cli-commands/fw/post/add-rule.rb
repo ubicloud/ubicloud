@@ -11,11 +11,8 @@ UbiCli.on("fw").run_on("add-rule") do
   args 1
 
   run do |cidr, opts|
-    range = opts[:fw_add_rule].values_at(:"start-port", :"end-port")
-    range[1] ||= range[0] || 65535
-    range[0] ||= 0
-    post(fw_path("/firewall-rule"), "cidr" => cidr, "port_range" => range.join("..")) do |data|
-      ["Added firewall rule with id: #{data["id"]}"]
-    end
+    start_port, end_port = opts[:fw_add_rule].values_at(:"start-port", :"end-port")
+    id = sdk_object.add_rule(cidr, start_port:, end_port:)[:id]
+    response("Added firewall rule with id: #{id}")
   end
 end

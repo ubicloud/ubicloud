@@ -8,8 +8,7 @@ UbiCli.on("fw").run_on("attach-subnet") do
   args 1
 
   run do |subnet_id|
-    post(fw_path("/attach-subnet"), "private_subnet_id" => subnet_id) do |data|
-      ["Attached private subnet with id #{subnet_id} to firewall with id #{data["id"]}"]
-    end
+    id = sdk_object.attach_subnet(subnet_id).id
+    response("Attached private subnet with id #{subnet_id} to firewall with id #{id}")
   end
 end

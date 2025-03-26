@@ -9,8 +9,7 @@ UbiCli.on("ps").run_on("create") do
 
   run do |opts|
     params = underscore_keys(opts[:ps_create])
-    post(ps_path, params) do |data|
-      ["Private subnet created with id: #{data["id"]}"]
-    end
+    id = sdk.private_subnet.create(location: @location, name: @name, **params).id
+    response("Private subnet created with id: #{id}")
   end
 end

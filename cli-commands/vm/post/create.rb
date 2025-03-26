@@ -20,12 +20,11 @@ UbiCli.on("vm").run_on("create") do
 
   run do |public_key, opts|
     params = underscore_keys(opts[:vm_create])
-    unless params.delete("ipv6_only")
-      params["enable_ip4"] = "1"
+    unless params.delete(:ipv6_only)
+      params[:enable_ip4] = "1"
     end
-    params["public_key"] = public_key.gsub(/(?!\r)\n/, "\r\n")
-    post(vm_path, params) do |data|
-      ["VM created with id: #{data["id"]}"]
-    end
+    params[:public_key] = public_key
+    id = sdk.vm.create(location: @location, name: @name, **params).id
+    response("VM created with id: #{id}")
   end
 end

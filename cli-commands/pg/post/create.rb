@@ -18,9 +18,7 @@ UbiCli.on("pg").run_on("create") do
 
   run do |opts|
     params = underscore_keys(opts[:pg_create])
-    params["size"] ||= Prog::Vm::Nexus::DEFAULT_SIZE
-    post(pg_path, params) do |data|
-      ["PostgreSQL database created with id: #{data["id"]}"]
-    end
+    id = sdk.postgres.create(location: @location, name: @name, **params).id
+    response("PostgreSQL database created with id: #{id}")
   end
 end

@@ -11,23 +11,25 @@ UbiCli.on("lb").run_on("show") do
   help_option_values("Fields:", fields)
 
   run do |opts|
-    get(lb_path) do |data|
-      keys = underscore_keys(check_fields(opts[:lb_show][:fields], fields, "lb show -f option"))
+    data = sdk_object.info
+    keys = underscore_keys(check_fields(opts[:lb_show][:fields], fields, "lb show -f option"))
 
-      body = []
+    body = []
 
-      keys.each do |key|
-        if key == "vms"
-          body << "vms:\n"
-          data[key].each do |vm_ubid|
-            body << "  " << vm_ubid << "\n"
-          end
-        else
-          body << key << ": " << data[key].to_s << "\n"
+    keys.each do |key|
+      case key
+      when :vms
+        body << "vms:\n"
+        data[key].each do |vm|
+          body << "  " << vm.id << "\n"
         end
+      when :subnet
+        body << key.to_s << ": " << data.subnet.name << "\n"
+      else
+        body << key.to_s << ": " << data[key].to_s << "\n"
       end
-
-      body
     end
+
+    response(body)
   end
 end

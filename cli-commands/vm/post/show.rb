@@ -17,41 +17,43 @@ UbiCli.on("vm").run_on("show") do
   help_option_values("Firewall Fields:", firewall_fields)
 
   run do |opts|
-    get(vm_path) do |data|
-      opts = opts[:vm_show]
-      keys = check_fields(opts[:fields], fields, "vm show -f option")
-      firewall_keys = check_fields(opts[:"firewall-fields"], firewall_fields, "vm show -w option")
-      firewall_rule_keys = check_fields(opts[:"rule-fields"], firewall_rule_fields, "vm show -r option")
+    data = sdk_object.info
+    opts = opts[:vm_show]
+    keys = check_fields(opts[:fields], fields, "vm show -f option")
+    firewall_keys = check_fields(opts[:"firewall-fields"], firewall_fields, "vm show -w option")
+    firewall_rule_keys = check_fields(opts[:"rule-fields"], firewall_rule_fields, "vm show -r option")
 
-      body = []
+    body = []
 
-      firewall_keys = underscore_keys(firewall_keys)
-      firewall_rule_keys = underscore_keys(firewall_rule_keys)
-      underscore_keys(keys).each do |key|
-        if key == "firewalls"
-          data[key].each_with_index do |firewall, i|
-            body << "firewall " << (i + 1).to_s << ":\n"
-            firewall_keys.each do |fw_key|
-              if fw_key == "firewall_rules"
-                body << "  rules:\n"
-                firewall[fw_key].each_with_index do |rule, i|
-                  body << "    " << (i + 1).to_s << ": "
-                  firewall_rule_keys.each do |fwr_key|
-                    body << rule[fwr_key].to_s << "  "
-                  end
-                  body << "\n"
+    firewall_keys = underscore_keys(firewall_keys)
+    firewall_rule_keys = underscore_keys(firewall_rule_keys)
+    underscore_keys(keys).each do |key|
+      case key
+      when :firewalls
+        data[key].each_with_index do |firewall, i|
+          body << "firewall " << (i + 1).to_s << ":\n"
+          firewall_keys.each do |fw_key|
+            if fw_key == :firewall_rules
+              body << "  rules:\n"
+              firewall[fw_key].each_with_index do |rule, i|
+                body << "    " << (i + 1).to_s << ": "
+                firewall_rule_keys.each do |fwr_key|
+                  body << rule[fwr_key].to_s << "  "
                 end
-              else
-                body << "  " << fw_key << ": " << firewall[fw_key].to_s << "\n"
+                body << "\n"
               end
+            else
+              body << "  " << fw_key.to_s << ": " << firewall[fw_key].to_s << "\n"
             end
           end
-        else
-          body << key << ": " << data[key].to_s << "\n"
         end
+      when :subnet
+        body << key.to_s << ": " << data[key].name << "\n"
+      else
+        body << key.to_s << ": " << data[key].to_s << "\n"
       end
-
-      body
     end
+
+    response(body)
   end
 end

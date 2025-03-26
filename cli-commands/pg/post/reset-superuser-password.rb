@@ -8,8 +8,7 @@ UbiCli.on("pg").run_on("reset-superuser-password") do
   args 1
 
   run do |password|
-    post(pg_path("/reset-superuser-password"), "password" => password) do |data|
-      ["Superuser password reset scheduled for PostgreSQL database with id: #{data["id"]}"]
-    end
+    id = sdk_object.reset_superuser_password(password).id
+    response("Superuser password reset scheduled for PostgreSQL database with id: #{id}")
   end
 end
