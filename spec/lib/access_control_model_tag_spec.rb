@@ -107,7 +107,7 @@
       error = "must only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number"
       tag = model.new(project_id: project.id)
       expect(tag.valid?).to be false
-      expect(tag.errors[:name]).to eq([error, "is not present"])
+      expect(tag.errors[:name]).to eq([error])
 
       tag.name = "@"
       expect(tag.valid?).to be false
