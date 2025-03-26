@@ -393,6 +393,19 @@ class Prog::Vm::GithubRunner < Prog::Base
           Clog.emit("Failed to move serial.log or running journalctl") { github_runner }
         end
       end
+
+      # For analyzing the Docker Hub rate limit, we check the quota and log the
+      # remaining limit.
+      begin
+        docker_quota_limit_command = <<~COMMAND
+          TOKEN=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
+          curl -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
+        COMMAND
+        vm.sshable.cmd(docker_quota_limit_command)
+      rescue Sshable::SshError
+        Clog.emit("Failed to check Docker Hub rate limit") { github_runner }
+      end
+
       vm.incr_destroy
     end
 

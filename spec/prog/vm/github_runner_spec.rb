@@ -580,6 +580,10 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(ps).to receive(:incr_destroy)
       expect(vm).to receive(:private_subnets).and_return([ps])
       expect(vm).to receive(:vm_host).and_return(vm_host).at_least(:once)
+      expect(sshable).to receive(:cmd).with(<<~COMMAND)
+        TOKEN=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
+        curl -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
+      COMMAND
       expect(sshable).to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
       expect(sshable).to receive(:cmd).with("journalctl -u runner-script -t 'run-withenv.sh' -t 'systemd' --no-pager | grep -Fv Started")
       expect(vm).to receive(:incr_destroy)
@@ -591,6 +595,10 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(nx).to receive(:decr_destroy)
       expect(github_runner).to receive(:skip_deregistration_set?).and_return(true)
       expect(github_runner).to receive(:workflow_job).and_return({"conclusion" => "success"}).at_least(:once)
+      expect(sshable).to receive(:cmd).with(<<~COMMAND)
+        TOKEN=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
+        curl -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
+      COMMAND
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
@@ -604,6 +612,10 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(github_runner).to receive(:workflow_job).and_return(nil)
       vm_host = instance_double(VmHost, sshable: sshable)
       expect(vm).to receive(:vm_host).and_return(vm_host).at_least(:once)
+      expect(sshable).to receive(:cmd).with(<<~COMMAND)
+        TOKEN=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
+        curl -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
+      COMMAND
       expect(sshable).to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
       expect(sshable).to receive(:cmd).with("journalctl -u runner-script -t 'run-withenv.sh' -t 'systemd' --no-pager | grep -Fv Started")
       expect(vm).to receive(:incr_destroy)
@@ -621,6 +633,24 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm).to receive(:vm_host).and_return(vm_host).at_least(:once)
       expect(sshable).to receive(:cmd).and_raise Sshable::SshError.new("bogus", "", "", nil, nil)
       expect(Clog).to receive(:emit).with("Failed to move serial.log or running journalctl").and_call_original
+      expect(sshable).to receive(:cmd).with(<<~COMMAND)
+        TOKEN=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
+        curl -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
+      COMMAND
+      expect(vm).to receive(:incr_destroy)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
+    it "emits log if it couldn't check Docker Hub rate limit" do
+      expect(nx).to receive(:decr_destroy)
+      expect(client).to receive(:get).and_raise(Octokit::NotFound)
+      expect(client).not_to receive(:delete)
+
+      expect(github_runner).to receive(:workflow_job).and_return({"conclusion" => "success"}).at_least(:once)
+      expect(sshable).to receive(:cmd).and_raise Sshable::SshError.new("bogus", "", "", nil, nil)
+
+      expect(Clog).to receive(:emit).with("Failed to check Docker Hub rate limit").and_call_original
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
@@ -632,6 +662,10 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(client).not_to receive(:delete)
 
       expect(github_runner).to receive(:workflow_job).and_return({"conclusion" => "success"}).at_least(:once)
+      expect(sshable).to receive(:cmd).with(<<~COMMAND)
+        TOKEN=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
+        curl -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
+      COMMAND
       expect(sshable).not_to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
       expect(sshable).not_to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -e run-withenv -e systemd | grep -v -e Started")
       expect(vm).to receive(:incr_destroy)
