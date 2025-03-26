@@ -6,8 +6,7 @@ UbiCli.on("vm").run_on("restart") do
   banner "ubi vm (location/vm-name | vm-id) restart"
 
   run do
-    post(vm_path("/restart")) do |data|
-      ["Scheduled restart of VM with id #{data["id"]}"]
-    end
+    id = sdk_object.restart.id
+    response("Scheduled restart of VM with id #{id}")
   end
 end

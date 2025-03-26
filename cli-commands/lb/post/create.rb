@@ -17,17 +17,14 @@ UbiCli.on("lb").run_on("create") do
 
   run do |private_subnet_id, src_port, dst_port, opts|
     params = underscore_keys(opts[:lb_create])
-    params["algorithm"] ||= "round_robin"
-    if (endpoint = params.delete("check_endpoint"))
-      params["health_check_endpoint"] = endpoint
+    if (endpoint = params.delete(:check_endpoint))
+      params[:health_check_endpoint] = endpoint
     end
-    params["health_check_protocol"] = params.delete("check_protocol") || "http"
-    params["stack"] ||= "dual"
-    params["private_subnet_id"] = private_subnet_id
-    params["src_port"] = src_port
-    params["dst_port"] = dst_port
-    post(lb_path, params) do |data|
-      ["Load balancer created with id: #{data["id"]}"]
-    end
+    params[:health_check_protocol] = params.delete(:check_protocol)
+    params[:private_subnet_id] = private_subnet_id
+    params[:src_port] = src_port
+    params[:dst_port] = dst_port
+    id = sdk.load_balancer.create(location: @location, name: @name, **params).id
+    response("Load balancer created with id: #{id}")
   end
 end

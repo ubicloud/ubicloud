@@ -8,8 +8,7 @@ UbiCli.on("fw").run_on("detach-subnet") do
   args 1
 
   run do |subnet_id|
-    post(fw_path("/detach-subnet"), "private_subnet_id" => subnet_id) do |data|
-      ["Detached private subnet with id #{subnet_id} from firewall with id #{data["id"]}"]
-    end
+    id = sdk_object.detach_subnet(subnet_id).id
+    response("Detached private subnet with id #{subnet_id} from firewall with id #{id}")
   end
 end

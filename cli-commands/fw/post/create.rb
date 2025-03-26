@@ -9,8 +9,7 @@ UbiCli.on("fw").run_on("create") do
 
   run do |opts|
     params = underscore_keys(opts[:fw_create])
-    post(fw_path, params) do |data|
-      ["Firewall created with id: #{data["id"]}"]
-    end
+    id = sdk.firewall.create(location: @location, name: @name, **params).id
+    response("Firewall created with id: #{id}")
   end
 end

@@ -8,12 +8,8 @@ UbiCli.on("pg").run_on("delete-firewall-rule") do
   args 1
 
   run do |ubid|
-    if ubid.include?("/")
-      raise Rodish::CommandFailure, "invalid firewall rule id format"
-    end
-
-    delete(pg_path("/firewall-rule/#{ubid}")) do |data|
-      ["Firewall rule, if it exists, has been scheduled for deletion"]
-    end
+    check_no_slash(ubid, "invalid firewall rule id format")
+    sdk_object.delete_firewall_rule(ubid)
+    response("Firewall rule, if it exists, has been scheduled for deletion")
   end
 end

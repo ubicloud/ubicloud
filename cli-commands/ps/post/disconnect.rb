@@ -8,11 +8,8 @@ UbiCli.on("ps").run_on("disconnect") do
   args 1
 
   run do |ps_id|
-    if ps_id.include?("/")
-      raise Rodish::CommandFailure, "invalid private subnet id format"
-    end
-    post(ps_path("/disconnect/#{ps_id}")) do |data|
-      ["Disconnected private subnets with ids #{ps_id} and #{data["id"]}"]
-    end
+    check_no_slash(ps_id, "invalid private subnet id format")
+    id = sdk_object.disconnect(ps_id).id
+    response("Disconnected private subnets with ids #{ps_id} and #{id}")
   end
 end

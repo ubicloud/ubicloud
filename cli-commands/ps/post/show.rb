@@ -20,48 +20,47 @@ UbiCli.on("ps").run_on("show") do
   help_option_values("Firewall Fields:", firewall_fields)
 
   run do |opts|
-    get(ps_path) do |data|
-      opts = opts[:ps_show]
-      keys = underscore_keys(check_fields(opts[:fields], fields, "ps show -f option"))
-      firewall_keys = underscore_keys(check_fields(opts[:"firewall-fields"], firewall_fields, "ps show -w option"))
-      firewall_rule_keys = underscore_keys(check_fields(opts[:"rule-fields"], firewall_rule_fields, "ps show -r option"))
-      nic_keys = underscore_keys(check_fields(opts[:"nic-fields"], nic_fields, "ps show -n option"))
+    data = sdk_object.info
+    opts = opts[:ps_show]
+    keys = underscore_keys(check_fields(opts[:fields], fields, "ps show -f option"))
+    firewall_keys = underscore_keys(check_fields(opts[:"firewall-fields"], firewall_fields, "ps show -w option"))
+    firewall_rule_keys = underscore_keys(check_fields(opts[:"rule-fields"], firewall_rule_fields, "ps show -r option"))
+    nic_keys = underscore_keys(check_fields(opts[:"nic-fields"], nic_fields, "ps show -n option"))
 
-      body = []
+    body = []
 
-      keys.each do |key|
-        case key
-        when "firewalls"
-          data[key].each_with_index do |firewall, i|
-            body << "firewall " << (i + 1).to_s << ":\n"
-            firewall_keys.each do |fw_key|
-              if fw_key == "firewall_rules"
-                body << "  rules:\n"
-                firewall[fw_key].each_with_index do |rule, i|
-                  body << "   " << (i + 1).to_s << ": "
-                  firewall_rule_keys.each do |fwr_key|
-                    body << rule[fwr_key].to_s << "  "
-                  end
-                  body << "\n"
+    keys.each do |key|
+      case key
+      when :firewalls
+        data[key].each_with_index do |firewall, i|
+          body << "firewall " << (i + 1).to_s << ":\n"
+          firewall_keys.each do |fw_key|
+            if fw_key == :firewall_rules
+              body << "  rules:\n"
+              firewall[fw_key].each_with_index do |rule, i|
+                body << "   " << (i + 1).to_s << ": "
+                firewall_rule_keys.each do |fwr_key|
+                  body << rule[fwr_key].to_s << "  "
                 end
-              else
-                body << "  " << fw_key << ": " << firewall[fw_key].to_s << "\n"
+                body << "\n"
               end
+            else
+              body << "  " << fw_key.to_s << ": " << firewall[fw_key].to_s << "\n"
             end
           end
-        when "nics"
-          data[key].each_with_index do |nic, i|
-            body << "nic " << (i + 1).to_s << ":\n"
-            nic_keys.each do |nic_key|
-              body << "  " << nic_key << ": " << nic[nic_key].to_s << "\n"
-            end
-          end
-        else
-          body << key << ": " << data[key].to_s << "\n"
         end
+      when :nics
+        data[key].each_with_index do |nic, i|
+          body << "nic " << (i + 1).to_s << ":\n"
+          nic_keys.each do |nic_key|
+            body << "  " << nic_key.to_s << ": " << nic[nic_key].to_s << "\n"
+          end
+        end
+      else
+        body << key.to_s << ": " << data[key].to_s << "\n"
       end
-
-      body
     end
+
+    response(body)
   end
 end

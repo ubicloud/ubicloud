@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rodish"
+require_relative "../sdk/ruby/lib/ubicloud"
 
 class UbiCli
   force_autoload = Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
@@ -12,6 +13,8 @@ class UbiCli
     "ps" => "private-subnet",
     "vm" => "vm"
   }.freeze
+
+  SDK_METHODS = FRAGMENTS.transform_values { _1.tr("-", "_").freeze }.freeze
 
   CAPITALIZED_LABELS = {
     "fw" => "Firewall",
@@ -55,6 +58,18 @@ class UbiCli
 
   def self.process(argv, env)
     super
+  rescue Ubicloud::Error => e
+    status = e.code
+    message = "! Unexpected response status: #{e.code}"
+    parsed_body = e.params
+    message << "\nDetails: #{parsed_body.dig("error", "message")}"
+    if (details = parsed_body.dig("error", "details"))
+      details.each do |k, v|
+        message << "\n  " << k.to_s << ": " << v.to_s
+      end
+    end
+    message += "\n"
+    [status, {"content-type" => "text/plain", "content-length" => message.bytesize.to_s}, [message]]
   rescue Rodish::CommandFailure => e
     status = 400
     message = e.message_with_usage.dup
@@ -66,7 +81,9 @@ class UbiCli
 
   def self.base(cmd, &block)
     on(cmd) do
-      desc "Manage #{LOWERCASE_LABELS[cmd]}s"
+      label = LOWERCASE_LABELS[cmd]
+
+      desc "Manage #{label}s"
 
       # :nocov:
       unless Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
@@ -80,20 +97,16 @@ class UbiCli
       instance_exec(&block)
 
       run do |(ref, *argv), opts, command|
+        @sdk_method = SDK_METHODS[cmd]
         @location, @name, extra = ref.split("/", 3)
 
         if !@name && OBJECT_INFO_REGEXP.match?(@location)
-          location = get(project_path("object-info/#{@location}")) do |data|
-            break data["location"]
-          end
-
-          if location.is_a?(Array)
-            location[0] = 400
-            next location
+          unless (object = sdk[@location])
+            raise Rodish::CommandFailure, "no #{label} with id #{@location} exists"
           end
 
           @name = @location
-          @location = location
+          @location = object.location
         end
 
         if extra || !@name
@@ -108,7 +121,7 @@ class UbiCli
   def self.list(cmd, fields)
     fields.freeze.each(&:freeze)
     key = :"#{cmd}_list"
-    fragment = FRAGMENTS[cmd]
+    sdk_method = SDK_METHODS[cmd]
 
     on(cmd, "list") do
       desc "List #{LOWERCASE_LABELS[cmd]}s"
@@ -122,27 +135,20 @@ class UbiCli
 
       run do |opts|
         opts = opts[key]
-        path = if (location = opts[:location])
-          if !location.match(Validation::ALLOWED_NAME_PATTERN)
+        if (location = opts[:location])
+          unless location.match(Validation::ALLOWED_NAME_PATTERN)
             raise Rodish::CommandFailure, "invalid location provided in #{cmd} list -l option"
-          else
-            "location/#{location}/#{fragment}"
           end
-        else
-          fragment
         end
 
-        get(project_path(path)) do |data|
-          keys = underscore_keys(check_fields(opts[:fields], fields, "#{cmd} list -f option"))
-          format_rows(keys, data["items"], headers: opts[:"no-headers"] != false)
-        end
+        items = sdk.send(sdk_method).list(location:)
+        keys = underscore_keys(check_fields(opts[:fields], fields, "#{cmd} list -f option"))
+        response(format_rows(keys, items, headers: opts[:"no-headers"] != false))
       end
     end
   end
 
   def self.destroy(cmd)
-    fragment = FRAGMENTS[cmd]
-
     on(cmd).run_on("destroy") do
       desc "Destroy a #{LOWERCASE_LABELS[cmd]}"
 
@@ -152,9 +158,8 @@ class UbiCli
 
       run do |opts|
         if opts.dig(:destroy, :force) || opts[:confirm] == @name
-          delete(project_subpath(fragment)) do |_, res|
-            ["#{CAPITALIZED_LABELS[cmd]}, if it exists, is now scheduled for destruction"]
-          end
+          sdk_object.destroy
+          response("#{CAPITALIZED_LABELS[cmd]}, if it exists, is now scheduled for destruction")
         elsif opts[:confirm]
           invalid_confirmation <<~END
             ! Confirmation of #{LOWERCASE_LABELS[cmd]} name not successful.
@@ -178,23 +183,21 @@ class UbiCli
       args(0...)
 
       run do |argv, opts|
-        get(pg_path) do |data, res|
-          conn_string = URI(data["connection_string"])
-          opts = opts[:pg_psql]
-          if (user = opts[:username])
-            conn_string.user = user
-            conn_string.password = nil
-          end
-
-          if (database = opts[:dbname])
-            conn_string.path = "/#{database}"
-          end
-
-          argv = [cmd, *argv, "--", conn_string]
-          argv = yield(argv) if block_given?
-
-          execute_argv(argv, res)
+        pg = sdk_object.info
+        conn_string = URI(pg.connection_string)
+        opts = opts[:pg_psql]
+        if (user = opts[:username])
+          conn_string.user = user
+          conn_string.password = nil
         end
+
+        if (database = opts[:dbname])
+          conn_string.path = "/#{database}"
+        end
+
+        argv = [cmd, *argv, "--", conn_string]
+        argv = yield(argv) if block_given?
+        execute_argv(argv)
       end
     end
   end
@@ -210,36 +213,34 @@ class UbiCli
   end
 
   def handle_ssh(opts)
-    get(vm_path) do |data, res|
-      opts = opts[:vm_ssh]
-      user = opts[:user]
-      if opts[:ip4]
-        address = data["ip4"] || false
-      elsif opts[:ip6]
-        address = data["ip6"]
-      end
+    vm = sdk_object.info
+    opts = opts[:vm_ssh]
+    user = opts[:user]
+    if opts[:ip4]
+      address = vm.ip4 || false
+    elsif opts[:ip6]
+      address = vm.ip6
+    end
 
-      if address.nil?
-        address = if ipv6_request?
-          data["ip6"] || data["ip4"]
-        else
-          data["ip4"] || data["ip6"]
-        end
-      end
-
-      if address
-        user ||= data["unix_user"]
-        execute_argv(yield(user:, address:), res)
+    if address.nil?
+      address = if ipv6_request?
+        vm.ip6 || vm.ip4
       else
-        res[0] = 400
-        ["! No valid IPv4 address for requested VM"]
+        vm.ip4 || vm.ip6
       end
+    end
+
+    if address
+      user ||= vm.unix_user
+      execute_argv(yield(user:, address:))
+    else
+      response("! No valid IPv4 address for requested VM", status: 400)
     end
   end
 
-  def execute_argv(args, res)
-    res[1]["ubi-command-execute"] = args.shift
-    [args.join("\0")]
+  def execute_argv(argv)
+    cmd = argv.shift
+    response(argv.join("\0"), headers: {"ubi-command-execute" => cmd})
   end
 
   def check_fields(given_fields, allowed_fields, option_name)
@@ -264,46 +265,15 @@ class UbiCli
     end
   end
 
-  def delete(path, params = {}, &block)
-    _req(_req_env("DELETE", path, params), &block)
-  end
-
-  def post(path, params = {}, &block)
-    _req(_req_env("POST", path, params), &block)
-  end
-
-  def patch(path, params = {}, &block)
-    _req(_req_env("PATCH", path, params), &block)
-  end
-
-  def get(path, &block)
-    _req(_req_env("GET", path, nil), &block)
-  end
-
-  def project_path(rest)
-    "/project/#{project_ubid}/#{rest}"
-  end
-
-  def project_subpath(fragment, rest = "")
-    project_path("location/#{@location}/#{fragment}/#{@name}#{rest}")
-  end
-
-  FRAGMENTS.each do |cmd, fragment|
-    define_method(:"#{cmd}_path") do |rest = ""|
-      project_subpath(fragment, rest)
-    end
-  end
-
   def format_rows(keys, rows, headers: false, col_sep: "  ")
     results = []
 
     sizes = Hash.new(0)
-    string_keys = keys.map(&:to_s)
-    string_keys.each do |key|
+    keys.each do |key|
       sizes[key] = headers ? key.size : 0
     end
     rows = rows.map do |row|
-      row.transform_values(&:to_s)
+      row.to_h.transform_values(&:to_s)
     end
     rows.each do |row|
       keys.each do |key|
@@ -317,7 +287,7 @@ class UbiCli
 
     if headers
       sep = false
-      string_keys.each do |key|
+      keys.each do |key|
         if sep
           results << col_sep
         else
@@ -350,11 +320,9 @@ class UbiCli
 
   def underscore_keys(keys)
     if keys.is_a?(Hash)
-      # Used with symbol keyed hashes that need to be
-      # converted to strings
-      keys.transform_keys { _1.to_s.tr("-", "_") }
-    else # when Hash
-      keys.map { _1.tr("-", "_") }
+      keys.transform_keys { _1.to_s.tr("-", "_").to_sym }
+    else # when Array
+      keys.map { _1.tr("-", "_").to_sym }
     end
   end
 
@@ -378,54 +346,12 @@ class UbiCli
     finalize_response([status, headers, body])
   end
 
-  def _req_env(method, path, params)
-    env = @env.merge(
-      "REQUEST_METHOD" => method,
-      "PATH_INFO" => path,
-      "rack.request.form_input" => nil,
-      "rack.request.form_hash" => nil
-    )
-    params &&= params.to_json.force_encoding(Encoding::BINARY)
-    env["rack.input"] = StringIO.new(params || "".b)
-    env.delete("roda.json_params")
-    env
+  def sdk
+    @sdk ||= Ubicloud.new(:rack, app: Clover, env: @env, project_id: project_ubid)
   end
 
-  def _req(env)
-    res = _submit_req(env)
-
-    case res[0]
-    when 200
-      # Temporary nocov until at least one action pushed into routes
-      # :nocov:
-      if res[1]["content-type"] == "application/json"
-        # :nocov:
-        body = +""
-        res[2].each { body << _1 }
-        res[2] = yield(JSON.parse(body), res)
-      end
-    when 204
-      res[0] = 200
-      res[2] = yield(nil, res)
-    else
-      body = +""
-      res[2].each { body << _1 }
-      error_message = "! Unexpected response status: #{res[0]}"
-      # Temporary nocov until at least one action pushed into routes
-      # :nocov:
-      if (res[1]["content-type"] == "application/json") && (parsed_body = JSON.parse(body)) && (error = parsed_body.dig("error", "message"))
-        # :nocov:
-        error_message << "\nDetails: #{error}"
-        if (details = parsed_body.dig("error", "details"))
-          details.each do |k, v|
-            error_message << "\n  " << k.to_s << ": " << v.to_s
-          end
-        end
-      end
-      res[2] = [error_message]
-    end
-
-    finalize_response(res)
+  def sdk_object
+    sdk.send(@sdk_method).new("#{@location}/#{@name}")
   end
 
   def finalize_response(res)
@@ -439,8 +365,8 @@ class UbiCli
     res
   end
 
-  def _submit_req(env)
-    Clover.call(env)
+  def check_no_slash(string, error_message)
+    raise Rodish::CommandFailure, error_message if string.include?("/")
   end
 
   # :nocov:
@@ -453,8 +379,10 @@ class UbiCli
       end
     end)
 
-    prepend(Module.new do
-      def _submit_req(env)
+    require_relative "../sdk/ruby/lib/ubicloud/adapter"
+    require_relative "../sdk/ruby/lib/ubicloud/adapter/rack"
+    Ubicloud::Adapter::Rack.prepend(Module.new do
+      def call(...)
         DB.allow_queries do
           super
         end
