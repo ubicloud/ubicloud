@@ -1,4 +1,4 @@
-! Invalid number of arguments for pg show subcommand (accepts: 0, given: 1)
+! Invalid number of arguments for pg show subcommand (requires: 0, given: 1)
 
 Show details for a PostgreSQL database
 

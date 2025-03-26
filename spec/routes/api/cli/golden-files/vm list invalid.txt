@@ -1,4 +1,4 @@
-! Invalid number of arguments for vm list subcommand (accepts: 0, given: 1)
+! Invalid number of arguments for vm list subcommand (requires: 0, given: 1)
 
 List virtual machines
 

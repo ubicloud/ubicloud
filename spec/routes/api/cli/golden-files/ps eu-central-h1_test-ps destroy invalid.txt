@@ -1,4 +1,4 @@
-! Invalid number of arguments for ps destroy subcommand (accepts: 0, given: 1)
+! Invalid number of arguments for ps destroy subcommand (requires: 0, given: 1)
 
 Destroy a private subnet
 
