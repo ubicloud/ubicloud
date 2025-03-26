@@ -60,6 +60,8 @@ class BillingRate
       "#{resource_family} GitHub Runner"
     when "GitHubRunnerConcurrency"
       "Additional GitHub Runner Concurrency"
+    when "GitHubCacheStorage"
+      "#{amount.to_i} GiB Storage for GitHub Cache"
     when "InferenceTokens"
       "#{resource_family} Inference Tokens"
     when "Gpu"
