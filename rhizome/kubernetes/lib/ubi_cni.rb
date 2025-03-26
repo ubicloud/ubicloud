@@ -141,7 +141,7 @@ options ndots:5
 
   def setup_ipv4(subnet, cni_netns, inner_ifname, outer_ifname)
     container_ip = find_random_available_ip(IPAddr.new(subnet))
-    gateway_ip = find_random_available_ip(IPAddr.new(subnet))
+    gateway_ip = find_random_available_ip(IPAddr.new(subnet), reserved_ips: [container_ip.to_s])
 
     r "ip addr replace #{gateway_ip}/24 dev #{outer_ifname}"
     r "ip link set #{outer_ifname} mtu #{MTU} up"
@@ -219,17 +219,24 @@ options ndots:5
     exit 1
   end
 
-  def find_random_available_ip(subnet)
-    allocated_ips = @ipam_store["allocated_ips"].values.flatten
-    max_retries = 100
+  def find_random_available_ip(subnet, reserved_ips: [])
+    allocated_ips = @ipam_store["allocated_ips"].values.flatten.concat(reserved_ips)
 
-    max_retries.times do
-      ip = generate_random_ip(subnet)
-      unless allocated_ips.include?(ip.to_s)
-        return ip
+    if subnet.ipv4?
+      available_ips = generate_all_usable_ips(subnet)
+      available_ips.reject! { |ip| allocated_ips.include?(ip.to_s) }
+      raise "No available IPs in subnet #{subnet}" if available_ips.empty?
+      available_ips.sample
+    else
+      max_retries = 100
+      max_retries.times do
+        ip = generate_random_ip(subnet)
+        unless allocated_ips.include?(ip.to_s)
+          return ip
+        end
       end
+      raise "Could not find an available IP after #{max_retries} retries"
     end
-    raise "Could not find an available IP after #{max_retries} retries"
   end
 
   def generate_random_ip(subnet)
@@ -243,7 +250,17 @@ options ndots:5
     #
     # Then we add 2 to the result of random_number so offsets start at 2.
     random_offset = SecureRandom.random_number(subnet_size - 3) + 2
-    IPAddr.new(base + random_offset, subnet.ipv4? ? Socket::AF_INET : Socket::AF_INET6)
+    IPAddr.new(base + random_offset, Socket::AF_INET6)
+  end
+
+  def generate_all_usable_ips(subnet)
+    subnet_size = calculate_subnet_size(subnet)
+    base = subnet.to_i & subnet.mask(subnet.prefix).to_i
+
+    # Valid host IPs range from offset 2 to subnet_size - 2
+    (2...(subnet_size - 1)).map do |offset|
+      IPAddr.new(base + offset, Socket::AF_INET)
+    end
   end
 
   def calculate_subnet_size(subnet)

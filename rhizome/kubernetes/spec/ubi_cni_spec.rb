@@ -218,11 +218,32 @@ RSpec.describe UbiCNI do
       expect(subnetipv6.include?(ip)).to be true
     end
 
-    it "raises an error when all available IPs are allocated" do
+    it "raises an error when all available ipv4 IPs are allocated" do
       all_ips = (1..254).map { |i| "192.168.1.#{i}" }
       ubicni.instance_variable_set(:@ipam_store, {"allocated_ips" => {"test-container" => all_ips}})
 
+      expect { ubicni.find_random_available_ip(subnet) }.to raise_error(RuntimeError, /No available IPs in subnet/)
+    end
+
+    it "raises an error when all available IPv6 IPs are allocated" do
+      subnet = IPAddr.new("fd00::/126")
+      # Usable host range: fd00::2 to fd00::2 (only one usable IP based on offset logic)
+      allocated_ips = ["fd00::2"]
+
+      ubicni.instance_variable_set(:@ipam_store, {
+        "allocated_ips" => {
+          "test-container" => allocated_ips
+        }
+      })
+
       expect { ubicni.find_random_available_ip(subnet) }.to raise_error(RuntimeError, /Could not find an available IP after 100 retries/)
+    end
+
+    it "does not accidentally reuse an ip twice" do
+      all_ips = (1..252).map { |i| "192.168.1.#{i}" }
+      ubicni.instance_variable_set(:@ipam_store, {"allocated_ips" => {"test-container" => all_ips}})
+      ip = ubicni.find_random_available_ip(subnet)
+      expect(ubicni.find_random_available_ip(subnet, reserved_ips: [ip.to_s]).to_s).not_to eq(ip.to_s)
     end
   end
 
