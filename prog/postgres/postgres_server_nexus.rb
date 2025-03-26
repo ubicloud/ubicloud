@@ -54,9 +54,10 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      should_destroy = ["destroy", nil].include?(postgres_server.resource&.strand&.label) || !(@snap.set?(:take_over) || ["prepare_for_take_over", "taking_over"].include?(strand.label))
+      is_destroying = ["destroy", nil].include?(postgres_server.resource&.strand&.label)
+      is_taking_over = @snap.set?(:take_over) || ["prepare_for_take_over", "taking_over"].include?(strand.label)
 
-      if should_destroy
+      if is_destroying || !is_taking_over
         if strand.label != "destroy"
           hop_destroy
         elsif strand.stack.count > 1
