@@ -325,6 +325,11 @@ task "annotate" do
   Sequel::Annotate.annotate(Dir["model/**/*.rb"])
 end
 
+desc "Build sdk gem"
+task "build-sdk-gem" do
+  sh("cd sdk/ruby && gem build ubicloud.gemspec")
+end
+
 desc "Emit assets before deploying"
 task "assets:precompile" do
   sh("npm", "install")
