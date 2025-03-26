@@ -1,4 +1,4 @@
-! Invalid number of arguments for lb create subcommand (accepts: 3, given: 0)
+! Invalid number of arguments for lb create subcommand (requires: 3, given: 0)
 
 Create a load balancer
 

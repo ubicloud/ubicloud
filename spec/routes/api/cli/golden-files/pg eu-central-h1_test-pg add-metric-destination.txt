@@ -1,4 +1,4 @@
-! Invalid number of arguments for pg add-metric-destination subcommand (accepts: 3, given: 0)
+! Invalid number of arguments for pg add-metric-destination subcommand (requires: 3, given: 0)
 
 Add a PostgreSQL metric destination
 

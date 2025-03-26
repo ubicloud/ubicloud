@@ -1,4 +1,4 @@
-! Invalid number of arguments for pg destroy subcommand (accepts: 0, given: 1)
+! Invalid number of arguments for pg destroy subcommand (requires: 0, given: 1)
 
 Destroy a PostgreSQL database
 
