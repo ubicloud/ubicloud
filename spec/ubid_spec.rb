@@ -129,6 +129,28 @@ RSpec.describe UBID do
     }.to raise_error UBIDParseError, "Invalid bottom bits parity"
   end
 
+  it "database generates random UUID in valid UBID format for expected types" do
+    (all_types - described_class::CURRENT_TIMESTAMP_TYPES).each { |type|
+      # generate 10 ids with this type, and verify that their timestamp
+      # part is not close
+      klass = described_class
+      ubids = Array.new(10) do
+        described_class.from_uuidish(DB.get { gen_random_ubid_uuid(klass.to_base32_n(type)) })
+      end
+      expect(ubids.map { _1.to_s[0..1] }).to eq([type] * 10)
+      ints = ubids.map(&:to_i)
+      max_ubid = ints.max
+      min_ubid = ints.min
+
+      # Timestamp is the left 48 bits of the 128-bit ubid.
+      time_difference = (max_ubid >> 80) - (min_ubid >> 80)
+
+      # Timestamp parts are random, so with a very high probability
+      # the difference between them will be > 8ms.
+      expect(time_difference).to be > 8
+    }
+  end
+
   it "generates random timestamp for most types" do
     (all_types - described_class::CURRENT_TIMESTAMP_TYPES).each { |type|
       # generate 10 ids with this type, and verify that their timestamp
