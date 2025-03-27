@@ -11,13 +11,13 @@ RSpec.describe Clover, "vm" do
     it "not list" do
       get "/project/#{project.ubid}/pg"
 
-      expect(last_response).to have_api_error(401, "Please login to continue")
+      expect(last_response).to have_api_error(401, "must include personal access token in Authorization header")
     end
   end
 
   describe "authenticated" do
     before do
-      login_api(user.email)
+      login_api
       postgres_project = Project.create_with_id(name: "default")
       allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
     end

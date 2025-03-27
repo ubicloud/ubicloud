@@ -243,54 +243,28 @@ class Clover < Roda
     end
   end
 
-  require "rodauth"
   require_relative "rodauth/features/personal_access_token"
 
   plugin :rodauth, name: :api do
-    enable :argon2, :json, :jwt, :active_sessions, :login, :personal_access_token
+    enable :json, :personal_access_token
 
     only_json? true
-    use_jwt? { !use_pat? }
 
-    # Converting rodauth error response to the common error format of the API
-    json_response_body do |hash|
-      # In case of an error, rodauth returns the error in the following format
-      # {
-      #   (required) "error": "There was an error logging in"
-      #   (optional) "field-error": [
-      #     "password",
-      #     "invalid password"
-      #   ]
-      # }
-      if json_response_error?
-        error_message = hash["error"]
-        type, code = case error_message
-        when "There was an error logging in"
-          ["InvalidCredentials", 401]
-        when "invalid JWT format or claim in Authorization header"
-          ["InvalidRequest", 400]
-        when "Please login to continue"
-          ["LoginRequired", 401]
-        else
-          # :nocov:
-          ["AuthenticationError", 401]
-          # :nocov:
-        end
+    invalid_auth_error_body = {
+      "error" => {
+        "code" => 401,
+        "type" => "InvalidCredentials",
+        "message" => "invalid personal access token provided in Authorization header"
+      }
+    }.to_json.freeze
 
-        hash.clear
-        hash["error"] = {
-          "code" => code,
-          "type" => type,
-          "message" => error_message
-        }
-      end
-
-      hash.to_json
+    # The only response body that can be generated with this Rodauth configuration
+    # is when the provided personal access token is invalid.  Generate the JSON
+    # error body up front and serve it, so it doesn't need to be generated per-request.
+    json_response_body do |_|
+      invalid_auth_error_body
     end
 
-    hmac_secret Config.clover_session_secret
-    jwt_secret Config.clover_session_secret
-    argon2_secret { Config.clover_session_secret }
     require_bcrypt? false
   end
 
@@ -638,14 +612,18 @@ class Clover < Roda
 
   route do |r|
     if api?
-      if r.path_info == "/cli" && (!/\ABearer:?\s+pat-/i.match?(env["HTTP_AUTHORIZATION"].to_s) || !rodauth.authenticated?)
-        response["content-type"] = "text/plain"
-        response.status = 400
-        next "! Invalid request: No valid personal access token provided\n"
+      unless /\ABearer:?\s+pat-/i.match?(env["HTTP_AUTHORIZATION"].to_s)
+        if r.path_info == "/cli"
+          response["content-type"] = "text/plain"
+          response.status = 400
+          next "! Invalid request: No valid personal access token provided\n"
+        else
+          response.json = true
+          fail CloverError.new(401, "MissingCredentials", "must include personal access token in Authorization header")
+        end
       end
       response.json = true
       response.skip_content_security_policy!
-      rodauth.check_active_session unless rodauth.use_pat?
     else
       r.on "runtime" do
         response.json = true

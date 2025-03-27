@@ -3,13 +3,8 @@
 require_relative "../spec_helper"
 
 RSpec.configure do |config|
-  def login_api(email = TEST_USER_EMAIL, password = TEST_USER_PASSWORD, use_pat: true)
-    @use_pat = use_pat
-    unless use_pat
-      post "/login", JSON.generate(login: email, password: password), {"CONTENT_TYPE" => "application/json"}
-      expect(last_response.status).to eq(200)
-      header "Authorization", "Bearer #{last_response.headers["authorization"]}"
-    end
+  def login_api
+    @use_pat = true
   end
 
   def project_with_default_policy(account, name: "project-1")
