@@ -79,28 +79,26 @@ class Clover
       return error("A workflow_job without runner_id")
     end
 
-    DB.transaction do
-      runner = GithubRunner.for_update.first(
-        installation_id: installation.id,
-        repository_name: data["repository"]["full_name"],
-        runner_id: runner_id
-      )
+    runner = GithubRunner.first(
+      installation_id: installation.id,
+      repository_name: data["repository"]["full_name"],
+      runner_id:
+    )
 
-      return error("Unregistered runner") unless runner
+    return error("Unregistered runner") unless runner
 
-      runner.update(workflow_job: job.except("steps"))
+    runner.this.update(workflow_job: Sequel.pg_jsonb(job.except("steps")))
 
-      case data["action"]
-      when "in_progress"
-        runner.log_duration("runner_started", Time.parse(job["started_at"]) - Time.parse(job["created_at"]))
-        success("GithubRunner[#{runner.ubid}] picked job #{job.fetch("id")}")
-      when "completed"
-        runner.incr_destroy
+    case data["action"]
+    when "in_progress"
+      runner.log_duration("runner_started", Time.parse(job["started_at"]) - Time.parse(job["created_at"]))
+      success("GithubRunner[#{runner.ubid}] picked job #{job.fetch("id")}")
+    when "completed"
+      runner.incr_destroy
 
-        success("GithubRunner[#{runner.ubid}] deleted")
-      else
-        error("Unhandled workflow_job action")
-      end
+      success("GithubRunner[#{runner.ubid}] deleted")
+    else
+      error("Unhandled workflow_job action")
     end
   end
 end
