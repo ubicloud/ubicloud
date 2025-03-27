@@ -102,8 +102,8 @@ module Option
   }.freeze
 
   POSTGRES_VERSION_OPTIONS = {
-    PostgresResource::Flavor::STANDARD => ["16", "17"],
-    PostgresResource::Flavor::PARADEDB => ["16", "17"],
+    PostgresResource::Flavor::STANDARD => ["17", "16"],
+    PostgresResource::Flavor::PARADEDB => ["17", "16"],
     PostgresResource::Flavor::LANTERN => ["16"]
   }
 
