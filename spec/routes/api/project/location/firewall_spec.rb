@@ -13,31 +13,31 @@ RSpec.describe Clover, "firewall" do
     it "not delete" do
       delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.name}"
 
-      expect(last_response).to have_api_error(401, "Please login to continue")
+      expect(last_response).to have_api_error(401, "must include personal access token in Authorization header")
     end
 
     it "not get" do
       get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.name}"
 
-      expect(last_response).to have_api_error(401, "Please login to continue")
+      expect(last_response).to have_api_error(401, "must include personal access token in Authorization header")
     end
 
     it "not associate" do
       get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.name}/attach-subnet"
 
-      expect(last_response).to have_api_error(401, "Please login to continue")
+      expect(last_response).to have_api_error(401, "must include personal access token in Authorization header")
     end
 
     it "not dissociate" do
       get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.name}/detach-subnet"
 
-      expect(last_response).to have_api_error(401, "Please login to continue")
+      expect(last_response).to have_api_error(401, "must include personal access token in Authorization header")
     end
   end
 
   describe "authenticated" do
     before do
-      login_api(user.email)
+      login_api
     end
 
     it "success get all location firewalls" do
