@@ -13,19 +13,19 @@ RSpec.describe Clover, "firewall" do
     it "not list" do
       get "/project/#{project.ubid}/firewall"
 
-      expect(last_response).to have_api_error(401, "Please login to continue")
+      expect(last_response).to have_api_error(401, "must include personal access token in Authorization header")
     end
 
     it "not create" do
       post "/project/#{project.ubid}/firewall"
 
-      expect(last_response).to have_api_error(401, "Please login to continue")
+      expect(last_response).to have_api_error(401, "must include personal access token in Authorization header")
     end
   end
 
   describe "authenticated" do
     before do
-      login_api(user.email)
+      login_api
     end
 
     it "success get all firewalls" do

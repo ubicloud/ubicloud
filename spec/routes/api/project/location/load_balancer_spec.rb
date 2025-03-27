@@ -29,14 +29,14 @@ RSpec.describe Clover, "load-balancer" do
       ].each do |method, path, body|
         send(method, path, body)
 
-        expect(last_response).to have_api_error(401, "Please login to continue")
+        expect(last_response).to have_api_error(401, "must include personal access token in Authorization header")
       end
     end
   end
 
   describe "authenticated" do
     before do
-      login_api(user.email)
+      login_api
       lb_project = Project.create_with_id(name: "default")
       allow(Config).to receive(:load_balancer_service_project_id).and_return(lb_project.id)
     end
