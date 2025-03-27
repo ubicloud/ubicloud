@@ -295,6 +295,11 @@ module Validation
   end
 
   def self.validate_kubernetes_cp_node_count(count)
-    fail ValidationFailed.new({name: "Kubernetes cluster control plane can have either 1 or 3 nodes"}) unless [1, 3].include?(count)
+    fail ValidationFailed.new({control_plane_node_count: "Kubernetes cluster control plane can have either 1 or 3 nodes"}) unless [1, 3].include?(count)
+  end
+
+  def self.validate_kubernetes_worker_node_count(count)
+    fail ValidationFailed.new({worker_node_count: "Kubernetes worker node count is not a valid integer."}) unless count.is_a?(Integer)
+    fail ValidationFailed.new({worker_node_count: "Kubernetes worker node count must be greater than 0."}) if count <= 0
   end
 end
