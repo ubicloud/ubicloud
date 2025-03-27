@@ -31,6 +31,9 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
   end
 
   def generate_lb_based_nat_rules
+    active_vm_ports_uniq_by_port = load_balancer.active_vm_ports { |ds| ds.eager(:load_balancer_port, load_balancer_vm: {vm: :nics}) }
+      .uniq(&:load_balancer_port_id)
+      .sort_by { |vm_port| vm_port.load_balancer_port.src_port }
     public_ipv4 = vm.ephemeral_net4.to_s
     public_ipv6 = vm.ephemeral_net6.nth(2).to_s
     private_ipv4 = vm.private_ipv4
@@ -47,7 +50,7 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
     end
 
     ipv4_prerouting = if load_balancer.ipv4_enabled?
-      load_balancer.active_vm_ports.uniq { |row| row.load_balancer_port.id }.map do |vm_port|
+      active_vm_ports_uniq_by_port.map do |vm_port|
         port = vm_port.load_balancer_port
         ipv4_map_def = generate_lb_map_defs_ipv4(port)
         modulo = ipv4_map_def.count
@@ -60,7 +63,7 @@ ip daddr #{private_ipv4} tcp dport #{port.src_port} ct state established,related
     end
 
     ipv6_prerouting = if load_balancer.ipv6_enabled?
-      load_balancer.active_vm_ports.uniq { |row| row.load_balancer_port.id }.map do |vm_port|
+      active_vm_ports_uniq_by_port.map do |vm_port|
         port = vm_port.load_balancer_port
         ipv6_map_def = generate_lb_map_defs_ipv6(port)
         modulo = ipv6_map_def.count
@@ -129,22 +132,30 @@ TEMPLATE
       "elements = {#{neighbor_vms.map(&:private_ipv6).join(", ")}}"]
   end
 
-  def generate_lb_map_defs_ipv4(current_port)
-    load_balancer.active_vm_ports
+  def generate_lb_map_defs(current_port)
+    items = load_balancer.active_vm_ports
       .select { |vm_port| vm_port.load_balancer_port.dst_port == current_port.dst_port }
-      .map
-      .with_index { |vm_port, index| "#{index} : #{vm_port.load_balancer_vm.vm.private_ipv4} . #{(vm_port.vm.id == vm.id) ? vm_port.load_balancer_port.dst_port : vm_port.load_balancer_port.src_port}" }
+      .map do |vm_port|
+        address = yield vm_port
+        port = (vm_port.load_balancer_vm.vm_id == vm.id) ? vm_port.load_balancer_port.dst_port : vm_port.load_balancer_port.src_port
+        [address.to_s, port.to_i]
+      end
+
+    items.sort!.map!.with_index do |(address, port), index|
+      "#{index} : #{address} . #{port}"
+    end
+  end
+
+  def generate_lb_map_defs_ipv4(current_port)
+    generate_lb_map_defs(current_port) do |vm_port|
+      vm_port.load_balancer_vm.vm.private_ipv4
+    end
   end
 
   def generate_lb_map_defs_ipv6(current_port)
-    load_balancer.active_vm_ports
-      .select { |vm_port| vm_port.load_balancer_port.dst_port == current_port.dst_port }
-      .map
-      .with_index do |vm_port, index|
-        port = (vm_port.load_balancer_vm.vm.id == vm.id) ? vm_port.load_balancer_port.dst_port : vm_port.load_balancer_port.src_port
-        address = (vm_port.load_balancer_vm.vm.id == vm.id) ? vm.ephemeral_net6.nth(2) : vm_port.load_balancer_vm.vm.private_ipv6
-        "#{index} : #{address} . #{port}"
-      end
+    generate_lb_map_defs(current_port) do |vm_port|
+      (vm_port.load_balancer_vm.vm_id == vm.id) ? vm.ephemeral_net6.nth(2) : vm_port.load_balancer_vm.vm.private_ipv6
+    end
   end
 
   def generate_nat_rules(current_public_ipv4, current_private_ipv4)
