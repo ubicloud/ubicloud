@@ -129,9 +129,9 @@ RSpec.describe Clover, "Kubernetes" do
       end
 
       it "cannot create kubernetes cluster when location not exist" do
-        fill_in "Name", with: "cannotcreate"
+        fill_in "Cluster Name", with: "cannotcreate"
         choose option: 3
-        select 2, from: "worker_nodes"
+        find('select#worker_nodes option[value="4"]:not([disabled])').select_option
         choose option: Location::LEASEWEB_WDC02_ID
         Location[Location::LEASEWEB_WDC02_ID].destroy
 
@@ -143,10 +143,10 @@ RSpec.describe Clover, "Kubernetes" do
       end
 
       it "can create new kubernetes cluster" do
-        fill_in "Name", with: "k8stest"
+        fill_in "Cluster Name", with: "k8stest"
         choose option: Location::HETZNER_FSN1_ID
         choose option: 3
-        select 2, from: "worker_nodes"
+        find('select#worker_nodes option[value="4"]:not([disabled])').select_option
 
         click_button "Create"
         expect(page.title).to eq("Ubicloud - k8stest")
@@ -157,15 +157,15 @@ RSpec.describe Clover, "Kubernetes" do
 
         expect(new_kc.project_id).to eq(project.id)
         expect(new_kc.cp_node_count).to eq(3)
-        expect(new_kc.nodepools.first.node_count).to eq(2)
+        expect(new_kc.nodepools.first.node_count).to eq(4)
         expect(new_kc.private_subnet.name).to eq("#{new_kc.ubid}-subnet")
       end
 
       it "can not create kubernetes cluster with invalid name" do
-        fill_in "Name", with: "invalid name"
+        fill_in "Cluster Name", with: "invalid name"
         choose option: Location::HETZNER_FSN1_ID
         choose option: 3
-        select 2, from: "worker_nodes"
+        find('select#worker_nodes option[value="4"]:not([disabled])').select_option
 
         click_button "Create"
         expect(page.title).to eq("Ubicloud - Create Kubernetes Cluster")
@@ -174,10 +174,10 @@ RSpec.describe Clover, "Kubernetes" do
       end
 
       it "can not create kubernetes cluster with same name in same project & location" do
-        fill_in "Name", with: "myk8s"
+        fill_in "Cluster Name", with: "myk8s"
         choose option: Location::HETZNER_FSN1_ID
         choose option: 3
-        select 2, from: "worker_nodes"
+        find('select#worker_nodes option[value="4"]:not([disabled])').select_option
 
         click_button "Create"
         expect(page.title).to eq("Ubicloud - Create Kubernetes Cluster")

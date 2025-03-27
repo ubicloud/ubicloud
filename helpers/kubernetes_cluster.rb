@@ -37,8 +37,10 @@ class Clover
 
     options.add_option(name: "name")
     options.add_option(name: "location", values: Option.kubernetes_locations)
-    options.add_option(name: "cp_nodes", values: ["1", "3"])
-    options.add_option(name: "worker_nodes", values: (1..6).map { {value: _1.to_s, display_name: _1.to_s} })
+    options.add_option(name: "cp_nodes", values: Option::KubernetesCPOptions.map(&:cp_node_count), parent: "location")
+    options.add_option(name: "worker_nodes", values: (1..10).map { {value: _1, display_name: "#{_1} Node#{(_1 == 1) ? "" : "s"}"} }, parent: "cp_nodes") do |location, cp_nodes, worker_nodes|
+      worker_nodes[:value] >= cp_nodes
+    end
 
     options.serialize
   end

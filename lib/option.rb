@@ -109,6 +109,12 @@ module Option
 
   AWS_LOCATIONS = ["us-east-1", "us-west-1"].freeze
 
+  KubernetesCPOption = Struct.new(:cp_node_count, :title, :explanation)
+  KubernetesCPOptions = [[1, "1 Node", "Single control plane node without resilience"],
+    [3, "3 Nodes", "Three control plane nodes with resilience"]].map {
+    KubernetesCPOption.new(*_1)
+  }.freeze
+
   def self.customer_postgres_sizes_for_project(project_id)
     customer_locations = Location.where(project_id:).all
     (
