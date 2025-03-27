@@ -29,7 +29,7 @@ RSpec.describe Clover, "cli pg show" do
       location: eu-central-h1
       vm_size: standard-2
       storage_size_gib: 64
-      version: 16
+      version: 17
       ha_type: none
       flavor: standard
       connection_string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com?channel_binding=require

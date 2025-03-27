@@ -132,7 +132,7 @@ class PostgresResource < Sequel::Model
 
   TARGET_STANDBY_COUNT_MAP = {HaType::NONE => 0, HaType::ASYNC => 1, HaType::SYNC => 2}.freeze
 
-  DEFAULT_VERSION = "16"
+  DEFAULT_VERSION = "17"
 
   def self.redacted_columns
     super + [:root_cert_1, :root_cert_2, :server_cert]

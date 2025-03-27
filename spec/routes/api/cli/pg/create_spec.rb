@@ -18,7 +18,7 @@ RSpec.describe Clover, "cli pg create" do
     expect(pg.target_vm_size).to eq "standard-2"
     expect(pg.target_storage_size_gib).to eq 64
     expect(pg.ha_type).to eq "none"
-    expect(pg.version).to eq "16"
+    expect(pg.version).to eq "17"
     expect(pg.flavor).to eq "standard"
     expect(body).to eq "PostgreSQL database created with id: #{pg.ubid}\n"
   end
