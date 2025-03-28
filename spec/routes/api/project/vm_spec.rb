@@ -13,13 +13,13 @@ RSpec.describe Clover, "vm" do
     it "not list" do
       get "/project/#{project.ubid}/vm"
 
-      expect(last_response).to have_api_error(401, "Please login to continue")
+      expect(last_response).to have_api_error(401, "must include personal access token in Authorization header")
     end
   end
 
   describe "authenticated" do
     before do
-      login_api(user.email)
+      login_api
     end
 
     it "success all vms" do

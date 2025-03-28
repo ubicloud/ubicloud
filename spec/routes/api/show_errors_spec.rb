@@ -8,7 +8,7 @@ RSpec.describe Clover do
       ENV["SHOW_ERRORS"] = "1"
     end
     @account = create_account
-    login_api(@account.email)
+    login_api
   end
 
   after do
