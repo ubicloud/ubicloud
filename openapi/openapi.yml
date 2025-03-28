@@ -12,46 +12,6 @@ info:
 servers:
   - url: 'https://api.ubicloud.com'
 paths:
-  /login:
-    post:
-      operationId: login
-      summary: Login with user information
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                login:
-                  type: string
-                  example: user@mail.com
-                password:
-                  type: string
-                  example: password
-              additionalProperties: false
-              required:
-                - login
-                - password
-      responses:
-        '200':
-          description: Logged in successfully.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: string
-                    example: You have been logged in
-                additionalProperties: false
-                required:
-                  - success
-        default:
-          $ref: '#/components/responses/Error'
-      security: []
-      tags:
-        - Login
   /project:
     get:
       operationId: listProjects
