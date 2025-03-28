@@ -118,9 +118,9 @@ RSpec.describe Invoice do
     it "can charge from a correct payment method even some of them are not working" do
       invoice.content["billing_info"] = {"id" => billing_info.id, "email" => "customer@example.com"}
       invoice.content["resources"] = [{"cost" => 4.3384, "line_items" => [{"cost" => 4.3384, "amount" => 5423.0, "duration" => 1, "location" => "global", "description" => "standard-2 GitHub Runner", "resource_type" => "GitHubRunnerMinutes", "resource_family" => "standard-2"}], "resource_id" => "ed0b26bf-53c4-82d2-9a00-21e5f05dc364", "resource_name" => "Daily Usage 2024-02-26"}]
-      payment_method1 = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_1", order: 1)
-      payment_method2 = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_2", order: 2)
-      payment_method3 = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_3", order: 3)
+      payment_method1 = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1", created_at: Time.now + 20)
+      payment_method2 = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_2", created_at: Time.now + 10)
+      payment_method3 = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_3", created_at: Time.now)
       # rubocop:disable RSpec/VerifiedDoubles
       expect(Stripe::PaymentIntent).to receive(:create).with(hash_including(amount: 1000, customer: billing_info.stripe_id, payment_method: payment_method1.stripe_id))
         .and_raise(Stripe::CardError.new("Declined", {}))
