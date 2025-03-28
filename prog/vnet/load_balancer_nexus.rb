@@ -81,7 +81,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
   def need_to_rewrite_dns_records?
     load_balancer.vms_to_dns.each do |vm|
-      if load_balancer.ipv4_enabled? && vm.ephemeral_net4
+      if load_balancer.ipv4_enabled? && vm.ephemeral_net4 && load_balancer.dns_zone
         return true unless load_balancer.dns_zone.records_dataset.find { _1.name == load_balancer.hostname + "." && _1.type == "A" && _1.data == vm.ephemeral_net4.to_s }
       end
 
