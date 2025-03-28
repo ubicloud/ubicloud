@@ -6,22 +6,34 @@ RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
   }
 
   let(:st) {
-    Strand.create_with_id(prog: "Vnet::UpdateLoadBalancerNode", stack: [{"subject_id" => vm.id, "load_balancer_id" => lb.id}], label: "update_load_balancer")
+    Strand.create(prog: "Vnet::UpdateLoadBalancerNode", stack: [{"subject_id" => vm.id, "load_balancer_id" => lb.id}], label: "update_load_balancer")
   }
+  let(:prj) {
+    Project.create(name: "test-prj")
+  }
+  let(:ps) {
+    Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps").subject
+  }
+
   let(:lb) {
-    prj = Project.create_with_id(name: "test-prj")
-    ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps").subject
     lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080).subject
-    dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: prj.id)
+    dz = DnsZone.create(name: "test-dns-zone", project_id: prj.id)
     cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
     lb.add_cert(cert)
     lb
   }
   let(:vm) {
-    Prog::Vm::Nexus.assemble("pub-key", lb.project_id, name: "test-vm", private_subnet_id: lb.private_subnet.id).subject
+    nic = Prog::Vnet::NicNexus.assemble(ps.id, ipv4_addr: "192.168.1.0/32", ipv6_addr: "fd10:9b0b:6b4b:8fbb::/64").subject
+    Prog::Vm::Nexus.assemble("pub-key", lb.project_id, name: "vm1", private_subnet_id: lb.private_subnet.id, nic_id: nic.id).subject
   }
   let(:neighbor_vm) {
-    Prog::Vm::Nexus.assemble("pub-key", lb.project_id, name: "neighbor-vm", private_subnet_id: lb.private_subnet.id).subject
+    nic = Prog::Vnet::NicNexus.assemble(ps.id, ipv4_addr: "172.10.1.0/32", ipv6_addr: "fd10:9b0b:6b4b:aaa::/64").subject
+    Prog::Vm::Nexus.assemble("pub-key", lb.project_id, name: "vm2", private_subnet_id: lb.private_subnet.id, nic_id: nic.id).subject
+  }
+  let(:vmh) {
+    vmh = instance_double(VmHost, sshable: instance_double(Sshable))
+    allow(vm).to receive(:vm_host).and_return(vmh)
+    vmh
   }
 
   before do
@@ -60,19 +72,11 @@ RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
     end
 
     context "when a single vm exists and it is the subject" do
-      let(:vmh) {
-        instance_double(VmHost, sshable: instance_double(Sshable))
-      }
-
       before do
         LoadBalancerVmPort.where(id: lb.vm_ports_dataset.map(&:id)).update(state: "up")
-        allow(vm).to receive(:vm_host).and_return(vmh)
       end
 
       it "does not hop to remove load balancer and creates basic load balancing with nat" do
-        allow(lb.active_vm_ports.first.load_balancer_vm.vm.nics.first).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0/32"))
-        allow(vm.nics.first).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0"))
-        expect(vm.nics.first).to receive(:private_ipv6).and_return(NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64")).at_least(:once)
         expect(vmh.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
@@ -120,8 +124,6 @@ LOAD_BALANCER
 
       it "does not hop to remove load balancer and creates basic load balancing with nat specifically for ipv4" do
         lb.update(stack: "ipv4")
-        allow(lb.active_vm_ports.first.load_balancer_vm.vm.nics.first).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0/32"))
-        allow(vm.nics.first).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0"))
         expect(vmh.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
@@ -165,12 +167,10 @@ LOAD_BALANCER
       end
 
       it "creates basic load balancing with hashing with multiple ports" do
-        new_port = LoadBalancerPort.create(load_balancer_id: lb.id, src_port: "443", dst_port: "8443")
-        LoadBalancerVmPort.create(load_balancer_port_id: new_port.id, load_balancer_vm_id: lb.load_balancers_vms.first.id, state: "up")
+        lb.add_port(443, 8443)
         lb.reload
-        allow(lb.active_vm_ports[0].load_balancer_vm.vm.nics.first).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0/32"))
-        allow(lb.active_vm_ports[1].load_balancer_vm.vm.nics.first).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0/32"))
-        allow(vm.nics.first).to receive_messages(private_ipv4: NetAddr::IPv4Net.parse("192.168.1.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64"))
+        port = LoadBalancerPort.where(load_balancer_id: lb.id, src_port: 443).first
+        LoadBalancerVmPort.where(load_balancer_port_id: port.id).update(state: "up")
         expect(vmh.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
@@ -228,9 +228,6 @@ LOAD_BALANCER
 
       it "creates basic load balancing with hashing" do
         lb.update(algorithm: "hash_based")
-        allow(lb.active_vm_ports.first.load_balancer_vm.vm.nics.first).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0/32"))
-        expect(vm.nics.first).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0/32")).at_least(:once)
-        expect(vm.nics.first).to receive(:private_ipv6).and_return(NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64")).at_least(:once)
         expect(vmh.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
@@ -278,18 +275,9 @@ LOAD_BALANCER
     end
 
     context "when multiple vms exist" do
-      let(:vmh) {
-        instance_double(VmHost, sshable: instance_double(Sshable))
-      }
-
       before do
         lb.add_vm(neighbor_vm)
-        LoadBalancerVmPort.where(id: lb.vm_ports_dataset.map(&:id)).update(state: "up")
-        allow(vm).to receive(:vm_host).and_return(vmh)
-        allow(vm.nics.first).to receive_messages(private_ipv4: NetAddr::IPv4Net.parse("192.168.1.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64"))
-        allow(lb.active_vm_ports[0].load_balancer_vm.vm.nics.first).to receive_messages(private_ipv4: NetAddr::IPv4Net.parse("192.168.1.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64"))
-        allow(neighbor_vm.nics.first).to receive_messages(private_ipv4: NetAddr::IPv4Net.parse("172.10.1.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:aaa::2/64"))
-        allow(lb.active_vm_ports[1].load_balancer_vm.vm.nics.first).to receive_messages(private_ipv4: NetAddr::IPv4Net.parse("172.10.1.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:aaa::2/64"))
+        LoadBalancerVmPort.map { |lbvmport| lbvmport.update(state: "up") }
       end
 
       it "creates load balancing with multiple vms if all active" do
@@ -312,7 +300,7 @@ elements = {fd10:9b0b:6b4b:aaa::2}
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
 ip daddr 100.100.100.100/32 tcp dport 80 meta mark set 0x00B1C100D
-ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : 192.168.1.0 . 8080, 1 : 172.10.1.0 . 80 }
+ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : 172.10.1.0 . 80, 1 : 192.168.1.0 . 8080 }
 ip daddr 192.168.1.0 tcp dport 80 ct state established,related,new counter dnat to 192.168.1.0:8080
 
 ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 meta mark set 0x00B1C100D
@@ -385,11 +373,7 @@ LOAD_BALANCER
       end
 
       it "creates load balancing with multiple vms if the vm we work on is down" do
-        LoadBalancerVmPort.where(id: lb.vm_ports_dataset.first.id).update(state: "down")
-
-        lb.reload
-        allow(neighbor_vm.nics.first).to receive_messages(private_ipv4: NetAddr::IPv4Net.parse("172.10.1.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:aaa::2/64"))
-        allow(lb.active_vm_ports[0].load_balancer_vm.vm.nics.first).to receive_messages(private_ipv4: NetAddr::IPv4Net.parse("172.10.1.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:aaa::2/64"))
+        LoadBalancerVmPort.where(load_balancer_vm_id: vm.load_balancers_vms.id).update(state: "down")
         expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
@@ -437,10 +421,7 @@ LOAD_BALANCER
       end
 
       it "creates load balancing with multiple vms if the vm we work on is up but the neighbor is down" do
-        LoadBalancerVmPort.where(id: lb.vm_ports[1].id).update(state: "down")
-        lb.reload
-        allow(vm.nics.first).to receive_messages(private_ipv4: NetAddr::IPv4Net.parse("192.168.1.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64"))
-        allow(lb.active_vm_ports[0].load_balancer_vm.vm.nics.first).to receive_messages(private_ipv4: NetAddr::IPv4Net.parse("192.168.1.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64"))
+        LoadBalancerVmPort.where(load_balancer_vm_id: neighbor_vm.load_balancers_vms.id).update(state: "down")
         expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
@@ -495,15 +476,6 @@ LOAD_BALANCER
   end
 
   describe "#remove_load_balancer" do
-    let(:vmh) {
-      instance_double(VmHost, sshable: instance_double(Sshable))
-    }
-
-    before do
-      allow(vm).to receive(:vm_host).and_return(vmh)
-      allow(vm.nics.first).to receive_messages(private_ipv4: NetAddr::IPv4Net.parse("192.168.1.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64"))
-    end
-
     it "creates basic nat rules" do
       expect(vmh.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<REMOVE_LOAD_BALANCER)
 table ip nat;
