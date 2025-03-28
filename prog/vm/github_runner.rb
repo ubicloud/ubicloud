@@ -359,7 +359,17 @@ class Prog::Vm::GithubRunner < Prog::Base
       TOKEN=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
       curl -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
     COMMAND
-    vm.sshable.cmd(docker_quota_limit_command)
+    quota_output = vm.sshable.cmd(docker_quota_limit_command, log: false)
+    if quota_output && (match = quota_output.match(/ratelimit-limit:\s*(\d+);w=(\d+).*?ratelimit-remaining:\s*(\d+);w=(\d+).*?docker-ratelimit-source:\s*([^\s]+)/m))
+      dockerhub_rate_limits = {
+        limit: match[1].to_i,
+        limit_window: match[2].to_i,
+        remaining: match[3].to_i,
+        remaining_window: match[4].to_i,
+        source: match[5]
+      }
+      Clog.emit("Remaining DockerHub rate limits") { {dockerhub_rate_limits:} }
+    end
   rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
     Clog.emit("Failed to collect final telemetry") { github_runner }
   end
