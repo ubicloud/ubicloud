@@ -44,7 +44,7 @@ class Invoice < Sequel::Model
     end
 
     errors = []
-    billing_info.payment_methods_dataset.order(:order).each do |pm|
+    billing_info.payment_methods.each do |pm|
       begin
         payment_intent = Stripe::PaymentIntent.create({
           amount: (amount * 100).to_i, # 100 cents to charge $1.00

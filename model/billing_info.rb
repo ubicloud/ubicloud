@@ -6,7 +6,7 @@ require "countries"
 require "excon"
 
 class BillingInfo < Sequel::Model
-  one_to_many :payment_methods
+  one_to_many :payment_methods, order: Sequel.desc(:created_at)
   one_to_one :project
 
   include ResourceMethods
