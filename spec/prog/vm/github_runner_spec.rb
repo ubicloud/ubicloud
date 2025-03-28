@@ -559,7 +559,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm.vm_host).to receive(:sshable).and_return(vmh_sshable)
       expect(vmh_sshable).to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
       expect(sshable).to receive(:cmd).with("journalctl -u runner-script -t 'run-withenv.sh' -t 'systemd' --no-pager | grep -Fv Started")
-      expect(sshable).to receive(:cmd).with(<<~COMMAND)
+      expect(sshable).to receive(:cmd).with(<<~COMMAND, log: false)
         TOKEN=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
@@ -573,7 +573,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm.vm_host).to receive(:sshable).and_return(vmh_sshable)
       expect(vmh_sshable).to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
       expect(sshable).to receive(:cmd).with("journalctl -u runner-script -t 'run-withenv.sh' -t 'systemd' --no-pager | grep -Fv Started")
-      expect(sshable).to receive(:cmd).with(<<~COMMAND)
+      expect(sshable).to receive(:cmd).with(<<~COMMAND, log: false)
         TOKEN=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
@@ -583,10 +583,13 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "Logs only docker limits if workflow_job is successful" do
       expect(github_runner).to receive(:workflow_job).and_return({"conclusion" => "success"})
-      expect(sshable).to receive(:cmd).with(<<~COMMAND)
+      expect(sshable).to receive(:cmd).with(<<~COMMAND, log: false).and_return("ratelimit-limit: 100;w=21600\nratelimit-remaining: 98;w=21600\ndocker-ratelimit-source: 192.168.1.1\n")
         TOKEN=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
+      expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits") do |&blk|
+        expect(blk.call).to eq(dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 98, remaining_window: 21600, source: "192.168.1.1"})
+      end
 
       nx.collect_final_telemetry
     end
