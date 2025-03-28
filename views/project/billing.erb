@@ -150,25 +150,25 @@
         part("components/button", text: "Add Payment Method", link: "#{@project_data[:path]}/billing/payment-method/create")
       ],
       rows:
-        @payment_methods.map do |pm|
+        billing_info.payment_methods.map do |pm|
           [
             [
-              "#{pm[:brand].capitalize} ending in #{pm[:last4]}",
-              "Expires #{pm[:exp_month]}/#{pm[:exp_year]}",
-              "Added on #{pm[:created_at]}",
+              "#{pm.stripe_data["brand"].capitalize} ending in #{pm.stripe_data["last4"]}",
+              "Expires #{pm.stripe_data["exp_month"]}/#{pm.stripe_data["exp_year"]}",
+              "Added on #{pm.created_at.strftime("%B %d, %Y")}",
               [
                 "delete_button",
                 {
                   component: {
-                    url: "#{@project_data[:path]}/billing/payment-method/#{pm[:ubid]}?project_id=#{@project.ubid}",
-                    csrf_url: "#{@project_data[:path]}/billing/payment-method/#{pm[:ubid]}",
-                    confirmation: pm[:last4]
+                    url: "#{@project_data[:path]}/billing/payment-method/#{pm.ubid}?project_id=#{@project.ubid}",
+                    csrf_url: "#{@project_data[:path]}/billing/payment-method/#{pm.ubid}",
+                    confirmation: pm.stripe_data["last4"]
                   },
                   extra_class: "flex justify-end"
                 }
               ]
             ],
-            { id: "payment-method-#{pm[:ubid]}" }
+            { id: "payment-method-#{pm.ubid}" }
           ]
         end,
       empty_state: "No payment methods. Add new payment method to able create resources in project."
