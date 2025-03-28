@@ -16,7 +16,7 @@ class Clover
       end
 
       r.is String do |usage_alert_ubid|
-        next unless (usage_alert = UsageAlert.from_ubid(usage_alert_ubid))
+        next unless (usage_alert = UsageAlert.from_ubid(usage_alert_ubid)) && usage_alert.project_id == @project.id
 
         r.delete true do
           usage_alert.destroy

@@ -143,7 +143,7 @@ class Clover
         end
 
         r.is String do |pm_ubid|
-          next unless (payment_method = PaymentMethod.from_ubid(pm_ubid))
+          next unless (payment_method = PaymentMethod.from_ubid(pm_ubid)) && payment_method.billing_info_id == @project.billing_info_id
 
           r.delete true do
             unless payment_method.billing_info.payment_methods.count > 1
@@ -162,7 +162,7 @@ class Clover
         r.is String do |invoice_ubid|
           invoice = (invoice_ubid == "current") ? @project.current_invoice : Invoice.from_ubid(invoice_ubid)
 
-          next unless invoice
+          next unless invoice && invoice.project_id == @project.id
 
           r.get true do
             @invoice_data = Serializers::Invoice.serialize(invoice, {detailed: true})
