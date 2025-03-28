@@ -3,7 +3,7 @@
 require_relative "spec_helper"
 
 RSpec.describe Vm do
-  subject(:vm) { described_class.new(display_state: "creating", created_at: Time.now) }
+  subject(:vm) { Prog::Vm::Nexus.assemble("dummy-public-key", Project.create(name: "test").id, name: "dummy-vm-1").subject }
 
   describe "#display_state" do
     it "returns deleting if destroy semaphore increased" do
@@ -213,6 +213,24 @@ RSpec.describe Vm do
 
     it "fails if spdk installation not found" do
       expect { vm.update_spdk_version("b") }.to raise_error RuntimeError, "SPDK version b not found on host"
+    end
+  end
+
+  describe "#params_json" do
+    it "accepts single ssh key from the user" do
+      expect(vm).to receive(:cloud_hypervisor_cpu_topology).and_return(Vm::CloudHypervisorCpuTopo.new(2, 1, 1, 1))
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ndp_needed: false))
+      vm.update(public_key: "key1\n")
+      params_json = JSON.parse(vm.params_json(123))
+      expect(params_json["ssh_public_keys"]).to eq(["key1"])
+    end
+
+    it "accepts multiple ssh keys from the user" do
+      expect(vm).to receive(:cloud_hypervisor_cpu_topology).and_return(Vm::CloudHypervisorCpuTopo.new(2, 1, 1, 1))
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ndp_needed: false))
+      vm.update(public_key: "\nkey1\r\nkey2 ")
+      params_json = JSON.parse(vm.params_json(123))
+      expect(params_json["ssh_public_keys"]).to eq(["key1", "key2"])
     end
   end
 
