@@ -15,8 +15,7 @@ class Clover
       authorize("Project:billing", @project.id)
 
       r.get true do
-        if (billing_info = @project.billing_info)
-          @payment_methods = Serializers::PaymentMethod.serialize(billing_info.payment_methods)
+        if @project.billing_info
           @invoices = Serializers::Invoice.serialize(@project.invoices.prepend(@project.current_invoice))
         end
 

@@ -7,8 +7,8 @@ RSpec.describe PaymentMethod do
 
   it "return Stripe Data if Stripe enabled" do
     allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
-    expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_1234567890").and_return({"id" => "pm_1234567890"})
-    expect(payment_method.stripe_data).to eq({"id" => "pm_1234567890"})
+    expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_1234567890").and_return({"id" => "pm_1234567890", "card" => {"brand" => "Visa", "last4" => "1234", "exp_month" => 12, "exp_year" => 2023}})
+    expect(payment_method.stripe_data).to eq({"brand" => "Visa", "last4" => "1234", "exp_month" => 12, "exp_year" => 2023})
   end
 
   it "not return Stripe Data if Stripe not enabled" do
