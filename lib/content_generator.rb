@@ -140,12 +140,22 @@ module ContentGenerator
       location.ui_name
     end
 
-    def self.cp_nodes(cp_nodes)
-      cp_nodes.to_s
+    def self.cp_nodes(location, cp_nodes)
+      node_price = 2 * BillingRate.unit_price_from_resource_properties("KubernetesControlPlaneVCpu", "standard", location.name)
+      data = Option::KubernetesCPOptions.find { _1.cp_node_count == cp_nodes }
+      [
+        data.title,
+        data.explanation,
+        "$#{"%.2f" % (cp_nodes * node_price * 60 * 672)}/mo",
+        "$#{"%.3f" % (cp_nodes * node_price * 60)}/hour"
+      ]
     end
 
-    def self.worker_nodes(worker_nodes)
-      worker_nodes[:display_name]
+    def self.worker_nodes(location, cp_nodes, worker_nodes)
+      node_price = 2 * BillingRate.unit_price_from_resource_properties("KubernetesWorkerVCpu", "standard", location.name) +
+        40 * BillingRate.unit_price_from_resource_properties("KubernetesWorkerStorage", "standard", location.name)
+
+      "#{worker_nodes[:display_name]} - $#{"%.2f" % (worker_nodes[:value] * node_price * 60 * 672)}/mo ($#{"%.3f" % (worker_nodes[:value] * node_price * 60)}/hour)"
     end
   end
 

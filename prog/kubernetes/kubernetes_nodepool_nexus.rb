@@ -9,6 +9,8 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
         fail "No existing cluster"
       end
 
+      Validation.validate_kubernetes_worker_node_count(node_count)
+
       kn = KubernetesNodepool.create(name:, node_count:, kubernetes_cluster_id:, target_node_size:, target_node_storage_size_gib:)
 
       Strand.create(prog: "Kubernetes::KubernetesNodepoolNexus", label: "start") { _1.id = kn.id }

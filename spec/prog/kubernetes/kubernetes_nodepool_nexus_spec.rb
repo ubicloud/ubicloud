@@ -38,6 +38,14 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       expect {
         described_class.assemble(name: "name", node_count: 2, kubernetes_cluster_id: SecureRandom.uuid)
       }.to raise_error RuntimeError, "No existing cluster"
+
+      expect {
+        described_class.assemble(name: "name", node_count: 0, kubernetes_cluster_id: kc.id)
+      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: worker_node_count"
+
+      expect {
+        described_class.assemble(name: "name", node_count: "2", kubernetes_cluster_id: kc.id)
+      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: worker_node_count"
     end
 
     it "creates a kubernetes nodepool" do
