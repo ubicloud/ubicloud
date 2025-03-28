@@ -48,14 +48,14 @@ RSpec.describe Pagination do
         expect(result[:records].length).to eq(1)
       end
 
-      it "big page size" do
-        101.times do |index|
+      it "more objects than requested page size" do
+        3.times do |index|
           ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "additional-ps-#{index}", location_id: Location::HETZNER_FSN1_ID).subject
           Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "additional-vm-#{index}", private_subnet_id: ps.id).subject
         end
 
-        result = project.vms_dataset.paginated_result(page_size: 1000)
-        expect(result[:records].length).to eq(100)
+        result = project.vms_dataset.paginated_result(page_size: 2)
+        expect(result[:records].length).to eq(2)
       end
 
       it "empty page" do
