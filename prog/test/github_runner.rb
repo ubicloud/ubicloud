@@ -17,7 +17,8 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       installation_id: Config.e2e_github_installation_id,
       name: "TestUser",
       type: "User",
-      project_id: github_test_project.id
+      project_id: github_test_project.id,
+      use_docker_mirror: true
     )
 
     Strand.create_with_id(
