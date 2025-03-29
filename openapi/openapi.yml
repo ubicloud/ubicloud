@@ -156,10 +156,10 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/firewall/{firewall_name}':
+  '/project/{project_id}/firewall/{firewall_reference}':
     parameters:
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_reference'
     delete:
       operationId: deleteFirewall
       summary: Delete a specific firewall
@@ -180,10 +180,10 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/firewall/{firewall_name}/firewall-rule':
+  '/project/{project_id}/firewall/{firewall_reference}/firewall-rule':
     parameters:
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_reference'
     post:
       operationId: createFirewallRule
       summary: Create a new firewall rule
@@ -214,10 +214,10 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
-  '/project/{project_id}/firewall/{firewall_name}/firewall-rule/{firewall_rule_id}':
+  '/project/{project_id}/firewall/{firewall_reference}/firewall-rule/{firewall_rule_id}':
     parameters:
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_reference'
       - $ref: '#/components/parameters/firewall_rule_id'
     delete:
       operationId: deleteFirewallRule
@@ -328,11 +328,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/location/{location}/firewall/{firewall_name}':
+  '/project/{project_id}/location/{location}/firewall/{firewall_reference}':
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_reference'
     delete:
       operationId: deleteLocationFirewall
       summary: Delete a specific firewall
@@ -374,11 +374,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/location/{location}/firewall/{firewall_name}/attach-subnet':
+  '/project/{project_id}/location/{location}/firewall/{firewall_reference}/attach-subnet':
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_reference'
     post:
       operationId: actionLocationFirewallAttachSubnet
       summary: Attach a subnet to firewall
@@ -402,11 +402,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/location/{location}/firewall/{firewall_name}/detach-subnet':
+  '/project/{project_id}/location/{location}/firewall/{firewall_reference}/detach-subnet':
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_reference'
     post:
       operationId: actionLocationFirewallDetachSubnet
       summary: Detach a subnet from firewall
@@ -430,9 +430,9 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/location/{location}/firewall/{firewall_name}/firewall-rule':
+  '/project/{project_id}/location/{location}/firewall/{firewall_reference}/firewall-rule':
     parameters:
-      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_reference'
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/project_id'
     post:
@@ -465,11 +465,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
-  '/project/{project_id}/location/{location}/firewall/{firewall_name}/firewall-rule/{firewall_rule_id}':
+  '/project/{project_id}/location/{location}/firewall/{firewall_reference}/firewall-rule/{firewall_rule_id}':
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_reference'
       - $ref: '#/components/parameters/firewall_rule_id'
     delete:
       operationId: deleteLocationFirewallFirewallRule
@@ -1397,13 +1397,18 @@ paths:
         - Virtual Machine
 components:
   parameters:
-    firewall_name:
-      description: Name of the firewall
+    firewall_reference:
+      description: Firewall ID or name
+      examples:
+        id:
+          value: fwn30gjk1d1e2jj34v9x0dq4rp
+        name:
+          value: firewall-name
       in: path
-      name: firewall_name
+      name: firewall_reference
       required: true
       schema:
-        type: string
+        $ref: '#/components/schemas/Reference'
     firewall_rule_id:
       description: ID of the firewall rule
       in: path
