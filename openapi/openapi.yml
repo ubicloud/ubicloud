@@ -1433,8 +1433,7 @@ components:
       name: postgres_database_reference
       required: true
       schema:
-        type: string
-        pattern: '^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$'
+        $ref: '#/components/schemas/Reference'
     postgres_firewall_rule_id:
       description: ID of the postgres firewall rule
       in: path
@@ -1799,6 +1798,10 @@ components:
         - discount
         - id
         - name
+    Reference:
+      description: Resource ID or name
+      type: string
+      pattern: '^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$'
     Vm:
       type: object
       properties:
