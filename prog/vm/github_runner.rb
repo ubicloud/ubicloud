@@ -224,8 +224,8 @@ class Prog::Vm::GithubRunner < Prog::Base
       UBICLOUD_CACHE_URL=#{Config.base_url}/runtime/github/" | sudo tee -a /etc/environment
     COMMAND
 
-    if (mirror_vm = Vm[Config.docker_mirror_server_vm_id]) && vm.vm_host_id == mirror_vm.vm_host_id
-      mirror_address = "#{mirror_vm.load_balancer.hostname}:5000"
+    if github_runner.installation.use_docker_mirror
+      mirror_address = "mirror.gcr.io"
       command += <<~COMMAND
         # Configure Docker daemon with registry mirror
         if [ -f /etc/docker/daemon.json ] && [ -s /etc/docker/daemon.json ]; then
