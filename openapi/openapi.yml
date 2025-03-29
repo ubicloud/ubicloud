@@ -255,10 +255,10 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
-  '/project/{project_id}/load-balancer/{load_balancer_name}':
+  '/project/{project_id}/load-balancer/{load_balancer_reference}':
     parameters:
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/load_balancer_name'
+      - $ref: '#/components/parameters/load_balancer_reference'
     get:
       operationId: getLoadBalancer
       summary: Get details of a specific Load Balancer
@@ -538,11 +538,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
-  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_name}':
+  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_reference}':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/load_balancer_name'
+      - $ref: '#/components/parameters/load_balancer_reference'
     delete:
       operationId: deleteLoadBalancer
       summary: Delete a specific Load Balancer
@@ -646,11 +646,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
-  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_name}/attach-vm':
+  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_reference}/attach-vm':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/load_balancer_name'
+      - $ref: '#/components/parameters/load_balancer_reference'
     post:
       operationId: attachVmLocationLoadBalancer
       summary: Attach a VM to a Load Balancer in a specific location of a project
@@ -674,11 +674,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
-  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_name}/detach-vm':
+  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_reference}/detach-vm':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/load_balancer_name'
+      - $ref: '#/components/parameters/load_balancer_reference'
     post:
       operationId: detachVmLocationLoadBalancer
       summary: Detach a VM from a Load Balancer in a specific location of a project
@@ -1418,13 +1418,18 @@ components:
         type: string
         example: fraz0q3vbrpa7pkg7zbmah9csn
         pattern: '^fr[0-9a-hj-km-np-tv-z]{24}$'
-    load_balancer_name:
-      description: Name of the load balancer
+    load_balancer_reference:
+      description: Load balancer ID or name
+      examples:
+        id:
+          value: 1bn30gjk1d1e2jj34v9x0dq4rp
+        name:
+          value: load-balancer-name
       in: path
-      name: load_balancer_name
+      name: load_balancer_reference
       required: true
       schema:
-        type: string
+        $ref: '#/components/schemas/Reference'
     location:
       description: The Ubicloud location/region
       in: path
