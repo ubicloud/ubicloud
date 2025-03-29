@@ -86,6 +86,33 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
     end
 
+    it "picks correct base image for AWS-pg16" do
+      expect(PostgresResource).to receive(:[]).and_return(postgres_resource)
+      expect(postgres_resource.location).to receive(:provider).and_return("aws").at_least(:once)
+      expect(postgres_resource).to receive(:version).and_return("16").at_least(:once)
+      expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).with(anything, hash_including(boot_image: Config.aws_based_postgres_16_ubuntu_2204_ami_version)).and_return(instance_double(Strand, id: "62c62ddb-5b5a-4e9e-b534-e73c16f86bcb"))
+      expect(PostgresServer).to receive(:create).and_return(instance_double(PostgresServer, id: "5c13fd6a-25c2-4fa4-be48-2846f127526a"))
+      described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
+    end
+
+    it "picks correct base image for AWS-pg17" do
+      expect(PostgresResource).to receive(:[]).and_return(postgres_resource)
+      expect(postgres_resource.location).to receive(:provider).and_return("aws").at_least(:once)
+      expect(postgres_resource).to receive(:version).and_return("17").at_least(:once)
+      expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).with(anything, hash_including(boot_image: Config.aws_based_postgres_17_ubuntu_2204_ami_version)).and_return(instance_double(Strand, id: "62c62ddb-5b5a-4e9e-b534-e73c16f86bcb"))
+      expect(PostgresServer).to receive(:create).and_return(instance_double(PostgresServer, id: "5c13fd6a-25c2-4fa4-be48-2846f127526a"))
+      described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
+    end
+
+    it "raises error if the version is not supported for AWS" do
+      expect(PostgresResource).to receive(:[]).and_return(postgres_resource)
+      expect(postgres_resource.location).to receive(:provider).and_return("aws").at_least(:once)
+      expect(postgres_resource).to receive(:version).and_return("18").at_least(:once)
+      expect {
+        described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
+      }.to raise_error RuntimeError, "Unsupported PostgreSQL version for AWS: 18"
+    end
+
     it "errors out for unknown flavor" do
       expect(PostgresResource).to receive(:[]).and_return(postgres_resource)
       expect(postgres_resource).to receive(:flavor).and_return("boring_flavor").at_least(:once)

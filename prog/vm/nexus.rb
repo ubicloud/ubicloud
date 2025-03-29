@@ -115,9 +115,11 @@ class Prog::Vm::Nexus < Prog::Base
       nic.update(vm_id: vm.id)
 
       gpu_count = 1 if gpu_count == 0 && vm_size.gpu
+      label = (location.provider == "aws") ? "start_aws" : "start"
+
       Strand.create(
         prog: "Vm::Nexus",
-        label: "start",
+        label:,
         stack: [{
           "storage_volumes" => storage_volumes.map { |v| v.transform_keys(&:to_s) },
           "swap_size_bytes" => swap_size_bytes,
@@ -175,6 +177,18 @@ class Prog::Vm::Nexus < Prog::Base
         hop_destroy
       end
     end
+  end
+
+  label def start_aws
+    nap 5 unless vm.nics.all? { |nic| nic.strand.label == "wait" }
+    bud Prog::Aws::Instance, {"subject_id" => vm.id}, :start
+    hop_wait_aws_vm_started
+  end
+
+  label def wait_aws_vm_started
+    reap
+    hop_wait_sshable if leaf?
+    nap 10
   end
 
   label def start
@@ -300,7 +314,9 @@ class Prog::Vm::Nexus < Prog::Base
 
   label def create_billing_record
     vm.update(display_state: "running", provisioned_at: Time.now)
-    Clog.emit("vm provisioned") { [vm, {provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: Time.now - vm.allocated_at}}] }
+
+    Clog.emit("vm provisioned") { [vm, {provision: {vm_ubid: vm.ubid, vm_host_ubid: host&.ubid, duration: Time.now - vm.allocated_at}}] }
+
     project = vm.project
     hop_wait unless project.billable
 
@@ -312,37 +328,39 @@ class Prog::Vm::Nexus < Prog::Base
       amount: vm.vcpus
     )
 
-    vm.storage_volumes.each do |vol|
-      BillingRecord.create_with_id(
-        project_id: project.id,
-        resource_id: vm.id,
-        resource_name: "Disk ##{vol["disk_index"]} of #{vm.name}",
-        billing_rate_id: BillingRate.from_resource_properties("VmStorage", vm.family, vm.location.name)["id"],
-        amount: vol["size_gib"]
-      )
-    end
+    unless vm.location.provider == "aws"
+      vm.storage_volumes.each do |vol|
+        BillingRecord.create_with_id(
+          project_id: project.id,
+          resource_id: vm.id,
+          resource_name: "Disk ##{vol["disk_index"]} of #{vm.name}",
+          billing_rate_id: BillingRate.from_resource_properties("VmStorage", vm.family, vm.location.name)["id"],
+          amount: vol["size_gib"]
+        )
+      end
 
-    if vm.ip4_enabled
-      BillingRecord.create_with_id(
-        project_id: project.id,
-        resource_id: vm.id,
-        resource_name: vm.assigned_vm_address.ip,
-        billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location.name)["id"],
-        amount: 1
-      )
-    end
+      if vm.ip4_enabled
+        BillingRecord.create_with_id(
+          project_id: project.id,
+          resource_id: vm.id,
+          resource_name: vm.assigned_vm_address.ip,
+          billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location.name)["id"],
+          amount: 1
+        )
+      end
 
-    if vm.pci_devices.any? { |dev| dev.is_gpu }
-      gpu_count = vm.pci_devices.count { |dev| dev.is_gpu }
-      gpu = vm.pci_devices.find { |dev| dev.is_gpu }
+      if vm.pci_devices.any? { |dev| dev.is_gpu }
+        gpu_count = vm.pci_devices.count { |dev| dev.is_gpu }
+        gpu = vm.pci_devices.find { |dev| dev.is_gpu }
 
-      BillingRecord.create_with_id(
-        project_id: project.id,
-        resource_id: vm.id,
-        resource_name: "GPUs of #{vm.name}",
-        billing_rate_id: BillingRate.from_resource_properties("Gpu", gpu.device, vm.location.name)["id"],
-        amount: gpu_count
-      )
+        BillingRecord.create_with_id(
+          project_id: project.id,
+          resource_id: vm.id,
+          resource_name: "GPUs of #{vm.name}",
+          billing_rate_id: BillingRate.from_resource_properties("Gpu", gpu.device, vm.location.name)["id"],
+          amount: gpu_count
+        )
+      end
     end
 
     hop_wait
@@ -455,6 +473,11 @@ class Prog::Vm::Nexus < Prog::Base
     end
 
     vm.update(display_state: "deleting")
+    if vm.location.provider == "aws"
+      bud Prog::Aws::Instance, {"subject_id" => vm.id}, :destroy
+      vm.nics.map(&:incr_destroy)
+      hop_wait_aws_vm_destroyed
+    end
 
     unless host.nil?
       begin
@@ -502,6 +525,15 @@ class Prog::Vm::Nexus < Prog::Base
     hop_wait_lb_expiry if vm.load_balancer
 
     hop_destroy_slice
+  end
+
+  label def wait_aws_vm_destroyed
+    reap
+    if leaf?
+      final_clean_up
+      pop "vm deleted"
+    end
+    nap 10
   end
 
   label def wait_lb_expiry

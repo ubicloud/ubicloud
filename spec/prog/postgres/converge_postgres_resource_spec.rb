@@ -31,8 +31,8 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
   describe "#provision_servers" do
     before do
       allow(postgres_resource).to receive(:has_enough_fresh_servers?).and_return(false)
-      allow(postgres_resource.servers[0]).to receive(:vm).and_return(instance_double(Vm, vm_host: instance_double(VmHost, id: "vmh-id-1")))
-      allow(postgres_resource.servers[1]).to receive(:vm).and_return(instance_double(Vm, vm_host: instance_double(VmHost, id: "vmh-id-2")))
+      allow(postgres_resource.servers[0]).to receive(:vm).and_return(instance_double(Vm, vm_host: instance_double(VmHost, id: "vmh-id-1"), display_state: "running"))
+      allow(postgres_resource.servers[1]).to receive(:vm).and_return(instance_double(Vm, vm_host: instance_double(VmHost, id: "vmh-id-2"), display_state: "running"))
     end
 
     it "hops to wait_servers_to_be_ready if there are enough fresh servers" do
@@ -40,8 +40,8 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.provision_servers }.to hop("wait_servers_to_be_ready")
     end
 
-    it "does not provision a new server if there is a server that is not assigned to a vm_host" do
-      expect(postgres_resource.servers[0]).to receive(:vm).and_return(instance_double(Vm, vm_host: nil))
+    it "does not provision a new server if there is a server that is not in running state" do
+      expect(postgres_resource.servers[0]).to receive(:vm).and_return(instance_double(Vm, vm_host: nil, display_state: "creating"))
       expect(Prog::Postgres::PostgresServerNexus).not_to receive(:assemble)
       expect { nx.provision_servers }.to nap
     end
@@ -52,8 +52,15 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.provision_servers }.to nap
     end
 
-    it "provisions a new server if there is no server with vm_host" do
+    it "provisions a new server if there is no server not running" do
       expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: ["vmh-id-1", "vmh-id-2"]))
+      expect { nx.provision_servers }.to nap
+    end
+
+    it "provisions a new server if there is no server not running and passes empty exclude_host_ids for AWS" do
+      expect(postgres_resource.servers[0].vm).to receive(:vm_host).and_return(nil)
+      expect(postgres_resource.servers[1].vm).to receive(:vm_host).and_return(nil)
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: []))
       expect { nx.provision_servers }.to nap
     end
   end

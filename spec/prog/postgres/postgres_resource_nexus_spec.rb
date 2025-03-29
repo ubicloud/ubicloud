@@ -24,7 +24,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
           family: "standard",
           vcpus: 2,
           vm_host: instance_double(VmHost, id: "dd9ef3e7-6d55-8371-947f-a8478b42a17d"),
-          private_subnets: [instance_double(PrivateSubnet, id: "627a23ee-c1fb-86d9-a261-21cc48415916")]
+          private_subnets: [instance_double(PrivateSubnet, id: "627a23ee-c1fb-86d9-a261-21cc48415916")],
+          display_state: "running"
         )
       )],
       representative_server: instance_double(
@@ -95,7 +96,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       }.to raise_error RuntimeError, "Location is not in the project"
 
       private_location.update(project_id: customer_project.id)
-      described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128)
+      described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 118)
 
       expect {
         parent = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject

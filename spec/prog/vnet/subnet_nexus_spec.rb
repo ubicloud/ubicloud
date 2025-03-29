@@ -137,6 +137,42 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
   end
 
+  describe "#start" do
+    it "creates a vpc if location is aws and starts to wait for it" do
+      loc = Location.create_with_id(name: "aws-us-east-1", provider: "aws", project_id: prj.id, display_name: "aws-us-east-1", ui_name: "AWS US East 1", visible: true)
+      expect(ps).to receive(:location).and_return(loc).at_least(:once)
+      expect(nx).to receive(:bud).with(Prog::Aws::Vpc, {"subject_id" => ps.id}, :create_vpc)
+      expect { nx.start }.to hop("wait_vpc_created")
+    end
+
+    it "does not create the PrivateSubnetAwsResource if it already exists" do
+      loc = Location.create_with_id(name: "aws-us-east-1", provider: "aws", project_id: prj.id, display_name: "aws-us-east-1", ui_name: "AWS US East 1", visible: true)
+      expect(ps).to receive(:location).and_return(loc).at_least(:once)
+      expect(ps).to receive(:private_subnet_aws_resource).and_return(instance_double(PrivateSubnetAwsResource, id: "123")).at_least(:once)
+      expect(nx).to receive(:bud).with(Prog::Aws::Vpc, {"subject_id" => ps.id}, :create_vpc)
+      expect { nx.start }.to hop("wait_vpc_created")
+      expect(PrivateSubnetAwsResource.count).to eq(0)
+    end
+
+    it "hops to wait if location is not aws" do
+      expect { nx.start }.to hop("wait")
+    end
+  end
+
+  describe "#wait_vpc_created" do
+    it "reaps and hops to wait if leaf" do
+      expect(nx).to receive(:reap)
+      expect(nx).to receive(:leaf?).and_return(true)
+      expect { nx.wait_vpc_created }.to hop("wait")
+    end
+
+    it "naps if not leaf" do
+      expect(nx).to receive(:reap)
+      expect(nx).to receive(:leaf?).and_return(false)
+      expect { nx.wait_vpc_created }.to nap(2)
+    end
+  end
+
   describe "#wait" do
     it "hops to refresh_keys if when_refresh_keys_set?" do
       expect(nx).to receive(:when_refresh_keys_set?).and_yield
@@ -393,6 +429,15 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect { nx.destroy }.to nap(5)
     end
 
+    it "hops to wait_aws_vpc_destroyed if location is aws" do
+      expect(ps).to receive(:location).and_return(Location.create_with_id(name: "aws-us-east-1", provider: "aws", project_id: prj.id, display_name: "aws-us-east-1", ui_name: "AWS US East 1", visible: true))
+      expect(nx).to receive(:private_subnet).and_return(ps).at_least(:once)
+      expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
+      expect(nic).to receive(:incr_destroy)
+      expect(nx).to receive(:bud).with(Prog::Aws::Vpc, {"subject_id" => ps.id}, :destroy)
+      expect { nx.destroy }.to hop("wait_aws_vpc_destroyed")
+    end
+
     it "increments the destroy semaphore of nics" do
       expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
       expect(nic).to receive(:incr_destroy).and_return(true)
@@ -416,6 +461,23 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(nx).to receive(:private_subnet).and_return(ps1).at_least(:once)
       expect(ps1).to receive(:disconnect_subnet).with(ps2).and_call_original
       expect { nx.destroy }.to exit({"msg" => "subnet destroyed"})
+    end
+  end
+
+  describe "#wait_aws_vpc_destroyed" do
+    it "deletes the vpc and pops if leaf" do
+      expect(nx).to receive(:private_subnet).and_return(ps).at_least(:once)
+      expect(ps).to receive(:destroy).and_return(true)
+      expect(ps).to receive(:private_subnet_aws_resource).and_return(instance_double(PrivateSubnetAwsResource, id: "123", destroy: true))
+      expect(nx).to receive(:reap)
+      expect(nx).to receive(:leaf?).and_return(true)
+      expect { nx.wait_aws_vpc_destroyed }.to exit({"msg" => "vpc destroyed"})
+    end
+
+    it "naps if not leaf" do
+      expect(nx).to receive(:reap)
+      expect(nx).to receive(:leaf?).and_return(false)
+      expect { nx.wait_aws_vpc_destroyed }.to nap(10)
     end
   end
 end

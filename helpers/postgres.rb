@@ -87,18 +87,28 @@ class Clover
 
     options.add_option(name: "name")
     options.add_option(name: "flavor", values: flavor)
-    options.add_option(name: "location", values: Option.postgres_locations(project_id: @project.id), parent: "flavor")
+    options.add_option(name: "location", values: Option.postgres_locations(project_id: @project.id), parent: "flavor") do |flavor, location|
+      !(location.provider == "aws" && flavor != PostgresResource::Flavor::STANDARD)
+    end
     options.add_option(name: "family", values: all_sizes_for_project.map(&:vm_family).uniq, parent: "location") do |flavor, location, family|
-      available_families = Option.families.map(&:name)
-      available_families.include?(family) && BillingRate.from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name)
+      if location.provider == "aws" && family != "standard"
+        false
+      else
+        available_families = Option.families.map(&:name)
+        available_families.include?(family) && BillingRate.from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name)
+      end
     end
     options.add_option(name: "size", values: all_sizes_for_project.map(&:name).uniq, parent: "family") do |flavor, location, family, size|
-      pg_size = all_sizes_for_project.find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
-      vm_size = Option::VmSizes.find { _1.name == pg_size.vm_size && _1.arch == "x64" && _1.visible }
-      vm_size.family == family
+      if location.provider == "aws" && (size.split("-").last.to_i > 16 || size.split("-").first == "burstable")
+        false
+      else
+        pg_size = all_sizes_for_project.find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
+        vm_size = Option::VmSizes.find { _1.name == pg_size.vm_size && _1.arch == "x64" && _1.visible }
+        vm_size.family == family
+      end
     end
 
-    options.add_option(name: "storage_size", values: ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096"], parent: "size") do |flavor, location, family, size, storage_size|
+    options.add_option(name: "storage_size", values: ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096", "118", "237", "475", "950", "1781", "1900", "3562", "3800"], parent: "size") do |flavor, location, family, size, storage_size|
       pg_size = all_sizes_for_project.find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
       pg_size.storage_size_options.include?(storage_size.to_i)
     end
@@ -117,17 +127,25 @@ class Clover
     options.add_option(name: "location", values: location, parent: "flavor")
 
     options.add_option(name: "family", values: all_sizes_for_project.map(&:vm_family).uniq, parent: "location") do |flavor, location, family|
-      available_families = Option.families.map(&:name)
-      available_families.include?(family) && BillingRate.from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name)
+      if location.provider == "aws" && family != "standard"
+        false
+      else
+        available_families = Option.families.map(&:name)
+        available_families.include?(family) && BillingRate.from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name)
+      end
     end
 
     options.add_option(name: "size", values: all_sizes_for_project.map(&:name).uniq, parent: "family") do |flavor, location, family, size|
-      pg_size = all_sizes_for_project.find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
-      vm_size = Option::VmSizes.find { _1.name == pg_size.vm_size && _1.arch == "x64" && _1.visible }
-      vm_size.family == family
+      if location.provider == "aws" && (size.split("-").last.to_i > 16 || size.split("-").first == "burstable")
+        false
+      else
+        pg_size = all_sizes_for_project.find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
+        vm_size = Option::VmSizes.find { _1.name == pg_size.vm_size && _1.arch == "x64" && _1.visible }
+        vm_size.family == family
+      end
     end
 
-    options.add_option(name: "storage_size", values: ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096"], parent: "size") do |flavor, location, family, size, storage_size|
+    options.add_option(name: "storage_size", values: ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096", "118", "237", "475", "950", "1781", "1900", "3562", "3800"], parent: "size") do |flavor, location, family, size, storage_size|
       pg_size = all_sizes_for_project.find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
       pg_size.storage_size_options.include?(storage_size.to_i)
     end
