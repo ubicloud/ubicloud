@@ -3,11 +3,11 @@
 module Pagination
   def paginated_result(start_after: nil, page_size: nil, order_column: nil)
     model = @opts[:model]
-    page_size ||= 10
+    page_size ||= 1000
     order_column_sym = (order_column || "id").to_sym
 
     begin
-      page_size = Integer(page_size).clamp(1, 100)
+      page_size = Integer(page_size).clamp(1, 1000)
     rescue ArgumentError
       fail Validation::ValidationFailed.new(page_size: "#{page_size} is not an integer")
     end
