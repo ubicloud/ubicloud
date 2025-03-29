@@ -1011,11 +1011,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
-  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_name}':
+  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_reference}':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/private_subnet_name'
+      - $ref: '#/components/parameters/private_subnet_reference'
     delete:
       operationId: deletePrivateSubnet
       summary: Delete a specific Private Subnet
@@ -1056,11 +1056,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
-  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_name}/connect':
+  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_reference}/connect':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/private_subnet_name'
+      - $ref: '#/components/parameters/private_subnet_reference'
     post:
       operationId: connectPrivateSubnet
       summary: Connect private subnet to another private subnet
@@ -1081,11 +1081,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
-  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_name}/disconnect/{private_subnet_id}':
+  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_reference}/disconnect/{private_subnet_id}':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/private_subnet_name'
+      - $ref: '#/components/parameters/private_subnet_reference'
       - $ref: '#/components/parameters/private_subnet_id'
     post:
       operationId: disconnectPrivateSubnet
@@ -1469,13 +1469,18 @@ components:
         type: string
         example: pskkmx0f2vke4h36nk9cm8v8q0
         pattern: '^ps[0-9a-hj-km-np-tv-z]{24}$'
-    private_subnet_name:
-      description: Private subnet name
+    private_subnet_reference:
+      description: Private subnet ID or name
+      examples:
+        id:
+          value: psn30gjk1d1e2jj34v9x0dq4rp
+        name:
+          value: private-subnet-name
       in: path
-      name: private_subnet_name
+      name: private_subnet_reference
       required: true
       schema:
-        type: string
+        $ref: '#/components/schemas/Reference'
     project_id:
       description: ID of the project
       in: path
