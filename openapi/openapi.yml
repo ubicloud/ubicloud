@@ -1154,11 +1154,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
-  '/project/{project_id}/location/{location}/vm/{vm_name}':
+  '/project/{project_id}/location/{location}/vm/{vm_reference}':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/vm_name'
+      - $ref: '#/components/parameters/vm_reference'
     delete:
       operationId: deleteVM
       summary: Delete a specific VM
@@ -1220,11 +1220,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
-  '/project/{project_id}/location/{location}/vm/{vm_name}/restart':
+  '/project/{project_id}/location/{location}/vm/{vm_reference}/restart':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/vm_name'
+      - $ref: '#/components/parameters/vm_reference'
     post:
       operationId: restartVM
       summary: Restart a specific VM
@@ -1537,13 +1537,18 @@ components:
       required: false
       schema:
         type: string
-    vm_name:
-      description: Virtual machine name
+    vm_reference:
+      description: Virtual machine ID or name
+      examples:
+        id:
+          value: vmn30gjk1d1e2jj34v9x0dq4rp
+        name:
+          value: virtual-machine-name
       in: path
-      name: vm_name
+      name: vm_reference
       required: true
       schema:
-        type: string
+        $ref: '#/components/schemas/Reference'
   schemas:
     Error:
       type: object
