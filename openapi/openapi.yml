@@ -679,11 +679,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}':
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_name'
+      - $ref: '#/components/parameters/postgres_database_reference'
     delete:
       operationId: deletePostgresDatabase
       summary: Delete a specific Postgres Database
@@ -766,11 +766,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/ca-certificates':
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/ca-certificates':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_name'
+      - $ref: '#/components/parameters/postgres_database_reference'
     get:
       operationId: getPostgresCACertificatesByName
       summary: Download CA certificates for a specific Postgres Database in a location with name
@@ -791,154 +791,14 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/firewall-rule/{firewall_rule_id}':
-    parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_name'
-      - $ref: '#/components/parameters/postgres_firewall_rule_id'
-    delete:
-      operationId: deleteLocationPostgresFirewallRule
-      summary: Delete a specific firewall rule
-      responses:
-        '204':
-          $ref: '#/components/responses/Delete'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Firewall Rule
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/metric-destination':
-    parameters:
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_name'
-      - $ref: '#/components/parameters/project_id'
-    post:
-      operationId: createLocationPostgresMetricDestination
-      summary: Create a new Postgres Metric Destination
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                password:
-                  description: Password for the Metric Destination
-                  type: string
-                url:
-                  description: URL for the Metric Destination
-                  type: string
-                username:
-                  description: Username for the Metric Destination
-                  type: string
-              additionalProperties: false
-              required:
-                - password
-                - url
-                - username
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresDatabase'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Metric Destination
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/metric-destination/{metric_destination_id}':
-    parameters:
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/metric_destination_id'
-      - $ref: '#/components/parameters/postgres_database_name'
-      - $ref: '#/components/parameters/project_id'
-    delete:
-      operationId: deleteLocationPostgresMetricDestination
-      summary: Delete a specific Metric Destination
-      responses:
-        '204':
-          $ref: '#/components/responses/Delete'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Metric Destination
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/reset-superuser-password':
-    post:
-      operationId: resetSuperuserPassword
-      summary: Reset superuser password of the Postgres database
-      parameters:
-        - $ref: '#/components/parameters/project_id'
-        - $ref: '#/components/parameters/location'
-        - $ref: '#/components/parameters/postgres_database_name'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                password:
-                  type: string
-              additionalProperties: false
-              required:
-                - password
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresDatabase'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/restart':
-    parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_name'
-    post:
-      operationId: restartPostgresDatabase
-      summary: Restart a specific Postgres Database
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresDatabase'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/restore':
-    post:
-      operationId: restorePostgresDatabase
-      summary: Restore a new Postgres database in a specific location of a project
-      parameters:
-        - $ref: '#/components/parameters/project_id'
-        - $ref: '#/components/parameters/location'
-        - $ref: '#/components/parameters/postgres_database_name'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                restore_target:
-                  type: string
-              additionalProperties: false
-              required:
-                - name
-                - restore_target
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresDatabase'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/set-maintenance-window':
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/set-maintenance-window':
     post:
       operationId: setMaintenanceWindow
       summary: Set maintenance window for the Postgres database
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/location'
-        - $ref: '#/components/parameters/postgres_database_name'
+        - $ref: '#/components/parameters/postgres_database_reference'
       requestBody:
         required: true
         content:
@@ -994,6 +854,146 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Firewall Rule
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/firewall-rule/{firewall_rule_id}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+      - $ref: '#/components/parameters/postgres_firewall_rule_id'
+    delete:
+      operationId: deleteLocationPostgresFirewallRule
+      summary: Delete a specific firewall rule
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/metric-destination':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+      - $ref: '#/components/parameters/project_id'
+    post:
+      operationId: createLocationPostgresMetricDestination
+      summary: Create a new Postgres Metric Destination
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  description: Password for the Metric Destination
+                  type: string
+                url:
+                  description: URL for the Metric Destination
+                  type: string
+                username:
+                  description: Username for the Metric Destination
+                  type: string
+              additionalProperties: false
+              required:
+                - password
+                - url
+                - username
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Metric Destination
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/metric-destination/{metric_destination_id}':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/metric_destination_id'
+      - $ref: '#/components/parameters/postgres_database_reference'
+      - $ref: '#/components/parameters/project_id'
+    delete:
+      operationId: deleteLocationPostgresMetricDestination
+      summary: Delete a specific Metric Destination
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Metric Destination
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/reset-superuser-password':
+    post:
+      operationId: resetSuperuserPassword
+      summary: Reset superuser password of the Postgres database
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_reference'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+              additionalProperties: false
+              required:
+                - password
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/restart':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    post:
+      operationId: restartPostgresDatabase
+      summary: Restart a specific Postgres Database
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/restore':
+    post:
+      operationId: restorePostgresDatabase
+      summary: Restore a new Postgres database in a specific location of a project
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_reference'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                restore_target:
+                  type: string
+              additionalProperties: false
+              required:
+                - name
+                - restore_target
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   '/project/{project_id}/location/{location}/private-subnet':
     get:
       operationId: listLocationPrivateSubnets
@@ -1422,13 +1422,6 @@ components:
       schema:
         type: integer
         default: 10
-    postgres_database_name:
-      description: Postgres database name
-      in: path
-      name: postgres_database_name
-      required: true
-      schema:
-        type: string
     postgres_database_reference:
       description: Postgres database ID or name
       examples:
