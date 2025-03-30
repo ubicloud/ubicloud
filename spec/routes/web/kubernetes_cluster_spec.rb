@@ -47,8 +47,6 @@ RSpec.describe Clover, "Kubernetes" do
 
   before do
     allow(Config).to receive(:kubernetes_service_project_id).and_return(Project.create(name: "UbicloudKubernetesService").id)
-    project.set_ff_kubernetes true
-    project_wo_permissions.set_ff_kubernetes true
   end
 
   describe "unauthenticated" do
@@ -67,27 +65,6 @@ RSpec.describe Clover, "Kubernetes" do
   describe "authenticated" do
     before do
       login(user.email)
-    end
-
-    describe "feature disabled" do
-      before do
-        project.set_ff_kubernetes false
-      end
-
-      it "is not shown in the sidebar" do
-        visit project.path
-        expect(page).to have_no_content("Kubernetes")
-
-        project.set_ff_kubernetes true
-
-        visit project.path
-        expect(page).to have_content("Kubernetes")
-      end
-
-      it "kubernetes page is not accessible" do
-        visit "#{project.path}/kubernetes-cluster"
-        expect(page.status_code).to eq(404)
-      end
     end
 
     describe "list" do

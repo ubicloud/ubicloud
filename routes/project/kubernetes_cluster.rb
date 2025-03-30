@@ -3,8 +3,6 @@
 class Clover
   hash_branch(:project_prefix, "kubernetes-cluster") do |r|
     r.web do
-      next unless @project.get_ff_kubernetes
-
       r.get true do
         kubernetes_cluster_list
       end
