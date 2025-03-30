@@ -27,6 +27,13 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v5
 
+    - name: Setup SSH access
+      uses: ubicloud/ssh-runner@v1
+      with:
+        public-ssh-key: |
+          ${{ secrets.OPERATOR_SSH_PUBLIC_KEYS }}
+        wait-minutes: 0
+
     - name: Set up Clover
       uses: ./.github/actions/setup-clover
 
