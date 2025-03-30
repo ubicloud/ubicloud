@@ -47,15 +47,13 @@
               is_active: request.path.start_with?("#{@project_data[:path]}/inference"),
               icon: "tabler-robot"
             ) %>
-            <% if @project.get_ff_kubernetes %>
-              <%== part(
-                "layouts/sidebar/item",
-                name: "Kubernetes",
-                url: "#{@project_data[:path]}/kubernetes-cluster",
-                is_active: request.path.start_with?("#{@project_data[:path]}/kubernetes-cluster"),
-                icon: "kubernetes"
-              ) %>
-            <% end %>
+            <%== part(
+              "layouts/sidebar/item",
+              name: "Kubernetes",
+              url: "#{@project_data[:path]}/kubernetes-cluster",
+              is_active: request.path.start_with?("#{@project_data[:path]}/kubernetes-cluster"),
+              icon: "kubernetes"
+            ) %>
           <% else %>
             <%== part(
               "layouts/sidebar/item",
