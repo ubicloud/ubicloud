@@ -1,0 +1,45 @@
+{
+  "basic": {},
+  "health_check": {
+    "check_frequency": "10s",
+    "consecutive_success": 2,
+    "consecutive_failure": 2
+  },
+  "servers": [
+    {
+      "name": "main-server",
+      "addr": "[::]:8443",
+      "locations": [
+        "inference",
+        "up"
+      ],
+      "threads": 0,
+      "metrics_path": "/metrics"
+    },
+    {
+      "name": "admin-server",
+      "addr": "127.0.0.1:8080,::1:8080",
+      "locations": [
+        "usage"
+      ],
+      "threads": 1
+    }
+  ],
+  "locations": [
+    {
+      "name": "up",
+      "path": "^/up$",
+      "app": "up"
+    },
+    {
+      "name": "inference",
+      "path": "^/v1/(chat/)?completions$",
+      "app": "inference"
+    },
+    {
+      "name": "usage",
+      "path": "^/usage$",
+      "app": "usage"
+    }
+  ]
+}
