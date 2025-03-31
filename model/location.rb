@@ -59,6 +59,7 @@ end
 # Referenced By:
 #  firewall            | firewall_location_id_fkey           | (location_id) REFERENCES location(id)
 #  inference_endpoint  | inference_endpoint_location_id_fkey | (location_id) REFERENCES location(id)
+#  inference_router    | inference_router_location_id_fkey   | (location_id) REFERENCES location(id)
 #  kubernetes_cluster  | kubernetes_cluster_location_id_fkey | (location_id) REFERENCES location(id)
 #  location_credential | location_credential_id_fkey         | (id) REFERENCES location(id)
 #  minio_cluster       | minio_cluster_location_id_fkey      | (location_id) REFERENCES location(id)
