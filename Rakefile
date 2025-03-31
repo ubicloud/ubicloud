@@ -288,9 +288,22 @@ cli_version = lambda do
   File.read("cli/version.txt").chomp
 end
 
+write_cli_makefile = lambda do |filename, version = cli_version.call|
+  File.write(filename, "all:\n\tgo build -ldflags '-X main.version=#{version}' -tags osusergo,netgo")
+end
+
 desc "Compile cli/ubi binary for current platform"
 task "ubi" do
   sh("cd cli && go build -ldflags '-X main.version=#{cli_version.call}' -tags osusergo,netgo")
+end
+
+desc "Update ubicloud/cli checkout in ../cli"
+task "cli-sync" do
+  Dir.chdir("cli") do
+    FileUtils.cp(%w[README.md go.mod ubi.go version.txt], "../../cli/")
+  end
+  FileUtils.cp("LICENSE", "../cli/")
+  write_cli_makefile.call("../cli/Makefile")
 end
 
 desc "Build release files for cli/ubi"
@@ -324,7 +337,7 @@ task "ubi-release" do
     tarball_dir = "ubi-#{version}"
     Dir.mkdir(tarball_dir)
     sh "cp", "version.txt", "ubi.go", "go.mod", tarball_dir
-    File.write(File.join(tarball_dir, "Makefile"), "all:\n\tgo build -ldflags '-X main.version=#{version}' -tags osusergo,netgo")
+    write_cli_makefile(File.join(tarball_dir, "Makefile"), version)
     sh "tar", "zcf", "#{tarball_dir}.tar.gz", tarball_dir
     Dir.chdir(tarball_dir) do
       sh "rm", "version.txt", "ubi.go", "go.mod", "Makefile"
