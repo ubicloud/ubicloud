@@ -6,6 +6,10 @@ module Option
   ai_models = YAML.load_file("config/ai_models.yml")
   AI_MODELS = ai_models.select { _1["enabled"] }.freeze
 
+  def self.ai_model_for_name(model_name)
+    Option::AI_MODELS.detect { _1["model_name"] == model_name }
+  end
+
   def self.locations(only_visible: true, feature_flags: [])
     Location.where(project_id: nil).all.select { |pl| !only_visible || (pl.visible || feature_flags.include?("location_#{pl.name.tr("-", "_")}")) }
   end
