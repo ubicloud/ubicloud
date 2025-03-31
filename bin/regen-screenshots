@@ -154,6 +154,92 @@ class RegenScreenshots
     click_link "postgresql-demo"
     screenshot "managed-postgresql/overview-2-screenshot.png"
 
+    click_link "Kubernetes"
+    click_link "Create Kubernetes Cluster"
+
+    fill_in "Cluster Name", with: "kubernetes-demo"
+    find('input[name="cp_nodes"][value="3"]:not([disabled])').trigger("click")
+    find('select#worker_nodes option[value="5"]:not([disabled])').select_option
+    screenshot "managed-kubernetes/create-screenshot.png"
+
+    kc_ubid = "kcj4veqfy46a4pcxpmj3dzwzf5"
+    kn_ubid = "kna6c1cyxqba5pbmfthkb0xawa"
+
+    k8s_cluster = KubernetesCluster.create(
+      name: "kubernetes-demo",
+      version: "v1.32",
+      cp_node_count: 3,
+      location_id: Location::HETZNER_FSN1_ID,
+      target_node_size: "standard-2",
+      private_subnet_id: Prog::Vnet::SubnetNexus.assemble(
+        project.id,
+        name: "#{kc_ubid}-subnet",
+        location_id: Location::HETZNER_FSN1_ID,
+        ipv4_range: Prog::Vnet::SubnetNexus.random_private_ipv4(Location[Location::HETZNER_FSN1_ID], project, 18).to_s
+      ).subject.id,
+      project_id: project.id
+    ) do |kc|
+      kc.id = UBID.parse(kc_ubid).to_uuid
+    end
+
+    k8s_nodepool = KubernetesNodepool.create(
+      name: "kubernetes-demo-np",
+      node_count: 5,
+      kubernetes_cluster_id: k8s_cluster.id,
+      target_node_size: "standard-2"
+    ) do |kn|
+      kn.id = UBID.parse(kn_ubid).to_uuid
+    end
+
+    Prog::Vnet::LoadBalancerNexus.assemble(
+      k8s_cluster.private_subnet_id,
+      name: k8s_cluster.services_load_balancer_name,
+      algorithm: "hash_based",
+      src_port: 443,
+      dst_port: 6443,
+      health_check_endpoint: "/",
+      health_check_protocol: "tcp",
+      stack: LoadBalancer::Stack::IPV4
+    )
+
+    ["le9ec", "e12en", "zd3ka"].each do |suffix|
+      k8s_cluster.add_cp_vm Prog::Vm::Nexus.assemble_with_sshable(
+        project.id,
+        sshable_unix_user: "ubi",
+        name: "#{kc_ubid}-#{suffix}",
+        location_id: k8s_cluster.location.id,
+        private_subnet_id: k8s_cluster.private_subnet_id,
+        enable_ip4: true
+      ).subject
+    end
+
+    ["ubicl", "krn71", "fysgd", "mant4", "m0h11"].each do |suffix|
+      k8s_nodepool.add_vm Prog::Vm::Nexus.assemble_with_sshable(
+        project.id,
+        sshable_unix_user: "ubi",
+        name: "#{kn_ubid}-#{suffix}",
+        location_id: k8s_cluster.location.id,
+        private_subnet_id: k8s_cluster.private_subnet_id,
+        enable_ip4: true
+      ).subject
+    end
+
+    Project.define_method(:kubernetes_clusters_dataset) do |*a|
+      super(*a).with_extend do
+        define_method(:all) { [k8s_cluster] }
+        define_method(:first) { |*| k8s_cluster }
+      end
+    end
+    KubernetesCluster.define_method(:display_state) { "running" }
+    Vm.define_method(:display_state) { "running" }
+    LoadBalancer.define_method(:hostname) { "f9f2x4td37-services.k8s.ubicloud.com" }
+
+    click_link "Kubernetes"
+    click_link "kubernetes-demo"
+    resize(1400)
+    screenshot "managed-kubernetes/overview-screenshot.png"
+
+    resize(800)
     click_link "Users"
     fill_in "email", with: "other@example.com"
     find("input[name=email]").click
