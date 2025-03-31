@@ -192,6 +192,9 @@ module Config
   optional :inference_endpoint_service_project_id, string
   optional :runpod_api_key, string, clear: true
   optional :huggingface_token, string, clear: true
+  override :inference_dns_zone, "ai.ubicloud.com", string
+  optional :inference_router_access_token, string, clear: true
+  override :inference_router_release_tag, "v0.1.0", string
 
   # DNS
   optional :dns_service_project_id, string
