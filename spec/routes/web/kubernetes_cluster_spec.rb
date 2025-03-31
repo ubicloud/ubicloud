@@ -10,13 +10,29 @@ RSpec.describe Clover, "Kubernetes" do
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
 
   let(:kc) do
-    Prog::Kubernetes::KubernetesClusterNexus.assemble(
+    cluster = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "myk8s",
       version: "v1.32",
       project_id: project.id,
       private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "mysubnet", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id).id,
       location_id: Location::HETZNER_FSN1_ID
     ).subject
+
+    Prog::Vnet::LoadBalancerNexus.assemble(
+      cluster.private_subnet_id,
+      name: cluster.services_load_balancer_name,
+      algorithm: "hash_based",
+      # TODO: change the api to support LBs without ports
+      # The next two fields will be later modified by the sync_kubernetes_services label
+      # These are just set for passing the creation validations
+      src_port: 443,
+      dst_port: 6443,
+      health_check_endpoint: "/",
+      health_check_protocol: "tcp",
+      stack: LoadBalancer::Stack::IPV4
+    )
+
+    cluster
   end
 
   let(:kc_no_perm) do

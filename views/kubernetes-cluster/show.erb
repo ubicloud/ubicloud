@@ -21,12 +21,13 @@
     ["ID", @kc.ubid],
     ["Name", @kc.name],
     ["Location", @kc.display_location],
-    ["Private Subnet", @kc.private_subnet.name],
     ["Kubernetes Version", @kc.version],
-    ["Control Plane Nodes", @kc.cp_node_count]
+    ["Control Plane Nodes", @kc.cp_node_count],
+    ["Worker Nodes", @kc.nodepools.sum { _1.node_count }]
   ]
   
   if @kc.display_state == "running"
+    data.push(["Service URL", LoadBalancer[name: @kc.services_load_balancer_name].hostname]) # TODO: Assign LB to a column properly
     data.push(["Kubeconfig", part("components/download_button", link: "#{request.path}/kubeconfig"), { escape: false }])
   else
     data.push(["Kubeconfig", "Waiting for cluster to be ready..."])
