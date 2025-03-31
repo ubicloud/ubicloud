@@ -488,12 +488,11 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
         "output", "completion_token_count"
       )
       expect(BillingRecord.count).to eq(2)
-      br = BillingRecord.all[0]
+      br, br2 = BillingRecord.order(:billing_rate_id).all
       expect(br.project_id).to eq(p1.id)
       expect(br.resource_id).to eq(inference_endpoint.id)
       expect(br.billing_rate_id).to eq("ba80e171-0c24-4bf9-ac4f-36bdadb259c0")
       expect(br.amount).to eq(10)
-      br2 = BillingRecord.all[1]
       expect(br2.project_id).to eq(p1.id)
       expect(br2.resource_id).to eq(inference_endpoint.id)
       expect(br2.billing_rate_id).to eq("c8886006-9e15-4046-b46a-163851626f83")
