@@ -8,6 +8,15 @@ GIT
       rodauth (~> 2.36)
 
 GIT
+  remote: https://github.com/jeremyevans/rodauth.git
+  revision: 2a72b30136c512ea2853ad9dbc126c067bef89e9
+  ref: 2a72b30136c512ea2853ad9dbc126c067bef89e9
+  specs:
+    rodauth (2.38.0)
+      roda (>= 2.6.0)
+      sequel (>= 4)
+
+GIT
   remote: https://github.com/jeremyevans/sequel.git
   revision: 4b87df31de26683a0204c49f3e759f0fc60fc8b2
   ref: 4b87df31de26683a0204c49f3e759f0fc60fc8b2
@@ -301,9 +310,6 @@ GEM
     rexml (3.4.1)
     roda (3.89.0)
       rack
-    rodauth (2.38.0)
-      roda (>= 2.6.0)
-      sequel (>= 4)
     rodish (2.0.0)
       optparse
     rotp (6.3.0)
@@ -485,7 +491,7 @@ DEPENDENCIES
   rake
   refrigerator (>= 1)
   roda (>= 3.89)
-  rodauth (>= 2.38)
+  rodauth!
   rodauth-omniauth!
   rodish (>= 2)
   rotp
