@@ -44,6 +44,10 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
 
+    - name: Cat bad files
+      run: |
+        head /opt/az/lib/python3.12/site-packages/dateutil/rrule.py
+
     - name: Set up Ruby
       uses: ruby/setup-ruby@v1
       with:
