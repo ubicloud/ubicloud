@@ -12,6 +12,17 @@ RSpec.describe Clover do
     expect(page).to have_flash_error("An invalid security token submitted with this request, please try again")
   end
 
+  it "does not redirect to requested path if path is too long" do
+    create_account
+    visit("/a" * 2048)
+    expect(page.status_code).to eq(200)
+    expect(page).to have_current_path("/login", ignore_query: true)
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Password", with: TEST_USER_PASSWORD
+    click_button "Sign in"
+    expect(page.title).to end_with("Dashboard")
+  end
+
   it "handles expected errors" do
     expect(Clog).to receive(:emit).with("route exception").and_call_original
 
