@@ -42,11 +42,12 @@ class Clover
           end
 
           if (user = Account.exclude(status_id: 3)[email: email])
-            begin
-              DB.transaction(savepoint: :only) do
-                user.add_project(@project)
-              end
-            rescue Sequel::UniqueConstraintViolation
+            result = DB[:access_tag]
+              .returning(:hyper_tag_id)
+              .insert_conflict
+              .insert(hyper_tag_id: user.id, project_id: @project.id)
+
+            if result.empty?
               flash["error"] = "The requested user already has access to this project"
               r.redirect "#{@project.path}/user"
             end
