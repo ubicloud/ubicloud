@@ -219,6 +219,15 @@ RSpec.describe InvoiceGenerator do
       invoices = described_class.new(begin_time, end_time, eur_rate: 1.1).run
       check_invoice_for_single_vm(invoices, p1, vm1, 30 * day, begin_time - 90 * day, expected_vat_info: {"amount" => 4.674, "eur_rate" => 1.1, "rate" => 19, "reversed" => false})
     end
+
+    it "charges no VAT if the total is less than minimum invoice charge threshold" do
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time, begin_time + 0.5 * day), 2)
+      invoices = described_class.new(begin_time, end_time).run
+      expect(invoices.first.content["vat_info"]).to be_nil
+    end
   end
 
   it "generates invoice for a single project" do
