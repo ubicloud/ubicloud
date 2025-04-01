@@ -7,7 +7,7 @@ RSpec.describe Clover, "committee infrastructure" do
   let(:project) { project_with_default_policy(user) }
 
   before do
-    login_api(user.email)
+    login_api
   end
 
   it "serializes unexpected nested errors that cannot be converted" do
