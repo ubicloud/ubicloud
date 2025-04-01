@@ -12,11 +12,18 @@ class Kubernetes::Client
   end
 
   # Returns a flat array of [port, nodePort] pairs from all services
+  # Deduplicates based on the 'port' value, keeping only the first occurrence
   # Format: [[src_port_0, dst_port_0], [src_port_1, dst_port_1], ...]
   def lb_desired_ports(svc_list)
-    svc_list.flat_map do |svc|
-      svc.dig("spec", "ports")&.map { |port| [port["port"], port["nodePort"]] } || []
+    seen_ports = {}
+    sorted = svc_list.sort_by { |svc| svc["metadata"]["creationTimestamp"] }
+    sorted.each do |svc|
+      svc.dig("spec", "ports")&.each do |port|
+        seen_ports[port["port"]] ||= port["nodePort"]
+      end
     end
+
+    seen_ports.to_a
   end
 
   def load_balancer_hostname_missing?(svc)
