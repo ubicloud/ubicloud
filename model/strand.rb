@@ -19,19 +19,34 @@ class Strand < Sequel::Model
     UBID.decode(ubid)
   end
 
+  # :nocov:
+  schedule = if Config.development?
+    Sequel.function(:least, 5, :try)
+  # :nocov:
+  else
+    Sequel.function(:least, Sequel[2]**Sequel.function(:least, :try, 20), 600) * Sequel.function(:random)
+  end
+
+  TAKE_LEASE_AND_RELOAD_PS = DB[:strand]
+    .returning
+    .where(
+      Sequel[id: DB[:strand].select(:id).where(id: :$id).for_update.skip_locked, exitval: nil] &
+        (Sequel[lease: nil] | (Sequel[:lease] < Sequel::CURRENT_TIMESTAMP))
+    )
+    .prepare(:update, :take_lease_and_reload,
+      lease: Sequel::CURRENT_TIMESTAMP + Sequel.cast("120 seconds", :interval),
+      try: Sequel[:try] + 1,
+      schedule: Sequel::CURRENT_TIMESTAMP + (schedule * Sequel.cast("1 second", :interval)))
+
   def take_lease_and_reload
-    affected = DB[<<SQL, id].first
-UPDATE strand
-SET lease = now() + '120 seconds', try = try + 1, schedule = #{SCHEDULE}
-WHERE id = ? AND (lease IS NULL OR lease < now()) AND exitval IS NULL
-RETURNING lease
-SQL
+    affected = TAKE_LEASE_AND_RELOAD_PS.call(id:).first
     return false unless affected
+    # Also operate as reload query
+    @values = affected
     lease_time = affected.fetch(:lease)
     verbose_logging = rand(1000) == 0
 
     Clog.emit("obtained lease") { {lease_acquired: {time: lease_time, delay: Time.now - schedule}} } if verbose_logging
-    reload
 
     begin
       yield
