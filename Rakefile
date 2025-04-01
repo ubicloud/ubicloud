@@ -311,7 +311,7 @@ task "ubi-release" do
   version = cli_version.call
 
   Dir.chdir("cli") do
-    File.delete("ubi") if File.file?("ubi")
+    FileUtils.rm_f("ubi")
 
     os_list = %w[linux windows darwin]
     arch_list = %w[amd64 arm64 386]
@@ -337,12 +337,10 @@ task "ubi-release" do
     tarball_dir = "ubi-#{version}"
     Dir.mkdir(tarball_dir)
     sh "cp", "version.txt", "ubi.go", "go.mod", tarball_dir
-    write_cli_makefile(File.join(tarball_dir, "Makefile"), version)
+    write_cli_makefile.call(File.join(tarball_dir, "Makefile"), version)
+    FileUtils.rm_f("#{tarball_dir}.tar.gz")
     sh "tar", "zcf", "#{tarball_dir}.tar.gz", tarball_dir
-    Dir.chdir(tarball_dir) do
-      sh "rm", "version.txt", "ubi.go", "go.mod", "Makefile"
-    end
-    Dir.rmdir(tarball_dir)
+    FileUtils.rm_rf(tarball_dir)
   end
 end
 
