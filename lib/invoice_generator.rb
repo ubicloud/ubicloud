@@ -63,7 +63,6 @@ class InvoiceGenerator
           end
         end
         project_content[:issuer_info] = issuer
-        project_content[:vat_info] = vat_info
         project_content[:resources] = []
         project_content[:subtotal] = 0
         project_records.group_by { |pr| [pr[:resource_id], pr[:resource_name]] }.each do |(resource_id, resource_name), line_items|
@@ -136,6 +135,11 @@ class InvoiceGenerator
           project_content[:free_inference_tokens_credit] = free_inference_tokens_credit
           project_content[:cost] -= project_content[:free_inference_tokens_credit]
         end
+
+        if project_content[:cost] < Config.minimum_invoice_charge_threshold
+          vat_info = nil
+        end
+        project_content[:vat_info] = vat_info
 
         if vat_info && !vat_info[:reversed]
           project_content[:vat_info][:amount] = (project_content[:cost] * vat_info[:rate].fdiv(100)).round(3)
