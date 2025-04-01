@@ -36,25 +36,55 @@ RSpec.describe Kubernetes::Client do
   end
 
   describe "lb_desired_ports" do
-    it "returns desired ports" do
+    it "returns desired ports sorted by creationTimestamp" do
       svc_list = [
         {
-          "spec" => {
-            "ports" => [
-              {"port" => 80, "nodePort" => 31942},
-              {"port" => 443, "nodePort" => 33212}
-            ]
-          }
+          "metadata" => {"name" => "svc-b", "namespace" => "default", "creationTimestamp" => "2024-01-03T00:00:00Z"},
+          "spec" => {"ports" => [{"port" => 80, "nodePort" => 31942}, {"port" => 443, "nodePort" => 33212}]}
         },
         {
+          "metadata" => {"name" => "svc-a", "namespace" => "default", "creationTimestamp" => "2024-01-01T00:00:00Z"},
+          "spec" => {"ports" => [{"port" => 800, "nodePort" => 32942}]}
+        }
+      ]
+      expect(kubernetes_client.lb_desired_ports(svc_list)).to eq([[800, 32942], [80, 31942], [443, 33212]])
+    end
+
+    it "keeps first occurrence of duplicate ports based on creationTimestamp" do
+      svc_list = [
+        {
+          "metadata" => {"name" => "svc-newer", "namespace" => "default", "creationTimestamp" => "2024-01-02T00:00:00Z"},
+          "spec" => {"ports" => [{"port" => 443, "nodePort" => 30123}]}
+        },
+        {
+          "metadata" => {"name" => "svc-older", "namespace" => "default", "creationTimestamp" => "2024-01-01T00:00:00Z"},
+          "spec" => {"ports" => [{"port" => 443, "nodePort" => 32003}]}
+        }
+      ]
+      expect(kubernetes_client.lb_desired_ports(svc_list)).to eq([[443, 32003]])
+    end
+
+    it "returns empty list if no services have ports" do
+      svc_list = [
+        {"metadata" => {"name" => "svc0", "namespace" => "ns", "creationTimestamp" => "2024-01-01T00:00:00Z"}, "spec" => {}},
+        {"metadata" => {"name" => "svc1", "namespace" => "ns", "creationTimestamp" => "2024-01-02T00:00:00Z"}, "spec" => {"ports" => nil}}
+      ]
+      expect(kubernetes_client.lb_desired_ports(svc_list)).to eq([])
+    end
+
+    it "ignores duplicate ports within the same service" do
+      svc_list = [
+        {
+          "metadata" => {"name" => "svc0", "namespace" => "ns", "creationTimestamp" => "2024-01-01T00:00:00Z"},
           "spec" => {
             "ports" => [
-              {"port" => 800, "nodePort" => 32942}
+              {"port" => 1234, "nodePort" => 30001},
+              {"port" => 1234, "nodePort" => 30002}
             ]
           }
         }
       ]
-      expect(kubernetes_client.lb_desired_ports(svc_list)).to eq([[80, 31942], [443, 33212], [800, 32942]])
+      expect(kubernetes_client.lb_desired_ports(svc_list)).to eq([[1234, 30001]])
     end
   end
 
@@ -189,7 +219,7 @@ RSpec.describe Kubernetes::Client do
     before do
       @lb = Prog::Vnet::LoadBalancerNexus.assemble(private_subnet.id, name: kubernetes_cluster.services_load_balancer_name, src_port: 80, dst_port: 8000).subject
       @response = {
-        "items" => [{}]
+        "items" => ["metadata" => {"name" => "svc", "namespace" => "default", "creationTimestamp" => "2024-01-03T00:00:00Z"}]
       }.to_json
       allow(kubernetes_client).to receive(:kubectl).with("get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(@response)
     end
@@ -224,6 +254,7 @@ RSpec.describe Kubernetes::Client do
       response = {
         "items" => [
           {
+            "metadata" => {"name" => "svc", "namespace" => "default", "creationTimestamp" => "2024-01-03T00:00:00Z"},
             "status" => {
               "loadBalancer" => {
                 "ingress" => [
@@ -248,7 +279,9 @@ RSpec.describe Kubernetes::Client do
     before do
       @lb = Prog::Vnet::LoadBalancerNexus.assemble(private_subnet.id, name: kubernetes_cluster.services_load_balancer_name, src_port: 443, dst_port: 8443).subject
       @response = {
-        "items" => [{}]
+        "items" => [
+          "metadata" => {"name" => "svc", "namespace" => "default", "creationTimestamp" => "2024-01-03T00:00:00Z"}
+        ]
       }.to_json
       allow(kubernetes_client).to receive(:kubectl).with("get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(@response)
     end
