@@ -45,7 +45,7 @@ SQL
           lease_clear_debug_snapshot = this.for_update.all
           num_updated = DB[<<SQL, id, lease_time].update
 UPDATE strand
-SET lease = NULL
+SET lease = now() - '1000 years'::interval
 WHERE id = ? AND lease = ?
 SQL
           Clog.emit("lease cleared") { {lease_cleared: {num_updated: num_updated}} } if verbose_logging
