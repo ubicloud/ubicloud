@@ -65,7 +65,7 @@ RSpec.describe Scheduling::Dispatcher do
       exited = false
       expect(ThreadPrinter).to receive(:run)
       expect(Kernel).to receive(:exit!).and_invoke(-> { exited = true })
-      di = described_class.new(apoptosis_timeout: 0.05)
+      di = described_class.new(apoptosis_timeout: 0.05, pool_size: 1)
       start_queue = di.instance_variable_get(:@thread_data).dig(0, :start_queue)
       start_queue.push(true)
       t = Time.now
@@ -80,7 +80,7 @@ RSpec.describe Scheduling::Dispatcher do
       exited = false
       expect(ThreadPrinter).to receive(:run)
       expect(Kernel).to receive(:exit!).and_invoke(-> { exited = true })
-      di = described_class.new(apoptosis_timeout: 0.05)
+      di = described_class.new(apoptosis_timeout: 0.05, pool_size: 1)
       thread_data = di.instance_variable_get(:@thread_data)
       start_queue = thread_data.dig(0, :start_queue)
       finish_queue = thread_data.dig(0, :finish_queue)
