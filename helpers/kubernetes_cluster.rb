@@ -3,6 +3,7 @@
 class Clover
   def kubernetes_cluster_post(name)
     authorize("KubernetesCluster:create", @project.id)
+    fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
     required_parameters = ["name", "location", "cp_nodes", "worker_nodes"]
     request_body_params = validate_request_params(required_parameters)
