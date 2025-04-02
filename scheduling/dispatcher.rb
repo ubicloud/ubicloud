@@ -10,7 +10,7 @@ class Scheduling::Dispatcher
   STRAND_RUNTIME = Strand::LEASE_EXPIRATION / 4
   APOPTOSIS_MUTEX = Mutex.new
 
-  def initialize(apoptosis_timeout: Strand::LEASE_EXPIRATION - 29, pool_size: Config.db_pool - 1)
+  def initialize(apoptosis_timeout: Strand::LEASE_EXPIRATION - 29, pool_size: Config.db_pool - 2)
     @shutting_down = false
 
     # How long to wait in seconds from the start of strand run
@@ -26,7 +26,7 @@ class Scheduling::Dispatcher
     # The thread pool size.  By default, set to one less than the number of database
     # connections, to ensure there is a connection always available for the
     # main thread, for the query to find strands to run.
-    pool_size = pool_size.clamp(1, Config.db_pool - 1)
+    pool_size = pool_size.clamp(1, Config.db_pool - 2)
 
     # The Queue that all threads in the thread pool pull from.  This is a
     # SizedQueue to allow for backoff in the case that the thread pool cannot
