@@ -61,6 +61,8 @@ class Scheduling::Dispatcher
       .limit(pool_size)
       .exclude(id: Sequel.function(:ANY, Sequel.cast(:$skip_strands, "uuid[]")))
       .select(:id)
+      .for_update
+      .skip_locked
       .prepare(:select, :get_strand_cohort)
   end
 
