@@ -6,7 +6,7 @@ RSpec.describe Scheduling::Dispatcher do
   subject(:di) { described_class.new }
 
   after do
-    di.shutdown_and_cleanup_threads
+    (@di || di).shutdown_and_cleanup_threads
     Thread.current.name = nil
   end
 
@@ -42,9 +42,47 @@ RSpec.describe Scheduling::Dispatcher do
       expect(di.scan.map(&:id)).to eq([st.id])
     end
 
+    it "does not include strands outside of partition" do
+      st = Strand.create(prog: "Test", label: "wait_exit")
+      id = "00000000-0000-0000-0000-000000000000"
+      di = @di = described_class.new(partition: id..id)
+      st.update(schedule: Time.now - 10)
+      expect(di.scan.map(&:id)).to eq([])
+    end
+
+    it "includes strands inside of partition" do
+      st = Strand.create(prog: "Test", label: "wait_exit")
+      di = @di = described_class.new(partition: st.id..st.id)
+      st.update(schedule: Time.now - 10)
+      expect(di.scan.map(&:id)).to eq([st.id])
+    end
+
     it "returns empty array when shutting down" do
       di.shutdown
       expect(di.scan).to eq([])
+    end
+  end
+
+  describe "#scan_old" do
+    it "returns empty array for non-partitioned dispatcher" do
+      expect(di.scan_old).to eq([])
+    end
+
+    it "returns empty array when shutting down" do
+      id = "00000000-0000-0000-0000-000000000000"
+      di = @di = described_class.new(partition: id..id)
+      di.shutdown
+      expect(di.scan_old).to eq([])
+    end
+
+    it "includes strands outside of partition" do
+      st = Strand.create(prog: "Test", label: "wait_exit")
+      id = "00000000-0000-0000-0000-000000000000"
+      di = @di = described_class.new(partition: id..id)
+      st.update(schedule: Time.now - 3)
+      expect(di.scan_old.map(&:id)).to eq([])
+      st.update(schedule: Time.now - 7)
+      expect(di.scan_old.map(&:id)).to eq([st.id])
     end
   end
 
@@ -65,7 +103,7 @@ RSpec.describe Scheduling::Dispatcher do
       exited = false
       expect(ThreadPrinter).to receive(:run)
       expect(Kernel).to receive(:exit!).and_invoke(-> { exited = true })
-      di = described_class.new(apoptosis_timeout: 0.05, pool_size: 1)
+      di = @di = described_class.new(apoptosis_timeout: 0.05, pool_size: 1)
       start_queue = di.instance_variable_get(:@thread_data).dig(0, :start_queue)
       start_queue.push(true)
       t = Time.now
@@ -80,7 +118,7 @@ RSpec.describe Scheduling::Dispatcher do
       exited = false
       expect(ThreadPrinter).to receive(:run)
       expect(Kernel).to receive(:exit!).and_invoke(-> { exited = true })
-      di = described_class.new(apoptosis_timeout: 0.05, pool_size: 1)
+      di = @di = described_class.new(apoptosis_timeout: 0.05, pool_size: 1)
       thread_data = di.instance_variable_get(:@thread_data)
       start_queue = thread_data.dig(0, :start_queue)
       finish_queue = thread_data.dig(0, :finish_queue)
@@ -96,6 +134,12 @@ RSpec.describe Scheduling::Dispatcher do
   end
 
   describe "#start_cohort" do
+    it "accepts an array of strands" do
+      expect(di.start_cohort([])).to be true
+      expect(di.instance_variable_get(:@strand_queue).pop(timeout: 0)).to be_nil
+      expect(di.instance_variable_get(:@current_strands)).to be_empty
+    end
+
     it "returns true if there are no strands" do
       expect(di.start_cohort).to be true
       expect(di.instance_variable_get(:@strand_queue).pop(timeout: 0)).to be_nil
