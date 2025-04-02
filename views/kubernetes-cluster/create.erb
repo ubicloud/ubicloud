@@ -1,5 +1,7 @@
 <% @page_title = "Create Kubernetes Cluster" %>
 
+<%== render("components/billing_warning") %>
+
 <%== part(
   "components/page_header",
   breadcrumbs: [
@@ -9,7 +11,6 @@
     %w[Create #]
   ]
 ) %>
-
 
 <%
   form_elements = [

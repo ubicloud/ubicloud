@@ -17,6 +17,7 @@ class Clover
       r.get "create" do
         authorize("KubernetesCluster:create", @project.id)
 
+        @has_valid_payment_method = @project.has_valid_payment_method?
         @option_tree, @option_parents = generate_kubernetes_cluster_options
 
         view "kubernetes-cluster/create"

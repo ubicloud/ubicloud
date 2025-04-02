@@ -144,7 +144,7 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page.title).to eq("Ubicloud - Create Kubernetes Cluster")
       end
 
-      it "cannot create kubernetes cluster when location not exist" do
+      it "cannot create kubernetes cluster when location does not exist" do
         fill_in "Cluster Name", with: "cannotcreate"
         choose option: 3
         find('select#worker_nodes option[value="4"]:not([disabled])').select_option
@@ -156,6 +156,25 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page.title).to eq("Ubicloud - ResourceNotFound")
         expect(page.status_code).to eq(404)
         expect(page).to have_content("ResourceNotFound")
+      end
+
+      it "can not create cluster if project has no valid payment method" do
+        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
+
+        page.refresh
+
+        expect(page).to have_content "Project doesn't have valid billing information"
+
+        fill_in "Cluster Name", with: "dummyk8s"
+        choose option: Location::HETZNER_FSN1_ID
+        choose option: 3
+        find('select#worker_nodes option[value="4"]:not([disabled])').select_option
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - Create Kubernetes Cluster")
+        expect(page).to have_content "Project doesn't have valid billing information"
       end
 
       it "can create new kubernetes cluster" do
