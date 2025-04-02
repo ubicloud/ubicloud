@@ -288,6 +288,33 @@ RSpec.describe Clover, "project" do
         expect(Mail::TestMailer.deliveries.length).to eq 1
       end
 
+      it "handles case when attempting to add user to project when they already have access" do
+        visit "#{project.path}/user"
+
+        expect(page).to have_content user.email
+        expect(page).to have_no_content user2.email
+
+        subject_tag = project.subject_tags.first
+        expect(ProjectInvitation.count).to eq 0
+        expect(DB[:applied_subject_tag].first(tag_id: subject_tag.id, subject_id: user2.id)).to be_nil
+
+        fill_in "Email", with: user2.email
+        select "Admin", from: "policy"
+        click_button "Invite"
+        expect(page).to have_flash_notice("Invitation sent successfully to 'user2@example.com'.")
+
+        fill_in "Email", with: user2.email
+        select "Admin", from: "policy"
+        click_button "Invite"
+        expect(page).to have_flash_error("The requested user already has access to this project")
+
+        expect(page).to have_content user.email
+        expect(page).to have_content user2.email
+        expect(ProjectInvitation.count).to eq 0
+        expect(DB[:applied_subject_tag].first(tag_id: subject_tag.id, subject_id: user2.id)).not_to be_nil
+        expect(Mail::TestMailer.deliveries.length).to eq 1
+      end
+
       it "can only add existing invited user to subject tag if SubjectTag:add permissions are allowed for it" do
         allowed = SubjectTag.create_with_id(project_id: project.id, name: "Allowed")
         AccessControlEntry.dataset.destroy
