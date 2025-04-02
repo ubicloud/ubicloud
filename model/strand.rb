@@ -199,7 +199,7 @@ Strand.unrestrict_primary_key
 #  id        | uuid                     | PRIMARY KEY
 #  parent_id | uuid                     |
 #  schedule  | timestamp with time zone | NOT NULL DEFAULT now()
-#  lease     | timestamp with time zone | DEFAULT (now() - '1000 years'::interval)
+#  lease     | timestamp with time zone | NOT NULL DEFAULT (now() - '1000 years'::interval)
 #  prog      | text                     | NOT NULL
 #  label     | text                     | NOT NULL
 #  stack     | jsonb                    | NOT NULL DEFAULT '[{}]'::jsonb
