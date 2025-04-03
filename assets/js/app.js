@@ -247,6 +247,7 @@ function redrawChildOptions(name) {
 
           break;
         case "select":
+          let current_value = $("select[name=" + child_name + "]").val();
           $("select[name=" + child_name + "]").children().hide().prop('disabled', true).prop('checked', false).prop('selected', false);
           $("select[name=" + child_name + "]").children(".always-visible, " + classes).show().prop('disabled', false);
 
@@ -259,7 +260,8 @@ function redrawChildOptions(name) {
             elements2select = $("select[name=" + child_name + "]").children(".always-visible, " + classes);
           }
 
-          elements2select[0].selected = true;
+          let element2select = elements2select.toArray().find((opt) => opt.value == current_value) || elements2select[0];
+          element2select.selected = true;
           break;
       }
 
