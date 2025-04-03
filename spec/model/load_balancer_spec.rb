@@ -175,7 +175,14 @@ RSpec.describe LoadBalancer do
     it "returns false if there are certs and they are not expired" do
       cert = Prog::Vnet::CertNexus.assemble(lb.hostname, dns_zone.id).subject
       lb.add_cert(cert)
+      cert.update(cert: "cert")
       expect(lb.need_certificates?).to be(false)
+    end
+
+    it "returns true if there are certs and they are not expired but the cert field is empty" do
+      cert = Prog::Vnet::CertNexus.assemble(lb.hostname, dns_zone.id).subject
+      lb.add_cert(cert)
+      expect(lb.need_certificates?).to be(true)
     end
   end
 
@@ -190,6 +197,8 @@ RSpec.describe LoadBalancer do
       lb.add_cert(cert1)
       lb.add_cert(cert2)
 
+      cert1.update(cert: "cert")
+      cert2.update(cert: "cert")
       cert1.update(created_at: Time.now - 1 * 365 * 24 * 60 * 60)
       expect(lb.active_cert.id).to eq(cert2.id)
     end
