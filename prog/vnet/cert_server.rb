@@ -36,9 +36,11 @@ class Prog::Vnet::CertServer < Prog::Base
 
   def put_cert_to_vm
     cert = load_balancer.active_cert
+    fail "BUG: certificate is nil" unless cert&.cert
 
     cert_payload = cert.cert
     cert_key_payload = OpenSSL::PKey::EC.new(cert.csr_key).to_pem
+
     vm.vm_host.sshable.cmd("sudo host/bin/setup-cert-server put-certificate #{vm.inhost_name}", stdin: JSON.generate({cert_payload: cert_payload.to_s, cert_key_payload: cert_key_payload.to_s}))
   end
 end

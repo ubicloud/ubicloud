@@ -91,6 +91,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
     it "increments rewrite_dns_records if needed" do
       expect(nx).to receive(:need_to_rewrite_dns_records?).and_return(true)
+      expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
       expect(nx.load_balancer).to receive(:incr_rewrite_dns_records)
       expect { nx.wait }.to nap(5)
     end
@@ -150,13 +151,18 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
     it "hops to wait if all children are done and no certs to remove" do
       expect(nx).to receive(:reap)
+      active_cert = Prog::Vnet::CertNexus.assemble("active-cert", dns_zone.id).subject
+      expect(nx.load_balancer).to receive(:active_cert).and_return(active_cert)
       expect { nx.wait_cert_broadcast }.to hop("wait")
     end
 
     it "removes certs if all children are done and there are certs to remove" do
       cert_to_remove = Prog::Vnet::CertNexus.assemble("cert-to-remove", dns_zone.id).subject
       cert_to_remove.update(created_at: Time.now - 60 * 60 * 24 * 30 * 4)
+      active_cert = Prog::Vnet::CertNexus.assemble("active-cert", dns_zone.id).subject
+      expect(nx.load_balancer).to receive(:active_cert).and_return(active_cert)
       nx.load_balancer.add_cert(cert_to_remove)
+      nx.load_balancer.add_cert(active_cert)
 
       expect(nx).to receive(:reap)
 
