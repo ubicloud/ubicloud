@@ -151,7 +151,7 @@ module ContentGenerator
       ]
     end
 
-    def self.worker_nodes(location, cp_nodes, worker_nodes)
+    def self.worker_nodes(location, worker_nodes)
       node_price = 2 * BillingRate.unit_price_from_resource_properties("KubernetesWorkerVCpu", "standard", location.name) +
         40 * BillingRate.unit_price_from_resource_properties("KubernetesWorkerStorage", "standard", location.name)
 
