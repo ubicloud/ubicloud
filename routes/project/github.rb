@@ -20,7 +20,8 @@ class Clover
 
       r.on "runner" do
         r.get true do
-          @runners = @project.github_runners_dataset.eager(:vm, :strand).where(strand: Strand.exclude(label: "deleted"))
+          @runners = @project.github_runners_dataset.eager(:vm, :strand)
+            .exclude(Sequel[:github_runner][:id] => Strand.where(prog: "Vm::GithubRunner", label: ["destroy", "wait_vm_destroy"]).select(:id))
             .reverse(:created_at).all
 
           view "github/runner"
