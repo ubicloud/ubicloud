@@ -1,9 +1,51 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+num_partitions, partition_num = ARGV
+if num_partitions
+  unless partition_num
+    if ENV["DYNO"]
+      partition_num = ENV["DYNO"].split(".", 2)[1]
+    else
+      warn "must provide number of partitions as second argument"
+      exit 1
+    end
+  end
+
+  num_partitions = Integer(num_partitions)
+  partition_num = Integer(partition_num)
+
+  unless (1..16).cover?(num_partitions)
+    warn "invalid number of partitions: #{num_partitions}"
+    exit 1
+  end
+
+  unless (1..num_partitions).cover?(partition_num)
+    warn "invalid partition number #{partition_num}"
+    exit 1
+  end
+
+  partition_num -= 1
+
+  hex_chars = 1
+  chars = (0...16**hex_chars).map { ("%x" % _1).rjust(hex_chars, "0") }
+  chars_per_partition = chars.size / num_partitions.to_r
+  start_char = chars[(chars_per_partition * partition_num).to_i]
+  uuid_suffix = "-0000-0000-0000-000000000000"
+  start_id = start_char.ljust(8, "0") + uuid_suffix
+
+  partition = if num_partitions == partition_num + 1
+    start_id.."ffffffff-ffff-ffff-ffff-ffffffffffff"
+  else
+    end_char = chars[(chars_per_partition * (partition_num + 1)).to_i]
+    end_id = end_char.ljust(8, "0") + uuid_suffix
+    start_id...end_id
+  end
+end
+
 require_relative "../loader"
 
-d = Scheduling::Dispatcher.new
+d = Scheduling::Dispatcher.new(partition:)
 Signal.trap("TERM") { d.shutdown }
 
 if Config.heartbeat_url
@@ -31,10 +73,31 @@ Strand.dataset.insert_conflict.insert(id: "08200dd2-20ce-833a-de82-10fd5a082bff"
 
 clover_freeze
 
+if partition
+  # Start with a random offset, so that multiple respirate processes are unlikely
+  # to run the old strand scan at the same time.
+  next_old_strand_scan = Time.now + (5 * rand)
+end
+no_old_strands = true
+
 DB.synchronize do
   until d.shutting_down
-    if d.start_cohort && !d.shutting_down
-      # Only sleep if not shutting down and there were no strands in previous scan
+    no_strands = d.start_cohort
+
+    break if d.shutting_down
+
+    if partition && next_old_strand_scan < Time.now
+      # Check every 5 seconds for strands still not leased by another respirate
+      # process.  However, if we find old strands, do not wait 5 seconds, because
+      # if we are processing strands from another partition, we should ensure
+      # they are all processed.
+      if (no_old_strands = d.start_cohort(d.scan_old))
+        next_old_strand_scan = Time.now + 5
+      end
+    end
+
+    if no_strands && no_old_strands && !d.shutting_down
+      # Only sleep if not shutting down and there were no strands in previous scan.
       # Note that this results in an up to a 1 second delay to pick up new strands,
       # but that is an accept tradeoff, because we do not want to busy loop the
       # database (potentially, LISTEN/NOTIFY could be used to reduce this latency)
