@@ -1,3 +1,4 @@
+let select_options = {}
 $(function () {
   setupAutoRefresh();
   setupDatePicker();
@@ -200,6 +201,14 @@ function setupDatePicker() {
 }
 
 function setupFormOptionUpdates() {
+  $("select").each(function (i, e) {
+    select_options[e.name] = $(e).children("option").clone();
+  });
+
+  for (let elem in option_tree) {
+    redrawChildOptions(elem);
+  }
+
   $('#creation-form').on('change', 'input', function () {
     let name = $(this).attr('name');
     option_dirty[name] = $(this).val();
@@ -247,8 +256,16 @@ function redrawChildOptions(name) {
 
           break;
         case "select":
-          $("select[name=" + child_name + "]").children().hide().prop('disabled', true).prop('checked', false).prop('selected', false);
-          $("select[name=" + child_name + "]").children(".always-visible, " + classes).show().prop('disabled', false);
+          let current_value = $("select[name=" + child_name + "]").val();
+          $("select[name=" + child_name + "]").empty();
+
+          select_options["worker_nodes"].each(function(i, opt) {
+            if ($(opt).is(".always-visible, " + classes)) {
+              $("select[name=" + child_name + "]").append($(opt));
+            }
+          });
+
+          $("select[name=" + child_name + "]").children().show().prop('disabled', false);
 
           if (option_dirty[child_name]) {
             elements2select = $("select[name=" + child_name + "]").children(classes + "[value=" + option_dirty[child_name] + "]");
@@ -259,7 +276,8 @@ function redrawChildOptions(name) {
             elements2select = $("select[name=" + child_name + "]").children(".always-visible, " + classes);
           }
 
-          elements2select[0].selected = true;
+          let element2select = elements2select.toArray().find((opt) => opt.value == current_value) || elements2select[0];
+          element2select.selected = true;
           break;
       }
 
