@@ -34,15 +34,6 @@ class GithubRunner < Sequel::Model
     "#{repository_url}/settings/actions/runners/#{runner_id}" if runner_id
   end
 
-  def display_state
-    return vm.display_state if vm
-    case strand&.label
-    when "wait_vm_destroy" then "deleted"
-    when "wait_concurrency_limit" then "reached_concurrency_limit"
-    else "not_created"
-    end
-  end
-
   def log_duration(message, duration)
     values = {ubid:, label:, repository_name:, duration:, conclusion: workflow_job&.dig("conclusion")}
     if vm

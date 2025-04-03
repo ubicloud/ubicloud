@@ -2,8 +2,6 @@
 
 class Clover
   def format_time_diff(start_time, end_time)
-    return unless start_time && end_time
-
     diff = (end_time - start_time).to_i
     h, diff = diff.divmod(3600)
     m, s = diff.divmod(60)
