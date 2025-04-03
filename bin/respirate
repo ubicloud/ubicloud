@@ -78,24 +78,31 @@ if partition
   # to run the old strand scan at the same time.
   next_old_strand_scan = Time.now + (5 * rand)
 end
+no_old_strands = true
 
 DB.synchronize do
   until d.shutting_down
-    if d.start_cohort && !d.shutting_down
-      # Only sleep if not shutting down and there were no strands in previous scan
+    no_strands = d.start_cohort
+
+    break if d.shutting_down
+
+    if partition && next_old_strand_scan < Time.now
+      # Check every 5 seconds for strands still not leased by another respirate
+      # process.  However, if we find old strands, do not wait 5 seconds, because
+      # if we are processing strands from another partition, we should ensure
+      # they are all processed.
+      if (no_old_strands = d.start_cohort(d.scan_old))
+        next_old_strand_scan = Time.now + 5
+      end
+    end
+
+    if no_strands && no_old_strands && !d.shutting_down
+      # Only sleep if not shutting down and there were no strands in previous scan.
       # Note that this results in an up to a 1 second delay to pick up new strands,
       # but that is an accept tradeoff, because we do not want to busy loop the
       # database (potentially, LISTEN/NOTIFY could be used to reduce this latency)
       duration_slept = sleep 1
       Clog.emit("respirate finished sleep") { {sleep_duration_sec: duration_slept} }
-    end
-
-    if partition && next_old_strand_scan < Time.now
-      next_old_strand_scan = Time.now + 5
-
-      # Check every 5 seconds for strands still not leased by another respirate
-      # process.
-      d.start_cohort(d.scan_old)
     end
   end
 end
