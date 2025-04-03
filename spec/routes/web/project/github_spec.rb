@@ -183,34 +183,39 @@ RSpec.describe Clover, "github" do
 
   describe "runner" do
     it "can list active runners" do
+      now = Time.now
+      expect(Time).to receive(:now).and_return(now).at_least(:once)
       runner_deleted = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").update(label: "wait_vm_destroy")
-      runner_with_job = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").update(label: "wait").subject
-      runner_with_job.update(runner_id: 2, vm_id: Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "runner-vm").id, workflow_job: {
-        "id" => 123,
-        "name" => "test-job",
-        "run_id" => 456,
-        "workflow_name" => "test-workflow"
-      })
-      runner_not_created = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo")
-      runner_concurrency_limit = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").update(label: "wait_concurrency_limit")
-      runner_wo_strand = GithubRunner.create_with_id(installation_id: installation.id, label: "ubicloud", repository_name: "my-repo")
+      runner_with_job = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud-standard-4-ubuntu-2404", repository_name: "my-repo").subject.update(
+        created_at: now + 20,
+        ready_at: now - 50,
+        runner_id: 2,
+        vm_id: Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "runner-vm", size: "premium-4", location_id: Location::GITHUB_RUNNERS_ID).id,
+        workflow_job: {
+          "id" => 123,
+          "name" => "test-job",
+          "run_id" => 456,
+          "workflow_name" => "test-workflow",
+          "created_at" => (now - 60).iso8601,
+          "started_at" => (now - 40).iso8601
+        }
+      )
+      runner_waiting_job = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject.update(ready_at: now - 400, created_at: now)
+      runner_not_created = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud-arm", repository_name: "my-repo").subject.update(created_at: now - 38)
+      runner_concurrency_limit = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud-gpu", repository_name: "my-repo").update(label: "wait_concurrency_limit").subject.update(created_at: now - 3.68 * 60 * 60)
 
       visit "#{project.path}/github/#{installation.ubid}/runner"
+
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - Active Runners")
-      expect(page).to have_content runner_deleted.ubid
-      expect(page).to have_content "deleted"
-      expect(page).to have_content "Runner doesn't have a job yet"
-      expect(page).to have_content runner_with_job.ubid
-      expect(page).to have_content "creating"
-      expect(page).to have_link runner_with_job.workflow_job["workflow_name"], href: runner_with_job.run_url
-      expect(page).to have_link runner_with_job.workflow_job["name"], href: runner_with_job.job_url
-      expect(page).to have_content runner_not_created.ubid
-      expect(page).to have_content "not_created"
-      expect(page).to have_content runner_concurrency_limit.ubid
-      expect(page).to have_content "reached_concurrency_limit"
-      expect(page).to have_content runner_wo_strand.ubid
-      expect(page).to have_content "not_created"
+      expect(page).to have_no_content runner_deleted.ubid
+      displayed_runner_rows = page.all("table.min-w-full tbody tr").map { |row| row.all("td").map(&:text) }
+      expect(displayed_runner_rows).to eq [
+        ["my-repo", "#{runner_with_job.ubid}\n4 vCPU\npremium\nx64\nubuntu-24", "test-workflow\ntest-job", "Running for 40s\nStarted in 20s", ""],
+        ["my-repo", "#{runner_waiting_job.ubid}\n2 vCPU\nstandard\nx64\nubuntu-22", "Waiting for GitHub to assign a job\nReady for 6m 40s", "", ""],
+        ["my-repo", "#{runner_not_created.ubid}\n2 vCPU\nstandard\narm64\nubuntu-22", "Provisioning an ephemeral virtual machine\nWaiting for 38s", "", ""],
+        ["my-repo", "#{runner_concurrency_limit.ubid}\n6 vCPU\nstandard-gpu\nx64\nubuntu-22", "Reached your concurrency limit\nWaiting for 3h 40m 48s", "", ""]
+      ]
     end
 
     it "can terminate runner" do
