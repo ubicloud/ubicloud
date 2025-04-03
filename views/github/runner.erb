@@ -7,25 +7,66 @@
 <div class="grid gap-6">
   <%== part(
     "components/table_card",
-    headers: ["Runner", "Repository", "Label", "State", "Branch", "Workflow Job", ""],
+    headers: ["Repository", "Runner", "Workflow Job", "", ""],
     rows:
       @runners.map do |runner|
         destroy_url = "#{@project_data[:path]}/github/#{@installation.ubid}/runner/#{runner.ubid}"
+        vm_size = runner.label_data["vm_size_data"]
+        os = runner.label_data["boot_image"].match(/(ubuntu-\d{2})\d{2}/)[1]
+        family = runner.vm&.family || vm_size.family
         [
           [
-            [runner.ubid, { link: runner.runner_url }],
-            runner.repository_name,
-            runner.label,
-            ["vm_state_label", { component: { state: runner.display_state } }],
-            runner.workflow_job&.[]("head_branch"),
-            if (workflow_job = runner.workflow_job)
-              [<<~CONTENT, {escape: false}]
-                <a href="#{runner.run_url}" class="text-orange-600 hover:text-orange-700" target="_blank">#{workflow_job["workflow_name"]}</a>
-                -
-                <a href="#{runner.job_url}" class="text-orange-600 hover:text-orange-700" target="_blank">#{workflow_job["name"]}</a>
+            [[
+              [runner.repository_name, {link: runner.repository_url}],
+              runner.workflow_job&.[]("head_branch")
+            ], {}],
+            [[
+              [runner.ubid, {link: runner.runner_url}],
+              [<<~CONTENT, {escape: false}],
+                <div class="flex gap-1">
+                  <div class="rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800">#{vm_size.vcpus} vCPU</div>
+                  <div class="rounded-md px-2 text-xs font-medium leading-5 #{(family == "premium") ? "bg-orange-100 text-orange-600" : "bg-slate-100 text-slate-800"}">#{family}</div>
+                  <div class="rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800">#{vm_size.arch}</div>
+                  <div class="rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800">#{os}</div>
+                </div>
               CONTENT
+            ], {}],
+            if (workflow_job = runner.workflow_job)
+              [[
+                [workflow_job["workflow_name"].to_s, {link: runner.run_url}],
+                [workflow_job["name"].to_s, {link: runner.job_url}],
+              ], {}]
+            elsif runner.ready_at
+              [
+                  [
+                    "Waiting for GitHub to assign a job",
+                    "Ready for #{format_time_diff(runner.ready_at, Time.now)}"
+                  ], {}
+                ]
+            elsif runner.strand && runner.strand.label == "wait_concurrency_limit"
+                [
+                  [
+                    "Reached your concurrency limit",
+                    "Waiting for #{format_time_diff(runner.created_at, Time.now)}"
+                  ], {}
+                ]
             else
-              "Runner doesn't have a job yet"
+                [
+                  [
+                    "Provisioning an ephemeral virtual machine",
+                    "Waiting for #{format_time_diff(runner.created_at, Time.now)}"
+                  ], {}
+                ]
+            end,
+            if (job = runner.workflow_job)
+              [
+                [
+                  "Running for #{format_time_diff(Time.parse(job["started_at"]), Time.now)}",
+                  "Started in #{format_time_diff(Time.parse(job["created_at"]), Time.parse(job["started_at"]))}"
+                ], {}
+              ]
+            else
+              ""
             end,
             [
               "button",
