@@ -14,7 +14,7 @@ module Github
     private_key = OpenSSL::PKey::RSA.new(Config.github_app_private_key)
     key = {
       iat: current,
-      exp: current + (10 * 60),
+      exp: current + (8 * 60),
       iss: Config.github_app_id
     }
     jwt = JWT.encode(key, private_key, "RS256")
