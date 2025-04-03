@@ -58,7 +58,10 @@ class Clover
 
         r.on "runner" do
           r.get true do
-            @runners = @project.github_runners_dataset.eager(:vm, :strand).reverse(:created_at).all
+            @runners = @project.github_runners_dataset.eager(:vm).eager_graph(:strand)
+              .exclude(Sequel[:strand][:prog] => "Vm::GithubRunner", Sequel[:strand][:label] => ["destroy", "wait_vm_destroy"])
+              .reverse(Sequel[:github_runner][:created_at])
+              .all
 
             view "github/runner"
           end
