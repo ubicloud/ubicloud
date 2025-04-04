@@ -325,6 +325,41 @@ RSpec.describe Clover, "vm" do
         expect { choose option: "6b9ef786-b842-8420-8c65-c25e3d4bdf3d" }.to raise_error Capybara::ElementNotFound
       end
 
+      it "cannot create vm in invisible location" do
+        project
+        visit "#{project.path}/vm/create"
+        fill_in "Name", with: "dummy-vm"
+        choose option: Location::HETZNER_FSN1_ID
+
+        Location.where(id: Location::HETZNER_FSN1_ID).update(visible: false)
+        click_button "Create"
+        expect(page.status_code).to eq(404)
+      end
+
+      it "cannot create vm in private location tied to other project" do
+        project
+        visit "#{project.path}/vm/create"
+        fill_in "Name", with: "dummy-vm"
+        choose option: Location::HETZNER_FSN1_ID
+
+        Location.where(id: Location::HETZNER_FSN1_ID).update(visible: false, project_id: project_wo_permissions.id)
+        click_button "Create"
+        expect(page.status_code).to eq(404)
+      end
+
+      it "can create vm in private location tied to current project" do
+        project
+        visit "#{project.path}/vm/create"
+        name = "dummy-vm"
+        fill_in "Name", with: name
+        choose option: Location::HETZNER_FSN1_ID
+
+        Location.where(id: Location::HETZNER_FSN1_ID).update(visible: false, project_id: project.id)
+        click_button "Create"
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
+      end
+
       it "can not create vm in a project when does not have permissions" do
         project_wo_permissions
         visit "#{project_wo_permissions.path}/vm/create"
