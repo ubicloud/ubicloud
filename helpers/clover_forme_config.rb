@@ -15,31 +15,33 @@ Forme.register_transformer(:wrapper, :ubicloud) do |tag, input|
   input.tag("div", {"class" => input.opts.fetch(:main_wrapper_class, "col-span-full")}, tag)
 end
 
-Forme.register_transformer(:labeler, :ubicloud) do |tag, input|
-  label = input.opts[:label]
-  id = input.opts[:id] || input.opts[:key]
+Forme.register_transformer(:labeler, :ubicloud, Class.new(Forme::Labeler::Explicit) do
+  def call(tag, input)
+    label = input.opts[:label]
+    id = id_for_input(input)
 
-  case input.type
-  when :radioset
-    [
-      input.tag("label", {"class" => "text-sm font-medium leading-6 text-gray-900"}, label),
-      input.tag("fieldset", {"class" => "radio-small-cards"}, [
-        input.tag("legend", {"class" => "sr-only"}, label),
-        input.tag("div", {"class" => "grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4"}, tag)
+    case input.type
+    when :radioset
+      [
+        input.tag("label", {"class" => "text-sm font-medium leading-6 text-gray-900"}, label),
+        input.tag("fieldset", {"class" => "radio-small-cards"}, [
+          input.tag("legend", {"class" => "sr-only"}, label),
+          input.tag("div", {"class" => "grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4"}, tag)
+        ])
+      ]
+    when :radio
+      input.tag("label", {}, [
+        tag,
+        input.tag("span", {"class" => "radio-small-card justify-center p-3 text-sm font-semibold"}, label)
       ])
-    ]
-  when :radio
-    input.tag("label", {}, [
-      tag,
-      input.tag("span", {"class" => "radio-small-card justify-center p-3 text-sm font-semibold"}, label)
-    ])
-  else
-    [
-      input.tag("label", {"for" => id, "class" => "block text-sm font-medium leading-6"}, label),
-      input.tag("div", {"class" => "flex gap-x-2"}, tag)
-    ]
+    else
+      [
+        input.tag("label", {"for" => id, "class" => "block text-sm font-medium leading-6"}, label),
+        input.tag("div", {"class" => "flex gap-x-2"}, tag)
+      ]
+    end
   end
-end
+end.new)
 
 Forme.register_transformer(:formatter, :ubicloud, Class.new(Forme::Formatter) do
   def default_classes_for_type(type)
@@ -69,7 +71,7 @@ Forme.register_transformer(:formatter, :ubicloud, Class.new(Forme::Formatter) do
     if @input.type == :radioset
       @opts[:labeler] ||= :ubicloud
       # Select the first option by default if there is no default set
-      @opts[:selected] = @opts.dig(:options, 0, 1) unless @opts[:selected]
+      @opts[:selected] ||= @opts.dig(:options, 0, 1) unless @opts[:value]
     end
 
     if !@opts.has_key?(:class) && (classes = default_classes_for_type(@input.type))

@@ -16,14 +16,22 @@ class Clover
     end
 
     r.web do
+      @firewall = Firewall.new(project_id: @project.id)
+      @private_subnet_dataset = dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:edit")
+
       r.get "create" do
         authorize("Firewall:create", @project.id)
         view "networking/firewall/create"
       end
 
       r.post true do
-        next unless (@location = Location[r.params["location"]])
-        firewall_post(r.params["name"])
+        forme_set(@firewall)
+        @location = @firewall.location
+        check_visible_location
+
+        handle_validation_failure("networking/firewall/create") do
+          firewall_post
+        end
       end
     end
   end

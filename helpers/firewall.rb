@@ -19,29 +19,21 @@ class Clover
     }
   end
 
-  def firewall_post(firewall_name)
+  def firewall_post
     authorize("Firewall:create", @project.id)
-    Validation.validate_name(firewall_name)
 
-    optional_parameters = %w[description]
-    optional_parameters.concat(%w[name location private_subnet_id]) if web?
-    description = validate_request_params([], optional_parameters)["description"] || ""
-
-    firewall = Firewall.create_with_id(
-      name: firewall_name,
-      description:,
-      location_id: @location.id,
-      project_id: @project.id
-    )
+    @firewall.description ||= ""
+    @firewall.save_changes
 
     if api?
-      Serializers::Firewall.serialize(firewall)
+      Serializers::Firewall.serialize(@firewall)
     else
-      private_subnet = PrivateSubnet.from_ubid(request.params["private_subnet_id"])
-      firewall.associate_with_private_subnet(private_subnet) if private_subnet
+      if (private_subnet = @private_subnet_dataset.where(location_id: @firewall.location_id).first(id: UBID.to_uuid(request.params["private_subnet_id"])))
+        @firewall.associate_with_private_subnet(private_subnet)
+      end
 
-      flash["notice"] = "'#{firewall_name}' is created"
-      request.redirect "#{@project.path}#{firewall.path}"
+      flash["notice"] = "'#{@firewall.name}' is created"
+      request.redirect "#{@project.path}#{@firewall.path}"
     end
   end
 end
