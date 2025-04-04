@@ -107,6 +107,38 @@ RSpec.describe Clover, "vm" do
         expect(Vm.first.ip4_enabled).to be true
       end
 
+      it "success with private location tied to current project" do
+        Location.where(display_name: TEST_LOCATION).update(visible: false, project_id: project.id)
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          size: "standard-2"
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["name"]).to eq("test-vm")
+        expect(Vm.first.ip4_enabled).to be false
+      end
+
+      it "failure with private location tied to other project" do
+        Location.where(display_name: TEST_LOCATION).update(visible: false, project_id: Project.create(name: "bad").id)
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          size: "standard-2"
+        }.to_json
+
+        expect(last_response).to have_api_error(404, "Validation failed for following path components: location", {"location" => "Given location is not a valid location. Available locations: eu-north-h1, us-east-a2"})
+      end
+
+      it "failure with invisible location" do
+        Location.where(display_name: TEST_LOCATION).update(visible: false)
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          size: "standard-2"
+        }.to_json
+
+        expect(last_response).to have_api_error(404, "Validation failed for following path components: location", {"location" => "Given location is not a valid location. Available locations: eu-north-h1, us-east-a2"})
+      end
+
       it "success with storage size" do
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
