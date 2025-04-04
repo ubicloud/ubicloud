@@ -43,6 +43,13 @@ module Validation
   # - Same with regular name pattern, but shorter (40 chars)
   ALLOWED_KUBERNETES_NAME_PATTERN = %r{\A[a-z0-9](?:[a-z0-9\-]{0,38}[a-z0-9])?\z}
 
+  module ModelNameValidation
+    def validate
+      super
+      validates_format(ALLOWED_NAME_PATTERN, :name, allow_nil: true, message: "Name must only contain lowercase letters, numbers, and hyphens and have max length 63.") if new? || changed_columns.include?(:name)
+    end
+  end
+
   def self.validate_name(name)
     msg = "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."
     fail ValidationFailed.new({name: msg}) unless name&.match(ALLOWED_NAME_PATTERN)

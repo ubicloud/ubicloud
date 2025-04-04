@@ -8,6 +8,14 @@ GIT
       rodauth (~> 2.36)
 
 GIT
+  remote: https://github.com/jeremyevans/forme.git
+  revision: 124fc548ddc5f32f2ccc3f5f0da200188883bfd8
+  ref: 124fc548ddc5f32f2ccc3f5f0da200188883bfd8
+  specs:
+    forme (2.6.0)
+      bigdecimal
+
+GIT
   remote: https://github.com/jeremyevans/rodauth.git
   revision: 2a72b30136c512ea2853ad9dbc126c067bef89e9
   ref: 2a72b30136c512ea2853ad9dbc126c067bef89e9
@@ -172,8 +180,6 @@ GEM
       rake
     fiddle (1.1.6)
     foreman (0.88.1)
-    forme (2.6.0)
-      bigdecimal
     hashdiff (1.1.2)
     hashery (2.1.2)
     hashie (5.0.0)
@@ -473,7 +479,7 @@ DEPENDENCIES
   erubi (>= 1.5)
   excon
   foreman
-  forme
+  forme!
   jwt
   mail
   net-ssh

@@ -10,7 +10,8 @@ class Clover
       if firewall_name
         r.post api? do
           check_visible_location
-          firewall_post(firewall_name)
+          @firewall = Firewall.new(project_id: @project.id, location_id: @location.id, name: firewall_name, description: r.params["description"])
+          firewall_post
         end
 
         filter = {Sequel[:firewall][:name] => firewall_name}

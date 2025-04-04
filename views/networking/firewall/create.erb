@@ -1,7 +1,4 @@
-<%
-@page_title = "Create Firewall"
-params = flash["old"] || request.params
-%>
+<% @page_title = "Create Firewall" %>
 
 <%== part(
   "components/page_header",
@@ -13,11 +10,11 @@ params = flash["old"] || request.params
   ]
 ) %>
 
-<% form(action: "#{@project_data[:path]}/firewall", method: "POST", id: "dependency-form", dependencies: "location") do |f| %>
+<% form(@firewall, action: "#{@project_data[:path]}/firewall", method: "POST", id: "dependency-form", dependencies: "location") do |f| %>
   <% wrap_resource_form do %>
-    <%== f.input(:text, key: :name, required: true, label: "Name", placeholder: "Enter name", main_wrapper_class: "sm:col-span-2", value: params["name"], error: flash.dig("errors", "name")) %>
-    <%== f.input(:text, key: :description, required: true, label: "Description", placeholder: "Enter description", main_wrapper_class: "sm:col-span-2", value: params["description"], error: flash.dig("errors", "description")) %>
-    <%== f.input(:radioset, key: :location, required: true, label: "Location", options: Option.locations.map { [_1.ui_name, _1.id] }, provides: "location", selected: params["location"]) %>
-    <%== f.input(:select, key: :private_subnet_id, required: true, label: "Private Subnet", main_wrapper_class: "sm:col-span-2", add_blank: "Select private subnet", selected: params["private_subnet_id"], options: dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view").map { [_1.name, {value: _1.ubid, class: "depends-location #{_1.location_id}"}] }) %>
+    <%== f.input(:name, placeholder: "Enter name", main_wrapper_class: "sm:col-span-2") %>
+    <%== f.input(:description, required: false, placeholder: "Enter description", main_wrapper_class: "sm:col-span-2") %>
+    <%== f.input(:location, as: :radio, required: true, options: Option.locations.map { [_1.ui_name, _1.id] }, provides: "location") %>
+    <%== f.input(:select, obj: nil, key: :private_subnet_id, name: "private_subnet_id", label: "Private Subnet", main_wrapper_class: "sm:col-span-2", add_blank: "Select private subnet", selected: request.params["private_subnet_id"], options: @private_subnet_dataset.map { [_1.name, {value: _1.ubid, class: "depends-location #{_1.location_id}"}] }) %>
   <% end %>
 <% end %>
