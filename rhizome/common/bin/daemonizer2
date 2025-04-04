@@ -1,0 +1,66 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "fileutils"
+require "shellwords"
+require_relative "../lib/util"
+
+if ARGV.count < 2
+  fail "Wrong number of arguments. Expected at least 2, Given #{ARGV.count}"
+end
+
+STATE_MAP = {
+  "dead" => "NotStarted",
+  "running" => "InProgress",
+  "exited" => "Succeeded",
+  "failed" => "Failed"
+}
+
+def get_state(name)
+  state = r("systemctl show -p SubState --value #{name}.service").chomp
+  STATE_MAP[state] || "Unknown"
+end
+
+def clean(name, stdin_path)
+  state = get_state(name)
+  case state
+  when "InProgress", "Unknown"
+    fail "Cannot clean unless the service is in Succeeded or Failed state!"
+  when "Succeeded"
+    r "sudo systemctl stop #{name}.service"
+    begin
+      File.unlink(stdin_path)
+    rescue Errno::ENOENT
+    end
+  when "Failed"
+    r "sudo systemctl reset-failed #{name}.service"
+  end
+end
+
+command = ARGV[0]
+name = ARGV[1]
+stdin_path = "/dev/shm/#{name}.stdin"
+
+case command
+when "check"
+  print(get_state(name))
+when "clean"
+  clean(name, stdin_path)
+when "run"
+  command_parts = ARGV[2..]
+  state = get_state(name)
+  clean(name, stdin_path) if %w[Succeeded Failed].include?(state)
+
+  dir = Dir.pwd
+  stdin = $stdin.read.strip
+  if stdin.empty?
+    command = Shellwords.shelljoin(command_parts)
+  else
+    safe_write_to_file(stdin_path, stdin)
+    command = "cat #{stdin_path} | " + Shellwords.shelljoin(command_parts)
+  end
+
+  r "sudo systemd-run --working-directory #{dir} --unit #{name} --remain-after-exit /bin/bash -c #{Shellwords.escape(command)}"
+else
+  raise "Unknown command #{command}"
+end

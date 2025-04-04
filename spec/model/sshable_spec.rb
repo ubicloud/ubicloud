@@ -159,4 +159,30 @@ RSpec.describe Sshable do
       expect { sa.cmd("irrelevant") }.to raise_error err
     end
   end
+
+  describe "daemonizer methods" do
+    let(:unit_name) { "test_unit" }
+    let(:run_command) { "sudo host/bin/setup-vm prep test_unit" }
+    let(:stdin_data) { "secret_data" }
+
+    it "calls cmd with the correct check command" do
+      expect(sa).to receive(:cmd).with("common/bin/daemonizer2 check test_unit")
+      sa.d_check(unit_name)
+    end
+
+    it "calls cmd with the correct clean command" do
+      expect(sa).to receive(:cmd).with("common/bin/daemonizer2 clean test_unit")
+      sa.d_clean(unit_name)
+    end
+
+    it "calls cmd with the correct run command and no stdin" do
+      expect(sa).to receive(:cmd).with("common/bin/daemonizer2 run test_unit sudo host/bin/setup-vm prep test_unit", stdin: nil)
+      sa.d_run(unit_name, run_command)
+    end
+
+    it "calls cmd with the correct run command and passes stdin" do
+      expect(sa).to receive(:cmd).with("common/bin/daemonizer2 run test_unit sudo host/bin/setup-vm prep test_unit", stdin: stdin_data)
+      sa.d_run(unit_name, run_command, stdin: stdin_data)
+    end
+  end
 end
