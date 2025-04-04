@@ -44,22 +44,4 @@ class Clover
       request.redirect "#{@project.path}#{firewall.path}"
     end
   end
-
-  def generate_firewall_options
-    options = OptionTreeGenerator.new
-    options.add_option(name: "name")
-    options.add_option(name: "description")
-    options.add_option(name: "location", values: Option.locations)
-    subnets = dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view").map {
-      {
-        location_id: _1.location_id,
-        value: _1.ubid,
-        display_name: _1.name
-      }
-    }
-    options.add_option(name: "private_subnet_id", values: subnets, parent: "location") do |location, private_subnet|
-      private_subnet[:location_id] == location.id
-    end
-    options.serialize
-  end
 end

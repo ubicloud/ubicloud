@@ -4,6 +4,7 @@ module.exports = {
     "./views/**/*.erb",
     "./assets/**/*.js",
     "./helpers/web.rb",
+    "./lib/clover_forme_config.rb",
   ],
   theme: {
     extend: {},

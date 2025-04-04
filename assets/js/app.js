@@ -1,6 +1,7 @@
 $(function () {
   setupAutoRefresh();
   setupDatePicker();
+  setupOptionHiding();
   setupFormOptionUpdates();
   setupPlayground();
   setupFormsWithPatchMethod()
@@ -196,6 +197,19 @@ function setupDatePicker() {
     }
 
     $(this).flatpickr(options);
+  });
+}
+
+function setupOptionHiding() {
+  var form = $('#dependency-form');
+  var dependencies = form.attr('dependencies').split();
+  $(dependencies).each(function(_, f) {
+    var func = function () {
+      form.find('.depends-'+f).hide();
+      form.find('.'+$(this).attr('value')).show();
+    };
+    form.find('.provides-'+f+' input[type=radio]:checked').each(func);
+    form.on('change', '.provides-'+f+' input[type=radio]', func);
   });
 }
 

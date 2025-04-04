@@ -65,6 +65,9 @@ class Clover < Roda
   plugin :render, escape: true, layout: "./layouts/app", template_opts: {chain_appends: !defined?(SimpleCov), freeze: true, skip_compiled_encoding_detection: true, scope_class: self, default_fixed_locals:, extract_fixed_locals: true}, assume_fixed_locals: true
   plugin :part
   plugin :request_headers
+  plugin :forme_route_csrf
+  plugin :capture_erb
+  plugin :inject_erb
   plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
 
   # :nocov:

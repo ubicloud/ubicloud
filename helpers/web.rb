@@ -142,4 +142,9 @@ class Clover < Roda
       raise Authorization::Unauthorized
     end
   end
+
+  def wrap_resource_form
+    inject_erb(part("components/form/resource_form") { capture_erb { yield } })
+    nil
+  end
 end
