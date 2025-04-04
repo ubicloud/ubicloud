@@ -110,15 +110,16 @@ class Clover < Roda
     # If location previously retrieved in project/location route, check that it is visible
     # This is called when creating resources in the api routes.
     #
-    # If location not previously retrieved, require it be visible when retrieving it.
-    # This is called when creating resources in the web routes.
-    @location ||= Location.first(id: request.params["location"], visible: true)
-    handle_invalid_location unless @location&.visible
+    # If location not previously retrieved, require it be visible or tied to the current project
+    # when retrieving it.  This is called when creating resources in the web routes.
+    @location ||= Location.visible_or_for_project(@project.id).first(id: request.params["location"])
+    handle_invalid_location unless @location&.visible_or_for_project?(@project.id)
   end
 
   def handle_invalid_location
     if api?
-      valid_locations = Location.where(visible: true).select_order_map(:display_name)
+      # Only show locations globally visible or tied to the current project.
+      valid_locations = Location.visible_or_for_project(@project.id).select_order_map(:display_name)
       response.write({error: {
         code: 404,
         type: "InvalidLocation",

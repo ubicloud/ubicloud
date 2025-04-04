@@ -16,6 +16,20 @@ class Location < Sequel::Model
   GITHUB_RUNNERS_ID = "6b9ef786-b842-8420-8c65-c25e3d4bdf3d"
   LEASEWEB_WDC02_ID = "e0865080-9a3d-8020-a812-f5817c7afe7f"
 
+  dataset_module do
+    def for_project(project_id)
+      where(Sequel[project_id:] | {project_id: nil})
+    end
+
+    def visible_or_for_project(project_id)
+      where(Sequel[project_id:] | {project_id: nil, visible: true})
+    end
+  end
+
+  def visible_or_for_project?(proj_id)
+    (visible && project_id.nil?) || project_id == proj_id
+  end
+
   def path
     "/private-location/#{ui_name}"
   end
