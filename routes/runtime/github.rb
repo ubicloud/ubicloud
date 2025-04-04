@@ -119,8 +119,7 @@ class Clover
           retries = 0
           begin
             upload_id = repository.blob_storage_client.create_multipart_upload(bucket: repository.bucket_name, key: entry.blob_key).upload_id
-            entry.update(upload_id: upload_id)
-          rescue Aws::S3::Errors::Unauthorized => ex
+          rescue Aws::S3::Errors::Unauthorized, Aws::S3::Errors::InternalError => ex
             retries += 1
             if retries < 3
               # :nocov:
@@ -132,6 +131,8 @@ class Clover
               fail CloverError.new(400, "InvalidRequest", "Could not authorize multipart upload")
             end
           end
+
+          entry.update(upload_id:)
         end
 
         # If size is not provided, it means that the client doesn't
