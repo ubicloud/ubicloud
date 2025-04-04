@@ -1,4 +1,7 @@
-<% @page_title = "Create Firewall" %>
+<%
+@page_title = "Create Firewall"
+params = flash["old"] || request.params
+%>
 
 <%== part(
   "components/page_header",
@@ -10,15 +13,11 @@
   ]
 ) %>
 
-<%
-  form_elements = [
-    {name: "name", type: "text", label: "Name", required: "required", placeholder: "Enter name", opening_tag: "<div class='sm:col-span-2'>"},
-    {name: "description", type: "text", label: "Description", required: "required", placeholder: "Enter description", opening_tag: "<div class='sm:col-span-2'>"},
-    {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::Vm.method(:location)},
-    {name: "private_subnet_id", type: "select", label: "Private Subnet", placeholder: "Select private subnet", content_generator: ContentGenerator::Vm.method(:private_subnet), opening_tag: "<div class='sm:col-span-2'>"},
-  ]
-
-  action = "#{@project_data[:path]}/firewall"
-%>
-
-<%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents)%>
+<% form(action: "#{@project_data[:path]}/firewall", method: "POST", id: "dependency-form", dependencies: "location") do |f| %>
+  <% wrap_resource_form do %>
+    <%== f.input(:text, key: :name, required: true, label: "Name", placeholder: "Enter name", main_wrapper_class: "sm:col-span-2", value: params["name"], error: flash.dig("errors", "name")) %>
+    <%== f.input(:text, key: :description, required: true, label: "Description", placeholder: "Enter description", main_wrapper_class: "sm:col-span-2", value: params["description"], error: flash.dig("errors", "description")) %>
+    <%== f.input(:radioset, key: :location, required: true, label: "Location", options: Option.locations.map { [_1.ui_name, _1.id] }, provides: "location", selected: params["location"]) %>
+    <%== f.input(:select, key: :private_subnet_id, required: true, label: "Private Subnet", main_wrapper_class: "sm:col-span-2", add_blank: "Select private subnet", selected: params["private_subnet_id"], options: dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view").map { [_1.name, {value: _1.ubid, class: "depends-location #{_1.location_id}"}] }) %>
+  <% end %>
+<% end %>

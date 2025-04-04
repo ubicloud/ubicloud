@@ -18,8 +18,6 @@ class Clover
     r.web do
       r.get "create" do
         authorize("Firewall:create", @project.id)
-        @option_tree, @option_parents = generate_firewall_options
-        @default_location = @project.default_location
         view "networking/firewall/create"
       end
 
