@@ -20,18 +20,34 @@ class Strand < Sequel::Model
   end
 
   def take_lease_and_reload
-    affected = DB[<<SQL, id].first
-UPDATE strand
-SET lease = now() + '120 seconds', try = try + 1, schedule = #{SCHEDULE}
-WHERE id = ? AND (lease IS NULL OR lease < now()) AND exitval IS NULL
-RETURNING lease
-SQL
+    unless (ps = DB.prepared_statement(:strand_take_lease_and_reload))
+      # :nocov:
+      ps_sch = if Config.development?
+        Sequel.function(:least, 5, :try)
+      # :nocov:
+      else
+        Sequel.function(:least, Sequel[2]**Sequel.function(:least, :try, 20), 600) * Sequel.function(:random)
+      end
+
+      ps = DB[:strand]
+        .returning
+        .where(
+          Sequel[id: DB[:strand].select(:id).where(id: :$id).for_update.skip_locked, exitval: nil] &
+            (Sequel[lease: nil] | (Sequel[:lease] < Sequel::CURRENT_TIMESTAMP))
+        )
+        .prepare(:update, :strand_take_lease_and_reload,
+          lease: Sequel::CURRENT_TIMESTAMP + Sequel.cast("120 seconds", :interval),
+          try: Sequel[:try] + 1,
+          schedule: Sequel::CURRENT_TIMESTAMP + (ps_sch * Sequel.cast("1 second", :interval)))
+    end
+    affected = ps.call(id:).first
     return false unless affected
+    # Also operate as reload query
+    @values = affected
     lease_time = affected.fetch(:lease)
     verbose_logging = rand(1000) == 0
 
     Clog.emit("obtained lease") { {lease_acquired: {time: lease_time, delay: Time.now - schedule}} } if verbose_logging
-    reload
 
     begin
       yield
@@ -68,10 +84,6 @@ SQL
       fail "BUG: prog must be in Prog module"
     end
   end
-
-  # :nocov:
-  SCHEDULE = Config.development? ? "(now() + least(5, try) * '1 second'::interval)" : "(now() + least(2 ^ least(try, 20), 600) * random() * '1 second'::interval)"
-  # :nocov:
 
   def load(snap = nil)
     Object.const_get("::Prog::" + prog).new(self, snap)
