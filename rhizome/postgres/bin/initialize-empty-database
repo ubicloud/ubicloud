@@ -17,15 +17,12 @@ r "rm -rf /etc/postgresql/#{v}"
 
 r "pg_createcluster #{v} main --start --locale=C.UTF8"
 
-r "sudo -u postgres psql -c 'CREATE ROLE ubi_replication WITH REPLICATION LOGIN'"
-r "sudo -u postgres psql -c 'CREATE ROLE ubi_monitoring WITH LOGIN IN ROLE pg_monitor'"
-
-pgbouncer_setup_query = <<~PGBOUNCER_SETUP
-  BEGIN;
-
+database_init_queries = <<~DATABASE_INIT
   /**
-    * Create pgbouncer role.
+    * Create system roles.
     */
+  CREATE ROLE ubi_replication WITH REPLICATION LOGIN;
+  CREATE ROLE ubi_monitoring WITH LOGIN IN ROLE pg_monitor;
   CREATE ROLE pgbouncer LOGIN;
 
   /**
@@ -58,8 +55,6 @@ pgbouncer_setup_query = <<~PGBOUNCER_SETUP
 
   REVOKE ALL ON FUNCTION pgbouncer.get_auth(name) FROM PUBLIC, pgbouncer;
   GRANT EXECUTE ON FUNCTION pgbouncer.get_auth(name) TO pgbouncer;
+DATABASE_INIT
 
-  COMMIT;
-PGBOUNCER_SETUP
-
-r "sudo -u postgres psql -d template1", stdin: pgbouncer_setup_query
+r "sudo -u postgres psql -d template1", stdin: database_init_queries
