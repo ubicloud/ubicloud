@@ -57,4 +57,4 @@ database_init_queries = <<~DATABASE_INIT
   GRANT EXECUTE ON FUNCTION pgbouncer.get_auth(name) TO pgbouncer;
 DATABASE_INIT
 
-r "sudo -u postgres psql -d template1", stdin: database_init_queries
+r "sudo -u postgres psql -d template1 -v 'ON_ERROR_STOP=1'", stdin: database_init_queries
