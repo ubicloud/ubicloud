@@ -266,7 +266,7 @@ RSpec.describe PostgresServer do
   end
 
   it "runs query on vm" do
-    expect(postgres_server.vm.sshable).to receive(:cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv", stdin: "SELECT 1").and_return("1\n")
+    expect(postgres_server.vm.sshable).to receive(:cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: "SELECT 1").and_return("1\n")
     expect(postgres_server.run_query("SELECT 1")).to eq("1")
   end
 end

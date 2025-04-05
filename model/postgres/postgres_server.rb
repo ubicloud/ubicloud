@@ -212,7 +212,7 @@ class PostgresServer < Sequel::Model
   end
 
   def self.run_query(vm, query)
-    vm.sshable.cmd("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv", stdin: query).chomp
+    vm.sshable.cmd("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: query).chomp
   end
 
   def run_query(query)
