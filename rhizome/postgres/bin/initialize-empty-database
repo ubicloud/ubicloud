@@ -68,4 +68,4 @@ pgbouncer_setup_query = <<~PGBOUNCER_SETUP
   COMMIT;
 PGBOUNCER_SETUP
 
-r "sudo -u postgres psql", stdin: pgbouncer_setup_query
+r "sudo -u postgres psql -d template1", stdin: pgbouncer_setup_query
