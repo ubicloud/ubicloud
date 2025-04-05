@@ -108,14 +108,5 @@ class Clover
         Serializers::LoadBalancer.serialize(lb.reload, {detailed: true})
       end
     end
-
-    # 204 response for invalid names
-    r.is String do |lb_name|
-      r.post { load_balancer_post(lb_name) }
-
-      r.delete do
-        204
-      end
-    end
   end
 end

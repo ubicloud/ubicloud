@@ -78,7 +78,7 @@ RSpec.describe Clover, "load-balancer" do
       end
 
       it "not found" do
-        get "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/_invalid"
+        get "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/not-found"
 
         expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
       end
@@ -119,10 +119,10 @@ RSpec.describe Clover, "load-balancer" do
         expect(last_response.status).to eq(204)
       end
 
-      it "not found" do
+      it "not found for invalid name" do
         delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/invalid_name"
 
-        expect(last_response.status).to eq(204)
+        expect(last_response.status).to eq(400)
       end
     end
 

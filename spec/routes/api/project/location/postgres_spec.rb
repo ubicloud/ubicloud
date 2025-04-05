@@ -145,7 +145,7 @@ RSpec.describe Clover, "postgres" do
           ha_type: "sync"
         }.to_json
 
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: name", {"name" => "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."})
+        expect(last_response).to have_api_error(400, 'Parameter "INVALIDNAME" does not match pattern ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$')
       end
 
       it "can update database properties" do
@@ -419,10 +419,10 @@ RSpec.describe Clover, "postgres" do
         expect(SemSnap.new(pg.id).set?("destroy")).to be false
       end
 
-      it "not exist ubid" do
+      it "invalid reference" do
         delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_fooubid"
 
-        expect(last_response.status).to eq(204)
+        expect(last_response.status).to eq(400)
         expect(SemSnap.new(pg.id).set?("destroy")).to be false
       end
 
