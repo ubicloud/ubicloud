@@ -180,6 +180,10 @@ class Clover < Roda
       when JSON::ParserError
         message = "Validation failed for following fields: body"
         details = {"body" => "Request body isn't a valid JSON object."}
+      when OpenAPIParser::InvalidPattern
+        pattern = e.original_error.instance_variable_get(:@pattern)
+        value = e.original_error.instance_variable_get(:@value)
+        message = "Parameter #{value.inspect} does not match pattern #{pattern}"
       when OpenAPIParser::NotExistPropertyDefinition
         keys = e.original_error.instance_variable_get(:@keys)
         message = "Validation failed for following fields: body"
