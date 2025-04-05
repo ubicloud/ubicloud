@@ -24,15 +24,9 @@ pgbouncer_setup_query = <<~PGBOUNCER_SETUP
   BEGIN;
 
   /**
-    * Create pgbouncer role if it does not exist.
+    * Create pgbouncer role.
     */
-  DO $$
-  BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pgbouncer') THEN
-          CREATE ROLE pgbouncer LOGIN;
-      END IF;
-  END
-  $$;
+  CREATE ROLE pgbouncer LOGIN;
 
   /**
     * Lock down the privileges of the pgbouncer role.
