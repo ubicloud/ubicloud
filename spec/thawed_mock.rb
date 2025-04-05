@@ -100,6 +100,7 @@ module ThawedMock
   allow_mocking(Prog::Vm::HostNexus, :assemble)
   allow_mocking(Prog::Vm::Nexus, :assemble, :assemble_with_sshable)
   allow_mocking(Prog::Vm::VmPool, :assemble)
+  allow_mocking(Prog::Vnet::LoadBalancerNexus, :assemble)
   allow_mocking(Prog::Vnet::NicNexus, :assemble, :gen_mac, :rand)
   allow_mocking(Prog::Vnet::SubnetNexus, :assemble, :random_private_ipv4, :random_private_ipv6)
 
