@@ -158,7 +158,7 @@ RSpec.describe Clover, "firewall" do
 
         expect(page.title).to eq("Ubicloud - Create Firewall")
         expect(page).to have_content "Name must only contain"
-        expect((find "input[name=name]")["value"]).to eq("invalid name")
+        expect((find "input[id=firewall_name]")["value"]).to eq("invalid name")
       end
 
       it "can not create firewall in a project when does not have permissions" do

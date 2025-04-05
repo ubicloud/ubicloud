@@ -142,4 +142,16 @@ class Clover < Roda
       raise Authorization::Unauthorized
     end
   end
+
+  def wrap_resource_form
+    inject_erb(part("components/form/resource_form") { capture_erb { yield } })
+    nil
+  end
+
+  def handle_validation_failure(template)
+    yield
+  rescue Sequel::ValidationFailed => e
+    flash.now["error"] = "Validation failed for following fields: #{e.errors.keys.join(", ")}"
+    view template
+  end
 end
