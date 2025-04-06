@@ -98,7 +98,7 @@ let option_dirty = <%==JSON.generate(form_elements.map { _1[:name] }.each_with_o
       description, tos_text = content_generator.call(@flavor)
       locals = {description:, tos_text:}
     when "section"
-      locals = {label:, content: element[:content]}
+      locals = {label:, content: element[:content], separator: element[:separator]}
     # :nocov:
     else
       raise "Unknown element type: #{type}"
