@@ -61,7 +61,7 @@ let option_dirty = <%==JSON.generate(form_elements.map { _1[:name] }.each_with_o
       opt_classes = parents.map { |k, v| "form_#{k} form_#{k}_#{v}" }
       opt_classes << "hidden" unless parents_selected
       opt_classes = opt_classes.join(" ")
-  
+
       opt_attrs = {}
       opt_attrs[:disabled] = "disabled" unless parents_selected
       opt_attrs[:checked] = "checked" if checked
@@ -76,20 +76,23 @@ let option_dirty = <%==JSON.generate(form_elements.map { _1[:name] }.each_with_o
       end
     end
 
+    attributes = {}
+    attributes[:required] = "" if required
+
     case type
     when "radio_small_cards"
-      locals = {name:, label:, options:, attributes: {required:}}
+      locals = {name:, label:, options:, attributes:}
     when "select"
-      locals = {name:, label:, options:, placeholder:, attributes: {required:}, description_html: element[:description_html]}
+      locals = {name:, label:, options:, placeholder:, attributes:, description_html: element[:description_html]}
     when "checkbox"
       locals = {name:, label:, options:, description: element[:description]}
     when "text"
-      locals = {name:, label:, value: element[:value], attributes: {required:, placeholder:}}
+      locals = {name:, label:, value: element[:value], attributes: attributes.merge!({placeholder:})}
     when "number"
-      locals = {name:, label:, type: "number", attributes: {required:, placeholder:}}
+      locals = {name:, label:, type: "number", attributes: attributes.merge!({placeholder:})}
       type = "text"
     when "textarea"
-      locals = {name:, label:, description: element[:description], attributes: {required:, placeholder:, rows: 3}}
+      locals = {name:, label:, description: element[:description], attributes: attributes.merge!({placeholder:, rows: 3})}
     when "hidden"
       selected_options[name] = element[:value]
       locals = {name:, value: element[:value]}
