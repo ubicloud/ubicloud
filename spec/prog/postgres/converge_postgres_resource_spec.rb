@@ -24,7 +24,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
   describe "#start" do
     it "registers a deadline" do
-      expect(nx).to receive(:register_deadline).with(nil, 2 * 60 * 60)
+      expect(nx).to receive(:register_deadline).with("recycle_representative_server", 2 * 60 * 60)
       expect { nx.start }.to hop("provision_servers")
     end
   end
