@@ -205,4 +205,8 @@ module Config
   optional :stripe_secret_key, string, clear: true
   override :annual_non_dutch_eu_sales_exceed_threshold, false, bool
   optional :invalid_vat_notification_email, string
+  override :invoices_bucket_name, "ubicloud-invoices", string
+  optional :invoices_blob_storage_endpoint, string
+  optional :invoices_blob_storage_access_key, string, clear: true
+  optional :invoices_blob_storage_secret_key, string, clear: true
 end
