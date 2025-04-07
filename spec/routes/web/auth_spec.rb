@@ -472,6 +472,16 @@ RSpec.describe Clover, "auth" do
       OmniAuth.config.test_mode = true
     end
 
+    it "shows error message if attempting to create an account where social login has no email" do
+      mock_provider(:github, nil)
+
+      visit "/login"
+      click_button "GitHub"
+
+      expect(page.title).to eq("Ubicloud - Login")
+      expect(page).to have_flash_error(/Social login is only allowed if social login provider provides email/)
+    end
+
     it "can create new account" do
       mock_provider(:github)
 
