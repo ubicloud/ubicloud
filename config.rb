@@ -152,10 +152,10 @@ module Config
   override :ubuntu_jammy_version, "20240701", string
   override :debian_12_version, "20241004-1890", string
   override :almalinux_9_version, "9.5-20241120", string
-  override :github_ubuntu_2404_version, "20250302.1.1", string
-  override :github_ubuntu_2204_version, "20250302.1.1", string
-  override :github_ubuntu_2004_version, "20250302.1.1", string
-  override :github_gpu_ubuntu_2204_version, "20250302.1.1", string
+  override :github_ubuntu_2404_version, "20250406.1.1", string
+  override :github_ubuntu_2204_version, "20250406.1.1", string
+  override :github_ubuntu_2004_version, "20250406.1.1", string
+  override :github_gpu_ubuntu_2204_version, "20250406.1.1", string
   override :postgres16_ubuntu_2204_version, "20250206.1.0", string
   override :postgres17_ubuntu_2204_version, "20250206.1.0", string
   override :postgres16_paradedb_ubuntu_2204_version, "20250123.1.0", string
