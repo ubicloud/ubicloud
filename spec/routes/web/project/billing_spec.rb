@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../spec_helper"
+require "aws-sdk-s3"
 require "pdf-reader"
 require "stripe"
 
@@ -268,6 +269,13 @@ RSpec.describe Clover, "billing" do
     end
 
     describe "invoices" do
+      let(:blob_storage_client) { Aws::S3::Client.new(stub_responses: true) }
+
+      before do
+        allow(Aws::S3::Client).to receive(:new).and_return(blob_storage_client)
+        blob_storage_client.stub_responses(:get_object, "NoSuchKey")
+      end
+
       def billing_record(begin_time, end_time)
         vm = create_vm
         BillingRecord.create_with_id(
@@ -431,6 +439,23 @@ RSpec.describe Clover, "billing" do
         expect(text).to include("ACME Inc. - Foo Companye Name")
         expect(text).to include("test-vm")
         expect(text).to include("Tax ID: 123123123")
+      end
+
+      it "show persisted invoice PDF from blob storage" do
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "US"}, "metadata" => {"company_name" => "Foo Companye Name", "tax_id" => "123123123"}}).at_least(:once)
+        bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
+        pdf = invoice.generate_pdf(Serializers::Invoice.serialize(invoice, {detailed: true}))
+        response = instance_double(Aws::S3::Types::GetObjectOutput, body: instance_double(StringIO, read: pdf))
+        expect(blob_storage_client).to receive(:get_object).with(bucket: "ubicloud-invoices", key: invoice.blob_key).and_return(response)
+
+        visit "#{project.path}/billing"
+        click_link invoice.name
+
+        expect(page.status_code).to eq(200)
+        text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
+        expect(text).to include("Ubicloud Inc.")
+        expect(text).to include("ACME Inc. - Foo Companye Name")
       end
 
       it "raises not found when invoice not exists" do
