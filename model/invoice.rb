@@ -1,9 +1,11 @@
 # frozen_string_literal: true
 
 require_relative "../model"
-require "stripe"
+require "aws-sdk-s3"
+require "countries"
 require "prawn"
 require "prawn/table"
+require "stripe"
 
 class Invoice < Sequel::Model
   many_to_one :project
@@ -12,6 +14,36 @@ class Invoice < Sequel::Model
 
   def path
     "/invoice/#{id ? ubid : "current"}"
+  end
+
+  def filename
+    "Ubicloud-#{begin_time.strftime("%Y-%m")}-#{invoice_number}.pdf"
+  end
+
+  def blob_key
+    group = if status == "below_minimum_threshold"
+      "below_minimum_threshold"
+    elsif content.dig("vat_info", "reversed")
+      "eu_vat_reversed"
+    else
+      country = ISO3166::Country.new(content.dig("billing_info", "country"))
+      if country.alpha2 == "NL"
+        "nl"
+      elsif country.in_eu_vat?
+        "eu"
+      else
+        "non_eu"
+      end
+    end
+    "#{begin_time.strftime("%Y/%m")}/#{group}/#{filename}"
+  end
+
+  def after_destroy
+    super
+    begin
+      Invoice.blob_storage_client.delete_object(bucket: Config.invoices_bucket_name, key: blob_key)
+    rescue Aws::S3::Errors::NoSuchKey
+    end
   end
 
   def name
@@ -88,10 +120,12 @@ class Invoice < Sequel::Model
 
   def send_success_email(below_threshold: false)
     ser = Serializers::Invoice.serialize(self, {detailed: true})
+    pdf = generate_pdf(ser)
     unless ser[:billing_email]
       Clog.emit("Couldn't send the invoice because it has no billing information") { {invoice_no_billing_info: {ubid:}} }
       return
     end
+    persist(pdf)
     messages = if below_threshold
       ["Since the invoice total of #{ser[:total]} is below our minimum charge threshold, there will be no charges for this month."]
     else
@@ -110,7 +144,7 @@ class Invoice < Sequel::Model
         "If you have any questions, please send us a support request via support@ubicloud.com, and include your invoice number."],
       button_title: "View Invoice",
       button_link: "#{Config.base_url}#{project.path}/billing#{ser[:path]}",
-      attachments: [["#{ser[:filename]}.pdf", generate_pdf(ser)]])
+      attachments: [[filename, pdf]])
   end
 
   def send_failure_email(errors)
@@ -134,7 +168,7 @@ class Invoice < Sequel::Model
     pdf = Prawn::Document.new(
       page_size: "A4",
       page_layout: :portrait,
-      info: {Title: data[:filename], Creator: "Ubicloud", reationDate: created_at}
+      info: {Title: filename, Creator: "Ubicloud", CreationDate: created_at}
     )
     # We use external fonts to support all UTF-8 characters
     pdf.font_families.update(
@@ -235,6 +269,26 @@ class Invoice < Sequel::Model
     end
 
     pdf.render
+  end
+
+  def persist(pdf)
+    Invoice.blob_storage_client.put_object(
+      bucket: Config.invoices_bucket_name,
+      key: blob_key,
+      body: pdf,
+      content_type: "application/pdf",
+      if_none_match: "*"
+    )
+  end
+
+  def self.blob_storage_client
+    Aws::S3::Client.new(
+      endpoint: Config.invoices_blob_storage_endpoint,
+      access_key_id: Config.invoices_blob_storage_access_key,
+      secret_access_key: Config.invoices_blob_storage_secret_key,
+      request_checksum_calculation: "when_required",
+      response_checksum_validation: "when_required"
+    )
   end
 end
 
