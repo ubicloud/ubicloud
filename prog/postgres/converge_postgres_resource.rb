@@ -6,7 +6,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   subject_is :postgres_resource
 
   label def start
-    register_deadline(nil, 2 * 60 * 60)
+    register_deadline("recycle_representative_server", 2 * 60 * 60)
     hop_provision_servers
   end
 
@@ -24,6 +24,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
 
   label def wait_servers_to_be_ready
     hop_provision_servers unless postgres_resource.has_enough_fresh_servers?
+
     hop_recycle_representative_server if postgres_resource.has_enough_ready_servers?
 
     nap 60
@@ -36,6 +37,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       current_hour = Time.now.utc.hour
       maintenance_window_start_at = postgres_resource.maintenance_window_start_at
       nap 10 * 60 if maintenance_window_start_at && (current_hour - maintenance_window_start_at) % 24 >= PostgresResource::MAINTENANCE_DURATION_IN_HOURS
+      register_deadline(nil, 10 * 60)
 
       rs.trigger_failover
     end
