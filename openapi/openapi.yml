@@ -831,31 +831,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/set-maintenance-window':
-    post:
-      operationId: setMaintenanceWindow
-      summary: Set maintenance window for the Postgres database
-      parameters:
-        - $ref: '#/components/parameters/project_id'
-        - $ref: '#/components/parameters/location'
-        - $ref: '#/components/parameters/postgres_database_reference'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                maintenance_window_start_at:
-                  type: integer
-              additionalProperties: false
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresDatabase'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/firewall-rule':
     parameters:
       - $ref: '#/components/parameters/location'
@@ -1027,6 +1002,31 @@ paths:
               required:
                 - name
                 - restore_target
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/set-maintenance-window':
+    post:
+      operationId: setMaintenanceWindow
+      summary: Set maintenance window for the Postgres database
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_reference'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                maintenance_window_start_at:
+                  type: integer
+              additionalProperties: false
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabase'
