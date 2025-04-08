@@ -14,8 +14,11 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     hop_wait_servers_to_be_ready if postgres_resource.has_enough_fresh_servers?
 
     if postgres_resource.servers.all? { _1.vm.vm_host } || postgres_resource.location.provider == "aws"
-      # vm_host might be nil for AWS VM based PG instances
-      exclude_host_ids = (Config.development? || Config.is_e2e) ? [] : postgres_resource.servers.map { _1.vm.vm_host&.id }.compact
+      exclude_host_ids = []
+      if !(Config.development? || Config.is_e2e) && postgres_resource.location.provider == HostProvider::HETZNER_PROVIDER_NAME
+        used_data_centers = postgres_resource.servers.map { _1.vm.vm_host.data_center }.uniq
+        exclude_host_ids = VmHost.where(data_center: used_data_centers).map(&:id)
+      end
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: postgres_resource.timeline.id, timeline_access: "fetch", exclude_host_ids: exclude_host_ids)
     end
 
