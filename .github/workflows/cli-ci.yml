@@ -12,11 +12,13 @@ on:
       - 'cli/**'
       - 'bin/ubi'
       - 'spec/cli_spec.rb'
+      - '.github/workflows/cli-ci.yml'
   pull_request:
     paths:
       - 'cli/**'
       - 'bin/ubi'
       - 'spec/cli_spec.rb'
+      - '.github/workflows/cli-ci.yml'
 
 jobs:
   cli-ci:
