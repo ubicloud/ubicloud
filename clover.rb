@@ -182,9 +182,11 @@ class Clover < Roda
         details = {"body" => "Request body isn't a valid JSON object."}
       when OpenAPIParser::InvalidPattern
         if e.original_error.instance_variable_get(:@reference) == "#/components/schemas/Reference"
+          value = e.original_error.instance_variable_get(:@value)
+          pattern = e.original_error.instance_variable_get(:@pattern)
           code = 404
           type = "ResourceNotFound"
-          message = "Sorry, we couldn’t find the resource you’re looking for."
+          message = "Parameter #{value.inspect} does not match pattern #{pattern}"
         else
           code = 500
           type = "UnexceptedError"
