@@ -8,7 +8,8 @@ class Nic < Sequel::Model
   one_to_many :src_ipsec_tunnels, key: :src_nic_id, class: :IpsecTunnel
   one_to_many :dst_ipsec_tunnels, key: :dst_nic_id, class: :IpsecTunnel
   one_to_one :strand, key: :id
-  plugin :association_dependencies, src_ipsec_tunnels: :destroy, dst_ipsec_tunnels: :destroy
+  one_to_one :nic_aws_resource, key: :id
+  plugin :association_dependencies, src_ipsec_tunnels: :destroy, dst_ipsec_tunnels: :destroy, nic_aws_resource: :destroy
 
   include ResourceMethods
   include SemaphoreMethods

@@ -91,9 +91,11 @@ RSpec.describe Prog::Vnet::NicNexus do
     end
 
     it "hops to wait_aws_nic_created if subnet is created" do
-      expect(ps).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
-      expect(nx).to receive(:bud).with(Prog::Aws::Nic, {"subject_id" => "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"}, :create_network_interface)
-      expect(nx).to receive(:nic).and_return(instance_double(Nic, private_subnet: ps, id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")).at_least(:once)
+      ps = Prog::Vnet::SubnetNexus.assemble(Project.create(name: "test").id)
+      nic = described_class.assemble(ps.id, name: "demonic").subject
+      ps.update(label: "wait")
+      expect(nx).to receive(:bud).with(Prog::Aws::Nic, {"subject_id" => nic.id}, :create_network_interface)
+      expect(nx).to receive(:nic).and_return(nic).at_least(:once)
       expect { nx.create_aws_nic }.to hop("wait_aws_nic_created")
     end
   end

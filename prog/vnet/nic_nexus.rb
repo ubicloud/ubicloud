@@ -16,7 +16,11 @@ class Prog::Vnet::NicNexus < Prog::Base
 
     DB.transaction do
       nic = Nic.create(private_ipv6: ipv6_addr, private_ipv4: ipv4_addr, mac: gen_mac, name: name, private_subnet_id: private_subnet_id) { _1.id = ubid.to_uuid }
-      label = (subnet.location.provider == "aws") ? "create_aws_nic" : "wait_allocation"
+      label = if subnet.location.provider == "aws"
+        "create_aws_nic"
+      else
+        "wait_allocation"
+      end
       Strand.create(prog: "Vnet::NicNexus", label:) { _1.id = nic.id }
     end
   end
@@ -29,6 +33,7 @@ class Prog::Vnet::NicNexus < Prog::Base
 
   label def create_aws_nic
     nap 10 unless nic.private_subnet.strand.label == "wait"
+    NicAwsResource.create { _1.id = nic.id }
     bud Prog::Aws::Nic, {"subject_id" => nic.id}, :create_network_interface
     hop_wait_aws_nic_created
   end

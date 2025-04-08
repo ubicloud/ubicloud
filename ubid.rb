@@ -92,6 +92,7 @@ class UBID
   TYPE_GITHUB_CACHE_ENTRY = "ge"
   TYPE_LOCATION_CREDENTIAL = "1c"
   TYPE_PRIVATE_SUBNET_AWS_RESOURCE = "aw"
+  TYPE_NIC_AWS_RESOURCE = "na"
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
 
