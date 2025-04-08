@@ -20,6 +20,7 @@ RSpec.describe PostgresServer do
     instance_double(
       Vm,
       sshable: instance_double(Sshable),
+      vcpus: 4,
       memory_gib: 8,
       ephemeral_net4: "1.2.3.4",
       ip6: "fdfa:b5aa:14a3:4a3d::2",
