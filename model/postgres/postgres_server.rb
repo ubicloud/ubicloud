@@ -101,7 +101,8 @@ class PostgresServer < Sequel::Model
         }
       },
       identity: resource.identity,
-      hosts: "#{resource.representative_server.vm.private_ipv4} #{resource.identity}"
+      hosts: "#{resource.representative_server.vm.private_ipv4} #{resource.identity}",
+      pgbouncer_instances: (vm.vcpus / 2.0).ceil.clamp(1, 8)
     }
   end
 
