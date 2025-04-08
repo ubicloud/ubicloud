@@ -15,6 +15,7 @@ on:
       - 'main'
     tags:
       - 'v*'
+  pull_request:
 
 env:
   IMAGE_NAME: ubicloud/ubicloud
