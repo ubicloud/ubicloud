@@ -23,9 +23,9 @@ RSpec.describe Prog::Test::GithubRunner do
   describe "#create_vm_pool" do
     it "creates pool and hops to wait_vm_pool_to_be_ready" do
       label_data = Github.runner_labels["ubicloud"]
-      expect(Prog::Vm::VmPool).to receive(:assemble)
-        .with(hash_including(size: 1, vm_size: label_data["vm_size"]))
-        .and_return(instance_double(Strand, subject: instance_double(VmPool, id: 12345)))
+      expect(Prog::Vm::VmPool).to receive(:assemble).
+        with(hash_including(size: 1, vm_size: label_data["vm_size"])).
+        and_return(instance_double(Strand, subject: instance_double(VmPool, id: 12345)))
       expect { gr_test.create_vm_pool }.to hop("wait_vm_pool_to_be_ready")
     end
   end

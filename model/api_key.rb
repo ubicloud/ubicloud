@@ -44,9 +44,9 @@ class ApiKey < Sequel::Model
 
   def unrestrict_token_for_project(project_id)
     AccessControlEntry.where(project_id:, subject_id: id).destroy
-    DB[:applied_subject_tag]
-      .insert_ignore
-      .insert(subject_id: id, tag_id: SubjectTag.where(project_id:, name: "Admin").select(:id))
+    DB[:applied_subject_tag].
+      insert_ignore.
+      insert(subject_id: id, tag_id: SubjectTag.where(project_id:, name: "Admin").select(:id))
   end
 
   def rotate
@@ -57,8 +57,8 @@ class ApiKey < Sequel::Model
   private
 
   def unrestricted_project_access_dataset(project_id)
-    DB[:applied_subject_tag]
-      .where(subject_id: id, tag_id: SubjectTag.where(project_id:, name: "Admin").select(:id))
+    DB[:applied_subject_tag].
+      where(subject_id: id, tag_id: SubjectTag.where(project_id:, name: "Admin").select(:id))
   end
 end
 

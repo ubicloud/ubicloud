@@ -31,9 +31,9 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
   end
 
   def generate_lb_based_nat_rules
-    active_vm_ports_uniq_by_port = load_balancer.active_vm_ports { |ds| ds.eager(:load_balancer_port, load_balancer_vm: {vm: :nics}) }
-      .uniq(&:load_balancer_port_id)
-      .sort_by { |vm_port| vm_port.load_balancer_port.src_port }
+    active_vm_ports_uniq_by_port = load_balancer.active_vm_ports { |ds| ds.eager(:load_balancer_port, load_balancer_vm: {vm: :nics}) }.
+      uniq(&:load_balancer_port_id).
+      sort_by { |vm_port| vm_port.load_balancer_port.src_port }
     public_ipv4 = vm.ephemeral_net4.to_s
     public_ipv6 = vm.ephemeral_net6.nth(2).to_s
     private_ipv4 = vm.private_ipv4
@@ -133,9 +133,9 @@ TEMPLATE
   end
 
   def generate_lb_map_defs(current_port)
-    items = load_balancer.active_vm_ports
-      .select { |vm_port| vm_port.load_balancer_port.dst_port == current_port.dst_port }
-      .map do |vm_port|
+    items = load_balancer.active_vm_ports.
+      select { |vm_port| vm_port.load_balancer_port.dst_port == current_port.dst_port }.
+      map do |vm_port|
         address = yield vm_port
         port = (vm_port.load_balancer_vm.vm_id == vm.id) ? vm_port.load_balancer_port.dst_port : vm_port.load_balancer_port.src_port
         [address.to_s, port.to_i]

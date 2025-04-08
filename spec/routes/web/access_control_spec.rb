@@ -17,9 +17,9 @@ RSpec.describe Clover, "access control" do
     # Show the displayed access control entries, except for the Admin one
     def displayed_access_control_entries
       page.all("table#access-control-entries .existing-aces-view td.values").map(&:text) +
-        page.all("table#access-control-entries .existing-aces select")
-          .map { |select| select.all("option[selected]")[0] || select.first("option") }
-          .map(&:text)
+        page.all("table#access-control-entries .existing-aces select").
+          map { |select| select.all("option[selected]")[0] || select.first("option") }.
+          map(&:text)
     end
 
     before do

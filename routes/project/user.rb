@@ -78,10 +78,10 @@ class Clover
         DB.transaction do
           allowed_add_tags = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").to_hash(:name)
           allowed_remove_tags = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:remove").to_hash(:name)
-          project_account_ids = @project
-            .accounts_dataset
-            .where(Sequel[:accounts][:id] => Sequel.any_uuid(account_ids))
-            .select_map(Sequel[:accounts][:id])
+          project_account_ids = @project.
+            accounts_dataset.
+            where(Sequel[:accounts][:id] => Sequel.any_uuid(account_ids)).
+            select_map(Sequel[:accounts][:id])
           subject_tag_map = SubjectTag.subject_id_map_for_project_and_accounts(@project.id, project_account_ids)
           project_account_ids.each do |account_id|
             subject_tag_map[account_id] ||= [] # Handle accounts not in any tags
@@ -126,10 +126,10 @@ class Clover
             r.redirect "#{@project.path}/user"
           end
 
-          invitatation_map = @project
-            .invitations_dataset
-            .where(email: invitation_policies.keys)
-            .to_hash(:email)
+          invitatation_map = @project.
+            invitations_dataset.
+            where(email: invitation_policies.keys).
+            to_hash(:email)
           invitation_policy_changes = {}
           invitation_policies.each do |email, policy|
             policy = nil if policy == ""
@@ -149,10 +149,10 @@ class Clover
             (removals[old_policy] ||= []) << 1 if old_policy
           end
           invitation_policy_changes.each do |policy, emails|
-            @project
-              .invitations_dataset
-              .where(email: emails)
-              .update(policy:)
+            @project.
+              invitations_dataset.
+              where(email: emails).
+              update(policy:)
           end
 
           changes = []

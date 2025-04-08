@@ -11,8 +11,8 @@ module Option
   end
 
   def self.postgres_locations(project_id: nil)
-    Location
-      .where(Sequel.|(
+    Location.
+      where(Sequel.|(
         {name: ["hetzner-fsn1", "leaseweb-wdc02"]},
         {project_id:}
       )).all

@@ -34,14 +34,14 @@ module AccessControlModelTag
   end
 
   def currently_included_in
-    DB[:tag]
-      .with_recursive(:tag,
+    DB[:tag].
+      with_recursive(:tag,
         DB[applied_table].where(applied_column => id).select(:tag_id, 0),
-        DB[applied_table].join(:tag, tag_id: applied_column)
-          .select(Sequel[applied_table][:tag_id], Sequel[:level] + 1)
-          .where { level < Config.recursive_tag_limit },
-        args: [:tag_id, :level])
-      .select_map(:tag_id)
+        DB[applied_table].join(:tag, tag_id: applied_column).
+          select(Sequel[applied_table][:tag_id], Sequel[:level] + 1).
+          where { level < Config.recursive_tag_limit },
+        args: [:tag_id, :level]).
+      select_map(:tag_id)
   end
 
   def check_members_to_add(to_add)

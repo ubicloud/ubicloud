@@ -4,10 +4,10 @@ class Clover
   hash_branch(:project_prefix, "token") do |r|
     r.web do
       authorize("Project:token", @project.id)
-      token_ds = current_account
-        .api_keys_dataset
-        .where(project_id: @project.id)
-        .reverse(:created_at)
+      token_ds = current_account.
+        api_keys_dataset.
+        where(project_id: @project.id).
+        reverse(:created_at)
 
       r.is do
         r.get do

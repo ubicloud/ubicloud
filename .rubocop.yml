@@ -95,3 +95,6 @@ Capybara/ClickLinkOrButtonStyle:
 
 Lint/UselessTimes:
   Enabled: false
+
+Layout/DotPosition:
+  EnforcedStyle: trailing

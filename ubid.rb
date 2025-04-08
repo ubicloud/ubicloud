@@ -165,8 +165,8 @@ class UBID
 
   # Map of prefixes to class name symbols, to avoid autoloading
   # classes until they are referenced by class_for_ubid
-  TYPE2CLASSNAME = constants.select { _1.start_with?("TYPE_") }.reject { _1.to_s == "TYPE_ETC" }
-    .map { [const_get(_1), camelize(_1.to_s).to_sym] }.to_h.freeze
+  TYPE2CLASSNAME = constants.select { _1.start_with?("TYPE_") }.reject { _1.to_s == "TYPE_ETC" }.
+    map { [const_get(_1), camelize(_1.to_s).to_sym] }.to_h.freeze
   private_constant :TYPE2CLASSNAME
 
   def self.class_for_ubid(str)

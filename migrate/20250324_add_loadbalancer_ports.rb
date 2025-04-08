@@ -45,14 +45,14 @@ Sequel.migration do
     )
 
     DB[:load_balancer_vm_port].import([:id, :load_balancer_port_id, :load_balancer_vm_id, :state],
-      DB[:load_balancers_vms]
-        .join(:load_balancer_port, load_balancer_id: :load_balancer_id)
-        .select_map([
+      DB[:load_balancers_vms].
+        join(:load_balancer_port, load_balancer_id: :load_balancer_id).
+        select_map([
           Sequel[:load_balancer_port][:id].as(:load_balancer_port_id),
           Sequel[:load_balancers_vms][:id].as(:load_balancer_vm_id),
           Sequel[:load_balancers_vms][:state]
-        ])
-        .each { _1.unshift(UBID.generate("1q").to_uuid) })
+        ]).
+        each { _1.unshift(UBID.generate("1q").to_uuid) })
   end
 
   down do
@@ -65,13 +65,13 @@ Sequel.migration do
       set_column_not_null :dst_port
     end
 
-    DB[:load_balancers_vms]
-      .update(
+    DB[:load_balancers_vms].
+      update(
         state: Sequel.expr do
-          DB[:load_balancer_vm_port]
-            .where(load_balancer_vm_id: Sequel[:load_balancers_vms][:id])
-            .select(:state)
-            .limit(1)
+          DB[:load_balancer_vm_port].
+            where(load_balancer_vm_id: Sequel[:load_balancers_vms][:id]).
+            select(:state).
+            limit(1)
         end
       )
     alter_table(:load_balancers_vms) do

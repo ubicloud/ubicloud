@@ -43,10 +43,10 @@
     end
   
   @nodes +=
-    @kc
-      .nodepools_dataset
-      .eager(:vms)
-      .flat_map do |np|
+    @kc.
+      nodepools_dataset.
+      eager(:vms).
+      flat_map do |np|
         np.vms.map { |vm| { name: vm.name, role: "Worker", state: vm.display_state, hostname: vm.ephemeral_net4.to_s } }
       end %>
 

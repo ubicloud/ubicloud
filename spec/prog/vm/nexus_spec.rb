@@ -88,8 +88,8 @@ RSpec.describe Prog::Vm::Nexus do
     it "creates Subnet and Nic if not passed" do
       expect {
         described_class.assemble("some_ssh_key", prj.id)
-      }.to change(PrivateSubnet, :count).from(0).to(1)
-        .and change(Nic, :count).from(0).to(1)
+      }.to change(PrivateSubnet, :count).from(0).to(1).
+        and change(Nic, :count).from(0).to(1)
     end
 
     it "creates Nic if only subnet_id is passed" do

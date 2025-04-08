@@ -214,20 +214,20 @@ zone-flush k8s.ubicloud.com
       expect(prog.ds).to receive(:vms).thrice.and_return([dummy_vm])
       expect(dummy_vm).to receive(:sshable).twice.and_return(dummy_sshable)
 
-      expect(prog.vm.sshable).to receive(:cmd).twice
-        .with("sudo -u knot knotc", stdin: "zone-read --")
-        .and_return("line1\nline2")
+      expect(prog.vm.sshable).to receive(:cmd).twice.
+        with("sudo -u knot knotc", stdin: "zone-read --").
+        and_return("line1\nline2")
 
-      expect(dummy_sshable).to receive(:cmd)
-        .with("sudo -u knot knotc", stdin: "zone-read --")
-        .and_return("line1\nline3")
+      expect(dummy_sshable).to receive(:cmd).
+        with("sudo -u knot knotc", stdin: "zone-read --").
+        and_return("line1\nline3")
 
       # Different outputs
       expect { prog.validate }.to hop("sync_zones")
 
-      expect(dummy_sshable).to receive(:cmd)
-        .with("sudo -u knot knotc", stdin: "zone-read --")
-        .and_return("line2\nline1")
+      expect(dummy_sshable).to receive(:cmd).
+        with("sudo -u knot knotc", stdin: "zone-read --").
+        and_return("line2\nline1")
 
       expect(prog.ds).to receive(:add_vm)
 

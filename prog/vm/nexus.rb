@@ -567,9 +567,9 @@ class Prog::Vm::Nexus < Prog::Base
     # the operation succeeded in case some other
     # transaction took over this slice.
     if slice
-      updated = slice.this
-        .where(enabled: true, used_cpu_percent: 0, used_memory_gib: 0)
-        .update(enabled: false)
+      updated = slice.this.
+        where(enabled: true, used_cpu_percent: 0, used_memory_gib: 0).
+        update(enabled: false)
 
       if updated == 1
         slice.incr_destroy

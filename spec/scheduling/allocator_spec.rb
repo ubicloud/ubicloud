@@ -74,8 +74,8 @@ RSpec.describe Al do
 
     it "persists valid allocation" do
       al = instance_double(Al::Allocation)
-      expect(Al::Allocation).to receive(:best_allocation)
-        .with(Al::Request.new(
+      expect(Al::Allocation).to receive(:best_allocation).
+        with(Al::Request.new(
           "2464de61-7501-8374-9ab0-416caebe31da", 2, 8, 33,
           [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
             [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
@@ -151,26 +151,26 @@ RSpec.describe Al do
       sd2 = StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 12, total_storage_gib: 99)
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
 
-      expect(Al::Allocation.candidate_hosts(req))
-        .to eq([{location_id: vmh.location_id,
-                 num_storage_devices: 2,
-                 storage_devices: [{"available_storage_gib" => sd2.available_storage_gib, "id" => sd2.id, "total_storage_gib" => sd2.total_storage_gib},
-                   {"available_storage_gib" => sd1.available_storage_gib, "id" => sd1.id, "total_storage_gib" => sd1.total_storage_gib}],
-                 total_cpus: vmh.total_cpus,
-                 total_cores: vmh.total_cores,
-                 total_hugepages_1g: vmh.total_hugepages_1g,
-                 total_storage_gib: sd1.total_storage_gib + sd2.total_storage_gib,
-                 available_storage_gib: sd1.available_storage_gib + sd2.available_storage_gib,
-                 used_cores: vmh.used_cores,
-                 used_hugepages_1g: vmh.used_hugepages_1g,
-                 vm_host_id: vmh.id,
-                 total_ipv4: 4,
-                 num_gpus: 0,
-                 available_gpus: 0,
-                 available_iommu_groups: nil,
-                 used_ipv4: 1,
-                 vm_provisioning_count: 0,
-                 accepts_slices: false}])
+      expect(Al::Allocation.candidate_hosts(req)).
+        to eq([{location_id: vmh.location_id,
+                num_storage_devices: 2,
+                storage_devices: [{"available_storage_gib" => sd2.available_storage_gib, "id" => sd2.id, "total_storage_gib" => sd2.total_storage_gib},
+                  {"available_storage_gib" => sd1.available_storage_gib, "id" => sd1.id, "total_storage_gib" => sd1.total_storage_gib}],
+                total_cpus: vmh.total_cpus,
+                total_cores: vmh.total_cores,
+                total_hugepages_1g: vmh.total_hugepages_1g,
+                total_storage_gib: sd1.total_storage_gib + sd2.total_storage_gib,
+                available_storage_gib: sd1.available_storage_gib + sd2.available_storage_gib,
+                used_cores: vmh.used_cores,
+                used_hugepages_1g: vmh.used_hugepages_1g,
+                vm_host_id: vmh.id,
+                total_ipv4: 4,
+                num_gpus: 0,
+                available_gpus: 0,
+                available_iommu_groups: nil,
+                used_ipv4: 1,
+                vm_provisioning_count: 0,
+                accepts_slices: false}])
     end
 
     it "retrieves provisioning count" do
@@ -181,25 +181,25 @@ RSpec.describe Al do
       create_vm(vm_host_id: vmh.id, location_id: vmh.location_id, boot_image: "ubuntu-jammy", display_state: "creating")
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
 
-      expect(Al::Allocation.candidate_hosts(req))
-        .to eq([{location_id: vmh.location_id,
-                 num_storage_devices: 1,
-                 storage_devices: [{"available_storage_gib" => sd1.available_storage_gib, "id" => sd1.id, "total_storage_gib" => sd1.total_storage_gib}],
-                 total_cpus: vmh.total_cpus,
-                 total_cores: vmh.total_cores,
-                 total_hugepages_1g: vmh.total_hugepages_1g,
-                 total_storage_gib: sd1.total_storage_gib,
-                 available_storage_gib: sd1.available_storage_gib,
-                 used_cores: vmh.used_cores,
-                 used_hugepages_1g: vmh.used_hugepages_1g,
-                 vm_host_id: vmh.id,
-                 total_ipv4: 4,
-                 num_gpus: 0,
-                 available_gpus: 0,
-                 available_iommu_groups: nil,
-                 used_ipv4: 1,
-                 vm_provisioning_count: 2,
-                 accepts_slices: false}])
+      expect(Al::Allocation.candidate_hosts(req)).
+        to eq([{location_id: vmh.location_id,
+                num_storage_devices: 1,
+                storage_devices: [{"available_storage_gib" => sd1.available_storage_gib, "id" => sd1.id, "total_storage_gib" => sd1.total_storage_gib}],
+                total_cpus: vmh.total_cpus,
+                total_cores: vmh.total_cores,
+                total_hugepages_1g: vmh.total_hugepages_1g,
+                total_storage_gib: sd1.total_storage_gib,
+                available_storage_gib: sd1.available_storage_gib,
+                used_cores: vmh.used_cores,
+                used_hugepages_1g: vmh.used_hugepages_1g,
+                vm_host_id: vmh.id,
+                total_ipv4: 4,
+                num_gpus: 0,
+                available_gpus: 0,
+                available_iommu_groups: nil,
+                used_ipv4: 1,
+                vm_provisioning_count: 2,
+                accepts_slices: false}])
     end
 
     it "applies host filter" do
@@ -1061,12 +1061,12 @@ RSpec.describe Al do
 
     it "prefers a host with available slice for burstables" do
       vh1 = VmHost.first
-      Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vh1, family: "standard", allowed_cpus: (2..5), memory_gib: 16, is_shared: false)
-        .subject
-        .update(used_cpu_percent: 400, used_memory_gib: 16, enabled: true) # Full
-      Prog::Vm::VmHostSliceNexus.assemble_with_host("sl2", vh1, family: "burstable", allowed_cpus: (6..7), memory_gib: 8, is_shared: true)
-        .subject
-        .update(used_cpu_percent: 100, used_memory_gib: 4, enabled: true)  # Partially filled in
+      Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vh1, family: "standard", allowed_cpus: (2..5), memory_gib: 16, is_shared: false).
+        subject.
+        update(used_cpu_percent: 400, used_memory_gib: 16, enabled: true) # Full
+      Prog::Vm::VmHostSliceNexus.assemble_with_host("sl2", vh1, family: "burstable", allowed_cpus: (6..7), memory_gib: 8, is_shared: true).
+        subject.
+        update(used_cpu_percent: 100, used_memory_gib: 4, enabled: true)  # Partially filled in
       vh1.update(total_cores: 4, total_cpus: 8, used_cores: 4, total_hugepages_1g: 27, used_hugepages_1g: 26)
       vh1.reload
 

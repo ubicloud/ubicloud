@@ -10,11 +10,11 @@ class GithubInstallation < Sequel::Model
   include ResourceMethods
 
   def total_active_runner_vcpus
-    runners_dataset
-      .left_join(:strand, id: :id)
-      .exclude(Sequel[:strand][:label] => ["start", "wait_concurrency_limit"])
-      .select_map(Sequel[:github_runner][:label])
-      .sum do
+    runners_dataset.
+      left_join(:strand, id: :id).
+      exclude(Sequel[:strand][:label] => ["start", "wait_concurrency_limit"]).
+      select_map(Sequel[:github_runner][:label]).
+      sum do
         label = Github.runner_labels[_1]
         Validation.validate_vm_size(label["vm_size"], label["arch"]).vcpus
       end

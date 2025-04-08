@@ -47,9 +47,9 @@ PGHOST=/var/run/postgresql
     return [] if blob_storage.nil?
 
     begin
-      blob_storage_client
-        .list_objects(ubid, "basebackups_005/")
-        .select { _1.key.end_with?("backup_stop_sentinel.json") }
+      blob_storage_client.
+        list_objects(ubid, "basebackups_005/").
+        select { _1.key.end_with?("backup_stop_sentinel.json") }
     rescue => ex
       recoverable_errors = ["The Access Key Id you provided does not exist in our records.", "AccessDenied", "No route to host", "Connection refused"]
       return [] if recoverable_errors.any? { ex.message.include?(_1) }

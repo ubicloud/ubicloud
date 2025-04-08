@@ -15,11 +15,11 @@ class SubjectTag < Sequel::Model
   end
 
   def self.subject_id_map_for_project_and_accounts(project_id, account_ids)
-    DB[:applied_subject_tag]
-      .join(:subject_tag, id: :tag_id)
-      .where(project_id:, subject_id: Sequel.any_uuid(account_ids))
-      .order(:subject_id, :name)
-      .select_hash_groups(:subject_id, :name)
+    DB[:applied_subject_tag].
+      join(:subject_tag, id: :tag_id).
+      where(project_id:, subject_id: Sequel.any_uuid(account_ids)).
+      order(:subject_id, :name).
+      select_hash_groups(:subject_id, :name)
   end
 
   def self.options_for_project(project)

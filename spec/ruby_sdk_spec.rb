@@ -190,8 +190,8 @@ RSpec.describe Ubicloud do
     let(:adapter) { described_class.new(token: "foo", project_id: "pj", base_uri: "http://localhost") }
 
     it "sends expected headers for GET requests" do
-      stub_request(:get, "http://localhost/project/pj/headers")
-        .with(
+      stub_request(:get, "http://localhost/project/pj/headers").
+        with(
           headers: {
             "Accept" => "text/plain",
             "Accept-Encoding" => "gzip;q=1.0,deflate;q=0.6,identity;q=0.3",
@@ -199,14 +199,14 @@ RSpec.describe Ubicloud do
             "Connection" => "close",
             "User-Agent" => "Ruby"
           }
-        )
-        .to_return(status: 200, body: "{}", headers: {})
+        ).
+        to_return(status: 200, body: "{}", headers: {})
       expect(adapter.get("headers")).to eq({})
     end
 
     it "sends expected headers for POST requests" do
-      stub_request(:post, "http://localhost/project/pj/headers")
-        .with(
+      stub_request(:post, "http://localhost/project/pj/headers").
+        with(
           body: "{\"foo\":\"bar\"}",
           headers: {
             "Accept" => "text/plain",
@@ -216,14 +216,14 @@ RSpec.describe Ubicloud do
             "Content-Type" => "application/json",
             "User-Agent" => "Ruby"
           }
-        )
-        .to_return(status: 200, body: "{}", headers: {})
+        ).
+        to_return(status: 200, body: "{}", headers: {})
       expect(adapter.post("headers", foo: "bar")).to eq({})
     end
 
     it "sends expected headers and body for POST requests" do
-      stub_request(:post, "http://localhost/project/pj/headers")
-        .with(
+      stub_request(:post, "http://localhost/project/pj/headers").
+        with(
           headers: {
             "Accept" => "text/plain",
             "Accept-Encoding" => "gzip;q=1.0,deflate;q=0.6,identity;q=0.3",
@@ -232,14 +232,14 @@ RSpec.describe Ubicloud do
             "Content-Type" => "application/json",
             "User-Agent" => "Ruby"
           }
-        )
-        .to_return(status: 200, body: "{}", headers: {})
+        ).
+        to_return(status: 200, body: "{}", headers: {})
       expect(adapter.post("headers")).to eq({})
     end
 
     it "sends expected headers for DELETE requests" do
-      stub_request(:delete, "http://localhost/project/pj/headers")
-        .with(
+      stub_request(:delete, "http://localhost/project/pj/headers").
+        with(
           headers: {
             "Accept" => "text/plain",
             "Accept-Encoding" => "gzip;q=1.0,deflate;q=0.6,identity;q=0.3",
@@ -248,8 +248,8 @@ RSpec.describe Ubicloud do
             "Content-Type" => "application/json",
             "User-Agent" => "Ruby"
           }
-        )
-        .to_return(status: 200, body: "{}", headers: {})
+        ).
+        to_return(status: 200, body: "{}", headers: {})
       expect(adapter.delete("headers")).to eq({})
     end
   end

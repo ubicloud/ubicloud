@@ -22,9 +22,9 @@
                 <div class="col-span-6 sm:col-span-6">
                   <fieldset>
                     <div class="space-y-5">
-                      <% (usage = DB[rodauth.webauthn_keys_table]
-                          .where(rodauth.webauthn_keys_account_id_column => rodauth.session_value)
-                          .select_hash(rodauth.webauthn_keys_webauthn_id_column, [rodauth.webauthn_keys_last_use_column, :name])
+                      <% (usage = DB[rodauth.webauthn_keys_table].
+                          where(rodauth.webauthn_keys_account_id_column => rodauth.session_value).
+                          select_hash(rodauth.webauthn_keys_webauthn_id_column, [rodauth.webauthn_keys_last_use_column, :name])
                         ).map do |id, (last_use, name)| %>
                         <div class="relative flex items-start">
                           <div class="flex h-6 items-center">

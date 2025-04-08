@@ -56,8 +56,8 @@ Sequel.migration do
         ["ffffffff-ff00-835a-87ff-f06940d85dc0", "ActionTag:view", "ttzzzzzzzz021gzzz0ta0v1ew0"],
         ["ffffffff-ff00-835a-87ff-ff8340029ad0", "ObjectTag:add", "ttzzzzzzzz021gzzzz0t00add0"],
         ["ffffffff-ff00-835a-87c1-a0030ea036e0", "ObjectTag:remove", "ttzzzzzzzz021gz0t00rem0ve1"],
-        ["ffffffff-ff00-835a-87ff-f06800d85dc0", "ObjectTag:view", "ttzzzzzzzz021gzzz0t00v1ew0"]]
-            .each(&:pop))
+        ["ffffffff-ff00-835a-87ff-f06800d85dc0", "ObjectTag:view", "ttzzzzzzzz021gzzz0t00v1ew0"]].
+            each(&:pop))
 
     %w[subject action object].each do |tag_type|
       create_table(:"#{tag_type}_tag") do
@@ -99,22 +99,22 @@ Sequel.migration do
     action_tags.each do |id, name|
       name = name.delete_suffix(":all")
       from(:applied_action_tag).insert([:tag_id, :action_id],
-        from(:action_type)
-          .where(Sequel.like(:name, "#{name}:%"))
-          .select(id, :id))
+        from(:action_type).
+          where(Sequel.like(:name, "#{name}:%")).
+          select(id, :id))
     end
     # Member action tag has Project:{view,github} actions
     from(:applied_action_tag).insert([:tag_id, :action_id],
-      from(:action_type)
-        .where(name: %w[Project:view Project:github])
-        .select(Sequel.cast(member_id, :uuid), :id)
-        .union(
+      from(:action_type).
+        where(name: %w[Project:view Project:github]).
+        select(Sequel.cast(member_id, :uuid), :id).
+        union(
           # and non-Project :all tags
-          from(:action_tag)
-            .where(project_id: nil)
-            .where(Sequel.like(:name, "%:all"))
-            .exclude(name: "Project:all")
-            .select(member_id, :id)
+          from(:action_tag).
+            where(project_id: nil).
+            where(Sequel.like(:name, "%:all")).
+            exclude(name: "Project:all").
+            select(member_id, :id)
         ))
 
     create_table(:access_control_entry) do

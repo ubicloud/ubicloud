@@ -535,28 +535,28 @@ RSpec.describe Prog::Vm::HostNexus do
     end
 
     it "fails if free hugepages couldn't be extracted" do
-      expect(sshable).to receive(:cmd).with("cat /proc/meminfo")
-        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 5")
+      expect(sshable).to receive(:cmd).with("cat /proc/meminfo").
+        and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 5")
       expect { nx.verify_hugepages }.to raise_error RuntimeError, "Couldn't extract free hugepage count"
     end
 
     it "fails if not enough hugepages for VMs" do
-      expect(sshable).to receive(:cmd).with("cat /proc/meminfo")
-        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 5\nHugePages_Free: 2")
+      expect(sshable).to receive(:cmd).with("cat /proc/meminfo").
+        and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 5\nHugePages_Free: 2")
       expect { nx.verify_hugepages }.to raise_error RuntimeError, "Not enough hugepages for VMs"
     end
 
     it "fails if used hugepages exceed spdk hugepages" do
-      expect(sshable).to receive(:cmd).with("cat /proc/meminfo")
-        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 5")
+      expect(sshable).to receive(:cmd).with("cat /proc/meminfo").
+        and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 5")
       expect { nx.verify_hugepages }.to raise_error RuntimeError, "Used hugepages exceed SPDK hugepages"
     end
 
     it "updates vm_host with hugepage stats and hops" do
-      expect(sshable).to receive(:cmd).with("cat /proc/meminfo")
-        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 8")
-      expect(vm_host).to receive(:update)
-        .with(total_hugepages_1g: 10, used_hugepages_1g: 7)
+      expect(sshable).to receive(:cmd).with("cat /proc/meminfo").
+        and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 8")
+      expect(vm_host).to receive(:update).
+        with(total_hugepages_1g: 10, used_hugepages_1g: 7)
       expect { nx.verify_hugepages }.to hop("start_slices")
     end
   end

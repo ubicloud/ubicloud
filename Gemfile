@@ -65,7 +65,7 @@ end
 
 group :lint do
   gem "brakeman"
-  gem "erb-formatter", github: "ubicloud/erb-formatter", ref: "a9ff0001a1eb028e2186b222aeb02b07c04f9808"
+  gem "erb-formatter", github: "ubicloud/erb-formatter", ref: "886cb4e27b099d6f347b950375aa22e638888f95"
 end
 
 group :test do

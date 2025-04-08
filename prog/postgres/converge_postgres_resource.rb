@@ -51,10 +51,10 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   label def prune_servers
     # Below we only keep servers that does not need recycling. If there are
     # more such servers than required, we prefer ready and recent servers (in that order)
-    servers_to_keep = postgres_resource.servers
-      .reject { _1.representative_at || _1.needs_recycling? }
-      .sort_by { [(_1.strand.label == "wait") ? 0 : 1, Time.now - _1.created_at] }
-      .take(postgres_resource.target_standby_count) + [postgres_resource.representative_server]
+    servers_to_keep = postgres_resource.servers.
+      reject { _1.representative_at || _1.needs_recycling? }.
+      sort_by { [(_1.strand.label == "wait") ? 0 : 1, Time.now - _1.created_at] }.
+      take(postgres_resource.target_standby_count) + [postgres_resource.representative_server]
     (postgres_resource.servers - servers_to_keep).each.each(&:incr_destroy)
 
     postgres_resource.incr_update_billing_records

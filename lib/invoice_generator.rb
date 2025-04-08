@@ -121,11 +121,11 @@ class InvoiceGenerator
         # Free AI tokens WILL be shown on the portal billing page as a separate credit.
         free_inference_tokens_remaining = FreeQuota.free_quotas["inference-tokens"]["value"]
         free_inference_tokens_credit = 0.0
-        project_content[:resources]
-          .flat_map { _1[:line_items] }
-          .select { _1[:resource_type] == "InferenceTokens" }
-          .sort_by { |li| [li[:begin_time].to_date, -li[:unit_price]] }
-          .each do |li|
+        project_content[:resources].
+          flat_map { _1[:line_items] }.
+          select { _1[:resource_type] == "InferenceTokens" }.
+          sort_by { |li| [li[:begin_time].to_date, -li[:unit_price]] }.
+          each do |li|
             used_amount = [li[:amount], free_inference_tokens_remaining].min
             free_inference_tokens_remaining -= used_amount
             free_inference_tokens_credit += used_amount * li[:unit_price]
@@ -184,8 +184,8 @@ class InvoiceGenerator
   end
 
   def active_billing_records
-    active_billing_records = BillingRecord.eager(project: [:billing_info, :invoices])
-      .where { |br| Sequel.pg_range(br.span).overlaps(Sequel.pg_range(@begin_time...@end_time)) }
+    active_billing_records = BillingRecord.eager(project: [:billing_info, :invoices]).
+      where { |br| Sequel.pg_range(br.span).overlaps(Sequel.pg_range(@begin_time...@end_time)) }
     active_billing_records = active_billing_records.where(project_id: @project_ids) unless @project_ids.empty?
     active_billing_records.all.map do |br|
       # We cap the billable duration at 672 hours. In this way, we can

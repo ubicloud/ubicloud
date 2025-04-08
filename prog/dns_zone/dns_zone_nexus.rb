@@ -23,10 +23,10 @@ class Prog::DnsZone::DnsZoneNexus < Prog::Base
     decr_refresh_dns_servers
 
     dns_zone.dns_servers.each do |dns_server|
-      records_to_rectify = dns_zone.records_dataset
-        .left_join(:seen_dns_records_by_dns_servers, dns_record_id: :id, dns_server_id: dns_server.id)
-        .where(Sequel[:seen_dns_records_by_dns_servers][:dns_record_id] => nil)
-        .order(Sequel.asc(:created_at)).all
+      records_to_rectify = dns_zone.records_dataset.
+        left_join(:seen_dns_records_by_dns_servers, dns_record_id: :id, dns_server_id: dns_server.id).
+        where(Sequel[:seen_dns_records_by_dns_servers][:dns_record_id] => nil).
+        order(Sequel.asc(:created_at)).all
 
       next if records_to_rectify.empty?
 

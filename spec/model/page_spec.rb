@@ -10,8 +10,8 @@ RSpec.describe Page do
   describe "#trigger" do
     before do
       expect(Config).to receive(:pagerduty_key).and_return("dummy-key").at_least(:once)
-      stub_request(:post, "https://events.pagerduty.com/v2/enqueue")
-        .to_return(status: 200, body: {dedup_key: "dummy-dedup-key", message: "Event processed", status: "success"}.to_json, headers: {})
+      stub_request(:post, "https://events.pagerduty.com/v2/enqueue").
+        to_return(status: 200, body: {dedup_key: "dummy-dedup-key", message: "Event processed", status: "success"}.to_json, headers: {})
     end
 
     it "triggers a page in Pagerduty if key is present" do
@@ -34,8 +34,8 @@ RSpec.describe Page do
   describe "#resolve" do
     it "resolves the page in Pagerduty if key is present" do
       expect(Config).to receive(:pagerduty_key).and_return("dummy-key").at_least(:once)
-      stub_request(:post, "https://events.pagerduty.com/v2/enqueue")
-        .to_return(status: 200, body: {dedup_key: "dummy-dedup-key", message: "Event processed", status: "success"}.to_json, headers: {})
+      stub_request(:post, "https://events.pagerduty.com/v2/enqueue").
+        to_return(status: 200, body: {dedup_key: "dummy-dedup-key", message: "Event processed", status: "success"}.to_json, headers: {})
 
       p.resolve
     end

@@ -13,8 +13,8 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
         updates[:default_branch] = default_branch if default_branch
         repository.insert_conflict(target: [:installation_id, :name], update: updates).save_changes
       end
-      Strand.new(prog: "Github::GithubRepositoryNexus", label: "wait") { _1.id = repository.id }
-        .insert_conflict(target: :id).save_changes
+      Strand.new(prog: "Github::GithubRepositoryNexus", label: "wait") { _1.id = repository.id }.
+        insert_conflict(target: :id).save_changes
     end
   end
 
@@ -87,10 +87,10 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     # created more than 7 days ago and not accessed yet.
     seven_days_ago = Time.now - 7 * 24 * 60 * 60
     cond = Sequel.expr { (last_accessed_at < seven_days_ago) | ((last_accessed_at =~ nil) & (created_at < seven_days_ago)) }
-    github_repository.cache_entries_dataset
-      .where(cond)
-      .limit(200)
-      .destroy_where(cond)
+    github_repository.cache_entries_dataset.
+      where(cond).
+      limit(200).
+      destroy_where(cond)
 
     # Destroy cache entries if it is created 30 minutes ago
     # but couldn't committed yet. 30 minutes decided as during
@@ -98,11 +98,11 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     # the max size for a single cache entry) takes ~8 minutes at most.
     # To be on the safe side, ~2x buffer is added.
     cond = Sequel.expr(committed_at: nil)
-    github_repository.cache_entries_dataset
-      .where { created_at < Time.now - 30 * 60 }
-      .where(cond)
-      .limit(200)
-      .destroy_where(cond)
+    github_repository.cache_entries_dataset.
+      where { created_at < Time.now - 30 * 60 }.
+      where(cond).
+      limit(200).
+      destroy_where(cond)
 
     # Destroy oldest cache entries if the total usage exceeds the limit.
     dataset = github_repository.cache_entries_dataset.exclude(size: nil)

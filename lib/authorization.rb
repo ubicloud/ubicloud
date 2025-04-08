@@ -18,16 +18,16 @@ module Authorization
   end
 
   def self.all_permissions(project_id, subject_id, object_id)
-    DB[:action_type]
-      .with(:action_ids, matched_policies_dataset(project_id, subject_id, nil, object_id).select(:action_id))
-      .with_recursive(:rec_action_ids,
+    DB[:action_type].
+      with(:action_ids, matched_policies_dataset(project_id, subject_id, nil, object_id).select(:action_id)).
+      with_recursive(:rec_action_ids,
         DB[:applied_action_tag].select(:action_id, 0).where(tag_id: DB[:action_ids]),
-        DB[:applied_action_tag].join(:rec_action_ids, action_id: :tag_id)
-          .select(Sequel[:applied_action_tag][:action_id], Sequel[:level] + 1)
-          .where { level < Config.recursive_tag_limit },
-        args: [:action_id, :level])
-      .where(Sequel.or([DB[:action_ids], DB[:rec_action_ids].select(:action_id)].map { [:id, _1] }) | DB[:action_ids].where(action_id: nil).exists)
-      .select_order_map(:name)
+        DB[:applied_action_tag].join(:rec_action_ids, action_id: :tag_id).
+          select(Sequel[:applied_action_tag][:action_id], Sequel[:level] + 1).
+          where { level < Config.recursive_tag_limit },
+        args: [:action_id, :level]).
+      where(Sequel.or([DB[:action_ids], DB[:rec_action_ids].select(:action_id)].map { [:id, _1] }) | DB[:action_ids].where(action_id: nil).exists).
+      select_order_map(:name)
   end
 
   # Used to avoid dynamic symbol creation at runtime
@@ -39,9 +39,9 @@ module Authorization
   private_class_method def self.recursive_tag_query(type, values, project_id: nil)
     table, column = RECURSIVE_TAG_QUERY_MAP.fetch(type, values)
 
-    base_ds = DB[table]
-      .select(:tag_id, 0)
-      .where(column => Sequel.any_uuid(values))
+    base_ds = DB[table].
+      select(:tag_id, 0).
+      where(column => Sequel.any_uuid(values))
 
     if project_id
       # We only look for applied_action_tag entries with an action_tag for the project or global action_tags.
@@ -50,19 +50,19 @@ module Authorization
       base_ds = base_ds.where(tag_id: DB[:action_tag].where(project_id:).or(project_id: nil).select(:id))
     end
 
-    DB[:tag]
-      .with_recursive(:tag,
+    DB[:tag].
+      with_recursive(:tag,
         base_ds,
-        DB[table].join(:tag, tag_id: column)
-          .select(Sequel[table][:tag_id], Sequel[:level] + 1)
-          .where { level < Config.recursive_tag_limit },
+        DB[table].join(:tag, tag_id: column).
+          select(Sequel[table][:tag_id], Sequel[:level] + 1).
+          where { level < Config.recursive_tag_limit },
         args: [:tag_id, :level]).select(:tag_id)
   end
 
   def self.matched_policies_dataset(project_id, subject_id, actions = nil, object_id = nil)
-    dataset = DB[:access_control_entry]
-      .where(project_id:)
-      .where(Sequel.or([subject_id, recursive_tag_query(:subject, subject_id)].map { [:subject_id, _1] }))
+    dataset = DB[:access_control_entry].
+      where(project_id:).
+      where(Sequel.or([subject_id, recursive_tag_query(:subject, subject_id)].map { [:subject_id, _1] }))
 
     if actions
       actions = Array(actions).map { ActionType::NAME_MAP.fetch(_1) }
@@ -114,12 +114,12 @@ module Authorization
     # We need to determine table of id explicitly.
     from = dataset.opts[:from].first
 
-    ds = DB[:object_ids]
-      .with_recursive(:object_ids,
+    ds = DB[:object_ids].
+      with_recursive(:object_ids,
         Authorization.matched_policies_dataset(project_id, subject_id, actions).select(:object_id, 0),
-        DB[:applied_object_tag].join(:object_ids, object_id: :tag_id)
-          .select(Sequel[:applied_object_tag][:object_id], Sequel[:level] + 1)
-          .where { level < Config.recursive_tag_limit },
+        DB[:applied_object_tag].join(:object_ids, object_id: :tag_id).
+          select(Sequel[:applied_object_tag][:object_id], Sequel[:level] + 1).
+          where { level < Config.recursive_tag_limit },
         args: [:object_id, :level]).select(:object_id)
 
     if dataset.model == ObjectTag
@@ -128,10 +128,10 @@ module Authorization
       # object tags will be found.  Convert non-metatag ids into UUIDs that would be invalid UBIDs,
       # preventing them from matching any existing ObjectTag instances.  This makes it so that users
       # authorized to manage members of the tag are not automatically authorized to manage the tag itself.
-      ds = ds
-        .select(Sequel.cast(:object_id, String))
-        .from_self
-        .select {
+      ds = ds.
+        select(Sequel.cast(:object_id, String)).
+        from_self.
+        select {
         Sequel.join([
           substr(:object_id, 0, 18),
           Sequel.case({"2" => "0"}, "3", substr(:object_id, 18, 1)),

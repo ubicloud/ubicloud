@@ -187,8 +187,8 @@ RSpec.describe Prog::Vm::GithubRunner do
       # Create a record
       nx.update_billing_record
 
-      expect { nx.update_billing_record }
-        .to change { BillingRecord[resource_id: project.id].amount }.from(5).to(10)
+      expect { nx.update_billing_record }.
+        to change { BillingRecord[resource_id: project.id].amount }.from(5).to(10)
     end
 
     it "create a new record for a new day" do
@@ -204,8 +204,8 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(github_runner).to receive(:ready_at).and_return(tomorrow - 5 * 60).at_least(:once)
       expect(BillingRecord).to receive(:create_with_id).and_call_original
       # Create tomorrow record
-      expect { nx.update_billing_record }
-        .to change { BillingRecord.where(resource_id: project.id).count }.from(1).to(2)
+      expect { nx.update_billing_record }.
+        to change { BillingRecord.where(resource_id: project.id).count }.from(1).to(2)
 
       expect(BillingRecord.where(resource_id: project.id).map(&:amount)).to eq([5, 5])
     end
@@ -459,12 +459,12 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "deletes the runner if the generate request fails due to 'already exists with the same name' error and the runner script does not start yet." do
-      expect(client).to receive(:post)
-        .with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label]))
-        .and_raise(Octokit::Conflict.new({body: "409 - Already exists - A runner with the name *** already exists."}))
-      expect(client).to receive(:paginate)
-        .and_yield({runners: [{name: github_runner.ubid.to_s, id: 123}]}, instance_double(Sawyer::Response, data: {runners: []}))
-        .and_return({runners: [{name: github_runner.ubid.to_s, id: 123}]})
+      expect(client).to receive(:post).
+        with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label])).
+        and_raise(Octokit::Conflict.new({body: "409 - Already exists - A runner with the name *** already exists."}))
+      expect(client).to receive(:paginate).
+        and_yield({runners: [{name: github_runner.ubid.to_s, id: 123}]}, instance_double(Sawyer::Response, data: {runners: []})).
+        and_return({runners: [{name: github_runner.ubid.to_s, id: 123}]})
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("dead")
       expect(client).to receive(:delete).with("/repos/#{github_runner.repository_name}/actions/runners/123")
       expect(Clog).to receive(:emit).with("Deregistering runner because it already exists").and_call_original
@@ -472,30 +472,30 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "hops to wait if the generate request fails due to 'already exists with the same name' error and the runner script is running" do
-      expect(client).to receive(:post)
-        .with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label]))
-        .and_raise(Octokit::Conflict.new({body: "409 - Already exists - A runner with the name *** already exists."}))
-      expect(client).to receive(:paginate)
-        .and_yield({runners: [{name: github_runner.ubid.to_s, id: 123}]}, instance_double(Sawyer::Response, data: {runners: []}))
-        .and_return({runners: [{name: github_runner.ubid.to_s, id: 123}]})
+      expect(client).to receive(:post).
+        with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label])).
+        and_raise(Octokit::Conflict.new({body: "409 - Already exists - A runner with the name *** already exists."}))
+      expect(client).to receive(:paginate).
+        and_yield({runners: [{name: github_runner.ubid.to_s, id: 123}]}, instance_double(Sawyer::Response, data: {runners: []})).
+        and_return({runners: [{name: github_runner.ubid.to_s, id: 123}]})
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(github_runner).to receive(:update).with(runner_id: 123, ready_at: anything)
       expect { nx.register_runner }.to hop("wait")
     end
 
     it "fails if the generate request fails due to 'already exists with the same name' error but couldn't find the runner" do
-      expect(client).to receive(:post)
-        .with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label]))
-        .and_raise(Octokit::Conflict.new({body: "409 - Already exists - A runner with the name *** already exists."}))
+      expect(client).to receive(:post).
+        with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label])).
+        and_raise(Octokit::Conflict.new({body: "409 - Already exists - A runner with the name *** already exists."}))
       expect(client).to receive(:paginate).and_return({runners: []})
       expect(client).not_to receive(:delete)
       expect { nx.register_runner }.to raise_error RuntimeError, "BUG: Failed with runner already exists error but couldn't find it"
     end
 
     it "fails if the generate request fails due to 'Octokit::Conflict' but it's not already exists error" do
-      expect(client).to receive(:post)
-        .with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label]))
-        .and_raise(Octokit::Conflict.new({body: "409 - Another issue"}))
+      expect(client).to receive(:post).
+        with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label])).
+        and_raise(Octokit::Conflict.new({body: "409 - Another issue"}))
       expect { nx.register_runner }.to raise_error Octokit::Conflict
     end
   end

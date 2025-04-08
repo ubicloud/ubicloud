@@ -136,10 +136,10 @@ class PostgresServer < Sequel::Model
   end
 
   def failover_target
-    target = resource.servers
-      .select { _1.standby? && _1.strand.label == "wait" && !_1.needs_recycling? }
-      .map { {server: _1, lsn: _1.run_query("SELECT pg_last_wal_receive_lsn()").chomp} }
-      .max_by { lsn2int(_1[:lsn]) }
+    target = resource.servers.
+      select { _1.standby? && _1.strand.label == "wait" && !_1.needs_recycling? }.
+      map { {server: _1, lsn: _1.run_query("SELECT pg_last_wal_receive_lsn()").chomp} }.
+      max_by { lsn2int(_1[:lsn]) }
 
     return nil if target.nil?
 
@@ -177,8 +177,8 @@ class PostgresServer < Sequel::Model
     DB.transaction do
       if pulse[:reading] == "up" && pulse[:reading_rpt] % 12 == 1
         begin
-          PostgresLsnMonitor.new(last_known_lsn: last_known_lsn) { _1.postgres_server_id = id }
-            .insert_conflict(
+          PostgresLsnMonitor.new(last_known_lsn: last_known_lsn) { _1.postgres_server_id = id }.
+            insert_conflict(
               target: :postgres_server_id,
               update: {last_known_lsn: last_known_lsn}
             ).save_changes

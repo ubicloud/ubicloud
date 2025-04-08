@@ -59,12 +59,12 @@ module Github
 
     Clog.emit("fetched deliveries") { {deliveries: {total: all_deliveries.count, page: page, since: since}} }
 
-    all_deliveries
-      .reject { _1[:delivered_at] < since }
-      .group_by { _1[:guid] }
-      .values
-      .reject { |group| group.any? { _1[:status] == "OK" } }
-      .map { |group| group.max_by { _1[:delivered_at] } }
+    all_deliveries.
+      reject { _1[:delivered_at] < since }.
+      group_by { _1[:guid] }.
+      values.
+      reject { |group| group.any? { _1[:status] == "OK" } }.
+      map { |group| group.max_by { _1[:delivered_at] } }
   end
 
   def self.redeliver_failed_deliveries(*)

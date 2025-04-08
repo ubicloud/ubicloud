@@ -146,10 +146,10 @@ class Clover < Roda
     # that users won't see higher price in their invoice compared
     # to price calculator and also we charge same amount no matter
     # the number of days in a given month.
-    BillingRate.rates.filter { resource_types.include?(_1["resource_type"]) }
-      .group_by { [_1["resource_type"], _1["resource_family"], _1["location"]] }
-      .map { |_, brs| brs.max_by { _1["active_from"] } }
-      .each_with_object(Hash.new { |h, k| h[k] = h.class.new(&h.default_proc) }) do |br, hash|
+    BillingRate.rates.filter { resource_types.include?(_1["resource_type"]) }.
+      group_by { [_1["resource_type"], _1["resource_family"], _1["location"]] }.
+      map { |_, brs| brs.max_by { _1["active_from"] } }.
+      each_with_object(Hash.new { |h, k| h[k] = h.class.new(&h.default_proc) }) do |br, hash|
       hash[br["location"]][br["resource_type"]][br["resource_family"]] = {
         hourly: br["unit_price"].to_f * 60,
         monthly: br["unit_price"].to_f * 60 * 672

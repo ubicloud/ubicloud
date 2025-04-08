@@ -43,12 +43,12 @@ class Project < Sequel::Model
   end
 
   def default_location
-    location_max_capacity = DB[:vm_host]
-      .join(:location, id: :location_id)
-      .where(allocation_state: "accepting")
-      .select_group(:location_id)
-      .order { sum(Sequel[:total_cores] - Sequel[:used_cores]).desc }
-      .first
+    location_max_capacity = DB[:vm_host].
+      join(:location, id: :location_id).
+      where(allocation_state: "accepting").
+      select_group(:location_id).
+      order { sum(Sequel[:total_cores] - Sequel[:used_cores]).desc }.
+      first
 
     if location_max_capacity.nil?
       Location.find(visible: true).display_name

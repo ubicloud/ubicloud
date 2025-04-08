@@ -136,8 +136,8 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
     elsif actual_replica_count > desired_replica_count
       victims = replicas.select {
                   !(_1.destroy_set? || _1.strand.label == "destroy")
-                }
-        .sort_by { |r|
+                }.
+        sort_by { |r|
         [(r.strand.label == "wait") ? 1 : 0, r.created_at]
       }.take(actual_replica_count - desired_replica_count)
       victims.each(&:incr_destroy)

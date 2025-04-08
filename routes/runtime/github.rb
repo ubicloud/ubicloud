@@ -24,14 +24,14 @@ class Clover
         scopes.compact!
         scopes.uniq!
 
-        dataset = dataset.where(scope: scopes)
-          .order(Sequel.case(scopes.map.with_index { |scope, idx| [{scope:}, idx] }.to_h, scopes.length))
+        dataset = dataset.where(scope: scopes).
+          order(Sequel.case(scopes.map.with_index { |scope, idx| [{scope:}, idx] }.to_h, scopes.length))
       end
 
-      entry = dataset
-        .where(key: keys)
-        .order_append(Sequel.case(keys.map.with_index { |key, idx| [{key:}, idx] }.to_h, keys.length))
-        .first
+      entry = dataset.
+        where(key: keys).
+        order_append(Sequel.case(keys.map.with_index { |key, idx| [{key:}, idx] }.to_h, keys.length)).
+        first
 
       # GitHub cache supports prefix match if the key doesn't match exactly.
       # From their docs:
@@ -41,10 +41,10 @@ class Clover
       #
       # We still prioritize scope over key in this case, and if there are
       # multiple prefix matches for a key, this chooses the most recent.
-      entry ||= dataset
-        .grep(:key, keys.map { |key| "#{DB.dataset.escape_like(key)}%" })
-        .order_append(Sequel.case(keys.map.with_index { |key, idx| [Sequel.like(:key, "#{DB.dataset.escape_like(key)}%"), idx] }.to_h, keys.length), Sequel.desc(:created_at))
-        .first
+      entry ||= dataset.
+        grep(:key, keys.map { |key| "#{DB.dataset.escape_like(key)}%" }).
+        order_append(Sequel.case(keys.map.with_index { |key, idx| [Sequel.like(:key, "#{DB.dataset.escape_like(key)}%"), idx] }.to_h, keys.length), Sequel.desc(:created_at)).
+        first
 
       entry_updated = entry && entry.this.update(last_accessed_at: Sequel::CURRENT_TIMESTAMP, last_accessed_by: runner.id) == 1
 
@@ -69,10 +69,10 @@ class Clover
         fail CloverError.new(204, "NotFound", "No cache entry") if key.nil?
 
         scopes = [runner.workflow_job&.dig("head_branch"), repository.default_branch].compact
-        entries = repository.cache_entries_dataset
-          .exclude(committed_at: nil)
-          .where(key: key, scope: scopes)
-          .order(:version).all
+        entries = repository.cache_entries_dataset.
+          exclude(committed_at: nil).
+          where(key: key, scope: scopes).
+          order(:version).all
 
         {
           totalCount: entries.count,

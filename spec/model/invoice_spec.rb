@@ -91,10 +91,10 @@ RSpec.describe Invoice do
       payment_method2 = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_2", order: 2)
 
       # rubocop:disable RSpec/VerifiedDoubles
-      expect(Stripe::PaymentIntent).to receive(:create).with(hash_including(amount: 1000, customer: billing_info.stripe_id, payment_method: payment_method1.stripe_id))
-        .and_raise(Stripe::CardError.new("Unsufficient funds", {}))
-      expect(Stripe::PaymentIntent).to receive(:create).with(hash_including(amount: 1000, customer: billing_info.stripe_id, payment_method: payment_method2.stripe_id))
-        .and_raise(Stripe::CardError.new("Card declined", {}))
+      expect(Stripe::PaymentIntent).to receive(:create).with(hash_including(amount: 1000, customer: billing_info.stripe_id, payment_method: payment_method1.stripe_id)).
+        and_raise(Stripe::CardError.new("Unsufficient funds", {}))
+      expect(Stripe::PaymentIntent).to receive(:create).with(hash_including(amount: 1000, customer: billing_info.stripe_id, payment_method: payment_method2.stripe_id)).
+        and_raise(Stripe::CardError.new("Card declined", {}))
       # rubocop:enable RSpec/VerifiedDoubles
       expect(Clog).to receive(:emit).with("Invoice couldn't charged.").and_call_original.twice
       expect(Clog).to receive(:emit).with("Invoice couldn't charged with any payment method.").and_call_original
@@ -107,8 +107,8 @@ RSpec.describe Invoice do
       payment_method = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_1", order: 1)
 
       # rubocop:disable RSpec/VerifiedDoubles
-      expect(Stripe::PaymentIntent).to receive(:create).with(hash_including(amount: 1000, customer: billing_info.stripe_id, payment_method: payment_method.stripe_id))
-        .and_return(double(Stripe::PaymentIntent, id: "payment-intent-id", status: "failed"))
+      expect(Stripe::PaymentIntent).to receive(:create).with(hash_including(amount: 1000, customer: billing_info.stripe_id, payment_method: payment_method.stripe_id)).
+        and_return(double(Stripe::PaymentIntent, id: "payment-intent-id", status: "failed"))
       # rubocop:enable RSpec/VerifiedDoubles
       expect(Clog).to receive(:emit).with("BUG: payment intent should succeed here").and_call_original
       expect(Clog).to receive(:emit).with("Invoice couldn't charged with any payment method.").and_call_original
@@ -122,10 +122,10 @@ RSpec.describe Invoice do
       payment_method2 = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_2", created_at: Time.now + 10)
       payment_method3 = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_3", created_at: Time.now)
       # rubocop:disable RSpec/VerifiedDoubles
-      expect(Stripe::PaymentIntent).to receive(:create).with(hash_including(amount: 1000, customer: billing_info.stripe_id, payment_method: payment_method1.stripe_id))
-        .and_raise(Stripe::CardError.new("Declined", {}))
-      expect(Stripe::PaymentIntent).to receive(:create).with(hash_including(amount: 1000, customer: billing_info.stripe_id, payment_method: payment_method2.stripe_id))
-        .and_return(double(Stripe::PaymentIntent, status: "succeeded", id: "pi_1234567890"))
+      expect(Stripe::PaymentIntent).to receive(:create).with(hash_including(amount: 1000, customer: billing_info.stripe_id, payment_method: payment_method1.stripe_id)).
+        and_raise(Stripe::CardError.new("Declined", {}))
+      expect(Stripe::PaymentIntent).to receive(:create).with(hash_including(amount: 1000, customer: billing_info.stripe_id, payment_method: payment_method2.stripe_id)).
+        and_return(double(Stripe::PaymentIntent, status: "succeeded", id: "pi_1234567890"))
       expect(Stripe::PaymentIntent).not_to receive(:create).with(hash_including(payment_method: payment_method3.stripe_id))
       # rubocop:enable RSpec/VerifiedDoubles
       expect(invoice).to receive(:save).with(columns: [:status, :content])

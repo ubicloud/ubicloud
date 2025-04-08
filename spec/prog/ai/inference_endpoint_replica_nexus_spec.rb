@@ -151,8 +151,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
     it "creates a pod for runpod" do
       expect(inference_endpoint).to receive(:engine).and_return "runpod"
       expect(Config).to receive(:operator_ssh_public_keys).and_return "operator ssh key"
-      stub_request(:post, "https://api.runpod.io/graphql")
-        .with(
+      stub_request(:post, "https://api.runpod.io/graphql").
+        with(
           body: "{\"query\":\"query Pods { myself { pods { id name runtime  { ports { ip isIpPublic privatePort publicPort type } } } } }\"}",
           headers: {
             "Accept-Encoding" => "deflate, gzip",
@@ -160,11 +160,11 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
             "Content-Type" => "application/json",
             "Host" => "api.runpod.io"
           }
-        )
-        .to_return(status: 200, body: {data: {myself: {pods: []}}}.to_json, headers: {})
+        ).
+        to_return(status: 200, body: {data: {myself: {pods: []}}}.to_json, headers: {})
 
-      stub_request(:post, "https://api.runpod.io/graphql")
-        .with(
+      stub_request(:post, "https://api.runpod.io/graphql").
+        with(
           body: "{\"query\":\"mutation {\\n  podFindAndDeployOnDemand(\\n    input: {\\n      cloudType: ALL\\n      dataCenterId: \\\"\\\"\\n      gpuCount: \\n      gpuTypeId: \\\"\\\"\\n      containerDiskInGb: \\n      minVcpuCount: \\n      minMemoryInGb: \\n      imageName: \\\"\\\"\\n      name: \\\"#{replica.ubid}\\\"\\n      volumeInGb: 0\\n      ports: \\\"22/tcp\\\"\\n      env: [\\n        { key: \\\"HF_TOKEN\\\", value: \\\"\\\" },\\n        { key: \\\"HF_HUB_ENABLE_HF_TRANSFER\\\", value: \\\"1\\\"},\\n        { key: \\\"MODEL_PATH\\\", value: \\\"/model\\\"},\\n        { key: \\\"MODEL_NAME_HF\\\", value: \\\"\\\"},\\n        { key: \\\"VLLM_PARAMS\\\", value: \\\"--served-model-name test-model --disable-log-requests --host 127.0.0.1 --some-params\\\"},\\n        { key: \\\"SSH_KEYS\\\", value: \\\"vm ssh key\\\\noperator ssh key\\\" }\\n      ]\\n    }\\n  ) {\\n    id\\n    imageName\\n    env\\n    machineId\\n    machine {\\n      podHostId\\n    }\\n  }\\n}\\n\"}",
           headers: {
             "Accept-Encoding" => "deflate, gzip",
@@ -172,8 +172,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
             "Content-Type" => "application/json",
             "Host" => "api.runpod.io"
           }
-        )
-        .to_return(status: 200, body: {"data" => {"podFindAndDeployOnDemand" => {"id" => "thepodid"}}}.to_json, headers: {})
+        ).
+        to_return(status: 200, body: {"data" => {"podFindAndDeployOnDemand" => {"id" => "thepodid"}}}.to_json, headers: {})
       expect(replica).to receive(:update).with(external_state: {"pod_id" => "thepodid"})
       expect(sshable).to receive(:cmd).and_return("vm ssh key\n")
       expect { nx.setup_external }.to nap(10)
@@ -181,8 +181,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
     it "does not create a pod if one already exists" do
       expect(inference_endpoint).to receive(:engine).and_return "runpod"
-      stub_request(:post, "https://api.runpod.io/graphql")
-        .with(
+      stub_request(:post, "https://api.runpod.io/graphql").
+        with(
           body: "{\"query\":\"query Pods { myself { pods { id name runtime  { ports { ip isIpPublic privatePort publicPort type } } } } }\"}",
           headers: {
             "Accept-Encoding" => "deflate, gzip",
@@ -190,8 +190,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
             "Content-Type" => "application/json",
             "Host" => "api.runpod.io"
           }
-        )
-        .to_return(status: 200, body: {"data" => {"myself" => {"pods" => [{"name" => replica.ubid.to_s, "id" => "thepodid"}]}}}.to_json, headers: {})
+        ).
+        to_return(status: 200, body: {"data" => {"myself" => {"pods" => [{"name" => replica.ubid.to_s, "id" => "thepodid"}]}}}.to_json, headers: {})
 
       expect(replica).to receive(:update).with(external_state: {"pod_id" => "thepodid"})
       expect { nx.setup_external }.to nap(10)
@@ -200,8 +200,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
     it "hops to setup for runpod" do
       expect(inference_endpoint).to receive(:engine).and_return "runpod"
       allow(replica).to receive(:external_state).and_return({"pod_id" => "thepodid"})
-      stub_request(:post, "https://api.runpod.io/graphql")
-        .with(
+      stub_request(:post, "https://api.runpod.io/graphql").
+        with(
           body: "{\"query\":\"query Pod { pod(input: {podId: \\\"thepodid\\\"}) { id name runtime  { ports { ip isIpPublic privatePort publicPort type } } } }\"}",
           headers: {
             "Accept-Encoding" => "deflate, gzip",
@@ -209,8 +209,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
             "Content-Type" => "application/json",
             "Host" => "api.runpod.io"
           }
-        )
-        .to_return(status: 200, body: {"data" => {"pod" => {"id" => "thepodid", "runtime" => {"ports" => [{"type" => "tcp", "isIpPublic" => true, "publicPort" => 1234, "ip" => "1.2.3.4"}]}}}}.to_json, headers: {})
+        ).
+        to_return(status: 200, body: {"data" => {"pod" => {"id" => "thepodid", "runtime" => {"ports" => [{"type" => "tcp", "isIpPublic" => true, "publicPort" => 1234, "ip" => "1.2.3.4"}]}}}}.to_json, headers: {})
 
       expect(replica).to receive(:update).with(external_state: {ip: "1.2.3.4", pod_id: "thepodid", port: 1234})
       expect { nx.setup_external }.to hop("setup")
@@ -219,8 +219,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
     it "waits until runpod ip and port are available" do
       expect(inference_endpoint).to receive(:engine).and_return "runpod"
       allow(replica).to receive(:external_state).and_return({"pod_id" => "thepodid"})
-      stub_request(:post, "https://api.runpod.io/graphql")
-        .with(
+      stub_request(:post, "https://api.runpod.io/graphql").
+        with(
           body: "{\"query\":\"query Pod { pod(input: {podId: \\\"thepodid\\\"}) { id name runtime  { ports { ip isIpPublic privatePort publicPort type } } } }\"}",
           headers: {
             "Accept-Encoding" => "deflate, gzip",
@@ -228,16 +228,16 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
             "Content-Type" => "application/json",
             "Host" => "api.runpod.io"
           }
-        )
-        .to_return(status: 200, body: {"data" => {"pod" => {"id" => "thepodid", "runtime" => {"ports" => [{"type" => "tcp", "isIpPublic" => false, "publicPort" => 1234, "ip" => "1.2.3.4"}]}}}}.to_json, headers: {})
+        ).
+        to_return(status: 200, body: {"data" => {"pod" => {"id" => "thepodid", "runtime" => {"ports" => [{"type" => "tcp", "isIpPublic" => false, "publicPort" => 1234, "ip" => "1.2.3.4"}]}}}}.to_json, headers: {})
       expect { nx.setup_external }.to nap(10)
     end
 
     it "raises an error if runpod pod id is unexpected" do
       expect(inference_endpoint).to receive(:engine).and_return "runpod"
       allow(replica).to receive(:external_state).and_return({"pod_id" => "thepodid"})
-      stub_request(:post, "https://api.runpod.io/graphql")
-        .with(
+      stub_request(:post, "https://api.runpod.io/graphql").
+        with(
           body: "{\"query\":\"query Pod { pod(input: {podId: \\\"thepodid\\\"}) { id name runtime  { ports { ip isIpPublic privatePort publicPort type } } } }\"}",
           headers: {
             "Accept-Encoding" => "deflate, gzip",
@@ -245,16 +245,16 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
             "Content-Type" => "application/json",
             "Host" => "api.runpod.io"
           }
-        )
-        .to_return(status: 200, body: {"data" => {"pod" => {"id" => "anotherpodid", "runtime" => {"ports" => [{"type" => "tcp", "isIpPublic" => false, "publicPort" => 1234, "ip" => "1.2.3.4"}]}}}}.to_json, headers: {})
+        ).
+        to_return(status: 200, body: {"data" => {"pod" => {"id" => "anotherpodid", "runtime" => {"ports" => [{"type" => "tcp", "isIpPublic" => false, "publicPort" => 1234, "ip" => "1.2.3.4"}]}}}}.to_json, headers: {})
       expect { nx.setup_external }.to raise_error("BUG: unexpected pod id")
     end
 
     it "raises an error if pod cannot be found" do
       expect(inference_endpoint).to receive(:engine).and_return "runpod"
       allow(replica).to receive(:external_state).and_return({"pod_id" => "thepodid"})
-      stub_request(:post, "https://api.runpod.io/graphql")
-        .with(
+      stub_request(:post, "https://api.runpod.io/graphql").
+        with(
           body: "{\"query\":\"query Pod { pod(input: {podId: \\\"thepodid\\\"}) { id name runtime  { ports { ip isIpPublic privatePort publicPort type } } } }\"}",
           headers: {
             "Accept-Encoding" => "deflate, gzip",
@@ -262,8 +262,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
             "Content-Type" => "application/json",
             "Host" => "api.runpod.io"
           }
-        )
-        .to_return(status: 200, body: {"data" => {}}.to_json, headers: {})
+        ).
+        to_return(status: 200, body: {"data" => {}}.to_json, headers: {})
       expect { nx.setup_external }.to raise_error("BUG: pod not found")
     end
   end
@@ -402,8 +402,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
       expect(lb).to receive(:remove_vm).with(vm)
       expect(replica).to receive(:external_state).and_return({"pod_id" => "thepodid"})
 
-      stub_request(:post, "https://api.runpod.io/graphql")
-        .with(
+      stub_request(:post, "https://api.runpod.io/graphql").
+        with(
           body: "{\"query\":\"mutation { podTerminate(input: {podId: \\\"thepodid\\\"}) }\"}",
           headers: {
             "Accept-Encoding" => "deflate, gzip",
@@ -411,8 +411,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
             "Content-Type" => "application/json",
             "Host" => "api.runpod.io"
           }
-        )
-        .to_return(status: 200, body: "", headers: {})
+        ).
+        to_return(status: 200, body: "", headers: {})
 
       expect(replica).to receive(:update).with(external_state: "{}")
       expect(vm).to receive(:incr_destroy)

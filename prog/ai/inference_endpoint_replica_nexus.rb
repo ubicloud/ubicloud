@@ -180,22 +180,22 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
 
   # pushes latest config to inference gateway and collects billing information
   def ping_gateway
-    api_key_ds = DB[:api_key]
-      .where(owner_table: "project")
-      .where(used_for: "inference_endpoint")
-      .where(is_valid: true)
-      .where(owner_id: Sequel[:project][:id])
-      .exists
+    api_key_ds = DB[:api_key].
+      where(owner_table: "project").
+      where(used_for: "inference_endpoint").
+      where(is_valid: true).
+      where(owner_id: Sequel[:project][:id]).
+      exists
 
     eligible_projects_ds = Project.where(api_key_ds)
     free_quota_exhausted_projects_ds = FreeQuota.get_exhausted_projects("inference-tokens")
     eligible_projects_ds = eligible_projects_ds.where(id: inference_endpoint.project.id) unless inference_endpoint.is_public
-    eligible_projects_ds = eligible_projects_ds
-      .exclude(billing_info_id: nil, credit: 0.0, id: free_quota_exhausted_projects_ds)
+    eligible_projects_ds = eligible_projects_ds.
+      exclude(billing_info_id: nil, credit: 0.0, id: free_quota_exhausted_projects_ds)
 
-    eligible_projects = eligible_projects_ds.all
-      .select(&:active?)
-      .map do
+    eligible_projects = eligible_projects_ds.all.
+      select(&:active?).
+      map do
       {
         ubid: _1.ubid,
         api_keys: _1.api_keys.select { |k| k.used_for == "inference_endpoint" && k.is_valid }.map { |k| Digest::SHA2.hexdigest(k.key) },
@@ -231,10 +231,10 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       project = Project.from_ubid(usage["ubid"])
 
       begin
-        today_record = BillingRecord
-          .where(project_id: project.id, resource_id: inference_endpoint.id, billing_rate_id: rate_id)
-          .where { Sequel.pg_range(_1.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
-          .first
+        today_record = BillingRecord.
+          where(project_id: project.id, resource_id: inference_endpoint.id, billing_rate_id: rate_id).
+          where { Sequel.pg_range(_1.span).overlaps(Sequel.pg_range(begin_time...end_time)) }.
+          first
 
         if today_record
           today_record.amount = Sequel[:amount] + tokens
