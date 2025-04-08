@@ -29,17 +29,21 @@ class Prog::Aws::Nic < Prog::Base
     network_interface_response = client.describe_network_interfaces({filters: [{name: "network-interface-id", values: [nic.name]}, {name: "tag:Ubicloud", values: ["true"]}]}).network_interfaces[0]
     if network_interface_response.status == "available"
       eip_response = client.allocate_address
+      nic.nic_aws_resource.update(eip_allocation_id: eip_response.allocation_id)
 
-      # Associate the Elastic IP with your network interface
-      client.associate_address({
-        allocation_id: eip_response.allocation_id,
-        network_interface_id: nic.name
-      })
-
-      pop "nic created"
+      hop_attach_eip_network_interface
     end
 
     nap 1
+  end
+
+  label def attach_eip_network_interface
+    # Associate the Elastic IP with your network interface
+    client.associate_address({
+      allocation_id: nic.nic_aws_resource.eip_allocation_id,
+      network_interface_id: nic.name
+    })
+    pop "nic created"
   end
 
   label def destroy
@@ -50,10 +54,12 @@ class Prog::Aws::Nic < Prog::Base
   end
 
   label def release_eip
-    ignore_invalid_nic do
-      if (eip_response = client.describe_addresses({filters: [{name: "network-interface-id", values: [nic.name]}]}).addresses[0])
-        client.release_address({allocation_id: eip_response.allocation_id})
-      end
+    begin
+      client.release_address({allocation_id: nic.nic_aws_resource.eip_allocation_id})
+    rescue Aws::EC2::Errors::InvalidAllocationIDNotFound
+      # Ignore if the address is not found
+      # This can happen if the address was already released or never existed
+      # In this case, we just pop the stack
     end
     pop "nic destroyed"
   end
