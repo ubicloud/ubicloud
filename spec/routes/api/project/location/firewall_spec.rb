@@ -58,7 +58,7 @@ RSpec.describe Clover, "firewall" do
     it "get does not exist for invalid name" do
       get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/foo_name"
 
-      expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+      expect(last_response).to have_api_error(404, 'Parameter "foo_name" does not match pattern ^[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$')
     end
 
     it "get does not exist for valid name" do
@@ -107,7 +107,7 @@ RSpec.describe Clover, "firewall" do
     it "delete for invalid ubid format" do
       delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_foo_ubid"
 
-      expect(last_response.status).to eq(204)
+      expect(last_response.status).to eq(404)
       expect(firewall).to exist
     end
 

@@ -213,10 +213,10 @@ RSpec.describe Clover, "private_subnet" do
         expect(SemSnap.new(ps.id).set?("destroy")).to be true
       end
 
-      it "not exist" do
+      it "not exist for invalid name" do
         delete "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/foo_name"
 
-        expect(last_response.status).to eq(204)
+        expect(last_response.status).to eq(404)
         expect(SemSnap.new(ps.id).set?("destroy")).to be false
       end
 

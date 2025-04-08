@@ -419,10 +419,10 @@ RSpec.describe Clover, "postgres" do
         expect(SemSnap.new(pg.id).set?("destroy")).to be false
       end
 
-      it "not exist ubid" do
+      it "invalid reference" do
         delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_fooubid"
 
-        expect(last_response.status).to eq(204)
+        expect(last_response.status).to eq(404)
         expect(SemSnap.new(pg.id).set?("destroy")).to be false
       end
 
