@@ -43,7 +43,7 @@ RSpec.describe "bin/ubi" do
   # rubocop:enable RSpec/BeforeAfterAll
 
   it "returns error if there is no UBI_TOKEN provided" do
-    o, e, s = Open3.capture3(@prog, "foo")
+    o, e, s = Open3.capture3(@env.merge("UBI_TOKEN" => nil), @prog, "foo")
     expect(o).to eq ""
     expect(e).to eq "! Personal access token must be provided in UBI_TOKEN env variable for use\n"
     expect(s.exitstatus).to eq 1
