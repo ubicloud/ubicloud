@@ -80,7 +80,7 @@ module ThawedMock
   allow_mocking(StorageKeyEncryptionKey, :create)
   allow_mocking(Strand, :create, :create_with_id)
   allow_mocking(UsageAlert, :where)
-  allow_mocking(VmHost, :[])
+  allow_mocking(VmHost, :[], :where)
   allow_mocking(Vm, :[], :where, :generate_ubid)
   allow_mocking(VmPool, :[], :where)
   allow_mocking(VmHostCpu, :create)
