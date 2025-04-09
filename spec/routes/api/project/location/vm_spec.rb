@@ -66,7 +66,7 @@ RSpec.describe Clover, "vm" do
       it "ubid not exist" do
         get "/project/#{project.ubid}/location/#{vm.display_location}/vm/_foo_ubid"
 
-        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+        expect(last_response).to have_api_error(404, 'Parameter "_foo_ubid" does not match pattern ^[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$')
       end
 
       it "location not exist" do
@@ -280,10 +280,10 @@ RSpec.describe Clover, "vm" do
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
       end
 
-      it "not exist ubid" do
-        delete "/project/#{project.ubid}/location/#{vm.display_location}/vm/_foo_ubid"
+      it "not exist invalid name" do
+        delete "/project/#{project.ubid}/location/#{vm.display_location}/vm/foo_name"
 
-        expect(last_response.status).to eq(204)
+        expect(last_response.status).to eq(404)
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
       end
 

@@ -180,6 +180,12 @@ class Clover < Roda
       when JSON::ParserError
         message = "Validation failed for following fields: body"
         details = {"body" => "Request body isn't a valid JSON object."}
+      when OpenAPIParser::InvalidPattern
+        pattern = e.original_error.instance_variable_get(:@pattern)
+        value = e.original_error.instance_variable_get(:@value)
+        code = 404
+        type = "ResourceNotFound"
+        message = "Parameter #{value.inspect} does not match pattern #{pattern}"
       when OpenAPIParser::NotExistPropertyDefinition
         keys = e.original_error.instance_variable_get(:@keys)
         message = "Validation failed for following fields: body"
@@ -202,7 +208,7 @@ class Clover < Roda
       message = "Sorry, we couldn’t process your request because of an unexpected error."
     end
 
-    raise e if Config.test? && e.is_a?(Committee::Error)
+    raise e if Config.test? && e.is_a?(Committee::Error) && code != 404
 
     response.status = code
     next if code == 204

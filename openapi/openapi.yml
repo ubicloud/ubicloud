@@ -156,10 +156,10 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/firewall/{firewall_name}':
+  '/project/{project_id}/firewall/{firewall_reference}':
     parameters:
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_reference'
     delete:
       operationId: deleteFirewall
       summary: Delete a specific firewall
@@ -180,10 +180,10 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/firewall/{firewall_name}/firewall-rule':
+  '/project/{project_id}/firewall/{firewall_reference}/firewall-rule':
     parameters:
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_reference'
     post:
       operationId: createFirewallRule
       summary: Create a new firewall rule
@@ -214,10 +214,10 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
-  '/project/{project_id}/firewall/{firewall_name}/firewall-rule/{firewall_rule_id}':
+  '/project/{project_id}/firewall/{firewall_reference}/firewall-rule/{firewall_rule_id}':
     parameters:
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_reference'
       - $ref: '#/components/parameters/firewall_rule_id'
     delete:
       operationId: deleteFirewallRule
@@ -255,10 +255,10 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
-  '/project/{project_id}/load-balancer/{load_balancer_name}':
+  '/project/{project_id}/load-balancer/{load_balancer_reference}':
     parameters:
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/load_balancer_name'
+      - $ref: '#/components/parameters/load_balancer_reference'
     get:
       operationId: getLoadBalancer
       summary: Get details of a specific Load Balancer
@@ -328,11 +328,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/location/{location}/firewall/{firewall_name}':
+  '/project/{project_id}/location/{location}/firewall/{firewall_reference}':
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_reference'
     delete:
       operationId: deleteLocationFirewall
       summary: Delete a specific firewall
@@ -374,11 +374,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/location/{location}/firewall/{firewall_name}/attach-subnet':
+  '/project/{project_id}/location/{location}/firewall/{firewall_reference}/attach-subnet':
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_reference'
     post:
       operationId: actionLocationFirewallAttachSubnet
       summary: Attach a subnet to firewall
@@ -402,11 +402,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/location/{location}/firewall/{firewall_name}/detach-subnet':
+  '/project/{project_id}/location/{location}/firewall/{firewall_reference}/detach-subnet':
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_reference'
     post:
       operationId: actionLocationFirewallDetachSubnet
       summary: Detach a subnet from firewall
@@ -430,9 +430,9 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/location/{location}/firewall/{firewall_name}/firewall-rule':
+  '/project/{project_id}/location/{location}/firewall/{firewall_reference}/firewall-rule':
     parameters:
-      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_reference'
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/project_id'
     post:
@@ -465,11 +465,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
-  '/project/{project_id}/location/{location}/firewall/{firewall_name}/firewall-rule/{firewall_rule_id}':
+  '/project/{project_id}/location/{location}/firewall/{firewall_reference}/firewall-rule/{firewall_rule_id}':
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_reference'
       - $ref: '#/components/parameters/firewall_rule_id'
     delete:
       operationId: deleteLocationFirewallFirewallRule
@@ -538,11 +538,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
-  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_name}':
+  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_reference}':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/load_balancer_name'
+      - $ref: '#/components/parameters/load_balancer_reference'
     delete:
       operationId: deleteLoadBalancer
       summary: Delete a specific Load Balancer
@@ -646,11 +646,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
-  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_name}/attach-vm':
+  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_reference}/attach-vm':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/load_balancer_name'
+      - $ref: '#/components/parameters/load_balancer_reference'
     post:
       operationId: attachVmLocationLoadBalancer
       summary: Attach a VM to a Load Balancer in a specific location of a project
@@ -674,11 +674,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
-  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_name}/detach-vm':
+  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_reference}/detach-vm':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/load_balancer_name'
+      - $ref: '#/components/parameters/load_balancer_reference'
     post:
       operationId: detachVmLocationLoadBalancer
       summary: Detach a VM from a Load Balancer in a specific location of a project
@@ -719,11 +719,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}':
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_name'
+      - $ref: '#/components/parameters/postgres_database_reference'
     delete:
       operationId: deletePostgresDatabase
       summary: Delete a specific Postgres Database
@@ -806,11 +806,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/ca-certificates':
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/ca-certificates':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_name'
+      - $ref: '#/components/parameters/postgres_database_reference'
     get:
       operationId: getPostgresCACertificatesByName
       summary: Download CA certificates for a specific Postgres Database in a location with name
@@ -827,171 +827,6 @@ paths:
               schema:
                 type: string
                 format: binary
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/firewall-rule/{firewall_rule_id}':
-    parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_name'
-      - $ref: '#/components/parameters/postgres_firewall_rule_id'
-    delete:
-      operationId: deleteLocationPostgresFirewallRule
-      summary: Delete a specific firewall rule
-      responses:
-        '204':
-          $ref: '#/components/responses/Delete'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Firewall Rule
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/metric-destination':
-    parameters:
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_name'
-      - $ref: '#/components/parameters/project_id'
-    post:
-      operationId: createLocationPostgresMetricDestination
-      summary: Create a new Postgres Metric Destination
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                password:
-                  description: Password for the Metric Destination
-                  type: string
-                url:
-                  description: URL for the Metric Destination
-                  type: string
-                username:
-                  description: Username for the Metric Destination
-                  type: string
-              additionalProperties: false
-              required:
-                - password
-                - url
-                - username
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresDatabase'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Metric Destination
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/metric-destination/{metric_destination_id}':
-    parameters:
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/metric_destination_id'
-      - $ref: '#/components/parameters/postgres_database_name'
-      - $ref: '#/components/parameters/project_id'
-    delete:
-      operationId: deleteLocationPostgresMetricDestination
-      summary: Delete a specific Metric Destination
-      responses:
-        '204':
-          $ref: '#/components/responses/Delete'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Metric Destination
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/reset-superuser-password':
-    post:
-      operationId: resetSuperuserPassword
-      summary: Reset superuser password of the Postgres database
-      parameters:
-        - $ref: '#/components/parameters/project_id'
-        - $ref: '#/components/parameters/location'
-        - $ref: '#/components/parameters/postgres_database_name'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                password:
-                  type: string
-              additionalProperties: false
-              required:
-                - password
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresDatabase'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/restart':
-    parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_name'
-    post:
-      operationId: restartPostgresDatabase
-      summary: Restart a specific Postgres Database
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresDatabase'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/restore':
-    post:
-      operationId: restorePostgresDatabase
-      summary: Restore a new Postgres database in a specific location of a project
-      parameters:
-        - $ref: '#/components/parameters/project_id'
-        - $ref: '#/components/parameters/location'
-        - $ref: '#/components/parameters/postgres_database_name'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                restore_target:
-                  type: string
-              additionalProperties: false
-              required:
-                - name
-                - restore_target
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresDatabase'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres Database
-  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/set-maintenance-window':
-    post:
-      operationId: setMaintenanceWindow
-      summary: Set maintenance window for the Postgres database
-      parameters:
-        - $ref: '#/components/parameters/project_id'
-        - $ref: '#/components/parameters/location'
-        - $ref: '#/components/parameters/postgres_database_name'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                maintenance_window_start_at:
-                  type: integer
-              additionalProperties: false
-      responses:
-        '200':
-          $ref: '#/components/responses/PostgresDatabase'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1034,6 +869,171 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Firewall Rule
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/firewall-rule/{firewall_rule_id}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+      - $ref: '#/components/parameters/postgres_firewall_rule_id'
+    delete:
+      operationId: deleteLocationPostgresFirewallRule
+      summary: Delete a specific firewall rule
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/metric-destination':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+      - $ref: '#/components/parameters/project_id'
+    post:
+      operationId: createLocationPostgresMetricDestination
+      summary: Create a new Postgres Metric Destination
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  description: Password for the Metric Destination
+                  type: string
+                url:
+                  description: URL for the Metric Destination
+                  type: string
+                username:
+                  description: Username for the Metric Destination
+                  type: string
+              additionalProperties: false
+              required:
+                - password
+                - url
+                - username
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Metric Destination
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/metric-destination/{metric_destination_id}':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/metric_destination_id'
+      - $ref: '#/components/parameters/postgres_database_reference'
+      - $ref: '#/components/parameters/project_id'
+    delete:
+      operationId: deleteLocationPostgresMetricDestination
+      summary: Delete a specific Metric Destination
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Metric Destination
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/reset-superuser-password':
+    post:
+      operationId: resetSuperuserPassword
+      summary: Reset superuser password of the Postgres database
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_reference'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+              additionalProperties: false
+              required:
+                - password
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/restart':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    post:
+      operationId: restartPostgresDatabase
+      summary: Restart a specific Postgres Database
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/restore':
+    post:
+      operationId: restorePostgresDatabase
+      summary: Restore a new Postgres database in a specific location of a project
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_reference'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                restore_target:
+                  type: string
+              additionalProperties: false
+              required:
+                - name
+                - restore_target
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/set-maintenance-window':
+    post:
+      operationId: setMaintenanceWindow
+      summary: Set maintenance window for the Postgres database
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_reference'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                maintenance_window_start_at:
+                  type: integer
+              additionalProperties: false
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   '/project/{project_id}/location/{location}/private-subnet':
     get:
       operationId: listLocationPrivateSubnets
@@ -1051,11 +1051,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
-  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_name}':
+  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_reference}':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/private_subnet_name'
+      - $ref: '#/components/parameters/private_subnet_reference'
     delete:
       operationId: deletePrivateSubnet
       summary: Delete a specific Private Subnet
@@ -1096,11 +1096,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
-  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_name}/connect':
+  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_reference}/connect':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/private_subnet_name'
+      - $ref: '#/components/parameters/private_subnet_reference'
     post:
       operationId: connectPrivateSubnet
       summary: Connect private subnet to another private subnet
@@ -1121,11 +1121,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
-  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_name}/disconnect/{private_subnet_id}':
+  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_reference}/disconnect/{private_subnet_id}':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/private_subnet_name'
+      - $ref: '#/components/parameters/private_subnet_reference'
       - $ref: '#/components/parameters/private_subnet_id'
     post:
       operationId: disconnectPrivateSubnet
@@ -1154,11 +1154,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
-  '/project/{project_id}/location/{location}/vm/{vm_name}':
+  '/project/{project_id}/location/{location}/vm/{vm_reference}':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/vm_name'
+      - $ref: '#/components/parameters/vm_reference'
     delete:
       operationId: deleteVM
       summary: Delete a specific VM
@@ -1220,11 +1220,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
-  '/project/{project_id}/location/{location}/vm/{vm_name}/restart':
+  '/project/{project_id}/location/{location}/vm/{vm_reference}/restart':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/vm_name'
+      - $ref: '#/components/parameters/vm_reference'
     post:
       operationId: restartVM
       summary: Restart a specific VM
@@ -1397,13 +1397,18 @@ paths:
         - Virtual Machine
 components:
   parameters:
-    firewall_name:
-      description: Name of the firewall
+    firewall_reference:
+      description: Firewall ID or name
+      examples:
+        id:
+          value: fwn30gjk1d1e2jj34v9x0dq4rp
+        name:
+          value: firewall-name
       in: path
-      name: firewall_name
+      name: firewall_reference
       required: true
       schema:
-        type: string
+        $ref: '#/components/schemas/Reference'
     firewall_rule_id:
       description: ID of the firewall rule
       in: path
@@ -1413,13 +1418,18 @@ components:
         type: string
         example: fraz0q3vbrpa7pkg7zbmah9csn
         pattern: '^fr[0-9a-hj-km-np-tv-z]{24}$'
-    load_balancer_name:
-      description: Name of the load balancer
+    load_balancer_reference:
+      description: Load balancer ID or name
+      examples:
+        id:
+          value: 1bn30gjk1d1e2jj34v9x0dq4rp
+        name:
+          value: load-balancer-name
       in: path
-      name: load_balancer_name
+      name: load_balancer_reference
       required: true
       schema:
-        type: string
+        $ref: '#/components/schemas/Reference'
     location:
       description: The Ubicloud location/region
       in: path
@@ -1462,13 +1472,6 @@ components:
       schema:
         type: integer
         default: 10
-    postgres_database_name:
-      description: Postgres database name
-      in: path
-      name: postgres_database_name
-      required: true
-      schema:
-        type: string
     postgres_database_reference:
       description: Postgres database ID or name
       examples:
@@ -1480,8 +1483,7 @@ components:
       name: postgres_database_reference
       required: true
       schema:
-        type: string
-        pattern: '^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$'
+        $ref: '#/components/schemas/Reference'
     postgres_firewall_rule_id:
       description: ID of the postgres firewall rule
       in: path
@@ -1507,13 +1509,18 @@ components:
         type: string
         example: pskkmx0f2vke4h36nk9cm8v8q0
         pattern: '^ps[0-9a-hj-km-np-tv-z]{24}$'
-    private_subnet_name:
-      description: Private subnet name
+    private_subnet_reference:
+      description: Private subnet ID or name
+      examples:
+        id:
+          value: psn30gjk1d1e2jj34v9x0dq4rp
+        name:
+          value: private-subnet-name
       in: path
-      name: private_subnet_name
+      name: private_subnet_reference
       required: true
       schema:
-        type: string
+        $ref: '#/components/schemas/Reference'
     project_id:
       description: ID of the project
       in: path
@@ -1530,13 +1537,18 @@ components:
       required: false
       schema:
         type: string
-    vm_name:
-      description: Virtual machine name
+    vm_reference:
+      description: Virtual machine ID or name
+      examples:
+        id:
+          value: vmn30gjk1d1e2jj34v9x0dq4rp
+        name:
+          value: virtual-machine-name
       in: path
-      name: vm_name
+      name: vm_reference
       required: true
       schema:
-        type: string
+        $ref: '#/components/schemas/Reference'
   schemas:
     Error:
       type: object
@@ -1846,6 +1858,10 @@ components:
         - discount
         - id
         - name
+    Reference:
+      description: Resource ID or name
+      type: string
+      pattern: '^[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$'
     Vm:
       type: object
       properties:
