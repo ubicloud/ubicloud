@@ -26,8 +26,8 @@ GIT
 
 GIT
   remote: https://github.com/ubicloud/erb-formatter.git
-  revision: 886cb4e27b099d6f347b950375aa22e638888f95
-  ref: 886cb4e27b099d6f347b950375aa22e638888f95
+  revision: df3174476986706828f7baf3e5e6f5ec8ecd849b
+  ref: df3174476986706828f7baf3e5e6f5ec8ecd849b
   specs:
     erb-formatter (0.7.3)
 
