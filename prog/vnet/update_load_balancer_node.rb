@@ -75,13 +75,14 @@ ip6 daddr #{private_ipv6} tcp dport #{port.src_port} ct state established,relate
       end.join("\n")
     end
 
-    ipv4_postrouting_rule = load_balancer.ports.map do |port|
+    sorted_ports = load_balancer.ports.sort_by { |port| port.src_port }
+    ipv4_postrouting_rule = sorted_ports.map do |port|
       if load_balancer.ipv4_enabled?
         "ip daddr @neighbor_ips_v4 tcp dport #{port.src_port} ct state established,related,new counter snat to #{private_ipv4}"
       end
     end.join("\n")
 
-    ipv6_postrouting_rule = load_balancer.ports.map do |port|
+    ipv6_postrouting_rule = sorted_ports.map do |port|
       if load_balancer.ipv6_enabled?
         "ip6 daddr @neighbor_ips_v6 tcp dport #{port.src_port} ct state established,related,new counter snat to #{private_ipv6}"
       end
