@@ -42,7 +42,16 @@ class Clover
           end
 
           if (user = Account.exclude(status_id: 3)[email: email])
-            user.add_project(@project)
+            result = DB[:access_tag]
+              .returning(:hyper_tag_id)
+              .insert_conflict
+              .insert(hyper_tag_id: user.id, project_id: @project.id)
+
+            if result.empty?
+              flash["error"] = "The requested user already has access to this project"
+              r.redirect "#{@project.path}/user"
+            end
+
             tag&.add_subject(user.id)
             Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
               greeting: "Hello,",
