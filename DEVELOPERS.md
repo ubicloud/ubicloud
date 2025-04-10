@@ -35,11 +35,7 @@ versions. There is a `.tool-versions` file that `mise` reads, and it
 is kept up to date.
 
 In the case of Ruby, obtaining a matching version is most important
-because it is constrained in the [Gemfile](Gemfile). However, any
-method of obtaining Ruby and Postgres is adequate.
-
-In the case of Ruby, obtaining a matching version is most
-important, because it is constrained in the [Gemfile](Gemfile).
+because it is constrained in the [Gemfile](Gemfile).
 
 Though, any method of obtaining Ruby and Postgres is adequate.
 
