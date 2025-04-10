@@ -60,18 +60,36 @@ end
 
 def safe_write_to_file(filename, content = nil)
   raise ArgumentError, "must provide either content or block" if (content.nil? && !block_given?) || (!content.nil? && block_given?)
-  temp_filename = filename + ".tmp"
-  lock_filename = "/tmp/#{Digest::SHA256.hexdigest(temp_filename)}.lock"
-  File.open(lock_filename, File::RDWR | File::CREAT) do |lock_file|
-    lock_file.flock(File::LOCK_EX)
+  atomic_file_replace(filename) do |_, new_file|
     if block_given?
-      File.open(temp_filename, File::RDWR | File::CREAT) do |f|
-        yield f
-      end
+      yield new_file
     else
-      File.write(temp_filename, content)
+      new_file.write(content)
     end
-    File.rename(temp_filename, filename)
+    nil
+  end
+end
+
+def atomic_file_replace(path)
+  lock_path = "/tmp/#{Digest::SHA256.hexdigest(path)}.lock"
+
+  File.open(lock_path, File::RDWR | File::CREAT, 0o644) do |lock_file|
+    lock_file.flock(File::LOCK_EX)
+    old_file = File.exist?(path) ? File.open(path, "r") : nil
+    result = nil
+    begin
+      tmp_path = "#{path}.tmp"
+      File.open(tmp_path, "w") do |new_file|
+        result = yield(old_file, new_file)
+        new_file.flush
+        new_file.fsync
+      end
+      File.rename(tmp_path, path)
+      sync_parent_dir(path)
+    ensure
+      old_file&.close
+    end
+    result
   end
 end
 

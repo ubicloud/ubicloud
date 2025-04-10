@@ -9,6 +9,17 @@ RSpec.describe UbiCNI do
   let(:logger) { Logger.new(IO::NULL) }
   let(:input) { {"ranges" => {"subnet_ipv4" => "192.168.1.0/24", "subnet_ipv6" => "fd00::/64", "subnet_ula_ipv6" => "fc00::/64"}} }
 
+  def stub_atomic_file_replace(ipam_store)
+    allow(ubicni).to receive(:atomic_file_replace) do |path, &block|
+      old_file = instance_double(File, read: JSON.pretty_generate(ipam_store))
+      new_file = instance_double(File)
+      allow(new_file).to receive(:write) do |arg|
+        ipam_store.replace(JSON.parse(arg))
+      end
+      block.call(old_file, new_file)
+    end
+  end
+
   before do
     allow(ENV).to receive(:[]).and_return(nil)
     allow(ENV).to receive(:[]).with("CNI_CONTAINERID").and_return("1234")
@@ -20,181 +31,282 @@ RSpec.describe UbiCNI do
   end
 
   describe "#run" do
-    describe "#handle_add" do
-      let(:input) do
-        {
-          "ranges" => {
-            "subnet_ula_ipv6" => "fd00::/64",
-            "subnet_ipv6" => "2001:db8::/64",
-            "subnet_ipv4" => "192.168.1.0/24"
-          }
-        }
-      end
-
-      let(:container_ipv6) { IPAddr.new("2001:db8::2") }
-      let(:container_ula_ipv6) { IPAddr.new("fd00::2") }
-      let(:ipv4_container_ip) { IPAddr.new("192.168.1.100") }
-      let(:ipv4_gateway_ip) { IPAddr.new("192.168.1.1") }
-
-      before do
-        allow(ENV).to receive(:[]).with("CNI_CONTAINERID").and_return("abcdef123456")
-        allow(ENV).to receive(:[]).with("CNI_COMMAND").and_return("ADD")
-        allow(ENV).to receive(:[]).with("CNI_NETNS").and_return("/var/run/netns/testnetns")
-        allow(ENV).to receive(:[]).with("CNI_IFNAME").and_return("eth0")
-
-        allow(FileUtils).to receive(:mkdir_p)
-        allow(File).to receive(:write)
-
-        expect(ubicni).to receive(:gen_mac).and_return("00:11:22:33:44:55")
-        expect(ubicni).to receive(:gen_mac).and_return("00:aa:bb:cc:dd:ee")
-        allow(ubicni).to receive(:mac_to_ipv6_link_local).with("00:11:22:33:44:55").and_return("fe80::02aa:bbff:fecc:ddee")
-        allow(ubicni).to receive(:mac_to_ipv6_link_local).with("00:aa:bb:cc:dd:ee").and_return("fe80::0211:22ff:fe33:4455")
-
-        allow(ubicni).to receive(:find_random_available_ip).and_return(
-          container_ipv6, container_ula_ipv6, ipv4_container_ip, ipv4_gateway_ip
-        )
-      end
-
-      it "sets up networking and assigns IPs correctly" do
-        expect(ubicni).to receive(:r).with("ip link add veth_abcdef12 addr 00:aa:bb:cc:dd:ee type veth peer name eth0 addr 00:11:22:33:44:55 netns testnetns").ordered
-
-        expect(ubicni).to receive(:r).with("ip -6 -n testnetns addr replace #{container_ipv6}/#{container_ipv6.prefix} dev eth0").ordered
-        expect(ubicni).to receive(:r).with("ip -6 -n testnetns link set eth0 mtu 1400 up").ordered
-        expect(ubicni).to receive(:r).with("ip -6 -n testnetns route replace default via fe80::0211:22ff:fe33:4455 dev eth0").ordered
-        expect(ubicni).to receive(:r).with("ip -6 link set veth_abcdef12 mtu 1400 up").ordered
-        expect(ubicni).to receive(:r).with("ip -6 route replace #{container_ipv6}/#{container_ipv6.prefix} via fe80::02aa:bbff:fecc:ddee dev veth_abcdef12 mtu 1400").ordered
-
-        expect(ubicni).to receive(:r).with("ip -6 -n testnetns addr replace #{container_ula_ipv6}/#{container_ula_ipv6.prefix} dev eth0").ordered
-        expect(ubicni).to receive(:r).with("ip -6 -n testnetns link set eth0 mtu 1400 up").ordered
-        expect(ubicni).to receive(:r).with("ip -6 link set veth_abcdef12 mtu 1400 up").ordered
-        expect(ubicni).to receive(:r).with("ip -6 route replace #{container_ula_ipv6}/#{container_ula_ipv6.prefix} via fe80::02aa:bbff:fecc:ddee dev veth_abcdef12 mtu 1400").ordered
-
-        expect(ubicni).to receive(:r).with("ip addr replace #{ipv4_gateway_ip}/24 dev veth_abcdef12").ordered
-        expect(ubicni).to receive(:r).with("ip link set veth_abcdef12 mtu 1400 up").ordered
-        expect(ubicni).to receive(:r).with("ip -n testnetns addr replace #{ipv4_container_ip}/24 dev eth0").ordered
-        expect(ubicni).to receive(:r).with("ip -n testnetns link set eth0 mtu 1400 up").ordered
-        expect(ubicni).to receive(:r).with("ip -n testnetns route replace default via #{ipv4_gateway_ip}").ordered
-        expect(ubicni).to receive(:r).with("ip route replace #{ipv4_container_ip}/#{ipv4_container_ip.prefix} via #{ipv4_gateway_ip} dev veth_abcdef12").ordered
-        expect(ubicni).to receive(:r).with("echo 1 > /proc/sys/net/ipv4/conf/veth_abcdef12/proxy_arp").ordered
-
-        output = ubicni.handle_add
-        response = JSON.parse(output)
-
-        expect(response).to include("cniVersion" => "1.0.0")
-        expect(response["interfaces"]).to be_an(Array)
-        expect(response["interfaces"]).to include(
-          hash_including("name" => "eth0", "mac" => "00:11:22:33:44:55")
-        )
-
-        expect(response["ips"]).to be_an(Array)
-        expect(response["ips"]).to include(
-          hash_including("address" => "#{container_ipv6}/128"),
-          hash_including("address" => "#{container_ula_ipv6}/128"),
-          hash_including("address" => "#{ipv4_container_ip}/32")
-        )
-
-        expect(response["routes"]).to be_an(Array)
-        expect(response["routes"]).to include(
-          hash_including("dst" => "0.0.0.0/0")
-        )
-      end
-    end
-
     it "calls handle_add if CNI_COMMAND is ADD" do
       allow(ENV).to receive(:[]).with("CNI_COMMAND").and_return("ADD")
-      expect(ubicni).to receive(:handle_add).and_return(nil)
-      ubicni.run
+      expect(ubicni).to receive(:handle_add).and_return("add_output")
+      expect { ubicni.run }.to output("add_output\n").to_stdout
     end
 
     it "calls handle_del if CNI_COMMAND is DEL" do
       allow(ENV).to receive(:[]).with("CNI_COMMAND").and_return("DEL")
-      expect(ubicni).to receive(:handle_del).and_return(nil)
-      ubicni.run
+      expect(ubicni).to receive(:handle_del).and_return("del_output")
+      expect { ubicni.run }.to output("del_output\n").to_stdout
     end
 
     it "calls handle_get if CNI_COMMAND is GET" do
       allow(ENV).to receive(:[]).with("CNI_COMMAND").and_return("GET")
-      expect(ubicni).to receive(:handle_get).and_return(nil)
-      ubicni.run
+      expect(ubicni).to receive(:handle_get).and_return("get_output")
+      expect { ubicni.run }.to output("get_output\n").to_stdout
     end
 
     it "raises an error for an unsupported command" do
       allow(ENV).to receive(:[]).with("CNI_COMMAND").and_return("INVALID")
       expect(logger).to receive(:error).with("Unsupported CNI command: INVALID")
-      expect { ubicni.run }.to output("{\"code\":100,\"msg\":\"Unsupported CNI command: INVALID\"}\n").to_stdout.and(raise_error(SystemExit))
+      expect { ubicni.run }.to output("{\"code\":100,\"msg\":\"Unsupported CNI command: INVALID\"}\n").to_stdout.and raise_error(SystemExit)
+    end
+  end
+
+  describe "#handle_add" do
+    let(:input) do
+      {
+        "ranges" => {
+          "subnet_ula_ipv6" => "fd00::/64",
+          "subnet_ipv6" => "2001:db8::/64",
+          "subnet_ipv4" => "192.168.1.0/24"
+        }
+      }
+    end
+
+    let(:container_ipv6) { IPAddr.new("2001:db8::2") }
+    let(:container_ula_ipv6) { IPAddr.new("fd00::2") }
+    let(:ipv4_container_ip) { IPAddr.new("192.168.1.100") }
+    let(:ipv4_gateway_ip) { IPAddr.new("192.168.1.1") }
+
+    before do
+      allow(ENV).to receive(:[]).with("CNI_CONTAINERID").and_return("abcdef123456")
+      allow(ENV).to receive(:[]).with("CNI_COMMAND").and_return("ADD")
+      allow(ENV).to receive(:[]).with("CNI_NETNS").and_return("/var/run/netns/testnetns")
+      allow(ENV).to receive(:[]).with("CNI_IFNAME").and_return("eth0")
+
+      allow(FileUtils).to receive(:mkdir_p)
+      allow(File).to receive(:write)
+      allow(ubicni).to receive(:gen_mac).and_return("00:11:22:33:44:55", "00:aa:bb:cc:dd:ee")
+      allow(ubicni).to receive(:mac_to_ipv6_link_local).with("00:11:22:33:44:55").and_return("fe80::0211:22ff:fe33:4455")
+      allow(ubicni).to receive(:mac_to_ipv6_link_local).with("00:aa:bb:cc:dd:ee").and_return("fe80::02aa:bbff:fecc:ddee")
+      allow(ubicni).to receive(:find_random_available_ip).and_return(
+        container_ipv6, container_ula_ipv6, ipv4_container_ip, ipv4_gateway_ip
+      )
+    end
+
+    it "sets up networking, assigns IPs, and updates the IPAM store" do
+      ipam_store = {"allocated_ips" => {}}
+      stub_atomic_file_replace(ipam_store)
+
+      expect(ubicni).to receive(:check_required_env_vars).with(["CNI_CONTAINERID", "CNI_NETNS", "CNI_IFNAME"])
+      expect(ubicni).to receive(:validate_input_ranges)
+
+      expect(ubicni).to receive(:r).with("ip link add veth_abcdef12 addr 00:aa:bb:cc:dd:ee type veth peer name eth0 addr 00:11:22:33:44:55 netns testnetns")
+      expect(ubicni).to receive(:r).with("ip -6 -n testnetns addr replace 2001:db8::2/128 dev eth0")
+      expect(ubicni).to receive(:r).with("ip -6 -n testnetns link set eth0 mtu 1400 up")
+      expect(ubicni).to receive(:r).with("ip -6 -n testnetns route replace default via fe80::02aa:bbff:fecc:ddee dev eth0")
+      expect(ubicni).to receive(:r).with("ip -6 link set veth_abcdef12 mtu 1400 up")
+      expect(ubicni).to receive(:r).with("ip -6 route replace 2001:db8::2/128 via fe80::0211:22ff:fe33:4455 dev veth_abcdef12 mtu 1400")
+
+      expect(ubicni).to receive(:r).with("ip -6 -n testnetns addr replace fd00::2/128 dev eth0")
+      expect(ubicni).to receive(:r).with("ip -6 -n testnetns link set eth0 mtu 1400 up")
+      expect(ubicni).to receive(:r).with("ip -6 link set veth_abcdef12 mtu 1400 up")
+      expect(ubicni).to receive(:r).with("ip -6 route replace fd00::2/128 via fe80::0211:22ff:fe33:4455 dev veth_abcdef12 mtu 1400")
+
+      expect(ubicni).to receive(:r).with("ip addr replace 192.168.1.1/24 dev veth_abcdef12")
+      expect(ubicni).to receive(:r).with("ip link set veth_abcdef12 mtu 1400 up")
+      expect(ubicni).to receive(:r).with("ip -n testnetns addr replace 192.168.1.100/24 dev eth0")
+      expect(ubicni).to receive(:r).with("ip -n testnetns link set eth0 mtu 1400 up")
+      expect(ubicni).to receive(:r).with("ip -n testnetns route replace default via 192.168.1.1")
+      expect(ubicni).to receive(:r).with("ip route replace 192.168.1.100/32 via 192.168.1.1 dev veth_abcdef12")
+      expect(ubicni).to receive(:r).with("echo 1 > /proc/sys/net/ipv4/conf/veth_abcdef12/proxy_arp")
+
+      output = ubicni.handle_add
+      response = JSON.parse(output)
+
+      expect(response).to include("cniVersion" => "1.0.0")
+      expect(response["interfaces"]).to include(
+        hash_including("name" => "eth0", "mac" => "00:11:22:33:44:55", "sandbox" => "/var/run/netns/testnetns")
+      )
+      expect(response["ips"]).to include(
+        hash_including("address" => "192.168.1.100/32", "gateway" => "192.168.1.1", "interface" => 0),
+        hash_including("address" => "fd00::2/128", "gateway" => "fe80::02aa:bbff:fecc:ddee", "interface" => 0),
+        hash_including("address" => "2001:db8::2/128", "gateway" => "fe80::02aa:bbff:fecc:ddee", "interface" => 0)
+      )
+      expect(response["routes"]).to include(hash_including("dst" => "0.0.0.0/0"))
+      expect(response["dns"]).to include(
+        "nameservers" => ["10.96.0.10"],
+        "search" => ["default.svc.cluster.local", "svc.cluster.local", "cluster.local"],
+        "options" => ["ndots:5"]
+      )
+
+      expect(ipam_store["allocated_ips"]["abcdef123456"]).to contain_exactly(
+        "192.168.1.100",
+        "192.168.1.1",
+        "fd00::2",
+        "2001:db8::2"
+      )
     end
   end
 
   describe "#handle_del" do
-    it "removes allocated IP when container exists" do
-      ubicni.instance_variable_set(:@ipam_store, {"allocated_ips" => {"1234" => ["192.168.1.2"]}})
-      expect(File).to receive(:write)
-      expect { ubicni.handle_del }.to change { ubicni.instance_variable_get(:@ipam_store)["allocated_ips"].size }.by(-1)
+    it "removes the allocated IPs for the container" do
+      initial_store = {"allocated_ips" => {"1234" => ["192.168.1.2"]}}
+      stub_atomic_file_replace(initial_store)
+
+      expect(ubicni).to receive(:check_required_env_vars).with(["CNI_CONTAINERID"])
+      output = ubicni.handle_del
+
+      expect(initial_store["allocated_ips"]).not_to have_key("1234")
+      expect(output).to eq("{}")
     end
 
-    it "does nothing when container does not exist" do
-      ubicni.instance_variable_set(:@ipam_store, {"allocated_ips" => {"12345" => ["192.168.1.2"]}})
-      expect(File).not_to receive(:write)
-      expect { ubicni.handle_del }.not_to change { ubicni.instance_variable_get(:@ipam_store)["allocated_ips"].size }
+    it "does nothing if the container ID does not exist in the store" do
+      initial_store = {"allocated_ips" => {"other_container" => ["192.168.1.2"]}}
+      stub_atomic_file_replace(initial_store)
+
+      expect(ubicni).to receive(:check_required_env_vars).with(["CNI_CONTAINERID"])
+      output = ubicni.handle_del
+
+      expect(initial_store["allocated_ips"]).to eq({"other_container" => ["192.168.1.2"]})
+      expect(output).to eq("{}")
+    end
+
+    it "deletes from an empty store when file exists but content is empty" do
+      old_file = instance_double(File, read: "")
+      new_file = instance_double(File)
+
+      expect(new_file).to receive(:write) do |written|
+        parsed = JSON.parse(written)
+        expect(parsed["allocated_ips"]).to eq({})
+      end
+      allow(ubicni).to receive(:atomic_file_replace).and_yield(old_file, new_file)
+      expect(ubicni).to receive(:check_required_env_vars).with(["CNI_CONTAINERID"])
+      output = ubicni.handle_del
+      expect(output).to eq("{}")
+    end
+
+    it "deletes from a parsed store when file has content" do
+      store_json = JSON.pretty_generate({"allocated_ips" => {"1234" => ["192.168.1.2"]}})
+      old_file = instance_double(File, read: store_json)
+      new_file = instance_double(File)
+      expect(new_file).to receive(:write) do |written|
+        parsed = JSON.parse(written)
+        expect(parsed["allocated_ips"]).to eq({})
+      end
+      allow(ubicni).to receive(:atomic_file_replace).and_yield(old_file, new_file)
+      expect(ubicni).to receive(:check_required_env_vars).with(["CNI_CONTAINERID"])
+      output = ubicni.handle_del
+      expect(output).to eq("{}")
+    end
+
+    it "handles case when old_file is nil" do
+      new_file = instance_double(File)
+      expect(new_file).to receive(:write) do |written|
+        parsed = JSON.parse(written)
+        expect(parsed["allocated_ips"]).to eq({})
+      end
+      allow(ubicni).to receive(:atomic_file_replace).and_yield(nil, new_file)
+      expect(ubicni).to receive(:check_required_env_vars).with(["CNI_CONTAINERID"])
+      output = ubicni.handle_del
+      expect(output).to eq("{}")
     end
   end
 
   describe "#handle_get" do
     before do
-      allow(File).to receive(:read).with("/opt/cni/bin/ubicni-ipam-store").and_return("{}")
-      allow(File).to receive(:exist?).with("/opt/cni/bin/ubicni-ipam-store").and_return(true)
-      allow(File).to receive(:exist?).with("/etc/netns/test-ns/resolv.conf").and_return(true)
-      allow(File).to receive(:readlines).and_return(["nameserver 8.8.8.8", "search local"])
-      allow(ubicni).to receive(:r).and_return("link/ether 00:11:22:33:44:55", "inet6 fd00::1/64")
-    end
-
-    it "retrieves container network information" do
       allow(ENV).to receive(:[]).with("CNI_COMMAND").and_return("GET")
       allow(ENV).to receive(:[]).with("CNI_NETNS").and_return("/var/run/netns/test-ns")
       allow(ENV).to receive(:[]).with("CNI_IFNAME").and_return("eth0")
-
-      allow(ubicni).to receive(:r).with("ip -n test-ns link show eth0").and_return(<<~OUTPUT)
-        2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP mode DEFAULT group default
-          link/ether 00:11:22:33:44:55 brd ff:ff:ff:ff:ff:ff
-      OUTPUT
-
-      allow(ubicni).to receive(:r).with("ip -n test-ns -6 addr show dev eth0").and_return(<<~OUTPUT)
-        inet6 2001:db8::2/64 scope global
-          valid_lft forever preferred_lft forever
-      OUTPUT
-
-      dns_config_path = "/etc/netns/test-ns/resolv.conf"
-      allow(File).to receive(:exist?).with(dns_config_path).and_return(true)
-      allow(File).to receive(:readlines).with(dns_config_path).and_return([
-        "nameserver 10.96.0.10\n",
-        "search default.svc.cluster.local svc.cluster.local cluster.local\n",
-        "options ndots:5\n"
-      ])
-
-      output = ubicni.handle_get
-      response = JSON.parse(output)
-
-      expect(response).to include("cniVersion" => "1.0.0")
-      expect(response["interfaces"]).to be_an(Array)
-      expect(response["interfaces"]).to include(
-        hash_including("name" => "eth0", "mac" => "00:11:22:33:44:55")
+      allow(ubicni).to receive(:r).with("ip -n test-ns link show eth0").and_return(
+        "2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP mode DEFAULT group default\n" \
+        "    link/ether 00:11:22:33:44:55 brd ff:ff:ff:ff:ff:ff"
       )
-      expect(response["ips"]).to be_an(Array)
-      expect(response["ips"]).to include(
-        hash_including("address" => "2001:db8::2/64")
+      allow(ubicni).to receive(:r).with("ip -n test-ns -6 addr show dev eth0").and_return(
+        "inet6 2001:db8::2/64 scope global\n" \
+        "   valid_lft forever preferred_lft forever"
       )
-      expect(response["dns"]["nameservers"]).to eq(["10.96.0.10"])
-      expect(response["dns"]["search"]).to eq("default.svc.cluster.local svc.cluster.local cluster.local".split)
     end
 
-    it "returns empty handed if the dns config file does not exist" do
+    it "retrieves container network information with DNS config" do
+      dns_config_path = "/etc/netns/test-ns/resolv.conf"
+      allow(File).to receive(:exist?).with(dns_config_path).and_return(true)
+      allow(File).to receive(:readlines).with(dns_config_path, chomp: true).and_return([
+        "nameserver 10.96.0.10",
+        "search default.svc.cluster.local svc.cluster.local cluster.local",
+        "options ndots:5"
+      ])
+
+      expect(ubicni).to receive(:check_required_env_vars).with(["CNI_NETNS", "CNI_IFNAME"])
+      response = JSON.parse(ubicni.handle_get)
+
+      expect(response).to include("cniVersion" => "1.0.0")
+      expect(response["interfaces"]).to include(
+        hash_including("name" => "eth0", "mac" => "00:11:22:33:44:55", "sandbox" => "/var/run/netns/test-ns")
+      )
+      expect(response["ips"]).to include(
+        hash_including("address" => "2001:db8::2/64", "gateway" => nil, "interface" => 0)
+      )
+      expect(response["dns"]).to include(
+        "nameservers" => ["10.96.0.10"],
+        "search" => ["default.svc.cluster.local", "svc.cluster.local", "cluster.local"],
+        "options" => ["ndots:5"]
+      )
+    end
+
+    it "returns empty DNS config if the file does not exist" do
       dns_config_path = "/etc/netns/test-ns/resolv.conf"
       allow(File).to receive(:exist?).with(dns_config_path).and_return(false)
 
+      expect(ubicni).to receive(:check_required_env_vars).with(["CNI_NETNS", "CNI_IFNAME"])
       response = JSON.parse(ubicni.handle_get)
 
-      expect(response["dns"]["nameservers"]).to eq([])
-      expect(response["dns"]["search"]).to eq([])
+      expect(response["dns"]).to include(
+        "nameservers" => [],
+        "search" => [],
+        "options" => ["ndots:5"]
+      )
+    end
+  end
+
+  describe "#allocate_ips_for_pod" do
+    let(:subnet_ula_ipv6) { "fc00::/64" }
+    let(:subnet_gua_ipv6) { "fd00::/64" }
+    let(:subnet_ipv4) { "192.168.1.0/24" }
+
+    let(:ipv4_container_ip) { IPAddr.new("192.168.1.100") }
+    let(:ipv4_gateway_ip) { IPAddr.new("192.168.1.1") }
+    let(:ipv6_container_ip) { IPAddr.new("fd00::2") }
+    let(:ula_container_ip) { IPAddr.new("fc00::2") }
+
+    before do
+      allow(ubicni).to receive(:find_random_available_ip).and_return(
+        ula_container_ip, ipv6_container_ip, ipv4_container_ip, ipv4_gateway_ip
+      )
+    end
+
+    it "uses default store when old_file.read is empty" do
+      old_file = instance_double(File, read: "")
+      new_file = instance_double(File)
+      allow(new_file).to receive(:write)
+      allow(ubicni).to receive(:atomic_file_replace).and_yield(old_file, new_file)
+
+      result = ubicni.allocate_ips_for_pod("abc123", subnet_ula_ipv6, subnet_gua_ipv6, subnet_ipv4)
+      expect(result).to eq([ipv4_container_ip, ipv4_gateway_ip, ula_container_ip, ipv6_container_ip])
+    end
+
+    it "parses content when old_file.read returns JSON" do
+      store_json = {"allocated_ips" => {"existing" => ["192.168.1.99"]}}
+      old_file = instance_double(File, read: JSON.generate(store_json))
+      new_file = instance_double(File)
+      allow(new_file).to receive(:write)
+      allow(ubicni).to receive(:atomic_file_replace).and_yield(old_file, new_file)
+
+      result = ubicni.allocate_ips_for_pod("abc123", subnet_ula_ipv6, subnet_gua_ipv6, subnet_ipv4)
+      expect(result).to eq([ipv4_container_ip, ipv4_gateway_ip, ula_container_ip, ipv6_container_ip])
+    end
+
+    it "uses default store when old_file is nil" do
+      new_file = instance_double(File)
+      allow(new_file).to receive(:write)
+      allow(ubicni).to receive(:atomic_file_replace).and_yield(nil, new_file)
+
+      result = ubicni.allocate_ips_for_pod("abc123", subnet_ula_ipv6, subnet_gua_ipv6, subnet_ipv4)
+      expect(result).to eq([ipv4_container_ip, ipv4_gateway_ip, ula_container_ip, ipv6_container_ip])
     end
   end
 
@@ -205,45 +317,48 @@ RSpec.describe UbiCNI do
   end
 
   describe "#find_random_available_ip" do
-    let(:subnet) { IPAddr.new("192.168.1.0/24") }
-    let(:subnetipv6) { IPAddr.new("fd00::/64") }
+    let(:ipv4_subnet) { IPAddr.new("192.168.1.0/24") }
+    let(:ipv6_subnet) { IPAddr.new("fd00::/64") }
+    let(:ipam_store) { {"allocated_ips" => {"test-container" => ["192.168.1.2"]}} }
 
-    it "returns an IP address within the subnet" do
-      ip = ubicni.find_random_available_ip(subnet)
-      expect(subnet.include?(ip)).to be true
+    it "returns an IP address within the IPv4 subnet" do
+      ip = ubicni.find_random_available_ip(ipam_store["allocated_ips"], ipv4_subnet)
+      expect(ipv4_subnet.include?(ip)).to be true
+      expect(ip.to_s).not_to eq("192.168.1.2")
     end
 
     it "returns an IP address within the IPv6 subnet" do
-      ip = ubicni.find_random_available_ip(subnetipv6)
-      expect(subnetipv6.include?(ip)).to be true
+      ip = ubicni.find_random_available_ip(ipam_store["allocated_ips"], ipv6_subnet)
+      expect(ipv6_subnet.include?(ip)).to be true
     end
 
-    it "raises an error when all available ipv4 IPs are allocated" do
+    it "raises an error when all available IPv4 IPs are allocated" do
       all_ips = (1..254).map { |i| "192.168.1.#{i}" }
-      ubicni.instance_variable_set(:@ipam_store, {"allocated_ips" => {"test-container" => all_ips}})
-
-      expect { ubicni.find_random_available_ip(subnet) }.to raise_error(RuntimeError, /No available IPs in subnet/)
+      ipam_store_all = {"allocated_ips" => {"test" => all_ips}}
+      expect { ubicni.find_random_available_ip(ipam_store_all["allocated_ips"], ipv4_subnet) }
+        .to raise_error(/No available IPs in subnet 192.168.1.0/)
     end
 
-    it "raises an error when all available IPv6 IPs are allocated" do
-      subnet = IPAddr.new("fd00::/126")
-      # Usable host range: fd00::2 to fd00::2 (only one usable IP based on offset logic)
-      allocated_ips = ["fd00::2"]
-
-      ubicni.instance_variable_set(:@ipam_store, {
-        "allocated_ips" => {
-          "test-container" => allocated_ips
-        }
-      })
-
-      expect { ubicni.find_random_available_ip(subnet) }.to raise_error(RuntimeError, /Could not find an available IP after 100 retries/)
+    it "avoids reserved IPs" do
+      ip = ubicni.find_random_available_ip(ipam_store["allocated_ips"], ipv4_subnet, reserved_ips: ["192.168.1.3"])
+      expect(ip.to_s).not_to eq("192.168.1.2")
+      expect(ip.to_s).not_to eq("192.168.1.3")
     end
 
-    it "does not accidentally reuse an ip twice" do
-      all_ips = (1..252).map { |i| "192.168.1.#{i}" }
-      ubicni.instance_variable_set(:@ipam_store, {"allocated_ips" => {"test-container" => all_ips}})
-      ip = ubicni.find_random_available_ip(subnet)
-      expect(ubicni.find_random_available_ip(subnet, reserved_ips: [ip.to_s]).to_s).not_to eq(ip.to_s)
+    it "returns an available IP within the IPv6 subnet and avoids allocated IPs" do
+      allocated_ips = {"test-container" => ["fd00::1"]}
+      allow(ubicni).to receive(:generate_random_ip).and_return(IPAddr.new("fd00::2"))
+      ip = ubicni.find_random_available_ip(allocated_ips, ipv6_subnet)
+      expect(ipv6_subnet.include?(ip)).to be true
+      expect(ip.to_s).not_to eq("fd00::1")
+    end
+
+    it "raises an error when no available IP is found after max retries for IPv6" do
+      allocated_ips = {"test-container" => ["fd00::1"]}
+      allow(ubicni).to receive(:generate_random_ip).and_return(IPAddr.new("fd00::1"))
+      expect {
+        ubicni.find_random_available_ip(allocated_ips, ipv6_subnet)
+      }.to raise_error("Could not find an available IP after 100 retries")
     end
   end
 
@@ -265,6 +380,102 @@ RSpec.describe UbiCNI do
     it "calculates subnet size for an IPv6 subnet" do
       subnet = IPAddr.new("fd00::/64")
       expect(ubicni.calculate_subnet_size(subnet)).to eq(2**64)
+    end
+  end
+
+  describe "#check_required_env_vars" do
+    it "does not call error_exit when all required variables are set" do
+      allow(ENV).to receive(:[]).with("CNI_CONTAINERID").and_return("some_value")
+      allow(ENV).to receive(:[]).with("CNI_NETNS").and_return("some_value")
+      allow(ENV).to receive(:[]).with("CNI_IFNAME").and_return("some_value")
+      expect(ubicni).not_to receive(:error_exit)
+      ubicni.check_required_env_vars(["CNI_CONTAINERID", "CNI_NETNS", "CNI_IFNAME"])
+    end
+
+    it "calls error_exit when a required variable is missing" do
+      allow(ENV).to receive(:[]).with("CNI_CONTAINERID").and_return("some_value")
+      allow(ENV).to receive(:[]).with("CNI_NETNS").and_return(nil)
+      allow(ENV).to receive(:[]).with("CNI_IFNAME").and_return("some_value")
+      expect(ubicni).to receive(:error_exit).with("Missing required environment variable: CNI_NETNS")
+      ubicni.check_required_env_vars(["CNI_CONTAINERID", "CNI_NETNS", "CNI_IFNAME"])
+    end
+
+    it "calls error_exit for each missing variable" do
+      allow(ENV).to receive(:[]).with("CNI_CONTAINERID").and_return(nil)
+      allow(ENV).to receive(:[]).with("CNI_NETNS").and_return(nil)
+      allow(ENV).to receive(:[]).with("CNI_IFNAME").and_return("some_value")
+      expect(ubicni).to receive(:error_exit).with("Missing required environment variable: CNI_CONTAINERID")
+      expect(ubicni).to receive(:error_exit).with("Missing required environment variable: CNI_NETNS")
+      ubicni.check_required_env_vars(["CNI_CONTAINERID", "CNI_NETNS", "CNI_IFNAME"])
+    end
+  end
+
+  describe "#validate_input_ranges" do
+    context "when all required ranges are present" do
+      subject(:ubicni) { described_class.new(input, logger) }
+
+      let(:input) do
+        {
+          "ranges" => {
+            "subnet_ula_ipv6" => "fd00::/64",
+            "subnet_ipv6" => "2001:db8::/64",
+            "subnet_ipv4" => "192.168.1.0/24"
+          }
+        }
+      end
+
+      it "does not call error_exit" do
+        expect(ubicni).not_to receive(:error_exit)
+        ubicni.validate_input_ranges
+      end
+    end
+
+    context "when 'ranges' key is missing" do
+      subject(:ubicni) { described_class.new(input, logger) }
+
+      let(:input) { {} }
+
+      it "calls error_exit with the appropriate message" do
+        expect(ubicni).to receive(:error_exit).with("Missing required ranges in input data")
+        ubicni.validate_input_ranges
+      end
+    end
+
+    context "when one of the required ranges is missing" do
+      subject(:ubicni) { described_class.new(input, logger) }
+
+      let(:input) do
+        {
+          "ranges" => {
+            "subnet_ula_ipv6" => "fd00::/64",
+            "subnet_ipv4" => "192.168.1.0/24"
+          }
+        }
+      end
+
+      it "calls error_exit with the appropriate message" do
+        expect(ubicni).to receive(:error_exit).with("Missing required ranges in input data")
+        ubicni.validate_input_ranges
+      end
+    end
+
+    context "when one of the required ranges is nil" do
+      subject(:ubicni) { described_class.new(input, logger) }
+
+      let(:input) do
+        {
+          "ranges" => {
+            "subnet_ula_ipv6" => "fd00::/64",
+            "subnet_ipv6" => nil,
+            "subnet_ipv4" => "192.168.1.0/24"
+          }
+        }
+      end
+
+      it "calls error_exit with the appropriate message" do
+        expect(ubicni).to receive(:error_exit).with("Missing required ranges in input data")
+        ubicni.validate_input_ranges
+      end
     end
   end
 end
