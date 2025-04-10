@@ -21,6 +21,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
 
   def before_run
     if kubernetes_cluster.strand.label == "destroy" && strand.label != "destroy"
+      strand.children.each(&:destroy)
       pop "provisioning canceled"
     end
   end
