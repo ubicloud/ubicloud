@@ -66,7 +66,7 @@ RSpec.describe Clover, "vm" do
       it "ubid not exist" do
         get "/project/#{project.ubid}/location/#{vm.display_location}/vm/_foo_ubid"
 
-        expect(last_response).to have_api_error(404, 'Parameter "_foo_ubid" does not match pattern ^[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$')
+        expect(last_response).to have_api_error(404, 'Parameter "_foo_ubid" does not match pattern ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$')
       end
 
       it "location not exist" do
@@ -171,7 +171,7 @@ RSpec.describe Clover, "vm" do
           enable_ip4: true
         }.to_json
 
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: name", {"name" => "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."})
+        expect(last_response).to have_api_error(404, 'Parameter "MyVM" does not match pattern ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$')
       end
 
       it "invalid boot image" do
