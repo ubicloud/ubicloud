@@ -93,7 +93,7 @@ RSpec.describe Clover, "private_subnet" do
       it "invalid name" do
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/invalid_name"
 
-        expect(last_response).to have_api_error(404, 'Parameter "invalid_name" does not match pattern ^[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$')
+        expect(last_response).to have_api_error(404, 'Parameter "invalid_name" does not match pattern ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$')
       end
 
       it "not authorized" do

@@ -80,7 +80,7 @@ RSpec.describe Clover, "load-balancer" do
       it "not found" do
         get "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/_invalid"
 
-        expect(last_response).to have_api_error(404, 'Parameter "_invalid" does not match pattern ^[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$')
+        expect(last_response).to have_api_error(404, 'Parameter "_invalid" does not match pattern ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$')
       end
     end
 

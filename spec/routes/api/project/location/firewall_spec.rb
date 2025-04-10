@@ -58,7 +58,7 @@ RSpec.describe Clover, "firewall" do
     it "get does not exist for invalid name" do
       get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/foo_name"
 
-      expect(last_response).to have_api_error(404, 'Parameter "foo_name" does not match pattern ^[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$')
+      expect(last_response).to have_api_error(404, 'Parameter "foo_name" does not match pattern ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$')
     end
 
     it "get does not exist for valid name" do
@@ -80,7 +80,7 @@ RSpec.describe Clover, "firewall" do
         description: "Firewall description"
       }.to_json
 
-      expect(last_response).to have_api_error(400, "Validation failed for following fields: name")
+      expect(last_response).to have_api_error(404, 'Parameter "FooName" does not match pattern ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$')
     end
 
     it "success delete with underscore" do
