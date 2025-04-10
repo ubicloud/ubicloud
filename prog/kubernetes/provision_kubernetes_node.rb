@@ -115,7 +115,7 @@ TEMPLATE
   end
 
   label def init_cluster
-    case vm.sshable.cmd("common/bin/daemonizer --check init_kubernetes_cluster")
+    case vm.sshable.d_check("init_kubernetes_cluster")
     when "Succeeded"
       hop_install_cni
     when "NotStarted"
@@ -128,7 +128,7 @@ TEMPLATE
         private_subnet_cidr6: kubernetes_cluster.private_subnet.net6,
         vm_cidr: vm.nics.first.private_ipv4
       }
-      vm.sshable.cmd("common/bin/daemonizer /home/ubi/kubernetes/bin/init-cluster init_kubernetes_cluster", stdin: JSON.generate(params))
+      vm.sshable.d_run("init_kubernetes_cluster", "/home/ubi/kubernetes/bin/init-cluster", stdin: JSON.generate(params), log: false)
       nap 30
     when "InProgress"
       nap 10
@@ -142,7 +142,7 @@ TEMPLATE
   end
 
   label def join_control_plane
-    case vm.sshable.cmd("common/bin/daemonizer --check join_control_plane")
+    case vm.sshable.d_check("join_control_plane")
     when "Succeeded"
       hop_install_cni
     when "NotStarted"
@@ -154,7 +154,7 @@ TEMPLATE
         certificate_key: cp_sshable.cmd("sudo kubeadm init phase upload-certs --upload-certs", log: false)[/certificate key:\n(.*)/, 1],
         discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command", log: false)[/discovery-token-ca-cert-hash (.*)/, 1]
       }
-      vm.sshable.cmd("common/bin/daemonizer kubernetes/bin/join-control-plane-node join_control_plane", stdin: JSON.generate(params), log: false)
+      vm.sshable.d_run("join_control_plane", "kubernetes/bin/join-control-plane-node", stdin: JSON.generate(params), log: false)
       nap 15
     when "InProgress"
       nap 10
@@ -168,7 +168,7 @@ TEMPLATE
   end
 
   label def join_worker
-    case vm.sshable.cmd("common/bin/daemonizer --check join_worker")
+    case vm.sshable.d_check("join_worker")
     when "Succeeded"
       hop_install_cni
     when "NotStarted"
@@ -180,7 +180,7 @@ TEMPLATE
         discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command", log: false)[/discovery-token-ca-cert-hash (.*)/, 1]
       }
 
-      vm.sshable.cmd("common/bin/daemonizer kubernetes/bin/join-worker-node join_worker", stdin: JSON.generate(params), log: false)
+      vm.sshable.d_run("join_worker", "kubernetes/bin/join-worker-node", stdin: JSON.generate(params), log: false)
       nap 15
     when "InProgress"
       nap 10

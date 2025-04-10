@@ -233,33 +233,33 @@ table ip6 pod_access {
     before { allow(prog.vm).to receive(:sshable).and_return(instance_double(Sshable)) }
 
     it "runs the init_cluster script if it's not started" do
-      expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check init_kubernetes_cluster").and_return("NotStarted")
+      expect(prog.vm.sshable).to receive(:d_check).with("init_kubernetes_cluster").and_return("NotStarted")
       expect(prog.vm).to receive(:nics).and_return([instance_double(Nic, private_ipv4: "10.0.0.37")])
-      expect(prog.vm.sshable).to receive(:cmd).with(
-        "common/bin/daemonizer /home/ubi/kubernetes/bin/init-cluster init_kubernetes_cluster",
-        stdin: /{"node_name":"test-vm","cluster_name":"k8scluster","lb_hostname":"somelb\..*","port":"443","private_subnet_cidr4":"172.19.0.0\/16","private_subnet_cidr6":"fd40:1a0a:8d48:182a::\/64","vm_cidr":"10.0.0.37"}/
+      expect(prog.vm.sshable).to receive(:d_run).with(
+        "init_kubernetes_cluster", "/home/ubi/kubernetes/bin/init-cluster",
+        stdin: /{"node_name":"test-vm","cluster_name":"k8scluster","lb_hostname":"somelb\..*","port":"443","private_subnet_cidr4":"172.19.0.0\/16","private_subnet_cidr6":"fd40:1a0a:8d48:182a::\/64","vm_cidr":"10.0.0.37"}/, log: false
       )
 
       expect { prog.init_cluster }.to nap(30)
     end
 
     it "naps if the init_cluster script is in progress" do
-      expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check init_kubernetes_cluster").and_return("InProgress")
+      expect(prog.vm.sshable).to receive(:d_check).with("init_kubernetes_cluster").and_return("InProgress")
       expect { prog.init_cluster }.to nap(10)
     end
 
     it "naps and does nothing (for now) if the init_cluster script is failed" do
-      expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check init_kubernetes_cluster").and_return("Failed")
+      expect(prog.vm.sshable).to receive(:d_check).with("init_kubernetes_cluster").and_return("Failed")
       expect { prog.init_cluster }.to nap(65536)
     end
 
     it "pops if the init_cluster script is successful" do
-      expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check init_kubernetes_cluster").and_return("Succeeded")
+      expect(prog.vm.sshable).to receive(:d_check).with("init_kubernetes_cluster").and_return("Succeeded")
       expect { prog.init_cluster }.to hop("install_cni")
     end
 
     it "naps forever if the daemonizer check returns something unknown" do
-      expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check init_kubernetes_cluster").and_return("Unknown")
+      expect(prog.vm.sshable).to receive(:d_check).with("init_kubernetes_cluster").and_return("Unknown")
       expect { prog.init_cluster }.to nap(65536)
     end
   end
@@ -268,15 +268,15 @@ table ip6 pod_access {
     before { allow(prog.vm).to receive(:sshable).and_return(instance_double(Sshable)) }
 
     it "runs the join_control_plane script if it's not started" do
-      expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check join_control_plane").and_return("NotStarted")
+      expect(prog.vm.sshable).to receive(:d_check).with("join_control_plane").and_return("NotStarted")
 
       sshable = instance_double(Sshable)
       allow(kubernetes_cluster.cp_vms.first).to receive(:sshable).and_return(sshable)
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).and_return("jt\n")
       expect(sshable).to receive(:cmd).with("sudo kubeadm init phase upload-certs --upload-certs", log: false).and_return("something\ncertificate key:\nck")
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --print-join-command", log: false).and_return("discovery-token-ca-cert-hash dtcch")
-      expect(prog.vm.sshable).to receive(:cmd).with(
-        "common/bin/daemonizer kubernetes/bin/join-control-plane-node join_control_plane",
+      expect(prog.vm.sshable).to receive(:d_run).with(
+        "join_control_plane", "kubernetes/bin/join-control-plane-node",
         stdin: /{"node_name":"test-vm","cluster_endpoint":"somelb\..*:443","join_token":"jt","certificate_key":"ck","discovery_token_ca_cert_hash":"dtcch"}/,
         log: false
       )
@@ -285,22 +285,22 @@ table ip6 pod_access {
     end
 
     it "naps if the join_control_plane script is in progress" do
-      expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check join_control_plane").and_return("InProgress")
+      expect(prog.vm.sshable).to receive(:d_check).with("join_control_plane").and_return("InProgress")
       expect { prog.join_control_plane }.to nap(10)
     end
 
     it "naps and does nothing (for now) if the join_control_plane script is failed" do
-      expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check join_control_plane").and_return("Failed")
+      expect(prog.vm.sshable).to receive(:d_check).with("join_control_plane").and_return("Failed")
       expect { prog.join_control_plane }.to nap(65536)
     end
 
     it "pops if the join_control_plane script is successful" do
-      expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check join_control_plane").and_return("Succeeded")
+      expect(prog.vm.sshable).to receive(:d_check).with("join_control_plane").and_return("Succeeded")
       expect { prog.join_control_plane }.to hop("install_cni")
     end
 
     it "naps forever if the daemonizer check returns something unknown" do
-      expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check join_control_plane").and_return("Unknown")
+      expect(prog.vm.sshable).to receive(:d_check).with("join_control_plane").and_return("Unknown")
       expect { prog.join_control_plane }.to nap(65536)
     end
   end
@@ -312,14 +312,14 @@ table ip6 pod_access {
     }
 
     it "runs the join-worker-node script if it's not started" do
-      expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check join_worker").and_return("NotStarted")
+      expect(prog.vm.sshable).to receive(:d_check).with("join_worker").and_return("NotStarted")
 
       sshable = instance_double(Sshable)
       allow(kubernetes_cluster.cp_vms.first).to receive(:sshable).and_return(sshable)
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).and_return("\njt\n")
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --print-join-command", log: false).and_return("discovery-token-ca-cert-hash dtcch")
-      expect(prog.vm.sshable).to receive(:cmd).with(
-        "common/bin/daemonizer kubernetes/bin/join-worker-node join_worker",
+      expect(prog.vm.sshable).to receive(:d_run).with(
+        "join_worker", "kubernetes/bin/join-worker-node",
         stdin: /{"node_name":"test-vm","endpoint":"somelb\..*:443","join_token":"jt","discovery_token_ca_cert_hash":"dtcch"}/,
         log: false
       )
@@ -328,22 +328,22 @@ table ip6 pod_access {
     end
 
     it "naps if the join-worker-node script is in progress" do
-      expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check join_worker").and_return("InProgress")
+      expect(prog.vm.sshable).to receive(:d_check).with("join_worker").and_return("InProgress")
       expect { prog.join_worker }.to nap(10)
     end
 
     it "naps and does nothing (for now) if the join-worker-node script is failed" do
-      expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check join_worker").and_return("Failed")
+      expect(prog.vm.sshable).to receive(:d_check).with("join_worker").and_return("Failed")
       expect { prog.join_worker }.to nap(65536)
     end
 
     it "pops if the join-worker-node script is successful" do
-      expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check join_worker").and_return("Succeeded")
+      expect(prog.vm.sshable).to receive(:d_check).with("join_worker").and_return("Succeeded")
       expect { prog.join_worker }.to hop("install_cni")
     end
 
     it "naps for a long time if the daemonizer check returns something unknown" do
-      expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check join_worker").and_return("Unknown")
+      expect(prog.vm.sshable).to receive(:d_check).with("join_worker").and_return("Unknown")
       expect { prog.join_worker }.to nap(65536)
     end
   end
