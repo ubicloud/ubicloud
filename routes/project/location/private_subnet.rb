@@ -91,16 +91,5 @@ class Clover
         204
       end
     end
-
-    # 204 response for invalid names
-    r.is String do |ps_name|
-      r.post do
-        private_subnet_post(ps_name)
-      end
-
-      r.delete do
-        204
-      end
-    end
   end
 end

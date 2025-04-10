@@ -267,16 +267,5 @@ class Clover
         certs
       end
     end
-
-    # 204 response for invalid names
-    r.is String do |pg_name|
-      r.post do
-        postgres_post(pg_name)
-      end
-
-      r.delete do
-        204
-      end
-    end
   end
 end
