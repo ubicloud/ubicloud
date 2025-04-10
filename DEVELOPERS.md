@@ -1,111 +1,228 @@
 # Clover
 
-Clover is the codename for Ubicloud's software, which consists of the control plane, data plane, and web console program for managing virtual machines and other applications.
+Clover is the codename for Ubicloud's software. It includes a control
+plane, a data plane, and a web console for managing virtual machines
+and other applications.
 
-It's a Ruby program that connects to Postgres.
+It is a Ruby program that connects to Postgres.
 
-The source code organization is based on the [Roda-Sequel
-Stack](https://github.com/jeremyevans/roda-sequel-stack), though a
-number of development choices have been modified.  As the name
-indicates, this project uses [Roda](https://roda.jeremyevans.net/)
-(for HTTP code) and [Sequel](http://sequel.jeremyevans.net/) (for
-database queries).
+The source code is organized based on the [Roda-Sequel
+Stack](https://github.com/jeremyevans/roda-sequel-stack), though
+several development choices have been modified. As the name indicates,
+this project uses [Roda](https://roda.jeremyevans.net/) (for HTTP
+handling) and [Sequel](http://sequel.jeremyevans.net/) (for database
+queries).
 
 Web authentication is managed with
 [Rodauth](http://rodauth.jeremyevans.net/).
 
-It communicates with servers using SSH, via the library
-[net-ssh](https://github.com/net-ssh/net-ssh).
+Clover communicates with servers using SSH via the
+[net-ssh](https://github.com/net-ssh/net-ssh) library.
 
-The tests are written using [RSpec](https://rspec.info/).
+Tests are written using [RSpec](https://rspec.info/).
 
-Code is automatically linted and formatted using
+Code is automatically linted and formatted with
 [RuboCop](https://rubocop.org/).
 
-Web console is designed with [Tailwind CSS](https://tailwindcss.com)
-based on components from [Tailwind UI](https://tailwindui.com). It uses
-jQuery for interactivity.
+The web console is designed with [Tailwind
+CSS](https://tailwindcss.com), based on components from [Tailwind
+UI](https://tailwindui.com), and uses jQuery for interactivity.
 
 ## Development Environment
 
-We suggest using [asdf-vm](https://github.com/asdf-vm/asdf) to manage
-software versions.  There is a [.tool-versions file](.tool-versions)
-that `asdf-vm` reads, and it is kept up to date.
+We recommend using [mise](https://mise.jdx.dev) to manage software
+versions. `mise` reads the `.tool-versions` file maintained in the
+repository.
 
-In the case of Ruby, obtaining a matching version is most
-important, because it is constrained in the [Gemfile](Gemfile).
+For Ruby, obtaining a matching version is especially important because
+it is constrained in the [Gemfile](Gemfile).
 
-Though, any method of obtaining Ruby and Postgres is adequate.
+### Install mise
 
-### Install asdf-vm and plugins
+If you are using `mise`, follow the instructions in the [Getting
+Started Manual](https://mise.jdx.dev/getting-started.html). There is a
+stand-alone installer, but you may prefer the Homebrew (`brew install
+mise`) or Debian/Ubuntu apt repository options, which are also
+documented on that page.
 
-If using `asdf-vm`, follow the instructions at the [Getting Started
-Manual](https://asdf-vm.com/guide/getting-started.html). There are
-three general steps:
-
-1. Download some common dependencies, `git` and `curl`. You may
-   already have them.
-2. Use `git` to clone `asdf-vm` into your home directory
-3. Source it into your shell automatically
-
-Having done so, typing `asdf` will yield a bunch of help text:
+After installing `mise`, typing `mise` will display help text:
 
 ```sh
-$ asdf
-version: v0.14.1-f00f759
+$ mise
+The front-end to your dev env
 
-MANAGE PLUGINS
-asdf plugin add <name> [<git-url>]      Add a plugin from the plugin repo OR,
+Usage: mise [OPTIONS] [TASK] [COMMAND]
+
+Commands:
 [...]
 ```
 
-We like to have these plugins (you can paste these commands):
+`mise` has [shell integration instructions in its
+manual](https://mise.jdx.dev/installing-mise.html), but included here
+are some short shell scripts to guide you through installing it in a
+conventional way.
+
+The first task is to integrate `mise` with your shell. The general
+idea is to run `mise activate $shell | source` in your shell
+initialization file.
+
+You can start a portable shell with `sh` and paste the following to
+automatically find the correct file:
 
 ```sh
-$ asdf plugin add ruby
-$ asdf plugin add direnv
-$ asdf plugin add postgres
-$ asdf plugin add nodejs
-$ asdf plugin add golang
+#!/bin/sh
+
+shell=$(basename "$SHELL")
+case "$shell" in
+  bash) f="$HOME/.bashrc"; [ "$(uname)" = "Darwin" ] && [ -f "$HOME/.bash_profile" ] && [ ! -f "$f" ] && f="$HOME/.bash_profile";;
+  zsh)  f="$HOME/.zshrc";;
+  fish) f="$HOME/.config/fish/config.fish";;
+  *)    echo "Unsupported shell: $shell" >&2; exit 1;;
+esac
+
+line="mise activate $shell | source"
+mkdir -p "$(dirname "$f")"; touch "$f"
+grep -qF "$line" "$f" 2>/dev/null || printf "\n%s\n" "$line" >> "$f"
 ```
 
-Once you have the plugins, you can start to install the software the
-plugin supports.  Let's first install Ruby.
+Activating in the shell is enough to proceed. You will need to restart
+your shell to apply the changes. After doing so, running `mise doctor`
+should report no problems.
 
-### Installing Ruby
+For additional convenience, you can optionally install `mise`
+autocompletion. The idea is to run `mise completion` in the
+appropriate completion directory. This is straightforward for `bash`
+and `fish`:
 
-First, install some system dependencies, such as a C and Rust compiler.
-[There is documentation listing the commands you can use for each
+```sh
+#!/bin/sh
+
+shell=$(basename "$SHELL")
+case "$shell" in
+  bash) comp="$HOME/.bash_completion.d/mise";;
+  fish) comp="$HOME/.config/fish/completions/mise.fish";;
+  *)    echo "Only bash and fish are supported by this script." >&2; exit 1;;
+esac
+
+mkdir -p "$(dirname "$comp")"
+mise completion "$shell" > "$comp"
+echo "Installed mise completions to $comp"
+```
+
+`zsh` is more challenging because it has no default completion path in
+`$HOME`. The script below sets up a conventional completion directory
+in `$HOME`:
+
+```sh
+#!/bin/sh
+
+compdir="$HOME/.local/share/zsh/site-functions"
+compfile="$compdir/_mise"
+
+mkdir -p "$compdir"
+mise completion zsh > "$compfile"
+
+# Add fpath and compinit to .zshrc if not present
+zshrc="$HOME/.zshrc"
+grep -qF "$compdir" "$zshrc" 2>/dev/null || \
+  printf '\nfpath=(%s $fpath)\n' "$compdir" >> "$zshrc"
+grep -qF "compinit" "$zshrc" 2>/dev/null || \
+  printf '\nautoload -U compinit; compinit\n' >> "$zshrc"
+
+echo "Installed mise zsh completion to $compfile and enabled it in $zshrc"
+```
+
+### Decide How to Get Postgres
+
+People have more opinions about how to manage their Postgres version
+(e.g., `Postgres.app`, `brew`, `apt install`, etc.), and exact version
+matching is less important. If you don't have a preference, we suggest
+using `mise` to manage Postgres.
+
+Managing Postgres with mise will increase the number of system
+dependencies you need to install to compile it. Instructions on what
+to install are provided in the next section.
+
+If you choose to use `mise` to compile and install Postgres, you can
+run:
+
+    ln -s mise.local.toml.template mise.local.toml
+
+`mise.local.toml` is a file that `mise` reads and is not committed to
+the source. `mise.local.toml.template` *is* committed and updated
+occasionally for new Postgres versions, though `mise` does not read
+it.
+
+### Installing System Dependencies
+
+`mise` will compile Ruby and/or Postgres. Additionally, some Ruby gems
+require compilation. For all of this, you must have a C compiler, a
+Rust compiler, and various libraries. [There is documentation listing
+the commands you can use for each
 platform](https://github.com/rbenv/ruby-build/wiki#suggested-build-environment)
-(e.g. Macintosh Homebrew, or Ubuntu).
+(e.g., Homebrew on macOS, or Ubuntu).
 
-After that, install Ruby.  `asdf` will consult the `.tool-versions`
-file to select the version.
+You will also need
+[dependencies](https://github.com/mise-plugins/mise-postgres#dependencies)
+installed on your system to compile Postgres.
+
+For quick reference, here are some recipes for the most common
+platforms we use.
+
+Homebrew:
 
 ```sh
-$ asdf install ruby
+xcode-select --install
+
+# Ruby
+brew install openssl@3 readline libyaml gmp autoconf
+
+# Postgres
+brew install gcc readline zlib curl ossp-uuid icu4c pkg-config
 ```
 
-Having done this, you can see if your `$PATH` finds the `ruby` "shim"
-generated by `asdf` and consult the version:
+Debian/Ubuntu based:
 
 ```sh
-$ which ruby
-/home/ubicloud/.asdf/shims/ruby
-$ ruby --version
-ruby 3.2.5 (2024-07-26 revision 31d0f1a2e7) [x86_64-linux]
+# Ruby
+apt-get install autoconf patch build-essential rustc libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libgmp-dev libncurses5-dev libffi-dev libgdbm6 libgdbm-dev libdb-dev uuid-dev
+
+# Postgres
+apt-get install build-essential libssl-dev libreadline-dev zlib1g-dev libcurl4-openssl-dev uuid-dev icu-devtools libicu-dev
 ```
 
-### Installing asdf-direnv
+### `mise install`
 
-We find use of `asdf` with
-[asdf-direnv](https://github.com/asdf-community/asdf-direnv) almost
-obligatory, for the reasons discussed in its README.  Let's set it up
-as a user-global tool, and not a project-local one:
+Finally, after installing `mise`, activating it in your shell, and
+installing system dependencies, run:
+
+    mise install
+
+This will install all required dependencies. You can then verify that
+these dependencies are active:
+
+    $ which ruby
+    /home/youruser/.local/share/mise/installs/ruby/3.2.8/bin/ruby
+    $ which postgres
+    /home/youruser/.local/share/mise/installs/postgres/15.8/bin/postgres
+    $ which node
+    /home/youruser/.local/share/mise/installs/node/23.6.0/bin/node
+    $ which go
+    /home/youruser/.local/share/mise/installs/go/1.24.0/bin/go
+
+### Checking `mise`-set Environment Variables
+
+Mise exports additional environment variables besides `$PATH`, and
+some of them are useful to know. You can see them in shell format with
+`mise env`:
 
 ```sh
-$ asdf direnv setup --version latest
-$ echo "direnv $(direnv --version)" >> ~/.tool-versions
+$ mise env
+set -gx GOBIN /home/youruser/.local/share/mise/installs/go/1.24.0/bin
+set -gx GOROOT /home/youruser/.local/share/mise/installs/go/1.24.0
+set -gx LD_LIBRARY_PATH /home/youruser/.local/share/mise/installs/postgres/15.8/lib
+set -gx PATH '/home/youruser/.local/share/mise/installs/ruby/3.2.8/bin:/home/youruser/.local/share/mise/installs/postgres/15.8/bin:/home/youruser/.local/share/mise/installs/node/23.6.0/bin:/home/youruser/.local/share/mise/installs/go/1.24.0/bin:/home/youruser/.local/share/mise/installs/direnv/2.35.0:/home/youruser/.local/share/mise/installs/yq/4.44.2:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin'
+set -gx PGDATA /home/youruser/.local/share/mise/installs/postgres/15.8/data
 ```
 
 After `direnv setup` you need to source your shell's startup files or
@@ -236,7 +353,7 @@ called "development" and the other "test", and they each have a
 database: `clover_development` and `clover_test`.  Only one user is
 used to connect to both databases, though, named `clover`.
 
-Presuming you have set up Postgres using `asdf-vm`, run a server in a
+Presuming you have set up Postgres using `mise`, run a server in a
 dedicated terminal window with `postgres -D $PGDATA` set aside, and
 then create the user and databases:
 
@@ -320,14 +437,13 @@ through the low-level `gem` command:
 
 ```sh
 $ which gem
-/home/ubicloud/.asdf/installs/ruby/3.2.5/bin/gem
+/home/youruser/.local/share/mise/installs/ruby/3.2.8/bin/gem
 $ gem install bundler
-Fetching bundler-2.5.17.gem
+Fetching bundler-2.6.7.gem
 [...]
 $ bundle install
+Bundle complete! 63 Gemfile dependencies, 178 gems now installed.
 [...]
-Bundle complete! 30 Gemfile dependencies, 75 gems now installed.
-Use `bundle info [gemname]` to see where a bundled gem is installed.
 ```
 
 Bundler's function is to solve complex gem version constraint upgrades
@@ -439,10 +555,10 @@ installed with `nodejs` package.
 
 ```sh
 $ which npm
-/home/ubicloud/.asdf/installs/nodejs/22.9.0/bin/npm
+/home/youruser/.local/share/mise/installs/node/23.6.0/bin/npm
 $ npm install
 [...]
-added 86 packages, and audited 87 packages in 1s
+added 46 packages, removed 19 packages, changed 41 packages, and audited 527 packages in 1s
 
 14 packages are looking for funding
     run `npm fund` for details
