@@ -112,16 +112,5 @@ class Clover
         end
       end
     end
-
-    # 204 response for invalid names
-    r.is String do |firewall_name|
-      r.post do
-        Validation.validate_name(firewall_name)
-      end
-
-      r.delete do
-        204
-      end
-    end
   end
 end
