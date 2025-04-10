@@ -1,6 +1,8 @@
 # Clover
 
-Clover is the codename for Ubicloud's software, which consists of the control plane, data plane, and web console program for managing virtual machines and other applications.
+Clover is the codename for Ubicloud's software, which consists of the
+control plane, data plane, and web console program for managing
+virtual machines and other applications.
 
 It's a Ruby program that connects to Postgres.
 
