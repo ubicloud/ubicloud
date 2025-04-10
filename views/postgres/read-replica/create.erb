@@ -1,0 +1,58 @@
+<%
+  @page_title, logo = if @flavor == PostgresResource::Flavor::PARADEDB
+    ["Create ParadeDB PostgreSQL Database Read Replica", "logo-paradedb.png"]
+  elsif @flavor == PostgresResource::Flavor::LANTERN
+    ["Create Lantern PostgreSQL Database Read Replica", "logo-lantern.png"]
+  else
+    ["Create PostgreSQL Database Read Replica", nil]
+  end
+%>
+
+  <% form_elements = [
+    {
+      name: "name",
+      type: "text",
+      label: "Name",
+      required: "required",
+      placeholder: "#{@pg[:name]}-read-replica",
+      opening_tag: "<div class='sm:col-span-3'>"
+    },
+
+    {
+      name: "family",
+      type: "radio_small_cards",
+      label: "Server family",
+      required: "required",
+      content_generator: ContentGenerator::Postgres.method(:family)
+    },
+    {
+      name: "size",
+      type: "radio_small_cards",
+      label: "Server size",
+      required: "required",
+      content_generator: ContentGenerator::Postgres.method(:size)
+    }
+  ]
+
+  pre_selected_values = {
+    "name" => "#{@pg[:name]}-read-replica",
+    "flavor" => @pg[:flavor],
+    "location" => @location.id,
+    "family" => @family,
+    "size" => @pg[:vm_size],
+    "storage_size" => @pg[:storage_size_gib],
+    "ha_type" => @pg[:ha_type]
+  } %>
+
+  <%== render(
+    "components/form/resource_creation_form",
+    locals: {
+      action: "#{@project_data[:path]}#{@pg[:path]}/read-replica",
+      method: "POST",
+      form_title: "Create PostgreSQL database read replica",
+      form_elements:,
+      pre_selected_values:,
+      option_tree: @option_tree,
+      option_parents: @option_parents
+    }
+  ) %>

@@ -184,6 +184,53 @@ class Clover
         end
       end
 
+      r.on "read-replica" do
+        r.get true do
+          # implement the config page for read-replica instance configuration
+          # matrix
+          authorize("Postgres:view", pg.id)
+          response.headers["Cache-Control"] = "no-store"
+
+          if api?
+            Serializers::Postgres.serialize(pg, {detailed: true})
+          else
+            @pg = Serializers::Postgres.serialize(pg, {detailed: true, include_path: true})
+            @family = Validation.validate_vm_size(pg.target_vm_size, "x64").family
+            @option_tree, @option_parents = generate_postgres_configure_options(flavor: @pg[:flavor], location: @location)
+            view "postgres/read-replica/create"
+          end
+        end
+
+        r.post true do
+          # Create the read-replica
+          required_parameters = ["name"]
+          allowed_optional_parameters = ["size", "storage_size", "ha_type", "location"]
+          ignored_parameters = ["family"]
+          request_body_params = validate_request_params(required_parameters, allowed_optional_parameters, ignored_parameters)
+          parsed_size = Validation.validate_postgres_size(@location, request_body_params["size"], @project.id)
+          st = Prog::Postgres::PostgresResourceNexus.assemble(
+            project_id: @project.id,
+            location_id: pg.location_id,
+            name: request_body_params["name"],
+            target_vm_size: parsed_size.vm_size,
+            target_storage_size_gib: request_body_params["storage_size"] || parsed_size.storage_size_options.first,
+            ha_type: request_body_params["ha_type"] || PostgresResource::HaType::NONE,
+            version: pg.version,
+            flavor: pg.flavor,
+            parent_id: pg.id,
+            restore_target: nil # TODO: remove this when we have a proper restore target
+          )
+          send_notification_mail_to_partners(st.subject, current_account.email)
+
+          if api?
+            Serializers::Postgres.serialize(st.subject, {detailed: true})
+          else
+            flash["notice"] = "'#{request_body_params["name"]}' will be ready in a few minutes"
+            r.redirect "#{@project.path}#{st.subject.path}"
+          end
+        end
+      end
+
       r.post "restore" do
         authorize("Postgres:create", @project.id)
         authorize("Postgres:view", pg.id)

@@ -83,8 +83,14 @@ class PostgresServer < Sequel::Model
         configs[:primary_conninfo] = "'#{resource.replication_connection_string(application_name: ubid)}'"
       end
 
-      if doing_pitr?
+      if doing_pitr? && !read_replica?
         configs[:recovery_target_time] = "'#{resource.restore_target}'"
+      end
+
+      if read_replica?
+        configs[:recovery_target_time] = "''"
+        configs[:recovery_target_timeline] = "latest"
+        configs[:recovery_target_inclusive] = false
       end
 
       if standby? || doing_pitr?
@@ -125,6 +131,10 @@ class PostgresServer < Sequel::Model
 
   def doing_pitr?
     !resource.representative_server.primary?
+  end
+
+  def read_replica?
+    timeline_access == "fetch" && doing_pitr?
   end
 
   def storage_size_gib
