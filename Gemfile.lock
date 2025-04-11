@@ -8,6 +8,14 @@ GIT
       rodauth (~> 2.36)
 
 GIT
+  remote: https://github.com/jeremyevans/forme.git
+  revision: 856e9abe62dde92b1efc1b06297ffaaec912bf27
+  ref: 856e9abe62dde92b1efc1b06297ffaaec912bf27
+  specs:
+    forme (2.6.0)
+      bigdecimal
+
+GIT
   remote: https://github.com/jeremyevans/rodauth.git
   revision: 2a72b30136c512ea2853ad9dbc126c067bef89e9
   ref: 2a72b30136c512ea2853ad9dbc126c067bef89e9
@@ -309,7 +317,7 @@ GEM
     refrigerator (1.8.0)
     regexp_parser (2.10.0)
     rexml (3.4.1)
-    roda (3.89.0)
+    roda (3.91.0)
       rack
     rodish (2.0.0)
       optparse
@@ -471,6 +479,7 @@ DEPENDENCIES
   erubi (>= 1.5)
   excon
   foreman
+  forme!
   jwt
   mail
   net-ssh
@@ -490,7 +499,7 @@ DEPENDENCIES
   rackup
   rake
   refrigerator (>= 1)
-  roda (>= 3.89)
+  roda (>= 3.91)
   rodauth!
   rodauth-omniauth!
   rodish (>= 2)

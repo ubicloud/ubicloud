@@ -1,46 +1,50 @@
 # frozen_string_literal: true
 
 class Clover
-  def postgres_post(name)
+  def postgres_post
     authorize("Postgres:create", @project.id)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
     Validation.validate_postgres_location(@location, @project.id)
+    parsed_size = Validation.validate_postgres_size(@location, request.params["size"], @project.id)
 
-    required_parameters = ["size"]
-    required_parameters << "name" << "location" if web?
-    allowed_optional_parameters = ["storage_size", "ha_type", "version", "flavor"]
-    ignored_parameters = ["family"]
-    request_body_params = validate_request_params(required_parameters, allowed_optional_parameters, ignored_parameters)
-    parsed_size = Validation.validate_postgres_size(@location, request_body_params["size"], @project.id)
-
-    ha_type = request_body_params["ha_type"] || PostgresResource::HaType::NONE
-    requested_standby_count = case ha_type
-    when PostgresResource::HaType::ASYNC then 1
-    when PostgresResource::HaType::SYNC then 2
-    else 0
-    end
+    ha_type = request.params["ha_type"] || PostgresResource::HaType::NONE
+    requested_standby_count = PostgresResource::HaType::REQUESTED_STANDBY_COUNT[ha_type] || 0
 
     requested_postgres_vcpu_count = (requested_standby_count + 1) * parsed_size.vcpu
     Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count)
 
+    @postgres.set(
+      target_vm_size: parsed_size.vm_size,
+      target_storage_size_gib: request.params["storage_size"] || parsed_size.storage_size_options.first,
+      ha_type: request.params["ha_type"] || PostgresResource::HaType::NONE,
+      flavor: request.params["flavor"] || PostgresResource::Flavor::STANDARD
+    )
+    @postgres.version ||= PostgresResource::DEFAULT_VERSION
+    @postgres.superuser_password = "a" # just to pass validation
+
+    unless @postgres.valid?
+      error = @postgres.send(:validation_failed_error)
+      raise error, "Validation failed for the following fields: #{@postgres.errors.keys.sort.join(", ")}"
+    end
+
     st = Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: @project.id,
       location_id: @location.id,
-      name:,
-      target_vm_size: parsed_size.vm_size,
-      target_storage_size_gib: request_body_params["storage_size"] || parsed_size.storage_size_options.first,
-      ha_type: request_body_params["ha_type"] || PostgresResource::HaType::NONE,
-      version: request_body_params["version"] || PostgresResource::DEFAULT_VERSION,
-      flavor: request_body_params["flavor"] || PostgresResource::Flavor::STANDARD
+      name: @postgres.name,
+      target_vm_size: @postgres.target_vm_size,
+      target_storage_size_gib: @postgres.target_storage_size_gib,
+      ha_type: @postgres.ha_type,
+      version: @postgres.version,
+      flavor: @postgres.flavor
     )
     send_notification_mail_to_partners(st.subject, current_account.email)
 
     if api?
       Serializers::Postgres.serialize(st.subject, {detailed: true})
     else
-      flash["notice"] = "'#{name}' will be ready in a few minutes"
-      request.redirect "#{@project.path}#{PostgresResource[st.id].path}"
+      flash["notice"] = "'#{@postgres.name}' will be ready in a few minutes"
+      request.redirect "#{@project.path}#{st.subject.path}"
     end
   end
 

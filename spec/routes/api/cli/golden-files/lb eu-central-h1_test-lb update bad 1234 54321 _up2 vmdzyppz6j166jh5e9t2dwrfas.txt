@@ -1,2 +1,3 @@
 ! Unexpected response status: 400
 Details: algorithm is not one of the supported values (hash_based, round_robin)
+  algorithm: is not one of the supported values (hash_based, round_robin)

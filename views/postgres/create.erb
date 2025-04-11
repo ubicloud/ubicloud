@@ -6,6 +6,16 @@
   else
     ["Create PostgreSQL Database", nil]
   end
+
+  _, _, @input_options = generate_postgres_options(flavor: @flavor)
+  @input_options.ignore_dependency("flavor")
+  @input_options.configure("location", text_method: :ui_name, value_method: :id)
+  @input_options.configure("version") { ["Postgres #{_1}", _1] }
+  @input_options.configure_display("size") { ContentGenerator::Postgres.size(*_1.values_at(*%w[flavor location family size])) }
+  @input_options.configure_display("storage_size") { ContentGenerator::Postgres.storage_size(*_1.values_at(*%w[flavor location family size storage_size])) }
+  @input_options.configure_display("ha_type") {
+    ContentGenerator::Postgres.ha_type(*_1.values_at(*%w[flavor location family size storage_size ha_type]))
+ }
 %>
 
 <%== render("components/billing_warning") %>
@@ -21,23 +31,42 @@
   right_items: [logo ? "<img src=\"/#{logo}\" class=\"h-6 object-contain\"/>" : nil]
 ) %>
 
-<%
-  form_elements = [
-    {name: "flavor", type: "hidden", value: @flavor},
-    {name: "name", type: "text", label: "Name", required: "required", placeholder: "Enter name", opening_tag: "<div class='sm:col-span-3'>"},
-    {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::Postgres.method(:location)},
-    {name: "family", type: "radio_small_cards", label: "Server family", required: "required", content_generator: ContentGenerator::Postgres.method(:family)},
-    {name: "size", type: "radio_small_cards", label: "Server size", required: "required", content_generator: ContentGenerator::Postgres.method(:size)},
-    {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required", content_generator: ContentGenerator::Postgres.method(:storage_size)},
-    {name: "version", type: "radio_small_cards", label: "Version", required: "required", content_generator: ContentGenerator::Postgres.method(:version)},
-    {name: "ha_type", type: "radio_small_cards", label: "High Availability", required: "required", content_generator: ContentGenerator::Postgres.method(:ha_type)},
-  ]
+<% form(@postgres, {action: "#{@project_data[:path]}/postgres", method: "POST", id: "dependency-form"}, request:, input_options: @input_options, validation_error: @validation_error) do |f| %>
+  <% wrap_resource_form do %>
+    <%== f.input(:hidden, obj: nil, name: "flavor", value: @flavor) %>
+    <%== f.input(:name, placeholder: "Enter name", main_wrapper_class: "sm:col-span-3") %>
+    <%== f.input(:location, as: :radio, key: :location) %>
+    <%== f.input(:radioset, obj: nil, key: :family, label: "Server family", display_type: :family) %>
+    <%== f.input(:radioset, obj: nil, key: :size, label: "Server size", display_type: :size) %>
+    <%== f.input(:radioset, obj: nil, key: :storage_size, label: "Storage size", display_type: :storage_size) %>
+    <%== f.input(:version, type: :radioset) %>
+    <%== f.input(:radioset, obj: nil, key: :ha_type, label: "High Availability", display_type: :ha_type) %>
 
-  if [PostgresResource::Flavor::PARADEDB, PostgresResource::Flavor::LANTERN].include?(@flavor)
-    form_elements << {name: "partnership_notice", type: "partnership_notice", label: "Partnership Notice", required: "required", content_generator: ContentGenerator::Postgres.method(:partnership_notice)}
-  end
-
-  action = "#{@project_data[:path]}/postgres"
-%>
-
-<%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents) %>
+    <% if [PostgresResource::Flavor::PARADEDB, PostgresResource::Flavor::LANTERN].include?(@flavor) %>
+      <div class="col-span-full">
+        <div class="space-y-2">
+          <label class="text-sm font-medium leading-6 text-gray-900">Partnership Notice</label>
+          <div class="space-y-1 text-sm leading-6 text-gray-600">
+            <% if @flavor == PostgresResource::Flavor::PARADEDB %>
+              <p>ParadeDB is an Elasticsearch alternative built on Postgres. ParadeDB instances are managed by the ParadeDB team and are optimal for search and analytics workloads.</p>
+              <p>You can get ParadeDB specific support via email at <a href='mailto:support@paradedb.com' class='text-orange-600 font-semibold'>support@paradedb.com</a> or via Slack at <a href='https://join.slack.com/t/paradedbcommunity/shared_invite/zt-2lkzdsetw-OiIgbyFeiibd1DG~6wFgTQ' target='_blank' class='text-orange-600 font-semibold'>ParadeDB Community Slack</a></p>
+              <p>By creating a ParadeDB PostgreSQL database on Ubicloud you consent to your contact information being shared with ParadeDB team.</p>
+            <% else %>
+              <p>Lantern is a PostgreSQL-based vector database designed specifically for building AI applications. Lantern instances are managed by the Lantern team and are optimal for AI workloads.</p>
+              <p>You can reach to Lantern team for support at <a href='mailto:support@lantern.dev' class='text-orange-600 font-semibold'>support@lantern.dev</a></p>
+              <p>By creating a Lantern PostgreSQL database on Ubicloud you consent to your contact information being shared with Lantern team.</p>
+            <% end %>
+          </div>
+          <%
+            tos_label = if PostgresResource::Flavor::PARADEDB
+              "Accept <a href='https://paradedb.notion.site/Terms-of-Use-d17c9916a5b746fab86c274feb35da75' target='_blank' class='text-orange-600 font-semibold'>Terms of Service</a> and <a href='https://paradedb.notion.site/Privacy-Policy-a7ce333c45c8478fb03250dff7e573b7?pvs=4' target='_blank' class='text-orange-600 font-semibold'> Privacy Policy</a>"
+            else
+              "Accept <a href='https://lantern.dev/legal/terms' target='_blank' class='text-orange-600 font-semibold'>Terms of Service</a> and <a href='https://lantern.dev/legal/privacy' target='_blank' class='text-orange-600 font-semibold'> Privacy Policy</a>"
+            end
+          %>
+          <%== f.input(:checkboxset, obj: nil, required: true, key: :tos, options: [[Forme.raw(tos_label), 1]]) %>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>

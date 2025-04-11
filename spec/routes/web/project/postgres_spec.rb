@@ -82,8 +82,8 @@ RSpec.describe Clover, "postgres" do
         name = "new-pg-db"
         fill_in "Name", with: name
         choose option: Location::HETZNER_FSN1_ID
-        choose option: "standard-2"
-        choose option: PostgresResource::HaType::NONE
+        page.all("input[name=size][value=standard-2]")[0].choose
+        page.all("input[name=ha_type][value=none]")[0].choose
 
         click_button "Create"
 
@@ -104,8 +104,8 @@ RSpec.describe Clover, "postgres" do
         name = "new-pg-db"
         fill_in "Name", with: name
         choose option: private_location.id
-        choose option: "standard-2"
-        choose option: PostgresResource::HaType::NONE
+        page.all("input[name=size][value=standard-2]")[0].choose
+        page.all("input[name=ha_type][value=none]")[0].choose
         choose option: "118"
 
         click_button "Create"
@@ -125,8 +125,8 @@ RSpec.describe Clover, "postgres" do
         name = "new-pg-db"
         fill_in "Name", with: name
         choose option: Location::HETZNER_FSN1_ID
-        choose option: "standard-60"
-        choose option: PostgresResource::HaType::NONE
+        page.all("input[name=size][value=standard-60]")[0].choose
+        page.all("input[name=ha_type][value=none]")[0].choose
 
         click_button "Create"
 
@@ -142,8 +142,8 @@ RSpec.describe Clover, "postgres" do
         name = "new-pg-db"
         fill_in "Name", with: name
         choose option: Location::HETZNER_FSN1_ID
-        choose option: "standard-60"
-        choose option: PostgresResource::HaType::NONE
+        page.all("input[name=size][value=standard-60]")[0].choose
+        page.all("input[name=ha_type][value=none]")[0].choose
         Location[Location::HETZNER_FSN1_ID].destroy
 
         click_button "Create"
@@ -161,8 +161,8 @@ RSpec.describe Clover, "postgres" do
         name = "new-pg-db"
         fill_in "Name", with: name
         choose option: Location::HETZNER_FSN1_ID
-        choose option: "standard-2"
-        choose option: PostgresResource::HaType::NONE
+        page.all("input[name=size][value=standard-2]")[0].choose
+        page.all("input[name=ha_type][value=none]")[0].choose
         check "Accept Terms of Service and Privacy Policy"
 
         click_button "Create"
@@ -199,8 +199,8 @@ RSpec.describe Clover, "postgres" do
 
         fill_in "Name", with: pg.name
         choose option: Location::HETZNER_FSN1_ID
-        choose option: "standard-2"
-        choose option: PostgresResource::HaType::NONE
+        page.all("input[name=size][value=standard-2]")[0].choose
+        page.all("input[name=ha_type][value=none]")[0].choose
 
         click_button "Create"
 

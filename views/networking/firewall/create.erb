@@ -10,15 +10,11 @@
   ]
 ) %>
 
-<%
-  form_elements = [
-    {name: "name", type: "text", label: "Name", required: "required", placeholder: "Enter name", opening_tag: "<div class='sm:col-span-2'>"},
-    {name: "description", type: "text", label: "Description", required: "required", placeholder: "Enter description", opening_tag: "<div class='sm:col-span-2'>"},
-    {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::Vm.method(:location)},
-    {name: "private_subnet_id", type: "select", label: "Private Subnet", placeholder: "Select private subnet", content_generator: ContentGenerator::Vm.method(:private_subnet), opening_tag: "<div class='sm:col-span-2'>"},
-  ]
-
-  action = "#{@project_data[:path]}/firewall"
-%>
-
-<%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents)%>
+<% form(@firewall, action: "#{@project_data[:path]}/firewall", method: "POST", id: "dependency-form", dependencies: "location") do |f| %>
+  <% wrap_resource_form do %>
+    <%== f.input(:name, placeholder: "Enter name", main_wrapper_class: "sm:col-span-2") %>
+    <%== f.input(:description, required: false, placeholder: "Enter description", main_wrapper_class: "sm:col-span-2") %>
+    <%== f.input(:location, as: :radio, required: true, options: Option.locations.map { [_1.ui_name, _1.id] }, provides: "location") %>
+    <%== f.input(:select, obj: nil, key: :private_subnet_id, name: "private_subnet_id", label: "Private Subnet", main_wrapper_class: "sm:col-span-2", add_blank: "Select private subnet", selected: request.params["private_subnet_id"], options: @private_subnet_dataset.map { [_1.name, {value: _1.ubid, class: "depends-location #{_1.location_id}"}] }) %>
+  <% end %>
+<% end %>

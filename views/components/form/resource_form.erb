@@ -1,0 +1,36 @@
+<%# locals: (form_title: nil, mode: "create") %>
+<div>
+  <% if form_title %>
+    <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+      <div class="min-w-0 flex-1">
+        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+          <%= form_title %>
+        </h3>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="grid gap-6">
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="space-y-12">
+          <div>
+            <div class="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+              <%== yield %>
+            </div>
+          </div>
+        </div>
+        <div class="px-4 py-5 sm:p-6">
+          <div class="flex items-center justify-end gap-x-6">
+            <% if mode == "create" %>
+              <a href="<% request.path_info.sub(/\/[^\/]+\z/, "") %>" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+              <%== part("components/form/submit_button", text: "Create") %>
+            <% else %>
+              <%== part("components/form/submit_button", text: "Update") %>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

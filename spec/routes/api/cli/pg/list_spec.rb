@@ -37,10 +37,10 @@ RSpec.describe Clover, "cli pg list" do
   end
 
   it "handles case where header size is larger than largest column size" do
-    @pg.update(name: "Abc")
+    @pg.update(name: "abc")
     expect(cli(%w[pg list])).to eq <<~END
       location       name  #{id_headr}  version  flavor  
-      eu-central-h1  Abc   #{@pg.ubid}  17       standard
+      eu-central-h1  abc   #{@pg.ubid}  17       standard
     END
   end
 

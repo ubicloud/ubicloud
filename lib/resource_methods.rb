@@ -33,6 +33,13 @@ module ResourceMethods
     self
   end
 
+  def forme_use_required_abbr?
+    false
+  end
+
+  def forme_config(form)
+  end
+
   def validate
     super
 
