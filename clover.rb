@@ -66,7 +66,7 @@ class Clover < Roda
   plugin :part
   plugin :request_headers
   plugin :forme_set, secret: Config.clover_session_secret
-  plugin :capture_erb
+  plugin :capture_erb, returns: :buffer
   plugin :inject_erb
   plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
 
@@ -165,10 +165,15 @@ class Clover < Roda
     end
 
     case e
-    when Sequel::ValidationFailed, Roda::RodaPlugins::InvalidRequestBody::Error
+    when Roda::RodaPlugins::InvalidRequestBody::Error
       code = 400
       type = "InvalidRequest"
       message = e.to_s
+    when Sequel::ValidationFailed
+      code = 400
+      type = "InvalidRequest"
+      message = e.message
+      details = e.errors&.transform_values { _1.join(", ") }
     when CloverError
       code = e.code
       type = e.type

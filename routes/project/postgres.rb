@@ -7,23 +7,30 @@ class Clover
     end
 
     r.web do
+      @postgres = PostgresResource.new(flavor: r.params["flavor"] || PostgresResource::Flavor::STANDARD, project_id: @project.id)
+      @flavor = @postgres.flavor
+      Validation.validate_postgres_flavor(@flavor)
+      @has_valid_payment_method = @project.has_valid_payment_method?
+
       r.post true do
         check_visible_location
-        postgres_post(r.params["name"])
+
+        forme_set(@postgres)
+
+        # Ideally, we would keep the default of location_id for the parameter name,
+        # and everything would work.
+        # However, too much other code depends on using location as the parameter name.
+        # Work around by handling the location= to location_id= in the model,
+        # and this code to remove the incorrect validation that forme_set would use by default.
+        @postgres.forme_validations.delete(:location)
+
+        handle_validation_failure("postgres/create") do
+          postgres_post
+        end
       end
 
       r.get "create" do
         authorize("Postgres:create", @project.id)
-
-        flavor = r.params["flavor"] || PostgresResource::Flavor::STANDARD
-        Validation.validate_postgres_flavor(flavor)
-
-        @flavor = flavor
-        @prices = fetch_location_based_prices("PostgresVCpu", "PostgresStorage")
-        @has_valid_payment_method = @project.has_valid_payment_method?
-        @enabled_postgres_sizes = Option::VmSizes.select { @project.quota_available?("PostgresVCpu", _1.vcpus) }.map(&:name)
-        @option_tree, @option_parents = generate_postgres_options(flavor: @flavor)
-
         view "postgres/create"
       end
     end

@@ -37,6 +37,9 @@ module ResourceMethods
     false
   end
 
+  def forme_config(form)
+  end
+
   def validate
     super
 

@@ -10,7 +10,9 @@ class Clover
       if pg_name
         r.post api? do
           check_visible_location
-          postgres_post(pg_name)
+          @postgres = PostgresResource.new(project_id: @project.id, location_id: @location.id, name: pg_name)
+          @postgres.set_fields(request.params, ["version", "flavor"])
+          postgres_post
         end
 
         filter = {Sequel[:postgres_resource][:name] => pg_name}
@@ -271,7 +273,8 @@ class Clover
     # 204 response for invalid names
     r.is String do |pg_name|
       r.post do
-        postgres_post(pg_name)
+        @postgres = PostgresResource.new(project_id: @project.id, location_id: @location.id, name: pg_name)
+        postgres_post
       end
 
       r.delete do

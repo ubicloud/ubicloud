@@ -46,6 +46,8 @@ module Option
     ["burstable", "Shared CPU", true, true]
   ].map { |args| VmFamily.new(*args) }
 
+  VmFamilyMap = VmFamilies.map { [_1.name, _1] }.to_h.freeze
+
   IoLimits = Struct.new(:max_ios_per_sec, :max_read_mbytes_per_sec, :max_write_mbytes_per_sec)
   NO_IO_LIMITS = IoLimits.new(nil, nil, nil).freeze
 
@@ -93,6 +95,8 @@ module Option
       PostgresSize.new(_1.id, "burstable-#{_2}", "burstable", "burstable-#{_2}", PostgresResource::Flavor::LANTERN, _2, _2 * 2, storage_size_options)
     ]
   }).freeze
+
+  PostgresSizeMap = PostgresSizes.map { [_1.name, _1] }.to_h.freeze
 
   PostgresHaOption = Struct.new(:name, :standby_count, :title, :explanation)
   PostgresHaOptions = [[PostgresResource::HaType::NONE, 0, "No Standbys", "No replication"],

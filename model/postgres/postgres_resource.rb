@@ -19,6 +19,7 @@ class PostgresResource < Sequel::Model
   dataset_module Pagination
 
   include ResourceMethods
+  include Validation::ModelNameValidation
   include SemaphoreMethods
   include ObjectTag::Cleanup
 
@@ -33,6 +34,14 @@ class PostgresResource < Sequel::Model
 
   def display_location
     location.display_name
+  end
+
+  def location=(loc)
+    if loc.is_a?(String)
+      self.location_id = loc
+    else
+      super
+    end
   end
 
   def path
@@ -121,12 +130,23 @@ class PostgresResource < Sequel::Model
   def validate
     super
     validates_includes(0..23, :maintenance_window_start_at, allow_nil: true, message: "must be between 0 and 23")
+
+    if new? || changed_columns.include?(:location_id)
+      available_pg_locs = Option.postgres_locations(project_id:)
+      validates_includes(available_pg_locs, :location, message: "Given location is not a valid postgres location. Available locations: #{available_pg_locs.map(&:display_name)}")
+    end
   end
 
   module HaType
     NONE = "none"
     ASYNC = "async"
     SYNC = "sync"
+
+    REQUESTED_STANDBY_COUNT = {
+      NONE => 0,
+      ASYNC => 1,
+      SYNC => 2
+    }.freeze
   end
 
   module Flavor

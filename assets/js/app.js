@@ -202,15 +202,36 @@ function setupDatePicker() {
 
 function setupOptionHiding() {
   var form = $('#dependency-form');
-  var dependencies = form.attr('dependencies').split();
-  $(dependencies).each(function(_, f) {
-    var func = function () {
-      form.find('.depends-'+f).hide();
-      form.find('.'+$(this).attr('value')).show();
-    };
-    form.find('.provides-'+f+' input[type=radio]:checked').each(func);
-    form.on('change', '.provides-'+f+' input[type=radio]', func);
-  });
+  var selected_re = RegExp("^selected-");
+  var func = function () {
+    var dependency_value = $(this).attr('filter');
+    var dependency_type = dependency_value.split("-")[0];
+
+    form.find(".dependency-radioset").each(function(_, rs) {
+      rs = $(rs);
+      var dependencies = rs.attr('dependencies');
+      if (!dependencies) return;
+      dependencies = dependencies.split(" ");
+      if (dependencies.indexOf(dependency_type) == -1) return;
+
+      rs.find(".depends-"+dependency_type).hide().removeClass("show-"+dependency_type).filter("."+dependency_value).addClass("show-"+dependency_type);
+      var show_when = "."+$.map(dependencies, function (f){ return "show-"+f }).join(".");
+      rs.find(show_when).show();
+      if (!rs.find(show_when+' :checked')[0]) {
+        sc = null;
+        rs.find('label:has(:checked)')[0].classList.forEach(function(e) {
+          if (selected_re.test(e)) sc = e;
+        });
+        var to_check = rs.find(show_when+'.'+sc+" input[type=radio]")[0]
+        if (!to_check) to_check = rs.find(show_when+' input[type=radio]')[0];
+        to_check = $(to_check);
+        to_check.prop("checked", true);
+        to_check.trigger("change");
+      }
+    });
+  };
+  form.find('.provider input[type=radio]:checked').each(func);
+  form.on('change', '.provider input[type=radio]', func);
 }
 
 function setupFormOptionUpdates() {

@@ -150,8 +150,23 @@ class Clover < Roda
 
   def handle_validation_failure(template)
     yield
+  rescue Validation::ValidationFailed => e
+    raise if ENV["SHOW_ERRORS"]
+    flash.now["error"] = e.message
+
+    # Store so that the form can find errors for inputs not tied to the model
+    @validation_error = e
+    view template
   rescue Sequel::ValidationFailed => e
-    flash.now["error"] = "Validation failed for following fields: #{e.errors.keys.join(", ")}"
+    raise if ENV["SHOW_ERRORS"]
+    full_message = e.errors.full_messages.join(", ")
+
+    # Some specs except one format, other specs expect another format
+    flash.now["error"] = if full_message.include?("is already taken")
+      full_message
+    else
+      "Validation failed for following fields: #{e.errors.keys.join(", ")}"
+    end
     view template
   end
 end
