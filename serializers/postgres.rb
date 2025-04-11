@@ -13,7 +13,9 @@ class Serializers::Postgres < Serializers::Base
       ha_type: pg.ha_type,
       flavor: pg.flavor,
       ca_certificates: pg.ca_certificates,
-      maintenance_window_start_at: pg.maintenance_window_start_at
+      maintenance_window_start_at: pg.maintenance_window_start_at,
+      read_replica: pg.read_replica?,
+      read_replicas: pg.read_replicas.map { Serializers::Postgres.serialize(_1, include_path: true) }
     }
 
     if options[:include_path]

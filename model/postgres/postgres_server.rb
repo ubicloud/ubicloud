@@ -17,7 +17,7 @@ class PostgresServer < Sequel::Model
   include HealthMonitorMethods
 
   semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup
-  semaphore :restart, :configure, :take_over, :configure_prometheus, :destroy
+  semaphore :restart, :configure, :take_over, :configure_prometheus, :destroy, :recycle
 
   def configure_hash
     configs = {
@@ -83,8 +83,14 @@ class PostgresServer < Sequel::Model
         configs[:primary_conninfo] = "'#{resource.replication_connection_string(application_name: ubid)}'"
       end
 
-      if doing_pitr?
+      if doing_pitr? && !read_replica?
         configs[:recovery_target_time] = "'#{resource.restore_target}'"
+      end
+
+      if read_replica?
+        configs[:recovery_target_time] = "''"
+        configs[:recovery_target_timeline] = "latest"
+        configs[:recovery_target_inclusive] = false
       end
 
       if standby? || doing_pitr?
@@ -109,6 +115,9 @@ class PostgresServer < Sequel::Model
     if primary? && (standby = failover_target)
       standby.incr_take_over
       true
+    elsif read_replica?
+      standby.incr_take_over
+      true
     else
       Clog.emit("Failed to trigger failover")
       false
@@ -127,12 +136,16 @@ class PostgresServer < Sequel::Model
     !resource.representative_server.primary?
   end
 
+  def read_replica?
+    resource.read_replica?
+  end
+
   def storage_size_gib
     vm.vm_storage_volumes_dataset.first(boot: false)&.size_gib
   end
 
   def needs_recycling?
-    vm.display_size != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib
+    recycle_set? || vm.display_size != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib
   end
 
   def failover_target
@@ -166,7 +179,15 @@ class PostgresServer < Sequel::Model
   def check_pulse(session:, previous_pulse:)
     reading = begin
       session[:db_connection] ||= Sequel.connect(adapter: "postgres", host: health_monitor_socket_path, user: "postgres", connect_timeout: 4)
-      lsn_function = primary? ? "pg_current_wal_lsn()" : "pg_last_wal_receive_lsn()"
+      lsn_function = if primary?
+        "pg_current_wal_lsn()"
+      elsif standby?
+        "pg_last_wal_receive_lsn()"
+      elsif read_replica?
+        "pg_last_wal_replay_lsn()"
+      else
+        raise "Unknown timeline access type: #{timeline_access}"
+      end
       last_known_lsn = session[:db_connection]["SELECT #{lsn_function} AS lsn"].first[:lsn]
       "up"
     rescue

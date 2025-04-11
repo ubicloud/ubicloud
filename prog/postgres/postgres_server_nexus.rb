@@ -144,11 +144,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     when "Succeeded"
       hop_refresh_certificates
     when "Failed", "NotStarted"
-      backup_label = if postgres_server.standby?
-        "LATEST"
-      else
-        postgres_server.timeline.latest_backup_label_before_target(target: postgres_server.resource.restore_target)
-      end
+      backup_label = "LATEST"
       vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/initialize-database-from-backup #{postgres_server.resource.version} #{backup_label}' initialize_database_from_backup")
     end
 
@@ -204,7 +200,7 @@ global:
   scrape_interval: 10s
   external_labels:
     ubicloud_resource_id: #{postgres_server.resource.ubid}
-    ubicloud_resource_role: #{(postgres_server.id == postgres_server.resource.representative_server.id) ? "primary" : "standby"}
+    ubicloud_resource_role: #{(!postgres_server.read_replica? && (postgres_server.id == postgres_server.resource.representative_server.id)) ? "primary" : "standby"}
 
 scrape_configs:
 - job_name: node
@@ -243,6 +239,7 @@ CONFIG
 
       when_initial_provisioning_set? do
         hop_update_superuser_password if postgres_server.primary?
+        hop_wait if postgres_server.read_replica?
         hop_wait_catch_up if postgres_server.standby?
         hop_wait_recovery_completion
       end
@@ -332,6 +329,7 @@ SQL
       if is_wal_replay_paused
         postgres_server.run_query("SELECT pg_wal_replay_resume()")
         is_in_recovery = false
+        hop_wait
       end
     end
 

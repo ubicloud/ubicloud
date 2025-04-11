@@ -42,10 +42,19 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       nap 10 * 60 if maintenance_window_start_at && (current_hour - maintenance_window_start_at) % 24 >= PostgresResource::MAINTENANCE_DURATION_IN_HOURS
       register_deadline(nil, 10 * 60)
 
-      rs.trigger_failover
+      if postgres_resource.read_replica?
+        hop_failover_read_replica
+      else
+        rs.trigger_failover
+      end
     end
 
     nap 60
+  end
+
+  label def failover_read_replica
+    postgres_resource.read_replica_failover
+    hop_prune_servers
   end
 
   label def prune_servers
@@ -55,7 +64,9 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       .reject { _1.representative_at || _1.needs_recycling? }
       .sort_by { [(_1.strand.label == "wait") ? 0 : 1, Time.now - _1.created_at] }
       .take(postgres_resource.target_standby_count) + [postgres_resource.representative_server]
-    (postgres_resource.servers - servers_to_keep).each.each(&:incr_destroy)
+    servers_to_prune = (postgres_resource.servers - servers_to_keep)
+    servers_to_prune.each.each(&:incr_destroy)
+    postgres_resource.read_replicas.map(&:incr_recycle_servers) if servers_to_prune.any? { _1.primary? }
 
     postgres_resource.incr_update_billing_records
 

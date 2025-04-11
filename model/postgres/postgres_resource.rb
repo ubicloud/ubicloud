@@ -14,6 +14,7 @@ class PostgresResource < Sequel::Model
   one_to_many :metric_destinations, class: :PostgresMetricDestination, key: :postgres_resource_id
   many_to_one :private_subnet
   many_to_one :location, key: :location_id, class: :Location
+  one_to_many :read_replicas, class: :PostgresResource, key: :parent_id do |ds| ds.where(restore_target: nil) end
 
   plugin :association_dependencies, firewall_rules: :destroy, metric_destinations: :destroy
   dataset_module Pagination
@@ -22,7 +23,7 @@ class PostgresResource < Sequel::Model
   include SemaphoreMethods
   include ObjectTag::Cleanup
 
-  semaphore :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records, :destroy
+  semaphore :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records, :destroy, :recycle_servers
 
   plugin :column_encryption do |enc|
     enc.column :superuser_password
@@ -121,6 +122,20 @@ class PostgresResource < Sequel::Model
   def validate
     super
     validates_includes(0..23, :maintenance_window_start_at, allow_nil: true, message: "must be between 0 and 23")
+  end
+
+  def read_replica?
+    parent_id && restore_target.nil?
+  end
+
+  def read_replica_failover
+    DB.transaction do
+      old_representative_server = representative_server
+      incr_refresh_dns_record
+      old_representative_server.update(representative_at: nil)
+      servers.reject { _1.id == old_representative_server.id }.first.update(representative_at: Time.now)
+      old_representative_server.incr_destroy
+    end
   end
 
   module HaType
