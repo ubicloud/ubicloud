@@ -204,6 +204,11 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       bud Prog::Postgres::ConvergePostgresResource, frame, :start
     end
 
+    when_recycle_servers_set? do
+      postgres_resource.servers.each(&:incr_recycle)
+      decr_recycle_servers
+    end
+
     when_update_billing_records_set? do
       hop_update_billing_records
     end

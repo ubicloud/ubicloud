@@ -203,18 +203,17 @@ class Clover
 
         r.post true do
           # Create the read-replica
-          required_parameters = ["name"]
-          allowed_optional_parameters = ["size", "storage_size", "ha_type", "location"]
-          ignored_parameters = ["family"]
-          request_body_params = validate_request_params(required_parameters, allowed_optional_parameters, ignored_parameters)
+          required_parameters = ["name", "size"]
+          ignored_parameters = ["family", "location", "ha_type", "version", "storage_size"]
+          request_body_params = validate_request_params(required_parameters, [], ignored_parameters)
           parsed_size = Validation.validate_postgres_size(@location, request_body_params["size"], @project.id)
           st = Prog::Postgres::PostgresResourceNexus.assemble(
             project_id: @project.id,
             location_id: pg.location_id,
             name: request_body_params["name"],
             target_vm_size: parsed_size.vm_size,
-            target_storage_size_gib: request_body_params["storage_size"] || parsed_size.storage_size_options.first,
-            ha_type: request_body_params["ha_type"] || PostgresResource::HaType::NONE,
+            target_storage_size_gib: pg.target_storage_size_gib,
+            ha_type: PostgresResource::HaType::NONE,
             version: pg.version,
             flavor: pg.flavor,
             parent_id: pg.id,

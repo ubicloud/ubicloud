@@ -200,7 +200,7 @@ global:
   scrape_interval: 10s
   external_labels:
     ubicloud_resource_id: #{postgres_server.resource.ubid}
-    ubicloud_resource_role: #{(postgres_server.id == postgres_server.resource.representative_server.id) ? "primary" : "standby"}
+    ubicloud_resource_role: #{(!postgres_server.read_replica? && (postgres_server.id == postgres_server.resource.representative_server.id)) ? "primary" : "standby"}
 
 scrape_configs:
 - job_name: node
