@@ -12,11 +12,13 @@ on:
       - 'cli/**'
       - 'bin/ubi'
       - 'spec/cli_spec.rb'
+      - '.github/workflows/cli-ci.yml'
   pull_request:
     paths:
       - 'cli/**'
       - 'bin/ubi'
       - 'spec/cli_spec.rb'
+      - '.github/workflows/cli-ci.yml'
 
 jobs:
   cli-ci:
@@ -34,7 +36,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15.4
+        image: postgres:15.8
         env:
           POSTGRES_USER: ${{ env.DB_USER }}
           POSTGRES_PASSWORD: ${{ env.DB_PASSWORD }}
@@ -85,5 +87,5 @@ jobs:
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v7
       with:
-        version: v1.64
+        version: v2.0
         working-directory: cli
