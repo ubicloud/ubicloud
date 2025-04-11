@@ -120,6 +120,11 @@ module Config
   optional :minio_service_project_id, string
   override :minio_version, "minio_20240406052602.0.0_amd64"
 
+  # VictoriaMetrics
+  optional :victoriametrics_service_project_id, string
+  override :victoriametrics_host_name, "victoriametrics.ubicloud.com", string
+  override :victoriametrics_version, "linux-amd64-v1.113.0"
+
   # Spdk
   override :spdk_version, "v23.09-ubi-0.3"
 

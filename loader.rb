@@ -82,6 +82,8 @@ module Prog::Postgres; end
 
 module Prog::Storage; end
 
+module Prog::VictoriaMetrics; end
+
 module Prog::Vm; end
 
 module Prog::Vnet; end
@@ -208,6 +210,7 @@ def clover_freeze
     Prog::Minio,
     Prog::Postgres,
     Prog::Storage,
+    Prog::VictoriaMetrics,
     Prog::Vm,
     Prog::Vnet,
     Prog::Vnet::RekeyNicTunnel::Xfrm,
