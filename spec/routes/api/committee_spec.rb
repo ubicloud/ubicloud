@@ -56,6 +56,18 @@ RSpec.describe Clover, "committee infrastructure" do
     }.to raise_error Committee::InvalidResponse, %r{#/components/schemas/Vm missing required parameters: .*}
   end
 
+  it "fails when request has invalid parameter" do
+    expect {
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/INVALID", {
+        public_key: "ssh key",
+        unix_user: "ubi",
+        size: "standard-2",
+        boot_image: "ubuntu-jammy",
+        storage_size: "40"
+      }.to_json
+    }.to raise_error Committee::InvalidRequest, '#/components/schemas/Reference pattern ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$ does not match value: "INVALID"'
+  end
+
   it "fails when request is missing required keys" do
     expect {
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {}.to_json
