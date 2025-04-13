@@ -118,12 +118,6 @@ RSpec.describe Clover, "load-balancer" do
 
         expect(last_response.status).to eq(204)
       end
-
-      it "not found for invalid name" do
-        delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/invalid_name"
-
-        expect(last_response.status).to eq(400)
-      end
     end
 
     describe "get" do

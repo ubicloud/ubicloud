@@ -206,7 +206,7 @@ class Clover < Roda
       message = "Sorry, we couldn’t process your request because of an unexpected error."
     end
 
-    raise e if Config.test? && e.is_a?(Committee::Error) && code != 400
+    raise e if Config.test? && e.is_a?(Committee::Error)
 
     response.status = code
     next if code == 204

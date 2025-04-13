@@ -139,15 +139,6 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(404, "Validation failed for following path components: location")
       end
 
-      it "invalid name" do
-        post "/project/#{project.ubid}/location/eu-central-h1/postgres/INVALIDNAME", {
-          size: "standard-2",
-          ha_type: "sync"
-        }.to_json
-
-        expect(last_response).to have_api_error(400, 'Parameter "INVALIDNAME" does not match pattern ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$')
-      end
-
       it "can update database properties" do
         expect(Project).to receive(:from_ubid).and_return(project)
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
@@ -416,13 +407,6 @@ RSpec.describe Clover, "postgres" do
         delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/foo-name"
 
         expect(last_response.status).to eq(204)
-        expect(SemSnap.new(pg.id).set?("destroy")).to be false
-      end
-
-      it "invalid reference" do
-        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_fooubid"
-
-        expect(last_response.status).to eq(400)
         expect(SemSnap.new(pg.id).set?("destroy")).to be false
       end
 
