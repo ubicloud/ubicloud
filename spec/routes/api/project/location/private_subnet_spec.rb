@@ -93,7 +93,7 @@ RSpec.describe Clover, "private_subnet" do
       it "invalid name" do
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/invalid_name"
 
-        expect(last_response).to have_api_error(404, 'Parameter "invalid_name" does not match pattern ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$')
+        expect(last_response).to have_api_error(400, 'Parameter "invalid_name" does not match pattern ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$')
       end
 
       it "not authorized" do
@@ -216,7 +216,7 @@ RSpec.describe Clover, "private_subnet" do
       it "not exist for invalid name" do
         delete "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/foo_name"
 
-        expect(last_response.status).to eq(404)
+        expect(last_response.status).to eq(400)
         expect(SemSnap.new(ps.id).set?("destroy")).to be false
       end
 

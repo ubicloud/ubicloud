@@ -55,10 +55,10 @@ RSpec.describe Clover, "firewall" do
       expect(last_response.status).to eq(200)
     end
 
-    it "get does not exist for invalid name" do
+    it "invalid request for invalid name" do
       get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/foo_name"
 
-      expect(last_response).to have_api_error(404, 'Parameter "foo_name" does not match pattern ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$')
+      expect(last_response).to have_api_error(400, 'Parameter "foo_name" does not match pattern ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$')
     end
 
     it "get does not exist for valid name" do
@@ -80,7 +80,7 @@ RSpec.describe Clover, "firewall" do
         description: "Firewall description"
       }.to_json
 
-      expect(last_response).to have_api_error(404, 'Parameter "FooName" does not match pattern ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$')
+      expect(last_response).to have_api_error(400, 'Parameter "FooName" does not match pattern ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$')
     end
 
     it "success delete with underscore" do
@@ -107,7 +107,7 @@ RSpec.describe Clover, "firewall" do
     it "delete for invalid ubid format" do
       delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_foo_ubid"
 
-      expect(last_response.status).to eq(404)
+      expect(last_response.status).to eq(400)
       expect(firewall).to exist
     end
 

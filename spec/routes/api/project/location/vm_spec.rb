@@ -66,7 +66,7 @@ RSpec.describe Clover, "vm" do
       it "ubid not exist" do
         get "/project/#{project.ubid}/location/#{vm.display_location}/vm/_foo_ubid"
 
-        expect(last_response).to have_api_error(404, 'Parameter "_foo_ubid" does not match pattern ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$')
+        expect(last_response).to have_api_error(400, 'Parameter "_foo_ubid" does not match pattern ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$')
       end
 
       it "location not exist" do
@@ -171,7 +171,7 @@ RSpec.describe Clover, "vm" do
           enable_ip4: true
         }.to_json
 
-        expect(last_response).to have_api_error(404, 'Parameter "MyVM" does not match pattern ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$')
+        expect(last_response).to have_api_error(400, 'Parameter "MyVM" does not match pattern ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$')
       end
 
       it "invalid boot image" do
@@ -283,7 +283,7 @@ RSpec.describe Clover, "vm" do
       it "not exist invalid name" do
         delete "/project/#{project.ubid}/location/#{vm.display_location}/vm/foo_name"
 
-        expect(last_response.status).to eq(404)
+        expect(last_response.status).to eq(400)
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
       end
 
