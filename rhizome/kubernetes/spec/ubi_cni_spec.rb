@@ -144,7 +144,6 @@ RSpec.describe UbiCNI do
       allow(File).to receive(:read).with("/opt/cni/bin/ubicni-ipam-store").and_return("{}")
       allow(File).to receive(:exist?).with("/opt/cni/bin/ubicni-ipam-store").and_return(true)
       allow(File).to receive(:exist?).with("/etc/netns/test-ns/resolv.conf").and_return(true)
-      allow(File).to receive(:readlines).and_return(["nameserver 8.8.8.8", "search local"])
       allow(ubicni).to receive(:r).and_return("link/ether 00:11:22:33:44:55", "inet6 fd00::1/64")
     end
 
@@ -165,7 +164,7 @@ RSpec.describe UbiCNI do
 
       dns_config_path = "/etc/netns/test-ns/resolv.conf"
       allow(File).to receive(:exist?).with(dns_config_path).and_return(true)
-      allow(File).to receive(:readlines).with(dns_config_path).and_return([
+      allow(File).to receive(:readlines).with(dns_config_path, chomp: true).and_return([
         "nameserver 10.96.0.10\n",
         "search default.svc.cluster.local svc.cluster.local cluster.local\n",
         "options ndots:5\n"
