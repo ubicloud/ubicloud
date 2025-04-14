@@ -73,13 +73,8 @@ class UbiCNI
     outer_link_local = mac_to_ipv6_link_local(outer_mac)
     outer_ifname = "veth_#{container_id[0, 8]}"
 
-    FileUtils.mkdir_p("/etc/netns/#{cni_netns}")
-    dns_config = <<~EOF
-nameserver 10.96.0.10
-search default.svc.cluster.local svc.cluster.local cluster.local
-options ndots:5
-    EOF
-    File.write("/etc/netns/#{cni_netns}/resolv.conf", dns_config)
+    @logger.info "Configuring DNS for network namespace #{cni_netns}"
+    setup_dns(cni_netns)
 
     r "ip link add #{outer_ifname} addr #{outer_mac} type veth peer name #{inner_ifname} addr #{inner_mac} netns #{cni_netns}"
 
@@ -130,6 +125,16 @@ options ndots:5
     }
     @logger.info "add response: #{JSON.generate(response)}"
     JSON.generate(response)
+  end
+
+  def setup_dns(cni_netns)
+    FileUtils.mkdir_p("/etc/netns/#{cni_netns}")
+    dns_config = <<~EOF
+nameserver 10.96.0.10
+search default.svc.cluster.local svc.cluster.local cluster.local
+options ndots:5
+    EOF
+    File.write("/etc/netns/#{cni_netns}/resolv.conf", dns_config)
   end
 
   def setup_ipv6(subnet, inner_link_local, outer_link_local, cni_netns, inner_ifname, outer_ifname, setup_default_route: false)
