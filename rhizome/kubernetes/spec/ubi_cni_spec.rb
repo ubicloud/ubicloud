@@ -267,4 +267,31 @@ RSpec.describe UbiCNI do
       expect(ubicni.calculate_subnet_size(subnet)).to eq(2**64)
     end
   end
+
+  describe "#check_required_env_vars" do
+    it "does not call error_exit when all required variables are set" do
+      allow(ENV).to receive(:[]).with("CNI_CONTAINERID").and_return("some_value")
+      allow(ENV).to receive(:[]).with("CNI_NETNS").and_return("some_value")
+      allow(ENV).to receive(:[]).with("CNI_IFNAME").and_return("some_value")
+      expect(ubicni).not_to receive(:error_exit)
+      ubicni.check_required_env_vars(["CNI_CONTAINERID", "CNI_NETNS", "CNI_IFNAME"])
+    end
+
+    it "calls error_exit when a required variable is missing" do
+      allow(ENV).to receive(:[]).with("CNI_CONTAINERID").and_return("some_value")
+      allow(ENV).to receive(:[]).with("CNI_NETNS").and_return(nil)
+      allow(ENV).to receive(:[]).with("CNI_IFNAME").and_return("some_value")
+      expect(ubicni).to receive(:error_exit).with("Missing required environment variable: CNI_NETNS")
+      ubicni.check_required_env_vars(["CNI_CONTAINERID", "CNI_NETNS", "CNI_IFNAME"])
+    end
+
+    it "calls error_exit for each missing variable" do
+      allow(ENV).to receive(:[]).with("CNI_CONTAINERID").and_return(nil)
+      allow(ENV).to receive(:[]).with("CNI_NETNS").and_return(nil)
+      allow(ENV).to receive(:[]).with("CNI_IFNAME").and_return("some_value")
+      expect(ubicni).to receive(:error_exit).with("Missing required environment variable: CNI_CONTAINERID")
+      expect(ubicni).to receive(:error_exit).with("Missing required environment variable: CNI_NETNS")
+      ubicni.check_required_env_vars(["CNI_CONTAINERID", "CNI_NETNS", "CNI_IFNAME"])
+    end
+  end
 end

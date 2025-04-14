@@ -55,6 +55,7 @@ class UbiCNI
   end
 
   def handle_add
+    check_required_env_vars(["CNI_CONTAINERID", "CNI_NETNS", "CNI_IFNAME"])
     subnet_ula_ipv6 = @input_data["ranges"]["subnet_ula_ipv6"]
     subnet_ipv6 = @input_data["ranges"]["subnet_ipv6"]
     subnet_ipv4 = @input_data["ranges"]["subnet_ipv4"]
@@ -162,6 +163,7 @@ options ndots:5
   end
 
   def handle_del
+    check_required_env_vars(["CNI_CONTAINERID"])
     container_id = ENV["CNI_CONTAINERID"]
 
     if @ipam_store["allocated_ips"].key?(container_id)
@@ -173,6 +175,7 @@ options ndots:5
   end
 
   def handle_get
+    check_required_env_vars(["CNI_NETNS", "CNI_IFNAME"])
     cni_netns = ENV["CNI_NETNS"].sub("/var/run/netns/", "")
     inner_ifname = ENV["CNI_IFNAME"]
 
@@ -273,6 +276,12 @@ options ndots:5
       2**(32 - subnet.prefix)
     else
       2**(128 - subnet.prefix)
+    end
+  end
+
+  def check_required_env_vars(vars)
+    vars.each do |var|
+      error_exit("Missing required environment variable: #{var}") unless ENV[var]
     end
   end
 end
