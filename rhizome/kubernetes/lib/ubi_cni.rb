@@ -31,15 +31,7 @@ class UbiCNI
   end
 
   def run
-    @logger.info "-------------------------------------------------------"
-    @logger.info "Handling new command: #{ENV["CNI_COMMAND"]}"
-    @logger.info "ENV[CNI_CONTAINERID] #{ENV["CNI_CONTAINERID"]}"
-    @logger.info "ENV[CNI_NETNS] #{ENV["CNI_NETNS"]}"
-    @logger.info "ENV[CNI_IFNAME] #{ENV["CNI_IFNAME"]}"
-    @logger.info "ENV[CNI_ARGS] #{ENV["CNI_ARGS"]}"
-    @logger.info "ENV[CNI_PATH] #{ENV["CNI_PATH"]}"
-    @logger.info "-------------------------------------------------------"
-
+    log_environment
     output = case @cni_command
     when "ADD" then handle_add
     when "DEL" then handle_del
@@ -47,6 +39,19 @@ class UbiCNI
     else error_exit("Unsupported CNI command: #{@cni_command}")
     end
     puts output
+  end
+
+  def log_environment
+    @logger.info <<~LOG
+      -------------------------------------------------------
+      Handling new command: #{@cni_command}
+      ENV[CNI_CONTAINERID] #{ENV["CNI_CONTAINERID"]}
+      ENV[CNI_NETNS] #{ENV["CNI_NETNS"]}
+      ENV[CNI_IFNAME] #{ENV["CNI_IFNAME"]}
+      ENV[CNI_ARGS] #{ENV["CNI_ARGS"]}
+      ENV[CNI_PATH] #{ENV["CNI_PATH"]}
+      -------------------------------------------------------
+    LOG
   end
 
   def handle_add
