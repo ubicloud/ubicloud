@@ -56,6 +56,8 @@ class UbiCNI
 
   def handle_add
     check_required_env_vars(["CNI_CONTAINERID", "CNI_NETNS", "CNI_IFNAME"])
+    validate_input_ranges
+
     subnet_ula_ipv6 = @input_data["ranges"]["subnet_ula_ipv6"]
     subnet_ipv6 = @input_data["ranges"]["subnet_ipv6"]
     subnet_ipv4 = @input_data["ranges"]["subnet_ipv4"]
@@ -282,6 +284,12 @@ options ndots:5
   def check_required_env_vars(vars)
     vars.each do |var|
       error_exit("Missing required environment variable: #{var}") unless ENV[var]
+    end
+  end
+
+  def validate_input_ranges
+    unless @input_data["ranges"]&.values_at("subnet_ula_ipv6", "subnet_ipv6", "subnet_ipv4")&.all?
+      error_exit("Missing required ranges in input data")
     end
   end
 end
