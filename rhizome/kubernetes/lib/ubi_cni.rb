@@ -175,12 +175,9 @@ options ndots:5
     dns_servers = []
     search_domains = []
     if File.exist?(dns_config_path)
-      File.readlines(dns_config_path).each do |line|
-        if line.start_with?("nameserver")
-          dns_servers << line.split[1]
-        elsif line.start_with?("search")
-          search_domains = line.split.drop(1)
-        end
+      File.readlines(dns_config_path, chomp: true).each do |line|
+        dns_servers << line.split[1] if line.start_with?("nameserver")
+        search_domains = line.split.drop(1) if line.start_with?("search")
       end
     end
 
