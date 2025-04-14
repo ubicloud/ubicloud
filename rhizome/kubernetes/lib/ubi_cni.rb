@@ -86,45 +86,27 @@ class UbiCNI
     @ipam_store["allocated_ips"][container_id] = [ipv4_container_ip, ipv4_gateway_ip, container_ula_ipv6, container_ipv6].map!(&:to_s)
     save_ipam_store
 
-    response = {
+    response = build_add_response(inner_ifname, inner_mac, cni_netns, ipv4_container_ip, ipv4_gateway_ip, container_ula_ipv6, container_ipv6, outer_link_local)
+    @logger.info "ADD response: #{JSON.generate(response)}"
+    JSON.generate(response)
+  end
+
+  def build_add_response(inner_ifname, inner_mac, cni_netns, ipv4_container_ip, ipv4_gateway_ip, container_ula_ipv6, container_ipv6, outer_link_local)
+    {
       cniVersion: "1.0.0",
-      interfaces: [
-        {
-          name: inner_ifname,
-          mac: inner_mac,
-          sandbox: "/var/run/netns/#{cni_netns}"
-        }
-      ],
+      interfaces: [{name: inner_ifname, mac: inner_mac, sandbox: "/var/run/netns/#{cni_netns}"}],
       ips: [
-        {
-          address: "#{ipv4_container_ip}/#{ipv4_container_ip.prefix}",
-          gateway: ipv4_gateway_ip.to_s,
-          interface: 0
-        },
-        {
-          address: "#{container_ula_ipv6}/#{container_ula_ipv6.prefix}",
-          gateway: outer_link_local,
-          interface: 0
-        },
-        {
-          address: "#{container_ipv6}/#{container_ipv6.prefix}",
-          gateway: outer_link_local,
-          interface: 0
-        }
+        {address: "#{ipv4_container_ip}/#{ipv4_container_ip.prefix}", gateway: ipv4_gateway_ip.to_s, interface: 0},
+        {address: "#{container_ula_ipv6}/#{container_ula_ipv6.prefix}", gateway: outer_link_local, interface: 0},
+        {address: "#{container_ipv6}/#{container_ipv6.prefix}", gateway: outer_link_local, interface: 0}
       ],
-      routes: [
-        {
-          dst: "0.0.0.0/0"
-        }
-      ],
+      routes: [{dst: "0.0.0.0/0"}],
       dns: {
         nameservers: ["10.96.0.10"],
         search: ["default.svc.cluster.local", "svc.cluster.local", "cluster.local"],
         options: ["ndots:5"]
       }
     }
-    @logger.info "add response: #{JSON.generate(response)}"
-    JSON.generate(response)
   end
 
   def setup_dns(cni_netns)
