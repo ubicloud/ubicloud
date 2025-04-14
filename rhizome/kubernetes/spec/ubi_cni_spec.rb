@@ -27,12 +27,6 @@ RSpec.describe UbiCNI do
       expect { ubicni.run }.to output("del_output\n").to_stdout
     end
 
-    it "calls handle_get if CNI_COMMAND is GET" do
-      expect(ENV).to receive(:[]).with("CNI_COMMAND").and_return("GET")
-      expect(ubicni).to receive(:handle_get).and_return("get_output")
-      expect { ubicni.run }.to output("get_output\n").to_stdout
-    end
-
     it "raises an error for an unsupported command" do
       expect(ENV).to receive(:[]).with("CNI_COMMAND").and_return("INVALID")
       expect(logger).to receive(:error).with("Unsupported CNI command: INVALID")
@@ -185,62 +179,6 @@ RSpec.describe UbiCNI do
       expect(file).to receive(:flush)
       expect(file).to receive(:fsync)
       expect(ubicni.handle_del).to eq("{}")
-    end
-  end
-
-  describe "#handle_get" do
-    before do
-      expect(ENV).to receive(:[]).with("CNI_COMMAND").and_return("GET")
-      expect(ENV).to receive(:[]).with("CNI_NETNS").and_return("/var/run/netns/test-ns")
-      expect(ENV).to receive(:[]).with("CNI_IFNAME").and_return("eth0")
-      expect(ubicni).to receive(:r).with("ip -n test-ns link show eth0").and_return(
-        "2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP mode DEFAULT group default\n" \
-        "    link/ether 00:11:22:33:44:55 brd ff:ff:ff:ff:ff:ff"
-      )
-      expect(ubicni).to receive(:r).with("ip -n test-ns -6 addr show dev eth0").and_return(
-        "inet6 2001:db8::2/64 scope global\n" \
-        "   valid_lft forever preferred_lft forever"
-      )
-    end
-
-    it "retrieves container network information with DNS config" do
-      dns_config_path = "/etc/netns/test-ns/resolv.conf"
-      expect(File).to receive(:exist?).with(dns_config_path).and_return(true)
-      expect(File).to receive(:readlines).with(dns_config_path, chomp: true).and_return([
-        "nameserver 10.96.0.10",
-        "search default.svc.cluster.local svc.cluster.local cluster.local",
-        "options ndots:5"
-      ])
-
-      expect(ubicni).to receive(:check_required_env_vars).with(["CNI_NETNS", "CNI_IFNAME"])
-      response = JSON.parse(ubicni.handle_get)
-
-      expect(response).to include("cniVersion" => "1.0.0")
-      expect(response["interfaces"]).to include(
-        hash_including("name" => "eth0", "mac" => "00:11:22:33:44:55", "sandbox" => "/var/run/netns/test-ns")
-      )
-      expect(response["ips"]).to include(
-        hash_including("address" => "2001:db8::2/64", "gateway" => nil, "interface" => 0)
-      )
-      expect(response["dns"]).to include(
-        "nameservers" => ["10.96.0.10"],
-        "search" => ["default.svc.cluster.local", "svc.cluster.local", "cluster.local"],
-        "options" => ["ndots:5"]
-      )
-    end
-
-    it "returns empty DNS config if the file does not exist" do
-      dns_config_path = "/etc/netns/test-ns/resolv.conf"
-      expect(File).to receive(:exist?).with(dns_config_path).and_return(false)
-
-      expect(ubicni).to receive(:check_required_env_vars).with(["CNI_NETNS", "CNI_IFNAME"])
-      response = JSON.parse(ubicni.handle_get)
-
-      expect(response["dns"]).to include(
-        "nameservers" => [],
-        "search" => [],
-        "options" => ["ndots:5"]
-      )
     end
   end
 
