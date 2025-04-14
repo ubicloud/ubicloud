@@ -294,4 +294,73 @@ RSpec.describe UbiCNI do
       ubicni.check_required_env_vars(["CNI_CONTAINERID", "CNI_NETNS", "CNI_IFNAME"])
     end
   end
+
+  describe "#validate_input_ranges" do
+    context "when all required ranges are present" do
+      subject(:ubicni) { described_class.new(input, logger) }
+
+      let(:input) do
+        {
+          "ranges" => {
+            "subnet_ula_ipv6" => "fd00::/64",
+            "subnet_ipv6" => "2001:db8::/64",
+            "subnet_ipv4" => "192.168.1.0/24"
+          }
+        }
+      end
+
+      it "does not call error_exit" do
+        expect(ubicni).not_to receive(:error_exit)
+        ubicni.validate_input_ranges
+      end
+    end
+
+    context "when 'ranges' key is missing" do
+      subject(:ubicni) { described_class.new(input, logger) }
+
+      let(:input) { {} }
+
+      it "calls error_exit with the appropriate message" do
+        expect(ubicni).to receive(:error_exit).with("Missing required ranges in input data")
+        ubicni.validate_input_ranges
+      end
+    end
+
+    context "when one of the required ranges is missing" do
+      subject(:ubicni) { described_class.new(input, logger) }
+
+      let(:input) do
+        {
+          "ranges" => {
+            "subnet_ula_ipv6" => "fd00::/64",
+            "subnet_ipv4" => "192.168.1.0/24"
+          }
+        }
+      end
+
+      it "calls error_exit with the appropriate message" do
+        expect(ubicni).to receive(:error_exit).with("Missing required ranges in input data")
+        ubicni.validate_input_ranges
+      end
+    end
+
+    context "when one of the required ranges is nil" do
+      subject(:ubicni) { described_class.new(input, logger) }
+
+      let(:input) do
+        {
+          "ranges" => {
+            "subnet_ula_ipv6" => "fd00::/64",
+            "subnet_ipv6" => nil,
+            "subnet_ipv4" => "192.168.1.0/24"
+          }
+        }
+      end
+
+      it "calls error_exit with the appropriate message" do
+        expect(ubicni).to receive(:error_exit).with("Missing required ranges in input data")
+        ubicni.validate_input_ranges
+      end
+    end
+  end
 end
