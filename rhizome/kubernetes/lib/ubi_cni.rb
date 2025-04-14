@@ -85,8 +85,8 @@ class UbiCNI
       interfaces: [{name: inner_ifname, mac: inner_mac, sandbox: "/var/run/netns/#{cni_netns}"}],
       ips: [
         {address: "#{ipv4_container_ip}/#{ipv4_container_ip.prefix}", gateway: ipv4_gateway_ip.to_s, interface: 0},
-        {address: "#{container_ula_ipv6}/#{container_ula_ipv6.prefix}", gateway: outer_link_local, interface: 0},
-        {address: "#{container_ipv6}/#{container_ipv6.prefix}", gateway: outer_link_local, interface: 0}
+        {address: "#{container_ipv6}/#{container_ipv6.prefix}", gateway: outer_link_local, interface: 0},
+        {address: "#{container_ula_ipv6}/#{container_ula_ipv6.prefix}", gateway: outer_link_local, interface: 0}
       ],
       routes: [{dst: "0.0.0.0/0"}],
       dns: {
