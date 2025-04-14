@@ -22,7 +22,6 @@ class UbiCNI
     output = case @cni_command
     when "ADD" then handle_add
     when "DEL" then handle_del
-    when "GET" then handle_get
     else error_exit("Unsupported CNI command: #{@cni_command}")
     end
     puts output
@@ -183,35 +182,6 @@ options ndots:5
     end
 
     "{}"
-  end
-
-  def handle_get
-    check_required_env_vars(["CNI_NETNS", "CNI_IFNAME"])
-    cni_netns = ENV["CNI_NETNS"].sub("/var/run/netns/", "")
-    inner_ifname = ENV["CNI_IFNAME"]
-
-    @logger.info "Retrieving configuration for interface #{inner_ifname} in namespace #{cni_netns}"
-    inner_mac = r("ip -n #{cni_netns} link show #{inner_ifname}").match(/link\/ether ([0-9a-f:]+)/)[1]
-    container_ip = r("ip -n #{cni_netns} -6 addr show dev #{inner_ifname}").match(/inet6 ([0-9a-f:\/]+)/)[1]
-
-    dns_config_path = "/etc/netns/#{cni_netns}/resolv.conf"
-    dns_servers = []
-    search_domains = []
-    if File.exist?(dns_config_path)
-      File.readlines(dns_config_path, chomp: true).each do |line|
-        dns_servers << line.split[1] if line.start_with?("nameserver")
-        search_domains = line.split.drop(1) if line.start_with?("search")
-      end
-    end
-
-    response = {
-      cniVersion: "1.0.0",
-      interfaces: [{name: inner_ifname, mac: inner_mac, sandbox: "/var/run/netns/#{cni_netns}"}],
-      ips: [{address: container_ip, gateway: nil, interface: 0}],
-      dns: {nameservers: dns_servers, search: search_domains, options: ["ndots:5"]}
-    }
-
-    JSON.generate(response)
   end
 
   def error_exit(message)
