@@ -1,8 +1,8 @@
 # Clover
 
-Clover is the codename for Ubicloud's software, which consists of the
-control plane, data plane, and web console program for managing
-virtual machines and other applications.
+Clover is the codename for Ubicloud's software. It includes a control
+plane, a data plane, and a web console for managing virtual machines
+and other applications.
 
 It's a Ruby program that connects to Postgres.
 
@@ -30,9 +30,9 @@ jQuery for interactivity.
 
 ## Development Environment
 
-We suggest using [mise](https://mise.jdx.dev) to manage software
-versions. There is a `.tool-versions` file that `mise` reads, and it
-is kept up to date.
+We recommend using [mise](https://mise.jdx.dev) to manage software
+versions. There is a `.tool-versions` file committed to the repository
+that `mise` reads.
 
 In the case of Ruby, obtaining a matching version is most important
 because it is constrained in the [Gemfile](Gemfile).
@@ -60,9 +60,10 @@ Commands:
 
 ### Installing System Dependencies
 
-`mise`, compiling Ruby and Postgres, and some Ruby gems will require a
-C and Rust compiler and some libraries.  [There is documentation
-listing the commands you can use for each
+`mise` will compile Ruby and Postgres.  Furthermore, some Ruby gems
+will require compilation.  For all of this, you must have a C
+compiler, a Rust compiler, and various libraries.  [There is
+documentation listing the commands you can use for each
 platform](https://github.com/rbenv/ruby-build/wiki#suggested-build-environment)
 (e.g. Macintosh Homebrew, or Ubuntu).
 
