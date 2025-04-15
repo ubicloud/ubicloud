@@ -48,10 +48,15 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
           target_storage_size_gib = Validation.validate_postgres_storage_size(location, target_vm_size, target_storage_size_gib, project_id)
         end
 
-        restore_target = Validation.validate_date(restore_target, "restore_target")
-        unless (earliest_restore_time = parent.timeline.earliest_restore_time) && earliest_restore_time <= restore_target &&
-            parent.timeline.latest_restore_time && restore_target <= parent.timeline.latest_restore_time
-          fail Validation::ValidationFailed.new({restore_target: "Restore target must be between #{earliest_restore_time} and #{parent.timeline.latest_restore_time}"})
+        if restore_target
+          restore_target = Validation.validate_date(restore_target, "restore_target")
+          earliest_restore_time = parent.timeline.earliest_restore_time
+          latest_restore_time = parent.timeline.latest_restore_time
+
+          unless earliest_restore_time && earliest_restore_time <= restore_target &&
+              latest_restore_time && restore_target <= latest_restore_time
+            fail Validation::ValidationFailed.new({restore_target: "Restore target must be between #{earliest_restore_time} and #{latest_restore_time}"})
+          end
         end
         [parent.superuser_password, parent.timeline.id, "fetch", parent.version]
       end

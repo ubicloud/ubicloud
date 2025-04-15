@@ -17,7 +17,7 @@ class PostgresServer < Sequel::Model
   include HealthMonitorMethods
 
   semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup
-  semaphore :restart, :configure, :take_over, :configure_prometheus, :destroy
+  semaphore :restart, :configure, :take_over, :configure_prometheus, :destroy, :recycle, :timeline_id_is_lagging
 
   def configure_hash
     configs = {
@@ -83,7 +83,11 @@ class PostgresServer < Sequel::Model
         configs[:primary_conninfo] = "'#{resource.replication_connection_string(application_name: ubid)}'"
       end
 
-      if doing_pitr?
+      if read_replica?
+        configs[:recovery_target_time] = "''"
+        configs[:recovery_target_timeline] = "latest"
+        configs[:recovery_target_inclusive] = false
+      elsif doing_pitr?
         configs[:recovery_target_time] = "'#{resource.restore_target}'"
       end
 
@@ -106,6 +110,20 @@ class PostgresServer < Sequel::Model
   end
 
   def trigger_failover
+    if read_replica?
+      DB.transaction do
+        if resource.representative_server.id == id && (target = read_replica_failover_target)
+          update(representative_at: nil)
+          target.update(representative_at: Time.now)
+          resource.incr_refresh_dns_record
+          return true
+        end
+      end
+
+      Clog.emit("Failed to trigger read replica failover")
+      return false
+    end
+
     if primary? && (standby = failover_target)
       standby.incr_take_over
       true
@@ -127,12 +145,25 @@ class PostgresServer < Sequel::Model
     !resource.representative_server.primary?
   end
 
+  def read_replica?
+    resource.read_replica?
+  end
+
   def storage_size_gib
     vm.vm_storage_volumes_dataset.first(boot: false)&.size_gib
   end
 
   def needs_recycling?
-    vm.display_size != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib
+    recycle_set? || vm.display_size != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib
+  end
+
+  def timeline_id_is_lagging
+    fail "the server is not a read replica" unless read_replica?
+    get_timeline_id < resource.parent.representative_server.get_timeline_id
+  end
+
+  def get_timeline_id
+    run_query("SELECT timeline_id FROM pg_control_checkpoint()").chomp.to_i
   end
 
   def failover_target
@@ -147,6 +178,17 @@ class PostgresServer < Sequel::Model
       return nil if lsn_monitor.last_known_lsn.nil?
       return nil if lsn_diff(lsn_monitor.last_known_lsn, target[:lsn]) > 80 * 1024 * 1024 # 80 MB or ~5 WAL files
     end
+
+    target[:server]
+  end
+
+  def read_replica_failover_target
+    target = resource.servers
+      .select { _1.strand.label == "wait" && !_1.needs_recycling? }
+      .map { {server: _1, lsn: _1.run_query("SELECT pg_last_wal_replay_lsn()").chomp} }
+      .max_by { lsn2int(_1[:lsn]) }
+
+    return nil if target.nil?
 
     target[:server]
   end
@@ -166,7 +208,13 @@ class PostgresServer < Sequel::Model
   def check_pulse(session:, previous_pulse:)
     reading = begin
       session[:db_connection] ||= Sequel.connect(adapter: "postgres", host: health_monitor_socket_path, user: "postgres", connect_timeout: 4)
-      lsn_function = primary? ? "pg_current_wal_lsn()" : "pg_last_wal_receive_lsn()"
+      lsn_function = if primary?
+        "pg_current_wal_lsn()"
+      elsif standby?
+        "pg_last_wal_receive_lsn()"
+      else
+        "pg_last_wal_replay_lsn()"
+      end
       last_known_lsn = session[:db_connection]["SELECT #{lsn_function} AS lsn"].first[:lsn]
       "up"
     rescue

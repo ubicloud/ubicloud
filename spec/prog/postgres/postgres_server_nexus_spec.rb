@@ -47,7 +47,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   before do
     allow(nx).to receive(:postgres_server).and_return(postgres_server)
-    allow(postgres_server).to receive(:resource).and_return(resource)
+    allow(postgres_server).to receive_messages(resource: resource, read_replica?: false)
   end
 
   describe ".assemble" do
@@ -414,6 +414,15 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.configure }.to hop("wait_catch_up")
     end
 
+    it "hops to wait for read replicas if configure command is succeeded" do
+      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Succeeded")
+      expect(postgres_server).to receive(:primary?).and_return(false)
+      expect(postgres_server).to receive(:read_replica?).and_return(true)
+      expect { nx.configure }.to hop("wait")
+    end
+
     it "naps if script return unknown status" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Unknown")
       expect { nx.configure }.to nap(5)
@@ -588,6 +597,32 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:when_restart_set?).and_yield
       expect(nx).to receive(:push).with(described_class, {}, "restart").and_call_original
       expect { nx.wait }.to hop("restart")
+    end
+
+    describe "read replica" do
+      before do
+        expect(postgres_server).to receive(:read_replica?).and_return(true)
+      end
+
+      it "checks if it was already lagging and the lag continues, if so, starts recycling" do
+        expect(postgres_server).to receive(:timeline_id_is_lagging_set?).and_return(true)
+        expect(postgres_server).to receive(:timeline_id_is_lagging).and_return(true)
+        expect(postgres_server).to receive(:incr_recycle)
+        expect { nx.wait }.to nap(60)
+      end
+
+      it "checks if it wasn't already lagging but the lag exists, if so, increments the lag semaphore" do
+        expect(postgres_server).to receive(:timeline_id_is_lagging_set?).and_return(false)
+        expect(postgres_server).to receive(:timeline_id_is_lagging).and_return(true)
+        expect(postgres_server).to receive(:incr_timeline_id_is_lagging)
+        expect { nx.wait }.to nap(120)
+      end
+
+      it "checks if it wasn't already lagging and there is no lag, simply naps" do
+        expect(postgres_server).to receive(:timeline_id_is_lagging_set?).and_return(false)
+        expect(postgres_server).to receive(:timeline_id_is_lagging).and_return(false)
+        expect { nx.wait }.to nap(60)
+      end
     end
   end
 
