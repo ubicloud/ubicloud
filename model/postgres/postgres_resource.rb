@@ -123,6 +123,10 @@ class PostgresResource < Sequel::Model
     validates_includes(0..23, :maintenance_window_start_at, allow_nil: true, message: "must be between 0 and 23")
   end
 
+  def read_replica?
+    parent_id && restore_target.nil?
+  end
+
   module HaType
     NONE = "none"
     ASYNC = "async"

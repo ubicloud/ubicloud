@@ -83,7 +83,11 @@ class PostgresServer < Sequel::Model
         configs[:primary_conninfo] = "'#{resource.replication_connection_string(application_name: ubid)}'"
       end
 
-      if doing_pitr?
+      if read_replica?
+        configs[:recovery_target_time] = "''"
+        configs[:recovery_target_timeline] = "latest"
+        configs[:recovery_target_inclusive] = false
+      elsif doing_pitr?
         configs[:recovery_target_time] = "'#{resource.restore_target}'"
       end
 
@@ -127,6 +131,10 @@ class PostgresServer < Sequel::Model
     !resource.representative_server.primary?
   end
 
+  def read_replica?
+    resource.read_replica?
+  end
+
   def storage_size_gib
     vm.vm_storage_volumes_dataset.first(boot: false)&.size_gib
   end
@@ -166,7 +174,13 @@ class PostgresServer < Sequel::Model
   def check_pulse(session:, previous_pulse:)
     reading = begin
       session[:db_connection] ||= Sequel.connect(adapter: "postgres", host: health_monitor_socket_path, user: "postgres", connect_timeout: 4)
-      lsn_function = primary? ? "pg_current_wal_lsn()" : "pg_last_wal_receive_lsn()"
+      lsn_function = if primary?
+        "pg_current_wal_lsn()"
+      elsif standby?
+        "pg_last_wal_receive_lsn()"
+      else
+        "pg_last_wal_replay_lsn()"
+      end
       last_known_lsn = session[:db_connection]["SELECT #{lsn_function} AS lsn"].first[:lsn]
       "up"
     rescue
