@@ -19,6 +19,23 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     vm.sshable.cmd("sudo tee -a /etc/hosts", stdin: "#{ip} #{kubernetes_cluster.endpoint}\n")
   end
 
+  # We need to create a random ula cidr for the cluster services subnet with
+  # a NetMask of /108
+  # For reference read here:
+  # https://github.com/kubernetes/kubernetes/blob/44c230bf5c321056e8bc89300b37c497f464f113/cmd/kubeadm/app/constants/constants.go#L251-L255
+  # This is an excerpt from the link:
+  # MaximumBitsForServiceSubnet defines maximum possible size of the service subnet in terms of bits.
+  # For example, if the value is 20, then the largest supported service subnet is /12 for IPv4 and /108 for IPv6.
+  # Note however that anything in between /108 and /112 will be clamped to /112 due to the limitations of the underlying allocation logic.
+  # MaximumBitsForServiceSubnet = 20
+  def random_ula_cidr
+    random_bytes = 0xfd.chr + SecureRandom.bytes(13)
+    high_bits = random_bytes[0...8].unpack1("Q>")
+    low_bits = (random_bytes[8...14] + "\x00\x00").unpack1("Q>")
+    network_address = NetAddr::IPv6.new((high_bits << 64) | low_bits)
+    NetAddr::IPv6Net.new(network_address, NetAddr::Mask128.new(108))
+  end
+
   def before_run
     if kubernetes_cluster.strand.label == "destroy" && strand.label != "destroy"
       pop "provisioning canceled"
@@ -127,7 +144,8 @@ TEMPLATE
         private_subnet_cidr4: kubernetes_cluster.private_subnet.net4,
         private_subnet_cidr6: kubernetes_cluster.private_subnet.net6,
         node_ipv4: vm.private_ipv4,
-        node_ipv6: vm.ephemeral_net6.nth(2)
+        node_ipv6: vm.ephemeral_net6.nth(2),
+        service_subnet_cidr6: random_ula_cidr
       }
       vm.sshable.d_run("init_kubernetes_cluster", "/home/ubi/kubernetes/bin/init-cluster", stdin: JSON.generate(params), log: false)
       nap 30

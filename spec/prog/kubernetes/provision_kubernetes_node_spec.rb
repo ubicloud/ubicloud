@@ -46,6 +46,19 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     allow(prog).to receive_messages(kubernetes_cluster: kubernetes_cluster, frame: {"vm_id" => vm.id})
   end
 
+  describe "random_ula_cidr" do
+    it "returns a /108 subnet" do
+      cidr = prog.random_ula_cidr
+      expect(cidr.netmask.prefix_len).to eq(108)
+    end
+
+    it "returns an address in the fd00::/8 range" do
+      cidr = prog.random_ula_cidr
+      ula_range = NetAddr::IPv6Net.parse("fd00::/8")
+      expect(ula_range.cmp(cidr)).to be(-1)
+    end
+  end
+
   describe "#before_run" do
     it "destroys itself if the kubernetes cluster is getting deleted" do
       Strand.create(id: kubernetes_cluster.id, label: "something", prog: "KubernetesClusterNexus")
