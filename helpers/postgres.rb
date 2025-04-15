@@ -60,7 +60,25 @@ class Clover
       }
     else
       dataset = dataset.eager(:representative_server, :timeline)
-      @postgres_databases = Serializers::Postgres.serialize(dataset.all, {include_path: true})
+      resources = dataset.all
+      # Group resources by their parent_id
+      grouped_resources = resources.group_by { |r| r[:parent_id] }
+
+      # Get all parents (resources with parent_id = nil)
+      parents = grouped_resources[nil] || []
+
+      # Create the ordered result
+      ordered_resources = []
+
+      # For each parent, add it followed by its children
+      parents.each do |parent|
+        ordered_resources << parent
+
+        # Find children of this parent
+        children = grouped_resources[parent.id] || []
+        ordered_resources.concat(children)
+      end
+      @postgres_databases = Serializers::Postgres.serialize(ordered_resources, {include_path: true})
       view "postgres/index"
     end
   end

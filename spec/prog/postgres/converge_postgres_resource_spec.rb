@@ -20,6 +20,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
   before do
     allow(nx).to receive(:postgres_resource).and_return(postgres_resource)
+    allow(postgres_resource).to receive(:read_replica?).and_return(false)
   end
 
   describe "#start" do

@@ -43,7 +43,7 @@ RSpec.describe PostgresServer do
 
   describe "#configure" do
     before do
-      allow(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, blob_storage: "dummy-blob-storage"))
+      allow(postgres_server).to receive_messages(timeline: instance_double(PostgresTimeline, blob_storage: "dummy-blob-storage"), read_replica?: false)
       allow(resource).to receive(:flavor).and_return(PostgresResource::Flavor::STANDARD)
     end
 
@@ -88,6 +88,12 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include(:primary_conninfo, :restore_command)
     end
 
+    it "sets configs that are specific to read_replicas" do
+      expect(postgres_server).to receive(:read_replica?).and_return(true).at_least(:once)
+      expect(postgres_server).to receive(:doing_pitr?).and_return(false).at_least(:once)
+      expect(postgres_server.configure_hash[:configs]).to include(:recovery_target_time, :recovery_target_timeline, :recovery_target_inclusive)
+    end
+
     it "sets configs that are specific to restoring servers" do
       postgres_server.timeline_access = "fetch"
       expect(resource).to receive(:restore_target)
@@ -109,11 +115,13 @@ RSpec.describe PostgresServer do
 
   describe "#trigger_failover" do
     it "fails if server is not primary" do
+      expect(postgres_server).to receive(:read_replica?).and_return(false).at_least(:once)
       expect(postgres_server).to receive(:primary?).and_return(false)
       expect(postgres_server.trigger_failover).to be_falsey
     end
 
     it "fails if there is no suitable standby" do
+      expect(postgres_server).to receive(:read_replica?).and_return(false).at_least(:once)
       expect(postgres_server).to receive(:primary?).and_return(true)
       expect(postgres_server).to receive(:failover_target).and_return(nil)
       expect(postgres_server.trigger_failover).to be_falsey
@@ -121,10 +129,61 @@ RSpec.describe PostgresServer do
 
     it "increments take over semaphore" do
       standby = instance_double(described_class)
+      expect(postgres_server).to receive(:read_replica?).and_return(false).at_least(:once)
       expect(postgres_server).to receive(:primary?).and_return(true)
       expect(postgres_server).to receive(:failover_target).and_return(standby)
       expect(standby).to receive(:incr_take_over)
       expect(postgres_server.trigger_failover).to be_truthy
+    end
+
+    it "triggers failover for read replica" do
+      expect(postgres_server).to receive(:read_replica?).and_return(true)
+      expect(postgres_server.resource).to receive(:representative_server).and_return(postgres_server).at_least(:once)
+      expect(postgres_server).to receive(:read_replica_failover_target).and_return(postgres_server)
+      expect(postgres_server).to receive(:update).with(representative_at: nil)
+      time = Time.now
+      expect(Time).to receive(:now).and_return(time)
+      expect(postgres_server).to receive(:update).with(representative_at: time)
+      expect(postgres_server.resource).to receive(:incr_refresh_dns_record)
+      expect(postgres_server.trigger_failover).to be_truthy
+    end
+
+    it "fails to trigger failover if read_replica but not representative_server" do
+      expect(postgres_server).to receive(:read_replica?).and_return(true).at_least(:once)
+      expect(postgres_server.resource).to receive(:representative_server).and_return(described_class.new { _1.id = "1f214853-0bc4-8020-b910-dffb867ef44f" }).at_least(:once)
+      expect(postgres_server.trigger_failover).to be_falsey
+    end
+
+    it "fails to trigger failover if read_replica and representative_server but not suitable target" do
+      expect(postgres_server).to receive(:read_replica?).and_return(true).at_least(:once)
+      expect(postgres_server.resource).to receive(:representative_server).and_return(postgres_server).at_least(:once)
+      expect(postgres_server).to receive(:read_replica_failover_target).and_return(nil)
+      expect(postgres_server.trigger_failover).to be_falsey
+    end
+  end
+
+  it "#read_replica?" do
+    expect(postgres_server.resource).to receive(:read_replica?).and_return(true)
+    expect(postgres_server).to be_read_replica
+    expect(postgres_server.resource).to receive(:read_replica?).and_return(false)
+    expect(postgres_server).not_to be_read_replica
+  end
+
+  describe "#timeline_id_is_lagging" do
+    it "fails if the server is not a read replica" do
+      expect(postgres_server).to receive(:read_replica?).and_return(false)
+      expect { postgres_server.timeline_id_is_lagging }.to raise_error RuntimeError, "the server is not a read replica"
+    end
+
+    it "returns if the lag exists" do
+      expect(postgres_server).to receive(:read_replica?).and_return(true).at_least(:once)
+      ps2 = instance_double(described_class)
+      expect(postgres_server.resource).to receive(:parent).and_return(resource).at_least(:once)
+      expect(resource).to receive(:representative_server).and_return(ps2).at_least(:once)
+      expect(ps2).to receive(:get_timeline_id).and_return(2).at_least(:once)
+      expect(postgres_server).to receive(:run_query).with("SELECT timeline_id FROM pg_control_checkpoint()").and_return("  1", "2  ")
+      expect(postgres_server.timeline_id_is_lagging).to be_truthy
+      expect(postgres_server.timeline_id_is_lagging).to be_falsey
     end
   end
 
@@ -179,6 +238,37 @@ RSpec.describe PostgresServer do
     end
   end
 
+  describe "#read_replica_failover_target" do
+    before do
+      expect(postgres_server).to receive_messages(strand: instance_double(Strand, label: "wait"), needs_recycling?: true)
+      allow(resource).to receive(:servers).and_return([
+        postgres_server,
+        instance_double(described_class, ubid: "pgubidstandby1", strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false),
+        instance_double(described_class, ubid: "pgubidstandby2", run_query: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false),
+        instance_double(described_class, ubid: "pgubidstandby3", run_query: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false)
+      ])
+    end
+
+    it "returns nil if there is no replica to failover" do
+      expect(resource).to receive(:servers).and_return([postgres_server]).at_least(:once)
+      expect(postgres_server.read_replica_failover_target).to be_nil
+    end
+
+    it "returns nil if there is no fresh read_replica" do
+      replica_server = described_class.new { _1.id = "c068cac7-ed45-82db-bf38-a003582b36ef" }
+      expect(replica_server).to receive(:resource).and_return(resource)
+      expect(replica_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      expect(replica_server).to receive(:vm).and_return(instance_double(Vm, display_size: "standard-4"))
+      expect(resource).to receive(:servers).and_return([postgres_server, replica_server]).at_least(:once)
+      expect(resource).to receive(:target_vm_size).and_return("standard-2")
+      expect(postgres_server.read_replica_failover_target).to be_nil
+    end
+
+    it "returns the replica with highest lsn" do
+      expect(postgres_server.read_replica_failover_target.ubid).to eq("pgubidstandby3")
+    end
+  end
+
   describe "storage_size_gib" do
     it "returns the storage size in GiB" do
       volume_dataset = instance_double(Sequel::Dataset)
@@ -216,6 +306,9 @@ RSpec.describe PostgresServer do
     }
 
     expect(postgres_server).not_to receive(:incr_checkup)
+    expect(postgres_server).to receive(:primary?).and_return(false)
+    expect(postgres_server).to receive(:standby?).and_return(false)
+
     postgres_server.check_pulse(session: session, previous_pulse: pulse)
   end
 
@@ -233,6 +326,8 @@ RSpec.describe PostgresServer do
     expect(session[:db_connection]).to receive(:[]).and_raise(Sequel::DatabaseConnectionError)
     expect(postgres_server).to receive(:reload).and_return(postgres_server)
     expect(postgres_server).to receive(:incr_checkup)
+    expect(postgres_server).to receive(:primary?).and_return(false)
+    expect(postgres_server).to receive(:standby?).and_return(true)
     postgres_server.check_pulse(session: session, previous_pulse: pulse)
   end
 
@@ -255,13 +350,33 @@ RSpec.describe PostgresServer do
     postgres_server.check_pulse(session: session, previous_pulse: pulse)
   end
 
+  it "uses pg_last_wal_replay_lsn to track lsn for read replicas" do
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session),
+      db_connection: instance_double(Sequel::Postgres::Database)
+    }
+    pulse = {
+      reading: "down",
+      reading_rpt: 5,
+      reading_chg: Time.now - 30
+    }
+
+    expect(session[:db_connection]).to receive(:[]).with("SELECT pg_last_wal_replay_lsn() AS lsn").and_raise(Sequel::DatabaseConnectionError)
+    expect(postgres_server).to receive(:primary?).and_return(false)
+    expect(postgres_server).to receive(:standby?).and_return(false)
+
+    expect(postgres_server).to receive(:reload).and_return(postgres_server)
+    expect(postgres_server).to receive(:incr_checkup)
+    postgres_server.check_pulse(session: session, previous_pulse: pulse)
+  end
+
   it "catches Sequel::Error if updating PostgresLsnMonitor fails" do
     lsn_monitor = instance_double(PostgresLsnMonitor, last_known_lsn: "1/5")
     expect(PostgresLsnMonitor).to receive(:new).and_return(lsn_monitor)
     expect(lsn_monitor).to receive(:insert_conflict).and_return(lsn_monitor)
     expect(lsn_monitor).to receive(:save_changes).and_raise(Sequel::Error)
     expect(Clog).to receive(:emit).with("Failed to update PostgresLsnMonitor")
-
+    expect(postgres_server).to receive(:primary?).and_return(true)
     postgres_server.check_pulse(session: {db_connection: DB}, previous_pulse: {})
   end
 

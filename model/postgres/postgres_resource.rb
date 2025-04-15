@@ -14,6 +14,7 @@ class PostgresResource < Sequel::Model
   one_to_many :metric_destinations, class: :PostgresMetricDestination, key: :postgres_resource_id
   many_to_one :private_subnet
   many_to_one :location, key: :location_id, class: :Location
+  one_to_many :read_replicas, class: :PostgresResource, key: :parent_id, conditions: {restore_target: nil}
 
   plugin :association_dependencies, firewall_rules: :destroy, metric_destinations: :destroy
   dataset_module Pagination
