@@ -221,6 +221,14 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       postgres_resource.set_firewall_rules
     end
 
+    when_promote_set? do
+      if postgres_resource.read_replica?
+        postgres_resource.servers.each(&:incr_promote)
+        postgres_resource.update(parent_id: nil)
+      end
+      decr_promote
+    end
+
     nap 30
   end
 

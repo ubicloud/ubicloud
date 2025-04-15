@@ -17,7 +17,7 @@ class PostgresServer < Sequel::Model
   include HealthMonitorMethods
 
   semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup
-  semaphore :restart, :configure, :take_over, :configure_prometheus, :destroy, :recycle
+  semaphore :restart, :configure, :take_over, :configure_prometheus, :destroy, :recycle, :promote
 
   def configure_hash
     configs = {

@@ -897,6 +897,21 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Metric Destination
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/promote':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    post:
+      operationId: promotePostgresDatabase
+      summary: Promote a specific Postgres Read Replica Database
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/read-replica':
     post:
       operationId: createPostgresDatabaseReadReplica
