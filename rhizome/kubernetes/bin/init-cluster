@@ -16,6 +16,7 @@ begin
   node_name = params.fetch("node_name")
   node_ipv4 = params.fetch("node_ipv4")
   node_ipv6 = params.fetch("node_ipv6")
+  service_subnet_cidr6 = params.fetch("service_subnet_cidr6")
 rescue KeyError => e
   puts "Needed #{e.key} in parameters"
   exit 1
@@ -49,7 +50,8 @@ cluster_config = {
     ]
   },
   "networking" => {
-    "podSubnet" => "#{private_subnet_cidr4},#{private_subnet_cidr6}"
+    "podSubnet" => "#{private_subnet_cidr4},#{private_subnet_cidr6}",
+    "serviceSubnet" => "10.96.0.0/12,#{service_subnet_cidr6}"
   },
   "controllerManager" => {
     "extraArgs" => [
