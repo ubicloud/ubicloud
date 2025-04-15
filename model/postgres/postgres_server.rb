@@ -17,7 +17,7 @@ class PostgresServer < Sequel::Model
   include HealthMonitorMethods
 
   semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup
-  semaphore :restart, :configure, :take_over, :configure_prometheus, :destroy
+  semaphore :restart, :configure, :take_over, :configure_prometheus, :destroy, :recycle, :timeline_id_is_lagging
 
   def configure_hash
     configs = {
@@ -110,6 +110,20 @@ class PostgresServer < Sequel::Model
   end
 
   def trigger_failover
+    if read_replica?
+      DB.transaction do
+        if resource.representative_server.id == id && (target = read_replica_failover_target)
+          update(representative_at: nil)
+          target.update(representative_at: Time.now)
+          resource.incr_refresh_dns_record
+          return true
+        end
+      end
+
+      Clog.emit("Failed to trigger read replica failover")
+      return false
+    end
+
     if primary? && (standby = failover_target)
       standby.incr_take_over
       true
@@ -140,7 +154,16 @@ class PostgresServer < Sequel::Model
   end
 
   def needs_recycling?
-    vm.display_size != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib
+    recycle_set? || vm.display_size != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib
+  end
+
+  def timeline_id_is_lagging
+    fail "the server is not a read replica" unless read_replica?
+    get_timeline_id < resource.parent.representative_server.get_timeline_id
+  end
+
+  def get_timeline_id
+    run_query("SELECT timeline_id FROM pg_control_checkpoint()").chomp.to_i
   end
 
   def failover_target
@@ -155,6 +178,17 @@ class PostgresServer < Sequel::Model
       return nil if lsn_monitor.last_known_lsn.nil?
       return nil if lsn_diff(lsn_monitor.last_known_lsn, target[:lsn]) > 80 * 1024 * 1024 # 80 MB or ~5 WAL files
     end
+
+    target[:server]
+  end
+
+  def read_replica_failover_target
+    target = resource.servers
+      .select { _1.strand.label == "wait" && !_1.needs_recycling? }
+      .map { {server: _1, lsn: _1.run_query("SELECT pg_last_wal_replay_lsn()").chomp} }
+      .max_by { lsn2int(_1[:lsn]) }
+
+    return nil if target.nil?
 
     target[:server]
   end

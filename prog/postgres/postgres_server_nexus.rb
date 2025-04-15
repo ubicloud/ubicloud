@@ -384,6 +384,20 @@ SQL
       push self.class, frame, "restart"
     end
 
+    if postgres_server.read_replica?
+      already_lagging = postgres_server.timeline_id_is_lagging_set?
+      currently_lagging = postgres_server.timeline_id_is_lagging
+
+      if already_lagging && currently_lagging
+        postgres_server.incr_recycle
+      elsif currently_lagging
+        postgres_server.incr_timeline_id_is_lagging
+        nap 2 * 60
+      end
+
+      nap 60
+    end
+
     nap 6 * 60 * 60
   end
 
