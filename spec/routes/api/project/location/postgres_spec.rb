@@ -30,6 +30,7 @@ RSpec.describe Clover, "postgres" do
         [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"],
         [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/read-replica"],
+        [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/promote"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule"],
         [:delete, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/foo_ubid"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore"],
@@ -207,6 +208,24 @@ RSpec.describe Clover, "postgres" do
         }.to_json
 
         expect(last_response.status).to eq(200)
+      end
+
+      it "promote" do
+        expect(Project).to receive(:from_ubid).and_return(project)
+        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
+        pg.update(parent_id: pg.id)
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/promote"
+
+        expect(last_response.status).to eq(200)
+      end
+
+      it "fails to promote if not read_replica" do
+        expect(Project).to receive(:from_ubid).and_return(project)
+        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/promote"
+
+        expect(last_response).to have_api_error(400, "Non read replica servers cannot be promoted.")
       end
 
       it "firewall-rule" do

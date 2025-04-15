@@ -393,6 +393,38 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content("my-read-replica")
       end
 
+      it "can promote a read replica" do
+        visit "#{project.path}#{pg.path}"
+        expect(page).to have_content "Read Replicas"
+
+        fill_in "#{pg.name}-read-replica", with: "my-read-replica"
+
+        find(".pg-read-replica-create-btn").click
+
+        expect(page.status_code).to eq(200)
+        expect(page.title).to eq("Ubicloud - my-read-replica")
+
+        find(".promote-btn").click
+        expect(PostgresResource[name: "my-read-replica"].semaphores.count).to eq(1)
+        expect(page).to have_content "'my-read-replica' will be promoted in a few minutes, please refresh the page"
+      end
+
+      it "fails to promote if not a read replica" do
+        visit "#{project.path}#{pg.path}"
+        expect(page).to have_content "Read Replicas"
+
+        fill_in "#{pg.name}-read-replica", with: "my-read-replica"
+
+        find(".pg-read-replica-create-btn").click
+
+        expect(page.status_code).to eq(200)
+        expect(page.title).to eq("Ubicloud - my-read-replica")
+        PostgresResource[name: "my-read-replica"].update(parent_id: nil)
+        find(".promote-btn").click
+        expect(page.status_code).to eq(400)
+        expect(page).to have_flash_error("Non read replica servers cannot be promoted.")
+      end
+
       it "can reset superuser password of PostgreSQL database" do
         visit "#{project.path}#{pg.path}"
         expect(page.title).to eq "Ubicloud - pg-with-permission"

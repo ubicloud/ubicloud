@@ -335,17 +335,21 @@ SQL
     end
 
     if !is_in_recovery
-      timeline_id = Prog::Postgres::PostgresTimelineNexus.assemble(location_id: postgres_server.resource.location_id, parent_id: postgres_server.timeline.id).id
-      postgres_server.timeline_id = timeline_id
-      postgres_server.timeline_access = "push"
-      postgres_server.save_changes
-
-      refresh_walg_credentials
+      switch_to_new_timeline
 
       hop_configure
     end
 
     nap 5
+  end
+
+  def switch_to_new_timeline
+    timeline_id = Prog::Postgres::PostgresTimelineNexus.assemble(location_id: postgres_server.resource.location_id, parent_id: postgres_server.timeline.id).id
+    postgres_server.timeline_id = timeline_id
+    postgres_server.timeline_access = "push"
+    postgres_server.save_changes
+
+    refresh_walg_credentials
   end
 
   label def wait
@@ -380,6 +384,11 @@ SQL
 
     when_restart_set? do
       push self.class, frame, "restart"
+    end
+
+    when_promote_set? do
+      switch_to_new_timeline
+      hop_taking_over
     end
 
     if postgres_server.read_replica?
@@ -439,9 +448,14 @@ SQL
 
   label def taking_over
     if postgres_server.read_replica?
-      postgres_server.update(representative_at: Time.now)
-      postgres_server.resource.incr_refresh_dns_record
-      hop_configure
+      if postgres_server.promote_set?
+        postgres_server.update(synchronization_status: "ready")
+        decr_promote
+      else
+        postgres_server.update(representative_at: Time.now)
+        postgres_server.resource.incr_refresh_dns_record
+        hop_configure
+      end
     end
 
     case vm.sshable.cmd("common/bin/daemonizer --check promote_postgres")
