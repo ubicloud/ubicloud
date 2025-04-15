@@ -215,6 +215,27 @@ class Clover
         end
       end
 
+      r.post "promote" do
+        authorize("Postgres:view", pg.id)
+
+        unless pg.read_replica?
+          if api?
+            fail CloverError.new(400, "InvalidRequest", "Non read replica servers cannot be promoted!")
+          else
+            flash["error"] = "Non read replica servers cannot be promoted!"
+            redirect_back_with_inputs
+          end
+        end
+
+        pg.incr_promote
+        if api?
+          Serializers::Postgres.serialize(pg)
+        else
+          flash["notice"] = "'#{pg.name}' will be promoted in a few minutes, please refresh the page"
+          r.redirect "#{@project.path}#{pg.path}"
+        end
+      end
+
       r.post "restore" do
         authorize("Postgres:create", @project.id)
         authorize("Postgres:view", pg.id)

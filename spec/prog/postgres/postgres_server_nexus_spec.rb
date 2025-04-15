@@ -599,6 +599,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.wait }.to hop("restart")
     end
 
+    it "promotes" do
+      expect(nx).to receive(:when_promote_set?).and_yield
+      expect(nx).to receive(:switch_to_new_timeline)
+      expect { nx.wait }.to hop("taking_over")
+    end
+
     describe "read replica" do
       before do
         expect(postgres_server).to receive(:read_replica?).and_return(true)

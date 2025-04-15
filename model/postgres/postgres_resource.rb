@@ -23,7 +23,7 @@ class PostgresResource < Sequel::Model
   include SemaphoreMethods
   include ObjectTag::Cleanup
 
-  semaphore :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records, :destroy
+  semaphore :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records, :destroy, :promote
 
   plugin :column_encryption do |enc|
     enc.column :superuser_password
