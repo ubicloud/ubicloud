@@ -152,7 +152,7 @@ TEMPLATE
         cluster_endpoint: "#{kubernetes_cluster.endpoint}:443",
         join_token: cp_sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).chomp,
         certificate_key: cp_sshable.cmd("sudo kubeadm init phase upload-certs --upload-certs", log: false)[/certificate key:\n(.*)/, 1],
-        discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command", log: false)[/discovery-token-ca-cert-hash (.*)/, 1]
+        discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command", log: false)[/discovery-token-ca-cert-hash (\S+)/, 1]
       }
       vm.sshable.d_run("join_control_plane", "kubernetes/bin/join-control-plane-node", stdin: JSON.generate(params), log: false)
       nap 15
@@ -177,7 +177,7 @@ TEMPLATE
         node_name: vm.name,
         endpoint: "#{kubernetes_cluster.endpoint}:443",
         join_token: cp_sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).tr("\n", ""),
-        discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command", log: false)[/discovery-token-ca-cert-hash (.*)/, 1]
+        discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command", log: false)[/discovery-token-ca-cert-hash (\S+)/, 1]
       }
 
       vm.sshable.d_run("join_worker", "kubernetes/bin/join-worker-node", stdin: JSON.generate(params), log: false)
