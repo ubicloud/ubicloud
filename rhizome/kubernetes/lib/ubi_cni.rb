@@ -183,25 +183,9 @@ options ndots:5
 
     response = {
       cniVersion: "1.0.0",
-      interfaces: [
-        {
-          name: inner_ifname,
-          mac: inner_mac,
-          sandbox: "/var/run/netns/#{cni_netns}"
-        }
-      ],
-      ips: [
-        {
-          address: container_ip,
-          gateway: nil,
-          interface: 0
-        }
-      ],
-      dns: {
-        nameservers: dns_servers,
-        search: search_domains,
-        options: ["ndots:5"]
-      }
+      interfaces: [{name: inner_ifname, mac: inner_mac, sandbox: "/var/run/netns/#{cni_netns}"}],
+      ips: [{address: container_ip, gateway: nil, interface: 0}],
+      dns: {nameservers: dns_servers, search: search_domains, options: ["ndots:5"]}
     }
 
     JSON.generate(response)
