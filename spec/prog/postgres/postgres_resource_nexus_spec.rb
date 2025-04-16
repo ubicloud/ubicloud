@@ -364,6 +364,22 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(postgres_resource).to receive(:set_firewall_rules)
       expect { nx.wait }.to nap(30)
     end
+
+    it "if read_replica and promote is set, promotes and naps" do
+      expect(nx).to receive(:when_promote_set?).and_yield
+      expect(postgres_resource).to receive(:read_replica?).and_return(true)
+      expect(postgres_resource).to receive(:servers).and_return([])
+      expect(postgres_resource).to receive(:update).with(parent_id: nil)
+      expect(nx).to receive(:decr_promote)
+      expect { nx.wait }.to nap(30)
+    end
+
+    it "if not read_replica and promote is set, just naps" do
+      expect(nx).to receive(:when_promote_set?).and_yield
+      expect(postgres_resource).to receive(:read_replica?).and_return(false)
+      expect(nx).to receive(:decr_promote)
+      expect { nx.wait }.to nap(30)
+    end
   end
 
   describe "#destroy" do

@@ -17,7 +17,7 @@ class PostgresServer < Sequel::Model
   include HealthMonitorMethods
 
   semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup
-  semaphore :restart, :configure, :take_over, :configure_prometheus, :destroy, :recycle, :timeline_id_is_lagging
+  semaphore :restart, :configure, :take_over, :configure_prometheus, :destroy, :recycle, :timeline_id_is_lagging, :promote
 
   def configure_hash
     configs = {
@@ -91,7 +91,7 @@ class PostgresServer < Sequel::Model
         configs[:recovery_target_time] = "'#{resource.restore_target}'"
       end
 
-      if standby? || doing_pitr?
+      if standby? || doing_pitr? || read_replica?
         configs[:restore_command] = "'/usr/bin/wal-g wal-fetch %f %p --config /etc/postgresql/wal-g.env'"
       end
     end
