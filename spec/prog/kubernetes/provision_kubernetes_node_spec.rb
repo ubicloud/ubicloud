@@ -234,10 +234,9 @@ table ip6 pod_access {
 
     it "runs the init_cluster script if it's not started" do
       expect(prog.vm.sshable).to receive(:d_check).with("init_kubernetes_cluster").and_return("NotStarted")
-      expect(prog.vm).to receive(:nics).and_return([instance_double(Nic, private_ipv4: "10.0.0.37")])
       expect(prog.vm.sshable).to receive(:d_run).with(
         "init_kubernetes_cluster", "/home/ubi/kubernetes/bin/init-cluster",
-        stdin: /{"node_name":"test-vm","cluster_name":"k8scluster","lb_hostname":"somelb\..*","port":"443","private_subnet_cidr4":"172.19.0.0\/16","private_subnet_cidr6":"fd40:1a0a:8d48:182a::\/64","vm_cidr":"10.0.0.37"}/, log: false
+        stdin: /{"node_name":"test-vm","cluster_name":"k8scluster","lb_hostname":"somelb\..*","port":"443","private_subnet_cidr4":"172.19.0.0\/16","private_subnet_cidr6":"fd40:1a0a:8d48:182a::\/64","node_ipv4":"172.19.145.65","node_ipv6":"2001:db8:85a3:73f2:1c4a::2"/, log: false
       )
 
       expect { prog.init_cluster }.to nap(30)
@@ -276,8 +275,8 @@ table ip6 pod_access {
       expect(sshable).to receive(:cmd).with("sudo kubeadm init phase upload-certs --upload-certs", log: false).and_return("something\ncertificate key:\nck")
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --print-join-command", log: false).and_return("discovery-token-ca-cert-hash dtcch")
       expect(prog.vm.sshable).to receive(:d_run).with(
-        "join_control_plane", "kubernetes/bin/join-control-plane-node",
-        stdin: /{"node_name":"test-vm","cluster_endpoint":"somelb\..*:443","join_token":"jt","certificate_key":"ck","discovery_token_ca_cert_hash":"dtcch"}/,
+        "join_control_plane", "kubernetes/bin/join-node",
+        stdin: /{"is_control_plane":true,"node_name":"test-vm","endpoint":"somelb\..*:443","join_token":"jt","certificate_key":"ck","discovery_token_ca_cert_hash":"dtcch","node_ipv4":"172.19.145.65","node_ipv6":"2001:db8:85a3:73f2:1c4a::2"}/,
         log: false
       )
 
@@ -319,8 +318,8 @@ table ip6 pod_access {
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).and_return("\njt\n")
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --print-join-command", log: false).and_return("discovery-token-ca-cert-hash dtcch")
       expect(prog.vm.sshable).to receive(:d_run).with(
-        "join_worker", "kubernetes/bin/join-worker-node",
-        stdin: /{"node_name":"test-vm","endpoint":"somelb\..*:443","join_token":"jt","discovery_token_ca_cert_hash":"dtcch"}/,
+        "join_worker", "kubernetes/bin/join-node",
+        stdin: /{"is_control_plane":false,"node_name":"test-vm","endpoint":"somelb\..*:443","join_token":"jt","discovery_token_ca_cert_hash":"dtcch","node_ipv4":"172.19.145.65","node_ipv6":"2001:db8:85a3:73f2:1c4a::2"}/,
         log: false
       )
 
