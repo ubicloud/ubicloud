@@ -126,7 +126,8 @@ TEMPLATE
         port: "443",
         private_subnet_cidr4: kubernetes_cluster.private_subnet.net4,
         private_subnet_cidr6: kubernetes_cluster.private_subnet.net6,
-        vm_cidr: vm.nics.first.private_ipv4
+        node_ipv4: vm.private_ipv4,
+        node_ipv6: vm.ephemeral_net6.nth(2)
       }
       vm.sshable.d_run("init_kubernetes_cluster", "/home/ubi/kubernetes/bin/init-cluster", stdin: JSON.generate(params), log: false)
       nap 30
@@ -148,13 +149,16 @@ TEMPLATE
     when "NotStarted"
       cp_sshable = kubernetes_cluster.sshable
       params = {
+        is_control_plane: true,
         node_name: vm.name,
-        cluster_endpoint: "#{kubernetes_cluster.endpoint}:443",
+        endpoint: "#{kubernetes_cluster.endpoint}:443",
         join_token: cp_sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).chomp,
         certificate_key: cp_sshable.cmd("sudo kubeadm init phase upload-certs --upload-certs", log: false)[/certificate key:\n(.*)/, 1],
-        discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command", log: false)[/discovery-token-ca-cert-hash (\S+)/, 1]
+        discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command", log: false)[/discovery-token-ca-cert-hash (\S+)/, 1],
+        node_ipv4: vm.private_ipv4,
+        node_ipv6: vm.ephemeral_net6.nth(2)
       }
-      vm.sshable.d_run("join_control_plane", "kubernetes/bin/join-control-plane-node", stdin: JSON.generate(params), log: false)
+      vm.sshable.d_run("join_control_plane", "kubernetes/bin/join-node", stdin: JSON.generate(params), log: false)
       nap 15
     when "InProgress"
       nap 10
@@ -174,13 +178,15 @@ TEMPLATE
     when "NotStarted"
       cp_sshable = kubernetes_cluster.sshable
       params = {
+        is_control_plane: false,
         node_name: vm.name,
         endpoint: "#{kubernetes_cluster.endpoint}:443",
         join_token: cp_sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).tr("\n", ""),
-        discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command", log: false)[/discovery-token-ca-cert-hash (\S+)/, 1]
+        discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command", log: false)[/discovery-token-ca-cert-hash (\S+)/, 1],
+        node_ipv4: vm.private_ipv4,
+        node_ipv6: vm.ephemeral_net6.nth(2)
       }
-
-      vm.sshable.d_run("join_worker", "kubernetes/bin/join-worker-node", stdin: JSON.generate(params), log: false)
+      vm.sshable.d_run("join_worker", "kubernetes/bin/join-node", stdin: JSON.generate(params), log: false)
       nap 15
     when "InProgress"
       nap 10
