@@ -76,6 +76,7 @@ class UbiCNI
     @logger.info "Configuring DNS for network namespace #{cni_netns}"
     setup_dns(cni_netns)
 
+    @logger.info "Setting up veth pair for container #{container_id}"
     r "ip link add #{outer_ifname} addr #{outer_mac} type veth peer name #{inner_ifname} addr #{inner_mac} netns #{cni_netns}"
 
     container_ipv6 = setup_ipv6(subnet_ipv6, inner_link_local, outer_link_local, cni_netns, inner_ifname, outer_ifname, setup_default_route: true)
