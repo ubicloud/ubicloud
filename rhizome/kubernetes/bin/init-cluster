@@ -42,7 +42,6 @@ cluster_config = {
   "apiVersion" => "kubeadm.k8s.io/v1beta4",
   "kind" => "ClusterConfiguration",
   "clusterName" => cluster_name,
-  "kubernetesVersion" => "stable",
   "controlPlaneEndpoint" => "#{lb_hostname}:#{port}",
   "apiServer" => {
     "certSANs" => [
