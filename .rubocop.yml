@@ -1,10 +1,10 @@
 # Modified from https://www.fastruby.io/blog/ruby/code-quality/how-we-use-rubocop-and-standardrb.html
 require:
   - rubocop-capybara
-  - rubocop-erb
   - standard
 
 plugins:
+  - rubocop-erb
   - rubocop-performance
   - rubocop-rake
   - rubocop-rspec
