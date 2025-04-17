@@ -56,7 +56,7 @@ class InvoiceGenerator
             trade_id: "88492729",
             in_eu_vat: true
           }
-          vat_info = if ((tax_id = project_content[:billing_info]["tax_id"]) && !tax_id.empty?) && country.alpha2 != "NL"
+          vat_info = if (tax_id = project_content[:billing_info]["tax_id"]) && !tax_id.empty? && country.alpha2 != "NL"
             {rate: 0, reversed: true}
           else
             {rate: Config.annual_non_dutch_eu_sales_exceed_threshold ? country.vat_rates["standard"] : 21, reversed: false, eur_rate: @eur_rate}

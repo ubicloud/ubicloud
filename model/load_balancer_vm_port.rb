@@ -61,12 +61,12 @@ class LoadBalancerVmPort < Sequel::Model
 
     time_passed_health_check_interval = Time.now - pulse[:reading_chg] > load_balancer.health_check_interval
 
-    if state == "up" && pulse[:reading] == "down" && (pulse[:reading_rpt] > load_balancer.health_check_down_threshold && time_passed_health_check_interval) && !load_balancer.reload.update_load_balancer_set?
+    if state == "up" && pulse[:reading] == "down" && pulse[:reading_rpt] > load_balancer.health_check_down_threshold && time_passed_health_check_interval && !load_balancer.reload.update_load_balancer_set?
       update(state: "down")
       load_balancer.incr_update_load_balancer
     end
 
-    if state == "down" && pulse[:reading] == "up" && (pulse[:reading_rpt] > load_balancer.health_check_up_threshold && time_passed_health_check_interval) && !load_balancer.reload.update_load_balancer_set?
+    if state == "down" && pulse[:reading] == "up" && pulse[:reading_rpt] > load_balancer.health_check_up_threshold && time_passed_health_check_interval && !load_balancer.reload.update_load_balancer_set?
       update(state: "up")
       load_balancer.incr_update_load_balancer
     end
