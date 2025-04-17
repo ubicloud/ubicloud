@@ -20,86 +20,6 @@ RSpec.describe UbiCNI do
   end
 
   describe "#run" do
-    describe "#handle_add" do
-      let(:input) do
-        {
-          "ranges" => {
-            "subnet_ula_ipv6" => "fd00::/64",
-            "subnet_ipv6" => "2001:db8::/64",
-            "subnet_ipv4" => "192.168.1.0/24"
-          }
-        }
-      end
-
-      let(:container_ipv6) { IPAddr.new("2001:db8::2") }
-      let(:container_ula_ipv6) { IPAddr.new("fd00::2") }
-      let(:ipv4_container_ip) { IPAddr.new("192.168.1.100") }
-      let(:ipv4_gateway_ip) { IPAddr.new("192.168.1.1") }
-
-      before do
-        allow(ENV).to receive(:[]).with("CNI_CONTAINERID").and_return("abcdef123456")
-        allow(ENV).to receive(:[]).with("CNI_COMMAND").and_return("ADD")
-        allow(ENV).to receive(:[]).with("CNI_NETNS").and_return("/var/run/netns/testnetns")
-        allow(ENV).to receive(:[]).with("CNI_IFNAME").and_return("eth0")
-
-        allow(FileUtils).to receive(:mkdir_p)
-        allow(File).to receive(:write)
-
-        expect(ubicni).to receive(:gen_mac).and_return("00:11:22:33:44:55")
-        expect(ubicni).to receive(:gen_mac).and_return("00:aa:bb:cc:dd:ee")
-        allow(ubicni).to receive(:mac_to_ipv6_link_local).with("00:11:22:33:44:55").and_return("fe80::02aa:bbff:fecc:ddee")
-        allow(ubicni).to receive(:mac_to_ipv6_link_local).with("00:aa:bb:cc:dd:ee").and_return("fe80::0211:22ff:fe33:4455")
-
-        allow(ubicni).to receive(:find_random_available_ip).and_return(
-          container_ipv6, container_ula_ipv6, ipv4_container_ip, ipv4_gateway_ip
-        )
-      end
-
-      it "sets up networking and assigns IPs correctly" do
-        expect(ubicni).to receive(:r).with("ip link add veth_abcdef12 addr 00:aa:bb:cc:dd:ee type veth peer name eth0 addr 00:11:22:33:44:55 netns testnetns").ordered
-
-        expect(ubicni).to receive(:r).with("ip -6 -n testnetns addr replace #{container_ipv6}/#{container_ipv6.prefix} dev eth0").ordered
-        expect(ubicni).to receive(:r).with("ip -6 -n testnetns link set eth0 mtu 1400 up").ordered
-        expect(ubicni).to receive(:r).with("ip -6 -n testnetns route replace default via fe80::0211:22ff:fe33:4455 dev eth0").ordered
-        expect(ubicni).to receive(:r).with("ip -6 link set veth_abcdef12 mtu 1400 up").ordered
-        expect(ubicni).to receive(:r).with("ip -6 route replace #{container_ipv6}/#{container_ipv6.prefix} via fe80::02aa:bbff:fecc:ddee dev veth_abcdef12 mtu 1400").ordered
-
-        expect(ubicni).to receive(:r).with("ip -6 -n testnetns addr replace #{container_ula_ipv6}/#{container_ula_ipv6.prefix} dev eth0").ordered
-        expect(ubicni).to receive(:r).with("ip -6 -n testnetns link set eth0 mtu 1400 up").ordered
-        expect(ubicni).to receive(:r).with("ip -6 link set veth_abcdef12 mtu 1400 up").ordered
-        expect(ubicni).to receive(:r).with("ip -6 route replace #{container_ula_ipv6}/#{container_ula_ipv6.prefix} via fe80::02aa:bbff:fecc:ddee dev veth_abcdef12 mtu 1400").ordered
-
-        expect(ubicni).to receive(:r).with("ip addr replace #{ipv4_gateway_ip}/24 dev veth_abcdef12").ordered
-        expect(ubicni).to receive(:r).with("ip link set veth_abcdef12 mtu 1400 up").ordered
-        expect(ubicni).to receive(:r).with("ip -n testnetns addr replace #{ipv4_container_ip}/24 dev eth0").ordered
-        expect(ubicni).to receive(:r).with("ip -n testnetns link set eth0 mtu 1400 up").ordered
-        expect(ubicni).to receive(:r).with("ip -n testnetns route replace default via #{ipv4_gateway_ip}").ordered
-        expect(ubicni).to receive(:r).with("ip route replace #{ipv4_container_ip}/#{ipv4_container_ip.prefix} via #{ipv4_gateway_ip} dev veth_abcdef12").ordered
-        expect(ubicni).to receive(:r).with("echo 1 > /proc/sys/net/ipv4/conf/veth_abcdef12/proxy_arp").ordered
-
-        output = ubicni.handle_add
-        response = JSON.parse(output)
-
-        expect(response).to include("cniVersion" => "1.0.0")
-        expect(response["interfaces"]).to be_an(Array)
-        expect(response["interfaces"]).to include(
-          hash_including("name" => "eth0", "mac" => "00:11:22:33:44:55")
-        )
-
-        expect(response["ips"]).to be_an(Array)
-        expect(response["ips"]).to include(
-          hash_including("address" => "#{container_ipv6}/128"),
-          hash_including("address" => "#{container_ula_ipv6}/128"),
-          hash_including("address" => "#{ipv4_container_ip}/32")
-        )
-
-        expect(response["routes"]).to be_an(Array)
-        expect(response["routes"]).to include(
-          hash_including("dst" => "0.0.0.0/0")
-        )
-      end
-    end
-
     it "calls handle_add if CNI_COMMAND is ADD" do
       allow(ENV).to receive(:[]).with("CNI_COMMAND").and_return("ADD")
       expect(ubicni).to receive(:handle_add).and_return(nil)
@@ -122,6 +42,86 @@ RSpec.describe UbiCNI do
       allow(ENV).to receive(:[]).with("CNI_COMMAND").and_return("INVALID")
       expect(logger).to receive(:error).with("Unsupported CNI command: INVALID")
       expect { ubicni.run }.to output("{\"code\":100,\"msg\":\"Unsupported CNI command: INVALID\"}\n").to_stdout.and(raise_error(SystemExit))
+    end
+  end
+
+  describe "#handle_add" do
+    let(:input) do
+      {
+        "ranges" => {
+          "subnet_ula_ipv6" => "fd00::/64",
+          "subnet_ipv6" => "2001:db8::/64",
+          "subnet_ipv4" => "192.168.1.0/24"
+        }
+      }
+    end
+
+    let(:container_ipv6) { IPAddr.new("2001:db8::2") }
+    let(:container_ula_ipv6) { IPAddr.new("fd00::2") }
+    let(:ipv4_container_ip) { IPAddr.new("192.168.1.100") }
+    let(:ipv4_gateway_ip) { IPAddr.new("192.168.1.1") }
+
+    before do
+      allow(ENV).to receive(:[]).with("CNI_CONTAINERID").and_return("abcdef123456")
+      allow(ENV).to receive(:[]).with("CNI_COMMAND").and_return("ADD")
+      allow(ENV).to receive(:[]).with("CNI_NETNS").and_return("/var/run/netns/testnetns")
+      allow(ENV).to receive(:[]).with("CNI_IFNAME").and_return("eth0")
+
+      allow(FileUtils).to receive(:mkdir_p)
+      allow(File).to receive(:write)
+
+      expect(ubicni).to receive(:gen_mac).and_return("00:11:22:33:44:55")
+      expect(ubicni).to receive(:gen_mac).and_return("00:aa:bb:cc:dd:ee")
+      allow(ubicni).to receive(:mac_to_ipv6_link_local).with("00:11:22:33:44:55").and_return("fe80::02aa:bbff:fecc:ddee")
+      allow(ubicni).to receive(:mac_to_ipv6_link_local).with("00:aa:bb:cc:dd:ee").and_return("fe80::0211:22ff:fe33:4455")
+
+      allow(ubicni).to receive(:find_random_available_ip).and_return(
+        container_ipv6, container_ula_ipv6, ipv4_container_ip, ipv4_gateway_ip
+      )
+    end
+
+    it "sets up networking and assigns IPs correctly" do
+      expect(ubicni).to receive(:r).with("ip link add veth_abcdef12 addr 00:aa:bb:cc:dd:ee type veth peer name eth0 addr 00:11:22:33:44:55 netns testnetns").ordered
+
+      expect(ubicni).to receive(:r).with("ip -6 -n testnetns addr replace #{container_ipv6}/#{container_ipv6.prefix} dev eth0").ordered
+      expect(ubicni).to receive(:r).with("ip -6 -n testnetns link set eth0 mtu 1400 up").ordered
+      expect(ubicni).to receive(:r).with("ip -6 -n testnetns route replace default via fe80::0211:22ff:fe33:4455 dev eth0").ordered
+      expect(ubicni).to receive(:r).with("ip -6 link set veth_abcdef12 mtu 1400 up").ordered
+      expect(ubicni).to receive(:r).with("ip -6 route replace #{container_ipv6}/#{container_ipv6.prefix} via fe80::02aa:bbff:fecc:ddee dev veth_abcdef12 mtu 1400").ordered
+
+      expect(ubicni).to receive(:r).with("ip -6 -n testnetns addr replace #{container_ula_ipv6}/#{container_ula_ipv6.prefix} dev eth0").ordered
+      expect(ubicni).to receive(:r).with("ip -6 -n testnetns link set eth0 mtu 1400 up").ordered
+      expect(ubicni).to receive(:r).with("ip -6 link set veth_abcdef12 mtu 1400 up").ordered
+      expect(ubicni).to receive(:r).with("ip -6 route replace #{container_ula_ipv6}/#{container_ula_ipv6.prefix} via fe80::02aa:bbff:fecc:ddee dev veth_abcdef12 mtu 1400").ordered
+
+      expect(ubicni).to receive(:r).with("ip addr replace #{ipv4_gateway_ip}/24 dev veth_abcdef12").ordered
+      expect(ubicni).to receive(:r).with("ip link set veth_abcdef12 mtu 1400 up").ordered
+      expect(ubicni).to receive(:r).with("ip -n testnetns addr replace #{ipv4_container_ip}/24 dev eth0").ordered
+      expect(ubicni).to receive(:r).with("ip -n testnetns link set eth0 mtu 1400 up").ordered
+      expect(ubicni).to receive(:r).with("ip -n testnetns route replace default via #{ipv4_gateway_ip}").ordered
+      expect(ubicni).to receive(:r).with("ip route replace #{ipv4_container_ip}/#{ipv4_container_ip.prefix} via #{ipv4_gateway_ip} dev veth_abcdef12").ordered
+      expect(ubicni).to receive(:r).with("echo 1 > /proc/sys/net/ipv4/conf/veth_abcdef12/proxy_arp").ordered
+
+      output = ubicni.handle_add
+      response = JSON.parse(output)
+
+      expect(response).to include("cniVersion" => "1.0.0")
+      expect(response["interfaces"]).to be_an(Array)
+      expect(response["interfaces"]).to include(
+        hash_including("name" => "eth0", "mac" => "00:11:22:33:44:55")
+      )
+
+      expect(response["ips"]).to be_an(Array)
+      expect(response["ips"]).to include(
+        hash_including("address" => "#{container_ipv6}/128"),
+        hash_including("address" => "#{container_ula_ipv6}/128"),
+        hash_including("address" => "#{ipv4_container_ip}/32")
+      )
+
+      expect(response["routes"]).to be_an(Array)
+      expect(response["routes"]).to include(
+        hash_including("dst" => "0.0.0.0/0")
+      )
     end
   end
 
