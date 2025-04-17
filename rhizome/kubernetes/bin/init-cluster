@@ -34,8 +34,7 @@ config = {
     ]
   },
   "networking" => {
-    "podSubnet" => "#{private_subnet_cidr4},#{private_subnet_cidr6}",
-    "dualStack" => true
+    "podSubnet" => "#{private_subnet_cidr4},#{private_subnet_cidr6}"
   },
   "controllerManager" => {
     "extraArgs" => {
