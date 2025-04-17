@@ -59,12 +59,12 @@ let option_dirty = <%==JSON.generate(form_elements.map { _1[:name] }.each_with_o
       selected_options[name] = opt_val if checked
 
       opt_classes = parents.map { |k, v| "form_#{k} form_#{k}_#{v}" }
-      opt_classes << "hidden" unless parents_selected
+      opt_classes << "hidden" unless parents_selected || type == "select"
       opt_classes = opt_classes.join(" ")
 
       opt_attrs = {}
-      opt_attrs[:disabled] = "disabled" unless parents_selected
-      opt_attrs[:checked] = "checked" if checked
+      opt_attrs[:disabled] = "disabled" unless parents_selected || type == "select"
+      opt_attrs[:checked] = "checked" if checked && type != "select"
 
       [opt_val, opt_text, opt_classes, opt_attrs]
     end if has_option
