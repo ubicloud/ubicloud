@@ -12,36 +12,31 @@ RSpec.describe UbiCNI do
   before do
     allow(ENV).to receive(:[]).and_return(nil)
     allow(ENV).to receive(:[]).with("CNI_CONTAINERID").and_return("1234")
-    allow(ENV).to receive(:[]).with("CNI_COMMAND").and_return("xx")
-    allow(ENV).to receive(:[]).with("CNI_NETNS").and_return("/var/run/netns/test-ns")
-    allow(ENV).to receive(:[]).with("CNI_IFNAME").and_return("eth0")
-    allow(ENV).to receive(:[]).with("CNI_ARGS").and_return("xx")
-    allow(ENV).to receive(:[]).with("CNI_PATH").and_return("xx")
   end
 
   describe "#run" do
     it "calls handle_add if CNI_COMMAND is ADD" do
-      allow(ENV).to receive(:[]).with("CNI_COMMAND").and_return("ADD")
-      expect(ubicni).to receive(:handle_add).and_return(nil)
-      ubicni.run
+      expect(ENV).to receive(:[]).with("CNI_COMMAND").and_return("ADD")
+      expect(ubicni).to receive(:handle_add).and_return("add_output")
+      expect { ubicni.run }.to output("add_output\n").to_stdout
     end
 
     it "calls handle_del if CNI_COMMAND is DEL" do
-      allow(ENV).to receive(:[]).with("CNI_COMMAND").and_return("DEL")
-      expect(ubicni).to receive(:handle_del).and_return(nil)
-      ubicni.run
+      expect(ENV).to receive(:[]).with("CNI_COMMAND").and_return("DEL")
+      expect(ubicni).to receive(:handle_del).and_return("del_output")
+      expect { ubicni.run }.to output("del_output\n").to_stdout
     end
 
     it "calls handle_get if CNI_COMMAND is GET" do
-      allow(ENV).to receive(:[]).with("CNI_COMMAND").and_return("GET")
-      expect(ubicni).to receive(:handle_get).and_return(nil)
-      ubicni.run
+      expect(ENV).to receive(:[]).with("CNI_COMMAND").and_return("GET")
+      expect(ubicni).to receive(:handle_get).and_return("get_output")
+      expect { ubicni.run }.to output("get_output\n").to_stdout
     end
 
     it "raises an error for an unsupported command" do
-      allow(ENV).to receive(:[]).with("CNI_COMMAND").and_return("INVALID")
+      expect(ENV).to receive(:[]).with("CNI_COMMAND").and_return("INVALID")
       expect(logger).to receive(:error).with("Unsupported CNI command: INVALID")
-      expect { ubicni.run }.to output("{\"code\":100,\"msg\":\"Unsupported CNI command: INVALID\"}\n").to_stdout.and(raise_error(SystemExit))
+      expect { ubicni.run }.to output("{\"code\":100,\"msg\":\"Unsupported CNI command: INVALID\"}\n").to_stdout.and raise_error(SystemExit)
     end
   end
 
@@ -195,59 +190,57 @@ RSpec.describe UbiCNI do
 
   describe "#handle_get" do
     before do
-      allow(File).to receive(:read).with("/opt/cni/bin/ubicni-ipam-store").and_return("{}")
-      allow(File).to receive(:exist?).with("/opt/cni/bin/ubicni-ipam-store").and_return(true)
-      allow(File).to receive(:exist?).with("/etc/netns/test-ns/resolv.conf").and_return(true)
-      allow(ubicni).to receive(:r).and_return("link/ether 00:11:22:33:44:55", "inet6 fd00::1/64")
+      expect(ENV).to receive(:[]).with("CNI_COMMAND").and_return("GET")
+      expect(ENV).to receive(:[]).with("CNI_NETNS").and_return("/var/run/netns/test-ns")
+      expect(ENV).to receive(:[]).with("CNI_IFNAME").and_return("eth0")
+      expect(ubicni).to receive(:r).with("ip -n test-ns link show eth0").and_return(
+        "2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP mode DEFAULT group default\n" \
+        "    link/ether 00:11:22:33:44:55 brd ff:ff:ff:ff:ff:ff"
+      )
+      expect(ubicni).to receive(:r).with("ip -n test-ns -6 addr show dev eth0").and_return(
+        "inet6 2001:db8::2/64 scope global\n" \
+        "   valid_lft forever preferred_lft forever"
+      )
     end
 
-    it "retrieves container network information" do
-      allow(ENV).to receive(:[]).with("CNI_COMMAND").and_return("GET")
-      allow(ENV).to receive(:[]).with("CNI_NETNS").and_return("/var/run/netns/test-ns")
-      allow(ENV).to receive(:[]).with("CNI_IFNAME").and_return("eth0")
-
-      allow(ubicni).to receive(:r).with("ip -n test-ns link show eth0").and_return(<<~OUTPUT)
-        2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP mode DEFAULT group default
-          link/ether 00:11:22:33:44:55 brd ff:ff:ff:ff:ff:ff
-      OUTPUT
-
-      allow(ubicni).to receive(:r).with("ip -n test-ns -6 addr show dev eth0").and_return(<<~OUTPUT)
-        inet6 2001:db8::2/64 scope global
-          valid_lft forever preferred_lft forever
-      OUTPUT
-
+    it "retrieves container network information with DNS config" do
       dns_config_path = "/etc/netns/test-ns/resolv.conf"
-      allow(File).to receive(:exist?).with(dns_config_path).and_return(true)
-      allow(File).to receive(:readlines).with(dns_config_path, chomp: true).and_return([
-        "nameserver 10.96.0.10\n",
-        "search default.svc.cluster.local svc.cluster.local cluster.local\n",
-        "options ndots:5\n"
+      expect(File).to receive(:exist?).with(dns_config_path).and_return(true)
+      expect(File).to receive(:readlines).with(dns_config_path, chomp: true).and_return([
+        "nameserver 10.96.0.10",
+        "search default.svc.cluster.local svc.cluster.local cluster.local",
+        "options ndots:5"
       ])
 
-      output = ubicni.handle_get
-      response = JSON.parse(output)
-
-      expect(response).to include("cniVersion" => "1.0.0")
-      expect(response["interfaces"]).to be_an(Array)
-      expect(response["interfaces"]).to include(
-        hash_including("name" => "eth0", "mac" => "00:11:22:33:44:55")
-      )
-      expect(response["ips"]).to be_an(Array)
-      expect(response["ips"]).to include(
-        hash_including("address" => "2001:db8::2/64")
-      )
-      expect(response["dns"]["nameservers"]).to eq(["10.96.0.10"])
-      expect(response["dns"]["search"]).to eq("default.svc.cluster.local svc.cluster.local cluster.local".split)
-    end
-
-    it "returns empty handed if the dns config file does not exist" do
-      dns_config_path = "/etc/netns/test-ns/resolv.conf"
-      allow(File).to receive(:exist?).with(dns_config_path).and_return(false)
-
+      expect(ubicni).to receive(:check_required_env_vars).with(["CNI_NETNS", "CNI_IFNAME"])
       response = JSON.parse(ubicni.handle_get)
 
-      expect(response["dns"]["nameservers"]).to eq([])
-      expect(response["dns"]["search"]).to eq([])
+      expect(response).to include("cniVersion" => "1.0.0")
+      expect(response["interfaces"]).to include(
+        hash_including("name" => "eth0", "mac" => "00:11:22:33:44:55", "sandbox" => "/var/run/netns/test-ns")
+      )
+      expect(response["ips"]).to include(
+        hash_including("address" => "2001:db8::2/64", "gateway" => nil, "interface" => 0)
+      )
+      expect(response["dns"]).to include(
+        "nameservers" => ["10.96.0.10"],
+        "search" => ["default.svc.cluster.local", "svc.cluster.local", "cluster.local"],
+        "options" => ["ndots:5"]
+      )
+    end
+
+    it "returns empty DNS config if the file does not exist" do
+      dns_config_path = "/etc/netns/test-ns/resolv.conf"
+      expect(File).to receive(:exist?).with(dns_config_path).and_return(false)
+
+      expect(ubicni).to receive(:check_required_env_vars).with(["CNI_NETNS", "CNI_IFNAME"])
+      response = JSON.parse(ubicni.handle_get)
+
+      expect(response["dns"]).to include(
+        "nameservers" => [],
+        "search" => [],
+        "options" => ["ndots:5"]
+      )
     end
   end
 
@@ -382,25 +375,25 @@ RSpec.describe UbiCNI do
 
   describe "#check_required_env_vars" do
     it "does not call error_exit when all required variables are set" do
-      allow(ENV).to receive(:[]).with("CNI_CONTAINERID").and_return("some_value")
-      allow(ENV).to receive(:[]).with("CNI_NETNS").and_return("some_value")
-      allow(ENV).to receive(:[]).with("CNI_IFNAME").and_return("some_value")
+      expect(ENV).to receive(:[]).with("CNI_CONTAINERID").and_return("some_value")
+      expect(ENV).to receive(:[]).with("CNI_NETNS").and_return("some_value")
+      expect(ENV).to receive(:[]).with("CNI_IFNAME").and_return("some_value")
       expect(ubicni).not_to receive(:error_exit)
       ubicni.check_required_env_vars(["CNI_CONTAINERID", "CNI_NETNS", "CNI_IFNAME"])
     end
 
     it "calls error_exit when a required variable is missing" do
-      allow(ENV).to receive(:[]).with("CNI_CONTAINERID").and_return("some_value")
-      allow(ENV).to receive(:[]).with("CNI_NETNS").and_return(nil)
-      allow(ENV).to receive(:[]).with("CNI_IFNAME").and_return("some_value")
+      expect(ENV).to receive(:[]).with("CNI_CONTAINERID").and_return("some_value")
+      expect(ENV).to receive(:[]).with("CNI_NETNS").and_return(nil)
+      expect(ENV).to receive(:[]).with("CNI_IFNAME").and_return("some_value")
       expect(ubicni).to receive(:error_exit).with("Missing required environment variable: CNI_NETNS")
       ubicni.check_required_env_vars(["CNI_CONTAINERID", "CNI_NETNS", "CNI_IFNAME"])
     end
 
     it "calls error_exit for each missing variable" do
-      allow(ENV).to receive(:[]).with("CNI_CONTAINERID").and_return(nil)
-      allow(ENV).to receive(:[]).with("CNI_NETNS").and_return(nil)
-      allow(ENV).to receive(:[]).with("CNI_IFNAME").and_return("some_value")
+      expect(ENV).to receive(:[]).with("CNI_CONTAINERID").and_return(nil)
+      expect(ENV).to receive(:[]).with("CNI_NETNS").and_return(nil)
+      expect(ENV).to receive(:[]).with("CNI_IFNAME").and_return("some_value")
       expect(ubicni).to receive(:error_exit).with("Missing required environment variable: CNI_CONTAINERID")
       expect(ubicni).to receive(:error_exit).with("Missing required environment variable: CNI_NETNS")
       ubicni.check_required_env_vars(["CNI_CONTAINERID", "CNI_NETNS", "CNI_IFNAME"])
