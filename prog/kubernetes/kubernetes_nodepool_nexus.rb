@@ -26,9 +26,11 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   end
 
   label def start
-    nap 30 unless kubernetes_nodepool.cluster.strand.label == "wait_nodes"
     register_deadline("wait", 120 * 60)
-    hop_create_services_load_balancer
+    when_start_bootstrapping_set? do
+      hop_create_services_load_balancer
+    end
+    nap 10
   end
 
   label def create_services_load_balancer
@@ -58,14 +60,15 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   end
 
   label def bootstrap_worker_vms
-    hop_wait if kubernetes_nodepool.vms.count >= kubernetes_nodepool.node_count
-    bud Prog::Kubernetes::ProvisionKubernetesNode, {"nodepool_id" => kubernetes_nodepool.id, "subject_id" => kubernetes_nodepool.kubernetes_cluster_id}
+    kubernetes_nodepool.node_count.times do
+      bud Prog::Kubernetes::ProvisionKubernetesNode, {"nodepool_id" => kubernetes_nodepool.id, "subject_id" => kubernetes_nodepool.kubernetes_cluster_id}
+    end
     hop_wait_worker_node
   end
 
   label def wait_worker_node
     reap
-    hop_bootstrap_worker_vms if leaf?
+    hop_wait if leaf?
     donate
   end
 
