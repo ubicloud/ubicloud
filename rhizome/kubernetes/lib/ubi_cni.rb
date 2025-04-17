@@ -108,6 +108,39 @@ options ndots:5
     File.write("/etc/netns/#{cni_netns}/resolv.conf", dns_config)
   end
 
+  def allocate_ips_for_pod(container_id, subnet_ula_ipv6, subnet_ipv6, subnet_ipv4)
+    result = nil
+    safe_write_to_file(IPAM_STORE_FILE) do |file|
+      ipam_store = begin
+        content = File.read(IPAM_STORE_FILE)
+        content.empty? ? {"allocated_ips" => {}} : JSON.parse(content)
+      rescue Errno::ENOENT
+        {"allocated_ips" => {}}
+      end
+      allocated_ips = ipam_store["allocated_ips"]
+      subnet_ula_ipv6_obj = IPAddr.new(subnet_ula_ipv6)
+      subnet_ipv6_obj = IPAddr.new(subnet_ipv6)
+      subnet_ipv4_obj = IPAddr.new(subnet_ipv4)
+
+      container_ula_ipv6 = find_random_available_ip(allocated_ips, subnet_ula_ipv6_obj)
+      container_ipv6 = find_random_available_ip(allocated_ips, subnet_ipv6_obj)
+      ipv4_container_ip = find_random_available_ip(allocated_ips, subnet_ipv4_obj)
+      ipv4_gateway_ip = find_random_available_ip(allocated_ips, subnet_ipv4_obj, reserved_ips: [ipv4_container_ip.to_s])
+
+      allocated_ips[container_id] = [
+        ipv4_container_ip.to_s,
+        ipv4_gateway_ip.to_s,
+        container_ula_ipv6.to_s,
+        container_ipv6.to_s
+      ]
+      file.write(JSON.pretty_generate(ipam_store))
+      file.flush
+      file.fsync
+      result = [ipv4_container_ip, ipv4_gateway_ip, container_ula_ipv6, container_ipv6]
+    end
+    result
+  end
+
   def setup_ipv6(container_ip, inner_link_local, outer_link_local, cni_netns, inner_ifname, outer_ifname, setup_default_route: false)
     r "ip -6 -n #{cni_netns} addr replace #{container_ip}/#{container_ip.prefix} dev #{inner_ifname}"
     r "ip -6 -n #{cni_netns} link set #{inner_ifname} mtu #{MTU} up"
@@ -249,38 +282,5 @@ options ndots:5
     unless @input_data["ranges"]&.values_at("subnet_ula_ipv6", "subnet_ipv6", "subnet_ipv4")&.all?
       error_exit("Missing required ranges in input data")
     end
-  end
-
-  def allocate_ips_for_pod(container_id, subnet_ula_ipv6, subnet_ipv6, subnet_ipv4)
-    result = nil
-    safe_write_to_file(IPAM_STORE_FILE) do |file|
-      ipam_store = begin
-        content = File.read(IPAM_STORE_FILE)
-        content.empty? ? {"allocated_ips" => {}} : JSON.parse(content)
-      rescue Errno::ENOENT
-        {"allocated_ips" => {}}
-      end
-      allocated_ips = ipam_store["allocated_ips"]
-      subnet_ula_ipv6_obj = IPAddr.new(subnet_ula_ipv6)
-      subnet_ipv6_obj = IPAddr.new(subnet_ipv6)
-      subnet_ipv4_obj = IPAddr.new(subnet_ipv4)
-
-      container_ula_ipv6 = find_random_available_ip(allocated_ips, subnet_ula_ipv6_obj)
-      container_ipv6 = find_random_available_ip(allocated_ips, subnet_ipv6_obj)
-      ipv4_container_ip = find_random_available_ip(allocated_ips, subnet_ipv4_obj)
-      ipv4_gateway_ip = find_random_available_ip(allocated_ips, subnet_ipv4_obj, reserved_ips: [ipv4_container_ip.to_s])
-
-      allocated_ips[container_id] = [
-        ipv4_container_ip.to_s,
-        ipv4_gateway_ip.to_s,
-        container_ula_ipv6.to_s,
-        container_ipv6.to_s
-      ]
-      file.write(JSON.pretty_generate(ipam_store))
-      file.flush
-      file.fsync
-      result = [ipv4_container_ip, ipv4_gateway_ip, container_ula_ipv6, container_ipv6]
-    end
-    result
   end
 end
