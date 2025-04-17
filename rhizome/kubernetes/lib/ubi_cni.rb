@@ -64,12 +64,11 @@ class UbiCNI
 
     container_id = ENV["CNI_CONTAINERID"]
     cni_netns = ENV["CNI_NETNS"].sub("/var/run/netns/", "")
-
-    inner_mac = gen_mac
-    inner_link_local = mac_to_ipv6_link_local(inner_mac)
     inner_ifname = ENV["CNI_IFNAME"]
 
+    inner_mac = gen_mac
     outer_mac = gen_mac
+    inner_link_local = mac_to_ipv6_link_local(inner_mac)
     outer_link_local = mac_to_ipv6_link_local(outer_mac)
     outer_ifname = "veth_#{container_id[0, 8]}"
 
