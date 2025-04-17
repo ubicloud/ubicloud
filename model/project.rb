@@ -189,6 +189,7 @@ end
 #  firewall             | firewall_project_id_fkey             | (project_id) REFERENCES project(id)
 #  github_installation  | github_installation_project_id_fkey  | (project_id) REFERENCES project(id)
 #  inference_endpoint   | inference_endpoint_project_id_fkey   | (project_id) REFERENCES project(id)
+#  inference_router     | inference_router_project_id_fkey     | (project_id) REFERENCES project(id)
 #  kubernetes_cluster   | kubernetes_cluster_project_id_fkey   | (project_id) REFERENCES project(id)
 #  load_balancer        | load_balancer_project_id_fkey        | (project_id) REFERENCES project(id)
 #  location             | location_project_id_fkey             | (project_id) REFERENCES project(id)
