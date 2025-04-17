@@ -66,6 +66,7 @@ class UbiCNI
     cni_netns = ENV["CNI_NETNS"].sub("/var/run/netns/", "")
     inner_ifname = ENV["CNI_IFNAME"]
 
+    @logger.info "Generating MAC addresses for container #{container_id}"
     inner_mac = gen_mac
     outer_mac = gen_mac
     inner_link_local = mac_to_ipv6_link_local(inner_mac)
@@ -167,6 +168,7 @@ options ndots:5
     cni_netns = ENV["CNI_NETNS"].sub("/var/run/netns/", "")
     inner_ifname = ENV["CNI_IFNAME"]
 
+    @logger.info "Retrieving configuration for interface #{inner_ifname} in namespace #{cni_netns}"
     inner_mac = r("ip -n #{cni_netns} link show #{inner_ifname}").match(/link\/ether ([0-9a-f:]+)/)[1]
     container_ip = r("ip -n #{cni_netns} -6 addr show dev #{inner_ifname}").match(/inet6 ([0-9a-f:\/]+)/)[1]
 
