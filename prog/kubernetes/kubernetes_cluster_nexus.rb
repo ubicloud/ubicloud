@@ -75,6 +75,14 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def bootstrap_control_plane_vms
     nap 5 unless kubernetes_cluster.endpoint
 
+    # In 1-node control plane setup, we will wait until it's over
+    # In 3-node control plane setup, we start the bootstrapping after
+    # the first CP bootstrap
+    ready_to_bootstrap_workers =
+      kubernetes_cluster.cp_vms.count >= kubernetes_cluster.cp_node_count ||
+      (kubernetes_cluster.cp_node_count == 3 && kubernetes_cluster.cp_vms.count == 1)
+    kubernetes_cluster.nodepools.each(&:incr_start_bootstrapping) if ready_to_bootstrap_workers
+
     hop_wait_nodes if kubernetes_cluster.cp_vms.count >= kubernetes_cluster.cp_node_count
 
     bud Prog::Kubernetes::ProvisionKubernetesNode, {"subject_id" => kubernetes_cluster.id}
