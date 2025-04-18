@@ -202,7 +202,7 @@ direnv: Creating env file /home/ubicloud/.cache/asdf-direnv/env/2363097900-47841
 direnv: loading ~/.cache/asdf-direnv/env/2363097900-478416608-196231759-3753665172
 direnv: using asdf direnv 2.34.0
 direnv: using asdf nodejs 22.9.0
-direnv: using asdf postgres 15.4
+direnv: using asdf postgres 15.8
 direnv: loading ~/.asdf/plugins/postgres/bin/exec-env
 direnv: using asdf ruby 3.2.5
 direnv: loading ~/.asdf/plugins/ruby/bin/exec-env
@@ -215,14 +215,14 @@ Note that `$PGDATA` is exported.  Thus, we can start Postgres:
 
 ```sh
 $ postgres -D $PGDATA
-2024-10-15 13:22:43.682 PST [36002] LOG:  starting PostgreSQL 15.4 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 12.2.1 20221121 (Red Hat 12.2.1-4), 64-bit
+2024-10-15 13:22:43.682 PST [36002] LOG:  starting PostgreSQL 15.8 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 12.2.1 20221121 (Red Hat 12.2.1-4), 64-bit
 ```
 
 Also note `LD_LIBRARY_PATH`:
 
 ```sh
 $ printenv LD_LIBRARY_PATH
-/home/ubicloud/.asdf/installs/postgres/15.4/lib
+/home/ubicloud/.asdf/installs/postgres/15.8/lib
 ```
 
 This is important to be able to compile client drivers against the
