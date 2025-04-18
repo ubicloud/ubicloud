@@ -38,3 +38,6 @@
 # CLI binary
 /cli/ubi
 /cli/ubi-*
+
+# mise "local" dependency specification that shouldn't be committed
+mise.local.toml
