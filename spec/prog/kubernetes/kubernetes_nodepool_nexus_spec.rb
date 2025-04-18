@@ -81,14 +81,40 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     end
   end
 
+  describe "#can_start_bootstrapping" do
+    it "allows bootstrapping on single vm control plane" do
+      expect(kn.cluster).to receive(:cp_node_count).and_return(1)
+      expect(kn.cluster).to receive(:strand).and_return(Strand.new(label: "wait_nodes"))
+      expect(nx.can_start_bootstrapping).to be(true)
+    end
+
+    it "doesn't allow bootstrapping on single vm control plane" do
+      expect(kn.cluster).to receive(:cp_node_count).and_return(1)
+      expect(kn.cluster).to receive(:strand).and_return(Strand.new(label: "not_wait_nodes"))
+      expect(nx.can_start_bootstrapping).to be(false)
+    end
+
+    it "allows bootstrapping on ha control plane" do
+      expect(kn.cluster).to receive(:cp_node_count).and_return(3)
+      expect(kn.cluster).to receive(:cp_vms).and_return([instance_double(Vm), instance_double(Vm)])
+      expect(nx.can_start_bootstrapping).to be(true)
+    end
+
+    it "doesn't allow bootstrapping on ha control plane" do
+      expect(kn.cluster).to receive(:cp_node_count).and_return(3)
+      expect(kn.cluster).to receive(:cp_vms).and_return([instance_double(Vm)])
+      expect(nx.can_start_bootstrapping).to be(false)
+    end
+  end
+
   describe "#start" do
     it "naps if the kubernetes cluster is not ready" do
-      expect(kn.cluster).to receive(:strand).and_return(Strand.new(label: "not-wait_nodes"))
-      expect { nx.start }.to nap(30)
+      expect(nx).to receive(:can_start_bootstrapping).and_return(false)
+      expect { nx.start }.to nap(10)
     end
 
     it "registers a deadline and hops if the cluster is ready" do
-      expect(kn.cluster).to receive(:strand).and_return(Strand.new(label: "wait_nodes"))
+      expect(nx).to receive(:can_start_bootstrapping).and_return(true)
       expect(nx).to receive(:register_deadline)
       expect { nx.start }.to hop("create_services_load_balancer")
     end
@@ -119,13 +145,10 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
   end
 
   describe "#bootstrap_worker_vms" do
-    it "hops wait if the target number of vms is reached" do
-      expect(kn).to receive(:vms).and_return [1, 2]
-      expect { nx.bootstrap_worker_vms }.to hop("wait")
-    end
-
-    it "buds ProvisionKubernetesNode prog to create VMs" do
-      expect(nx).to receive(:bud).with(Prog::Kubernetes::ProvisionKubernetesNode, {"nodepool_id" => kn.id, "subject_id" => kn.cluster.id})
+    it "buds a total of node_count times ProvisionKubernetesNode prog to create VMs" do
+      kn.node_count.times do
+        expect(nx).to receive(:bud).with(Prog::Kubernetes::ProvisionKubernetesNode, {"nodepool_id" => kn.id, "subject_id" => kn.cluster.id})
+      end
       expect { nx.bootstrap_worker_vms }.to hop("wait_worker_node")
     end
   end
@@ -136,7 +159,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     it "hops back to bootstrap_worker_vms if there are no sub-programs running" do
       expect(nx).to receive(:leaf?).and_return true
 
-      expect { nx.wait_worker_node }.to hop("bootstrap_worker_vms")
+      expect { nx.wait_worker_node }.to hop("wait")
     end
 
     it "donates if there are sub-programs running" do
