@@ -244,6 +244,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
       expect(kubernetes_cluster.cp_vms).to all(receive(:incr_destroy))
       expect(kubernetes_cluster.nodepools).to all(receive(:incr_destroy))
+      expect(kubernetes_cluster.private_subnet).to receive(:incr_destroy)
 
       expect(kubernetes_cluster).not_to receive(:destroy)
       expect { nx.destroy }.to nap(5)
