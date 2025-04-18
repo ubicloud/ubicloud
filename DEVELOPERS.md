@@ -58,9 +58,100 @@ Commands:
 [...]
 ```
 
+`mise` has [shell integration instructions in its
+manual](https://mise.jdx.dev/installing-mise.html), but included here
+are some short shell scripts to guide you through installing it a
+conventional way:
+
+The first task is to integrate `mise` with your shell.  The general
+idea is to run `mise activate $shell | source"` in your shell
+initialization.
+
+You can start `sh` for a portable shell and paste this to take care of
+finding the right file automatically:
+
+```sh
+#!/bin/sh
+
+shell=$(basename "$SHELL")
+case "$shell" in
+  bash) f="$HOME/.bashrc"; [ "$(uname)" = "Darwin" ] && [ -f "$HOME/.bash_profile" ] && [ ! -f "$f" ] && f="$HOME/.bash_profile";;
+  zsh)  f="$HOME/.zshrc";;
+  fish) f="$HOME/.config/fish/config.fish";;
+  *)    echo "Unsupported shell: $shell" >&2; exit 1;;
+esac
+
+line="mise activate $shell | source"
+mkdir -p "$(dirname "$f")"; touch "$f"
+grep -qF "$line" "$f" 2>/dev/null || printf "\n%s\n" "$line" >> "$f"
+```
+
+Activation in the shell is enough to move on.  You will need to
+restart your shell to receive a copy with the changes, and having done
+so, if you run `mise doctor`, it should identify no problems.
+
+For more convenience, you can optionally install `mise`
+autocompletion.  The idea is to run `mise completion` in the
+completion directory.  This is easy for `bash` and `fish`:
+
+```sh
+#!/bin/sh
+
+shell=$(basename "$SHELL")
+case "$shell" in
+  bash) comp="$HOME/.bash_completion.d/mise";;
+  fish) comp="$HOME/.config/fish/completions/mise.fish";;
+  *)    echo "Only bash and fish supported by this script." >&2; exit 1;;
+esac
+
+mkdir -p "$(dirname "$comp")"
+mise completion "$shell" > "$comp"
+echo "Installed mise completions to $comp"
+```
+
+`zsh` is more challenging because it has no default for completion
+paths in the `$HOME` directory.  This script has some conventional
+opinions about this, and sets up a completion directory in `$HOME`:
+
+```sh
+#!/bin/sh
+
+compdir="$HOME/.local/share/zsh/site-functions"
+compfile="$compdir/_mise"
+
+mkdir -p "$compdir"
+mise completion zsh > "$compfile"
+
+# Add fpath and compinit to .zshrc if not present
+zshrc="$HOME/.zshrc"
+grep -qF "$compdir" "$zshrc" 2>/dev/null || \
+  printf '\nfpath=(%s $fpath)\n' "$compdir" >> "$zshrc"
+grep -qF "compinit" "$zshrc" 2>/dev/null || \
+  printf '\nautoload -U compinit; compinit\n' >> "$zshrc"
+
+echo "Installed mise zsh completion to $compfile and enabled it in $zshrc"
+```
+
+### Decide How to Get Postgres
+
+People have more opinions about how to manage their Postgres version
+(e.g. Postgres.app or similar).  If you don't have an opinion, we
+suggest you use `mise` to manage Postgres.
+
+Managing Postgres with `mise` will increase the number of system
+dependencies you are obligated to install to compile it.
+
+If you opt to use `mise` to compile and install Postgres, you can run:
+
+    ln -s mise.local.toml.template mise.local.toml
+
+`mise.local.toml` is a file `mise` reads that is not committed to the
+source. `mise.local.toml.template` *is* committed and updated for new
+Postgres versions occasionally, though `mise` does not read it.
+
 ### Installing System Dependencies
 
-`mise` will compile Ruby and Postgres.  Furthermore, some Ruby gems
+`mise` will compile Ruby and/or Postgres.  Furthermore, some Ruby gems
 will require compilation.  For all of this, you must have a C
 compiler, a Rust compiler, and various libraries.  [There is
 documentation listing the commands you can use for each
