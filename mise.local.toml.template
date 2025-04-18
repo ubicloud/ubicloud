@@ -1,0 +1,2 @@
+[tools]
+postgres = "15.8"
