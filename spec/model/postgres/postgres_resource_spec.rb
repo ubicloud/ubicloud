@@ -60,22 +60,32 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.needs_convergence?).to be(false)
   end
 
-  it "returns display state correctly" do
-    expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "unavailable")))
-    expect(postgres_resource.display_state).to eq("unavailable")
+  describe "display_state" do
+    it "returns 'deleting' when strand label is 'destroy'" do
+      expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "destroy")).at_least(:once)
+      expect(postgres_resource.display_state).to eq("deleting")
+    end
 
-    expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "wait"))).at_least(:once)
-    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, children: [instance_double(Strand, prog: "Postgres::ConvergePostgresResource")]))
-    expect(postgres_resource.display_state).to eq("converging")
+    it "returns 'unavailable' when representative server's strand label is 'unavailable'" do
+      expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait")).at_least(:once)
+      expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "unavailable")))
+      expect(postgres_resource.display_state).to eq("unavailable")
+    end
 
-    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait", children: [])).twice
-    expect(postgres_resource.display_state).to eq("running")
+    it "returns 'converging' when strand has ConvergePostgresResource children" do
+      expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait", children: [instance_double(Strand, prog: "Postgres::ConvergePostgresResource")])).at_least(:once)
+      expect(postgres_resource.display_state).to eq("converging")
+    end
 
-    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "destroy", children: [])).exactly(3).times
-    expect(postgres_resource.display_state).to eq("deleting")
+    it "returns 'running' when strand label is 'wait' and has no children" do
+      expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait", children: [])).at_least(:once)
+      expect(postgres_resource.display_state).to eq("running")
+    end
 
-    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait_server", children: [])).exactly(3).times
-    expect(postgres_resource.display_state).to eq("creating")
+    it "returns 'creating' when strand is 'wait_server'" do
+      expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait_server", children: [])).at_least(:once)
+      expect(postgres_resource.display_state).to eq("creating")
+    end
   end
 
   it "returns target_standby_count correctly" do
