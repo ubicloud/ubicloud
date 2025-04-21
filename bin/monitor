@@ -11,8 +11,9 @@ resource_scanner = Thread.new do
   monitorable_resource_types = [VmHost, PostgresServer, Vm.where(~Sshable.where(id: Sequel[:vm][:id]).exists), MinioServer, GithubRunner, VmHostSlice, LoadBalancerVmPort, KubernetesCluster]
 
   loop do
+    monitorable_resources = monitorable_resource_types.flat_map(&:all)
     mutex.synchronize do
-      Enumerator::Chain.new(*monitorable_resource_types).each do |r|
+      monitorable_resources.each do |r|
         resources[r.id] ||= MonitorableResource.new(r)
       end
     end
