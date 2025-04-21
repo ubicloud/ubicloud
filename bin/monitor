@@ -25,13 +25,13 @@ rescue => ex
   Kernel.exit!
 end
 
-pulse_checker = Thread.new do
+begin
   loop do
     mutex.synchronize do
-      # Deduct 3 for the threads that are always running: main, resource_scanner, pulse_checker
-      Clog.emit("Active threads count.") { {active_threads_count: Thread.list.count - 3} }
+      # Deduct 2 for the threads that are always running: main, resource_scanner
+      Clog.emit("Active threads count.") { {active_threads_count: Thread.list.count - 2} }
       resources.each do |r_id, r|
-        sleep 1 while Thread.list.count + 2 > Config.max_monitor_threads
+        sleep 1 while Thread.list.count + 1 > Config.max_monitor_threads
 
         r.force_stop_if_stuck
 
@@ -55,4 +55,3 @@ rescue => ex
 end
 
 resource_scanner.join
-pulse_checker.join
