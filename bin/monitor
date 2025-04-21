@@ -6,10 +6,12 @@ clover_freeze
 
 resources = {}
 mutex = Mutex.new
+thread_pool_size = (Config.max_monitor_threads - 2).clamp(1, nil)
+monitorable_resource_types = [VmHost, PostgresServer, Vm.where(~Sshable.where(id: Sequel[:vm][:id]).exists), MinioServer, GithubRunner, VmHostSlice, LoadBalancerVmPort, KubernetesCluster]
+queue_size = thread_pool_size + (monitorable_resource_types.sum(&:count) * 1.5).round
+queue = SizedQueue.new(queue_size)
 
 resource_scanner = Thread.new do
-  monitorable_resource_types = [VmHost, PostgresServer, Vm.where(~Sshable.where(id: Sequel[:vm][:id]).exists), MinioServer, GithubRunner, VmHostSlice, LoadBalancerVmPort, KubernetesCluster]
-
   loop do
     monitorable_resources = monitorable_resource_types.flat_map(&:all)
     mutex.synchronize do
@@ -26,27 +28,33 @@ rescue => ex
   Kernel.exit!
 end
 
+thread_pool = Array.new(thread_pool_size) do
+  Thread.new do
+    while (r = queue.pop)
+      r.lock_no_wait do
+        r.open_resource_session
+        r.process_event_loop
+        r.check_pulse
+      end
+    end
+  end
+end
+
 begin
   loop do
-    mutex.synchronize do
-      # Deduct 2 for the threads that are always running: main, resource_scanner
-      Clog.emit("Active threads count.") { {active_threads_count: Thread.list.count - 2} }
-      resources.each do |r_id, r|
-        sleep 1 while Thread.list.count + 1 > Config.max_monitor_threads
+    # Since the switch to use a thread pool for monitored resources,
+    # this emits the number of pulse threads, not the number of monitor threads + pulse threads
+    Clog.emit("Active threads count.") { {active_threads_count: Thread.list.count - thread_pool_size - 2} }
 
-        r.force_stop_if_stuck
+    rs = mutex.synchronize { resources.values }
 
-        Thread.new do
-          r.lock_no_wait do
-            r.open_resource_session
-            r.process_event_loop
-            r.check_pulse
-          end
-        end
-      end
-
-      resources.select { |r_id, r| r.deleted }.each { |r_id, r| resources.delete(r_id) }
+    rs.each do |r|
+      r.force_stop_if_stuck
+      queue.push(r)
     end
+
+    mutex.synchronize { resources.delete_if { |_, r| r.deleted } }
+
     sleep 5
   end
 rescue => ex
@@ -56,3 +64,5 @@ rescue => ex
 end
 
 resource_scanner.join
+thread_pool.each { queue.push(nil) }
+thread_pool.each(&:join)
