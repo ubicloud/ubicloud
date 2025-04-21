@@ -4,6 +4,7 @@ require "net/ssh"
 require "openssl"
 require "erubi"
 require "tilt"
+require "fileutils"
 
 module Util
   # A minimal, non-cached SSH implementation.
