@@ -143,7 +143,7 @@ RSpec.describe Prog::Base do
     it "can render exit" do
       expect(described_class::Exit.new(
         Strand.new(prog: "TestProg", label: "exiting_label"), {"msg" => "done"}
-      ).to_s).to eq('Strand exits from TestProg#exiting_label with {"msg"=>"done"}')
+      ).to_s).to eq('Strand exits from TestProg#exiting_label with {"msg" => "done"}')
     end
   end
 
