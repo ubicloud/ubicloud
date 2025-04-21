@@ -96,11 +96,11 @@ RSpec.describe PrivateSubnet do
     it "includes ubid if id is available" do
       ubid = described_class.generate_ubid
       private_subnet.id = ubid.to_uuid.to_s
-      expect(private_subnet.inspect).to eq "#<PrivateSubnet[\"#{ubid}\"] @values={:net6=>\"fd1b:9793:dcef:cd0a::/64\", :net4=>\"10.9.39.0/26\", :location_id=>\"10saktg1sprp3mxefj1m3kppq2\", :state=>\"waiting\", :name=>\"ps\", :project_id=>\"#{private_subnet.project.ubid}\"}>"
+      expect(private_subnet.inspect).to eq "#<PrivateSubnet[\"#{ubid}\"] @values={net6: \"fd1b:9793:dcef:cd0a::/64\", net4: \"10.9.39.0/26\", location_id: \"10saktg1sprp3mxefj1m3kppq2\", state: \"waiting\", name: \"ps\", project_id: \"#{private_subnet.project.ubid}\"}>"
     end
 
     it "does not includes ubid if id is missing" do
-      expect(private_subnet.inspect).to eq "#<PrivateSubnet @values={:net6=>\"fd1b:9793:dcef:cd0a::/64\", :net4=>\"10.9.39.0/26\", :location_id=>\"10saktg1sprp3mxefj1m3kppq2\", :state=>\"waiting\", :name=>\"ps\", :project_id=>\"#{private_subnet.project.ubid}\"}>"
+      expect(private_subnet.inspect).to eq "#<PrivateSubnet @values={net6: \"fd1b:9793:dcef:cd0a::/64\", net4: \"10.9.39.0/26\", location_id: \"10saktg1sprp3mxefj1m3kppq2\", state: \"waiting\", name: \"ps\", project_id: \"#{private_subnet.project.ubid}\"}>"
     end
   end
 

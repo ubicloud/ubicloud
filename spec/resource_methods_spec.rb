@@ -30,16 +30,16 @@ RSpec.describe ResourceMethods do
     expect(project.inspect).to eq "#<Project @values={}>"
 
     project.created_at = Time.new(2024, 11, 13, 9, 16, 56.123456, 3600)
-    expect(project.inspect).to eq "#<Project @values={:created_at=>\"2024-11-13 09:16:56\"}>"
+    expect(project.inspect).to eq "#<Project @values={created_at: \"2024-11-13 09:16:56\"}>"
 
     project.id = UBID.parse("pjhahqe5e90j3j6kfjtwtxpsps").to_uuid
-    expect(project.inspect).to eq "#<Project[\"pjhahqe5e90j3j6kfjtwtxpsps\"] @values={:created_at=>\"2024-11-13 09:16:56\"}>"
+    expect(project.inspect).to eq "#<Project[\"pjhahqe5e90j3j6kfjtwtxpsps\"] @values={created_at: \"2024-11-13 09:16:56\"}>"
 
     subject_tag = SubjectTag.new(project_id: project.id, name: nil)
-    expect(subject_tag.inspect).to eq "#<SubjectTag @values={:project_id=>\"pjhahqe5e90j3j6kfjtwtxpsps\", :name=>nil}>"
+    expect(subject_tag.inspect).to eq "#<SubjectTag @values={project_id: \"pjhahqe5e90j3j6kfjtwtxpsps\", name: nil}>"
 
     subject_tag.name = "a"
-    expect(subject_tag.inspect).to eq "#<SubjectTag @values={:project_id=>\"pjhahqe5e90j3j6kfjtwtxpsps\", :name=>\"a\"}>"
+    expect(subject_tag.inspect).to eq "#<SubjectTag @values={project_id: \"pjhahqe5e90j3j6kfjtwtxpsps\", name: \"a\"}>"
   end
 
   it "Model.[] allows lookup using both uuid and ubid" do
