@@ -272,7 +272,7 @@ RSpec.describe Clover, "postgres" do
         expect(MinioCluster).to receive(:[]).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
         expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
         page.refresh
-        fill_in "New server name", with: "restored-server"
+        fill_in "#{pg.name}-fork", with: "restored-server"
         fill_in "Target Time (UTC)", with: restore_target.strftime("%Y-%m-%d %H:%M"), visible: false
         click_button "Fork"
         expect(page.body).to include "metric-destination-password"
@@ -366,13 +366,31 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}"
         expect(page).to have_content "Fork PostgreSQL database"
 
-        fill_in "New server name", with: "restored-server"
+        fill_in "#{pg.name}-fork", with: "restored-server"
         fill_in "Target Time (UTC)", with: restore_target.strftime("%Y-%m-%d %H:%M"), visible: false
 
         click_button "Fork"
 
         expect(page.status_code).to eq(200)
         expect(page.title).to eq("Ubicloud - restored-server")
+      end
+
+      it "can create a read replica of a PostgreSQL database" do
+        visit "#{project.path}#{pg.path}"
+        expect(page).to have_content "Read Replicas"
+
+        fill_in "#{pg.name}-read-replica", with: "my-read-replica"
+
+        find(".pg-read-replica-create-btn").click
+
+        expect(page.status_code).to eq(200)
+        expect(page.title).to eq("Ubicloud - my-read-replica")
+
+        visit "#{project.path}#{pg.path}"
+        expect(page).to have_content("my-read-replica")
+
+        visit "#{project.path}/postgres"
+        expect(page).to have_content("my-read-replica")
       end
 
       it "can reset superuser password of PostgreSQL database" do

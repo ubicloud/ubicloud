@@ -13,7 +13,9 @@ class Serializers::Postgres < Serializers::Base
       ha_type: pg.ha_type,
       flavor: pg.flavor,
       ca_certificates: pg.ca_certificates,
-      maintenance_window_start_at: pg.maintenance_window_start_at
+      maintenance_window_start_at: pg.maintenance_window_start_at,
+      read_replica: !!pg.read_replica?,
+      parent: pg.parent&.path
     }
 
     if options[:include_path]
@@ -25,7 +27,8 @@ class Serializers::Postgres < Serializers::Base
         connection_string: pg.connection_string,
         primary: pg.representative_server&.primary?,
         firewall_rules: Serializers::PostgresFirewallRule.serialize(pg.firewall_rules.sort_by { |fwr| fwr.cidr.version && fwr.cidr.to_s }),
-        metric_destinations: pg.metric_destinations.map { {id: _1.ubid, username: _1.username, url: _1.url} }
+        metric_destinations: pg.metric_destinations.map { {id: _1.ubid, username: _1.username, url: _1.url} },
+        read_replicas: Serializers::Postgres.serialize(pg.read_replicas, {include_path: true})
       )
 
       if pg.timeline && pg.representative_server&.primary?

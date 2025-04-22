@@ -44,7 +44,7 @@ RSpec.describe PostgresServer do
 
   describe "#configure" do
     before do
-      allow(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, blob_storage: "dummy-blob-storage"))
+      allow(postgres_server).to receive_messages(timeline: instance_double(PostgresTimeline, blob_storage: "dummy-blob-storage"), read_replica?: false)
       allow(resource).to receive(:flavor).and_return(PostgresResource::Flavor::STANDARD)
     end
 
@@ -110,33 +110,41 @@ RSpec.describe PostgresServer do
 
   describe "#trigger_failover" do
     it "fails if server is not primary" do
-      expect(postgres_server).to receive(:primary?).and_return(false)
+      expect(postgres_server).to receive(:representative_at).and_return(false)
       expect(postgres_server.trigger_failover).to be_falsey
     end
 
     it "fails if there is no suitable standby" do
-      expect(postgres_server).to receive(:primary?).and_return(true)
+      expect(postgres_server).to receive(:representative_at).and_return(true)
       expect(postgres_server).to receive(:failover_target).and_return(nil)
       expect(postgres_server.trigger_failover).to be_falsey
     end
 
     it "increments take over semaphore" do
       standby = instance_double(described_class)
-      expect(postgres_server).to receive(:primary?).and_return(true)
+      expect(postgres_server).to receive(:representative_at).and_return(true)
       expect(postgres_server).to receive(:failover_target).and_return(standby)
       expect(standby).to receive(:incr_take_over)
       expect(postgres_server.trigger_failover).to be_truthy
     end
   end
 
+  it "#read_replica?" do
+    expect(postgres_server.resource).to receive(:read_replica?).and_return(true)
+    expect(postgres_server).to be_read_replica
+    expect(postgres_server.resource).to receive(:read_replica?).and_return(false)
+    expect(postgres_server).not_to be_read_replica
+  end
+
   describe "#failover_target" do
     before do
-      postgres_server.timeline_access = "push"
+      postgres_server.representative_at = Time.now
+      allow(postgres_server).to receive(:read_replica?).and_return(false)
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", standby?: true, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false),
-        instance_double(described_class, ubid: "pgubidstandby2", standby?: true, run_query: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false),
-        instance_double(described_class, ubid: "pgubidstandby3", standby?: true, run_query: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false)
+        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: false),
+        instance_double(described_class, ubid: "pgubidstandby2", representative_at: nil, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false),
+        instance_double(described_class, ubid: "pgubidstandby3", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false)
       ])
     end
 
@@ -146,17 +154,20 @@ RSpec.describe PostgresServer do
     end
 
     it "returns nil if there is no fresh standby" do
+      expect(postgres_server).to receive(:representative_at).and_return(Time.now)
       standby_server = described_class.new { _1.id = "c068cac7-ed45-82db-bf38-a003582b36ef" }
       expect(standby_server).to receive(:resource).and_return(resource)
-      expect(standby_server).to receive(:standby?).and_return(true)
+      expect(standby_server).to receive(:representative_at).and_return(nil).at_least(:once)
       expect(standby_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
-      expect(standby_server).to receive(:vm).and_return(instance_double(Vm, display_size: "standard-4"))
+      expect(standby_server).to receive(:vm).and_return(instance_double(Vm, display_size: "standard-4", sshable: instance_double(Sshable)))
+
       expect(resource).to receive(:servers).and_return([postgres_server, standby_server]).at_least(:once)
       expect(resource).to receive(:target_vm_size).and_return("standard-2")
       expect(postgres_server.failover_target).to be_nil
     end
 
     it "returns the standby with highest lsn in sync replication" do
+      expect(postgres_server).to receive(:representative_at).and_return(Time.now)
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby3")
     end
@@ -180,6 +191,39 @@ RSpec.describe PostgresServer do
     end
   end
 
+  describe "#failover_target read_replica" do
+    before do
+      expect(postgres_server).to receive(:representative_at).and_return(Time.now)
+      allow(postgres_server).to receive(:read_replica?).and_return(true)
+
+      allow(resource).to receive(:servers).and_return([
+        postgres_server,
+        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: true),
+        instance_double(described_class, ubid: "pgubidstandby2", representative_at: nil, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true),
+        instance_double(described_class, ubid: "pgubidstandby3", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true)
+      ])
+    end
+
+    it "returns nil if there is no replica to failover" do
+      expect(resource).to receive(:servers).and_return([postgres_server]).at_least(:once)
+      expect(postgres_server.failover_target).to be_nil
+    end
+
+    it "returns nil if there is no fresh read_replica" do
+      replica_server = described_class.new { _1.id = "c068cac7-ed45-82db-bf38-a003582b36ef" }
+      expect(replica_server).to receive(:resource).and_return(resource)
+      expect(replica_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      expect(replica_server).to receive(:vm).and_return(instance_double(Vm, display_size: "standard-4"))
+      expect(resource).to receive(:servers).and_return([postgres_server, replica_server]).at_least(:once)
+      expect(resource).to receive(:target_vm_size).and_return("standard-2")
+      expect(postgres_server.failover_target).to be_nil
+    end
+
+    it "returns the replica with highest lsn" do
+      expect(postgres_server.failover_target.ubid).to eq("pgubidstandby3")
+    end
+  end
+
   describe "storage_size_gib" do
     it "returns the storage size in GiB" do
       volume_dataset = instance_double(Sequel::Dataset)
@@ -193,6 +237,35 @@ RSpec.describe PostgresServer do
       expect(volume_dataset).to receive(:first).and_return(nil)
       expect(vm).to receive(:vm_storage_volumes_dataset).and_return(volume_dataset)
       expect(postgres_server.storage_size_gib).to be_nil
+    end
+  end
+
+  describe "lsn_caught_up" do
+    let(:parent_resource) {
+      instance_double(PostgresResource, representative_server: instance_double(described_class, current_lsn: "F/F"))
+    }
+
+    before do
+      allow(resource).to receive(:parent).and_return(parent_resource)
+    end
+
+    it "returns true if the diff is less than 80MB" do
+      expect(postgres_server).to receive(:read_replica?).and_return(true)
+      expect(postgres_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
+      expect(postgres_server.lsn_caught_up).to be_truthy
+    end
+
+    it "returns false if the diff is less than 80MB" do
+      expect(postgres_server).to receive(:read_replica?).and_return(true)
+      expect(postgres_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("1/00000000")
+      expect(postgres_server.lsn_caught_up).to be_falsey
+    end
+
+    it "returns true if the diff is less than 80MB for not read replica and uses the main representative server" do
+      expect(postgres_server).to receive(:read_replica?).and_return(false)
+      expect(resource).to receive(:representative_server).and_return(postgres_server)
+      expect(postgres_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F", "F/F")
+      expect(postgres_server.lsn_caught_up).to be_truthy
     end
   end
 
@@ -217,6 +290,9 @@ RSpec.describe PostgresServer do
     }
 
     expect(postgres_server).not_to receive(:incr_checkup)
+    expect(postgres_server).to receive(:primary?).and_return(false)
+    expect(postgres_server).to receive(:standby?).and_return(false)
+
     postgres_server.check_pulse(session: session, previous_pulse: pulse)
   end
 
@@ -234,6 +310,8 @@ RSpec.describe PostgresServer do
     expect(session[:db_connection]).to receive(:[]).and_raise(Sequel::DatabaseConnectionError)
     expect(postgres_server).to receive(:reload).and_return(postgres_server)
     expect(postgres_server).to receive(:incr_checkup)
+    expect(postgres_server).to receive(:primary?).and_return(false)
+    expect(postgres_server).to receive(:standby?).and_return(true)
     postgres_server.check_pulse(session: session, previous_pulse: pulse)
   end
 
@@ -256,13 +334,33 @@ RSpec.describe PostgresServer do
     postgres_server.check_pulse(session: session, previous_pulse: pulse)
   end
 
+  it "uses pg_last_wal_replay_lsn to track lsn for read replicas" do
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session),
+      db_connection: instance_double(Sequel::Postgres::Database)
+    }
+    pulse = {
+      reading: "down",
+      reading_rpt: 5,
+      reading_chg: Time.now - 30
+    }
+
+    expect(session[:db_connection]).to receive(:[]).with("SELECT pg_last_wal_replay_lsn() AS lsn").and_raise(Sequel::DatabaseConnectionError)
+    expect(postgres_server).to receive(:primary?).and_return(false)
+    expect(postgres_server).to receive(:standby?).and_return(false)
+
+    expect(postgres_server).to receive(:reload).and_return(postgres_server)
+    expect(postgres_server).to receive(:incr_checkup)
+    postgres_server.check_pulse(session: session, previous_pulse: pulse)
+  end
+
   it "catches Sequel::Error if updating PostgresLsnMonitor fails" do
     lsn_monitor = instance_double(PostgresLsnMonitor, last_known_lsn: "1/5")
     expect(PostgresLsnMonitor).to receive(:new).and_return(lsn_monitor)
     expect(lsn_monitor).to receive(:insert_conflict).and_return(lsn_monitor)
     expect(lsn_monitor).to receive(:save_changes).and_raise(Sequel::Error)
     expect(Clog).to receive(:emit).with("Failed to update PostgresLsnMonitor")
-
+    expect(postgres_server).to receive(:primary?).and_return(true)
     postgres_server.check_pulse(session: {db_connection: DB}, previous_pulse: {})
   end
 

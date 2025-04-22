@@ -35,12 +35,16 @@
   <div class="grid gap-6">
     <%== part(
       "components/table_card",
-      headers: ["Name", "Managed by", "Location", "State"],
+      headers: ["Name", "Compute", "Storage", "Version", "Parent", "Managed by", "Location", "State"],
       rows: @postgres_databases.map do |pg|
         brand, = flavors[pg[:flavor]]
         [
           [
             [pg[:name], {link: @project_data[:path] + pg[:path]}],
+            [pg[:vm_size]],
+            [pg[:storage_size_gib]],
+            [pg[:version]],
+            [pg[:parent] ? pg[:parent].split("/").last : "", {link: pg[:parent] ? @project_data[:path] + pg[:parent] : ""}],
             ["<div class='inline-flex gap-x-1 items-center'><img src='/icons/pg-#{brand.downcase}.png' class='object-cover rounded-lg overflow-hidden w-6 h-6'/><p>#{brand}</p></div>", {escape: false}],
             pg[:location],
             ["pg_state_label", {component: { state: pg[:state] }}]

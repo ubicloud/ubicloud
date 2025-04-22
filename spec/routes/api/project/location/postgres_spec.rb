@@ -29,6 +29,7 @@ RSpec.describe Clover, "postgres" do
         [:delete, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}"],
         [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"],
         [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}"],
+        [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/read-replica"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule"],
         [:delete, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/foo_ubid"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore"],
@@ -195,6 +196,17 @@ RSpec.describe Clover, "postgres" do
 
         expect(pg.reload.target_storage_size_gib).to eq(128)
         expect(last_response).to have_api_error(400, "Database is not ready for update")
+      end
+
+      it "read-replica" do
+        expect(Project).to receive(:from_ubid).and_return(project)
+        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
+
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
+          name: "my-read-replica"
+        }.to_json
+
+        expect(last_response.status).to eq(200)
       end
 
       it "firewall-rule" do

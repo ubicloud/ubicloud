@@ -71,7 +71,10 @@ class Clover
         requested_postgres_vcpu_count = (PostgresResource::TARGET_STANDBY_COUNT_MAP[ha_type] + 1) * target_vm_size.vcpu
         Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count - current_postgres_vcpu_count)
 
-        pg.update(target_vm_size: target_vm_size.vm_size, target_storage_size_gib:, ha_type:)
+        DB.transaction do
+          pg.update(target_vm_size: target_vm_size.vm_size, target_storage_size_gib:, ha_type:)
+          pg.read_replicas.map { _1.update(target_vm_size: target_vm_size.vm_size, target_storage_size_gib:) }
+        end
 
         if api?
           Serializers::Postgres.serialize(pg, {detailed: true})
@@ -181,6 +184,33 @@ class Clover
           end
 
           204
+        end
+      end
+
+      r.on "read-replica" do
+        r.post true do
+          required_parameters = ["name"]
+          request_body_params = validate_request_params(required_parameters, [], [])
+          st = Prog::Postgres::PostgresResourceNexus.assemble(
+            project_id: @project.id,
+            location_id: pg.location_id,
+            name: request_body_params["name"],
+            target_vm_size: pg.target_vm_size,
+            target_storage_size_gib: pg.target_storage_size_gib,
+            ha_type: PostgresResource::HaType::NONE,
+            version: pg.version,
+            flavor: pg.flavor,
+            parent_id: pg.id,
+            restore_target: nil
+          )
+          send_notification_mail_to_partners(st.subject, current_account.email)
+
+          if api?
+            Serializers::Postgres.serialize(st.subject, {detailed: true})
+          else
+            flash["notice"] = "'#{request_body_params["name"]}' will be ready in a few minutes"
+            r.redirect "#{@project.path}#{st.subject.path}"
+          end
         end
       end
 
