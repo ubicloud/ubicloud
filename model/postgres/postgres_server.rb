@@ -128,12 +128,29 @@ class PostgresServer < Sequel::Model
     !resource.representative_server.primary?
   end
 
+  def read_replica?
+    resource.read_replica?
+  end
+
   def storage_size_gib
     vm.vm_storage_volumes_dataset.first(boot: false)&.size_gib
   end
 
   def needs_recycling?
     vm.display_size != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib
+  end
+
+  def lsn_caught_up
+    parent_server = if read_replica?
+      resource.parent.representative_server
+    else
+      resource.representative_server
+    end
+    lsn_diff(parent_server.current_lsn, current_lsn) < 80 * 1024 * 1024
+  end
+
+  def current_lsn
+    run_query("SELECT #{lsn_function}").chomp
   end
 
   def failover_target
@@ -152,6 +169,16 @@ class PostgresServer < Sequel::Model
     target[:server]
   end
 
+  def lsn_function
+    if primary?
+      "pg_current_wal_lsn()"
+    elsif standby?
+      "pg_last_wal_receive_lsn()"
+    else
+      "pg_last_wal_replay_lsn()"
+    end
+  end
+
   def init_health_monitor_session
     FileUtils.rm_rf(health_monitor_socket_path)
     FileUtils.mkdir_p(health_monitor_socket_path)
@@ -167,7 +194,6 @@ class PostgresServer < Sequel::Model
   def check_pulse(session:, previous_pulse:)
     reading = begin
       session[:db_connection] ||= Sequel.connect(adapter: "postgres", host: health_monitor_socket_path, user: "postgres", connect_timeout: 4)
-      lsn_function = primary? ? "pg_current_wal_lsn()" : "pg_last_wal_receive_lsn()"
       last_known_lsn = session[:db_connection]["SELECT #{lsn_function} AS lsn"].first[:lsn]
       "up"
     rescue
