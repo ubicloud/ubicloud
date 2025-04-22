@@ -52,6 +52,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
 
       - name: Log in to Docker Hub
+        if: ${{ inputs.push_image }}
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -66,7 +67,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=ubicloud-${{ matrix.runner }}
           cache-to: type=gha,mode=max,scope=ubicloud-${{ matrix.runner }}
-          outputs: type=image,name=${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=${{ inputs.push_image && 'true' || 'false' }}
 
       - name: Export digest
         run: |
