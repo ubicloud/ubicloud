@@ -144,7 +144,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     when "Succeeded"
       hop_refresh_certificates
     when "Failed", "NotStarted"
-      backup_label = if postgres_server.standby?
+      backup_label = if postgres_server.standby? || postgres_server.read_replica?
         "LATEST"
       else
         postgres_server.timeline.latest_backup_label_before_target(target: postgres_server.resource.restore_target)
@@ -243,7 +243,7 @@ CONFIG
 
       when_initial_provisioning_set? do
         hop_update_superuser_password if postgres_server.primary?
-        hop_wait_catch_up if postgres_server.standby?
+        hop_wait_catch_up if postgres_server.standby? || postgres_server.read_replica?
         hop_wait_recovery_completion
       end
 
@@ -300,10 +300,9 @@ SQL
   end
 
   label def wait_catch_up
-    query = "SELECT pg_current_wal_lsn() - replay_lsn FROM pg_stat_replication WHERE application_name = '#{postgres_server.ubid}'"
-    lag = postgres_server.resource.representative_server.run_query(query).chomp
+    nap 30 unless postgres_server.lsn_caught_up
 
-    nap 30 if lag.empty? || lag.to_i > 80 * 1024 * 1024 # 80 MB or ~5 WAL files
+    hop_wait if postgres_server.read_replica?
 
     postgres_server.update(synchronization_status: "ready")
     postgres_server.resource.representative_server.incr_configure
