@@ -17,7 +17,7 @@ class PostgresServer < Sequel::Model
   include HealthMonitorMethods
 
   semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup
-  semaphore :restart, :configure, :take_over, :configure_prometheus, :destroy
+  semaphore :restart, :configure, :take_over, :configure_prometheus, :destroy, :recycle
 
   def configure_hash
     configs = {
@@ -107,7 +107,7 @@ class PostgresServer < Sequel::Model
   end
 
   def trigger_failover
-    if primary? && (standby = failover_target)
+    if representative_at && (standby = failover_target)
       standby.incr_take_over
       true
     else
@@ -137,7 +137,7 @@ class PostgresServer < Sequel::Model
   end
 
   def needs_recycling?
-    vm.display_size != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib
+    recycle_set? || vm.display_size != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib
   end
 
   def lsn_caught_up
@@ -155,8 +155,9 @@ class PostgresServer < Sequel::Model
 
   def failover_target
     target = resource.servers
-      .select { _1.standby? && _1.strand.label == "wait" && !_1.needs_recycling? }
-      .map { {server: _1, lsn: _1.run_query("SELECT pg_last_wal_receive_lsn()").chomp} }
+      .reject { _1.representative_at }
+      .select { _1.strand.label == "wait" && !_1.needs_recycling? }
+      .map { {server: _1, lsn: _1.current_lsn} }
       .max_by { lsn2int(_1[:lsn]) }
 
     return nil if target.nil?
