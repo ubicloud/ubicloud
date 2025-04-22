@@ -286,6 +286,7 @@ class Invoice < Sequel::Model
       endpoint: Config.invoices_blob_storage_endpoint,
       access_key_id: Config.invoices_blob_storage_access_key,
       secret_access_key: Config.invoices_blob_storage_secret_key,
+      region: "auto",
       request_checksum_calculation: "when_required",
       response_checksum_validation: "when_required"
     )
