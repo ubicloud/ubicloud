@@ -44,7 +44,17 @@ cluster_config = {
   "clusterName" => cluster_name,
   "controlPlaneEndpoint" => "#{lb_hostname}:#{port}",
   "apiServer" => {
-    "certSANs" => [lb_hostname]
+    "certSANs" => [lb_hostname],
+    "extraArgs" => [
+      {
+        "name" => "bind-address",
+        "value" => "::"
+      },
+      {
+        "name" => "advertise-address",
+        "value" => node_ipv4
+      }
+    ]
   },
   "networking" => {
     "podSubnet" => "#{private_subnet_cidr4},#{private_subnet_cidr6}",

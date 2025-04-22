@@ -65,8 +65,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       health_check_endpoint: "/healthz",
       health_check_protocol: "tcp",
       custom_hostname_dns_zone_id:,
-      custom_hostname_prefix:,
-      stack: LoadBalancer::Stack::IPV4
+      custom_hostname_prefix:
     ).subject
     kubernetes_cluster.update(api_server_lb_id: load_balancer.id)
 
