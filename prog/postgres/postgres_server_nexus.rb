@@ -382,6 +382,31 @@ SQL
       push self.class, frame, "restart"
     end
 
+    if postgres_server.read_replica?
+      nap 60 if postgres_server.lsn_caught_up
+
+      lsn = postgres_server.current_lsn
+      previous_lsn = strand.stack.first["lsn"]
+      # The first time we are behind the primary, so, we'll just record the info
+      # and nap
+      unless previous_lsn
+        update_stack_lsn(lsn)
+        nap 15 * 60
+      end
+
+      if postgres_server.lsn_diff(lsn, previous_lsn) > 0
+        update_stack_lsn(lsn)
+        # Even if it is lagging, it has applied new wal files, so, we should
+        # give it a chance to catch up
+        nap 15 * 60
+      else
+        # It has not applied any new wal files while has been napping for the
+        # last 15 minutes, so, there should be something wrong, we are recycling
+        postgres_server.incr_recycle
+      end
+      nap 60
+    end
+
     nap 6 * 60 * 60
   end
 
@@ -404,6 +429,7 @@ SQL
 
   label def prepare_for_take_over
     decr_take_over
+
     hop_taking_over if postgres_server.resource.representative_server.nil?
 
     postgres_server.resource.representative_server.incr_destroy
@@ -412,6 +438,12 @@ SQL
   end
 
   label def taking_over
+    if postgres_server.read_replica?
+      postgres_server.update(representative_at: Time.now)
+      postgres_server.resource.incr_refresh_dns_record
+      hop_configure
+    end
+
     case vm.sshable.cmd("common/bin/daemonizer --check promote_postgres")
     when "Succeeded"
       postgres_server.update(timeline_access: "push", representative_at: Time.now)
@@ -469,5 +501,12 @@ SQL
     end
 
     false
+  end
+
+  def update_stack_lsn(lsn)
+    current_frame = strand.stack.first
+    current_frame["lsn"] = lsn
+    strand.modified!(:stack)
+    strand.save_changes
   end
 end
