@@ -24,13 +24,13 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
     ["Version", "Postgres #{@pg[:version]}"],
     ["High Availability", PG_HA_DATA[@pg[:ha_type]]]
   ]
-  
+
   if @pg[:connection_string]
     data.push(["Connection String", @pg[:connection_string], { copyable: true, revealable: true }])
   else
     data.push(["Connection String", "Waiting for host to be ready..."])
   end
-  
+
   if @pg[:ca_certificates]
     data.push(
       ["CA Certificates", part("components/download_button", link: "#{request.path}/ca-certificates"), { escape: false }]
@@ -108,100 +108,170 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
       </div>
     <% end %>
   </div>
-  <!-- Update target state of the database resource -->
-  <% form_elements = [
-    {
-      name: "family",
-      type: "radio_small_cards",
-      label: "Server family",
-      required: "required",
-      content_generator: ContentGenerator::Postgres.method(:family)
-    },
-    {
-      name: "size",
-      type: "radio_small_cards",
-      label: "Server size",
-      required: "required",
-      content_generator: ContentGenerator::Postgres.method(:size)
-    },
-    {
-      name: "storage_size",
-      type: "radio_small_cards",
-      label: "Storage size",
-      required: "required",
-      content_generator: ContentGenerator::Postgres.method(:storage_size)
-    },
-    {
-      name: "ha_type",
-      type: "radio_small_cards",
-      label: "High Availability",
-      required: "required",
-      content_generator: ContentGenerator::Postgres.method(:ha_type)
-    },
-    {
-      name: "failover_time_notice",
-      type: "section",
-      content:
-        "If a maintenance window is configured, failover to the new server with the desired configuration will occur during the first available maintenance window after the new server is ready. Otherwise, failover will take place as soon as the new server becomes ready. Depending on the size of the data, it may take several hours for the new server to become ready.",
-      separator: false
-    }
-  ]
-  
-  pre_selected_values = {
-    "flavor" => @pg[:flavor],
-    "location" => @location.id,
-    "family" => @family,
-    "size" => @pg[:vm_size],
-    "storage_size" => @pg[:storage_size_gib],
-    "ha_type" => @pg[:ha_type]
-  } %>
+  <% if !@pg[:read_replica] %>
+    <!-- Update target state of the database resource -->
+    <% form_elements = [
+      {
+        name: "family",
+        type: "radio_small_cards",
+        label: "Server family",
+        required: "required",
+        content_generator: ContentGenerator::Postgres.method(:family)
+      },
+      {
+        name: "size",
+        type: "radio_small_cards",
+        label: "Server size",
+        required: "required",
+        content_generator: ContentGenerator::Postgres.method(:size)
+      },
+      {
+        name: "storage_size",
+        type: "radio_small_cards",
+        label: "Storage size",
+        required: "required",
+        content_generator: ContentGenerator::Postgres.method(:storage_size)
+      },
+      {
+        name: "ha_type",
+        type: "radio_small_cards",
+        label: "High Availability",
+        required: "required",
+        content_generator: ContentGenerator::Postgres.method(:ha_type)
+      },
+      {
+        name: "failover_time_notice",
+        type: "section",
+        content:
+          "If a maintenance window is configured, failover to the new server with the desired configuration will occur during the first available maintenance window after the new server is ready. Otherwise, failover will take place as soon as the new server becomes ready. Depending on the size of the data, it may take several hours for the new server to become ready.",
+        separator: false
+      }
+    ]
 
-  <%== render(
-    "components/form/resource_creation_form",
-    locals: {
-      action: "#{@project_data[:path]}#{@pg[:path]}",
-      method: "PATCH",
-      form_title: "Configure PostgreSQL database",
-      form_elements:,
-      pre_selected_values:,
-      option_tree: @option_tree,
-      option_parents: @option_parents,
-      mode: "update"
-    }
-  ) %>
-  <!-- Fork database -->
-  <% if @pg[:earliest_restore_time] && @pg[:latest_restore_time] > @pg[:earliest_restore_time] %>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <div class="px-4 py-5 sm:p-6">
-        <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/restore" %>" role="form" method="POST">
-          <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/restore") %>
-          <div class="space-y-4">
-            <div>
-              <h2 class="text-lg font-medium leading-6 text-gray-900">Fork PostgreSQL database</h2>
-              <p class="mt-1 text-sm text-gray-500">
-                When you fork your existing PostgreSQL database, a new server will be provisioned.
-              </p>
+    pre_selected_values = {
+      "flavor" => @pg[:flavor],
+      "location" => @location.id,
+      "family" => @family,
+      "size" => @pg[:vm_size],
+      "storage_size" => @pg[:storage_size_gib],
+      "ha_type" => @pg[:ha_type]
+    } %>
+
+    <%== render(
+      "components/form/resource_creation_form",
+      locals: {
+        action: "#{@project_data[:path]}#{@pg[:path]}",
+        method: "PATCH",
+        form_title: "Configure PostgreSQL database",
+        form_elements:,
+        pre_selected_values:,
+        option_tree: @option_tree,
+        option_parents: @option_parents,
+        mode: "update"
+      }
+    ) %>
+    <!-- Fork database -->
+    <% if @pg[:earliest_restore_time] && @pg[:latest_restore_time] > @pg[:earliest_restore_time] %>
+      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+        <div class="px-4 py-5 sm:p-6">
+          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/restore" %>" role="form" method="POST">
+            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/restore") %>
+            <div class="space-y-4">
+              <div>
+                <h2 class="text-lg font-medium leading-6 text-gray-900">Fork PostgreSQL database</h2>
+                <p class="mt-1 text-sm text-gray-500">
+                  When you fork your existing PostgreSQL database, a new server will be provisioned.
+                </p>
+              </div>
+              <div class="grid grid-cols-12 gap-6">
+                <div class="col-span-12 sm:col-span-5">
+                  <%== part(
+                    "components/form/text",
+                    label: "New server name",
+                    name: "name",
+                    attributes: {
+                      placeholder: @pg[:name] + "-fork",
+                      required: true
+                    }
+                  ) %>
+                </div>
+                <div class="col-span-12 sm:col-span-5">
+                  <%== part(
+                    "components/form/datepicker",
+                    label: "Target Time (UTC)",
+                    name: "restore_target",
+                    default_date: @pg[:latest_restore_time],
+                    max_date: @pg[:latest_restore_time],
+                    min_date: @pg[:earliest_restore_time]
+                  ) %>
+                </div>
+                <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                  <%== part("components/form/submit_button", text: "Fork") %>
+                </div>
+              </div>
             </div>
-            <div class="grid grid-cols-12 gap-6">
-              <div class="col-span-12 sm:col-span-5">
-                <%== part("components/form/text", label: "New server name", name: "name", attributes: { required: true }) %>
-              </div>
-              <div class="col-span-12 sm:col-span-5">
-                <%== part(
-                  "components/form/datepicker",
-                  label: "Target Time (UTC)",
-                  name: "restore_target",
-                  default_date: @pg[:latest_restore_time],
-                  max_date: @pg[:latest_restore_time],
-                  min_date: @pg[:earliest_restore_time]
-                ) %>
-              </div>
-              <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
-                <%== part("components/form/submit_button", text: "Fork") %>
-              </div>
-            </div>
-          </div>
-        </form>
+          </form>
+        </div>
+      </div>
+    <% end %>
+    <!-- Read Replicas -->
+    <div>
+      <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+        <div class="min-w-0 flex-1">
+          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+            Read Replicas
+          </h3>
+        </div>
+      </div>
+      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+        <table class="min-w-full divide-y divide-gray-300">
+          <thead class="bg-gray-50">
+            <tr>
+              <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">State</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200 bg-white">
+            <% @pg[:read_replicas].each do |read_replica| %>
+              <tr>
+                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                  <a href="<%= @project_data[:path] + read_replica[:path] %>" class="text-orange-600 hover:text-orange-700">
+                    <%= read_replica[:name] %>
+                  </a>
+                </td>
+                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                  <%== part("components/pg_state_label", state: read_replica[:state], extra_class: "text-md") %>
+                </td>
+              </tr>
+            <% end %>
+            <% if edit_perm %>
+              <tr>
+                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                  <%== part(
+                    "components/form/text",
+                    name: "name",
+                    attributes: {
+                      placeholder: @pg[:name] + "-read-replica",
+                      required: true,
+                      form: "form-pg-read-replica-create"
+                    }
+                  ) %>
+                </td>
+                <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                  <form
+                    action="<%= "#{@project_data[:path]}#{@pg[:path]}/read-replica" %>"
+                    role="form"
+                    method="POST"
+                    id="form-pg-read-replica-create"
+                  >
+                    <%== csrf_tag("#{request.path}/read-replica") %>
+                    <%== part("components/form/submit_button", text: "Create", extra_class: "pg-read-replica-create-btn") %>
+                  </form>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
       </div>
     </div>
   <% end %>

@@ -47,7 +47,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   before do
     allow(nx).to receive(:postgres_server).and_return(postgres_server)
-    allow(postgres_server).to receive(:resource).and_return(resource)
+    allow(postgres_server).to receive_messages(resource: resource, read_replica?: false)
   end
 
   describe ".assemble" do
@@ -414,6 +414,16 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.configure }.to hop("wait_catch_up")
     end
 
+    it "hops to wait for read replicas if configure command is succeeded" do
+      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Succeeded")
+      expect(postgres_server).to receive(:primary?).and_return(false)
+      expect(postgres_server).to receive(:standby?).and_return(false)
+      expect(postgres_server).to receive(:read_replica?).and_return(true)
+      expect { nx.configure }.to hop("wait_catch_up")
+    end
+
     it "naps if script return unknown status" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Unknown")
       expect { nx.configure }.to nap(5)
@@ -461,14 +471,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#wait_catch_up" do
-    it "naps if the lag cannot be read or too high" do
-      expect(postgres_server).to receive(:run_query).and_return("", "90000000")
+    it "naps if the lag is too high" do
+      expect(postgres_server).to receive(:lsn_caught_up).and_return(false, false)
       expect { nx.wait_catch_up }.to nap(30)
       expect { nx.wait_catch_up }.to nap(30)
     end
 
     it "sets the synchronization_status and hops to wait_synchronization for sync replication" do
-      expect(postgres_server).to receive(:run_query).and_return("80000000")
+      expect(postgres_server).to receive(:lsn_caught_up).and_return(true)
       expect(postgres_server).to receive(:update).with(synchronization_status: "ready")
       expect(postgres_server).to receive(:incr_configure)
       expect(postgres_server.resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
@@ -476,10 +486,16 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "sets the synchronization_status and hops to wait for async replication" do
-      expect(postgres_server).to receive(:run_query).and_return("80000000")
+      expect(postgres_server).to receive(:lsn_caught_up).and_return(true)
       expect(postgres_server).to receive(:update).with(synchronization_status: "ready")
       expect(postgres_server).to receive(:incr_configure)
       expect(postgres_server.resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC)
+      expect { nx.wait_catch_up }.to hop("wait")
+    end
+
+    it "hops to wait if replica and caught up" do
+      expect(postgres_server).to receive(:read_replica?).and_return(true)
+      expect(postgres_server).to receive(:lsn_caught_up).and_return(true)
       expect { nx.wait_catch_up }.to hop("wait")
     end
   end
@@ -589,6 +605,46 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:push).with(described_class, {}, "restart").and_call_original
       expect { nx.wait }.to hop("restart")
     end
+
+    describe "read replica" do
+      before do
+        expect(postgres_server).to receive(:read_replica?).and_return(true)
+      end
+
+      it "checks if it was already lagging and the lag continues, if so, starts recycling" do
+        expect(postgres_server).to receive(:lsn_caught_up).and_return(false)
+        expect(postgres_server).to receive(:current_lsn).and_return("1/A")
+
+        expect(nx.strand).to receive(:stack).and_return([{"lsn" => "1/A"}]).at_least(:once)
+        expect(postgres_server).to receive(:lsn_diff).with("1/A", "1/A").and_return(0)
+        expect(postgres_server).to receive(:incr_recycle)
+        expect { nx.wait }.to nap(60)
+      end
+
+      it "checks if it wasn't already lagging but the lag exists, if so, update the stack and nap" do
+        expect(postgres_server).to receive(:lsn_caught_up).and_return(false)
+        expect(postgres_server).to receive(:current_lsn).and_return("1/A")
+
+        expect(nx.strand).to receive(:stack).and_return([{}]).at_least(:once)
+        expect(nx).to receive(:update_stack_lsn).with("1/A")
+        expect { nx.wait }.to nap(900)
+      end
+
+      it "checks if there is no lag, simply naps" do
+        expect(postgres_server).to receive(:lsn_caught_up).and_return(true)
+        expect { nx.wait }.to nap(60)
+      end
+
+      it "checks if there was a lag, and it still exist but we are progressing, so, we update the stack and nap" do
+        expect(postgres_server).to receive(:lsn_caught_up).and_return(false)
+        expect(postgres_server).to receive(:current_lsn).and_return("1/A")
+
+        expect(nx.strand).to receive(:stack).and_return([{"lsn" => "1/9"}]).at_least(:once)
+        expect(postgres_server).to receive(:lsn_diff).with("1/A", "1/9").and_return(1)
+        expect(nx).to receive(:update_stack_lsn).with("1/A")
+        expect { nx.wait }.to nap(900)
+      end
+    end
   end
 
   describe "#unavailable" do
@@ -666,6 +722,16 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check promote_postgres").and_return("Unknown")
       expect { nx.taking_over }.to nap(5)
     end
+
+    it "updates the representative server, refreshes dns and hops to configure when read_replica" do
+      time = Time.now
+      expect(Time).to receive(:now).and_return(time)
+      expect(postgres_server).to receive(:read_replica?).and_return(true)
+      expect(postgres_server).to receive(:update).with(representative_at: time)
+      expect(postgres_server.resource).to receive(:incr_refresh_dns_record)
+
+      expect { nx.taking_over }.to hop("configure")
+    end
   end
 
   describe "#destroy" do
@@ -712,6 +778,16 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_server).to receive(:run_query).with("SELECT 1").and_raise(Sshable::SshError)
       expect(sshable).to receive(:cmd).with("sudo tail -n 5 /dat/16/data/pg_log/postgresql.log").and_return("not doing redo")
       expect(nx.available?).to be(false)
+    end
+  end
+
+  describe ".update_stack_lsn" do
+    it "updates the lsn in the current frame" do
+      frame = [{"lsn" => "hello"}]
+      nx.strand.stack = frame
+      expect(nx.strand).to receive(:modified!)
+      nx.update_stack_lsn("update")
+      expect(frame.first["lsn"]).to eq("update")
     end
   end
 end

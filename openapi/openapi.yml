@@ -897,6 +897,33 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Metric Destination
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/read-replica':
+    post:
+      operationId: createPostgresDatabaseReadReplica
+      summary: Create a read replica of the Postgres database
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_reference'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+              additionalProperties: false
+              required:
+                - name
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/reset-superuser-password':
     post:
       operationId: resetSuperuserPassword
@@ -1722,6 +1749,13 @@ components:
           description: Maintenance window start time
           type: integer
           nullable: true
+        read_replica:
+          description: If the database is a read replica or not
+          type: boolean
+        parent:
+          description: Parent Postgres database
+          type: string
+          nullable: true
       additionalProperties: false
       required:
         - flavor
@@ -1734,6 +1768,7 @@ components:
         - version
         - vm_size
         - maintenance_window_start_at
+        - read_replica
     PostgresFirewallRule:
       type: object
       properties:
