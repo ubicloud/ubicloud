@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 source "https://rubygems.org"
+
+# Update ruby version in Dockerfile and .tool_versions when updating this
 ruby "3.4.3"
 
 gem "acme-client"
