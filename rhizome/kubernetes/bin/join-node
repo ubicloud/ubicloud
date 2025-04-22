@@ -46,7 +46,23 @@ config = {
 
 if is_control_plane
   config["controlPlane"] = {
-    "certificateKey" => certificate_key
+    "certificateKey" => certificate_key,
+    "localAPIEndpoint" => {
+      "advertiseAddress" => node_ipv4,
+      "bindPort" => 6443
+    },
+    "apiServer" => {
+      "extraArgs" => [
+        {
+          "name" => "bind-address",
+          "value" => "::"
+        },
+        {
+          "name" => "advertise-address",
+          "value" => node_ipv4
+        }
+      ]
+    }
   }
 end
 

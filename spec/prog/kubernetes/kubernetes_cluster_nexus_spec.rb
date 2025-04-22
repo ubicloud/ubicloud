@@ -128,7 +128,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster.api_server_lb.ports.first.dst_port).to eq 6443
       expect(kubernetes_cluster.api_server_lb.health_check_endpoint).to eq "/healthz"
       expect(kubernetes_cluster.api_server_lb.health_check_protocol).to eq "tcp"
-      expect(kubernetes_cluster.api_server_lb.stack).to eq LoadBalancer::Stack::IPV4
+      expect(kubernetes_cluster.api_server_lb.stack).to eq LoadBalancer::Stack::DUAL
       expect(kubernetes_cluster.api_server_lb.private_subnet_id).to eq subnet.id
       expect(kubernetes_cluster.api_server_lb.custom_hostname_dns_zone_id).to eq dns_zone.id
       expect(kubernetes_cluster.api_server_lb.custom_hostname).to eq "k8scluster-apiserver-#{kubernetes_cluster.ubid[-5...]}.k8s.ubicloud.com"
@@ -142,7 +142,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster.api_server_lb.ports.first.dst_port).to eq 6443
       expect(kubernetes_cluster.api_server_lb.health_check_endpoint).to eq "/healthz"
       expect(kubernetes_cluster.api_server_lb.health_check_protocol).to eq "tcp"
-      expect(kubernetes_cluster.api_server_lb.stack).to eq LoadBalancer::Stack::IPV4
+      expect(kubernetes_cluster.api_server_lb.stack).to eq LoadBalancer::Stack::DUAL
       expect(kubernetes_cluster.api_server_lb.private_subnet_id).to eq subnet.id
       expect(kubernetes_cluster.api_server_lb.custom_hostname).to be_nil
     end
