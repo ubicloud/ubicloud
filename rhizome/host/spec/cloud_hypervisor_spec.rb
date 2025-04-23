@@ -4,7 +4,7 @@ require_relative "../lib/cloud_hypervisor"
 
 RSpec.describe CloudHypervisor do
   context "when downloading firmware" do
-    subject(:fw) { CloudHypervisor::FirmwareClass.new("202402", "thesha") }
+    subject(:fw) { CloudHypervisor::Firmware.new("202402", "thesha") }
 
     let(:gh_fw_url) { "https://github.com/ubicloud/build-edk2-firmware/releases/download/edk2-stable202402-x64/CLOUDHV-x64.fd" }
     let(:firmware_path) { "/opt/fw/CLOUDHV-202402.fd" }
@@ -41,7 +41,7 @@ RSpec.describe CloudHypervisor do
   end
 
   context "when downloading cloud-hypervisor" do
-    subject(:ch) { CloudHypervisor::VersionClass.new("35.1", "sha_ch", "sha_remote") }
+    subject(:ch) { CloudHypervisor::Version.new("35.1", "sha_ch", "sha_remote") }
 
     let(:gh_ch_remote_url) { "https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v35.1/ch-remote-static" }
     let(:gh_ch_bin_url) { "https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v35.1/cloud-hypervisor-static" }
