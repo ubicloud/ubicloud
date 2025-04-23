@@ -1,6 +1,7 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    base64 (0.2.0)
     diff-lcs (1.5.0)
     netaddr (2.0.6)
     rspec (3.12.0)
@@ -22,6 +23,7 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
+  base64
   netaddr
   rspec
 
