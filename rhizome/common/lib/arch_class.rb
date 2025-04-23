@@ -4,14 +4,14 @@ require "rbconfig"
 
 ArchClass = Struct.new(:sym) {
   def self.from_system
-    new case RbConfig::CONFIG.fetch("target_cpu").downcase
-    when /arm64|aarch64/
-      "arm64"
-    when /amd64|x86_64|x64/
-      "x64"
+    new case RbConfig::CONFIG.fetch("target_cpu")
+    when /arm64|aarch64/i
+      :arm64
+    when /amd64|x86_64|x64/i
+      :x64
     else
       fail "BUG: could not detect architecture"
-    end.intern
+    end
   end
 
   def arm64?
