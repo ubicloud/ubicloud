@@ -247,6 +247,11 @@ ensure
   File.delete(output_file) if File.file?(output_file)
 end
 
+desc "Run rhizome (data plane) tests"
+task "rhizome_spec" do
+  sh "COVERAGE=rhizome bundle exec rspec -O /dev/null rhizome"
+end
+
 desc "Update cli spec golden files"
 task "update_golden_files" do
   sh "mv spec/routes/api/cli/spec-output-files/*.txt spec/routes/api/cli/spec-output-files/.txt spec/routes/api/cli/golden-files/"
