@@ -92,6 +92,8 @@ module Scheduling; end
 
 module Serializers; end
 
+module VictoriaMetrics; end
+
 autoload_normal.call("model", flat: true)
 %w[lib clover.rb].each { autoload_normal.call(it) }
 %w[scheduling prog serializers].each { autoload_normal.call(it, include_first: true) }

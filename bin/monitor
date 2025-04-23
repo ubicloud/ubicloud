@@ -7,7 +7,7 @@ clover_freeze
 resources = {}
 mutex = Mutex.new
 thread_pool_size = (Config.max_monitor_threads - 2).clamp(1, nil)
-monitorable_resource_types = [VmHost, PostgresServer, Vm.where(~Sshable.where(id: Sequel[:vm][:id]).exists), MinioServer, GithubRunner, VmHostSlice, LoadBalancerVmPort, KubernetesCluster]
+monitorable_resource_types = [VmHost, PostgresServer, Vm.where(~Sshable.where(id: Sequel[:vm][:id]).exists), MinioServer, GithubRunner, VmHostSlice, LoadBalancerVmPort, KubernetesCluster, VictoriaMetricsServer]
 queue_size = thread_pool_size + (monitorable_resource_types.sum(&:count) * 1.5).round
 queue = SizedQueue.new(queue_size)
 

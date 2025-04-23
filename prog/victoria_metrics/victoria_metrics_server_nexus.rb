@@ -123,7 +123,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
         admin_password: resource.admin_password,
         cert: victoria_metrics_server.cert,
         cert_key: victoria_metrics_server.cert_key,
-        ca_bundle: victoria_metrics_server.resource.root_certs
+        ca_bundle: resource.root_certs
       })
 
       vm.sshable.d_run("configure_victoria_metrics", "/home/ubi/victoria_metrics/bin/configure", stdin: config_json)
@@ -132,6 +132,11 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
   end
 
   label def wait
+    when_checkup_set? do
+      hop_unavailable if !available?
+      decr_checkup
+    end
+
     when_reconfigure_set? do
       decr_reconfigure
       hop_configure
@@ -168,6 +173,21 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
     nap 1
   end
 
+  label def unavailable
+    register_deadline("wait", 10 * 60)
+
+    reap
+    nap 5 unless strand.children.select { it.prog == "VictoriaMetrics::VictoriaMetricsServerNexus" && it.label == "restart" }.empty?
+
+    if available?
+      decr_checkup
+      hop_wait
+    end
+
+    bud self.class, frame, :restart
+    nap 5
+  end
+
   label def destroy
     register_deadline(nil, 10 * 60)
     decr_destroy
@@ -177,6 +197,15 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
     victoria_metrics_server.destroy
 
     pop "victoria_metrics server destroyed"
+  end
+
+  def available?
+    return true if victoria_metrics_server.initial_provisioning_set?
+
+    victoria_metrics_server.client.health
+  rescue => ex
+    Clog.emit("victoria_metrics server is down") { {victoria_metrics_server_down: {ubid: victoria_metrics_server.ubid, exception: Util.exception_to_hash(ex)}} }
+    false
   end
 
   def create_certificate
