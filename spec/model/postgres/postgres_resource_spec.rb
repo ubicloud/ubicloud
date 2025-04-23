@@ -68,14 +68,18 @@ RSpec.describe PostgresResource do
     expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, children: [instance_double(Strand, prog: "Postgres::ConvergePostgresResource")]))
     expect(postgres_resource.display_state).to eq("converging")
 
-    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait", children: [])).twice
+    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait", children: []))
     expect(postgres_resource.display_state).to eq("running")
 
-    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "destroy", children: [])).exactly(3).times
+    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "destroy", children: []))
     expect(postgres_resource.display_state).to eq("deleting")
 
-    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait_server", children: [])).exactly(3).times
+    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait_server", children: []))
     expect(postgres_resource.display_state).to eq("creating")
+  end
+
+  it "returns display state correctly when there is no associated strand" do
+    expect(postgres_resource.display_state).to eq("deleting")
   end
 
   it "returns target_standby_count correctly" do

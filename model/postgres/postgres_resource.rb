@@ -42,6 +42,7 @@ class PostgresResource < Sequel::Model
 
   def display_state
     return "unavailable" if representative_server&.strand&.label == "unavailable"
+    return "deleting" unless (strand = self.strand)
     return "converging" if strand.children.any? { _1.prog == "Postgres::ConvergePostgresResource" }
     return "running" if ["wait", "refresh_certificates", "refresh_dns_record"].include?(strand.label) && !initial_provisioning_set?
     return "deleting" if destroy_set? || strand.label == "destroy"
