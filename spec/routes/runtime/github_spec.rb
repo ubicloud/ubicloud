@@ -45,6 +45,18 @@ RSpec.describe Clover, "github" do
     expect(last_response).to have_runtime_error(400, "Wrong parameters")
   end
 
+  it "handles errors when attempting to setup blob storage" do
+    vm = create_vm
+    login_runtime(vm)
+    repository = instance_double(GithubRepository, access_key: nil)
+    expect(GithubRunner).to receive(:[]).with(vm_id: vm.id).and_return(instance_double(GithubRunner, repository: repository))
+    expect(repository).to receive(:setup_blob_storage).and_raise(Excon::Error::HTTPStatus, "Expected(200) <=> Actual(520 Unknown)")
+
+    post "/runtime/github/caches"
+
+    expect(last_response).to have_runtime_error(400, "unable to setup blob storage")
+  end
+
   describe "cache endpoints" do
     let(:repository) { GithubRepository.create_with_id(name: "test", default_branch: "main", access_key: "123", installation:) }
     let(:installation) { GithubInstallation.create_with_id(installation_id: 123, name: "test-user", type: "User", project: Project.create_with_id(name: "test")) }

@@ -6,7 +6,11 @@ class Clover
       fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
     end
 
-    repository.setup_blob_storage unless repository.access_key
+    begin
+      repository.setup_blob_storage unless repository.access_key
+    rescue Excon::Error::HTTPStatus
+      fail CloverError.new(400, "InvalidRequest", "unable to setup blob storage")
+    end
 
     # getCacheEntry
     r.get "cache" do
