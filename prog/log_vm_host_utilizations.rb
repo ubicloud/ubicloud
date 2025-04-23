@@ -8,10 +8,10 @@ class Prog::LogVmHostUtilizations < Prog::Base
         count(:id).as(:host_count),
         sum(:used_cores).as(:used_cores),
         sum(:total_cores).as(:total_cores),
-        round((sum(:used_cores) * 100.0 / sum(:total_cores)), 2).cast(:float).as(:core_utilization),
+        round(sum(:used_cores) * 100.0 / sum(:total_cores), 2).cast(:float).as(:core_utilization),
         sum(:used_hugepages_1g).as(:used_hugepages_1g),
         sum(:total_hugepages_1g).as(:total_hugepages_1g),
-        round((sum(:used_hugepages_1g) * 100.0 / sum(:total_hugepages_1g)), 2).cast(:float).as(:hugepage_utilization)
+        round(sum(:used_hugepages_1g) * 100.0 / sum(:total_hugepages_1g), 2).cast(:float).as(:hugepage_utilization)
       ]
     }.group(:allocation_state, :location_id, :arch).all
 

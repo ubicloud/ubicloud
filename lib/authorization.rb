@@ -144,9 +144,9 @@ module Authorization
       # Allow where there is a specific entry for the object,
       {Sequel[from][:id] => ds},
       # or where the action is allowed for all objects in the project,
-      (ds.where(object_id: nil).exists &
+      ds.where(object_id: nil).exists &
         # and the object is related to the project
-        {project_id => Sequel[from][:project_id]})
+        {project_id => Sequel[from][:project_id]}
     ))
   end
 end

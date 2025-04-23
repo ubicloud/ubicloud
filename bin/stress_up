@@ -156,7 +156,7 @@ def diff_stats(stats_begin, stats_end)
   end
 
   stats_diff.store(:percent_throttled, (diff_throttled * 100) / (diff_usage + diff_throttled))
-  stats_diff.store(:percent_bursts, ((diff_burst * 100) / (diff_usage - diff_burst)))
+  stats_diff.store(:percent_bursts, (diff_burst * 100) / (diff_usage - diff_burst))
 
   stats_diff
 end
