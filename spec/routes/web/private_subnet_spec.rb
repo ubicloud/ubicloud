@@ -217,7 +217,7 @@ RSpec.describe Clover, "private subnet" do
         expect(private_subnet.connected_subnets.count).to eq(0)
         visit "#{project.path}#{private_subnet.path}"
 
-        select ps2.name, from: "connected-subnet-ubid"
+        select ps2.name, from: "connected-subnet-id"
         click_button "Connect"
 
         expect(private_subnet.reload.connected_subnets.count).to eq(1)
@@ -229,7 +229,7 @@ RSpec.describe Clover, "private subnet" do
         visit "#{project.path}#{private_subnet.path}"
         ps2.strand.destroy
         ps2.destroy
-        select "dummy-ps-2", from: "connected-subnet-ubid"
+        select "dummy-ps-2", from: "connected-subnet-id"
         click_button "Connect"
 
         expect(page).to have_flash_error("Subnet to be connected not found")

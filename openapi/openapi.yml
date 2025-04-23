@@ -1098,7 +1098,7 @@ paths:
             schema:
               type: object
               properties:
-                connected-subnet-ubid:
+                connected-subnet-id:
                   type: string
               additionalProperties: false
       responses:

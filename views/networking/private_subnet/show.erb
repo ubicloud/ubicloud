@@ -128,7 +128,7 @@ viewable_fws, viewable_subnets =
           <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
             <%== part(
               "components/form/select",
-              name: "connected-subnet-ubid",
+              name: "connected-subnet-id",
               label: "",
               placeholder: "Pick a subnet to connect",
               options: @connectable_subnets.map { |s| [s[:id], s[:name]] },

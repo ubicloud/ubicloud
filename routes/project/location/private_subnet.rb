@@ -25,7 +25,7 @@ class Clover
 
       r.post "connect" do
         authorize("PrivateSubnet:connect", ps.id)
-        subnet = PrivateSubnet.from_ubid(r.params["connected-subnet-ubid"])
+        subnet = PrivateSubnet.from_ubid(r.params["connected-subnet-id"])
         unless subnet
           if api?
             response.status = 400
