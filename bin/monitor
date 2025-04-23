@@ -8,7 +8,7 @@ resources = {}
 mutex = Mutex.new
 
 resource_scanner = Thread.new do
-  monitorable_resource_types = [VmHost, PostgresServer, Vm.where(~Sshable.where(id: Sequel[:vm][:id]).exists), MinioServer, GithubRunner, VmHostSlice, LoadBalancerVmPort, KubernetesCluster]
+  monitorable_resource_types = [VmHost, PostgresServer, Vm.where(~Sshable.where(id: Sequel[:vm][:id]).exists), MinioServer, GithubRunner, VmHostSlice, LoadBalancerVmPort, KubernetesCluster, VictoriaMetricsServer]
 
   loop do
     mutex.synchronize do

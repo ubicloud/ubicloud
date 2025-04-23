@@ -215,6 +215,19 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
       expect { nx.wait }.to hop("refresh_certificates")
     end
 
+    it "handles checkup when server is unavailable" do
+      expect(nx).to receive(:when_checkup_set?).and_yield
+      expect(nx).to receive(:available?).and_return(false)
+      expect { nx.wait }.to hop("unavailable")
+    end
+
+    it "handles checkup when server is available" do
+      expect(nx).to receive(:when_checkup_set?).and_yield
+      expect(nx).to receive(:available?).and_return(true)
+      expect(nx).to receive(:decr_checkup)
+      expect { nx.wait }.to nap(60 * 60 * 24 * 30)
+    end
+
     it "naps if no action needed" do
       expect { nx.wait }.to nap(60 * 60 * 24 * 30)
     end
@@ -340,6 +353,63 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
       ).and_return([cert, key])
 
       expect(nx.create_certificate).to eq(["cert", "key"])
+    end
+  end
+
+  describe "#unavailable" do
+    it "registers deadline and naps if restart is in progress" do
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
+      expect(nx).to receive(:reap)
+      expect(nx.strand).to receive(:children).and_return([
+        instance_double(Strand, prog: "VictoriaMetrics::VictoriaMetricsServerNexus", label: "restart")
+      ])
+      expect { nx.unavailable }.to nap(5)
+    end
+
+    it "hops to wait if server becomes available" do
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
+      expect(nx).to receive(:reap)
+      expect(nx.strand).to receive(:children).and_return([])
+      expect(nx).to receive(:available?).and_return(true)
+      expect(nx).to receive(:decr_checkup)
+      expect { nx.unavailable }.to hop("wait")
+    end
+
+    it "buds restart and naps if server remains unavailable" do
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
+      expect(nx).to receive(:reap)
+      expect(nx.strand).to receive(:children).and_return([])
+      expect(nx).to receive(:available?).and_return(false)
+      expect(nx).to receive(:bud).with(described_class, {}, :restart)
+      expect { nx.unavailable }.to nap(5)
+    end
+  end
+
+  describe "#available?" do
+    it "returns true if initial provisioning is set" do
+      expect(victoria_metrics_server).to receive(:initial_provisioning_set?).and_return(true)
+      expect(nx.available?).to be true
+    end
+
+    it "returns true if health check succeeds" do
+      expect(victoria_metrics_server).to receive(:initial_provisioning_set?).and_return(false)
+      expect(victoria_metrics_server).to receive(:client).and_return(instance_double(VictoriaMetrics::Client, health: true))
+      expect(nx.available?).to be true
+    end
+
+    it "returns false if health check fails" do
+      expect(victoria_metrics_server).to receive(:initial_provisioning_set?).and_return(false)
+      expect(victoria_metrics_server).to receive(:client).and_return(instance_double(VictoriaMetrics::Client, health: false))
+      expect(nx.available?).to be false
+    end
+
+    it "returns false and logs error if health check raises exception" do
+      expect(victoria_metrics_server).to receive(:initial_provisioning_set?).and_return(false)
+      client = instance_double(VictoriaMetrics::Client)
+      expect(client).to receive(:health).and_raise(StandardError.new("Connection failed"))
+      expect(victoria_metrics_server).to receive(:client).and_return(client)
+      expect(Clog).to receive(:emit).with("victoria_metrics server is down")
+      expect(nx.available?).to be false
     end
   end
 end
