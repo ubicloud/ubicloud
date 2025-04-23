@@ -19,4 +19,4 @@ unless (sha256_ch_remote = ARGV.shift)
   exit 1
 end
 
-CloudHypervisor::VersionClass.new(version, sha256_ch_bin, sha256_ch_remote).download
+CloudHypervisor::Version.new(version, sha256_ch_bin, sha256_ch_remote).download

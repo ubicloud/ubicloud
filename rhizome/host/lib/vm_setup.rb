@@ -686,9 +686,9 @@ Slice=#{slice_name}
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
 ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
 
-ExecStart=#{CloudHypervisor::VERSION.bin} -v \
+ExecStart=#{CloudHypervisor::Version::DEFAULT.bin} -v \
 --api-socket path=#{vp.ch_api_sock} \
---kernel #{CloudHypervisor::FIRMWARE.path} \
+--kernel #{CloudHypervisor::Firmware::DEFAULT.path} \
 #{disk_params.join("\n")}
 --disk path=#{vp.cloudinit_img} \
 --console off --serial file=#{vp.serial_log} \
@@ -697,7 +697,7 @@ ExecStart=#{CloudHypervisor::VERSION.bin} -v \
 #{pci_device_params} \
 #{net_params.join(" \\\n")}
 
-ExecStop=#{CloudHypervisor::VERSION.ch_remote_bin} --api-socket #{vp.ch_api_sock} shutdown-vmm
+ExecStop=#{CloudHypervisor::Version::DEFAULT.ch_remote_bin} --api-socket #{vp.ch_api_sock} shutdown-vmm
 Restart=no
 User=#{@vm_name}
 Group=#{@vm_name}
