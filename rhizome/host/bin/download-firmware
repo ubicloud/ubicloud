@@ -14,4 +14,4 @@ unless (sha256 = ARGV.shift)
   exit 1
 end
 
-CloudHypervisor::FirmwareClass.new(version, sha256).download
+CloudHypervisor::Firmware.new(version, sha256).download
