@@ -15,7 +15,7 @@ module Ubicloud
     # Connect the given private subnet to the receiver. Accepts either a PrivateSubnet instance
     # or a private subnet id string. Returns self.
     def connect(subnet)
-      merge_into_values(adapter.post(_path("/connect"), "connected-subnet-ubid": to_id(subnet)))
+      merge_into_values(adapter.post(_path("/connect"), "connected-subnet-id": to_id(subnet)))
     end
 
     # Disconnect the given private subnet from the receiver. Accepts either a PrivateSubnet instance
