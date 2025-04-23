@@ -653,9 +653,9 @@ DNSMASQ_SERVICE
 
     disk_params = storage_volumes.map { |volume|
       if volume.read_only
-        "--disk path=#{volume.image_path},readonly=on \\"
+        "path=#{volume.image_path},readonly=on"
       else
-        "--disk vhost_user=true,socket=#{volume.vhost_sock},num_queues=1,queue_size=256 \\"
+        "vhost_user=true,socket=#{volume.vhost_sock},num_queues=1,queue_size=256"
       end
     }
 
@@ -689,8 +689,7 @@ ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
 ExecStart=#{CloudHypervisor::Version::DEFAULT.bin} -v \
 --api-socket path=#{vp.ch_api_sock} \
 --kernel #{CloudHypervisor::Firmware::DEFAULT.path} \
-#{disk_params.join("\n")}
---disk path=#{vp.cloudinit_img} \
+--disk #{disk_params.join(" ")} path=#{vp.cloudinit_img} \
 --console off --serial file=#{vp.serial_log} \
 --cpus #{cpu_setting} \
 --memory size=#{mem_gib}G,hugepages=on,hugepage_size=1G \
