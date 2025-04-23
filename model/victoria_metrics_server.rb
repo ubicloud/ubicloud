@@ -9,8 +9,9 @@ class VictoriaMetricsServer < Sequel::Model
 
   include ResourceMethods
   include SemaphoreMethods
+  include HealthMonitorMethods
 
-  semaphore :destroy, :initial_provisioning, :restart, :reconfigure
+  semaphore :checkup, :destroy, :initial_provisioning, :restart, :reconfigure
 
   plugin :column_encryption do |enc|
     enc.column :cert_key
@@ -18,6 +19,56 @@ class VictoriaMetricsServer < Sequel::Model
 
   def public_ipv6_address
     vm.ip6.to_s
+  end
+
+  def private_ipv4_address
+    vm.private_ipv4.to_s
+  end
+
+  def ip6_url
+    "https://[#{public_ipv6_address}]:8427"
+  end
+
+  def init_health_monitor_session
+    socket_path = File.join(Dir.pwd, "var", "health_monitor_sockets", "vn_#{vm.ephemeral_net6.nth(2)}")
+    FileUtils.rm_rf(socket_path)
+    FileUtils.mkdir_p(socket_path)
+
+    ssh_session = vm.sshable.start_fresh_session
+    ssh_session.forward.local(UNIXServer.new(File.join(socket_path, "health_monitor_socket")), private_ipv4_address, 8427)
+    {
+      ssh_session: ssh_session,
+      victoria_metrics_client: client(socket: File.join("unix://", socket_path, "health_monitor_socket"))
+    }
+  end
+
+  def check_pulse(session:, previous_pulse:)
+    reading = begin
+      session[:victoria_metrics_client].health ? "up" : "down"
+    rescue
+      "down"
+    end
+    pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading)
+
+    if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30 && !reload.checkup_set?
+      incr_checkup
+    end
+
+    pulse
+  end
+
+  def needs_event_loop_for_pulse_check?
+    true
+  end
+
+  def client(socket: nil)
+    VictoriaMetrics::Client.new(
+      endpoint: ip6_url,
+      ssl_ca_file_data: resource.root_certs + cert,
+      socket: socket,
+      username: resource.admin_user,
+      password: resource.admin_password
+    )
   end
 
   def self.redacted_columns

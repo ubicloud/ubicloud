@@ -307,7 +307,7 @@ module Validation
   end
 
   def self.validate_victoria_metrics_username(username)
-    msg = "VictoriaMetrics user must only contain lowercase letters, numbers, hyphens and underscore and cannot start with a number or hyphen. It also have max length of 32, min length of 3."
+    msg = "VictoriaMetrics user must only contain lowercase letters, numbers, hyphens and underscore and cannot start with a number or hyphen. It also has a max length of 32 and a min length of 3."
     fail ValidationFailed.new({username: msg}) unless username&.match(ALLOWED_VICTORIA_METRICS_USERNAME_PATTERN)
   end
 
