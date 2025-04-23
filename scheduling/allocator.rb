@@ -200,7 +200,7 @@ module Scheduling::Allocator
           .select_append(Sequel.function(:coalesce, :slice_cpu_available, 0).as(:slice_cpu_available))
           .select_append(Sequel.function(:coalesce, :slice_memory_available, 0).as(:slice_memory_available))
           .where {
-            ((total_hugepages_1g - used_hugepages_1g >= request.memory_gib) & (total_cores - used_cores >= Sequel.function(:greatest, 1, (request.vcpus * total_cores / total_cpus)))) |
+            ((total_hugepages_1g - used_hugepages_1g >= request.memory_gib) & (total_cores - used_cores >= Sequel.function(:greatest, 1, request.vcpus * total_cores / total_cpus))) |
               ((slice_cpu_available > 0) & (slice_memory_available > 0))
           }
       else
@@ -209,7 +209,7 @@ module Scheduling::Allocator
         # allocated for a new VM.
         ds
           .where { (total_hugepages_1g - used_hugepages_1g >= request.memory_gib) }
-          .where { (total_cores - used_cores >= Sequel.function(:greatest, 1, (request.vcpus * total_cores / total_cpus))) }
+          .where { (total_cores - used_cores >= Sequel.function(:greatest, 1, request.vcpus * total_cores / total_cpus)) }
       end
 
       ds = ds.join(:boot_image, Sequel[:vm_host][:id] => Sequel[:boot_image][:vm_host_id])

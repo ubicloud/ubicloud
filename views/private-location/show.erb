@@ -10,7 +10,7 @@
 <div class="grid gap-6">
   <!-- Detail Card -->
   <form action="<%= (@project.path + @location.path) %>" method="POST">
-    <%== csrf_tag((@project.path + @location.path)) %>
+    <%== csrf_tag(@project.path + @location.path) %>
 
     <%== part(
       "components/kv_data_card",
