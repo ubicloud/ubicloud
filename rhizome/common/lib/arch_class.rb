@@ -21,14 +21,4 @@ ArchClass = Struct.new(:sym) {
   def x64?
     sym == :x64
   end
-
-  def render(x64: sym, arm64: sym)
-    if x64?
-      x64
-    elsif arm64?
-      arm64
-    else
-      fail "BUG: could not detect architecture"
-    end.to_s
-  end
 }

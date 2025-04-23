@@ -44,7 +44,7 @@ RSpec.describe CertServerSetup do
 
   describe "#download_server" do
     it "downloads the server, extracts it, and removes the tarball" do
-      expect(Arch).to receive(:render).with(x64: "https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.5/metadata-endpoint_Linux_x86_64.tar.gz", arm64: "https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.5/metadata-endpoint_Linux_arm64.tar.gz").and_return("https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.5/metadata-endpoint_Linux_arm64.tar.gz")
+      expect(Arch).to receive(:x64?).and_return(false)
       expect(cert_server_setup).to receive(:r).with("curl -L3 -o /tmp/metadata-endpoint-0.1.5.tar.gz https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.5/metadata-endpoint_Linux_arm64.tar.gz")
       expect(FileUtils).to receive(:mkdir_p).with("/opt/metadata-endpoint-0.1.5")
       expect(FileUtils).to receive(:cd).with("/opt/metadata-endpoint-0.1.5")
@@ -53,7 +53,7 @@ RSpec.describe CertServerSetup do
     end
 
     it "downloads the server for x64" do
-      expect(Arch).to receive(:render).with(x64: "https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.5/metadata-endpoint_Linux_x86_64.tar.gz", arm64: "https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.5/metadata-endpoint_Linux_arm64.tar.gz").and_return("https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.5/metadata-endpoint_Linux_x86_64.tar.gz")
+      expect(Arch).to receive(:x64?).and_return(true)
       expect(cert_server_setup).to receive(:r).with("curl -L3 -o /tmp/metadata-endpoint-0.1.5.tar.gz https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.5/metadata-endpoint_Linux_x86_64.tar.gz")
       expect(FileUtils).to receive(:mkdir_p).with("/opt/metadata-endpoint-0.1.5")
       expect(FileUtils).to receive(:cd).with("/opt/metadata-endpoint-0.1.5")
