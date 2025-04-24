@@ -434,7 +434,8 @@ RSpec.describe Prog::Vm::Nexus do
         host_exclusion_filter: [],
         location_filter: [Location::HETZNER_FSN1_ID],
         location_preference: [],
-        gpu_count: 0
+        gpu_count: 0,
+        prioritize_performance_cpu: false
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -449,7 +450,8 @@ RSpec.describe Prog::Vm::Nexus do
         host_exclusion_filter: [],
         location_filter: ["6b9ef786-b842-8420-8c65-c25e3d4bdf3d", Location::HETZNER_FSN1_ID, "1f214853-0bc4-8020-b910-dffb867ef44f"],
         location_preference: ["6b9ef786-b842-8420-8c65-c25e3d4bdf3d"],
-        gpu_count: 0
+        gpu_count: 0,
+        prioritize_performance_cpu: false
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -465,7 +467,8 @@ RSpec.describe Prog::Vm::Nexus do
         host_exclusion_filter: [],
         location_filter: [],
         location_preference: ["6b9ef786-b842-8420-8c65-c25e3d4bdf3d"],
-        gpu_count: 0
+        gpu_count: 0,
+        prioritize_performance_cpu: false
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -484,7 +487,8 @@ RSpec.describe Prog::Vm::Nexus do
         host_exclusion_filter: [],
         location_filter: [],
         location_preference: [],
-        gpu_count: 0
+        gpu_count: 0,
+        prioritize_performance_cpu: false
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -503,7 +507,8 @@ RSpec.describe Prog::Vm::Nexus do
         host_exclusion_filter: [:vm_host_id, "another-vm-host-id"],
         location_filter: [Location::HETZNER_FSN1_ID],
         location_preference: [],
-        gpu_count: 0
+        gpu_count: 0,
+        prioritize_performance_cpu: false
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -530,7 +535,8 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::HETZNER_FSN1_ID],
         host_exclusion_filter: [],
         location_preference: [],
-        gpu_count: 0
+        gpu_count: 0,
+        prioritize_performance_cpu: false
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -549,7 +555,27 @@ RSpec.describe Prog::Vm::Nexus do
         host_exclusion_filter: [],
         location_filter: [Location::HETZNER_FSN1_ID],
         location_preference: [],
-        gpu_count: 3
+        gpu_count: 3,
+        prioritize_performance_cpu: false
+      )
+      expect { nx.start }.to hop("create_unix_user")
+    end
+
+    it "prioritize performance CPU if the runner's project has the feature flag" do
+      vm.location_id = Location::GITHUB_RUNNERS_ID
+      prj.set_ff_performance_runners(true)
+      installation_id = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id).id
+      GithubRunner.create(label: "ubicloud", repository_name: "ubicloud/test", installation_id:, vm_id: vm.id)
+      expect(Scheduling::Allocator).to receive(:allocate).with(
+        vm, :storage_volumes,
+        allocation_state_filter: ["accepting"],
+        distinct_storage_devices: false,
+        host_filter: [],
+        host_exclusion_filter: [],
+        location_filter: ["6b9ef786-b842-8420-8c65-c25e3d4bdf3d", Location::HETZNER_FSN1_ID, "1f214853-0bc4-8020-b910-dffb867ef44f"],
+        location_preference: ["6b9ef786-b842-8420-8c65-c25e3d4bdf3d"],
+        gpu_count: 0,
+        prioritize_performance_cpu: true
       )
       expect { nx.start }.to hop("create_unix_user")
     end
