@@ -3,7 +3,7 @@
 <%== render("inference/tabbar") %>
 
 <div class="grid xl:grid-cols-2 2xl:grid-cols-3 gap-4">
-  <% @inference_endpoints.each_with_index do | ie, index |
+  <% @inference_models.each_with_index do | ie, index |
     path, model_icon, curl_message = case ie[:tags]["capability"]
       when "Text Generation"
         [

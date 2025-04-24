@@ -1,15 +1,26 @@
 # frozen_string_literal: true
 
 class Clover
+  def visible_capable_models(dataset)
+    dataset
+      .where(visible: true)
+      .where(Sequel.pg_jsonb_op(:tags).get_text("capability") => ["Text Generation", "Embeddings"])
+      .order(:model_name)
+  end
+
   def inference_endpoint_ds
     dataset_private = dataset_authorize(@project.inference_endpoints_dataset, "InferenceEndpoint:view")
     dataset_public = InferenceEndpoint.where(is_public: true)
 
     dataset = dataset_private.union(dataset_public)
-    dataset = dataset.where(visible: true)
-    dataset = dataset.where(Sequel.pg_jsonb_op(:tags).get_text("capability") => ["Text Generation", "Embeddings"])
-    dataset = dataset.order(:model_name)
+    dataset = visible_capable_models(dataset)
     dataset.eager(:load_balancer)
+  end
+
+  def inference_router_model_ds
+    visible_capable_models(InferenceRouterModel)
+      .eager_graph(inference_router_targets: {inference_router: :load_balancer})
+      .exclude(inference_router_model_id: nil)
   end
 
   def inference_api_key_ds
