@@ -8,7 +8,7 @@ RSpec.describe Clover, "vm" do
   let(:project) { project_with_default_policy(user) }
 
   let(:vm) do
-    vm = Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-1").subject
+    vm = Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "dummy-vm-1").subject
     vm.update(ephemeral_net6: "2a01:4f8:173:1ed3:aa7c::/79")
     vm.reload # without reload ephemeral_net6 is string and can't call .network
   end
@@ -37,7 +37,7 @@ RSpec.describe Clover, "vm" do
 
     describe "list" do
       it "success multiple" do
-        Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-2")
+        Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "dummy-vm-2")
 
         get "/project/#{project.ubid}/location/#{vm.display_location}/vm"
 
@@ -48,9 +48,9 @@ RSpec.describe Clover, "vm" do
       end
 
       it "success multiple location with pagination" do
-        Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-2")
-        Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-3")
-        Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-4", location_id: "e0865080-9a3d-8020-a812-f5817c7afe7f")
+        Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "dummy-vm-2")
+        Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "dummy-vm-3")
+        Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "dummy-vm-4", location_id: "e0865080-9a3d-8020-a812-f5817c7afe7f")
 
         get "/project/#{project.ubid}/location/#{vm.display_location}/vm", {
           order_column: "name",

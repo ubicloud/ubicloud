@@ -4,7 +4,7 @@ require_relative "../spec_helper"
 
 RSpec.describe Clover, "cli lb attach-vm" do
   before do
-    cli(%w[vm eu-central-h1/test-vm create a])
+    cli(%w[vm eu-central-h1/test-vm create] << "a a")
     @vm = Vm.first
     cli(%w[ps eu-central-h1/test-ps create])
     @ps = PrivateSubnet.first

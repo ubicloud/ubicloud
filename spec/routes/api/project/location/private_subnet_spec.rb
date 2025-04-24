@@ -64,7 +64,7 @@ RSpec.describe Clover, "private_subnet" do
           ipv6_addr: "fd38:5c12:20bf:67d4:919e::/79",
           ipv4_addr: "172.17.226.186/32")
 
-        Prog::Vm::Nexus.assemble("dummy-public-key", project.id, private_subnet_id: ps.id, nic_id: nic.id, name: "dummy-vm-2")
+        Prog::Vm::Nexus.assemble("dummy-public key", project.id, private_subnet_id: ps.id, nic_id: nic.id, name: "dummy-vm-2")
 
         get "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet"
 
@@ -180,7 +180,7 @@ RSpec.describe Clover, "private_subnet" do
       end
 
       it "dependent vm failure" do
-        Prog::Vm::Nexus.assemble("dummy-public-key", project.id, private_subnet_id: ps.id, name: "dummy-vm-2")
+        Prog::Vm::Nexus.assemble("dummy-public key", project.id, private_subnet_id: ps.id, name: "dummy-vm-2")
 
         delete "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"
 
@@ -188,7 +188,7 @@ RSpec.describe Clover, "private_subnet" do
       end
 
       it "if all dependent vms are marked for deletion the subnet can be deleted" do
-        st = Prog::Vm::Nexus.assemble("dummy-public-key", project.id, private_subnet_id: ps.id, name: "dummy-vm")
+        st = Prog::Vm::Nexus.assemble("dummy-public key", project.id, private_subnet_id: ps.id, name: "dummy-vm")
         st.subject.incr_destroy
 
         delete "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"
@@ -198,7 +198,7 @@ RSpec.describe Clover, "private_subnet" do
       end
 
       it "if all dependent vms are being deleted the subnet can be deleted" do
-        st = Prog::Vm::Nexus.assemble("dummy-public-key", project.id, private_subnet_id: ps.id, name: "dummy-vm")
+        st = Prog::Vm::Nexus.assemble("dummy-public key", project.id, private_subnet_id: ps.id, name: "dummy-vm")
         st.update(label: "destroy")
 
         delete "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"

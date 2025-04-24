@@ -7,7 +7,7 @@ RSpec.describe Clover, "vm" do
 
   let(:project) { project_with_default_policy(user) }
 
-  let(:vm) { Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-1").subject }
+  let(:vm) { Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "dummy-vm-1").subject }
 
   describe "unauthenticated" do
     it "not list" do
@@ -23,8 +23,8 @@ RSpec.describe Clover, "vm" do
     end
 
     it "success all vms" do
-      Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-2", location_id: Location::HETZNER_FSN1_ID)
-      Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-3", location_id: vm.location_id)
+      Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "dummy-vm-2", location_id: Location::HETZNER_FSN1_ID)
+      Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "dummy-vm-3", location_id: vm.location_id)
 
       get "/project/#{project.ubid}/vm"
 

@@ -224,7 +224,7 @@ RSpec.describe Clover, "load balancer" do
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
         cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
         lb.add_cert(cert)
-        vm = Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
+        vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
 
         visit "#{project.path}#{lb.path}"
         select vm.name, from: "vm_id"
@@ -251,7 +251,7 @@ RSpec.describe Clover, "load balancer" do
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
         cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
         lb1.add_cert(cert)
-        vm = Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
+        vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
 
         visit "#{project.path}#{lb2.path}"
         select vm.name, from: "vm_id"
@@ -266,7 +266,7 @@ RSpec.describe Clover, "load balancer" do
       it "can not attach vm when it does not exist" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
-        vm = Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
+        vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
 
         visit "#{project.path}#{lb.path}"
         select vm.name, from: "vm_id"
@@ -286,7 +286,7 @@ RSpec.describe Clover, "load balancer" do
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
         cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
         lb.add_cert(cert)
-        vm = Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
+        vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
         expect(page).to have_no_content vm.name
 
         lb.add_vm(vm)
@@ -309,7 +309,7 @@ RSpec.describe Clover, "load balancer" do
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
         cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
         lb.add_cert(cert)
-        vm = Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
+        vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
 
         visit "#{project.path}#{lb.path}"
         select "dummy-vm-1", from: "vm_id"

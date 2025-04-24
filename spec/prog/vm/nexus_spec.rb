@@ -75,19 +75,19 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "fails if there is no project" do
       expect {
-        described_class.assemble("some_ssh_key", "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
+        described_class.assemble("some_ssh key", "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
       }.to raise_error RuntimeError, "No existing project"
     end
 
     it "fails if location doesn't exist" do
       expect {
-        described_class.assemble("some_ssh_key", prj.id, location_id: nil)
+        described_class.assemble("some_ssh key", prj.id, location_id: nil)
       }.to raise_error RuntimeError, "No existing location"
     end
 
     it "creates Subnet and Nic if not passed" do
       expect {
-        described_class.assemble("some_ssh_key", prj.id)
+        described_class.assemble("some_ssh key", prj.id)
       }.to change(PrivateSubnet, :count).from(0).to(1)
         .and change(Nic, :count).from(0).to(1)
     end
@@ -100,7 +100,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(Project).to receive(:[]).with(prj.id).and_return(prj)
       expect(prj).to receive(:private_subnets).and_return([ps]).at_least(:once)
 
-      described_class.assemble("some_ssh_key", prj.id, private_subnet_id: ps.id)
+      described_class.assemble("some_ssh key", prj.id, private_subnet_id: ps.id)
     end
 
     it "adds the VM to a private subnet if nic_id is passed" do
@@ -111,7 +111,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(Prog::Vnet::NicNexus).not_to receive(:assemble)
       expect(Project).to receive(:[]).with(prj.id).and_return(prj)
       expect(prj.private_subnets).to receive(:any?).and_return(true)
-      described_class.assemble("some_ssh_key", prj.id, nic_id: nic.id, location_id: Location::HETZNER_FSN1_ID)
+      described_class.assemble("some_ssh key", prj.id, nic_id: nic.id, location_id: Location::HETZNER_FSN1_ID)
     end
 
     def requested_disk_size(st)
@@ -119,24 +119,24 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "creates with default storage size from vm size" do
-      st = described_class.assemble("some_ssh_key", prj.id)
+      st = described_class.assemble("some_ssh key", prj.id)
       expect(requested_disk_size(st)).to eq(Option::VmSizes.first.storage_size_options.first)
     end
 
     it "creates with custom storage size if provided" do
-      st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{size_gib: 40}])
+      st = described_class.assemble("some_ssh key", prj.id, storage_volumes: [{size_gib: 40}])
       expect(requested_disk_size(st)).to eq(40)
     end
 
     it "fails if given nic_id is not valid" do
       expect {
-        described_class.assemble("some_ssh_key", prj.id, nic_id: nic.id)
+        described_class.assemble("some_ssh key", prj.id, nic_id: nic.id)
       }.to raise_error RuntimeError, "Given nic doesn't exist with the id 0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"
     end
 
     it "fails if given subnet_id is not valid" do
       expect {
-        described_class.assemble("some_ssh_key", prj.id, private_subnet_id: nic.id)
+        described_class.assemble("some_ssh key", prj.id, private_subnet_id: nic.id)
       }.to raise_error RuntimeError, "Given subnet doesn't exist with the id 0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"
     end
 
@@ -144,7 +144,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(Nic).to receive(:[]).with(nic.id).and_return(nic)
       expect(nic).to receive(:vm_id).and_return("57afa8a7-2357-4012-9632-07fbe13a3133")
       expect {
-        described_class.assemble("some_ssh_key", prj.id, nic_id: nic.id)
+        described_class.assemble("some_ssh key", prj.id, nic_id: nic.id)
       }.to raise_error RuntimeError, "Given nic is assigned to a VM already"
     end
 
@@ -153,7 +153,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nic).to receive(:private_subnet).and_return(ps)
       expect(ps).to receive(:location_id).and_return("hel2")
       expect {
-        described_class.assemble("some_ssh_key", prj.id, nic_id: nic.id)
+        described_class.assemble("some_ssh key", prj.id, nic_id: nic.id)
       }.to raise_error RuntimeError, "Given nic is created in a different location"
     end
 
@@ -164,7 +164,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(prj).to receive(:private_subnets).and_return([ps]).at_least(:once)
       expect(prj.private_subnets).to receive(:any?).and_return(false)
       expect {
-        described_class.assemble("some_ssh_key", prj.id, nic_id: nic.id)
+        described_class.assemble("some_ssh key", prj.id, nic_id: nic.id)
       }.to raise_error RuntimeError, "Given nic is not available in the given project"
     end
 
@@ -174,34 +174,34 @@ RSpec.describe Prog::Vm::Nexus do
       expect(prj).to receive(:private_subnets).and_return([ps]).at_least(:once)
       expect(prj.private_subnets).to receive(:any?).and_return(false)
       expect {
-        described_class.assemble("some_ssh_key", prj.id, private_subnet_id: ps.id)
+        described_class.assemble("some_ssh key", prj.id, private_subnet_id: ps.id)
       }.to raise_error RuntimeError, "Given subnet is not available in the given project"
     end
 
     it "creates arm64 vm with double core count and 3.2GB memory per core" do
-      st = described_class.assemble("some_ssh_key", prj.id, size: "standard-4", arch: "arm64")
+      st = described_class.assemble("some_ssh key", prj.id, size: "standard-4", arch: "arm64")
       expect(st.subject.vcpus).to eq(4)
       expect(st.subject.memory_gib).to eq(12)
     end
 
     it "requests as many gpus as specified" do
-      st = described_class.assemble("some_ssh_key", prj.id, size: "standard-2", gpu_count: 2)
+      st = described_class.assemble("some_ssh key", prj.id, size: "standard-2", gpu_count: 2)
       expect(st.stack[0]["gpu_count"]).to eq(2)
     end
 
     it "requests at least a single gpu for standard-gpu-6" do
-      st = described_class.assemble("some_ssh_key", prj.id, size: "standard-gpu-6")
+      st = described_class.assemble("some_ssh key", prj.id, size: "standard-gpu-6")
       expect(st.stack[0]["gpu_count"]).to eq(1)
     end
 
     it "requests no gpus by default" do
-      st = described_class.assemble("some_ssh_key", prj.id, size: "standard-2")
+      st = described_class.assemble("some_ssh key", prj.id, size: "standard-2")
       expect(st.stack[0]["gpu_count"]).to eq(0)
     end
 
     it "hops to start_aws if location is aws" do
       loc = Location.create_with_id(name: "us-east-1", provider: "aws", project_id: prj.id, display_name: "us-east-1", ui_name: "us-east-1", visible: true)
-      st = described_class.assemble("some_ssh_key", prj.id, location_id: loc.id)
+      st = described_class.assemble("some_ssh key", prj.id, location_id: loc.id)
       expect(st.label).to eq("start_aws")
     end
   end
@@ -515,7 +515,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "fails if same host is forced and excluded" do
       expect {
-        described_class.assemble("some_ssh_key", prj.id,
+        described_class.assemble("some_ssh key", prj.id,
           force_host_id: "some-vm-host-id", exclude_host_ids: ["some-vm-host-id"])
       }.to raise_error RuntimeError, "Cannot force and exclude the same host"
     end

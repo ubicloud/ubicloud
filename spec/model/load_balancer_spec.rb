@@ -11,7 +11,7 @@ RSpec.describe LoadBalancer do
 
   let(:vm1) {
     prj = lb.private_subnet.project
-    Prog::Vm::Nexus.assemble("pub-key", prj.id, name: "test-vm1", private_subnet_id: lb.private_subnet.id).subject
+    Prog::Vm::Nexus.assemble("pub key", prj.id, name: "test-vm1", private_subnet_id: lb.private_subnet.id).subject
   }
 
   it "disallows VM ubid format as name" do

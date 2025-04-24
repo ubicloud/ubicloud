@@ -35,7 +35,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
 
   let(:vm) {
     vm_host = create_vm_host
-    vm = Prog::Vm::Nexus.assemble("key", project.id, name: "name", private_subnet_id: private_subnet.id).subject
+    vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "name", private_subnet_id: private_subnet.id).subject
     vm.update(vm_host_id: vm_host.id)
     vm
   }

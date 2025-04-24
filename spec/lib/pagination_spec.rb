@@ -6,11 +6,11 @@ RSpec.describe Pagination do
   let(:project) { Project.create_with_id(name: "default") }
 
   let!(:first_vm) do
-    Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-1").subject
+    Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "dummy-vm-1").subject
   end
 
   let!(:second_vm) do
-    Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-2").subject
+    Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "dummy-vm-2").subject
   end
 
   describe "#validate_paginated_result" do
@@ -51,7 +51,7 @@ RSpec.describe Pagination do
       it "more objects than requested page size" do
         3.times do |index|
           ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "additional-ps-#{index}", location_id: Location::HETZNER_FSN1_ID).subject
-          Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "additional-vm-#{index}", private_subnet_id: ps.id).subject
+          Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "additional-vm-#{index}", private_subnet_id: ps.id).subject
         end
 
         result = project.vms_dataset.paginated_result(page_size: 2)

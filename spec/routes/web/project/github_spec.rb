@@ -122,7 +122,7 @@ RSpec.describe Clover, "github" do
     it "can list active runners" do
       runner_deleted = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").update(label: "wait_vm_destroy")
       runner_with_job = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").update(label: "wait").subject
-      runner_with_job.update(runner_id: 2, vm_id: Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "runner-vm").id, workflow_job: {
+      runner_with_job.update(runner_id: 2, vm_id: Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "runner-vm").id, workflow_job: {
         "id" => 123,
         "name" => "test-job",
         "run_id" => 456,
