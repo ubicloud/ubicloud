@@ -1,8 +1,14 @@
+--confirm 2c0j48 ai api-key ak2c0j48r8kj4nharh6yagf3eb destroy
 --confirm test-lb lb eu-central-h1/test-lb destroy
 --confirm test-pg pg eu-central-h1/test-pg destroy
 --confirm test-ps-default fw eu-central-h1/test-ps-default destroy
 --confirm test-ps ps eu-central-h1/test-ps destroy
 --confirm test-vm vm eu-central-h1/test-vm destroy
+ai api-key list
+ai api-key list -N
+ai api-key create
+ai api-key ak2c0j48r8kj4nharh6yagf3eb show
+ai api-key ak2c0j48r8kj4nharh6yagf3eb destroy -f
 fw eu-central-h1/default-eu-central-h1-default delete-rule fr7cv7h5bz324maazy93ykn8s4
 fw eu-central-h1/default-eu-central-h1-default detach-subnet psfzm9e26xky5m9ggetw4dpqe2
 fw eu-central-h1/default-eu-central-h1-default show

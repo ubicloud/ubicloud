@@ -13,6 +13,10 @@ class ApiKey < Sequel::Model
     enc.column :key
   end
 
+  def self.random_key
+    SecureRandom.alphanumeric(32)
+  end
+
   def name
     ubid
   end
@@ -30,7 +34,7 @@ class ApiKey < Sequel::Model
       fail "Invalid owner_table: #{owner_table}"
     end
 
-    key = SecureRandom.alphanumeric(32)
+    key = ApiKey.random_key
     super(owner_table:, owner_id:, key:, used_for:, project_id:)
   end
 

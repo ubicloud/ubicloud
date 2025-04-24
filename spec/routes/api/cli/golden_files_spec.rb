@@ -59,6 +59,9 @@ RSpec.describe Clover, "cli" do
     expect(PostgresMetricDestination).to receive(:generate_uuid).and_return("46d93419-abcc-8a8d-823a-55efe660727f").at_least(:once)
     expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("nc186qw3d23j1kzsgjqg2t811r")).at_least(:once)
     expect(LoadBalancer).to receive(:generate_uuid).and_return("eb8e0b21-94f2-8c2b-82c8-da57fcfe88c7").at_least(:once)
+    ApiKey.create(owner_table: "project", owner_id: @project.id, used_for: "inference_endpoint", project_id: @project.id, key: "89k2Q8FSzNU3lbQ1ZIpS6HCAQzxplOq1") { it.id = "13012223-089c-8953-ac55-889bca83c6e5" }
+    expect(ApiKey).to receive(:random_key).and_return("B5T6fbB5wXBX9kZEEdQXmAWbNY9rWuoL").at_least(:once)
+    expect(ApiKey).to receive(:generate_uuid).and_return("6677de33-3888-8953-bde1-ed8a8137d507").at_least(:once)
 
     cli_commands = []
     cli_commands.concat File.readlines("spec/routes/api/cli/golden-file-commands/success.txt").map { [it, {}] }

@@ -6,18 +6,18 @@ require_relative "../sdk/ruby/lib/ubicloud"
 class UbiCli
   force_autoload = Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
 
-  FRAGMENTS = {
+  SDK_METHODS = {
     "fw" => "firewall",
-    "lb" => "load-balancer",
+    "ak" => "inference_api_key",
+    "lb" => "load_balancer",
     "pg" => "postgres",
-    "ps" => "private-subnet",
+    "ps" => "private_subnet",
     "vm" => "vm"
   }.freeze
 
-  SDK_METHODS = FRAGMENTS.transform_values { it.tr("-", "_").freeze }.freeze
-
   CAPITALIZED_LABELS = {
     "fw" => "Firewall",
+    "ak" => "Inference api key",
     "lb" => "Load balancer",
     "pg" => "PostgreSQL database",
     "ps" => "Private subnet",
@@ -28,7 +28,7 @@ class UbiCli
   LOWERCASE_LABELS["pg"] = CAPITALIZED_LABELS["pg"]
   LOWERCASE_LABELS.freeze
 
-  OBJECT_INFO_REGEXP = /((fw|1b|pg|ps|vm)[a-z0-9]{24})/
+  OBJECT_INFO_REGEXP = /((fw|1b|pg|ps|vm|ak)[a-z0-9]{24})/
   UBI_VERSION_REGEXP = /\A\d{1,4}\.\d{1,4}\.\d{1,4}\z/
 
   Rodish.processor(self)
