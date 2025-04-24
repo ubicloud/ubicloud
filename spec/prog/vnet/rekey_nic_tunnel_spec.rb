@@ -11,8 +11,7 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
       net4: "1.1.1.0/26", state: "waiting", project_id: Project.create(name: "test").id)
   }
   let(:tunnel) {
-    sa = Sshable.create_with_id(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair)
-    vmh = VmHost.create(location_id: Location::HETZNER_FSN1_ID) { it.id = sa.id }
+    vmh = create_vm_host
     vm_src = create_vm(name: "hellovm", vm_host_id: vmh.id)
     vm_dst = create_vm(name: "hellovm2", vm_host_id: vmh.id)
     n_src = Nic.create_with_id(private_subnet_id: ps.id,
