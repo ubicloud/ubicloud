@@ -710,7 +710,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "updates the metadata and hops to configure if promote command is succeeded" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check promote_postgres").and_return("Succeeded")
 
-      expect(postgres_server).to receive(:update).with(timeline_access: "push", representative_at: anything)
+      expect(postgres_server).to receive(:update).with(timeline_access: "push", representative_at: anything, synchronization_status: "ready")
       expect(postgres_server.resource).to receive(:incr_refresh_dns_record)
       expect(postgres_server).to receive(:primary?).and_return(true)
       expect(postgres_server).to receive(:incr_configure)
@@ -734,32 +734,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       it "updates the representative server, refreshes dns and destroys the old representative_server and hops to configure when read_replica" do
         time = Time.now
         expect(postgres_server).to receive(:read_replica?).and_return(true)
-        expect(postgres_server).to receive(:promote_set?).and_return(false)
         expect(Time).to receive(:now).and_return(time)
         expect(postgres_server).to receive(:update).with(representative_at: time)
         expect(postgres_server.resource).to receive(:incr_refresh_dns_record)
-        expect { nx.taking_over }.to hop("configure")
-      end
-
-      it "updates the sync status, decrements promote and hops to configure when read_replica and to be promoted" do
-        expect(postgres_server).to receive(:read_replica?).and_return(true)
-        expect(postgres_server).to receive(:promote_set?).and_return(true).at_least(:once)
-        expect(postgres_server).to receive(:update).with(synchronization_status: "ready")
-        expect(nx).to receive(:decr_promote)
-        expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check promote_postgres").and_return("Succeeded")
-
-        expect(postgres_server).to receive(:update).with(timeline_access: "push", representative_at: anything)
-        expect(postgres_server.resource).to receive(:incr_refresh_dns_record)
-        expect(postgres_server).to receive(:primary?).and_return(true)
-        expect(postgres_server).to receive(:incr_configure)
-        expect(postgres_server).to receive(:incr_restart)
-
-        standby = instance_double(PostgresServer, primary?: false)
-        expect(standby).to receive(:update).with(synchronization_status: "catching_up")
-        expect(standby).to receive(:incr_configure)
-
-        expect(postgres_server.resource).to receive(:servers).and_return([postgres_server, standby]).twice
-
         expect { nx.taking_over }.to hop("configure")
       end
     end
