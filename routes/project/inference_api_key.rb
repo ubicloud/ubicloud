@@ -28,13 +28,23 @@ class Clover
       end
     end
 
-    r.delete String do |ubid|
-      if (iak = inference_api_key_ds.with_pk(UBID.to_uuid(ubid)))
-        authorize("InferenceApiKey:delete", iak.id)
-        iak.destroy
-        flash["notice"] = "Inference API Key deleted successfully" if web?
+    r.is String do |ubid|
+      iak = inference_api_key_ds.with_pk(UBID.to_uuid(ubid))
+
+      r.get api? do
+        if iak
+          {id: iak.ubid, key: iak.key}
+        end
       end
-      204
+
+      r.delete do
+        if iak
+          authorize("InferenceApiKey:delete", iak.id)
+          iak.destroy
+          flash["notice"] = "Inference API Key deleted successfully" if web?
+        end
+        204
+      end
     end
   end
 end
