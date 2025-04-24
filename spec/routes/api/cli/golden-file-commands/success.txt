@@ -113,13 +113,13 @@ ps list -l eu-north-h1 -N -f name,id
 ps list -N
 ps psfzm9e26xky5m9ggetw4dpqe2 show
 version
-vm eu-central-h1/test2-vm create -6 pk
-vm eu-central-h1/test2-vm create -b debian-12 pk
-vm eu-central-h1/test2-vm create pk
-vm eu-central-h1/test2-vm create -p psfzm9e26xky5m9ggetw4dpqe2 pk
-vm eu-central-h1/test2-vm create -S 80 pk
-vm eu-central-h1/test2-vm create -s standard-4 pk
-vm eu-central-h1/test2-vm create -u foo pk
+vm eu-central-h1/test2-vm create -6 "ssh-rsa pk"
+vm eu-central-h1/test2-vm create -b debian-12 "ssh-rsa pk"
+vm eu-central-h1/test2-vm create "ssh-rsa pk"
+vm eu-central-h1/test2-vm create -p psfzm9e26xky5m9ggetw4dpqe2 "ssh-rsa pk"
+vm eu-central-h1/test2-vm create -S 80 "ssh-rsa pk"
+vm eu-central-h1/test2-vm create -s standard-4 "ssh-rsa pk"
+vm eu-central-h1/test2-vm create -u foo "ssh-rsa pk"
 vm eu-central-h1/test-vm destroy -f
 vm eu-central-h1/test-vm restart
 vm eu-central-h1/test-vm show

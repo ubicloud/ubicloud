@@ -122,7 +122,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     end
 
     it "hops to wait_cert_broadcast if need_certificates? is false and refresh_cert is set" do
-      vm = Prog::Vm::Nexus.assemble("pub-key", ps.project_id, name: "testvm", private_subnet_id: ps.id).subject
+      vm = Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "testvm", private_subnet_id: ps.id).subject
       nx.load_balancer.add_vm(vm)
       nx.load_balancer.incr_refresh_cert
       expect(Strand.where(prog: "Vnet::CertServer", label: "put_certificate").count).to eq 1
@@ -132,7 +132,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     end
 
     it "hops to wait need_certificates? and refresh_cert are false" do
-      vm = Prog::Vm::Nexus.assemble("pub-key", ps.project_id, name: "testvm", private_subnet_id: ps.id).subject
+      vm = Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "testvm", private_subnet_id: ps.id).subject
       nx.load_balancer.add_vm(vm)
       expect(Strand.where(prog: "Vnet::CertServer", label: "put_certificate").count).to eq 1
       expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
@@ -143,7 +143,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
   describe "#wait_cert_broadcast" do
     it "naps for 1 second if not all children are done" do
-      vm = Prog::Vm::Nexus.assemble("pub-key", ps.project_id, name: "testvm", private_subnet_id: ps.id).subject
+      vm = Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "testvm", private_subnet_id: ps.id).subject
       nx.load_balancer.add_vm(vm)
       expect(nx).to receive(:reap)
       expect { nx.wait_cert_broadcast }.to nap(1)
@@ -174,7 +174,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
   describe "#update_vm_load_balancers" do
     it "updates load balancers for all vms" do
-      vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub-key", ps.project_id, name: "test-vm#{_1}", private_subnet_id: ps.id).subject }
+      vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "test-vm#{_1}", private_subnet_id: ps.id).subject }
       vms.each { st.subject.add_vm(_1) }
       expect { nx.update_vm_load_balancers }.to hop("wait_update_vm_load_balancers")
       # Update progs are budded in update_vm_load_balancers
@@ -184,7 +184,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
   describe "#wait_update_vm_load_balancers" do
     before do
-      vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub-key", ps.project_id, name: "test-vm#{_1}", private_subnet_id: ps.id).subject }
+      vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "test-vm#{_1}", private_subnet_id: ps.id).subject }
       vms.each { st.subject.add_vm(_1) }
       expect { nx.update_vm_load_balancers }.to hop("wait_update_vm_load_balancers")
     end
@@ -203,7 +203,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
   describe "#destroy" do
     before do
-      vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub-key", ps.project_id, name: "test-vm#{_1}", private_subnet_id: ps.id).subject }
+      vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "test-vm#{_1}", private_subnet_id: ps.id).subject }
       vms.each { st.subject.add_vm(_1) }
       expect { nx.update_vm_load_balancers }.to hop("wait_update_vm_load_balancers")
       st.children.map(&:destroy)

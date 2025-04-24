@@ -18,7 +18,7 @@ RSpec.describe LoadBalancerVmPort do
 
   let(:vm) {
     nic = Prog::Vnet::NicNexus.assemble(private_subnet.id, name: "test-vm-nic", ipv4_addr: "192.168.1.1").subject
-    Prog::Vm::Nexus.assemble("pub-key", prj.id, name: "test-vm", private_subnet_id: private_subnet.id, nic_id: nic.id).subject
+    Prog::Vm::Nexus.assemble("pub key", prj.id, name: "test-vm", private_subnet_id: private_subnet.id, nic_id: nic.id).subject
   }
 
   let(:prj) {

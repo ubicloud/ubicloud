@@ -4,8 +4,8 @@ require_relative "../spec_helper"
 
 RSpec.describe Clover, "cli lb update" do
   before do
-    cli(%w[vm eu-central-h1/test-vm create a])
-    cli(%w[vm eu-central-h1/test-vm2 create b])
+    cli(%w[vm eu-central-h1/test-vm create] << "a a")
+    cli(%w[vm eu-central-h1/test-vm2 create] << "b b")
     @vm1, @vm2 = Vm.all
     cli(%w[ps eu-central-h1/test-ps create])
     @ps = PrivateSubnet.first

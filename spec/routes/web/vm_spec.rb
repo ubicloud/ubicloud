@@ -10,12 +10,12 @@ RSpec.describe Clover, "vm" do
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
 
   let(:vm) do
-    vm = Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-1").subject
+    vm = Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "dummy-vm-1").subject
     vm.update(ephemeral_net6: "2a01:4f8:173:1ed3:aa7c::/79")
     vm.reload # without reload ephemeral_net6 is string and can't call .network
   end
 
-  let(:vm_wo_permission) { Prog::Vm::Nexus.assemble("dummy-public-key", project_wo_permissions.id, name: "dummy-vm-2").subject }
+  let(:vm_wo_permission) { Prog::Vm::Nexus.assemble("dummy-public key", project_wo_permissions.id, name: "dummy-vm-2").subject }
 
   describe "unauthenticated" do
     it "can not list without login" do
@@ -67,6 +67,7 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
         name = "dummy-vm"
         fill_in "Name", with: name
+        fill_in "SSH Public Key", with: "a a"
         choose option: Location::HETZNER_FSN1_ID
         uncheck "enable_ip4"
         choose option: "ubuntu-jammy"
@@ -183,6 +184,7 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
         name = "dummy-vm"
         fill_in "Name", with: name
+        fill_in "SSH Public Key", with: "a a"
         choose option: Location::HETZNER_FSN1_ID
         check "enable_ip4"
         choose option: "ubuntu-jammy"
@@ -208,6 +210,7 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content ps.name
         name = "dummy-vm"
         fill_in "Name", with: name
+        fill_in "SSH Public Key", with: "a a"
         choose option: Location::HETZNER_FSN1_ID
         select match: :prefer_exact, text: ps.name
         choose option: "ubuntu-jammy"
@@ -232,6 +235,7 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content "Default"
         name = "dummy-vm"
         fill_in "Name", with: name
+        fill_in "SSH Public Key", with: "a a"
         choose option: Location::HETZNER_FSN1_ID
         select match: :prefer_exact, text: "Default"
         choose option: "ubuntu-jammy"
@@ -249,6 +253,7 @@ RSpec.describe Clover, "vm" do
         # can create a second vm in the same location and it will use the same subnet
         visit "#{project.path}/vm/create"
         fill_in "Name", with: "dummy-vm-2"
+        fill_in "SSH Public Key", with: "a a"
         choose option: Location::HETZNER_FSN1_ID
         select match: :prefer_exact, text: "Default"
         choose option: "ubuntu-jammy"
@@ -286,6 +291,7 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
 
         fill_in "Name", with: vm.name
+        fill_in "SSH Public Key", with: "a a"
         choose option: Location::HETZNER_FSN1_ID
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
@@ -352,6 +358,7 @@ RSpec.describe Clover, "vm" do
         visit "#{project.path}/vm/create"
         name = "dummy-vm"
         fill_in "Name", with: name
+        fill_in "SSH Public Key", with: "a a"
         choose option: Location::HETZNER_FSN1_ID
 
         Location.where(id: Location::HETZNER_FSN1_ID).update(visible: false, project_id: project.id)

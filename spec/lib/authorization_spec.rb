@@ -13,7 +13,7 @@ RSpec.describe Authorization do
   let(:vms) {
     (0..3).map do |index|
       ps = Prog::Vnet::SubnetNexus.assemble(projects[index / 2].id, name: "vm#{index}-ps", location_id: Location::HETZNER_FSN1_ID).subject
-      Prog::Vm::Nexus.assemble("key", projects[index / 2].id, name: "vm#{index}", private_subnet_id: ps.id)
+      Prog::Vm::Nexus.assemble("k y", projects[index / 2].id, name: "vm#{index}", private_subnet_id: ps.id)
     end.map(&:subject)
   }
   let(:pg) {

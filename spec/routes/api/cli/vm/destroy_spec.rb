@@ -6,7 +6,7 @@ RSpec.describe Clover, "cli vm destroy" do
   before do
     expect(Vm.count).to eq 0
     expect(PrivateSubnet.count).to eq 0
-    cli(%w[vm eu-central-h1/test-vm create a])
+    cli(%w[vm eu-central-h1/test-vm create] << "a a")
     expect(Vm.count).to eq 1
     @vm = Vm.first
     expect(@vm).to be_a Vm

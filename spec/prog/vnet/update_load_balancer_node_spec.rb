@@ -24,11 +24,11 @@ RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
   }
   let(:vm) {
     nic = Prog::Vnet::NicNexus.assemble(ps.id, ipv4_addr: "192.168.1.0/32", ipv6_addr: "fd10:9b0b:6b4b:8fbb::/64").subject
-    Prog::Vm::Nexus.assemble("pub-key", lb.project_id, name: "vm1", private_subnet_id: lb.private_subnet.id, nic_id: nic.id).subject
+    Prog::Vm::Nexus.assemble("pub key", lb.project_id, name: "vm1", private_subnet_id: lb.private_subnet.id, nic_id: nic.id).subject
   }
   let(:neighbor_vm) {
     nic = Prog::Vnet::NicNexus.assemble(ps.id, ipv4_addr: "172.10.1.0/32", ipv6_addr: "fd10:9b0b:6b4b:aaa::/64").subject
-    Prog::Vm::Nexus.assemble("pub-key", lb.project_id, name: "vm2", private_subnet_id: lb.private_subnet.id, nic_id: nic.id).subject
+    Prog::Vm::Nexus.assemble("pub key", lb.project_id, name: "vm2", private_subnet_id: lb.private_subnet.id, nic_id: nic.id).subject
   }
   let(:vmh) {
     vmh = instance_double(VmHost, sshable: instance_double(Sshable))

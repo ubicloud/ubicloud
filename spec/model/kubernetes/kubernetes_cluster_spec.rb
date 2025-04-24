@@ -141,8 +141,8 @@ RSpec.describe KubernetesCluster do
   describe "vm_diff_for_lb" do
     it "finds the extra and missing vms" do
       lb = Prog::Vnet::LoadBalancerNexus.assemble(kc.private_subnet.id, name: kc.services_load_balancer_name, src_port: 443, dst_port: 8443).subject
-      extra_vm = Prog::Vm::Nexus.assemble("key", kc.project.id, name: "extra-vm", private_subnet_id: kc.private_subnet.id).subject
-      missing_vm = Prog::Vm::Nexus.assemble("key", kc.project.id, name: "missing-vm", private_subnet_id: kc.private_subnet.id).subject
+      extra_vm = Prog::Vm::Nexus.assemble("k y", kc.project.id, name: "extra-vm", private_subnet_id: kc.private_subnet.id).subject
+      missing_vm = Prog::Vm::Nexus.assemble("k y", kc.project.id, name: "missing-vm", private_subnet_id: kc.private_subnet.id).subject
       lb.add_vm(extra_vm)
       np = instance_double(KubernetesNodepool, vms: [missing_vm])
       expect(kc).to receive(:nodepools).and_return([np])

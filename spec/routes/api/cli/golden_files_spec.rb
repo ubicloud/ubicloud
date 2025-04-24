@@ -20,7 +20,7 @@ RSpec.describe Clover, "cli" do
     expect(PostgresResource).to receive(:generate_uuid).and_return("dd0375a6-1c66-82d0-a5e8-af1e8527a8a2")
     expect(PostgresFirewallRule).to receive(:generate_uuid).and_return("5a601238-b56e-8ecf-bbca-9e3e680812b8")
     expect(PostgresMetricDestination).to receive(:generate_uuid).and_return("45754ea1-c139-8a8d-af18-7b24e0dbc7de")
-    cli(%w[vm eu-central-h1/test-vm create a])
+    cli(%w[vm eu-central-h1/test-vm create] << "ssh-rsa a")
     @vm = Vm.first
     add_ipv4_to_vm(@vm, "128.0.0.1")
     @vm.nics.first.update(private_ipv4: "10.67.141.133/32", private_ipv6: "fda0:d79a:93e7:d4fd:1c2::0/80")
@@ -72,7 +72,7 @@ RSpec.describe Clover, "cli" do
     cli_commands.each do |cmd, kws|
       cmd.chomp!
       body = DB.transaction(savepoint: true, rollback: :always) do
-        cli(cmd.split, **kws)
+        cli(cmd.shellsplit, **kws)
       end
       File.write(File.join(output_dir, "#{cmd.tr("/", "_")}.txt"), body)
     end
