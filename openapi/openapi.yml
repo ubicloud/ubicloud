@@ -1432,6 +1432,16 @@ paths:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/inference_api_key_id'
+    get:
+      operationId: getInferenceApiKey
+      summary: Get a specific inference api key
+      responses:
+        '200':
+          $ref: '#/components/responses/InferenceApiKey'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - InferenceApiKey
     delete:
       operationId: deleteInferenceApiKey
       summary: Delete a specific inference api key

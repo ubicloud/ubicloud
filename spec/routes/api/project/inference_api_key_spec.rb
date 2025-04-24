@@ -46,6 +46,18 @@ RSpec.describe Clover, "inference api key" do
       expect(JSON.parse(last_response.body)).to eq("id" => api_key.ubid, "key" => api_key.key)
     end
 
+    it "success get inference api key" do
+      get "/project/#{project.ubid}/inference-api-key/#{api_key.ubid}"
+      expect(last_response.status).to eq(200)
+      expect(JSON.parse(last_response.body)).to eq("id" => api_key.ubid, "key" => api_key.key)
+    end
+
+    it "failure get deleted inference api key" do
+      api_key.destroy
+      get "/project/#{project.ubid}/inference-api-key/#{api_key.ubid}"
+      expect(last_response.status).to eq(404)
+    end
+
     it "success delete inference api key" do
       delete "/project/#{project.ubid}/inference-api-key/#{api_key.ubid}"
       expect(last_response.status).to eq(204)
