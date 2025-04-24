@@ -6,6 +6,8 @@ require_relative "../sdk/ruby/lib/ubicloud"
 require_relative "../sdk/ruby/lib/ubicloud/adapter"
 require_relative "../sdk/ruby/lib/ubicloud/adapter/net_http"
 
+require "rack/mock_request"
+
 # rubocop:disable RSpec/SpecFilePathFormat
 RSpec.describe Ubicloud do
   # rubocop:enable RSpec/SpecFilePathFormat
@@ -64,6 +66,22 @@ RSpec.describe Ubicloud do
   it "Context#[] returns nil for valid format but missing object" do
     expect(Clover).to receive(:call).and_return([404, {}, []])
     expect(ubi["vm345678901234567890123456"]).to be_nil
+  end
+
+  it "supports inference api keys" do
+    account = Account.create_with_id(email: "user@example.com", status_id: 2)
+    project = account.create_project_with_default_policy("test")
+    pat = ApiKey.create_personal_access_token(account, project:)
+    SubjectTag.first(project_id: project.id, name: "Admin").add_subject(pat.id)
+    iak = ApiKey.create_inference_api_key(project)
+    env = Rack::MockRequest.env_for("http://api.localhost/cli")
+    env["HTTP_AUTHORIZATION"] = "Bearer: pat-#{pat.ubid}-#{pat.key}"
+    ubi = described_class.new(:rack, app: Clover, env:, project_id: project.ubid)
+    expect(ubi[iak.ubid].to_h).to eq(id: iak.ubid, key: iak.key)
+
+    expect { ubi.inference_api_key.new("badc0j48r8kj4nharh6yagf3eb") }.to raise_error(Ubicloud::Error)
+    expect { ubi.inference_api_key.new(foo: "badc0j48r8kj4nharh6yagf3eb") }.to raise_error(Ubicloud::Error)
+    expect { ubi.inference_api_key.new(Object.new) }.to raise_error(Ubicloud::Error)
   end
 
   it "Context#new returns nil for invalid format" do
