@@ -15,7 +15,7 @@ RSpec.describe Al do
 
   # Creates a Request object with the given parameters
   #
-  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: true, require_shared_slice: false, diagnostics: false, prioritize_performance_cpu: false)
+  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: true, require_shared_slice: false, diagnostics: false, family_filter: [])
     Al::Request.new(
       vm.id,
       vm.vcpus,
@@ -38,7 +38,7 @@ RSpec.describe Al do
       use_slices,
       require_shared_slice,
       diagnostics,
-      prioritize_performance_cpu
+      family_filter
     )
   end
 
@@ -81,7 +81,7 @@ RSpec.describe Al do
           [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
             [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
           "ubuntu-jammy", false, 0, true, Config.allocator_target_host_utilization, "x64", ["accepting"], [], [], [], [],
-          "standard", 200, true, false, false, false
+          "standard", 200, true, false, false, []
         )).and_return(al)
       expect(al).to receive(:update)
 
@@ -101,7 +101,7 @@ RSpec.describe Al do
         [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
         "ubuntu-jammy", false, 0, true, 0.65, "x64", ["accepting"], [], [], [], [],
-        "standard", 400
+        "standard", 400, true, false, false, []
       )
     }
 
@@ -171,7 +171,8 @@ RSpec.describe Al do
                  available_iommu_groups: nil,
                  used_ipv4: 1,
                  vm_provisioning_count: 0,
-                 accepts_slices: false}])
+                 accepts_slices: false,
+                 family: "standard"}])
     end
 
     it "retrieves provisioning count" do
@@ -200,7 +201,8 @@ RSpec.describe Al do
                  available_iommu_groups: nil,
                  used_ipv4: 1,
                  vm_provisioning_count: 2,
-                 accepts_slices: false}])
+                 accepts_slices: false,
+                 family: "standard"}])
     end
 
     it "applies host filter" do
@@ -248,6 +250,23 @@ RSpec.describe Al do
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
       req.location_filter = [Location::HETZNER_FSN1_ID]
+      cand = Al::Allocation.candidate_hosts(req)
+
+      expect(cand.size).to eq(1)
+      expect(cand.first[:vm_host_id]).to eq(vmh1.id)
+    end
+
+    it "applies family filter" do
+      vmh1 = create_vm_host(family: "performance", total_cpus: 10, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      vmh2 = create_vm_host(family: "standard", total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      StorageDevice.create_with_id(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
+      Address.create_with_id(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
+
+      req.family_filter = ["performance"]
       cand = Al::Allocation.candidate_hosts(req)
 
       expect(cand.size).to eq(1)
@@ -433,23 +452,12 @@ RSpec.describe Al do
     end
 
     it "prioritize AX102 github runners for premium CPU testers" do
-      req.prioritize_performance_cpu = true
       expect(Al::VmHostCpuAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
       expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
       vmhds[:location_id] = "6b9ef786-b842-8420-8c65-c25e3d4bdf3d"
-      vmhds[:total_cores] = 16
+      vmhds[:family] = "performance"
       expect(Al::Allocation.new(vmhds, req).score).to eq(-1)
-    end
-
-    it "penalizes AX102 github runners for non premium CPU testers" do
-      req.prioritize_performance_cpu = false
-      expect(Al::VmHostCpuAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
-      expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
-      expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
-      vmhds[:location_id] = "6b9ef786-b842-8420-8c65-c25e3d4bdf3d"
-      vmhds[:total_cores] = 16
-      expect(Al::Allocation.new(vmhds, req).score).to eq(5)
     end
 
     it "respects location preferences" do
@@ -707,6 +715,13 @@ RSpec.describe Al do
       vmh = VmHost.first
       vmh.update(allocation_state: "draining")
       al = Al::Allocation.best_allocation(create_req(vm, vol, allocation_state_filter: []))
+      expect(al).to be_truthy
+    end
+
+    it "can have empty family filter" do
+      vmh = VmHost.first
+      vmh.update(family: "performance")
+      al = Al::Allocation.best_allocation(create_req(vm, vol, family_filter: []))
       expect(al).to be_truthy
     end
 

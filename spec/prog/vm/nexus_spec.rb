@@ -443,7 +443,7 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::HETZNER_FSN1_ID],
         location_preference: [],
         gpu_count: 0,
-        prioritize_performance_cpu: false
+        family_filter: ["standard"]
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -459,7 +459,7 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID],
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
-        prioritize_performance_cpu: false
+        family_filter: ["standard"]
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -476,7 +476,23 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID, Location::LEASEWEB_WDC02_ID],
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
-        prioritize_performance_cpu: false
+        family_filter: ["standard"]
+      )
+      expect { nx.start }.to hop("create_unix_user")
+    end
+
+    it "considers standard family for burstable virtual machines" do
+      vm.family = "burstable"
+      expect(Scheduling::Allocator).to receive(:allocate).with(
+        vm, :storage_volumes,
+        allocation_state_filter: ["accepting"],
+        distinct_storage_devices: false,
+        host_filter: [],
+        host_exclusion_filter: [],
+        location_filter: [Location::HETZNER_FSN1_ID],
+        location_preference: [],
+        gpu_count: 0,
+        family_filter: ["standard"]
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -495,7 +511,7 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID, Location::LEASEWEB_WDC02_ID],
         location_preference: [Location::LEASEWEB_WDC02_ID],
         gpu_count: 0,
-        prioritize_performance_cpu: false
+        family_filter: ["standard"]
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -515,7 +531,7 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [],
         location_preference: [],
         gpu_count: 0,
-        prioritize_performance_cpu: false
+        family_filter: []
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -535,7 +551,7 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::HETZNER_FSN1_ID],
         location_preference: [],
         gpu_count: 0,
-        prioritize_performance_cpu: false
+        family_filter: ["standard"]
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -563,7 +579,7 @@ RSpec.describe Prog::Vm::Nexus do
         host_exclusion_filter: [],
         location_preference: [],
         gpu_count: 0,
-        prioritize_performance_cpu: false
+        family_filter: ["standard"]
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -583,7 +599,7 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::HETZNER_FSN1_ID],
         location_preference: [],
         gpu_count: 3,
-        prioritize_performance_cpu: false
+        family_filter: ["standard"]
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -602,7 +618,7 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: ["6b9ef786-b842-8420-8c65-c25e3d4bdf3d", Location::HETZNER_FSN1_ID, "1f214853-0bc4-8020-b910-dffb867ef44f"],
         location_preference: ["6b9ef786-b842-8420-8c65-c25e3d4bdf3d"],
         gpu_count: 0,
-        prioritize_performance_cpu: true
+        family_filter: ["standard", "performance"]
       )
       expect { nx.start }.to hop("create_unix_user")
     end
