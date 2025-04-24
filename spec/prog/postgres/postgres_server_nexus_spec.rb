@@ -318,7 +318,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:refresh_walg_credentials)
 
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
-      expect { nx.refresh_certificates }.to hop("configure_prometheus")
+      expect { nx.refresh_certificates }.to hop("configure_metrics")
     end
 
     it "hops to wait at times other than the initial provisioning" do
@@ -335,25 +335,69 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
   end
 
-  describe "#configure_prometheus" do
-    it "configures prometheus and hops configure_pgbouncer during initial provisioning" do
+  describe "#configure_metrics" do
+    let(:metrics_config) { {interval: "30s", endpoints: ["https://localhost:9100/metrics"], metrics_dir: "/home/ubi/postgres/metrics"} }
+
+    it "configures prometheus and metrics during initial provisioning" do
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
       expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
       expect(sshable).to receive(:cmd).with("sudo systemctl enable --now postgres_exporter")
       expect(sshable).to receive(:cmd).with("sudo systemctl enable --now node_exporter")
       expect(sshable).to receive(:cmd).with("sudo systemctl enable --now prometheus")
-      expect { nx.configure_prometheus }.to hop("configure")
+
+      # Configure metrics expectations
+      expect(postgres_server).to receive(:metrics_config).and_return(metrics_config)
+      expect(sshable).to receive(:cmd).with("mkdir -p /home/ubi/postgres/metrics")
+      expect(sshable).to receive(:cmd).with("tee /home/ubi/postgres/metrics/config.json > /dev/null", stdin: metrics_config.to_json)
+      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo systemctl daemon-reload")
+      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now postgres-metrics.timer")
+
+      expect { nx.configure_metrics }.to hop("configure")
     end
 
-    it "configures prometheus and hops wait at times other than the initial provisioning" do
+    it "configures prometheus and metrics and hops to wait at times other than initial provisioning" do
+      # Prometheus expectations
       expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
       expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
       expect(sshable).to receive(:cmd).with("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
       expect(sshable).to receive(:cmd).with("sudo systemctl reload node_exporter || sudo systemctl restart node_exporter")
       expect(sshable).to receive(:cmd).with("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
+
+      # Configure metrics expectations
+      expect(postgres_server).to receive(:metrics_config).and_return(metrics_config)
+      expect(sshable).to receive(:cmd).with("mkdir -p /home/ubi/postgres/metrics")
+      expect(sshable).to receive(:cmd).with("tee /home/ubi/postgres/metrics/config.json > /dev/null", stdin: metrics_config.to_json)
+      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo systemctl daemon-reload")
+
       expect(resource).to receive(:representative_server).and_return(instance_double(PostgresServer, id: "random-id"))
-      expect { nx.configure_prometheus }.to hop("wait")
+      expect { nx.configure_metrics }.to hop("wait")
+    end
+
+    it "uses default interval if not specified in config" do
+      config_without_interval = {endpoints: ["https://localhost:9100/metrics"], metrics_dir: "/home/ubi/postgres/metrics"}
+
+      # Prometheus expectations
+      expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
+      expect(sshable).to receive(:cmd).with("sudo systemctl reload node_exporter || sudo systemctl restart node_exporter")
+      expect(sshable).to receive(:cmd).with("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
+
+      # Configure metrics expectations with default interval
+      expect(postgres_server).to receive(:metrics_config).and_return(config_without_interval)
+      expect(sshable).to receive(:cmd).with("mkdir -p /home/ubi/postgres/metrics")
+      expect(sshable).to receive(:cmd).with("tee /home/ubi/postgres/metrics/config.json > /dev/null", stdin: config_without_interval.to_json)
+      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: /OnUnitActiveSec=15s/)
+      expect(sshable).to receive(:cmd).with("sudo systemctl daemon-reload")
+
+      expect(resource).to receive(:representative_server).and_return(instance_double(PostgresServer, id: "random-id"))
+      expect { nx.configure_metrics }.to hop("wait")
     end
   end
 
@@ -590,9 +634,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
 
-    it "hops to configure_prometheus if configure_prometheus is set" do
-      expect(nx).to receive(:when_configure_prometheus_set?).and_yield
-      expect { nx.wait }.to hop("configure_prometheus")
+    it "hops to configure_metrics if configure_metrics is set" do
+      expect(nx).to receive(:when_configure_metrics_set?).and_yield
+      expect { nx.wait }.to hop("configure_metrics")
     end
 
     it "hops to configure if configure is set" do

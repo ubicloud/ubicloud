@@ -174,7 +174,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     refresh_walg_credentials
 
     when_initial_provisioning_set? do
-      hop_configure_prometheus
+      hop_configure_metrics
     end
 
     vm.sshable.cmd("sudo -u postgres pg_ctlcluster #{postgres_server.resource.version} main reload")
@@ -182,7 +182,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     hop_wait
   end
 
-  label def configure_prometheus
+  label def configure_metrics
     web_config = <<CONFIG
 tls_server_config:
   cert_file: /etc/ssl/certs/server.crt
@@ -221,10 +221,48 @@ scrape_configs:
 CONFIG
     vm.sshable.cmd("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: prometheus_config)
 
+    metrics_config = postgres_server.metrics_config
+    metrics_dir = metrics_config[:metrics_dir]
+    vm.sshable.cmd("mkdir -p #{metrics_dir}")
+    vm.sshable.cmd("tee #{metrics_dir}/config.json > /dev/null", stdin: metrics_config.to_json)
+
+    metrics_service = <<SERVICE
+[Unit]
+Description=PostgreSQL Metrics Collection
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=ubi
+ExecStart=/home/ubi/postgres/bin/metrics-collector #{metrics_dir}
+StandardOutput=journal
+StandardError=journal
+SERVICE
+    vm.sshable.cmd("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: metrics_service)
+
+    metrics_interval = metrics_config[:interval] || "15s"
+
+    metrics_timer = <<TIMER
+[Unit]
+Description=Run PostgreSQL Metrics Collection Periodically
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=#{metrics_interval}
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target
+TIMER
+    vm.sshable.cmd("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: metrics_timer)
+
+    vm.sshable.cmd("sudo systemctl daemon-reload")
+
     when_initial_provisioning_set? do
       vm.sshable.cmd("sudo systemctl enable --now postgres_exporter")
       vm.sshable.cmd("sudo systemctl enable --now node_exporter")
       vm.sshable.cmd("sudo systemctl enable --now prometheus")
+      vm.sshable.cmd("sudo systemctl enable --now postgres-metrics.timer")
 
       hop_configure
     end
@@ -372,9 +410,9 @@ SQL
       decr_checkup
     end
 
-    when_configure_prometheus_set? do
-      decr_configure_prometheus
-      hop_configure_prometheus
+    when_configure_metrics_set? do
+      decr_configure_metrics
+      hop_configure_metrics
     end
 
     when_configure_set? do
