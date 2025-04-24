@@ -113,7 +113,7 @@ jobs:
       run: bundle exec rake
 
     - name: Run dataplane tests
-      run: COVERAGE=rhizome bundle exec rspec -O /dev/null rhizome
+      run: bundle exec rake rhizome_spec
 
     - name: Archive code coverage results
       if: failure()
