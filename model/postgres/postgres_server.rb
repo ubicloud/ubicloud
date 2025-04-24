@@ -17,7 +17,7 @@ class PostgresServer < Sequel::Model
   include HealthMonitorMethods
 
   semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup
-  semaphore :restart, :configure, :take_over, :configure_prometheus, :destroy, :recycle, :promote
+  semaphore :restart, :configure, :take_over, :configure_prometheus, :configure_metrics, :destroy, :recycle, :promote
 
   def configure_hash
     configs = {
@@ -102,7 +102,8 @@ class PostgresServer < Sequel::Model
       },
       identity: resource.identity,
       hosts: "#{resource.representative_server.vm.private_ipv4} #{resource.identity}",
-      pgbouncer_instances: (vm.vcpus / 2.0).ceil.clamp(1, 8)
+      pgbouncer_instances: (vm.vcpus / 2.0).ceil.clamp(1, 8),
+      metrics_config: metrics_config
     }
   end
 
@@ -245,6 +246,17 @@ class PostgresServer < Sequel::Model
 
   def run_query(query)
     self.class.run_query(vm, query)
+  end
+
+  def metrics_config
+    {
+      endpoints: [
+        "https://localhost:9090/federate?match[]=%7B__name__%3D~%22.%2B%22%7D"
+      ],
+      max_pending_buffer_size: 120,
+      interval: "15s",
+      additional_labels: {}
+    }
   end
 end
 

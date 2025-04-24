@@ -226,12 +226,57 @@ CONFIG
       vm.sshable.cmd("sudo systemctl enable --now node_exporter")
       vm.sshable.cmd("sudo systemctl enable --now prometheus")
 
-      hop_configure
+      hop_configure_metrics
     end
 
     vm.sshable.cmd("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
     vm.sshable.cmd("sudo systemctl reload node_exporter || sudo systemctl restart node_exporter")
     vm.sshable.cmd("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
+
+    hop_wait
+  end
+
+  label def configure_metrics
+    metrics_config = postgres_server.metrics_config
+    vm.sshable.cmd("mkdir -p /home/ubi/postgres/metrics")
+    vm.sshable.cmd("tee /home/ubi/postgres/metrics/config.json > /dev/null", stdin: metrics_config.to_json)
+
+    metrics_service = <<SERVICE
+[Unit]
+Description=PostgreSQL Metrics Collection
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=ubi
+ExecStart=/home/ubi/postgres/bin/metrics-collector /home/ubi/postgres/metrics /home/ubi/postgres/metrics/config.json
+StandardOutput=journal
+StandardError=journal
+SERVICE
+    vm.sshable.cmd("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: metrics_service)
+
+    metrics_interval = metrics_config[:interval] || "15s"
+
+    metrics_timer = <<TIMER
+[Unit]
+Description=Run PostgreSQL Metrics Collection Periodically
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=#{metrics_interval}
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target
+TIMER
+    vm.sshable.cmd("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: metrics_timer)
+
+    vm.sshable.cmd("sudo systemctl daemon-reload")
+
+    when_initial_provisioning_set? do
+      vm.sshable.cmd("sudo systemctl enable --now postgres-metrics.timer")
+      hop_configure
+    end
 
     hop_wait
   end
@@ -375,6 +420,11 @@ SQL
     when_configure_prometheus_set? do
       decr_configure_prometheus
       hop_configure_prometheus
+    end
+
+    when_configure_metrics_set? do
+      decr_configure_metrics
+      hop_configure_metrics
     end
 
     when_configure_set? do
