@@ -8,6 +8,7 @@ module Ubicloud
   # return instances of Ubicloud::ModelAdapter, for the related model.
   #
   # +firewall+ :: Ubicloud::Firewall
+  # +inference_api_key+ :: Ubicloud::InferenceApiKey
   # +load_balancer+ :: Ubicloud::LoadBalancer
   # +postgres+ :: Ubicloud::Postgres
   # +private_subnet+ :: Ubicloud::PrivateSubnet
@@ -23,7 +24,8 @@ module Ubicloud
       postgres: Postgres,
       firewall: Firewall,
       private_subnet: PrivateSubnet,
-      load_balancer: LoadBalancer
+      load_balancer: LoadBalancer,
+      inference_api_key: InferenceApiKey
     }.each do |meth, model|
       define_method(meth) { @models[meth] ||= ModelAdapter.new(model, @adapter) }
     end
@@ -33,7 +35,8 @@ module Ubicloud
       "pg" => Postgres,
       "fw" => Firewall,
       "ps" => PrivateSubnet,
-      "1b" => LoadBalancer
+      "1b" => LoadBalancer,
+      "ak" => InferenceApiKey
     }.freeze
 
     # Return a new model instance for the given id, assuming the id is properly
