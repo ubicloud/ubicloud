@@ -1,0 +1,47 @@
+#!/usr/bin/env ruby
+
+# frozen_string_literal: true
+
+require "time"
+require "json"
+require "shellwords"
+
+require_relative "../../common/lib/util"
+
+if ARGV.count != 1
+  fail "Wrong number of arguments. Expected 1, Given #{ARGV.count}"
+end
+
+metrics_dir = ARGV[0]
+fail "Metrics directory does not exist: #{metrics_dir}" unless Dir.exist?(metrics_dir)
+q_metrics_dir = metrics_dir.shellescape
+
+metrics_config_path = File.join(metrics_dir, "config.json")
+fail "Metrics config file does not exist: #{metrics_config_path}" unless File.exist?(metrics_config_path)
+
+r "mkdir -p #{q_metrics_dir}/pending"
+r "mkdir -p #{q_metrics_dir}/done"
+
+metrics_config_hash = JSON.parse(File.read(metrics_config_path))
+endpoints = metrics_config_hash["endpoints"]
+max_pending_buffer_size = metrics_config_hash["max_pending_buffer_size"] || 100
+
+filename = Time.now.utc.strftime("%Y-%m-%dT%H-%M-%S-%6N")
+
+# Collect metrics from each endpoint to a temporary file
+endpoints.each do |endpoint|
+  r "curl --fail --insecure #{endpoint.shellescape} >> /tmp/#{filename}.txt"
+end
+
+r "mv /tmp/#{filename}.txt #{q_metrics_dir}/pending/#{filename}.txt"
+
+# Remove pending files till the number of files is less than max_pending_buffer_size.
+pending_files = Dir.children("#{q_metrics_dir}/pending").sort
+num_files_to_remove = [pending_files.count - max_pending_buffer_size, 0].max
+
+pending_files.slice(0, num_files_to_remove).each do |pending_file|
+  File.rename("#{metrics_dir}/pending/#{pending_file}", "#{metrics_dir}/done/#{pending_file}")
+end
+
+# Delete all done files.
+r "rm -rf #{q_metrics_dir}/done/*"
