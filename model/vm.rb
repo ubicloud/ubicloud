@@ -259,7 +259,7 @@ class Vm < Sequel::Model
     }.to_h
   end
 
-  ssh_public_key_line = /(([^ \r\n]|"[^"\r\n]+")+ +)? *[^ \r\n]+ +[A-Za-z0-9+\/]+=*( +[^\r\n]*)?/
+  ssh_public_key_line = /(([^# \r\n]|"[^"\r\n]+")+ +)? *[^# \r\n]+ +[A-Za-z0-9+\/]+=*( +[^\r\n]*)?/
   VALID_SSH_PUBLIC_KEY_LINE = /^#{ssh_public_key_line}$/
   VALID_SSH_AUTHORIZED_KEYS = /\A(([ \t]*|(#[^\r\n]*)?|#{ssh_public_key_line})(\r?\n|\z))+\z/
 

@@ -53,7 +53,7 @@ RSpec.describe Clover, "cli vm create" do
   it "shows errors if trying to create a vm with an invalid private subnet" do
     expect(Vm.count).to eq 0
     ps = PrivateSubnet.create(project_id: @project.id, name: "test-ps", location_id: Location::HETZNER_FSN1_ID, net6: "fe80::/64", net4: "192.168.0.0/24")
-    expect(cli(%W[vm eu-north-h1/test-vm2 create -p #{ps.ubid} c], status: 400)).to eq(<<~END)
+    expect(cli(%W[vm eu-north-h1/test-vm2 create -p #{ps.ubid}] << "c c", status: 400)).to eq(<<~END)
       ! Unexpected response status: 400
       Details: Validation failed for following fields: private_subnet_id
         private_subnet_id: Private subnet with the given id "#{ps.ubid}" is not found in the location "eu-north-h1"

@@ -16,13 +16,25 @@ UbiCli.on("vm").run_on("create") do
   help_option_values("Size:", vm_sizes.map(&:name).uniq)
   help_option_values("Storage Size:", vm_sizes.map(&:storage_size_options).flatten.uniq.sort)
 
+  help_example "ubi vm eu-central-h1/my-vm-name create \"$(cat ~/.ssh/id_ed25519.pub)\""
+  help_example "ubi vm eu-central-h1/my-vm-name create \"$(cat ~/.ssh/authorized_keys)\""
+
   args 1
 
-  run do |public_key, opts|
+  run do |public_key, opts, command|
     params = underscore_keys(opts[:vm_create])
     unless params.delete(:ipv6_only)
       params[:enable_ip4] = "1"
     end
+
+    unless Vm::VALID_SSH_AUTHORIZED_KEYS.match?(public_key)
+      command.raise_failure("public key provided is not in authorized_keys format")
+    end
+
+    unless Vm::VALID_SSH_PUBLIC_KEY_LINE.match?(public_key)
+      command.raise_failure("public key provided does not contain a valid public key")
+    end
+
     params[:public_key] = public_key
     id = sdk.vm.create(location: @location, name: @name, **params).id
     response("VM created with id: #{id}")

@@ -37,6 +37,8 @@ ps eu-central-h1/test-ps destroy invalid
 ps list -f invalid
 ps list invalid
 vm eu-central-h1/test2-vm create
+vm eu-central-h1/test2-vm create a
+vm eu-central-h1/test2-vm create "# a"
 vm eu-central-h1/test-vm destroy invalid
 vm eu-central-h1/test-vm show -f invalid
 vm eu-central-h1/test-vm -u foo scp :remote-path local-path invalid

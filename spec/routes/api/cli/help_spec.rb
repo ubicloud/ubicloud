@@ -36,6 +36,10 @@ RSpec.describe Clover, "cli help" do
       Usage:
           ubi vm location/vm-name create [options] public_key
 
+      Examples:
+          ubi vm eu-central-h1/my-vm-name create "$(cat ~/.ssh/id_ed25519.pub)"
+          ubi vm eu-central-h1/my-vm-name create "$(cat ~/.ssh/authorized_keys)"
+
       Options:
           -6, --ipv6-only                  do not enable IPv4
     OUTPUT
