@@ -99,3 +99,46 @@ r "pg_ctlcluster #{v} main reload || pg_ctlcluster #{v} main restart"
 
 pgbouncer_setup = PgBouncerSetup.new(v, configure_hash["configs"]["max_connections"], configure_hash["pgbouncer_instances"])
 pgbouncer_setup.setup
+
+# Configure metrics collector
+# Save the metrics configuration to a file
+metrics_config = configure_hash.fetch("metrics_config", {})
+r "mkdir -p /home/ubi/postgres/metrics"
+safe_write_to_file("/home/ubi/postgres/metrics/config.json", metrics_config.to_json)
+r "chown -R ubi:ubi /home/ubi/postgres/metrics"
+
+# Create systemd service for metrics collection
+metrics_service = <<-SERVICE
+[Unit]
+Description=PostgreSQL Metrics Collection
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=ubi
+ExecStart=/home/ubi/postgres/bin/metrics-collector /home/ubi/postgres/metrics /home/ubi/postgres/metrics/config.json
+StandardOutput=journal
+StandardError=journal
+SERVICE
+safe_write_to_file("/etc/systemd/system/postgres-metrics.service", metrics_service)
+
+# Create systemd timer for metrics collection
+metrics_interval = metrics_config["interval"] || "15s"
+metrics_timer = <<-TIMER
+[Unit]
+Description=Run PostgreSQL Metrics Collection Periodically
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=#{metrics_interval}
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target
+TIMER
+safe_write_to_file("/etc/systemd/system/postgres-metrics.timer", metrics_timer)
+
+# Enable and start the timer
+r "systemctl daemon-reload"
+r "systemctl enable postgres-metrics.timer"
+r "systemctl start postgres-metrics.timer"

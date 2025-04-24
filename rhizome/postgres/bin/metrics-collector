@@ -1,0 +1,43 @@
+#!/usr/bin/env ruby
+
+# frozen_string_literal: true
+
+require "time"
+require "json"
+require "shellwords"
+
+require_relative "../../common/lib/util"
+
+if ARGV.count != 2
+  fail "Wrong number of arguments. Expected 2, Given #{ARGV.count}"
+end
+
+metrics_dir = ARGV[0]
+metrics_config_path = ARGV[1]
+
+r "mkdir -p #{metrics_dir}/pending"
+r "mkdir -p #{metrics_dir}/done"
+
+metrics_config_hash = JSON.parse(File.read(metrics_config_path))
+endpoints = metrics_config_hash["endpoints"]
+max_pending_buffer_size_mib = metrics_config_hash["max_pending_buffer_size_mib"] || 20
+
+filename = Time.now.utc.iso8601.tr(":", "-")
+
+# Collect metrics from each endpoint to a temporary file
+endpoints.each do |endpoint|
+  r "curl --fail --insecure #{Shellwords.escape(endpoint)} >> /tmp/#{filename}.txt"
+end
+
+r "mv /tmp/#{filename}.txt #{metrics_dir}/pending/#{filename}.txt"
+
+# Remove pending files till the size of the pending directory is less than the max_pending_buffer_size
+pending_files = Dir.glob("#{metrics_dir}/pending/*").sort
+
+pending_files.each do |pending_file|
+  break if r("du -sm #{metrics_dir}/pending | cut -f1").to_i < max_pending_buffer_size_mib
+  r "mv #{pending_file} #{metrics_dir}/done"
+end
+
+# Delete all done files.
+r "rm -rf #{metrics_dir}/done/*"
