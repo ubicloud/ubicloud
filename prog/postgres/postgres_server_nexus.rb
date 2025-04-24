@@ -388,6 +388,7 @@ SQL
 
     when_promote_set? do
       switch_to_new_timeline
+      decr_promote
       hop_taking_over
     end
 
@@ -448,19 +449,14 @@ SQL
 
   label def taking_over
     if postgres_server.read_replica?
-      if postgres_server.promote_set?
-        postgres_server.update(synchronization_status: "ready")
-        decr_promote
-      else
-        postgres_server.update(representative_at: Time.now)
-        postgres_server.resource.incr_refresh_dns_record
-        hop_configure
-      end
+      postgres_server.update(representative_at: Time.now)
+      postgres_server.resource.incr_refresh_dns_record
+      hop_configure
     end
 
     case vm.sshable.cmd("common/bin/daemonizer --check promote_postgres")
     when "Succeeded"
-      postgres_server.update(timeline_access: "push", representative_at: Time.now)
+      postgres_server.update(timeline_access: "push", representative_at: Time.now, synchronization_status: "ready")
       postgres_server.resource.incr_refresh_dns_record
       postgres_server.resource.servers.each(&:incr_configure)
       postgres_server.resource.servers.reject(&:primary?).each { _1.update(synchronization_status: "catching_up") }
