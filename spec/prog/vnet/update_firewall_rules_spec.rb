@@ -109,17 +109,8 @@ elements = {123.123.123.123/32}
 elements = {2a00:1450:400e:811::200e/128}
   }
 
-  flowtable ubi_flowtable {
-    hook ingress priority filter
-    devices = { tap0 }
-  }
-
   chain forward_ingress {
     type filter hook forward priority filter; policy drop;
-
-    # Offload to ubi_flowtable. This is used to offload already filtered
-    # traffic to reduce the latency.
-    meta l4proto { tcp, udp } flow offload @ubi_flowtable
 
     # Destination port 111 is reserved for the portmapper. We block it to
     # prevent abuse.
@@ -263,17 +254,8 @@ elements = {123.123.123.123/32}
 elements = {2a00:1450:400e:811::200e/128}
   }
 
-  flowtable ubi_flowtable {
-    hook ingress priority filter
-    devices = { tap0 }
-  }
-
   chain forward_ingress {
     type filter hook forward priority filter; policy drop;
-
-    # Offload to ubi_flowtable. This is used to offload already filtered
-    # traffic to reduce the latency.
-    meta l4proto { tcp, udp } flow offload @ubi_flowtable
 
     # Destination port 111 is reserved for the portmapper. We block it to
     # prevent abuse.
@@ -424,17 +406,8 @@ elements = {123.123.123.123/32}
 elements = {2a00:1450:400e:811::200e/128}
   }
 
-  flowtable ubi_flowtable {
-    hook ingress priority filter
-    devices = { tap0 }
-  }
-
   chain forward_ingress {
     type filter hook forward priority filter; policy drop;
-
-    # Offload to ubi_flowtable. This is used to offload already filtered
-    # traffic to reduce the latency.
-    meta l4proto { tcp, udp } flow offload @ubi_flowtable
 
     # Destination port 111 is reserved for the portmapper. We block it to
     # prevent abuse.
@@ -572,17 +545,8 @@ table inet fw_table {
 
   }
 
-  flowtable ubi_flowtable {
-    hook ingress priority filter
-    devices = { tap0 }
-  }
-
   chain forward_ingress {
     type filter hook forward priority filter; policy drop;
-
-    # Offload to ubi_flowtable. This is used to offload already filtered
-    # traffic to reduce the latency.
-    meta l4proto { tcp, udp } flow offload @ubi_flowtable
 
     # Destination port 111 is reserved for the portmapper. We block it to
     # prevent abuse.

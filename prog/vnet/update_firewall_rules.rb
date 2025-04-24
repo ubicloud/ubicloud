@@ -103,17 +103,8 @@ table inet fw_table {
 #{globally_blocked_ipv6s.empty? ? "" : "elements = {#{globally_blocked_ipv6s}}"}
   }
 
-  flowtable ubi_flowtable {
-    hook ingress priority filter
-    devices = { #{vm.nics.map(&:ubid_to_tap_name).join(",")} }
-  }
-
   chain forward_ingress {
     type filter hook forward priority filter; policy drop;
-
-    # Offload to ubi_flowtable. This is used to offload already filtered
-    # traffic to reduce the latency.
-    meta l4proto { tcp, udp } flow offload @ubi_flowtable
 
     # Destination port 111 is reserved for the portmapper. We block it to
     # prevent abuse.
