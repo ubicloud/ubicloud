@@ -410,16 +410,15 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
         "completion_billing_resource", "completion_token_count"
       )
       expect(BillingRecord.count).to eq(2)
-      br = BillingRecord.all[0]
-      expect(br.project_id).to eq(p1.id)
-      expect(br.resource_id).to eq(inference_router.id)
-      expect(br.billing_rate_id).to eq("ba80e171-0c24-4bf9-ac4f-36bdadb259c0")
-      expect(br.amount).to eq(10)
-      br2 = BillingRecord.all[1]
-      expect(br2.project_id).to eq(p1.id)
-      expect(br2.resource_id).to eq(inference_router.id)
-      expect(br2.billing_rate_id).to eq("c8886006-9e15-4046-b46a-163851626f83")
-      expect(br2.amount).to eq(20)
+      brs = BillingRecord.order(:billing_rate_id).all
+      expect(brs[0].project_id).to eq(p1.id)
+      expect(brs[0].resource_id).to eq(inference_router.id)
+      expect(brs[0].billing_rate_id).to eq("ba80e171-0c24-4bf9-ac4f-36bdadb259c0")
+      expect(brs[0].amount).to eq(10)
+      expect(brs[1].project_id).to eq(p1.id)
+      expect(brs[1].resource_id).to eq(inference_router.id)
+      expect(brs[1].billing_rate_id).to eq("c8886006-9e15-4046-b46a-163851626f83")
+      expect(brs[1].amount).to eq(20)
       nx.update_billing_records(
         [{"ubid" => p1.ubid, "model_name" => "test-model", "request_count" => 1, "prompt_token_count" => 1, "completion_token_count" => 2}],
         "prompt_billing_resource", "prompt_token_count"
@@ -429,8 +428,8 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
         "completion_billing_resource", "completion_token_count"
       )
       expect(BillingRecord.count).to eq(2)
-      expect(Integer(br.reload.amount)).to eq(11)
-      expect(Integer(br2.reload.amount)).to eq(22)
+      expect(Integer(brs[0].reload.amount)).to eq(11)
+      expect(Integer(brs[1].reload.amount)).to eq(22)
     end
 
     it "does not update for zero tokens" do
