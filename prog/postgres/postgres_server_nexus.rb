@@ -391,7 +391,7 @@ SQL
       hop_taking_over
     end
 
-    if postgres_server.read_replica?
+    if postgres_server.read_replica? && postgres_server.resource.parent
       nap 60 if postgres_server.lsn_caught_up
 
       lsn = postgres_server.current_lsn

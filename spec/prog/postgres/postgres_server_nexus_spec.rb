@@ -615,6 +615,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     describe "read replica" do
       before do
         expect(postgres_server).to receive(:read_replica?).and_return(true)
+        expect(postgres_server.resource).to receive(:parent).and_return(true)
       end
 
       it "checks if it was already lagging and the lag continues, if so, starts recycling" do
