@@ -8,6 +8,7 @@ Examples:
     ubi help vm    # Get help for vm subcommand
 
 Commands:
+    ai         Manage AI features
     fw         Manage firewalls
     help       Get command help
     lb         Manage load balancers

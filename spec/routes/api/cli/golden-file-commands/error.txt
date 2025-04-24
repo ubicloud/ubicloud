@@ -1,9 +1,11 @@
 
+--confirm foo ai api-key ak2c0j48r8kj4nharh6yagf3eb destroy
 --confirm foo fw eu-central-h1/test-ps-default destroy
 --confirm foo lb eu-central-h1/test-lb destroy
 --confirm foo pg eu-central-h1/test-pg destroy
 --confirm foo ps eu-central-h1/test-ps destroy
 --confirm foo vm eu-central-h1/test-vm destroy
+ai api-key badc0j48r8kj4nharh6yagf3eb show
 fw eu-central-h1/default-eu-central-h1-default show -f bad
 fw eu-central-h1/test2-fw create invalid
 fw eu-central-h1/test-ps-default destroy invalid

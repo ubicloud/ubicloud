@@ -8,6 +8,7 @@ Examples:
     ubi help vm    # Get help for vm subcommand
 
 Commands:
+    ai         Manage AI features
     fw         Manage firewalls
     help       Get command help
     lb         Manage load balancers
@@ -15,6 +16,60 @@ Commands:
     ps         Manage private subnets
     version    Display CLI program version
     vm         Manage virtual machines
+
+
+Manage AI features
+
+Usage:
+    ubi ai [command] ...
+
+Commands:
+    api-key    Manage AI inference api keys
+
+
+Manage AI inference api keys
+
+Usage:
+    ubi ai api-key [command] ...
+    ubi ai api-key api-key-id [post-command] ...
+
+Commands:
+    create     Create an inference api key
+    list       List inference api keys
+
+Post Commands:
+    destroy    Destroy an inference api key
+    show       Show details for an inference api key
+
+
+Create an inference api key
+
+Usage:
+    ubi ai api-key create
+
+
+List inference api keys
+
+Usage:
+    ubi ai api-key list [options]
+
+Options:
+    -N, --no-headers                 do not show headers
+
+
+Destroy an inference api key
+
+Usage:
+    ubi ai api-key api-key-id destroy [options]
+
+Options:
+    -f, --force                      do not require confirmation
+
+
+Show details for an inference api key
+
+Usage:
+    ubi ai api-key api-key-id show
 
 
 Manage firewalls

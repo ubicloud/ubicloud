@@ -1,3 +1,4 @@
+ai api-key ak2c0j48r8kj4nharh6yagf3eb destroy
 fw eu-central-h1/test-ps-default destroy
 lb eu-central-h1/test-lb destroy
 pg eu-central-h1/test-pg destroy

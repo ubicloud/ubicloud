@@ -1,0 +1,2 @@
+Destroying this inference api key is not recoverable.
+Enter the following to confirm destruction of the inference api key: 2c0j48
