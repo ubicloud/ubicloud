@@ -177,6 +177,7 @@ GEM
     hashie (5.0.0)
     i18n (1.14.7)
       concurrent-ruby (~> 1.0)
+    io-console (0.8.0)
     jmespath (1.6.2)
     json (2.10.2)
     json_schema (0.21.0)
@@ -277,7 +278,7 @@ GEM
     prawn-table (0.2.2)
       prawn (>= 1.3.0, < 3.0.0)
     prism (1.4.0)
-    pry (0.14.2)
+    pry (0.15.2)
       coderay (~> 1.1)
       method_source (~> 1.0)
     pry-byebug (3.11.0)
@@ -308,6 +309,8 @@ GEM
     rake (13.2.1)
     refrigerator (1.8.0)
     regexp_parser (2.10.0)
+    reline (0.6.1)
+      io-console (~> 0.5)
     rexml (3.4.1)
     roda (3.89.0)
       rack
@@ -491,6 +494,7 @@ DEPENDENCIES
   rackup
   rake
   refrigerator (>= 1)
+  reline
   roda (>= 3.89)
   rodauth!
   rodauth-omniauth!
