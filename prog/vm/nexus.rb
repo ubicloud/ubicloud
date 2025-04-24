@@ -207,6 +207,10 @@ class Prog::Vm::Nexus < Prog::Base
           [["accepting"], [vm.location_id], [], []]
         end
 
+      prefer_performance = if vm.location_id == Location::GITHUB_RUNNERS_ID && (runner = GithubRunner.first(vm_id: vm.id))
+        runner.installation.project.get_ff_performance_runners
+      end
+
       Scheduling::Allocator.allocate(
         vm, frame["storage_volumes"],
         distinct_storage_devices: distinct_storage_devices,
@@ -215,7 +219,8 @@ class Prog::Vm::Nexus < Prog::Base
         location_preference: location_preference,
         host_filter: host_filter,
         host_exclusion_filter: host_exclusion_filter,
-        gpu_count: gpu_count
+        gpu_count: gpu_count,
+        prioritize_performance_cpu: !!prefer_performance
       )
     rescue RuntimeError => ex
       raise unless ex.message.include?("no space left on any eligible host")

@@ -12,7 +12,7 @@ module Scheduling::Allocator
     @target_host_utilization ||= Config.allocator_target_host_utilization
   end
 
-  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [])
+  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], prioritize_performance_cpu: false)
     request = Request.new(
       vm.id,
       vm.vcpus,
@@ -34,7 +34,8 @@ module Scheduling::Allocator
       vm.cpu_percent_limit,
       true, # use slices
       Option::VmFamilies.find { _1.name == vm.family }&.require_shared_slice || false,
-      vm.project.get_ff_allocator_diagnostics || false
+      vm.project.get_ff_allocator_diagnostics || false,
+      prioritize_performance_cpu
     )
     allocation = Allocation.best_allocation(request)
     fail "#{vm} no space left on any eligible host" unless allocation
@@ -64,7 +65,8 @@ module Scheduling::Allocator
     :cpu_percent_limit,
     :use_slices,
     :require_shared_slice,
-    :diagnostics
+    :diagnostics,
+    :prioritize_performance_cpu
   ) do
     def initialize(*args)
       super
@@ -315,6 +317,10 @@ module Scheduling::Allocator
 
       # penalty for ongoing vm provisionings on the host
       score += @candidate_host[:vm_provisioning_count] * 0.5
+
+      # prioritize AX102 for our premium CPU testers.
+      # penalize other customers since the allocator is eager to use smaller hosts first
+      score += @request.prioritize_performance_cpu ? -1 : 1 if @candidate_host[:total_cores] == 16
 
       # penalty for AX161, TODO: remove after migration to AX162
       score += 0.5 if @candidate_host[:total_cores] == 32

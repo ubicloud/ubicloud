@@ -15,7 +15,7 @@ RSpec.describe Al do
 
   # Creates a Request object with the given parameters
   #
-  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: true, require_shared_slice: false, diagnostics: false)
+  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: true, require_shared_slice: false, diagnostics: false, prioritize_performance_cpu: false)
     Al::Request.new(
       vm.id,
       vm.vcpus,
@@ -37,7 +37,8 @@ RSpec.describe Al do
       vm.cpu_percent_limit,
       use_slices,
       require_shared_slice,
-      diagnostics
+      diagnostics,
+      prioritize_performance_cpu
     )
   end
 
@@ -80,7 +81,7 @@ RSpec.describe Al do
           [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
             [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
           "ubuntu-jammy", false, 0, true, Config.allocator_target_host_utilization, "x64", ["accepting"], [], [], [], [],
-          "standard", 200, true
+          "standard", 200, true, false, false, false
         )).and_return(al)
       expect(al).to receive(:update)
 
@@ -429,6 +430,26 @@ RSpec.describe Al do
       vmhds[:total_cores] = 32
       vmhds[:total_cpus] = 64
       expect(Al::Allocation.new(vmhds, req).score).to eq(0.5)
+    end
+
+    it "prioritize AX102 github runners for premium CPU testers" do
+      req.prioritize_performance_cpu = true
+      expect(Al::VmHostCpuAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
+      expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
+      expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
+      vmhds[:location_id] = "6b9ef786-b842-8420-8c65-c25e3d4bdf3d"
+      vmhds[:total_cores] = 16
+      expect(Al::Allocation.new(vmhds, req).score).to eq(-1)
+    end
+
+    it "penalizes AX102 github runners for non premium CPU testers" do
+      req.prioritize_performance_cpu = false
+      expect(Al::VmHostCpuAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
+      expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
+      expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
+      vmhds[:location_id] = "6b9ef786-b842-8420-8c65-c25e3d4bdf3d"
+      vmhds[:total_cores] = 16
+      expect(Al::Allocation.new(vmhds, req).score).to eq(1)
     end
 
     it "respects location preferences" do

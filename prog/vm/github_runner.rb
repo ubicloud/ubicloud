@@ -25,6 +25,7 @@ class Prog::Vm::GithubRunner < Prog::Base
 
   def pick_vm
     skip_sync = true
+    prefer_performance = github_runner.installation.project.get_ff_performance_runners
     pool = VmPool.where(
       vm_size: label_data["vm_size"],
       boot_image: label_data["boot_image"],
@@ -35,7 +36,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       arch: label_data["arch"]
     ).first
 
-    if (picked_vm = pool&.pick_vm)
+    if !prefer_performance && (picked_vm = pool&.pick_vm)
       return picked_vm
     end
 
