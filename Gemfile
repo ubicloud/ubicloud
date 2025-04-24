@@ -32,6 +32,7 @@ gem "puma", ">= 6.2.2"
 gem "rack-unreloader", ">= 1.8"
 gem "rake"
 gem "refrigerator", ">= 1"
+gem "reline" # Remove it when pry adds it as a dependency
 gem "roda", ">= 3.89"
 gem "rodauth", github: "jeremyevans/rodauth", ref: "2a72b30136c512ea2853ad9dbc126c067bef89e9"
 gem "rodauth-omniauth", github: "janko/rodauth-omniauth", ref: "477810179ba0cab8d459be1a0d87dca5b57ec94b"
