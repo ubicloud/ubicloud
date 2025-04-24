@@ -243,7 +243,7 @@ RSpec.configure do |config|
     end
 
     def create_vm_host(**args)
-      args = {location_id: Location::HETZNER_FSN1_ID, allocation_state: "accepting", arch: "x64", total_cores: 48, used_cores: 2}.merge(args)
+      args = {location_id: Location::HETZNER_FSN1_ID, allocation_state: "accepting", arch: "x64", family: "standard", total_cores: 48, used_cores: 2}.merge(args)
       ubid = VmHost.generate_ubid
       Sshable.create { it.id = ubid.to_uuid }
       VmHost.create(**args) { it.id = ubid.to_uuid }
@@ -272,9 +272,7 @@ RSpec.configure do |config|
     end
 
     def add_ipv4_to_vm(vm, ipv4)
-      host = VmHost.new_with_id(allocation_state: "accepting", location_id: Location::HETZNER_FSN1_ID, total_cores: 10, used_cores: 3)
-      Sshable.create(id: host.id)
-      host.save_changes
+      host = create_vm_host(total_cores: 10, used_cores: 3)
       cidr = IPAddr.new(ipv4)
       cidr.prefix = 24
       addr = Address.create(cidr: cidr.to_s, routed_to_host_id: host.id)

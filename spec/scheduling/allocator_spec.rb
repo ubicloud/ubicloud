@@ -1092,7 +1092,7 @@ RSpec.describe Al do
       vh1.reload
 
       # Create a second host
-      vh2 = VmHost.create(allocation_state: "accepting", arch: "x64", location_id: Location::HETZNER_FSN1_ID, total_mem_gib: 64, total_sockets: 2, total_dies: 2, net6: "fd10:9b0b:6b4b:8fcc::/64", total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2, accepts_slices: true) { it.id = Sshable.create_with_id.id }
+      vh2 = create_vm_host(total_sockets: 2, total_dies: 2, total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2, accepts_slices: true)
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vh2.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create_with_id(vm_host_id: vh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vh2.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
