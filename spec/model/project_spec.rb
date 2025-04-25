@@ -115,14 +115,14 @@ RSpec.describe Project do
 
     it "returns false if any accounts is suspended" do
       project = described_class.create_with_id(name: "test")
-      Account.create_with_id(email: "user1@example.com").tap { _1.add_project(project) }
-      Account.create_with_id(email: "user2@example.com").tap { _1.add_project(project) }.update(suspended_at: Time.now)
+      Account.create_with_id(email: "user1@example.com").tap { it.add_project(project) }
+      Account.create_with_id(email: "user2@example.com").tap { it.add_project(project) }.update(suspended_at: Time.now)
       expect(project.active?).to be false
     end
 
     it "returns true if any condition not match" do
       project = described_class.create_with_id(name: "test")
-      Account.create_with_id(email: "user1@example.com").tap { _1.add_project(project) }
+      Account.create_with_id(email: "user1@example.com").tap { it.add_project(project) }
       expect(project.active?).to be true
     end
   end
@@ -136,7 +136,7 @@ RSpec.describe Project do
         {allocation_state: "accepting", location_id: Location::LEASEWEB_WDC02_ID, total_cores: 100, used_cores: 99},
         {allocation_state: "draining", location_id: Location::HETZNER_HEL1_ID, total_cores: 100, used_cores: 0},
         {allocation_state: "accepting", location_id: Location::GITHUB_RUNNERS_ID, total_cores: 100, used_cores: 0}
-      ].each { create_vm_host(**_1) }
+      ].each { create_vm_host(**it) }
 
       expect(project.default_location).to eq("github-runners")
     end
@@ -161,7 +161,7 @@ RSpec.describe Project do
 
   it "calculates effective quota value" do
     project = described_class.create_with_id(name: "test")
-    project.add_quota(ProjectQuota.new(value: 1000).tap { _1.quota_id = "14fa6820-bf63-41d2-b35e-4a4dcefd1b15" })
+    project.add_quota(ProjectQuota.new(value: 1000).tap { it.quota_id = "14fa6820-bf63-41d2-b35e-4a4dcefd1b15" })
     expect(project.effective_quota_value("VmVCpu")).to eq 32
     expect(project.effective_quota_value("GithubRunnerVCpu")).to eq 1000
     expect(project.effective_quota_value("PostgresVCpu")).to eq 128

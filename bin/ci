@@ -8,8 +8,8 @@ require "optparse"
 @started_at = Time.now
 
 def main(options)
-  all_test_cases = YAML.load_file("config/e2e_test_cases.yml").to_h { [_1["name"], _1] }
-  boot_images = all_test_cases.values_at(*options[:test_cases]).flat_map { _1["images"] }.uniq
+  all_test_cases = YAML.load_file("config/e2e_test_cases.yml").to_h { [it["name"], it] }
+  boot_images = all_test_cases.values_at(*options[:test_cases]).flat_map { it["images"] }.uniq
 
   hetzner_server_st = Prog::Test::HetznerServer.assemble(vm_host_id: options[:vm_host_id], default_boot_images: boot_images)
   wait_until(hetzner_server_st, "wait")
@@ -38,7 +38,7 @@ def main(options)
     tests_to_wait << unencrypted_vms_st
   end
 
-  if (gh_test_cases = all_test_cases.values_at(*options[:test_cases].select { _1.include?("github_runner") }))
+  if (gh_test_cases = all_test_cases.values_at(*options[:test_cases].select { it.include?("github_runner") }))
     tests_to_wait << Prog::Test::GithubRunner.assemble(gh_test_cases)
   end
 
@@ -76,7 +76,7 @@ def log(st, msg)
   when "Test::HetznerServer"
     "VmHost.#{Strand[st.stack.first["vm_host_id"]]&.label}"
   when "Test::VmGroup"
-    st.stack.first["vms"].map { "Vm.#{Strand[_1]&.label}" }.join(", ")
+    st.stack.first["vms"].map { "Vm.#{Strand[it]&.label}" }.join(", ")
   when "Test::Vm"
     "Vm.#{Strand[st.stack.first["subject_id"]]&.label}"
   else

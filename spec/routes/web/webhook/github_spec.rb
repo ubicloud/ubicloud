@@ -114,7 +114,7 @@ RSpec.describe Clover, "github" do
     end
 
     it "destroys runner when receive completed action" do
-      Strand.create(prog: "Vm::GithubRunner", label: "start") { _1.id = runner.id }
+      Strand.create(prog: "Vm::GithubRunner", label: "start") { it.id = runner.id }
 
       send_webhook("workflow_job", workflow_job_payload(action: "completed", workflow_job: workflow_job_object(runner_id: runner.runner_id)))
 

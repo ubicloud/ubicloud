@@ -11,12 +11,12 @@ class StorageKeyEncryption
 
   def write_encrypted_dek(key_file, data_encryption_key)
     File.open(key_file, "w") {
-      _1.write(JSON.pretty_generate({
+      it.write(JSON.pretty_generate({
         cipher: data_encryption_key[:cipher],
         key: wrap_key(data_encryption_key[:key]),
         key2: wrap_key(data_encryption_key[:key2])
       }))
-      fsync_or_fail(_1)
+      fsync_or_fail(it)
     }
   end
 

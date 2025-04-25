@@ -187,7 +187,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     storage_roots = []
 
     params = JSON.parse(File.read(vp.prep_json))
-    params["storage_volumes"].reject { _1["read_only"] }.each { |params|
+    params["storage_volumes"].reject { it["read_only"] }.each { |params|
       volume = StorageVolume.new(@vm_name, params)
       volume.purge_spdk_artifacts
       storage_roots.append(volume.storage_root)
@@ -412,7 +412,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def generate_ip6_private_filter_rules(nics)
-    nics.map { "ether saddr #{_1.mac} ip6 saddr != #{_1.net6} drop" }.join("\n")
+    nics.map { "ether saddr #{it.mac} ip6 saddr != #{it.net6} drop" }.join("\n")
   end
 
   def build_nftables_config(gua, nics, ip4)
@@ -484,8 +484,8 @@ dhcp-range=#{nic.tap},#{vm_sub_6.nth(2)},#{vm_sub_6.nth(2)},#{vm_sub_6.netmask.p
 DHCP
     end.join("\n")
 
-    raparams = nics.map { "ra-param=#{_1.tap}" }.join("\n")
-    interfaces = nics.map { "interface=#{_1.tap}" }.join("\n")
+    raparams = nics.map { "ra-param=#{it.tap}" }.join("\n")
+    interfaces = nics.map { "interface=#{it.tap}" }.join("\n")
     dnsmasq_address_ip6 = NetAddr::IPv6.parse("fd00:0b1c:100d:53::")
     runner_config = if boot_image.include?("github")
       <<~ADDRESSES
@@ -582,7 +582,7 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
     shell: /bin/bash
     ssh_authorized_keys:
-#{public_keys.map { "      - #{yq(_1)}" }.join("\n")}
+#{public_keys.map { "      - #{yq(it)}" }.join("\n")}
 
 ssh_pwauth: False
 
@@ -598,7 +598,7 @@ EOS
   end
 
   def storage(storage_params, storage_secrets, prep)
-    storage_params.reject { _1["read_only"] }.map { |params|
+    storage_params.reject { it["read_only"] }.map { |params|
       device_id = params["device_id"]
       key_wrapping_secrets = storage_secrets[device_id]
       storage_volume = StorageVolume.new(@vm_name, params)
@@ -616,7 +616,7 @@ EOS
   end
 
   def prepare_pci_devices(pci_devices)
-    pci_devices.select { _1[0].end_with? ".0" }.each do |pci_dev|
+    pci_devices.select { it[0].end_with? ".0" }.each do |pci_dev|
       r("echo 1 > /sys/bus/pci/devices/0000:#{pci_dev[0]}/reset")
       r("chown #{@vm_name}:#{@vm_name} /sys/kernel/iommu_groups/#{pci_dev[1]} /dev/vfio/#{pci_dev[1]}")
     end
@@ -625,7 +625,7 @@ EOS
   def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
     cpu_setting = "boot=#{max_vcpus},topology=#{cpu_topology}"
 
-    tapnames = nics.map { "-i #{_1.tap}" }.join(" ")
+    tapnames = nics.map { "-i #{it.tap}" }.join(" ")
 
     vp.write_dnsmasq_service <<DNSMASQ_SERVICE
 [Unit]
@@ -663,8 +663,8 @@ DNSMASQ_SERVICE
     spdk_after = spdk_services.map { |s| "After=#{s}" }.join("\n")
     spdk_requires = spdk_services.map { |s| "Requires=#{s}" }.join("\n")
 
-    net_params = nics.map { "--net mac=#{_1.mac},tap=#{_1.tap},ip=,mask=,num_queues=#{max_vcpus * 2 + 1}" }
-    pci_device_params = pci_devices.map { " --device path=/sys/bus/pci/devices/0000:#{_1[0]}/" }.join
+    net_params = nics.map { "--net mac=#{it.mac},tap=#{it.tap},ip=,mask=,num_queues=#{max_vcpus * 2 + 1}" }
+    pci_device_params = pci_devices.map { " --device path=/sys/bus/pci/devices/0000:#{it[0]}/" }.join
     limit_memlock = pci_devices.empty? ? "" : "LimitMEMLOCK=#{mem_gib * 1073741824}"
     cpu_quota = (cpu_percent_limit == 0) ? "" : "CPUQuota=#{cpu_percent_limit}%"
 

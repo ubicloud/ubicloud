@@ -7,19 +7,19 @@ require "octokit"
 RSpec.describe Prog::Vm::GithubRunner do
   subject(:nx) {
     described_class.new(Strand.new).tap {
-      _1.instance_variable_set(:@github_runner, github_runner)
+      it.instance_variable_set(:@github_runner, github_runner)
     }
   }
 
   let(:github_runner) {
     GithubRunner.new(installation_id: "", repository_name: "test-repo", label: "ubicloud-standard-4", created_at: Time.now, allocated_at: Time.now + 10, ready_at: Time.now + 20).tap {
-      _1.id = GithubRunner.generate_uuid
+      it.id = GithubRunner.generate_uuid
     }
   }
 
   let(:vm) {
     Vm.new(family: "standard", cores: 1, name: "dummy-vm", location_id: Location[name: "github-runners"].id).tap {
-      _1.id = "788525ed-d6f0-4937-a844-323d4fd91946"
+      it.id = "788525ed-d6f0-4937-a844-323d4fd91946"
     }
   }
   let(:sshable) { instance_double(Sshable) }

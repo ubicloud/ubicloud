@@ -20,12 +20,12 @@ class Prog::Minio::MinioPoolNexus < Prog::Base
         drive_count: drive_count,
         storage_size_gib: storage_size_gib,
         vm_size: vm_size
-      ) { _1.id = ubid.to_uuid }
+      ) { it.id = ubid.to_uuid }
 
       minio_pool.server_count.times do |i|
         Prog::Minio::MinioServerNexus.assemble(minio_pool.id, minio_pool.start_index + i)
       end
-      Strand.create(prog: "Minio::MinioPoolNexus", label: "wait_servers") { _1.id = minio_pool.id }
+      Strand.create(prog: "Minio::MinioPoolNexus", label: "wait_servers") { it.id = minio_pool.id }
     end
   end
 
@@ -55,7 +55,7 @@ class Prog::Minio::MinioPoolNexus < Prog::Base
   end
 
   label def wait_servers
-    if minio_pool.servers.all? { _1.strand.label == "wait" }
+    if minio_pool.servers.all? { it.strand.label == "wait" }
       when_add_additional_pool_set? do
         decr_add_additional_pool
         cluster.incr_reconfigure

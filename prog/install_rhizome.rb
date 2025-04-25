@@ -23,7 +23,7 @@ class Prog::InstallRhizome < Prog::Base
         elsif stat.file?
           writer.add_file(file, stat.mode) do |tf|
             File.open(full_path, "rb") do
-              IO.copy_stream(_1, tf)
+              IO.copy_stream(it, tf)
             end
           end
 

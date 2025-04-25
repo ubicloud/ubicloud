@@ -4,7 +4,7 @@ require_relative "../spec_helper"
 
 RSpec.describe PostgresServer do
   subject(:postgres_server) {
-    described_class.new { _1.id = "c068cac7-ed45-82db-bf38-a003582b36ee" }
+    described_class.new { it.id = "c068cac7-ed45-82db-bf38-a003582b36ee" }
   }
 
   let(:resource) {
@@ -155,7 +155,7 @@ RSpec.describe PostgresServer do
 
     it "returns nil if there is no fresh standby" do
       expect(postgres_server).to receive(:representative_at).and_return(Time.now)
-      standby_server = described_class.new { _1.id = "c068cac7-ed45-82db-bf38-a003582b36ef" }
+      standby_server = described_class.new { it.id = "c068cac7-ed45-82db-bf38-a003582b36ef" }
       expect(standby_server).to receive(:resource).and_return(resource)
       expect(standby_server).to receive(:representative_at).and_return(nil).at_least(:once)
       expect(standby_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
@@ -210,7 +210,7 @@ RSpec.describe PostgresServer do
     end
 
     it "returns nil if there is no fresh read_replica" do
-      replica_server = described_class.new { _1.id = "c068cac7-ed45-82db-bf38-a003582b36ef" }
+      replica_server = described_class.new { it.id = "c068cac7-ed45-82db-bf38-a003582b36ef" }
       expect(replica_server).to receive(:resource).and_return(resource)
       expect(replica_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(replica_server).to receive(:vm).and_return(instance_double(Vm, display_size: "standard-4"))

@@ -43,7 +43,7 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
     end
 
     it "the model it is assembled with has unique id" do
-      expect(Option::AI_MODELS.map { _1["id"] }.size).to eq(Option::AI_MODELS.map { _1["id"] }.uniq.size)
+      expect(Option::AI_MODELS.map { it["id"] }.size).to eq(Option::AI_MODELS.map { it["id"] }.uniq.size)
     end
 
     it "raises an error if model is not found" do

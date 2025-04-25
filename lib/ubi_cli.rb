@@ -14,7 +14,7 @@ class UbiCli
     "vm" => "vm"
   }.freeze
 
-  SDK_METHODS = FRAGMENTS.transform_values { _1.tr("-", "_").freeze }.freeze
+  SDK_METHODS = FRAGMENTS.transform_values { it.tr("-", "_").freeze }.freeze
 
   CAPITALIZED_LABELS = {
     "fw" => "Firewall",
@@ -320,9 +320,9 @@ class UbiCli
 
   def underscore_keys(keys)
     if keys.is_a?(Hash)
-      keys.transform_keys { _1.to_s.tr("-", "_").to_sym }
+      keys.transform_keys { it.to_s.tr("-", "_").to_sym }
     else # when Array
-      keys.map { _1.tr("-", "_").to_sym }
+      keys.map { it.tr("-", "_").to_sym }
     end
   end
 

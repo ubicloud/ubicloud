@@ -19,7 +19,7 @@ class Prog::Vm::GithubRunner < Prog::Base
         label: label
       )
 
-      Strand.create(prog: "Vm::GithubRunner", label: "start") { _1.id = github_runner.id }
+      Strand.create(prog: "Vm::GithubRunner", label: "start") { it.id = github_runner.id }
     end
   end
 
@@ -84,7 +84,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       github_runner.log_duration("runner_completed", duration)
       today_record = BillingRecord
         .where(project_id: project.id, resource_id: project.id, billing_rate_id: rate_id)
-        .where { Sequel.pg_range(_1.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
+        .where { Sequel.pg_range(it.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
         .first
 
       if today_record
@@ -290,7 +290,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     runners = github_client.paginate("/repos/#{github_runner.repository_name}/actions/runners") do |data, last_response|
       data[:runners].concat last_response.data[:runners]
     end
-    unless (runner = runners[:runners].find { _1[:name] == github_runner.ubid.to_s })
+    unless (runner = runners[:runners].find { it[:name] == github_runner.ubid.to_s })
       fail "BUG: Failed with runner already exists error but couldn't find it"
     end
 

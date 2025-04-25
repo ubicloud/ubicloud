@@ -65,14 +65,14 @@ RSpec.describe Prog::Storage::SetupSpdk do
   describe "#update_database" do
     it "updates the database and exits" do
       hugepages = 3
-      SpdkInstallation.create(version: spdk_version, vm_host_id: vm_host.id, hugepages: hugepages, allocation_weight: 0) { _1.id = vm_host.id }
+      SpdkInstallation.create(version: spdk_version, vm_host_id: vm_host.id, hugepages: hugepages, allocation_weight: 0) { it.id = vm_host.id }
       expect { setup_spdk.update_database }.to exit({"msg" => "SPDK was setup"})
       expect(vm_host.reload.used_hugepages_1g).to eq(hugepages)
       expect(vm_host.spdk_installations.first.allocation_weight).to eq(50)
     end
 
     it "doesn't reserve a hugepage if service didn't start" do
-      SpdkInstallation.create(version: spdk_version, vm_host_id: vm_host.id, hugepages: 3, allocation_weight: 0) { _1.id = vm_host.id }
+      SpdkInstallation.create(version: spdk_version, vm_host_id: vm_host.id, hugepages: 3, allocation_weight: 0) { it.id = vm_host.id }
       allow(setup_spdk).to receive(:frame).and_return({"version" => spdk_version, "start_service" => false, "allocation_weight" => 50})
       expect { setup_spdk.update_database }.to exit({"msg" => "SPDK was setup"})
       expect(vm_host.reload.used_hugepages_1g).to eq(0)

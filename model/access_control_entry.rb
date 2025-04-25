@@ -11,7 +11,7 @@ class AccessControlEntry < Sequel::Model
   def_column_alias :object_id, :object_id
 
   def update_from_ubids(hash)
-    update(hash.transform_values { UBID.to_uuid(_1) if _1 })
+    update(hash.transform_values { UBID.to_uuid(it) if it })
   end
 
   def validate

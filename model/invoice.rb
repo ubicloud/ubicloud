@@ -131,7 +131,7 @@ class Invoice < Sequel::Model
     else
       ["The invoice amount of #{ser[:total]} will be debited from your credit card on file."]
     end
-    github_usage = ser[:items].select { _1[:description].include?("GitHub Runner") }.sum { _1[:cost] }
+    github_usage = ser[:items].select { it[:description].include?("GitHub Runner") }.sum { it[:cost] }
     saved_amount = 9 * github_usage
     if saved_amount > 1
       messages << "You saved $#{saved_amount.to_i} this month using managed Ubicloud runners instead of GitHub hosted runners!"
@@ -150,13 +150,13 @@ class Invoice < Sequel::Model
   def send_failure_email(errors)
     ser = Serializers::Invoice.serialize(self, {detailed: true})
     receivers = [ser[:billing_email]]
-    receivers += project.accounts.select { Authorization.has_permission?(project.id, _1.id, "Project:billing", project.id) }.map(&:email)
+    receivers += project.accounts.select { Authorization.has_permission?(project.id, it.id, "Project:billing", project.id) }.map(&:email)
     Util.send_email(receivers.uniq, "Urgent: Action Required to Prevent Service Disruption",
       cc: Config.mail_from,
       greeting: "Dear #{ser[:billing_name]},",
       body: ["We hope this message finds you well.",
         "We've noticed that your credit card on file has been declined with the following errors:",
-        *errors.map { "- #{_1}" },
+        *errors.map { "- #{it}" },
         "The invoice amount of #{ser[:total]} tried be debited from your credit card on file.",
         "To prevent service disruption, please update your payment information within the next two days.",
         "If you have any questions, please send us a support request via support@ubicloud.com."],
@@ -237,7 +237,7 @@ class Invoice < Sequel::Model
     items += if data[:items].empty?
       [[{content: "No resources", colspan: 4, align: :center, font_style: :semibold}]]
     else
-      data[:items].map { [_1[:name], _1[:description], _1[:usage], _1[:cost_humanized]] }
+      data[:items].map { [it[:name], it[:description], it[:usage], it[:cost_humanized]] }
     end
     pdf.table items, header: true, width: pdf.bounds.width, cell_style: {size: 9, border_color: "E5E7EB", borders: [], padding: [5, 6, 12, 6], valign: :center} do
       style(row(0), size: 12, font_style: :semibold, text_color: dark_gray, background_color: "F9FAFB")

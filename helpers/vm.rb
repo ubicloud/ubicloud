@@ -86,9 +86,9 @@ class Clover
 
     subnets = dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view").map {
       {
-        location_id: _1.location_id,
-        value: _1.ubid,
-        display_name: _1.name
+        location_id: it.location_id,
+        value: it.ubid,
+        display_name: it.name
       }
     }
     options.add_option(name: "private_subnet_id", values: subnets, parent: "location") do |location, private_subnet|
@@ -99,13 +99,13 @@ class Clover
     options.add_option(name: "family", values: Option.families.map(&:name), parent: "location") do |location, family|
       !!BillingRate.from_resource_properties("VmVCpu", family, location.name)
     end
-    options.add_option(name: "size", values: Option::VmSizes.select { _1.visible }.map { _1.display_name }, parent: "family") do |location, family, size|
-      vm_size = Option::VmSizes.find { _1.display_name == size && _1.arch == "x64" }
+    options.add_option(name: "size", values: Option::VmSizes.select { it.visible }.map { it.display_name }, parent: "family") do |location, family, size|
+      vm_size = Option::VmSizes.find { it.display_name == size && it.arch == "x64" }
       vm_size.family == family
     end
 
     options.add_option(name: "storage_size", values: ["10", "20", "40", "80", "160", "320", "600", "640", "1200", "2400"], parent: "size") do |location, family, size, storage_size|
-      vm_size = Option::VmSizes.find { _1.display_name == size && _1.arch == "x64" }
+      vm_size = Option::VmSizes.find { it.display_name == size && it.arch == "x64" }
       vm_size.storage_size_options.include?(storage_size.to_i)
     end
 

@@ -67,7 +67,7 @@ class Project < Sequel::Model
   end
 
   def has_resources
-    RESOURCE_ASSOCIATIONS.any? { !send(:"#{_1}_dataset").empty? } || github_installations.flat_map(&:runners).count > 0
+    RESOURCE_ASSOCIATIONS.any? { !send(:"#{it}_dataset").empty? } || github_installations.flat_map(&:runners).count > 0
   end
 
   def soft_delete
@@ -79,7 +79,7 @@ class Project < Sequel::Model
         DB[:"applied_#{tag_type}_tag"].where(tag_id: dataset.select(:id)).delete
         dataset.destroy
       end
-      github_installations.each { Prog::Github::DestroyGithubInstallation.assemble(_1) }
+      github_installations.each { Prog::Github::DestroyGithubInstallation.assemble(it) }
 
       # We still keep the project object for billing purposes.
       # These need to be cleaned up manually once in a while.
@@ -115,7 +115,7 @@ class Project < Sequel::Model
     case resource_type
     when "VmVCpu" then vms.sum(&:vcpus)
     when "GithubRunnerVCpu" then github_installations.sum(&:total_active_runner_vcpus)
-    when "PostgresVCpu" then postgres_resources.flat_map { _1.servers.map { |s| s.vm.vcpus } }.sum
+    when "PostgresVCpu" then postgres_resources.flat_map { it.servers.map { |s| s.vm.vcpus } }.sum
     else
       raise "Unknown resource type: #{resource_type}"
     end

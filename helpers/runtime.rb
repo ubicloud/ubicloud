@@ -26,7 +26,7 @@ class Clover < Roda
       Clog.emit("Could not list the jobs of the workflow run ") { {runner_scope_failure: log_context} }
       return
     end
-    if (job = jobs.find { _1[:runner_name] == runner.ubid })
+    if (job = jobs.find { it[:runner_name] == runner.ubid })
       job[:head_branch]
     else
       Clog.emit("The workflow run does not have given runner") { {runner_scope_failure: log_context} }

@@ -39,7 +39,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
         health_check_protocol: health_check_protocol
       )
       ports.each { |src_port, dst_port| LoadBalancerPort.create(load_balancer_id: lb.id, src_port:, dst_port:) }
-      Strand.create(prog: "Vnet::LoadBalancerNexus", label: "wait") { _1.id = lb.id }
+      Strand.create(prog: "Vnet::LoadBalancerNexus", label: "wait") { it.id = lb.id }
     end
   end
 
@@ -84,11 +84,11 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
     load_balancer.vms_to_dns.each do |vm|
       if load_balancer.ipv4_enabled? && vm.ephemeral_net4
-        return true unless load_balancer.dns_zone.records_dataset.find { _1.name == load_balancer.hostname + "." && _1.type == "A" && _1.data == vm.ephemeral_net4.to_s }
+        return true unless load_balancer.dns_zone.records_dataset.find { it.name == load_balancer.hostname + "." && it.type == "A" && it.data == vm.ephemeral_net4.to_s }
       end
 
       if load_balancer.ipv6_enabled?
-        return true unless load_balancer.dns_zone.records_dataset.find { _1.name == load_balancer.hostname + "." && _1.type == "AAAA" && _1.data == vm.ephemeral_net6.nth(2).to_s }
+        return true unless load_balancer.dns_zone.records_dataset.find { it.name == load_balancer.hostname + "." && it.type == "AAAA" && it.data == vm.ephemeral_net6.nth(2).to_s }
       end
     end
 
@@ -117,7 +117,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
   label def wait_cert_broadcast
     reap
-    if strand.children.select { _1.prog == "Vnet::CertServer" }.all? { _1.exitval == "certificate is reshared" } || strand.children.empty?
+    if strand.children.select { it.prog == "Vnet::CertServer" }.all? { it.exitval == "certificate is reshared" } || strand.children.empty?
       decr_refresh_cert
       load_balancer.certs_dataset.exclude(id: load_balancer.active_cert.id).all do |cert|
         CertsLoadBalancers[cert_id: cert.id].destroy
@@ -138,7 +138,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
   label def wait_update_vm_load_balancers
     reap
-    if strand.children_dataset.where(prog: "Vnet::UpdateLoadBalancerNode").all? { _1.exitval == "load balancer is updated" } || strand.children.empty?
+    if strand.children_dataset.where(prog: "Vnet::UpdateLoadBalancerNode").all? { it.exitval == "load balancer is updated" } || strand.children.empty?
       decr_update_load_balancer
       hop_wait
     end
@@ -148,7 +148,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
   label def destroy
     decr_destroy
-    strand.children.map { _1.destroy }
+    strand.children.map { it.destroy }
     load_balancer.private_subnet.incr_update_firewall_rules
 
     # The following if statement makes sure that it's OK to not have dns_zone

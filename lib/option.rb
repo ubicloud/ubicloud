@@ -4,7 +4,7 @@ require "yaml"
 
 module Option
   ai_models = YAML.load_file("config/ai_models.yml")
-  AI_MODELS = ai_models.select { _1["enabled"] }.freeze
+  AI_MODELS = ai_models.select { it["enabled"] }.freeze
 
   def self.locations(only_visible: true, feature_flags: [])
     Location.where(project_id: nil).all.select { |pl| !only_visible || (pl.visible || feature_flags.include?("location_#{pl.name.tr("-", "_")}")) }
@@ -23,7 +23,7 @@ module Option
   end
 
   def self.families
-    Option::VmFamilies.select { _1.visible }
+    Option::VmFamilies.select { it.visible }
   end
 
   BootImage = Struct.new(:name, :display_name)
@@ -53,21 +53,21 @@ module Option
     alias_method :display_name, :name
   end
   VmSizes = [2, 4, 8, 16, 30, 60].map {
-    storage_size_options = [_1 * 20, _1 * 40]
-    VmSize.new("standard-#{_1}", "standard", _1, _1 * 100, 0, _1 * 4, storage_size_options, NO_IO_LIMITS, true, false, "x64")
+    storage_size_options = [it * 20, it * 40]
+    VmSize.new("standard-#{it}", "standard", it, it * 100, 0, it * 4, storage_size_options, NO_IO_LIMITS, true, false, "x64")
   }.concat([2, 4, 8, 16, 30, 60].map {
-    storage_size_options = [_1 * 20, _1 * 40]
-    VmSize.new("standard-#{_1}", "standard", _1, _1 * 100, 0, (_1 * 3.2).to_i, storage_size_options, NO_IO_LIMITS, false, false, "arm64")
+    storage_size_options = [it * 20, it * 40]
+    VmSize.new("standard-#{it}", "standard", it, it * 100, 0, (it * 3.2).to_i, storage_size_options, NO_IO_LIMITS, false, false, "arm64")
   }).concat([6].map {
-    VmSize.new("standard-gpu-#{_1}", "standard-gpu", _1, _1 * 100, 0, (_1 * 5.34).to_i, [_1 * 30], NO_IO_LIMITS, false, true, "x64")
+    VmSize.new("standard-gpu-#{it}", "standard-gpu", it, it * 100, 0, (it * 5.34).to_i, [it * 30], NO_IO_LIMITS, false, true, "x64")
   }).concat([1, 2].map {
-    storage_size_options = [_1 * 10, _1 * 20]
-    io_limits = IoLimits.new(nil, _1 * 50, _1 * 50)
-    VmSize.new("burstable-#{_1}", "burstable", _1, _1 * 50, _1 * 50, _1 * 2, storage_size_options, io_limits, true, false, "x64")
+    storage_size_options = [it * 10, it * 20]
+    io_limits = IoLimits.new(nil, it * 50, it * 50)
+    VmSize.new("burstable-#{it}", "burstable", it, it * 50, it * 50, it * 2, storage_size_options, io_limits, true, false, "x64")
   }).concat([1, 2].map {
-    storage_size_options = [_1 * 10, _1 * 20]
-    io_limits = IoLimits.new(nil, _1 * 50, _1 * 50)
-    VmSize.new("burstable-#{_1}", "burstable", _1, _1 * 50, _1 * 50, (_1 * 1.6).to_i, storage_size_options, io_limits, false, false, "arm64")
+    storage_size_options = [it * 10, it * 20]
+    io_limits = IoLimits.new(nil, it * 50, it * 50)
+    VmSize.new("burstable-#{it}", "burstable", it, it * 50, it * 50, (it * 1.6).to_i, storage_size_options, io_limits, false, false, "arm64")
   }).freeze
 
   PostgresSize = Struct.new(:location_id, :name, :vm_family, :vm_size, :flavor, :vcpu, :memory, :storage_size_options) do
@@ -98,7 +98,7 @@ module Option
   PostgresHaOptions = [[PostgresResource::HaType::NONE, 0, "No Standbys", "No replication"],
     [PostgresResource::HaType::ASYNC, 1, "1 Standby", "Asynchronous replication"],
     [PostgresResource::HaType::SYNC, 2, "2 Standbys", "Synchronous replication with quorum"]].map {
-    PostgresHaOption.new(*_1)
+    PostgresHaOption.new(*it)
   }.freeze
 
   POSTGRES_VERSION_OPTIONS = {
@@ -112,7 +112,7 @@ module Option
   KubernetesCPOption = Struct.new(:cp_node_count, :title, :explanation)
   KubernetesCPOptions = [[1, "1 Node", "Single control plane node without resilience"],
     [3, "3 Nodes", "Three control plane nodes with resilience"]].map {
-    KubernetesCPOption.new(*_1)
+    KubernetesCPOption.new(*it)
   }.freeze
 
   def self.customer_postgres_sizes_for_project(project_id)

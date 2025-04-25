@@ -38,7 +38,7 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
     public_ipv6 = vm.ephemeral_net6.nth(2).to_s
     private_ipv4 = vm.private_ipv4
     private_ipv6 = vm.private_ipv6
-    neighbor_vms = load_balancer.active_vm_ports.reject { _1.load_balancer_vm.vm_id == vm.id }.uniq { |row| row.load_balancer_vm.id }.map(&:vm)
+    neighbor_vms = load_balancer.active_vm_ports.reject { it.load_balancer_vm.vm_id == vm.id }.uniq { |row| row.load_balancer_vm.id }.map(&:vm)
     neighbor_ips_v4_set, neighbor_ips_v6_set = generate_lb_ip_set_definition(neighbor_vms)
 
     balance_mode_ip4, balance_mode_ip6 = if load_balancer.algorithm == "round_robin"

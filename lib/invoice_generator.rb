@@ -109,7 +109,7 @@ class InvoiceGenerator
 
         # Each project have $1 github runner credit every month
         # 1$ github credit won't be shown on the portal billing page for now.
-        github_usage = project_content[:resources].flat_map { _1[:line_items] }.select { _1[:resource_type] == "GitHubRunnerMinutes" }.sum { _1[:cost] }
+        github_usage = project_content[:resources].flat_map { it[:line_items] }.select { it[:resource_type] == "GitHubRunnerMinutes" }.sum { it[:cost] }
         github_credit = [1.0, github_usage, project_content[:cost]].min
         if github_credit > 0
           project_content[:github_credit] = github_credit
@@ -122,8 +122,8 @@ class InvoiceGenerator
         free_inference_tokens_remaining = FreeQuota.free_quotas["inference-tokens"]["value"]
         free_inference_tokens_credit = 0.0
         project_content[:resources]
-          .flat_map { _1[:line_items] }
-          .select { _1[:resource_type] == "InferenceTokens" }
+          .flat_map { it[:line_items] }
+          .select { it[:resource_type] == "InferenceTokens" }
           .sort_by { |li| [li[:begin_time].to_date, -li[:unit_price]] }
           .each do |li|
             used_amount = [li[:amount], free_inference_tokens_remaining].min

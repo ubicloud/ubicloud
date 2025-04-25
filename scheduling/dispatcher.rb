@@ -49,7 +49,7 @@ class Scheduling::Dispatcher
       end
 
       ready.first.close
-    end.tap { _1.name = "apoptosis:" + strand_ubid }
+    end.tap { it.name = "apoptosis:" + strand_ubid }
 
     Thread.new do
       Thread.current[:created_at] = Time.now
@@ -66,7 +66,7 @@ class Scheduling::Dispatcher
       # Adequate to unblock IO.select.
       apoptosis_w.close
       notify_w.close
-    end.tap { _1.name = strand_ubid }
+    end.tap { it.name = strand_ubid }
 
     notify_r
   end
@@ -87,7 +87,7 @@ class Scheduling::Dispatcher
     return 0 if @notifiers.empty?
     ready, _, _ = IO.select(@notifiers)
     ready.each(&:close)
-    @notifiers.delete_if { ready.include?(_1) }
+    @notifiers.delete_if { ready.include?(it) }
     ready.count
   end
 end

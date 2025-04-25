@@ -33,7 +33,7 @@ module Ubicloud
       check_no_slash(rule_id, "invalid rule id format")
       adapter.delete(_path("/firewall-rule/#{rule_id}"))
 
-      self[:firewall_rules]&.delete_if { _1[:id] == rule_id }
+      self[:firewall_rules]&.delete_if { it[:id] == rule_id }
 
       nil
     end

@@ -12,7 +12,7 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
   }
   let(:tunnel) {
     sa = Sshable.create_with_id(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair)
-    vmh = VmHost.create(location_id: Location::HETZNER_FSN1_ID) { _1.id = sa.id }
+    vmh = VmHost.create(location_id: Location::HETZNER_FSN1_ID) { it.id = sa.id }
     vm_src = create_vm(name: "hellovm", vm_host_id: vmh.id)
     vm_dst = create_vm(name: "hellovm2", vm_host_id: vmh.id)
     n_src = Nic.create_with_id(private_subnet_id: ps.id,
@@ -31,7 +31,7 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
       name: "default-nic",
       rekey_payload: {"reqid" => 14329, "spi4" => "0xe0000000", "spi6" => "0xe1111111"},
       vm_id: vm_dst.id)
-    IpsecTunnel.create_with_id(src_nic_id: n_src.id, dst_nic_id: n_dst.id).tap { _1.id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e" }
+    IpsecTunnel.create_with_id(src_nic_id: n_src.id, dst_nic_id: n_dst.id).tap { it.id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e" }
   }
 
   before do
@@ -40,7 +40,7 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
 
   describe "#before_run" do
     it "pops when destroy is set" do
-      Strand.create(prog: "Vnet:NicNexus", label: "wait_vm") { _1.id = tunnel.src_nic.id }
+      Strand.create(prog: "Vnet:NicNexus", label: "wait_vm") { it.id = tunnel.src_nic.id }
       tunnel.src_nic.incr_destroy
       expect { nx.before_run }.to exit({"msg" => "nic.destroy semaphore is set"})
     end

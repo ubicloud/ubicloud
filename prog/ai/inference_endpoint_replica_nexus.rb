@@ -22,7 +22,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
         location_id: inference_endpoint.location_id,
         name: ubid.to_s,
         size: inference_endpoint.vm_size,
-        storage_volumes: inference_endpoint.storage_volumes.map { _1.transform_keys(&:to_sym) },
+        storage_volumes: inference_endpoint.storage_volumes.map { it.transform_keys(&:to_sym) },
         boot_image: inference_endpoint.boot_image,
         private_subnet_id: inference_endpoint.load_balancer.private_subnet.id,
         enable_ip4: true,
@@ -34,9 +34,9 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       replica = InferenceEndpointReplica.create(
         inference_endpoint_id: inference_endpoint_id,
         vm_id: vm_st.id
-      ) { _1.id = ubid.to_uuid }
+      ) { it.id = ubid.to_uuid }
 
-      Strand.create(prog: "Ai::InferenceEndpointReplicaNexus", label: "start") { _1.id = replica.id }
+      Strand.create(prog: "Ai::InferenceEndpointReplicaNexus", label: "start") { it.id = replica.id }
     end
   end
 
@@ -130,7 +130,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
 
     resolve_page
     delete_runpod_pod
-    strand.children.each { _1.destroy }
+    strand.children.each { it.destroy }
     inference_endpoint.load_balancer.evacuate_vm(vm)
     inference_endpoint.load_balancer.remove_vm(vm)
     vm.incr_destroy
@@ -197,8 +197,8 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       .select(&:active?)
       .map do
       {
-        ubid: _1.ubid,
-        api_keys: _1.api_keys.select { |k| k.used_for == "inference_endpoint" && k.is_valid }.map { |k| Digest::SHA2.hexdigest(k.key) },
+        ubid: it.ubid,
+        api_keys: it.api_keys.select { |k| k.used_for == "inference_endpoint" && k.is_valid }.map { |k| Digest::SHA2.hexdigest(k.key) },
         quota_rps: inference_endpoint.max_project_rps,
         quota_tps: inference_endpoint.max_project_tps
       }
@@ -233,7 +233,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       begin
         today_record = BillingRecord
           .where(project_id: project.id, resource_id: inference_endpoint.id, billing_rate_id: rate_id)
-          .where { Sequel.pg_range(_1.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
+          .where { Sequel.pg_range(it.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
           .first
 
         if today_record

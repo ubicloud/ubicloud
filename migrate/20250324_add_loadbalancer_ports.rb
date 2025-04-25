@@ -41,7 +41,7 @@ Sequel.migration do
 
     DB[:load_balancer_port].import(
       [:id, :load_balancer_id, :src_port, :dst_port],
-      DB[:load_balancer].select_map([:id, :src_port, :dst_port]).each { _1.unshift(UBID.generate("lp").to_uuid) }
+      DB[:load_balancer].select_map([:id, :src_port, :dst_port]).each { it.unshift(UBID.generate("lp").to_uuid) }
     )
 
     DB[:load_balancer_vm_port].import([:id, :load_balancer_port_id, :load_balancer_vm_id, :state],
@@ -52,7 +52,7 @@ Sequel.migration do
           Sequel[:load_balancers_vms][:id].as(:load_balancer_vm_id),
           Sequel[:load_balancers_vms][:state]
         ])
-        .each { _1.unshift(UBID.generate("1q").to_uuid) })
+        .each { it.unshift(UBID.generate("1q").to_uuid) })
   end
 
   down do

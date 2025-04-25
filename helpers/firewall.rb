@@ -52,9 +52,9 @@ class Clover
     options.add_option(name: "location", values: Option.locations)
     subnets = dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view").map {
       {
-        location_id: _1.location_id,
-        value: _1.ubid,
-        display_name: _1.name
+        location_id: it.location_id,
+        value: it.ubid,
+        display_name: it.name
       }
     }
     options.add_option(name: "private_subnet_id", values: subnets, parent: "location") do |location, private_subnet|

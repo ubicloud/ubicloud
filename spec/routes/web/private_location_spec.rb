@@ -22,7 +22,7 @@ RSpec.describe Clover, "location-credential" do
     LocationCredential.create(
       access_key: "access_key",
       secret_key: "secret_key"
-    ) { _1.id = loc.id }
+    ) { it.id = loc.id }
     loc
   end
 
@@ -39,7 +39,7 @@ RSpec.describe Clover, "location-credential" do
     LocationCredential.create(
       access_key: "access_key",
       secret_key: "secret_key"
-    ) { _1.id = loc.id }
+    ) { it.id = loc.id }
     loc
   }
 

@@ -362,7 +362,7 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
                     placeholder: "No Maintenance Window",
                     options:
                       (0..23).map do
-                        [_1, "#{"%02d" % _1}:00 - #{"%02d" % ((_1 + PostgresResource::MAINTENANCE_DURATION_IN_HOURS) % 24)}:00 (UTC)"]
+                        [it, "#{"%02d" % it}:00 - #{"%02d" % ((it + PostgresResource::MAINTENANCE_DURATION_IN_HOURS) % 24)}:00 (UTC)"]
                       end,
                     label: "Maintenance Window:",
                     selected: @pg[:maintenance_window_start_at]

@@ -8,11 +8,11 @@ removal_allowed = has_permission?("#{@tag_model}:remove", @authorize_id)
 
 add_groups = @tag_model.options_for_project(@project)
 avoid = @current_members.dup
-@tag.currently_included_in.each { avoid[_1] = true }
+@tag.currently_included_in.each { avoid[it] = true }
 avoid[@tag.id] = true
 add_groups.transform_values! do |v|
-  v = v.reject { avoid.include?(_1.id) }
-  v.map! { [_1.name.to_s, _1.ubid] }
+  v = v.reject { avoid.include?(it.id) }
+  v.map! { [it.name.to_s, it.ubid] }
   v.sort!
 end
 add_groups.reject! { _2.empty? }

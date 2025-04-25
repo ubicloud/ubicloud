@@ -8,7 +8,7 @@ RSpec.describe Prog::Vnet::NicNexus do
   let(:st) { Strand.new }
   let(:ps) {
     PrivateSubnet.create_with_id(name: "ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64",
-      net4: "10.0.0.0/26", state: "waiting", project_id: Project.create(name: "test").id).tap { _1.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
+      net4: "10.0.0.0/26", state: "waiting", project_id: Project.create(name: "test").id).tap { it.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
   }
 
   describe ".assemble" do
@@ -214,7 +214,7 @@ RSpec.describe Prog::Vnet::NicNexus do
   describe "#destroy" do
     let(:ps) {
       PrivateSubnet.create_with_id(name: "ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64",
-        net4: "1.1.1.0/26", state: "waiting", project_id: Project.create(name: "test").id).tap { _1.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
+        net4: "1.1.1.0/26", state: "waiting", project_id: Project.create(name: "test").id).tap { it.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
     }
     let(:nic) {
       Nic.new(private_subnet_id: ps.id,
@@ -222,7 +222,7 @@ RSpec.describe Prog::Vnet::NicNexus do
         private_ipv4: "10.0.0.1",
         mac: "00:00:00:00:00:00",
         encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579",
-        name: "default-nic").tap { _1.id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e" }
+        name: "default-nic").tap { it.id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e" }
     }
     let(:ipsec_tunnels) {
       [
@@ -279,7 +279,7 @@ RSpec.describe Prog::Vnet::NicNexus do
         private_ipv4: "10.0.0.1",
         mac: "00:00:00:00:00:00",
         encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579",
-        name: "default-nic").tap { _1.id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e" }
+        name: "default-nic").tap { it.id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e" }
     }
 
     before do

@@ -15,10 +15,10 @@ end
 
 # Reduce the directory size to less than 1GB
 files_with_sizes = Dir.glob(File.join(directory_path, "*"))
-  .select { File.file?(_1) }
-  .map { {file: _1, size: File.size(_1)} }
-  .sort_by { _1[:size] }
-while files_with_sizes.sum { _1[:size] } > 1 * 1024 * 1024 * 1024 # 1GB in bytes
+  .select { File.file?(it) }
+  .map { {file: it, size: File.size(it)} }
+  .sort_by { it[:size] }
+while files_with_sizes.sum { it[:size] } > 1 * 1024 * 1024 * 1024 # 1GB in bytes
   break unless (largest_file = files_with_sizes.pop)
   FileUtils.rm(largest_file[:file])
 end

@@ -31,7 +31,7 @@ Rev:	a1
 IOMMUGroup:	13
 EOS
       expect { lp.start }.to exit({"msg" => "created PciDevice records"}).and change {
-        PciDevice.map { {vm_host_id: _1.vm_host_id, slot: _1.slot, device_class: _1.device_class, vendor: _1.vendor, device: _1.device, numa_node: _1.numa_node, iommu_group: _1.iommu_group, vm_id: _1.vm_id} }.sort_by { _1[:slot] }
+        PciDevice.map { {vm_host_id: it.vm_host_id, slot: it.slot, device_class: it.device_class, vendor: it.vendor, device: it.device, numa_node: it.numa_node, iommu_group: it.iommu_group, vm_id: it.vm_id} }.sort_by { it[:slot] }
       }.from(
         []
       ).to(
@@ -66,7 +66,7 @@ Rev:	a1
 IOMMUGroup:	13
 EOS
       expect { lp.start }.to exit({"msg" => "created PciDevice records"}).and change {
-        PciDevice.map { {vm_host_id: _1.vm_host_id, slot: _1.slot, device_class: _1.device_class, vendor: _1.vendor, device: _1.device, numa_node: _1.numa_node, iommu_group: _1.iommu_group, vm_id: _1.vm_id} }.sort_by { _1[:slot] }
+        PciDevice.map { {vm_host_id: it.vm_host_id, slot: it.slot, device_class: it.device_class, vendor: it.vendor, device: it.device, numa_node: it.numa_node, iommu_group: it.iommu_group, vm_id: it.vm_id} }.sort_by { it[:slot] }
       }.from(
         [{vm_host_id: vmh.id, slot: "01:00.0", device_class: "dc", vendor: "vd", device: "dv", numa_node: 0, iommu_group: 3, vm_id: nil}]
       ).to(

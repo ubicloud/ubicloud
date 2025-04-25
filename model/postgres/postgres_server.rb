@@ -74,7 +74,7 @@ class PostgresServer < Sequel::Model
         configs[:archive_timeout] = "60"
         configs[:archive_command] = "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'"
         if resource.ha_type == PostgresResource::HaType::SYNC
-          caught_up_standbys = resource.servers.select { _1.standby? && _1.synchronization_status == "ready" }
+          caught_up_standbys = resource.servers.select { it.standby? && it.synchronization_status == "ready" }
           configs[:synchronous_standby_names] = "'ANY 1 (#{caught_up_standbys.map(&:ubid).join(",")})'" unless caught_up_standbys.empty?
         end
       end
@@ -96,8 +96,8 @@ class PostgresServer < Sequel::Model
       configs: configs,
       private_subnets: vm.private_subnets.map {
         {
-          net4: _1.net4.to_s,
-          net6: _1.net6.to_s
+          net4: it.net4.to_s,
+          net6: it.net6.to_s
         }
       },
       identity: resource.identity,
@@ -155,10 +155,10 @@ class PostgresServer < Sequel::Model
 
   def failover_target
     target = resource.servers
-      .reject { _1.representative_at }
-      .select { _1.strand.label == "wait" && !_1.needs_recycling? }
-      .map { {server: _1, lsn: _1.current_lsn} }
-      .max_by { lsn2int(_1[:lsn]) }
+      .reject { it.representative_at }
+      .select { it.strand.label == "wait" && !it.needs_recycling? }
+      .map { {server: it, lsn: it.current_lsn} }
+      .max_by { lsn2int(it[:lsn]) }
 
     return nil if target.nil?
 
@@ -205,7 +205,7 @@ class PostgresServer < Sequel::Model
     DB.transaction do
       if pulse[:reading] == "up" && pulse[:reading_rpt] % 12 == 1
         begin
-          PostgresLsnMonitor.new(last_known_lsn: last_known_lsn) { _1.postgres_server_id = id }
+          PostgresLsnMonitor.new(last_known_lsn: last_known_lsn) { it.postgres_server_id = id }
             .insert_conflict(
               target: :postgres_server_id,
               update: {last_known_lsn: last_known_lsn}
@@ -232,7 +232,7 @@ class PostgresServer < Sequel::Model
   end
 
   def lsn2int(lsn)
-    lsn.split("/").map { _1.rjust(8, "0") }.join.hex
+    lsn.split("/").map { it.rjust(8, "0") }.join.hex
   end
 
   def lsn_diff(lsn1, lsn2)

@@ -82,12 +82,12 @@ RSpec.describe Prog::Vnet::CertServer do
 
   describe ".put_cert_to_vm" do
     it "fails if certificate is nil" do
-      lb.certs.map { _1.update(cert: nil) }
+      lb.certs.map { it.update(cert: nil) }
       expect { nx.put_cert_to_vm }.to raise_error(RuntimeError, "BUG: certificate is nil")
     end
 
     it "fails if certificate payload is nil" do
-      lb.certs.map { _1.update(cert: nil) }
+      lb.certs.map { it.update(cert: nil) }
       expect(nx.load_balancer).to receive(:active_cert).and_return(lb.certs.first)
 
       expect { nx.put_cert_to_vm }.to raise_error(RuntimeError, "BUG: certificate is nil")

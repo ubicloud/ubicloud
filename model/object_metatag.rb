@@ -22,7 +22,7 @@ class ObjectMetatag < DelegateClass(ObjectTag)
 
   # Designed solely for use with UBID.resolve_map
   def self.where(id:)
-    ObjectTag.where(id: Sequel.any_uuid(id.args[0].map { from_meta_uuid(_1) })).map(&:metatag)
+    ObjectTag.where(id: Sequel.any_uuid(id.args[0].map { from_meta_uuid(it) })).map(&:metatag)
   end
 
   # Designed solely for use with UBID.decode

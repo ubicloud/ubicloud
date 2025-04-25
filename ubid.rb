@@ -123,7 +123,7 @@ class UBID
   end
 
   # InferenceApiKey does not have a type, and using et (TYPE_ETC) seems like a bad idea
-  ACTION_TYPE_PREFIX_MAP = <<~TYPES.split("\n").map! { _1.split(": ") }.to_h.freeze
+  ACTION_TYPE_PREFIX_MAP = <<~TYPES.split("\n").map! { it.split(": ") }.to_h.freeze
     Project: pj
     Vm: vm
     PrivateSubnet: ps
@@ -169,8 +169,8 @@ class UBID
 
   # Map of prefixes to class name symbols, to avoid autoloading
   # classes until they are referenced by class_for_ubid
-  TYPE2CLASSNAME = constants.select { _1.start_with?("TYPE_") }.reject { _1.to_s == "TYPE_ETC" }
-    .map { [const_get(_1), camelize(_1.to_s).to_sym] }.to_h.freeze
+  TYPE2CLASSNAME = constants.select { it.start_with?("TYPE_") }.reject { it.to_s == "TYPE_ETC" }
+    .map { [const_get(it), camelize(it.to_s).to_sym] }.to_h.freeze
   private_constant :TYPE2CLASSNAME
 
   def self.class_for_ubid(str)
@@ -184,13 +184,13 @@ class UBID
 
   def self.resolve_map(uuids)
     uuids.keys.group_by do
-      ubid = from_uuidish(_1).to_s
+      ubid = from_uuidish(it).to_s
       # Bad hack, needed because ApiKey does not use a fixed ubid type
       ubid.start_with?("et") ? ApiKey : class_for_ubid(ubid)
     end.each do |model, model_uuids|
       next unless model
       model.where(id: Sequel.any_uuid(model_uuids)).each do
-        uuids[_1.id] = _1
+        uuids[it.id] = it
       end
     end
     uuids
@@ -366,7 +366,7 @@ class UBID
   def self.to_base32_n(s)
     result = 0
     s.chars.each {
-      result = result * 32 + to_base32(_1)
+      result = result * 32 + to_base32(it)
     }
     result
   end

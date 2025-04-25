@@ -3,7 +3,7 @@
 require_relative "../spec_helper"
 
 RSpec.describe GithubRepository do
-  subject(:github_repository) { described_class.new(name: "test", access_key: "my-token-id").tap { _1.id = "8823102a-2d5c-8e16-ac04-c60f1b6b9984" } }
+  subject(:github_repository) { described_class.new(name: "test", access_key: "my-token-id").tap { it.id = "8823102a-2d5c-8e16-ac04-c60f1b6b9984" } }
 
   let(:blob_storage_client) { instance_double(Aws::S3::Client) }
   let(:cloudflare_client) { instance_double(CloudflareClient) }

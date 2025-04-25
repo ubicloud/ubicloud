@@ -8,7 +8,7 @@ RSpec.describe StorageDevice do
     context "when finding the disk id from device_name for SSD disks" do
       it "changes the unix_device_list to the device id and saves changes" do
         sa = Sshable.create_with_id(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair)
-        vmh = VmHost.create(location_id: Location::HETZNER_FSN1_ID) { _1.id = sa.id }
+        vmh = VmHost.create(location_id: Location::HETZNER_FSN1_ID) { it.id = sa.id }
         storage_device = described_class.create_with_id(vm_host_id: vmh.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["sda"])
 
         expect(storage_device.vm_host.sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'sda$' | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-random-id")
@@ -21,7 +21,7 @@ RSpec.describe StorageDevice do
     context "when finding the disk id from device_name for NVMe disks" do
       it "changes the unix_device_list to the device id and saves changes" do
         sa = Sshable.create_with_id(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair)
-        vmh = VmHost.create(location_id: Location::HETZNER_FSN1_ID) { _1.id = sa.id }
+        vmh = VmHost.create(location_id: Location::HETZNER_FSN1_ID) { it.id = sa.id }
         storage_device = described_class.create_with_id(vm_host_id: vmh.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["nvme0n1"])
 
         expect(storage_device.vm_host.sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'nvme0n1$' | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id")

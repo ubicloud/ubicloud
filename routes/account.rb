@@ -9,7 +9,7 @@ class Clover
 
       r.on "login-method" do
         r.get true do
-          @identities = current_account.identities.to_h { [_1.provider, _1.uid] }
+          @identities = current_account.identities.to_h { [it.provider, it.uid] }
 
           view "account/login_method"
         end
@@ -25,7 +25,7 @@ class Clover
             DB[:account_password_hashes].where(id: current_account.id).delete
             DB[:account_previous_password_hashes].where(account_id: current_account.id).delete
             flash[:notice] = "Your password has been deleted"
-          elsif (identity = identities.find { _1.provider == provider && _1.uid == uid })
+          elsif (identity = identities.find { it.provider == provider && it.uid == uid })
             identity.destroy
             flash[:notice] = "Your account has been disconnected from #{provider.capitalize}"
           else

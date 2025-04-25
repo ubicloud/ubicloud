@@ -32,9 +32,9 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       replica = InferenceRouterReplica.create(
         inference_router_id: inference_router_id,
         vm_id: vm_st.id
-      ) { _1.id = ubid.to_uuid }
+      ) { it.id = ubid.to_uuid }
 
-      Strand.create(prog: "Ai::InferenceRouterReplicaNexus", label: "start") { _1.id = replica.id }
+      Strand.create(prog: "Ai::InferenceRouterReplicaNexus", label: "start") { it.id = replica.id }
     end
   end
 
@@ -180,7 +180,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
     decr_destroy
 
     resolve_page
-    strand.children.each { _1.destroy }
+    strand.children.each { it.destroy }
     inference_router.load_balancer.evacuate_vm(vm)
     inference_router.load_balancer.remove_vm(vm)
     vm.incr_destroy
@@ -243,8 +243,8 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       .select(&:active?)
       .map do
       {
-        ubid: _1.ubid,
-        api_keys: _1.api_keys
+        ubid: it.ubid,
+        api_keys: it.api_keys
           .select { |k| k.used_for == "inference_endpoint" && k.is_valid }
           .sort_by { |k| k.id }
           .map { |k| Digest::SHA2.hexdigest(k.key) }
@@ -320,7 +320,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       begin
         today_record = BillingRecord
           .where(project_id: project.id, resource_id: inference_router.id, billing_rate_id: rate_id)
-          .where { Sequel.pg_range(_1.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
+          .where { Sequel.pg_range(it.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
           .first
 
         if today_record

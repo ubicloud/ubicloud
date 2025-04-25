@@ -57,9 +57,9 @@ class Clover
         else
           @quotas = ["VmVCpu", "PostgresVCpu"].map {
             {
-              resource_type: _1,
-              current_resource_usage: @project.current_resource_usage(_1),
-              quota: @project.effective_quota_value(_1)
+              resource_type: it,
+              current_resource_usage: @project.current_resource_usage(it),
+              quota: @project.effective_quota_value(it)
             }
           }
 

@@ -13,10 +13,10 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   label def provision_servers
     hop_wait_servers_to_be_ready if postgres_resource.has_enough_fresh_servers?
 
-    if postgres_resource.servers.all? { _1.vm.vm_host } || postgres_resource.location.provider == "aws"
+    if postgres_resource.servers.all? { it.vm.vm_host } || postgres_resource.location.provider == "aws"
       exclude_host_ids = []
       if !(Config.development? || Config.is_e2e) && postgres_resource.location.provider == HostProvider::HETZNER_PROVIDER_NAME
-        used_data_centers = postgres_resource.servers.map { _1.vm.vm_host.data_center }.uniq
+        used_data_centers = postgres_resource.servers.map { it.vm.vm_host.data_center }.uniq
         exclude_host_ids = VmHost.where(data_center: used_data_centers).map(&:id)
       end
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: postgres_resource.timeline.id, timeline_access: "fetch", exclude_host_ids: exclude_host_ids)
@@ -52,8 +52,8 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     # Below we only keep servers that does not need recycling. If there are
     # more such servers than required, we prefer ready and recent servers (in that order)
     servers_to_keep = postgres_resource.servers
-      .reject { _1.representative_at || _1.needs_recycling? }
-      .sort_by { [(_1.strand.label == "wait") ? 0 : 1, Time.now - _1.created_at] }
+      .reject { it.representative_at || it.needs_recycling? }
+      .sort_by { [(it.strand.label == "wait") ? 0 : 1, Time.now - it.created_at] }
       .take(postgres_resource.target_standby_count) + [postgres_resource.representative_server]
     (postgres_resource.servers - servers_to_keep).each.each(&:incr_destroy)
 

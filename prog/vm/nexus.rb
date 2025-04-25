@@ -111,7 +111,7 @@ class Prog::Vm::Nexus < Prog::Base
         pool_id: pool_id,
         arch: arch,
         project_id:
-      ) { _1.id = ubid.to_uuid }
+      ) { it.id = ubid.to_uuid }
       nic.update(vm_id: vm.id)
 
       gpu_count = 1 if gpu_count == 0 && vm_size.gpu
@@ -128,7 +128,7 @@ class Prog::Vm::Nexus < Prog::Base
           "exclude_host_ids" => exclude_host_ids,
           "gpu_count" => gpu_count
         }]
-      ) { _1.id = vm.id }
+      ) { it.id = vm.id }
     end
   end
 
@@ -136,7 +136,7 @@ class Prog::Vm::Nexus < Prog::Base
     ssh_key = SshKey.generate
     st = assemble(ssh_key.public_key, *, **kwargs)
     Sshable.create(unix_user: sshable_unix_user, host: "temp_#{st.id}", raw_private_key_1: ssh_key.keypair) {
-      _1.id = st.id
+      it.id = st.id
     }
     st
   end

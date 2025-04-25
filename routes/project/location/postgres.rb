@@ -73,7 +73,7 @@ class Clover
 
         DB.transaction do
           pg.update(target_vm_size: target_vm_size.vm_size, target_storage_size_gib:, ha_type:)
-          pg.read_replicas.map { _1.update(target_vm_size: target_vm_size.vm_size, target_storage_size_gib:) }
+          pg.read_replicas.map { it.update(target_vm_size: target_vm_size.vm_size, target_storage_size_gib:) }
         end
 
         if api?

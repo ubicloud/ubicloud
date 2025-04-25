@@ -9,7 +9,7 @@ RSpec.describe Authorization do
       Account.create_with_id(email: "auth2@example.com")
     ]
   }
-  let(:projects) { (0..1).map { users[_1].create_project_with_default_policy("project-#{_1}") } }
+  let(:projects) { (0..1).map { users[it].create_project_with_default_policy("project-#{it}") } }
   let(:vms) {
     (0..3).map do |index|
       ps = Prog::Vnet::SubnetNexus.assemble(projects[index / 2].id, name: "vm#{index}-ps", location_id: Location::HETZNER_FSN1_ID).subject

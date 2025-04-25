@@ -24,7 +24,7 @@ class SubjectTag < Sequel::Model
 
   def self.options_for_project(project)
     {
-      "Tag" => project.subject_tags.reject { _1.name == "Admin" },
+      "Tag" => project.subject_tags.reject { it.name == "Admin" },
       "Account" => project.accounts
     }
   end

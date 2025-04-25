@@ -6,7 +6,7 @@ require "octokit"
 RSpec.describe Prog::Github::DestroyGithubInstallation do
   subject(:dgi) {
     described_class.new(Strand.new).tap {
-      _1.instance_variable_set(:@github_installation, github_installation)
+      it.instance_variable_set(:@github_installation, github_installation)
     }
   }
 

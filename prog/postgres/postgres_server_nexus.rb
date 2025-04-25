@@ -56,9 +56,9 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         representative_at: representative_at,
         synchronization_status: synchronization_status,
         vm_id: vm_st.id
-      ) { _1.id = ubid.to_uuid }
+      ) { it.id = ubid.to_uuid }
 
-      Strand.create(prog: "Postgres::PostgresServerNexus", label: "start") { _1.id = postgres_server.id }
+      Strand.create(prog: "Postgres::PostgresServerNexus", label: "start") { it.id = postgres_server.id }
     end
   end
 
@@ -108,14 +108,14 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     case vm.sshable.cmd("common/bin/daemonizer --check format_disk")
     when "Succeeded"
       vm.sshable.cmd("sudo mkdir -p /dat")
-      device_path = vm.vm_storage_volumes.find { _1.boot == false }.device_path.shellescape
+      device_path = vm.vm_storage_volumes.find { it.boot == false }.device_path.shellescape
 
       vm.sshable.cmd("sudo common/bin/add_to_fstab #{device_path} /dat ext4 defaults 0 0")
       vm.sshable.cmd("sudo mount #{device_path} /dat")
 
       hop_configure_walg_credentials
     when "Failed", "NotStarted"
-      device_path = vm.vm_storage_volumes.find { _1.boot == false }.device_path.shellescape
+      device_path = vm.vm_storage_volumes.find { it.boot == false }.device_path.shellescape
       vm.sshable.cmd("common/bin/daemonizer 'sudo mkfs --type ext4 #{device_path}' format_disk")
     end
 
@@ -192,10 +192,10 @@ CONFIG
 
     metric_destinations = postgres_server.resource.metric_destinations.map {
       <<METRIC_DESTINATION
-- url: '#{_1.url}'
+- url: '#{it.url}'
   basic_auth:
-    username: '#{_1.username}'
-    password: '#{_1.password}'
+    username: '#{it.username}'
+    password: '#{it.password}'
 METRIC_DESTINATION
     }.prepend("remote_write:").join("\n")
 
@@ -426,7 +426,7 @@ SQL
     nap 0 if postgres_server.trigger_failover
 
     reap
-    nap 5 unless strand.children.select { _1.prog == "Postgres::PostgresServerNexus" && _1.label == "restart" }.empty?
+    nap 5 unless strand.children.select { it.prog == "Postgres::PostgresServerNexus" && it.label == "restart" }.empty?
 
     if available?
       decr_checkup
@@ -459,7 +459,7 @@ SQL
       postgres_server.update(timeline_access: "push", representative_at: Time.now, synchronization_status: "ready")
       postgres_server.resource.incr_refresh_dns_record
       postgres_server.resource.servers.each(&:incr_configure)
-      postgres_server.resource.servers.reject(&:primary?).each { _1.update(synchronization_status: "catching_up") }
+      postgres_server.resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
       postgres_server.incr_restart
       hop_configure
     when "Failed", "NotStarted"
@@ -473,7 +473,7 @@ SQL
   label def destroy
     decr_destroy
 
-    strand.children.each { _1.destroy }
+    strand.children.each { it.destroy }
     vm.incr_destroy
     postgres_server.destroy
 

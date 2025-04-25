@@ -15,14 +15,14 @@ class Prog::Vnet::UpdateFirewallRules < Prog::Base
     end
 
     rules = vm.firewalls.map(&:firewall_rules).flatten
-    allowed_ingress_ip4_port_set, allowed_ingress_ip4_lb_dest_set = consolidate_rules(rules.select { !_1.ip6? && _1.port_range })
-    allowed_ingress_ip6_port_set, allowed_ingress_ip6_lb_dest_set = consolidate_rules(rules.select { _1.ip6? && _1.port_range })
+    allowed_ingress_ip4_port_set, allowed_ingress_ip4_lb_dest_set = consolidate_rules(rules.select { !it.ip6? && it.port_range })
+    allowed_ingress_ip6_port_set, allowed_ingress_ip6_lb_dest_set = consolidate_rules(rules.select { it.ip6? && it.port_range })
     guest_ephemeral, clover_ephemeral = subdivide_network(vm.ephemeral_net6).map(&:to_s)
 
     globally_blocked_ipv4s, globally_blocked_ipv6s = generate_globally_blocked_lists
 
     load_balancer_allow_rule = if vm.load_balancer
-      neighbors = vm.load_balancer.vms.reject { _1.id == vm.id }
+      neighbors = vm.load_balancer.vms.reject { it.id == vm.id }
       ipv4_rules = neighbors.flat_map do |n|
         vm.load_balancer.ports.map { |p| "#{n.private_ipv4} . #{p[:src_port]}" }
       end
@@ -201,8 +201,8 @@ TEMPLATE
 
   label def remove_aws_old_rules
     rules = vm.firewalls.map(&:firewall_rules).flatten
-    ip4_rules = rules.select { !_1.ip6? && _1.port_range }
-    ip6_rules = rules.select { _1.ip6? && _1.port_range }
+    ip4_rules = rules.select { !it.ip6? && it.port_range }
+    ip6_rules = rules.select { it.ip6? && it.port_range }
 
     # Fetch existing security group rules
     security_group = aws_client.describe_security_groups({
@@ -262,8 +262,8 @@ TEMPLATE
         globally_blocked_ipv6s << "#{ip}/128" if ip.ipv6?
       end
     end
-    summ_ipv4 = NetAddr.summ_IPv4Net(globally_blocked_ipv4s.map { NetAddr::IPv4Net.parse(_1.to_s) })
-    summ_ipv6 = NetAddr.summ_IPv6Net(globally_blocked_ipv6s.map { NetAddr::IPv6Net.parse(_1.to_s) })
+    summ_ipv4 = NetAddr.summ_IPv4Net(globally_blocked_ipv4s.map { NetAddr::IPv4Net.parse(it.to_s) })
+    summ_ipv6 = NetAddr.summ_IPv6Net(globally_blocked_ipv6s.map { NetAddr::IPv6Net.parse(it.to_s) })
     [summ_ipv4.join(", "), summ_ipv6.join(", ")]
   end
 
@@ -368,11 +368,11 @@ TEMPLATE
   end
 
   def generate_private_ip4_list
-    vm.nics.map { _1.private_ipv4.to_s }.join(",")
+    vm.nics.map { it.private_ipv4.to_s }.join(",")
   end
 
   def generate_private_ip6_list
-    vm.nics.map { _1.private_ipv6.to_s }.join(",")
+    vm.nics.map { it.private_ipv6.to_s }.join(",")
   end
 
   def subdivide_network(net)

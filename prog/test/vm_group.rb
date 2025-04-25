@@ -27,7 +27,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
     test_slices = frame.fetch("test_slices")
 
     size_options = test_slices ? ["standard-2", "burstable-1"] : ["standard-2"]
-    subnets = Array.new(2) { Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-#{_1}", location_id: Location::HETZNER_FSN1_ID) }
+    subnets = Array.new(2) { Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-#{it}", location_id: Location::HETZNER_FSN1_ID) }
     encrypted = frame.fetch("storage_encrypted", true)
     boot_images = frame.fetch("boot_images")
     storage_options = [
@@ -56,12 +56,12 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def wait_vms
-    nap 10 if frame["vms"].any? { Vm[_1].display_state != "running" }
+    nap 10 if frame["vms"].any? { Vm[it].display_state != "running" }
     hop_verify_vms
   end
 
   label def verify_vms
-    frame["vms"].each { bud(Prog::Test::Vm, {subject_id: _1}) }
+    frame["vms"].each { bud(Prog::Test::Vm, {subject_id: it}) }
     hop_wait_verify_vms
   end
 
@@ -76,7 +76,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
 
     vm_cores = vm_host.vms.sum(&:cores)
     slice_cores = vm_host.slices.sum(&:cores)
-    spdk_cores = vm_host.cpus.count { _1.spdk } * vm_host.total_cores / vm_host.total_cpus
+    spdk_cores = vm_host.cpus.count { it.spdk } * vm_host.total_cores / vm_host.total_cpus
 
     fail_test "Host used cores does not match the allocated VMs cores (vm_cores=#{vm_cores}, slice_cores=#{slice_cores}, spdk_cores=#{spdk_cores}, used_cores=#{vm_host.used_cores})" if vm_cores + slice_cores + spdk_cores != vm_host.used_cores
 
@@ -90,7 +90,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
       hop_verify_firewall_rules
     end
 
-    slices = frame["vms"].map { Vm[_1].vm_host_slice&.id }.reject(&:nil?)
+    slices = frame["vms"].map { Vm[it].vm_host_slice&.id }.reject(&:nil?)
     push Prog::Test::VmHostSlices, {"slices" => slices}
   end
 
@@ -111,7 +111,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
       end
     end
 
-    ps1, ps2 = frame["subnets"].map { PrivateSubnet[_1] }
+    ps1, ps2 = frame["subnets"].map { PrivateSubnet[it] }
     push Prog::Test::ConnectedSubnets, {subnet_id_multiple: ((ps1.vms.count > 1) ? ps1.id : ps2.id), subnet_id_single: ((ps1.vms.count > 1) ? ps2.id : ps1.id)}
   end
 
@@ -131,14 +131,14 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def destroy_resources
-    frame["vms"].each { Vm[_1].incr_destroy }
-    frame["subnets"].each { PrivateSubnet[_1].tap { |ps| ps.firewalls.each { |fw| fw.destroy } }.incr_destroy }
+    frame["vms"].each { Vm[it].incr_destroy }
+    frame["subnets"].each { PrivateSubnet[it].tap { |ps| ps.firewalls.each { |fw| fw.destroy } }.incr_destroy }
 
     hop_wait_resources_destroyed
   end
 
   label def wait_resources_destroyed
-    unless frame["vms"].all? { Vm[_1].nil? } && frame["subnets"].all? { PrivateSubnet[_1].nil? }
+    unless frame["vms"].all? { Vm[it].nil? } && frame["subnets"].all? { PrivateSubnet[it].nil? }
       nap 5
     end
 

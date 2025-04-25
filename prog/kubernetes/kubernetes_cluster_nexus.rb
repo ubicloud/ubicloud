@@ -31,9 +31,9 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       # TODO: Validate location
       # TODO: Validate node count
 
-      KubernetesCluster.create(name:, version:, cp_node_count:, location_id:, target_node_size:, target_node_storage_size_gib:, project_id: project.id, private_subnet_id: subnet.id) { _1.id = ubid.to_uuid }
+      KubernetesCluster.create(name:, version:, cp_node_count:, location_id:, target_node_size:, target_node_storage_size_gib:, project_id: project.id, private_subnet_id: subnet.id) { it.id = ubid.to_uuid }
 
-      Strand.create(prog: "Kubernetes::KubernetesClusterNexus", label: "start") { _1.id = ubid.to_uuid }
+      Strand.create(prog: "Kubernetes::KubernetesClusterNexus", label: "start") { it.id = ubid.to_uuid }
     end
   end
 
@@ -90,17 +90,17 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   end
 
   label def wait_nodes
-    nap 10 unless kubernetes_cluster.nodepools.all? { _1.strand.label == "wait" }
+    nap 10 unless kubernetes_cluster.nodepools.all? { it.strand.label == "wait" }
     hop_create_billing_records
   end
 
   label def create_billing_records
     records =
-      kubernetes_cluster.cp_vms.map { {type: "KubernetesControlPlaneVCpu", family: _1.family, amount: _1.vcpus} } +
+      kubernetes_cluster.cp_vms.map { {type: "KubernetesControlPlaneVCpu", family: it.family, amount: it.vcpus} } +
       kubernetes_cluster.nodepools.flat_map(&:vms).flat_map {
         [
-          {type: "KubernetesWorkerVCpu", family: _1.family, amount: _1.vcpus},
-          {type: "KubernetesWorkerStorage", family: "standard", amount: _1.storage_size_gib}
+          {type: "KubernetesWorkerVCpu", family: it.family, amount: it.vcpus},
+          {type: "KubernetesWorkerStorage", family: "standard", amount: it.storage_size_gib}
         ]
       }
 
@@ -138,7 +138,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     kubernetes_cluster.api_server_lb.incr_destroy
     kubernetes_cluster.cp_vms.each(&:incr_destroy)
     kubernetes_cluster.remove_all_cp_vms
-    kubernetes_cluster.nodepools.each { _1.incr_destroy }
+    kubernetes_cluster.nodepools.each { it.incr_destroy }
     kubernetes_cluster.private_subnet.incr_destroy
     nap 5 unless kubernetes_cluster.nodepools.empty?
     kubernetes_cluster.destroy

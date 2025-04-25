@@ -6,13 +6,13 @@ require "octokit"
 RSpec.describe Prog::Github::GithubRepositoryNexus do
   subject(:nx) {
     described_class.new(Strand.new).tap {
-      _1.instance_variable_set(:@github_repository, github_repository)
+      it.instance_variable_set(:@github_repository, github_repository)
     }
   }
 
   let(:github_repository) {
     GithubRepository.new(name: "ubicloud/ubicloud", last_job_at: Time.now).tap {
-      _1.id = "31b9c46a-602a-8616-ae2f-41775cb592dd"
+      it.id = "31b9c46a-602a-8616-ae2f-41775cb592dd"
     }
   }
 

@@ -14,7 +14,7 @@ class FreeQuota
     @free_quotas ||= begin
       quotas = YAML.load_file("config/free_quotas.yml")
       quotas.each_with_object({}) do |item, hash|
-        item["billing_rate_ids"] = BillingRate.from_resource_type(item["resource_type"]).map { _1["id"] }
+        item["billing_rate_ids"] = BillingRate.from_resource_type(item["resource_type"]).map { it["id"] }
         hash[item["name"]] = item
       end
     end

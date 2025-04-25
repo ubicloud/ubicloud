@@ -33,7 +33,7 @@ class Sshable < Sequel::Model
 
   def keys
     [raw_private_key_1, raw_private_key_2].compact.map {
-      SshKey.from_binary(_1)
+      SshKey.from_binary(it)
     }
   end
 

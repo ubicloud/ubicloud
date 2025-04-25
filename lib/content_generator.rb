@@ -17,7 +17,7 @@ module ContentGenerator
     end
 
     def self.family(location, family)
-      vm_family = Option::VmFamilies.find { _1.name == family }
+      vm_family = Option::VmFamilies.find { it.name == family }
       [
         vm_family.display_name,
         vm_family.ui_descriptor
@@ -25,7 +25,7 @@ module ContentGenerator
     end
 
     def self.size(location, family, size)
-      size = Option::VmSizes.find { _1.display_name == size }
+      size = Option::VmSizes.find { it.display_name == size }
       unit_price = BillingRate.unit_price_from_resource_properties("VmVCpu", family, location.name)
 
       [
@@ -49,7 +49,7 @@ module ContentGenerator
     end
 
     def self.boot_image(boot_image)
-      Option::BootImages.find { _1.name == boot_image }.display_name
+      Option::BootImages.find { it.name == boot_image }.display_name
     end
   end
 
@@ -59,7 +59,7 @@ module ContentGenerator
     end
 
     def self.family(flavor, location, family)
-      vm_family = Option::VmFamilies.find { _1.name == family }
+      vm_family = Option::VmFamilies.find { it.name == family }
 
       [
         vm_family.display_name,
@@ -68,7 +68,7 @@ module ContentGenerator
     end
 
     def self.size(flavor, location, family, size)
-      size = Option::PostgresSizes.find { _1.display_name == size }
+      size = Option::PostgresSizes.find { it.display_name == size }
       unit_price = BillingRate.unit_price_from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name)
 
       [
@@ -95,8 +95,8 @@ module ContentGenerator
     end
 
     def self.ha_type(flavor, location, family, vm_size, storage_size, ha_type)
-      vcpu = Option::PostgresSizes.find { _1.display_name == vm_size }.vcpu
-      ha_type = Option::PostgresHaOptions.find { _1.name == ha_type }
+      vcpu = Option::PostgresSizes.find { it.display_name == vm_size }.vcpu
+      ha_type = Option::PostgresHaOptions.find { it.name == ha_type }
       compute_unit_price = BillingRate.unit_price_from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name)
       storage_unit_price = BillingRate.unit_price_from_resource_properties("PostgresStorage", flavor, location.name)
       standby_count = ha_type.standby_count
@@ -142,7 +142,7 @@ module ContentGenerator
 
     def self.cp_nodes(location, cp_nodes)
       node_price = 2 * BillingRate.unit_price_from_resource_properties("KubernetesControlPlaneVCpu", "standard", location.name)
-      data = Option::KubernetesCPOptions.find { _1.cp_node_count == cp_nodes }
+      data = Option::KubernetesCPOptions.find { it.cp_node_count == cp_nodes }
       [
         data.title,
         data.explanation,

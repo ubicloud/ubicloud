@@ -263,7 +263,7 @@ lf = $LOADED_FEATURES.dup
 at_exit do
   loaded_features = $LOADED_FEATURES - lf
   dir = __dir__
-  loaded_features.reject! { _1.start_with?(dir) }
+  loaded_features.reject! { it.start_with?(dir) }
 
   unless loaded_features.empty?
     load_paths = $LOAD_PATH.sort_by { |path| -path.length }

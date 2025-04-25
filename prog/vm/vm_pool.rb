@@ -18,7 +18,7 @@ class Prog::Vm::VmPool < Prog::Base
         storage_skip_sync:,
         arch:
       )
-      Strand.create(prog: "Vm::VmPool", label: "create_new_vm") { _1.id = vm_pool.id }
+      Strand.create(prog: "Vm::VmPool", label: "create_new_vm") { it.id = vm_pool.id }
     end
   end
 
@@ -72,7 +72,7 @@ class Prog::Vm::VmPool < Prog::Base
 
   label def destroy
     vm_pool.vms.each do |vm|
-      vm.private_subnets.each { _1.incr_destroy }
+      vm.private_subnets.each { it.incr_destroy }
       vm.incr_destroy
     end
     hop_wait_vms_destroy

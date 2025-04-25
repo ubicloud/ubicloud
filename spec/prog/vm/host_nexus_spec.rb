@@ -54,7 +54,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(st).to be_a Strand
       expect(st.label).to eq("start")
       expect(st.subject.assigned_subnets.count).to eq(3)
-      expect(st.subject.assigned_subnets.map { _1.cidr.to_s }.sort).to eq(["127.0.0.1/32", "30.30.30.32/29", "2a01:4f8:10a:128b::/64"].sort)
+      expect(st.subject.assigned_subnets.map { it.cidr.to_s }.sort).to eq(["127.0.0.1/32", "30.30.30.32/29", "2a01:4f8:10a:128b::/64"].sort)
 
       expect(st.subject.assigned_host_addresses.count).to eq(1)
       expect(st.subject.assigned_host_addresses.first.ip.to_s).to eq("127.0.0.1/32")
@@ -166,7 +166,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(vm_host).to receive(:net6).and_return(NetAddr.parse_net("2a01:4f9:2b:35a::/64"))
       budded = []
       expect(nx).to receive(:bud) do
-        budded << _1
+        budded << it
       end.at_least(:once)
 
       expect { nx.prep }.to hop("wait_prep")
@@ -188,7 +188,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(vm_host).to receive(:net6).and_return(nil)
       budded_learn_network = false
       expect(nx).to receive(:bud) do
-        budded_learn_network ||= (_1 == Prog::LearnNetwork)
+        budded_learn_network ||= (it == Prog::LearnNetwork)
       end.at_least(:once)
 
       expect { nx.prep }.to hop("wait_prep")

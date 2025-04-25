@@ -8,7 +8,7 @@ RSpec.describe InferenceEndpoint do
       name: "ie-name",
       location_id: Location::HETZNER_FSN1_ID,
       model_name: "model-name"
-    ) { _1.id = "c76fcd0c-3fb0-40cc-8732-d71869ee1341" }
+    ) { it.id = "c76fcd0c-3fb0-40cc-8732-d71869ee1341" }
   end
 
   describe "#display_states" do

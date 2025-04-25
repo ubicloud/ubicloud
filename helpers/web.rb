@@ -23,7 +23,7 @@ class Clover < Roda
     "deleting" => "bg-red-100 text-red-800"
   )
   ["rebooting", "starting", "waiting for capacity", "restarting"].each do
-    VM_STATE_LABEL_COLOR[_1] = VM_STATE_LABEL_COLOR["creating"]
+    VM_STATE_LABEL_COLOR[it] = VM_STATE_LABEL_COLOR["creating"]
   end
   VM_STATE_LABEL_COLOR["deleted"] = VM_STATE_LABEL_COLOR["deleting"]
   VM_STATE_LABEL_COLOR.freeze

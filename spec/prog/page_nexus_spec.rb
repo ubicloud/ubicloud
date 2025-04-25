@@ -5,7 +5,7 @@ require_relative "../model/spec_helper"
 RSpec.describe Prog::PageNexus do
   subject(:pn) {
     described_class.new(Strand.new).tap {
-      _1.instance_variable_set(:@page, pg)
+      it.instance_variable_set(:@page, pg)
     }
   }
 

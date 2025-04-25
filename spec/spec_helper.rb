@@ -238,8 +238,8 @@ RSpec.configure do |config|
   def create_vm_host(**args)
     args = {location_id: Location::HETZNER_FSN1_ID, allocation_state: "accepting", arch: "x64", total_cores: 48, used_cores: 2}.merge(args)
     ubid = VmHost.generate_ubid
-    Sshable.create { _1.id = ubid.to_uuid }
-    VmHost.create(**args) { _1.id = ubid.to_uuid }
+    Sshable.create { it.id = ubid.to_uuid }
+    VmHost.create(**args) { it.id = ubid.to_uuid }
   end
 
   def create_vm(**args)

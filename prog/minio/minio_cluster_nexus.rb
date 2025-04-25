@@ -40,7 +40,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
         root_cert_2: root_cert_2,
         root_cert_key_2: root_cert_key_2,
         project_id:
-      ) { _1.id = ubid.to_uuid }
+      ) { it.id = ubid.to_uuid }
 
       per_pool_server_count = server_count / pool_count
       per_pool_drive_count = drive_count / pool_count
@@ -50,7 +50,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
         Prog::Minio::MinioPoolNexus.assemble(minio_cluster.id, start_index, per_pool_server_count, per_pool_drive_count, per_pool_storage_size, vm_size)
       end
 
-      Strand.create(prog: "Minio::MinioClusterNexus", label: "wait_pools") { _1.id = minio_cluster.id }
+      Strand.create(prog: "Minio::MinioClusterNexus", label: "wait_pools") { it.id = minio_cluster.id }
     end
   end
 
@@ -64,7 +64,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
 
   label def wait_pools
     register_deadline("wait", 10 * 60)
-    if minio_cluster.pools.all? { _1.strand.label == "wait" }
+    if minio_cluster.pools.all? { it.strand.label == "wait" }
       # Start all the servers now
       minio_cluster.servers.each(&:incr_restart)
       hop_wait

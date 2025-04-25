@@ -1,5 +1,5 @@
 <li>
-  <div class="group <%= items.compact.map { _1[2] }.any? ? "active" : "" %>">
+  <div class="group <%= items.compact.map { it[2] }.any? ? "active" : "" %>">
     <button
       type="button"
       class="sidebar-group-btn w-full text-orange-100 hover:text-white hover:bg-orange-700 flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold"

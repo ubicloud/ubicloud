@@ -26,7 +26,7 @@ module Authorization
           .select(Sequel[:applied_action_tag][:action_id], Sequel[:level] + 1)
           .where { level < Config.recursive_tag_limit },
         args: [:action_id, :level])
-      .where(Sequel.or([DB[:action_ids], DB[:rec_action_ids].select(:action_id)].map { [:id, _1] }) | DB[:action_ids].where(action_id: nil).exists)
+      .where(Sequel.or([DB[:action_ids], DB[:rec_action_ids].select(:action_id)].map { [:id, it] }) | DB[:action_ids].where(action_id: nil).exists)
       .select_order_map(:name)
   end
 
@@ -62,11 +62,11 @@ module Authorization
   def self.matched_policies_dataset(project_id, subject_id, actions = nil, object_id = nil)
     dataset = DB[:access_control_entry]
       .where(project_id:)
-      .where(Sequel.or([subject_id, recursive_tag_query(:subject, subject_id)].map { [:subject_id, _1] }))
+      .where(Sequel.or([subject_id, recursive_tag_query(:subject, subject_id)].map { [:subject_id, it] }))
 
     if actions
-      actions = Array(actions).map { ActionType::NAME_MAP.fetch(_1) }
-      dataset = dataset.where(Sequel.or([nil, Sequel.any_uuid(actions), recursive_tag_query(:action, actions, project_id:)].map { [:action_id, _1] }))
+      actions = Array(actions).map { ActionType::NAME_MAP.fetch(it) }
+      dataset = dataset.where(Sequel.or([nil, Sequel.any_uuid(actions), recursive_tag_query(:action, actions, project_id:)].map { [:action_id, it] }))
     end
 
     if object_id
@@ -99,7 +99,7 @@ module Authorization
         false
       end
 
-      dataset = dataset.where(Sequel.or([nil, object_id, recursive_tag_query(:object, object_id)].map { [:object_id, _1] }) & in_project_cond)
+      dataset = dataset.where(Sequel.or([nil, object_id, recursive_tag_query(:object, object_id)].map { [:object_id, it] }) & in_project_cond)
     end
 
     dataset

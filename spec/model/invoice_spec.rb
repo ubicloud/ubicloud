@@ -45,7 +45,7 @@ RSpec.describe Invoice do
   describe ".send_failure_email" do
     it "sends failure email to accounts with billing permissions in addition to the provided billing email" do
       project = Project.create_with_id(name: "cool-project")
-      accounts = (0..2).map { Account.create_with_id(email: "account#{_1}@example.com").tap { |a| a.add_project(project) } }
+      accounts = (0..2).map { Account.create_with_id(email: "account#{it}@example.com").tap { |a| a.add_project(project) } }
       AccessControlEntry.create_with_id(project_id: project.id, subject_id: accounts[0].id)
       AccessControlEntry.create_with_id(project_id: project.id, subject_id: accounts[1].id, action_id: ActionType::NAME_MAP["Vm:view"])
       AccessControlEntry.create_with_id(project_id: project.id, subject_id: accounts[2].id, action_id: ActionType::NAME_MAP["Project:billing"])

@@ -32,8 +32,8 @@ safe_write_to_file("/etc/postgresql/#{v}/main/conf.d/001-service.conf", configs)
 # Update pg_hba.conf
 private_subnets = configure_hash["private_subnets"].flat_map {
   [
-    "host    all             all             #{_1["net4"]}                     scram-sha-256",
-    "host    all             all             #{_1["net6"]}                     scram-sha-256"
+    "host    all             all             #{it["net4"]}                     scram-sha-256",
+    "host    all             all             #{it["net6"]}                     scram-sha-256"
   ]
 }.join("\n")
 

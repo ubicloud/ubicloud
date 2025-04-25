@@ -138,7 +138,7 @@ class VmHost < Sequel::Model
     rand = SecureRandom.random_number(2**(32 - used_subnet.cidr.netmask.prefix_len)).to_i
     picked_subnet = used_subnet.cidr.nth(rand)
     # we check if the picked subnet is used by one of the vms
-    return ip4_random_vm_network if vm_addresses.map { _1.ip.to_s }.include?("#{picked_subnet}/32")
+    return ip4_random_vm_network if vm_addresses.map { it.ip.to_s }.include?("#{picked_subnet}/32")
 
     # For Leaseweb, avoid using the very first and the last ips
     if provider == "leaseweb"
@@ -249,7 +249,7 @@ class VmHost < Sequel::Model
 
   def hetznerify(server_id)
     DB.transaction do
-      HostProvider.create(provider_name: HostProvider::HETZNER_PROVIDER_NAME, server_identifier: server_id) { _1.id = id }
+      HostProvider.create(provider_name: HostProvider::HETZNER_PROVIDER_NAME, server_identifier: server_id) { it.id = id }
       create_addresses
     end
   end
@@ -391,11 +391,11 @@ class VmHost < Sequel::Model
   end
 
   def available_storage_gib
-    storage_devices.sum { _1.available_storage_gib }
+    storage_devices.sum { it.available_storage_gib }
   end
 
   def total_storage_gib
-    storage_devices.sum { _1.total_storage_gib }
+    storage_devices.sum { it.total_storage_gib }
   end
 
   def render_arch(arm64:, x64:)

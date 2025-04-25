@@ -76,7 +76,7 @@ class Clover
           r.post true do
             DB.transaction do
               typecast_params.array!(:Hash, "aces").each do
-                ubid, deleted, action_id, object_id = _1.values_at("ubid", "deleted", "action", "object")
+                ubid, deleted, action_id, object_id = it.values_at("ubid", "deleted", "action", "object")
                 action_id = nil if action_id == ""
                 object_id = nil if object_id == ""
 

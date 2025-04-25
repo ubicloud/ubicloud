@@ -11,8 +11,8 @@ class Prog::Vm::HostNexus < Prog::Base
 
       ubid = VmHost.generate_ubid
 
-      Sshable.create(host: sshable_hostname) { _1.id = ubid.to_uuid }
-      vmh = VmHost.create(location_id:, net6: net6, ndp_needed: ndp_needed) { _1.id = ubid.to_uuid }
+      Sshable.create(host: sshable_hostname) { it.id = ubid.to_uuid }
+      vmh = VmHost.create(location_id:, net6: net6, ndp_needed: ndp_needed) { it.id = ubid.to_uuid }
 
       if provider_name == HostProvider::HETZNER_PROVIDER_NAME || provider_name == HostProvider::LEASEWEB_PROVIDER_NAME
         HostProvider.create do |hp|
@@ -28,7 +28,7 @@ class Prog::Vm::HostNexus < Prog::Base
         # Avoid overriding custom server names for development hosts.
         vmh.set_server_name unless Config.development?
       else
-        Address.create(cidr: sshable_hostname, routed_to_host_id: vmh.id) { _1.id = vmh.id }
+        Address.create(cidr: sshable_hostname, routed_to_host_id: vmh.id) { it.id = vmh.id }
         AssignedHostAddress.create_with_id(ip: sshable_hostname, address_id: vmh.id, host_id: vmh.id)
       end
 
@@ -36,7 +36,7 @@ class Prog::Vm::HostNexus < Prog::Base
         prog: "Vm::HostNexus",
         label: "start",
         stack: [{"spdk_version" => spdk_version, "default_boot_images" => default_boot_images}]
-      ) { _1.id = vmh.id }
+      ) { it.id = vmh.id }
     end
   end
 

@@ -61,12 +61,12 @@ RSpec.describe Clover, "cli" do
     expect(LoadBalancer).to receive(:generate_uuid).and_return("eb8e0b21-94f2-8c2b-82c8-da57fcfe88c7").at_least(:once)
 
     cli_commands = []
-    cli_commands.concat File.readlines("spec/routes/api/cli/golden-file-commands/success.txt").map { [_1, {}] }
-    cli_commands.concat File.readlines("spec/routes/api/cli/golden-file-commands/error.txt").map { [_1, {status: 400}] }
-    cli_commands.concat File.readlines("spec/routes/api/cli/golden-file-commands/confirm.txt").map { [_1, {confirm_prompt: "Confirmation"}] }
+    cli_commands.concat File.readlines("spec/routes/api/cli/golden-file-commands/success.txt").map { [it, {}] }
+    cli_commands.concat File.readlines("spec/routes/api/cli/golden-file-commands/error.txt").map { [it, {status: 400}] }
+    cli_commands.concat File.readlines("spec/routes/api/cli/golden-file-commands/confirm.txt").map { [it, {confirm_prompt: "Confirmation"}] }
     Dir["spec/routes/api/cli/golden-file-commands/execute/*.txt"].each do |f|
       cmd = File.basename(f).delete_suffix(".txt")
-      cli_commands.concat File.readlines(f).map { [_1, {command_execute: cmd}] }
+      cli_commands.concat File.readlines(f).map { [it, {command_execute: cmd}] }
     end
 
     cli_commands.each do |cmd, kws|

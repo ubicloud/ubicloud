@@ -14,7 +14,7 @@ RSpec.describe Prog::RotateStorageKek do
   let(:vm) {
     vm_host = instance_double(VmHost)
     vm = Vm.new.tap {
-      _1.id = Vm.generate_uuid
+      it.id = Vm.generate_uuid
     }
     allow(vm_host).to receive(:sshable).and_return(sshable)
     allow(vm).to receive(:vm_host).and_return(vm_host)
@@ -25,14 +25,14 @@ RSpec.describe Prog::RotateStorageKek do
     StorageKeyEncryptionKey.new(
       algorithm: "aes-256-gcm", key: "key_1",
       init_vector: "iv_1", auth_data: "somedata"
-    ) { _1.id = StorageKeyEncryptionKey.generate_uuid }
+    ) { it.id = StorageKeyEncryptionKey.generate_uuid }
   }
 
   let(:new_kek) {
     StorageKeyEncryptionKey.new(
       algorithm: "aes-256-gcm", key: "key_2",
       init_vector: "iv_2", auth_data: "somedata"
-    ) { _1.id = StorageKeyEncryptionKey.generate_uuid }
+    ) { it.id = StorageKeyEncryptionKey.generate_uuid }
   }
 
   let(:volume) {
@@ -40,7 +40,7 @@ RSpec.describe Prog::RotateStorageKek do
       name: "nvme0",
       total_storage_gib: 100,
       available_storage_gib: 20
-    ) { _1.id = StorageDevice.generate_uuid }
+    ) { it.id = StorageDevice.generate_uuid }
     disk = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0, storage_device: dev)
     disk.key_encryption_key_1 = current_kek
     disk.key_encryption_key_2 = new_kek

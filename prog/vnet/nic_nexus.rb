@@ -15,13 +15,13 @@ class Prog::Vnet::NicNexus < Prog::Base
     ipv4_addr ||= subnet.random_private_ipv4.to_s
 
     DB.transaction do
-      nic = Nic.create(private_ipv6: ipv6_addr, private_ipv4: ipv4_addr, mac: gen_mac, name: name, private_subnet_id: private_subnet_id) { _1.id = ubid.to_uuid }
+      nic = Nic.create(private_ipv6: ipv6_addr, private_ipv4: ipv4_addr, mac: gen_mac, name: name, private_subnet_id: private_subnet_id) { it.id = ubid.to_uuid }
       label = if subnet.location.provider == "aws"
         "create_aws_nic"
       else
         "wait_allocation"
       end
-      Strand.create(prog: "Vnet::NicNexus", label:) { _1.id = nic.id }
+      Strand.create(prog: "Vnet::NicNexus", label:) { it.id = nic.id }
     end
   end
 
@@ -33,7 +33,7 @@ class Prog::Vnet::NicNexus < Prog::Base
 
   label def create_aws_nic
     nap 10 unless nic.private_subnet.strand.label == "wait"
-    NicAwsResource.create { _1.id = nic.id }
+    NicAwsResource.create { it.id = nic.id }
     bud Prog::Aws::Nic, {"subject_id" => nic.id}, :create_network_interface
     hop_wait_aws_nic_created
   end
@@ -143,7 +143,7 @@ class Prog::Vnet::NicNexus < Prog::Base
   # local address errors out.
   def self.gen_mac
     ([rand(256) & 0xFE | 0x02] + Array.new(5) { rand(256) }).map {
-      "%0.2X" % _1
+      "%0.2X" % it
     }.join(":").downcase
   end
 end

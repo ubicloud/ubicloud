@@ -23,7 +23,7 @@ class MinioServer < Sequel::Model
 
   def generate_etc_hosts_entry
     entries = ["::1 #{hostname}"]
-    entries += cluster.servers.reject { _1.id == id }.map do |server|
+    entries += cluster.servers.reject { it.id == id }.map do |server|
       "#{server.public_ipv6_address} #{server.hostname}"
     end
     entries.join("\n")
@@ -70,8 +70,8 @@ class MinioServer < Sequel::Model
 
   def check_pulse(session:, previous_pulse:)
     reading = begin
-      server_data = JSON.parse(session[:minio_client].admin_info.body)["servers"].find { _1["endpoint"] == endpoint }
-      (server_data["state"] == "online" && server_data["drives"].all? { _1["state"] == "ok" }) ? "up" : "down"
+      server_data = JSON.parse(session[:minio_client].admin_info.body)["servers"].find { it["endpoint"] == endpoint }
+      (server_data["state"] == "online" && server_data["drives"].all? { it["state"] == "ok" }) ? "up" : "down"
     rescue
       "down"
     end

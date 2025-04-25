@@ -5,7 +5,7 @@
   name:,
   id:,
   options: [["", "No access", nil, {}]].concat(
-    @allowed_view_tag_names.map { [_1, _1, nil, @allowed_add_tag_names_map.include?(_1) ? {} : { disabled: true }] }
+    @allowed_view_tag_names.map { [it, it, nil, @allowed_add_tag_names_map.include?(it) ? {} : { disabled: true }] }
   ),
   selected:
 ) %>

@@ -57,13 +57,13 @@ class Clover
     options = OptionTreeGenerator.new
     options.add_option(name: "name")
     options.add_option(name: "description")
-    options.add_option(name: "private_subnet_id", values: dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view").map { {value: _1.ubid, display_name: _1.name} })
-    options.add_option(name: "algorithm", values: ["Round Robin", "Hash Based"].map { {value: _1.downcase.tr(" ", "_"), display_name: _1} })
-    options.add_option(name: "stack", values: [LoadBalancer::Stack::IPV4, LoadBalancer::Stack::IPV6, LoadBalancer::Stack::DUAL].map { {value: _1.downcase, display_name: _1.gsub("ip", "IP")} })
+    options.add_option(name: "private_subnet_id", values: dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view").map { {value: it.ubid, display_name: it.name} })
+    options.add_option(name: "algorithm", values: ["Round Robin", "Hash Based"].map { {value: it.downcase.tr(" ", "_"), display_name: it} })
+    options.add_option(name: "stack", values: [LoadBalancer::Stack::IPV4, LoadBalancer::Stack::IPV6, LoadBalancer::Stack::DUAL].map { {value: it.downcase, display_name: it.gsub("ip", "IP")} })
     options.add_option(name: "src_port")
     options.add_option(name: "dst_port")
     options.add_option(name: "health_check_endpoint")
-    options.add_option(name: "health_check_protocol", values: ["http", "https", "tcp"].map { {value: _1, display_name: _1.upcase} })
+    options.add_option(name: "health_check_protocol", values: ["http", "https", "tcp"].map { {value: it, display_name: it.upcase} })
     options.serialize
   end
 end
