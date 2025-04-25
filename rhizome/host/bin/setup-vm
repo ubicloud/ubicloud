@@ -14,7 +14,22 @@ unless (vm_name = ARGV.shift)
   exit 1
 end
 
-vm_setup = VmSetup.new(vm_name)
+params = begin
+  JSON.parse(File.read(VmPath.new(vm_name).prep_json))
+rescue Errno::ENOENT
+  if action.start_with?("delete")
+    # Params were not historically needed for the delete actions,
+    # so handle case where prep file has already been deleted.
+    {}
+  else
+    raise
+  end
+end
+
+vm_setup = VmSetup.new(vm_name,
+  hugepages: params.fetch("hugepages", true),
+  ch_version: params["ch_version"],
+  firmware_version: params["firmware_version"])
 
 if action == "delete"
   vm_setup.purge
@@ -31,8 +46,6 @@ if action == "delete_net"
   vm_setup.purge_user
   exit 0
 end
-
-params = JSON.parse(File.read(VmPath.new(vm_name).prep_json))
 
 begin
   # "Global Unicast" subnet, i.e. a subnet for exchanging packets with

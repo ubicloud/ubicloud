@@ -63,7 +63,6 @@ RSpec.describe CloudHypervisor do
     def setup_file_downloads(sha_remote:, sha_ch:)
       f_remote = instance_double(File, path: paths[:remote_tmp])
       f_ch = instance_double(File, path: paths[:ch_tmp])
-      expect(Arch).to receive(:sym).and_return(:x64).at_least(:once)
       expect(ch).to receive(:safe_write_to_file).with(paths[:remote]).and_yield(f_remote)
       expect(ch).to receive(:safe_write_to_file).with(paths[:ch]).and_yield(f_ch)
       expect(ch).to receive(:curl_file).with(gh_ch_remote_url, paths[:remote_tmp]).and_return(sha_remote)
@@ -80,6 +79,7 @@ RSpec.describe CloudHypervisor do
     context "when cloud hypervisor does not exist" do
       before do
         setup_existing_files(remote_exist: false, ch_exist: false)
+        expect(CloudHypervisor::Version).to receive(:exe_suffix).and_return("-static").twice
       end
 
       it "downloads the cloud hypervisor" do
