@@ -658,6 +658,13 @@ DNSMASQ_SERVICE
         "vhost_user=true,socket=#{volume.vhost_sock},num_queues=1,queue_size=256"
       end
     }
+    disk_params << "path=#{vp.cloudinit_img}"
+
+    disk_args = if CloudHypervisor::Version::DEFAULT.version >= "36"
+      "--disk #{disk_params.join(" ")}"
+    else
+      disk_params.map { |x| "--disk #{x}" }.join("\n")
+    end
 
     spdk_services = storage_volumes.map { |volume| volume.spdk_service }.uniq
     spdk_after = spdk_services.map { |s| "After=#{s}" }.join("\n")
@@ -689,7 +696,7 @@ ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
 ExecStart=#{CloudHypervisor::Version::DEFAULT.bin} -v \
 --api-socket path=#{vp.ch_api_sock} \
 --kernel #{CloudHypervisor::Firmware::DEFAULT.path} \
---disk #{disk_params.join(" ")} path=#{vp.cloudinit_img} \
+#{disk_args} \
 --console off --serial file=#{vp.serial_log} \
 --cpus #{cpu_setting} \
 --memory size=#{mem_gib}G,hugepages=on,hugepage_size=1G \

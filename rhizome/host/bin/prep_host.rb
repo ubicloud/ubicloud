@@ -54,6 +54,7 @@ r "timedatectl set-timezone UTC"
 
 # Download cloud hypervisor binaries.
 CloudHypervisor::Version::DEFAULT.download
+CloudHypervisor::Version::OLD.download if defined?(CloudHypervisor::Version::OLD)
 
 # Download firmware binaries.
 CloudHypervisor::Firmware::DEFAULT.download
