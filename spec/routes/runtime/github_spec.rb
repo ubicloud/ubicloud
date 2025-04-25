@@ -172,6 +172,13 @@ RSpec.describe Clover, "github" do
 
         expect(last_response).to have_runtime_error(400, "Could not authorize multipart upload")
       end
+
+      it "fails if the bucket does not yet exist" do
+        expect(blob_storage_client).to receive(:create_multipart_upload).with(hash_including(bucket: repository.bucket_name)).and_raise(Aws::S3::Errors::NoSuchBucket.new("error", "error")).exactly(3)
+        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
+
+        expect(last_response).to have_runtime_error(400, "Could not authorize multipart upload")
+      end
     end
 
     describe "commits cache" do

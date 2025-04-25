@@ -124,7 +124,7 @@ class Clover
           retries = 0
           begin
             upload_id = repository.blob_storage_client.create_multipart_upload(bucket: repository.bucket_name, key: entry.blob_key).upload_id
-          rescue Aws::S3::Errors::Unauthorized, Aws::S3::Errors::InternalError => ex
+          rescue Aws::S3::Errors::Unauthorized, Aws::S3::Errors::InternalError, Aws::S3::Errors::NoSuchBucket => ex
             retries += 1
             if retries < 3
               # :nocov:
