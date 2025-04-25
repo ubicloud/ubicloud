@@ -3,9 +3,9 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe MonitorableResource do
-  let(:postgres_server) { PostgresServer.new { _1.id = "c068cac7-ed45-82db-bf38-a003582b36ee" } }
+  let(:postgres_server) { PostgresServer.new { it.id = "c068cac7-ed45-82db-bf38-a003582b36ee" } }
   let(:r_w_event_loop) { described_class.new(postgres_server) }
-  let(:vm_host) { VmHost.new { _1.id = "46683a25-acb1-4371-afe9-d39f303e44b4" } }
+  let(:vm_host) { VmHost.new { it.id = "46683a25-acb1-4371-afe9-d39f303e44b4" } }
   let(:r_without_event_loop) { described_class.new(vm_host) }
 
   describe "#open_resource_session" do

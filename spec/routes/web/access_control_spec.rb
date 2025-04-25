@@ -592,7 +592,7 @@ RSpec.describe Clover, "access control" do
             expect(page.all("table#tag-membership-add td").map(&:text)).to eq ["Member", "", "test-account", ""]
           when "action"
             expect(page.all("table#tag-membership-add tbody th").map(&:text)).to eq ["Global Tag", "Action"]
-            expect(page.all("table#tag-membership-add td").map(&:text)).to eq (global_tags + action_types).flat_map { [_1, ""] }
+            expect(page.all("table#tag-membership-add td").map(&:text)).to eq (global_tags + action_types).flat_map { [it, ""] }
           else
             expect(page.html).not_to include "Add Members to #{cap_type} Tag"
           end
@@ -608,7 +608,7 @@ RSpec.describe Clover, "access control" do
           expect(page.all("table#tag-membership-add td").map(&:text)).to eq ["Member", "", "other-subject", "", "test-account", ""]
         when "action"
           expect(page.all("table#tag-membership-add tbody th").map(&:text)).to eq ["Global Tag", "Tag", "Action"]
-          expect(page.all("table#tag-membership-add td").map(&:text)).to eq [*global_tags, "other-action", *action_types].flat_map { [_1, ""] }
+          expect(page.all("table#tag-membership-add td").map(&:text)).to eq [*global_tags, "other-action", *action_types].flat_map { [it, ""] }
         else
           expect(page.all("table#tag-membership-add tbody th").map(&:text)).to eq ["Tag (grants access to objects contained in tag)", "Project", "SubjectTag", "ObjectTag (grants access to tag itself)"]
           expect(page.all("table#tag-membership-add td").map(&:text)).to eq ["other-object", "", "Default", "", "Admin", "", "Member", "", "other-object", "", "test-object", ""]
@@ -666,11 +666,11 @@ RSpec.describe Clover, "access control" do
             "", ""]
         when "action"
           ["Global Tag",
-            *ActionTag.where(project_id: nil).select_order_map(:name).flat_map { [_1, ""] },
+            *ActionTag.where(project_id: nil).select_order_map(:name).flat_map { [it, ""] },
             "Tag",
             "test3-action", "",
             "Action",
-            *ActionType.map(&:name).sort.flat_map { [_1, ""] }]
+            *ActionType.map(&:name).sort.flat_map { [it, ""] }]
         else
           ["Tag (grants access to objects contained in tag)",
             "test3-object", "",

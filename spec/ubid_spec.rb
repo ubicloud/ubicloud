@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.describe UBID do
-  let(:all_types) { described_class.constants.select { _1.start_with?("TYPE_") }.map { described_class.const_get(_1) } }
+  let(:all_types) { described_class.constants.select { it.start_with?("TYPE_") }.map { described_class.const_get(it) } }
 
   it ".generate_vanity_action_type supports creating vanity ubids for action types" do
     expect(described_class.generate_vanity_action_type("Project:view").to_s).to eq "ttzzzzzzzz021gzzz0pj0v1ew0"
@@ -33,7 +33,7 @@ RSpec.describe UBID do
       ["0", 0], ["o", 0], ["A", 10], ["e", 14], ["m", 20], ["S", 25], ["z", 31]
     ]
     tests.each {
-      expect(described_class.to_base32(_1[0])).to eq(_1[1])
+      expect(described_class.to_base32(it[0])).to eq(it[1])
     }
   end
 
@@ -57,7 +57,7 @@ RSpec.describe UBID do
       [0, "0"], [12, "c"], [16, "g"], [20, "m"], [26, "t"], [28, "w"], [31, "z"]
     ]
     tests.each {
-      expect(described_class.from_base32(_1[0])).to eq(_1[1])
+      expect(described_class.from_base32(it[0])).to eq(it[1])
     }
   end
 
@@ -137,7 +137,7 @@ RSpec.describe UBID do
       ubids = Array.new(10) do
         described_class.from_uuidish(DB.get { gen_random_ubid_uuid(klass.to_base32_n(type)) })
       end
-      expect(ubids.map { _1.to_s[0..1] }).to eq([type] * 10)
+      expect(ubids.map { it.to_s[0..1] }).to eq([type] * 10)
       ints = ubids.map(&:to_i)
       max_ubid = ints.max
       min_ubid = ints.min
@@ -209,12 +209,12 @@ RSpec.describe UBID do
     expect(sshable.ubid).to start_with UBID::TYPE_SSHABLE
 
     host = create_vm_host
-    si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: host.id) { _1.id = host.id }
+    si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: host.id) { it.id = host.id }
 
     vm = create_vm
     expect(vm.ubid).to start_with UBID::TYPE_VM
 
-    dev = StorageDevice.create(name: "x", available_storage_gib: 1, total_storage_gib: 1, vm_host_id: host.id) { _1.id = host.id }
+    dev = StorageDevice.create(name: "x", available_storage_gib: 1, total_storage_gib: 1, vm_host_id: host.id) { it.id = host.id }
 
     sv = VmStorageVolume.create_with_id(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false, spdk_installation_id: si.id, storage_device_id: dev.id)
     expect(sv.ubid).to start_with UBID::TYPE_VM_STORAGE_VOLUME
@@ -284,9 +284,9 @@ RSpec.describe UBID do
   it "can decode ids" do
     sshable = Sshable.create_with_id
     host = create_vm_host
-    si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: host.id) { _1.id = host.id }
+    si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: host.id) { it.id = host.id }
     vm = create_vm
-    dev = StorageDevice.create(name: "x", available_storage_gib: 1, total_storage_gib: 1, vm_host_id: host.id) { _1.id = host.id }
+    dev = StorageDevice.create(name: "x", available_storage_gib: 1, total_storage_gib: 1, vm_host_id: host.id) { it.id = host.id }
     sv = VmStorageVolume.create_with_id(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false, spdk_installation_id: si.id, storage_device_id: dev.id)
     kek = StorageKeyEncryptionKey.create_with_id(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")
     account = Account.create_with_id(email: "x@y.net")

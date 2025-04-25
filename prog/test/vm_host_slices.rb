@@ -37,6 +37,6 @@ class Prog::Test::VmHostSlices < Prog::Test::Base
   end
 
   def slices
-    @slices ||= frame["slices"].map { VmHostSlice[_1] }
+    @slices ||= frame["slices"].map { VmHostSlice[it] }
   end
 end

@@ -14,7 +14,7 @@ inherit_gem:
   standard: config/base.yml
 
 AllCops:
-  TargetRubyVersion: 3.2
+  TargetRubyVersion: 3.4
   NewCops: enable
   Exclude:
     - public/**/*
@@ -33,6 +33,10 @@ Rake:
 
 Sequel:
   Enabled: true
+
+# Seems to be buggy and flags non-redundant line continuations as redundant
+Style/RedundantLineContinuation:
+  Enabled: false
 
 RSpec/DescribeMethod:
   Enabled: false

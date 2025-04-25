@@ -33,9 +33,9 @@ class Prog::Minio::MinioServerNexus < Prog::Base
         distinct_storage_devices: Config.production? && !Config.is_e2e
       )
 
-      minio_server = MinioServer.create(minio_pool_id: minio_pool_id, vm_id: vm_st.id, index: index) { _1.id = ubid.to_uuid }
+      minio_server = MinioServer.create(minio_pool_id: minio_pool_id, vm_id: vm_st.id, index: index) { it.id = ubid.to_uuid }
 
-      Strand.create(prog: "Minio::MinioServerNexus", label: "start") { _1.id = minio_server.id }
+      Strand.create(prog: "Minio::MinioServerNexus", label: "start") { it.id = minio_server.id }
     end
   end
 
@@ -167,7 +167,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     register_deadline("wait", 10 * 60)
 
     reap
-    nap 5 unless strand.children.select { _1.prog == "Minio::MinioServerNexus" && _1.label == "minio_restart" }.empty?
+    nap 5 unless strand.children.select { it.prog == "Minio::MinioServerNexus" && it.label == "minio_restart" }.empty?
 
     if available?
       decr_checkup
@@ -184,7 +184,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     minio_server.cluster.dns_zone&.delete_record(record_name: cluster.hostname, type: "A", data: vm.ephemeral_net4&.to_s)
     minio_server.cluster.dns_zone&.delete_record(record_name: cluster.hostname, type: "AAAA", data: vm.ephemeral_net6&.nth(2)&.to_s)
     minio_server.vm.sshable.destroy
-    minio_server.vm.nics.each { _1.incr_destroy }
+    minio_server.vm.nics.each { it.incr_destroy }
     minio_server.vm.incr_destroy
     minio_server.destroy
 
@@ -193,8 +193,8 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
   def available?
     return true if minio_server.initial_provisioning_set?
-    server_data = JSON.parse(minio_server.client.admin_info.body)["servers"].find { _1["endpoint"] == minio_server.endpoint }
-    server_data["state"] == "online" && server_data["drives"].all? { _1["state"] == "ok" }
+    server_data = JSON.parse(minio_server.client.admin_info.body)["servers"].find { it["endpoint"] == minio_server.endpoint }
+    server_data["state"] == "online" && server_data["drives"].all? { it["state"] == "ok" }
   rescue => ex
     Clog.emit("Minio server is down") { {minio_server_down: {ubid: minio_server.ubid, exception: Util.exception_to_hash(ex)}} }
     false

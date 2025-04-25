@@ -48,7 +48,7 @@ RSpec.describe VmHost do
   it "requires an Sshable too" do
     expect {
       sa = Sshable.create_with_id(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair)
-      described_class.create(location_id: Location::HETZNER_FSN1_ID) { _1.id = sa.id }
+      described_class.create(location_id: Location::HETZNER_FSN1_ID) { it.id = sa.id }
     }.not_to raise_error
   end
 
@@ -269,8 +269,8 @@ RSpec.describe VmHost do
   it "create_addresses fails if a failover ip of non existent server is being added" do
     expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
     expect(vh).to receive(:id).and_return("46683a25-acb1-4371-afe9-d39f303e44b4").at_least(:once)
-    Sshable.create(host: "test.localhost") { _1.id = vh.id }
-    described_class.create(location_id: Location::HETZNER_FSN1_ID) { _1.id = vh.id }
+    Sshable.create(host: "test.localhost") { it.id = vh.id }
+    described_class.create(location_id: Location::HETZNER_FSN1_ID) { it.id = vh.id }
 
     expect(vh).to receive(:assigned_subnets).and_return([]).at_least(:once)
     expect { vh.create_addresses }.to raise_error(RuntimeError, "BUG: source host 1.1.1.1 isn't added to the database")
@@ -278,10 +278,10 @@ RSpec.describe VmHost do
 
   it "create_addresses creates given addresses and doesn't make an api call when ips given" do
     expect(vh).to receive(:id).and_return("46683a25-acb1-4371-afe9-d39f303e44b4").at_least(:once)
-    Sshable.create(host: "1.1.0.0") { _1.id = vh.id }
+    Sshable.create(host: "1.1.0.0") { it.id = vh.id }
     Sshable.create_with_id(host: "1.1.1.1")
 
-    described_class.create(location_id: Location::HETZNER_FSN1_ID) { _1.id = vh.id }
+    described_class.create(location_id: Location::HETZNER_FSN1_ID) { it.id = vh.id }
 
     expect(vh).to receive(:assigned_subnets).and_return([]).at_least(:once)
     vh.create_addresses(ip_records: hetzner_ips)
@@ -292,10 +292,10 @@ RSpec.describe VmHost do
   it "create_addresses creates addresses" do
     expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
     expect(vh).to receive(:id).and_return("46683a25-acb1-4371-afe9-d39f303e44b4").at_least(:once)
-    Sshable.create(host: "1.1.0.0") { _1.id = vh.id }
+    Sshable.create(host: "1.1.0.0") { it.id = vh.id }
     Sshable.create_with_id(host: "1.1.1.1")
 
-    described_class.create(location_id: Location::HETZNER_FSN1_ID) { _1.id = vh.id }
+    described_class.create(location_id: Location::HETZNER_FSN1_ID) { it.id = vh.id }
 
     expect(vh).to receive(:assigned_subnets).and_return([]).at_least(:once)
     vh.create_addresses
@@ -312,9 +312,9 @@ RSpec.describe VmHost do
   it "skips already assigned subnets" do
     expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
     expect(vh).to receive(:id).and_return("46683a25-acb1-4371-afe9-d39f303e44b4").at_least(:once)
-    Sshable.create(host: "1.1.0.0") { _1.id = vh.id }
+    Sshable.create(host: "1.1.0.0") { it.id = vh.id }
     Sshable.create_with_id(host: "1.1.1.1")
-    described_class.create(location_id: Location::HETZNER_FSN1_ID) { _1.id = vh.id }
+    described_class.create(location_id: Location::HETZNER_FSN1_ID) { it.id = vh.id }
 
     expect(vh).to receive(:assigned_subnets).and_return([Address.new(cidr: NetAddr::IPv4Net.parse("1.1.1.0/30".shellescape))]).at_least(:once)
     vh.create_addresses
@@ -331,8 +331,8 @@ RSpec.describe VmHost do
     expect(vh).to receive(:id).and_return(new_id).at_least(:once)
     expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
 
-    Sshable.create(host: "1.1.0.0") { _1.id = old_id }
-    described_class.create(location_id: Location::HETZNER_FSN1_ID) { _1.id = old_id }
+    Sshable.create(host: "1.1.0.0") { it.id = old_id }
+    described_class.create(location_id: Location::HETZNER_FSN1_ID) { it.id = old_id }
 
     Sshable.create_with_id(host: "1.1.1.1")
     adr = Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: old_id)
@@ -349,8 +349,8 @@ RSpec.describe VmHost do
     old_id = "4c5dc171-a116-4a05-9e6d-381a4b382b71"
     expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
 
-    Sshable.create(host: "1.1.0.0") { _1.id = old_id }
-    described_class.create(location_id: Location::HETZNER_FSN1_ID) { _1.id = old_id }
+    Sshable.create(host: "1.1.0.0") { it.id = old_id }
+    described_class.create(location_id: Location::HETZNER_FSN1_ID) { it.id = old_id }
 
     adr = Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: old_id)
     expect(Address).to receive(:where).with(cidr: "1.1.1.0/30").and_return([adr]).once

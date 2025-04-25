@@ -9,7 +9,7 @@ module AccessControlModelTag
 
       define_method(:applied_table) { table }
       define_method(:applied_column) { column }
-      define_method(:"add_#{base}") { add_member(_1) }
+      define_method(:"add_#{base}") { add_member(it) }
     end
   end
 
@@ -26,7 +26,7 @@ module AccessControlModelTag
   end
 
   def add_members(member_ids)
-    applied_dataset.import([:tag_id, applied_column], member_ids.map { [id, _1] })
+    applied_dataset.import([:tag_id, applied_column], member_ids.map { [id, it] })
   end
 
   def remove_members(member_ids)
@@ -71,17 +71,17 @@ module AccessControlModelTag
     end
 
     proposed_additions = {}
-    to_add.each { proposed_additions[_1] = nil }
+    to_add.each { proposed_additions[it] = nil }
     UBID.resolve_map(proposed_additions)
 
     to_add = []
     # Only allow valid members into the tag
     proposed_additions.each_value do
-      if is_a?(SubjectTag) && _1.is_a?(SubjectTag) && _1.name == "Admin"
+      if is_a?(SubjectTag) && it.is_a?(SubjectTag) && it.name == "Admin"
         issues << "cannot include Admin subject tag in another tag"
         next
       end
-      to_add << _1 if _1 && self.class.valid_member?(project_id, _1)
+      to_add << it if it && self.class.valid_member?(project_id, it)
     end
     if proposed_additions.size != to_add.size
       issues << "#{proposed_additions.size - to_add.size} members not valid"

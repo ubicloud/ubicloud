@@ -198,7 +198,7 @@ end
       child.id
     end.freeze
 
-    strand.children.delete_if { reaped_ids.include?(_1.id) }
+    strand.children.delete_if { reaped_ids.include?(it.id) }
 
     reapable
   end

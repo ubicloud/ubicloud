@@ -32,7 +32,7 @@ class DnsZone < Sequel::Model
     DB[:dns_record].import(
       [:id, :dns_zone_id, :name, :type, :ttl, :data, :tombstoned],
       records.select_map([:name, :type, :ttl, :data]).map do
-        [DnsRecord.generate_uuid, id, *_1, true]
+        [DnsRecord.generate_uuid, id, *it, true]
       end
     )
 

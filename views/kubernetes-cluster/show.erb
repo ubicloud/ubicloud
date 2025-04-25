@@ -23,7 +23,7 @@
     ["Location", @kc.display_location],
     ["Kubernetes Version", @kc.version],
     ["Control Plane Nodes", @kc.cp_node_count],
-    ["Worker Nodes", @kc.nodepools.sum { _1.node_count }]
+    ["Worker Nodes", @kc.nodepools.sum { it.node_count }]
   ]
   
   if @kc.display_state == "running"

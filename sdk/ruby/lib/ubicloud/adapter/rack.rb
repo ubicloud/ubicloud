@@ -32,7 +32,7 @@ module Ubicloud
 
       status, _, rack_body = @app.call(env)
       body = +""
-      rack_body.each { body << _1 }
+      rack_body.each { body << it }
       rack_body.close if rack_body.respond_to?(:close)
 
       handle_response(status, body, missing:)

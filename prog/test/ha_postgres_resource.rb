@@ -8,9 +8,9 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
   def self.assemble
     postgres_test_project = Project.create(name: "Postgres-HA-Test-Project")
     Project[Config.postgres_service_project_id] ||
-      Project.create(name: "Postgres-Service-Project") { _1.id = Config.postgres_service_project_id }
+      Project.create(name: "Postgres-Service-Project") { it.id = Config.postgres_service_project_id }
     Project[Config.minio_service_project_id] ||
-      Project.create(name: "Minio-Service-Project") { _1.id = Config.minio_service_project_id }
+      Project.create(name: "Minio-Service-Project") { it.id = Config.minio_service_project_id }
 
     frame = {
       "postgres_test_project_id" => postgres_test_project.id,
@@ -56,7 +56,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
 
   label def wait_postgres_resource
     server_count = postgres_resource.servers.count
-    nap 10 if server_count != postgres_resource.target_server_count || postgres_resource.servers.filter { _1.strand.label != "wait" }.any?
+    nap 10 if server_count != postgres_resource.target_server_count || postgres_resource.servers.filter { it.strand.label != "wait" }.any?
     hop_test_postgres
   end
 
@@ -70,7 +70,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
   end
 
   label def trigger_failover
-    primary = postgres_resource.servers.find { _1.timeline_access == "push" }
+    primary = postgres_resource.servers.find { it.timeline_access == "push" }
     update_stack({"primary_ubid" => primary.ubid})
 
     primary.vm.sshable.cmd("echo -e '\nfoobar' | sudo tee -a /etc/postgresql/#{postgres_resource.version}/main/conf.d/001-service.conf")

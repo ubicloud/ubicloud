@@ -49,16 +49,16 @@ PGHOST=/var/run/postgresql
     begin
       blob_storage_client
         .list_objects(ubid, "basebackups_005/")
-        .select { _1.key.end_with?("backup_stop_sentinel.json") }
+        .select { it.key.end_with?("backup_stop_sentinel.json") }
     rescue => ex
       recoverable_errors = ["The Access Key Id you provided does not exist in our records.", "AccessDenied", "No route to host", "Connection refused"]
-      return [] if recoverable_errors.any? { ex.message.include?(_1) }
+      return [] if recoverable_errors.any? { ex.message.include?(it) }
       raise
     end
   end
 
   def latest_backup_label_before_target(target:)
-    backup = backups.sort_by(&:last_modified).reverse.find { _1.last_modified < target }
+    backup = backups.sort_by(&:last_modified).reverse.find { it.last_modified < target }
     fail "BUG: no backup found" unless backup
     backup.key.delete_prefix("basebackups_005/").delete_suffix("_backup_stop_sentinel.json")
   end

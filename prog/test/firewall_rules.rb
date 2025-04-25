@@ -171,7 +171,7 @@ ExecStart=nc -l 8080 -6
   end
 
   def vm2
-    @vm2 ||= firewall.private_subnets.first.vms.reject { _1.id == vm1.id }.first
+    @vm2 ||= firewall.private_subnets.first.vms.reject { it.id == vm1.id }.first
   end
 
   def vm_outside

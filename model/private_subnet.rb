@@ -145,7 +145,7 @@ class PrivateSubnet < Sequel::Model
   end
 
   def find_all_connected_nics(excluded_private_subnet_ids = [])
-    nics + connected_subnets.select { |subnet| !excluded_private_subnet_ids.include?(subnet.id) }.flat_map { _1.find_all_connected_nics(excluded_private_subnet_ids + [id]) }.uniq
+    nics + connected_subnets.select { |subnet| !excluded_private_subnet_ids.include?(subnet.id) }.flat_map { it.find_all_connected_nics(excluded_private_subnet_ids + [id]) }.uniq
   end
 end
 

@@ -78,7 +78,7 @@
                     options:
                       ISO3166::Country
                         .all
-                        .reject { Config.sanctioned_countries.include?(_1.alpha2) }
+                        .reject { Config.sanctioned_countries.include?(it.alpha2) }
                         .sort_by(&:common_name)
                         .map { |c| [c.alpha2, c.common_name] }
                         .to_h

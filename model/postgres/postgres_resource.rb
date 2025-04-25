@@ -43,7 +43,7 @@ class PostgresResource < Sequel::Model
   def display_state
     return "deleting" if destroy_set? || strand.nil? || strand.label == "destroy"
     return "unavailable" if representative_server&.strand&.label == "unavailable"
-    return "converging" if strand.children.any? { _1.prog == "Postgres::ConvergePostgresResource" }
+    return "converging" if strand.children.any? { it.prog == "Postgres::ConvergePostgresResource" }
     return "running" if ["wait", "refresh_certificates", "refresh_dns_record"].include?(strand.label) && !initial_provisioning_set?
     "creating"
   end
@@ -92,20 +92,20 @@ class PostgresResource < Sequel::Model
   end
 
   def has_enough_fresh_servers?
-    servers.count { !_1.needs_recycling? } >= target_server_count
+    servers.count { !it.needs_recycling? } >= target_server_count
   end
 
   def has_enough_ready_servers?
-    servers.count { !_1.needs_recycling? && _1.strand.label == "wait" } >= target_server_count
+    servers.count { !it.needs_recycling? && it.strand.label == "wait" } >= target_server_count
   end
 
   def needs_convergence?
-    servers.any? { _1.needs_recycling? } || servers.count != target_server_count
+    servers.any? { it.needs_recycling? } || servers.count != target_server_count
   end
 
   def set_firewall_rules
-    vm_firewall_rules = firewall_rules.map { {cidr: _1.cidr.to_s, port_range: Sequel.pg_range(5432..5432)} }
-    vm_firewall_rules.concat(firewall_rules.map { {cidr: _1.cidr.to_s, port_range: Sequel.pg_range(6432..6432)} })
+    vm_firewall_rules = firewall_rules.map { {cidr: it.cidr.to_s, port_range: Sequel.pg_range(5432..5432)} }
+    vm_firewall_rules.concat(firewall_rules.map { {cidr: it.cidr.to_s, port_range: Sequel.pg_range(6432..6432)} })
     vm_firewall_rules.push({cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)})
     vm_firewall_rules.push({cidr: "::/0", port_range: Sequel.pg_range(22..22)})
     vm_firewall_rules.push({cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(5432..5432)})

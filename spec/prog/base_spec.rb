@@ -298,7 +298,7 @@ RSpec.describe Prog::Base do
 
     it "can create a page with extra data from a vm" do
       vm = create_vm
-      st = Strand.create(prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}]) { _1.id = vm.id }
+      st = Strand.create(prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}]) { it.id = vm.id }
       st.unsynchronized_run
       page = Page.active.first
       expect(page).not_to be_nil
@@ -308,7 +308,7 @@ RSpec.describe Prog::Base do
 
     it "can create a page with extra data from a vm with a vm host" do
       vm = create_vm(vm_host: create_vm_host(data_center: "FSN1-DC1"))
-      st = Strand.create(prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}]) { _1.id = vm.id }
+      st = Strand.create(prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}]) { it.id = vm.id }
       st.unsynchronized_run
       page = Page.active.first
       expect(page).not_to be_nil
@@ -319,7 +319,7 @@ RSpec.describe Prog::Base do
     it "can create a page with extra data from a vm host" do
       vmh = create_vm_host(data_center: "FSN1-DC1")
       create_vm(vm_host: vmh)
-      st = Strand.create(prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}]) { _1.id = vmh.id }
+      st = Strand.create(prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}]) { it.id = vmh.id }
       st.unsynchronized_run
       page = Page.active.first
       expect(page).not_to be_nil
@@ -330,7 +330,7 @@ RSpec.describe Prog::Base do
     it "can create a page with extra data from a github runner" do
       installation = GithubInstallation.create(installation_id: 123, name: "test-user", type: "User", project: Project.create(name: "test-project"))
       runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "my-repo", installation:)
-      st = Strand.create(prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}]) { _1.id = runner.id }
+      st = Strand.create(prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}]) { it.id = runner.id }
       st.unsynchronized_run
       page = Page.active.first
       expect(page).not_to be_nil
@@ -342,7 +342,7 @@ RSpec.describe Prog::Base do
       vm = create_vm(vm_host: create_vm_host(data_center: "FSN1-DC1"))
       installation = GithubInstallation.create(installation_id: 123, name: "test-user", type: "User", project: Project.create(name: "test-project"))
       runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "my-repo", vm_id: vm.id, installation:)
-      st = Strand.create(prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}]) { _1.id = runner.id }
+      st = Strand.create(prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}]) { it.id = runner.id }
       st.unsynchronized_run
       page = Page.active.first
       expect(page).not_to be_nil

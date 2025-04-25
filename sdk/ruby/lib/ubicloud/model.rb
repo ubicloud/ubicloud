@@ -42,7 +42,7 @@ module Ubicloud
           fragment
         end
 
-        adapter.get(path)[:items].map { new(adapter, _1) }
+        adapter.get(path)[:items].map { new(adapter, it) }
       end
 
       # Resolve associations.  This is called after all models have been loaded.
@@ -234,7 +234,7 @@ module Ubicloud
 
         values[key] = if value.is_a?(Array)
           value.map do
-            convert_to_association(_1, klass)
+            convert_to_association(it, klass)
           end
         else
           convert_to_association(value, klass)

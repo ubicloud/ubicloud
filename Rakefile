@@ -427,4 +427,4 @@ namespace :linter do
 end
 
 desc "Run all linters"
-task linter: ["rubocop", "brakeman", "erb_formatter", "openapi", "go"].map { "linter:#{_1}" }
+task linter: ["rubocop", "brakeman", "erb_formatter", "openapi", "go"].map { "linter:#{it}" }

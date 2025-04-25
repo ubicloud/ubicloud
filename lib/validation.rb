@@ -62,8 +62,8 @@ module Validation
   end
 
   def self.validate_vm_size(size, arch, only_visible: false)
-    available_vm_sizes = Option::VmSizes.select { !only_visible || _1.visible }
-    unless (vm_size = available_vm_sizes.find { _1.name == size && _1.arch == arch })
+    available_vm_sizes = Option::VmSizes.select { !only_visible || it.visible }
+    unless (vm_size = available_vm_sizes.find { it.name == size && it.arch == arch })
       fail ValidationFailed.new({size: "\"#{size}\" is not a valid virtual machine size. Available sizes: #{available_vm_sizes.map(&:name)}"})
     end
     vm_size
@@ -77,13 +77,13 @@ module Validation
   end
 
   def self.validate_boot_image(image_name)
-    unless Option::BootImages.find { _1.name == image_name }
+    unless Option::BootImages.find { it.name == image_name }
       fail ValidationFailed.new({boot_image: "\"#{image_name}\" is not a valid boot image name. Available boot image names are: #{Option::BootImages.map(&:name)}"})
     end
   end
 
   def self.validate_postgres_ha_type(ha_type)
-    unless Option::PostgresHaOptions.find { _1.name == ha_type }
+    unless Option::PostgresHaOptions.find { it.name == ha_type }
       fail ValidationFailed.new({ha_type: "\"#{ha_type}\" is not a valid PostgreSQL high availability option. Available options: #{Option::PostgresHaOptions.map(&:name)}"})
     end
   end
@@ -125,7 +125,7 @@ module Validation
 
   def self.validate_postgres_size(location, size, project_id)
     all_sizes_for_project = Option.customer_postgres_sizes_for_project(project_id)
-    unless (postgres_size = all_sizes_for_project.find { _1.location_id == location.id && _1.name == size })
+    unless (postgres_size = all_sizes_for_project.find { it.location_id == location.id && it.name == size })
       fail ValidationFailed.new({size: "\"#{size}\" is not a valid PostgreSQL database size. Available sizes: #{all_sizes_for_project.map(&:name)}"})
     end
     postgres_size

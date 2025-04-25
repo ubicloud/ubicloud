@@ -11,7 +11,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
   def_delegators :inference_endpoint, :replicas, :load_balancer, :private_subnet, :project
 
   def self.model_for_id(model_id)
-    Option::AI_MODELS.detect { _1["id"] == model_id }
+    Option::AI_MODELS.detect { it["id"] == model_id }
   end
 
   def self.assemble_with_model(project_id:, location_id:, name:, model_id:,
@@ -74,9 +74,9 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
         model_name:, engine:, engine_params:, replica_count:, is_public:,
         load_balancer_id: lb_s.id, private_subnet_id: subnet_s.id, gpu_count:, tags:,
         max_requests:, max_project_rps:, max_project_tps:, external_config:
-      ) { _1.id = ubid.to_uuid }
+      ) { it.id = ubid.to_uuid }
       Prog::Ai::InferenceEndpointReplicaNexus.assemble(inference_endpoint.id)
-      Strand.create(prog: "Ai::InferenceEndpointNexus", label: "start") { _1.id = inference_endpoint.id }
+      Strand.create(prog: "Ai::InferenceEndpointNexus", label: "start") { it.id = inference_endpoint.id }
     end
   end
 
@@ -95,7 +95,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
   end
 
   label def wait_replicas
-    nap 5 if replicas.any? { _1.strand.label != "wait" }
+    nap 5 if replicas.any? { it.strand.label != "wait" }
     hop_wait
   end
 
@@ -126,7 +126,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
   end
 
   def reconcile_replicas
-    actual_replica_count = replicas.count { !(_1.destroy_set? || _1.strand.label == "destroy") }
+    actual_replica_count = replicas.count { !(it.destroy_set? || it.strand.label == "destroy") }
     desired_replica_count = inference_endpoint.replica_count
 
     if actual_replica_count < desired_replica_count
@@ -135,7 +135,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
       end
     elsif actual_replica_count > desired_replica_count
       victims = replicas.select {
-                  !(_1.destroy_set? || _1.strand.label == "destroy")
+                  !(it.destroy_set? || it.strand.label == "destroy")
                 }
         .sort_by { |r|
         [(r.strand.label == "wait") ? 1 : 0, r.created_at]

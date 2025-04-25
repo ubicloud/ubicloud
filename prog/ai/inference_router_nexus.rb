@@ -39,9 +39,9 @@ class Prog::Ai::InferenceRouterNexus < Prog::Base
 
       inference_router = InferenceRouter.create(
         project_id:, location_id:, name:, vm_size:, replica_count:, load_balancer_id: lb_s.id, private_subnet_id: subnet_s.id
-      ) { _1.id = ubid.to_uuid }
+      ) { it.id = ubid.to_uuid }
       Prog::Ai::InferenceRouterReplicaNexus.assemble(inference_router.id)
-      Strand.create(prog: "Ai::InferenceRouterNexus", label: "start") { _1.id = inference_router.id }
+      Strand.create(prog: "Ai::InferenceRouterNexus", label: "start") { it.id = inference_router.id }
     end
   end
 
@@ -60,7 +60,7 @@ class Prog::Ai::InferenceRouterNexus < Prog::Base
   end
 
   label def wait_replicas
-    nap 5 if replicas.any? { _1.strand.label != "wait" }
+    nap 5 if replicas.any? { it.strand.label != "wait" }
     hop_wait
   end
 
@@ -90,7 +90,7 @@ class Prog::Ai::InferenceRouterNexus < Prog::Base
   end
 
   def reconcile_replicas
-    actual_replica_count = replicas.count { !(_1.destroy_set? || _1.strand.label == "destroy") }
+    actual_replica_count = replicas.count { !(it.destroy_set? || it.strand.label == "destroy") }
     desired_replica_count = inference_router.replica_count
 
     if actual_replica_count < desired_replica_count
@@ -99,7 +99,7 @@ class Prog::Ai::InferenceRouterNexus < Prog::Base
       end
     elsif actual_replica_count > desired_replica_count
       victims = replicas.select {
-                  !(_1.destroy_set? || _1.strand.label == "destroy")
+                  !(it.destroy_set? || it.strand.label == "destroy")
                 }
         .sort_by { |r|
         [(r.strand.label == "wait") ? 1 : 0, r.created_at]

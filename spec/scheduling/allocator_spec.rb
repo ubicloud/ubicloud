@@ -9,7 +9,7 @@ TestResourceAllocation = Struct.new(:utilization, :is_valid)
 RSpec.describe Al do
   let(:vm) {
     Vm.new(family: "standard", vcpus: 2, cpu_percent_limit: 200, cpu_burst_percent_limit: 0, memory_gib: 8, name: "dummy-vm", arch: "x64", location_id: Location::HETZNER_FSN1_ID, ip4_enabled: "true", created_at: Time.now, unix_user: "", public_key: "", boot_image: "ubuntu-jammy").tap {
-      _1.id = "2464de61-7501-8374-9ab0-416caebe31da"
+      it.id = "2464de61-7501-8374-9ab0-416caebe31da"
     }
   }
 
@@ -20,7 +20,7 @@ RSpec.describe Al do
       vm.id,
       vm.vcpus,
       vm.memory_gib,
-      storage_volumes.map { _1["size_gib"] }.sum,
+      storage_volumes.map { it["size_gib"] }.sum,
       storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
       vm.boot_image,
       distinct_storage_devices,
@@ -115,7 +115,7 @@ RSpec.describe Al do
 
     it "selects the best allocation candidate" do
       candidates = [[0.1, false], [5, true], [0.9, true], [99, true]]
-      candidates.each { expect(Al::Allocation).to receive(:new).once.ordered.with(_1, req).and_return TestAllocation.new(_1[0], _1[1]) }
+      candidates.each { expect(Al::Allocation).to receive(:new).once.ordered.with(it, req).and_return TestAllocation.new(it[0], it[1]) }
       expect(Al::Allocation).to receive(:candidate_hosts).with(req).and_return(candidates)
       expect(Al::Allocation).to receive(:random_score).and_return(0).at_least(:once)
 
@@ -572,7 +572,7 @@ RSpec.describe Al do
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
-      SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { _1.id = vmh.id }
+      SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { it.id = vmh.id }
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
       PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
       PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
@@ -583,18 +583,18 @@ RSpec.describe Al do
       vmh = VmHost.first
       used_cores = vmh.used_cores
       used_hugepages_1g = vmh.used_hugepages_1g
-      available_storage = vmh.storage_devices.sum { _1.available_storage_gib }
+      available_storage = vmh.storage_devices.sum { it.available_storage_gib }
       described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
         {"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])
       vmh.reload
-      expect(vm.vm_storage_volumes.detect { _1.disk_index == 0 }.size_gib).to eq(85)
-      expect(vm.vm_storage_volumes.detect { _1.disk_index == 1 }.size_gib).to eq(95)
-      expect(StorageDevice[vm.vm_storage_volumes.detect { _1.disk_index == 0 }.storage_device_id].name).to eq("stor2")
-      expect(StorageDevice[vm.vm_storage_volumes.detect { _1.disk_index == 1 }.storage_device_id].name).to eq("stor1")
+      expect(vm.vm_storage_volumes.detect { it.disk_index == 0 }.size_gib).to eq(85)
+      expect(vm.vm_storage_volumes.detect { it.disk_index == 1 }.size_gib).to eq(95)
+      expect(StorageDevice[vm.vm_storage_volumes.detect { it.disk_index == 0 }.storage_device_id].name).to eq("stor2")
+      expect(StorageDevice[vm.vm_storage_volumes.detect { it.disk_index == 1 }.storage_device_id].name).to eq("stor1")
       expect(used_cores + vm.cores).to eq(vmh.used_cores)
       expect(used_hugepages_1g + vm.memory_gib).to eq(vmh.used_hugepages_1g)
-      expect(available_storage - 180).to eq(vmh.storage_devices.sum { _1.available_storage_gib })
-      expect(vmh.pci_devices.map { _1.vm_id }).to eq([nil, nil])
+      expect(available_storage - 180).to eq(vmh.storage_devices.sum { it.available_storage_gib })
+      expect(vmh.pci_devices.map { it.vm_id }).to eq([nil, nil])
     end
 
     it "updates pci devices" do
@@ -602,25 +602,25 @@ RSpec.describe Al do
       vmh = VmHost.first
       used_cores = vmh.used_cores
       used_hugepages_1g = vmh.used_hugepages_1g
-      available_storage = vmh.storage_devices.sum { _1.available_storage_gib }
+      available_storage = vmh.storage_devices.sum { it.available_storage_gib }
       described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
         {"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}], gpu_count: 1)
       vmh.reload
-      expect(vm.vm_storage_volumes.detect { _1.disk_index == 0 }.size_gib).to eq(85)
-      expect(vm.vm_storage_volumes.detect { _1.disk_index == 1 }.size_gib).to eq(95)
-      expect(StorageDevice[vm.vm_storage_volumes.detect { _1.disk_index == 0 }.storage_device_id].name).to eq("stor2")
-      expect(StorageDevice[vm.vm_storage_volumes.detect { _1.disk_index == 1 }.storage_device_id].name).to eq("stor1")
+      expect(vm.vm_storage_volumes.detect { it.disk_index == 0 }.size_gib).to eq(85)
+      expect(vm.vm_storage_volumes.detect { it.disk_index == 1 }.size_gib).to eq(95)
+      expect(StorageDevice[vm.vm_storage_volumes.detect { it.disk_index == 0 }.storage_device_id].name).to eq("stor2")
+      expect(StorageDevice[vm.vm_storage_volumes.detect { it.disk_index == 1 }.storage_device_id].name).to eq("stor1")
       expect(used_cores + vm.cores).to eq(vmh.used_cores)
       expect(used_hugepages_1g + vm.memory_gib).to eq(vmh.used_hugepages_1g)
-      expect(available_storage - 180).to eq(vmh.storage_devices.sum { _1.available_storage_gib })
-      expect(vmh.pci_devices.map { _1.vm_id }).to eq([vm.id, vm.id])
+      expect(available_storage - 180).to eq(vmh.storage_devices.sum { it.available_storage_gib })
+      expect(vmh.pci_devices.map { it.vm_id }).to eq([vm.id, vm.id])
     end
 
     it "allows concurrent allocations" do
       vmh = VmHost.first
       used_cores = vmh.used_cores
       used_hugepages_1g = vmh.used_hugepages_1g
-      available_storage = vmh.storage_devices.sum { _1.available_storage_gib }
+      available_storage = vmh.storage_devices.sum { it.available_storage_gib }
       vm1 = create_vm
       vm2 = create_vm
       al1 = Al::Allocation.best_allocation(create_req(vm, vol))
@@ -630,7 +630,7 @@ RSpec.describe Al do
       vmh.reload
       expect(used_cores + vm1.cores + vm2.cores).to eq(vmh.used_cores)
       expect(used_hugepages_1g + vm1.memory_gib + vm2.memory_gib).to eq(vmh.used_hugepages_1g)
-      expect(available_storage - 10).to eq(vmh.storage_devices.sum { _1.available_storage_gib })
+      expect(available_storage - 10).to eq(vmh.storage_devices.sum { it.available_storage_gib })
     end
 
     it "fails concurrent allocations if core constraints are violated" do
@@ -803,7 +803,7 @@ RSpec.describe Al do
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
-      SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { _1.id = vmh.id }
+      SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { it.id = vmh.id }
       Address.create_with_id(cidr: "2.1.1.0/30", routed_to_host_id: vmh.id)
       PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
       PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
@@ -850,7 +850,7 @@ RSpec.describe Al do
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
-      SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { _1.id = vmh.id }
+      SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { it.id = vmh.id }
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
       PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
       PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
@@ -920,7 +920,7 @@ RSpec.describe Al do
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
-      SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { _1.id = vmh.id }
+      SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { it.id = vmh.id }
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
       PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
       PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
@@ -987,7 +987,7 @@ RSpec.describe Al do
       vmh = VmHost.first
       used_cores = vmh.used_cores
       used_hugepages_1g = vmh.used_hugepages_1g
-      available_storage = vmh.storage_devices.sum { _1.available_storage_gib }
+      available_storage = vmh.storage_devices.sum { it.available_storage_gib }
 
       vm1 = create_vm
       vm2 = create_vm
@@ -998,7 +998,7 @@ RSpec.describe Al do
       vmh.reload
       expect(vmh.used_cores).to eq(used_cores + vm1.vm_host_slice.cores + vm2.vm_host_slice.cores)
       expect(vmh.used_hugepages_1g).to eq(used_hugepages_1g + vm1.vm_host_slice.total_memory_gib + vm2.vm_host_slice.total_memory_gib)
-      expect(vmh.storage_devices.sum { _1.available_storage_gib }).to eq(available_storage - 10)
+      expect(vmh.storage_devices.sum { it.available_storage_gib }).to eq(available_storage - 10)
     end
 
     it "finds a disjoined cpuset" do
@@ -1092,11 +1092,11 @@ RSpec.describe Al do
       vh1.reload
 
       # Create a second host
-      vh2 = VmHost.create(allocation_state: "accepting", arch: "x64", location_id: Location::HETZNER_FSN1_ID, total_mem_gib: 64, total_sockets: 2, total_dies: 2, net6: "fd10:9b0b:6b4b:8fcc::/64", total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2, accepts_slices: true) { _1.id = Sshable.create_with_id.id }
+      vh2 = VmHost.create(allocation_state: "accepting", arch: "x64", location_id: Location::HETZNER_FSN1_ID, total_mem_gib: 64, total_sockets: 2, total_dies: 2, net6: "fd10:9b0b:6b4b:8fcc::/64", total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2, accepts_slices: true) { it.id = Sshable.create_with_id.id }
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vh2.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create_with_id(vm_host_id: vh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vh2.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
-      SpdkInstallation.create(vm_host_id: vh2.id, version: "v1", allocation_weight: 100) { _1.id = vh2.id }
+      SpdkInstallation.create(vm_host_id: vh2.id, version: "v1", allocation_weight: 100) { it.id = vh2.id }
       Address.create_with_id(cidr: "1.1.2.0/30", routed_to_host_id: vh2.id)
       PciDevice.create_with_id(vm_host_id: vh2.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
       PciDevice.create_with_id(vm_host_id: vh2.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
@@ -1145,7 +1145,7 @@ RSpec.describe Al do
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
-      SpdkInstallation.create(vm_host_id: vmh2.id, version: "v1", allocation_weight: 100) { _1.id = vmh2.id }
+      SpdkInstallation.create(vm_host_id: vmh2.id, version: "v1", allocation_weight: 100) { it.id = vmh2.id }
       Address.create_with_id(cidr: "1.2.1.0/30", routed_to_host_id: vmh2.id)
       PciDevice.create_with_id(vm_host_id: vmh2.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
       PciDevice.create_with_id(vm_host_id: vmh2.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
@@ -1173,7 +1173,7 @@ RSpec.describe Al do
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
-      SpdkInstallation.create(vm_host_id: vmh2.id, version: "v1", allocation_weight: 100) { _1.id = vmh2.id }
+      SpdkInstallation.create(vm_host_id: vmh2.id, version: "v1", allocation_weight: 100) { it.id = vmh2.id }
       Address.create_with_id(cidr: "1.2.1.0/30", routed_to_host_id: vmh2.id)
       PciDevice.create_with_id(vm_host_id: vmh2.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
       PciDevice.create_with_id(vm_host_id: vmh2.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
@@ -1192,7 +1192,7 @@ RSpec.describe Al do
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
-      SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { _1.id = vmh.id }
+      SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { it.id = vmh.id }
       Address.create_with_id(cidr: "2.1.1.0/30", routed_to_host_id: vmh.id)
       PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
       PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
@@ -1309,13 +1309,13 @@ RSpec.describe Al do
     end
 
     it "chooses the only one if one provided" do
-      si_1 = SpdkInstallation.new(allocation_weight: 100) { _1.id = SpdkInstallation.generate_uuid }
+      si_1 = SpdkInstallation.new(allocation_weight: 100) { it.id = SpdkInstallation.generate_uuid }
       expect(Al::StorageAllocation.allocate_spdk_installation([si_1])).to eq(si_1.id)
     end
 
     it "doesn't return the one with zero weight" do
-      si_1 = SpdkInstallation.new(allocation_weight: 0) { _1.id = SpdkInstallation.generate_uuid }
-      si_2 = SpdkInstallation.new(allocation_weight: 100) { _1.id = SpdkInstallation.generate_uuid }
+      si_1 = SpdkInstallation.new(allocation_weight: 0) { it.id = SpdkInstallation.generate_uuid }
+      si_2 = SpdkInstallation.new(allocation_weight: 100) { it.id = SpdkInstallation.generate_uuid }
       expect(Al::StorageAllocation.allocate_spdk_installation([si_1, si_2])).to eq(si_2.id)
     end
   end

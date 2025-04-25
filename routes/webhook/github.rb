@@ -59,7 +59,7 @@ class Clover
       return error("No workflow_job in the payload")
     end
 
-    unless (label = job.fetch("labels").find { Github.runner_labels.key?(_1) })
+    unless (label = job.fetch("labels").find { Github.runner_labels.key?(it) })
       return error("Unmatched label")
     end
 

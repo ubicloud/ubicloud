@@ -2,7 +2,7 @@
 
 RSpec.describe DB do
   it "has no unexpectedly collated columns" do
-    expect(described_class[<<SQL].all.map { _1[:name] }.join(", ")).to eq ""
+    expect(described_class[<<SQL].all.map { it[:name] }.join(", ")).to eq ""
 SELECT quote_ident(nspname) || '.' || quote_ident(relname) || '.' || quote_ident(attname) AS name
 FROM pg_class
 JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid AND

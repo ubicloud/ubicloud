@@ -409,7 +409,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
 
     it "extends deadline if a vm prevents destroy" do
       vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", location_id: Location::HETZNER_FSN1_ID).tap {
-        _1.id = "788525ed-d6f0-4937-a844-323d4fd91946"
+        it.id = "788525ed-d6f0-4937-a844-323d4fd91946"
       }
       expect(ps).to receive(:nics).and_return([nic]).twice
       expect(nic).to receive(:vm_id).and_return("vm-id")

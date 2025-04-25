@@ -21,7 +21,7 @@ RSpec.describe Clover, "private-location" do
     LocationCredential.create(
       access_key: "access-key-id",
       secret_key: "secret-access-key"
-    ) { _1.id = loc.id }
+    ) { it.id = loc.id }
     loc
   end
 

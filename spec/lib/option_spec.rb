@@ -6,15 +6,15 @@ require_relative "../../lib/option"
 RSpec.describe Option do
   describe "#VmSize options" do
     it "no burstable cpu allowed for Standard VMs" do
-      expect(Option::VmSizes.map { _1.name.include?("standard-") == (_1.cpu_burst_percent_limit == 0) }.all?(true)).to be true
+      expect(Option::VmSizes.map { it.name.include?("standard-") == (it.cpu_burst_percent_limit == 0) }.all?(true)).to be true
     end
 
     it "no gpu allowed for non-GPU VMs" do
-      expect(Option::VmSizes.map { _1.name.include?("gpu") == _1.gpu }.all?(true)).to be true
+      expect(Option::VmSizes.map { it.name.include?("gpu") == it.gpu }.all?(true)).to be true
     end
 
     it "no odd number of vcpus allowed, except for 1" do
-      expect(Option::VmSizes.all? { _1.vcpus == 1 || _1.vcpus.even? }).to be true
+      expect(Option::VmSizes.all? { it.vcpus == 1 || it.vcpus.even? }).to be true
     end
   end
 

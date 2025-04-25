@@ -83,10 +83,10 @@ class Clover
           totalCount: entries.count,
           artifactCaches: entries.map do
             {
-              scope: _1.scope,
-              cacheKey: _1.key,
-              cacheVersion: _1.version,
-              creationTime: _1.created_at
+              scope: it.scope,
+              cacheKey: it.key,
+              cacheVersion: it.version,
+              creationTime: it.created_at
             }
           end
         }
@@ -147,7 +147,7 @@ class Clover
 
         max_chunk_size = 32 * 1024 * 1024 # 32MB
         presigned_urls = (1..size.fdiv(max_chunk_size).ceil).map do
-          repository.url_presigner.presigned_url(:upload_part, bucket: repository.bucket_name, key: entry.blob_key, upload_id: upload_id, part_number: _1, expires_in: 900)
+          repository.url_presigner.presigned_url(:upload_part, bucket: repository.bucket_name, key: entry.blob_key, upload_id: upload_id, part_number: it, expires_in: 900)
         end
 
         {

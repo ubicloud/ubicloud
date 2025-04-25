@@ -12,9 +12,9 @@ RSpec.describe Prog::Aws::Vpc do
   let(:ps) {
     prj = Project.create_with_id(name: "test-prj")
     loc = Location.create_with_id(name: "us-east-1", provider: "aws", project_id: prj.id, display_name: "aws-us-east-1", ui_name: "AWS US East 1", visible: true)
-    LocationCredential.create_with_id(access_key: "test-access-key", secret_key: "test-secret-key") { _1.id = loc.id }
+    LocationCredential.create_with_id(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = loc.id }
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps", location_id: loc.id).subject
-    PrivateSubnetAwsResource.create { _1.id = ps.id }
+    PrivateSubnetAwsResource.create { it.id = ps.id }
     ps
   }
 
@@ -52,7 +52,7 @@ RSpec.describe Prog::Aws::Vpc do
 
       expect(client).to receive(:describe_vpcs).with({filters: [{name: "vpc-id", values: [ps.name]}]}).and_call_original
       expect(client).to receive(:create_security_group).with({group_name: "aws-us-east-1-#{ps.ubid}", description: "Security group for aws-us-east-1-#{ps.ubid}", vpc_id: ps.name, tag_specifications: [{resource_type: "security-group", tags: [{key: "Ubicloud", value: "true"}]}]}).and_call_original
-      ps.firewalls.map { _1.firewall_rules.map { |fw| fw.destroy } }
+      ps.firewalls.map { it.firewall_rules.map { |fw| fw.destroy } }
       FirewallRule.create_with_id(firewall_id: ps.firewalls.first.id, cidr: "0.0.0.1/32", port_range: 22..80)
       ps.reload
       expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-0123456789abcdefg", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 80, ip_ranges: [{cidr_ip: "0.0.0.1/32"}]}]}).and_call_original
@@ -64,7 +64,7 @@ RSpec.describe Prog::Aws::Vpc do
       client.stub_responses(:create_security_group, Aws::EC2::Errors::InvalidGroupDuplicate.new(nil, nil))
       client.stub_responses(:describe_security_groups, security_groups: [{group_id: "sg-0123456789abcdefg"}])
 
-      ps.firewalls.map { _1.firewall_rules.map { |fw| fw.destroy } }
+      ps.firewalls.map { it.firewall_rules.map { |fw| fw.destroy } }
       FirewallRule.create_with_id(firewall_id: ps.firewalls.first.id, cidr: "0.0.0.1/32", port_range: 22..80)
       FirewallRule.create_with_id(firewall_id: ps.firewalls.first.id, cidr: "::/32", port_range: 22..80)
       ps.reload

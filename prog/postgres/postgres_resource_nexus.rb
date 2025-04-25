@@ -78,7 +78,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: timeline_id, timeline_access: timeline_access, representative_at: Time.now)
 
-      Strand.create(prog: "Postgres::PostgresResourceNexus", label: "start") { _1.id = postgres_resource.id }
+      Strand.create(prog: "Postgres::PostgresResourceNexus", label: "start") { it.id = postgres_resource.id }
     end
   end
 
@@ -163,7 +163,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def wait_servers
-    nap 5 if servers.any? { _1.strand.label != "wait" }
+    nap 5 if servers.any? { it.strand.label != "wait" }
     hop_update_billing_records
   end
 
@@ -200,7 +200,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   label def wait
     reap
 
-    if postgres_resource.needs_convergence? && strand.children.none? { _1.prog == "Postgres::ConvergePostgresResource" }
+    if postgres_resource.needs_convergence? && strand.children.none? { it.prog == "Postgres::ConvergePostgresResource" }
       bud Prog::Postgres::ConvergePostgresResource, frame, :start
     end
 
@@ -237,7 +237,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     decr_destroy
 
-    strand.children.each { _1.destroy }
+    strand.children.each { it.destroy }
     postgres_resource.private_subnet.firewalls.each(&:destroy)
     postgres_resource.private_subnet.incr_destroy
     servers.each(&:incr_destroy)

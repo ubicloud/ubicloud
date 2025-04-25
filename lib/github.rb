@@ -39,7 +39,7 @@ module Github
 
   def self.runner_labels
     @runner_labels ||= begin
-      labels = YAML.load_file("config/github_runner_labels.yml").to_h { [_1["name"], _1] }
+      labels = YAML.load_file("config/github_runner_labels.yml").to_h { [it["name"], it] }
       labels.transform_values { |v| (a = v["alias_for"]) ? labels[a] : v }
     end
   end
@@ -60,11 +60,11 @@ module Github
     Clog.emit("fetched deliveries") { {deliveries: {total: all_deliveries.count, page: page, since: since}} }
 
     all_deliveries
-      .reject { _1[:delivered_at] < since }
-      .group_by { _1[:guid] }
+      .reject { it[:delivered_at] < since }
+      .group_by { it[:guid] }
       .values
-      .reject { |group| group.any? { _1[:status] == "OK" } }
-      .map { |group| group.max_by { _1[:delivered_at] } }
+      .reject { |group| group.any? { it[:status] == "OK" } }
+      .map { |group| group.max_by { it[:delivered_at] } }
   end
 
   def self.redeliver_failed_deliveries(*)

@@ -13,13 +13,13 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
         updates[:default_branch] = default_branch if default_branch
         repository.insert_conflict(target: [:installation_id, :name], update: updates).save_changes
       end
-      Strand.new(prog: "Github::GithubRepositoryNexus", label: "wait") { _1.id = repository.id }
+      Strand.new(prog: "Github::GithubRepositoryNexus", label: "wait") { it.id = repository.id }
         .insert_conflict(target: :id).save_changes
     end
   end
 
   def client
-    @client ||= Github.installation_client(github_repository.installation.installation_id).tap { _1.auto_paginate = true }
+    @client ||= Github.installation_client(github_repository.installation.installation_id).tap { it.auto_paginate = true }
   end
 
   # We dynamically adjust the polling interval based on the remaining rate
@@ -53,7 +53,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
 
       jobs.each do |job|
         next if job[:status] != "queued"
-        next unless (label = job[:labels].find { Github.runner_labels.key?(_1) })
+        next unless (label = job[:labels].find { Github.runner_labels.key?(it) })
         queued_labels[label] += 1
       end
     end

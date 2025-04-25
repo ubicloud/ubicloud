@@ -17,7 +17,7 @@ module Scheduling::Allocator
       vm.id,
       vm.vcpus,
       vm.memory_gib,
-      storage_volumes.map { _1["size_gib"] }.sum,
+      storage_volumes.map { it["size_gib"] }.sum,
       storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
       vm.boot_image,
       distinct_storage_devices,
@@ -33,7 +33,7 @@ module Scheduling::Allocator
       vm.family,
       vm.cpu_percent_limit,
       true, # use slices
-      Option::VmFamilies.find { _1.name == vm.family }&.require_shared_slice || false,
+      Option::VmFamilies.find { it.name == vm.family }&.require_shared_slice || false,
       vm.project.get_ff_allocator_diagnostics || false,
       prioritize_performance_cpu
     )
@@ -122,9 +122,9 @@ module Scheduling::Allocator
     end
 
     def self.best_allocation(request)
-      candidate_hosts(request).map { Allocation.new(_1, request) }
-        .select { _1.is_valid }
-        .min_by { _1.score + random_score }
+      candidate_hosts(request).map { Allocation.new(it, request) }
+        .select { it.is_valid }
+        .min_by { it.score + random_score }
     end
 
     def self.candidate_hosts(request)
@@ -218,7 +218,7 @@ module Scheduling::Allocator
         .where(Sequel[:boot_image][:name] => request.boot_image)
         .exclude(Sequel[:boot_image][:activated_at] => nil)
 
-      request.storage_volumes.select { _1[1]["read_only"] && _1[1]["image"] }.map { [_1[0], _1[1]["image"]] }.each do |idx, img|
+      request.storage_volumes.select { it[1]["read_only"] && it[1]["image"] }.map { [it[0], it[1]["image"]] }.each do |idx, img|
         table_alias = :"boot_image_#{idx}"
         ds = ds.join(Sequel[:boot_image].as(table_alias), Sequel[:vm_host][:id] => Sequel[table_alias][:vm_host_id])
           .where(Sequel[table_alias][:name] => img)
@@ -287,15 +287,15 @@ module Scheduling::Allocator
     end
 
     def is_valid
-      @allocations.all? { _1.is_valid }
+      @allocations.all? { it.is_valid }
     end
 
     def update(vm)
       vm_host = VmHost[@candidate_host[:vm_host_id]]
       DB.transaction do
         Allocation.update_vm(vm_host, vm)
-        @vm_host_allocations.each { _1.update(vm, vm_host) }
-        @device_allocations.each { _1.update(vm, vm_host) }
+        @vm_host_allocations.each { it.update(vm, vm_host) }
+        @device_allocations.each { it.update(vm, vm_host) }
       end
     end
 
@@ -306,7 +306,7 @@ module Scheduling::Allocator
     private
 
     def calculate_score
-      util = @allocations.map { _1.utilization }
+      util = @allocations.map { it.utilization }
 
       # utilization score, in range [0, 2]
       score = @request.target_host_utilization - util.sum.fdiv(util.size)
@@ -497,13 +497,13 @@ module Scheduling::Allocator
       # Try to find an existing slice with some room
       vm_host.slices
         .select {
-          (_1.used_cpu_percent + @request.cpu_percent_limit <= _1.total_cpu_percent) &&
-            (_1.used_memory_gib + @request.memory_gib <= _1.total_memory_gib) &&
-            (_1.cores == @request.cores_for_vcpus(vm_host.total_cpus / vm_host.total_cores)) &&
-            (_1.family == @request.family) &&
-            _1.enabled
+          (it.used_cpu_percent + @request.cpu_percent_limit <= it.total_cpu_percent) &&
+            (it.used_memory_gib + @request.memory_gib <= it.total_memory_gib) &&
+            (it.cores == @request.cores_for_vcpus(vm_host.total_cpus / vm_host.total_cores)) &&
+            (it.family == @request.family) &&
+            it.enabled
         }
-        .min_by { _1.used_cpu_percent }
+        .min_by { it.used_cpu_percent }
     end
   end
 
@@ -543,7 +543,7 @@ module Scheduling::Allocator
     end
 
     def update(vm, vm_host)
-      @storage_device_allocations.each { _1.update }
+      @storage_device_allocations.each { it.update }
       create_storage_volumes(vm, vm_host)
     end
 
@@ -577,7 +577,7 @@ module Scheduling::Allocator
 
     def map_volumes_to_devices
       return false if @candidate_host[:available_storage_gib] < @request.storage_gib
-      @storage_device_allocations = @candidate_host[:storage_devices].map { StorageDeviceAllocation.new(_1["id"], _1["available_storage_gib"]) }
+      @storage_device_allocations = @candidate_host[:storage_devices].map { StorageDeviceAllocation.new(it["id"], it["available_storage_gib"]) }
 
       @volume_to_device_map = {}
       @request.storage_volumes.each do |vol_id, vol|

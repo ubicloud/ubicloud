@@ -12,11 +12,11 @@ RSpec.describe Prog::Aws::Nic do
   let(:nic) {
     prj = Project.create_with_id(name: "test-prj")
     loc = Location.create_with_id(name: "us-east-1", provider: "aws", project_id: prj.id, display_name: "aws-us-east-1", ui_name: "AWS US East 1", visible: true)
-    LocationCredential.create_with_id(access_key: "test-access-key", secret_key: "test-secret-key") { _1.id = loc.id }
+    LocationCredential.create_with_id(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = loc.id }
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps", location_id: loc.id).subject
-    PrivateSubnetAwsResource.create(subnet_id: "subnet-0123456789abcdefg", security_group_id: "sg-0123456789abcdefg") { _1.id = ps.id }
+    PrivateSubnetAwsResource.create(subnet_id: "subnet-0123456789abcdefg", security_group_id: "sg-0123456789abcdefg") { it.id = ps.id }
     nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "test-nic").subject
-    NicAwsResource.create { _1.id = nic.id }
+    NicAwsResource.create { it.id = nic.id }
     nic
   }
 

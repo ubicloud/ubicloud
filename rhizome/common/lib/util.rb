@@ -54,7 +54,7 @@ end
 def sync_parent_dir(f)
   parent_dir = Pathname.new(f).parent.to_s
   File.open(parent_dir) {
-    fsync_or_fail(_1)
+    fsync_or_fail(it)
   }
 end
 

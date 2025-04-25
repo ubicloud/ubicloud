@@ -106,14 +106,14 @@ class Clover
       if location.provider == "aws" && (size.split("-").last.to_i > 16 || size.split("-").first == "burstable")
         false
       else
-        pg_size = all_sizes_for_project.find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
-        vm_size = Option::VmSizes.find { _1.name == pg_size.vm_size && _1.arch == "x64" && _1.visible }
+        pg_size = all_sizes_for_project.find { it.name == size && it.flavor == flavor && it.location_id == location.id }
+        vm_size = Option::VmSizes.find { it.name == pg_size.vm_size && it.arch == "x64" && it.visible }
         vm_size.family == family
       end
     end
 
     options.add_option(name: "storage_size", values: ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096", "118", "237", "475", "950", "1781", "1900", "3562", "3800"], parent: "size") do |flavor, location, family, size, storage_size|
-      pg_size = all_sizes_for_project.find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
+      pg_size = all_sizes_for_project.find { it.name == size && it.flavor == flavor && it.location_id == location.id }
       pg_size.storage_size_options.include?(storage_size.to_i)
     end
 
@@ -143,14 +143,14 @@ class Clover
       if location.provider == "aws" && (size.split("-").last.to_i > 16 || size.split("-").first == "burstable")
         false
       else
-        pg_size = all_sizes_for_project.find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
-        vm_size = Option::VmSizes.find { _1.name == pg_size.vm_size && _1.arch == "x64" && _1.visible }
+        pg_size = all_sizes_for_project.find { it.name == size && it.flavor == flavor && it.location_id == location.id }
+        vm_size = Option::VmSizes.find { it.name == pg_size.vm_size && it.arch == "x64" && it.visible }
         vm_size.family == family
       end
     end
 
     options.add_option(name: "storage_size", values: ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096", "118", "237", "475", "950", "1781", "1900", "3562", "3800"], parent: "size") do |flavor, location, family, size, storage_size|
-      pg_size = all_sizes_for_project.find { _1.name == size && _1.flavor == flavor && _1.location_id == location.id }
+      pg_size = all_sizes_for_project.find { it.name == size && it.flavor == flavor && it.location_id == location.id }
       pg_size.storage_size_options.include?(storage_size.to_i)
     end
 

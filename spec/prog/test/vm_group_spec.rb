@@ -15,7 +15,7 @@ RSpec.describe Prog::Test::VmGroup do
     it "hops to wait_children_ready" do
       expect(vg_test).to receive(:update_stack).and_call_original
       expect { vg_test.setup_vms }.to hop("wait_vms")
-      vm_images = vg_test.strand.stack.first["vms"].map { Vm[_1].boot_image }
+      vm_images = vg_test.strand.stack.first["vms"].map { Vm[it].boot_image }
       expect(vm_images).to eq(["ubuntu-noble", "debian-12", "ubuntu-noble"])
     end
 
@@ -26,7 +26,7 @@ RSpec.describe Prog::Test::VmGroup do
         "boot_images" => ["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"]
       }).at_least(:once)
       expect { vg_test.setup_vms }.to hop("wait_vms")
-      vm_images = vg_test.strand.stack.first["vms"].map { Vm[_1].boot_image }
+      vm_images = vg_test.strand.stack.first["vms"].map { Vm[it].boot_image }
       expect(vm_images).to eq(["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"])
     end
 

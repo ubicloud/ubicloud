@@ -55,7 +55,7 @@ EOS
           sd.values.slice(
             :name, :available_storage_gib, :total_storage_gib
           )
-        }.sort_by { _1[:name] }
+        }.sort_by { it[:name] }
       }.from(
         [{name: "stor1", total_storage_gib: 100, available_storage_gib: 100}]
       ).to(

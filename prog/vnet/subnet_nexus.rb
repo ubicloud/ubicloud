@@ -23,7 +23,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     ipv6_range ||= random_private_ipv6(location, project).to_s
     ipv4_range ||= random_private_ipv4(location, project).to_s
     DB.transaction do
-      ps = PrivateSubnet.create(name: name, location_id: location.id, net6: ipv6_range, net4: ipv4_range, state: "waiting", project_id:) { _1.id = ubid.to_uuid }
+      ps = PrivateSubnet.create(name: name, location_id: location.id, net6: ipv6_range, net4: ipv4_range, state: "waiting", project_id:) { it.id = ubid.to_uuid }
 
       firewall = if firewall_id
         existing_fw = project.firewalls_dataset.where(location_id: location.id).first(Sequel[:firewall][:id] => firewall_id)
@@ -37,7 +37,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       end
       firewall.associate_with_private_subnet(ps, apply_firewalls: false)
 
-      Strand.create(prog: "Vnet::SubnetNexus", label: "start") { _1.id = ubid.to_uuid }
+      Strand.create(prog: "Vnet::SubnetNexus", label: "start") { it.id = ubid.to_uuid }
     end
   end
 
@@ -52,7 +52,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
   label def start
     if private_subnet.location.provider == "aws"
-      PrivateSubnetAwsResource.create { _1.id = private_subnet.id } unless private_subnet.private_subnet_aws_resource
+      PrivateSubnetAwsResource.create { it.id = private_subnet.id } unless private_subnet.private_subnet_aws_resource
       bud Prog::Aws::Vpc, {"subject_id" => private_subnet.id}, :create_vpc
       hop_wait_vpc_created
     else
@@ -169,14 +169,14 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     end
 
     decr_destroy
-    strand.children.each { _1.destroy }
+    strand.children.each { it.destroy }
     if private_subnet.location.provider == "aws"
       private_subnet.nics.map(&:incr_destroy)
       private_subnet.firewalls.map(&:destroy)
       bud Prog::Aws::Vpc, {"subject_id" => private_subnet.id}, :destroy
       hop_wait_aws_vpc_destroyed
     end
-    private_subnet.firewalls.map { _1.disassociate_from_private_subnet(private_subnet, apply_firewalls: false) }
+    private_subnet.firewalls.map { it.disassociate_from_private_subnet(private_subnet, apply_firewalls: false) }
 
     private_subnet.connected_subnets.each do |subnet|
       private_subnet.disconnect_subnet(subnet)
@@ -224,17 +224,17 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       random_private_ipv4(location, project, cidr_size)
     end
 
-    selected_addr = random_private_ipv4(location, project, cidr_size) if PrivateSubnet::BANNED_IPV4_SUBNETS.any? { _1.rel(selected_addr) } || project.private_subnets_dataset[net4: selected_addr.to_s, location_id: location.id]
+    selected_addr = random_private_ipv4(location, project, cidr_size) if PrivateSubnet::BANNED_IPV4_SUBNETS.any? { it.rel(selected_addr) } || project.private_subnets_dataset[net4: selected_addr.to_s, location_id: location.id]
 
     selected_addr
   end
 
   def to_be_added_nics
-    private_subnet.find_all_connected_nics.select { _1.strand.label == "wait_setup" }
+    private_subnet.find_all_connected_nics.select { it.strand.label == "wait_setup" }
   end
 
   def active_nics
-    private_subnet.find_all_connected_nics.select { _1.strand.label == "wait" }
+    private_subnet.find_all_connected_nics.select { it.strand.label == "wait" }
   end
 
   def nics_to_rekey
@@ -242,6 +242,6 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   def rekeying_nics
-    private_subnet.find_all_connected_nics.select { !_1.rekey_payload.nil? }
+    private_subnet.find_all_connected_nics.select { !it.rekey_payload.nil? }
   end
 end

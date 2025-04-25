@@ -17,7 +17,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
   }
   let(:dns_zone) {
     dz = DnsZone.create_with_id(project_id: ps.project_id, name: "lb.ubicloud.com")
-    Strand.create_with_id(prog: "DnsZone::DnsZoneNexus", label: "wait") { _1.id = dz.id }
+    Strand.create_with_id(prog: "DnsZone::DnsZoneNexus", label: "wait") { it.id = dz.id }
     dz
   }
 
@@ -174,8 +174,8 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
   describe "#update_vm_load_balancers" do
     it "updates load balancers for all vms" do
-      vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "test-vm#{_1}", private_subnet_id: ps.id).subject }
-      vms.each { st.subject.add_vm(_1) }
+      vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "test-vm#{it}", private_subnet_id: ps.id).subject }
+      vms.each { st.subject.add_vm(it) }
       expect { nx.update_vm_load_balancers }.to hop("wait_update_vm_load_balancers")
       # Update progs are budded in update_vm_load_balancers
       expect(st.children_dataset.where(prog: "Vnet::UpdateLoadBalancerNode", label: "update_load_balancer").count).to eq 3
@@ -184,8 +184,8 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
   describe "#wait_update_vm_load_balancers" do
     before do
-      vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "test-vm#{_1}", private_subnet_id: ps.id).subject }
-      vms.each { st.subject.add_vm(_1) }
+      vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "test-vm#{it}", private_subnet_id: ps.id).subject }
+      vms.each { st.subject.add_vm(it) }
       expect { nx.update_vm_load_balancers }.to hop("wait_update_vm_load_balancers")
     end
 
@@ -203,8 +203,8 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
   describe "#destroy" do
     before do
-      vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "test-vm#{_1}", private_subnet_id: ps.id).subject }
-      vms.each { st.subject.add_vm(_1) }
+      vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "test-vm#{it}", private_subnet_id: ps.id).subject }
+      vms.each { st.subject.add_vm(it) }
       expect { nx.update_vm_load_balancers }.to hop("wait_update_vm_load_balancers")
       st.children.map(&:destroy)
     end

@@ -72,7 +72,7 @@ class Clover
         authorize("Project:user", @project.id)
         user_policies = typecast_params.Hash("user_policies") || {}
         invitation_policies = typecast_params.Hash("invitation_policies") || {}
-        user_policies.transform_keys! { UBID.to_uuid(_1) }
+        user_policies.transform_keys! { UBID.to_uuid(it) }
         account_ids = user_policies.keys
 
         DB.transaction do
@@ -198,7 +198,7 @@ class Clover
 
           DB.transaction do
             typecast_params.array!(:Hash, "aces").each do
-              ubid, deleted, subject_id, action_id, object_id = _1.values_at("ubid", "deleted", "subject", "action", "object")
+              ubid, deleted, subject_id, action_id, object_id = it.values_at("ubid", "deleted", "subject", "action", "object")
               subject_id = nil if subject_id == ""
               action_id = nil if action_id == ""
               object_id = nil if object_id == ""
@@ -257,8 +257,8 @@ class Clover
 
                 members = @current_members = {}
                 @tag.member_ids.each do
-                  next if @tag_type == "subject" && UBID.uuid_class_match?(_1, ApiKey)
-                  members[_1] = nil
+                  next if @tag_type == "subject" && UBID.uuid_class_match?(it, ApiKey)
+                  members[it] = nil
                 end
                 UBID.resolve_map(members)
                 view "project/tag"
@@ -292,8 +292,8 @@ class Clover
               changes_made = to_add = issues = nil
               DB.transaction(isolation: :serializable) do
                 to_add = typecast_params.array(:nonempty_str, "add") || []
-                to_add.reject! { UBID.class_match?(_1, ApiKey) } if @tag_type == "subject"
-                to_add.map! { UBID.to_uuid(_1) }
+                to_add.reject! { UBID.class_match?(it, ApiKey) } if @tag_type == "subject"
+                to_add.map! { UBID.to_uuid(it) }
                 to_add, issues = @tag.check_members_to_add(to_add)
                 issues = "#{": " unless issues.empty?}#{issues.join(", ")}"
                 unless to_add.empty?
@@ -315,8 +315,8 @@ class Clover
               authorize("#{@tag.class}:remove", @authorize_id)
 
               to_remove = typecast_params.array(:nonempty_str, "remove") || []
-              to_remove.reject! { UBID.class_match?(_1, ApiKey) } if @tag_type == "subject"
-              to_remove.map! { UBID.to_uuid(_1) }
+              to_remove.reject! { UBID.class_match?(it, ApiKey) } if @tag_type == "subject"
+              to_remove.map! { UBID.to_uuid(it) }
 
               num_removed = nil
               # No need for serializable isolation here, as we are removing
@@ -324,7 +324,7 @@ class Clover
               DB.transaction do
                 num_removed = @tag.remove_members(to_remove)
 
-                if @tag_type == "subject" && @tag.name == "Admin" && !@tag.member_ids.find { UBID.uuid_class_match?(_1, Account) }
+                if @tag_type == "subject" && @tag.name == "Admin" && !@tag.member_ids.find { UBID.uuid_class_match?(it, Account) }
                   raise Sequel::ValidationFailed, "Must keep at least one account in Admin subject tag"
                 end
               end

@@ -166,14 +166,14 @@ class Prog::Test::Vm < Prog::Test::Base
   end
 
   def vms_in_same_project
-    vm.project.vms.filter { _1.id != vm.id }
+    vm.project.vms.filter { it.id != vm.id }
   end
 
   def vms_with_same_subnet
-    vms_in_same_project.filter { _1.private_subnets.first.id == vm.private_subnets.first.id }
+    vms_in_same_project.filter { it.private_subnets.first.id == vm.private_subnets.first.id }
   end
 
   def vms_with_different_subnet
-    vms_in_same_project.filter { _1.private_subnets.first.id != vm.private_subnets.first.id }
+    vms_in_same_project.filter { it.private_subnets.first.id != vm.private_subnets.first.id }
   end
 end

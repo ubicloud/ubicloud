@@ -2,7 +2,7 @@
 
 RSpec.describe BillingRate do
   it "each rate has a unique ID" do
-    expect(described_class.rates.map { _1["id"] }.size).to eq(described_class.rates.map { _1["id"] }.uniq.size)
+    expect(described_class.rates.map { it["id"] }.size).to eq(described_class.rates.map { it["id"] }.uniq.size)
   end
 
   describe "#unit_price_from_resource_properties" do
@@ -58,7 +58,7 @@ RSpec.describe BillingRate do
   end
 
   it "can unambiguously find active rate" do
-    expect(described_class.rates.group_by { [_1["resource_type"], _1["resource_family"], _1["location"], _1["active_from"]] }).not_to be_any { |k, v| v.count != 1 }
+    expect(described_class.rates.group_by { [it["resource_type"], it["resource_family"], it["location"], it["active_from"]] }).not_to be_any { |k, v| v.count != 1 }
   end
 
   it "can find rate for aws locations" do
@@ -76,7 +76,7 @@ RSpec.describe BillingRate do
     LocationCredential.create(
       access_key: "test",
       secret_key: "test"
-    ) { _1.id = loc.id }
+    ) { it.id = loc.id }
 
     expect(described_class.from_resource_properties("VmVCpu", "standard", loc.name, Time.now)).not_to be_nil
     expect(described_class.from_resource_properties("PostgresVCpu", "standard-standard", loc.name, Time.now)).not_to be_nil

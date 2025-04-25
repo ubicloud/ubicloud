@@ -6,7 +6,7 @@ require "netaddr"
 RSpec.describe Prog::Vm::Nexus do
   subject(:nx) {
     described_class.new(st).tap {
-      _1.instance_variable_set(:@vm, vm)
+      it.instance_variable_set(:@vm, vm)
     }
   }
 
@@ -15,11 +15,11 @@ RSpec.describe Prog::Vm::Nexus do
     kek = StorageKeyEncryptionKey.new(
       algorithm: "aes-256-gcm", key: "key",
       init_vector: "iv", auth_data: "somedata"
-    ) { _1.id = "04a3fe32-4cf0-48f7-909e-e35822864413" }
-    si = SpdkInstallation.new(version: "v1") { _1.id = SpdkInstallation.generate_uuid }
-    bi = BootImage.new(name: "my-image", version: "20230303") { _1.id = "b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1" }
-    dev1 = StorageDevice.new(name: "nvme0") { _1.id = StorageDevice.generate_uuid }
-    dev2 = StorageDevice.new(name: "DEFAULT") { _1.id = StorageDevice.generate_uuid }
+    ) { it.id = "04a3fe32-4cf0-48f7-909e-e35822864413" }
+    si = SpdkInstallation.new(version: "v1") { it.id = SpdkInstallation.generate_uuid }
+    bi = BootImage.new(name: "my-image", version: "20230303") { it.id = "b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1" }
+    dev1 = StorageDevice.new(name: "nvme0") { it.id = StorageDevice.generate_uuid }
+    dev2 = StorageDevice.new(name: "DEFAULT") { it.id = StorageDevice.generate_uuid }
     disk_1 = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, skip_sync: false)
     disk_1.spdk_installation = si
     disk_1.key_encryption_key_1 = kek
@@ -43,16 +43,16 @@ RSpec.describe Prog::Vm::Nexus do
       location_id: Location::HETZNER_FSN1_ID,
       created_at: Time.now
     ).tap {
-      _1.id = "2464de61-7501-8374-9ab0-416caebe31da"
-      _1.vm_storage_volumes.append(disk_1)
-      _1.vm_storage_volumes.append(disk_2)
-      disk_1.vm = _1
-      disk_2.vm = _1
-      allow(_1).to receive(:active_billing_records).and_return([BillingRecord.new(
+      it.id = "2464de61-7501-8374-9ab0-416caebe31da"
+      it.vm_storage_volumes.append(disk_1)
+      it.vm_storage_volumes.append(disk_2)
+      disk_1.vm = it
+      disk_2.vm = it
+      allow(it).to receive(:active_billing_records).and_return([BillingRecord.new(
         project_id: "50089dcf-b472-8ad2-9ca6-b3e70d12759d",
-        resource_name: _1.name,
-        billing_rate_id: BillingRate.from_resource_properties("VmVCpu", _1.family, "hetzner-fsn1")["id"],
-        amount: _1.vcpus
+        resource_name: it.name,
+        billing_rate_id: BillingRate.from_resource_properties("VmVCpu", it.family, "hetzner-fsn1")["id"],
+        amount: it.vcpus
       )])
     }
     vm
@@ -62,7 +62,7 @@ RSpec.describe Prog::Vm::Nexus do
   describe ".assemble" do
     let(:ps) {
       PrivateSubnet.create(name: "ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64",
-        net4: "1.1.1.0/26", state: "waiting", project_id: prj.id) { _1.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
+        net4: "1.1.1.0/26", state: "waiting", project_id: prj.id) { it.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
     }
     let(:nic) {
       Nic.new(private_subnet_id: ps.id,
@@ -70,7 +70,7 @@ RSpec.describe Prog::Vm::Nexus do
         private_ipv4: "10.0.0.1",
         mac: "00:00:00:00:00:00",
         encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579",
-        name: "default-nic").tap { _1.id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e" }
+        name: "default-nic").tap { it.id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e" }
     }
 
     it "fails if there is no project" do
@@ -687,7 +687,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "create a billing record when host is not nil, too" do
-      host = VmHost.new.tap { _1.id = "46ca6ded-b056-4723-bd91-612959f52f6f" }
+      host = VmHost.new.tap { it.id = "46ca6ded-b056-4723-bd91-612959f52f6f" }
       allow(nx).to receive(:host).and_return(host)
       vm.vm_host = host
       vm.location.provider = "aws"

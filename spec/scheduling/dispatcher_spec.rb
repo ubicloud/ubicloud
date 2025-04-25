@@ -55,7 +55,7 @@ RSpec.describe Scheduling::Dispatcher do
 
   describe "#start_cohort" do
     after do
-      Thread.list.each { _1.join if _1 != Thread.current }
+      Thread.list.each { it.join if it != Thread.current }
     end
 
     it "can create threads" do

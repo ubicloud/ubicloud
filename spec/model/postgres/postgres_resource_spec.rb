@@ -7,7 +7,7 @@ RSpec.describe PostgresResource do
     described_class.new(
       name: "pg-name",
       superuser_password: "dummy-password"
-    ) { _1.id = "6181ddb3-0002-8ad0-9aeb-084832c9273b" }
+    ) { it.id = "6181ddb3-0002-8ad0-9aeb-084832c9273b" }
   }
 
   it "returns connection string without ubid qualifier" do
@@ -90,12 +90,12 @@ RSpec.describe PostgresResource do
 
   it "returns target_standby_count correctly" do
     expect(postgres_resource).to receive(:ha_type).and_return(PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC)
-    (0..2).each { expect(postgres_resource.target_standby_count).to eq(_1) }
+    (0..2).each { expect(postgres_resource.target_standby_count).to eq(it) }
   end
 
   it "returns target_server_count correctly" do
     expect(postgres_resource).to receive(:target_standby_count).and_return(0, 1, 2)
-    (0..2).each { expect(postgres_resource.target_server_count).to eq(_1 + 1) }
+    (0..2).each { expect(postgres_resource.target_server_count).to eq(it + 1) }
   end
 
   it "sets firewall rules" do

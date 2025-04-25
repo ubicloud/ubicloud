@@ -57,11 +57,11 @@ class Serializers::Invoice < Serializers::Base
                      usage: BillingRate.line_item_usage(line_item["resource_type"], line_item["resource_family"], line_item["amount"], line_item["duration"])
                    }
                  end
-               end.group_by { _1[:description] }.flat_map do |description, line_items|
+               end.group_by { it[:description] }.flat_map do |description, line_items|
                  if line_items.count > 100 && description.end_with?("Address", "Virtual Machine")
-                   duration_sum = line_items.sum { _1[:duration] }
-                   amount_sum = line_items.sum { _1[:amount] }
-                   cost_sum = line_items.sum { _1[:cost] }
+                   duration_sum = line_items.sum { it[:duration] }
+                   amount_sum = line_items.sum { it[:amount] }
+                   cost_sum = line_items.sum { it[:cost] }
                    {
                      name: "#{line_items.count} x #{description} (Aggregated)",
                      description: description,
@@ -74,7 +74,7 @@ class Serializers::Invoice < Serializers::Base
                  else
                    line_items
                  end
-               end.sort_by { _1[:name] }
+               end.sort_by { it[:name] }
       )
     end
 

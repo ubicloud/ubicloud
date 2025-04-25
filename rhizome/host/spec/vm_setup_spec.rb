@@ -37,17 +37,17 @@ RSpec.describe VmSetup do
     it "templates user YAML with no swap" do
       vs.write_user_data("some_user", ["some_ssh_key"], nil, "")
       expect(vps).to have_received(:write_user_data) {
-        expect(_1).to match(/some_user/)
-        expect(_1).to match(/some_ssh_key/)
+        expect(it).to match(/some_user/)
+        expect(it).to match(/some_ssh_key/)
       }
     end
 
     it "templates user YAML with swap" do
       vs.write_user_data("some_user", ["some_ssh_key"], 123, "")
       expect(vps).to have_received(:write_user_data) {
-        expect(_1).to match(/some_user/)
-        expect(_1).to match(/some_ssh_key/)
-        expect(_1).to match(/size: 123/)
+        expect(it).to match(/some_user/)
+        expect(it).to match(/some_ssh_key/)
+        expect(it).to match(/size: 123/)
       }
     end
 
@@ -281,7 +281,7 @@ RSpec.describe VmSetup do
       nics = [
         %w[fd48:666c:a296:ce4b:2cc6::/79 192.168.5.50/32 ncaka58xyg 3e:bd:a5:96:f7:b9],
         %w[fddf:53d2:4c89:2305:46a0::/79 10.10.10.10/32 ncbbbbbbbb fb:55:dd:ba:21:0a]
-      ].map { VmSetup::Nic.new(*_1) }
+      ].map { VmSetup::Nic.new(*it) }
 
       expect(vps).to receive(:write_nftables_conf).with(<<NFTABLES_CONF)
 table ip raw {

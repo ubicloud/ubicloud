@@ -44,7 +44,7 @@ class Clover
         LocationCredential.create(
           access_key: request_body_params["access_key"],
           secret_key: request_body_params["secret_key"]
-        ) { _1.id = loc.id }
+        ) { it.id = loc.id }
         loc
       end
 

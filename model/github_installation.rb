@@ -15,7 +15,7 @@ class GithubInstallation < Sequel::Model
       .exclude(Sequel[:strand][:label] => ["start", "wait_concurrency_limit"])
       .select_map(Sequel[:github_runner][:label])
       .sum do
-        label = Github.runner_labels[_1]
+        label = Github.runner_labels[it]
         Validation.validate_vm_size(label["vm_size"], label["arch"]).vcpus
       end
   end

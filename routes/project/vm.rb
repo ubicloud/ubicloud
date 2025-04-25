@@ -24,7 +24,7 @@ class Clover
         @prices = fetch_location_based_prices("VmVCpu", "VmStorage", "IPAddress")
         @has_valid_payment_method = @project.has_valid_payment_method?
         @default_location = @project.default_location
-        @enabled_vm_sizes = Option::VmSizes.select { _1.visible && @project.quota_available?("VmVCpu", _1.vcpus) }.map(&:name)
+        @enabled_vm_sizes = Option::VmSizes.select { it.visible && @project.quota_available?("VmVCpu", it.vcpus) }.map(&:name)
         @option_tree, @option_parents = generate_vm_options
 
         view "vm/create"

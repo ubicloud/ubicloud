@@ -143,10 +143,10 @@ class Vm < Sequel::Model
   # and use its name as a display name.
   def display_size
     vm_size = Option::VmSizes.find {
-      _1.family == family &&
-        _1.arch == arch &&
-        _1.vcpus == vcpus &&
-        (cpu_percent_limit.nil? || _1.cpu_percent_limit == cpu_percent_limit)
+      it.family == family &&
+        it.arch == arch &&
+        it.vcpus == vcpus &&
+        (cpu_percent_limit.nil? || it.cpu_percent_limit == cpu_percent_limit)
     }
     vm_size.name
   end
@@ -164,7 +164,7 @@ class Vm < Sequel::Model
   end
 
   def storage_size_gib
-    vm_storage_volumes.map { _1.size_gib }.sum
+    vm_storage_volumes.map { it.size_gib }.sum
   end
 
   def init_health_monitor_session
@@ -222,7 +222,7 @@ class Vm < Sequel::Model
       "ndp_needed" => vm_host.ndp_needed,
       "storage_volumes" => storage_volumes,
       "swap_size_bytes" => swap_size_bytes,
-      "pci_devices" => pci_devices.map { [_1.slot, _1.iommu_group] },
+      "pci_devices" => pci_devices.map { [it.slot, it.iommu_group] },
       "slice_name" => vm_host_slice&.inhost_name || "system.slice",
       "cpu_percent_limit" => cpu_percent_limit || 0,
       "cpu_burst_percent_limit" => cpu_burst_percent_limit || 0

@@ -84,7 +84,7 @@ class Clover
             dst_port: Validation.validate_port(:dst_port, request_body_params["dst_port"]))
         end
 
-        new_vms = request_body_params["vms"].map { Vm.from_ubid(_1.delete("\"")) }
+        new_vms = request_body_params["vms"].map { Vm.from_ubid(it.delete("\"")) }
         new_vms.each do |vm|
           unless vm
             fail Validation::ValidationFailed.new("vms" => "VM not found")
@@ -99,7 +99,7 @@ class Clover
         end
 
         lb.vms.each do |vm|
-          next if new_vms.any? { _1.id == vm.id }
+          next if new_vms.any? { it.id == vm.id }
           lb.evacuate_vm(vm)
           lb.remove_vm(vm)
         end

@@ -91,11 +91,11 @@ module Scheduling; end
 module Serializers; end
 
 autoload_normal.call("model", flat: true)
-%w[lib clover.rb].each { autoload_normal.call(_1) }
-%w[scheduling prog serializers].each { autoload_normal.call(_1, include_first: true) }
+%w[lib clover.rb].each { autoload_normal.call(it) }
+%w[scheduling prog serializers].each { autoload_normal.call(it, include_first: true) }
 
 if ENV["LOAD_FILES_SEPARATELY_CHECK"] == "1"
-  files = %w[model lib scheduling prog serializers].flat_map { Dir["#{_1}/**/*.rb"] }
+  files = %w[model lib scheduling prog serializers].flat_map { Dir["#{it}/**/*.rb"] }
   files << "clover.rb"
 
   Sequel::DATABASES.each(&:disconnect)
@@ -119,12 +119,12 @@ Unreloader.record_dependency("lib/resource_methods.rb", "model")
 Unreloader.record_dependency("lib/semaphore_methods.rb", "model")
 
 if force_autoload
-  AUTOLOAD_CONSTANT_VALUES = AUTOLOAD_CONSTANTS.map { Object.const_get(_1) }.freeze
+  AUTOLOAD_CONSTANT_VALUES = AUTOLOAD_CONSTANTS.map { Object.const_get(it) }.freeze
 
   # All classes are already available, so speed up UBID.class_for_ubid using
   # hash of prefixes to class objects
   class UBID
-    TYPE2CLASS = TYPE2CLASSNAME.transform_values { Object.const_get(_1) }.freeze
+    TYPE2CLASS = TYPE2CLASSNAME.transform_values { Object.const_get(it) }.freeze
     private_constant :TYPE2CLASS
 
     singleton_class.remove_method(:class_for_ubid)
@@ -175,7 +175,7 @@ def clover_freeze
 
   # Aws SDK started to autoload modules when used, so we need to load them
   # before freezing. https://github.com/aws/aws-sdk-ruby/pull/3105
-  [:Client, :Presigner, :Errors].each { Aws::S3.const_get(_1) }
+  [:Client, :Presigner, :Errors].each { Aws::S3.const_get(it) }
 
   # A standard library method that edits/creates a module variable as
   # a side effect.  We encountered it when using rubygems for its tar

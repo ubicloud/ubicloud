@@ -70,7 +70,7 @@ class SystemParser
         $1
       end
       unix_device = s.captures.first
-      size_gib, avail_gib = s.captures[2..].map { Integer(_1) / 1073741824 }
+      size_gib, avail_gib = s.captures[2..].map { Integer(it) / 1073741824 }
       out << DfRecord.new(unix_device, optional_name, size_gib, avail_gib)
     end
 

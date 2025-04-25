@@ -363,7 +363,7 @@ RSpec.describe Clover, "github" do
 
         response = JSON.parse(last_response.body)
         expect(response["totalCount"]).to eq(2)
-        expect(response["artifactCaches"].map { [_1["cacheKey"], _1["cacheVersion"]] }).to eq([["k1", "v1"], ["k1", "v2"]])
+        expect(response["artifactCaches"].map { [it["cacheKey"], it["cacheVersion"]] }).to eq([["k1", "v1"], ["k1", "v2"]])
       end
 
       it "returns the list of cache entries for the default branch" do
@@ -380,7 +380,7 @@ RSpec.describe Clover, "github" do
 
         response = JSON.parse(last_response.body)
         expect(response["totalCount"]).to eq(1)
-        expect(response["artifactCaches"].sort.map { [_1["cacheKey"], _1["cacheVersion"]] }).to eq([["k1", "v2"]])
+        expect(response["artifactCaches"].sort.map { [it["cacheKey"], it["cacheVersion"]] }).to eq([["k1", "v2"]])
       end
     end
   end

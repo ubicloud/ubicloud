@@ -1,13 +1,13 @@
 <% @page_title = @ps[:name]
 
 perm_checks = {
-  "Firewall:view" => Firewall.where(id: Sequel.any_uuid(@ps[:firewalls].map { UBID.to_uuid(_1[:id]) })),
-  "PrivateSubnet:view" => PrivateSubnet.where(id: Sequel.any_uuid(@connected_subnets.map { UBID.to_uuid(_1[:id]) }))
+  "Firewall:view" => Firewall.where(id: Sequel.any_uuid(@ps[:firewalls].map { UBID.to_uuid(it[:id]) })),
+  "PrivateSubnet:view" => PrivateSubnet.where(id: Sequel.any_uuid(@connected_subnets.map { UBID.to_uuid(it[:id]) }))
 }
 
 viewable_fws, viewable_subnets =
   perm_checks.map do |perm, ds|
-    dataset_authorize(ds, perm).select_hash(:id, Sequel.as(true, :v)).transform_keys! { UBID.from_uuidish(_1).to_s }
+    dataset_authorize(ds, perm).select_hash(:id, Sequel.as(true, :v)).transform_keys! { UBID.from_uuidish(it).to_s }
   end %>
 
 <%== part(
