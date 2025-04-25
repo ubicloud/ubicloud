@@ -16,8 +16,19 @@ require_relative "storage_volume"
 class VmSetup
   Nic = Struct.new(:net6, :net4, :tap, :mac, :private_ipv4_gateway)
 
-  def initialize(vm_name)
+  def initialize(vm_name, hugepages: true, ch_version: nil, firmware_version: nil)
     @vm_name = vm_name
+    @hugepages = hugepages
+    @ch_version = CloudHypervisor::Version[ch_version] || no_valid_ch_version
+    @firmware_version = CloudHypervisor::Firmware[firmware_version] || no_valid_firmware_version
+  end
+
+  private def no_valid_ch_version
+    raise("no valid cloud hypervisor version")
+  end
+
+  private def no_valid_firmware_version
+    raise("no valid cloud hypervisor firmware version")
   end
 
   def q_vm
@@ -199,12 +210,14 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def unmount_hugepages
+    return unless @hugepages
     r "umount #{vp.q_hugepages}"
   rescue CommandFail => ex
     raise unless /(no mount point specified)|(not mounted)|(No such file or directory)/.match?(ex.stderr)
   end
 
   def hugepages(mem_gib)
+    return unless @hugepages
     FileUtils.mkdir_p vp.hugepages
     FileUtils.chown @vm_name, @vm_name, vp.hugepages
     r "mount -t hugetlbfs -o uid=#{q_vm},size=#{mem_gib}G nodev #{vp.q_hugepages}"
@@ -653,11 +666,18 @@ DNSMASQ_SERVICE
 
     disk_params = storage_volumes.map { |volume|
       if volume.read_only
-        "--disk path=#{volume.image_path},readonly=on \\"
+        "path=#{volume.image_path},readonly=on"
       else
-        "--disk vhost_user=true,socket=#{volume.vhost_sock},num_queues=1,queue_size=256 \\"
+        "vhost_user=true,socket=#{volume.vhost_sock},num_queues=1,queue_size=256"
       end
     }
+    disk_params << "path=#{vp.cloudinit_img}"
+
+    disk_args = if Gem::Version.new(@ch_version.version) >= Gem::Version.new("36")
+      "--disk #{disk_params.join(" ")}"
+    else
+      disk_params.map { |x| "--disk #{x}" }.join(" ")
+    end
 
     spdk_services = storage_volumes.map { |volume| volume.spdk_service }.uniq
     spdk_after = spdk_services.map { |s| "After=#{s}" }.join("\n")
@@ -686,18 +706,17 @@ Slice=#{slice_name}
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
 ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
 
-ExecStart=#{CloudHypervisor::Version::DEFAULT.bin} -v \
+ExecStart=#{@ch_version.bin} -v \
 --api-socket path=#{vp.ch_api_sock} \
---kernel #{CloudHypervisor::Firmware::DEFAULT.path} \
-#{disk_params.join("\n")}
---disk path=#{vp.cloudinit_img} \
+--kernel #{@firmware_version.path} \
+#{disk_args} \
 --console off --serial file=#{vp.serial_log} \
 --cpus #{cpu_setting} \
---memory size=#{mem_gib}G,hugepages=on,hugepage_size=1G \
+--memory size=#{mem_gib}G,#{@hugepages ? "hugepages=on,hugepage_size=1G" : "shared=on"} \
 #{pci_device_params} \
 #{net_params.join(" \\\n")}
 
-ExecStop=#{CloudHypervisor::Version::DEFAULT.ch_remote_bin} --api-socket #{vp.ch_api_sock} shutdown-vmm
+ExecStop=#{@ch_version.ch_remote_bin} --api-socket #{vp.ch_api_sock} shutdown-vmm
 Restart=no
 User=#{@vm_name}
 Group=#{@vm_name}

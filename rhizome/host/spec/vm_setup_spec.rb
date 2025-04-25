@@ -5,7 +5,18 @@ require "openssl"
 require "base64"
 
 RSpec.describe VmSetup do
-  subject(:vs) { described_class.new("test") }
+  subject(:vs) {
+    vs = Class.new(described_class) do
+      def no_valid_ch_version
+        nil
+      end
+
+      def no_valid_firmware_version
+        nil
+      end
+    end.new("test")
+    vs
+  }
 
   def key_wrapping_secrets
     key_wrapping_algorithm = "aes-256-gcm"
