@@ -15,8 +15,8 @@ File.open("/etc/fstab", File::RDONLY) do |f|
   f.flock(File::LOCK_EX)
 
   content = f.read
-  rows = content.split("\n").reject { it.start_with?("#") }
-  matches = rows.select { it.match(/\A#{device}\s|\s#{dir}\s/) }
+  rows = content.split("\n").reject { _1.start_with?("#") }
+  matches = rows.select { _1.match(/\A#{device}\s|\s#{dir}\s/) }
   if matches.count == 0
     content += "\n#{device} #{dir} #{type} #{options} #{dump} #{fsck}"
     safe_write_to_file("/etc/fstab", content)

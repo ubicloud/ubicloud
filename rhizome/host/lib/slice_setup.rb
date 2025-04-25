@@ -55,7 +55,7 @@ SLICE_CONFIG
     str.split(",").all? do |part|
       if part.include?("-")
         r = part.split("-")
-        r.size == 2 && r.all? { it.to_i.to_s == it } && r[0].to_i <= r[1].to_i
+        r.size == 2 && r.all? { _1.to_i.to_s == _1 } && r[0].to_i <= r[1].to_i
       else
         part.to_i.to_s == part
       end
