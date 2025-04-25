@@ -5,11 +5,10 @@ require_relative "../../common/lib/arch"
 
 module CloudHypervisor
   class Firmware < Struct.new(:version, :sha256)
-    DEFAULT = if Arch.x64?
-      new("202311", "e31738aacd3d68d30f8f9a4d09711cca3dfb414e8910dc3af90c50f36885380a")
-    else
-      new("202211", "482f428f782591d7c2222e0bc8240d25fb200fb21fd984b3339c85979d94b4d8")
-    end
+    DEFAULT = Arch.render(
+      x64: new("202311", "e31738aacd3d68d30f8f9a4d09711cca3dfb414e8910dc3af90c50f36885380a"),
+      arm64: new("202211", "482f428f782591d7c2222e0bc8240d25fb200fb21fd984b3339c85979d94b4d8")
+    )
 
     def url
       "https://github.com/ubicloud/build-edk2-firmware/releases/download/edk2-stable#{version}-#{Arch.sym}/CLOUDHV-#{Arch.sym}.fd"
@@ -38,14 +37,14 @@ module CloudHypervisor
   end
 
   class Version < Struct.new(:version, :sha256_ch_bin, :sha256_ch_remote)
-    DEFAULT = if Arch.x64?
-      new("45.0", "362d42eb464e2980d7b41109a214f8b1518b4e1f8e7d8c227b67c19d4581c250", "11a050087d279f9b5860ddbf2545fda43edf93f9b266440d0981932ee379c6ec")
-    else
-      new("45.0", "3a8073379d098817d54f7c0ab25a7734b88b070a98e5d820ab39e244b35b5e5e", "a4b736ce82f5e2fc4a92796a9a443f243ef69f4970dad1e1772bd841c76c3301")
-    end
+    DEFAULT = Arch.render(
+      x64: new("45.0", "362d42eb464e2980d7b41109a214f8b1518b4e1f8e7d8c227b67c19d4581c250", "11a050087d279f9b5860ddbf2545fda43edf93f9b266440d0981932ee379c6ec"),
+      arm64: new("45.0", "3a8073379d098817d54f7c0ab25a7734b88b070a98e5d820ab39e244b35b5e5e", "a4b736ce82f5e2fc4a92796a9a443f243ef69f4970dad1e1772bd841c76c3301")
+    )
+    EXE_SUFFIX = Arch.render(x64: "-static", arm64: "-static-aarch64")
 
     def url_for(type)
-      "https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v#{version}/#{type}-static#{"-aarch64" if Arch.arm64?}"
+      "https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v#{version}/#{type}#{EXE_SUFFIX}"
     end
 
     def ch_remote_url

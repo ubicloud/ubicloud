@@ -21,4 +21,8 @@ ArchClass = Struct.new(:sym) {
   def x64?
     sym == :x64
   end
+
+  def render(x64:, arm64:)
+    {x64:, arm64:}.fetch(sym)
+  end
 }

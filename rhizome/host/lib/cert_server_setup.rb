@@ -48,7 +48,8 @@ class CertServerSetup
   end
 
   def package_url
-    "https://github.com/ubicloud/metadata-endpoint/releases/download/v#{server_version}/metadata-endpoint_Linux_#{Arch.x64? ? "x86_64" : "arm64"}.tar.gz"
+    arch = Arch.render(x64: "x86_64", arm64: "arm64")
+    "https://github.com/ubicloud/metadata-endpoint/releases/download/v#{server_version}/metadata-endpoint_Linux_#{arch}.tar.gz"
   end
 
   def setup
