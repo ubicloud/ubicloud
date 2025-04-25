@@ -22,7 +22,7 @@ class Prog::Vm::UpdateIpv6 < Prog::Base
     )
 
     write_params_json
-    vm_host.sshable.cmd("sudo host/bin/setup-vm reassign-ip6 #{vm.inhost_name}", stdin: JSON.generate({storage: vm.storage_secrets}))
+    vm_host.sshable.cmd("sudo host/bin/setup-vm reassign-ip6 #{vm.inhost_name}#{Prog::Vm::Nexus::SETUP_VM_HUGEPAGES}", stdin: JSON.generate({storage: vm.storage_secrets}))
     hop_start_vm
   end
 

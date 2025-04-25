@@ -16,8 +16,9 @@ require_relative "storage_volume"
 class VmSetup
   Nic = Struct.new(:net6, :net4, :tap, :mac, :private_ipv4_gateway)
 
-  def initialize(vm_name)
+  def initialize(vm_name, hugepages: true)
     @vm_name = vm_name
+    @hugepages = hugepages
   end
 
   def q_vm
@@ -199,12 +200,14 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def unmount_hugepages
+    return unless @hugepages
     r "umount #{vp.q_hugepages}"
   rescue CommandFail => ex
     raise unless /(no mount point specified)|(not mounted)|(No such file or directory)/.match?(ex.stderr)
   end
 
   def hugepages(mem_gib)
+    return unless @hugepages
     FileUtils.mkdir_p vp.hugepages
     FileUtils.chown @vm_name, @vm_name, vp.hugepages
     r "mount -t hugetlbfs -o uid=#{q_vm},size=#{mem_gib}G nodev #{vp.q_hugepages}"
@@ -699,7 +702,7 @@ ExecStart=#{CloudHypervisor::Version::DEFAULT.bin} -v \
 #{disk_args} \
 --console off --serial file=#{vp.serial_log} \
 --cpus #{cpu_setting} \
---memory size=#{mem_gib}G,hugepages=on,hugepage_size=1G \
+--memory size=#{mem_gib}G,#{@hugepages ? "hugepages=on,hugepage_size=1G" : "shared=on"} \
 #{pci_device_params} \
 #{net_params.join(" \\\n")}
 
