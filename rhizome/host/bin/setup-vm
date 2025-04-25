@@ -14,7 +14,13 @@ unless (vm_name = ARGV.shift)
   exit 1
 end
 
-vm_setup = VmSetup.new(vm_name)
+vm_options = {}
+if (options_str = ARGV.shift)
+  options_array = options_str.split(",")
+  vm_options[:hugepages] = false if options_array.include?("hugepages=off")
+end
+
+vm_setup = VmSetup.new(vm_name, **vm_options)
 
 if action == "delete"
   vm_setup.purge
