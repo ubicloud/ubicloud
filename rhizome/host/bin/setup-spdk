@@ -20,17 +20,19 @@ spdk_setup = SpdkSetup.new(version)
 
 case verb
 when "install"
-  unless (cpu_count = ARGV.shift)
-    puts "expected cpu_count as argument"
+  unless (cpu_count = ARGV.shift) && cpu_count.to_i.positive?
+    puts "expected a positive cpu_count as argument"
     exit 1
   end
+  cpu_count = cpu_count.to_i
+
   # YYY: The default is used for backward comaptibility. Make it mandatory after
   # the upgrade.
   os_version = ARGV.shift || "ubuntu-22.04"
   spdk_setup.install_package(os_version: os_version)
-  spdk_setup.create_hugepages_mount
-  spdk_setup.create_conf
-  spdk_setup.create_service(cpu_count: cpu_count.to_i)
+  spdk_setup.create_hugepages_mount(cpu_count: cpu_count)
+  spdk_setup.create_conf(cpu_count: cpu_count)
+  spdk_setup.create_service(cpu_count: cpu_count)
   spdk_setup.enable_services
 when "start"
   spdk_setup.start_services
