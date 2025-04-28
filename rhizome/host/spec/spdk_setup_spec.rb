@@ -70,7 +70,7 @@ RSpec.describe SpdkSetup do
     it "creates the hugepages mount" do
       expect(spdk_setup).to receive(:r).with("sudo --user=spdk mkdir -p /home/spdk/hugepages.#{spdk_version.tr("-", ".")}")
       expect(File).to receive(:write).with("/lib/systemd/system/home-spdk-hugepages.#{spdk_version.tr("-", ".")}.mount", /.*/)
-      expect { spdk_setup.create_hugepages_mount }.not_to raise_error
+      expect { spdk_setup.create_hugepages_mount(cpu_count: 4) }.not_to raise_error
     end
   end
 

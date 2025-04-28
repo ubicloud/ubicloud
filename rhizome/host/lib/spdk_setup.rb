@@ -121,7 +121,11 @@ SPDK_SERVICE
     )
   end
 
-  def create_hugepages_mount
+  def create_hugepages_mount(cpu_count:)
+    # Numbers in create_conf are chosen in such a way that we need 1GB of
+    # hugepages for each CPU core.
+    hugepages = cpu_count
+
     user = SpdkPath.user
     r "sudo --user=#{user.shellescape} mkdir -p #{hugepages_dir.shellescape}"
 
@@ -133,7 +137,7 @@ Description=SPDK hugepages mount #{@spdk_version}
 What=hugetlbfs
 Where=#{hugepages_dir}
 Type=hugetlbfs
-Options=uid=#{user},size=4G
+Options=uid=#{user},size=#{hugepages}G
 
 [Install]
 WantedBy=#{spdk_service}
@@ -141,7 +145,9 @@ SPDK_HUGEPAGES_MOUNT
     )
   end
 
-  def create_conf
+  def create_conf(cpu_count:)
+    small_pool_count = 19200 * cpu_count
+    large_pool_count = 2400 * cpu_count
     iobuf_conf = [{
       method: "iobuf_set_options",
       params: {
@@ -151,10 +157,10 @@ SPDK_HUGEPAGES_MOUNT
         # on demand. In my tests, this number peaked at 512 large items for a
         # volume when doing bursts of 256k writes.
         #
-        # So, this config should be enough for 18 VMs doing bursts of 256k
-        # writes at the same time.
-        small_pool_count: 76800,
-        large_pool_count: 9600,
+        # So, this config should be enough for 18 VMs on AX-162 doing bursts of
+        # 256k writes at the same time.
+        small_pool_count: small_pool_count,
+        large_pool_count: large_pool_count,
         small_bufsize: 8192,
         large_bufsize: 135168
       }
