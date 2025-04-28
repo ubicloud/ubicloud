@@ -24,7 +24,9 @@ class Prog::Storage::SetupSpdk < Prog::Base
   label def start
     version = frame["version"]
     arch = vm_host.arch
-    spdk_hugepages = 4
+
+    # Rhizome's spdk_setup.rb uses one 1G hugepage per CPU core
+    spdk_hugepages = vm_host.spdk_cpu_count
 
     fail "Unsupported version: #{version}, #{arch}" unless SUPPORTED_SPDK_VERSIONS.include? [version, arch]
 
