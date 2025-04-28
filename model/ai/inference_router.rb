@@ -3,7 +3,7 @@
 require_relative "../../model"
 
 class InferenceRouter < Sequel::Model
-  one_to_one :strand
+  one_to_one :strand, key: :id
   many_to_one :project
   one_to_many :replicas, class: :InferenceRouterReplica, key: :inference_router_id
   many_to_one :load_balancer
