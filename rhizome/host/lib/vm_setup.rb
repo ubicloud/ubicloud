@@ -16,9 +16,19 @@ require_relative "storage_volume"
 class VmSetup
   Nic = Struct.new(:net6, :net4, :tap, :mac, :private_ipv4_gateway)
 
-  def initialize(vm_name, hugepages: true)
+  def initialize(vm_name, hugepages: true, ch_version: nil, firmware_version: nil)
     @vm_name = vm_name
     @hugepages = hugepages
+    @ch_version = CloudHypervisor::Version[ch_version] || no_valid_ch_version
+    @firmware_version = CloudHypervisor::Firmware[firmware_version] || no_valid_firmware_version
+  end
+
+  private def no_valid_ch_version
+    raise("no valid cloud hypervisor version")
+  end
+
+  private def no_valid_firmware_version
+    raise("no valid cloud hypervisor firmware version")
   end
 
   def q_vm
@@ -663,10 +673,10 @@ DNSMASQ_SERVICE
     }
     disk_params << "path=#{vp.cloudinit_img}"
 
-    disk_args = if CloudHypervisor::Version::DEFAULT.version >= "36"
+    disk_args = if Gem::Version.new(@ch_version.version) >= Gem::Version.new("36")
       "--disk #{disk_params.join(" ")}"
     else
-      disk_params.map { |x| "--disk #{x}" }.join("\n")
+      disk_params.map { |x| "--disk #{x}" }.join(" ")
     end
 
     spdk_services = storage_volumes.map { |volume| volume.spdk_service }.uniq
@@ -696,9 +706,9 @@ Slice=#{slice_name}
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
 ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
 
-ExecStart=#{CloudHypervisor::Version::DEFAULT.bin} -v \
+ExecStart=#{@ch_version.bin} -v \
 --api-socket path=#{vp.ch_api_sock} \
---kernel #{CloudHypervisor::Firmware::DEFAULT.path} \
+--kernel #{@firmware_version.path} \
 #{disk_args} \
 --console off --serial file=#{vp.serial_log} \
 --cpus #{cpu_setting} \
@@ -706,7 +716,7 @@ ExecStart=#{CloudHypervisor::Version::DEFAULT.bin} -v \
 #{pci_device_params} \
 #{net_params.join(" \\\n")}
 
-ExecStop=#{CloudHypervisor::Version::DEFAULT.ch_remote_bin} --api-socket #{vp.ch_api_sock} shutdown-vmm
+ExecStop=#{@ch_version.ch_remote_bin} --api-socket #{vp.ch_api_sock} shutdown-vmm
 Restart=no
 User=#{@vm_name}
 Group=#{@vm_name}

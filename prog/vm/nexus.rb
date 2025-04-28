@@ -8,9 +8,6 @@ require "base64"
 
 class Prog::Vm::Nexus < Prog::Base
   DEFAULT_SIZE = "standard-2"
-  # :nocov:
-  SETUP_VM_HUGEPAGES = Config.development? ? " hugepages=off" : ""
-  # :nocov:
 
   subject_is :vm
 
@@ -18,7 +15,8 @@ class Prog::Vm::Nexus < Prog::Base
     unix_user: "ubi", location_id: Location::HETZNER_FSN1_ID, boot_image: Config.default_boot_image_name,
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
     enable_ip4: false, pool_id: nil, arch: "x64", swap_size_bytes: nil,
-    distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0)
+    distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0,
+    hugepages: !Config.development?, ch_version: nil, firmware_version: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -129,7 +127,10 @@ class Prog::Vm::Nexus < Prog::Base
           "distinct_storage_devices" => distinct_storage_devices,
           "force_host_id" => force_host_id,
           "exclude_host_ids" => exclude_host_ids,
-          "gpu_count" => gpu_count
+          "gpu_count" => gpu_count,
+          "hugepages" => hugepages,
+          "ch_version" => ch_version,
+          "firmware_version" => firmware_version
         }]
       ) { it.id = vm.id }
     end
@@ -296,8 +297,16 @@ class Prog::Vm::Nexus < Prog::Base
     hop_wait_sshable
   end
 
+  def self.setup_vm_options_str(frame)
+    options = []
+    options << "hugepages=off" if frame["hugepages"] == false
+    options << "ch_version=#{frame["ch_version"]}" if frame["ch_version"]
+    options << "firmware_version=#{frame["firmware_version"]}" if frame["firmware_version"]
+    options.join(",")
+  end
+
   def setup_vm_str(action)
-    "sudo host/bin/setup-vm #{action} #{q_vm}#{SETUP_VM_HUGEPAGES}"
+    "sudo host/bin/setup-vm #{action} #{q_vm} #{self.class.setup_vm_options_str(frame)}"
   end
 
   def write_params_json

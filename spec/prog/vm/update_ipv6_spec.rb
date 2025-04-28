@@ -46,8 +46,9 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
   it "rewrites persisted" do
     expect(pr).to receive(:vm_host).and_return(vm_host).at_least(:once)
     expect(vm).to receive(:update).with(ephemeral_net6: "2001::/64")
+    expect(vm).to receive(:strand).and_return(instance_double(Strand, stack: [{}]))
     expect(pr).to receive(:write_params_json)
-    expect(vm_host.sshable).to receive(:cmd).with("sudo host/bin/setup-vm reassign-ip6 test", stdin: JSON.generate({storage: "storage_secrets"}))
+    expect(vm_host.sshable).to receive(:cmd).with("sudo host/bin/setup-vm reassign-ip6 test ", stdin: JSON.generate({storage: "storage_secrets"}))
     expect(pr).to receive(:hop_start_vm)
     pr.rewrite_persisted
   end

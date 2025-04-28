@@ -53,11 +53,10 @@ r "chmod +x /etc/update-motd.d/99-clover-motd"
 r "timedatectl set-timezone UTC"
 
 # Download cloud hypervisor binaries.
-CloudHypervisor::Version::DEFAULT.download
-CloudHypervisor::Version::OLD.download if defined?(CloudHypervisor::Version::OLD)
+CloudHypervisor::Version.download
 
 # Download firmware binaries.
-CloudHypervisor::Firmware::DEFAULT.download
+CloudHypervisor::Firmware.download
 
 # Err towards listing ('l') and not restarting services by default,
 # otherwise a stray keystroke when using "apt install" for unrelated

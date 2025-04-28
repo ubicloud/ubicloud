@@ -278,51 +278,58 @@ RSpec.describe Prog::Vm::Nexus do
       expect { nx.prep }.to hop("clean_prep")
     end
 
-    it "generates and passes a params json if prep command is not started yet" do
-      vm = nx.vm
-      vm.ephemeral_net6 = "fe80::/64"
-      vm.unix_user = "test_user"
-      vm.public_key = "test_ssh_key"
-      vm.local_vetho_ip = "169.254.0.0"
-      ps = instance_double(PrivateSubnet, location_id: Location::HETZNER_FSN1_ID, net4: NetAddr::IPv4Net.parse("10.0.0.0/26"))
-      nic = Nic.new(private_ipv6: "fd10:9b0b:6b4b:8fbb::/64", private_ipv4: "10.0.0.3/32", mac: "5a:0f:75:80:c3:64")
-      pci = PciDevice.new(slot: "01:00.0", iommu_group: 23)
-      expect(nic).to receive(:ubid_to_tap_name).and_return("tap4ncdd56m")
-      expect(vm).to receive(:nics).and_return([nic]).at_least(:once)
-      expect(nic).to receive(:private_subnet).and_return(ps).at_least(:once)
-      expect(vm).to receive(:cloud_hypervisor_cpu_topology).and_return(Vm::CloudHypervisorCpuTopo.new(2, 1, 1, 1))
-      expect(vm).to receive(:pci_devices).and_return([pci]).at_least(:once)
-      prj.set_ff_vm_public_ssh_keys(["operator_ssh_key"])
-      expect(vm).to receive(:project).and_return(prj).at_least(:once)
+    {
+      "" => {},
+      "hugepages=off,ch_version=45.0,firmware_version=202311" => {"hugepages" => false, "ch_version" => "45.0", "firmware_version" => "202311"}
+    }.each do |setup_vm_opts_str, frame_update|
+      it "generates and passes a params json if prep command is not started yet (with frame opts: #{frame_update.inspect})" do
+        nx.strand.stack.first.update(frame_update)
+        nx.instance_variable_set(:@frame, nil)
+        vm = nx.vm
+        vm.ephemeral_net6 = "fe80::/64"
+        vm.unix_user = "test_user"
+        vm.public_key = "test_ssh_key"
+        vm.local_vetho_ip = "169.254.0.0"
+        ps = instance_double(PrivateSubnet, location_id: Location::HETZNER_FSN1_ID, net4: NetAddr::IPv4Net.parse("10.0.0.0/26"))
+        nic = Nic.new(private_ipv6: "fd10:9b0b:6b4b:8fbb::/64", private_ipv4: "10.0.0.3/32", mac: "5a:0f:75:80:c3:64")
+        pci = PciDevice.new(slot: "01:00.0", iommu_group: 23)
+        expect(nic).to receive(:ubid_to_tap_name).and_return("tap4ncdd56m")
+        expect(vm).to receive(:nics).and_return([nic]).at_least(:once)
+        expect(nic).to receive(:private_subnet).and_return(ps).at_least(:once)
+        expect(vm).to receive(:cloud_hypervisor_cpu_topology).and_return(Vm::CloudHypervisorCpuTopo.new(2, 1, 1, 1))
+        expect(vm).to receive(:pci_devices).and_return([pci]).at_least(:once)
+        prj.set_ff_vm_public_ssh_keys(["operator_ssh_key"])
+        expect(vm).to receive(:project).and_return(prj).at_least(:once)
 
-      sshable = instance_spy(Sshable)
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("NotStarted")
-      vmh = instance_double(VmHost, sshable: sshable,
-        total_cpus: 80, total_cores: 80, total_sockets: 10, ndp_needed: false, arch: "arm64")
-      expect(vm).to receive(:vm_host).and_return(vmh).at_least(:once)
+        sshable = instance_spy(Sshable)
+        expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("NotStarted")
+        vmh = instance_double(VmHost, sshable: sshable,
+          total_cpus: 80, total_cores: 80, total_sockets: 10, ndp_needed: false, arch: "arm64")
+        expect(vm).to receive(:vm_host).and_return(vmh).at_least(:once)
 
-      expect(sshable).to receive(:cmd).with(/sudo -u vm[0-9a-z]+ tee/, stdin: String) do |**kwargs|
-        require "json"
-        params = JSON(kwargs.fetch(:stdin))
-        expect(params).to include({
-          "public_ipv6" => "fe80::/64",
-          "unix_user" => "test_user",
-          "ssh_public_keys" => ["test_ssh_key", "operator_ssh_key"],
-          "max_vcpus" => 2,
-          "cpu_topology" => "2:1:1:1",
-          "mem_gib" => 8,
-          "local_ipv4" => "169.254.0.0",
-          "nics" => [["fd10:9b0b:6b4b:8fbb::/64", "10.0.0.3/32", "tap4ncdd56m", "5a:0f:75:80:c3:64", "10.0.0.1/26"]],
-          "swap_size_bytes" => nil,
-          "pci_devices" => [["01:00.0", 23]],
-          "slice_name" => "system.slice",
-          "cpu_percent_limit" => 200,
-          "cpu_burst_percent_limit" => 0
-        })
+        expect(sshable).to receive(:cmd).with(/sudo -u vm[0-9a-z]+ tee/, stdin: String) do |**kwargs|
+          require "json"
+          params = JSON(kwargs.fetch(:stdin))
+          expect(params).to include({
+            "public_ipv6" => "fe80::/64",
+            "unix_user" => "test_user",
+            "ssh_public_keys" => ["test_ssh_key", "operator_ssh_key"],
+            "max_vcpus" => 2,
+            "cpu_topology" => "2:1:1:1",
+            "mem_gib" => 8,
+            "local_ipv4" => "169.254.0.0",
+            "nics" => [["fd10:9b0b:6b4b:8fbb::/64", "10.0.0.3/32", "tap4ncdd56m", "5a:0f:75:80:c3:64", "10.0.0.1/26"]],
+            "swap_size_bytes" => nil,
+            "pci_devices" => [["01:00.0", 23]],
+            "slice_name" => "system.slice",
+            "cpu_percent_limit" => 200,
+            "cpu_burst_percent_limit" => 0
+          })
+        end
+        expect(sshable).to receive(:cmd).with(/sudo host\/bin\/setup-vm prep #{nx.vm_name} #{setup_vm_opts_str}/, {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/})
+
+        expect { nx.prep }.to nap(1)
       end
-      expect(sshable).to receive(:cmd).with(/sudo host\/bin\/setup-vm prep #{nx.vm_name}/, {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/})
-
-      expect { nx.prep }.to nap(1)
     end
 
     it "naps if prep command is in progress" do
@@ -810,7 +817,7 @@ RSpec.describe Prog::Vm::Nexus do
 
       expect(nx).to receive(:decr_update_spdk_dependency)
       expect(nx).to receive(:write_params_json)
-      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm reinstall-systemd-units #{vm.inhost_name}")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm reinstall-systemd-units #{vm.inhost_name} ")
       expect { nx.update_spdk_dependency }.to hop("wait")
     end
   end
@@ -820,7 +827,7 @@ RSpec.describe Prog::Vm::Nexus do
       sshable = instance_double(Sshable)
       expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: sshable))
       expect(nx).to receive(:decr_restart)
-      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm restart #{vm.inhost_name}")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm restart #{vm.inhost_name} ")
       expect { nx.restart }.to hop("wait")
     end
   end

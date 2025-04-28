@@ -16,8 +16,10 @@ end
 
 vm_options = {}
 if (options_str = ARGV.shift)
-  options_array = options_str.split(",")
-  vm_options[:hugepages] = false if options_array.include?("hugepages=off")
+  options_hash = options_str.split(",").map { |v| v.split("=", 2) }.to_h
+  vm_options[:hugepages] = false if options_hash["hugepages"] == "off"
+  vm_options[:ch_version] = options_hash["ch_version"] if options_hash.include?("ch_version")
+  vm_options[:firmware_version] = options_hash["firmware_version"] if options_hash.include?("firmware_version")
 end
 
 vm_setup = VmSetup.new(vm_name, **vm_options)
