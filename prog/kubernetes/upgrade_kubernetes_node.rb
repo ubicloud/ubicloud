@@ -60,7 +60,8 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
     when "InProgress"
       nap 10
     when "Failed"
-      nap 60 * 60
+      vm.sshable.d_restart("drain_node")
+      nap 10
     end
     nap 60 * 60
   end
