@@ -79,6 +79,7 @@ RSpec.describe CloudHypervisor do
     context "when cloud hypervisor does not exist" do
       before do
         setup_existing_files(remote_exist: false, ch_exist: false)
+        expect(CloudHypervisor::Version).to receive(:exe_suffix).and_return("-static").twice
       end
 
       it "downloads the cloud hypervisor" do

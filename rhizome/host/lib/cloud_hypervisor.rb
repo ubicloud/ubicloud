@@ -58,10 +58,8 @@ module CloudHypervisor
   end
 
   class Version < Struct.new(:version, :sha256_ch_bin, :sha256_ch_remote)
-    EXE_SUFFIX = Arch.render(x64: "-static", arm64: "-static-aarch64")
-
     def url_for(type)
-      "https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v#{version}/#{type}#{EXE_SUFFIX}"
+      "https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v#{version}/#{type}#{self.class.exe_suffix}"
     end
 
     def ch_remote_url
@@ -138,12 +136,18 @@ module CloudHypervisor
     end
     INSTALLED.freeze
 
+    EXE_SUFFIX = Arch.render(x64: "-static", arm64: "-static-aarch64")
+
     def self.[](version)
       INSTALLED[version]
     end
 
     def self.download
       SUPPORTED.each_value(&:download)
+    end
+
+    def self.exe_suffix
+      EXE_SUFFIX
     end
   end
 end
