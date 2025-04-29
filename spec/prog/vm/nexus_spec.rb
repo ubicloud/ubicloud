@@ -437,24 +437,20 @@ RSpec.describe Prog::Vm::Nexus do
     it "allocates with expected parameters" do
       expect(Scheduling::Allocator).to receive(:allocate).with(
         vm, :storage_volumes,
-        allocation_state_filter: ["accepting"],
-        host_filter: [],
         location_filter: [Location::HETZNER_FSN1_ID],
-        location_preference: [],
         family_filter: ["standard"]
       )
       expect { nx.start }.to hop("create_unix_user")
     end
 
-    it "considers EU locations for github-runners" do
-      vm.location_id = Location::GITHUB_RUNNERS_ID
+    it "overwrites location and family filters" do
+      vm.allocator_preferences = {"location_filter" => [Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID], "location_preference" => [Location::HETZNER_HEL1_ID], "family_filter" => ["standard-gpu-6"]}
+
       expect(Scheduling::Allocator).to receive(:allocate).with(
         vm, :storage_volumes,
-        allocation_state_filter: ["accepting"],
-        host_filter: [],
-        location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID],
-        location_preference: [Location::GITHUB_RUNNERS_ID],
-        family_filter: ["standard"]
+        location_filter: [Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID],
+        location_preference: [Location::HETZNER_HEL1_ID],
+        family_filter: ["standard-gpu-6"]
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -463,137 +459,7 @@ RSpec.describe Prog::Vm::Nexus do
       vm.family = "burstable"
       expect(Scheduling::Allocator).to receive(:allocate).with(
         vm, :storage_volumes,
-        allocation_state_filter: ["accepting"],
-        host_filter: [],
         location_filter: [Location::HETZNER_FSN1_ID],
-        location_preference: [],
-        family_filter: ["standard"]
-      )
-      expect { nx.start }.to hop("create_unix_user")
-    end
-
-    it "considers filtered locations for runners if set for the installation" do
-      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, allocator_preferences: {"location_filter" => [Location::GITHUB_RUNNERS_ID, Location::LEASEWEB_WDC02_ID]})
-      GithubRunner.create(vm_id: vm.id, repository_name: "ubicloud/test", label: "ubicloud", installation_id: installation.id)
-      vm.location_id = Location::GITHUB_RUNNERS_ID
-
-      expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
-        allocation_state_filter: ["accepting"],
-        host_filter: [],
-        location_filter: [Location::GITHUB_RUNNERS_ID, Location::LEASEWEB_WDC02_ID],
-        location_preference: [Location::GITHUB_RUNNERS_ID],
-        family_filter: ["standard"]
-      )
-      expect { nx.start }.to hop("create_unix_user")
-    end
-
-    it "considers preferred locations for runners if set for the installation" do
-      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, allocator_preferences: {
-        "location_filter" => [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID, Location::LEASEWEB_WDC02_ID],
-        "location_preference" => [Location::LEASEWEB_WDC02_ID]
-      })
-      GithubRunner.create(vm_id: vm.id, repository_name: "ubicloud/test", label: "ubicloud", installation_id: installation.id)
-      vm.location_id = Location::GITHUB_RUNNERS_ID
-
-      expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
-        allocation_state_filter: ["accepting"],
-        host_filter: [],
-        location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID, Location::LEASEWEB_WDC02_ID],
-        location_preference: [Location::LEASEWEB_WDC02_ID],
-        family_filter: ["standard"]
-      )
-      expect { nx.start }.to hop("create_unix_user")
-    end
-
-    it "considers preferred families for runners if set for the installation" do
-      vm.location_id = Location::GITHUB_RUNNERS_ID
-      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, allocator_preferences: {"family_filter" => ["standard", "premium"]})
-      GithubRunner.create(label: "ubicloud", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
-
-      expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
-        allocation_state_filter: ["accepting"],
-        host_filter: [],
-        location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID],
-        location_preference: [Location::GITHUB_RUNNERS_ID],
-        family_filter: ["standard", "premium"]
-      )
-      expect { nx.start }.to hop("create_unix_user")
-    end
-
-    it "allows premium family allocation if free runner upgrade runner is enabled" do
-      vm.location_id = Location::GITHUB_RUNNERS_ID
-      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id)
-      GithubRunner.create(label: "ubicloud", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
-      prj.set_ff_free_runner_upgrade_until(Time.now + 5 * 24 * 60 * 60)
-      expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
-        allocation_state_filter: ["accepting"],
-        host_filter: [],
-        location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID],
-        location_preference: [Location::GITHUB_RUNNERS_ID],
-        family_filter: ["standard", "premium"]
-      )
-      expect { nx.start }.to hop("create_unix_user")
-    end
-
-    it "can force allocating a host" do
-      vm.allocator_preferences = {"force_host_id" => :vm_host_id}
-
-      expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
-        allocation_state_filter: ["accepting"],
-        host_filter: [],
-        location_filter: [vm.location_id],
-        location_preference: [],
-        family_filter: ["standard"],
-        force_host_id: :vm_host_id
-      )
-      expect { nx.start }.to hop("create_unix_user")
-    end
-
-    it "can exclude hosts" do
-      vm.allocator_preferences = {"host_exclusion_filter" => [:vm_host_id, "another-vm-host-id"]}
-
-      expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
-        allocation_state_filter: ["accepting"],
-        host_filter: [],
-        host_exclusion_filter: [:vm_host_id, "another-vm-host-id"],
-        location_filter: [Location::HETZNER_FSN1_ID],
-        location_preference: [],
-        family_filter: ["standard"]
-      )
-      expect { nx.start }.to hop("create_unix_user")
-    end
-
-    it "requests distinct storage devices" do
-      vm.allocator_preferences = {"distinct_storage_devices" => true}
-
-      expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
-        allocation_state_filter: ["accepting"],
-        distinct_storage_devices: true,
-        host_filter: [],
-        location_filter: [Location::HETZNER_FSN1_ID],
-        location_preference: [],
-        family_filter: ["standard"]
-      )
-      expect { nx.start }.to hop("create_unix_user")
-    end
-
-    it "requests gpus" do
-      vm.allocator_preferences = {"gpu_count" => 3}
-
-      expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
-        allocation_state_filter: ["accepting"],
-        host_filter: [],
-        location_filter: [Location::HETZNER_FSN1_ID],
-        location_preference: [],
-        gpu_count: 3,
         family_filter: ["standard"]
       )
       expect { nx.start }.to hop("create_unix_user")

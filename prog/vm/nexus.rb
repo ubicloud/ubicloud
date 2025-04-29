@@ -191,36 +191,10 @@ class Prog::Vm::Nexus < Prog::Base
   label def start
     queued_vms = Vm.join(:strand, id: :id).where(:location_id => vm.location_id, :arch => vm.arch, Sequel[:strand][:label] => "start")
     begin
-      runner = GithubRunner.first(vm_id: vm.id) if vm.location_id == Location::GITHUB_RUNNERS_ID
-      allocation_state_filter, location_filter, location_preference, host_filter, family_filter =
-        if vm.location_id == Location::GITHUB_RUNNERS_ID
-          runner_location_filter = [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID]
-          runner_location_preference = [Location::GITHUB_RUNNERS_ID]
-          runner_family_filter = [vm.family]
-          prefs = if runner
-            runner_family_filter.append("premium") if runner.installation.free_runner_upgrade?
-            runner.installation.allocator_preferences
-          else
-            {}
-          end
-          [
-            ["accepting"],
-            prefs["location_filter"] || runner_location_filter,
-            prefs["location_preference"] || runner_location_preference,
-            [],
-            prefs["family_filter"] || runner_family_filter
-          ]
-        else
-          [["accepting"], [vm.location_id], [], [], [vm.family]]
-        end
       allocator_params = vm.allocator_preferences.transform_keys(&:to_sym)
-      allocator_params.merge!({
-        allocation_state_filter:,
-        location_filter:,
-        location_preference:,
-        host_filter:,
-        family_filter:
-      })
+      allocator_params[:location_filter] ||= [vm.location_id]
+      allocator_params[:family_filter] ||= [vm.vm_host_family]
+
       Scheduling::Allocator.allocate(vm, frame["storage_volumes"], **allocator_params)
     rescue RuntimeError => ex
       raise unless ex.message.include?("no space left on any eligible host")
