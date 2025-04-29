@@ -124,6 +124,10 @@ class Sshable < Sequel::Model
     cmd("common/bin/daemonizer2 run #{unit_name.shellescape} #{Shellwords.join(run_command)}", stdin:, log:)
   end
 
+  def d_restart(unit_name)
+    cmd("common/bin/daemonizer2 restart #{unit_name}")
+  end
+
   # A huge number of settings are needed to isolate net-ssh from the
   # host system and provide some anti-hanging assurance (keepalive,
   # timeout).
