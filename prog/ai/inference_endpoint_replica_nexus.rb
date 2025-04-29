@@ -26,7 +26,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
         boot_image: inference_endpoint.boot_image,
         private_subnet_id: inference_endpoint.load_balancer.private_subnet.id,
         enable_ip4: true,
-        gpu_count: inference_endpoint.gpu_count
+        allocator_preferences: {gpu_count: inference_endpoint.gpu_count}
       )
 
       inference_endpoint.load_balancer.add_vm(vm_st.subject)
