@@ -331,8 +331,8 @@ module Scheduling::Allocator
       # penalty of 5 if host has a GPU but VM doesn't require a GPU
       score += 5 unless @request.gpu_count > 0 || @candidate_host[:num_gpus] == 0
 
-      # penalty of 10 if location preference is not honored
-      score += 10 unless @request.location_preference.empty? || @request.location_preference.include?(@candidate_host[:location_id])
+      # penalty of 1.5 if location preference is not honored
+      score += 1.5 unless @request.location_preference.empty? || @request.location_preference.include?(@candidate_host[:location_id])
 
       score
     end
