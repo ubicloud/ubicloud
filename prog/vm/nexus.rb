@@ -16,7 +16,7 @@ class Prog::Vm::Nexus < Prog::Base
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
     enable_ip4: false, pool_id: nil, arch: "x64", swap_size_bytes: nil,
     distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0,
-    hugepages: !Config.development?, ch_version: nil, firmware_version: nil)
+    hugepages: true, ch_version: nil, firmware_version: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
