@@ -45,7 +45,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         boot_image: boot_image,
         private_subnet_id: postgres_resource.private_subnet_id,
         enable_ip4: true,
-        exclude_host_ids: exclude_host_ids
+        allocator_preferences: {host_exclusion_filter: exclude_host_ids}
       )
 
       synchronization_status = representative_at ? "ready" : "catching_up"
