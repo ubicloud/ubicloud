@@ -6,8 +6,8 @@ require_relative "../../common/lib/arch"
 module CloudHypervisor
   # For Firmware and Version:
   #
-  # POTENTIAL constant is a hash of versions that should be installed by prep_host
-  # SUPPORTED constant is a hash of versions that are installed, with a default of the default version
+  # SUPPORTED constant is a hash of versions that should be installed by prep_host
+  # INSTALLED constant is a hash of versions that are installed, with a default of the default version
 
   class Firmware < Struct.new(:version, :sha256)
     def url
@@ -43,17 +43,17 @@ module CloudHypervisor
       x64: new("202311", "e31738aacd3d68d30f8f9a4d09711cca3dfb414e8910dc3af90c50f36885380a"),
       arm64: new("202211", "482f428f782591d7c2222e0bc8240d25fb200fb21fd984b3339c85979d94b4d8")
     )
-    POTENTIAL = {default.version => default}.freeze
-    SUPPORTED = POTENTIAL.select { _2.downloaded? }
-    SUPPORTED.default = default if default.downloaded?
-    SUPPORTED.freeze
+    SUPPORTED = {default.version => default}.freeze
+    INSTALLED = SUPPORTED.select { _2.downloaded? }
+    INSTALLED.default = default if default.downloaded?
+    INSTALLED.freeze
 
     def self.[](version)
-      SUPPORTED[version]
+      INSTALLED[version]
     end
 
     def self.download
-      POTENTIAL.each_value(&:download)
+      SUPPORTED.each_value(&:download)
     end
   end
 
@@ -115,35 +115,35 @@ module CloudHypervisor
       $1.to_i
     end
 
-    POTENTIAL = {"35.1" => Arch.render(
+    SUPPORTED = {"35.1" => Arch.render(
       x64: new("35.1", "e8426b0733248ed559bea64eb04d732ce8a471edc94807b5e2ecfdfc57136ab4", "337bd88183f6886f1c7b533499826587360f23168eac5aabf38e6d6b977c93b0"),
       arm64: new("35.1", "071a0b4918565ce81671ecd36d65b87351c85ea9ca0fbf73d4a67ec810efe606", "355cdb1e2af7653a15912c66f7c76c922ca788fd33d77f6f75846ff41278e249")
     )}
 
     default = if ubuntu_version >= 24
-      POTENTIAL["45.0"] = Arch.render(
+      SUPPORTED["45.0"] = Arch.render(
         x64: new("45.0", "362d42eb464e2980d7b41109a214f8b1518b4e1f8e7d8c227b67c19d4581c250", "11a050087d279f9b5860ddbf2545fda43edf93f9b266440d0981932ee379c6ec"),
         arm64: new("45.0", "3a8073379d098817d54f7c0ab25a7734b88b070a98e5d820ab39e244b35b5e5e", "a4b736ce82f5e2fc4a92796a9a443f243ef69f4970dad1e1772bd841c76c3301")
       )
     else
-      POTENTIAL["35.1"]
-    end
-    POTENTIAL.freeze
-
-    SUPPORTED = POTENTIAL.select { _2.downloaded? }
-    SUPPORTED.default = if default.downloaded?
-      default
-    else
-      SUPPORTED.values.first
+      SUPPORTED["35.1"]
     end
     SUPPORTED.freeze
 
+    INSTALLED = SUPPORTED.select { _2.downloaded? }
+    INSTALLED.default = if default.downloaded?
+      default
+    else
+      INSTALLED.values.first
+    end
+    INSTALLED.freeze
+
     def self.[](version)
-      SUPPORTED[version]
+      INSTALLED[version]
     end
 
     def self.download
-      POTENTIAL.each_value(&:download)
+      SUPPORTED.each_value(&:download)
     end
   end
 end
