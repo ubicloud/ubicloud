@@ -14,28 +14,28 @@ module Scheduling::Allocator
 
   def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [])
     request = Request.new(
-      vm.id,
-      vm.vcpus,
-      vm.memory_gib,
-      storage_volumes.map { it["size_gib"] }.sum,
-      storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
-      vm.boot_image,
-      distinct_storage_devices,
-      gpu_count,
-      vm.ip4_enabled,
-      target_host_utilization,
-      vm.arch,
-      allocation_state_filter,
-      host_filter,
-      host_exclusion_filter,
-      location_filter,
-      location_preference,
-      vm.family,
-      vm.cpu_percent_limit,
-      true, # use slices
-      Option::VmFamilies.find { it.name == vm.family }&.require_shared_slice || false,
-      vm.project.get_ff_allocator_diagnostics || false,
-      family_filter
+      vm_id: vm.id,
+      vcpus: vm.vcpus,
+      memory_gib: vm.memory_gib,
+      storage_gib: storage_volumes.map { it["size_gib"] }.sum,
+      storage_volumes: storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
+      boot_image: vm.boot_image,
+      distinct_storage_devices:,
+      gpu_count:,
+      ip4_enabled: vm.ip4_enabled,
+      target_host_utilization:,
+      arch_filter: vm.arch,
+      allocation_state_filter:,
+      host_filter:,
+      host_exclusion_filter:,
+      location_filter:,
+      location_preference:,
+      family: vm.family,
+      cpu_percent_limit: vm.cpu_percent_limit,
+      use_slices: true,
+      require_shared_slice: Option::VmFamilies.find { it.name == vm.family }&.require_shared_slice || false,
+      diagnostics: vm.project.get_ff_allocator_diagnostics || false,
+      family_filter:
     )
     allocation = Allocation.best_allocation(request)
     fail "#{vm} no space left on any eligible host" unless allocation
