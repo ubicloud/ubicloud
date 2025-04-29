@@ -14,15 +14,11 @@ class Prog::Vm::Nexus < Prog::Base
   def self.assemble(public_key, project_id, name: nil, size: DEFAULT_SIZE,
     unix_user: "ubi", location_id: Location::HETZNER_FSN1_ID, boot_image: Config.default_boot_image_name,
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
-    enable_ip4: false, pool_id: nil, arch: "x64", swap_size_bytes: nil,
-    distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0,
+    enable_ip4: false, pool_id: nil, arch: "x64", swap_size_bytes: nil, allocator_preferences: {},
     hugepages: true, ch_version: nil, firmware_version: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
-    end
-    if exclude_host_ids.include?(force_host_id)
-      fail "Cannot force and exclude the same host"
     end
 
     unless (location = Location[location_id])
@@ -96,14 +92,7 @@ class Prog::Vm::Nexus < Prog::Base
         nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic").subject
       end
 
-      gpu_count = 1 if gpu_count == 0 && vm_size.gpu
-      allocator_preferences = {
-        distinct_storage_devices:,
-        force_host_id:,
-        gpu_count:,
-        host_exclusion_filter: exclude_host_ids
-      }
-
+      allocator_preferences["gpu_count"] = 1 if !allocator_preferences["gpu_count"] && vm_size.gpu
       vm = Vm.create(
         public_key: public_key,
         unix_user: unix_user,
@@ -132,10 +121,6 @@ class Prog::Vm::Nexus < Prog::Base
         stack: [{
           "storage_volumes" => storage_volumes.map { |v| v.transform_keys(&:to_s) },
           "swap_size_bytes" => swap_size_bytes,
-          "distinct_storage_devices" => distinct_storage_devices,
-          "force_host_id" => force_host_id,
-          "exclude_host_ids" => exclude_host_ids,
-          "gpu_count" => gpu_count,
           "hugepages" => hugepages,
           "ch_version" => ch_version,
           "firmware_version" => firmware_version
@@ -206,9 +191,6 @@ class Prog::Vm::Nexus < Prog::Base
   label def start
     queued_vms = Vm.join(:strand, id: :id).where(:location_id => vm.location_id, :arch => vm.arch, Sequel[:strand][:label] => "start")
     begin
-      distinct_storage_devices = frame["distinct_storage_devices"] || false
-      host_exclusion_filter = frame["exclude_host_ids"] || []
-      gpu_count = frame["gpu_count"] || 0
       runner = GithubRunner.first(vm_id: vm.id) if vm.location_id == Location::GITHUB_RUNNERS_ID
       allocation_state_filter, location_filter, location_preference, host_filter, family_filter =
         if vm.location_id == Location::GITHUB_RUNNERS_ID
@@ -231,20 +213,15 @@ class Prog::Vm::Nexus < Prog::Base
         else
           [["accepting"], [vm.location_id], [], [], [vm.family]]
         end
-      family_filter = ["standard"] if vm.family == "burstable"
-
-      Scheduling::Allocator.allocate(
-        vm, frame["storage_volumes"],
-        distinct_storage_devices: distinct_storage_devices,
-        allocation_state_filter: allocation_state_filter,
-        location_filter: location_filter,
-        location_preference: location_preference,
-        host_filter: host_filter,
-        host_exclusion_filter: host_exclusion_filter,
-        gpu_count: gpu_count,
-        family_filter: family_filter,
-        force_host_id: frame["force_host_id"]
-      )
+      allocator_params = vm.allocator_preferences.transform_keys(&:to_sym)
+      allocator_params.merge!({
+        allocation_state_filter:,
+        location_filter:,
+        location_preference:,
+        host_filter:,
+        family_filter:
+      })
+      Scheduling::Allocator.allocate(vm, frame["storage_volumes"], **allocator_params)
     rescue RuntimeError => ex
       raise unless ex.message.include?("no space left on any eligible host")
 
