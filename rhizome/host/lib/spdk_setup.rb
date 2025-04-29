@@ -50,17 +50,9 @@ class SpdkSetup
   end
 
   def package_url(os_version:)
-    arch = if Arch.arm64?
-      "arm64"
-    elsif Arch.x64?
-      "x64"
-    else
-      fail "BUG: unexpected architecture"
-    end
-
     case @spdk_version
     when "v23.09-ubi-0.3"
-      "https://github.com/ubicloud/bdev_ubi/releases/download/spdk-23.09-ubi-0.3/ubicloud-spdk-#{os_version}-#{arch}.tar.gz"
+      "https://github.com/ubicloud/bdev_ubi/releases/download/spdk-23.09-ubi-0.3/ubicloud-spdk-#{os_version}-#{Arch.sym}.tar.gz"
     else
       fail "BUG: unsupported SPDK version"
     end
