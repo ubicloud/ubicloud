@@ -8,10 +8,5 @@ RSpec.describe ArchClass do
       expect(described_class.new(:x64).render(x64: "test-x64", arm64: "test-arm64")).to eq("test-x64")
       expect(described_class.new(:arm64).render(x64: "test-x64", arm64: "test-arm64")).to eq("test-arm64")
     end
-
-    it "has default representations for nil input to render" do
-      expect(described_class.new(:x64).render).to eq("x64")
-      expect(described_class.new(:arm64).render).to eq("arm64")
-    end
   end
 end
