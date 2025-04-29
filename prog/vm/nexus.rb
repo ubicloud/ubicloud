@@ -200,7 +200,7 @@ class Prog::Vm::Nexus < Prog::Base
       allocation_state_filter, location_filter, location_preference, host_filter =
         if frame["force_host_id"]
           [[], [], [], [frame["force_host_id"]]]
-        elsif Location[vm.location_id].name == "github-runners"
+        elsif vm.location_id == Location::GITHUB_RUNNERS_ID
           runner_locations = (vm.vcpus == 60) ? [] : [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID]
           [["accepting"], runner_locations, [Location::GITHUB_RUNNERS_ID], []]
         else
