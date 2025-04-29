@@ -14,28 +14,28 @@ module Scheduling::Allocator
 
   def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [])
     request = Request.new(
-      vm_id: vm.id,
-      vcpus: vm.vcpus,
+      arch_filter: vm.arch,
+      boot_image: vm.boot_image,
+      cpu_percent_limit: vm.cpu_percent_limit,
+      diagnostics: vm.project.get_ff_allocator_diagnostics || false,
+      family: vm.family,
+      ip4_enabled: vm.ip4_enabled,
       memory_gib: vm.memory_gib,
+      require_shared_slice: Option::VmFamilies.find { it.name == vm.family }&.require_shared_slice || false,
       storage_gib: storage_volumes.map { it["size_gib"] }.sum,
       storage_volumes: storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
-      boot_image: vm.boot_image,
-      distinct_storage_devices:,
-      gpu_count:,
-      ip4_enabled: vm.ip4_enabled,
-      target_host_utilization:,
-      arch_filter: vm.arch,
+      vcpus: vm.vcpus,
+      vm_id: vm.id,
+      use_slices: true,
       allocation_state_filter:,
-      host_filter:,
+      distinct_storage_devices:,
+      family_filter:,
+      gpu_count:,
       host_exclusion_filter:,
+      host_filter:,
       location_filter:,
       location_preference:,
-      family: vm.family,
-      cpu_percent_limit: vm.cpu_percent_limit,
-      use_slices: true,
-      require_shared_slice: Option::VmFamilies.find { it.name == vm.family }&.require_shared_slice || false,
-      diagnostics: vm.project.get_ff_allocator_diagnostics || false,
-      family_filter:
+      target_host_utilization:
     )
     allocation = Allocation.best_allocation(request)
     fail "#{vm} no space left on any eligible host" unless allocation
@@ -45,28 +45,28 @@ module Scheduling::Allocator
   end
 
   Request = Data.define(
-    :vm_id,
-    :vcpus,
+    :arch_filter,
+    :boot_image,
+    :cpu_percent_limit,
+    :diagnostics,
+    :family,
+    :ip4_enabled,
     :memory_gib,
+    :require_shared_slice,
     :storage_gib,
     :storage_volumes,
-    :boot_image,
-    :distinct_storage_devices,
-    :gpu_count,
-    :ip4_enabled,
-    :target_host_utilization,
-    :arch_filter,
+    :vcpus,
+    :vm_id,
+    :use_slices,
     :allocation_state_filter,
-    :host_filter,
+    :distinct_storage_devices,
+    :family_filter,
+    :gpu_count,
     :host_exclusion_filter,
+    :host_filter,
     :location_filter,
     :location_preference,
-    :family,
-    :cpu_percent_limit,
-    :use_slices,
-    :require_shared_slice,
-    :diagnostics,
-    :family_filter
+    :target_host_utilization
   ) do
     def initialize(**args)
       args[:require_shared_slice] ||= false
