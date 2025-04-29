@@ -12,7 +12,7 @@ module Scheduling::Allocator
     @target_host_utilization ||= Config.allocator_target_host_utilization
   end
 
-  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [])
+  def self.allocate(vm, storage_volumes, **args)
     request = Request.new(
       arch_filter: vm.arch,
       boot_image: vm.boot_image,
@@ -26,16 +26,7 @@ module Scheduling::Allocator
       storage_volumes: storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
       vcpus: vm.vcpus,
       vm_id: vm.id,
-      use_slices: true,
-      allocation_state_filter:,
-      distinct_storage_devices:,
-      family_filter:,
-      gpu_count:,
-      host_exclusion_filter:,
-      host_filter:,
-      location_filter:,
-      location_preference:,
-      target_host_utilization:
+      **args
     )
     allocation = Allocation.best_allocation(request)
     fail "#{vm} no space left on any eligible host" unless allocation
@@ -69,8 +60,18 @@ module Scheduling::Allocator
     :target_host_utilization
   ) do
     def initialize(**args)
-      args[:require_shared_slice] ||= false
       args[:diagnostics] ||= false
+      args[:require_shared_slice] ||= false
+      args[:use_slices] = args[:use_slices].nil? || args[:use_slices]
+      args[:allocation_state_filter] ||= ["accepting"]
+      args[:distinct_storage_devices] ||= false
+      args[:family_filter] ||= []
+      args[:gpu_count] ||= 0
+      args[:host_exclusion_filter] ||= []
+      args[:host_filter] ||= []
+      args[:location_filter] ||= []
+      args[:location_preference] ||= []
+      args[:target_host_utilization] ||= Scheduling::Allocator.target_host_utilization
       super
     end
 

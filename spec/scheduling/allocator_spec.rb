@@ -15,30 +15,19 @@ RSpec.describe Al do
 
   # Creates a Request object with the given parameters
   #
-  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: true, require_shared_slice: false, diagnostics: false, family_filter: [])
+  def create_req(vm, storage_volumes, target_host_utilization: 0.55, **args)
     Al::Request.new(
       arch_filter: vm.arch,
       boot_image: vm.boot_image,
       cpu_percent_limit: vm.cpu_percent_limit,
-      diagnostics:,
       family: vm.family,
       ip4_enabled: vm.ip4_enabled,
       memory_gib: vm.memory_gib,
-      require_shared_slice:,
       storage_gib: storage_volumes.map { it["size_gib"] }.sum,
       storage_volumes: storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
       vm_id: vm.id,
       vcpus: vm.vcpus,
-      use_slices:,
-      allocation_state_filter:,
-      distinct_storage_devices:,
-      family_filter:,
-      gpu_count:,
-      host_exclusion_filter:,
-      host_filter:,
-      location_filter:,
-      location_preference:,
-      target_host_utilization:
+      **args
     )
   end
 
@@ -75,14 +64,9 @@ RSpec.describe Al do
 
     it "persists valid allocation" do
       al = instance_double(Al::Allocation)
+
       expect(Al::Allocation).to receive(:best_allocation)
-        .with(Al::Request.new(
-          "2464de61-7501-8374-9ab0-416caebe31da", 2, 8, 33,
-          [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
-            [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-          "ubuntu-jammy", false, 0, true, Config.allocator_target_host_utilization, "x64", ["accepting"], [], [], [], [],
-          "standard", 200, true, false, false, []
-        )).and_return(al)
+        .with(Al::Request.new(arch_filter: "x64", boot_image: "ubuntu-jammy", cpu_percent_limit: 200, diagnostics: false, family: "standard", ip4_enabled: true, memory_gib: 8, require_shared_slice: false, storage_gib: 33, storage_volumes: [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}], [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]], vcpus: 2, vm_id: "2464de61-7501-8374-9ab0-416caebe31da", use_slices: true, allocation_state_filter: ["accepting"], distinct_storage_devices: false, family_filter: [], gpu_count: 0, host_exclusion_filter: [], host_filter: [], location_filter: [], location_preference: [], target_host_utilization: Config.allocator_target_host_utilization)).and_return(al)
       expect(al).to receive(:update)
 
       described_class.allocate(vm, storage_volumes)
@@ -95,18 +79,10 @@ RSpec.describe Al do
   end
 
   describe "candidate_selection" do
-    let(:req) {
-      Al::Request.new(
-        "2464de61-7501-8374-9ab0-416caebe31da", 4, 8, 33,
-        [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
-          [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-        "ubuntu-jammy", false, 0, true, 0.65, "x64", ["accepting"], [], [], [], [],
-        "standard", 400, true, false, false, []
-      )
-    }
+    let(:req) { create_req(vm, []) }
 
     it "prints diagnostics if flagged" do
-      expect(req).to receive(:diagnostics).and_return(true)
+      req = create_req(vm, [], diagnostics: true)
       expect(Clog).to receive(:emit).with("Allocator query for vm") do |&blk|
         expect(blk.call[:allocator_query].keys).to eq([:vm_id, :sql])
       end
@@ -215,7 +191,7 @@ RSpec.describe Al do
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
-      req.host_filter = [vmh2.id]
+      req = create_req(vm, [], host_filter: [vmh2.id])
       cand = Al::Allocation.candidate_hosts(req)
 
       expect(cand.size).to eq(1)
@@ -232,7 +208,7 @@ RSpec.describe Al do
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
-      req.host_exclusion_filter = [vmh1.id]
+      req = create_req(vm, [], host_exclusion_filter: [vmh1.id])
       cand = Al::Allocation.candidate_hosts(req)
 
       expect(cand.size).to eq(1)
@@ -249,7 +225,7 @@ RSpec.describe Al do
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
-      req.location_filter = [Location::HETZNER_FSN1_ID]
+      req = create_req(vm, [], location_filter: [Location::HETZNER_FSN1_ID])
       cand = Al::Allocation.candidate_hosts(req)
 
       expect(cand.size).to eq(1)
@@ -266,7 +242,7 @@ RSpec.describe Al do
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
-      req.family_filter = ["performance"]
+      req = create_req(vm, [], family_filter: ["performance"])
       cand = Al::Allocation.candidate_hosts(req)
 
       expect(cand.size).to eq(1)
@@ -284,7 +260,7 @@ RSpec.describe Al do
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
-      req.distinct_storage_devices = true
+      req = create_req(vm, [{"size_gib" => 22}, {"size_gib" => 11}], distinct_storage_devices: true)
       cand = Al::Allocation.candidate_hosts(req)
       expect(cand.size).to eq(1)
       expect(cand.first[:vm_host_id]).to eq(vmh2.id)
@@ -306,7 +282,7 @@ RSpec.describe Al do
     end
 
     it "retrieves candidates without available ipv4 addresses if not ip4_enabled" do
-      req.ip4_enabled = false
+      req = create_req(vm, [], ip4_enabled: false)
       vmh1 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       vmh2 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create_with_id(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
@@ -333,7 +309,7 @@ RSpec.describe Al do
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
-      req.gpu_count = 1
+      req = create_req(vm, [], gpu_count: 1)
       cand = Al::Allocation.candidate_hosts(req)
       expect(cand.size).to eq(1)
       expect(cand.first[:vm_host_id]).to eq(vmh2.id)
@@ -343,13 +319,7 @@ RSpec.describe Al do
 
   describe "Allocation" do
     let(:req) {
-      Al::Request.new(
-        "2464de61-7501-8374-9ab0-416caebe31da", 4, 16, 33,
-        [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
-          [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-        "ubuntu-jammy", false, 0, true, 0.65, "x64", ["accepting"], [], [], [], [],
-        "standard", 400
-      )
+      Al::Request.new(arch_filter: "x64", boot_image: "ubuntu-jammy", cpu_percent_limit: 400, diagnostics: false, family: "standard", ip4_enabled: true, memory_gib: 16, require_shared_slice: false, storage_gib: 33, storage_volumes: [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}], [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]], vcpus: 4, vm_id: "2464de61-7501-8374-9ab0-416caebe31da", use_slices: true, allocation_state_filter: ["accepting"], distinct_storage_devices: false, family_filter: [], gpu_count: 0, host_exclusion_filter: [], host_filter: [], location_filter: [], location_preference: [], target_host_utilization: Config.allocator_target_host_utilization)
     }
     let(:vmhds) {
       {location_id: Location::HETZNER_FSN1_ID,
@@ -466,13 +436,13 @@ RSpec.describe Al do
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(0, true))
       score_no_preference = Al::Allocation.new(vmhds, req).score
 
-      req.location_preference = [Location::HETZNER_FSN1_ID]
+      req = create_req(vm, [], location_preference: [Location::HETZNER_FSN1_ID])
       expect(Al::VmHostCpuAllocation).to receive(:new).and_return(TestResourceAllocation.new(0, true))
       expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(0, true))
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(0, true))
       score_preference_met = Al::Allocation.new(vmhds, req).score
 
-      req.location_preference = ["6b9ef786-b842-8420-8c65-c25e3d4bdf3d"]
+      req = create_req(vm, [], location_preference: [Location::GITHUB_RUNNERS_ID])
       expect(Al::VmHostCpuAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
       expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
@@ -527,43 +497,38 @@ RSpec.describe Al do
     }
 
     it "can allocate storage on the same device" do
-      req.distinct_storage_devices = false
-      req.storage_volumes = [[1, {"size_gib" => 12}], [0, {"size_gib" => 12}]]
+      req = create_req(vm, [{"size_gib" => 12}, {"size_gib" => 12}], distinct_storage_devices: false)
       storage_allocation = Al::StorageAllocation.new(vmhds, req)
       expect(storage_allocation.is_valid).to be_truthy
       expect(storage_allocation.volume_to_device_map).to eq({1 => "sd2id", 0 => "sd2id"})
     end
 
     it "can allocate storage on distinct devices" do
-      req.distinct_storage_devices = true
-      req.storage_volumes = [[1, {"size_gib" => 50}], [0, {"size_gib" => 10}]]
+      req = create_req(vm, [{"size_gib" => 10}, {"size_gib" => 50}], distinct_storage_devices: true)
       storage_allocation = Al::StorageAllocation.new(vmhds, req)
       expect(storage_allocation.is_valid).to be_truthy
       expect(storage_allocation.volume_to_device_map).to eq({1 => "sd2id", 0 => "sd1id"})
     end
 
     it "fails if there is not enough space available" do
-      req.storage_gib = 10000
+      req = create_req(vm, [{"size_gib" => 10000}])
       storage_allocation = Al::StorageAllocation.new(vmhds, req)
       expect(storage_allocation.is_valid).to be_falsey
     end
 
     it "fails if distinct devices are requested but not available" do
-      req.distinct_storage_devices = true
-      req.storage_volumes = [[1, {"size_gib" => 1}], [0, {"size_gib" => 1}], [2, {"size_gib" => 1}]]
+      req = create_req(vm, [{"size_gib" => 1}, {"size_gib" => 1}, {"size_gib" => 1}], distinct_storage_devices: true)
       storage_allocation = Al::StorageAllocation.new(vmhds, req)
       expect(storage_allocation.is_valid).to be_falsey
     end
 
     it "can calculate utilization" do
-      req.storage_gib = 101
-      req.storage_volumes = [[0, {"size_gib" => 91}], [1, {"size_gib" => 10}]]
+      req = create_req(vm, [{"size_gib" => 91}, {"size_gib" => 10}])
       storage_allocation = Al::StorageAllocation.new(vmhds, req)
       expect(storage_allocation.is_valid).to be_truthy
       expect(storage_allocation.utilization).to be_within(0.0001).of(1)
 
-      req.storage_gib = 2
-      req.storage_volumes = [[0, {"size_gib" => 1}], [1, {"size_gib" => 1}]]
+      req = create_req(vm, [{"size_gib" => 1}, {"size_gib" => 1}])
       storage_allocation = Al::StorageAllocation.new(vmhds, req)
       expect(storage_allocation.is_valid).to be_truthy
       expect(storage_allocation.utilization).to be_within(0.01).of(0.1)
