@@ -197,19 +197,26 @@ class Prog::Vm::Nexus < Prog::Base
       distinct_storage_devices = frame["distinct_storage_devices"] || false
       host_exclusion_filter = frame["exclude_host_ids"] || []
       gpu_count = frame["gpu_count"] || 0
+      runner = GithubRunner.first(vm_id: vm.id) if vm.location_id == Location::GITHUB_RUNNERS_ID
       allocation_state_filter, location_filter, location_preference, host_filter =
         if frame["force_host_id"]
           [[], [], [], [frame["force_host_id"]]]
         elsif vm.location_id == Location::GITHUB_RUNNERS_ID
-          runner_locations = (vm.vcpus == 60) ? [] : [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID]
-          [["accepting"], runner_locations, [Location::GITHUB_RUNNERS_ID], []]
+          runner_location_filter = [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID]
+          runner_location_filter.append(Location::LEASEWEB_WDC02_ID) if vm.vcpus == 60
+          runner_location_preference = if runner && (preferred_locations = runner.installation.project.get_ff_preferred_runner_locations) && !preferred_locations.empty?
+            # Just be sure your preferred ones are also in the location filter
+            runner_location_filter |= preferred_locations
+            preferred_locations
+          else
+            [Location::GITHUB_RUNNERS_ID]
+          end
+          [["accepting"], runner_location_filter, runner_location_preference, []]
         else
           [["accepting"], [vm.location_id], [], []]
         end
 
-      prefer_performance = if vm.location_id == Location::GITHUB_RUNNERS_ID && (runner = GithubRunner.first(vm_id: vm.id))
-        runner.installation.project.get_ff_performance_runners
-      end
+      prefer_performance = runner.installation.project.get_ff_performance_runners if runner
 
       Scheduling::Allocator.allocate(
         vm, frame["storage_volumes"],
