@@ -320,7 +320,7 @@ module Scheduling::Allocator
 
       # prioritize AX102 for our premium CPU testers.
       # penalize other customers since the allocator is eager to use smaller hosts first
-      score += @request.prioritize_performance_cpu ? -1 : 1 if @candidate_host[:total_cores] == 16
+      score += @request.prioritize_performance_cpu ? -1 : 5 if @candidate_host[:total_cores] == 16
 
       # penalty for AX161, TODO: remove after migration to AX162
       score += 0.5 if @candidate_host[:total_cores] == 32

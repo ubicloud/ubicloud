@@ -449,7 +449,7 @@ RSpec.describe Al do
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
       vmhds[:location_id] = "6b9ef786-b842-8420-8c65-c25e3d4bdf3d"
       vmhds[:total_cores] = 16
-      expect(Al::Allocation.new(vmhds, req).score).to eq(1)
+      expect(Al::Allocation.new(vmhds, req).score).to eq(5)
     end
 
     it "respects location preferences" do
