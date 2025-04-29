@@ -71,9 +71,14 @@ func sendRequest(args []string) {
 		fmt.Fprintf(os.Stderr, "! Error sending http request\n")
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
 
 	processResponse(resp, args)
+
+	err = resp.Body.Close()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "! Error closing response body\n")
+		os.Exit(1)
+	}
 }
 
 func main() {
