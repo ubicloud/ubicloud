@@ -132,9 +132,10 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
       expect { prog.drain_old_node }.to nap(10)
     end
 
-    it "naps when it fails and waits for the page" do
+    it "restarts when it fails" do
       expect(sshable).to receive(:d_check).with("drain_node").and_return("Failed")
-      expect { prog.drain_old_node }.to nap(60 * 60)
+      expect(sshable).to receive(:d_restart).with("drain_node")
+      expect { prog.drain_old_node }.to nap(10)
     end
 
     it "naps when daemonizer something unexpected and waits for the page" do
