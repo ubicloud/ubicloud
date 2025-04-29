@@ -27,7 +27,8 @@ filename = Time.now.utc.iso8601.tr(":", "-")
 
 # Collect metrics from each endpoint to a temporary file
 endpoints.each do |endpoint|
-  r "curl --fail --insecure #{Shellwords.escape(endpoint)} >> /tmp/#{filename}.txt"
+  q_endpoint = endpoint.shellescape
+  r "curl --fail --insecure #{q_endpoint} >> /tmp/#{filename}.txt"
 end
 
 r "mv /tmp/#{filename}.txt #{q_metrics_dir}/pending/#{filename}.txt"
