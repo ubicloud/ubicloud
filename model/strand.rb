@@ -42,12 +42,12 @@ class Strand < Sequel::Model
     end
     affected = ps.call(id:).first
     return false unless affected
-    # Also operate as reload query
-    @values = affected
     lease_time = affected.fetch(:lease)
     verbose_logging = rand(1000) == 0
 
     Clog.emit("obtained lease") { {lease_acquired: {time: lease_time, delay: Time.now - schedule}} } if verbose_logging
+    # Also operate as reload query
+    @values = affected
 
     begin
       yield
