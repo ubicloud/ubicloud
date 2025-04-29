@@ -40,7 +40,7 @@ pending_files = Dir.children("#{q_metrics_dir}/pending").sort
 num_files_to_remove = [pending_files.count - max_pending_buffer_size, 0].max
 
 pending_files.slice(0, num_files_to_remove).each do |pending_file|
-  r "mv #{q_metrics_dir}/pending/#{pending_file} #{q_metrics_dir}/done"
+  File.rename(File.join(metrics_dir, "pending", pending_file), File.join(metrics_dir, "done", pending_file))
 end
 
 # Delete all done files.
