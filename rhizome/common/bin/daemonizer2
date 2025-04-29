@@ -40,6 +40,10 @@ def clean(name, stdin_path)
   end
 end
 
+def restart(name)
+  r "sudo systemctl restart #{name}"
+end
+
 command = ARGV[0]
 name = ARGV[1]
 stdin_path = "/dev/shm/#{name}.stdin"
@@ -49,6 +53,8 @@ when "check"
   print(get_state(name))
 when "clean"
   clean(name, stdin_path)
+when "restart"
+  restart(name)
 when "run"
   command_parts = ARGV[2..]
   state = get_state(name)
