@@ -15,8 +15,8 @@ end
 metrics_dir = ARGV[0]
 metrics_config_path = ARGV[1]
 
-r "mkdir -p #{metrics_dir}/pending"
-r "mkdir -p #{metrics_dir}/done"
+r "mkdir -p #{metrics_dir.shellescape}/pending"
+r "mkdir -p #{metrics_dir.shellescape}/done"
 
 metrics_config_hash = JSON.parse(File.read(metrics_config_path))
 endpoints = metrics_config_hash["endpoints"]
@@ -29,15 +29,15 @@ endpoints.each do |endpoint|
   r "curl --fail --insecure #{Shellwords.escape(endpoint)} >> /tmp/#{filename}.txt"
 end
 
-r "mv /tmp/#{filename}.txt #{metrics_dir}/pending/#{filename}.txt"
+r "mv /tmp/#{filename}.txt #{metrics_dir.shellescape}/pending/#{filename}.txt"
 
 # Remove pending files till the size of the pending directory is less than the max_pending_buffer_size
-pending_files = Dir.glob("#{metrics_dir}/pending/*").sort
+pending_files = Dir.glob("#{metrics_dir.shellescape}/pending/*").sort
 
 pending_files.each do |pending_file|
-  break if r("du -sm #{metrics_dir}/pending | cut -f1").to_i < max_pending_buffer_size_mib
-  r "mv #{pending_file} #{metrics_dir}/done"
+  break if r("du -sm #{metrics_dir.shellescape}/pending | cut -f1").to_i < max_pending_buffer_size_mib
+  r "mv #{pending_file} #{metrics_dir.shellescape}/done"
 end
 
 # Delete all done files.
-r "rm -rf #{metrics_dir}/done/*"
+r "rm -rf #{metrics_dir.shellescape}/done/*"
