@@ -44,7 +44,7 @@ module Scheduling::Allocator
     Clog.emit("vm allocated") { {allocation: allocation.to_s, duration: Time.now - vm.created_at} }
   end
 
-  Request = Struct.new(
+  Request = Data.define(
     :vm_id,
     :vcpus,
     :memory_gib,
@@ -68,10 +68,10 @@ module Scheduling::Allocator
     :diagnostics,
     :family_filter
   ) do
-    def initialize(*args)
+    def initialize(**args)
+      args[:require_shared_slice] ||= false
+      args[:diagnostics] ||= false
       super
-      self.require_shared_slice ||= false
-      self.diagnostics ||= false
     end
 
     # Computes the amount of memory needed for a slice
