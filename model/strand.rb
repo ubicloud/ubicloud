@@ -33,7 +33,7 @@ class Strand < Sequel::Model
         .returning
         .where(
           Sequel[id: DB[:strand].select(:id).where(id: :$id).for_update.skip_locked, exitval: nil] &
-            (Sequel[lease: nil] | (Sequel[:lease] < Sequel::CURRENT_TIMESTAMP))
+            (Sequel[:lease] < Sequel::CURRENT_TIMESTAMP)
         )
         .prepare(:update, :strand_take_lease_and_reload,
           lease: Sequel::CURRENT_TIMESTAMP + Sequel.cast("120 seconds", :interval),
