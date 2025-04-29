@@ -211,9 +211,7 @@ class Prog::Vm::Nexus < Prog::Base
       gpu_count = frame["gpu_count"] || 0
       runner = GithubRunner.first(vm_id: vm.id) if vm.location_id == Location::GITHUB_RUNNERS_ID
       allocation_state_filter, location_filter, location_preference, host_filter, family_filter =
-        if frame["force_host_id"]
-          [[], [], [], [frame["force_host_id"]], []]
-        elsif vm.location_id == Location::GITHUB_RUNNERS_ID
+        if vm.location_id == Location::GITHUB_RUNNERS_ID
           runner_location_filter = [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID]
           runner_location_preference = [Location::GITHUB_RUNNERS_ID]
           runner_family_filter = [vm.family]
@@ -244,7 +242,8 @@ class Prog::Vm::Nexus < Prog::Base
         host_filter: host_filter,
         host_exclusion_filter: host_exclusion_filter,
         gpu_count: gpu_count,
-        family_filter: family_filter
+        family_filter: family_filter,
+        force_host_id: frame["force_host_id"]
       )
     rescue RuntimeError => ex
       raise unless ex.message.include?("no space left on any eligible host")

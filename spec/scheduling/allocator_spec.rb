@@ -88,6 +88,21 @@ RSpec.describe Al do
       described_class.allocate(vm, storage_volumes)
     end
 
+    it "forces vm host without any filter" do
+      al = instance_double(Al::Allocation)
+      expect(Al::Allocation).to receive(:best_allocation)
+        .with(Al::Request.new(
+          "2464de61-7501-8374-9ab0-416caebe31da", 2, 8, 33,
+          [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
+            [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
+          "ubuntu-jammy", false, 0, true, Config.allocator_target_host_utilization, "x64", [], ["eb1c0420-1e9b-8371-a594-f93f73ed5f28"], [], [], [],
+          "standard", 200, true, false, false, []
+        )).and_return(al)
+      expect(al).to receive(:update)
+
+      described_class.allocate(vm, storage_volumes, host_filter: ["vm123"], family_filter: ["performance"], force_host_id: "eb1c0420-1e9b-8371-a594-f93f73ed5f28")
+    end
+
     it "handles non-existing family" do
       vm.family = "non-existing-family"
       expect { described_class.allocate(vm, storage_volumes) }.to raise_error RuntimeError, /no space left on any eligible host/

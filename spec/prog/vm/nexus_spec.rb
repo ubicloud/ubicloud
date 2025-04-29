@@ -443,7 +443,8 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::HETZNER_FSN1_ID],
         location_preference: [],
         gpu_count: 0,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
+        force_host_id: nil
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -459,7 +460,8 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID],
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
+        force_host_id: nil
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -475,7 +477,8 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::HETZNER_FSN1_ID],
         location_preference: [],
         gpu_count: 0,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
+        force_host_id: nil
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -494,7 +497,8 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::GITHUB_RUNNERS_ID, Location::LEASEWEB_WDC02_ID],
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
+        force_host_id: nil
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -516,7 +520,8 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID, Location::LEASEWEB_WDC02_ID],
         location_preference: [Location::LEASEWEB_WDC02_ID],
         gpu_count: 0,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
+        force_host_id: nil
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -535,7 +540,8 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID],
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
-        family_filter: ["standard", "premium"]
+        family_filter: ["standard", "premium"],
+        force_host_id: nil
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -554,7 +560,8 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID],
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
-        family_filter: ["standard", "premium"]
+        family_filter: ["standard", "premium"],
+        force_host_id: nil
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -567,14 +574,15 @@ RSpec.describe Prog::Vm::Nexus do
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
         vm, :storage_volumes,
-        allocation_state_filter: [],
+        allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
-        host_filter: [:vm_host_id],
+        host_filter: [],
         host_exclusion_filter: [],
-        location_filter: [],
+        location_filter: [vm.location_id],
         location_preference: [],
         gpu_count: 0,
-        family_filter: []
+        family_filter: ["standard"],
+        force_host_id: :vm_host_id
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -594,7 +602,8 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::HETZNER_FSN1_ID],
         location_preference: [],
         gpu_count: 0,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
+        force_host_id: nil
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -622,7 +631,8 @@ RSpec.describe Prog::Vm::Nexus do
         host_exclusion_filter: [],
         location_preference: [],
         gpu_count: 0,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
+        force_host_id: nil
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -642,7 +652,8 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::HETZNER_FSN1_ID],
         location_preference: [],
         gpu_count: 3,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
+        force_host_id: nil
       )
       expect { nx.start }.to hop("create_unix_user")
     end

@@ -12,7 +12,16 @@ module Scheduling::Allocator
     @target_host_utilization ||= Config.allocator_target_host_utilization
   end
 
-  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [])
+  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], force_host_id: nil)
+    if force_host_id
+      allocation_state_filter = []
+      host_filter = [force_host_id]
+      host_exclusion_filter = []
+      location_filter = []
+      location_preference = []
+      family_filter = []
+    end
+
     request = Request.new(
       vm.id,
       vm.vcpus,
