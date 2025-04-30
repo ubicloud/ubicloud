@@ -510,29 +510,27 @@ class Prog::Vm::Nexus < Prog::Base
       host.sshable.cmd("sudo host/bin/setup-vm #{action} #{q_vm}")
     end
 
-    DB.transaction do
-      vm.vm_storage_volumes.each do |vol|
-        vol.storage_device_dataset.update(available_storage_gib: Sequel[:available_storage_gib] + vol.size_gib)
-      end
-
-      if vm.vm_host_slice
-        # If the vm is running in a slice, the slice deallocation will update cpu and memory on the host
-        # Instead update the slice utilization
-        VmHostSlice.dataset.where(id: vm.vm_host_slice_id).update(
-          used_cpu_percent: Sequel[:used_cpu_percent] - vm.cpu_percent_limit,
-          used_memory_gib: Sequel[:used_memory_gib] - vm.memory_gib
-        )
-      elsif host
-        fail "BUG: Number of cores cannot be zero when VM is runing without a slice" if vm.cores == 0
-        # If there is no slice, we need to update the host utilization directly
-        VmHost.dataset.where(id: vm.vm_host_id).update(
-          used_cores: Sequel[:used_cores] - vm.cores,
-          used_hugepages_1g: Sequel[:used_hugepages_1g] - vm.memory_gib
-        )
-      end
-
-      vm.pci_devices_dataset.update(vm_id: nil)
+    vm.vm_storage_volumes.each do |vol|
+      vol.storage_device_dataset.update(available_storage_gib: Sequel[:available_storage_gib] + vol.size_gib)
     end
+
+    if vm.vm_host_slice
+      # If the vm is running in a slice, the slice deallocation will update cpu and memory on the host
+      # Instead update the slice utilization
+      VmHostSlice.dataset.where(id: vm.vm_host_slice_id).update(
+        used_cpu_percent: Sequel[:used_cpu_percent] - vm.cpu_percent_limit,
+        used_memory_gib: Sequel[:used_memory_gib] - vm.memory_gib
+      )
+    elsif host
+      fail "BUG: Number of cores cannot be zero when VM is runing without a slice" if vm.cores == 0
+      # If there is no slice, we need to update the host utilization directly
+      VmHost.dataset.where(id: vm.vm_host_id).update(
+        used_cores: Sequel[:used_cores] - vm.cores,
+        used_hugepages_1g: Sequel[:used_hugepages_1g] - vm.memory_gib
+      )
+    end
+
+    vm.pci_devices_dataset.update(vm_id: nil)
 
     hop_wait_lb_expiry if vm.load_balancer
 
