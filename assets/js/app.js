@@ -379,16 +379,26 @@ function setupPlayground() {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
+      let buffer = "";
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value).trim();
-        const lines = chunk.split("data: ");
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // Save last (possibly incomplete) line for next iteration.
+
+        // At the end of stream, buffer will either be empty or contain only '[DONE]',
+        // because all complete lines would have been processed and '[DONE]' is a full line.
+        // So there is no need to flush or process the buffer after the loop.
+
         const parsedLines = lines
+          .filter((line) => line.startsWith("data:"))
+          .map((line) => line.slice(5).trim())
           .filter((line) => line !== "" && line !== "[DONE]")
-          .map((line) => JSON.parse(line));
+          .map((line) => { try { return JSON.parse(line); } catch { return null; } })
+          .filter((x) => x !== null);
 
         parsedLines.forEach((parsedLine) => {
           const new_content = parsedLine?.choices?.[0]?.delta?.content;
