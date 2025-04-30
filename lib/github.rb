@@ -4,6 +4,15 @@ require "octokit"
 require "jwt"
 require "yaml"
 
+Octokit.configure do |c|
+  c.connection_options = {
+    request: {
+      open_timeout: 10,
+      timeout: 10
+    }
+  }
+end
+
 module Github
   def self.oauth_client
     Octokit::Client.new(client_id: Config.github_app_client_id, client_secret: Config.github_app_client_secret)
