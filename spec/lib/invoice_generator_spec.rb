@@ -104,8 +104,8 @@ RSpec.describe InvoiceGenerator do
   let(:ie1) { InferenceEndpoint.create_with_id(name: "ie1", model_name: "test-model", project_id: p1.id, is_public: true, visible: true, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id) }
 
   let(:day) { 24 * 60 * 60 }
-  let(:begin_time) { Time.parse("2023-06-01") }
-  let(:end_time) { Time.parse("2023-07-01") }
+  let(:begin_time) { Time.utc(2023, 6) }
+  let(:end_time) { Time.utc(2023, 7) }
 
   it "fails if eur_rate not provided while saving result" do
     expect { described_class.new(begin_time, end_time, save_result: true).run }.to raise_error(ArgumentError, "eur_rate must be provided when save_result is true")

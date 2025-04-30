@@ -10,7 +10,7 @@ RSpec.describe Prog::RedeliverGithubFailures do
   describe "#wait" do
     it "redelivers failed deliveries and naps" do
       expect(Time).to receive(:now).and_return("2023-10-19 23:27:47 +0000").at_least(:once)
-      expect(Github).to receive(:redeliver_failed_deliveries).with(Time.parse("2023-10-19 22:27:47 +0000"))
+      expect(Github).to receive(:redeliver_failed_deliveries).with(Time.utc(2023, 10, 19, 22, 27, 47))
       expect(rgf.strand).to receive(:save_changes)
       expect {
         expect { rgf.wait }.to nap(2 * 60)

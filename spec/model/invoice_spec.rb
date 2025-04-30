@@ -3,7 +3,7 @@
 require_relative "spec_helper"
 
 RSpec.describe Invoice do
-  subject(:invoice) { described_class.new(id: "50d5aae4-311c-843b-b500-77fbc7778050", begin_time: Time.parse("2025-03-01"), end_time: Time.parse("2025-04-01"), invoice_number: "2503-4ddfa430e8-0006", created_at: Time.now, content: {"cost" => 10, "subtotal" => 11, "credit" => 1, "discount" => 0, "resources" => [], "billing_info" => {"country" => "NL"}}, status: "unpaid") }
+  subject(:invoice) { described_class.new(id: "50d5aae4-311c-843b-b500-77fbc7778050", begin_time: Time.utc(2025, 3), end_time: Time.utc(2025, 4), invoice_number: "2503-4ddfa430e8-0006", created_at: Time.now, content: {"cost" => 10, "subtotal" => 11, "credit" => 1, "discount" => 0, "resources" => [], "billing_info" => {"country" => "NL"}}, status: "unpaid") }
 
   let(:billing_info) { BillingInfo.create_with_id(stripe_id: "cs_1234567890") }
   let(:client) { instance_double(Aws::S3::Client) }
