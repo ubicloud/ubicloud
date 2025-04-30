@@ -251,7 +251,7 @@ RSpec.describe Clover, "billing" do
 
     it "can delete payment method" do
       payment_method_2 = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_2222222222")
-      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}})
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "ACME Inc."}})
       expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}})
       expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method_2.stripe_id).and_return({"card" => {"brand" => "mastercard"}})
       expect(Stripe::PaymentMethod).to receive(:detach).with(payment_method.stripe_id)
@@ -310,7 +310,7 @@ RSpec.describe Clover, "billing" do
       end
 
       it "show current usage details" do
-        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}}).at_least(:once)
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "ACME Inc."}}).at_least(:once)
         bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
         100.times do
           billing_record(Time.utc(2023, 6), Time.utc(2023, 6) + 10)
@@ -377,7 +377,7 @@ RSpec.describe Clover, "billing" do
       end
 
       it "show finalized invoice as PDF from US issuer without VAT" do
-        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "US"}, "metadata" => {"company_name" => "Foo Companye Name", "tax_id" => "123123123"}}).at_least(:once)
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {"company_name" => "Acme Inc.", "tax_id" => "123123123"}}).at_least(:once)
         bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
 
@@ -387,13 +387,14 @@ RSpec.describe Clover, "billing" do
         expect(page.status_code).to eq(200)
         text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
         expect(text).to include("Ubicloud Inc.")
-        expect(text).to include("ACME Inc. - Foo Companye Name")
+        expect(text).to include("Acme Inc.")
+        expect(text).not_to include("John Doe")
         expect(text).to include("test-vm")
         expect(text).not_to include("VAT")
       end
 
       it "show finalized invoice as PDF from EU issuer with 21% VAT" do
-        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "DE"}, "metadata" => {"company_name" => "Foo Companye Name"}}).at_least(:once)
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "DE"}, "metadata" => {"company_name" => ""}}).at_least(:once)
         bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
 
@@ -404,6 +405,7 @@ RSpec.describe Clover, "billing" do
         expect(page.status_code).to eq(200)
         text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
         expect(text).to include("Ubicloud B.V.")
+        expect(text).to include("John Doe")
         expect(text).to include("test-vm")
         expect(text).to include("VAT (21%): (€5.68) $5.17")
       end
@@ -425,7 +427,7 @@ RSpec.describe Clover, "billing" do
       end
 
       it "show finalized invoice as PDF with old issuer info" do
-        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "US"}, "metadata" => {"company_name" => "Foo Companye Name", "tax_id" => "123123123"}}).at_least(:once)
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {"tax_id" => "123123123"}}).at_least(:once)
         bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
         invoice.content["issuer_info"].merge!("name" => nil, "tax_id" => "123123123", "in_eu_vat" => false)
@@ -436,13 +438,13 @@ RSpec.describe Clover, "billing" do
 
         expect(page.status_code).to eq(200)
         text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
-        expect(text).to include("ACME Inc. - Foo Companye Name")
+        expect(text).to include("John Doe")
         expect(text).to include("test-vm")
         expect(text).to include("Tax ID: 123123123")
       end
 
       it "show persisted invoice PDF from blob storage" do
-        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "US"}, "metadata" => {"company_name" => "Foo Companye Name", "tax_id" => "123123123"}}).at_least(:once)
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {"company_name" => "ACME Inc.", "tax_id" => "123123123"}}).at_least(:once)
         bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
         pdf = invoice.generate_pdf(Serializers::Invoice.serialize(invoice, {detailed: true}))
@@ -455,7 +457,7 @@ RSpec.describe Clover, "billing" do
         expect(page.status_code).to eq(200)
         text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
         expect(text).to include("Ubicloud Inc.")
-        expect(text).to include("ACME Inc. - Foo Companye Name")
+        expect(text).to include("ACME Inc.")
       end
 
       it "raises not found when invoice not exists" do

@@ -212,7 +212,7 @@ class Invoice < Sequel::Model
     row = pdf.bounding_box([0, row_y], width: column_width) do
       if data[:billing_name]
         pdf.text "Bill to:", style: :semibold, color: dark_gray, size: 14
-        pdf.text [data[:billing_name], data[:company_name]].compact.join(" - "), style: :semibold, color: dark_gray, size: 14
+        pdf.text data[:company_name].to_s.strip.empty? ? data[:billing_name] : data[:company_name], style: :semibold, color: dark_gray, size: 14
         pdf.move_down 5
         pdf.text "#{data[:billing_address]},"
         pdf.text "#{data[:billing_city]}, #{data[:billing_state]} #{data[:billing_postal_code]},"
