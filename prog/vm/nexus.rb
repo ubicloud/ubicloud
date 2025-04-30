@@ -590,13 +590,11 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   def final_clean_up
-    DB.transaction do
-      vm.nics.map do |nic|
-        nic.update(vm_id: nil)
-        nic.incr_destroy
-      end
-      vm.destroy
+    vm.nics.map do |nic|
+      nic.update(vm_id: nil)
+      nic.incr_destroy
     end
+    vm.destroy
   end
 
   label def start_after_host_reboot
