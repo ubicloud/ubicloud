@@ -101,22 +101,20 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   def setup_blob_storage
-    DB.transaction do
-      admin_client = Minio::Client.new(
-        endpoint: postgres_timeline.blob_storage_endpoint,
-        access_key: postgres_timeline.blob_storage.admin_user,
-        secret_key: postgres_timeline.blob_storage.admin_password,
-        ssl_ca_file_data: postgres_timeline.blob_storage.root_certs
-      )
+    admin_client = Minio::Client.new(
+      endpoint: postgres_timeline.blob_storage_endpoint,
+      access_key: postgres_timeline.blob_storage.admin_user,
+      secret_key: postgres_timeline.blob_storage.admin_password,
+      ssl_ca_file_data: postgres_timeline.blob_storage.root_certs
+    )
 
-      # Setup user keys and policy for the timeline
-      admin_client.admin_add_user(postgres_timeline.access_key, postgres_timeline.secret_key)
-      admin_client.admin_policy_add(postgres_timeline.ubid, postgres_timeline.blob_storage_policy)
-      admin_client.admin_policy_set(postgres_timeline.ubid, postgres_timeline.access_key)
+    # Setup user keys and policy for the timeline
+    admin_client.admin_add_user(postgres_timeline.access_key, postgres_timeline.secret_key)
+    admin_client.admin_policy_add(postgres_timeline.ubid, postgres_timeline.blob_storage_policy)
+    admin_client.admin_policy_set(postgres_timeline.ubid, postgres_timeline.access_key)
 
-      # Create bucket for the timeline
-      blob_storage_client.create_bucket(postgres_timeline.ubid)
-      blob_storage_client.set_lifecycle_policy(postgres_timeline.ubid, postgres_timeline.ubid, 8)
-    end
+    # Create bucket for the timeline
+    blob_storage_client.create_bucket(postgres_timeline.ubid)
+    blob_storage_client.set_lifecycle_policy(postgres_timeline.ubid, postgres_timeline.ubid, 8)
   end
 end
