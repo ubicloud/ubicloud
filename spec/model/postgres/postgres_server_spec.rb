@@ -278,6 +278,12 @@ RSpec.describe PostgresServer do
     postgres_server.init_health_monitor_session
   end
 
+  it "initiates a new metrics export session" do
+    session = instance_double(Net::SSH::Connection::Session)
+    expect(postgres_server.vm.sshable).to receive(:start_fresh_session).and_return(session)
+    postgres_server.init_metrics_export_session
+  end
+
   it "checks pulse" do
     session = {
       ssh_session: instance_double(Net::SSH::Connection::Session),

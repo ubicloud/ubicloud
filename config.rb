@@ -47,7 +47,8 @@ module Config
   optional :clover_column_encryption_key, base64, clear: true
   optional :heartbeat_url, string
   optional :clover_database_root_certs, string
-  override :max_monitor_threads, 32, int
+  override :max_health_monitor_threads, 32, int
+  override :max_metrics_export_threads, 32, int
   optional :omniauth_github_id, string, clear: true
   optional :omniauth_github_secret, string, clear: true
   optional :omniauth_google_id, string, clear: true

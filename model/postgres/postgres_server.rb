@@ -15,6 +15,7 @@ class PostgresServer < Sequel::Model
   include ResourceMethods
   include SemaphoreMethods
   include HealthMonitorMethods
+  include MetricsTargetMethods
 
   semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup
   semaphore :restart, :configure, :take_over, :configure_prometheus, :configure_metrics, :destroy, :recycle, :promote
@@ -190,6 +191,13 @@ class PostgresServer < Sequel::Model
     {
       ssh_session: ssh_session,
       db_connection: nil
+    }
+  end
+
+  def init_metrics_export_session
+    ssh_session = vm.sshable.start_fresh_session
+    {
+      ssh_session: ssh_session
     }
   end
 
