@@ -162,7 +162,7 @@ SQL
       stack.first["last_label_changed_at"] = Time.now.to_s
       modified!(:stack)
 
-      update(**hp.strand_update_args.merge(try: 0))
+      update(**hp.strand_update_args, try: 0)
 
       hp
     rescue Prog::Base::Exit => ext
