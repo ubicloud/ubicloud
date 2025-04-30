@@ -476,6 +476,11 @@ LOAD_BALANCER
   end
 
   describe "#remove_load_balancer" do
+    it "does nothing if the vm is not scheduled anywhere" do
+      expect(vm).to receive(:vm_host).and_return(nil)
+      expect { nx.remove_load_balancer }.to exit({"msg" => "load balancer is removed"})
+    end
+
     it "creates basic nat rules" do
       expect(vmh.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<REMOVE_LOAD_BALANCER)
 table ip nat;
