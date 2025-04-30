@@ -4,19 +4,32 @@
 require_relative "../loader"
 clover_freeze
 
-resources = {}
-mutex = Mutex.new
-thread_pool_size = (Config.max_monitor_threads - 2).clamp(1, nil)
+health_monitor_resources = {}
+health_monitor_mutex = Mutex.new
+health_monitor_thread_pool_size = (Config.max_health_monitor_threads - 2).clamp(1, nil)
 monitorable_resource_types = [VmHost, PostgresServer, Vm.where(~Sshable.where(id: Sequel[:vm][:id]).exists), MinioServer, GithubRunner, VmHostSlice, LoadBalancerVmPort, KubernetesCluster, VictoriaMetricsServer]
-queue_size = thread_pool_size + (monitorable_resource_types.sum(&:count) * 1.5).round
-queue = SizedQueue.new(queue_size)
+health_monitor_queue_size = health_monitor_thread_pool_size + (monitorable_resource_types.sum(&:count) * 1.5).round
+health_monitor_queue = SizedQueue.new(health_monitor_queue_size)
+
+metrics_target_resources = {}
+metrics_export_mutex = Mutex.new
+metrics_export_thread_pool_size = (Config.max_metrics_export_threads - 2).clamp(1, nil)
+metrics_target_resource_types = [PostgresServer]
+metrics_export_queue_size = metrics_export_thread_pool_size + (metrics_target_resource_types.sum(&:count) * 1.5).round
+metrics_export_queue = SizedQueue.new(metrics_export_queue_size)
 
 resource_scanner = Thread.new do
   loop do
     monitorable_resources = monitorable_resource_types.flat_map(&:all)
-    mutex.synchronize do
+    health_monitor_mutex.synchronize do
       monitorable_resources.each do |r|
-        resources[r.id] ||= MonitorableResource.new(r)
+        health_monitor_resources[r.id] ||= MonitorableResource.new(r)
+      end
+    end
+    metrics_resources = metrics_target_resource_types.flat_map(&:all)
+    metrics_export_mutex.synchronize do
+      metrics_resources.each do |r|
+        metrics_target_resources[r.id] ||= MetricsTargetResource.new(r)
       end
     end
 
@@ -28,9 +41,9 @@ rescue => ex
   Kernel.exit!
 end
 
-thread_pool = Array.new(thread_pool_size) do
+health_monitor_thread_pool = Array.new(health_monitor_thread_pool_size) do
   Thread.new do
-    while (r = queue.pop)
+    while (r = health_monitor_queue.pop)
       r.lock_no_wait do
         r.open_resource_session
         r.process_event_loop
@@ -40,20 +53,36 @@ thread_pool = Array.new(thread_pool_size) do
   end
 end
 
+metrics_export_thread_pool = Array.new(metrics_export_thread_pool_size) do
+  Thread.new do
+    while (r = metrics_export_queue.pop)
+      r.lock_no_wait do
+        r.open_resource_session
+        r.export_metrics
+      end
+    end
+  end
+end
+
 begin
   loop do
     # Since the switch to use a thread pool for monitored resources,
-    # this emits the number of pulse threads, not the number of monitor threads + pulse threads
-    Clog.emit("Active threads count.") { {active_threads_count: Thread.list.count - thread_pool_size - 2} }
+    # this emits the number of pulse threads + export threads, not the number of monitor threads + pulse threads
+    Clog.emit("Active threads count.") { {active_threads_count: Thread.list.count - health_monitor_thread_pool_size - metrics_export_thread_pool_size - 2} }
 
-    rs = mutex.synchronize { resources.values }
-
-    rs.each do |r|
+    health_monitor_rs = health_monitor_mutex.synchronize { health_monitor_resources.values }
+    health_monitor_rs.each do |r|
       r.force_stop_if_stuck
-      queue.push(r)
+      health_monitor_queue.push(r)
     end
+    health_monitor_mutex.synchronize { health_monitor_resources.delete_if { |_, r| r.deleted } }
 
-    mutex.synchronize { resources.delete_if { |_, r| r.deleted } }
+    metrics_export_rs = metrics_export_mutex.synchronize { metrics_target_resources.values }
+    metrics_export_rs.each do |r|
+      r.force_stop_if_stuck
+      metrics_export_queue.push(r)
+    end
+    metrics_export_mutex.synchronize { metrics_target_resources.delete_if { |_, r| r.deleted } }
 
     sleep 5
   end
@@ -64,5 +93,7 @@ rescue => ex
 end
 
 resource_scanner.join
-thread_pool.each { queue.push(nil) }
-thread_pool.each(&:join)
+health_monitor_thread_pool.each { health_monitor_queue.push(nil) }
+health_monitor_thread_pool.each(&:join)
+metrics_export_thread_pool.each { metrics_export_queue.push(nil) }
+metrics_export_thread_pool.each(&:join)

@@ -129,4 +129,120 @@ RSpec.describe VictoriaMetrics::Client do
       end
     end
   end
+
+  describe "#import_prometheus" do
+    let(:samples) { "metric{label=\"value\"} 42.5" }
+    let(:time) { Time.now }
+    let(:timestamp_msec) { (time.to_f * 1000).to_i }
+    let(:scrape) { instance_double(VictoriaMetrics::Client::Scrape, time: time, samples: samples) }
+
+    before do
+      allow(client).to receive(:gzip).with(samples).and_return("gzipped_data")
+    end
+
+    context "with no extra labels" do
+      before do
+        stub_request(:post, "#{endpoint}/api/v1/import/prometheus?timestamp=#{timestamp_msec}")
+          .with(
+            body: "gzipped_data",
+            headers: {
+              "Content-Encoding" => "gzip",
+              "Content-Type" => "application/octet-stream"
+            }
+          )
+          .to_return(status: 204)
+      end
+
+      it "sends a POST request with correct parameters" do
+        expect { client.import_prometheus(scrape) }.not_to raise_error
+      end
+    end
+
+    context "with extra labels" do
+      let(:extra_labels) { {"env" => "production", "region" => "us-west"} }
+
+      before do
+        stub_request(:post, "#{endpoint}/api/v1/import/prometheus?timestamp=#{timestamp_msec}&extra_label=env%3Dproduction&extra_label=region%3Dus-west")
+          .with(
+            body: "gzipped_data",
+            headers: {
+              "Content-Encoding" => "gzip",
+              "Content-Type" => "application/octet-stream"
+            }
+          )
+          .to_return(status: 204)
+      end
+
+      it "sends a POST request with correct parameters and extra labels" do
+        expect { client.import_prometheus(scrape, extra_labels) }.not_to raise_error
+      end
+    end
+
+    context "when the server returns an error" do
+      before do
+        stub_request(:post, "#{endpoint}/api/v1/import/prometheus?timestamp=#{timestamp_msec}")
+          .to_return(status: 500, body: "Server Error")
+      end
+
+      it "raises a ClientError" do
+        expect { client.import_prometheus(scrape) }.to raise_error(VictoriaMetrics::ClientError)
+      end
+    end
+
+    context "with authentication" do
+      let(:username) { "user" }
+      let(:password) { "pass" }
+      let(:client) { described_class.new(endpoint: endpoint, username: username, password: password) }
+
+      before do
+        stub_request(:post, "#{endpoint}/api/v1/import/prometheus?timestamp=#{timestamp_msec}")
+          .with(
+            headers: {
+              "Authorization" => "Basic #{Base64.strict_encode64("#{username}:#{password}")}",
+              "Content-Encoding" => "gzip",
+              "Content-Type" => "application/octet-stream"
+            }
+          )
+          .to_return(status: 204)
+      end
+
+      it "includes authentication headers" do
+        client.import_prometheus(scrape)
+        expect(WebMock).to have_requested(:post, "#{endpoint}/api/v1/import/prometheus?timestamp=#{timestamp_msec}")
+          .with(
+            headers: {
+              "Authorization" => "Basic #{Base64.strict_encode64("#{username}:#{password}")}",
+              "Content-Encoding" => "gzip",
+              "Content-Type" => "application/octet-stream"
+            }
+          )
+      end
+    end
+  end
+
+  describe "#gzip" do
+    it "compresses the input string" do
+      input = "test string"
+      compressed = client.send(:gzip, input)
+
+      # Verify it's gzipped by decompressing it
+      io = StringIO.new(compressed)
+      gz = Zlib::GzipReader.new(io)
+      decompressed = gz.read
+
+      expect(decompressed).to eq(input)
+    end
+  end
+
+  describe "#scrape_initialize" do
+    it "initializes a Scrape object with time and samples" do
+      time = Time.now
+      samples = "metric{label=\"value\"} 42.5"
+      scrape = VictoriaMetrics::Client::Scrape.new(time: time, samples: samples)
+
+      expect(scrape).to be_a(VictoriaMetrics::Client::Scrape)
+      expect(scrape.time).to eq(time)
+      expect(scrape.samples).to eq(samples)
+    end
+  end
 end
