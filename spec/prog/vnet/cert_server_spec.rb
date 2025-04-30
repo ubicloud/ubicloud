@@ -40,8 +40,14 @@ RSpec.describe Prog::Vnet::CertServer do
       expect { nx.before_run }.to exit({"msg" => "vm is destroyed"})
     end
 
+    it "pops if vm is detached from the load_balancer" do
+      expect(vm).to receive(:load_balancer).and_return(nil)
+      expect { nx.before_run }.to exit({"msg" => "vm is detached"})
+    end
+
     it "if vm exists, does nothing" do
-      expect(nx).to receive(:vm).and_return(vm)
+      expect(nx).to receive(:vm).and_return(vm).twice
+      expect(vm).to receive(:load_balancer).and_return(lb)
       nx.before_run
     end
   end
@@ -63,6 +69,11 @@ RSpec.describe Prog::Vnet::CertServer do
       expect(nx.load_balancer).to receive(:active_cert).and_return(nil)
       expect { nx.put_certificate }.to nap(5)
     end
+
+    it "naps if the vm is not scheduled" do
+      expect(vm).to receive(:vm_host).and_return(nil)
+      expect { nx.put_certificate }.to nap(5)
+    end
   end
 
   describe "#start_certificate_server" do
@@ -76,6 +87,11 @@ RSpec.describe Prog::Vnet::CertServer do
     it "removes the certificate files, server and hops to remove_load_balancer" do
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo host/bin/setup-cert-server stop_and_remove test-vm")
 
+      expect { nx.remove_cert_server }.to exit({"msg" => "certificate resources and server are removed"})
+    end
+
+    it "does nothing if the vm is not scheduled anywhere" do
+      expect(vm).to receive(:vm_host).and_return(nil)
       expect { nx.remove_cert_server }.to exit({"msg" => "certificate resources and server are removed"})
     end
   end
