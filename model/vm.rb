@@ -214,7 +214,7 @@ class Vm < Sequel::Model
       dns_ipv4: nics.first.private_subnet.net4.nth(2).to_s,
       unix_user:,
       ssh_public_keys: [public_key] + project_public_keys,
-      nics: nics.map { |nic| [nic.private_ipv6.to_s, nic.private_ipv4.to_s, nic.ubid_to_tap_name, nic.mac, nic.private_ipv4_gateway] },
+      nics: nics.map { [it.private_ipv6.to_s, it.private_ipv4.to_s, it.ubid_to_tap_name, it.mac, it.private_ipv4_gateway] },
       boot_image:,
       max_vcpus: topo.max_vcpus,
       cpu_topology: topo.to_s,
