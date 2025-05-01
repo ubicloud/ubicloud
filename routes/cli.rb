@@ -3,6 +3,7 @@
 class Clover
   hash_branch("cli") do |r|
     r.post api? do
+      no_authorization_needed
       response["content-type"] = "text/plain"
 
       unless (argv = r.POST["argv"]).is_a?(Array) && argv.all?(String)

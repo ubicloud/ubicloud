@@ -57,12 +57,20 @@ class Clover < Roda
   def check_found_object(obj)
     unless obj
       response.status = if request.delete? && request.remaining_path.empty?
+        no_authorization_needed
         204
       else
         404
       end
       request.halt
     end
+  end
+
+  def no_authorization_needed
+    # Do nothing, this is a no-op method only used to check in the specs
+    # that all requests have some form of authorization, or an explicit
+    # indication that additional authorization is not needed
+    nil
   end
 
   private def each_authorization_id

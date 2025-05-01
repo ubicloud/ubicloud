@@ -572,6 +572,7 @@ class Clover < Roda
 
   hash_branch("after-login") do |r|
     r.get web? do
+      no_authorization_needed
       if (project = current_account.projects_dataset.order(:created_at, :name).first)
         r.redirect "#{project.path}/dashboard"
       else
@@ -588,6 +589,7 @@ class Clover < Roda
     end
 
     hash_branch("clear-last-password-entry") do |r|
+      no_authorization_needed
       session.delete("last_password_entry")
       ""
     end
