@@ -41,23 +41,25 @@ RSpec.configure do |config|
     Capybara.use_default_driver
   end
 
-  def flash_message_matcher(expected_type, expected_message)
-    match do |page|
-      next false unless page.has_css?("#flash-#{expected_type}")
-      actual_message = page.find_by_id("flash-#{expected_type}").text
-      if expected_message.is_a?(String)
-        actual_message == expected_message
-      else
-        actual_message =~ expected_message
+  class RSpec::Matchers::DSL::Matcher
+    def self.flash_message_matcher(expected_type, expected_message)
+      match do |page|
+        next false unless page.has_css?("#flash-#{expected_type}")
+        actual_message = page.find_by_id("flash-#{expected_type}").text
+        if expected_message.is_a?(String)
+          actual_message == expected_message
+        else
+          actual_message =~ expected_message
+        end
       end
-    end
 
-    failure_message do |page|
-      <<~MESSAGE
-        #{"expected: ".rjust(16)}#{expected_type} - #{expected_message}
-        #{"actual error: ".rjust(16)}#{page.has_css?("#flash-error") ? page.find_by_id("flash-error").text : "(no error message)"}
-        #{"actual notice: ".rjust(16)}#{page.has_css?("#flash-notice") ? page.find_by_id("flash-notice").text : "(no notice message)"}
-      MESSAGE
+      failure_message do |page|
+        <<~MESSAGE
+          #{"expected: ".rjust(16)}#{expected_type} - #{expected_message}
+          #{"actual error: ".rjust(16)}#{page.has_css?("#flash-error") ? page.find_by_id("flash-error").text : "(no error message)"}
+          #{"actual notice: ".rjust(16)}#{page.has_css?("#flash-notice") ? page.find_by_id("flash-notice").text : "(no notice message)"}
+        MESSAGE
+      end
     end
   end
 
@@ -68,13 +70,15 @@ RSpec.configure do |config|
   RSpec::Matchers.define :have_flash_error do |expected_message|
     flash_message_matcher(:error, expected_message)
   end
-end
 
-def login(email = TEST_USER_EMAIL, password = TEST_USER_PASSWORD)
-  visit "/login"
-  fill_in "Email Address", with: email
-  fill_in "Password", with: password
-  click_button "Sign in"
+  config.include(Module.new do
+    def login(email = TEST_USER_EMAIL, password = TEST_USER_PASSWORD)
+      visit "/login"
+      fill_in "Email Address", with: email
+      fill_in "Password", with: password
+      click_button "Sign in"
 
-  expect(page.title).to end_with("Dashboard")
+      expect(page.title).to end_with("Dashboard")
+    end
+  end)
 end
