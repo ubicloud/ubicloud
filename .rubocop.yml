@@ -99,3 +99,6 @@ Capybara/ClickLinkOrButtonStyle:
 
 Lint/UselessTimes:
   Enabled: false
+
+Lint/ConstantDefinitionInBlock:
+  Enabled: false
