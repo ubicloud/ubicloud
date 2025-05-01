@@ -178,7 +178,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     end
 
     vm.sshable.cmd("sudo -u postgres pg_ctlcluster #{postgres_server.resource.version} main reload")
-    vm.sshable.cmd("sudo systemctl reload pgbouncer@*")
+    vm.sshable.cmd("sudo systemctl reload pgbouncer@*.service")
     hop_wait
   end
 
@@ -483,7 +483,7 @@ SQL
   label def restart
     decr_restart
     vm.sshable.cmd("sudo postgres/bin/restart #{postgres_server.resource.version}")
-    vm.sshable.cmd("sudo systemctl restart pgbouncer@*")
+    vm.sshable.cmd("sudo systemctl restart pgbouncer@*.service")
     pop "postgres server is restarted"
   end
 
