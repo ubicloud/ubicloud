@@ -1,15 +1,13 @@
 # frozen_string_literal: true
 
-RSpec.describe DB do
+RSpec.describe "Database" do
   it "has no unexpectedly collated columns" do
-    expect(described_class[<<SQL].all.map { it[:name] }.join(", ")).to eq ""
-SELECT quote_ident(nspname) || '.' || quote_ident(relname) || '.' || quote_ident(attname) AS name
-FROM pg_class
-JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid AND
-                     pg_namespace.nspname NOT IN ('pg_catalog', 'information_schema')
-JOIN pg_attribute ON pg_class.oid = pg_attribute.attrelid
-JOIN pg_collation ON pg_attribute.attcollation = pg_collation.oid AND
-                     pg_collation.collcollate <> 'C'
-SQL
+    collated_columns = DB[:pg_class]
+      .join(:pg_namespace, oid: :relnamespace) { |j| Sequel.qualify(j, :nspname) !~ ["pg_catalog", "information_schema"] }
+      .join(:pg_attribute, attrelid: Sequel[:pg_class][:oid])
+      .join(:pg_collation, oid: :attcollation) { |j| Sequel.qualify(j, :collcollate) !~ "C" }
+      .select_map(Sequel.join(%i[nspname relname attname].map { Sequel.function(:quote_ident, it) }, ".").as(:name))
+
+    expect(collated_columns).to eq []
   end
 end

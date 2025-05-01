@@ -92,7 +92,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect(nx).to receive(:dns_challenge).and_return(challenge).at_least(:once)
       dns_record = DnsRecord.create_with_id(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "test-record-type", ttl: 600, data: "content")
-      DB["INSERT INTO seen_dns_records_by_dns_servers(dns_record_id, dns_server_id) VALUES('#{dns_record.id}', NULL)"].insert
+      DB[:seen_dns_records_by_dns_servers].insert(dns_record_id: dns_record.id, dns_server_id: nil)
 
       expect(challenge).to receive(:request_validation)
       expect { nx.wait_dns_update }.to hop("wait_dns_validation")
