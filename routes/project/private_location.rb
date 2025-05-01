@@ -70,8 +70,7 @@ class Clover
 
     r.is String do |name|
       @location = @project.locations.find { |loc| loc.ui_name == name }
-
-      next(r.delete? ? 204 : 404) unless @location
+      check_found_object(@location)
 
       r.get do
         authorize("Location:view", @project.id)

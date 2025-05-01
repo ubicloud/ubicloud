@@ -20,8 +20,7 @@ class Clover
 
       filter[:location_id] = @location.id
       ps = @project.private_subnets_dataset.eager(:location).first(filter)
-
-      next (r.delete? ? 204 : 404) unless ps
+      check_found_object(ps)
 
       r.post "connect" do
         authorize("PrivateSubnet:connect", ps.id)

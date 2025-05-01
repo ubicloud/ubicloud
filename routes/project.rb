@@ -40,7 +40,7 @@ class Clover
       @project = Project.from_ubid(project_ubid)
       @project = nil unless @project&.visible
 
-      next(r.delete? ? 204 : 404) unless @project
+      check_found_object(@project)
 
       if @project.accounts_dataset.where(Sequel[:accounts][:id] => current_account_id).empty?
         fail Authorization::Unauthorized

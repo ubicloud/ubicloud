@@ -28,21 +28,17 @@ class Clover
 
     r.is String do |firewall_rule_ubid|
       firewall_rule = FirewallRule.from_ubid(firewall_rule_ubid)
+      check_found_object(firewall_rule)
 
-      request.delete true do
-        if firewall_rule
-          authorize("Firewall:edit", @firewall.id)
-          @firewall.remove_firewall_rule(firewall_rule)
-        end
-
+      r.delete true do
+        authorize("Firewall:edit", @firewall.id)
+        @firewall.remove_firewall_rule(firewall_rule)
         204
       end
 
-      request.get true do
-        if firewall_rule
-          authorize("Firewall:view", @firewall.id)
-          Serializers::FirewallRule.serialize(firewall_rule)
-        end
+      r.get true do
+        authorize("Firewall:view", @firewall.id)
+        Serializers::FirewallRule.serialize(firewall_rule)
       end
     end
   end

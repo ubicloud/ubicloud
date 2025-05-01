@@ -54,6 +54,17 @@ class Clover < Roda
     rodauth.session["pat_id"]
   end
 
+  def check_found_object(obj)
+    unless obj
+      response.status = if request.delete? && request.remaining_path.empty?
+        204
+      else
+        404
+      end
+      request.halt
+    end
+  end
+
   private def each_authorization_id
     return to_enum(:each_authorization_id) unless block_given?
 
