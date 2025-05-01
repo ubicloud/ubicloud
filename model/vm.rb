@@ -206,27 +206,27 @@ class Vm < Sequel::Model
 
     # we don't write secrets to params_json, because it
     # shouldn't be stored in the host for security reasons.
-    JSON.pretty_generate({
-      "vm_name" => name,
-      "public_ipv6" => ephemeral_net6.to_s,
-      "public_ipv4" => ip4.to_s || "",
-      "local_ipv4" => local_vetho_ip.to_s.shellescape || "",
-      "dns_ipv4" => nics.first.private_subnet.net4.nth(2).to_s,
-      "unix_user" => unix_user,
-      "ssh_public_keys" => [public_key] + project_public_keys,
-      "nics" => nics.map { |nic| [nic.private_ipv6.to_s, nic.private_ipv4.to_s, nic.ubid_to_tap_name, nic.mac, nic.private_ipv4_gateway] },
-      "boot_image" => boot_image,
-      "max_vcpus" => topo.max_vcpus,
-      "cpu_topology" => topo.to_s,
-      "mem_gib" => memory_gib,
-      "ndp_needed" => vm_host.ndp_needed,
-      "storage_volumes" => storage_volumes,
-      "swap_size_bytes" => swap_size_bytes,
-      "pci_devices" => pci_devices.map { [it.slot, it.iommu_group] },
-      "slice_name" => vm_host_slice&.inhost_name || "system.slice",
-      "cpu_percent_limit" => cpu_percent_limit || 0,
-      "cpu_burst_percent_limit" => cpu_burst_percent_limit || 0
-    })
+    JSON.pretty_generate(
+      vm_name: name,
+      public_ipv6: ephemeral_net6.to_s,
+      public_ipv4: ip4.to_s || "",
+      local_ipv4: local_vetho_ip.to_s.shellescape || "",
+      dns_ipv4: nics.first.private_subnet.net4.nth(2).to_s,
+      unix_user:,
+      ssh_public_keys: [public_key] + project_public_keys,
+      nics: nics.map { |nic| [nic.private_ipv6.to_s, nic.private_ipv4.to_s, nic.ubid_to_tap_name, nic.mac, nic.private_ipv4_gateway] },
+      boot_image:,
+      max_vcpus: topo.max_vcpus,
+      cpu_topology: topo.to_s,
+      mem_gib: memory_gib,
+      ndp_needed: vm_host.ndp_needed,
+      storage_volumes:,
+      swap_size_bytes:,
+      pci_devices: pci_devices.map { [it.slot, it.iommu_group] },
+      slice_name: vm_host_slice&.inhost_name || "system.slice",
+      cpu_percent_limit: cpu_percent_limit || 0,
+      cpu_burst_percent_limit: cpu_burst_percent_limit || 0
+    )
   end
 
   def storage_volumes
