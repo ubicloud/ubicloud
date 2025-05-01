@@ -124,7 +124,6 @@ aws-sdk-s3/plugins/md5s
 aws-sdk-s3/plugins/redirects
 aws-sdk-s3/plugins/s3_host_id
 aws-sdk-s3/plugins/s3_signer
-aws-sdk-s3/plugins/skip_whole_multipart_get_checksums
 aws-sdk-s3/plugins/sse_cpk
 aws-sdk-s3/plugins/streaming_retry
 aws-sdk-s3/plugins/url_encoded_keys
@@ -160,6 +159,8 @@ date_arithmetic
 index_caching
 pg_array
 pg_auto_parameterize
+pg_auto_parameterize_in_array
+pg_enum
 pg_json
 pg_json_ops
 pg_range
@@ -176,6 +177,9 @@ defaults_setter
 insert_conflict
 inspect_pk
 many_through_many
+pg_auto_constraint_validations
+pg_auto_validate_enums
+pg_eager_any_typed_array
 require_valid_schema
 serialization
 singular_table_names
@@ -213,6 +217,7 @@ invalid_request_body
 json
 json_parser
 not_found
+part
 public
 render
 render_coverage
@@ -257,6 +262,16 @@ two_factor_base
 verify_account
 verify_login_change
 webauthn
+END
+
+<<END.split.each { |f| require "rodish/plugins/#{f}" }
+_context_sensitive_help
+_wrap
+help_examples
+help_option_values
+help_order
+post_commands
+skip_option_parsing
 END
 
 lf = $LOADED_FEATURES.dup
