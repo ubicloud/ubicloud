@@ -189,6 +189,8 @@ class Clover
 
       r.on "read-replica" do
         r.post true do
+          authorize("Postgres:edit", pg.id)
+
           required_parameters = ["name"]
           request_body_params = validate_request_params(required_parameters, [], [])
           st = Prog::Postgres::PostgresResourceNexus.assemble(
