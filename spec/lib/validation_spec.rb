@@ -512,4 +512,53 @@ RSpec.describe Validation do
       expect { described_class.validate_provider_location_name("azure", "us-east-1") }.to raise_error described_class::ValidationFailed
     end
   end
+
+  describe "#validate_victoria_metrics_username" do
+    it "valid usernames" do
+      [
+        "abc",
+        "abc123",
+        "abc-123",
+        "abc_123",
+        "abc--123",
+        "a-b-c-1-2",
+        "a_b_c_1_2",
+        "a" * 32
+      ].each do |username|
+        expect(described_class.validate_victoria_metrics_username(username)).to be_nil
+      end
+    end
+
+    it "invalid usernames" do
+      [
+        nil,
+        "ab",
+        "-abc",
+        "ABC",
+        "123abc",
+        "abc$",
+        "a" * 33
+      ].each do |username|
+        expect { described_class.validate_victoria_metrics_username(username) }.to raise_error described_class::ValidationFailed
+      end
+    end
+  end
+
+  describe "#validate_victoria_metrics_storage_size" do
+    it "valid storage sizes" do
+      [1, 100, 2000, 4000].each do |size|
+        expect(described_class.validate_victoria_metrics_storage_size(size)).to eq(size)
+      end
+    end
+
+    it "invalid storage sizes" do
+      [0, -1, 4001, 5000].each do |size|
+        expect { described_class.validate_victoria_metrics_storage_size(size) }.to raise_error described_class::ValidationFailed
+      end
+    end
+
+    it "converts string input to integer" do
+      expect(described_class.validate_victoria_metrics_storage_size("100")).to eq(100)
+    end
+  end
 end

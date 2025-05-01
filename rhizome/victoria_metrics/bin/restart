@@ -1,0 +1,4 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+r "systemctl restart victoria_metrics && systemctl restart vmauth"

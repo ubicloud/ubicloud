@@ -1,0 +1,98 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../../common/lib/util"
+
+config_json = JSON.parse($stdin.read)
+
+cert = config_json["cert"]
+cert_key = config_json["cert_key"]
+ca_bundle = config_json["ca_bundle"]
+user = config_json["admin_user"]
+password = config_json["admin_password"]
+
+r "mkdir -p /dat/victoria_metrics"
+r "chown victoria_metrics:victoria_metrics /dat/victoria_metrics"
+
+vm_service = <<-VM_SERVICE
+[Unit]
+Description=High-performance, cost-effective and scalable time series database, long-term remote storage for Prometheus
+After=network.target
+
+[Service]
+Type=simple
+User=victoria_metrics
+Group=victoria_metrics
+StartLimitBurst=5
+StartLimitInterval=0
+Restart=on-failure
+RestartSec=1
+ExecStart=/usr/local/bin/victoria-metrics-prod \
+        -storageDataPath=/dat/victoria_metrics \
+        -httpListenAddr=127.0.0.1:8428 \
+        -retentionPeriod=#{config_json["retention_period"] or 1}
+ExecStop=/bin/kill -s SIGTERM $MAINPID
+LimitNOFILE=65536
+LimitNPROC=32000
+
+[Install]
+WantedBy=multi-user.target
+VM_SERVICE
+
+safe_write_to_file("/etc/systemd/system/victoria_metrics.service", vm_service)
+r "systemctl daemon-reload"
+r "systemctl enable victoria_metrics --now"
+
+r "mkdir -p /etc/victoria_metrics/certs/CAs"
+r "chown -R victoria_metrics:victoria_metrics /etc/victoria_metrics/"
+
+auth_config = <<-AUTH_CONFIG
+users:
+  - username: "#{user}"
+    password: "#{password}"
+    url_prefix: "http://127.0.0.1:8428"
+AUTH_CONFIG
+
+safe_write_to_file("/etc/victoria_metrics/auth-config.yml", auth_config)
+r "chown victoria_metrics:victoria_metrics /etc/victoria_metrics/auth-config.yml"
+
+safe_write_to_file("/etc/victoria_metrics/certs/public.crt", cert)
+safe_write_to_file("/etc/victoria_metrics/certs/private.key", cert_key)
+safe_write_to_file("/etc/victoria_metrics/certs/CAs/public.crt", ca_bundle)
+r "chown -R victoria_metrics:victoria_metrics /etc/victoria_metrics/certs"
+
+vmauth_service = <<-VMAUTH_SERVICE
+[Unit]
+Description=Simple auth proxy, router and load balancer for VictoriaMetrics
+After=network.target
+
+[Service]
+Type=simple
+User=victoria_metrics
+Group=victoria_metrics
+StartLimitBurst=5
+StartLimitInterval=0
+Restart=on-failure
+RestartSec=1
+ExecStart=/usr/local/bin/vmauth-prod \
+        --tls=true \
+        --auth.config=/etc/victoria_metrics/auth-config.yml \
+        --httpListenAddr=0.0.0.0:8427 \
+        --tlsCertFile=/etc/victoria_metrics/certs/public.crt \
+        --tlsKeyFile=/etc/victoria_metrics/certs/private.key \
+        --maxConcurrentRequests=1000 \
+        --maxConcurrentPerUserRequests=1000 \
+        --httpInternalListenAddr=127.0.0.1:8429 \
+        --enableTCP6
+ExecStop=/bin/kill -s SIGTERM $MAINPID
+LimitNOFILE=65536
+LimitNPROC=32000
+
+[Install]
+WantedBy=multi-user.target
+VMAUTH_SERVICE
+
+safe_write_to_file("/etc/systemd/system/vmauth.service", vmauth_service)
+r "systemctl daemon-reload"
+r "systemctl enable vmauth --now"
