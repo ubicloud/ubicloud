@@ -588,6 +588,23 @@ class Clover < Roda
       raise(r.params["message"] || "test error")
     end
 
+    hash_branch("test-no-authorization-needed") do |r|
+      r.get "once" do
+        no_authorization_needed
+        ""
+      end
+
+      r.get "twice" do
+        2.times { no_authorization_needed }
+      end
+
+      r.get "after-authorization" do
+        @project = current_account.projects.first
+        dataset_authorize(current_account.projects_dataset, "Project:edit")
+        no_authorization_needed
+      end
+    end
+
     hash_branch("clear-last-password-entry") do |r|
       no_authorization_needed
       session.delete("last_password_entry")
@@ -675,6 +692,7 @@ class Clover < Roda
       end
     end
 
+    @need_authorization = true
     r.hash_branches("")
   end
 
@@ -686,5 +704,43 @@ class Clover < Roda
     @schema_validator.response_validate(status, headers, body, true) if @schema_validator.link_exist?
   rescue JSON::ParserError => e
     raise Committee::InvalidResponse.new("Response body wasn't valid JSON.", original_error: e)
+  end
+
+  # :nocov:
+  if Config.test? && ENV["CLOVER_FREEZE"] != "1"
+    # :nocov:
+
+    # This section is included when running non-frozen specs, and ensures that all routes
+    # either call an authorization method, or explicitly indicate that no additional authorization
+    # is needed by calling no_authorization_needed
+
+    after do |res|
+      if @need_authorization && res && res[0] != 404 && res[0] != 501
+        raise "no authorization check for #{request.request_method} #{request.path_info}"
+      end
+    end
+
+    prepend(Module.new do
+      def authorize(actions, object_id)
+        @need_authorization = false
+        super
+      end
+
+      def has_permission?(actions, object_id)
+        @need_authorization = false
+        super
+      end
+
+      def dataset_authorize(ds, actions)
+        @need_authorization = false
+        super
+      end
+
+      def no_authorization_needed
+        raise "called no_authorization_needed when authorization already not needed: #{request.inspect}" unless @need_authorization
+        @need_authorization = false
+        super
+      end
+    end)
   end
 end

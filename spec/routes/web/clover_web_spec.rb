@@ -23,6 +23,19 @@ RSpec.describe Clover do
     expect(page.title).to end_with("Dashboard")
   end
 
+  if ENV["CLOVER_FREEZE"] != "1"
+    it "raises error if no_authorization_needed called when not needed or already authorized" do
+      create_account.create_project_with_default_policy("project-1")
+      login
+
+      visit "/test-no-authorization-needed/once"
+      expect(page.status_code).to eq(200)
+
+      expect { visit "/test-no-authorization-needed/twice" }.to raise_error(RuntimeError)
+      expect { visit "/test-no-authorization-needed/after-authorization" }.to raise_error(RuntimeError)
+    end
+  end
+
   it "handles expected errors" do
     expect(Clog).to receive(:emit).with("route exception").and_call_original
 
