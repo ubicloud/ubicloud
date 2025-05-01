@@ -26,8 +26,8 @@ ncpu = nil
 nproc = lambda do
   return ncpu if ncpu
   require "etc"
-  # Limit to 6 processes, as higher number results in more time
-  ncpu = Etc.nprocessors.clamp(1, 6).to_s
+  # Limit to 10 processes, as higher number results in more time
+  ncpu = Etc.nprocessors.clamp(1, 10).to_s
 end
 
 clone_test_database = lambda do
