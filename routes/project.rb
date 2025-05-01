@@ -3,6 +3,7 @@
 class Clover
   hash_branch("project") do |r|
     r.get true do
+      no_authorization_needed
       dataset = current_account.projects_dataset.where(visible: true)
 
       if api?
@@ -26,6 +27,7 @@ class Clover
       required_parameters = ["name"]
       request_body_params = validate_request_params(required_parameters)
       project = current_account.create_project_with_default_policy(request_body_params["name"])
+      no_authorization_needed
 
       if api?
         Serializers::Project.serialize(project)
@@ -34,7 +36,10 @@ class Clover
       end
     end
 
-    r.get(web?, "create") { view "project/create" }
+    r.get(web?, "create") do
+      no_authorization_needed
+      view "project/create"
+    end
 
     r.on String do |project_ubid|
       @project = Project.from_ubid(project_ubid)
@@ -80,7 +85,10 @@ class Clover
       end
 
       if web?
-        r.get("dashboard") { view("project/dashboard") }
+        r.get("dashboard") do
+          no_authorization_needed
+          view("project/dashboard")
+        end
 
         r.post true do
           authorize("Project:edit", @project.id)

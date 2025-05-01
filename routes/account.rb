@@ -4,17 +4,20 @@ class Clover
   hash_branch("account") do |r|
     r.web do
       r.get true do
+        no_authorization_needed
         r.redirect "/account/multifactor-manage"
       end
 
       r.on "login-method" do
         r.get true do
+          no_authorization_needed
           @identities = current_account.identities.to_h { [it.provider, it.uid] }
 
           view "account/login_method"
         end
 
         r.post "disconnect" do
+          no_authorization_needed
           provider, uid = typecast_params.nonempty_str(["provider", "uid"])
           identities = current_account.identities
           unless identities.length > (rodauth.has_password? ? 0 : 1)

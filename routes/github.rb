@@ -3,6 +3,7 @@
 class Clover
   hash_branch("github") do |r|
     r.get web?, "callback" do
+      no_authorization_needed
       oauth_code = r.params["code"]
       installation_id = r.params["installation_id"]
       setup_action = r.params["setup_action"]
