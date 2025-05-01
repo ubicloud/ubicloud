@@ -692,7 +692,7 @@ class Clover < Roda
       end
     end
 
-    @need_authorization = true
+    @still_need_authorization = true
     r.hash_branches("")
   end
 
@@ -715,30 +715,30 @@ class Clover < Roda
     # is needed by calling no_authorization_needed
 
     after do |res|
-      if @need_authorization && res && res[0] != 404 && res[0] != 501
+      if @still_need_authorization && res && res[0] != 404 && res[0] != 501
         raise "no authorization check for #{request.request_method} #{request.path_info}"
       end
     end
 
     prepend(Module.new do
       def authorize(actions, object_id)
-        @need_authorization = false
+        @still_need_authorization = false
         super
       end
 
       def has_permission?(actions, object_id)
-        @need_authorization = false
+        @still_need_authorization = false
         super
       end
 
       def dataset_authorize(ds, actions)
-        @need_authorization = false
+        @still_need_authorization = false
         super
       end
 
       def no_authorization_needed
-        raise "called no_authorization_needed when authorization already not needed: #{request.inspect}" unless @need_authorization
-        @need_authorization = false
+        raise "called no_authorization_needed when authorization already not needed: #{request.inspect}" unless @still_need_authorization
+        @still_need_authorization = false
         super
       end
     end)
