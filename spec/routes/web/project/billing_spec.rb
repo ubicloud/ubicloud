@@ -80,7 +80,6 @@ RSpec.describe Clover, "billing" do
       expect(page).to have_field("Billing Name", with: "ACME Inc.")
       expect(billing_info.payment_methods.first.stripe_id).to eq("pm_1234567890")
       expect(page).to have_content "Visa"
-      expect(page).to have_no_content "Discount"
       expect(page).to have_no_content "100%"
 
       project.this.update(discount: 100)
@@ -266,6 +265,58 @@ RSpec.describe Clover, "billing" do
       expect(page.status_code).to eq(204)
       expect(page.body).to be_empty
       expect(billing_info.reload.payment_methods.count).to eq(1)
+    end
+
+    describe "discount code" do
+      before do
+        expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return(
+          {"name" => "New Inc.", "address" => {"country" => "DE"}, "metadata" => {"tax_id" => "DE456789"}}
+        ).at_least(:once)
+      end
+
+      it "can apply a valid discount code" do
+        DiscountCode.create_with_id(code: "VALID_CODE", credit_amount: 33, expires_at: Time.now + 86400)
+        visit "#{project.path}/billing"
+        fill_in "Discount Code", with: "VALID_CODE"
+        click_button "Apply"
+
+        expect(page).to have_flash_notice "Discount code successfully applied."
+        expect(page).to have_content "$33.00"
+        expect(project.reload.credit).to eq(33.00)
+      end
+
+      it "shows error for invalid discount code" do
+        visit "#{project.path}/billing"
+        fill_in "Discount Code", with: "INVALID_CODE"
+        click_button "Apply"
+
+        expect(page).to have_flash_error "Discount code not found."
+        expect(page).to have_content "$0.00"
+        expect(project.reload.credit).to eq(0.00)
+      end
+
+      it "shows error for expired discount code" do
+        DiscountCode.create_with_id(code: "EXPIRED_CODE", credit_amount: 33, expires_at: Time.now - 86400)
+        visit "#{project.path}/billing"
+        fill_in "Discount Code", with: "EXPIRED_CODE"
+        click_button "Apply"
+
+        expect(page).to have_flash_error "Discount code not found."
+        expect(page).to have_content "$0.00"
+        expect(project.reload.credit).to eq(0.00)
+      end
+
+      it "shows error if discount code has already been applied" do
+        used_discount_code = DiscountCode.create_with_id(code: "USED_CODE", credit_amount: 33, expires_at: Time.now + 86400)
+        ProjectDiscountCode.create_with_id(project_id: project.id, discount_code_id: used_discount_code.id)
+        visit "#{project.path}/billing"
+        fill_in "Discount Code", with: "USED_CODE"
+        click_button "Apply"
+
+        expect(page).to have_flash_error "Discount code has already been applied to this project."
+        expect(page).to have_content "$0.00"
+        expect(project.reload.credit).to eq(0.00)
+      end
     end
 
     describe "invoices" do

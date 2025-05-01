@@ -173,6 +173,33 @@
         end,
       empty_state: "No payment methods. Add new payment method to able create resources in project."
     ) %>
+    <!-- Discount Code -->
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <form action="<%= "#{@project_data[:path]}/discount-code" %>" method="POST">
+        <%== csrf_tag("#{@project_data[:path]}/discount-code") %>
+        <div class="px-4 py-5 sm:p-6">
+          <div class="space-y-12">
+            <div>
+              <div class="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-8">
+                <div class="sm:col-span-4">
+                  <%== part(
+                    "components/form/text",
+                    name: "discount_code",
+                    label: "Discount Code",
+                    attributes: {
+                      required: true,
+                    }
+                  ) %>
+                </div>
+                <div class="col-span-2 sm:col-span-3 flex justify-start items-end">
+                  <%== part("components/form/submit_button", text: "Apply") %>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
     <!-- Invoices -->
     <div>
       <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
