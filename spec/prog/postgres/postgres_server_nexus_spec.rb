@@ -329,7 +329,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.crt && sudo chmod 640 /etc/ssl/certs/server.crt")
       expect(sshable).to receive(:cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.key && sudo chmod 640 /etc/ssl/certs/server.key")
       expect(sshable).to receive(:cmd).with("sudo -u postgres pg_ctlcluster 16 main reload")
-      expect(sshable).to receive(:cmd).with("sudo systemctl reload pgbouncer@*")
+      expect(sshable).to receive(:cmd).with("sudo systemctl reload pgbouncer@*.service")
       expect(nx).to receive(:refresh_walg_credentials)
       expect { nx.refresh_certificates }.to hop("wait")
     end
@@ -798,7 +798,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#restart" do
     it "restarts and exits" do
       expect(sshable).to receive(:cmd).with("sudo postgres/bin/restart 16")
-      expect(sshable).to receive(:cmd).with("sudo systemctl restart pgbouncer@*")
+      expect(sshable).to receive(:cmd).with("sudo systemctl restart pgbouncer@*.service")
       expect { nx.restart }.to exit({"msg" => "postgres server is restarted"})
     end
   end
