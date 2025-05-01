@@ -43,11 +43,11 @@ RSpec.describe Prog::DnsZone::DnsZoneNexus do
       dns_zone.add_record(r2)
       dns_zone.add_record(r3)
 
-      DB["INSERT INTO seen_dns_records_by_dns_servers(dns_record_id, dns_server_id) VALUES('#{r1.id}', '#{dns_server.id}')"].insert
+      DB[:seen_dns_records_by_dns_servers].insert(dns_record_id: r1.id, dns_server_id: dns_server.id)
     end
 
     it "does not push anything if there is no unseen records" do
-      DB["INSERT INTO seen_dns_records_by_dns_servers SELECT id, '#{dns_server.id}' FROM dns_record"].insert
+      DB[:seen_dns_records_by_dns_servers].insert(DB[:dns_record].select(:id, dns_server.id))
 
       expect(sshable).not_to receive(:cmd)
       expect { nx.refresh_dns_servers }.to hop("wait")
@@ -90,8 +90,8 @@ COMMANDS
       dns_zone.add_record(r2)
       dns_zone.add_record(r3)
 
-      DB["INSERT INTO seen_dns_records_by_dns_servers(dns_record_id, dns_server_id) VALUES('#{r1.id}', '#{dns_server.id}')"].insert
-      DB["INSERT INTO seen_dns_records_by_dns_servers(dns_record_id, dns_server_id) VALUES('#{r3.id}', '#{dns_server.id}')"].insert
+      DB[:seen_dns_records_by_dns_servers].insert(dns_record_id: r1.id, dns_server_id: dns_server.id)
+      DB[:seen_dns_records_by_dns_servers].insert(dns_record_id: r3.id, dns_server_id: dns_server.id)
 
       expect { nx.purge_obsolete_records }.to hop("wait")
       expect(dns_zone.reload.records.count).to eq(1)
@@ -107,8 +107,8 @@ COMMANDS
       dns_zone.add_record(r2)
       dns_zone.add_record(r3)
 
-      DB["INSERT INTO seen_dns_records_by_dns_servers(dns_record_id, dns_server_id) VALUES('#{r1.id}', '#{dns_server.id}')"].insert
-      DB["INSERT INTO seen_dns_records_by_dns_servers(dns_record_id, dns_server_id) VALUES('#{r2.id}', '#{dns_server.id}')"].insert
+      DB[:seen_dns_records_by_dns_servers].insert(dns_record_id: r1.id, dns_server_id: dns_server.id)
+      DB[:seen_dns_records_by_dns_servers].insert(dns_record_id: r2.id, dns_server_id: dns_server.id)
 
       expect { nx.purge_obsolete_records }.to hop("wait")
       expect(dns_zone.reload.records.count).to eq(2)
