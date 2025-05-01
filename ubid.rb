@@ -97,6 +97,8 @@ class UBID
   TYPE_LOCATION_CREDENTIAL = "1c"
   TYPE_PRIVATE_SUBNET_AWS_RESOURCE = "aw"
   TYPE_NIC_AWS_RESOURCE = "na"
+  TYPE_VICTORIA_METRICS_RESOURCE = "vr"
+  TYPE_VICTORIA_METRICS_SERVER = "vn"
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
 

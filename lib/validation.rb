@@ -29,6 +29,9 @@ module Validation
   # Minio user name, we are using ALLOWED_OS_USER_NAME_PATTERN with min length of 3
   ALLOWED_MINIO_USERNAME_PATTERN = %r{\A[a-z_][a-z0-9_-]{2,31}\z}
 
+  # Victoriametrics user name, we are using ALLOWED_OS_USER_NAME_PATTERN with min length of 3
+  ALLOWED_VICTORIA_METRICS_USERNAME_PATTERN = %r{\A[a-z_][a-z0-9_-]{2,31}\z}
+
   ALLOWED_PORT_RANGE_PATTERN = %r{\A(\d+)(?:\.\.(\d+))?\z}
 
   # - Max length 63
@@ -301,5 +304,18 @@ module Validation
   def self.validate_kubernetes_worker_node_count(count)
     fail ValidationFailed.new({worker_node_count: "Kubernetes worker node count is not a valid integer."}) unless count.is_a?(Integer)
     fail ValidationFailed.new({worker_node_count: "Kubernetes worker node count must be greater than 0."}) if count <= 0
+  end
+
+  def self.validate_victoria_metrics_username(username)
+    msg = "VictoriaMetrics user must only contain lowercase letters, numbers, hyphens and underscore and cannot start with a number or hyphen. It also have max length of 32, min length of 3."
+    fail ValidationFailed.new({username: msg}) unless username&.match(ALLOWED_VICTORIA_METRICS_USERNAME_PATTERN)
+  end
+
+  def self.validate_victoria_metrics_storage_size(storage_size)
+    min_storage_size, max_storage_size = 1, 4000
+    storage_size = storage_size.to_i
+
+    fail ValidationFailed.new({storage_size: "VictoriaMetrics storage must be between #{min_storage_size}GiB and #{max_storage_size}GiB"}) unless storage_size.between?(min_storage_size, max_storage_size)
+    storage_size
   end
 end

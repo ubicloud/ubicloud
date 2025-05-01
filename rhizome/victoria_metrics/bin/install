@@ -1,0 +1,14 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+
+unless (ver = ARGV.shift)
+  fail "No version provided"
+end
+
+r "wget https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/#{ver}/victoria-metrics-linux-amd64-#{ver}.tar.gz -O victoria-metrics.tar.gz"
+r "tar xvf victoria-metrics.tar.gz -C /usr/local/bin/"
+
+r "wget https://github.com/VictoriaMetrics/VictoriaMetrics/releases/download/#{ver}/vmutils-linux-amd64-#{ver}.tar.gz -O vmutils.tar.gz"
+r "tar xvf vmutils.tar.gz -C /usr/local/bin/"
