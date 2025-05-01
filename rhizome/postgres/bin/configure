@@ -49,8 +49,15 @@ pg_hba_entries = <<-PG_HBA
 local   all             postgres                                peer map=system2postgres
 local   all             pgbouncer                               peer map=system2pgbouncer
 
+# Allow connections from localhost with ubi_monitoring OS user as
+# ubi_monitoring database user. This will be used by postgres_exporter
+# to scrape metrics and expose them to prometheus.
+local   all             ubi_monitoring                          peer
+
 # "local" is for Unix domain socket connections only
-local   all             all                                     peer
+# Use SCRAM authentication for all local connections to allow pgbouncer
+# passthrough to work for all non-unix users
+local   all             all                                     scram-sha-256
 # IPv4 local connections:
 host    all             all             127.0.0.1/32            scram-sha-256
 # IPv6 local connections:
@@ -61,11 +68,6 @@ host    all             all             ::1/128                 scram-sha-256
 local   replication     all                                     peer
 host    replication     all             127.0.0.1/32            scram-sha-256
 host    replication     all             ::1/128                 scram-sha-256
-
-# Allow connections from localhost with ubi_monitoring OS user as
-# ubi_monitoring database user. This will be used by postgres_exporter
-# to scrape metrics and expose them to prometheus.
-local   all             ubi_monitoring                          peer
 
 # Allow connections from private subnet with SCRAM authentication
 #{private_subnets}
