@@ -21,7 +21,7 @@ class Clover
       filter[:private_subnet_id] = @project.private_subnets_dataset.where(location_id: @location.id).select(Sequel[:private_subnet][:id])
       lb = LoadBalancer.first(filter)
 
-      next (r.delete? ? 204 : 404) unless lb
+      check_found_object(lb)
 
       r.post %w[attach-vm detach-vm] do |action|
         authorize("LoadBalancer:edit", lb.id)

@@ -20,8 +20,7 @@ class Clover
 
       filter[:location_id] = @location.id
       vm = @project.vms_dataset.eager(:location).first(filter)
-
-      next(r.delete? ? 204 : 404) unless vm
+      check_found_object(vm)
 
       r.get true do
         authorize("Vm:view", vm.id)
