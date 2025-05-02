@@ -132,6 +132,7 @@ CERT_DOWNLOAD_TIMER
 [Unit]
 Description=Inference Gateway
 After=network.target
+StartLimitIntervalSec=0
 
 [Service]
 EnvironmentFile=/ie/workdir/inference-gateway.conf
@@ -142,8 +143,6 @@ User=ie
 Group=ie
 Restart=always
 RestartSec=5
-StartLimitIntervalSec=0
-StartLimitBurst=0
 LimitNOFILE=65536
 
 ProtectHome=yes
@@ -168,6 +167,7 @@ Description=Inference Engine
 After=network.target
 After=inference-gateway.service
 Requires=inference-gateway.service
+StartLimitIntervalSec=0
 
 [Service]
 ExecStart=#{engine_start_command}
@@ -182,8 +182,6 @@ User=ie
 Group=ie
 Restart=always
 RestartSec=5
-StartLimitIntervalSec=0
-StartLimitBurst=0
 LimitNOFILE=65536
 ProtectHome=yes
 DynamicUser=yes
