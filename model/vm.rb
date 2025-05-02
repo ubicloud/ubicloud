@@ -199,7 +199,7 @@ class Vm < Sequel::Model
     super + [:public_key]
   end
 
-  def params_json(swap_size_bytes)
+  def params_json(swap_size_bytes: nil, ch_version: nil, firmware_version: nil, hugepages: nil)
     topo = cloud_hypervisor_cpu_topology
 
     project_public_keys = project.get_ff_vm_public_ssh_keys || []
@@ -225,7 +225,10 @@ class Vm < Sequel::Model
       pci_devices: pci_devices.map { [it.slot, it.iommu_group] },
       slice_name: vm_host_slice&.inhost_name || "system.slice",
       cpu_percent_limit: cpu_percent_limit || 0,
-      cpu_burst_percent_limit: cpu_burst_percent_limit || 0
+      cpu_burst_percent_limit: cpu_burst_percent_limit || 0,
+      ch_version:,
+      firmware_version:,
+      hugepages:
     )
   end
 

@@ -968,7 +968,7 @@ RSpec.describe Al do
       expect(nic).to receive(:mac).and_return("")
       expect(nic).to receive(:private_ipv4_gateway).and_return("")
       expect(vm).to receive(:nics).and_return([nic]).at_least(1)
-      expect(JSON.parse(vm.params_json("")).fetch("slice_name")).to eq(expected_slice_name + ".slice")
+      expect(JSON.parse(vm.params_json).fetch("slice_name")).to eq(expected_slice_name + ".slice")
 
       # Validate the slice properties
       expect(slice.name).to eq(expected_slice_name)
