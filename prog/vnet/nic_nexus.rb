@@ -54,7 +54,6 @@ class Prog::Vnet::NicNexus < Prog::Base
   label def wait_setup
     decr_vm_allocated
     when_start_rekey_set? do
-      decr_setup_nic
       hop_start_rekey
     end
     nap 5

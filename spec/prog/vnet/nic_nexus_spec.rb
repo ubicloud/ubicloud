@@ -134,7 +134,6 @@ RSpec.describe Prog::Vnet::NicNexus do
     it "starts rekeying if setup is triggered" do
       expect(nx).to receive(:decr_vm_allocated)
       expect(nx).to receive(:when_start_rekey_set?).and_yield
-      expect(nx).to receive(:decr_setup_nic)
       expect { nx.wait_setup }.to hop("start_rekey")
     end
   end
