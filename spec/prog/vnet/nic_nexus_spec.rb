@@ -131,10 +131,21 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect { nx.wait_setup }.to nap(5)
     end
 
+    it "incrs add_new_nic when setup_nic is set" do
+      private_subnet = instance_double(PrivateSubnet)
+      nic = instance_double(Nic, private_subnet: private_subnet)
+
+      expect(nx).to receive(:nic).and_return(nic)
+      expect(nx).to receive(:decr_vm_allocated)
+      expect(nx).to receive(:when_setup_nic_set?).and_yield
+      expect(nx).to receive(:decr_setup_nic)
+      expect(private_subnet).to receive(:incr_add_new_nic)
+      expect { nx.wait_setup }.to nap(5)
+    end
+
     it "starts rekeying if setup is triggered" do
       expect(nx).to receive(:decr_vm_allocated)
       expect(nx).to receive(:when_start_rekey_set?).and_yield
-      expect(nx).to receive(:decr_setup_nic)
       expect { nx.wait_setup }.to hop("start_rekey")
     end
   end

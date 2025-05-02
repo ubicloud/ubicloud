@@ -284,7 +284,7 @@ class Prog::Vm::Nexus < Prog::Base
   label def prep
     case host.sshable.cmd("common/bin/daemonizer --check prep_#{q_vm}")
     when "Succeeded"
-      vm.private_subnets.each(&:incr_add_new_nic)
+      vm.nics.each(&:incr_setup_nic)
       hop_clean_prep
     when "NotStarted", "Failed"
       secrets_json = JSON.generate({
