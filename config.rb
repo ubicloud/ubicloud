@@ -162,7 +162,7 @@ module Config
   override :postgres17_paradedb_ubuntu_2204_version, "20250425.1.1", string
   override :postgres16_lantern_ubuntu_2204_version, "20250103.1.0", string
   override :postgres17_lantern_ubuntu_2204_version, "20250103.1.0", string
-  override :ai_ubuntu_2404_nvidia_version, "20250319.1.0", string
+  override :ai_ubuntu_2404_nvidia_version, "20250505.1.0", string
   override :kubernetes_v1_32_version, "20250320.1.0", string
 
   override :aws_based_postgres_16_ubuntu_2204_ami_version, "ami-030c060f85668b37d", string
