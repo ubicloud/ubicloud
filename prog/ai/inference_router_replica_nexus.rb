@@ -296,7 +296,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
   # pushes latest config to inference router and collects billing information
   def ping_inference_router
     update_config
-    usage_response = vm.sshable.cmd("curl -k https://localhost:8080/usage")
+    usage_response = vm.sshable.cmd("curl -k -m 10 --no-progress-meter https://localhost:8080/usage")
     project_usage = JSON.parse(usage_response)
     Clog.emit("Successfully pinged inference router.") { {inference_router: inference_router.ubid, replica: inference_router_replica.ubid, project_usage: project_usage} }
     update_billing_records(project_usage, "prompt_billing_resource", "prompt_token_count")

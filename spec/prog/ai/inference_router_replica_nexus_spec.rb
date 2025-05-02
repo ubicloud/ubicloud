@@ -368,7 +368,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
         "prompt_token_count" => 0,
         "completion_token_count" => 0
       }]
-      expect(sshable).to receive(:cmd).with("curl -k https://localhost:8080/usage").and_return(usage.to_json)
+      expect(sshable).to receive(:cmd).with("curl -k -m 10 --no-progress-meter https://localhost:8080/usage").and_return(usage.to_json)
 
       expect(nx).to receive(:update_billing_records).with(
         usage, "prompt_billing_resource", "prompt_token_count"
@@ -390,7 +390,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
         hash_including(stdin: a_string_matching(/"projects":/))
       )
       expect(sshable).not_to receive(:cmd).with("sudo pkill -f -HUP inference-router")
-      expect(sshable).to receive(:cmd).with("curl -k https://localhost:8080/usage").and_return("[]")
+      expect(sshable).to receive(:cmd).with("curl -k -m 10 --no-progress-meter https://localhost:8080/usage").and_return("[]")
       nx.ping_inference_router
     end
   end
