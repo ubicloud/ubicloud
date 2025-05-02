@@ -24,31 +24,31 @@ Usage:
     ubi ai [command] ...
 
 Commands:
-    api-key    Manage AI inference api keys
+    api-key    Manage AI inference API keys
 
 
-Manage AI inference api keys
+Manage AI inference API keys
 
 Usage:
     ubi ai api-key [command] ...
     ubi ai api-key api-key-id [post-command] ...
 
 Commands:
-    create     Create an inference api key
-    list       List inference api keys
+    create     Create an inference API key
+    list       List inference API keys
 
 Post Commands:
-    destroy    Destroy an inference api key
-    show       Show details for an inference api key
+    destroy    Destroy an inference API key
+    show       Show details for an inference API key
 
 
-Create an inference api key
+Create an inference API key
 
 Usage:
     ubi ai api-key create
 
 
-List inference api keys
+List inference API keys
 
 Usage:
     ubi ai api-key list [options]
@@ -57,7 +57,7 @@ Options:
     -N, --no-headers                 do not show headers
 
 
-Destroy an inference api key
+Destroy an inference API key
 
 Usage:
     ubi ai api-key api-key-id destroy [options]
@@ -66,7 +66,7 @@ Options:
     -f, --force                      do not require confirmation
 
 
-Show details for an inference api key
+Show details for an inference API key
 
 Usage:
     ubi ai api-key api-key-id show

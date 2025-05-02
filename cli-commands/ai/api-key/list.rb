@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 UbiCli.on("ai", "api-key", "list") do
-  desc "List inference api keys"
+  desc "List inference API keys"
 
   key = :api_key_list
 

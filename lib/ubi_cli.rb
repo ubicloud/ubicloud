@@ -17,7 +17,7 @@ class UbiCli
 
   CAPITALIZED_LABELS = {
     "fw" => "Firewall",
-    "ak" => "Inference api key",
+    "ak" => "Inference API key",
     "lb" => "Load balancer",
     "pg" => "PostgreSQL database",
     "ps" => "Private subnet",
@@ -26,6 +26,7 @@ class UbiCli
 
   LOWERCASE_LABELS = CAPITALIZED_LABELS.transform_values(&:downcase)
   LOWERCASE_LABELS["pg"] = CAPITALIZED_LABELS["pg"]
+  LOWERCASE_LABELS["ak"] = "inference API key"
   LOWERCASE_LABELS.freeze
 
   OBJECT_INFO_REGEXP = /((fw|1b|pg|ps|vm|ak)[a-z0-9]{24})/
