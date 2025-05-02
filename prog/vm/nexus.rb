@@ -15,7 +15,8 @@ class Prog::Vm::Nexus < Prog::Base
     unix_user: "ubi", location_id: Location::HETZNER_FSN1_ID, boot_image: Config.default_boot_image_name,
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
     enable_ip4: false, pool_id: nil, arch: "x64", swap_size_bytes: nil,
-    distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0)
+    distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0,
+    hugepages: true, ch_version: nil, firmware_version: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -126,7 +127,10 @@ class Prog::Vm::Nexus < Prog::Base
           "distinct_storage_devices" => distinct_storage_devices,
           "force_host_id" => force_host_id,
           "exclude_host_ids" => exclude_host_ids,
-          "gpu_count" => gpu_count
+          "gpu_count" => gpu_count,
+          "hugepages" => hugepages,
+          "ch_version" => ch_version,
+          "firmware_version" => firmware_version
         }]
       ) { it.id = vm.id }
     end
@@ -301,7 +305,8 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   def write_params_json
-    host.sshable.cmd("sudo -u #{q_vm} tee #{params_path.shellescape}", stdin: vm.params_json(frame["swap_size_bytes"]))
+    host.sshable.cmd("sudo -u #{q_vm} tee #{params_path.shellescape}",
+      stdin: vm.params_json(**frame.slice("swap_size_bytes", "hugepages", "ch_version", "firmware_version").transform_keys!(&:to_sym)))
   end
 
   label def wait_sshable
