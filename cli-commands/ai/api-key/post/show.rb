@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 UbiCli.on("ai", "api-key").run_on("show") do
-  desc "Show details for an inference api key"
+  desc "Show details for an inference API key"
 
   banner "ubi ai api-key api-key-id show"
 

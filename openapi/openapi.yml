@@ -204,7 +204,7 @@ paths:
       - $ref: '#/components/parameters/project_id'
     get:
       operationId: getInferenceApiKeys
-      summary: Return the list of inference api keys in the project
+      summary: Return the list of inference API keys in the project
       responses:
         '200':
           $ref: '#/components/responses/InferenceApiKeys'
@@ -214,7 +214,7 @@ paths:
         - Inference Api Key
     post:
       operationId: createInferenceApiKey
-      summary: Create a new inference api key
+      summary: Create a new inference API key
       requestBody:
         required: true
         content:
@@ -236,7 +236,7 @@ paths:
       - $ref: '#/components/parameters/inference_api_key_id'
     get:
       operationId: getInferenceApiKey
-      summary: Get a specific inference api key
+      summary: Get a specific inference API key
       responses:
         '200':
           $ref: '#/components/responses/InferenceApiKey'
@@ -246,7 +246,7 @@ paths:
         - Inference Api Key
     delete:
       operationId: deleteInferenceApiKey
-      summary: Delete a specific inference api key
+      summary: Delete a specific inference API key
       responses:
         '204':
           $ref: '#/components/responses/Delete'
@@ -1476,7 +1476,7 @@ components:
         example: fraz0q3vbrpa7pkg7zbmah9csn
         pattern: '^fr[0-9a-hj-km-np-tv-z]{24}$'
     inference_api_key_id:
-      description: ID of the inference api key
+      description: ID of the inference API key
       in: path
       name: inference_api_key_id
       required: true
@@ -1719,12 +1719,12 @@ components:
       type: object
       properties:
         id:
-          description: ID of the inference api key
+          description: ID of the inference API key
           type: string
           example: akaz0q3vbrpa7pkg7zbmah9csn
           pattern: '^ak[0-9a-hj-km-np-tv-z]{24}$'
         key:
-          description: inference api key data
+          description: inference API key data
           type: string
       additionalProperties: false
       required:
@@ -2084,13 +2084,13 @@ components:
           schema:
             $ref: '#/components/schemas/FirewallRule'
     InferenceApiKey:
-      description: An Inference Api Key
+      description: An Inference API Key
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/InferenceApiKey'
     InferenceApiKeys:
-      description: A list of Inference Api Keys
+      description: A list of Inference API Keys
       content:
         application/json:
           schema:
@@ -2352,7 +2352,7 @@ tags:
     name: Firewall
   - description: Firewall Rule Operations
     name: Firewall Rule
-  - description: Inference Api Key Operations
+  - description: Inference API Key Operations
     name: Inference Api Key
   - description: Load Balancer Operations
     name: Load Balancer
