@@ -23,6 +23,6 @@ ArchClass = Struct.new(:sym) {
   end
 
   def render(x64:, arm64:)
-    {x64:, arm64:}.fetch(sym)
+    {x64: x64, arm64: arm64}.fetch(sym)
   end
 }
