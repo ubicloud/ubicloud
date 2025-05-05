@@ -118,14 +118,7 @@ module CloudHypervisor
       arm64: new("35.1", "071a0b4918565ce81671ecd36d65b87351c85ea9ca0fbf73d4a67ec810efe606", "355cdb1e2af7653a15912c66f7c76c922ca788fd33d77f6f75846ff41278e249")
     )}
 
-    default = if ubuntu_version >= 24
-      SUPPORTED["45.0"] = Arch.render(
-        x64: new("45.0", "362d42eb464e2980d7b41109a214f8b1518b4e1f8e7d8c227b67c19d4581c250", "11a050087d279f9b5860ddbf2545fda43edf93f9b266440d0981932ee379c6ec"),
-        arm64: new("45.0", "3a8073379d098817d54f7c0ab25a7734b88b070a98e5d820ab39e244b35b5e5e", "a4b736ce82f5e2fc4a92796a9a443f243ef69f4970dad1e1772bd841c76c3301")
-      )
-    else
-      SUPPORTED["35.1"]
-    end
+    default = SUPPORTED["35.1"]
     SUPPORTED.freeze
 
     INSTALLED = SUPPORTED.select { _2.downloaded? }
