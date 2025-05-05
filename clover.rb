@@ -588,6 +588,10 @@ class Clover < Roda
       raise(r.params["message"] || "test error")
     end
 
+    hash_branch("test-missing-request-params") do |r|
+      validate_request_params(%w[foo])
+    end
+
     hash_branch("test-no-authorization-needed") do |r|
       r.get "once" do
         no_authorization_needed
