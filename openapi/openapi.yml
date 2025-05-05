@@ -609,6 +609,12 @@ paths:
                   items:
                     type: string
               additionalProperties: false
+              required:
+                - algorithm
+                - dst_port
+                - health_check_endpoint
+                - src_port
+                - vms
       responses:
         '200':
           $ref: '#/components/responses/LoadBalancer'
