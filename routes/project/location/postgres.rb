@@ -45,10 +45,10 @@ class Clover
       r.patch do
         authorize("Postgres:edit", pg.id)
 
-        request_body_params = r.params
-        target_vm_size = Validation.validate_postgres_size(pg.location, request_body_params["size"] || pg.target_vm_size, @project.id)
-        target_storage_size_gib = Validation.validate_postgres_storage_size(pg.location, target_vm_size.vm_size, request_body_params["storage_size"] || pg.target_storage_size_gib, @project.id)
-        ha_type = request_body_params["ha_type"] || PostgresResource::HaType::NONE
+        params = r.params
+        target_vm_size = Validation.validate_postgres_size(pg.location, params["size"] || pg.target_vm_size, @project.id)
+        target_storage_size_gib = Validation.validate_postgres_storage_size(pg.location, target_vm_size.vm_size, params["storage_size"] || pg.target_storage_size_gib, @project.id)
+        ha_type = params["ha_type"] || PostgresResource::HaType::NONE
         Validation.validate_postgres_ha_type(ha_type)
 
         if pg.representative_server.nil? || target_storage_size_gib < pg.representative_server.storage_size_gib
@@ -108,8 +108,8 @@ class Clover
         r.post true do
           authorize("Postgres:edit", pg.id)
 
-          request_body_params = validate_request_params(["cidr"])
-          parsed_cidr = Validation.validate_cidr(request_body_params["cidr"])
+          params = validate_request_params(["cidr"])
+          parsed_cidr = Validation.validate_cidr(params["cidr"])
 
           firewall_rule = DB.transaction do
             pg.incr_update_firewall_rules
@@ -145,16 +145,16 @@ class Clover
           authorize("Postgres:edit", pg.id)
 
           password_param = (api? ? "password" : "metric-destination-password")
-          request_body_params = validate_request_params(["url", "username", password_param])
+          params = validate_request_params(["url", "username", password_param])
 
-          Validation.validate_url(request_body_params["url"])
+          Validation.validate_url(params["url"])
 
           DB.transaction do
             PostgresMetricDestination.create_with_id(
               postgres_resource_id: pg.id,
-              url: request_body_params["url"],
-              username: request_body_params["username"],
-              password: request_body_params[password_param]
+              url: params["url"],
+              username: params["username"],
+              password: params[password_param]
             )
             pg.servers.each(&:incr_configure_prometheus)
           end
@@ -185,11 +185,11 @@ class Clover
         r.post true do
           authorize("Postgres:edit", pg.id)
 
-          request_body_params = validate_request_params(["name"])
+          params = validate_request_params(["name"])
           st = Prog::Postgres::PostgresResourceNexus.assemble(
             project_id: @project.id,
             location_id: pg.location_id,
-            name: request_body_params["name"],
+            name: params["name"],
             target_vm_size: pg.target_vm_size,
             target_storage_size_gib: pg.target_storage_size_gib,
             ha_type: PostgresResource::HaType::NONE,
@@ -203,7 +203,7 @@ class Clover
           if api?
             Serializers::Postgres.serialize(st.subject, {detailed: true})
           else
-            flash["notice"] = "'#{request_body_params["name"]}' will be ready in a few minutes"
+            flash["notice"] = "'#{params["name"]}' will be ready in a few minutes"
             r.redirect "#{@project.path}#{st.subject.path}"
           end
         end
@@ -235,25 +235,25 @@ class Clover
         authorize("Postgres:create", @project.id)
         authorize("Postgres:view", pg.id)
 
-        request_body_params = validate_request_params(["name", "restore_target"])
+        params = validate_request_params(["name", "restore_target"])
 
         st = Prog::Postgres::PostgresResourceNexus.assemble(
           project_id: @project.id,
           location_id: pg.location_id,
-          name: request_body_params["name"],
+          name: params["name"],
           target_vm_size: pg.target_vm_size,
           target_storage_size_gib: pg.target_storage_size_gib,
           version: pg.version,
           flavor: pg.flavor,
           parent_id: pg.id,
-          restore_target: request_body_params["restore_target"]
+          restore_target: params["restore_target"]
         )
         send_notification_mail_to_partners(st.subject, current_account.email)
 
         if api?
           Serializers::Postgres.serialize(st.subject, {detailed: true})
         else
-          flash["notice"] = "'#{request_body_params["name"]}' will be ready in a few minutes"
+          flash["notice"] = "'#{params["name"]}' will be ready in a few minutes"
           r.redirect "#{@project.path}#{st.subject.path}"
         end
       end
@@ -270,11 +270,11 @@ class Clover
           end
         end
 
-        request_body_params = validate_request_params(["password", "repeat_password"])
-        Validation.validate_postgres_superuser_password(request_body_params["password"], request_body_params["repeat_password"])
+        params = validate_request_params(["password", "repeat_password"])
+        Validation.validate_postgres_superuser_password(params["password"], params["repeat_password"])
 
         DB.transaction do
-          pg.update(superuser_password: request_body_params["password"])
+          pg.update(superuser_password: params["password"])
           pg.representative_server.incr_update_superuser_password
         end
 
@@ -289,8 +289,7 @@ class Clover
       r.post "set-maintenance-window" do
         authorize("Postgres:edit", pg.id)
 
-        request_body_params = r.params
-        pg.update(maintenance_window_start_at: request_body_params["maintenance_window_start_at"])
+        pg.update(maintenance_window_start_at: r.params["maintenance_window_start_at"])
 
         if api?
           Serializers::Postgres.serialize(pg, {detailed: true})

@@ -26,23 +26,23 @@ class Clover
 
     r.post true do
       authorize("Location:create", @project.id)
-      request_body_params = validate_request_params(["name", "provider_location_name", "access_key", "secret_key"])
+      params = validate_request_params(["name", "provider_location_name", "access_key", "secret_key"])
 
-      Validation.validate_name(request_body_params["name"])
-      Validation.validate_provider_location_name("aws", request_body_params["provider_location_name"])
+      Validation.validate_name(params["name"])
+      Validation.validate_provider_location_name("aws", params["provider_location_name"])
 
       loc = DB.transaction do
         loc = Location.create(
-          display_name: request_body_params["name"],
-          name: request_body_params["provider_location_name"],
-          ui_name: request_body_params["name"],
+          display_name: params["name"],
+          name: params["provider_location_name"],
+          ui_name: params["name"],
           visible: true,
           provider: "aws",
           project_id: @project.id
         )
         LocationCredential.create(
-          access_key: request_body_params["access_key"],
-          secret_key: request_body_params["secret_key"]
+          access_key: params["access_key"],
+          secret_key: params["secret_key"]
         ) { it.id = loc.id }
         loc
       end

@@ -24,9 +24,9 @@ class Clover
   def load_balancer_post(name)
     authorize("LoadBalancer:create", @project.id)
 
-    request_body_params = validate_request_params(%w[private_subnet_id algorithm src_port dst_port health_check_protocol stack name])
+    params = validate_request_params(%w[private_subnet_id algorithm src_port dst_port health_check_protocol stack name])
 
-    unless (ps = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"]))
+    unless (ps = PrivateSubnet.from_ubid(params["private_subnet_id"]))
       fail Validation::ValidationFailed.new("private_subnet_id" => "Private subnet not found")
     end
     authorize("PrivateSubnet:view", ps.id)
@@ -34,12 +34,12 @@ class Clover
     lb = Prog::Vnet::LoadBalancerNexus.assemble(
       ps.id,
       name:,
-      algorithm: request_body_params["algorithm"],
-      stack: Validation.validate_load_balancer_stack(request_body_params["stack"]),
-      src_port: Validation.validate_port(:src_port, request_body_params["src_port"]),
-      dst_port: Validation.validate_port(:dst_port, request_body_params["dst_port"]),
-      health_check_endpoint: request_body_params["health_check_endpoint"] || Prog::Vnet::LoadBalancerNexus::DEFAULT_HEALTH_CHECK_ENDPOINT,
-      health_check_protocol: request_body_params["health_check_protocol"]
+      algorithm: params["algorithm"],
+      stack: Validation.validate_load_balancer_stack(params["stack"]),
+      src_port: Validation.validate_port(:src_port, params["src_port"]),
+      dst_port: Validation.validate_port(:dst_port, params["dst_port"]),
+      health_check_endpoint: params["health_check_endpoint"] || Prog::Vnet::LoadBalancerNexus::DEFAULT_HEALTH_CHECK_ENDPOINT,
+      health_check_protocol: params["health_check_protocol"]
     ).subject
 
     if api?

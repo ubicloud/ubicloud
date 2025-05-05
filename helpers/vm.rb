@@ -25,8 +25,8 @@ class Clover
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless project.has_valid_payment_method?
 
     allowed_optional_parameters = ["size", "storage_size", "unix_user", "boot_image", "enable_ip4", "private_subnet_id"]
-    request_body_params = validate_request_params(%w[public_key name location])
-    assemble_params = request_body_params.slice(*allowed_optional_parameters).compact
+    params = validate_request_params(%w[public_key name location])
+    assemble_params = params.slice(*allowed_optional_parameters).compact
 
     # Generally parameter validation is handled in progs while creating resources.
     # Since Vm::Nexus both handles VM creation requests from user and also Postgres
@@ -61,7 +61,7 @@ class Clover
     Validation.validate_vcpu_quota(project, "VmVCpu", requested_vm_vcpu_count)
 
     st = Prog::Vm::Nexus.assemble(
-      request_body_params["public_key"],
+      params["public_key"],
       project.id,
       name: name,
       location_id: @location.id,
