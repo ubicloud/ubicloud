@@ -35,12 +35,13 @@ class Strand < Sequel::Model
           Sequel[id: DB[:strand].select(:id).where(id: :$id).for_update.skip_locked, exitval: nil] &
             (Sequel[:lease] < Sequel::CURRENT_TIMESTAMP)
         )
-        .prepare(:update, :strand_take_lease_and_reload,
+        .prepare_sql_type(:update)
+        .prepare(:first, :strand_take_lease_and_reload,
           lease: Sequel::CURRENT_TIMESTAMP + Sequel.cast("120 seconds", :interval),
           try: Sequel[:try] + 1,
           schedule: Sequel::CURRENT_TIMESTAMP + (ps_sch * Sequel.cast("1 second", :interval)))
     end
-    affected = ps.call(id:).first
+    affected = ps.call(id:)
     return false unless affected
     lease_time = affected.fetch(:lease)
     verbose_logging = rand(1000) == 0
