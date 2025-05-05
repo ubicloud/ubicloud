@@ -24,11 +24,8 @@ class Clover
     authorize("Vm:create", project.id)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless project.has_valid_payment_method?
 
-    required_parameters = ["public_key"]
-    required_parameters << "name" << "location" if web?
     allowed_optional_parameters = ["size", "storage_size", "unix_user", "boot_image", "enable_ip4", "private_subnet_id"]
-    ignored_parameters = ["family"]
-    request_body_params = validate_request_params(required_parameters, allowed_optional_parameters, ignored_parameters)
+    request_body_params = validate_request_params(%w[public_key name location])
     assemble_params = request_body_params.slice(*allowed_optional_parameters).compact
 
     # Generally parameter validation is handled in progs while creating resources.

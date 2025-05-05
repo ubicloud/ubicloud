@@ -25,8 +25,7 @@ class Clover
 
       r.post %w[attach-vm detach-vm] do |action|
         authorize("LoadBalancer:edit", lb.id)
-        required_parameters = %w[vm_id]
-        request_body_params = validate_request_params(required_parameters)
+        request_body_params = validate_request_params(%w[vm_id])
 
         unless (vm = Vm.from_ubid(request_body_params["vm_id"]))
           fail Validation::ValidationFailed.new("vm_id" => "VM not found")

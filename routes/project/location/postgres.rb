@@ -45,10 +45,7 @@ class Clover
       r.patch do
         authorize("Postgres:edit", pg.id)
 
-        allowed_optional_parameters = ["size", "storage_size", "ha_type"]
-        ignored_parameters = ["family"]
-        request_body_params = validate_request_params([], allowed_optional_parameters, ignored_parameters)
-
+        request_body_params = r.params
         target_vm_size = Validation.validate_postgres_size(pg.location, request_body_params["size"] || pg.target_vm_size, @project.id)
         target_storage_size_gib = Validation.validate_postgres_storage_size(pg.location, target_vm_size.vm_size, request_body_params["storage_size"] || pg.target_storage_size_gib, @project.id)
         ha_type = request_body_params["ha_type"] || PostgresResource::HaType::NONE
@@ -111,8 +108,7 @@ class Clover
         r.post true do
           authorize("Postgres:edit", pg.id)
 
-          required_parameters = ["cidr"]
-          request_body_params = validate_request_params(required_parameters)
+          request_body_params = validate_request_params(["cidr"])
           parsed_cidr = Validation.validate_cidr(request_body_params["cidr"])
 
           firewall_rule = DB.transaction do
@@ -149,8 +145,7 @@ class Clover
           authorize("Postgres:edit", pg.id)
 
           password_param = (api? ? "password" : "metric-destination-password")
-          required_parameters = ["url", "username", password_param]
-          request_body_params = validate_request_params(required_parameters)
+          request_body_params = validate_request_params(["url", "username", password_param])
 
           Validation.validate_url(request_body_params["url"])
 
@@ -190,8 +185,7 @@ class Clover
         r.post true do
           authorize("Postgres:edit", pg.id)
 
-          required_parameters = ["name"]
-          request_body_params = validate_request_params(required_parameters, [], [])
+          request_body_params = validate_request_params(["name"])
           st = Prog::Postgres::PostgresResourceNexus.assemble(
             project_id: @project.id,
             location_id: pg.location_id,
@@ -241,8 +235,7 @@ class Clover
         authorize("Postgres:create", @project.id)
         authorize("Postgres:view", pg.id)
 
-        required_parameters = ["name", "restore_target"]
-        request_body_params = validate_request_params(required_parameters)
+        request_body_params = validate_request_params(["name", "restore_target"])
 
         st = Prog::Postgres::PostgresResourceNexus.assemble(
           project_id: @project.id,
@@ -277,8 +270,7 @@ class Clover
           end
         end
 
-        required_parameters = api? ? ["password"] : ["password", "repeat_password"]
-        request_body_params = validate_request_params(required_parameters)
+        request_body_params = validate_request_params(["password", "repeat_password"])
         Validation.validate_postgres_superuser_password(request_body_params["password"], request_body_params["repeat_password"])
 
         DB.transaction do
@@ -297,9 +289,7 @@ class Clover
       r.post "set-maintenance-window" do
         authorize("Postgres:edit", pg.id)
 
-        allowed_optional_parameters = ["maintenance_window_start_at"]
-        request_body_params = validate_request_params([], allowed_optional_parameters)
-
+        request_body_params = r.params
         pg.update(maintenance_window_start_at: request_body_params["maintenance_window_start_at"])
 
         if api?
