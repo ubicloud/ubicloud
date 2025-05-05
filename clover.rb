@@ -603,6 +603,10 @@ class Clover < Roda
         dataset_authorize(current_account.projects_dataset, "Project:edit")
         no_authorization_needed
       end
+
+      r.get "runtime-error" do
+        raise "foo"
+      end
     end
 
     hash_branch("clear-last-password-entry") do |r|
@@ -715,7 +719,19 @@ class Clover < Roda
     # is needed by calling no_authorization_needed
 
     after do |res|
-      if @still_need_authorization && res && res[0] != 404 && res[0] != 501
+      if @still_need_authorization
+        if res
+          case res[0]
+          when 404, 501
+            next
+          end
+        else
+          case $!
+          when Authorization::Unauthorized
+            next
+          end
+        end
+
         raise "no authorization check for #{request.request_method} #{request.path_info}"
       end
     end

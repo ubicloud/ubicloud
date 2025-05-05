@@ -31,8 +31,10 @@ RSpec.describe Clover do
       visit "/test-no-authorization-needed/once"
       expect(page.status_code).to eq(200)
 
-      expect { visit "/test-no-authorization-needed/twice" }.to raise_error(RuntimeError)
-      expect { visit "/test-no-authorization-needed/after-authorization" }.to raise_error(RuntimeError)
+      re = /called no_authorization_needed when authorization already not needed: /
+      expect { visit "/test-no-authorization-needed/twice" }.to raise_error(RuntimeError, re)
+      expect { visit "/test-no-authorization-needed/after-authorization" }.to raise_error(RuntimeError, re)
+      expect { visit "/test-no-authorization-needed/runtime-error" }.to raise_error(RuntimeError, /no authorization check for /)
     end
   end
 
