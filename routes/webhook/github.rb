@@ -6,7 +6,7 @@ class Clover
       body = r.body.read
       next 401 unless check_signature(r.headers["x-hub-signature-256"], body)
 
-      response.headers["Content-Type"] = "application/json"
+      response.headers["content-type"] = "application/json"
 
       data = JSON.parse(body)
       case r.headers["x-github-event"]
