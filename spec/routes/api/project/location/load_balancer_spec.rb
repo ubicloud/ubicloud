@@ -164,9 +164,9 @@ RSpec.describe Clover, "load-balancer" do
       end
 
       it "missing required parameters" do
-        patch "/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}", {}.to_json
-
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: body")
+        expect do
+          patch "/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}", {}.to_json
+        end.to raise_error(Committee::InvalidRequest, /missing required parameters: algorithm, dst_port, health_check_endpoint, src_port, vms/)
       end
 
       it "updates vms" do
