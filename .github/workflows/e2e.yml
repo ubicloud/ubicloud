@@ -13,7 +13,7 @@ on:
         type: string
 
   schedule:
-    - cron:  '0 */2 * * *'
+    - cron:  '0 */4 * * *'
 
 jobs:
   run-ci:
@@ -21,7 +21,7 @@ jobs:
     runs-on: ubicloud
     environment: E2E-CI
     # TODO: Revert it when the internal MinIO cluster is stabilized
-    timeout-minutes: 105
+    timeout-minutes: 180
     concurrency: e2e_environment
 
     env:
@@ -131,7 +131,7 @@ jobs:
         HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
       run: |
         set -o pipefail
-        timeout 100m foreman start | tee foreman.log | grep "e2e.1"
+        timeout 175m foreman start | tee foreman.log | grep "e2e.1"
 
     - name: Print logs
       if: always()
