@@ -83,6 +83,27 @@ RSpec.describe Clover, "project" do
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq("test-project")
       end
+
+      it "creates up to 10 projects per account" do
+        project
+        (10 - user.projects_dataset.count).times do |i|
+          post "/project", {
+            name: "test-project-#{i}"
+          }.to_json
+
+          expect(last_response.status).to eq(200)
+          expect(JSON.parse(last_response.body)["name"]).to eq("test-project-#{i}")
+        end
+
+        expect(user.projects_dataset.count).to eq(10)
+
+        post "/project", {
+          name: "test-project"
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Project limit exceeded. You can create up to 10 projects. Contact support@ubicloud.com if you need more.")
+        expect(user.projects_dataset.count).to eq(10)
+      end
     end
 
     describe "delete" do
