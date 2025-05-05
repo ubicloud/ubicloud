@@ -20,10 +20,10 @@ rescue KeyError => e
 end
 
 replica_setup.prep(
-  engine_start_cmd:,
-  replica_ubid:,
-  ssl_crt_path:,
-  ssl_key_path:,
-  gateway_port:,
-  max_requests:
+  engine_start_cmd: engine_start_cmd,
+  replica_ubid: replica_ubid,
+  ssl_crt_path: ssl_crt_path,
+  ssl_key_path: ssl_key_path,
+  gateway_port: gateway_port,
+  max_requests: max_requests
 )
