@@ -104,13 +104,8 @@ module CloudHypervisor
       FileUtils.chmod "a+x", path
     end
 
-    def self.lsb_release
-      `lsb_release -d`
-    end
-
     def self.ubuntu_version
-      raise "unable to determine Ubuntu version" unless /Ubuntu (\d\d)\./ =~ lsb_release
-      $1.to_i
+      File.read("/etc/os-release")[/VERSION_ID="?(\d\d)/, 1]&.to_i or raise "unable to determine Ubuntu version"
     end
 
     SUPPORTED = {"35.1" => Arch.render(
