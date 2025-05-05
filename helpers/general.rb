@@ -152,13 +152,17 @@ class Clover < Roda
   end
 
   def validate_request_params(required_keys, allowed_optional_keys = [], ignored_keys = [])
+    params = request.params
+
     # Committee handles validation for API
-    return request.params if api?
+    if web?
+      missing_required_keys = required_keys - params.keys
+      unless missing_required_keys.empty?
+        fail Validation::ValidationFailed.new({body: "Request body must include required parameters: #{missing_required_keys.join(", ")}"})
+      end
+    end
 
-    params = request.params.reject { ignored_keys.include?(it) }
-    params = params.reject { it == "_csrf" }
-
-    Validation.validate_request_params(params, required_keys, allowed_optional_keys)
+    params
   end
 
   def fetch_location_based_prices(*resource_types)
