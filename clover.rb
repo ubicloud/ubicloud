@@ -573,11 +573,7 @@ class Clover < Roda
   hash_branch("after-login") do |r|
     r.get web? do
       no_authorization_needed
-      if (project = current_account.projects_dataset.order(:created_at, :name).first)
-        r.redirect "#{project.path}/dashboard"
-      else
-        r.redirect "/project"
-      end
+      redirect_default_project_dashboard
     end
   end
 
@@ -670,7 +666,11 @@ class Clover < Roda
       rodauth.load_memory
 
       r.root do
-        r.redirect rodauth.login_route
+        if rodauth.logged_in?
+          redirect_default_project_dashboard
+        else
+          r.redirect rodauth.login_route
+        end
       end
 
       rodauth.check_active_session

@@ -70,6 +70,14 @@ class Clover < Roda
     end
   end
 
+  def redirect_default_project_dashboard
+    if (project = current_account.projects_dataset.order(:created_at, :name).first)
+      request.redirect "#{project.path}/dashboard"
+    else
+      request.redirect "/project"
+    end
+  end
+
   def omniauth_providers
     @omniauth_providers ||= [
       # :nocov:
