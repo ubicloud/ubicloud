@@ -25,11 +25,11 @@ class Clover
   def private_subnet_post(name)
     authorize("PrivateSubnet:create", @project.id)
 
-    request_body_params = validate_request_params(%w[name location])
-    firewall_id = if request_body_params["firewall_id"]
-      fw = Firewall.from_ubid(request_body_params["firewall_id"])
+    params = validate_request_params(%w[name location])
+    firewall_id = if params["firewall_id"]
+      fw = Firewall.from_ubid(params["firewall_id"])
       unless fw && fw.location_id == @location.id
-        fail Validation::ValidationFailed.new(firewall_id: "Firewall with id \"#{request_body_params["firewall_id"]}\" and location \"#{@location.display_name}\" is not found")
+        fail Validation::ValidationFailed.new(firewall_id: "Firewall with id \"#{params["firewall_id"]}\" and location \"#{@location.display_name}\" is not found")
       end
       authorize("Firewall:view", fw.id)
       fw.id

@@ -7,13 +7,13 @@ class Clover
     r.post true do
       authorize("Firewall:edit", @firewall.id)
 
-      request_body_params = validate_request_params(["cidr"])
+      params = validate_request_params(["cidr"])
 
-      parsed_cidr = Validation.validate_cidr(request_body_params["cidr"])
-      port_range = if request_body_params["port_range"].nil?
+      parsed_cidr = Validation.validate_cidr(params["cidr"])
+      port_range = if params["port_range"].nil?
         [0, 65535]
       else
-        request_body_params["port_range"] = Validation.validate_port_range(request_body_params["port_range"])
+        params["port_range"] = Validation.validate_port_range(params["port_range"])
       end
 
       pg_range = Sequel.pg_range(port_range.first..port_range.last)

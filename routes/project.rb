@@ -35,8 +35,8 @@ class Clover
         end
       end
 
-      request_body_params = validate_request_params(["name"])
-      project = current_account.create_project_with_default_policy(request_body_params["name"])
+      params = validate_request_params(["name"])
+      project = current_account.create_project_with_default_policy(params["name"])
       no_authorization_needed
 
       if api?
