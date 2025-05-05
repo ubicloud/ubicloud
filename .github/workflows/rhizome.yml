@@ -1,0 +1,41 @@
+name: Rhizome CI
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'rhizome/**'
+      - '.github/workflows/rhizome.yml'
+  pull_request:
+    paths:
+      - 'rhizome/**'
+      - '.github/workflows/rhizome.yml'
+
+jobs:
+  ruby-ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: [ "3.0", 3.2 ]
+        runs-on: [ubicloud, ubicloud-arm]
+    name: Ruby ${{matrix.ruby}} - ${{matrix.runs-on}}
+    runs-on: ${{matrix.runs-on}}
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ matrix.ruby }}
+        bundler-cache: true
+      env:
+        BUNDLE_GEMFILE: rhizome/Gemfile
+
+    - name: Run dataplane tests
+      run: (cd rhizome && bundle exec rspec -O /dev/null .)
