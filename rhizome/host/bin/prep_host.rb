@@ -4,6 +4,7 @@
 require_relative "../../common/lib/util"
 require_relative "../lib/cloud_hypervisor"
 require_relative "../lib/spdk_setup"
+require_relative "../lib/vhost_backend"
 require "fileutils"
 require "socket"
 
@@ -57,6 +58,9 @@ CloudHypervisor::Version.download
 
 # Download firmware binaries.
 CloudHypervisor::Firmware.download
+
+# Download vhost backend binaries.
+VhostBackend::Version::DEFAULT.download
 
 # Err towards listing ('l') and not restarting services by default,
 # otherwise a stray keystroke when using "apt install" for unrelated
