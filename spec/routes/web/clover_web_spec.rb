@@ -52,6 +52,15 @@ RSpec.describe Clover do
     expect { visit "/webhook/test-error?message=treat+as+unexpected+error" }.to raise_error(RuntimeError, "treat as unexpected error")
   end
 
+  it "raises validation error if a required parameter is not present" do
+    create_account
+    login
+    visit("/test-missing-request-params")
+
+    # Validation error without referrer redirects to /, which redirects to default project dashboard
+    expect(page.title).to eq("Ubicloud - Default Dashboard")
+  end
+
   it "does not have broken links" do
     create_account
     login

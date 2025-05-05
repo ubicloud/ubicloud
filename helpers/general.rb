@@ -152,8 +152,11 @@ class Clover < Roda
   end
 
   def validate_request_params(required_keys, allowed_optional_keys = [], ignored_keys = [])
+    # Committee handles validation for API
+    return request.params if api?
+
     params = request.params.reject { ignored_keys.include?(it) }
-    params = params.reject { it == "_csrf" } unless api?
+    params = params.reject { it == "_csrf" }
 
     Validation.validate_request_params(params, required_keys, allowed_optional_keys)
   end
