@@ -25,9 +25,7 @@ class Clover
   def private_subnet_post(name)
     authorize("PrivateSubnet:create", @project.id)
 
-    required_parameters = []
-    required_parameters << "name" << "location" if web?
-    request_body_params = validate_request_params(required_parameters, ["firewall_id"])
+    request_body_params = validate_request_params(%w[name location])
     firewall_id = if request_body_params["firewall_id"]
       fw = Firewall.from_ubid(request_body_params["firewall_id"])
       unless fw && fw.location_id == @location.id
