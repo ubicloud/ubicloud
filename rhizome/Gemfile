@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
+# Use __dir__ to make sure that
+# `BUNDLE_GEMFILE=rhizome/Gemfile bundle install` works from repository root,
+# as that is what rhizome CI uses.
+
 # Load Gemfiles
-Dir.glob("*/Gemfile") do |file|
-  instance_eval File.read(file)
+Dir.glob("*/Gemfile", base: __dir__) do |file|
+  instance_eval File.read(File.join(__dir__, file))
 end
