@@ -24,7 +24,7 @@ class Clover
 
       r.get true do
         authorize("Postgres:view", pg.id)
-        response.headers["Cache-Control"] = "no-store"
+        response.headers["cache-control"] = "no-store"
 
         if api?
           Serializers::Postgres.serialize(pg, {detailed: true})
@@ -76,7 +76,7 @@ class Clover
           Serializers::Postgres.serialize(pg, {detailed: true})
         else
           flash["notice"] = "'#{pg.name}' will be updated according to requested configuration"
-          response["Location"] = "#{@project.path}#{pg.path}"
+          response["location"] = "#{@project.path}#{pg.path}"
           200
         end
       end
@@ -304,8 +304,8 @@ class Clover
 
         return 404 unless (certs = pg.ca_certificates)
 
-        response.headers["Content-Disposition"] = "attachment; filename=\"#{pg.name}.pem\""
-        response.headers["Content-Type"] = "application/x-pem-file"
+        response.headers["content-disposition"] = "attachment; filename=\"#{pg.name}.pem\""
+        response.headers["content-type"] = "application/x-pem-file"
         certs
       end
     end

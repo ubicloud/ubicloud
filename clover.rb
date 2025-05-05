@@ -65,6 +65,7 @@ class Clover < Roda
   plugin :render, escape: true, layout: "./layouts/app", template_opts: {chain_appends: !defined?(SimpleCov), freeze: true, skip_compiled_encoding_detection: true, scope_class: self, default_fixed_locals:, extract_fixed_locals: true}, assume_fixed_locals: true
   plugin :part
   plugin :request_headers
+  plugin :plain_hash_response_headers
   plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
 
   # :nocov:
@@ -136,7 +137,7 @@ class Clover < Roda
       message: "Sorry, we couldn’t find the resource you’re looking for."
     }
 
-    if api? || request.headers["Accept"] == "application/json"
+    if api? || request.headers["accept"] == "application/json"
       {error: @error}.to_json
     else
       view "/error"
@@ -215,7 +216,7 @@ class Clover < Roda
 
     if runtime?
       error
-    elsif api? || request.headers["Accept"] == "application/json"
+    elsif api? || request.headers["accept"] == "application/json"
       {error:}
     else
       @error = error
@@ -231,7 +232,7 @@ class Clover < Roda
         flash["errors"] = (flash["errors"] || {}).merge(details).transform_keys(&:to_s)
 
         if request.patch?
-          response["Location"] = env["HTTP_REFERER"]
+          response["location"] = env["HTTP_REFERER"]
           response.status = 200
           request.halt
         else
@@ -710,7 +711,13 @@ class Clover < Roda
     status, headers, body = res
     next unless api? && status && headers && body
     @schema_validator ||= SCHEMA_ROUTER.build_schema_validator(request)
-    @schema_validator.response_validate(status, headers, body, true) if @schema_validator.link_exist?
+    begin
+      # Work around committee's lack of support for rack 3 lowercase keys
+      headers["Content-Type"] = headers["content-type"]
+      @schema_validator.response_validate(status, headers, body, true) if @schema_validator.link_exist?
+    ensure
+      headers.delete("Content-Type")
+    end
   rescue JSON::ParserError => e
     raise Committee::InvalidResponse.new("Response body wasn't valid JSON.", original_error: e)
   end
