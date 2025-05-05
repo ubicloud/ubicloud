@@ -226,21 +226,6 @@ module Validation
     end
   end
 
-  def self.validate_request_params(request_body_params, required_keys, allowed_optional_keys = [])
-    missing_required_keys = required_keys - request_body_params.keys
-    unless missing_required_keys.empty?
-      fail ValidationFailed.new({body: "Request body must include required parameters: #{missing_required_keys.join(", ")}"})
-    end
-
-    allowed_keys = required_keys + allowed_optional_keys
-    unallowed_keys = request_body_params.keys - allowed_keys
-    if unallowed_keys.any?
-      fail ValidationFailed.new({body: "Only following parameters are allowed: #{allowed_keys.join(", ")}"})
-    end
-
-    request_body_params
-  end
-
   def self.validate_usage_limit(limit)
     limit_integer = limit.to_i
     fail ValidationFailed.new({limit: "Limit is not a valid integer."}) if limit_integer.to_s != limit

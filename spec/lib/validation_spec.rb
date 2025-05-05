@@ -396,12 +396,6 @@ RSpec.describe Validation do
     end
   end
 
-  describe "#validate_request_params" do
-    it "rejects requests without required params" do
-      expect { described_class.validate_request_params({extra: true}, []) }.to raise_error described_class::ValidationFailed
-    end
-  end
-
   describe "#validate_url" do
     it "valid account names" do
       [
