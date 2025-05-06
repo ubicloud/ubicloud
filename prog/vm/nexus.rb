@@ -207,20 +207,20 @@ class Prog::Vm::Nexus < Prog::Base
           [[], [], [], [frame["force_host_id"]], []]
         elsif vm.location_id == Location::GITHUB_RUNNERS_ID
           runner_location_filter = [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID]
-          runner_location_filter.append(Location::LEASEWEB_WDC02_ID) if vm.vcpus == 60
           runner_location_preference = [Location::GITHUB_RUNNERS_ID]
           runner_family_filter = [vm.family]
-          if runner
-            if (preferred_locations = runner.installation.project.get_ff_preferred_runner_locations) && !preferred_locations.empty?
-              # Just be sure your preferred ones are also in the location filter
-              runner_location_filter |= preferred_locations
-              runner_location_preference = preferred_locations
-            end
-            if vm.family == "standard" && runner.installation.project.get_ff_performance_runners
-              runner_family_filter = [vm.family, "performance"]
-            end
+          prefs = if runner
+            runner.installation.allocator_preferences
+          else
+            {}
           end
-          [["accepting"], runner_location_filter, runner_location_preference, [], runner_family_filter]
+          [
+            ["accepting"],
+            prefs["location_filter"] || runner_location_filter,
+            prefs["location_preference"] || runner_location_preference,
+            [],
+            prefs["family_filter"] || runner_family_filter
+          ]
         else
           [["accepting"], [vm.location_id], [], [], [vm.family]]
         end

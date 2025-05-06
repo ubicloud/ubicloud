@@ -27,7 +27,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
   before do
     allow(Github).to receive(:installation_client).and_return(client)
-    allow(github_runner).to receive_messages(vm: vm, installation: instance_double(GithubInstallation, installation_id: 123))
+    allow(github_runner).to receive_messages(vm: vm, installation: instance_double(GithubInstallation, installation_id: 123, allocator_preferences: {}))
     allow(vm).to receive_messages(sshable: sshable, vm_host: instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", data_center: "FSN1-DC1"))
   end
 
@@ -68,7 +68,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     before do
       runner_project = Project.create_with_id(name: "default")
       allow(Config).to receive(:github_runner_service_project_id).and_return(runner_project.id)
-      expect(github_runner).to receive(:installation).and_return(instance_double(GithubInstallation, project:))
+      expect(github_runner).to receive(:installation).and_return(instance_double(GithubInstallation, project:, allocator_preferences: {}))
     end
 
     it "provisions a VM if the pool is not existing" do

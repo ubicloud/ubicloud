@@ -24,15 +24,14 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   def pick_vm
-    skip_sync = true
-    prefer_performance = github_runner.installation.project.get_ff_performance_runners
+    prefer_performance = (github_runner.installation.allocator_preferences["family_filter"] || []).include?("performance")
     pool = VmPool.where(
       vm_size: label_data["vm_size"],
       boot_image: label_data["boot_image"],
       location_id: Location[name: label_data["location"]].id,
       storage_size_gib: label_data["storage_size_gib"],
       storage_encrypted: true,
-      storage_skip_sync: skip_sync,
+      storage_skip_sync: true,
       arch: label_data["arch"]
     ).first
 
@@ -54,7 +53,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       size: label_data["vm_size"],
       location_id: Location[name: label_data["location"]].id,
       boot_image: label_data["boot_image"],
-      storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: true, skip_sync: skip_sync}],
+      storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: true, skip_sync: true}],
       enable_ip4: true,
       arch: label_data["arch"],
       swap_size_bytes: 4294963200, # ~4096MB, the same value with GitHub hosted runners
