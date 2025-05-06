@@ -16,9 +16,7 @@ is_content_array = options[0][1].is_a?(Array) %>
             name="<%= name %>"
             value="<%= opt_val %>"
             class="peer sr-only"
-            <% attributes.merge(opt_attrs || {}).each do |atr_key, atr_value| %>
-            <%= atr_key %>="<%= atr_value %>"
-            <% end%>
+            <%== html_attrs(**attributes, **opt_attrs) %>
           >
           <% if is_content_array %>
             <span class="radio-small-card justify-between p-4">
