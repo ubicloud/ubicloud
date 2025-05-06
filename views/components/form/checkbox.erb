@@ -16,9 +16,7 @@
               type="checkbox"
               value="<%= opt_val %>"
               class="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-600"
-              <% (opt_attrs || {}).each do |opt_atr_key, opt_atr_value| %>
-                <%= opt_atr_key %>="<%= opt_atr_value %>"
-              <% end%>
+              <%== html_attrs(opt_attrs || {}) %>
             >
           </div>
           <% if opt_text %>
