@@ -600,7 +600,7 @@ $ rake linter:erb_formatter
 
 ### Cloudifying a Host for Development
 
-We show cloudifying a host from Hetzner, but the principles should work everywhere. Make sure that the Hetzner instance has at least one `One additional subnet /29` ordered and `Ubuntu 22.04 LTS base` is installed.
+We show cloudifying a host from Hetzner, but the principles should work everywhere. Make sure that the Hetzner instance has at least one `One additional subnet /29` ordered and `Ubuntu 24.04 LTS base` is installed.
 
 1. Set the environment variables in `.env.rb`;
     ```ruby
