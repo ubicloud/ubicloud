@@ -25,7 +25,7 @@ class Clover
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless project.has_valid_payment_method?
 
     allowed_optional_parameters = ["size", "storage_size", "unix_user", "boot_image", "enable_ip4", "private_subnet_id"]
-    params = validate_request_params(%w[public_key name location])
+    params = check_required_web_params(%w[public_key name location])
     assemble_params = params.slice(*allowed_optional_parameters).compact
 
     # Generally parameter validation is handled in progs while creating resources.

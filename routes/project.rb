@@ -35,7 +35,7 @@ class Clover
         end
       end
 
-      params = validate_request_params(["name"])
+      params = check_required_web_params(["name"])
       project = current_account.create_project_with_default_policy(params["name"])
       no_authorization_needed
 

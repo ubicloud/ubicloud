@@ -7,7 +7,7 @@ class Clover
     r.post true do
       authorize("Firewall:edit", @firewall.id)
 
-      params = validate_request_params(["cidr"])
+      params = check_required_web_params(["cidr"])
 
       parsed_cidr = Validation.validate_cidr(params["cidr"])
       port_range = if params["port_range"].nil?

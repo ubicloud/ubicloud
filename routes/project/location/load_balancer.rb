@@ -25,7 +25,7 @@ class Clover
 
       r.post %w[attach-vm detach-vm] do |action|
         authorize("LoadBalancer:edit", lb.id)
-        params = validate_request_params(%w[vm_id])
+        params = check_required_web_params(%w[vm_id])
 
         unless (vm = Vm.from_ubid(params["vm_id"]))
           fail Validation::ValidationFailed.new("vm_id" => "VM not found")
@@ -73,7 +73,7 @@ class Clover
 
       r.patch api? do
         authorize("LoadBalancer:edit", lb.id)
-        params = validate_request_params(%w[algorithm src_port dst_port health_check_endpoint vms])
+        params = check_required_web_params(%w[algorithm src_port dst_port health_check_endpoint vms])
         DB.transaction do
           lb.update(
             algorithm: params["algorithm"],
