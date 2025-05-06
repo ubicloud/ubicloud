@@ -555,4 +555,22 @@ RSpec.describe Validation do
       expect(described_class.validate_victoria_metrics_storage_size("100")).to eq(100)
     end
   end
+
+  describe "#validate_rfc3339_datetime_str" do
+    it "validates RFC 3339 datetime strings" do
+      ["2025-05-12T11:57:24+00:00", "2025-05-12T11:57:24+05:30", "2025-05-12T11:57:24-02:00"].each do |datetime_str|
+        expect { described_class.validate_rfc3339_datetime_str(datetime_str) }.not_to raise_error
+      end
+    end
+
+    it "invalidates non-RFC 3339 datetime strings" do
+      ["1747053663", "abc", "2025-05-12T11:57:24"].each do |datetime_str|
+        expect { described_class.validate_rfc3339_datetime_str(datetime_str) }.to raise_error described_class::ValidationFailed
+      end
+    end
+
+    it "converts string input to Time" do
+      expect(described_class.validate_rfc3339_datetime_str("2025-05-12T11:57:24+00:00")).to be_a(Time)
+    end
+  end
 end

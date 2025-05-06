@@ -220,6 +220,129 @@ RSpec.describe VictoriaMetrics::Client do
     end
   end
 
+  describe "#query_range" do
+    let(:query) { 'sum(rate(http_requests_total{job="api"}[5m]))' }
+    let(:start_ts) { Time.now.to_i - 3600 } # 1 hour ago
+    let(:end_ts) { Time.now.to_i }
+
+    context "when the query is successful" do
+      before do
+        stub_request(:get, /#{endpoint}\/api\/v1\/query_range.*/)
+          .to_return(
+            status: 200,
+            body: {
+              "status" => "success",
+              "data" => {
+                "resultType" => "matrix",
+                "result" => [
+                  {
+                    "metric" => {"job" => "api", "instance" => "server1"},
+                    "values" => [
+                      [1600000000, "10.5"],
+                      [1600000015, "12.3"]
+                    ]
+                  },
+                  {
+                    "metric" => {"job" => "api", "instance" => "server2"},
+                    "values" => [
+                      [1600000000, "5.2"],
+                      [1600000015, "6.1"]
+                    ]
+                  }
+                ]
+              }
+            }.to_json
+          )
+      end
+
+      it "returns formatted series data" do
+        result = client.query_range(query: query, start_ts: start_ts, end_ts: end_ts)
+
+        expect(result.length).to eq(2)
+        expect(result[0]["labels"]).to eq({"job" => "api", "instance" => "server1"})
+        expect(result[0]["values"]).to eq([[1600000000, "10.5"], [1600000015, "12.3"]])
+        expect(result[1]["labels"]).to eq({"job" => "api", "instance" => "server2"})
+        expect(result[1]["values"]).to eq([[1600000000, "5.2"], [1600000015, "6.1"]])
+      end
+
+      it "constructs the correct query parameters" do
+        client.query_range(query: query, start_ts: start_ts, end_ts: end_ts)
+
+        expected_step = client.send(:step_seconds, start_ts, end_ts)
+        query_params = [
+          ["query", query],
+          ["start", start_ts.to_s],
+          ["end", end_ts.to_s],
+          ["step", expected_step.to_s]
+        ]
+        encoded_params = URI.encode_www_form(query_params)
+
+        expect(WebMock).to have_requested(:get, "#{endpoint}/api/v1/query_range?#{encoded_params}")
+      end
+    end
+
+    context "when the query returns no results" do
+      before do
+        stub_request(:get, /#{endpoint}\/api\/v1\/query_range.*/)
+          .to_return(
+            status: 200,
+            body: {
+              "status" => "success",
+              "data" => {
+                "resultType" => "matrix",
+                "result" => []
+              }
+            }.to_json
+          )
+      end
+
+      it "returns an empty array" do
+        result = client.query_range(query: query, start_ts: start_ts, end_ts: end_ts)
+        expect(result).to eq([])
+      end
+    end
+
+    context "when the query returns an error" do
+      before do
+        stub_request(:get, /#{endpoint}\/api\/v1\/query_range.*/)
+          .to_return(
+            status: 200,
+            body: {
+              "status" => "error",
+              "errorType" => "execution",
+              "error" => "parse error: unexpected end of input"
+            }.to_json
+          )
+      end
+
+      it "returns an empty array" do
+        result = client.query_range(query: query, start_ts: start_ts, end_ts: end_ts)
+        expect(result).to eq([])
+      end
+    end
+
+    context "when the query returns a different result type" do
+      before do
+        stub_request(:get, /#{endpoint}\/api\/v1\/query_range.*/)
+          .to_return(
+            status: 200,
+            body: {
+              "status" => "success",
+              "data" => {
+                "resultType" => "scalar",
+                "result" => 42
+              }
+            }.to_json
+          )
+      end
+
+      it "returns an empty array" do
+        result = client.query_range(query: query, start_ts: start_ts, end_ts: end_ts)
+        expect(result).to eq([])
+      end
+    end
+  end
+
   describe "#gzip" do
     it "compresses the input string" do
       input = "test string"
@@ -243,6 +366,34 @@ RSpec.describe VictoriaMetrics::Client do
       expect(scrape).to be_a(VictoriaMetrics::Client::Scrape)
       expect(scrape.time).to eq(time)
       expect(scrape.samples).to eq(samples)
+    end
+  end
+
+  describe "#step_seconds" do
+    it "calculates the step based on the time range" do
+      # 1 hour difference
+      start_time = 1600000000
+      end_time = start_time + 3600
+      expect(client.send(:step_seconds, start_time, end_time)).to eq(15)
+
+      # 3 hours difference
+      end_time = start_time + (3 * 3600)
+      expect(client.send(:step_seconds, start_time, end_time)).to eq(30)
+
+      # 5 hours difference
+      end_time = start_time + (5 * 3600)
+      expect(client.send(:step_seconds, start_time, end_time)).to eq(45)
+    end
+
+    it "handles edge cases" do
+      # Exactly 2 hours
+      start_time = 1600000000
+      end_time = start_time + (2 * 3600)
+      expect(client.send(:step_seconds, start_time, end_time)).to eq(15)
+
+      # Less than 1 hour
+      end_time = start_time + 1800 # 30 minutes
+      expect(client.send(:step_seconds, start_time, end_time)).to eq(15)
     end
   end
 end

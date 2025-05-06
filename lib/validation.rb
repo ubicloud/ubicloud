@@ -303,4 +303,12 @@ module Validation
     fail ValidationFailed.new({storage_size: "VictoriaMetrics storage must be between #{min_storage_size}GiB and #{max_storage_size}GiB"}) unless storage_size.between?(min_storage_size, max_storage_size)
     storage_size
   end
+
+  def self.validate_rfc3339_datetime_str(datetime_str, param = "time")
+    # Try parsing as RFC 3339 datetime string
+    DateTime.rfc3339(datetime_str).to_time.utc
+  rescue ArgumentError
+    msg = "\"#{datetime_str}\" is not a valid date for \"#{param}\"."
+    fail ValidationFailed.new({param => msg})
+  end
 end
