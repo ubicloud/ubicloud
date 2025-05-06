@@ -53,6 +53,12 @@ class Prog::Vnet::NicNexus < Prog::Base
 
   label def wait_setup
     decr_vm_allocated
+    when_vm_up_set? do
+      DB.transaction do
+        decr_vm_up
+        nic.private_subnet.incr_add_new_nic
+      end
+    end
     when_start_rekey_set? do
       hop_start_rekey
     end
