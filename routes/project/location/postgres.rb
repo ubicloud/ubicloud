@@ -336,6 +336,93 @@ class Clover
         response.headers["content-type"] = "application/x-pem-file"
         certs
       end
+
+      r.get "metrics" do
+        authorize("Postgres:view", pg.id)
+
+        start_time = request.params["start"] || (DateTime.now.new_offset(0) - 30.0 / 1440).rfc3339
+        start_time = Validation.validate_rfc3339_datetime_str(start_time, "start")
+
+        end_time = request.params["end"] || DateTime.now.new_offset(0).rfc3339
+        end_time = Validation.validate_rfc3339_datetime_str(end_time, "end")
+
+        start_ts = start_time.to_i
+        end_ts = end_time.to_i
+
+        if end_ts < start_ts
+          raise CloverError.new(400, "InvalidRequest", "End timestamp must be greater than start timestamp")
+        end
+
+        if end_ts - start_ts > 31 * 24 * 60 * 60 + 5 * 60
+          raise CloverError.new(400, "InvalidRequest", "Maximum time range is 31 days")
+        end
+
+        if start_ts < Time.now.utc.to_i - 31 * 24 * 60 * 60
+          raise CloverError.new(400, "InvalidRequest", "Cannot query metrics older than 31 days")
+        end
+
+        metric_key = request.params["key"]&.to_sym
+        single_query = !request.params["key"].nil?
+
+        if single_query && !Metrics::POSTGRES_METRICS.key?(metric_key)
+          raise CloverError.new(400, "InvalidRequest", "Invalid metric name")
+        end
+
+        metric_keys = metric_key ? [metric_key] : Metrics::POSTGRES_METRICS.keys
+
+        vmr = VictoriaMetricsResource.first(project_id: Config.victoria_metrics_service_project_id)
+        vms = vmr&.servers&.first
+        tsdb_client = vms&.client
+
+        if tsdb_client.nil?
+          raise CloverError.new(404, "NotFound", "Metrics are not configured for this instance")
+        end
+
+        results = metric_keys.map do |key|
+          metric_definition = Metrics::POSTGRES_METRICS[key]
+
+          series_results = metric_definition.series.filter_map do |s|
+            query = s.query.gsub("$ubicloud_resource_id", pg.ubid)
+            begin
+              series_query_result = tsdb_client.query_range(
+                query: query,
+                start_ts: start_ts,
+                end_ts: end_ts
+              )
+
+              # This can be a two cases:
+              # 1. Missing data (e.g. no data for the given time range)
+              # 2. No data for the given query (maybe bad query)
+              if series_query_result.empty?
+                next
+              end
+
+              # Combine labels with configured series labesls.
+              series_query_result.each { it["labels"].merge!(s.labels) }
+
+              series_query_result
+            rescue VictoriaMetrics::ClientError => e
+              Clog.emit("Could not query VictoriaMetrics") { {error: e.message, query: query} }
+
+              if single_query
+                raise CloverError.new(500, "InternalError", "Internal error while querying metrics", {query: query})
+              end
+            end
+          end
+
+          {
+            key: key.to_s,
+            name: metric_definition.name,
+            unit: metric_definition.unit,
+            description: metric_definition.description,
+            series: series_results.flatten
+          }
+        end
+
+        {
+          metrics: results
+        }
+      end
     end
   end
 end

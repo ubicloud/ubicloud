@@ -37,7 +37,8 @@ RSpec.describe Clover, "postgres" do
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/restore"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/reset-superuser-password"],
-        [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/ca-certificates"]
+        [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/ca-certificates"],
+        [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics"]
       ].each do |method, path|
         send method, path
 
@@ -369,6 +370,148 @@ RSpec.describe Clover, "postgres" do
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: billing_info")
+      end
+    end
+
+    describe "metrics" do
+      let(:prj) { Project.create_with_id(name: "vm-project") { it.id = "1d7edb2f-c1b8-4d28-b7a6-4226b5855e7d" } }
+      let(:vmr) { instance_double(VictoriaMetricsResource, project_id: prj.id) }
+      let(:vm_server) { instance_double(VictoriaMetricsServer, client: tsdb_client) }
+      let(:tsdb_client) { instance_double(VictoriaMetrics::Client) }
+
+      before do
+        allow(Config).to receive(:victoria_metrics_service_project_id).and_return(prj.id)
+        allow(VictoriaMetricsResource).to receive(:first).with(project_id: prj.id).and_return(vmr)
+        allow(vmr).to receive(:servers).and_return([vm_server])
+        allow(Project).to receive(:from_ubid).and_return(project)
+        allow(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
+      end
+
+      it "returns metrics for the specified time range" do
+        query_result = [
+          {
+            "values" => [[1619712000, "10.5"], [1619715600, "12.3"]],
+            "labels" => {"instance" => "test-instance"}
+          }
+        ]
+
+        expect(tsdb_client).to receive(:query_range).and_return(query_result)
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics?key=cpu_usage"
+
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["metrics"].first["name"]).to eq("CPU Usage")
+        expect(response_body["metrics"].first["series"]).to be_an(Array)
+      end
+
+      it "returns all metrics when no name is specified" do
+        query_result = [
+          {
+            "values" => [[1619712000, "10.5"], [1619715600, "12.3"]],
+            "labels" => {"instance" => "test-instance"}
+          }
+        ]
+
+        num_time_series = Metrics::POSTGRES_METRICS.values.sum { |metric| metric.series.count }
+
+        expect(tsdb_client).to receive(:query_range).exactly(num_time_series).times.and_return(query_result)
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics"
+
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["metrics"].size).to eq(Metrics::POSTGRES_METRICS.size)
+      end
+
+      it "fails when end timestamp is before start timestamp" do
+        query_params = {
+          start: (DateTime.now.new_offset(0) - 1).rfc3339,
+          end: (DateTime.now.new_offset(0) - 2).rfc3339
+        }
+
+        query_str = URI.encode_www_form(query_params)
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics?#{query_str}"
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("End timestamp must be greater than start timestamp")
+      end
+
+      it "fails when time range is too large" do
+        query_params = {
+          start: (DateTime.now.new_offset(0) - 32).rfc3339,
+          end: DateTime.now.new_offset(0).rfc3339
+        }
+        query_str = URI.encode_www_form(query_params)
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics?#{query_str}"
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Maximum time range is 31 days")
+      end
+
+      it "fails when start timestamp is too old" do
+        query_params = {
+          start: (DateTime.now.new_offset(0) - 32).rfc3339,
+          end: (DateTime.now.new_offset(0) - 31).rfc3339
+        }
+        query_str = URI.encode_www_form(query_params)
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics?#{query_str}"
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Cannot query metrics older than 31 days")
+      end
+
+      it "fails when metric name is invalid" do
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics?key=invalid_metric"
+
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Invalid metric name")
+      end
+
+      it "returns 404 when victori_ametrics resource is not available" do
+        allow(VictoriaMetricsResource).to receive(:first).and_return(nil)
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics"
+
+        expect(last_response.status).to eq(404)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Metrics are not configured for this instance")
+      end
+
+      it "returns 404 when victoria_metrics servers are not available" do
+        allow(vmr).to receive(:servers).and_return([])
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics"
+
+        expect(last_response.status).to eq(404)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Metrics are not configured for this instance")
+      end
+
+      it "returns 404 when tsdb_client is not available" do
+        allow(vm_server).to receive(:client).and_return(nil)
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics"
+
+        expect(last_response.status).to eq(404)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Metrics are not configured for this instance")
+      end
+
+      it "handles empty metrics data properly" do
+        expect(tsdb_client).to receive(:query_range).and_return([])
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics?key=cpu_usage"
+
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["metrics"].first["series"]).to be_empty
+      end
+
+      it "handles client errors gracefully for multi-metric queries" do
+        expect(tsdb_client).to receive(:query_range).at_least(:once).and_raise(VictoriaMetrics::ClientError.new("Test error"))
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["metrics"]).to be_an(Array)
+      end
+
+      it "returns error for client errors with single metric queries" do
+        expect(tsdb_client).to receive(:query_range).and_raise(VictoriaMetrics::ClientError.new("Test error"))
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics?key=cpu_usage"
+
+        expect(last_response.status).to eq(500)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Internal error while querying metrics")
       end
     end
 

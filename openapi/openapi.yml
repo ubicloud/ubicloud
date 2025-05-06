@@ -958,6 +958,45 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Metric Destination
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/metrics':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: getPostgresDatabaseMetrics
+      summary: Get metrics for a specific Postgres Database in a location
+      parameters:
+        - name: start
+          in: query
+          description: Start time for metrics query (rfc3339 format)
+          required: false
+          schema:
+            type: string
+            example: '2025-05-12T11:57:24+00:00'
+            default: now-30m
+        - name: end
+          in: query
+          description: End time for metrics query (rfc3339 format)
+          required: false
+          schema:
+            type: string
+            example: '2025-05-12T11:27:24+00:00'
+            default: now
+        - name: key
+          in: query
+          description: Key of the specific metric to retrieve
+          required: false
+          schema:
+            type: string
+            example: cpu_usage
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabaseMetrics'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/promote':
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -1869,6 +1908,68 @@ components:
         - vm_size
         - maintenance_window_start_at
         - read_replica
+    PostgresDatabaseMetrics:
+      type: object
+      properties:
+        metrics:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              key:
+                description: Key of the metric
+                type: string
+                example: cpu_usage
+              name:
+                description: Name of the metric
+                type: string
+                example: CPU Usage
+              description:
+                description: Description of the metric
+                type: string
+                example: CPU usage of the Postgres database
+              unit:
+                description: Unit of measurement for the metric
+                type: string
+                example: percent
+                nullable: true
+              series:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    labels:
+                      description: Labels identifying the time series
+                      type: object
+                      example:
+                        server: pv9z3a26qkyy4qcxrhzg5f1bs8
+                      additionalProperties:
+                        type: string
+                    values:
+                      description: Array of timestamp-value pairs
+                      type: array
+                      items:
+                        type: array
+                        minItems: 2
+                        maxItems: 2
+                        items:
+                          oneOf:
+                            - type: number
+                              description: Unix timestamp
+                            - type: string
+                              description: Sample value
+                  required:
+                    - labels
+                    - values
+            required:
+              - name
+              - unit
+              - series
+      additionalProperties: false
+      required:
+        - metrics
     PostgresFirewallRule:
       type: object
       properties:
@@ -2232,6 +2333,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/PostgresFirewallRule'
+    PostgresDatabaseMetrics:
+      description: Metrics data for a Postgres Database
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PostgresDatabaseMetrics'
     PostgresFirewallRules:
       description: A list of Postgres Firewall Rules
       content:
