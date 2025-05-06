@@ -9,9 +9,7 @@
     id="<%= name %>"
     name="<%= name %>"
     class="block w-full rounded-md border-0 sm:py-1.5 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-orange-600"
-    <% attributes.each do |atr_key, atr_value| %>
-    <%= atr_key %>="<%= atr_value %>"
-    <% end%>
+    <%== html_attrs(attributes) %>
   ><%= value %></textarea>
   <% if description %>
     <p class="text-sm text-gray-500 leading-6" id="<%= name %>-description"><%= description %></p>

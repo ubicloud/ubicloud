@@ -127,7 +127,7 @@ GEM
       rack-test (>= 0.6.3)
       regexp_parser (>= 1.5, < 3.0)
       xpath (~> 3.2)
-    capybara-validate_html5 (2.0.0)
+    capybara-validate_html5 (2.1.0)
       capybara
       rack-test (>= 0.6)
     cbor (0.5.9.8)
@@ -472,7 +472,7 @@ DEPENDENCIES
   brakeman
   by (>= 1.1.0)
   capybara
-  capybara-validate_html5 (>= 2)
+  capybara-validate_html5 (>= 2.1)
   committee!
   countries
   cuprite

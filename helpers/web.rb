@@ -128,6 +128,24 @@ class Clover < Roda
     end
   end
 
+  def html_attrs(attributes)
+    attributes.map do |key, value|
+      case key
+      when :required, :checked
+        case value
+        when true
+          key.name
+        when false, nil
+          ""
+        else
+          "#{key.name}=\"#{h(value)}\""
+        end
+      else
+        "#{h(key)}=\"#{h(value)}\""
+      end
+    end.join(" ")
+  end
+
   def object_tag_membership_label(obj)
     case obj
     when ObjectTag
