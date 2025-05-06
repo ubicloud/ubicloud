@@ -12,9 +12,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   }
 
   let(:github_runner) {
-    GithubRunner.new(installation_id: "", repository_name: "test-repo", label: "ubicloud-standard-4", created_at: Time.now, allocated_at: Time.now + 10, ready_at: Time.now + 20).tap {
-      it.id = GithubRunner.generate_uuid
-    }
+    GithubRunner.new_with_id(installation_id: "", repository_name: "test-repo", label: "ubicloud-standard-4", created_at: Time.now, allocated_at: Time.now + 10, ready_at: Time.now + 20)
   }
 
   let(:vm) {
@@ -24,16 +22,18 @@ RSpec.describe Prog::Vm::GithubRunner do
   }
   let(:sshable) { instance_double(Sshable) }
   let(:client) { instance_double(Octokit::Client) }
+  let(:project) { Project.create(name: "default") }
 
   before do
+    runner_project = Project.create(name: "runner-project")
+    allow(Config).to receive(:github_runner_service_project_id).and_return(runner_project.id)
     allow(Github).to receive(:installation_client).and_return(client)
-    allow(github_runner).to receive_messages(vm: vm, installation: instance_double(GithubInstallation, installation_id: 123))
+    allow(github_runner).to receive_messages(vm:, installation: instance_double(GithubInstallation, installation_id: 123, project:, allocator_preferences: {}))
     allow(vm).to receive_messages(sshable: sshable, vm_host: instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", data_center: "FSN1-DC1"))
   end
 
   describe ".assemble" do
     it "creates github runner and vm with sshable" do
-      project = Project.create_with_id(name: "default")
       installation = GithubInstallation.create_with_id(installation_id: 123, project_id: project.id, name: "test-user", type: "User")
 
       st = described_class.assemble(installation, repository_name: "test-repo", label: "ubicloud")
@@ -45,7 +45,6 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "creates github runner with custom size" do
-      project = Project.create_with_id(name: "default")
       installation = GithubInstallation.create_with_id(installation_id: 123, project_id: project.id, name: "test-user", type: "User")
       st = described_class.assemble(installation, repository_name: "test-repo", label: "ubicloud-standard-8")
 
@@ -63,14 +62,6 @@ RSpec.describe Prog::Vm::GithubRunner do
   end
 
   describe ".pick_vm" do
-    let(:project) { Project.create_with_id(name: "default") }
-
-    before do
-      runner_project = Project.create_with_id(name: "default")
-      allow(Config).to receive(:github_runner_service_project_id).and_return(runner_project.id)
-      expect(github_runner).to receive(:installation).and_return(instance_double(GithubInstallation, project:))
-    end
-
     it "provisions a VM if the pool is not existing" do
       expect(VmPool).to receive(:where).and_return([])
       expect(Prog::Vnet::SubnetNexus).to receive(:assemble).and_call_original
@@ -115,13 +106,19 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm).not_to be_nil
       expect(vm.name).to eq("dummy-vm")
     end
+
+    it "provisions a VM if the installation prefers performance runners" do
+      expect(github_runner.installation).to receive(:allocator_preferences).and_return({"family_filter" => ["performance"]})
+      expect(VmPool).to receive(:where).and_return([])
+      expect(Prog::Vnet::SubnetNexus).to receive(:assemble).and_call_original
+      expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
+      vm = nx.pick_vm
+      expect(vm).not_to be_nil
+    end
   end
 
   describe ".update_billing_record" do
-    let(:project) { Project.create_with_id(name: "default") }
-
     before do
-      allow(github_runner).to receive(:installation).and_return(instance_double(GithubInstallation, project: project)).at_least(:once)
       allow(github_runner).to receive(:workflow_job).and_return({"id" => 123})
     end
 
