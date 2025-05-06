@@ -23,6 +23,18 @@
 - { name: ubicloud-standard-16-ubuntu-2004,     vm_size: standard-16,    arch: x64,   storage_size_gib: 300, boot_image: github-ubuntu-2004,     location: github-runners }
 - { name: ubicloud-standard-30-ubuntu-2004,     vm_size: standard-30,    arch: x64,   storage_size_gib: 400, boot_image: github-ubuntu-2004,     location: github-runners }
 - { name: ubicloud-standard-60-ubuntu-2004,     vm_size: standard-60,    arch: x64,   storage_size_gib: 600, boot_image: github-ubuntu-2004,     location: github-runners }
+- { name: ubicloud-performance-2-ubuntu-2404,   vm_size: performance-2,  arch: x64,   storage_size_gib: 75,  boot_image: github-ubuntu-2404,     location: github-runners }
+- { name: ubicloud-performance-4-ubuntu-2404,   vm_size: performance-4,  arch: x64,   storage_size_gib: 150, boot_image: github-ubuntu-2404,     location: github-runners }
+- { name: ubicloud-performance-8-ubuntu-2404,   vm_size: performance-8,  arch: x64,   storage_size_gib: 200, boot_image: github-ubuntu-2404,     location: github-runners }
+- { name: ubicloud-performance-16-ubuntu-2404,  vm_size: performance-16, arch: x64,   storage_size_gib: 300, boot_image: github-ubuntu-2404,     location: github-runners }
+- { name: ubicloud-performance-30-ubuntu-2404,  vm_size: performance-30, arch: x64,   storage_size_gib: 400, boot_image: github-ubuntu-2404,     location: github-runners }
+- { name: ubicloud-performance-60-ubuntu-2404,  vm_size: performance-60, arch: x64,   storage_size_gib: 600, boot_image: github-ubuntu-2404,     location: github-runners }
+- { name: ubicloud-performance-2-ubuntu-2204,   vm_size: performance-2,  arch: x64,   storage_size_gib: 86,  boot_image: github-ubuntu-2204,     location: github-runners }
+- { name: ubicloud-performance-4-ubuntu-2204,   vm_size: performance-4,  arch: x64,   storage_size_gib: 150, boot_image: github-ubuntu-2204,     location: github-runners }
+- { name: ubicloud-performance-8-ubuntu-2204,   vm_size: performance-8,  arch: x64,   storage_size_gib: 200, boot_image: github-ubuntu-2204,     location: github-runners }
+- { name: ubicloud-performance-16-ubuntu-2204,  vm_size: performance-16, arch: x64,   storage_size_gib: 300, boot_image: github-ubuntu-2204,     location: github-runners }
+- { name: ubicloud-performance-30-ubuntu-2204,  vm_size: performance-30, arch: x64,   storage_size_gib: 400, boot_image: github-ubuntu-2204,     location: github-runners }
+- { name: ubicloud-performance-60-ubuntu-2204,  vm_size: performance-60, arch: x64,   storage_size_gib: 600, boot_image: github-ubuntu-2204,     location: github-runners }
 - { name: ubicloud-arm,                         alias_for: ubicloud-standard-2-arm-ubuntu-2204 }
 - { name: ubicloud-standard-2-arm,              alias_for: ubicloud-standard-2-arm-ubuntu-2204 }
 - { name: ubicloud-standard-4-arm,              alias_for: ubicloud-standard-4-arm-ubuntu-2204 }
