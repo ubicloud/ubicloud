@@ -252,6 +252,7 @@ class Vm < Sequel::Model
         "disk_index" => s.disk_index,
         "encrypted" => !s.key_encryption_key_1.nil?,
         "spdk_version" => s.spdk_version,
+        "vhost_block_backend_version" => s.vhost_block_backend_version,
         "use_bdev_ubi" => s.use_bdev_ubi,
         "skip_sync" => s.skip_sync,
         "storage_device" => s.storage_device.name,
