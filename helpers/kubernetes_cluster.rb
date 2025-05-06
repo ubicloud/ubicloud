@@ -5,7 +5,7 @@ class Clover
     authorize("KubernetesCluster:create", @project.id)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
-    params = validate_request_params(["name", "location", "cp_nodes", "worker_nodes"])
+    params = check_required_web_params(["name", "location", "cp_nodes", "worker_nodes"])
 
     DB.transaction do
       kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(

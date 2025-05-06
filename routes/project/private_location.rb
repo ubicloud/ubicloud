@@ -26,7 +26,7 @@ class Clover
 
     r.post true do
       authorize("Location:create", @project.id)
-      params = validate_request_params(["name", "provider_location_name", "access_key", "secret_key"])
+      params = check_required_web_params(["name", "provider_location_name", "access_key", "secret_key"])
 
       Validation.validate_name(params["name"])
       Validation.validate_provider_location_name("aws", params["provider_location_name"])

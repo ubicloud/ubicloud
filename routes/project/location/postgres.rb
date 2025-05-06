@@ -108,7 +108,7 @@ class Clover
         r.post true do
           authorize("Postgres:edit", pg.id)
 
-          params = validate_request_params(["cidr"])
+          params = check_required_web_params(["cidr"])
           parsed_cidr = Validation.validate_cidr(params["cidr"])
 
           firewall_rule = DB.transaction do
@@ -145,7 +145,7 @@ class Clover
           authorize("Postgres:edit", pg.id)
 
           password_param = (api? ? "password" : "metric-destination-password")
-          params = validate_request_params(["url", "username", password_param])
+          params = check_required_web_params(["url", "username", password_param])
 
           Validation.validate_url(params["url"])
 
@@ -185,7 +185,7 @@ class Clover
         r.post true do
           authorize("Postgres:edit", pg.id)
 
-          params = validate_request_params(["name"])
+          params = check_required_web_params(["name"])
           st = Prog::Postgres::PostgresResourceNexus.assemble(
             project_id: @project.id,
             location_id: pg.location_id,
@@ -235,7 +235,7 @@ class Clover
         authorize("Postgres:create", @project.id)
         authorize("Postgres:view", pg.id)
 
-        params = validate_request_params(["name", "restore_target"])
+        params = check_required_web_params(["name", "restore_target"])
 
         st = Prog::Postgres::PostgresResourceNexus.assemble(
           project_id: @project.id,
@@ -270,7 +270,7 @@ class Clover
           end
         end
 
-        params = validate_request_params(["password", "repeat_password"])
+        params = check_required_web_params(["password", "repeat_password"])
         Validation.validate_postgres_superuser_password(params["password"], params["repeat_password"])
 
         DB.transaction do

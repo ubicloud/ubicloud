@@ -151,7 +151,7 @@ class Clover < Roda
     request.halt
   end
 
-  def validate_request_params(required_keys)
+  def check_required_web_params(required_keys)
     params = request.params
 
     # Committee handles validation for API
