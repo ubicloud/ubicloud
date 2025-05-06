@@ -13,11 +13,13 @@ require_relative "spdk_rpc"
 require_relative "spdk_setup"
 require_relative "storage_key_encryption"
 require_relative "storage_path"
+require_relative "vhost_block_backend"
 
 class StorageVolume
   attr_reader :image_path, :read_only
   def initialize(vm_name, params)
     @vm_name = vm_name
+    @vhost_block_backend_version = params["vhost_block_backend_version"]
     @disk_index = params["disk_index"]
     @device_id = params["device_id"]
     @encrypted = params["encrypted"]
@@ -49,6 +51,11 @@ class StorageVolume
     FileUtils.mkdir_p storage_dir
     encryption_key = setup_data_encryption_key(key_wrapping_secrets) if @encrypted
 
+    if @vhost_block_backend_version
+      prep_vhost_block_backend(encryption_key)
+      return
+    end
+
     if @image_path.nil?
       fail "bdev_ubi requires a base image" if @use_bdev_ubi
       create_empty_disk_file
@@ -67,8 +74,50 @@ class StorageVolume
     end
   end
 
+  def prep_vhost_block_backend(encryption_key)
+    vhost_block_backend = VhostBlockBackend.new(@vhost_block_backend_version)
+    config_path = vhost_block_backend.config_path(@vm_name, @disk_index)
+
+    File.write(config_path, <<~CONFIG)
+path: "#{disk_file}"
+image_path: "#{@image_path}"
+socket: "#{vhost_sock}"
+num_queues: 1
+queue_size: 256
+seg_size_max: 4096
+seg_count_max: 1
+poll_queue_timeout_us: 500
+encryption_key:
+  - "#{encryption_key[:key]}"
+  - "#{encryption_key[:key2]}"
+    CONFIG
+
+    service_file_path = "/etc/systemd/system/#{@vm_name}-storage.service"
+    File.write(service_file_path, <<~SERVICE)
+        [Unit]
+        Description=Vhost Block Backend Service for #{@vm_name}
+        After=network.target
+
+        [Service]
+        ExecStart=#{vhost_block_backend.bin_path} --config #{config_path}
+        Restart=always
+        User=#{@vm_name}
+        Group=#{@vm_name}
+
+        [Install]
+        WantedBy=multi-user.target
+    SERVICE
+
+    FileUtils.chmod "u=rw,g=r,o=", service_file_path
+  end
+
   def start(key_wrapping_secrets)
     encryption_key = read_data_encryption_key(key_wrapping_secrets) if @encrypted
+
+    if @vhost_block_backend_version
+      r "systemctl start #{@vm_name}-storage"
+      return
+    end
 
     retries = 0
     begin
@@ -88,6 +137,14 @@ class StorageVolume
   end
 
   def purge_spdk_artifacts
+    if @vhost_block_backend_version
+      service_file_path = "/etc/systemd/system/#{@vm_name}-storage.service"
+      r "systemctl stop #{@vm_name}-storage"
+      rm_if_exists(service_file_path)
+      rm_if_exists(vhost_sock)
+      return
+    end
+
     vhost_controller = SpdkPath.vhost_controller(@vm_name, @disk_index)
 
     rpc_client.vhost_delete_controller(vhost_controller)
