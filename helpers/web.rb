@@ -127,7 +127,7 @@ class Clover < Roda
         case value
         when true
           key.name
-        when false
+        when false, nil
           ""
         else
           "#{key.name}=\"#{h(value)}\""
