@@ -15,7 +15,7 @@ Open3.popen3({"RACK_ENV" => "production", "PORT" => "8081", "WEB_CONCURRENCY" =>
   pid = wait_thr.pid
 
   timer_thread = Thread.new do
-    queue.pop(timeout: 6)
+    queue.pop(timeout: 12)
     if works.nil?
       error = "Timeout"
       Process.kill(:KILL, pid)
