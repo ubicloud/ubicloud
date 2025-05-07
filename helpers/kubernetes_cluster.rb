@@ -20,6 +20,7 @@ class Clover
         node_count: params["worker_nodes"].to_i,
         kubernetes_cluster_id: kc.id
       )
+      audit_log(kc, "create")
 
       flash["notice"] = "'#{name}' will be ready in a few minutes"
       request.redirect "#{@project.path}#{kc.path}"

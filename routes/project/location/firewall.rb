@@ -27,6 +27,7 @@ class Clover
         firewall.private_subnets.map { authorize("PrivateSubnet:edit", it.id) }
         DB.transaction do
           firewall.destroy
+          audit_log(firewall, "destroy")
         end
         204
       end
@@ -67,9 +68,11 @@ class Clover
         DB.transaction do
           if action == "attach-subnet"
             firewall.associate_with_private_subnet(private_subnet)
+            audit_log(firewall, "associate", private_subnet)
             actioned = "attached to"
           else
             firewall.disassociate_from_private_subnet(private_subnet)
+            audit_log(firewall, "disassociate", private_subnet)
             actioned = "detached from"
           end
         end
@@ -102,6 +105,7 @@ class Clover
 
           DB.transaction do
             firewall_rule = firewall.insert_firewall_rule(parsed_cidr.to_s, pg_range)
+            audit_log(firewall_rule, "create", firewall)
           end
 
           flash["notice"] = "Firewall rule is created"
@@ -115,6 +119,7 @@ class Clover
 
           DB.transaction do
             firewall.remove_firewall_rule(fwr)
+            audit_log(fwr, "destroy")
           end
 
           {message: "Firewall rule deleted"}

@@ -18,6 +18,7 @@ class Clover
 
         r.post "disconnect" do
           no_authorization_needed
+          no_audit_log
           provider, uid = typecast_params.nonempty_str(["provider", "uid"])
           identities = current_account.identities
           unless identities.length > (rodauth.has_password? ? 0 : 1)

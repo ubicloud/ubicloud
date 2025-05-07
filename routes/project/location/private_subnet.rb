@@ -39,6 +39,7 @@ class Clover
 
         DB.transaction do
           ps.connect_subnet(subnet)
+          audit_log(ps, "connect", subnet)
         end
 
         if api?
@@ -61,6 +62,7 @@ class Clover
 
         DB.transaction do
           ps.disconnect_subnet(subnet)
+          audit_log(ps, "disconnect", subnet)
         end
 
         if api?
@@ -96,6 +98,7 @@ class Clover
 
         DB.transaction do
           ps.incr_destroy
+          audit_log(ps, "destroy")
         end
 
         204

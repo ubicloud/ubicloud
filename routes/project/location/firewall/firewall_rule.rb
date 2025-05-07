@@ -21,6 +21,7 @@ class Clover
       firewall_rule = nil
       DB.transaction do
         firewall_rule = @firewall.insert_firewall_rule(parsed_cidr.to_s, pg_range)
+        audit_log(firewall_rule, "create")
       end
 
       Serializers::FirewallRule.serialize(firewall_rule)
@@ -34,6 +35,7 @@ class Clover
         authorize("Firewall:edit", @firewall.id)
         DB.transaction do
           @firewall.remove_firewall_rule(firewall_rule)
+          audit_log(firewall_rule, "destroy")
         end
         204
       end
