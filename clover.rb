@@ -589,6 +589,7 @@ class Clover < Roda
     end
 
     hash_branch("test-missing-request-params") do |r|
+      no_authorization_needed
       check_required_web_params(%w[foo])
     end
 
