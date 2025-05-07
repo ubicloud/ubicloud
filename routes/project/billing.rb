@@ -158,7 +158,9 @@ class Clover
               next {error: {message: "You can't delete the last payment method of a project."}}
             end
 
-            payment_method.destroy
+            DB.transaction do
+              payment_method.destroy
+            end
 
             204
           end

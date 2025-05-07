@@ -36,13 +36,15 @@ class Clover
       end
 
       params = check_required_web_params(["name"])
-      project = current_account.create_project_with_default_policy(params["name"])
       no_authorization_needed
+      DB.transaction do
+        @project = current_account.create_project_with_default_policy(params["name"])
+      end
 
       if api?
-        Serializers::Project.serialize(project)
+        Serializers::Project.serialize(@project)
       else
-        r.redirect project.path
+        r.redirect @project.path
       end
     end
 
@@ -89,7 +91,9 @@ class Clover
           fail DependencyError.new("'#{@project.name}' project has some resources. Delete all related resources first.")
         end
 
-        @project.soft_delete
+        DB.transaction do
+          @project.soft_delete
+        end
 
         204
       end

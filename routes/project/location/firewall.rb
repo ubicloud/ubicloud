@@ -25,7 +25,9 @@ class Clover
       r.delete true do
         authorize("Firewall:delete", firewall.id)
         firewall.private_subnets.map { authorize("PrivateSubnet:edit", it.id) }
-        firewall.destroy
+        DB.transaction do
+          firewall.destroy
+        end
         204
       end
 
@@ -60,13 +62,16 @@ class Clover
         end
 
         authorize("PrivateSubnet:edit", private_subnet.id)
+        actioned = nil
 
-        if action == "attach-subnet"
-          firewall.associate_with_private_subnet(private_subnet)
-          actioned = "attached to"
-        else
-          firewall.disassociate_from_private_subnet(private_subnet)
-          actioned = "detached from"
+        DB.transaction do
+          if action == "attach-subnet"
+            firewall.associate_with_private_subnet(private_subnet)
+            actioned = "attached to"
+          else
+            firewall.disassociate_from_private_subnet(private_subnet)
+            actioned = "detached from"
+          end
         end
 
         if api?
@@ -95,7 +100,10 @@ class Clover
           parsed_cidr = Validation.validate_cidr(r.params["cidr"])
           pg_range = Sequel.pg_range(port_range.first..port_range.last)
 
-          firewall.insert_firewall_rule(parsed_cidr.to_s, pg_range)
+          DB.transaction do
+            firewall_rule = firewall.insert_firewall_rule(parsed_cidr.to_s, pg_range)
+          end
+
           flash["notice"] = "Firewall rule is created"
 
           r.redirect "#{@project.path}#{firewall.path}"
@@ -105,7 +113,9 @@ class Clover
           authorize("Firewall:edit", firewall.id)
           next 204 unless (fwr = FirewallRule.from_ubid(firewall_rule_ubid))
 
-          firewall.remove_firewall_rule(fwr)
+          DB.transaction do
+            firewall.remove_firewall_rule(fwr)
+          end
 
           {message: "Firewall rule deleted"}
         end

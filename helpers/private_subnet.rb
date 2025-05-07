@@ -35,18 +35,21 @@ class Clover
       fw.id
     end
 
-    st = Prog::Vnet::SubnetNexus.assemble(
-      @project.id,
-      name:,
-      location_id: @location.id,
-      firewall_id:
-    )
+    ps = nil
+    DB.transaction do
+      ps = Prog::Vnet::SubnetNexus.assemble(
+        @project.id,
+        name:,
+        location_id: @location.id,
+        firewall_id:
+      ).subject
+    end
 
     if api?
-      Serializers::PrivateSubnet.serialize(st.subject)
+      Serializers::PrivateSubnet.serialize(ps)
     else
       flash["notice"] = "'#{name}' will be ready in a few seconds"
-      request.redirect "#{@project.path}#{PrivateSubnet[st.id].path}"
+      request.redirect "#{@project.path}#{ps.path}"
     end
   end
 
