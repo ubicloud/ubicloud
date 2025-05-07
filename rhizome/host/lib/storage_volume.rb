@@ -52,6 +52,7 @@ class StorageVolume
     encryption_key = setup_data_encryption_key(key_wrapping_secrets) if @encrypted
 
     if @vhost_block_backend_version
+      create_empty_disk_file
       prep_vhost_block_backend(encryption_key)
       return
     end
@@ -359,7 +360,7 @@ encryption_key:
   end
 
   def spdk_service
-    @spdk_service ||= SpdkSetup.new(@spdk_version).spdk_service
+    @spdk_service ||= SpdkSetup.new(@spdk_version).spdk_service if @spdk_version
   end
 
   def sp

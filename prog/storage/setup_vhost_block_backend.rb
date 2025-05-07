@@ -4,8 +4,8 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
   subject_is :sshable, :vm_host
 
   SUPPORTED_VHOST_BLOCK_BACKEND_VERSIONS = [
-    ["v0.1-1", "x64"],
-    ["v0.1-1", "arm64"]
+    ["v0.1-2", "x64"],
+    ["v0.1-2", "arm64"]
   ]
 
   def self.assemble(vm_host_id, version, allocation_weight: 0)

@@ -679,7 +679,7 @@ DNSMASQ_SERVICE
       disk_params.map { |x| "--disk #{x}" }.join(" ")
     end
 
-    spdk_services = storage_volumes.map { |volume| volume.spdk_service }.uniq
+    spdk_services = storage_volumes.filter_map { |volume| volume.spdk_service }.uniq
     spdk_after = spdk_services.map { |s| "After=#{s}" }.join("\n")
     spdk_requires = spdk_services.map { |s| "Requires=#{s}" }.join("\n")
 
