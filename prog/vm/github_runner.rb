@@ -67,14 +67,18 @@ class Prog::Vm::GithubRunner < Prog::Base
     # If the runner is destroyed before it's ready or doesn't pick a job, don't charge for it.
     return unless github_runner.ready_at && github_runner.workflow_job
 
-    project = github_runner.installation.project
     billed_vm_size = if label_data["arch"] == "arm64"
       "#{label_data["vm_size"]}-arm"
+    elsif github_runner.installation.free_runner_upgrade?
+      # If we enable free upgrades for the project, we should charge
+      # the customer for the label's VM size instead of the effective VM size.
+      label_data["vm_size"]
     else
       "#{vm.family}-#{vm.vcpus}"
     end
     github_runner.update(billed_vm_size:)
     rate_id = BillingRate.from_resource_properties("GitHubRunnerMinutes", billed_vm_size, "global")["id"]
+    project = github_runner.installation.project
 
     retries = 0
     begin
