@@ -6,14 +6,39 @@
     [@project_data[:name], @project_data[:path]],
     ["GitHub Runners", "#{@project_data[:path]}/github"],
     [@page_title, "#"]
-  ]
+  ],
+  right_items: [<<-DROPDOWN]
+    <div class="group dropdown relative inline-block text-left">
+      <div>#{part("components/button", text: @installation.name, icon: "github", right_icon: "hero-chevron-down")}</div>
+      <div class="hidden opacity-0 scale-95 group-[.active]:block group-[.active]:opacity-100 group-[.active]:scale-100 transition ease-out duration-100 absolute -right-2 z-10 mt-2 w-72 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" role="menu" tabindex="-1">
+        <div>
+          #{@project.github_installations.map do |ins|
+            <<-ITEM
+            <div class="hover:bg-gray-50" role="none">
+              <a href="#{@project_data[:path]}/github/#{ins.ubid}/runner" class="block px-4 py-3 focus:outline-none">
+                <h3 class="text-sm leading-6 text-gray-900 #{(ins.id == @installation.id) ? "font-semibold" : ""}">#{ins.name}</h3>
+              </a>
+            </div>
+            ITEM
+          end.join}
+        </div>
+        <div>
+          <div class="hover:bg-gray-50">
+            <a href="#{@project_data[:path]}/github/create" class="flex items-center px-4 py-3 text-sm leading-6 text-gray-700">
+              Connect New Account
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  DROPDOWN
 ) %>
 
 <%== part(
   "components/tabbar",
   tabs: [
-    ["Active Runners", "#{@project_data[:path]}/github/runner"],
-    ["Caches", "#{@project_data[:path]}/github/cache"],
-    ["Settings", "#{@project_data[:path]}/github/setting"]
+    ["Active Runners", "#{@project_data[:path]}/github/#{@installation.ubid}/runner"],
+    ["Caches", "#{@project_data[:path]}/github/#{@installation.ubid}/cache"],
+    ["Settings", "#{@project_data[:path]}/github/#{@installation.ubid}/setting"]
   ]
 ) %>

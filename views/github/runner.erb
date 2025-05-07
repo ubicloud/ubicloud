@@ -10,7 +10,7 @@
     headers: ["Runner", "Repository", "Label", "State", "Branch", "Workflow Job", ""],
     rows:
       @runners.map do |runner|
-        destroy_url = "#{@project_data[:path]}/github/runner/#{runner[:ubid]}"
+        destroy_url = "#{@project_data[:path]}/github/#{@installation.ubid}/runner/#{runner[:ubid]}"
         [
           [
             [runner[:ubid], { link: runner[:runner_url] }],
