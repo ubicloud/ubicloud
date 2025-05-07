@@ -33,6 +33,7 @@ class Clover
         location_id: @location.id,
         project_id: @project.id
       )
+      audit_log(firewall, "create")
     end
 
     if api?

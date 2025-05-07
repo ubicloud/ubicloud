@@ -69,6 +69,7 @@ class Clover
         location_id: @location.id,
         **assemble_params.transform_keys(&:to_sym)
       ).subject
+      audit_log(vm, "create")
     end
 
     if api?

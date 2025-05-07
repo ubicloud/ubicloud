@@ -20,6 +20,7 @@ class Clover
           DB.transaction do
             pat = ApiKey.create_personal_access_token(current_account, project: @project)
             SubjectTag[project_id: @project.id, name: "Admin"].add_subject(pat.id)
+            audit_log(pat, "create")
           end
           flash["notice"] = "Created personal access token with id #{pat.ubid}"
           r.redirect "#{@project.path}/token"
@@ -34,6 +35,7 @@ class Clover
             DB.transaction do
               token.destroy
               @project.disassociate_subject(token.id)
+              audit_log(token, "destroy")
             end
             flash["notice"] = "Personal access token deleted successfully"
           end
@@ -46,9 +48,11 @@ class Clover
           DB.transaction do
             if action == "restrict-access"
               token.restrict_token_for_project(@project.id)
+              audit_log(token, "restrict")
               flash["notice"] = "Restricted personal access token"
             else
               token.unrestrict_token_for_project(@project.id)
+              audit_log(token, "unrestrict")
               flash["notice"] = "Token access is now unrestricted"
             end
           end
@@ -86,17 +90,22 @@ class Clover
                 if ubid == "template"
                   next if deleted == "true" || (action_id.nil? && object_id.nil?)
                   ace = AccessControlEntry.new_with_id(project_id: @project.id, subject_id: token.id)
+                  audit_action = "create"
                 else
                   next unless (ace = AccessControlEntry[project_id: @project.id, subject_id: token.id, id: UBID.to_uuid(ubid)])
                   if deleted == "true"
                     ace.destroy
+                    audit_log(ace, "destroy")
                     next
                   end
+                  audit_action = "update"
                 end
                 ace.update_from_ubids(action_id:, object_id:)
+                audit_log(ace, audit_action, [token, action_id, object_id])
               end
             end
 
+            no_audit_log # Possibly no changes
             flash["notice"] = "Token access control entries saved successfully"
 
             r.redirect "#{@project_data[:path]}/token/#{token.ubid}/access-control"

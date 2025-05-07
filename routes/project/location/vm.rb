@@ -33,6 +33,7 @@ class Clover
 
         DB.transaction do
           vm.incr_destroy
+          audit_log(vm, "destroy")
         end
 
         204
@@ -43,6 +44,7 @@ class Clover
 
         DB.transaction do
           vm.incr_restart
+          audit_log(vm, "restart")
         end
 
         if api?

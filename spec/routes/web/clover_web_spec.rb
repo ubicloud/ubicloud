@@ -36,6 +36,14 @@ RSpec.describe Clover do
       expect { visit "/test-no-authorization-needed/after-authorization" }.to raise_error(RuntimeError, re)
       expect { visit "/test-no-authorization-needed/runtime-error" }.to raise_error(RuntimeError, /no authorization check for /)
     end
+
+    it "raises error for non-GET request without audit logging" do
+      expect { post "/webhook/test-no-audit-logging/test" }.to raise_error(RuntimeError, /no audit logging for /)
+    end
+  end
+
+  it "raises error for unsupported audit log action" do
+    expect { post "/webhook/test-no-audit-logging/bad" }.to raise_error(RuntimeError, "unsupported audit_log action: bad_action")
   end
 
   it "handles expected errors" do

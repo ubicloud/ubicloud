@@ -590,6 +590,17 @@ class Clover < Roda
       check_required_web_params(%w[foo])
     end
 
+    hash_branch(:webhook_prefix, "test-no-audit-logging") do |r|
+      r.post "test" do
+        @still_need_audit_logging = true
+        ""
+      end
+
+      r.post "bad" do
+        audit_log(@project, "bad_action")
+      end
+    end
+
     hash_branch("test-no-authorization-needed") do |r|
       r.get "once" do
         no_authorization_needed
@@ -702,6 +713,7 @@ class Clover < Roda
       end
     end
 
+    @still_need_audit_logging = true
     @still_need_authorization = true
     r.hash_branches("")
   end
@@ -740,9 +752,23 @@ class Clover < Roda
 
         raise "no authorization check for #{request.request_method} #{request.path_info}"
       end
+
+      if !request.get? && @still_need_audit_logging && res && res[0] < 400 && res[0] != 204 && (api? || !flash.next["error"])
+        raise "no audit logging for #{request.request_method} #{request.path_info}"
+      end
     end
 
     prepend(Module.new do
+      def audit_log(...)
+        @still_need_audit_logging = false
+        super
+      end
+
+      def no_audit_log
+        @still_need_audit_logging = false
+        super
+      end
+
       def authorize(actions, object_id)
         @still_need_authorization = false
         super

@@ -38,6 +38,7 @@ class Clover
       params = check_required_web_params(["name"])
       DB.transaction do
         @project = current_account.create_project_with_default_policy(params["name"])
+        audit_log(@project, "create")
       end
 
       if api?
@@ -92,6 +93,7 @@ class Clover
 
         DB.transaction do
           @project.soft_delete
+          audit_log(@project, "destroy")
         end
 
         204
@@ -106,6 +108,7 @@ class Clover
         r.post true do
           authorize("Project:edit", @project.id)
           @project.update(name: r.params["name"])
+          audit_log(@project, "update")
 
           flash["notice"] = "The project name is updated to '#{@project.name}'."
 
