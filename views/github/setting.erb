@@ -1,77 +1,58 @@
 <% @page_title = "GitHub Runner Settings" %>
 
-<% if @installations.count > 0 %>
-  <div class="auto-refresh hidden" data-interval="10"></div>
+<%== render("github/tabbar") %>
 
-  <%== render("github/tabbar") %>
-
-  <div class="grid gap-6">
-    <!-- GitHub Installations Card -->
-    <div>
-      <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
-        <div class="min-w-0 flex-1">
-          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-            Connected Accounts
-          </h3>
-        </div>
-        <div class="mt-4 flex md:ml-4 md:mt-0">
-          <%== part("components/button", text: "Connect New Account", link: "#{@project_data[:path]}/github/installation/create") %>
-        </div>
+<div class="grid gap-6">
+  <div>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <!-- Transparent Cache Card -->
+      <div class="px-4 py-5 sm:p-6">
+        <form action="<%= "#{@project_data[:path]}/github/#{@installation.ubid}" %>" role="form" method="POST">
+          <%== csrf_tag("#{@project_data[:path]}/github/#{@installation.ubid}") %>
+          <%== part("components/form/hidden", name: "cache_enabled", value: !@installation.cache_enabled) %>
+          <div class="sm:flex sm:items-center sm:justify-between">
+            <div>
+              <h3 class="text-base font-semibold leading-6 text-gray-900">Ubicloud Transparent Cache</h3>
+              <div class="mt-2 text-sm text-gray-500">
+                <p>Transparent cache allows you to use Ubicloud’s cache service without modifying your workflow files.
+                  Check out
+                  <a href="https://www.ubicloud.com/docs/github-actions-integration/ubicloud-cache" class="text-orange-500 font-medium">our documentation</a>
+                  for information.</p>
+              </div>
+            </div>
+            <div id="cache-toggle-<%=@installation.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+              <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                <%== part(
+                  "components/button",
+                  **(
+                    if @installation.cache_enabled
+                      { text: "Disable ", type: "danger" }
+                    else
+                      { text: "Enable", type: "primary" }
+                    end
+                  )
+                ) %>
+              </div>
+            </div>
+          </div>
+        </form>
       </div>
-      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-        <table class="min-w-full divide-y divide-gray-300">
-          <tbody class="divide-y divide-gray-200 bg-white">
-            <% @installations.each do |ins| %>
-              <tr>
-                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <%= ins.name %>
-                </td>
-                <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                  <div class="flex items-center justify-end space-x-4">
-                    <form action="<%= "#{@project_data[:path]}/github/installation/#{ins.ubid}" %>" role="form" method="POST">
-                      <%== csrf_tag("#{@project_data[:path]}/github/installation/#{ins.ubid}") %>
-                      <%== part("components/form/hidden", name: "cache_enabled", value: !ins.cache_enabled) %>
-                      <%== part(
-                        "components/button",
-                        **(
-                          if ins.cache_enabled
-                            { text: "Disable Ubicloud Cache", type: "danger" }
-                          else
-                            { text: "Enable Ubicloud Cache", type: "primary" }
-                          end
-                        )
-                      ) %>
-                    </form>
-
-                    <%== part("components/button", text: "Configure", link: "https://github.com/apps/#{Config.github_app_name}/installations/#{ins.installation_id}") %>
-                  </div>
-                </td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
+      <!-- Configure Repositories -->
+      <div class="px-4 py-5 sm:p-6">
+        <div class="sm:flex sm:items-center sm:justify-between">
+          <div>
+            <h3 class="text-base font-semibold leading-6 text-gray-900">Repository Access</h3>
+            <div class="mt-2 text-sm text-gray-500">
+              <p>Configure the list of repositories that Ubicloud can access on GitHub's UI.</p>
+            </div>
+          </div>
+          <div id="configure-<%=@installation.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+            <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+              <%== part("components/button", text: "Configure", link: "https://github.com/apps/#{Config.github_app_name}/installations/#{@installation.installation_id}") %>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
-<% elsif !@project.has_valid_payment_method? %>
-  <form action="<%= "#{@project_data[:path]}/billing" %>" method="POST">
-    <%== csrf_tag("#{@project_data[:path]}/billing") %>
-    <%== part(
-      "components/empty_state",
-      icon: "hero-banknotes",
-      title: "No billing information",
-      description:
-        "Project doesn't have valid billing information. First, you need to update the project's billing details to use GitHub Runners.",
-      button_title: "New Billing Information"
-    ) %>
-  </form>
-<% else %>
-  <%== part(
-    "components/empty_state",
-    icon: "github",
-    title: "No Connected Accounts",
-    description: "Get started by installing our GitHub app to your user or organization account.",
-    button_link: "#{@project_data[:path]}/github/installation/create",
-    button_title: "Connect New Account"
-  ) %>
-<% end %>
+</div>

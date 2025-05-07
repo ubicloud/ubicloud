@@ -14,7 +14,7 @@ class Clover
         authorize("Project:github", installation.project.id)
         flash["notice"] = "GitHub runner integration is already enabled for #{installation.project.name} project."
         Clog.emit("GitHub installation already exists") { {installation_failed: {id: installation_id, account_ubid: current_account.ubid}} }
-        r.redirect "#{installation.project.path}/github"
+        r.redirect "#{installation.project.path}/github/#{installation.ubid}/runner"
       end
 
       unless (@project = project = Project[session.delete("github_installation_project_id")])
@@ -49,15 +49,15 @@ class Clover
         r.redirect "#{project.path}/dashboard"
       end
 
-      GithubInstallation.create_with_id(
-        installation_id: installation_id,
+      installation = GithubInstallation.create(
+        installation_id:,
         name: installation_response[:account][:login] || installation_response[:account][:name],
         type: installation_response[:account][:type],
         project_id: project.id
       )
 
       flash["notice"] = "GitHub runner integration is enabled for #{project.name} project."
-      r.redirect "#{project.path}/github"
+      r.redirect "#{project.path}/github/#{installation.ubid}/runner"
     end
   end
 end

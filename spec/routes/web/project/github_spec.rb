@@ -38,6 +38,16 @@ RSpec.describe Clover, "github" do
     expect(page).to have_content "Forbidden"
   end
 
+  it "redirects to the first installation if it exists" do
+    installation
+
+    visit "#{project.path}/github"
+
+    expect(page.status_code).to eq(200)
+    expect(page).to have_current_path("#{project.path}/github/#{installation.ubid}/runner")
+    expect(page.title).to eq("Ubicloud - Active Runners")
+  end
+
   describe "setting" do
     it "can connect GitHub account" do
       visit "#{project.path}/github"
@@ -52,10 +62,10 @@ RSpec.describe Clover, "github" do
       expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
 
-      visit "#{project.path}/github/installation/create"
+      visit "#{project.path}/github/create"
 
       expect(page.status_code).to eq(200)
-      expect(page.title).to eq("Ubicloud - GitHub Runner Settings")
+      expect(page.title).to eq("Ubicloud - GitHub Runners Integration")
       expect(page).to have_flash_error("Project doesn't have valid billing information")
     end
 
@@ -73,27 +83,32 @@ RSpec.describe Clover, "github" do
       expect(page.title).to eq("Ubicloud - Project Billing")
     end
 
-    it "can list installations" do
-      ins1 = GithubInstallation.create_with_id(installation_id: 111, name: "test-user", type: "User", project_id: project.id)
-      ins2 = GithubInstallation.create_with_id(installation_id: 222, name: "test-org", type: "Organization", project_id: project.id)
+    it "can switch between installations" do
+      ins1 = GithubInstallation.create(installation_id: 111, name: "test-user", type: "User", project_id: project.id)
+      ins2 = GithubInstallation.create(installation_id: 222, name: "test-org", type: "Organization", project_id: project.id)
 
-      visit "#{project.path}/github/setting"
+      visit "#{project.path}/github/#{ins1.ubid}/runner"
+
+      click_link "test-org"
 
       expect(page.status_code).to eq(200)
-      expect(page.title).to eq("Ubicloud - GitHub Runner Settings")
-      expect(page).to have_content "test-user"
-      expect(page).to have_link "Configure", href: /\/apps\/runner-app\/installations\/#{ins1.installation_id}/
-      expect(page).to have_content "test-org"
-      expect(page).to have_link "Configure", href: /\/apps\/runner-app\/installations\/#{ins2.installation_id}/
+      expect(page).to have_current_path("#{project.path}/github/#{ins2.ubid}/runner", ignore_query: true)
+      expect(page.title).to eq("Ubicloud - Active Runners")
+
+      click_link "test-user"
+
+      expect(page.status_code).to eq(200)
+      expect(page).to have_current_path("#{project.path}/github/#{ins1.ubid}/runner", ignore_query: true)
+      expect(page.title).to eq("Ubicloud - Active Runners")
     end
 
     it "enables cache for installation" do
       installation.update(cache_enabled: false)
 
-      visit "#{project.path}/github/setting"
-      _csrf = find("form[action='#{project.path}/github/installation/#{installation.ubid}'] input[name='_csrf']", visible: false).value
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+      _csrf = find("form[action='#{project.path}/github/#{installation.ubid}'] input[name='_csrf']", visible: false).value
 
-      page.driver.post "#{project.path}/github/installation/#{installation.ubid}", {cache_enabled: true, _csrf:}
+      page.driver.post "#{project.path}/github/#{installation.ubid}", {cache_enabled: true, _csrf:}
 
       expect(page.status_code).to eq(302)
       expect(installation.reload.cache_enabled).to be true
@@ -102,17 +117,17 @@ RSpec.describe Clover, "github" do
     it "disables cache for installation" do
       installation.update(cache_enabled: true)
 
-      visit "#{project.path}/github/setting"
-      _csrf = find("form[action='#{project.path}/github/installation/#{installation.ubid}'] input[name='_csrf']", visible: false).value
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+      _csrf = find("form[action='#{project.path}/github/#{installation.ubid}'] input[name='_csrf']", visible: false).value
 
-      page.driver.post "#{project.path}/github/installation/#{installation.ubid}", {cache_enabled: false, _csrf:}
+      page.driver.post "#{project.path}/github/#{installation.ubid}", {cache_enabled: false, _csrf:}
 
       expect(page.status_code).to eq(302)
       expect(installation.reload.cache_enabled).to be false
     end
 
     it "raises not found when installation doesn't exist" do
-      visit "#{project.path}/github/installation/invalid_id"
+      visit "#{project.path}/github/invalid_id"
 
       expect(page.status_code).to eq(404)
     end
@@ -132,7 +147,7 @@ RSpec.describe Clover, "github" do
       runner_concurrency_limit = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").update(label: "wait_concurrency_limit")
       runner_wo_strand = GithubRunner.create_with_id(installation_id: installation.id, label: "ubicloud", repository_name: "my-repo")
 
-      visit "#{project.path}/github/runner"
+      visit "#{project.path}/github/#{installation.ubid}/runner"
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - Active Runners")
       expect(page).to have_content runner_deleted.ubid
@@ -153,7 +168,7 @@ RSpec.describe Clover, "github" do
     it "can terminate runner" do
       runner = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject
 
-      visit "#{project.path}/github/runner"
+      visit "#{project.path}/github/#{installation.ubid}/runner"
 
       expect(page.status_code).to eq(200)
       expect(page).to have_content runner.ubid
@@ -162,12 +177,12 @@ RSpec.describe Clover, "github" do
       page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
       expect(page.status_code).to eq(204)
 
-      visit "#{project.path}/github/runner"
+      visit "#{project.path}/github/#{installation.ubid}/runner"
       expect(page).to have_flash_notice("Runner '#{runner.ubid}' forcibly terminated")
     end
 
     it "raises not found when runner not exists" do
-      visit "#{project.path}/github/runner/grv4tp3wnb7j7jm5d40wv72j0t"
+      visit "#{project.path}/github/#{installation.ubid}/runner/grv4tp3wnb7j7jm5d40wv72j0t"
 
       expect(page.title).to eq("Ubicloud - ResourceNotFound")
       expect(page.status_code).to eq(404)
@@ -185,7 +200,7 @@ RSpec.describe Clover, "github" do
       create_cache_entry(size: 800, created_at: Time.now - 10 * 60, last_accessed_at: Time.now - 5 * 60)
       create_cache_entry(size: 20.6 * 1024, created_at: Time.now - 4 * 24 * 60 * 60, last_accessed_at: Time.now - 3 * 60 * 60)
 
-      visit "#{project.path}/github/cache"
+      visit "#{project.path}/github/#{installation.ubid}/cache"
 
       expect(page.status_code).to eq(200)
       expect(page).to have_content "3 cache entries"
@@ -206,7 +221,7 @@ RSpec.describe Clover, "github" do
       expect(Aws::S3::Client).to receive(:new).and_return(client)
       expect(client).to receive(:delete_object).with(bucket: repository.bucket_name, key: entry.blob_key)
 
-      visit "#{project.path}/github/cache"
+      visit "#{project.path}/github/#{installation.ubid}/cache"
 
       expect(page.status_code).to eq(200)
       expect(page).to have_content entry.key
@@ -215,12 +230,12 @@ RSpec.describe Clover, "github" do
       page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
       expect(page.status_code).to eq(204)
 
-      visit "#{project.path}/github/cache"
+      visit "#{project.path}/github/#{installation.ubid}/cache"
       expect(page).to have_flash_notice("Cache '#{entry.key}' deleted.")
     end
 
     it "raises not found when cache entry not exists" do
-      visit "#{project.path}/github/cache/etn0h8p5js1a4kpa9er7jkg77c"
+      visit "#{project.path}/github/#{installation.ubid}/cache/etn0h8p5js1a4kpa9er7jkg77c"
 
       expect(page.title).to eq("Ubicloud - ResourceNotFound")
       expect(page.status_code).to eq(404)
