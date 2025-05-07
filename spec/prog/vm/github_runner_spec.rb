@@ -28,7 +28,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     runner_project = Project.create(name: "runner-project")
     allow(Config).to receive(:github_runner_service_project_id).and_return(runner_project.id)
     allow(Github).to receive(:installation_client).and_return(client)
-    allow(github_runner).to receive_messages(vm:, installation: instance_double(GithubInstallation, installation_id: 123, project:, allocator_preferences: {}))
+    allow(github_runner).to receive_messages(vm:, installation: instance_double(GithubInstallation, installation_id: 123, project:, allocator_preferences: {}, free_runner_upgrade?: false))
     allow(vm).to receive_messages(sshable: sshable, vm_host: instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", data_center: "FSN1-DC1"))
   end
 
@@ -196,6 +196,23 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(br.amount).to eq(5)
       expect(br.duration(time, time)).to eq(1)
       expect(br.billing_rate["resource_family"]).to eq("premium-2")
+    end
+
+    it "uses the original billing rate for runners who were upgraded for free" do
+      time = Time.now
+      vm.family = "premium"
+      expect(Time).to receive(:now).and_return(time).at_least(:once)
+      expect(github_runner).to receive(:label).and_return("ubicloud-standard-2").at_least(:once)
+      expect(github_runner).to receive(:ready_at).and_return(time - 5 * 60).at_least(:once)
+      expect(github_runner).to receive(:update).with(billed_vm_size: "standard-2")
+      expect(github_runner.installation).to receive(:free_runner_upgrade?).and_return(true)
+      expect(BillingRecord).to receive(:create_with_id).and_call_original
+      nx.update_billing_record
+
+      br = BillingRecord[resource_id: project.id]
+      expect(br.amount).to eq(5)
+      expect(br.duration(time, time)).to eq(1)
+      expect(br.billing_rate["resource_family"]).to eq("standard-2")
     end
 
     it "updates the amount of existing billing record" do

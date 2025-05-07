@@ -210,6 +210,7 @@ class Prog::Vm::Nexus < Prog::Base
           runner_location_preference = [Location::GITHUB_RUNNERS_ID]
           runner_family_filter = [vm.family]
           prefs = if runner
+            runner_family_filter.append("premium") if runner.installation.free_runner_upgrade?
             runner.installation.allocator_preferences
           else
             {}
