@@ -66,6 +66,13 @@ class Clover < Roda
   plugin :part
   plugin :request_headers
   plugin :plain_hash_response_headers
+  plugin :typecast_params do
+    handle_type(:ubid_uuid) do
+      if it.is_a?(String) && it.bytesize == 26
+        UBID.to_uuid(it)
+      end
+    end
+  end
   plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
 
   # :nocov:
