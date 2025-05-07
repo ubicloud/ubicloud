@@ -24,9 +24,9 @@ class Clover
     end
 
     r.post true do
+      no_authorization_needed
       if current_account.projects_dataset.count >= 10
         err_msg = "Project limit exceeded. You can create up to 10 projects. Contact support@ubicloud.com if you need more."
-        no_authorization_needed
         if api?
           fail CloverError.new(400, "InvalidRequest", err_msg)
         else
@@ -36,7 +36,6 @@ class Clover
       end
 
       params = check_required_web_params(["name"])
-      no_authorization_needed
       DB.transaction do
         @project = current_account.create_project_with_default_policy(params["name"])
       end
