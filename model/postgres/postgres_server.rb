@@ -253,7 +253,7 @@ class PostgresServer < Sequel::Model
       endpoints: [
         "https://localhost:9090/federate?match[]=%7B__name__%3D~%22.%2B%22%7D"
       ],
-      max_pending_buffer_size: 120,
+      max_file_retention: 120,
       interval: "15s",
       additional_labels: {},
       metrics_dir: "/home/ubi/postgres/metrics"

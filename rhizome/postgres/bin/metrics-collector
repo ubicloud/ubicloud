@@ -22,16 +22,19 @@ fail "Metrics config file does not exist: #{metrics_dir}/config.json" unless Fil
 FileUtils.mkdir_p("#{metrics_dir}/pending")
 FileUtils.mkdir_p("#{metrics_dir}/done")
 
+# Clear the pending directory on startup (anything there is from a crash)
+Dir.children("#{metrics_dir}/pending").each { File.delete("#{metrics_dir}/pending/#{_1}") }
+
 # Parse config
 metrics_config_hash = JSON.parse(File.read("#{metrics_dir}/config.json"))
 endpoints = metrics_config_hash["endpoints"]
-max_pending_buffer_size = metrics_config_hash["max_pending_buffer_size"] || 100
+max_file_retention = metrics_config_hash["max_file_retention"] || 100
 
 filename = Time.now.utc.strftime("%Y-%m-%dT%H-%M-%S-%6N")
-temp_file_path = "/tmp/#{filename}.txt"
+pending_file_path = "#{metrics_dir}/pending/#{filename}.txt"
 
-# Collect metrics from each endpoint using Ruby's HTTP client
-File.open(temp_file_path, "w") do |file|
+# Download content directly to the pending directory
+File.open(pending_file_path, "w") do |file|
   endpoints.each do |endpoint|
     uri = URI(endpoint)
     http = Net::HTTP.new(uri.host, uri.port)
@@ -46,19 +49,14 @@ File.open(temp_file_path, "w") do |file|
   file.fsync
 end
 
-# Move file to pending directory
-File.rename(temp_file_path, "#{metrics_dir}/pending/#{filename}.txt")
+# Move complete file to "done" and make confirm rename persistence via
+# directory fsync.
+File.rename(pending_file_path, "#{metrics_dir}/done/#{filename}.txt")
+File.open("#{metrics_dir}/done") { _1.fsync }
 
-# Remove pending files till the number of files is less than
-# max_pending_buffer_size.
-pending_files = Dir.children("#{metrics_dir}/pending").sort
-num_files_to_remove = [pending_files.count - max_pending_buffer_size, 0].max
+# Trim the done directory to keep only max_file_retention files
+done_files = Dir.children("#{metrics_dir}/done").sort
+num_files_to_remove = [done_files.count - max_file_retention, 0].max
 
-pending_files.slice(0, num_files_to_remove).each do |pending_file|
-  File.rename("#{metrics_dir}/pending/#{pending_file}", "#{metrics_dir}/done/#{pending_file}")
-end
-
-# Delete all done files.
-Dir.children("#{metrics_dir}/done").each do |done_file|
-  File.delete("#{metrics_dir}/done/#{done_file}")
-end
+# Remove oldest files
+done_files.slice(0, num_files_to_remove).each { File.delete("#{metrics_dir}/done/#{_1}") }
