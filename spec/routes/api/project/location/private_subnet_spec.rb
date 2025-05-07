@@ -109,9 +109,10 @@ RSpec.describe Clover, "private_subnet" do
       end
 
       it "with invalid firewall id" do
-        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/test-ps", {firewall_id: "invalidid"}.to_json
+        firewall_id = "a" * 25 + "b"
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/test-ps", {firewall_id:}.to_json
 
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: firewall_id", {"firewall_id" => "Firewall with id \"invalidid\" and location \"eu-central-h1\" is not found"})
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: firewall_id", {"firewall_id" => "Firewall with id \"#{firewall_id}\" and location \"eu-central-h1\" is not found"})
       end
 
       it "with empty body" do
