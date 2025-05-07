@@ -196,6 +196,14 @@ class Clover < Roda
     @current_account = Account[rodauth.session_value]
   end
 
+  def authorized_object(key:, perm:, association: nil, ds: @project.send(:"#{association}_dataset"), location_id: nil)
+    if (id = typecast_params.ubid_uuid(key))
+      ds = dataset_authorize(ds, perm)
+      ds = ds.where(location_id:) if location_id
+      ds.first(id:)
+    end
+  end
+
   def check_visible_location
     # If location previously retrieved in project/location route, check that it is visible
     # This is called when creating resources in the api routes.
