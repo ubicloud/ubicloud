@@ -30,13 +30,10 @@ class Clover
     authorize("PrivateSubnet:create", @project.id)
 
     params = check_required_web_params(%w[name location])
-    firewall_id = if params["firewall_id"]
-      fw = Firewall.from_ubid(params["firewall_id"])
-      unless fw && fw.location_id == @location.id
+    if params["firewall_id"]
+      unless (firewall = authorized_firewall(location_id: @location.id))
         fail Validation::ValidationFailed.new(firewall_id: "Firewall with id \"#{params["firewall_id"]}\" and location \"#{@location.display_name}\" is not found")
       end
-      authorize("Firewall:view", fw.id)
-      fw.id
     end
 
     ps = nil
@@ -45,7 +42,7 @@ class Clover
         @project.id,
         name:,
         location_id: @location.id,
-        firewall_id:
+        firewall_id: firewall&.id
       ).subject
       audit_log(ps, "create")
     end
