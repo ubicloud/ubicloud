@@ -31,6 +31,7 @@ RestartSec=1
 ExecStart=/usr/local/bin/victoria-metrics-prod \
         -storageDataPath=/dat/victoria_metrics \
         -httpListenAddr=127.0.0.1:8428 \
+        -dedup.minScrapeInterval=15s \
         -retentionPeriod=#{config_json["retention_period"] or 1}
 ExecStop=/bin/kill -s SIGTERM $MAINPID
 LimitNOFILE=65536
