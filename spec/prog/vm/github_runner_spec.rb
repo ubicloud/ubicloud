@@ -16,7 +16,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   }
 
   let(:vm) {
-    Vm.new(family: "standard", cores: 1, name: "dummy-vm", location_id: Location[name: "github-runners"].id).tap {
+    Vm.new(family: "standard", cores: 1, vcpus: 2, name: "dummy-vm", location_id: Location[name: "github-runners"].id).tap {
       it.id = "788525ed-d6f0-4937-a844-323d4fd91946"
     }
   }
@@ -120,6 +120,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   describe ".update_billing_record" do
     before do
       allow(github_runner).to receive(:workflow_job).and_return({"id" => 123})
+      allow(github_runner).to receive(:update).with(billed_vm_size: "standard-2")
     end
 
     it "not updates billing record if the runner is destroyed before it's ready" do
@@ -154,6 +155,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(Time).to receive(:now).and_return(time).at_least(:once)
       expect(github_runner).to receive(:label).and_return("ubicloud-arm").at_least(:once)
       expect(github_runner).to receive(:ready_at).and_return(time - 5 * 60).at_least(:once)
+      expect(github_runner).to receive(:update).with(billed_vm_size: "standard-2-arm")
       expect(BillingRecord).to receive(:create_with_id).and_call_original
       nx.update_billing_record
 
@@ -166,8 +168,11 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "uses separate billing rate for gpu runners" do
       time = Time.now
       expect(Time).to receive(:now).and_return(time).at_least(:once)
+      vm.family = "standard-gpu"
+      vm.vcpus = 6
       expect(github_runner).to receive(:label).and_return("ubicloud-gpu").at_least(:once)
       expect(github_runner).to receive(:ready_at).and_return(time - 5 * 60).at_least(:once)
+      expect(github_runner).to receive(:update).with(billed_vm_size: "standard-gpu-6")
       expect(BillingRecord).to receive(:create_with_id).and_call_original
       nx.update_billing_record
 
@@ -175,6 +180,22 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(br.amount).to eq(5)
       expect(br.duration(time, time)).to eq(1)
       expect(br.billing_rate["resource_family"]).to eq("standard-gpu-6")
+    end
+
+    it "uses the premium billing rate for upgraded runners" do
+      time = Time.now
+      vm.family = "premium"
+      expect(Time).to receive(:now).and_return(time).at_least(:once)
+      expect(github_runner).to receive(:label).and_return("ubicloud-standard-2").at_least(:once)
+      expect(github_runner).to receive(:ready_at).and_return(time - 5 * 60).at_least(:once)
+      expect(github_runner).to receive(:update).with(billed_vm_size: "premium-2")
+      expect(BillingRecord).to receive(:create_with_id).and_call_original
+      nx.update_billing_record
+
+      br = BillingRecord[resource_id: project.id]
+      expect(br.amount).to eq(5)
+      expect(br.duration(time, time)).to eq(1)
+      expect(br.billing_rate["resource_family"]).to eq("premium-2")
     end
 
     it "updates the amount of existing billing record" do
