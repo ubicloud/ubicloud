@@ -1,4 +1,4 @@
-<%# locals: (action:, form_elements:, option_tree:, option_parents:, method: "POST", form_title: nil, pre_selected_values: [], mode: "create") %>
+<%# locals: (action:, form_elements:, option_tree:, option_parents:, method: "POST", form_title: nil, pre_selected_values: {}, mode: "create") %>
 <% nonce = SecureRandom.base64(32)
 content_security_policy.add_script_src [:nonce, nonce] %>
 
