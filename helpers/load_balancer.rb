@@ -43,6 +43,7 @@ class Clover
         health_check_endpoint: params["health_check_endpoint"] || Prog::Vnet::LoadBalancerNexus::DEFAULT_HEALTH_CHECK_ENDPOINT,
         health_check_protocol: params["health_check_protocol"]
       ).subject
+      audit_log(lb, "create")
     end
 
     if api?

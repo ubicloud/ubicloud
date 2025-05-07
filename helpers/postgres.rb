@@ -32,6 +32,7 @@ class Clover
         version: params["version"] || PostgresResource::DEFAULT_VERSION,
         flavor: params["flavor"] || PostgresResource::Flavor::STANDARD
       ).subject
+      audit_log(pg, "create")
     end
     send_notification_mail_to_partners(pg, current_account.email)
 

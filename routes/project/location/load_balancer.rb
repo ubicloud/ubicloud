@@ -40,9 +40,11 @@ class Clover
               fail Validation::ValidationFailed.new("vm_id" => "VM is already attached to a load balancer")
             end
             lb.add_vm(vm)
+            audit_log(lb, "attach_vm", vm)
             actioned = "attached to"
           else
             lb.detach_vm(vm)
+            audit_log(lb, "detach_vm", vm)
             actioned = "detached from"
           end
         end
@@ -72,6 +74,7 @@ class Clover
         authorize("LoadBalancer:delete", lb.id)
         DB.transaction do
           lb.incr_destroy
+          audit_log(lb, "destroy")
         end
         204
       end
@@ -109,6 +112,7 @@ class Clover
         end
 
         lb.incr_update_load_balancer
+        audit_log(lb, "update")
         Serializers::LoadBalancer.serialize(lb.reload, {detailed: true})
       end
     end

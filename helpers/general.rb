@@ -30,6 +30,77 @@ class Clover < Roda
     end
   end
 
+  AUDIT_LOG_DS = DB[:audit_log].returning(nil)
+  SUPPORTED_ACTIONS = Set.new(<<~ACTIONS.split.each(&:freeze)).freeze
+    add_account
+    add_invitation
+    add_member
+    associate
+    attach_vm
+    connect
+    create
+    create_replica
+    destroy
+    destroy_invitation
+    detach_vm
+    disassociate
+    disconnect
+    promote
+    remove_account
+    remove_member
+    reset_superuser_password
+    restart
+    restore
+    restrict
+    set_maintenance_window
+    unrestrict
+    update
+    update_billing
+    update_invitation
+  ACTIONS
+  LOGGED_ACTIONS = Set.new(%w[create create_replica destroy]).freeze
+
+  def audit_log(object, action, objects = [])
+    raise "unsupported audit_log action: #{action}" unless SUPPORTED_ACTIONS.include?(action)
+
+    # Currently, only store create and destroy actions in non-test mode.
+    # This can be removed later if we decide to expand to logging all actions.
+    # :nocov:
+    return unless LOGGED_ACTIONS.include?(action) || Config.test?
+    # :nocov:
+
+    project_id = @project.id
+    subject_id = current_account.id
+    ubid_type = object.class.ubid_type
+
+    object_ids = Array(objects).map do
+      case it
+      when Sequel::Model
+        it.id
+      when String
+        if it.length == 26
+          UBID.to_uuid(it)
+        else
+          it
+        end
+      else
+        it
+      end
+    end
+
+    object_ids.compact!
+    object_ids.unshift(object.id) unless object.is_a?(Project)
+    object_ids = Sequel.pg_array(object_ids, :uuid)
+    AUDIT_LOG_DS.insert(project_id:, ubid_type:, action:, subject_id:, object_ids:)
+  end
+
+  def no_audit_log
+    # Do nothing, this is a no-op method only used to check in the specs
+    # that all non-GET requests have some form of audit logging, as an explicit
+    # indication that audit logging is not needed
+    nil
+  end
+
   def before_rodauth_create_account(account, name)
     account[:id] = Account.generate_uuid
     account[:name] = name

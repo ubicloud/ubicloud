@@ -32,6 +32,7 @@ class Clover
             DB.transaction do
               runner.incr_skip_deregistration
               runner.incr_destroy
+              audit_log(runner, "destroy")
             end
             flash["notice"] = "Runner '#{runner.ubid}' forcibly terminated"
             204
@@ -63,6 +64,7 @@ class Clover
             cache_enabled = r.params["cache_enabled"] == "true"
             DB.transaction do
               installation.update(cache_enabled: cache_enabled)
+              audit_log(installation, "update")
             end
             flash["notice"] = "Ubicloud cache is #{cache_enabled ? "enabled" : "disabled"} for the installation #{installation.name}."
 
@@ -87,6 +89,7 @@ class Clover
           r.delete true do
             DB.transaction do
               entry.destroy
+              audit_log(entry, "destroy")
             end
             flash["notice"] = "Cache '#{entry.key}' deleted."
             204

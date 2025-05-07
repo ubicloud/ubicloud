@@ -21,6 +21,7 @@ class Clover
         iak = nil
         DB.transaction do
           iak = ApiKey.create_inference_api_key(@project)
+          audit_log(iak, "create")
         end
 
         if web?
@@ -46,6 +47,7 @@ class Clover
           authorize("InferenceApiKey:delete", iak.id)
           DB.transaction do
             iak.destroy
+            audit_log(iak, "destroy")
           end
           flash["notice"] = "Inference API Key deleted successfully" if web?
         end

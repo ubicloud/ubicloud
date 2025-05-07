@@ -11,7 +11,8 @@ class Clover
         limit = Validation.validate_usage_limit(r.params["limit"])
 
         DB.transaction do
-          UsageAlert.create_with_id(project_id: @project.id, user_id: current_account_id, name: name, limit: limit)
+          ua = UsageAlert.create_with_id(project_id: @project.id, user_id: current_account_id, name: name, limit: limit)
+          audit_log(ua, "create")
         end
 
         r.redirect "#{@project.path}/billing"
@@ -23,6 +24,7 @@ class Clover
         r.delete true do
           DB.transaction do
             usage_alert.destroy
+            audit_log(usage_alert, "destroy")
           end
 
           flash["notice"] = "Usage alert #{usage_alert.name} is deleted."
