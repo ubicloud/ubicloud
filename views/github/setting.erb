@@ -24,17 +24,17 @@
             <% @installations.each do |ins| %>
               <tr>
                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <%= ins[:name] %>
+                  <%= ins.name %>
                 </td>
                 <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                   <div class="flex items-center justify-end space-x-4">
-                    <form action="<%= "#{@project_data[:path]}/github/installation/#{ins[:ubid]}" %>" role="form" method="POST">
-                      <%== csrf_tag("#{@project_data[:path]}/github/installation/#{ins[:ubid]}") %>
-                      <%== part("components/form/hidden", name: "cache_enabled", value: !ins[:cache_enabled]) %>
+                    <form action="<%= "#{@project_data[:path]}/github/installation/#{ins.ubid}" %>" role="form" method="POST">
+                      <%== csrf_tag("#{@project_data[:path]}/github/installation/#{ins.ubid}") %>
+                      <%== part("components/form/hidden", name: "cache_enabled", value: !ins.cache_enabled) %>
                       <%== part(
                         "components/button",
                         **(
-                          if ins[:cache_enabled]
+                          if ins.cache_enabled
                             { text: "Disable Ubicloud Cache", type: "danger" }
                           else
                             { text: "Enable Ubicloud Cache", type: "primary" }
@@ -43,7 +43,7 @@
                       ) %>
                     </form>
 
-                    <%== part("components/button", text: "Configure", link: ins[:installation_url]) %>
+                    <%== part("components/button", text: "Configure", link: "https://github.com/apps/#{Config.github_app_name}/installations/#{ins.installation_id}") %>
                   </div>
                 </td>
               </tr>
