@@ -31,16 +31,19 @@ class Clover
     end
     authorize("PrivateSubnet:view", ps.id)
 
-    lb = Prog::Vnet::LoadBalancerNexus.assemble(
-      ps.id,
-      name:,
-      algorithm: params["algorithm"],
-      stack: Validation.validate_load_balancer_stack(params["stack"]),
-      src_port: Validation.validate_port(:src_port, params["src_port"]),
-      dst_port: Validation.validate_port(:dst_port, params["dst_port"]),
-      health_check_endpoint: params["health_check_endpoint"] || Prog::Vnet::LoadBalancerNexus::DEFAULT_HEALTH_CHECK_ENDPOINT,
-      health_check_protocol: params["health_check_protocol"]
-    ).subject
+    lb = nil
+    DB.transaction do
+      lb = Prog::Vnet::LoadBalancerNexus.assemble(
+        ps.id,
+        name:,
+        algorithm: params["algorithm"],
+        stack: Validation.validate_load_balancer_stack(params["stack"]),
+        src_port: Validation.validate_port(:src_port, params["src_port"]),
+        dst_port: Validation.validate_port(:dst_port, params["dst_port"]),
+        health_check_endpoint: params["health_check_endpoint"] || Prog::Vnet::LoadBalancerNexus::DEFAULT_HEALTH_CHECK_ENDPOINT,
+        health_check_protocol: params["health_check_protocol"]
+      ).subject
+    end
 
     if api?
       Serializers::LoadBalancer.serialize(lb, {detailed: true})

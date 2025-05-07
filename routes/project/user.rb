@@ -41,34 +41,42 @@ class Clover
             end
           end
 
-          if (user = Account.exclude(status_id: 3)[email: email])
-            result = DB[:access_tag]
-              .returning(:hyper_tag_id)
-              .insert_conflict
-              .insert(hyper_tag_id: user.id, project_id: @project.id)
+          user = Account.exclude(status_id: 3)[email: email]
 
-            if result.empty?
-              flash["error"] = "The requested user already has access to this project"
-              r.redirect "#{@project.path}/user"
+          DB.transaction do
+            if user
+              result = DB[:access_tag]
+                .returning(:hyper_tag_id)
+                .insert_conflict
+                .insert(hyper_tag_id: user.id, project_id: @project.id)
+
+              if result.empty?
+                flash["error"] = "The requested user already has access to this project"
+                r.redirect "#{@project.path}/user"
+              end
+
+              if tag
+                tag.add_subject(user.id)
+              end
+
+              Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
+                greeting: "Hello,",
+                body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on Ubicloud.",
+                  "To join project, click the button below.",
+                  "For any questions or assistance, reach out to our team at support@ubicloud.com."],
+                button_title: "Join Project",
+                button_link: "#{Config.base_url}#{@project.path}/dashboard")
+            else
+              @project.add_invitation(email: email, policy: (policy if tag), inviter_id: current_account_id, expires_at: Time.now + 7 * 24 * 60 * 60)
+
+              Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
+                greeting: "Hello,",
+                body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on Ubicloud.",
+                  "To join project, you need to create an account on Ubicloud. Once you create an account, you'll be automatically joined to the project.",
+                  "For any questions or assistance, reach out to our team at support@ubicloud.com."],
+                button_title: "Create Account",
+                button_link: "#{Config.base_url}/create-account")
             end
-
-            tag&.add_subject(user.id)
-            Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
-              greeting: "Hello,",
-              body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on Ubicloud.",
-                "To join project, click the button below.",
-                "For any questions or assistance, reach out to our team at support@ubicloud.com."],
-              button_title: "Join Project",
-              button_link: "#{Config.base_url}#{@project.path}/dashboard")
-          else
-            @project.add_invitation(email: email, policy: (policy if tag), inviter_id: current_account_id, expires_at: Time.now + 7 * 24 * 60 * 60)
-            Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
-              greeting: "Hello,",
-              body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on Ubicloud.",
-                "To join project, you need to create an account on Ubicloud. Once you create an account, you'll be automatically joined to the project.",
-                "For any questions or assistance, reach out to our team at support@ubicloud.com."],
-              button_title: "Create Account",
-              button_link: "#{Config.base_url}/create-account")
           end
 
           flash["notice"] = "Invitation sent successfully to '#{email}'."
@@ -248,7 +256,9 @@ class Clover
 
           r.post true do
             authorize(tag_perm_map[tag_type], @project.id)
-            @tag_model.create_with_id(project_id: @project.id, name: typecast_params.nonempty_str("name"))
+            DB.transaction do
+              @tag_model.create_with_id(project_id: @project.id, name: typecast_params.nonempty_str("name"))
+            end
             flash["notice"] = "#{@display_tag_type} tag created successfully"
             r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}"
           end

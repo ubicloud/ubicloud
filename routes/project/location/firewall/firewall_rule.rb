@@ -18,7 +18,10 @@ class Clover
 
       pg_range = Sequel.pg_range(port_range.first..port_range.last)
 
-      firewall_rule = @firewall.insert_firewall_rule(parsed_cidr.to_s, pg_range)
+      firewall_rule = nil
+      DB.transaction do
+        firewall_rule = @firewall.insert_firewall_rule(parsed_cidr.to_s, pg_range)
+      end
 
       Serializers::FirewallRule.serialize(firewall_rule)
     end
@@ -29,7 +32,9 @@ class Clover
 
       r.delete true do
         authorize("Firewall:edit", @firewall.id)
-        @firewall.remove_firewall_rule(firewall_rule)
+        DB.transaction do
+          @firewall.remove_firewall_rule(firewall_rule)
+        end
         204
       end
 

@@ -18,7 +18,11 @@ class Clover
 
       r.post do
         authorize("InferenceApiKey:create", @project.id)
-        iak = DB.transaction { ApiKey.create_inference_api_key(@project) }
+        iak = nil
+        DB.transaction do
+          iak = ApiKey.create_inference_api_key(@project)
+        end
+
         if web?
           flash["notice"] = "Created Inference API Key with id #{iak.ubid}. It may take a few minutes to sync."
           r.redirect "#{@project.path}/inference-api-key"
@@ -40,7 +44,9 @@ class Clover
       r.delete do
         if iak
           authorize("InferenceApiKey:delete", iak.id)
-          iak.destroy
+          DB.transaction do
+            iak.destroy
+          end
           flash["notice"] = "Inference API Key deleted successfully" if web?
         end
         204
