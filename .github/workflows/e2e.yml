@@ -137,6 +137,14 @@ jobs:
       if: always()
       run: grep -h -v -E "sleep_duration_sec|monitor.1" foreman.log
 
+    - name: Extract image download time
+      if: always()
+      id: extract_download
+      run: |
+        download_time="$(grep "VmHost.wait_download_boot_images" foreman.log | cut -d'|' -f2 | tail -1)"
+        echo "### Image downloaded in $download_time" >> $GITHUB_STEP_SUMMARY
+        echo "DOWNLOAD_TIME=$download_time" >> $GITHUB_OUTPUT
+
     - name: Upload logs
       if: always()
       uses: actions/upload-artifact@v4
@@ -162,5 +170,8 @@ jobs:
                   short: true
                   value: "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.ref_name }}>"
                 - title: "Action"
-                  short: false
+                  short: true
                   value: "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.workflow }}>"
+                - title: "Download Time"
+                  short: true
+                  value: "${{ steps.extract_download.outputs.DOWNLOAD_TIME }}"
