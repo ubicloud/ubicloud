@@ -39,8 +39,9 @@ class Clover
     if api?
       Serializers::Firewall.serialize(firewall)
     else
-      private_subnet = PrivateSubnet.from_ubid(request.params["private_subnet_id"])
-      firewall.associate_with_private_subnet(private_subnet) if private_subnet
+      if (private_subnet = authorized_private_subnet(perm: "PrivateSubnet:edit", location_id: @location.id))
+        firewall.associate_with_private_subnet(private_subnet)
+      end
 
       flash["notice"] = "'#{firewall_name}' is created"
       request.redirect "#{@project.path}#{firewall.path}"
