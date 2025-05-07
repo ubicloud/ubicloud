@@ -12,87 +12,82 @@ class Clover
       authorize("Project:github", @project.id)
 
       r.get true do
-        if @project.github_installations.empty?
-          r.redirect "#{@project.path}/github/setting"
+        if (installation = @project.github_installations.first)
+          r.redirect "#{@project.path}/github/#{installation.ubid}/runner"
         end
-        r.redirect "#{@project.path}/github/runner"
+        view "github/index"
       end
 
-      r.on "runner" do
-        r.get true do
-          @runners = Serializers::GithubRunner.serialize(@project.github_runners_dataset.eager(:vm, :strand).reverse(:created_at).all)
+      r.get "create" do
+        unless @project.has_valid_payment_method?
+          flash["error"] = "Project doesn't have valid billing information"
+          r.redirect "#{@project.path}/github"
+        end
+        session[:github_installation_project_id] = @project.id
 
-          view "github/runner"
+        r.redirect "https://github.com/apps/#{Config.github_app_name}/installations/new", 302
+      end
+
+      r.on :ubid_uuid do |id|
+        next unless (@installation = GithubInstallation[id:, project_id: @project.id])
+
+        r.get "setting" do
+          view "github/setting"
         end
 
-        r.is :ubid_uuid do |id|
-          next unless (runner = GithubRunner[id:, installation_id: GithubInstallation.select(:id).where(project_id: @project.id)])
+        r.post true do
+          cache_enabled = r.params["cache_enabled"] == "true"
+          DB.transaction do
+            @installation.update(cache_enabled:)
+            audit_log(@installation, "update")
+          end
+          flash["notice"] = "Ubicloud cache is #{cache_enabled ? "enabled" : "disabled"} for the installation #{@installation.name}."
 
-          r.delete true do
-            DB.transaction do
-              runner.incr_skip_deregistration
-              runner.incr_destroy
-              audit_log(runner, "destroy")
+          r.redirect "#{@project.path}/github/#{@installation.ubid}/setting"
+        end
+
+        r.on "runner" do
+          r.get true do
+            @runners = Serializers::GithubRunner.serialize(@installation.runners_dataset.eager(:vm, :strand).reverse(:created_at).all)
+
+            view "github/runner"
+          end
+
+          r.is :ubid_uuid do |id|
+            next unless (runner = GithubRunner[id:, installation_id: GithubInstallation.select(:id).where(project_id: @project.id)])
+
+            r.delete true do
+              DB.transaction do
+                runner.incr_skip_deregistration
+                runner.incr_destroy
+                audit_log(runner, "destroy")
+              end
+              flash["notice"] = "Runner '#{runner.ubid}' forcibly terminated"
+              204
             end
-            flash["notice"] = "Runner '#{runner.ubid}' forcibly terminated"
-            204
           end
         end
-      end
 
-      r.get "setting" do
-        @installations = @project.github_installations
+        r.on "cache" do
+          r.get true do
+            entries = @installation.cache_entries_dataset.exclude(committed_at: nil).eager(:repository).reverse(:created_at).all
+            @entries_by_repo = Serializers::GithubCacheEntry.serialize(entries).group_by { it[:repository][:id] }
+            @quota_per_repo = "#{@project.effective_quota_value("GithubRunnerCacheStorage")} GB"
 
-        view "github/setting"
-      end
-
-      r.on "installation" do
-        r.get "create" do
-          unless @project.has_valid_payment_method?
-            flash["error"] = "Project doesn't have valid billing information"
-            r.redirect "#{@project.path}/github"
+            view "github/cache"
           end
-          session[:github_installation_project_id] = @project.id
 
-          r.redirect "https://github.com/apps/#{Config.github_app_name}/installations/new", 302
-        end
+          r.is :ubid_uuid do |id|
+            next unless (entry = GithubCacheEntry[id:, repository_id: GithubRepository.select(:id).where(installation_id: GithubInstallation.select(:id).where(project_id: @project.id))])
 
-        r.on :ubid_uuid do |id|
-          next unless (installation = GithubInstallation[id:, project_id: @project.id])
-
-          r.post true do
-            cache_enabled = r.params["cache_enabled"] == "true"
-            DB.transaction do
-              installation.update(cache_enabled: cache_enabled)
-              audit_log(installation, "update")
+            r.delete true do
+              DB.transaction do
+                entry.destroy
+                audit_log(entry, "destroy")
+              end
+              flash["notice"] = "Cache '#{entry.key}' deleted."
+              204
             end
-            flash["notice"] = "Ubicloud cache is #{cache_enabled ? "enabled" : "disabled"} for the installation #{installation.name}."
-
-            r.redirect "#{@project.path}/github/setting"
-          end
-        end
-      end
-
-      r.on "cache" do
-        r.get true do
-          repository_id_q = @project.github_installations_dataset.join(:github_repository, installation_id: :id).select(Sequel[:github_repository][:id])
-          entries = GithubCacheEntry.where(repository_id: repository_id_q).exclude(committed_at: nil).eager(:repository).reverse(:created_at).all
-          @entries_by_repo = Serializers::GithubCacheEntry.serialize(entries).group_by { it[:repository][:id] }
-          @quota_per_repo = "#{@project.effective_quota_value("GithubRunnerCacheStorage")} GB"
-
-          view "github/cache"
-        end
-
-        r.is :ubid_uuid do |id|
-          next unless (entry = GithubCacheEntry[id:, repository_id: GithubRepository.select(:id).where(installation_id: GithubInstallation.select(:id).where(project_id: @project.id))])
-
-          r.delete true do
-            DB.transaction do
-              entry.destroy
-              audit_log(entry, "destroy")
-            end
-            flash["notice"] = "Cache '#{entry.key}' deleted."
-            204
           end
         end
       end
