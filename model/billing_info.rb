@@ -15,7 +15,9 @@ class BillingInfo < Sequel::Model
     if (Stripe.api_key = Config.stripe_secret_key)
       @stripe_data ||= begin
         data = Stripe::Customer.retrieve(stripe_id)
-        address = data["address"]
+        return nil unless data
+        address = data["address"] || {}
+        metadata = data["metadata"] || {}
         {
           "name" => data["name"],
           "email" => data["email"],
@@ -24,11 +26,15 @@ class BillingInfo < Sequel::Model
           "city" => address["city"],
           "state" => address["state"],
           "postal_code" => address["postal_code"],
-          "tax_id" => data["metadata"]["tax_id"],
-          "company_name" => data["metadata"]["company_name"]
+          "tax_id" => metadata["tax_id"],
+          "company_name" => metadata["company_name"]
         }
       end
     end
+  end
+
+  def has_address?
+    !stripe_data&.[]("address").to_s.empty?
   end
 
   def country

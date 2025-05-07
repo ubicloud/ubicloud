@@ -30,6 +30,13 @@ class Clover
         rescue Sequel::UniqueConstraintViolation
           flash["error"] = "Discount code has already been applied to this project."
         else
+          unless @project.billing_info
+            stripe_customer = Stripe::Customer.create(name: current_account.name, email: current_account.email)
+            DB.transaction do
+              billing_info = BillingInfo.create_with_id(stripe_id: stripe_customer["id"])
+              @project.update(billing_info_id: billing_info.id)
+            end
+          end
           flash["notice"] = "Discount code successfully applied."
         end
 

@@ -28,7 +28,7 @@ class InvoiceGenerator
         project_content[:billing_info] = project.billing_info&.stripe_data&.merge({
           "id" => project.billing_info.id,
           "ubid" => project.billing_info.ubid,
-          "in_eu_vat" => !!country.in_eu_vat?
+          "in_eu_vat" => !!country&.in_eu_vat?
         })
 
         # Invoices are issued by Ubicloud Inc. for non-EU customers without VAT applied.

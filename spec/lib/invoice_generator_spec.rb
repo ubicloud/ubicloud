@@ -228,6 +228,15 @@ RSpec.describe InvoiceGenerator do
       invoices = described_class.new(begin_time, end_time).run
       expect(invoices.first.content["vat_info"]).to be_nil
     end
+
+    it "charges no VAT if the address is missing" do
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => nil}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time, begin_time + 0.5 * day), 2)
+      invoices = described_class.new(begin_time, end_time).run
+      expect(invoices.first.content["vat_info"]).to be_nil
+    end
   end
 
   it "generates invoice for a single project" do

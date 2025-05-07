@@ -62,8 +62,8 @@ RSpec.describe Clover, "billing" do
       # rubocop:enable RSpec/VerifiedDoubles
       expect(Stripe::Checkout::Session).to receive(:retrieve).with("session_123").and_return({"setup_intent" => "st_123456790"})
       expect(Stripe::SetupIntent).to receive(:retrieve).with("st_123456790").and_return({"customer" => "cs_1234567890", "payment_method" => "pm_1234567890"})
-      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}}).twice
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_1234567890").and_return({"card" => {"brand" => "visa"}}).thrice
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"line1" => "Test Rd", "country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}}).exactly(3)
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_1234567890").and_return({"card" => {"brand" => "visa"}, "billing_details" => {}}).thrice
 
       visit project.path
 
@@ -129,6 +129,25 @@ RSpec.describe Clover, "billing" do
       expect(page).to have_field("Country", with: "DE")
     end
 
+    it "can update billing info without address" do
+      expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return(
+        {"name" => "Old Inc.", "address" => nil, "metadata" => {}},
+        {"name" => "New Inc.", "address" => nil, "metadata" => {}}
+      ).at_least(:once)
+      expect(Stripe::Customer).to receive(:update).with(billing_info.stripe_id, anything)
+      visit "#{project.path}/billing"
+
+      expect(page.title).to eq("Ubicloud - Project Billing")
+      expect(page).to have_field("Billing Name", with: "Old Inc.")
+
+      fill_in "Billing Name", with: "New Inc."
+
+      click_button "Update"
+
+      expect(page.status_code).to eq(200)
+      expect(page).to have_field("Billing Name", with: "New Inc.")
+    end
+
     it "can update tax id" do
       expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return(
         {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
@@ -173,11 +192,13 @@ RSpec.describe Clover, "billing" do
     end
 
     it "can add new payment method" do
-      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}}).twice
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"line1" => "Some Rd", "country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}}).exactly(4)
       expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}}).twice
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_222222222").and_return({"card" => {"brand" => "mastercard"}}).twice
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_222222222").and_return({"card" => {"brand" => "mastercard"}, "billing_details" => {}}).twice
       # rubocop:disable RSpec/VerifiedDoubles
-      expect(Stripe::Checkout::Session).to receive(:create).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/success?session_id=session_123"))
+      expect(Stripe::Checkout::Session).to receive(:create).with(
+        hash_including(billing_address_collection: "auto")
+      ).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/success?session_id=session_123"))
       expect(Stripe::PaymentIntent).to receive(:create).and_return(double(Stripe::PaymentIntent, status: "requires_capture", id: "pi_1234567890"))
       # rubocop:enable RSpec/VerifiedDoubles
       expect(Stripe::Checkout::Session).to receive(:retrieve).with("session_123").and_return({"setup_intent" => "st_123456790"})
@@ -194,9 +215,40 @@ RSpec.describe Clover, "billing" do
       expect(page).to have_content "Mastercard"
     end
 
+    it "can copy billing address from new payment method when missing" do
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return(
+        {"name" => "ACME Inc.", "address" => nil, "metadata" => {"company_name" => "Foo Company Name"}},
+        {"name" => "ACME Inc.", "address" => nil, "metadata" => {"company_name" => "Foo Company Name"}},
+        {"name" => "ACME Inc.", "address" => nil, "metadata" => {"company_name" => "Foo Company Name"}},
+        {"name" => "ACME Inc.", "address" => {"country" => "US"}, "metadata" => {"company_name" => "Foo Company Name"}}
+      ).exactly(4)
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}}).twice
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_222222222").and_return({"card" => {"brand" => "mastercard"}, "billing_details" => {"address" => {"country" => "US"}}}).twice
+      # rubocop:disable RSpec/VerifiedDoubles
+      expect(Stripe::Checkout::Session).to receive(:create).with(
+        hash_including(billing_address_collection: "required")
+      ).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/success?session_id=session_123"))
+      expect(Stripe::PaymentIntent).to receive(:create).and_return(double(Stripe::PaymentIntent, status: "requires_capture", id: "pi_1234567890"))
+      # rubocop:enable RSpec/VerifiedDoubles
+      expect(Stripe::Checkout::Session).to receive(:retrieve).with("session_123").and_return({"setup_intent" => "st_123456790"})
+      expect(Stripe::SetupIntent).to receive(:retrieve).with("st_123456790").and_return({"payment_method" => "pm_222222222"})
+      expect(Stripe::Customer).to receive(:update).with("cs_1234567890", hash_including(address: {"country" => "US"})).at_least(:once)
+
+      visit "#{project.path}/billing"
+
+      click_link "Add Payment Method"
+
+      expect(page.status_code).to eq(200)
+      expect(page.title).to eq("Ubicloud - Project Billing")
+      expect(billing_info.payment_methods.count).to eq(2)
+      expect(page).to have_content "Visa"
+      expect(page).to have_content "Mastercard"
+      expect(page).to have_field("Country", with: "US")
+    end
+
     it "can't add fraud payment method" do
       fraud_payment_method = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pmi_1234567890", fraud: true, card_fingerprint: "cfg1234")
-      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}}).twice
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}}).exactly(3)
       expect(Stripe::PaymentMethod).to receive(:retrieve).with(fraud_payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}}).twice
       expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_222222222").and_return({"card" => {"brand" => "mastercard", "fingerprint" => "cfg1234"}})
       # rubocop:disable RSpec/VerifiedDoubles
@@ -233,7 +285,7 @@ RSpec.describe Clover, "billing" do
     end
 
     it "can't delete last payment method" do
-      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}})
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}})
       expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}})
 
       visit "#{project.path}/billing"
@@ -267,7 +319,7 @@ RSpec.describe Clover, "billing" do
       expect(billing_info.reload.payment_methods.count).to eq(1)
     end
 
-    describe "discount code" do
+    describe "discount code with billing info" do
       before do
         expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return(
           {"name" => "New Inc.", "address" => {"country" => "DE"}, "metadata" => {"tax_id" => "DE456789"}}
@@ -316,6 +368,47 @@ RSpec.describe Clover, "billing" do
         expect(page).to have_flash_error "Discount code has already been applied to this project."
         expect(page).to have_content "$0.00"
         expect(project.reload.credit).to eq(0.00)
+      end
+    end
+
+    describe "discount code without billing info" do
+      it "can create billing info if missing when adding a valid discount code" do
+        DiscountCode.create_with_id(code: "VALID_CODE", credit_amount: 33, expires_at: Time.now + 86400)
+        customer = {
+          "id" => "test_customer",
+          "name" => "ACME Inc.",
+          "email" => "test@example.com",
+          "address" => nil,
+          "metadata" => {}
+        }
+        expect(Stripe::Customer).to receive(:create).and_return(customer).once
+        expect(Stripe::Customer).to receive(:retrieve).with("test_customer").and_return(customer).once
+
+        visit project.path
+
+        within "#desktop-menu" do
+          click_link "Billing"
+        end
+
+        visit "#{project.path}/billing"
+        expect(project.billing_info_id).to be_nil
+        fill_in "Discount Code", with: "VALID_CODE"
+        click_button "Apply"
+
+        expect(page).to have_flash_notice "Discount code successfully applied."
+        expect(page).to have_content "$33.00"
+        expect(project.reload.credit).to eq(33.00)
+        expect(project.billing_info_id).not_to be_nil
+      end
+
+      it "shows error if the discount code is invalid without creating billing info" do
+        visit "#{project.path}/billing"
+        fill_in "Discount Code", with: "INVALID_CODE"
+        click_button "Apply"
+
+        expect(page).to have_flash_error "Discount code not found."
+        expect(page).to have_content "Add new billing information"
+        expect(project.billing_info_id).to be_nil
       end
     end
 
