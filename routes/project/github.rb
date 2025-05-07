@@ -38,7 +38,7 @@ class Clover
       end
 
       r.get "setting" do
-        @installations = Serializers::GithubInstallation.serialize(@project.github_installations)
+        @installations = @project.github_installations
 
         view "github/setting"
       end
