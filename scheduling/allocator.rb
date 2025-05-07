@@ -259,12 +259,14 @@ module Scheduling::Allocator
     def self.update_vm(vm_host, vm)
       ip4, address = vm_host.ip4_random_vm_network if vm.ip4_enabled
       fail "no ip4 addresses left" if vm.ip4_enabled && !ip4
-      vm.update(
+      update_args = {
         vm_host_id: vm_host.id,
         ephemeral_net6: vm_host.ip6_random_vm_network.to_s,
         local_vetho_ip: vm_host.veth_pair_random_ip4_addr.to_s,
         allocated_at: Time.now
-      )
+      }
+      update_args[:family] = vm_host.family if vm.family != "burstable"
+      vm.update(**update_args)
       AssignedVmAddress.create_with_id(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id) if ip4
       vm.sshable&.update(host: vm.ephemeral_net4 || NetAddr.parse_net(vm.ephemeral_net6).nth(2))
     end
