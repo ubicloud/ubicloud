@@ -86,6 +86,7 @@ end
 #  workflow_job    | jsonb                    |
 #  repository_id   | uuid                     |
 #  allocated_at    | timestamp with time zone |
+#  billed_vm_size  | text                     |
 # Indexes:
 #  github_runner_pkey      | PRIMARY KEY btree (id)
 #  github_runner_vm_id_key | UNIQUE btree (vm_id)
