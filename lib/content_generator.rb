@@ -157,6 +157,10 @@ module ContentGenerator
 
       "#{worker_nodes[:display_name]} - $#{"%.2f" % (worker_nodes[:value] * node_price * 60 * 672)}/mo ($#{"%.3f" % (worker_nodes[:value] * node_price * 60)}/hour)"
     end
+
+    def self.version(version)
+      "Kubernetes #{version}"
+    end
   end
 
   module PrivateLocation

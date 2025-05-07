@@ -22,6 +22,10 @@ module Option
     Location.where(name: ["hetzner-fsn1", "leaseweb-wdc02"]).all
   end
 
+  def self.kubernetes_versions
+    ["v1.32", "v1.33"].freeze
+  end
+
   def self.families
     Option::VmFamilies.select { it.visible }
   end

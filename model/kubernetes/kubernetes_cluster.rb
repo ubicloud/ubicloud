@@ -23,7 +23,7 @@ class KubernetesCluster < Sequel::Model
   def validate
     super
     errors.add(:cp_node_count, "must be greater than 0") if cp_node_count <= 0
-    errors.add(:version, "must be a valid Kubernetes version") unless ["v1.32", "v1.31"].include?(version)
+    errors.add(:version, "must be a valid Kubernetes version") unless Option.kubernetes_versions.include?(version)
   end
 
   def display_state

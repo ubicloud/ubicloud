@@ -16,6 +16,7 @@
   form_elements = [
     {name: "name", type: "text", label: "Cluster Name", required: "required", placeholder: "Enter cluster name"},
     {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::KubernetesCluster.method(:location)},
+    {name: "version", type: "radio_small_cards", label: "Version", required: "required", content_generator: ContentGenerator::KubernetesCluster.method(:version)},
     {name: "cp_nodes", type: "radio_small_cards", label: "Control Plane", required: "required", content_generator: ContentGenerator::KubernetesCluster.method(:cp_nodes)},
     {name: "worker_nodes", type: "select", label: "Worker Nodes", required: "required", placeholder: "Select number of worker nodes", content_generator: ContentGenerator::KubernetesCluster.method(:worker_nodes), opening_tag: "<div class='sm:col-span-3'>"},
   ]
