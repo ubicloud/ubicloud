@@ -10,7 +10,9 @@ class Clover
         Validation.validate_short_text(name, "name")
         limit = Validation.validate_usage_limit(r.params["limit"])
 
-        UsageAlert.create_with_id(project_id: @project.id, user_id: current_account_id, name: name, limit: limit)
+        DB.transaction do
+          UsageAlert.create_with_id(project_id: @project.id, user_id: current_account_id, name: name, limit: limit)
+        end
 
         r.redirect "#{@project.path}/billing"
       end
@@ -19,7 +21,10 @@ class Clover
         next unless (usage_alert = UsageAlert.from_ubid(usage_alert_ubid)) && usage_alert.project_id == @project.id
 
         r.delete true do
-          usage_alert.destroy
+          DB.transaction do
+            usage_alert.destroy
+          end
+
           flash["notice"] = "Usage alert #{usage_alert.name} is deleted."
           204
         end

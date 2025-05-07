@@ -29,8 +29,10 @@ class Clover
           next unless (runner = GithubRunner.from_ubid(runner_ubid)) && runner.installation.project_id == @project.id
 
           r.delete true do
-            runner.incr_skip_deregistration
-            runner.incr_destroy
+            DB.transaction do
+              runner.incr_skip_deregistration
+              runner.incr_destroy
+            end
             flash["notice"] = "Runner '#{runner.ubid}' forcibly terminated"
             204
           end
@@ -59,7 +61,9 @@ class Clover
 
           r.post true do
             cache_enabled = r.params["cache_enabled"] == "true"
-            installation.update(cache_enabled: cache_enabled)
+            DB.transaction do
+              installation.update(cache_enabled: cache_enabled)
+            end
             flash["notice"] = "Ubicloud cache is #{cache_enabled ? "enabled" : "disabled"} for the installation #{installation.name}."
 
             r.redirect "#{@project.path}/github/setting"
@@ -81,7 +85,9 @@ class Clover
           next unless (entry = GithubCacheEntry.from_ubid(entry_ubid)) && entry.repository.installation.project_id == @project.id
 
           r.delete true do
-            entry.destroy
+            DB.transaction do
+              entry.destroy
+            end
             flash["notice"] = "Cache '#{entry.key}' deleted."
             204
           end

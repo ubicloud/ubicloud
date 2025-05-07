@@ -25,12 +25,15 @@ class Clover
 
     description = request.params["description"] || ""
 
-    firewall = Firewall.create_with_id(
-      name: firewall_name,
-      description:,
-      location_id: @location.id,
-      project_id: @project.id
-    )
+    firewall = nil
+    DB.transaction do
+      firewall = Firewall.create_with_id(
+        name: firewall_name,
+        description:,
+        location_id: @location.id,
+        project_id: @project.id
+      )
+    end
 
     if api?
       Serializers::Firewall.serialize(firewall)

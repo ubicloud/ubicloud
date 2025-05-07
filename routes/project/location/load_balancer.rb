@@ -32,16 +32,19 @@ class Clover
         end
 
         authorize("Vm:view", vm.id)
+        actioned = nil
 
-        if action == "attach-vm"
-          if vm.load_balancer
-            fail Validation::ValidationFailed.new("vm_id" => "VM is already attached to a load balancer")
+        DB.transaction do
+          if action == "attach-vm"
+            if vm.load_balancer
+              fail Validation::ValidationFailed.new("vm_id" => "VM is already attached to a load balancer")
+            end
+            lb.add_vm(vm)
+            actioned = "attached to"
+          else
+            lb.detach_vm(vm)
+            actioned = "detached from"
           end
-          lb.add_vm(vm)
-          actioned = "attached to"
-        else
-          lb.detach_vm(vm)
-          actioned = "detached from"
         end
 
         if api?
@@ -67,7 +70,9 @@ class Clover
 
       r.delete true do
         authorize("LoadBalancer:delete", lb.id)
-        lb.incr_destroy
+        DB.transaction do
+          lb.incr_destroy
+        end
         204
       end
 

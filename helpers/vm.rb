@@ -60,18 +60,22 @@ class Clover
     requested_vm_vcpu_count = parsed_size.nil? ? 2 : parsed_size.vcpus
     Validation.validate_vcpu_quota(project, "VmVCpu", requested_vm_vcpu_count)
 
-    st = Prog::Vm::Nexus.assemble(
-      params["public_key"],
-      project.id,
-      name: name,
-      location_id: @location.id,
-      **assemble_params.transform_keys(&:to_sym)
-    )
+    vm = nil
+    DB.transaction do
+      vm = Prog::Vm::Nexus.assemble(
+        params["public_key"],
+        project.id,
+        name: name,
+        location_id: @location.id,
+        **assemble_params.transform_keys(&:to_sym)
+      ).subject
+    end
+
     if api?
-      Serializers::Vm.serialize(st.subject, {detailed: true})
+      Serializers::Vm.serialize(vm, {detailed: true})
     else
       flash["notice"] = "'#{name}' will be ready in a few minutes"
-      request.redirect "#{project.path}#{st.subject.path}"
+      request.redirect "#{project.path}#{vm.path}"
     end
   end
 

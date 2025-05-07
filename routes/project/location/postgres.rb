@@ -38,7 +38,9 @@ class Clover
 
       r.delete true do
         authorize("Postgres:delete", pg.id)
-        pg.incr_destroy
+        DB.transaction do
+          pg.incr_destroy
+        end
         204
       end
 
@@ -83,9 +85,11 @@ class Clover
 
       r.post "restart" do
         authorize("Postgres:edit", pg.id)
-        pg.servers.each do |s|
-          s.incr_restart
-        rescue Sequel::ForeignKeyConstraintViolation
+        DB.transaction do
+          pg.servers.each do |s|
+            s.incr_restart
+          rescue Sequel::ForeignKeyConstraintViolation
+          end
         end
 
         if api?
@@ -111,9 +115,10 @@ class Clover
           params = check_required_web_params(["cidr"])
           parsed_cidr = Validation.validate_cidr(params["cidr"])
 
-          firewall_rule = DB.transaction do
+          firewall_rule = nil
+          DB.transaction do
             pg.incr_update_firewall_rules
-            PostgresFirewallRule.create_with_id(
+            firewall_rule = PostgresFirewallRule.create_with_id(
               postgres_resource_id: pg.id,
               cidr: parsed_cidr.to_s
             )
@@ -186,18 +191,21 @@ class Clover
           authorize("Postgres:edit", pg.id)
 
           params = check_required_web_params(["name"])
-          st = Prog::Postgres::PostgresResourceNexus.assemble(
-            project_id: @project.id,
-            location_id: pg.location_id,
-            name: params["name"],
-            target_vm_size: pg.target_vm_size,
-            target_storage_size_gib: pg.target_storage_size_gib,
-            ha_type: PostgresResource::HaType::NONE,
-            version: pg.version,
-            flavor: pg.flavor,
-            parent_id: pg.id,
-            restore_target: nil
-          )
+          st = nil
+          DB.transaction do
+            st = Prog::Postgres::PostgresResourceNexus.assemble(
+              project_id: @project.id,
+              location_id: pg.location_id,
+              name: params["name"],
+              target_vm_size: pg.target_vm_size,
+              target_storage_size_gib: pg.target_storage_size_gib,
+              ha_type: PostgresResource::HaType::NONE,
+              version: pg.version,
+              flavor: pg.flavor,
+              parent_id: pg.id,
+              restore_target: nil
+            )
+          end
           send_notification_mail_to_partners(st.subject, current_account.email)
 
           if api?
@@ -222,7 +230,10 @@ class Clover
           end
         end
 
-        pg.incr_promote
+        DB.transaction do
+          pg.incr_promote
+        end
+
         if api?
           Serializers::Postgres.serialize(pg)
         else
@@ -236,18 +247,21 @@ class Clover
         authorize("Postgres:view", pg.id)
 
         params = check_required_web_params(["name", "restore_target"])
+        st = nil
 
-        st = Prog::Postgres::PostgresResourceNexus.assemble(
-          project_id: @project.id,
-          location_id: pg.location_id,
-          name: params["name"],
-          target_vm_size: pg.target_vm_size,
-          target_storage_size_gib: pg.target_storage_size_gib,
-          version: pg.version,
-          flavor: pg.flavor,
-          parent_id: pg.id,
-          restore_target: params["restore_target"]
-        )
+        DB.transaction do
+          st = Prog::Postgres::PostgresResourceNexus.assemble(
+            project_id: @project.id,
+            location_id: pg.location_id,
+            name: params["name"],
+            target_vm_size: pg.target_vm_size,
+            target_storage_size_gib: pg.target_storage_size_gib,
+            version: pg.version,
+            flavor: pg.flavor,
+            parent_id: pg.id,
+            restore_target: params["restore_target"]
+          )
+        end
         send_notification_mail_to_partners(st.subject, current_account.email)
 
         if api?
@@ -289,7 +303,9 @@ class Clover
       r.post "set-maintenance-window" do
         authorize("Postgres:edit", pg.id)
 
-        pg.update(maintenance_window_start_at: r.params["maintenance_window_start_at"])
+        DB.transaction do
+          pg.update(maintenance_window_start_at: r.params["maintenance_window_start_at"])
+        end
 
         if api?
           Serializers::Postgres.serialize(pg, {detailed: true})

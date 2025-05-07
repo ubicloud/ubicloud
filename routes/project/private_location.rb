@@ -99,7 +99,10 @@ class Clover
       r.post do
         authorize("Location:edit", @project.id)
         Validation.validate_name(r.params["name"])
-        @location.update(ui_name: r.params["name"], display_name: r.params["name"])
+
+        DB.transaction do
+          @location.update(ui_name: r.params["name"], display_name: r.params["name"])
+        end
 
         if api?
           Serializers::PrivateLocation.serialize(@location)

@@ -43,13 +43,16 @@ class Clover
         next unless token
 
         r.post %w[unrestrict-access restrict-access] do |action|
-          if action == "restrict-access"
-            token.restrict_token_for_project(@project.id)
-            flash["notice"] = "Restricted personal access token"
-          else
-            token.unrestrict_token_for_project(@project.id)
-            flash["notice"] = "Token access is now unrestricted"
+          DB.transaction do
+            if action == "restrict-access"
+              token.restrict_token_for_project(@project.id)
+              flash["notice"] = "Restricted personal access token"
+            else
+              token.unrestrict_token_for_project(@project.id)
+              flash["notice"] = "Token access is now unrestricted"
+            end
           end
+
           r.redirect "#{@project.path}/token/#{token.ubid}/access-control"
         end
 

@@ -20,23 +20,26 @@ class Clover
     requested_postgres_vcpu_count = (requested_standby_count + 1) * parsed_size.vcpu
     Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count)
 
-    st = Prog::Postgres::PostgresResourceNexus.assemble(
-      project_id: @project.id,
-      location_id: @location.id,
-      name:,
-      target_vm_size: parsed_size.vm_size,
-      target_storage_size_gib: params["storage_size"] || parsed_size.storage_size_options.first,
-      ha_type: params["ha_type"] || PostgresResource::HaType::NONE,
-      version: params["version"] || PostgresResource::DEFAULT_VERSION,
-      flavor: params["flavor"] || PostgresResource::Flavor::STANDARD
-    )
-    send_notification_mail_to_partners(st.subject, current_account.email)
+    pg = nil
+    DB.transaction do
+      pg = Prog::Postgres::PostgresResourceNexus.assemble(
+        project_id: @project.id,
+        location_id: @location.id,
+        name:,
+        target_vm_size: parsed_size.vm_size,
+        target_storage_size_gib: params["storage_size"] || parsed_size.storage_size_options.first,
+        ha_type: params["ha_type"] || PostgresResource::HaType::NONE,
+        version: params["version"] || PostgresResource::DEFAULT_VERSION,
+        flavor: params["flavor"] || PostgresResource::Flavor::STANDARD
+      ).subject
+    end
+    send_notification_mail_to_partners(pg, current_account.email)
 
     if api?
-      Serializers::Postgres.serialize(st.subject, {detailed: true})
+      Serializers::Postgres.serialize(pg, {detailed: true})
     else
       flash["notice"] = "'#{name}' will be ready in a few minutes"
-      request.redirect "#{@project.path}#{PostgresResource[st.id].path}"
+      request.redirect "#{@project.path}#{pg.path}"
     end
   end
 
