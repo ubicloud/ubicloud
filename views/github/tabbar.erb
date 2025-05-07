@@ -15,8 +15,9 @@
           #{@project.github_installations.map do |ins|
             <<-ITEM
             <div class="hover:bg-gray-50" role="none">
-              <a href="#{@project_data[:path]}/github/#{ins.ubid}/runner" class="block px-4 py-3 focus:outline-none">
-                <h3 class="text-sm leading-6 text-gray-900 #{(ins.id == @installation.id) ? "font-semibold" : ""}">#{ins.name}</h3>
+              <a href="#{@project_data[:path]}/github/#{ins.ubid}/runner" class="flex items-center px-4 py-3 text-sm leading-6 text-gray-700">
+                <img src="https://github.com/#{ins.name}.png?size=64" alt="" class="mr-2 size-6 shrink-0 rounded-lg drop-shadow-sm">
+                <span class="#{(ins.id == @installation.id) ? "font-semibold" : ""}">#{ins.name}</span>
               </a>
             </div>
             ITEM
@@ -25,6 +26,9 @@
         <div>
           <div class="hover:bg-gray-50">
             <a href="#{@project_data[:path]}/github/create" class="flex items-center px-4 py-3 text-sm leading-6 text-gray-700">
+              <div class="mr-2 size-6 shrink-0 rounded-lg bg-gray-400 flex items-center justify-center drop-shadow-sm">
+                #{part("components/icon", name: "github", classes: "size-4 text-white")}
+              </div>
               Connect New Account
             </a>
           </div>
