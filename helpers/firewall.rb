@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
 class Clover
+  def authorized_firewall(perm: "Firewall:view", location_id: nil)
+    authorized_object(association: :firewalls, key: "firewall_id", perm:, location_id:)
+  end
+
   def firewall_list_dataset
     dataset_authorize(@project.firewalls_dataset, "Firewall:view")
   end
