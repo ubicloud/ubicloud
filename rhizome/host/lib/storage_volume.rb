@@ -85,10 +85,10 @@ path: "#{disk_file}"
 image_path: "#{@image_path}"
 socket: "#{vhost_sock}"
 num_queues: 1
-queue_size: 256
-seg_size_max: 4096
-seg_count_max: 1
-poll_queue_timeout_us: 500
+queue_size: 64
+seg_size_max: 65536
+seg_count_max: 4
+poll_queue_timeout_us: 1000
 encryption_key:
   - "#{encryption_key[:key]}"
   - "#{encryption_key[:key2]}"
