@@ -77,7 +77,7 @@ RSpec.describe Clover, "github" do
 
     visit "/github/callback?code=invalid"
 
-    expect(page.title).to eq("Ubicloud - GitHub Runner Settings")
+    expect(page.title).to eq("Ubicloud - GitHub Runners Integration")
     expect(page).to have_flash_error(/^GitHub App installation failed.*/)
   end
 
@@ -88,7 +88,7 @@ RSpec.describe Clover, "github" do
 
     visit "/github/callback?code=123123"
 
-    expect(page.title).to eq("Ubicloud - GitHub Runner Settings")
+    expect(page.title).to eq("Ubicloud - GitHub Runners Integration")
     expect(page).to have_flash_error(/^GitHub App installation failed.*/)
   end
 
