@@ -208,7 +208,7 @@ class Prog::Vm::Nexus < Prog::Base
         elsif vm.location_id == Location::GITHUB_RUNNERS_ID
           runner_location_filter = [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID]
           runner_location_preference = [Location::GITHUB_RUNNERS_ID]
-          runner_family_filter = [vm.family]
+          runner_family_filter = [vm.vm_host_family]
           prefs = if runner
             runner.installation.allocator_preferences
           else
@@ -222,9 +222,8 @@ class Prog::Vm::Nexus < Prog::Base
             prefs["family_filter"] || runner_family_filter
           ]
         else
-          [["accepting"], [vm.location_id], [], [], [vm.family]]
+          [["accepting"], [vm.location_id], [], [], [vm.vm_host_family]]
         end
-      family_filter = ["standard"] if vm.family == "burstable"
 
       Scheduling::Allocator.allocate(
         vm, frame["storage_volumes"],

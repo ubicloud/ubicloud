@@ -163,6 +163,11 @@ class Vm < Sequel::Model
     self.class.ubid_to_name(UBID.from_uuidish(id))
   end
 
+  def vm_host_family
+    return "standard" if family == "burstable"
+    family
+  end
+
   def storage_size_gib
     vm_storage_volumes.map { it.size_gib }.sum
   end
