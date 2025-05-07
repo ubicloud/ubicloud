@@ -2,11 +2,7 @@
 
 class Clover
   def authorized_private_subnet(perm: "PrivateSubnet:view", location_id: nil)
-    if (private_subnet_id = typecast_params.ubid_uuid("private_subnet_id"))
-      ds = dataset_authorize(@project.private_subnets_dataset, perm)
-      ds = ds.where(location_id:) if location_id
-      ds.first(id: private_subnet_id)
-    end
+    authorized_object(association: :private_subnets, key: "private_subnet_id", perm:, location_id:)
   end
 
   def private_subnet_list
