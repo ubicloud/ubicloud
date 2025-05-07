@@ -18,6 +18,26 @@ RSpec.describe BillingInfo do
     expect(billing_info.stripe_data).to be_nil
   end
 
+  describe ".has_address?" do
+    it "returns true when Stripe customer has address" do
+      allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
+      allow(Stripe::Customer).to receive(:retrieve).and_return({"address" => {"line1" => "Some Rd", "country" => "US"}, "metadata" => {}})
+      expect(billing_info.has_address?).to be true
+    end
+
+    it "returns false when Stripe customer has no address" do
+      allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
+      allow(Stripe::Customer).to receive(:retrieve).and_return({})
+      expect(billing_info.has_address?).to be false
+    end
+
+    it "returns false when Stripe customer is nil" do
+      allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
+      allow(Stripe::Customer).to receive(:retrieve).and_return(nil)
+      expect(billing_info.has_address?).to be false
+    end
+  end
+
   it "delete Stripe customer if Stripe enabled" do
     allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
     expect(Stripe::Customer).to receive(:delete).with("cs_1234567890")
