@@ -68,11 +68,13 @@ class Prog::Vm::GithubRunner < Prog::Base
     return unless github_runner.ready_at && github_runner.workflow_job
 
     project = github_runner.installation.project
-    rate_id = if label_data["arch"] == "arm64"
-      BillingRate.from_resource_properties("GitHubRunnerMinutes", "#{label_data["vm_size"]}-arm", "global")["id"]
+    billed_vm_size = if label_data["arch"] == "arm64"
+      "#{label_data["vm_size"]}-arm"
     else
-      BillingRate.from_resource_properties("GitHubRunnerMinutes", label_data["vm_size"], "global")["id"]
+      "#{vm.family}-#{vm.vcpus}"
     end
+    github_runner.update(billed_vm_size:)
+    rate_id = BillingRate.from_resource_properties("GitHubRunnerMinutes", billed_vm_size, "global")["id"]
 
     retries = 0
     begin
