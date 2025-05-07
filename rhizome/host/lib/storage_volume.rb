@@ -49,6 +49,7 @@ class StorageVolume
     fail "Storage device directory doesn't exist: #{sp.device_path}" if !File.exist?(sp.device_path)
 
     FileUtils.mkdir_p storage_dir
+    FileUtils.chown @vm_name, @vm_name, storage_dir
     encryption_key = setup_data_encryption_key(key_wrapping_secrets) if @encrypted
 
     if @vhost_block_backend_version
@@ -100,6 +101,7 @@ encryption_key:
         After=network.target
 
         [Service]
+        Environment=RUST_LOG=debug
         ExecStart=#{vhost_block_backend.bin_path} --config #{config_path}
         Restart=always
         User=#{@vm_name}
