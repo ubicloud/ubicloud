@@ -19,6 +19,10 @@ class GithubInstallation < Sequel::Model
         Validation.validate_vm_size(label["vm_size"], label["arch"]).vcpus
       end
   end
+
+  def free_runner_upgrade?
+    (upgrade_until = project.get_ff_free_runner_upgrade_until) && Time.parse(upgrade_until) > Time.now
+  end
 end
 
 # Table: github_installation
