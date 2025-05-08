@@ -307,8 +307,8 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can update PostgreSQL instance size configuration" do
-        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg)).at_least(:once)
+        expect(Project).to receive(:[]).and_return(project).at_least(:once)
         expect(pg.representative_server).to receive(:storage_size_gib).and_return(128).at_least(:once)
 
         visit "#{project.path}#{pg.path}"

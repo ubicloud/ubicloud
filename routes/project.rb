@@ -54,11 +54,12 @@ class Clover
     end
 
     r.on String do |project_ubid|
-      @project = Project.from_ubid(project_ubid)
-      @project = nil unless @project&.visible
-
+      @project = Project[id: UBID.to_uuid(project_ubid), visible: true]
       check_found_object(@project)
 
+      # Would be better to select project from current_account.projects_dataset,
+      # but that requires returning 404 instead of 403 if a project the user
+      # does not have access to is requested.
       if @project.accounts_dataset.where(Sequel[:accounts][:id] => current_account_id).empty?
         fail Authorization::Unauthorized
       end

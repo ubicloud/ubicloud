@@ -49,7 +49,7 @@ RSpec.describe Clover, "github" do
     end
 
     it "can not connect GitHub account if project has no valid payment method" do
-      expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+      expect(Project).to receive(:[]).and_return(project).at_least(:once)
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
 
       visit "#{project.path}/github/installation/create"
@@ -60,7 +60,7 @@ RSpec.describe Clover, "github" do
     end
 
     it "shows new billing info button instead of connect account if project has no valid payment method" do
-      expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+      expect(Project).to receive(:[]).and_return(project).at_least(:once)
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
       # rubocop:disable RSpec/VerifiedDoubles
       expect(Stripe::Checkout::Session).to receive(:create).and_return(double(Stripe::Checkout::Session, url: ""))
