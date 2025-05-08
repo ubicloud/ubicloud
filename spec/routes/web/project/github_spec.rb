@@ -102,13 +102,44 @@ RSpec.describe Clover, "github" do
       expect(page.title).to eq("Ubicloud - Active Runners")
     end
 
+    it "enables premium runners for installation" do
+      installation.update(allocator_preferences: {})
+
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+      within("form#premium-runner-update-form") do
+        expect(find("button").text).to eq("Enable")
+        _csrf = find("input[name='_csrf']", visible: false).value
+        page.driver.post "#{project.path}/github/#{installation.ubid}", {premium_runner_enabled: true, _csrf:}
+      end
+
+      expect(page.status_code).to eq(302)
+      expect(installation.reload.premium_runner_enabled?).to be true
+    end
+
+    it "disables premium runners for installation" do
+      installation.update(allocator_preferences: {"family_filter" => ["standard", "premium"]})
+
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+      within("form#premium-runner-update-form") do
+        expect(find("button").text).to eq("Disable")
+        _csrf = find("input[name='_csrf']", visible: false).value
+        page.driver.post "#{project.path}/github/#{installation.ubid}", {premium_runner_enabled: false, _csrf:}
+      end
+
+      expect(page.status_code).to eq(302)
+      expect(installation.reload.premium_runner_enabled?).to be false
+    end
+
     it "enables cache for installation" do
       installation.update(cache_enabled: false)
 
       visit "#{project.path}/github/#{installation.ubid}/setting"
-      _csrf = find("form[action='#{project.path}/github/#{installation.ubid}'] input[name='_csrf']", visible: false).value
 
-      page.driver.post "#{project.path}/github/#{installation.ubid}", {cache_enabled: true, _csrf:}
+      within("form#cache-update-form") do
+        expect(find("button").text).to eq("Enable")
+        _csrf = find("input[name='_csrf']", visible: false).value
+        page.driver.post "#{project.path}/github/#{installation.ubid}", {cache_enabled: true, _csrf:}
+      end
 
       expect(page.status_code).to eq(302)
       expect(installation.reload.cache_enabled).to be true
@@ -132,9 +163,12 @@ RSpec.describe Clover, "github" do
       installation.update(cache_enabled: true)
 
       visit "#{project.path}/github/#{installation.ubid}/setting"
-      _csrf = find("form[action='#{project.path}/github/#{installation.ubid}'] input[name='_csrf']", visible: false).value
 
-      page.driver.post "#{project.path}/github/#{installation.ubid}", {cache_enabled: false, _csrf:}
+      within("form#cache-update-form") do
+        expect(find("button").text).to eq("Disable")
+        _csrf = find("input[name='_csrf']", visible: false).value
+        page.driver.post "#{project.path}/github/#{installation.ubid}", {cache_enabled: false, _csrf:}
+      end
 
       expect(page.status_code).to eq(302)
       expect(installation.reload.cache_enabled).to be false
