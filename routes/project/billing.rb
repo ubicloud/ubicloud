@@ -173,9 +173,7 @@ class Clover
 
       r.on "invoice" do
         r.is String do |invoice_ubid|
-          invoice = (invoice_ubid == "current") ? @project.current_invoice : Invoice.from_ubid(invoice_ubid)
-
-          next unless invoice && invoice.project_id == @project.id
+          next unless (invoice = (invoice_ubid == "current") ? @project.current_invoice : Invoice[id: UBID.to_uuid(invoice_ubid), project_id: @project.id])
 
           r.get true do
             @invoice_data = Serializers::Invoice.serialize(invoice, {detailed: true})
