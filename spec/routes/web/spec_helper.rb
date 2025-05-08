@@ -8,7 +8,15 @@ File.write(css_file, "") unless File.file?(css_file)
 
 require "capybara"
 require "capybara/rspec"
-require "capybara/validate_html5" if ENV["CLOVER_FREEZE"] == "1"
+
+if ENV["CLOVER_FREEZE"] == "1"
+  require "capybara/validate_html5"
+
+  Capybara.custom_html_validation do |doc, &block|
+    css = "*[required=true], *[required=false], input[checked=true], input[checked=false]"
+    doc.css(css).map(&block)
+  end
+end
 
 Gem.suffix_pattern
 

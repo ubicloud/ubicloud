@@ -73,7 +73,7 @@ end
 
 group :test do
   gem "capybara"
-  gem "capybara-validate_html5", ">= 2"
+  gem "capybara-validate_html5", ">= 2.1"
   gem "pdf-reader"
   gem "rspec"
   gem "simplecov"
