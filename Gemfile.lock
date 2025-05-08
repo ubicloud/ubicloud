@@ -1,4 +1,14 @@
 GIT
+  remote: https://github.com/interagent/committee.git
+  revision: fc9329c7e7eebb19c46114e6dcee6e292bb6cf4c
+  ref: fc9329c7e7eebb19c46114e6dcee6e292bb6cf4c
+  specs:
+    committee (5.5.3)
+      json_schema (~> 0.14, >= 0.14.3)
+      openapi_parser (~> 2.0)
+      rack (>= 1.5, < 3.2)
+
+GIT
   remote: https://github.com/janko/rodauth-omniauth.git
   revision: 477810179ba0cab8d459be1a0d87dca5b57ec94b
   ref: 477810179ba0cab8d459be1a0d87dca5b57ec94b
@@ -123,10 +133,6 @@ GEM
     cbor (0.5.9.8)
     chunky_png (1.4.0)
     coderay (1.1.3)
-    committee (5.5.0)
-      json_schema (~> 0.14, >= 0.14.3)
-      openapi_parser (~> 2.0)
-      rack (>= 1.5, < 3.2)
     concurrent-ruby (1.3.5)
     connection_pool (2.5.2)
     cose (1.3.1)
@@ -467,7 +473,7 @@ DEPENDENCIES
   by (>= 1.1.0)
   capybara
   capybara-validate_html5 (>= 2)
-  committee
+  committee!
   countries
   cuprite
   ed25519

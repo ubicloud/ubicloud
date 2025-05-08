@@ -711,13 +711,7 @@ class Clover < Roda
     status, headers, body = res
     next unless api? && status && headers && body
     @schema_validator ||= SCHEMA_ROUTER.build_schema_validator(request)
-    begin
-      # Work around committee's lack of support for rack 3 lowercase keys
-      headers["Content-Type"] = headers["content-type"]
-      @schema_validator.response_validate(status, headers, body, true) if @schema_validator.link_exist?
-    ensure
-      headers.delete("Content-Type")
-    end
+    @schema_validator.response_validate(status, headers, body, true) if @schema_validator.link_exist?
   rescue JSON::ParserError => e
     raise Committee::InvalidResponse.new("Response body wasn't valid JSON.", original_error: e)
   end
