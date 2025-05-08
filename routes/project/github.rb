@@ -38,7 +38,6 @@ class Clover
         r.post true do
           unless r.params["cache_enabled"].nil?
             @installation.cache_enabled = r.params["cache_enabled"] == "true"
-            flash["notice"] = "Transparent cache is #{@installation.cache_enabled ? "enabled" : "disabled"}"
           end
 
           unless r.params["premium_runner_enabled"].nil?
@@ -46,7 +45,6 @@ class Clover
               ["premium", "standard"]
             end
             @installation.modified!(:allocator_preferences)
-            flash["notice"] = "Premium runners are #{@installation.premium_runner_enabled? ? "enabled" : "disabled"}"
           end
           DB.transaction do
             @installation.save_changes
