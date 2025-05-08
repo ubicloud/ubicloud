@@ -75,6 +75,11 @@ class Clover < Roda
   end
   plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
 
+  plugin :symbol_matchers
+  symbol_matcher(:ubid_uuid, /([a-tv-z0-9]{26})/) do |s|
+    UBID.to_uuid(s)
+  end
+
   # :nocov:
   if Config.test? && defined?(SimpleCov)
     plugin :render_coverage

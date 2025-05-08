@@ -152,8 +152,8 @@ class Clover
           r.redirect checkout.url, 303
         end
 
-        r.is String do |pm_ubid|
-          next unless (payment_method = PaymentMethod[:id => UBID.to_uuid(pm_ubid), :billing_info_id => @project.billing_info_id, Sequel[:billing_info_id] => Sequel::NOTNULL])
+        r.is :ubid_uuid do |id|
+          next unless (payment_method = PaymentMethod[id:, billing_info_id: @project.billing_info_id])
 
           r.delete true do
             unless payment_method.billing_info.payment_methods.count > 1

@@ -53,8 +53,8 @@ class Clover
       view "project/create"
     end
 
-    r.on String do |project_ubid|
-      @project = Project[id: UBID.to_uuid(project_ubid), visible: true]
+    r.on :ubid_uuid do |id|
+      @project = Project[id:, visible: true]
       check_found_object(@project)
 
       # Would be better to select project from current_account.projects_dataset,
