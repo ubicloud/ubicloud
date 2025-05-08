@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
 class Clover
+  def authorized_vm(perm: "Vm:view", location_id: nil)
+    authorized_object(association: :vms, key: "vm_id", perm:, location_id:)
+  end
+
   def vm_list_dataset
     dataset_authorize(@project.vms_dataset, "Vm:view")
   end
