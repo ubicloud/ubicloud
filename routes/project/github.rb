@@ -26,7 +26,7 @@ class Clover
         end
 
         r.is String do |runner_ubid|
-          next unless (runner = GithubRunner.from_ubid(runner_ubid)) && runner.installation.project_id == @project.id
+          next unless (runner = GithubRunner[id: UBID.to_uuid(runner_ubid), installation_id: GithubInstallation.select(:id).where(project_id: @project.id)])
 
           r.delete true do
             DB.transaction do
