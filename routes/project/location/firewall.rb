@@ -111,9 +111,9 @@ class Clover
           r.redirect "#{@project.path}#{firewall.path}"
         end
 
-        r.delete String do |firewall_rule_ubid|
+        r.delete :ubid_uuid do |id|
           authorize("Firewall:edit", firewall.id)
-          next 204 unless (fwr = FirewallRule.from_ubid(firewall_rule_ubid))
+          next 204 unless (fwr = firewall.firewall_rules_dataset[id:])
 
           DB.transaction do
             firewall.remove_firewall_rule(fwr)
