@@ -49,11 +49,9 @@ class Clover
     end
 
     if assemble_params["private_subnet_id"] && assemble_params["private_subnet_id"] != ""
-      ps = PrivateSubnet.from_ubid(assemble_params["private_subnet_id"])
-      if !ps || ps.location_id != @location.id
+      unless (ps = authorized_private_subnet(location_id: @location.id))
         fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{assemble_params["private_subnet_id"]}\" is not found in the location \"#{@location.display_name}\""})
       end
-      authorize("PrivateSubnet:view", ps.id)
     end
     assemble_params["private_subnet_id"] = ps&.id
 
