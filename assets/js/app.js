@@ -3,7 +3,8 @@ $(function () {
   setupDatePicker();
   setupFormOptionUpdates();
   setupPlayground();
-  setupFormsWithPatchMethod()
+  setupFormsWithPatchMethod();
+  setupMetricsCharts();
 });
 
 $(".toggle-mobile-menu").on("click", function (event) {
@@ -467,4 +468,293 @@ function setupFormsWithPatchMethod() {
         }
     });
   });
+}
+
+const metricsCharts = [];
+const colorPalette = [
+  {
+    color: '#5470c6',
+    class: 'blue-600'
+  },
+  {
+    color: '#91cc75',
+    class: 'green-400'
+  },
+  {
+    color: '#fac858',
+    class: 'amber-400'
+  },
+  {
+    color: '#ee6666',
+    class: 'red-400'
+  },
+  {
+    color: '#73c0de',
+    class: 'sky-300'
+  },
+  {
+    color: '#3ba272',
+    class: 'emerald-600'
+  },
+  {
+    color: '#fc8452',
+    class: 'orange-500',
+  }
+];
+
+function setupMetricsCharts() {
+  const metricsContainer = document.querySelector('#metrics-container');
+  if (!metricsContainer) {
+    return;
+  }
+
+  const charts = document.querySelectorAll('#metrics-container [id$="-chart"]');
+
+  charts.forEach(chart => {
+    const metricKey = chart.getAttribute('data-metric-key');
+    const chartInstance = {
+      key: metricKey,
+      unit: chart.getAttribute('data-metric-unit'),
+      chart: echarts.init(chart)
+    };
+    metricsCharts.push(chartInstance);
+    setupInitialChartOptions(chartInstance);
+  });
+
+  updateMetricsCharts();
+
+  $('#metrics-container #time-range').on('change', updateMetricsCharts);
+  $('#metrics-container #refresh-button').on('click', updateMetricsCharts);
+
+  // Reload charts every 5 minutes.
+  setInterval(updateMetricsCharts, 5 * 60 * 1000);
+}
+
+function setupInitialChartOptions(chartInstance) {
+  const options = {
+    color: colorPalette.map(p => p.color),
+    tooltip: {
+      trigger: 'axis',
+      formatter: function(params) {
+        const isoDate = toLocalISOString(new Date(params[0].value[0]));
+
+        // Build the tooltip HTML
+        let html = `<strong>${isoDate}</strong><br/>`;
+        params.forEach((item, idx) => {
+          const value = unitFormatter(chartInstance.unit, 2)(item.value[1]);
+          // Use the series color for the marker
+          const colorClass = colorPalette[idx % colorPalette.length].class;
+          html += `
+            <span class="text-${colorClass} text-right">● ${item.seriesName}</span><span class="ml-2">${value}<br/></span>
+          `;
+        });
+        return html;
+      }
+    },
+    xAxis: {
+      type: 'time',
+      splitLine: { show: true },
+      axisLabel: {
+        hideOverlap: true
+      }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: {
+        formatter: unitFormatter(chartInstance.unit),
+        showMaxLabel: false
+      },
+      min: 0,
+      max: (chartInstance.unit === "%") ? 100 : function (value) {
+        return Math.max(10, Math.round(1.1 * value.max))
+      }
+    },
+    grid: {
+      containLabel: true,
+      left: '0%',
+      right: '2%',
+      top: '10%',
+      bottom: '0%',
+    },
+  }
+
+  chartInstance.chart.setOption(options);
+
+  window.addEventListener('resize', debounce(chartInstance.chart.resize, 300));
+}
+
+function queryAndUpdateChart(chartInstance, start_time, end_time) {
+  const metricKey = chartInstance.key;
+  const params = {
+    key: metricKey,
+    start: start_time.toISOString(),
+    end: end_time.toISOString()
+  }
+  const queryString = new URLSearchParams(params).toString();
+  const url = `${document.location.href}/metrics?${queryString}`;
+
+  fetch(url)
+    .then(response => response.json())
+    .then(data => {
+      const metrics = data.metrics || [];
+
+      if (metrics.length === 0) {
+        console.warn(`No metrics found for ${metricKey}`);
+        return;
+      }
+
+      const metric = metrics[0];
+      const chartSeries = [];
+
+      for (const series of metric["series"]) {
+        const values = series["values"];
+        const seriesData = values.map(item => {
+          const ts = item[0] * 1000;
+          const value = Number(Number(item[1]).toFixed(2));
+          return [ts, value]
+        });
+        const labelKeys = Object.keys(series["labels"]);
+        const firstKey = labelKeys[0];
+        const seriesName = series["labels"][firstKey] || series["labels"]["name"] || metric["name"];
+
+        chartSeries.push({
+          name: seriesName,
+          type: 'line',
+          data: seriesData,
+          symbol: 'circle',
+          smooth: true,
+          itemStyle: {
+            opacity: 0,
+          },
+          emphasis: {
+            itemStyle: {
+              opacity: 1,
+            },
+          },
+        });
+      }
+
+      chartInstance.chart.hideLoading();
+      chartInstance.chart.setOption({
+        legend: {
+          data: chartSeries.map(series => series.name),
+          right: '2%',
+        },
+        xAxis: {
+          type: 'time',
+          min: start_time.getTime(),
+          max: end_time.getTime()
+        },
+        series: chartSeries
+      });
+      chartInstance.chart.resize();
+    })
+    .catch(error => {
+      chartInstance.chart.hideLoading();
+      chartInstance.chart.setOption({
+        graphic: {
+          type: 'text',
+          left: 'center',
+          top: 'middle',
+          style: {
+            text: 'Failed to load data. Please refresh the charts to try again.',
+            fontSize: 18,
+            fill: '#c00'
+          }
+        }
+      });
+
+      console.error(`Error fetching data for ${metricKey}: ${error}`)
+    });
+}
+
+function updateMetricsCharts() {
+  const timeDuration = $('#metrics-container #time-range').val();
+  const timeDurationSeconds = durationToSeconds(timeDuration);
+  const start_time = new Date(Date.now() - timeDurationSeconds * 1000);
+  const end_time = new Date(Date.now());
+
+  for (const chartInstance of metricsCharts) {
+    chartInstance.chart.showLoading();
+    queryAndUpdateChart(chartInstance, start_time, end_time);
+  }
+}
+
+function durationToSeconds(durationStr) {
+  const units = {
+    "s": 1,
+    "m": 60,
+    "h": 60 * 60,
+    "d": 24 * 60 * 60,
+  };
+  const count = parseInt(durationStr.slice(0, -1));
+  const unit = durationStr.slice(-1);
+  if (isNaN(count) || !units[unit]) {
+    throw new Error("Invalid duration format");
+  }
+  return count * units[unit];
+}
+
+function bytesFormatter(unit, precision) {
+  const unitParts = unit.split('/');
+  const suffix = unitParts.length > 1 ? "/" + unitParts[1] : "";
+
+  return function (value, index) {
+    if (value >= 1024 ** 4) return (value / (1024 ** 4)).toFixed(precision) + ' TiB' + suffix;
+    if (value >= 1024 ** 3) return (value / (1024 ** 3)).toFixed(precision) + ' GiB' + suffix;
+    if (value >= 1024 ** 2) return (value / (1024 ** 2)).toFixed(precision) + ' MiB' + suffix;
+    if (value >= 1024) return (value / 1024).toFixed(precision) + ' KiB' + suffix;
+    return value + ' bytes' + suffix;
+  }
+}
+
+function opsFormatter(unit, precision) {
+  const unitParts = unit.split('/');
+  const suffix = unitParts.length > 1 ? "/" + unitParts[1] : "";
+  const unitName = unitParts[0];
+
+  return function (value, index) {
+    if (value >= 1000 ** 3) return (value / (1000 ** 3)).toFixed(precision) + ' G ' + unitName + suffix;
+    if (value >= 1000 ** 2) return (value / (1000 ** 2)).toFixed(precision) + ' M ' + unitName + suffix;
+    if (value >= 1000) return (value / 1000).toFixed(precision) + ' K ' + unitName + suffix;
+    return value + ' ' + unitName + suffix;
+  }
+}
+
+function unitFormatter(unit, precision = 0) {
+  if (unit.startsWith("bytes")) {
+    return bytesFormatter(unit, precision);
+  } else if (unit == "IOPS" || unit.startsWith("ops") || unit.startsWith("count") || unit.startsWith("deadlock")) {
+    return opsFormatter(unit, precision);
+  } else {
+    return function (value, index) {
+      return value + ' ' + unit;
+    }
+  }
+}
+
+function toLocalISOString(date) {
+  const pad = n => String(n).padStart(2, '0');
+  const tz = -date.getTimezoneOffset();
+  const sign = tz >= 0 ? '+' : '-';
+  const tzH = pad(Math.floor(Math.abs(tz) / 60));
+  const tzM = pad(Math.abs(tz) % 60);
+  return (
+    date.getFullYear() + '-' +
+    pad(date.getMonth() + 1) + '-' +
+    pad(date.getDate()) + 'T' +
+    pad(date.getHours()) + ':' +
+    pad(date.getMinutes()) + ':' +
+    pad(date.getSeconds())
+  );
+}
+
+function debounce(callback, delay = 1000) {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => {
+      callback(...args);
+    }, delay);
+  };
 }
