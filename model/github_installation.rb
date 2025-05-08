@@ -24,6 +24,10 @@ class GithubInstallation < Sequel::Model
   def free_runner_upgrade?
     (upgrade_until = project.get_ff_free_runner_upgrade_until) && Time.parse(upgrade_until) > Time.now
   end
+
+  def premium_runner_enabled?
+    !!allocator_preferences["family_filter"]&.include?("premium")
+  end
 end
 
 # Table: github_installation

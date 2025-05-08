@@ -28,7 +28,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     runner_project = Project.create(name: "runner-project")
     allow(Config).to receive(:github_runner_service_project_id).and_return(runner_project.id)
     allow(Github).to receive(:installation_client).and_return(client)
-    allow(github_runner).to receive_messages(vm:, installation: instance_double(GithubInstallation, installation_id: 123, project:, allocator_preferences: {}, free_runner_upgrade?: false))
+    allow(github_runner).to receive_messages(vm:, installation: instance_double(GithubInstallation, installation_id: 123, project:, allocator_preferences: {}, free_runner_upgrade?: false, premium_runner_enabled?: false))
     allow(vm).to receive_messages(sshable: sshable, vm_host: instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", data_center: "FSN1-DC1"))
   end
 
@@ -108,7 +108,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "provisions a VM if the installation prefers premium runners" do
-      expect(github_runner.installation).to receive(:allocator_preferences).and_return({"family_filter" => ["premium"]})
+      expect(github_runner.installation).to receive(:premium_runner_enabled?).and_return(true)
       expect(VmPool).to receive(:where).and_return([])
       expect(Prog::Vnet::SubnetNexus).to receive(:assemble).and_call_original
       expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original

@@ -12,7 +12,7 @@ class Clover
       authorize("Project:github", @project.id)
 
       r.get true do
-        if (installation = @project.github_installations.first)
+        if (installation = @project.github_installations_dataset.first)
           r.redirect "#{@project.path}/github/#{installation.ubid}/runner"
         end
         view "github/index"
@@ -36,12 +36,22 @@ class Clover
         end
 
         r.post true do
-          cache_enabled = r.params["cache_enabled"] == "true"
+          unless r.params["cache_enabled"].nil?
+            @installation.cache_enabled = r.params["cache_enabled"] == "true"
+            flash["notice"] = "Transparent cache is #{@installation.cache_enabled ? "enabled" : "disabled"}"
+          end
+
+          unless r.params["premium_runner_enabled"].nil?
+            @installation.allocator_preferences["family_filter"] = if r.params["premium_runner_enabled"] == "true"
+              ["premium", "standard"]
+            end
+            @installation.modified!(:allocator_preferences)
+            flash["notice"] = "Premium runners are #{@installation.premium_runner_enabled? ? "enabled" : "disabled"}"
+          end
           DB.transaction do
-            @installation.update(cache_enabled:)
+            @installation.save_changes
             audit_log(@installation, "update")
           end
-          flash["notice"] = "Ubicloud cache is #{cache_enabled ? "enabled" : "disabled"} for the installation #{@installation.name}."
 
           r.redirect "#{@project.path}/github/#{@installation.ubid}/setting"
         end
