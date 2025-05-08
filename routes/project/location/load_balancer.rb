@@ -87,30 +87,31 @@ class Clover
           )
           lb.ports.first.update(src_port: Validation.validate_port(:src_port, params["src_port"]),
             dst_port: Validation.validate_port(:dst_port, params["dst_port"]))
-        end
 
-        new_vms = params["vms"].map { Vm.from_ubid(it.delete("\"")) }
-        new_vms.each do |vm|
-          unless vm
+          vm_ids = params["vms"].map { UBID.to_uuid(it.delete("\"")) }
+          new_vms = dataset_authorize(@project.vms_dataset, "Vm:view").eager(:load_balancer).where(id: vm_ids).all
+
+          unless vm_ids.length == new_vms.length
             fail Validation::ValidationFailed.new("vms" => "VM not found")
           end
 
-          authorize("Vm:view", vm.id)
-          if vm.load_balancer
-            next if vm.load_balancer.id == lb.id
-            fail Validation::ValidationFailed.new("vms" => "VM is already attached to a load balancer")
+          new_vms.each do |vm|
+            if (lb_id = vm.load_balancer&.id)
+              next if lb_id == lb.id
+              fail Validation::ValidationFailed.new("vms" => "VM is already attached to a load balancer")
+            end
+            lb.add_vm(vm)
           end
-          lb.add_vm(vm)
-        end
 
-        lb.vms.each do |vm|
-          next if new_vms.any? { it.id == vm.id }
-          lb.evacuate_vm(vm)
-          lb.remove_vm(vm)
-        end
+          lb.vms.each do |vm|
+            next if new_vms.any? { it.id == vm.id }
+            lb.evacuate_vm(vm)
+            lb.remove_vm(vm)
+          end
 
-        lb.incr_update_load_balancer
-        audit_log(lb, "update")
+          lb.incr_update_load_balancer
+          audit_log(lb, "update")
+        end
         Serializers::LoadBalancer.serialize(lb.reload, {detailed: true})
       end
     end
