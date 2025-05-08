@@ -25,8 +25,8 @@ class Clover
           view "github/runner"
         end
 
-        r.is String do |runner_ubid|
-          next unless (runner = GithubRunner[id: UBID.to_uuid(runner_ubid), installation_id: GithubInstallation.select(:id).where(project_id: @project.id)])
+        r.is :ubid_uuid do |id|
+          next unless (runner = GithubRunner[id:, installation_id: GithubInstallation.select(:id).where(project_id: @project.id)])
 
           r.delete true do
             DB.transaction do
@@ -57,8 +57,8 @@ class Clover
           r.redirect "https://github.com/apps/#{Config.github_app_name}/installations/new", 302
         end
 
-        r.on String do |installation_id|
-          next unless (installation = GithubInstallation[id: UBID.to_uuid(installation_id), project_id: @project.id])
+        r.on :ubid_uuid do |id|
+          next unless (installation = GithubInstallation[id:, project_id: @project.id])
 
           r.post true do
             cache_enabled = r.params["cache_enabled"] == "true"

@@ -99,6 +99,18 @@ RSpec.describe Clover, "github" do
       expect(installation.reload.cache_enabled).to be true
     end
 
+    it "handles case where installation does not exist" do
+      installation.update(cache_enabled: false)
+
+      visit "#{project.path}/github/setting"
+      _csrf = find("form[action='#{project.path}/github/installation/#{installation.ubid}'] input[name='_csrf']", visible: false).value
+      installation.destroy
+
+      page.driver.post "#{project.path}/github/installation/#{installation.ubid}", {cache_enabled: true, _csrf:}
+
+      expect(page.status_code).to eq(404)
+    end
+
     it "disables cache for installation" do
       installation.update(cache_enabled: true)
 

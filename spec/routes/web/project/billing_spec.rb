@@ -319,6 +319,17 @@ RSpec.describe Clover, "billing" do
       expect(billing_info.reload.payment_methods.count).to eq(1)
     end
 
+    it "returns 404 if payment method does not exist" do
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}})
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}})
+      visit "#{project.path}/billing"
+      payment_method.this.delete(force: true)
+
+      btn = find "#payment-method-#{payment_method.ubid} .delete-btn"
+      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+      expect(page.status_code).to eq(404)
+    end
+
     describe "discount code with billing info" do
       before do
         expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return(
