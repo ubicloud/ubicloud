@@ -9,7 +9,7 @@ module Metrics
     MetricDefinition.new(
       name: "CPU Usage",
       description: "Percentage of CPU used by the system",
-      unit: "percent",
+      unit: "%",
       series: [
         TimeSeries.new(
           labels: {},
@@ -40,16 +40,16 @@ module Metrics
     memory_usage:
     MetricDefinition.new(
       name: "Memory Usage",
-      description: "Memory usage statistics",
-      unit: "percent",
+      description: "Total memory usage vs cache & buffers",
+      unit: "%",
       series: [
         TimeSeries.new(
           labels: {name: "Used Memory"},
-          query: "(1 - (node_memory_MemAvailable_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"} / node_memory_MemTotal_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"})) * 100"
+          query: "sum((1 - (node_memory_MemAvailable_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"} / node_memory_MemTotal_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"})) * 100)"
         ),
         TimeSeries.new(
           labels: {name: "Cache & Buffers"},
-          query: "(node_memory_Cached_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"} + node_memory_Buffers_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}) / node_memory_MemTotal_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"} * 100"
+          query: "sum((node_memory_Cached_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"} + node_memory_Buffers_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}) / node_memory_MemTotal_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"} * 100)"
         )
       ]
     ),
@@ -57,7 +57,7 @@ module Metrics
     MetricDefinition.new(
       name: "Disk Usage",
       description: "Disk space utilization",
-      unit: "percent",
+      unit: "%",
       series: [
         TimeSeries.new(
           labels: {name: "Used Space"},
@@ -68,24 +68,24 @@ module Metrics
     network_traffic:
     MetricDefinition.new(
       name: "Network Traffic",
-      description: "Network traffic in bytes per second",
+      description: "Incoming and outgoing network traffic",
       unit: "bytes/s",
       series: [
         TimeSeries.new(
           labels: {name: "Received"},
-          query: "rate(node_network_receive_bytes_total{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m])"
+          query: "sum(rate(node_network_receive_bytes_total{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
         ),
         TimeSeries.new(
           labels: {name: "Transmitted"},
-          query: "rate(node_network_transmit_bytes_total{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m])"
+          query: "sum(rate(node_network_transmit_bytes_total{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
         )
       ]
     ),
     connection_count:
     MetricDefinition.new(
-      name: "Connection count",
+      name: "Connection Count",
       description: "Database activity metrics",
-      unit: nil,
+      unit: "count",
       series: [
         TimeSeries.new(
           labels: {name: "Active"},
@@ -99,9 +99,9 @@ module Metrics
     ),
     cache_hit_ratio:
     MetricDefinition.new(
-      name: "Cache hit ratio",
-      description: "Cache hit ratio",
-      unit: "percent",
+      name: "Cache Hit Ratio",
+      description: "Percentage of cache hits vs reads",
+      unit: "%",
       series: [
         TimeSeries.new(
           labels: {},
@@ -111,9 +111,9 @@ module Metrics
     ),
     operation_throughput:
     MetricDefinition.new(
-      name: "Operation throughput",
+      name: "Operation Throughput",
       description: "Fetch, insert, update, delete operations per second",
-      unit: "operations/s",
+      unit: "ops/s",
       series: [
         TimeSeries.new(
           labels: {name: "Fetch"},
@@ -147,7 +147,7 @@ module Metrics
     ),
     database_size:
     MetricDefinition.new(
-      name: "Database size",
+      name: "Database Size",
       description: "Top 5 databases by size",
       unit: "bytes",
       series: [

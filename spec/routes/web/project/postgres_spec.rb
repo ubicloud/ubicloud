@@ -477,6 +477,25 @@ RSpec.describe Clover, "postgres" do
 
         expect(page.status_code).to eq(200)
       end
+
+      it "does not show metrics if feature flag is disabled" do
+        visit "#{project.path}#{pg.path}"
+        expect(page).to have_no_content "CPU Usage"
+      end
+
+      it "shows metrics if feature flag is enabled and the resource is running" do
+        project.set_ff_postgres_metrics(true)
+        pg.strand.update(label: "wait")
+        visit "#{project.path}#{pg.path}"
+        expect(page).to have_content "CPU Usage"
+      end
+
+      it "does not show metrics if feature flag is enabled but the resource is not running" do
+        project.set_ff_postgres_metrics(true)
+        pg.strand.update(label: "wait_servers")
+        visit "#{project.path}#{pg.path}"
+        expect(page).to have_no_content "CPU Usage"
+      end
     end
 
     describe "firewall" do
