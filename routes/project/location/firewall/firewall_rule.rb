@@ -27,8 +27,8 @@ class Clover
       Serializers::FirewallRule.serialize(firewall_rule)
     end
 
-    r.is String do |firewall_rule_ubid|
-      firewall_rule = FirewallRule.from_ubid(firewall_rule_ubid)
+    r.is :ubid_uuid do |id|
+      firewall_rule = @firewall.firewall_rules_dataset[id:]
       check_found_object(firewall_rule)
 
       r.delete true do
