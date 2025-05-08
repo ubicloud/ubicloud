@@ -83,8 +83,8 @@ class Clover
           view "github/cache"
         end
 
-        r.is String do |entry_ubid|
-          next unless (entry = GithubCacheEntry.from_ubid(entry_ubid)) && entry.repository.installation.project_id == @project.id
+        r.is :ubid_uuid do |id|
+          next unless (entry = GithubCacheEntry[id:, repository_id: GithubRepository.select(:id).where(installation_id: GithubInstallation.select(:id).where(project_id: @project.id))])
 
           r.delete true do
             DB.transaction do
