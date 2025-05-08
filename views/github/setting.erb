@@ -3,16 +3,95 @@
 <%== render("github/tabbar") %>
 
 <div class="grid gap-6">
+  <!-- Performance runners -->
+  <div class="overflow-hidden rounded-lg ring-1 ring-black ring-opacity-5 bg-white lg:flex shadow">
+    <div class="p-8 sm:p-10 lg:flex-auto">
+      <div class="flex items-center">
+        <h3 class="text-3xl font-semibold tracking-tight text-gray-900">
+          High Performance Runners
+        </h3>
+        <% if @installation.performance_runner_enabled %>
+          <span class="rounded-full bg-orange-600/10 px-2.5 py-1 text-xs/5 font-semibold text-orange-600 ml-2">
+            Enabled
+          </span>
+        <% end %>
+      </div>
+      <p class="mt-4 text-base/7 text-gray-600">
+        Speed up your builds with cutting edge gaming CPUs! We automatically route your jobs to premium machines. If
+        capacity's full, you seamlessly fall back to standard runners with no extra wait time. You always get billed by
+        the minute and for the runner type you're using.
+      </p>
+      <div class="mt-6 flex items-center gap-x-4">
+        <h4 class="flex-none text-sm/6 font-semibold text-orange-600">What’s different</h4>
+        <div class="h-px flex-auto bg-gray-100"></div>
+      </div>
+      <ul role="list" class="mt-4 grid grid-cols-1 gap-4 text-sm/6 text-gray-600 sm:grid-cols-2">
+        <% [
+          "Fast gaming CPUs",
+          "Twice as fast",
+          "One fifth the cost",
+          "10x better price/performance"
+        ].each do |text| %>
+          <li class="flex gap-x-3">
+            <%== part("components/icon", name: "hero-check", classes: "h-6 w-5 flex-none text-orange-600") %>
+            <%= text %>
+          </li>
+        <% end %>
+      </ul>
+    </div>
+    <div class="-mt-2 p-2 lg:mt-0 lg:w-full lg:max-w-md lg:shrink-0">
+      <div
+        class="rounded-lg bg-gray-50 py-10 text-center ring-1 ring-inset ring-gray-900/5 lg:flex lg:flex-col lg:justify-center lg:py-16"
+      >
+        <div class="mx-auto max-w-xs px-8">
+          <p class="text-base font-semibold text-gray-600">Boost your builds.
+            <br>
+            1/5th the cost of GitHub runners</p>
+          <p class="mt-6 flex items-baseline justify-center gap-x-2">
+            <span class="text-5xl font-semibold tracking-tight text-gray-900">$0.0016</span>
+            <span class="text-sm/6 font-semibold tracking-wide text-gray-600">/minute</span>
+          </p>
+          <form
+            id="performance-runner-update-form"
+            action="<%= "#{@project_data[:path]}/github/#{@installation.ubid}" %>"
+            role="form"
+            method="POST"
+          >
+            <%== csrf_tag("#{@project_data[:path]}/github/#{@installation.ubid}") %>
+            <%== part("components/form/hidden", name: "performance_runner_enabled", value: !@installation.performance_runner_enabled) %>
+            <%== part(
+              "components/button",
+              extra_class: "mt-10 block w-full",
+              **(@installation.performance_runner_enabled ? { text: "Disable ", type: "danger" } : { text: "Enable", type: "primary" })
+            ) %>
+          </form>
+          <p class="mt-6 text-xs/5 text-gray-600"></p>
+        </div>
+      </div>
+    </div>
+  </div>
   <div>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <!-- Transparent Cache Card -->
       <div class="px-4 py-5 sm:p-6">
-        <form action="<%= "#{@project_data[:path]}/github/#{@installation.ubid}" %>" role="form" method="POST">
+        <form
+          id="cache-update-form"
+          action="<%= "#{@project_data[:path]}/github/#{@installation.ubid}" %>"
+          role="form"
+          method="POST"
+        >
           <%== csrf_tag("#{@project_data[:path]}/github/#{@installation.ubid}") %>
           <%== part("components/form/hidden", name: "cache_enabled", value: !@installation.cache_enabled) %>
           <div class="sm:flex sm:items-center sm:justify-between">
             <div>
-              <h3 class="text-base font-semibold leading-6 text-gray-900">Ubicloud Transparent Cache</h3>
+              <div class="flex items-center">
+                <h3 class="text-base font-semibold leading-6 text-gray-900">Ubicloud Transparent Cache</h3>
+                <% if @installation.cache_enabled %>
+                  <span class="rounded-full bg-orange-600/10 px-2.5 py-1 text-xs font-semibold text-orange-600 ml-2">
+                    Enabled
+                  </span>
+                <% end %>
+              </div>
               <div class="mt-2 text-sm text-gray-500">
                 <p>Transparent cache allows you to use Ubicloud’s cache service without modifying your workflow files.
                   Check out
@@ -20,17 +99,11 @@
                   for information.</p>
               </div>
             </div>
-            <div id="cache-toggle-<%=@installation.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+            <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
               <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
                 <%== part(
                   "components/button",
-                  **(
-                    if @installation.cache_enabled
-                      { text: "Disable ", type: "danger" }
-                    else
-                      { text: "Enable", type: "primary" }
-                    end
-                  )
+                  **(@installation.cache_enabled ? { text: "Disable ", type: "danger" } : { text: "Enable", type: "primary" })
                 ) %>
               </div>
             </div>

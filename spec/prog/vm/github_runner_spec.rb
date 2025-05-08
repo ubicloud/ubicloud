@@ -68,7 +68,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     before do
       runner_project = Project.create_with_id(name: "default")
       allow(Config).to receive(:github_runner_service_project_id).and_return(runner_project.id)
-      expect(github_runner).to receive(:installation).and_return(instance_double(GithubInstallation, project:, allocator_preferences: {}))
+      expect(github_runner).to receive(:installation).and_return(instance_double(GithubInstallation, project:, performance_runner_enabled: false))
     end
 
     it "provisions a VM if the pool is not existing" do
