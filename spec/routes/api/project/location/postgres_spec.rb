@@ -143,8 +143,8 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can update database properties" do
-        expect(Project).to receive(:from_ubid).and_return(project)
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
+        expect(Project).to receive(:[]).and_return(project)
         expect(pg.representative_server).to receive(:storage_size_gib).and_return(128)
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
@@ -160,8 +160,8 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can scale down storage if the requested size is enough for existing data" do
-        expect(Project).to receive(:from_ubid).and_return(project)
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
+        expect(Project).to receive(:[]).and_return(project)
         expect(pg.representative_server).to receive(:storage_size_gib).and_return(128)
         expect(pg.representative_server.vm.sshable).to receive(:cmd).and_return("10000000\n")
 
@@ -173,8 +173,8 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "does not scale down storage if the requested size is too small for existing data" do
-        expect(Project).to receive(:from_ubid).and_return(project)
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
+        expect(Project).to receive(:[]).and_return(project)
         expect(pg.representative_server).to receive(:storage_size_gib).and_return(128)
         expect(pg.representative_server.vm.sshable).to receive(:cmd).and_return("999999999\n")
 
@@ -187,8 +187,8 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "returns error message if current usage is unknown" do
-        expect(Project).to receive(:from_ubid).and_return(project)
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
+        expect(Project).to receive(:[]).and_return(project)
         expect(pg.representative_server).to receive(:storage_size_gib).and_return(128)
         expect(pg.representative_server.vm.sshable).to receive(:cmd).and_raise(StandardError.new("error"))
 
@@ -201,8 +201,8 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "read-replica" do
-        expect(Project).to receive(:from_ubid).and_return(project)
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
+        expect(Project).to receive(:[]).and_return(project, Project[Config.postgres_service_project_id]).at_least(:once)
 
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
           name: "my-read-replica"
@@ -212,8 +212,8 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "promote" do
-        expect(Project).to receive(:from_ubid).and_return(project)
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
+        expect(Project).to receive(:[]).and_return(project)
         pg.update(parent_id: pg.id)
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/promote"
 
@@ -221,8 +221,8 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "fails to promote if not read_replica" do
-        expect(Project).to receive(:from_ubid).and_return(project)
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
+        expect(Project).to receive(:[]).and_return(project)
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/promote"
 
@@ -383,7 +383,6 @@ RSpec.describe Clover, "postgres" do
         allow(Config).to receive(:postgres_service_project_id).and_return(prj.id)
         allow(VictoriaMetricsResource).to receive(:first).with(project_id: prj.id).and_return(vmr)
         allow(vmr).to receive(:servers).and_return([vm_server])
-        allow(Project).to receive(:from_ubid).and_return(project)
         allow(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
       end
 

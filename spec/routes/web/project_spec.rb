@@ -693,7 +693,7 @@ RSpec.describe Clover, "project" do
       it "can not have more than 50 pending invitations" do
         visit "#{project.path}/user"
 
-        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        expect(Project).to receive(:[]).and_return(project).at_least(:once)
         expect(project).to receive(:invitations_dataset).and_return(instance_double(Sequel::Dataset, count: 50))
         expect(project).to receive(:invitations_dataset).and_call_original
 
