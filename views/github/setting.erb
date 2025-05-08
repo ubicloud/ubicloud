@@ -43,28 +43,15 @@
       <div
         class="rounded-lg bg-gray-50 py-10 text-center ring-1 ring-inset ring-gray-900/5 lg:flex lg:flex-col lg:justify-center lg:py-16"
       >
-        <div class="mx-auto max-w-xs px-8">
+        <div class="mx-auto max-w-xs px-8 space-y-6">
           <p class="text-base font-semibold text-gray-600">Boost your builds.
             <br>
             1/5th the cost of GitHub runners</p>
-          <p class="mt-6 flex items-baseline justify-center gap-x-2">
+          <p class="flex items-baseline justify-center gap-x-2">
             <span class="text-5xl font-semibold tracking-tight text-gray-900">$0.0016</span>
             <span class="text-sm/6 font-semibold tracking-wide text-gray-600">/minute</span>
           </p>
-          <form
-            id="premium-runner-update-form"
-            action="<%= "#{@project_data[:path]}/github/#{@installation.ubid}" %>"
-            role="form"
-            method="POST"
-          >
-            <%== csrf_tag("#{@project_data[:path]}/github/#{@installation.ubid}") %>
-            <%== part("components/form/hidden", name: "premium_runner_enabled", value: !@installation.premium_runner_enabled?) %>
-            <%== part(
-              "components/button",
-              extra_class: "mt-10 block w-full",
-              **(@installation.premium_runner_enabled? ? { text: "Disable ", type: "danger" } : { text: "Enable", type: "primary" })
-            ) %>
-          </form>
+          <%== part("components/form/toggle_form", name: "premium_runner_enabled", action: "#{@project_data[:path]}/github/#{@installation.ubid}", active: @installation.premium_runner_enabled?) %>
           <p class="mt-6 text-xs/5 text-gray-600"></p>
         </div>
       </div>
@@ -74,41 +61,29 @@
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <!-- Transparent Cache Card -->
       <div class="px-4 py-5 sm:p-6">
-        <form
-          id="cache-update-form"
-          action="<%= "#{@project_data[:path]}/github/#{@installation.ubid}" %>"
-          role="form"
-          method="POST"
-        >
-          <%== csrf_tag("#{@project_data[:path]}/github/#{@installation.ubid}") %>
-          <%== part("components/form/hidden", name: "cache_enabled", value: !@installation.cache_enabled) %>
-          <div class="sm:flex sm:items-center sm:justify-between">
-            <div>
-              <div class="flex items-center">
-                <h3 class="text-base font-semibold leading-6 text-gray-900">Ubicloud Transparent Cache</h3>
-                <% if @installation.cache_enabled %>
-                  <span class="rounded-full bg-orange-600/10 px-2.5 py-1 text-xs font-semibold text-orange-600 ml-2">
-                    Enabled
-                  </span>
-                <% end %>
-              </div>
-              <div class="mt-2 text-sm text-gray-500">
-                <p>Transparent cache allows you to use Ubicloud’s cache service without modifying your workflow files.
-                  Check out
-                  <a href="https://www.ubicloud.com/docs/github-actions-integration/ubicloud-cache" class="text-orange-500 font-medium">our documentation</a>
-                  for information.</p>
-              </div>
+        <div class="sm:flex sm:items-center sm:justify-between">
+          <div>
+            <div class="flex items-center">
+              <h3 class="text-base font-semibold leading-6 text-gray-900">Ubicloud Transparent Cache</h3>
+              <% if @installation.cache_enabled %>
+                <span class="rounded-full bg-orange-600/10 px-2.5 py-1 text-xs font-semibold text-orange-600 ml-2">
+                  Enabled
+                </span>
+              <% end %>
             </div>
-            <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-              <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
-                <%== part(
-                  "components/button",
-                  **(@installation.cache_enabled ? { text: "Disable ", type: "danger" } : { text: "Enable", type: "primary" })
-                ) %>
-              </div>
+            <div class="mt-2 text-sm text-gray-500">
+              <p>Transparent cache allows you to use Ubicloud’s cache service without modifying your workflow files.
+                Check out
+                <a href="https://www.ubicloud.com/docs/github-actions-integration/ubicloud-cache" class="text-orange-500 font-medium">our documentation</a>
+                for information.</p>
             </div>
           </div>
-        </form>
+          <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+            <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+              <%== part("components/form/toggle_form", name: "cache_enabled", action: "#{@project_data[:path]}/github/#{@installation.ubid}", active: @installation.cache_enabled) %>
+            </div>
+          </div>
+        </div>
       </div>
       <!-- Configure Repositories -->
       <div class="px-4 py-5 sm:p-6">

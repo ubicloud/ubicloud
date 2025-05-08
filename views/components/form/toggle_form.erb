@@ -1,0 +1,16 @@
+<%# locals: (name:, action:, active:) %>
+
+<form id="<%= name %>_toggle" action="<%= action %>" role="form" method="POST">
+  <%== csrf_tag(action) %>
+  <%== part("components/form/hidden", name:, value: !active) %>
+  <div class="group <%= active ? "active" : "" %>">
+    <button
+      type="submit"
+      class="toggle-parent-to-active relative inline-flex h-8 w-16 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 group-[.active]:bg-orange-600 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-600 focus:ring-offset-2"
+    >
+      <span
+        class="pointer-events-none inline-block size-7 translate-x-0 group-[.active]:translate-x-8 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+      ></span>
+    </button>
+  </div>
+</form>

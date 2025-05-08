@@ -37,7 +37,7 @@ $(".dropdown").on("click", function (event) {
   $(this).toggleClass("active");
 });
 
-$(".sidebar-group-btn").on("click", function (event) {
+$(".toggle-parent-to-active").on("click", function (event) {
   $(this).parent().toggleClass("active");
 });
 
