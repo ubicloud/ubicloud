@@ -228,7 +228,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
     project_usage.each do |usage|
       tokens = usage[usage_key]
       next if tokens.zero?
-      project = Project.from_ubid(usage["ubid"])
+      project = Project[id: UBID.to_uuid(usage["ubid"])]
 
       begin
         today_record = BillingRecord
