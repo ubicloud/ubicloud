@@ -154,9 +154,22 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.bootstrap_control_plane_vms }.to nap(5)
     end
 
+    it "incrs start_bootstrapping on KubernetesNodepool on 3 node control plane setup" do
+      expect(kubernetes_cluster).to receive(:cp_vms).and_return([create_vm, create_vm, create_vm]).twice
+      expect(kubernetes_cluster.nodepools.first).to receive(:incr_start_bootstrapping)
+      expect { nx.bootstrap_control_plane_vms }.to hop("wait_nodes")
+    end
+
+    it "incrs start_bootstrapping on KubernetesNodepool on 1 node control plane setup" do
+      kubernetes_cluster.update(cp_node_count: 1)
+      expect(kubernetes_cluster).to receive(:cp_vms).and_return([create_vm]).twice
+      expect(kubernetes_cluster.nodepools.first).to receive(:incr_start_bootstrapping)
+      expect { nx.bootstrap_control_plane_vms }.to hop("wait_nodes")
+    end
+
     it "hops wait_nodes if the target number of CP vms is reached" do
       expect(kubernetes_cluster.api_server_lb).to receive(:hostname).and_return "endpoint"
-      expect(kubernetes_cluster).to receive(:cp_vms).and_return [1, 2, 3]
+      expect(kubernetes_cluster).to receive(:cp_vms).and_return([1, 2, 3]).twice
       expect { nx.bootstrap_control_plane_vms }.to hop("wait_nodes")
     end
 
