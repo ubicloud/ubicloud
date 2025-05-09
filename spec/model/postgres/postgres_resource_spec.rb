@@ -72,9 +72,24 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.display_state).to eq("unavailable")
     end
 
-    it "returns 'converging' when strand has ConvergePostgresResource children" do
+    it "returns 'converging' when the resource has enough ready servers and in maintenance window" do
       expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait", children: [instance_double(Strand, prog: "Postgres::ConvergePostgresResource")])).at_least(:once)
+      expect(postgres_resource).to receive(:has_enough_ready_servers?).and_return(true).at_least(:once)
+      expect(postgres_resource).to receive(:in_maintenance_window?).and_return(true)
       expect(postgres_resource.display_state).to eq("converging")
+    end
+
+    it "returns 'waiting for maintenance window' when the resource has enough ready servers and not in maintenance window" do
+      expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait", children: [instance_double(Strand, prog: "Postgres::ConvergePostgresResource")])).at_least(:once)
+      expect(postgres_resource).to receive(:has_enough_ready_servers?).and_return(true).at_least(:once)
+      expect(postgres_resource).to receive(:in_maintenance_window?).and_return(false).at_least(:once)
+      expect(postgres_resource.display_state).to eq("waiting for maintenance window")
+    end
+
+    it "returns 'preparing for convergence' when the resource doesn't have enough ready servers" do
+      expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait", children: [instance_double(Strand, prog: "Postgres::ConvergePostgresResource")])).at_least(:once)
+      expect(postgres_resource).to receive(:has_enough_ready_servers?).and_return(false).at_least(:once)
+      expect(postgres_resource.display_state).to eq("preparing for convergence")
     end
 
     it "returns 'running' when strand label is 'wait' and has no children" do
