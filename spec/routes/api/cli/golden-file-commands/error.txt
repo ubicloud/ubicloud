@@ -31,9 +31,9 @@ pg eu-central-h1/test-pg show invalid
 pg eu-central-h1/test-pg -X pg_dump
 pg list -f invalid
 pg list invalid
-ps eu-central-h1/test-ps connect psfzm7e26xky5m9ggetw4dpqe2
+ps eu-central-h1/test-ps connect psfzm3e26xky5m9ggetw4dpqe2
 ps eu-central-h1/test-ps disconnect psfzm9e26xky5m9ggetw4dpqe2/foo
-ps eu-central-h1/test-ps disconnect psfzm7e26xky5m9ggetw4dpqe2
+ps eu-central-h1/test-ps disconnect psfzm3e26xky5m9ggetw4dpqe2
 ps eu-central-h1/test2-ps create invalid
 ps eu-central-h1/test-ps destroy invalid
 ps list -f invalid
