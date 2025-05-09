@@ -88,6 +88,17 @@ RSpec.describe PostgresResource do
     end
   end
 
+  it "returns in_maintenance_window? correctly" do
+    expect(postgres_resource).to receive(:maintenance_window_start_at).and_return(nil)
+    expect(postgres_resource.in_maintenance_window?).to be(true)
+
+    expect(postgres_resource).to receive(:maintenance_window_start_at).and_return(1).at_least(:once)
+    expect(Time).to receive(:now).and_return(Time.parse("2025-05-01 02:00:00Z"), Time.parse("2025-05-01 04:00:00Z"), Time.parse("2025-05-01 00:00:00Z"))
+    expect(postgres_resource.in_maintenance_window?).to be(true)
+    expect(postgres_resource.in_maintenance_window?).to be(false)
+    expect(postgres_resource.in_maintenance_window?).to be(false)
+  end
+
   it "returns target_standby_count correctly" do
     expect(postgres_resource).to receive(:ha_type).and_return(PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC)
     (0..2).each { expect(postgres_resource.target_standby_count).to eq(it) }
