@@ -102,7 +102,7 @@ RSpec.describe KubernetesCluster do
     end
 
     it "validates version" do
-      kc.version = "v1.33"
+      kc.version = "v1.31"
       expect(kc.valid?).to be false
       expect(kc.errors[:version]).to eq(["must be a valid Kubernetes version"])
 
@@ -162,6 +162,21 @@ RSpec.describe KubernetesCluster do
       expect(extra_ports[0].src_port).to eq(80)
       expect(missing_ports.count).to eq(1)
       expect(missing_ports[0][0]).to eq(443)
+    end
+  end
+
+  describe "#all_vms" do
+    it "returns all VMs in the cluster, including CP and worker nodes" do
+      expect(kc).to receive(:cp_vms).and_return([1, 2])
+      expect(kc).to receive(:nodepools).and_return([instance_double(KubernetesNodepool, vms: [3, 4]), instance_double(KubernetesNodepool, vms: [5, 6])])
+      expect(kc.all_vms).to eq([1, 2, 3, 4, 5, 6])
+    end
+  end
+
+  describe "#worker_vms" do
+    it "returns all worker VMs in the cluster" do
+      expect(kc).to receive(:nodepools).and_return([instance_double(KubernetesNodepool, vms: [3, 4]), instance_double(KubernetesNodepool, vms: [5, 6])])
+      expect(kc.worker_vms).to eq([3, 4, 5, 6])
     end
   end
 end

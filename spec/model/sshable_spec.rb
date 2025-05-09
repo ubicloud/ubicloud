@@ -175,6 +175,11 @@ RSpec.describe Sshable do
       sa.d_clean(unit_name)
     end
 
+    it "calls cmd with the correct restart command" do
+      expect(sa).to receive(:cmd).with("common/bin/daemonizer2 restart test_unit")
+      sa.d_restart(unit_name)
+    end
+
     it "calls cmd with the correct run command and no stdin" do
       expect(sa).to receive(:cmd).with("common/bin/daemonizer2 run test_unit sudo\\ host/bin/setup-vm\\ prep\\ test_unit", stdin: nil, log: true)
       sa.d_run(unit_name, run_command)

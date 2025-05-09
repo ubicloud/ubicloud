@@ -74,48 +74,6 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     end
   end
 
-  describe "#write_hosts_file_if_needed" do
-    it "exits early if the environment is not dev" do
-      expect(prog.vm).not_to receive(:sshable)
-      expect(Config).to receive(:development?).and_return(false)
-      prog.write_hosts_file_if_needed
-    end
-
-    it "exits early if /etc/hosts file contains an entry about the cluster endpoint already" do
-      sshable = instance_double(Sshable)
-      allow(prog.vm).to receive(:sshable).and_return(sshable)
-      expect(Config).to receive(:development?).and_return(true)
-
-      expect(sshable).to receive(:cmd).with("cat /etc/hosts").and_return("something #{kubernetes_cluster.endpoint} something")
-      expect(sshable).not_to receive(:cmd).with(/echo/)
-      prog.write_hosts_file_if_needed
-    end
-
-    it "creates an /etc/hosts entry linking the cluster endpoint to the IP4 of the first VM" do
-      sshable = instance_double(Sshable)
-      allow(prog.vm).to receive(:sshable).and_return(sshable)
-      expect(Config).to receive(:development?).and_return(true)
-
-      expect(sshable).to receive(:cmd).with("cat /etc/hosts").and_return("nothing relevant")
-      expect(kubernetes_cluster).to receive(:sshable).and_return(instance_double(Sshable, host: "SOMEIP"))
-      expect(sshable).to receive(:cmd).with("sudo tee -a /etc/hosts", {stdin: /SOMEIP somelb\..*\n/})
-
-      prog.write_hosts_file_if_needed
-    end
-
-    it "uses the given IP an /etc/hosts entry linking the cluster endpoint to the IP4 of the first VM" do
-      sshable = instance_double(Sshable)
-      expect(prog.vm).to receive(:sshable).and_return(sshable).twice
-      expect(Config).to receive(:development?).and_return(true)
-
-      expect(sshable).to receive(:cmd).with("cat /etc/hosts").and_return("nothing relevant")
-      expect(kubernetes_cluster).not_to receive(:sshable)
-      expect(sshable).to receive(:cmd).with("sudo tee -a /etc/hosts", {stdin: /ANOTHERIP somelb\..*\n/})
-
-      prog.write_hosts_file_if_needed "ANOTHERIP"
-    end
-  end
-
   describe "#start" do
     it "creates a CP VM and hops if a nodepool is not given" do
       expect(prog.kubernetes_nodepool).to be_nil
@@ -226,7 +184,6 @@ table ip6 pod_access {
 
   describe "#assign_role" do
     it "hops to init_cluster if this is the first vm of the cluster" do
-      expect(prog).to receive(:write_hosts_file_if_needed)
       expect(prog.kubernetes_cluster.cp_vms).to receive(:count).and_return(1)
       expect { prog.assign_role }.to hop("init_cluster")
     end
