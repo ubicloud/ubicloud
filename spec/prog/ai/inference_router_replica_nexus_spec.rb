@@ -396,10 +396,9 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
   end
 
   describe "#update_billing_records" do
-    p1 = Project.create_with_id(name: "default")
+    let(:p1) { Project.create_with_id(name: "default") }
 
     it "updates billing records" do
-      expect(Project).to receive(:from_ubid).with(p1.ubid).and_return(p1).exactly(4).times
       expect(BillingRecord.count).to eq(0)
       nx.update_billing_records(
         [{"ubid" => p1.ubid, "model_name" => "test-model", "request_count" => 1, "prompt_token_count" => 10, "completion_token_count" => 20}],
@@ -462,8 +461,6 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
 
     it "failure in updating single record doesn't impact others" do
       p2 = Project.create_with_id(name: "default")
-      expect(Project).to receive(:from_ubid).with(p1.ubid).and_return(p1)
-      expect(Project).to receive(:from_ubid).with(p2.ubid).and_return(p2)
       expect(BillingRecord).to receive(:create_with_id).once.ordered.with(hash_including(project_id: p1.id)).and_raise(Sequel::DatabaseConnectionError)
       expect(BillingRecord).to receive(:create_with_id).once.ordered.with(hash_including(project_id: p2.id)).and_call_original
       expect(BillingRecord.count).to eq(0)

@@ -315,7 +315,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       rate_id = rate["id"]
       tokens = usage[usage_key]
       next if tokens.zero?
-      project = Project.from_ubid(usage["ubid"])
+      project = Project[id: UBID.to_uuid(usage["ubid"])]
 
       begin
         today_record = BillingRecord
