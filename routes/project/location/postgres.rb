@@ -178,10 +178,10 @@ class Clover
           end
         end
 
-        r.delete String do |metric_destination_ubid|
+        r.delete :ubid_uuid do |id|
           authorize("Postgres:edit", pg.id)
 
-          if (md = PostgresMetricDestination.from_ubid(metric_destination_ubid))
+          if (md = pg.metric_destinations_dataset[id:])
             DB.transaction do
               md.destroy
               pg.servers.each(&:incr_configure_prometheus)
