@@ -36,11 +36,13 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   label def create_services_load_balancer
     hop_bootstrap_worker_vms if LoadBalancer[name: kubernetes_nodepool.cluster.services_load_balancer_name]
 
-    custom_hostname_dns_zone_id = DnsZone[name: Config.kubernetes_service_hostname]&.id
-    custom_hostname_prefix = if custom_hostname_dns_zone_id
+    dns_zone = DnsZone[name: Config.kubernetes_service_hostname]
+
+    custom_hostname_prefix = if dns_zone
       "#{kubernetes_nodepool.cluster.ubid.to_s[-10...]}-services"
     end
-    Prog::Vnet::LoadBalancerNexus.assemble(
+
+    lb = Prog::Vnet::LoadBalancerNexus.assemble(
       kubernetes_nodepool.cluster.private_subnet_id,
       name: kubernetes_nodepool.cluster.services_load_balancer_name,
       algorithm: "hash_based",
@@ -51,10 +53,12 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
       dst_port: 6443,
       health_check_endpoint: "/",
       health_check_protocol: "tcp",
-      custom_hostname_dns_zone_id:,
+      custom_hostname_dns_zone_id: dns_zone&.id,
       custom_hostname_prefix:,
       stack: LoadBalancer::Stack::IPV4
-    )
+    ).subject
+
+    lb.dns_zone&.insert_record(record_name: "*.#{lb.hostname}.", type: "CNAME", ttl: 3600, data: "#{lb.hostname}.")
 
     hop_bootstrap_worker_vms
   end
@@ -80,7 +84,12 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
     reap
     donate unless leaf?
     decr_destroy
-    LoadBalancer[name: kubernetes_nodepool.cluster.services_load_balancer_name]&.incr_destroy
+
+    lb = LoadBalancer[name: kubernetes_nodepool.cluster.services_load_balancer_name]
+    if (dns_zone = DnsZone[name: Config.kubernetes_service_hostname])
+      dns_zone.delete_record(record_name: "*.#{lb.hostname}.")
+    end
+    lb.incr_destroy
     kubernetes_nodepool.vms.each(&:incr_destroy)
     kubernetes_nodepool.remove_all_vms
     kubernetes_nodepool.destroy

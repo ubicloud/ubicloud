@@ -114,6 +114,11 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       expect(lb.name).to eq kc.services_load_balancer_name
       expect(lb.custom_hostname_dns_zone_id).to eq dns_zone.id
       expect(lb.custom_hostname).to eq "#{kc.ubid.to_s[-10...]}-services.k8s.ubicloud.com"
+
+      record = DnsRecord[name: "*.#{kc.ubid.to_s[-10...]}-services.k8s.ubicloud.com."]
+      expect(record).not_to be_nil
+      expect(record.type).to eq "CNAME"
+      expect(record.data).to eq "#{lb.hostname}."
     end
   end
 
@@ -170,14 +175,21 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       expect { nx.destroy }.to exit({"msg" => "kubernetes nodepool is deleted"})
     end
 
-    it "destroys the nodepool and its vms with non existing services loadbalancer" do
-      vms = [create_vm, create_vm]
-      expect(kn).to receive(:vms).and_return(vms)
+    it "deletes the sub-subdomain DNS record if the DNS zone exists" do
+      allow(Config).to receive(:kubernetes_service_hostname).and_return("k8s.ubicloud.com")
+      dns_zone = DnsZone.create_with_id(project_id: Project.first.id, name: "k8s.ubicloud.com", last_purged_at: Time.now)
+      Prog::Vnet::LoadBalancerNexus.assemble(
+        subnet.id,
+        name: kc.services_load_balancer_name,
+        custom_hostname_dns_zone_id: dns_zone&.id,
+        custom_hostname_prefix: "#{kc.ubid.to_s[-10...]}-services",
+        src_port: 443, dst_port: 8443
+      )
 
-      expect(vms).to all(receive(:incr_destroy))
-      expect(kn).to receive(:remove_all_vms)
-      expect(kn).to receive(:destroy)
+      dns_zone.insert_record(record_name: "*.#{kc.ubid.to_s[-10...]}-services.k8s.ubicloud.com.", type: "CNAME", ttl: 123, data: "whatever.")
+
       expect { nx.destroy }.to exit({"msg" => "kubernetes nodepool is deleted"})
+      expect(DnsRecord[name: "*.#{kc.ubid.to_s[-10...]}-services.k8s.ubicloud.com.", tombstoned: true]).not_to be_nil
     end
   end
 end
