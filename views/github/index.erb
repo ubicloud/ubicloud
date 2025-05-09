@@ -1,0 +1,24 @@
+<% @page_title = "GitHub Runners Integration" %>
+
+<% if !@project.has_valid_payment_method? %>
+  <form action="<%= "#{@project_data[:path]}/billing" %>" method="POST">
+    <%== csrf_tag("#{@project_data[:path]}/billing") %>
+    <%== part(
+      "components/empty_state",
+      icon: "hero-banknotes",
+      title: "No billing information",
+      description:
+        "Project doesn't have valid billing information. First, you need to update the project's billing details to use GitHub Runners.",
+      button_title: "New Billing Information"
+    ) %>
+  </form>
+<% else %>
+  <%== part(
+    "components/empty_state",
+    icon: "github",
+    title: "No Connected Accounts",
+    description: "Get started by installing our GitHub app to your user or organization account.",
+    button_link: "#{@project_data[:path]}/github/create",
+    button_title: "Connect New Account"
+  ) %>
+<% end %>

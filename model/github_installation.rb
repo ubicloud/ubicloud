@@ -6,6 +6,7 @@ class GithubInstallation < Sequel::Model
   many_to_one :project
   one_to_many :runners, key: :installation_id, class: :GithubRunner
   one_to_many :repositories, key: :installation_id, class: :GithubRepository
+  many_to_many :cache_entries, join_table: :github_repository, right_key: :id, right_primary_key: :repository_id, left_key: :installation_id, class: :GithubCacheEntry
 
   include ResourceMethods
 
@@ -22,6 +23,10 @@ class GithubInstallation < Sequel::Model
 
   def free_runner_upgrade?
     (upgrade_until = project.get_ff_free_runner_upgrade_until) && Time.parse(upgrade_until) > Time.now
+  end
+
+  def performance_runner_enabled
+    (allocator_preferences["family_filter"] || []).include?("performance")
   end
 end
 
