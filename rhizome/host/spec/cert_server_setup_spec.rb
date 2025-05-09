@@ -127,7 +127,7 @@ MemoryLimit=10M
 
   describe "#put_certificate" do
     it "puts the certificate to the server" do
-      expect(FileUtils).to receive(:mkdir_p).with("/vm/test-vm/cert")
+      expect(FileUtils).to receive(:mkdir).with("/vm/test-vm/cert")
       expect(cert_server_setup).to receive(:safe_write_to_file).with("/vm/test-vm/cert/cert.pem", "cert")
       expect(cert_server_setup).to receive(:safe_write_to_file).with("/vm/test-vm/cert/key.pem", "key")
 
