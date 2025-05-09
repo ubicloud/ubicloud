@@ -386,12 +386,12 @@ class Clover
         204
       end
 
-      r.delete String do |user_ubid|
+      r.delete :ubid_uuid do |id|
         authorize("Project:user", @project.id)
 
-        next unless (user = Account.from_ubid(user_ubid))
+        next unless (user = @project.accounts_dataset[id:])
 
-        unless @project.accounts.count > 1
+        unless @project.accounts_dataset.count > 1
           response.status = 400
           next {error: {message: "You can't remove the last user from '#{@project.name}' project. Delete project instead."}}
         end
