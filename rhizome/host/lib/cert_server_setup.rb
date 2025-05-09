@@ -131,7 +131,10 @@ CERT_SERVICE
   end
 
   def put_certificate(cert_payload, cert_key_payload)
-    FileUtils.mkdir_p(cert_folder)
+    begin
+      FileUtils.mkdir(cert_folder)
+    rescue Errno::EEXIST
+    end
     safe_write_to_file(cert_path, cert_payload)
     safe_write_to_file(key_path, cert_key_payload)
   end
