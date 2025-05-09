@@ -47,15 +47,12 @@ class Clover
         end
       end
 
-      r.post "disconnect", String do |disconnecting_ps_ubid|
+      r.post "disconnect", :ubid_uuid do |id|
         authorize("PrivateSubnet:disconnect", ps.id)
-        subnet = PrivateSubnet.from_ubid(disconnecting_ps_ubid)
-        unless subnet
+        unless (subnet = authorized_private_subnet(id:, perm: "PrivateSubnet:disconnect"))
           response.status = 400
           next {error: {code: 400, type: "InvalidRequest", message: "Subnet to be disconnected not found"}}
         end
-
-        authorize("PrivateSubnet:disconnect", subnet.id)
 
         DB.transaction do
           ps.disconnect_subnet(subnet)
