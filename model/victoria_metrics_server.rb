@@ -29,6 +29,10 @@ class VictoriaMetricsServer < Sequel::Model
     "https://[#{public_ipv6_address}]:8427"
   end
 
+  def endpoint
+    (Config.development? || Config.is_e2e) ? ip6_url : "https://#{resource.hostname}:8427"
+  end
+
   def init_health_monitor_session
     socket_path = File.join(Dir.pwd, "var", "health_monitor_sockets", "vn_#{vm.ephemeral_net6.nth(2)}")
     FileUtils.rm_rf(socket_path)
@@ -63,7 +67,7 @@ class VictoriaMetricsServer < Sequel::Model
 
   def client(socket: nil)
     VictoriaMetrics::Client.new(
-      endpoint: ip6_url,
+      endpoint: endpoint,
       ssl_ca_file_data: resource.root_certs + cert,
       socket: socket,
       username: resource.admin_user,

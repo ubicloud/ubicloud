@@ -55,7 +55,7 @@ RSpec.describe VictoriaMetricsServer do
       expect(vms.vm).to receive(:sshable).and_return(sshable)
       expect(vms).to receive(:private_ipv4_address).and_return("192.168.1.1")
       expect(VictoriaMetrics::Client).to receive(:new).with(
-        endpoint: vms.ip6_url,
+        endpoint: vms.endpoint,
         ssl_ca_file_data: vms.resource.root_certs + vms.cert,
         socket: File.join("unix://", socket_path, "health_monitor_socket"),
         username: vms.resource.admin_user,
@@ -151,9 +151,9 @@ RSpec.describe VictoriaMetricsServer do
   end
 
   describe "#client" do
-    it "creates a client with the correct parameters" do
+    it "creates a client with the correct parameters in prod" do
       expect(VictoriaMetrics::Client).to receive(:new).with(
-        endpoint: vms.ip6_url,
+        endpoint: vms.endpoint,
         ssl_ca_file_data: vms.resource.root_certs + vms.cert,
         socket: nil,
         username: vms.resource.admin_user,
@@ -166,7 +166,7 @@ RSpec.describe VictoriaMetricsServer do
     it "creates a client with a socket when specified" do
       socket = "unix:///path/to/socket"
       expect(VictoriaMetrics::Client).to receive(:new).with(
-        endpoint: vms.ip6_url,
+        endpoint: vms.endpoint,
         ssl_ca_file_data: vms.resource.root_certs + vms.cert,
         socket: socket,
         username: vms.resource.admin_user,
@@ -174,6 +174,19 @@ RSpec.describe VictoriaMetricsServer do
       )
 
       vms.client(socket: socket)
+    end
+  end
+
+  describe "#endpoint" do
+    it "returns the endpoint with hostname in production" do
+      expect(Config).to receive(:development?).and_return(false)
+      expect(Config).to receive(:is_e2e).and_return(false)
+      expect(vms.endpoint).to eq("https://#{vms.resource.hostname}:8427")
+    end
+
+    it "returns the endpoint with ip6_url in development" do
+      expect(Config).to receive(:development?).and_return(true)
+      expect(vms.endpoint).to eq(vms.ip6_url)
     end
   end
 
