@@ -31,8 +31,8 @@ class Clover
         r.get "kubeconfig" do
           authorize("KubernetesCluster:edit", kc.id)
 
-          response["Content-Type"] = "text/plain"
-          response["Content-Disposition"] = "attachment; filename=\"#{kc.name}-kubeconfig.yaml\""
+          response["content-type"] = "text/plain"
+          response["content-disposition"] = "attachment; filename=\"#{kc.name}-kubeconfig.yaml\""
           kc.kubeconfig
         end
       end

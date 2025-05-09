@@ -175,8 +175,8 @@ class Clover
             @invoice_data = Serializers::Invoice.serialize(invoice, {detailed: true})
 
             unless invoice.status == "current"
-              response["Content-Type"] = "application/pdf"
-              response["Content-Disposition"] = "inline; filename=\"#{invoice.filename}\""
+              response["content-type"] = "application/pdf"
+              response["content-disposition"] = "inline; filename=\"#{invoice.filename}\""
               begin
                 next Invoice.blob_storage_client.get_object(bucket: Config.invoices_bucket_name, key: invoice.blob_key).body.read
               rescue Aws::S3::Errors::NoSuchKey
