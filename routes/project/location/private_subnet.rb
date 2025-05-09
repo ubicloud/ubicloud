@@ -24,8 +24,7 @@ class Clover
 
       r.post "connect" do
         authorize("PrivateSubnet:connect", ps.id)
-        subnet = PrivateSubnet.from_ubid(r.params["connected-subnet-id"])
-        unless subnet
+        unless (subnet = authorized_private_subnet(key: "connected-subnet-id", perm: "PrivateSubnet:connect"))
           if api?
             response.status = 400
             next {error: {code: 400, type: "InvalidRequest", message: "Subnet to be connected not found"}}
@@ -34,8 +33,6 @@ class Clover
             r.redirect "#{@project.path}#{ps.path}"
           end
         end
-
-        authorize("PrivateSubnet:connect", subnet.id)
 
         DB.transaction do
           ps.connect_subnet(subnet)
