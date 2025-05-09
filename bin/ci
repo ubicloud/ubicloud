@@ -17,9 +17,6 @@ def main(options)
   tests_to_wait = []
   if options[:test_cases].include?("vm") && (test_case = all_test_cases["vm"])
     # Testing slices is not parallel with other tests as it requires a specific host state
-    # YYY: Make this default when all hosts in prod support slices.
-    Semaphore.incr(hetzner_server_st.id, "allow_slices")
-    wait_until(hetzner_server_st, "wait")
 
     # This tests encrypted VMs with slices, which will create both standard and
     # burstable VMs. The test will also test host reboot.
@@ -30,6 +27,7 @@ def main(options)
     # on when the host is rebooted and can cause flaky issues for github runner tests.
     wait_until(encrypted_vms_st)
 
+    # YYY: Remove this when all hosts use slices
     Semaphore.incr(hetzner_server_st.id, "disallow_slices")
     wait_until(hetzner_server_st, "wait")
 
