@@ -12,7 +12,7 @@ module Scheduling::Allocator
     @target_host_utilization ||= Config.allocator_target_host_utilization
   end
 
-  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], prioritize_performance_cpu: false)
+  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [])
     request = Request.new(
       vm.id,
       vm.vcpus,
@@ -35,7 +35,7 @@ module Scheduling::Allocator
       true, # use slices
       Option::VmFamilies.find { it.name == vm.family }&.require_shared_slice || false,
       vm.project.get_ff_allocator_diagnostics || false,
-      prioritize_performance_cpu
+      family_filter
     )
     allocation = Allocation.best_allocation(request)
     fail "#{vm} no space left on any eligible host" unless allocation
@@ -66,7 +66,7 @@ module Scheduling::Allocator
     :use_slices,
     :require_shared_slice,
     :diagnostics,
-    :prioritize_performance_cpu
+    :family_filter
   ) do
     def initialize(*args)
       super
@@ -152,7 +152,8 @@ module Scheduling::Allocator
           Sequel.function(:coalesce, :available_gpus, 0).as(:available_gpus),
           :available_iommu_groups,
           Sequel.function(:coalesce, :vm_provisioning_count, 0).as(:vm_provisioning_count),
-          :accepts_slices
+          :accepts_slices,
+          :family
         )
         .where(arch: request.arch_filter)
         .with(:total_ipv4, DB[:address]
@@ -231,6 +232,7 @@ module Scheduling::Allocator
       ds = ds.exclude(Sequel[:vm_host][:id] => request.host_exclusion_filter) unless request.host_exclusion_filter.empty?
       ds = ds.where(location_id: request.location_filter) unless request.location_filter.empty?
       ds = ds.where(allocation_state: request.allocation_state_filter) unless request.allocation_state_filter.empty?
+      ds = ds.where(Sequel[:vm_host][:family] => request.family_filter) unless request.family_filter.empty?
       ds = ds.exclude(total_cores: 14, total_cpus: 14) unless request.family == "standard-gpu"
 
       # If we dont's want to use slices, place those only on hosts that do not accept them
@@ -318,9 +320,8 @@ module Scheduling::Allocator
       # penalty for ongoing vm provisionings on the host
       score += @candidate_host[:vm_provisioning_count] * 0.5
 
-      # prioritize AX102 for our premium CPU testers.
-      # penalize other customers since the allocator is eager to use smaller hosts first
-      score += @request.prioritize_performance_cpu ? -1 : 5 if @candidate_host[:total_cores] == 16
+      # prioritize performance family over other families if available
+      score += -1 if @candidate_host[:family] == "performance"
 
       # penalty for AX161, TODO: remove after migration to AX162
       score += 0.5 if @candidate_host[:total_cores] == 32

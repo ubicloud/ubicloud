@@ -117,12 +117,9 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
 
         click_button "Create"
-        vm_host = VmHost.new_with_id(location_id: Location::HETZNER_FSN1_ID)
-        Sshable.create { |s| s.id = vm_host.id }
-        vm_host.save_changes
         address = Address.create(
           cidr: "1.2.3.0/24",
-          routed_to_host_id: vm_host.id
+          routed_to_host_id: create_vm_host.id
         )
         vm.assigned_vm_address = AssignedVmAddress.new_with_id(
           ip: "1.2.3.4",

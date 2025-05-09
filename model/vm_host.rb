@@ -432,6 +432,7 @@ end
 #  os_version         | text                     |
 #  accepts_slices     | boolean                  | NOT NULL DEFAULT false
 #  location_id        | uuid                     | NOT NULL
+#  family             | text                     | NOT NULL
 # Indexes:
 #  vm_host_pkey     | PRIMARY KEY btree (id)
 #  vm_host_ip6_key  | UNIQUE btree (ip6)

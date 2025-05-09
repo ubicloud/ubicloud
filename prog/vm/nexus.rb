@@ -202,25 +202,29 @@ class Prog::Vm::Nexus < Prog::Base
       host_exclusion_filter = frame["exclude_host_ids"] || []
       gpu_count = frame["gpu_count"] || 0
       runner = GithubRunner.first(vm_id: vm.id) if vm.location_id == Location::GITHUB_RUNNERS_ID
-      allocation_state_filter, location_filter, location_preference, host_filter =
+      allocation_state_filter, location_filter, location_preference, host_filter, family_filter =
         if frame["force_host_id"]
-          [[], [], [], [frame["force_host_id"]]]
+          [[], [], [], [frame["force_host_id"]], []]
         elsif vm.location_id == Location::GITHUB_RUNNERS_ID
           runner_location_filter = [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID]
           runner_location_filter.append(Location::LEASEWEB_WDC02_ID) if vm.vcpus == 60
-          runner_location_preference = if runner && (preferred_locations = runner.installation.project.get_ff_preferred_runner_locations) && !preferred_locations.empty?
-            # Just be sure your preferred ones are also in the location filter
-            runner_location_filter |= preferred_locations
-            preferred_locations
-          else
-            [Location::GITHUB_RUNNERS_ID]
+          runner_location_preference = [Location::GITHUB_RUNNERS_ID]
+          runner_family_filter = [vm.family]
+          if runner
+            if (preferred_locations = runner.installation.project.get_ff_preferred_runner_locations) && !preferred_locations.empty?
+              # Just be sure your preferred ones are also in the location filter
+              runner_location_filter |= preferred_locations
+              runner_location_preference = preferred_locations
+            end
+            if vm.family == "standard" && runner.installation.project.get_ff_performance_runners
+              runner_family_filter = [vm.family, "performance"]
+            end
           end
-          [["accepting"], runner_location_filter, runner_location_preference, []]
+          [["accepting"], runner_location_filter, runner_location_preference, [], runner_family_filter]
         else
-          [["accepting"], [vm.location_id], [], []]
+          [["accepting"], [vm.location_id], [], [], [vm.family]]
         end
-
-      prefer_performance = runner.installation.project.get_ff_performance_runners if runner
+      family_filter = ["standard"] if vm.family == "burstable"
 
       Scheduling::Allocator.allocate(
         vm, frame["storage_volumes"],
@@ -231,7 +235,7 @@ class Prog::Vm::Nexus < Prog::Base
         host_filter: host_filter,
         host_exclusion_filter: host_exclusion_filter,
         gpu_count: gpu_count,
-        prioritize_performance_cpu: !!prefer_performance
+        family_filter: family_filter
       )
     rescue RuntimeError => ex
       raise unless ex.message.include?("no space left on any eligible host")

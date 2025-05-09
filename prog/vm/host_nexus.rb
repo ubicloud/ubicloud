@@ -3,7 +3,7 @@
 class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
 
-  def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, spdk_version: Config.spdk_version, default_boot_images: [])
+  def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, spdk_version: Config.spdk_version, default_boot_images: [])
     DB.transaction do
       unless Location[location_id]
         raise "No existing Location"
@@ -12,7 +12,7 @@ class Prog::Vm::HostNexus < Prog::Base
       ubid = VmHost.generate_ubid
 
       Sshable.create(host: sshable_hostname) { it.id = ubid.to_uuid }
-      vmh = VmHost.create(location_id:, net6: net6, ndp_needed: ndp_needed) { it.id = ubid.to_uuid }
+      vmh = VmHost.create(location_id:, family:, net6:, ndp_needed:) { it.id = ubid.to_uuid }
 
       if provider_name == HostProvider::HETZNER_PROVIDER_NAME || provider_name == HostProvider::LEASEWEB_PROVIDER_NAME
         HostProvider.create do |hp|
