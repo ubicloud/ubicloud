@@ -24,7 +24,10 @@ class Clover
 
         r.delete true do
           authorize("KubernetesCluster:delete", kc.id)
-          kc.incr_destroy
+          DB.transaction do
+            kc.incr_destroy
+            audit_log(kc, "destroy")
+          end
           204
         end
 

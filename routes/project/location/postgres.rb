@@ -38,7 +38,10 @@ class Clover
 
       r.delete true do
         authorize("Postgres:delete", pg.id)
-        pg.incr_destroy
+        DB.transaction do
+          pg.incr_destroy
+          audit_log(pg, "destroy")
+        end
         204
       end
 
@@ -70,6 +73,7 @@ class Clover
         DB.transaction do
           pg.update(target_vm_size: target_vm_size.vm_size, target_storage_size_gib:, ha_type:)
           pg.read_replicas.map { it.update(target_vm_size: target_vm_size.vm_size, target_storage_size_gib:) }
+          audit_log(pg, "update")
         end
 
         if api?
@@ -83,9 +87,12 @@ class Clover
 
       r.post "restart" do
         authorize("Postgres:edit", pg.id)
-        pg.servers.each do |s|
-          s.incr_restart
-        rescue Sequel::ForeignKeyConstraintViolation
+        DB.transaction do
+          pg.servers.each do |s|
+            s.incr_restart
+          rescue Sequel::ForeignKeyConstraintViolation
+          end
+          audit_log(pg, "restart")
         end
 
         if api?
@@ -111,12 +118,14 @@ class Clover
           params = check_required_web_params(["cidr"])
           parsed_cidr = Validation.validate_cidr(params["cidr"])
 
-          firewall_rule = DB.transaction do
+          firewall_rule = nil
+          DB.transaction do
             pg.incr_update_firewall_rules
-            PostgresFirewallRule.create_with_id(
+            firewall_rule = PostgresFirewallRule.create_with_id(
               postgres_resource_id: pg.id,
               cidr: parsed_cidr.to_s
             )
+            audit_log(firewall_rule, "create", pg)
           end
 
           if api?
@@ -134,6 +143,7 @@ class Clover
             DB.transaction do
               fwr.destroy
               pg.incr_update_firewall_rules
+              audit_log(fwr, "destroy")
             end
           end
           204
@@ -150,13 +160,14 @@ class Clover
           Validation.validate_url(params["url"])
 
           DB.transaction do
-            PostgresMetricDestination.create_with_id(
+            md = PostgresMetricDestination.create_with_id(
               postgres_resource_id: pg.id,
               url: params["url"],
               username: params["username"],
               password: params[password_param]
             )
             pg.servers.each(&:incr_configure_prometheus)
+            audit_log(md, "create", pg)
           end
 
           if api?
@@ -174,6 +185,7 @@ class Clover
             DB.transaction do
               md.destroy
               pg.servers.each(&:incr_configure_prometheus)
+              audit_log(md, "destroy")
             end
           end
 
@@ -186,18 +198,22 @@ class Clover
           authorize("Postgres:edit", pg.id)
 
           params = check_required_web_params(["name"])
-          st = Prog::Postgres::PostgresResourceNexus.assemble(
-            project_id: @project.id,
-            location_id: pg.location_id,
-            name: params["name"],
-            target_vm_size: pg.target_vm_size,
-            target_storage_size_gib: pg.target_storage_size_gib,
-            ha_type: PostgresResource::HaType::NONE,
-            version: pg.version,
-            flavor: pg.flavor,
-            parent_id: pg.id,
-            restore_target: nil
-          )
+          st = nil
+          DB.transaction do
+            st = Prog::Postgres::PostgresResourceNexus.assemble(
+              project_id: @project.id,
+              location_id: pg.location_id,
+              name: params["name"],
+              target_vm_size: pg.target_vm_size,
+              target_storage_size_gib: pg.target_storage_size_gib,
+              ha_type: PostgresResource::HaType::NONE,
+              version: pg.version,
+              flavor: pg.flavor,
+              parent_id: pg.id,
+              restore_target: nil
+            )
+            audit_log(pg, "create_replica", st.subject)
+          end
           send_notification_mail_to_partners(st.subject, current_account.email)
 
           if api?
@@ -222,7 +238,11 @@ class Clover
           end
         end
 
-        pg.incr_promote
+        DB.transaction do
+          pg.incr_promote
+          audit_log(pg, "promote")
+        end
+
         if api?
           Serializers::Postgres.serialize(pg)
         else
@@ -236,18 +256,22 @@ class Clover
         authorize("Postgres:view", pg.id)
 
         params = check_required_web_params(["name", "restore_target"])
+        st = nil
 
-        st = Prog::Postgres::PostgresResourceNexus.assemble(
-          project_id: @project.id,
-          location_id: pg.location_id,
-          name: params["name"],
-          target_vm_size: pg.target_vm_size,
-          target_storage_size_gib: pg.target_storage_size_gib,
-          version: pg.version,
-          flavor: pg.flavor,
-          parent_id: pg.id,
-          restore_target: params["restore_target"]
-        )
+        DB.transaction do
+          st = Prog::Postgres::PostgresResourceNexus.assemble(
+            project_id: @project.id,
+            location_id: pg.location_id,
+            name: params["name"],
+            target_vm_size: pg.target_vm_size,
+            target_storage_size_gib: pg.target_storage_size_gib,
+            version: pg.version,
+            flavor: pg.flavor,
+            parent_id: pg.id,
+            restore_target: params["restore_target"]
+          )
+          audit_log(pg, "restore", st.subject)
+        end
         send_notification_mail_to_partners(st.subject, current_account.email)
 
         if api?
@@ -276,6 +300,7 @@ class Clover
         DB.transaction do
           pg.update(superuser_password: params["password"])
           pg.representative_server.incr_update_superuser_password
+          audit_log(pg, "reset_superuser_password")
         end
 
         if api?
@@ -289,7 +314,10 @@ class Clover
       r.post "set-maintenance-window" do
         authorize("Postgres:edit", pg.id)
 
-        pg.update(maintenance_window_start_at: r.params["maintenance_window_start_at"])
+        DB.transaction do
+          pg.update(maintenance_window_start_at: r.params["maintenance_window_start_at"])
+          audit_log(pg, "set_maintenance_window")
+        end
 
         if api?
           Serializers::Postgres.serialize(pg, {detailed: true})

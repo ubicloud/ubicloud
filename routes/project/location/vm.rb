@@ -30,13 +30,23 @@ class Clover
 
       r.delete true do
         authorize("Vm:delete", vm.id)
-        vm.incr_destroy
+
+        DB.transaction do
+          vm.incr_destroy
+          audit_log(vm, "destroy")
+        end
+
         204
       end
 
       r.post "restart" do
         authorize("Vm:edit", vm.id)
-        vm.incr_restart
+
+        DB.transaction do
+          vm.incr_restart
+          audit_log(vm, "restart")
+        end
+
         if api?
           Serializers::Vm.serialize(vm, {detailed: true})
         else

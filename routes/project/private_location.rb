@@ -44,6 +44,7 @@ class Clover
           access_key: params["access_key"],
           secret_key: params["secret_key"]
         ) { it.id = loc.id }
+        audit_log(loc, "create")
         loc
       end
 
@@ -91,6 +92,7 @@ class Clover
         DB.transaction do
           @location.location_credential.destroy
           @location.destroy
+          audit_log(@location, "destroy")
         end
 
         204
@@ -99,7 +101,11 @@ class Clover
       r.post do
         authorize("Location:edit", @project.id)
         Validation.validate_name(r.params["name"])
-        @location.update(ui_name: r.params["name"], display_name: r.params["name"])
+
+        DB.transaction do
+          @location.update(ui_name: r.params["name"], display_name: r.params["name"])
+          audit_log(@location, "update")
+        end
 
         if api?
           Serializers::PrivateLocation.serialize(@location)

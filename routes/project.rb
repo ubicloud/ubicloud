@@ -24,9 +24,9 @@ class Clover
     end
 
     r.post true do
+      no_authorization_needed
       if current_account.projects_dataset.count >= 10
         err_msg = "Project limit exceeded. You can create up to 10 projects. Contact support@ubicloud.com if you need more."
-        no_authorization_needed
         if api?
           fail CloverError.new(400, "InvalidRequest", err_msg)
         else
@@ -36,13 +36,15 @@ class Clover
       end
 
       params = check_required_web_params(["name"])
-      project = current_account.create_project_with_default_policy(params["name"])
-      no_authorization_needed
+      DB.transaction do
+        @project = current_account.create_project_with_default_policy(params["name"])
+        audit_log(@project, "create")
+      end
 
       if api?
-        Serializers::Project.serialize(project)
+        Serializers::Project.serialize(@project)
       else
-        r.redirect project.path
+        r.redirect @project.path
       end
     end
 
@@ -89,7 +91,10 @@ class Clover
           fail DependencyError.new("'#{@project.name}' project has some resources. Delete all related resources first.")
         end
 
-        @project.soft_delete
+        DB.transaction do
+          @project.soft_delete
+          audit_log(@project, "destroy")
+        end
 
         204
       end
@@ -103,6 +108,7 @@ class Clover
         r.post true do
           authorize("Project:edit", @project.id)
           @project.update(name: r.params["name"])
+          audit_log(@project, "update")
 
           flash["notice"] = "The project name is updated to '#{@project.name}'."
 

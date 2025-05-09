@@ -41,34 +41,45 @@ class Clover
             end
           end
 
-          if (user = Account.exclude(status_id: 3)[email: email])
-            result = DB[:access_tag]
-              .returning(:hyper_tag_id)
-              .insert_conflict
-              .insert(hyper_tag_id: user.id, project_id: @project.id)
+          user = Account.exclude(status_id: 3)[email: email]
 
-            if result.empty?
-              flash["error"] = "The requested user already has access to this project"
-              r.redirect "#{@project.path}/user"
+          DB.transaction do
+            if user
+              result = DB[:access_tag]
+                .returning(:hyper_tag_id)
+                .insert_conflict
+                .insert(hyper_tag_id: user.id, project_id: @project.id)
+              audit_log(@project, "add_account", user)
+
+              if result.empty?
+                flash["error"] = "The requested user already has access to this project"
+                r.redirect "#{@project.path}/user"
+              end
+
+              if tag
+                tag.add_subject(user.id)
+                audit_log(tag, "add_member", user)
+              end
+
+              Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
+                greeting: "Hello,",
+                body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on Ubicloud.",
+                  "To join project, click the button below.",
+                  "For any questions or assistance, reach out to our team at support@ubicloud.com."],
+                button_title: "Join Project",
+                button_link: "#{Config.base_url}#{@project.path}/dashboard")
+            else
+              @project.add_invitation(email: email, policy: (policy if tag), inviter_id: current_account_id, expires_at: Time.now + 7 * 24 * 60 * 60)
+              audit_log(@project, "add_invitation")
+
+              Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
+                greeting: "Hello,",
+                body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on Ubicloud.",
+                  "To join project, you need to create an account on Ubicloud. Once you create an account, you'll be automatically joined to the project.",
+                  "For any questions or assistance, reach out to our team at support@ubicloud.com."],
+                button_title: "Create Account",
+                button_link: "#{Config.base_url}/create-account")
             end
-
-            tag&.add_subject(user.id)
-            Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
-              greeting: "Hello,",
-              body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on Ubicloud.",
-                "To join project, click the button below.",
-                "For any questions or assistance, reach out to our team at support@ubicloud.com."],
-              button_title: "Join Project",
-              button_link: "#{Config.base_url}#{@project.path}/dashboard")
-          else
-            @project.add_invitation(email: email, policy: (policy if tag), inviter_id: current_account_id, expires_at: Time.now + 7 * 24 * 60 * 60)
-            Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
-              greeting: "Hello,",
-              body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on Ubicloud.",
-                "To join project, you need to create an account on Ubicloud. Once you create an account, you'll be automatically joined to the project.",
-                "For any questions or assistance, reach out to our team at support@ubicloud.com."],
-              button_title: "Create Account",
-              button_link: "#{Config.base_url}/create-account")
           end
 
           flash["notice"] = "Invitation sent successfully to '#{email}'."
@@ -124,8 +135,14 @@ class Clover
             (additions[added_tag] ||= []) << account_id if added_tag
           end
 
-          additions.each { |tag, user_ids| tag.add_members(user_ids) }
-          removals.each { |tag, user_ids| tag.remove_members(user_ids) }
+          additions.each do |tag, user_ids|
+            tag.add_members(user_ids)
+            audit_log(tag, "add_member", user_ids)
+          end
+          removals.each do |tag, user_ids|
+            tag.remove_members(user_ids)
+            audit_log(tag, "remove_member", user_ids)
+          end
           additions.transform_keys!(&:name)
           removals.transform_keys!(&:name)
 
@@ -162,12 +179,15 @@ class Clover
               .invitations_dataset
               .where(email: emails)
               .update(policy:)
+
+            audit_log(@project, "update_invitation")
           end
 
           changes = []
           additions.each { |name, user_ids| changes << "#{user_ids.size} members added to #{name}" }
           removals.each { |name, user_ids| changes << "#{user_ids.size} members removed from #{name}" }
 
+          no_audit_log if changes.empty?
           flash["notice"] = changes.empty? ? "No change in user policies" : changes.join(", ")
           flash["error"] = issues.uniq.join(", ") unless issues.empty?
         end
@@ -218,15 +238,19 @@ class Clover
               if ubid == "template"
                 next if deleted == "true"
                 ace = AccessControlEntry.new_with_id(project_id: @project.id)
+                audit_action = "create"
               else
                 next unless (ace = AccessControlEntry[project_id: @project.id, id: UBID.to_uuid(ubid)])
                 check_ace_subject(ace.subject_id)
                 if deleted == "true"
                   ace.destroy
+                  audit_log(ace, "destroy")
                   next
                 end
+                audit_action = "update"
               end
               ace.update_from_ubids(subject_id:, action_id:, object_id:)
+              audit_log(ace, audit_action, [subject_id, action_id, object_id])
             end
           end
 
@@ -248,7 +272,10 @@ class Clover
 
           r.post true do
             authorize(tag_perm_map[tag_type], @project.id)
-            @tag_model.create_with_id(project_id: @project.id, name: typecast_params.nonempty_str("name"))
+            DB.transaction do
+              tag = @tag_model.create_with_id(project_id: @project.id, name: typecast_params.nonempty_str("name"))
+              audit_log(tag, "create")
+            end
             flash["notice"] = "#{@display_tag_type} tag created successfully"
             r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}"
           end
@@ -282,12 +309,14 @@ class Clover
 
               r.post do
                 @tag.update(name: typecast_params.nonempty_str("name"))
+                audit_log(@tag, "update")
                 flash["notice"] = "#{@display_tag_type} tag name updated successfully"
                 r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
               end
 
               r.delete do
                 @tag.destroy
+                audit_log(@tag, "destroy")
                 flash["notice"] = "#{@display_tag_type} tag deleted successfully"
                 204
               end
@@ -307,6 +336,7 @@ class Clover
                 issues = "#{": " unless issues.empty?}#{issues.join(", ")}"
                 unless to_add.empty?
                   @tag.add_members(to_add)
+                  audit_log(@tag, "add_member", to_add)
                   changes_made = true
                 end
               end
@@ -332,6 +362,7 @@ class Clover
               # entries and that will not introduce loops
               DB.transaction do
                 num_removed = @tag.remove_members(to_remove)
+                audit_log(@tag, "remove_member", to_remove)
 
                 if @tag_type == "subject" && @tag.name == "Admin" && !@tag.member_ids.find { UBID.uuid_class_match?(it, Account) }
                   raise Sequel::ValidationFailed, "Must keep at least one account in Admin subject tag"
@@ -349,6 +380,7 @@ class Clover
         authorize("Project:user", @project.id)
 
         @project.invitations_dataset.where(email: email).destroy
+        audit_log(@project, "destroy_invitation")
         # Javascript handles redirect
         flash["notice"] = "Invitation for '#{email}' is removed successfully."
         204
@@ -366,6 +398,7 @@ class Clover
 
         @project.disassociate_subject(user.id)
         user.remove_project(@project)
+        audit_log(@project, "remove_account", user)
 
         # Javascript refreshes page
         flash["notice"] = "Removed #{user.email} from #{@project.name}"

@@ -53,11 +53,14 @@ class Clover
                 end
               end
             end
+            audit_log(@project, "update_billing")
           rescue Stripe::InvalidRequestError => e
             flash["error"] = e.message
           end
 
           r.redirect @project.path + "/billing"
+        else
+          no_audit_log
         end
 
         checkout = Stripe::Checkout::Session.create(
@@ -158,7 +161,10 @@ class Clover
               next {error: {message: "You can't delete the last payment method of a project."}}
             end
 
-            payment_method.destroy
+            DB.transaction do
+              payment_method.destroy
+              audit_log(payment_method, "destroy")
+            end
 
             204
           end

@@ -36,7 +36,12 @@ class Clover
         end
 
         authorize("PrivateSubnet:connect", subnet.id)
-        ps.connect_subnet(subnet)
+
+        DB.transaction do
+          ps.connect_subnet(subnet)
+          audit_log(ps, "connect", subnet)
+        end
+
         if api?
           Serializers::PrivateSubnet.serialize(ps)
         else
@@ -54,7 +59,12 @@ class Clover
         end
 
         authorize("PrivateSubnet:disconnect", subnet.id)
-        ps.disconnect_subnet(subnet)
+
+        DB.transaction do
+          ps.disconnect_subnet(subnet)
+          audit_log(ps, "disconnect", subnet)
+        end
+
         if api?
           Serializers::PrivateSubnet.serialize(ps)
         else
@@ -86,7 +96,11 @@ class Clover
           fail DependencyError.new("Private subnet '#{ps.name}' has VMs attached, first, delete them.")
         end
 
-        ps.incr_destroy
+        DB.transaction do
+          ps.incr_destroy
+          audit_log(ps, "destroy")
+        end
+
         204
       end
     end
