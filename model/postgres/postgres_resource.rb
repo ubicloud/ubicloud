@@ -103,6 +103,10 @@ class PostgresResource < Sequel::Model
     servers.any? { it.needs_recycling? } || servers.count != target_server_count
   end
 
+  def in_maintenance_window?
+    maintenance_window_start_at.nil? || (Time.now.utc.hour - maintenance_window_start_at) % 24 < MAINTENANCE_DURATION_IN_HOURS
+  end
+
   def set_firewall_rules
     vm_firewall_rules = firewall_rules.map { {cidr: it.cidr.to_s, port_range: Sequel.pg_range(5432..5432)} }
     vm_firewall_rules.concat(firewall_rules.map { {cidr: it.cidr.to_s, port_range: Sequel.pg_range(6432..6432)} })
