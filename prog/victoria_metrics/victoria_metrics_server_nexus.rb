@@ -85,7 +85,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
     case vm.sshable.d_check("install_victoria_metrics")
     when "Succeeded"
       vm.sshable.d_clean("install_victoria_metrics")
-      hop_configure
+      hop_mount_data_disk
     when "Failed", "NotStarted"
       vm.sshable.d_run("install_victoria_metrics", "/home/ubi/victoria_metrics/bin/install", Config.victoria_metrics_version)
     end
