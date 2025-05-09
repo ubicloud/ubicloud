@@ -110,12 +110,6 @@ module ResourceMethods
       end
     end
 
-    def from_ubid(ubid)
-      self[id: UBID.parse(ubid).to_uuid]
-    rescue UBIDParseError
-      nil
-    end
-
     def ubid_type
       UBID.const_get("TYPE_#{ClassMethods.uppercase_underscore(name)}")
     end
