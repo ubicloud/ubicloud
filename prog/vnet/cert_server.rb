@@ -9,6 +9,7 @@ class Prog::Vnet::CertServer < Prog::Base
 
   label def before_run
     pop "vm is destroyed" unless vm
+    pop "vm is detached" unless vm.load_balancer
   end
 
   label def reshare_certificate
@@ -19,6 +20,7 @@ class Prog::Vnet::CertServer < Prog::Base
 
   label def put_certificate
     nap 5 unless load_balancer.active_cert&.cert
+    nap 5 unless vm.vm_host
 
     put_cert_to_vm
     hop_start_certificate_server
@@ -30,6 +32,8 @@ class Prog::Vnet::CertServer < Prog::Base
   end
 
   label def remove_cert_server
+    pop "certificate resources and server are removed" unless vm.vm_host
+
     vm.vm_host.sshable.cmd("sudo host/bin/setup-cert-server stop_and_remove #{vm.inhost_name}")
     pop "certificate resources and server are removed"
   end
