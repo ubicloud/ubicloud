@@ -18,8 +18,8 @@ class Clover
         r.redirect "#{@project.path}/billing"
       end
 
-      r.is String do |usage_alert_ubid|
-        next unless (usage_alert = UsageAlert.from_ubid(usage_alert_ubid)) && usage_alert.project_id == @project.id
+      r.is :ubid_uuid do |id|
+        next unless (usage_alert = @project.usage_alerts_dataset[id:])
 
         r.delete true do
           DB.transaction do
