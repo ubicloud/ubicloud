@@ -136,10 +136,10 @@ class Clover
           end
         end
 
-        r.delete String do |firewall_rule_ubid|
+        r.delete :ubid_uuid do |id|
           authorize("Postgres:edit", pg.id)
 
-          if (fwr = PostgresFirewallRule.from_ubid(firewall_rule_ubid))
+          if (fwr = pg.firewall_rules_dataset[id:])
             DB.transaction do
               fwr.destroy
               pg.incr_update_firewall_rules
