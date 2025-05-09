@@ -41,6 +41,15 @@
         crossorigin="anonymous"
       ></script>
     <% end %>
+    <% if @enable_echarts %>
+      <script
+        src="https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js"
+        integrity="sha256-v0oiNSTkC3fDBL7GfhIiz1UfFIgM9Cxp3ARlWOEcB7E="
+        crossorigin="anonymous"
+      >
+      </script>
+    <% end %>
+
   </head>
 
   <body class="h-full">
