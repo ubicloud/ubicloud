@@ -595,9 +595,9 @@ RSpec.describe Clover, "postgres" do
           username: "username",
           password: "password"
         )
-        expect(PostgresMetricDestination).to receive(:from_ubid).and_return(nil)
 
         visit "#{project.path}#{pg.path}"
+        md.this.update(id: PostgresMetricDestination.generate_uuid)
 
         btn = find "#md-delete-#{md.ubid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
