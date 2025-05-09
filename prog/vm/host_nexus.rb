@@ -90,11 +90,16 @@ class Prog::Vm::HostNexus < Prog::Base
     hop_wait_prep
   end
 
+  def os_supports_slices?(os_version)
+    os_version == "ubuntu-24.04"
+  end
+
   label def wait_prep
     reap.each do |st|
       case st.prog
       when "LearnOs"
-        vm_host.update(os_version: st.exitval.fetch("os_version"))
+        os_version = st.exitval.fetch("os_version")
+        vm_host.update(os_version: os_version, accepts_slices: os_supports_slices?(os_version))
       when "LearnMemory"
         mem_gib = st.exitval.fetch("mem_gib")
         vm_host.update(total_mem_gib: mem_gib)

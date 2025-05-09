@@ -3,7 +3,7 @@
 require_relative "../../lib/util"
 
 class Prog::Test::HetznerServer < Prog::Test::Base
-  semaphore :verify_cleanup_and_destroy, :allow_slices, :disallow_slices
+  semaphore :verify_cleanup_and_destroy, :disallow_slices
 
   def self.assemble(vm_host_id: nil, default_boot_images: [])
     frame = if vm_host_id
@@ -110,22 +110,11 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       hop_verify_cleanup
     end
 
-    when_allow_slices_set? do
-      hop_allow_slices
-    end
-
     when_disallow_slices_set? do
       hop_disallow_slices
     end
 
     nap 15
-  end
-
-  label def allow_slices
-    vm_host.allow_slices
-    Semaphore.where(strand_id: strand.id, name: "allow_slices").destroy
-
-    hop_wait
   end
 
   label def disallow_slices
