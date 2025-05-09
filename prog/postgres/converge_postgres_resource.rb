@@ -37,11 +37,9 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     if (rs = postgres_resource.representative_server)
       hop_prune_servers unless rs.needs_recycling?
 
-      current_hour = Time.now.utc.hour
-      maintenance_window_start_at = postgres_resource.maintenance_window_start_at
-      nap 10 * 60 if maintenance_window_start_at && (current_hour - maintenance_window_start_at) % 24 >= PostgresResource::MAINTENANCE_DURATION_IN_HOURS
-      register_deadline(nil, 10 * 60)
+      nap 10 * 60 unless postgres_resource.in_maintenance_window?
 
+      register_deadline(nil, 10 * 60)
       rs.trigger_failover
     end
 

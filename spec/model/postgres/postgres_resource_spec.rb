@@ -72,9 +72,24 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.display_state).to eq("unavailable")
     end
 
-    it "returns 'converging' when strand has ConvergePostgresResource children" do
+    it "returns 'converging' when the resource has enough ready servers and in maintenance window" do
       expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait", children: [instance_double(Strand, prog: "Postgres::ConvergePostgresResource")])).at_least(:once)
+      expect(postgres_resource).to receive(:has_enough_ready_servers?).and_return(true).at_least(:once)
+      expect(postgres_resource).to receive(:in_maintenance_window?).and_return(true)
       expect(postgres_resource.display_state).to eq("converging")
+    end
+
+    it "returns 'waiting maintenance window' when the resource has enough ready servers and not in maintenance window" do
+      expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait", children: [instance_double(Strand, prog: "Postgres::ConvergePostgresResource")])).at_least(:once)
+      expect(postgres_resource).to receive(:has_enough_ready_servers?).and_return(true).at_least(:once)
+      expect(postgres_resource).to receive(:in_maintenance_window?).and_return(false).at_least(:once)
+      expect(postgres_resource.display_state).to eq("waiting maintenance window")
+    end
+
+    it "returns 'preparing for convergence' when the resource doesn't have enough ready servers" do
+      expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait", children: [instance_double(Strand, prog: "Postgres::ConvergePostgresResource")])).at_least(:once)
+      expect(postgres_resource).to receive(:has_enough_ready_servers?).and_return(false).at_least(:once)
+      expect(postgres_resource.display_state).to eq("preparing for convergence")
     end
 
     it "returns 'running' when strand label is 'wait' and has no children" do
@@ -86,6 +101,17 @@ RSpec.describe PostgresResource do
       expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait_server", children: [])).at_least(:once)
       expect(postgres_resource.display_state).to eq("creating")
     end
+  end
+
+  it "returns in_maintenance_window? correctly" do
+    expect(postgres_resource).to receive(:maintenance_window_start_at).and_return(nil)
+    expect(postgres_resource.in_maintenance_window?).to be(true)
+
+    expect(postgres_resource).to receive(:maintenance_window_start_at).and_return(1).at_least(:once)
+    expect(Time).to receive(:now).and_return(Time.parse("2025-05-01 02:00:00Z"), Time.parse("2025-05-01 04:00:00Z"), Time.parse("2025-05-01 00:00:00Z"))
+    expect(postgres_resource.in_maintenance_window?).to be(true)
+    expect(postgres_resource.in_maintenance_window?).to be(false)
+    expect(postgres_resource.in_maintenance_window?).to be(false)
   end
 
   it "returns target_standby_count correctly" do
