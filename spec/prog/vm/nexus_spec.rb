@@ -464,23 +464,6 @@ RSpec.describe Prog::Vm::Nexus do
       expect { nx.start }.to hop("create_unix_user")
     end
 
-    it "considers all locations for standard-60 runners" do
-      vm.location_id = Location::GITHUB_RUNNERS_ID
-      vm.vcpus = 60
-      expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
-        allocation_state_filter: ["accepting"],
-        distinct_storage_devices: false,
-        host_filter: [],
-        host_exclusion_filter: [],
-        location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID, Location::LEASEWEB_WDC02_ID],
-        location_preference: [Location::GITHUB_RUNNERS_ID],
-        gpu_count: 0,
-        family_filter: ["standard"]
-      )
-      expect { nx.start }.to hop("create_unix_user")
-    end
-
     it "considers standard family for burstable virtual machines" do
       vm.family = "burstable"
       expect(Scheduling::Allocator).to receive(:allocate).with(
@@ -497,11 +480,33 @@ RSpec.describe Prog::Vm::Nexus do
       expect { nx.start }.to hop("create_unix_user")
     end
 
-    it "considers preferred locations for runners if the feature flag is set" do
-      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id)
+    it "considers filtered locations for runners if set for the installation" do
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, allocator_preferences: {"location_filter" => [Location::GITHUB_RUNNERS_ID, Location::LEASEWEB_WDC02_ID]})
       GithubRunner.create(vm_id: vm.id, repository_name: "ubicloud/test", label: "ubicloud", installation_id: installation.id)
       vm.location_id = Location::GITHUB_RUNNERS_ID
-      prj.set_ff_preferred_runner_locations([Location::LEASEWEB_WDC02_ID])
+
+      expect(Scheduling::Allocator).to receive(:allocate).with(
+        vm, :storage_volumes,
+        allocation_state_filter: ["accepting"],
+        distinct_storage_devices: false,
+        host_filter: [],
+        host_exclusion_filter: [],
+        location_filter: [Location::GITHUB_RUNNERS_ID, Location::LEASEWEB_WDC02_ID],
+        location_preference: [Location::GITHUB_RUNNERS_ID],
+        gpu_count: 0,
+        family_filter: ["standard"]
+      )
+      expect { nx.start }.to hop("create_unix_user")
+    end
+
+    it "considers preferred locations for runners if set for the installation" do
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, allocator_preferences: {
+        "location_filter" => [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID, Location::LEASEWEB_WDC02_ID],
+        "location_preference" => [Location::LEASEWEB_WDC02_ID]
+      })
+      GithubRunner.create(vm_id: vm.id, repository_name: "ubicloud/test", label: "ubicloud", installation_id: installation.id)
+      vm.location_id = Location::GITHUB_RUNNERS_ID
+
       expect(Scheduling::Allocator).to receive(:allocate).with(
         vm, :storage_volumes,
         allocation_state_filter: ["accepting"],
@@ -512,6 +517,25 @@ RSpec.describe Prog::Vm::Nexus do
         location_preference: [Location::LEASEWEB_WDC02_ID],
         gpu_count: 0,
         family_filter: ["standard"]
+      )
+      expect { nx.start }.to hop("create_unix_user")
+    end
+
+    it "considers preferred families for runners if set for the installation" do
+      vm.location_id = Location::GITHUB_RUNNERS_ID
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, allocator_preferences: {"family_filter" => ["standard", "performance"]})
+      GithubRunner.create(label: "ubicloud", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
+
+      expect(Scheduling::Allocator).to receive(:allocate).with(
+        vm, :storage_volumes,
+        allocation_state_filter: ["accepting"],
+        distinct_storage_devices: false,
+        host_filter: [],
+        host_exclusion_filter: [],
+        location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID],
+        location_preference: [Location::GITHUB_RUNNERS_ID],
+        gpu_count: 0,
+        family_filter: ["standard", "performance"]
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -600,25 +624,6 @@ RSpec.describe Prog::Vm::Nexus do
         location_preference: [],
         gpu_count: 3,
         family_filter: ["standard"]
-      )
-      expect { nx.start }.to hop("create_unix_user")
-    end
-
-    it "prioritize performance CPU if the runner's project has the feature flag" do
-      vm.location_id = Location::GITHUB_RUNNERS_ID
-      prj.set_ff_performance_runners(true)
-      installation_id = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id).id
-      GithubRunner.create(label: "ubicloud", repository_name: "ubicloud/test", installation_id:, vm_id: vm.id)
-      expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
-        allocation_state_filter: ["accepting"],
-        distinct_storage_devices: false,
-        host_filter: [],
-        host_exclusion_filter: [],
-        location_filter: ["6b9ef786-b842-8420-8c65-c25e3d4bdf3d", Location::HETZNER_FSN1_ID, "1f214853-0bc4-8020-b910-dffb867ef44f"],
-        location_preference: ["6b9ef786-b842-8420-8c65-c25e3d4bdf3d"],
-        gpu_count: 0,
-        family_filter: ["standard", "performance"]
       )
       expect { nx.start }.to hop("create_unix_user")
     end
