@@ -96,6 +96,14 @@ class Prog::Vm::Nexus < Prog::Base
         nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic").subject
       end
 
+      gpu_count = 1 if gpu_count == 0 && vm_size.gpu
+      allocator_preferences = {
+        distinct_storage_devices:,
+        force_host_id:,
+        gpu_count:,
+        host_exclusion_filter: exclude_host_ids
+      }
+
       vm = Vm.create(
         public_key: public_key,
         unix_user: unix_user,
@@ -111,11 +119,11 @@ class Prog::Vm::Nexus < Prog::Base
         ip4_enabled: enable_ip4,
         pool_id: pool_id,
         arch: arch,
-        project_id:
+        project_id:,
+        allocator_preferences:
       ) { it.id = ubid.to_uuid }
       nic.update(vm_id: vm.id)
 
-      gpu_count = 1 if gpu_count == 0 && vm_size.gpu
       label = (location.provider == "aws") ? "start_aws" : "start"
 
       Strand.create(
