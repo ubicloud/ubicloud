@@ -24,16 +24,25 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     ipv4_range ||= random_private_ipv4(location, project).to_s
     DB.transaction do
       ps = PrivateSubnet.create(name: name, location_id: location.id, net6: ipv6_range, net4: ipv4_range, state: "waiting", project_id:) { it.id = ubid.to_uuid }
+      firewall_dataset = project.firewalls_dataset.where(location_id:)
 
-      firewall = if firewall_id
-        existing_fw = project.firewalls_dataset.where(location_id: location.id).first(Sequel[:firewall][:id] => firewall_id)
-        fail "Firewall with id #{firewall_id} and location #{location.name} does not exist" unless existing_fw
-        existing_fw
+      if firewall_id
+        unless (firewall = firewall_dataset.first(Sequel[:firewall][:id] => firewall_id))
+          fail "Firewall with id #{firewall_id} and location #{location.name} does not exist"
+        end
       else
         port_range = allow_only_ssh ? 22..22 : 0..65535
-        new_fw = Firewall.create_with_id(name: "#{name}-default", location_id: location.id, project_id:)
-        ["0.0.0.0/0", "::/0"].each { |cidr| FirewallRule.create_with_id(firewall_id: new_fw.id, cidr: cidr, port_range: Sequel.pg_range(port_range)) }
-        new_fw
+        fw_name = "#{name}-default"
+        # As is typical when checking before inserting, there is a race condition here with
+        # a user concurrently manually creating a firewall with the same name.  However,
+        # the worst case scenario is a bogus error message, and the user could try creating
+        # the private subnet again.
+        unless firewall_dataset.where(Sequel[:firewall][:name] => fw_name).empty?
+          fw_name += "-#{Array.new(7) { UBID.from_base32(rand(32)) }.join}"
+        end
+
+        firewall = Firewall.create(name: fw_name, location_id: location.id, project_id:)
+        ["0.0.0.0/0", "::/0"].each { |cidr| FirewallRule.create_with_id(firewall_id: firewall.id, cidr: cidr, port_range: Sequel.pg_range(port_range)) }
       end
       firewall.associate_with_private_subnet(ps, apply_firewalls: false)
 
