@@ -32,13 +32,13 @@ class Prog::Vnet::SubnetNexus < Prog::Base
         end
       else
         port_range = allow_only_ssh ? 22..22 : 0..65535
-        fw_name = "#{name}-default"
+        fw_name = "#{name[0, 55]}-default"
         # As is typical when checking before inserting, there is a race condition here with
         # a user concurrently manually creating a firewall with the same name.  However,
         # the worst case scenario is a bogus error message, and the user could try creating
         # the private subnet again.
         unless firewall_dataset.where(Sequel[:firewall][:name] => fw_name).empty?
-          fw_name += "-#{Array.new(7) { UBID.from_base32(rand(32)) }.join}"
+          fw_name = "#{name[0, 47]}-default-#{Array.new(7) { UBID.from_base32(rand(32)) }.join}"
         end
 
         firewall = Firewall.create(name: fw_name, location_id: location.id, project_id:)
