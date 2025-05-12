@@ -114,8 +114,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
 
       expect(Config).to receive(:development?).and_return(true)
       expect(vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
-      expect(vm).to receive(:ephemeral_net6).and_return(NetAddr::IPv6Net.parse("2a01:4f8:10a:128b:814c::/79"))
-      create_certificate_payload[:extensions] = ["subjectAltName=DNS:minio-cluster-name.minio.ubicloud.com,DNS:minio-cluster-name0.minio.ubicloud.com,IP:1.1.1.1,IP:2a01:4f8:10a:128b:814c::2", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"]
+      create_certificate_payload[:extensions] = ["subjectAltName=DNS:minio-cluster-name.minio.ubicloud.com,DNS:minio-cluster-name0.minio.ubicloud.com,IP:1.1.1.1", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"]
       expect(Util).to receive(:create_certificate).with(create_certificate_payload).and_return([instance_double(OpenSSL::X509::Certificate, to_pem: "cert"), instance_double(OpenSSL::PKey::EC, to_pem: "cert_key")])
 
       expect(nx.minio_server).to receive(:update).and_call_original
@@ -132,10 +131,8 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       vm = nx.minio_server.vm
       vm.strand.update(label: "wait")
       expect(vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
-      expect(vm).to receive(:ephemeral_net6).and_return(NetAddr::IPv6Net.parse("2a01:4f8:10a:128b:814c::/79"))
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
       expect(nx.minio_server.cluster.dns_zone).to receive(:insert_record).with(record_name: nx.cluster.hostname, type: "A", ttl: 10, data: "1.1.1.1")
-      expect(nx.minio_server.cluster.dns_zone).to receive(:insert_record).with(record_name: nx.cluster.hostname, type: "AAAA", ttl: 10, data: "2a01:4f8:10a:128b:814c::2")
       expect(nx).to receive(:register_deadline)
       expect(OpenSSL::X509::Certificate).to receive(:new).with("root_cert_1").and_return(cert_1)
       expect(OpenSSL::PKey::EC).to receive(:new).with("root_cert_key_1").and_return(key_1)
@@ -380,7 +377,6 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(nx.minio_server.vm).to receive(:incr_destroy)
       expect(nx.minio_server).to receive(:destroy)
       expect(nx.minio_server.cluster.dns_zone).to receive(:delete_record).with(record_name: nx.cluster.hostname, type: "A", data: nil)
-      expect(nx.minio_server.cluster.dns_zone).to receive(:delete_record).with(record_name: nx.cluster.hostname, type: "AAAA", data: nil)
       expect { nx.destroy }.to exit({"msg" => "minio server destroyed"})
     end
 
@@ -392,10 +388,8 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(nx.minio_server.vm.nics.first).to receive(:incr_destroy)
       expect(nx.minio_server.vm).to receive(:incr_destroy)
       expect(nx.minio_server.vm).to receive(:ephemeral_net4).and_return("10.10.10.10")
-      expect(nx.minio_server.vm).to receive(:ephemeral_net6).and_return(NetAddr::IPv6Net.parse("2a01:4f8:10a:128b:814c::/79")).at_least(:once)
       expect(nx.minio_server).to receive(:destroy)
       expect(nx.minio_server.cluster.dns_zone).to receive(:delete_record).with(record_name: nx.cluster.hostname, type: "A", data: "10.10.10.10")
-      expect(nx.minio_server.cluster.dns_zone).to receive(:delete_record).with(record_name: nx.cluster.hostname, type: "AAAA", data: "2a01:4f8:10a:128b:814c::2")
       expect { nx.destroy }.to exit({"msg" => "minio server destroyed"})
     end
   end
