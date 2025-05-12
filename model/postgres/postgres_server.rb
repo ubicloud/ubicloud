@@ -264,7 +264,8 @@ class PostgresServer < Sequel::Model
       max_file_retention: 120,
       interval: "15s",
       additional_labels: {},
-      metrics_dir: "/home/ubi/postgres/metrics"
+      metrics_dir: "/home/ubi/postgres/metrics",
+      project_id: Config.postgres_service_project_id
     }
   end
 end

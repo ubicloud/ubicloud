@@ -380,7 +380,7 @@ RSpec.describe Clover, "postgres" do
       let(:tsdb_client) { instance_double(VictoriaMetrics::Client) }
 
       before do
-        allow(Config).to receive(:victoria_metrics_service_project_id).and_return(prj.id)
+        allow(Config).to receive(:postgres_service_project_id).and_return(prj.id)
         allow(VictoriaMetricsResource).to receive(:first).with(project_id: prj.id).and_return(vmr)
         allow(vmr).to receive(:servers).and_return([vm_server])
         allow(Project).to receive(:from_ubid).and_return(project)

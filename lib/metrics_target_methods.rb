@@ -21,7 +21,10 @@ module MetricsTargetMethods
       additional_labels: {foo: "bar"},
 
       # Directory to store the collected metrics
-      metrics_dir: "/home/ubi/metrics"
+      metrics_dir: "/home/ubi/metrics",
+
+      # Service Project ID to use for the metrics storage
+      project_id: Config.victoria_metrics_service_project_id
     }
   end
 
