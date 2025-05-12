@@ -124,6 +124,34 @@ RSpec.describe Clover, "private subnet" do
         expect(page.status_code).to eq(404)
         expect(page).to have_content("ResourceNotFound")
       end
+
+      it "can create new private subnet with same name after destroying it" do
+        2.times do
+          project
+          visit "#{project.path}/private-subnet/create"
+
+          expect(page.title).to eq("Ubicloud - Create Private Subnet")
+          name = "dummy-ps"
+          fill_in "Name", with: name
+          choose option: Location::HETZNER_FSN1_ID
+
+          click_button "Create"
+
+          expect(page).to have_flash_notice("'#{name}' will be ready in a few seconds")
+          expect(page.title).to eq("Ubicloud - #{name}")
+          expect(PrivateSubnet.count).to eq(1)
+
+          ps = PrivateSubnet.first
+          expect(ps.project_id).to eq(project.id)
+
+          visit "#{project.path}#{ps.path}"
+          btn = find ".delete-btn"
+          page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+
+          expect(SemSnap.new(ps.id).set?("destroy")).to be true
+          ps.destroy
+        end
+      end
     end
 
     describe "show" do
