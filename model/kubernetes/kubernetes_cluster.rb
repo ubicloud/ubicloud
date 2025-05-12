@@ -18,12 +18,12 @@ class KubernetesCluster < Sequel::Model
   include SemaphoreMethods
   include HealthMonitorMethods
 
-  semaphore :destroy, :sync_kubernetes_services
+  semaphore :destroy, :sync_kubernetes_services, :upgrade
 
   def validate
     super
     errors.add(:cp_node_count, "must be greater than 0") if cp_node_count <= 0
-    errors.add(:version, "must be a valid Kubernetes version") unless ["v1.32", "v1.31"].include?(version)
+    errors.add(:version, "must be a valid Kubernetes version") unless ["v1.32", "v1.33"].include?(version)
   end
 
   def display_state
@@ -109,6 +109,14 @@ class KubernetesCluster < Sequel::Model
       "down"
     end
     aggregate_readings(previous_pulse: previous_pulse, reading: reading)
+  end
+
+  def all_vms
+    cp_vms + nodepools.flat_map(&:vms)
+  end
+
+  def worker_vms
+    nodepools.flat_map(&:vms)
   end
 end
 
