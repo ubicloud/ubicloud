@@ -22,9 +22,9 @@ class MinioServer < Sequel::Model
   end
 
   def generate_etc_hosts_entry
-    entries = ["::1 #{hostname}"]
+    entries = ["127.0.0.1 #{hostname}"]
     entries += cluster.servers.reject { it.id == id }.map do |server|
-      "#{server.public_ipv6_address} #{server.hostname}"
+      "#{server.public_ipv4_address} #{server.hostname}"
     end
     entries.join("\n")
   end
@@ -37,8 +37,8 @@ class MinioServer < Sequel::Model
     vm.private_ipv4.to_s
   end
 
-  def public_ipv6_address
-    vm.ephemeral_net6.nth(2).to_s
+  def public_ipv4_address
+    vm.ephemeral_net4.to_s
   end
 
   def minio_volumes
@@ -48,15 +48,15 @@ class MinioServer < Sequel::Model
   end
 
   def ip4_url
-    "https://#{vm.ephemeral_net4}:9000"
+    "https://#{public_ipv4_address}:9000"
   end
 
   def endpoint
-    cluster.dns_zone ? "#{hostname}:9000" : "#{vm.ephemeral_net4}:9000"
+    cluster.dns_zone ? "#{hostname}:9000" : "#{public_ipv4_address}:9000"
   end
 
   def init_health_monitor_session
-    socket_path = File.join(Dir.pwd, "var", "health_monitor_sockets", "ms_#{vm.ephemeral_net6.nth(2)}")
+    socket_path = File.join(Dir.pwd, "var", "health_monitor_sockets", "ms_#{public_ipv4_address}")
     FileUtils.rm_rf(socket_path)
     FileUtils.mkdir_p(socket_path)
 

@@ -86,7 +86,7 @@ ff00::0 ip6-mcastprefix
 ff02::1 ip6-allnodes
 ff02::2 ip6-allrouters
 ff02::3 ip6-allhosts
-::1 minio-cluster-name0.minio.ubicloud.com
+127.0.0.1 minio-cluster-name0.minio.ubicloud.com
 ECHO
       JSON.generate({
         minio_config: minio_config,
