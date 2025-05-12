@@ -131,7 +131,7 @@ RSpec.describe Clover, "private subnet" do
           visit "#{project.path}/private-subnet/create"
 
           expect(page.title).to eq("Ubicloud - Create Private Subnet")
-          name = "dummy-ps"
+          name = "a123456789" * 6
           fill_in "Name", with: name
           choose option: Location::HETZNER_FSN1_ID
 
@@ -151,6 +151,10 @@ RSpec.describe Clover, "private subnet" do
           expect(SemSnap.new(ps.id).set?("destroy")).to be true
           ps.destroy
         end
+
+        expect(Firewall.where(name: "a123456789a123456789a123456789a123456789a123456789a1234-default")).not_to be_empty
+        expect(Firewall.count).to eq 2
+        expect(Firewall.get { sum(Sequel.char_length(:name)) }).to eq 126
       end
     end
 
