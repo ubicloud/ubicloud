@@ -370,7 +370,7 @@ class Clover
 
         metric_keys = metric_key ? [metric_key] : Metrics::POSTGRES_METRICS.keys
 
-        vmr = VictoriaMetricsResource.first(project_id: Config.victoria_metrics_service_project_id)
+        vmr = VictoriaMetricsResource.first(project_id: pg.representative_server.metrics_config[:project_id])
         vms = vmr&.servers&.first
         tsdb_client = vms&.client
 
