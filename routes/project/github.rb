@@ -63,18 +63,16 @@ class Clover
             view "github/runner"
           end
 
-          r.is :ubid_uuid do |id|
+          r.delete :ubid_uuid do |id|
             next unless (runner = GithubRunner[id:, installation_id: GithubInstallation.select(:id).where(project_id: @project.id)])
 
-            r.delete true do
-              DB.transaction do
-                runner.incr_skip_deregistration
-                runner.incr_destroy
-                audit_log(runner, "destroy")
-              end
-              flash["notice"] = "Runner '#{runner.ubid}' forcibly terminated"
-              204
+            DB.transaction do
+              runner.incr_skip_deregistration
+              runner.incr_destroy
+              audit_log(runner, "destroy")
             end
+            flash["notice"] = "Runner '#{runner.ubid}' forcibly terminated"
+            204
           end
         end
 
@@ -87,17 +85,15 @@ class Clover
             view "github/cache"
           end
 
-          r.is :ubid_uuid do |id|
+          r.delete :ubid_uuid do |id|
             next unless (entry = GithubCacheEntry[id:, repository_id: GithubRepository.select(:id).where(installation_id: GithubInstallation.select(:id).where(project_id: @project.id))])
 
-            r.delete true do
-              DB.transaction do
-                entry.destroy
-                audit_log(entry, "destroy")
-              end
-              flash["notice"] = "Cache '#{entry.key}' deleted."
-              204
+            DB.transaction do
+              entry.destroy
+              audit_log(entry, "destroy")
             end
+            flash["notice"] = "Cache '#{entry.key}' deleted."
+            204
           end
         end
       end
