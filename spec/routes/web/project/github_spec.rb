@@ -230,11 +230,14 @@ RSpec.describe Clover, "github" do
     end
 
     it "raises not found when runner not exists" do
-      visit "#{project.path}/github/#{installation.ubid}/runner/grv4tp3wnb7j7jm5d40wv72j0t"
+      runner = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject
+      visit "#{project.path}/github/#{installation.ubid}/runner"
+      runner.destroy
 
-      expect(page.title).to eq("Ubicloud - ResourceNotFound")
+      btn = find "#runner-#{runner.id} .delete-btn"
+      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+
       expect(page.status_code).to eq(404)
-      expect(page).to have_content "ResourceNotFound"
     end
   end
 
@@ -283,11 +286,17 @@ RSpec.describe Clover, "github" do
     end
 
     it "raises not found when cache entry not exists" do
-      visit "#{project.path}/github/#{installation.ubid}/cache/etn0h8p5js1a4kpa9er7jkg77c"
+      entry = create_cache_entry(key: "new-cache")
+      client = instance_double(Aws::S3::Client)
+      expect(Aws::S3::Client).to receive(:new).and_return(client)
+      expect(client).to receive(:delete_object).with(bucket: repository.bucket_name, key: entry.blob_key)
 
-      expect(page.title).to eq("Ubicloud - ResourceNotFound")
+      visit "#{project.path}/github/#{installation.ubid}/cache"
+      entry.destroy
+
+      btn = find "#entry-#{entry.ubid} .delete-btn"
+      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
       expect(page.status_code).to eq(404)
-      expect(page).to have_content "ResourceNotFound"
     end
   end
 end
