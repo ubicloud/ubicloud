@@ -122,7 +122,7 @@ RSpec.describe Clover, "github" do
           spec.expect(key).to spec.eq blob_key
           spec.expect(bucket).to spec.eq s3_bucket
         end
-        expect(Aws::S3::Client).to receive(:new).with(anything).and_return(s3_client)
+        expect(Aws::S3::Client).to receive(:new).with(anything).and_return(s3_client).twice
 
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
 

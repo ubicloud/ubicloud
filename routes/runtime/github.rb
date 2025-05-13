@@ -142,7 +142,7 @@ class Clover
         begin
           entry.update(upload_id:)
         rescue Sequel::ValidationFailed, Sequel::UniqueConstraintViolation
-          blob_storage_client.delete_object(bucket:, key: blob_key)
+          entry.delete_blob_storage
 
           fail CloverError.new(409, "AlreadyExists", "A cache entry for #{scope} scope already exists with #{key} key and #{version} version.")
         end
