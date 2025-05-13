@@ -7,8 +7,8 @@ require "yaml"
 Octokit.configure do |c|
   c.connection_options = {
     request: {
-      open_timeout: 10,
-      timeout: 10
+      open_timeout: 5,
+      timeout: 5
     }
   }
 end
