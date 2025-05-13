@@ -99,8 +99,31 @@ RSpec.describe Clover, "github" do
         expect(last_response).to have_runtime_error(400, "The cache size is over the 10GB limit")
       end
 
-      it "fails if the cache entry already exists" do
+      it "fails if the cache entry already exists before upload" do
         GithubCacheEntry.create_with_id(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
+
+        expect(last_response).to have_runtime_error(409, "A cache entry for dev scope already exists with k1 key and v1 version.")
+      end
+
+      it "fails if the cache entry already exists after upload, and deletes upload in that case" do
+        s3_client = instance_double(Aws::S3::Client, create_multipart_upload: nil, delete_object: nil)
+        repository_id = repository.id
+        created_by = runner.id
+        blob_key = s3_bucket = nil
+        expect(s3_client).to receive(:create_multipart_upload) do |key:, bucket:|
+          blob_key = key
+          s3_bucket = bucket
+          GithubCacheEntry.create(key: "k1", version: "v1", scope: "dev", repository_id:, created_by:, committed_at: Time.now)
+          Struct.new(:upload_id).new("1")
+        end
+        spec = self
+        expect(s3_client).to receive(:delete_object) do |key:, bucket:|
+          spec.expect(key).to spec.eq blob_key
+          spec.expect(bucket).to spec.eq s3_bucket
+        end
+        expect(Aws::S3::Client).to receive(:new).with(anything).and_return(s3_client)
+
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
 
         expect(last_response).to have_runtime_error(409, "A cache entry for dev scope already exists with k1 key and v1 version.")
