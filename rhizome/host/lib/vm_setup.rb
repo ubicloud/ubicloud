@@ -655,7 +655,7 @@ DNSMASQ_SERVICE
       if volume.read_only
         "--disk path=#{volume.image_path},readonly=on \\"
       else
-        "--disk vhost_user=true,socket=#{volume.vhost_sock},num_queues=1,queue_size=64 \\"
+        "--disk vhost_user=true,socket=#{volume.vhost_sock},num_queues=4,queue_size=64 \\"
       end
     }
 
