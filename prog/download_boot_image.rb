@@ -61,14 +61,20 @@ class Prog::DownloadBootImage < Prog::Base
 
   def sha256_sum
     hashes = {
+      ["ubuntu-noble", "x64", "20250502.1"] => "8e7d1781c14d309f4ad6fa01d6cdb5fbf6adf95a509394135634f6a283d1f33f",
+      ["ubuntu-noble", "arm64", "20250502.1"] => "5452ba9308557ef728078e829c2f221dfd4c05635fe67037d4f714efd12dbdbc",
       ["ubuntu-noble", "x64", "20240523.1"] => "b60205f4cc48a24b999ad0bd61ceb9fe28abfe4ac3701acb7bb5d6b0b5fdc624",
       ["ubuntu-noble", "arm64", "20240523.1"] => "54f6b62cc8d393e5c82495a49b8980157dfa6a13b930d8d4170e34e30742d949",
       ["ubuntu-noble", "x64", "20240702"] => "182dc760bfca26c45fb4e4668049ecd4d0ecdd6171b3bae81d0135e8f1e9d93e",
       ["ubuntu-noble", "arm64", "20240702"] => "5fe06e10a3b53cfff06edcb8595552b1f0372265b69fa424aa464eb4bcba3b09",
+      ["ubuntu-jammy", "x64", "20250508"] => "0cf20b41a17dbea17b2ac2a08c1c9b677748940c11a0381a02931e0af1a1fb52",
+      ["ubuntu-jammy", "arm64", "20250508"] => "e2b20e818549db10486373927dd0feedd681a32dcbcd8a0bc2f2bd2f411c9f8b",
       ["ubuntu-jammy", "x64", "20240319"] => "304983616fcba6ee1452e9f38993d7d3b8a90e1eb65fb0054d672ce23294d812",
       ["ubuntu-jammy", "arm64", "20240319"] => "40ea1181447b9395fa03f6f2c405482fe532a348cc46fbb876effcfbbb35336f",
       ["ubuntu-jammy", "x64", "20240701"] => "769f0355acc3f411251aeb96401a827248aae838b91c637d991ea51bed30eeeb",
       ["ubuntu-jammy", "arm64", "20240701"] => "76423945c97fddd415fa17610c7472b07c46d6758d42f4f706f1bbe972f51155",
+      ["debian-12", "x64", "20250428-2096"] => "1619b87079d6c0aa6194d0de6fdfc0b874ea0afd08d4153b0074f8276785661f",
+      ["debian-12", "arm64", "20250428-2096"] => "c6d1639e8a4d10cd7cdaeed618a7794d6fdd44df4a04df2fbfb7e490f2a67141",
       ["debian-12", "arm64", "20241004-1890"] => "7965a9b9f02eb473138e6357def557029053178e4cd37c19e620f674ca7224c0",
       ["debian-12", "x64", "20241004-1890"] => "5af3d0e134eb3560ab035021763401d1ec72a25c761fe0ce964351e1409c523d",
       ["almalinux-9", "x64", "9.5-20241120"] => "abddf01589d46c841f718cec239392924a03b34c4fe84929af5d543c50e37e37",
