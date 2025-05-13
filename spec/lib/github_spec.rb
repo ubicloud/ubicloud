@@ -41,7 +41,10 @@ RSpec.describe Github do
       -----END RSA PRIVATE KEY-----
     TEST_2048_KEY
 
-    expect(Octokit::Client).to receive(:new).with(bearer_token: "eyJhbGciOiJSUzI1NiJ9.eyJpYXQiOjE3NjI4MTkyMDAsImV4cCI6MTc2MjgxOTY4MCwiaXNzIjoiMTIzNDU2In0.iMTR9OO7pZbG9WR5_brak0frQ8XmRPMPQIbE0_spLOL19PX7dxXSQNg-lHxmJP3tghiW7TIgx6-8mY4--ZNKPgTpnwgi_qsgg5IkzM6r2t6XfNV-pFcBsoGas2pHXfitnCWpwHlWj17SZ-AoVkp4VsURJwuBwlNOBVDO4R4bzHZbgA_Xw7lu8OQGnfOm1AzCM4jD6AR22hGdVCkpORXiI4mSi1xdHoP6ARnB6GV6jeRSG41gJLteV6zBZjoVCe7MYSOcmw4RZ4coLR2frRYLyoAAPLqFGDAmJdtxame9fKiXbwflBUTVHaSNl0a-YyseifUysM5Z9GOY1ky7vnzmwg")
+    expect(Octokit::Client).to receive(:new).with(
+      bearer_token: "eyJhbGciOiJSUzI1NiJ9.eyJpYXQiOjE3NjI4MTkyMDAsImV4cCI6MTc2MjgxOTY4MCwiaXNzIjoiMTIzNDU2In0.iMTR9OO7pZbG9WR5_brak0frQ8XmRPMPQIbE0_spLOL19PX7dxXSQNg-lHxmJP3tghiW7TIgx6-8mY4--ZNKPgTpnwgi_qsgg5IkzM6r2t6XfNV-pFcBsoGas2pHXfitnCWpwHlWj17SZ-AoVkp4VsURJwuBwlNOBVDO4R4bzHZbgA_Xw7lu8OQGnfOm1AzCM4jD6AR22hGdVCkpORXiI4mSi1xdHoP6ARnB6GV6jeRSG41gJLteV6zBZjoVCe7MYSOcmw4RZ4coLR2frRYLyoAAPLqFGDAmJdtxame9fKiXbwflBUTVHaSNl0a-YyseifUysM5Z9GOY1ky7vnzmwg",
+      per_page: 100
+    )
     described_class.app_client
   end
 
@@ -51,7 +54,7 @@ RSpec.describe Github do
     expect(described_class).to receive(:app_client).and_return(app_client)
     expect(app_client).to receive(:create_app_installation_access_token).with(installation_id).and_return({token: "abcdefg"})
     installation_client = instance_double(Octokit::Client)
-    expect(Octokit::Client).to receive(:new).with(access_token: "abcdefg", auto_paginate: false).and_return(installation_client)
+    expect(Octokit::Client).to receive(:new).with(access_token: "abcdefg", auto_paginate: false, per_page: 100).and_return(installation_client)
 
     described_class.installation_client(installation_id)
   end
