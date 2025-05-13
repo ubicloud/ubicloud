@@ -700,10 +700,10 @@ function bytesFormatter(unit, precision) {
   const suffix = unitParts.length > 1 ? "/" + unitParts[1] : "";
 
   return function (value, index) {
-    if (value >= 1024 ** 4) return (value / (1024 ** 4)).toFixed(precision) + ' TiB' + suffix;
-    if (value >= 1024 ** 3) return (value / (1024 ** 3)).toFixed(precision) + ' GiB' + suffix;
-    if (value >= 1024 ** 2) return (value / (1024 ** 2)).toFixed(precision) + ' MiB' + suffix;
-    if (value >= 1024) return (value / 1024).toFixed(precision) + ' KiB' + suffix;
+    if (value >= 1024 ** 4) return flexiblePrecision(value / (1024 ** 4), precision) + ' TiB' + suffix;
+    if (value >= 1024 ** 3) return flexiblePrecision(value / (1024 ** 3), precision) + ' GiB' + suffix;
+    if (value >= 1024 ** 2) return flexiblePrecision(value / (1024 ** 2), precision) + ' MiB' + suffix;
+    if (value >= 1024) return flexiblePrecision(value / 1024, precision) + ' KiB' + suffix;
     return value + ' bytes' + suffix;
   }
 }
@@ -714,9 +714,9 @@ function opsFormatter(unit, precision) {
   const unitName = unitParts[0];
 
   return function (value, index) {
-    if (value >= 1000 ** 3) return (value / (1000 ** 3)).toFixed(precision) + ' G ' + unitName + suffix;
-    if (value >= 1000 ** 2) return (value / (1000 ** 2)).toFixed(precision) + ' M ' + unitName + suffix;
-    if (value >= 1000) return (value / 1000).toFixed(precision) + ' K ' + unitName + suffix;
+    if (value >= 1000 ** 3) return flexiblePrecision(value / (1000 ** 3), precision)+ ' G ' + unitName + suffix;
+    if (value >= 1000 ** 2) return flexiblePrecision(value / (1000 ** 2), precision)+ ' M ' + unitName + suffix;
+    if (value >= 1000) return flexiblePrecision(value / 1000, precision) + ' K ' + unitName + suffix;
     return value + ' ' + unitName + suffix;
   }
 }
@@ -757,4 +757,12 @@ function debounce(callback, delay = 1000) {
       callback(...args);
     }, delay);
   };
+}
+
+// Increase precision for values less than 10 if using 0 precision, to not
+// repeat the same single-digit axis value multiple times.
+function flexiblePrecision(value, precision) {
+  const increasedPrecision = Math.max(1, precision);
+
+  return (value < 10) ? value.toFixed(increasedPrecision) : value.toFixed(precision);
 }
