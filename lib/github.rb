@@ -31,12 +31,9 @@ module Github
     Octokit::Client.new(bearer_token: jwt)
   end
 
-  def self.installation_client(installation_id)
+  def self.installation_client(installation_id, auto_paginate: false)
     access_token = app_client.create_app_installation_access_token(installation_id)[:token]
-
-    client = Octokit::Client.new(access_token: access_token)
-    client.auto_paginate = true
-    client
+    Octokit::Client.new(access_token:, auto_paginate:)
   end
 
   # :nocov:
