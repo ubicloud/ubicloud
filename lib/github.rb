@@ -26,14 +26,14 @@ module Github
       exp: current + (8 * 60),
       iss: Config.github_app_id
     }
-    jwt = JWT.encode(key, private_key, "RS256")
+    bearer_token = JWT.encode(key, private_key, "RS256")
 
-    Octokit::Client.new(bearer_token: jwt)
+    Octokit::Client.new(bearer_token:, per_page: 100)
   end
 
-  def self.installation_client(installation_id, auto_paginate: false)
+  def self.installation_client(installation_id, auto_paginate: false, per_page: 100)
     access_token = app_client.create_app_installation_access_token(installation_id)[:token]
-    Octokit::Client.new(access_token:, auto_paginate:)
+    Octokit::Client.new(access_token:, auto_paginate:, per_page:)
   end
 
   # :nocov:
@@ -57,7 +57,7 @@ module Github
 
   def self.failed_deliveries(since, max_page = 50)
     client = Github.app_client
-    all_deliveries = client.get("/app/hook/deliveries?per_page=100")
+    all_deliveries = client.get("/app/hook/deliveries")
     page = 1
     while (next_url = client.last_response.rels[:next]&.href) && (since < all_deliveries.last[:delivered_at])
       if page >= max_page
