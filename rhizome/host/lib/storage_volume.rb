@@ -85,19 +85,21 @@ class StorageVolume
     vhost_block_backend = VhostBlockBackend.new(@vhost_block_backend_version)
     config_path = vhost_block_backend.config_path(@vm_name, @disk_index)
 
-    File.write(config_path, <<~CONFIG)
-path: "#{disk_file}"
-image_path: "#{@image_path}"
-socket: "#{vhost_sock}"
-num_queues: 4
-queue_size: 64
-seg_size_max: 65536
-seg_count_max: 4
-poll_queue_timeout_us: 1000
-encryption_key:
-  - "#{key1}"
-  - "#{key2}"
-    CONFIG
+    config = {
+      "path" => disk_file,
+      "image_path" => @image_path,
+      "socket" => vhost_sock,
+      "num_queues" => 4,
+      "queue_size" => 64,
+      "seg_size_max" => 65536,
+      "seg_count_max" => 4,
+      "poll_queue_timeout_us" => 1000,
+      "encryption_key" => [key1, key2]
+    }
+
+    File.write(config_path, config.to_yaml)
+    FileUtils.chown @vm_name, @vm_name, config_path
+    FileUtils.chmod "u=rw,g=,o=", config_path
 
     service_file_path = "/etc/systemd/system/#{@vm_name}-storage.service"
     File.write(service_file_path, <<~SERVICE)
