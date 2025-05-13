@@ -3,7 +3,7 @@
 # :nocov:
 environment ENV["RACK_ENV"] || "development"
 port ENV["PORT"] || "3000"
-threads 15, 15
+threads 50, 50
 
 if @config.options[:workers] > 0
   silence_single_worker_warning
