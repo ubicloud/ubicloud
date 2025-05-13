@@ -44,6 +44,19 @@ class StorageKeyEncryption
     ]
   end
 
+  def wrap_key2(key)
+    bytes = [key].pack("H*")
+    algorithm = @key_encryption_cipher["algorithm"]
+    fail "currently only aes-256-gcm is supported" unless algorithm == "aes-256-gcm"
+
+    cipher = OpenSSL::Cipher.new(algorithm)
+    cipher.encrypt
+    cipher.key = Base64.decode64(@key_encryption_cipher["key"])
+    cipher.iv = Base64.decode64(@key_encryption_cipher["init_vector"])
+    cipher.auth_data = @key_encryption_cipher["auth_data"]
+    Base64.encode64(cipher.update(bytes) + cipher.final + cipher.auth_tag)
+  end
+
   def unwrap_key(encrypted_key)
     algorithm = @key_encryption_cipher["algorithm"]
     fail "currently only aes-256-gcm is supported" unless algorithm == "aes-256-gcm"
