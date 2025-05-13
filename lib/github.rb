@@ -26,14 +26,14 @@ module Github
       exp: current + (8 * 60),
       iss: Config.github_app_id
     }
-    jwt = JWT.encode(key, private_key, "RS256")
+    bearer_token = JWT.encode(key, private_key, "RS256")
 
-    Octokit::Client.new(bearer_token: jwt)
+    Octokit::Client.new(bearer_token:, per_page: 100)
   end
 
-  def self.installation_client(installation_id, auto_paginate: false)
+  def self.installation_client(installation_id, auto_paginate: false, per_page: 100)
     access_token = app_client.create_app_installation_access_token(installation_id)[:token]
-    Octokit::Client.new(access_token:, auto_paginate:)
+    Octokit::Client.new(access_token:, auto_paginate:, per_page:)
   end
 
   # :nocov:

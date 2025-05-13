@@ -53,13 +53,13 @@ RSpec.describe Prog::RedeliverGithubFailures do
   describe "failed deliveries" do
     it "fetches failed deliveries" do
       # page 1
-      expect(app_client).to receive(:get).with("/app/hook/deliveries?per_page=100").and_return([
+      expect(app_client).to receive(:get).with("/app/hook/deliveries").and_return([
         {guid: "1", id: "11", status: "Fail", delivered_at: time + 5},
         {guid: "2", id: "21", status: "Fail", delivered_at: time + 4},
         {guid: "3", id: "31", status: "OK", delivered_at: time + 3}
       ])
       # page 2
-      next_url = "/app/hook/deliveries?per_page=100&cursor=next_page"
+      next_url = "/app/hook/deliveries?cursor=next_page"
       expect(app_client).to receive(:last_response).and_return(instance_double(Sawyer::Response, rels: {next: instance_double(Sawyer::Relation, href: next_url)}))
       expect(app_client).to receive(:get).with(next_url).and_return([
         {guid: "2", id: "21", status: "OK", delivered_at: time + 2},
@@ -78,7 +78,7 @@ RSpec.describe Prog::RedeliverGithubFailures do
     end
 
     it "fetches failed deliveries with max page" do
-      expect(app_client).to receive(:get).with("/app/hook/deliveries?per_page=100").and_return([
+      expect(app_client).to receive(:get).with("/app/hook/deliveries").and_return([
         {guid: "2", id: "21", status: "OK", delivered_at: time + 3},
         {guid: "3", id: "31", status: "Fail", delivered_at: time + 3}
       ])
