@@ -6,6 +6,8 @@ require "fileutils"
 require "json"
 require "openssl"
 require "base64"
+require "timeout"
+require "yaml"
 require_relative "boot_image"
 require_relative "vm_path"
 require_relative "spdk_path"
@@ -87,7 +89,7 @@ class StorageVolume
 path: "#{disk_file}"
 image_path: "#{@image_path}"
 socket: "#{vhost_sock}"
-num_queues: 1
+num_queues: 4
 queue_size: 64
 seg_size_max: 65536
 seg_count_max: 4
@@ -105,7 +107,7 @@ encryption_key:
 
         [Service]
         Environment=RUST_LOG=debug
-        ExecStart=#{vhost_block_backend.bin_path} --config #{config_path} --kek /run/#{@vm_name}/kek.yaml
+        ExecStart=#{vhost_block_backend.bin_path} --config #{config_path} --kek #{kek_pipe}
         Restart=always
         User=#{@vm_name}
         Group=#{@vm_name}
@@ -124,16 +126,20 @@ encryption_key:
       FileUtils.mkdir_p "/run/#{@vm_name}"
       FileUtils.chown @vm_name, @vm_name, "/run/#{@vm_name}"
       FileUtils.chmod "u=rwx,g=,o=", "/run/#{@vm_name}"
-      kek_yaml = "/run/#{@vm_name}/kek.yaml"
-      File.write(kek_yaml, <<~YAML)
-method: "aes256-gcm"
-key: "#{key_wrapping_secrets["key"].strip}"
-initial_vector: "#{key_wrapping_secrets["init_vector"].strip}"
-auth_data: "#{Base64.strict_encode64(key_wrapping_secrets["auth_data"]).strip}"
-      YAML
-      FileUtils.chown @vm_name, @vm_name, kek_yaml
-      FileUtils.chmod "u=rw,g=,o=", kek_yaml
+      File.delete(kek_pipe) if File.exist?(kek_pipe)
+      File.mkfifo(kek_pipe, 0o600)
+      FileUtils.chown @vm_name, @vm_name, kek_pipe
       r "systemctl start #{@vm_name}-storage"
+      payload = {
+        "method" => "aes256-gcm",
+        "key" => key_wrapping_secrets["key"].strip,
+        "initial_vector" => key_wrapping_secrets["init_vector"].strip,
+        "auth_data" => Base64.strict_encode64(key_wrapping_secrets["auth_data"]).strip
+      }.to_yaml
+
+      Timeout.timeout(5) do
+        File.open(kek_pipe, File::WRONLY) { |f| f.write(payload) }
+      end
       return
     end
 
@@ -152,6 +158,10 @@ auth_data: "#{Base64.strict_encode64(key_wrapping_secrets["auth_data"]).strip}"
       end
       raise
     end
+  end
+
+  def kek_pipe
+    @kek_pipe ||= "/run/#{@vm_name}/kek.yaml.pipe"
   end
 
   def purge_spdk_artifacts
