@@ -54,7 +54,7 @@ class StorageVolume
 
     if @vhost_block_backend_version
       create_empty_disk_file
-      prep_vhost_block_backend(encryption_key)
+      prep_vhost_block_backend(encryption_key, key_wrapping_secrets)
       return
     end
 
@@ -76,7 +76,10 @@ class StorageVolume
     end
   end
 
-  def prep_vhost_block_backend(encryption_key)
+  def prep_vhost_block_backend(encryption_key, key_wrapping_secrets)
+    key_encryption = StorageKeyEncryption.new(key_wrapping_secrets)
+    key1 = key_encryption.wrap_key2(encryption_key[:key]).delete("\n")
+    key2 = key_encryption.wrap_key2(encryption_key[:key2]).delete("\n")
     vhost_block_backend = VhostBlockBackend.new(@vhost_block_backend_version)
     config_path = vhost_block_backend.config_path(@vm_name, @disk_index)
 
@@ -90,8 +93,8 @@ seg_size_max: 65536
 seg_count_max: 4
 poll_queue_timeout_us: 1000
 encryption_key:
-  - "#{encryption_key[:key]}"
-  - "#{encryption_key[:key2]}"
+  - "#{key1}"
+  - "#{key2}"
     CONFIG
 
     service_file_path = "/etc/systemd/system/#{@vm_name}-storage.service"
@@ -102,7 +105,7 @@ encryption_key:
 
         [Service]
         Environment=RUST_LOG=debug
-        ExecStart=#{vhost_block_backend.bin_path} --config #{config_path}
+        ExecStart=#{vhost_block_backend.bin_path} --config #{config_path} --kek /run/#{@vm_name}/kek.yaml
         Restart=always
         User=#{@vm_name}
         Group=#{@vm_name}
@@ -118,6 +121,18 @@ encryption_key:
     encryption_key = read_data_encryption_key(key_wrapping_secrets) if @encrypted
 
     if @vhost_block_backend_version
+      FileUtils.mkdir_p "/run/#{@vm_name}"
+      FileUtils.chown @vm_name, @vm_name, "/run/#{@vm_name}"
+      FileUtils.chmod "u=rwx,g=,o=", "/run/#{@vm_name}"
+      kek_yaml = "/run/#{@vm_name}/kek.yaml"
+      File.write(kek_yaml, <<~YAML)
+method: "aes256-gcm"
+key: "#{key_wrapping_secrets["key"].strip}"
+initial_vector: "#{key_wrapping_secrets["init_vector"].strip}"
+auth_data: "#{Base64.strict_encode64(key_wrapping_secrets["auth_data"]).strip}"
+      YAML
+      FileUtils.chown @vm_name, @vm_name, kek_yaml
+      FileUtils.chmod "u=rw,g=,o=", kek_yaml
       r "systemctl start #{@vm_name}-storage"
       return
     end
@@ -145,6 +160,7 @@ encryption_key:
       r "systemctl stop #{@vm_name}-storage"
       rm_if_exists(service_file_path)
       rm_if_exists(vhost_sock)
+      rm_if_exists("/run/#{@vm_name}")
       return
     end
 
