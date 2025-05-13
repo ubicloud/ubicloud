@@ -488,6 +488,7 @@ SQL
   label def taking_over
     if postgres_server.read_replica?
       postgres_server.update(representative_at: Time.now)
+      postgres_server.resource.servers.each(&:incr_configure_metrics)
       postgres_server.resource.incr_refresh_dns_record
       hop_configure
     end
@@ -497,6 +498,7 @@ SQL
       postgres_server.update(timeline_access: "push", representative_at: Time.now, synchronization_status: "ready")
       postgres_server.resource.incr_refresh_dns_record
       postgres_server.resource.servers.each(&:incr_configure)
+      postgres_server.resource.servers.each(&:incr_configure_metrics)
       postgres_server.resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
       postgres_server.incr_restart
       hop_configure

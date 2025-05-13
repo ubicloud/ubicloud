@@ -758,13 +758,15 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_server.resource).to receive(:incr_refresh_dns_record)
       expect(postgres_server).to receive(:primary?).and_return(true)
       expect(postgres_server).to receive(:incr_configure)
+      expect(postgres_server).to receive(:incr_configure_metrics)
       expect(postgres_server).to receive(:incr_restart)
 
       standby = instance_double(PostgresServer, primary?: false)
       expect(standby).to receive(:update).with(synchronization_status: "catching_up")
       expect(standby).to receive(:incr_configure)
+      expect(standby).to receive(:incr_configure_metrics)
 
-      expect(postgres_server.resource).to receive(:servers).and_return([postgres_server, standby]).twice
+      expect(postgres_server.resource).to receive(:servers).at_least(:once).and_return([postgres_server, standby])
 
       expect { nx.taking_over }.to hop("configure")
     end
@@ -781,6 +783,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         expect(Time).to receive(:now).and_return(time)
         expect(postgres_server).to receive(:update).with(representative_at: time)
         expect(postgres_server.resource).to receive(:incr_refresh_dns_record)
+        expect(postgres_server.resource).to receive(:servers).at_least(:once).and_return([postgres_server])
+        expect(postgres_server).to receive(:incr_configure_metrics)
         expect { nx.taking_over }.to hop("configure")
       end
     end
