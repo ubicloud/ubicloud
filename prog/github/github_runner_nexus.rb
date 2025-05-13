@@ -148,7 +148,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   def github_client
-    @github_client ||= Github.installation_client(installation.installation_id)
+    @github_client ||= Github.installation_client(installation.installation_id, auto_paginate: true)
   end
 
   def busy?

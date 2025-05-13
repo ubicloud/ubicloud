@@ -19,7 +19,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   end
 
   def client
-    @client ||= Github.installation_client(github_repository.installation.installation_id).tap { it.auto_paginate = true }
+    @client ||= Github.installation_client(github_repository.installation.installation_id, auto_paginate: true)
   end
 
   # We dynamically adjust the polling interval based on the remaining rate
