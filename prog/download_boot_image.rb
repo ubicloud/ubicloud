@@ -54,6 +54,9 @@ class Prog::DownloadBootImage < Prog::Base
       elsif image_name == "almalinux-9"
         arch = vm_host.render_arch(arm64: "aarch64", x64: "x86_64")
         "https://repo.almalinux.org/almalinux/9/cloud/#{arch}/images/AlmaLinux-9-GenericCloud-#{version}.#{arch}.qcow2"
+      elsif image_name == "alpine-3.21"
+        arch = vm_host.render_arch(arm64: "aarch64", x64: "x86_64")
+        "https://dl-cdn.alpinelinux.org/alpine/v3.21/releases/cloud/nocloud_alpine-3.21.2-#{arch}-uefi-cloudinit-r0.qcow2"
       else
         fail "Unknown image name: #{image_name}"
       end
@@ -61,6 +64,8 @@ class Prog::DownloadBootImage < Prog::Base
 
   def sha256_sum
     hashes = {
+      ["alpine-3.21", "arm64", "3.21.2"] => "4c93bf533f749ccc68a19166818bdaee75f32f24bb085a27bf918c4cde84992d",
+      ["alpine-3.21", "x64", "3.21.2"] => "90cd5673e4d64c30e515c40300241eaea01842ee5211f83727067268eb589082",
       ["ubuntu-noble", "x64", "20250502.1"] => "8e7d1781c14d309f4ad6fa01d6cdb5fbf6adf95a509394135634f6a283d1f33f",
       ["ubuntu-noble", "arm64", "20250502.1"] => "5452ba9308557ef728078e829c2f221dfd4c05635fe67037d4f714efd12dbdbc",
       ["ubuntu-noble", "x64", "20240523.1"] => "b60205f4cc48a24b999ad0bd61ceb9fe28abfe4ac3701acb7bb5d6b0b5fdc624",
