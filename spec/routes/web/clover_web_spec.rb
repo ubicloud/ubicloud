@@ -31,10 +31,15 @@ RSpec.describe Clover do
       visit "/test-no-authorization-needed/once"
       expect(page.status_code).to eq(200)
 
-      re = /called no_authorization_needed when authorization already not needed: /
-      expect { visit "/test-no-authorization-needed/twice" }.to raise_error(RuntimeError, re)
-      expect { visit "/test-no-authorization-needed/after-authorization" }.to raise_error(RuntimeError, re)
-      expect { visit "/test-no-authorization-needed/runtime-error" }.to raise_error(RuntimeError, /no authorization check for /)
+      visit "/test-no-authorization-needed/authorization-error"
+      expect(page.status_code).to eq(403)
+
+      multiple_re = /called no_authorization_needed when authorization already not needed: /
+      missing_re = /no authorization check for /
+      expect { visit "/test-no-authorization-needed/twice" }.to raise_error(RuntimeError, multiple_re)
+      expect { visit "/test-no-authorization-needed/after-authorization" }.to raise_error(RuntimeError, multiple_re)
+      expect { visit "/test-no-authorization-needed/never" }.to raise_error(RuntimeError, missing_re)
+      expect { visit "/test-no-authorization-needed/runtime-error" }.to raise_error(RuntimeError, missing_re)
     end
 
     it "raises error for non-GET request without audit logging" do
