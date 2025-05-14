@@ -196,6 +196,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       detail: {
         "Name" => github_runner.ubid,
         "Label" => github_runner.label,
+        "VM Family" => vm.family,
         "Arch" => vm.arch,
         "Image" => vm.boot_image,
         "VM Host" => vm.vm_host.ubid,
