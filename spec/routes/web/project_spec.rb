@@ -106,13 +106,13 @@ RSpec.describe Clover, "project" do
         expect(page).to have_content project_wo_permissions.name
       end
 
-      it "raises forbidden when user isn't added to project" do
+      it "returns not found when user isn't added to project" do
         new_project = Project.create_with_id(name: "new-project")
         visit "#{new_project.path}/dashboard"
 
-        expect(page.title).to eq("Ubicloud - Forbidden")
-        expect(page.status_code).to eq(403)
-        expect(page).to have_content "Forbidden"
+        expect(page.title).to eq("Ubicloud - ResourceNotFound")
+        expect(page.status_code).to eq(404)
+        expect(page).to have_content "ResourceNotFound"
       end
 
       it "not show on sidebar when does not have permissions" do
@@ -693,7 +693,7 @@ RSpec.describe Clover, "project" do
       it "can not have more than 50 pending invitations" do
         visit "#{project.path}/user"
 
-        expect(Project).to receive(:[]).and_return(project).at_least(:once)
+        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project).twice
         expect(project).to receive(:invitations_dataset).and_return(instance_double(Sequel::Dataset, count: 50))
         expect(project).to receive(:invitations_dataset).and_call_original
 

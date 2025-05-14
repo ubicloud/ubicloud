@@ -136,7 +136,7 @@ RSpec.describe Clover, "Kubernetes" do
       end
 
       it "can not create cluster if project has no valid payment method" do
-        expect(Project).to receive(:[]).and_return(project).at_least(:once)
+        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project).at_least(:once)
         expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
 
         page.refresh

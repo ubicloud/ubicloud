@@ -53,16 +53,9 @@ class Clover
       view "project/create"
     end
 
-    r.on :ubid_uuid do |id|
-      @project = Project[id:, visible: true]
+    r.on :ubid_uuid do |project_id|
+      @project = Clover.authorized_project(current_account, project_id)
       check_found_object(@project)
-
-      # Would be better to select project from current_account.projects_dataset,
-      # but that requires returning 404 instead of 403 if a project the user
-      # does not have access to is requested.
-      if @project.accounts_dataset.where(Sequel[:accounts][:id] => current_account_id).empty?
-        fail Authorization::Unauthorized
-      end
 
       @project_data = Serializers::Project.serialize(@project, {include_path: true, web: true})
       @project_permissions = all_permissions(@project.id) if web?
