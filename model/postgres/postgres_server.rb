@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "net/ssh"
+require "uri"
 require_relative "../../model"
 
 class PostgresServer < Sequel::Model
@@ -257,9 +258,19 @@ class PostgresServer < Sequel::Model
   end
 
   def metrics_config
+    ignored_timeseries_patterns = [
+      "pg_stat_user_tables_.*",
+      "pg_statio_user_tables_.*"
+    ]
+    exclude_pattern = ignored_timeseries_patterns.join("|")
+    query_params = {
+      "match[]": "{__name__!~'#{exclude_pattern}'}"
+    }
+    query_str = URI.encode_www_form(query_params)
+
     {
       endpoints: [
-        "https://localhost:9090/federate?match[]=%7B__name__%3D~%22.%2B%22%7D"
+        "https://localhost:9090/federate?#{query_str}"
       ],
       max_file_retention: 120,
       interval: "15s",
