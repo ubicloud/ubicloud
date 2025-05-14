@@ -34,7 +34,8 @@ class Prog::Vm::GithubRunner < Prog::Base
       arch: label_data["arch"]
     ).first
 
-    if !github_runner.installation.premium_runner_enabled? && (picked_vm = pool&.pick_vm)
+    installation = github_runner.installation
+    if !(installation.premium_runner_enabled? || installation.free_runner_upgrade?) && (picked_vm = pool&.pick_vm)
       return picked_vm
     end
 
