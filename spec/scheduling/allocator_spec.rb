@@ -257,7 +257,7 @@ RSpec.describe Al do
     end
 
     it "applies family filter" do
-      vmh1 = create_vm_host(family: "performance", total_cpus: 10, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      vmh1 = create_vm_host(family: "premium", total_cpus: 10, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       vmh2 = create_vm_host(family: "standard", total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create_with_id(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
@@ -266,7 +266,7 @@ RSpec.describe Al do
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
-      req.family_filter = ["performance"]
+      req.family_filter = ["premium"]
       cand = Al::Allocation.candidate_hosts(req)
 
       expect(cand.size).to eq(1)
@@ -456,7 +456,7 @@ RSpec.describe Al do
       expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
       vmhds[:location_id] = "6b9ef786-b842-8420-8c65-c25e3d4bdf3d"
-      vmhds[:family] = "performance"
+      vmhds[:family] = "premium"
       expect(Al::Allocation.new(vmhds, req).score).to eq(-1)
     end
 
@@ -720,7 +720,7 @@ RSpec.describe Al do
 
     it "can have empty family filter" do
       vmh = VmHost.first
-      vmh.update(family: "performance")
+      vmh.update(family: "premium")
       al = Al::Allocation.best_allocation(create_req(vm, vol, family_filter: []))
       expect(al).to be_truthy
     end

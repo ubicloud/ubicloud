@@ -320,8 +320,8 @@ module Scheduling::Allocator
       # penalty for ongoing vm provisionings on the host
       score += @candidate_host[:vm_provisioning_count] * 0.5
 
-      # prioritize performance family over other families if available
-      score += -1 if @candidate_host[:family] == "performance"
+      # prioritize premium family over other families if available
+      score += -1 if @candidate_host[:family] == "premium"
 
       # penalty for AX161, TODO: remove after migration to AX162
       score += 0.5 if @candidate_host[:total_cores] == 32

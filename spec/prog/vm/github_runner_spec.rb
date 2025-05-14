@@ -107,8 +107,8 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm.name).to eq("dummy-vm")
     end
 
-    it "provisions a VM if the installation prefers performance runners" do
-      expect(github_runner.installation).to receive(:allocator_preferences).and_return({"family_filter" => ["performance"]})
+    it "provisions a VM if the installation prefers premium runners" do
+      expect(github_runner.installation).to receive(:allocator_preferences).and_return({"family_filter" => ["premium"]})
       expect(VmPool).to receive(:where).and_return([])
       expect(Prog::Vnet::SubnetNexus).to receive(:assemble).and_call_original
       expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original

@@ -24,7 +24,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   def pick_vm
-    prefer_performance = github_runner.installation.allocator_preferences["family_filter"]&.include?("performance")
+    prefer_premium = github_runner.installation.allocator_preferences["family_filter"]&.include?("premium")
     pool = VmPool.where(
       vm_size: label_data["vm_size"],
       boot_image: label_data["boot_image"],
@@ -35,7 +35,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       arch: label_data["arch"]
     ).first
 
-    if !prefer_performance && (picked_vm = pool&.pick_vm)
+    if !prefer_premium && (picked_vm = pool&.pick_vm)
       return picked_vm
     end
 
