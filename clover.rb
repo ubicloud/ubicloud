@@ -614,6 +614,10 @@ class Clover < Roda
     end
 
     hash_branch("test-no-authorization-needed") do |r|
+      r.get "never" do
+        ""
+      end
+
       r.get "once" do
         no_authorization_needed
         ""
@@ -627,6 +631,10 @@ class Clover < Roda
         @project = current_account.projects.first
         dataset_authorize(current_account.projects_dataset, "Project:edit")
         no_authorization_needed
+      end
+
+      r.get "authorization-error" do
+        raise Authorization::Unauthorized
       end
 
       r.get "runtime-error" do
