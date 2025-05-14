@@ -300,7 +300,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "can not create virtual machine if project has no valid payment method" do
-        expect(Project).to receive(:[]).and_return(project).at_least(:once)
+        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project).thrice
         expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
 
         visit "#{project.path}/vm/create"

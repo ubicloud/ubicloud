@@ -9,6 +9,11 @@ class Clover < Roda
     const_set(:"#{model.table_name.upcase}_NAME_OR_UBID", name_or_ubid_for(model))
   end
 
+  # Designed only for compatibility with existing mocking in the specs
+  def self.authorized_project(account, project_id)
+    account.projects_dataset[Sequel[:project][:id] => project_id, :visible => true]
+  end
+
   class RodaResponse
     API_DEFAULT_HEADERS = DEFAULT_HEADERS.merge("content-type" => "application/json").freeze
     WEB_DEFAULT_HEADERS = DEFAULT_HEADERS.merge(

@@ -111,7 +111,7 @@ module ThawedMock
   allow_mocking(BillingRate, :from_resource_properties)
   allow_mocking(Clog, :emit)
   allow_mocking(CloudflareClient, :new)
-  allow_mocking(Clover, :call)
+  allow_mocking(Clover, :call, :authorized_project)
   allow_mocking(Hosting::Apis, :pull_data_center, :pull_ips, :reimage_server, :hardware_reset_server, :set_server_name)
   allow_mocking(InvoiceGenerator, :new)
   allow_mocking(Minio::Client, :new)

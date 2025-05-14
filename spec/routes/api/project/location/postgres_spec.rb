@@ -144,7 +144,7 @@ RSpec.describe Clover, "postgres" do
 
       it "can update database properties" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
-        expect(Project).to receive(:[]).and_return(project)
+        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
         expect(pg.representative_server).to receive(:storage_size_gib).and_return(128)
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
@@ -161,7 +161,7 @@ RSpec.describe Clover, "postgres" do
 
       it "can scale down storage if the requested size is enough for existing data" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
-        expect(Project).to receive(:[]).and_return(project)
+        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
         expect(pg.representative_server).to receive(:storage_size_gib).and_return(128)
         expect(pg.representative_server.vm.sshable).to receive(:cmd).and_return("10000000\n")
 
@@ -174,7 +174,7 @@ RSpec.describe Clover, "postgres" do
 
       it "does not scale down storage if the requested size is too small for existing data" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
-        expect(Project).to receive(:[]).and_return(project)
+        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
         expect(pg.representative_server).to receive(:storage_size_gib).and_return(128)
         expect(pg.representative_server.vm.sshable).to receive(:cmd).and_return("999999999\n")
 
@@ -188,7 +188,7 @@ RSpec.describe Clover, "postgres" do
 
       it "returns error message if current usage is unknown" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
-        expect(Project).to receive(:[]).and_return(project)
+        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
         expect(pg.representative_server).to receive(:storage_size_gib).and_return(128)
         expect(pg.representative_server.vm.sshable).to receive(:cmd).and_raise(StandardError.new("error"))
 
@@ -202,7 +202,8 @@ RSpec.describe Clover, "postgres" do
 
       it "read-replica" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
-        expect(Project).to receive(:[]).and_return(project, Project[Config.postgres_service_project_id]).at_least(:once)
+        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
+        expect(Project).to receive(:[]).and_return(Project[Config.postgres_service_project_id]).thrice
 
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
           name: "my-read-replica"
@@ -213,7 +214,7 @@ RSpec.describe Clover, "postgres" do
 
       it "promote" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
-        expect(Project).to receive(:[]).and_return(project)
+        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
         pg.update(parent_id: pg.id)
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/promote"
 
@@ -222,7 +223,7 @@ RSpec.describe Clover, "postgres" do
 
       it "fails to promote if not read_replica" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
-        expect(Project).to receive(:[]).and_return(project)
+        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/promote"
 

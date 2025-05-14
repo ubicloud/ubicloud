@@ -133,7 +133,7 @@ RSpec.describe Clover, "private-location" do
         p = create_account("test@test.com").create_project_with_default_policy("project-1")
         delete "/project/#{p.ubid}/private-location/#{private_location.ui_name}"
 
-        expect(last_response).to have_api_error(403, "Sorry, you don't have permission to continue with this request.")
+        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
       end
     end
 
@@ -167,7 +167,7 @@ RSpec.describe Clover, "private-location" do
         p = u.create_project_with_default_policy("project-1")
         get "/project/#{p.ubid}/private-location/#{private_location.ui_name}"
 
-        expect(last_response).to have_api_error(403, "Sorry, you don't have permission to continue with this request.")
+        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
       end
     end
 
