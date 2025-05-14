@@ -115,6 +115,15 @@ RSpec.describe Prog::Vm::GithubRunner do
       vm = nx.pick_vm
       expect(vm).not_to be_nil
     end
+
+    it "provisions a VM if a free premium upgrade is enabled" do
+      expect(github_runner.installation).to receive(:free_runner_upgrade?).and_return(true)
+      expect(VmPool).to receive(:where).and_return([])
+      expect(Prog::Vnet::SubnetNexus).to receive(:assemble).and_call_original
+      expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
+      vm = nx.pick_vm
+      expect(vm).not_to be_nil
+    end
   end
 
   describe ".update_billing_record" do
