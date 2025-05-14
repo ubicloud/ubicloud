@@ -35,7 +35,8 @@ module Option
     ["ubuntu-noble", "Ubuntu Noble 24.04 LTS"],
     ["ubuntu-jammy", "Ubuntu Jammy 22.04 LTS"],
     ["debian-12", "Debian 12"],
-    ["almalinux-9", "AlmaLinux 9"]
+    ["almalinux-9", "AlmaLinux 9"],
+    ["alpine-3.21", "Alpine Linux 3.21"]
   ].map { |args| BootImage.new(*args) }.freeze
 
   VmFamily = Data.define(:name, :ui_descriptor, :visible, :require_shared_slice) do
