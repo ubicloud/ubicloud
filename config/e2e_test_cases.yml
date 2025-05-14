@@ -1,4 +1,4 @@
-- { name: vm,                        images: ["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"] }
+- { name: vm,                        images: ["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9", "alpine-3.21"] }
 - { name: github_runner_ubuntu_2404, images: ["github-ubuntu-2404"], details: {repo_name: ubicloud/github-e2e-test-workflows, workflow_name: test_2404.yml, branch_name: main} }
 - { name: github_runner_ubuntu_2204, images: ["github-ubuntu-2204"], details: {repo_name: ubicloud/github-e2e-test-workflows, workflow_name: test_2204.yml, branch_name: main} }
 - { name: github_runner_ubuntu_2004, images: ["github-ubuntu-2004"], details: {repo_name: ubicloud/github-e2e-test-workflows, workflow_name: test_2004.yml, branch_name: main} }
