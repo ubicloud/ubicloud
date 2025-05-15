@@ -23,6 +23,16 @@ RSpec.describe "Database" do
     it "needs new partitions (action required)" do
       # if this test starts to fail, it's time to create new partitions for table audit_log. if this is ignored,
       # DB[:audit_log].insert will start to fail in 45 days or less.
+      # Add a warning 60 days out, so the issue can be fixed before the warning turns into an test failure.
+
+      begin
+        DB.transaction(savepoint: true) do
+          insert_row(Time.now + 60 * 60 * 24 * 60)
+        end
+      rescue Sequel::ConstraintViolation
+        warn "\n\nNEED TO CREATE MORE audit_log PARTITIONS!\n\n\n"
+      end
+
       expect(insert_row(Time.now + 60 * 60 * 24 * 45)).to eq [{ubid_type: "vm"}]
     end
 
