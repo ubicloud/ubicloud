@@ -13,7 +13,7 @@ module Metrics
       series: [
         TimeSeries.new(
           labels: {},
-          query: "(1 - sum(avg(rate(node_cpu_seconds_total{mode=\"idle\", ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m])))) * 100"
+          query: "avg(rate(node_cpu_seconds_total{mode=~\"(iowait|user|system|steal)\", ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m])) by (mode) * 100"
         )
       ]
     ),
