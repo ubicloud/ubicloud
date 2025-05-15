@@ -11,9 +11,8 @@
     rows:
       @runners.map do |runner|
         destroy_url = "#{@project_data[:path]}/github/#{@installation.ubid}/runner/#{runner.ubid}"
-        vm_size = runner.label_data["vm_size_data"]
         os = runner.label_data["boot_image"].match(/(ubuntu-\d{2})\d{2}/)[1]
-        family = runner.vm&.family || vm_size.family
+        family = runner.vm&.family || runner.label_data["family"]
         [
           [
             [[
@@ -24,9 +23,9 @@
               [runner.ubid, {link: runner.runner_url}],
               [<<~CONTENT, {escape: false}],
                 <div class="flex gap-1">
-                  <div class="rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800">#{vm_size.vcpus} vCPU</div>
+                  <div class="rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800">#{runner.label_data["vcpus"]} vCPU</div>
                   <div class="rounded-md px-2 text-xs font-medium leading-5 #{(family == "premium") ? "bg-orange-100 text-orange-600" : "bg-slate-100 text-slate-800"}">#{family}</div>
-                  <div class="rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800">#{vm_size.arch}</div>
+                  <div class="rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800">#{runner.label_data["arch"]}</div>
                   <div class="rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800">#{os}</div>
                 </div>
               CONTENT
