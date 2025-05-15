@@ -82,19 +82,23 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm.id).to eq(picked_vm.id)
     end
 
-    it "provisions a VM if the installation prefers premium runners" do
+    it "uses the premium vm pool if the installation prefers premium runners" do
+      pool = VmPool.create(size: 2, vm_size: "premium-4", boot_image: "github-ubuntu-2204", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64", storage_skip_sync: true)
+      vm = create_vm(pool_id: pool.id, display_state: "running", family: "premium")
       expect(installation).to receive(:premium_runner_enabled?).and_return(true)
-      vm = nx.pick_vm
-      expect(vm).not_to be_nil
-      expect(vm.pool_id).to be_nil
+      picked_vm = nx.pick_vm
+      expect(vm.id).to eq(picked_vm.id)
+      expect(picked_vm.family).to eq("premium")
     end
 
-    it "provisions a VM if a free premium upgrade is enabled" do
+    it "uses the premium vm pool if a free premium upgrade is enabled" do
+      pool = VmPool.create(size: 2, vm_size: "premium-4", boot_image: "github-ubuntu-2204", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64", storage_skip_sync: true)
+      vm = create_vm(pool_id: pool.id, display_state: "running", family: "premium")
       expect(installation).to receive(:premium_runner_enabled?).and_return(false)
       expect(installation).to receive(:free_runner_upgrade?).and_return(true)
-      vm = nx.pick_vm
-      expect(vm).not_to be_nil
-      expect(vm.pool_id).to be_nil
+      picked_vm = nx.pick_vm
+      expect(vm.id).to eq(picked_vm.id)
+      expect(picked_vm.family).to eq("premium")
     end
   end
 
