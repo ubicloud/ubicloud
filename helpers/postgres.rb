@@ -48,16 +48,7 @@ class Clover
     dataset = dataset_authorize(@project.postgres_resources_dataset.eager, "Postgres:view").eager(:semaphores, :location, strand: :children)
     if api?
       dataset = dataset.where(location_id: @location.id) if @location
-      result = dataset.paginated_result(
-        start_after: request.params["start_after"],
-        page_size: request.params["page_size"],
-        order_column: request.params["order_column"]
-      )
-
-      {
-        items: Serializers::Postgres.serialize(result[:records]),
-        count: result[:count]
-      }
+      paginated_result(dataset, Serializers::Postgres)
     else
       dataset = dataset.eager(:representative_server, :timeline)
       resources = dataset.all
