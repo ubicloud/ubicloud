@@ -65,7 +65,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: /home/runner/.cache/rubocop_cache
-        key: ${{ matrix.runs-on }}-rubocop-cache
+        key: ${{ matrix.runs-on }}-rubocop-cache-${{ hashFiles('Gemfile.lock', '.rubocop.yml') }}
 
     - name: Run rubocop
       run: bundle exec rake linter:rubocop
