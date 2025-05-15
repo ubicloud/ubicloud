@@ -6,12 +6,8 @@ class Clover < Roda
       tp.str(%w[start_after order_column])
       tp.pos_int("page_size")
     end
+    opts[:serializer] = serializer
 
-    result = dataset.paginated_result(**opts)
-
-    {
-      items: serializer.serialize(result[:records]),
-      count: result[:count]
-    }
+    dataset.paginated_result(**opts)
   end
 end
