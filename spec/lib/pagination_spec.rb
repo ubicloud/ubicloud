@@ -17,35 +17,35 @@ RSpec.describe Pagination do
     describe "success" do
       it "order column" do
         result = project.vms_dataset.paginated_result(order_column: "name")
-        expect(result[:records][0].ubid).to eq(first_vm.ubid)
-        expect(result[:records][1].ubid).to eq(second_vm.ubid)
+        expect(result[:items][0].ubid).to eq(first_vm.ubid)
+        expect(result[:items][1].ubid).to eq(second_vm.ubid)
       end
 
       it "page size 1" do
         result = project.vms_dataset.paginated_result(page_size: 1)
-        expect(result[:records].length).to eq(1)
+        expect(result[:items].length).to eq(1)
         expect(result[:count]).to eq(2)
       end
 
       it "page size 2" do
         result = project.vms_dataset.paginated_result(page_size: 2)
-        expect(result[:records].length).to eq(2)
+        expect(result[:items].length).to eq(2)
         expect(result[:count]).to eq(2)
       end
 
       it "last resource" do
         result = project.vms_dataset.paginated_result(page_size: 3, order_column: "name")
-        expect(result[:records][-1].name).to eq(second_vm.name)
+        expect(result[:items][-1].name).to eq(second_vm.name)
       end
 
       it "partial name" do
         result = project.vms_dataset.paginated_result(page_size: 1, order_column: "name", start_after: "dummy-vm")
-        expect(result[:records][0].name).to eq(first_vm.name)
+        expect(result[:items][0].name).to eq(first_vm.name)
       end
 
       it "negative page size" do
         result = project.vms_dataset.paginated_result(page_size: -1)
-        expect(result[:records].length).to eq(1)
+        expect(result[:items].length).to eq(1)
       end
 
       it "more objects than requested page size" do
@@ -55,12 +55,12 @@ RSpec.describe Pagination do
         end
 
         result = project.vms_dataset.paginated_result(page_size: 2)
-        expect(result[:records].length).to eq(2)
+        expect(result[:items].length).to eq(2)
       end
 
       it "empty page" do
         result = project.vms_dataset.paginated_result(start_after: second_vm.name, order_column: "name")
-        expect(result[:records].length).to eq(0)
+        expect(result[:items].length).to eq(0)
         expect(result[:count]).to eq(2)
       end
     end
