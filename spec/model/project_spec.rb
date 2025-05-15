@@ -81,17 +81,6 @@ RSpec.describe Project do
       project.update(billing_info_id: bi.id, credit: 100)
       expect(project.has_valid_payment_method?).to be true
     end
-
-    it "sets and gets feature flags" do
-      mod = Module.new
-      described_class.feature_flag(:dummy_flag, into: mod)
-      project = described_class.create_with_id(name: "dummy-name")
-      project.extend(mod)
-
-      expect(project.get_ff_dummy_flag).to be_nil
-      project.set_ff_dummy_flag("new-value")
-      expect(project.get_ff_dummy_flag).to eq "new-value"
-    end
   end
 
   describe ".soft_delete" do
@@ -144,6 +133,21 @@ RSpec.describe Project do
     it "provides first location when location with highest available core capacity cannot be determined" do
       expect(project.default_location).to eq "eu-central-h1"
     end
+  end
+
+  it "sets and gets feature flags" do
+    mod = Module.new
+    described_class.feature_flag(:dummy_flag1, :dummy_flag2, into: mod)
+    project = described_class.create(name: "dummy-name", feature_flags: {"dummy_flag2" => "val2", "not_exists_flag" => "no"})
+    project.extend(mod)
+
+    expect(project.get_ff_dummy_flag1).to be_nil
+    expect(project.get_ff_dummy_flag2).to eq("val2")
+    expect(project.feature_flags).to have_key("not_exists_flag")
+    project.set_ff_dummy_flag1("new-value")
+    expect(project.get_ff_dummy_flag1).to eq("new-value")
+    expect(project.get_ff_dummy_flag2).to eq("val2")
+    expect(project.feature_flags).not_to have_key("not_exists_flag")
   end
 
   it "calculates current resource usage" do
