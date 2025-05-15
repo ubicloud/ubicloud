@@ -151,8 +151,21 @@ module ContentGenerator
       ]
     end
 
-    def self.worker_nodes(location, cp_nodes, worker_nodes)
-      node_price = 2 * BillingRate.unit_price_from_resource_properties("KubernetesWorkerVCpu", "standard", location.name) +
+    def self.worker_size(location, size)
+      size = Option::VmSizes.find { it.display_name == size }
+      unit_price = BillingRate.unit_price_from_resource_properties("VmVCpu", "standard", location.name)
+
+      [
+        size.display_name,
+        "#{size.vcpus} vCPUs / #{size.memory_gib} GB RAM",
+        "$#{"%.2f" % (size.vcpus * unit_price * 60 * 672)}/mo",
+        "$#{"%.3f" % (size.vcpus * unit_price * 60)}/hour"
+      ]
+    end
+
+    def self.worker_nodes(location, worker_size, worker_nodes)
+      size = Option::VmSizes.find { it.display_name == worker_size }
+      node_price = size.vcpus * BillingRate.unit_price_from_resource_properties("KubernetesWorkerVCpu", "standard", location.name) +
         40 * BillingRate.unit_price_from_resource_properties("KubernetesWorkerStorage", "standard", location.name)
 
       "#{worker_nodes[:display_name]} - $#{"%.2f" % (worker_nodes[:value] * node_price * 60 * 672)}/mo ($#{"%.3f" % (worker_nodes[:value] * node_price * 60)}/hour)"
