@@ -25,8 +25,15 @@ class Prog::Vm::GithubRunner < Prog::Base
 
   def pick_vm
     label_data = github_runner.label_data
+    installation = github_runner.installation
+
+    vm_size = if installation.premium_runner_enabled? || installation.free_runner_upgrade?
+      "premium-#{label_data["vcpus"]}"
+    else
+      label_data["vm_size"]
+    end
     pool = VmPool.where(
-      vm_size: label_data["vm_size"],
+      vm_size:,
       boot_image: label_data["boot_image"],
       location_id: Location::GITHUB_RUNNERS_ID,
       storage_size_gib: label_data["storage_size_gib"],
@@ -35,8 +42,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       arch: label_data["arch"]
     ).first
 
-    installation = github_runner.installation
-    if !(installation.premium_runner_enabled? || installation.free_runner_upgrade?) && (picked_vm = pool&.pick_vm)
+    if (picked_vm = pool&.pick_vm)
       return picked_vm
     end
 
