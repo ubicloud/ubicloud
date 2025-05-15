@@ -158,7 +158,7 @@ class Project < Sequel::Model
     end
   end
 
-  feature_flag :vm_public_ssh_keys, :location_latitude_fra, :access_all_cache_scopes, :allocator_diagnostics, :private_locations, :postgres_metrics, :free_runner_upgrade_until
+  feature_flag :vm_public_ssh_keys, :location_latitude_fra, :access_all_cache_scopes, :allocator_diagnostics, :private_locations, :free_runner_upgrade_until
 end
 
 # Table: project
