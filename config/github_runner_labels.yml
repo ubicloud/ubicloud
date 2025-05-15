@@ -51,7 +51,7 @@
 - { name: ubicloud-standard-16-arm-ubuntu-2204, vm_size: standard-16,    arch: arm64, storage_size_gib: 300, boot_image: github-ubuntu-2204 }
 - { name: ubicloud-standard-30-arm-ubuntu-2204, vm_size: standard-30,    arch: arm64, storage_size_gib: 400, boot_image: github-ubuntu-2204 }
 - { name: ubicloud-standard-60-arm-ubuntu-2204, vm_size: standard-60,    arch: arm64, storage_size_gib: 600, boot_image: github-ubuntu-2204 }
-- { name: ubicloud-gpu,                         vm_size: standard-gpu-6, arch: x64,   storage_size_gib: 180, boot_image: github-gpu-ubuntu-2204, gpu: true  }
+- { name: ubicloud-gpu,                         vm_size: standard-gpu-6, arch: x64,   storage_size_gib: 180, boot_image: github-gpu-ubuntu-2204 }
 # Deprecated: Remove old labels once all customers have migrated to new labels.
 - { name: ubicloud-standard-2-ubuntu-2204-arm,  alias_for: ubicloud-standard-2-arm-ubuntu-2204 }
 - { name: ubicloud-standard-4-ubuntu-2204-arm,  alias_for: ubicloud-standard-4-arm-ubuntu-2204 }
