@@ -10,16 +10,7 @@ class Clover
 
     if api?
       dataset = dataset.where(location: @location) if @location
-      result = dataset.eager(nics: [:private_subnet]).paginated_result(
-        start_after: request.params["start_after"],
-        page_size: request.params["page_size"],
-        order_column: request.params["order_column"]
-      )
-
-      {
-        items: Serializers::PrivateSubnet.serialize(result[:records]),
-        count: result[:count]
-      }
+      paginated_result(dataset.eager(nics: :private_subnet), Serializers::PrivateSubnet)
     else
       @pss = Serializers::PrivateSubnet.serialize(dataset.all, {include_path: true})
       view "networking/private_subnet/index"
