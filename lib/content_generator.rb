@@ -141,21 +141,44 @@ module ContentGenerator
     end
 
     def self.cp_nodes(location, cp_nodes)
-      node_price = 2 * BillingRate.unit_price_from_resource_properties("KubernetesControlPlaneVCpu", "standard", location.name)
+      cp_node_price = 2 * BillingRate.unit_price_from_resource_properties("KubernetesControlPlaneVCpu", "standard", location.name)
       data = Option::KubernetesCPOptions.find { it.cp_node_count == cp_nodes }
       [
         data.title,
         data.explanation,
-        "$#{"%.2f" % (cp_nodes * node_price * 60 * 672)}/mo",
-        "$#{"%.3f" % (cp_nodes * node_price * 60)}/hour"
+        "$#{"%.2f" % (cp_nodes * cp_node_price * 60 * 672)}/mo",
+        "$#{"%.3f" % (cp_nodes * cp_node_price * 60)}/hour"
       ]
     end
 
-    def self.worker_nodes(location, cp_nodes, worker_nodes)
-      node_price = 2 * BillingRate.unit_price_from_resource_properties("KubernetesWorkerVCpu", "standard", location.name) +
-        40 * BillingRate.unit_price_from_resource_properties("KubernetesWorkerStorage", "standard", location.name)
+    def self.worker_size(location, size)
+      worker_size = Option::VmSizes.find { it.display_name == size }
 
-      "#{worker_nodes[:display_name]} - $#{"%.2f" % (worker_nodes[:value] * node_price * 60 * 672)}/mo ($#{"%.3f" % (worker_nodes[:value] * node_price * 60)}/hour)"
+      [
+        worker_size.display_name,
+        "#{worker_size.vcpus} vCPUs / #{worker_size.memory_gib} GB RAM",
+        "$#{"%.2f" % monthly_price(location, worker_size)}/mo",
+        "$#{"%.3f" % hourly_price(location, worker_size)}/hour"
+      ]
+    end
+
+    def self.worker_nodes(location, size, worker_nodes)
+      worker_size = Option::VmSizes.find { it.display_name == size }
+
+      "#{worker_nodes[:display_name]} - $#{"%.2f" % (worker_nodes[:value] * monthly_price(location, worker_size))}/mo ($#{"%.3f" % (worker_nodes[:value] * hourly_price(location, worker_size))}/hour)"
+    end
+
+    def self.node_price(location, worker_size)
+      worker_size.vcpus * BillingRate.unit_price_from_resource_properties("KubernetesWorkerVCpu", "standard", location.name) +
+        40 * BillingRate.unit_price_from_resource_properties("KubernetesWorkerStorage", "standard", location.name)
+    end
+
+    def self.hourly_price(location, worker_size)
+      node_price(location, worker_size) * 60
+    end
+
+    def self.monthly_price(location, worker_size)
+      node_price(location, worker_size) * 60 * 672
     end
 
     def self.version(version)
