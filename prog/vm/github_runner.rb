@@ -28,7 +28,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     pool = VmPool.where(
       vm_size: label_data["vm_size"],
       boot_image: label_data["boot_image"],
-      location_id: Location[name: label_data["location"]].id,
+      location_id: Location::GITHUB_RUNNERS_ID,
       storage_size_gib: label_data["storage_size_gib"],
       storage_encrypted: true,
       storage_skip_sync: true,
@@ -42,7 +42,7 @@ class Prog::Vm::GithubRunner < Prog::Base
 
     ps = Prog::Vnet::SubnetNexus.assemble(
       Config.github_runner_service_project_id,
-      location_id: Location[name: label_data["location"]].id,
+      location_id: Location::GITHUB_RUNNERS_ID,
       allow_only_ssh: true
     ).subject
 
@@ -52,7 +52,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       sshable_unix_user: "runneradmin",
       name: github_runner.ubid.to_s,
       size: label_data["vm_size"],
-      location_id: Location[name: label_data["location"]].id,
+      location_id: Location::GITHUB_RUNNERS_ID,
       boot_image: label_data["boot_image"],
       storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: true, skip_sync: true}],
       enable_ip4: true,
