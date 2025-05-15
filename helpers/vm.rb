@@ -11,16 +11,7 @@ class Clover
 
   def vm_list_api_response(dataset)
     dataset = dataset.where(location_id: @location.id) if @location
-    result = dataset.paginated_result(
-      start_after: request.params["start_after"],
-      page_size: request.params["page_size"],
-      order_column: request.params["order_column"]
-    )
-
-    {
-      items: Serializers::Vm.serialize(result[:records]),
-      count: result[:count]
-    }
+    paginated_result(dataset, Serializers::Vm)
   end
 
   def vm_post(name)
