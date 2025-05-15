@@ -13,7 +13,7 @@ RSpec.describe Github do
     expect(private_key).to receive(:is_a?).with(OpenSSL::PKey::RSA).and_return(true)
     expect(private_key).to receive(:sign).and_return("signed")
     expect(OpenSSL::PKey::RSA).to receive(:new).and_return(private_key)
-    expect(Octokit::Client).to receive(:new).with(bearer_token: anything)
+    expect(Octokit::Client).to receive(:new).with(bearer_token: anything, per_page: 100)
 
     described_class.app_client
   end
@@ -24,8 +24,7 @@ RSpec.describe Github do
     expect(described_class).to receive(:app_client).and_return(app_client)
     expect(app_client).to receive(:create_app_installation_access_token).with(installation_id).and_return({token: "abcdefg"})
     installation_client = instance_double(Octokit::Client)
-    expect(installation_client).to receive(:auto_paginate=).with(true)
-    expect(Octokit::Client).to receive(:new).with(access_token: "abcdefg").and_return(installation_client)
+    expect(Octokit::Client).to receive(:new).with(access_token: "abcdefg", auto_paginate: false, per_page: 100).and_return(installation_client)
 
     described_class.installation_client(installation_id)
   end
@@ -45,7 +44,7 @@ RSpec.describe Github do
     time = Time.now
     app_client = instance_double(Octokit::Client)
     expect(described_class).to receive(:app_client).and_return(app_client)
-    expect(app_client).to receive(:get).with("/app/hook/deliveries?per_page=100").and_return([
+    expect(app_client).to receive(:get).with("/app/hook/deliveries").and_return([
       {guid: "1", status: "Fail", delivered_at: time + 5},
       {guid: "2", status: "Fail", delivered_at: time + 4},
       {guid: "3", status: "OK", delivered_at: time + 3}
@@ -72,7 +71,7 @@ RSpec.describe Github do
     time = Time.now
     app_client = instance_double(Octokit::Client)
     expect(described_class).to receive(:app_client).and_return(app_client)
-    expect(app_client).to receive(:get).with("/app/hook/deliveries?per_page=100").and_return([
+    expect(app_client).to receive(:get).with("/app/hook/deliveries").and_return([
       {guid: "3", status: "Fail", delivered_at: time + 3}
     ])
     expect(app_client).to receive(:last_response).and_return(instance_double(Sawyer::Response, rels: {next: instance_double(Sawyer::Relation, href: "next_url")}))
