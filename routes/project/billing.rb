@@ -27,22 +27,24 @@ class Clover
       r.post true do
         if (billing_info = @project.billing_info)
           current_tax_id = billing_info.stripe_data["tax_id"]
-          new_tax_id = r.params["tax_id"].gsub(/[^a-zA-Z0-9]/, "")
+          tp = typecast_params
+          new_tax_id = tp.str!("tax_id").gsub(/[^a-zA-Z0-9]/, "")
+
           begin
             Stripe::Customer.update(billing_info.stripe_id, {
-              name: r.params["name"],
-              email: r.params["email"].strip,
+              name: tp.str!("name"),
+              email: tp.str!("email").strip,
               address: {
-                country: r.params["country"],
-                state: r.params["state"],
-                city: r.params["city"],
-                postal_code: r.params["postal_code"],
-                line1: r.params["address"],
+                country: tp.str!("country"),
+                state: tp.str!("state"),
+                city: tp.str!("city"),
+                postal_code: tp.str!("postal_code"),
+                line1: tp.str!("address"),
                 line2: nil
               },
               metadata: {
                 tax_id: new_tax_id,
-                company_name: r.params["company_name"]
+                company_name: tp.str!("company_name")
               }
             })
             if new_tax_id != current_tax_id
@@ -76,7 +78,7 @@ class Clover
       end
 
       r.get "success" do
-        checkout_session = Stripe::Checkout::Session.retrieve(r.params["session_id"])
+        checkout_session = Stripe::Checkout::Session.retrieve(typecast_params.str!("session_id"))
         setup_intent = Stripe::SetupIntent.retrieve(checkout_session["setup_intent"])
 
         stripe_id = setup_intent["payment_method"]
