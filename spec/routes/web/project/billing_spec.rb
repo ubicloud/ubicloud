@@ -658,8 +658,11 @@ RSpec.describe Clover, "billing" do
         visit "#{project.path}/billing"
         fill_in "alert_name", with: "alert-3"
         click_button "Add"
+        expect(page).to have_flash_error "Value must be an integer greater than 0 for parameter limit"
 
-        expect(page).to have_flash_error "Validation failed for following fields: limit"
+        fill_in "limit", with: 0
+        click_button "Add"
+        expect(page).to have_flash_error "Value must be an integer greater than 0 for parameter limit"
       end
 
       it "can delete usage alert" do
