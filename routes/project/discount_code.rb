@@ -7,11 +7,14 @@ class Clover
       billing_path = "#{@project.path}/billing"
 
       r.post true do
-        discount_code = r.params["discount_code"].to_s.strip.downcase
-        Validation.validate_short_text(discount_code, "discount_code")
+        if (discount_code = typecast_params.nonempty_str("discount_code"))
+          discount_code = discount_code.strip.downcase
+          Validation.validate_short_text(discount_code, "discount_code")
 
-        # Check if the discount code exists
-        discount = DiscountCode.first(code: discount_code) { expires_at > Time.now.utc }
+          # Check if the discount code exists
+          discount = DiscountCode.first(code: discount_code) { expires_at > Sequel::CURRENT_TIMESTAMP }
+        end
+
         unless discount
           flash["error"] = "Discount code not found."
           Clog.emit("Invalid discount code attempted") { {invalid_discount_code: {project_id: @project.id, code: discount_code}} }
