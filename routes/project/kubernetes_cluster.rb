@@ -9,7 +9,7 @@ class Clover
 
       r.post true do
         check_visible_location
-        kubernetes_cluster_post(r.params["name"])
+        kubernetes_cluster_post(typecast_params.nonempty_str("name"))
       end
 
       r.get "create" do

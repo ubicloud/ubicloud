@@ -8,7 +8,7 @@ class Clover
 
     r.web do
       r.post true do
-        load_balancer_post(r.params["name"])
+        load_balancer_post(typecast_params.nonempty_str("name"))
       end
 
       r.get "create" do

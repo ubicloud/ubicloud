@@ -9,7 +9,7 @@ class Clover
     r.web do
       r.post true do
         check_visible_location
-        postgres_post(r.params["name"])
+        postgres_post(typecast_params.nonempty_str("name"))
       end
 
       r.get "create" do
