@@ -5,16 +5,7 @@ class Clover
     dataset = dataset_authorize(@project.load_balancers_dataset, "LoadBalancer:view").eager(:private_subnet)
     dataset = dataset.join(:private_subnet, id: Sequel[:load_balancer][:private_subnet_id]).where(location_id: @location.id).select_all(:load_balancer) if @location
     if api?
-      result = dataset.paginated_result(
-        start_after: request.params["start_after"],
-        page_size: request.params["page_size"],
-        order_column: request.params["order_column"]
-      )
-
-      {
-        items: Serializers::LoadBalancer.serialize(result[:records]),
-        count: result[:count]
-      }
+      paginated_result(dataset, Serializers::LoadBalancer)
     else
       @lbs = Serializers::LoadBalancer.serialize(dataset.all, {include_path: true})
       view "networking/load_balancer/index"

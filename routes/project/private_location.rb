@@ -8,16 +8,7 @@ class Clover
       @dataset = @project.locations_dataset
 
       if api?
-        result = @dataset.paginated_result(
-          start_after: r.params["start_after"],
-          page_size: r.params["page_size"],
-          order_column: r.params["order_column"]
-        )
-
-        {
-          items: Serializers::PrivateLocation.serialize(result[:records]),
-          count: result[:count]
-        }
+        paginated_result(@dataset, Serializers::PrivateLocation)
       else
         @locations = @dataset.all
         view "private-location/index"

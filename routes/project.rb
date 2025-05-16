@@ -7,16 +7,7 @@ class Clover
       dataset = current_account.projects_dataset.where(visible: true)
 
       if api?
-        result = dataset.paginated_result(
-          start_after: r.params["start_after"],
-          page_size: r.params["page_size"],
-          order_column: r.params["order_column"]
-        )
-
-        {
-          items: Serializers::Project.serialize(result[:records]),
-          count: result[:count]
-        }
+        paginated_result(dataset, Serializers::Project)
       else
         @projects = Serializers::Project.serialize(dataset.all, {include_path: true, web: true})
         view "project/index"

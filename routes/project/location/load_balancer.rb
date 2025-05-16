@@ -88,7 +88,7 @@ class Clover
           lb.ports.first.update(src_port: Validation.validate_port(:src_port, params["src_port"]),
             dst_port: Validation.validate_port(:dst_port, params["dst_port"]))
 
-          vm_ids = params["vms"].map { UBID.to_uuid(it.delete("\"")) }
+          vm_ids = typecast_params.array(:ubid_uuid, "vms")
           new_vms = dataset_authorize(@project.vms_dataset, "Vm:view").eager(:load_balancer).where(id: vm_ids).all
 
           unless vm_ids.length == new_vms.length

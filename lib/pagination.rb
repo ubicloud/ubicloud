@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Pagination
-  def paginated_result(start_after: nil, page_size: nil, order_column: nil)
+  def paginated_result(start_after: nil, page_size: nil, order_column: nil, serializer: nil)
     model = @opts[:model]
     page_size ||= 1000
     order_column_sym = (order_column || "id").to_sym
@@ -34,8 +34,9 @@ module Pagination
 
     query = order(order_column_sym).limit(page_size)
     query = query.where(Sequel[model.table_name][order_column_sym] > start_after) if start_after
-    page_records = query.all
+    items = query.all
+    items = serializer.serialize(items) if serializer
 
-    {records: page_records, count: count}
+    {items:, count:}
   end
 end

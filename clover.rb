@@ -175,7 +175,7 @@ class Clover < Roda
     end
 
     case e
-    when Sequel::ValidationFailed, Roda::RodaPlugins::InvalidRequestBody::Error
+    when Sequel::ValidationFailed, Roda::RodaPlugins::InvalidRequestBody::Error, Roda::RodaPlugins::TypecastParams::Error
       code = 400
       type = "InvalidRequest"
       message = e.to_s
@@ -340,7 +340,7 @@ class Clover < Roda
     two_factor_auth_return_to_requested_location? true
     already_logged_in { redirect login_redirect }
     after_login do
-      remember_login if request.params["remember-me"] == "on"
+      remember_login if scope.typecast_params.str("remember-me") == "on"
       if omniauth_identity && (url = omniauth_params["redirect_url"])
         flash["notice"] = "You have successfully connected your account with #{omniauth_provider.capitalize}."
         redirect url
@@ -548,7 +548,7 @@ class Clover < Roda
     webauthn_setup_button "Setup Security Key"
     webauthn_setup_notice_flash "Security key is now setup, please make note of your recovery codes"
     webauthn_setup_error_flash "Error setting up security key"
-    webauthn_key_insert_hash { |credential| super(credential).merge(name: request.params["name"]) }
+    webauthn_key_insert_hash { |credential| super(credential).merge(name: scope.typecast_params.nonempty_str!("name")) }
 
     # :nocov:
     after_webauthn_setup do
@@ -594,7 +594,7 @@ class Clover < Roda
   if Config.test?
     # :nocov:
     hash_branch(:webhook_prefix, "test-error") do |r|
-      raise(r.params["message"] || "test error")
+      raise(typecast_params.str("message") || "test error")
     end
 
     hash_branch("test-missing-request-params") do |r|
