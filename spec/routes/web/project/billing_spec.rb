@@ -358,6 +358,15 @@ RSpec.describe Clover, "billing" do
         expect(project.reload.credit).to eq(0.00)
       end
 
+      it "shows error when submitted without discount code" do
+        visit "#{project.path}/billing"
+        click_button "Apply"
+
+        expect(page).to have_flash_error "Discount code not found."
+        expect(page).to have_content "$0.00"
+        expect(project.reload.credit).to eq(0.00)
+      end
+
       it "shows error for expired discount code" do
         DiscountCode.create_with_id(code: "EXPIRED_CODE", credit_amount: 33, expires_at: Time.now - 86400)
         visit "#{project.path}/billing"
