@@ -92,13 +92,8 @@ class Clover
         r.post true do
           authorize("Firewall:edit", firewall.id)
 
-          port_range = if r.params["port_range"].empty?
-            [0, 65535]
-          else
-            Validation.validate_port_range(r.params["port_range"])
-          end
-
-          parsed_cidr = Validation.validate_cidr(r.params["cidr"])
+          parsed_cidr = Validation.validate_cidr(typecast_params.str!("cidr"))
+          port_range = Validation.validate_port_range(typecast_params.str("port_range"))
           pg_range = Sequel.pg_range(port_range.first..port_range.last)
 
           DB.transaction do

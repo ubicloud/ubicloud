@@ -189,6 +189,8 @@ module Validation
   end
 
   def self.validate_port_range(port_range)
+    return [0, 65535] if port_range.nil?
+
     fail ValidationFailed.new({port_range: "Invalid port range"}) unless (match = port_range.match(ALLOWED_PORT_RANGE_PATTERN))
     start_port = match[1].to_i
 
