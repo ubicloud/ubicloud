@@ -23,8 +23,7 @@ class Clover
         end
 
         r.post do
-          email = r.params["email"]
-          policy = r.params["policy"]
+          email = typecast_params.nonempty_str!("email")
 
           if ProjectInvitation[project_id: @project.id, email: email]
             flash["error"] = "'#{email}' already invited to join the project."
@@ -34,7 +33,7 @@ class Clover
             r.redirect "#{@project.path}/user"
           end
 
-          unless policy == ""
+          if (policy = typecast_params.nonempty_str("policy"))
             unless (tag = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").first(name: policy))
               flash["error"] = "You don't have permission to invite users with this subject tag."
               r.redirect "#{@project_data[:path]}/user"
