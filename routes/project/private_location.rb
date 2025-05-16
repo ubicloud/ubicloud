@@ -17,23 +17,26 @@ class Clover
 
     r.post true do
       authorize("Location:create", @project.id)
-      params = check_required_web_params(["name", "provider_location_name", "access_key", "secret_key"])
+      check_required_web_params(["name", "provider_location_name", "access_key", "secret_key"])
 
-      Validation.validate_name(params["name"])
-      Validation.validate_provider_location_name("aws", params["provider_location_name"])
+      tp = typecast_params
+      name = tp.nonempty_str("name")
+      provider_location_name = tp.nonempty_str("provider_location_name")
+      Validation.validate_name(name)
+      Validation.validate_provider_location_name("aws", provider_location_name)
 
       loc = DB.transaction do
         loc = Location.create(
-          display_name: params["name"],
-          name: params["provider_location_name"],
-          ui_name: params["name"],
+          display_name: name,
+          name: provider_location_name,
+          ui_name: name,
           visible: true,
           provider: "aws",
           project_id: @project.id
         )
         LocationCredential.create(
-          access_key: params["access_key"],
-          secret_key: params["secret_key"]
+          access_key: tp.nonempty_str("access_key"),
+          secret_key: tp.nonempty_str("secret_key")
         ) { it.id = loc.id }
         audit_log(loc, "create")
         loc
@@ -91,10 +94,11 @@ class Clover
 
       r.post do
         authorize("Location:edit", @project.id)
-        Validation.validate_name(r.params["name"])
+        name = typecast_params.nonempty_str("name")
+        Validation.validate_name(name)
 
         DB.transaction do
-          @location.update(ui_name: r.params["name"], display_name: r.params["name"])
+          @location.update(ui_name: name, display_name: name)
           audit_log(@location, "update")
         end
 
