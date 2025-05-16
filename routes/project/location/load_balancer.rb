@@ -79,16 +79,15 @@ class Clover
 
       r.patch api? do
         authorize("LoadBalancer:edit", lb.id)
-        params = check_required_web_params(%w[algorithm src_port dst_port health_check_endpoint vms])
-        DB.transaction do
-          lb.update(
-            algorithm: params["algorithm"],
-            health_check_endpoint: params["health_check_endpoint"]
-          )
-          lb.ports.first.update(src_port: Validation.validate_port(:src_port, params["src_port"]),
-            dst_port: Validation.validate_port(:dst_port, params["dst_port"]))
+        algorithm, health_check_endpoint = typecast_params.nonempty_str!(%w[algorithm health_check_endpoint])
+        src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port])
+        vm_ids = typecast_params.array(:ubid_uuid, "vms")
 
-          vm_ids = typecast_params.array(:ubid_uuid, "vms")
+        DB.transaction do
+          lb.update(algorithm:, health_check_endpoint:)
+          lb.ports.first.update(src_port: Validation.validate_port(:src_port, src_port),
+            dst_port: Validation.validate_port(:dst_port, dst_port))
+
           new_vms = dataset_authorize(@project.vms_dataset, "Vm:view").eager(:load_balancer).where(id: vm_ids).all
 
           unless vm_ids.length == new_vms.length
