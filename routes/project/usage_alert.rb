@@ -8,9 +8,7 @@ class Clover
       r.post true do
         name = typecast_params.nonempty_str("alert_name")
         Validation.validate_short_text(name, "name")
-        unless (limit = typecast_params.pos_int("limit"))
-          fail Validation::ValidationFailed.new({limit: "Limit must be an integer greater than 0."})
-        end
+        limit = typecast_params.pos_int!("limit")
 
         DB.transaction do
           ua = UsageAlert.create_with_id(project_id: @project.id, user_id: current_account_id, name:, limit:)

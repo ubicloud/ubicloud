@@ -66,14 +66,16 @@ class Clover < Roda
   plugin :part
   plugin :request_headers
   plugin :plain_hash_response_headers
+  plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
   plugin :typecast_params do
-    handle_type(:ubid_uuid) do
+    invalid_value_message(:pos_int64, "Value must be an integer greater than 0 for parameter")
+
+    handle_type(:ubid_uuid, invalid_value_message: "Value provided not a valid id for parameter") do
       if it.is_a?(String) && it.bytesize == 26
         UBID.to_uuid(it)
       end
     end
   end
-  plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
 
   plugin :symbol_matchers
   symbol_matcher(:ubid_uuid, /([a-tv-z0-9]{26})/) do |s|
@@ -233,7 +235,7 @@ class Clover < Roda
     else
       @error = error
 
-      if e.is_a?(Sequel::ValidationFailed) || e.is_a?(DependencyError)
+      if e.is_a?(Sequel::ValidationFailed) || e.is_a?(DependencyError) || e.is_a?(Roda::RodaPlugins::TypecastParams::Error)
         flash["error"] = message
         redirect_back_with_inputs
       elsif e.is_a?(Sequel::SerializationFailure)
