@@ -654,6 +654,14 @@ RSpec.describe Clover, "billing" do
         expect(page).to have_content "alert-3"
       end
 
+      it "shows error for invalid usage alert" do
+        visit "#{project.path}/billing"
+        fill_in "alert_name", with: "alert-3"
+        click_button "Add"
+
+        expect(page).to have_flash_error "Validation failed for following fields: limit"
+      end
+
       it "can delete usage alert" do
         visit "#{project.path}/billing"
         expect(page).to have_content "alert-1"

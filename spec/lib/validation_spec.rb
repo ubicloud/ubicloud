@@ -333,17 +333,6 @@ RSpec.describe Validation do
       end
     end
 
-    describe "#validate_usage_limit" do
-      it "valid usage limit" do
-        expect(described_class.validate_usage_limit("123")).to eq(123)
-      end
-
-      it "invalid usage limit" do
-        expect { described_class.validate_usage_limit("abc") }.to raise_error described_class::ValidationFailed
-        expect { described_class.validate_usage_limit("0") }.to raise_error described_class::ValidationFailed
-      end
-    end
-
     describe "#validate_cloudflare_turnstile" do
       it "no ops when cloudflare site key not configured" do
         expect(Config).to receive(:cloudflare_turnstile_site_key).and_return(nil)

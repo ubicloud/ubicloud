@@ -226,13 +226,6 @@ module Validation
     end
   end
 
-  def self.validate_usage_limit(limit)
-    limit_integer = limit.to_i
-    fail ValidationFailed.new({limit: "Limit is not a valid integer."}) if limit_integer.to_s != limit
-    fail ValidationFailed.new({limit: "Limit must be greater than 0."}) if limit_integer <= 0
-    limit_integer
-  end
-
   def self.validate_short_text(text, field_name)
     fail ValidationFailed.new({field_name: "The #{field_name} must have max length 63 and only contain alphanumeric characters, hyphen, underscore, space, parantheses, exclamation, question mark and star."}) unless text.match(ALLOWED_SHORT_TEXT_PATTERN)
   end
