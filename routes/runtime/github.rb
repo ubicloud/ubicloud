@@ -15,8 +15,8 @@ class Clover
 
     # getCacheEntry
     r.get "cache" do
-      keys, version = r.params["keys"]&.split(","), r.params["version"]
-      fail CloverError.new(400, "InvalidRequest", "Wrong parameters") if keys.nil? || keys.empty? || version.nil?
+      keys, version = typecast_params.nonempty_str!(%w[keys version])
+      keys = keys.split(",")
 
       dataset = repository.cache_entries_dataset.exclude(committed_at: nil).where(version: version)
 
@@ -25,7 +25,7 @@ class Clover
         # We prioritize scope over key, returning the cache for the first matching
         # key in the head branch scope, followed by the first matching key in
         # default branch scope.
-        scopes = [runner.workflow_job&.dig("head_branch") || get_scope_from_github(runner, r.params["runId"]), repository.default_branch]
+        scopes = [runner.workflow_job&.dig("head_branch") || get_scope_from_github(runner, typecast_params.str("runId")), repository.default_branch]
         scopes.compact!
         scopes.uniq!
 
@@ -70,8 +70,9 @@ class Clover
     r.on "caches" do
       # listCache
       r.get true do
-        key = r.params["key"]
-        fail CloverError.new(204, "NotFound", "No cache entry") if key.nil?
+        unless (key = typecast_params.nonempty_str("key"))
+          fail CloverError.new(204, "NotFound", "No cache entry")
+        end
 
         scopes = [runner.workflow_job&.dig("head_branch"), repository.default_branch].compact
         entries = repository.cache_entries_dataset
@@ -94,12 +95,10 @@ class Clover
 
       # reserveCache
       r.post true do
-        key = r.params["key"]
-        version = r.params["version"]
-        size = r.params["cacheSize"]&.to_i
-        fail CloverError.new(400, "InvalidRequest", "Wrong parameters") if key.nil? || version.nil?
+        key, version = typecast_params.nonempty_str!(%w[key version])
+        size = typecast_params.pos_int("cacheSize")
 
-        unless (scope = runner.workflow_job&.dig("head_branch") || get_scope_from_github(runner, r.params["runId"]))
+        unless (scope = runner.workflow_job&.dig("head_branch") || get_scope_from_github(runner, typecast_params.nonempty_str("runId")))
           Clog.emit("The runner does not have a workflow job") { {no_workflow_job: {ubid: runner.ubid, repository_ubid: repository.ubid}} }
           fail CloverError.new(400, "InvalidRequest", "No workflow job data available")
         end
@@ -159,10 +158,9 @@ class Clover
 
       # commitCache
       r.post "commit" do
-        etags = r.params["etags"]
-        upload_id = r.params["uploadId"]
-        size = r.params["size"].to_i
-        fail CloverError.new(400, "InvalidRequest", "Wrong parameters") if etags.nil? || etags.empty? || upload_id.nil? || size == 0
+        etags = typecast_params.array!(:nonempty_str, "etags")
+        upload_id = typecast_params.nonempty_str!("uploadId")
+        size = typecast_params.pos_int!("size")
 
         entry = GithubCacheEntry[repository_id: repository.id, upload_id: upload_id, committed_at: nil]
         fail CloverError.new(204, "NotFound", "No cache entry") if entry.nil? || (entry.size && entry.size != size)
