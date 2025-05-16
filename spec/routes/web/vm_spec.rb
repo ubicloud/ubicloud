@@ -270,6 +270,7 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
 
         fill_in "Name", with: "invalid name"
+        fill_in "SSH Public Key", with: "a a"
         choose option: Location::HETZNER_FSN1_ID
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
