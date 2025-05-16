@@ -50,11 +50,9 @@ class Clover
       r.post %w[attach-subnet detach-subnet] do |action|
         authorize("Firewall:view", firewall.id)
 
-        private_subnet_id = check_required_web_params(["private_subnet_id"])["private_subnet_id"]
-
         unless (private_subnet = authorized_private_subnet(location_id: @location.id, perm: "PrivateSubnet:edit"))
           if api?
-            fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{private_subnet_id}\" and the location \"#{@location.display_name}\" is not found"})
+            fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{typecast_params.str("private_subnet_id")}\" and the location \"#{@location.display_name}\" is not found"})
           else
             flash["error"] = "Private subnet not found"
             r.redirect "#{@project.path}#{firewall.path}"

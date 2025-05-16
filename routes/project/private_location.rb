@@ -17,15 +17,13 @@ class Clover
 
     r.post true do
       authorize("Location:create", @project.id)
-      check_required_web_params(["name", "provider_location_name", "access_key", "secret_key"])
+      name, provider_location_name, access_key, secret_key = typecast_params.nonempty_str!(["name", "provider_location_name", "access_key", "secret_key"])
 
-      tp = typecast_params
-      name = tp.nonempty_str("name")
-      provider_location_name = tp.nonempty_str("provider_location_name")
       Validation.validate_name(name)
       Validation.validate_provider_location_name("aws", provider_location_name)
 
-      loc = DB.transaction do
+      loc = nil
+      DB.transaction do
         loc = Location.create(
           display_name: name,
           name: provider_location_name,
@@ -34,12 +32,8 @@ class Clover
           provider: "aws",
           project_id: @project.id
         )
-        LocationCredential.create(
-          access_key: tp.nonempty_str("access_key"),
-          secret_key: tp.nonempty_str("secret_key")
-        ) { it.id = loc.id }
+        LocationCredential.create(access_key:, secret_key:) { it.id = loc.id }
         audit_log(loc, "create")
-        loc
       end
 
       if api?
