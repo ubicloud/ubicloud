@@ -26,9 +26,8 @@ class Clover
         end
       end
 
-      params = check_required_web_params(["name"])
       DB.transaction do
-        @project = current_account.create_project_with_default_policy(params["name"])
+        @project = current_account.create_project_with_default_policy(typecast_params.nonempty_str!("name"))
         audit_log(@project, "create")
       end
 
@@ -92,7 +91,7 @@ class Clover
 
         r.post true do
           authorize("Project:edit", @project.id)
-          @project.update(name: r.params["name"])
+          @project.update(name: typecast_params.nonempty_str!("name"))
           audit_log(@project, "update")
 
           flash["notice"] = "The project name is updated to '#{@project.name}'."
