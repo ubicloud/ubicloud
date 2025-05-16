@@ -48,10 +48,9 @@ class Clover
       r.patch do
         authorize("Postgres:edit", pg.id)
 
-        params = r.params
-        target_vm_size = Validation.validate_postgres_size(pg.location, params["size"] || pg.target_vm_size, @project.id)
-        target_storage_size_gib = Validation.validate_postgres_storage_size(pg.location, target_vm_size.vm_size, params["storage_size"] || pg.target_storage_size_gib, @project.id)
-        ha_type = params["ha_type"] || PostgresResource::HaType::NONE
+        target_vm_size = Validation.validate_postgres_size(pg.location, typecast_params.str("size") || pg.target_vm_size, @project.id)
+        target_storage_size_gib = Validation.validate_postgres_storage_size(pg.location, target_vm_size.vm_size, typecast_params.pos_int("storage_size") || pg.target_storage_size_gib, @project.id)
+        ha_type = typecast_params.str("ha_type") || PostgresResource::HaType::NONE
         Validation.validate_postgres_ha_type(ha_type)
 
         if pg.representative_server.nil? || target_storage_size_gib < pg.representative_server.storage_size_gib
@@ -115,8 +114,7 @@ class Clover
         r.post true do
           authorize("Postgres:edit", pg.id)
 
-          params = check_required_web_params(["cidr"])
-          parsed_cidr = Validation.validate_cidr(params["cidr"])
+          parsed_cidr = Validation.validate_cidr(typecast_params.nonempty_str!("cidr"))
 
           firewall_rule = nil
           DB.transaction do
@@ -155,17 +153,12 @@ class Clover
           authorize("Postgres:edit", pg.id)
 
           password_param = (api? ? "password" : "metric-destination-password")
-          params = check_required_web_params(["url", "username", password_param])
+          url, username, password = typecast_params.nonempty_str!(["url", "username", password_param])
 
-          Validation.validate_url(params["url"])
+          Validation.validate_url(url)
 
           DB.transaction do
-            md = PostgresMetricDestination.create_with_id(
-              postgres_resource_id: pg.id,
-              url: params["url"],
-              username: params["username"],
-              password: params[password_param]
-            )
+            md = PostgresMetricDestination.create(postgres_resource_id: pg.id, url:, username:, password:)
             pg.servers.each(&:incr_configure_prometheus)
             audit_log(md, "create", pg)
           end
@@ -197,13 +190,13 @@ class Clover
         r.post true do
           authorize("Postgres:edit", pg.id)
 
-          params = check_required_web_params(["name"])
+          name = typecast_params.nonempty_str!("name")
           st = nil
           DB.transaction do
             st = Prog::Postgres::PostgresResourceNexus.assemble(
               project_id: @project.id,
               location_id: pg.location_id,
-              name: params["name"],
+              name:,
               target_vm_size: pg.target_vm_size,
               target_storage_size_gib: pg.target_storage_size_gib,
               ha_type: PostgresResource::HaType::NONE,
@@ -219,7 +212,7 @@ class Clover
           if api?
             Serializers::Postgres.serialize(st.subject, {detailed: true})
           else
-            flash["notice"] = "'#{params["name"]}' will be ready in a few minutes"
+            flash["notice"] = "'#{name}' will be ready in a few minutes"
             r.redirect "#{@project.path}#{st.subject.path}"
           end
         end
@@ -255,20 +248,20 @@ class Clover
         authorize("Postgres:create", @project.id)
         authorize("Postgres:view", pg.id)
 
-        params = check_required_web_params(["name", "restore_target"])
+        name, restore_target = typecast_params.nonempty_str!(["name", "restore_target"])
         st = nil
 
         DB.transaction do
           st = Prog::Postgres::PostgresResourceNexus.assemble(
             project_id: @project.id,
             location_id: pg.location_id,
-            name: params["name"],
+            name:,
             target_vm_size: pg.target_vm_size,
             target_storage_size_gib: pg.target_storage_size_gib,
             version: pg.version,
             flavor: pg.flavor,
             parent_id: pg.id,
-            restore_target: params["restore_target"]
+            restore_target:
           )
           audit_log(pg, "restore", st.subject)
         end
@@ -277,7 +270,7 @@ class Clover
         if api?
           Serializers::Postgres.serialize(st.subject, {detailed: true})
         else
-          flash["notice"] = "'#{params["name"]}' will be ready in a few minutes"
+          flash["notice"] = "'#{name}' will be ready in a few minutes"
           r.redirect "#{@project.path}#{st.subject.path}"
         end
       end
@@ -294,11 +287,12 @@ class Clover
           end
         end
 
-        params = check_required_web_params(["password", "repeat_password"])
-        Validation.validate_postgres_superuser_password(params["password"], params["repeat_password"])
+        password = typecast_params.str!("password")
+        repeat_password = typecast_params.str!("repeat_password") if web?
+        Validation.validate_postgres_superuser_password(password, repeat_password)
 
         DB.transaction do
-          pg.update(superuser_password: params["password"])
+          pg.update(superuser_password: password)
           pg.representative_server.incr_update_superuser_password
           audit_log(pg, "reset_superuser_password")
         end
@@ -313,9 +307,10 @@ class Clover
 
       r.post "set-maintenance-window" do
         authorize("Postgres:edit", pg.id)
+        maintenance_window_start_at = typecast_params.pos_int("maintenance_window_start_at")
 
         DB.transaction do
-          pg.update(maintenance_window_start_at: r.params["maintenance_window_start_at"])
+          pg.update(maintenance_window_start_at:)
           audit_log(pg, "set_maintenance_window")
         end
 
@@ -340,10 +335,11 @@ class Clover
       r.get "metrics" do
         authorize("Postgres:view", pg.id)
 
-        start_time = request.params["start"] || (DateTime.now.new_offset(0) - 30.0 / 1440).rfc3339
+        start_time, end_time = typecast_params.str(%w[start end])
+        start_time ||= (DateTime.now.new_offset(0) - 30.0 / 1440).rfc3339
         start_time = Validation.validate_rfc3339_datetime_str(start_time, "start")
 
-        end_time = request.params["end"] || DateTime.now.new_offset(0).rfc3339
+        end_time ||= DateTime.now.new_offset(0).rfc3339
         end_time = Validation.validate_rfc3339_datetime_str(end_time, "end")
 
         start_ts = start_time.to_i
@@ -361,8 +357,8 @@ class Clover
           raise CloverError.new(400, "InvalidRequest", "Cannot query metrics older than 31 days")
         end
 
-        metric_key = request.params["key"]&.to_sym
-        single_query = !request.params["key"].nil?
+        metric_key = typecast_params.str("key")&.to_sym
+        single_query = !metric_key.nil?
 
         if single_query && !Metrics::POSTGRES_METRICS.key?(metric_key)
           raise CloverError.new(400, "InvalidRequest", "Invalid metric name")
