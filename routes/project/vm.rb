@@ -16,7 +16,7 @@ class Clover
     r.web do
       r.post true do
         check_visible_location
-        vm_post(r.params["name"])
+        vm_post(typecast_params.nonempty_str("name"))
       end
 
       r.get "create" do
