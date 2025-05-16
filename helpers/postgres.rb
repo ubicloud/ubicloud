@@ -7,10 +7,10 @@ class Clover
 
     Validation.validate_postgres_location(@location, @project.id)
 
-    params = check_required_web_params(%w[size name location])
-    parsed_size = Validation.validate_postgres_size(@location, params["size"], @project.id)
+    size = typecast_params.nonempty_str!("size")
+    parsed_size = Validation.validate_postgres_size(@location, size, @project.id)
 
-    ha_type = params["ha_type"] || PostgresResource::HaType::NONE
+    ha_type = typecast_params.nonempty_str("ha_type") || PostgresResource::HaType::NONE
     requested_standby_count = case ha_type
     when PostgresResource::HaType::ASYNC then 1
     when PostgresResource::HaType::SYNC then 2
@@ -27,10 +27,10 @@ class Clover
         location_id: @location.id,
         name:,
         target_vm_size: parsed_size.vm_size,
-        target_storage_size_gib: params["storage_size"] || parsed_size.storage_size_options.first,
-        ha_type: params["ha_type"] || PostgresResource::HaType::NONE,
-        version: params["version"] || PostgresResource::DEFAULT_VERSION,
-        flavor: params["flavor"] || PostgresResource::Flavor::STANDARD
+        target_storage_size_gib: typecast_params.nonempty_str("storage_size") || parsed_size.storage_size_options.first,
+        ha_type:,
+        version: typecast_params.nonempty_str("version") || PostgresResource::DEFAULT_VERSION,
+        flavor: typecast_params.nonempty_str("flavor") || PostgresResource::Flavor::STANDARD
       ).subject
       audit_log(pg, "create")
     end
