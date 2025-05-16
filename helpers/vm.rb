@@ -19,36 +19,40 @@ class Clover
     authorize("Vm:create", project.id)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless project.has_valid_payment_method?
 
-    allowed_optional_parameters = ["size", "storage_size", "unix_user", "boot_image", "enable_ip4", "private_subnet_id"]
-    params = check_required_web_params(%w[public_key name location])
-    assemble_params = params.slice(*allowed_optional_parameters).compact
+    public_key = typecast_params.nonempty_str!("public_key")
+    assemble_params = typecast_params.convert!(symbolize: true) do |tp|
+      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id"])
+      tp.pos_int("storage_size")
+      tp.bool("enable_ip4")
+    end
+    assemble_params.compact!
 
     # Generally parameter validation is handled in progs while creating resources.
     # Since Vm::Nexus both handles VM creation requests from user and also Postgres
     # service, moved the boot_image validation here to not allow users to pass
     # postgres image as boot image while creating a VM.
-    if assemble_params["boot_image"]
-      Validation.validate_boot_image(assemble_params["boot_image"])
+    if assemble_params[:boot_image]
+      Validation.validate_boot_image(assemble_params[:boot_image])
     end
 
     # Same as above, moved the size validation here to not allow users to
     # pass gpu instance while creating a VM.
-    if assemble_params["size"]
-      parsed_size = Validation.validate_vm_size(assemble_params["size"], "x64", only_visible: true)
+    if assemble_params[:size]
+      parsed_size = Validation.validate_vm_size(assemble_params[:size], "x64", only_visible: true)
     end
 
-    if assemble_params["storage_size"]
-      storage_size = Validation.validate_vm_storage_size(assemble_params["size"] || Prog::Vm::Nexus::DEFAULT_SIZE, "x64", assemble_params["storage_size"])
-      assemble_params["storage_volumes"] = [{size_gib: storage_size, encrypted: true}]
-      assemble_params.delete("storage_size")
+    if assemble_params[:storage_size]
+      storage_size = Validation.validate_vm_storage_size(assemble_params[:size] || Prog::Vm::Nexus::DEFAULT_SIZE, "x64", assemble_params[:storage_size])
+      assemble_params[:storage_volumes] = [{size_gib: storage_size, encrypted: true}]
+      assemble_params.delete(:storage_size)
     end
 
-    if assemble_params["private_subnet_id"] && assemble_params["private_subnet_id"] != ""
+    if assemble_params[:private_subnet_id]
       unless (ps = authorized_private_subnet(location_id: @location.id))
-        fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{assemble_params["private_subnet_id"]}\" is not found in the location \"#{@location.display_name}\""})
+        fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{assemble_params[:private_subnet_id]}\" is not found in the location \"#{@location.display_name}\""})
       end
     end
-    assemble_params["private_subnet_id"] = ps&.id
+    assemble_params[:private_subnet_id] = ps&.id
 
     requested_vm_vcpu_count = parsed_size.nil? ? 2 : parsed_size.vcpus
     Validation.validate_vcpu_quota(project, "VmVCpu", requested_vm_vcpu_count)
@@ -56,11 +60,11 @@ class Clover
     vm = nil
     DB.transaction do
       vm = Prog::Vm::Nexus.assemble(
-        params["public_key"],
+        public_key,
         project.id,
-        name: name,
+        name:,
         location_id: @location.id,
-        **assemble_params.transform_keys(&:to_sym)
+        **assemble_params
       ).subject
       audit_log(vm, "create")
     end
