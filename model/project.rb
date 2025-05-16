@@ -145,10 +145,10 @@ class Project < Sequel::Model
   end
 
   def self.feature_flag(*flags, into: self)
-    flags.map(&:to_s).each do |flag|
+    flags.map!(&:to_s).each do |flag|
       into.module_eval do
         define_method :"set_ff_#{flag}" do |value|
-          update(feature_flags: feature_flags.merge({flag => value}))
+          update(feature_flags: feature_flags.merge({flag => value}).slice(*flags))
         end
 
         define_method :"get_ff_#{flag}" do
