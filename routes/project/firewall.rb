@@ -24,7 +24,7 @@ class Clover
       end
 
       r.post true do
-        next unless (@location = Location[typecast_params.nonempty_str("location")])
+        check_visible_location
         firewall_post(typecast_params.nonempty_str("name"))
       end
     end
