@@ -599,11 +599,6 @@ class Clover < Roda
       raise(typecast_params.str("message") || "test error")
     end
 
-    hash_branch("test-missing-request-params") do |r|
-      no_authorization_needed
-      check_required_web_params(%w[foo])
-    end
-
     hash_branch(:webhook_prefix, "test-no-audit-logging") do |r|
       r.post "test" do
         @still_need_audit_logging = true
