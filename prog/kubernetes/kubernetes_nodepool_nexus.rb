@@ -86,10 +86,8 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
     decr_destroy
 
     lb = LoadBalancer[name: kubernetes_nodepool.cluster.services_load_balancer_name]
-    if (dns_zone = DnsZone[name: Config.kubernetes_service_hostname])
-      dns_zone.delete_record(record_name: "*.#{lb.hostname}.")
-    end
-    lb.incr_destroy
+    lb&.dns_zone&.delete_record(record_name: "*.#{lb.hostname}.")
+    lb&.incr_destroy
     kubernetes_nodepool.vms.each(&:incr_destroy)
     kubernetes_nodepool.remove_all_vms
     kubernetes_nodepool.destroy

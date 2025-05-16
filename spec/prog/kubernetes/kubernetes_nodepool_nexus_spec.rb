@@ -176,7 +176,6 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     end
 
     it "deletes the sub-subdomain DNS record if the DNS zone exists" do
-      allow(Config).to receive(:kubernetes_service_hostname).and_return("k8s.ubicloud.com")
       dns_zone = DnsZone.create_with_id(project_id: Project.first.id, name: "k8s.ubicloud.com", last_purged_at: Time.now)
       Prog::Vnet::LoadBalancerNexus.assemble(
         subnet.id,
@@ -190,6 +189,25 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
 
       expect { nx.destroy }.to exit({"msg" => "kubernetes nodepool is deleted"})
       expect(DnsRecord[name: "*.#{kc.ubid.to_s[-10...]}-services.k8s.ubicloud.com.", tombstoned: true]).not_to be_nil
+    end
+
+    it "completes the destroy process even if the load balancer does not exist" do
+      expect(LoadBalancer[name: kc.services_load_balancer_name]).to be_nil
+      expect { nx.destroy }.to exit({"msg" => "kubernetes nodepool is deleted"})
+    end
+
+    it "completes the destroy process even if the DNS zone does not exist" do
+      lb = Prog::Vnet::LoadBalancerNexus.assemble(
+        subnet.id,
+        name: kc.services_load_balancer_name,
+        src_port: 443, dst_port: 8443
+      ).subject
+
+      expect(LoadBalancer).to receive(:[]).and_return(lb)
+      expect(lb).to receive(:incr_destroy)
+      expect(lb).to receive(:dns_zone).and_return(nil)
+
+      expect { nx.destroy }.to exit({"msg" => "kubernetes nodepool is deleted"})
     end
   end
 end
