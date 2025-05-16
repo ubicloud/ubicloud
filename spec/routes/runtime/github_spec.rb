@@ -42,7 +42,7 @@ RSpec.describe Clover, "github" do
 
     post "/runtime/github/caches"
 
-    expect(last_response).to have_runtime_error(400, "Wrong parameters")
+    expect(last_response).to have_runtime_error(400, "missing parameter for key")
   end
 
   it "handles errors when attempting to setup blob storage" do
@@ -82,7 +82,7 @@ RSpec.describe Clover, "github" do
           params = {key: key, version: version}.compact
           post "/runtime/github/caches", params
 
-          expect(last_response).to have_runtime_error(400, "Wrong parameters")
+          expect(last_response).to have_runtime_error(400, /missing parameter for/)
         end
       end
 
@@ -191,7 +191,7 @@ RSpec.describe Clover, "github" do
           params = {etags: etags, uploadId: upload_id, size: size}.compact
           post "/runtime/github/caches/commit", params
 
-          expect(last_response).to have_runtime_error(400, "Wrong parameters")
+          expect(last_response).to have_runtime_error(400, /missing parameter for /)
         end
       end
 
@@ -243,7 +243,7 @@ RSpec.describe Clover, "github" do
           params = {keys: keys, version: version}.compact
           get "/runtime/github/cache", params
 
-          expect(last_response).to have_runtime_error(400, "Wrong parameters")
+          expect(last_response).to have_runtime_error(400, /missing parameter for |empty string provided for parameter keys/)
         end
       end
 

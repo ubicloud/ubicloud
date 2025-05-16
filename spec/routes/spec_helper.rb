@@ -21,8 +21,18 @@ RSpec.configure do |config|
       match do |response|
         return false if response.body.empty?
         parsed_body = JSON.parse(response.body)
+
+        message_match = case expected_message
+        when nil
+          true
+        when String
+          parsed_body.dig(*message_path) == expected_message
+        when Regexp
+          expected_message.match?(parsed_body.dig(*message_path))
+        end
+
         response.status == expected_state &&
-          (expected_message.nil? || parsed_body.dig(*message_path) == expected_message) &&
+          message_match &&
           (expected_details.nil? || parsed_body.dig(*details_path) == expected_details)
       end
 
