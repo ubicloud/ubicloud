@@ -4,9 +4,9 @@ class Clover
   hash_branch("github") do |r|
     r.get web?, "callback" do
       no_authorization_needed
-      oauth_code = r.params["code"]
-      installation_id = r.params["installation_id"]
-      setup_action = r.params["setup_action"]
+      oauth_code = typecast_params.str("code")
+      installation_id = typecast_params.str("installation_id")
+      setup_action = typecast_params.str("setup_action")
       code_response = Github.oauth_client.exchange_code_for_token(oauth_code)
 
       if (installation = GithubInstallation[installation_id: installation_id])
