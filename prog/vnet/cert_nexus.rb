@@ -60,7 +60,7 @@ class Prog::Vnet::CertNexus < Prog::Base
 
   label def wait_dns_validation
     case dns_challenge.status
-    when "pending"
+    when "pending", "processing"
       nap 10
     when "valid"
       cert.update(csr_key: OpenSSL::PKey::EC.generate("prime256v1").to_der)
