@@ -3,10 +3,14 @@
 require_relative "../../model"
 
 class InferenceRouterTarget < Sequel::Model
+  one_to_one :strand, key: :id
   many_to_one :inference_router
   many_to_one :inference_router_model
 
   include ResourceMethods
+  include SemaphoreMethods
+
+  semaphore :destroy
 
   plugin :column_encryption do |enc|
     enc.column :api_key
