@@ -88,7 +88,7 @@ RSpec.describe Clover, "private subnet" do
         expect(page.title).to eq("Ubicloud - Create Private Subnet")
         name = "dummy-ps"
         fill_in "Name", with: name
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
 
         click_button "Create"
 
@@ -105,7 +105,7 @@ RSpec.describe Clover, "private subnet" do
         expect(page.title).to eq("Ubicloud - Create Private Subnet")
 
         fill_in "Name", with: private_subnet.name
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
 
         click_button "Create"
 
@@ -115,7 +115,7 @@ RSpec.describe Clover, "private subnet" do
 
       it "location not exist" do
         visit "#{project.path}/private-subnet/create"
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
         Location[Location::HETZNER_FSN1_ID].destroy
 
         click_button "Create"
@@ -133,7 +133,7 @@ RSpec.describe Clover, "private subnet" do
           expect(page.title).to eq("Ubicloud - Create Private Subnet")
           name = "a123456789" * 6
           fill_in "Name", with: name
-          choose option: Location::HETZNER_FSN1_ID
+          choose option: Location::HETZNER_FSN1_UBID
 
           click_button "Create"
 

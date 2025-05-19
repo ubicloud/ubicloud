@@ -125,7 +125,7 @@ RSpec.describe Clover, "Kubernetes" do
         fill_in "Cluster Name", with: "cannotcreate"
         choose option: 3
         find('select#worker_nodes option[value="4"]:not([disabled])').select_option
-        choose option: Location::LEASEWEB_WDC02_ID
+        choose option: Location::LEASEWEB_WDC02_UBID
         Location[Location::LEASEWEB_WDC02_ID].destroy
 
         click_button "Create"
@@ -144,7 +144,7 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page).to have_content "Project doesn't have valid billing information"
 
         fill_in "Cluster Name", with: "dummyk8s"
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
         choose option: 3
         find('select#worker_nodes option[value="4"]:not([disabled])').select_option
 
@@ -156,7 +156,7 @@ RSpec.describe Clover, "Kubernetes" do
 
       it "can create new kubernetes cluster" do
         fill_in "Cluster Name", with: "k8stest"
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
         choose option: 3
         find('select#worker_nodes option[value="4"]:not([disabled])').select_option
 
@@ -175,7 +175,7 @@ RSpec.describe Clover, "Kubernetes" do
 
       it "can not create kubernetes cluster with invalid name" do
         fill_in "Cluster Name", with: "invalid name"
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
         choose option: 3
         find('select#worker_nodes option[value="4"]:not([disabled])').select_option
 
@@ -187,7 +187,7 @@ RSpec.describe Clover, "Kubernetes" do
 
       it "can not create kubernetes cluster with same name in same project & location" do
         fill_in "Cluster Name", with: "myk8s"
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
         choose option: 3
         find('select#worker_nodes option[value="4"]:not([disabled])').select_option
 
@@ -197,7 +197,7 @@ RSpec.describe Clover, "Kubernetes" do
       end
 
       it "can not select invisible location" do
-        expect { choose option: Location::GITHUB_RUNNERS_ID }.to raise_error Capybara::ElementNotFound
+        expect { choose option: Location::GITHUB_RUNNERS_UBID }.to raise_error Capybara::ElementNotFound
       end
 
       it "can not create kubernetes cluster in a project when does not have permissions" do

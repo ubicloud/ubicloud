@@ -174,7 +174,7 @@ RSpec.describe Clover, "firewall" do
         visit "#{project.path}/firewall/create"
 
         fill_in "Name", with: "dummy-fw"
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
         Location[Location::HETZNER_FSN1_ID].destroy
 
         click_button "Create"
