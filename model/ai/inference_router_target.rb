@@ -27,6 +27,9 @@ end
 #  enabled                   | boolean                  | NOT NULL DEFAULT false
 #  inference_router_model_id | uuid                     | NOT NULL
 #  inference_router_id       | uuid                     | NOT NULL
+#  type                      | text                     | NOT NULL DEFAULT 'manual'::text
+#  config                    | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
+#  state                     | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 # Indexes:
 #  inference_router_target_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
