@@ -102,6 +102,18 @@ RSpec.describe Clover, "vm" do
         expect(page.status_code).to eq 404
       end
 
+      it "shows 404 page if attempting to create a VM with an invalid location format" do
+        visit "#{project.path}/vm/create"
+        fill_in "Name", with: "dummy-vm"
+        choose "Germany"
+
+        # Monkey with location id to use non-uuid format
+        page.driver.browser.dom.css("[value=#{Location::HETZNER_FSN1_ID}]").attr("value", "foo")
+
+        click_button "Create"
+        expect(page.status_code).to eq 404
+      end
+
       it "shows vm create page with burstable and location_latitude_fra" do
         project.set_ff_location_latitude_fra true
         visit "#{project.path}/vm/create"
