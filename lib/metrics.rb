@@ -65,6 +65,22 @@ module Metrics
         )
       ]
     ),
+    disk_io:
+    MetricDefinition.new(
+      name: "Disk I/O",
+      description: "I/O operations per second",
+      unit: "IOPS",
+      series: [
+        TimeSeries.new(
+          labels: {name: "Reads"},
+          query: "sum(rate(node_disk_reads_completed_total{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
+        ),
+        TimeSeries.new(
+          labels: {name: "Writes"},
+          query: "sum(rate(node_disk_writes_completed_total{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
+        )
+      ]
+    ),
     network_traffic:
     MetricDefinition.new(
       name: "Network Traffic",
