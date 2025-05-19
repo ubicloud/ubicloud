@@ -18,7 +18,7 @@ class Clover
     authorize("Firewall:create", @project.id)
     Validation.validate_name(firewall_name)
 
-    description = request.params["description"] || ""
+    description = typecast_params.str("description") || ""
 
     firewall = nil
     DB.transaction do
