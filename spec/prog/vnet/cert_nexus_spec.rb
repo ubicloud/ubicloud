@@ -120,18 +120,27 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect { nx.wait_dns_validation }.to hop("restart")
     end
 
-    it "finalizes the certificate when dns_challenge is valid" do
+    it "hops to cert_finalization when dns_challenge is valid" do
       expect(challenge).to receive(:status).and_return("valid")
 
       key = Clec::Cert.ec_key
       expect(OpenSSL::PKey::EC).to receive(:generate).and_return(key)
+      expect(cert).to receive(:update).with(csr_key: key.to_der)
+      expect { nx.wait_dns_validation }.to hop("cert_finalization")
+    end
+  end
+
+  describe "#cert_finalization" do
+    it "finalizes the certificate" do
       csr = instance_double(Acme::Client::CertificateRequest)
       acme_order = instance_double(Acme::Client::Resources::Order)
       expect(nx).to receive(:acme_order).and_return(acme_order).at_least(:once)
-      expect(Acme::Client::CertificateRequest).to receive(:new).with(private_key: key, common_name: "cert-hostname").and_return(csr)
+      ec = instance_double(OpenSSL::PKey::EC)
+      expect(cert).to receive(:csr_key).and_return("der_key")
+      expect(OpenSSL::PKey::EC).to receive(:new).with("der_key").and_return(ec)
+      expect(Acme::Client::CertificateRequest).to receive(:new).with(private_key: ec, common_name: "cert-hostname").and_return(csr)
       expect(acme_order).to receive(:finalize).with(csr: csr)
-      expect(cert).to receive(:update).with(csr_key: key.to_der)
-      expect { nx.wait_dns_validation }.to hop("wait_cert_finalization")
+      expect { nx.cert_finalization }.to hop("wait_cert_finalization")
     end
   end
 
