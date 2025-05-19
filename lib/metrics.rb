@@ -172,6 +172,22 @@ module Metrics
           query: "topk(5, sum(pg_database_size_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\", datname!~\"template0|template1\"}) by (datname))"
         )
       ]
+    ),
+    transactions:
+    MetricDefinition.new(
+      name: "Transactions",
+      description: "Committed vs rolled back transactions",
+      unit: "count/s",
+      series: [
+        TimeSeries.new(
+          labels: {name: "Commits"},
+          query: "sum(rate(pg_stat_database_xact_commit{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
+        ),
+        TimeSeries.new(
+          labels: {name: "Rollbacks"},
+          query: "sum(rate(pg_stat_database_xact_rollback{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
+        )
+      ]
     )
   }
 end
