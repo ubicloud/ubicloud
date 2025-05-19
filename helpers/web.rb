@@ -53,7 +53,7 @@ class Clover < Roda
 
     request.redirect "/" unless uri
 
-    flash["old"] = request.params
+    flash["old"] = redirect_back_with_inputs_params
 
     if uri && env["REQUEST_METHOD"] != "GET"
       # Force flash rotation, so flash works correctly for internal redirects
@@ -68,6 +68,10 @@ class Clover < Roda
     else
       request.redirect referrer
     end
+  end
+
+  def redirect_back_with_inputs_params
+    request.params
   end
 
   def redirect_default_project_dashboard
