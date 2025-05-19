@@ -240,5 +240,6 @@ def clover_freeze
     Validation::ValidationFailed
   ].each(&:freeze)
 
+  RubyVM::YJIT.enable
   Refrigerator.freeze_core
 end
