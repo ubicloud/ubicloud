@@ -99,6 +99,14 @@ class Clover < Roda
     AUDIT_LOG_DS.insert(project_id:, ubid_type:, action:, subject_id:, object_ids:)
   end
 
+  def before_authenticated_hash_branches
+    # nothing, only existing for setting up test-specific code
+  end
+
+  def before_main_hash_branches
+    # nothing, only existing for setting up test-specific code
+  end
+
   def no_audit_log
     # Do nothing, this is a no-op method only used to check in the specs
     # that all non-GET requests have some form of audit logging, as an explicit

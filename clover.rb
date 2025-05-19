@@ -697,6 +697,7 @@ class Clover < Roda
           fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
         end
 
+        before_main_hash_branches
         r.hash_branches(:runtime_prefix)
       end
 
@@ -704,6 +705,7 @@ class Clover < Roda
       r.assets
 
       r.on "webhook" do
+        before_main_hash_branches
         r.hash_branches(:webhook_prefix)
       end
 
@@ -737,8 +739,7 @@ class Clover < Roda
       end
     end
 
-    @still_need_audit_logging = true
-    @still_need_authorization = true
+    before_authenticated_hash_branches
     r.hash_branches("")
   end
 
@@ -772,6 +773,10 @@ class Clover < Roda
           when Authorization::Unauthorized
             next
           end
+
+          # Allow easier debugging of issues, by not raising a RuntimeError if there is a separate
+          # error being raised and you are explicitly requesting showing it.
+          next if ENV["SHOW_ERRORS"]
         end
 
         raise "no authorization check for #{request.request_method} #{request.path_info}"
@@ -783,6 +788,35 @@ class Clover < Roda
     end
 
     prepend(Module.new do
+      def before_authenticated_hash_branches
+        # Set the audit logging and authorization flags, which will be unset by
+        # the related methods, to ensure that all routes have some form of authorization,
+        # all add non-GET routes have some form of audit logging.
+        @still_need_audit_logging = true
+        @still_need_authorization = true
+        before_main_hash_branches
+      end
+
+      def before_main_hash_branches
+        # Disallow direct access of request.params in routes, only allow access
+        # through typecast_params
+        typecast_params
+        request.singleton_class.send(:undef_method, :params)
+
+        # Need to rewind body so webhook github requests work
+        request.body.rewind unless request.get?
+      end
+
+      def redirect_back_with_inputs_params
+        # This currently needs all parameters. We could change the related views to
+        # use typecast_params with the flash["old"] value, but in the long term,
+        # should avoid the redirect_back_with_inputs approach completely.
+        # Use super for coverage, even though it will raise an exception.
+        super
+      rescue
+        request.instance_variable_get(:@params)
+      end
+
       def audit_log(...)
         @still_need_audit_logging = false
         super
