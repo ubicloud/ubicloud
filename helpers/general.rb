@@ -215,7 +215,9 @@ class Clover < Roda
     #
     # If location not previously retrieved, require it be visible or tied to the current project
     # when retrieving it.  This is called when creating resources in the web routes.
-    @location ||= Location.visible_or_for_project(@project.id).first(id: request.params["location"])
+    @location ||= if (id = typecast_params.uuid("location"))
+      Location.visible_or_for_project(@project.id).first(id:)
+    end
     handle_invalid_location unless @location&.visible_or_for_project?(@project.id)
   end
 
