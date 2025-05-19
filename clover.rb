@@ -75,13 +75,6 @@ class Clover < Roda
         UBID.to_uuid(it)
       end
     end
-
-    # XXX: Remove after location parameters switch from uuids to ubids.
-    handle_type(:uuid, invalid_value_message: "Value provided not a valid id for parameter") do
-      if it.is_a?(String) && it.bytesize == 36 && /\A\h{8}-\h{4}-\h{4}-\h{4}-\h{12}\z/.match?(it)
-        it
-      end
-    end
   end
 
   plugin :symbol_matchers
