@@ -212,7 +212,7 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
 
     pre_selected_values = {
       "flavor" => @pg[:flavor],
-      "location" => @location.id,
+      "location" => @location.ubid,
       "family" => @family,
       "size" => @pg[:vm_size],
       "storage_size" => @pg[:storage_size_gib],

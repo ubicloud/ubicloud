@@ -68,7 +68,7 @@ RSpec.describe Clover, "vm" do
         name = "dummy-vm"
         fill_in "Name", with: name
         fill_in "SSH Public Key", with: "a a"
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
         uncheck "enable_ip4"
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
@@ -108,7 +108,7 @@ RSpec.describe Clover, "vm" do
         choose "Germany"
 
         # Monkey with location id to use non-uuid format
-        page.driver.browser.dom.css("[value=#{Location::HETZNER_FSN1_ID}]").attr("value", "foo")
+        page.driver.browser.dom.css("[value=\"#{Location::HETZNER_FSN1_UBID}\"]").attr("value", "foo")
 
         click_button "Create"
         expect(page.status_code).to eq 404
@@ -194,7 +194,7 @@ RSpec.describe Clover, "vm" do
         name = "dummy-vm"
         fill_in "Name", with: name
         fill_in "SSH Public Key", with: "a a"
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
         check "enable_ip4"
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
@@ -220,7 +220,7 @@ RSpec.describe Clover, "vm" do
         name = "dummy-vm"
         fill_in "Name", with: name
         fill_in "SSH Public Key", with: "a a"
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
         select match: :prefer_exact, text: ps.name
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
@@ -245,7 +245,7 @@ RSpec.describe Clover, "vm" do
         name = "dummy-vm"
         fill_in "Name", with: name
         fill_in "SSH Public Key", with: "a a"
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
         select match: :prefer_exact, text: "Default"
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
@@ -263,7 +263,7 @@ RSpec.describe Clover, "vm" do
         visit "#{project.path}/vm/create"
         fill_in "Name", with: "dummy-vm-2"
         fill_in "SSH Public Key", with: "a a"
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
         select match: :prefer_exact, text: "Default"
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
@@ -283,7 +283,7 @@ RSpec.describe Clover, "vm" do
 
         fill_in "Name", with: "invalid name"
         fill_in "SSH Public Key", with: "a a"
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
 
@@ -302,7 +302,7 @@ RSpec.describe Clover, "vm" do
 
         fill_in "Name", with: vm.name
         fill_in "SSH Public Key", with: "a a"
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
 
@@ -322,7 +322,7 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content "Project doesn't have valid billing information"
 
         fill_in "Name", with: "dummy-vm"
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
 
@@ -345,7 +345,7 @@ RSpec.describe Clover, "vm" do
         project
         visit "#{project.path}/vm/create"
         fill_in "Name", with: "dummy-vm"
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
 
         Location.where(id: Location::HETZNER_FSN1_ID).update(visible: false)
         click_button "Create"
@@ -356,7 +356,7 @@ RSpec.describe Clover, "vm" do
         project
         visit "#{project.path}/vm/create"
         fill_in "Name", with: "dummy-vm"
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
 
         Location.where(id: Location::HETZNER_FSN1_ID).update(visible: false, project_id: project_wo_permissions.id)
         click_button "Create"
@@ -369,7 +369,7 @@ RSpec.describe Clover, "vm" do
         name = "dummy-vm"
         fill_in "Name", with: name
         fill_in "SSH Public Key", with: "a a"
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
 
         Location.where(id: Location::HETZNER_FSN1_ID).update(visible: false, project_id: project.id)
         click_button "Create"
@@ -391,7 +391,7 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
 
         fill_in "Name", with: "cannotcreate"
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
 

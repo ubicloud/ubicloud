@@ -39,7 +39,7 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
     has_option = ["radio_small_cards", "select", "checkbox"].include?(type)
     options = OptionTreeGenerator.generate_allowed_options(name, option_tree, option_parents).map do |option|
       opt_val = if option[name].is_a?(Sequel::Model)
-        option[name].id
+        option[name].ubid
       elsif type == "select"
         option[name][:value]
       else
@@ -48,7 +48,7 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
 
       opt_text = content_generator.call(*option.values)
 
-      parents = option.reject { |k, v| k == name }.transform_values { |v| v.is_a?(Sequel::Model) ? v.id : v }
+      parents = option.reject { |k, v| k == name }.transform_values { |v| v.is_a?(Sequel::Model) ? v.ubid : v }
 
       parents_selected = parents.all? { |k, v| selected_options[k] == v }
       submitted_value = flash.dig("old", name)
