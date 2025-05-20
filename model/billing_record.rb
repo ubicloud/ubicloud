@@ -33,8 +33,9 @@ class BillingRecord < Sequel::Model
     (duration_end - duration_begin) / 60
   end
 
+  CURRENT_SPAN = Sequel.lit("tstzrange(lower(span), now())").freeze
   def finalize
-    self.class.where(id: id).update(span: Sequel.lit("tstzrange(lower(span), now())"))
+    this.update(span: CURRENT_SPAN)
   end
 
   def billing_rate
