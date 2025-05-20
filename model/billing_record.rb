@@ -6,9 +6,7 @@ class BillingRecord < Sequel::Model
   many_to_one :project
 
   dataset_module do
-    def active
-      where { {Sequel.function(:upper, :span) => nil} }
-    end
+    where(:active, Sequel.function(:upper, :span) => nil)
   end
 
   include ResourceMethods
