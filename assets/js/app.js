@@ -540,10 +540,10 @@ function setupInitialChartOptions(chartInstance) {
 
         // Build the tooltip HTML
         let html = `<strong>${isoDate}</strong><br/>`;
-        params.forEach((item, idx) => {
+        params.forEach((item) => {
           const value = unitFormatter(chartInstance.unit, 2)(item.value[1]);
           // Use the series color for the marker
-          const colorClass = colorPalette[idx % colorPalette.length].class;
+          const colorClass = colorPalette[item.componentIndex % colorPalette.length].class;
           html += `
             <span class="text-${colorClass} text-right">● ${item.seriesName}</span><span class="ml-2">${value}<br/></span>
           `;
