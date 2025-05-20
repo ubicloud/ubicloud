@@ -323,7 +323,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
         }])
         expect(json_sent["locations"].map { |h| h.transform_keys(&:to_sym) }).to eq([
           {name: "up", path: "^/up$", app: "up"},
-          {name: "inference", path: "^/v1/(chat/)?completions$", app: "inference"},
+          {name: "inference", path: "^/v1/(chat/completions|completions|embeddings)$", app: "inference"},
           {name: "usage", path: "^/usage$", app: "usage"}
         ])
         expect(json_sent["routes"].map { |h| h.transform_keys(&:to_sym).except(:endpoints) }).to eq([{
@@ -384,7 +384,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       expect(inference_router).to receive(:ubid).and_return("irubid")
       expect(sshable).to receive(:cmd).with(
         "md5sum /ir/workdir/config.json | awk '{ print $1 }'"
-      ).and_return("4569f48e2c010e208e6b11af2a40d9d5") # md5sum of the test config.
+      ).and_return("dd8a549def177e5a6cbedeb511b55208") # md5sum of the test config.
       expect(sshable).not_to receive(:cmd).with(
         "sudo mkdir -p /ir/workdir && sudo tee /ir/workdir/config.json > /dev/null",
         hash_including(stdin: a_string_matching(/"projects":/))

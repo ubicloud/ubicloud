@@ -33,7 +33,7 @@
     },
     {
       "name": "inference",
-      "path": "^/v1/(chat/)?completions$",
+      "path": "^/v1/(chat/completions|completions|embeddings)$",
       "app": "inference"
     },
     {
