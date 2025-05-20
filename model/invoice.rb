@@ -10,7 +10,7 @@ require "stripe"
 class Invoice < Sequel::Model
   many_to_one :project
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   def path
     "/invoice/#{id ? ubid : "current"}"

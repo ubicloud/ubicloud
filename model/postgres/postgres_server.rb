@@ -13,7 +13,7 @@ class PostgresServer < Sequel::Model
 
   plugin :association_dependencies, lsn_monitor: :destroy
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
   include HealthMonitorMethods
   include MetricsTargetMethods

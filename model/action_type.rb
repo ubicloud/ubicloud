@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class ActionType < Sequel::Model
-  include ResourceMethods
+  plugin ResourceMethods
 
   plugin :static_cache
 

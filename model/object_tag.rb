@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class ObjectTag < Sequel::Model
-  include ResourceMethods
+  plugin ResourceMethods
   include AccessControlModelTag
 
   module Cleanup

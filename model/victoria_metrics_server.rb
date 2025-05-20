@@ -7,7 +7,7 @@ class VictoriaMetricsServer < Sequel::Model
   many_to_one :vm
   many_to_one :resource, class: :VictoriaMetricsResource, key: :victoria_metrics_resource_id
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
   include HealthMonitorMethods
 

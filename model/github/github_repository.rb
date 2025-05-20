@@ -12,7 +12,7 @@ class GithubRepository < Sequel::Model
 
   plugin :association_dependencies, cache_entries: :destroy
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
 
   semaphore :destroy

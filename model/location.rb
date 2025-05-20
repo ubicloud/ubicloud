@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class Location < Sequel::Model
-  include ResourceMethods
+  plugin ResourceMethods
   dataset_module Pagination
 
   one_to_one :location_credential, key: :id

@@ -35,7 +35,7 @@ class Project < Sequel::Model
   plugin :association_dependencies, accounts: :nullify, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy, access_control_entries: :destroy, subject_tags: :destroy, action_tags: :destroy, object_tags: :destroy,
     locations: :destroy
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   def has_valid_payment_method?
     return true unless Config.stripe_secret_key

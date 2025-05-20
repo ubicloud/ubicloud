@@ -19,7 +19,7 @@ class PostgresResource < Sequel::Model
   plugin :association_dependencies, firewall_rules: :destroy, metric_destinations: :destroy
   dataset_module Pagination
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
   include ObjectTag::Cleanup
 

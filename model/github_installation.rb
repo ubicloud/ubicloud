@@ -8,7 +8,7 @@ class GithubInstallation < Sequel::Model
   one_to_many :repositories, key: :installation_id, class: :GithubRepository
   many_to_many :cache_entries, join_table: :github_repository, right_key: :id, right_primary_key: :repository_id, left_key: :installation_id, class: :GithubCacheEntry
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   def total_active_runner_vcpus
     runners_dataset.total_active_runner_vcpus

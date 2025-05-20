@@ -6,7 +6,7 @@ class InferenceRouterModel < Sequel::Model
   one_to_many :inference_router_targets
   one_through_one :inference_router, join_table: :inference_router_target
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   def self.from_model_name(name)
     first(model_name: name)

@@ -3,7 +3,7 @@
 require_relative "../../model"
 
 class DnsRecord < Sequel::Model
-  include ResourceMethods
+  plugin ResourceMethods
 end
 
 # Table: dns_record

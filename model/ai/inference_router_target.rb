@@ -7,7 +7,7 @@ class InferenceRouterTarget < Sequel::Model
   many_to_one :inference_router
   many_to_one :inference_router_model
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
 
   semaphore :destroy

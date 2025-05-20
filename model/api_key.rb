@@ -5,7 +5,7 @@ require_relative "../model"
 class ApiKey < Sequel::Model
   many_to_one :project
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SubjectTag::Cleanup # personal access tokens
   include ObjectTag::Cleanup # inference tokens
 

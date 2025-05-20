@@ -18,7 +18,7 @@ class LoadBalancer < Sequel::Model
 
   plugin :association_dependencies, load_balancers_vms: :destroy, ports: :destroy, certs_load_balancers: :destroy
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
   include ObjectTag::Cleanup
   dataset_module Pagination

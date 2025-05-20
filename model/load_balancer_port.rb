@@ -4,7 +4,7 @@ require_relative "../model"
 
 class LoadBalancerPort < Sequel::Model
   many_to_one :load_balancer
-  include ResourceMethods
+  plugin ResourceMethods
   include HealthMonitorMethods
 end
 

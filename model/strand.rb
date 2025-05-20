@@ -13,7 +13,7 @@ class Strand < Sequel::Model
   one_to_many :children, key: :parent_id, class: self
   one_to_many :semaphores
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   def subject
     return @subject if defined?(@subject)

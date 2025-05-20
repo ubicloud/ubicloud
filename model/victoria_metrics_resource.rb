@@ -9,7 +9,7 @@ class VictoriaMetricsResource < Sequel::Model
   one_to_many :servers, class: :VictoriaMetricsServer, key: :victoria_metrics_resource_id
   many_to_one :private_subnet
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
 
   semaphore :destroy, :reconfigure
