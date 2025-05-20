@@ -16,7 +16,7 @@ class DnsZone < Sequel::Model
 
   def insert_record(record_name:, type:, ttl:, data:)
     record_name = add_dot_if_missing(record_name)
-    DnsRecord.create_with_id(dns_zone_id: id, name: record_name, type: type, ttl: ttl, data: data)
+    add_record(name: record_name, type:, ttl:, data:)
 
     incr_refresh_dns_servers
   end
@@ -26,8 +26,8 @@ class DnsZone < Sequel::Model
 
     record_name = add_dot_if_missing(record_name)
     records = records_dataset.where(name: record_name, tombstoned: false)
-    records = records.where(type: type) if type
-    records = records.where(data: data) if data
+    records = records.where(type:) if type
+    records = records.where(data:) if data
 
     DB[:dns_record].import(
       [:id, :dns_zone_id, :name, :type, :ttl, :data, :tombstoned],
