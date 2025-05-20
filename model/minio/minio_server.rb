@@ -11,7 +11,7 @@ class MinioServer < Sequel::Model
   many_to_one :pool, key: :minio_pool_id, class: :MinioPool
   one_through_one :cluster, join_table: :minio_pool, left_primary_key: :minio_pool_id, left_key: :id, class: :MinioCluster
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
   include HealthMonitorMethods
 

@@ -5,11 +5,7 @@ require_relative "../model"
 class CertsLoadBalancers < Sequel::Model
   many_to_one :cert
 
-  def self.ubid_type
-    UBID::TYPE_ETC
-  end
-
-  include ResourceMethods
+  plugin ResourceMethods, etc_type: true
 
   def destroy
     DB.transaction do

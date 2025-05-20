@@ -12,7 +12,7 @@ class VmStorageVolume < Sequel::Model
 
   plugin :association_dependencies, key_encryption_key_1: :destroy, key_encryption_key_2: :destroy
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   def device_id
     "#{vm.inhost_name}_#{disk_index}"

@@ -4,7 +4,7 @@ require_relative "../model"
 require "aws-sdk-ec2"
 
 class LocationCredential < Sequel::Model
-  include ResourceMethods
+  plugin ResourceMethods
   many_to_one :project
   many_to_one :location, key: :id
   plugin :column_encryption do |enc|

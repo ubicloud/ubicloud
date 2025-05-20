@@ -6,7 +6,7 @@ require "stripe"
 class PaymentMethod < Sequel::Model
   many_to_one :billing_info
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   def stripe_data
     if (Stripe.api_key = Config.stripe_secret_key)

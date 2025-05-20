@@ -23,7 +23,7 @@ class Page < Sequel::Model
   end
 
   include SemaphoreMethods
-  include ResourceMethods
+  plugin ResourceMethods
   semaphore :resolve
 
   def pagerduty_client

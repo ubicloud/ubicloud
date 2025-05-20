@@ -9,7 +9,7 @@ class Cert < Sequel::Model
 
   plugin :association_dependencies, certs_load_balancers: :destroy
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
   semaphore :destroy, :restarted
 

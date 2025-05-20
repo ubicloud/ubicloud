@@ -9,7 +9,7 @@ class GithubCacheEntry < Sequel::Model
 
   many_to_one :repository, key: :repository_id, class: :GithubRepository
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   dataset_module do
     # The same as Dataset#destroy, except that it adds the given condition

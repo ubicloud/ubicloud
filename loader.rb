@@ -218,6 +218,8 @@ def clover_freeze
     Prog::Vnet::RekeyNicTunnel::Xfrm,
     ResourceMethods,
     ResourceMethods::ClassMethods,
+    ResourceMethods::InstanceMethods,
+    ResourceMethods::UbidTypeEtcMethods,
     Scheduling,
     Scheduling::Allocator,
     Scheduling::Allocator::Allocation,

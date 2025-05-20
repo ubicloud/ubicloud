@@ -52,7 +52,7 @@ class PrivateSubnet < Sequel::Model
     "/location/#{display_location}/private-subnet/#{name}"
   end
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   def self.ubid_to_name(ubid)
     ubid.to_s[0..7]
