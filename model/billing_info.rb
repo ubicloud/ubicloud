@@ -50,10 +50,10 @@ class BillingInfo < Sequel::Model
 
   def validate_vat
     response = Excon.get("https://ec.europa.eu/taxation_customs/vies/rest-api/ms/#{stripe_data["country"]}/vat/#{stripe_data["tax_id"]}", expects: 200)
-    status = JSON.parse(response.body)["userError"]
-    if status == "VALID"
+    case (status = JSON.parse(response.body)["userError"])
+    when "VALID"
       true
-    elsif status == "INVALID" || status == "INVALID_INPUT"
+    when "INVALID", "INVALID_INPUT"
       false
     else
       fail "Unexpected response from VAT service: #{status}"
