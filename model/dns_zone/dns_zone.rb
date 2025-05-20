@@ -66,10 +66,11 @@ class DnsZone < Sequel::Model
         .having { count.function.* =~ dns_server_ids.count }.all
 
       records_to_purge = obsoleted_records + seen_tombstoned_records
-      DB[:seen_dns_records_by_dns_servers].where(dns_record_id: records_to_purge.map(&:id).uniq).delete(force: true)
-      records_to_purge.uniq(&:id).map(&:destroy)
+      records_to_purge.uniq!(&:id)
+      DB[:seen_dns_records_by_dns_servers].where(dns_record_id: records_to_purge.map(&:id)).delete(force: true)
+      records_to_purge.each(&:destroy)
 
-      update(last_purged_at: Time.now)
+      this.update(last_purged_at: Sequel::CURRENT_TIMESTAMP)
     end
   end
 
