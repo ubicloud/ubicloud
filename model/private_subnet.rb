@@ -37,11 +37,9 @@ class PrivateSubnet < Sequel::Model
     nics + connected_subnets.flat_map(&:nics)
   end
 
-  def destroy
-    DB.transaction do
-      FirewallsPrivateSubnets.where(private_subnet_id: id).all.each(&:destroy)
-      super
-    end
+  def before_destroy
+    FirewallsPrivateSubnets.where(private_subnet_id: id).destroy
+    super
   end
 
   def display_location
