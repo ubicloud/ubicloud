@@ -7,11 +7,9 @@ class CertsLoadBalancers < Sequel::Model
 
   plugin ResourceMethods, etc_type: true
 
-  def destroy
-    DB.transaction do
-      cert.incr_destroy
-      super
-    end
+  def before_destroy
+    cert.incr_destroy
+    super
   end
 end
 
