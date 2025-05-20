@@ -35,7 +35,7 @@ class Account < Sequel::Model(:accounts)
     update(suspended_at: Time.now)
     DB[:account_active_session_keys].where(account_id: id).delete(force: true)
 
-    projects.each { it.billing_info&.payment_methods_dataset&.update(fraud: true) }
+    PaymentMethod.where(billing_info_id: projects_dataset.select(:billing_info_id)).update(fraud: true)
   end
 end
 
