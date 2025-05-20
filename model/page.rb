@@ -7,9 +7,7 @@ require "openssl"
 
 class Page < Sequel::Model
   dataset_module do
-    def active
-      where(resolved_at: nil)
-    end
+    where :active, resolved_at: nil
   end
 
   # This cannot be covered, as the current coverage tests run without freezing models.
