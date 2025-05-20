@@ -8,6 +8,8 @@ require "prawn/table"
 require "stripe"
 
 class Invoice < Sequel::Model
+  unrestrict_primary_key
+
   many_to_one :project
 
   plugin ResourceMethods
@@ -292,8 +294,6 @@ class Invoice < Sequel::Model
     )
   end
 end
-
-Invoice.unrestrict_primary_key
 
 # Table: invoice
 # Columns:
