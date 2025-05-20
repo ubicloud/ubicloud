@@ -4,7 +4,7 @@ require "net/ssh"
 require_relative "../model"
 
 class Sshable < Sequel::Model
-  include ResourceMethods
+  plugin ResourceMethods
 
   plugin :column_encryption do |enc|
     enc.column :raw_private_key_1

@@ -9,7 +9,7 @@ class GithubRunner < Sequel::Model
   many_to_one :repository, key: :repository_id, class: :GithubRepository
   one_to_one :vm, key: :id, primary_key: :vm_id
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
   include HealthMonitorMethods
   semaphore :destroy, :skip_deregistration

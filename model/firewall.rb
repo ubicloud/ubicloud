@@ -9,7 +9,7 @@ class Firewall < Sequel::Model
   many_to_one :location
   plugin :association_dependencies, firewall_rules: :destroy
 
-  include ResourceMethods
+  plugin ResourceMethods
   include ObjectTag::Cleanup
 
   dataset_module Pagination

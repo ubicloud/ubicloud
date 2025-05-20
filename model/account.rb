@@ -10,7 +10,7 @@ class Account < Sequel::Model(:accounts)
 
   plugin :association_dependencies, usage_alerts: :destroy, projects: :nullify
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SubjectTag::Cleanup
 
   def create_project_with_default_policy(name, default_policy: true)

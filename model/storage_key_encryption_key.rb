@@ -8,7 +8,7 @@ class StorageKeyEncryptionKey < Sequel::Model
     enc.column :init_vector
   end
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   def secret_key_material_hash
     # default to_hash doesn't decrypt encrypted columns, so implement

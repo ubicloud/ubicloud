@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class SubjectTag < Sequel::Model
-  include ResourceMethods
+  plugin ResourceMethods
   include AccessControlModelTag
 
   module Cleanup

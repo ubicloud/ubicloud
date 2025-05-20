@@ -6,7 +6,7 @@ class DnsServer < Sequel::Model
   many_to_many :dns_zones
   many_to_many :vms
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   def run_commands_on_all_vms(commands)
     vms.each do |vm|

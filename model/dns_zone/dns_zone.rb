@@ -9,7 +9,7 @@ class DnsZone < Sequel::Model
   one_to_many :records, class: :DnsRecord
   one_to_one :active_billing_record, class: :BillingRecord, key: :resource_id, &:active
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
 
   semaphore :refresh_dns_servers

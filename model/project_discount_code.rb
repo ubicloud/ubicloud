@@ -6,7 +6,7 @@ class ProjectDiscountCode < Sequel::Model
   many_to_one :project
   many_to_one :discount_code
 
-  include ResourceMethods
+  plugin ResourceMethods
 end
 
 # Table: project_discount_code

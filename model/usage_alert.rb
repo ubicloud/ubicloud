@@ -6,7 +6,7 @@ class UsageAlert < Sequel::Model
   many_to_one :project
   many_to_one :user, class: :Account, key: :user_id
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   def trigger
     send_email

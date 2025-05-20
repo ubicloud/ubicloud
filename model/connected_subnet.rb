@@ -3,11 +3,7 @@
 require_relative "../model"
 
 class ConnectedSubnet < Sequel::Model
-  def self.ubid_type
-    UBID::TYPE_ETC
-  end
-
-  include ResourceMethods
+  plugin ResourceMethods, etc_type: true
 end
 
 # Table: connected_subnet

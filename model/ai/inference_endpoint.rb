@@ -12,7 +12,7 @@ class InferenceEndpoint < Sequel::Model
 
   dataset_module Pagination
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
   include ObjectTag::Cleanup
 

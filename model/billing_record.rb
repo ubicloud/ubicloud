@@ -9,7 +9,7 @@ class BillingRecord < Sequel::Model
     where(:active, Sequel.function(:upper, :span) => nil)
   end
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   def duration(begin_time, end_time)
     # Billing logic differs based on the resource type: some are billed by duration, others

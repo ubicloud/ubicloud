@@ -6,7 +6,7 @@ class VmPool < Sequel::Model
   one_to_one :strand, key: :id
   one_to_many :vms, key: :pool_id
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   include SemaphoreMethods
   semaphore :destroy
