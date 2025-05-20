@@ -7,7 +7,7 @@ class DnsZone < Sequel::Model
   many_to_one :project
   many_to_many :dns_servers
   one_to_many :records, class: :DnsRecord
-  one_to_one :active_billing_record, class: :BillingRecord, key: :resource_id do |ds| ds.active end
+  one_to_one :active_billing_record, class: :BillingRecord, key: :resource_id, &:active
 
   include ResourceMethods
   include SemaphoreMethods
