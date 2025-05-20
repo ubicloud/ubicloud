@@ -17,9 +17,7 @@ class ApiKey < Sequel::Model
     SecureRandom.alphanumeric(32)
   end
 
-  def name
-    ubid
-  end
+  alias_method :name, :ubid
 
   def self.create_personal_access_token(account, project:)
     create(owner_table: "accounts", owner_id: account.id, used_for: "api", project_id: project.id)
