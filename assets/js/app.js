@@ -562,7 +562,7 @@ function setupInitialChartOptions(chartInstance) {
       type: 'value',
       axisLabel: {
         formatter: unitFormatter(chartInstance.unit),
-        showMaxLabel: false
+        showMaxLabel: chartInstance.unit === "%"
       },
       min: 0,
       max: (chartInstance.unit === "%") ? 100 : function (value) {
