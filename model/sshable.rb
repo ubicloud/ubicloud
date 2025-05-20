@@ -4,6 +4,10 @@ require "net/ssh"
 require_relative "../model"
 
 class Sshable < Sequel::Model
+  # We need to unrestrict primary key so Sshable.new(...).save_changes works
+  # in sshable_spec.rb.
+  unrestrict_primary_key
+
   plugin ResourceMethods
 
   plugin :column_encryption do |enc|
@@ -179,10 +183,6 @@ class Sshable < Sequel::Model
     end
   end
 end
-
-# We need to unrestrict primary key so Sshable.new(...).save_changes works
-# in sshable_spec.rb.
-Sshable.unrestrict_primary_key
 
 # Table: sshable
 # Columns:

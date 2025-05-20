@@ -5,6 +5,9 @@ require_relative "../model"
 require "time"
 
 class Strand < Sequel::Model
+  # We need to unrestrict primary key so strand.add_child works in Prog::Base.
+  unrestrict_primary_key
+
   Strand.plugin :defaults_setter, cache: true
   Strand.default_values[:stack] = proc { [{}] }
 
@@ -216,9 +219,6 @@ SQL
     end
   end
 end
-
-# We need to unrestrict primary key so strand.add_child works in Prog::Base.
-Strand.unrestrict_primary_key
 
 # Table: strand
 # Columns:
