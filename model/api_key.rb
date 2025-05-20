@@ -51,7 +51,7 @@ class ApiKey < Sequel::Model
   end
 
   def rotate
-    new_key = SecureRandom.alphanumeric(32)
+    new_key = ApiKey.random_key
     update(key: new_key, updated_at: Time.now)
   end
 
