@@ -145,9 +145,12 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     decr_upgrade
 
     node_to_upgrade = kubernetes_cluster.cp_vms.find do |vm|
-      # TODO: Put another check here to make sure the version we receive is either one version old or the correct version, just in case
       vm_version = kubernetes_cluster.client(session: vm.sshable.start_fresh_session).version
-      vm_version != kubernetes_cluster.version
+      vm_minor_version = vm_version.match(/^v\d+\.(\d+)$/)&.captures&.first&.to_i
+      cluster_minor_version = kubernetes_cluster.version.match(/^v\d+\.(\d+)$/)&.captures&.first&.to_i
+
+      next false unless vm_minor_version && cluster_minor_version
+      vm_minor_version == cluster_minor_version - 1
     end
 
     hop_wait unless node_to_upgrade
