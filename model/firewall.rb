@@ -24,12 +24,12 @@ class Firewall < Sequel::Model
 
   def remove_firewall_rule(firewall_rule)
     firewall_rules_dataset.where(id: firewall_rule.id).destroy
-    private_subnets.map(&:incr_update_firewall_rules)
+    update_private_subnet_firewall_rules
   end
 
   def insert_firewall_rule(cidr, port_range)
     fwr = add_firewall_rule(cidr:, port_range:)
-    private_subnets.each(&:incr_update_firewall_rules)
+    update_private_subnet_firewall_rules
     fwr
   end
 
@@ -39,11 +39,11 @@ class Firewall < Sequel::Model
       add_firewall_rule(it)
     end
 
-    private_subnets.each(&:incr_update_firewall_rules)
+    update_private_subnet_firewall_rules
   end
 
   def before_destroy
-    private_subnets.each(&:incr_update_firewall_rules)
+    update_private_subnet_firewall_rules
     remove_all_private_subnets
     super
   end
@@ -56,6 +56,12 @@ class Firewall < Sequel::Model
   def disassociate_from_private_subnet(private_subnet, apply_firewalls: true)
     remove_private_subnet(private_subnet)
     private_subnet.incr_update_firewall_rules if apply_firewalls
+  end
+
+  private
+
+  def update_private_subnet_firewall_rules
+    private_subnets.each(&:incr_update_firewall_rules)
   end
 end
 
