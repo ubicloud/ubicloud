@@ -23,7 +23,7 @@ class Firewall < Sequel::Model
   end
 
   def remove_firewall_rule(firewall_rule)
-    firewall_rule.destroy
+    firewall_rules_dataset.where(id: firewall_rule.id).destroy
     private_subnets.map(&:incr_update_firewall_rules)
   end
 
