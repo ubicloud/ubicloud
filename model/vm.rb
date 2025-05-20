@@ -69,9 +69,10 @@ class Vm < Sequel::Model
   end
 
   def display_state
-    return "deleting" if destroy_set? || strand&.label == "destroy"
-    return "restarting" if restart_set? || strand&.label == "restart"
-    return "stopped" if stop_set? || strand&.label == "stopped"
+    label = strand&.label
+    return "deleting" if destroy_set? || label == "destroy"
+    return "restarting" if restart_set? || label == "restart"
+    return "stopped" if stop_set? || label == "stopped"
     if waiting_for_capacity_set?
       return "no capacity available" if Time.now - created_at > 15 * 60
       return "waiting for capacity"
