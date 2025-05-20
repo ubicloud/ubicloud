@@ -3,10 +3,10 @@
 require_relative "../model"
 
 class ProjectInvitation < Sequel::Model
+  unrestrict_primary_key
+
   many_to_one :project
 end
-
-ProjectInvitation.unrestrict_primary_key
 
 # Table: project_invitation
 # Primary Key: (project_id, email)
