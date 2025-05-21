@@ -126,13 +126,12 @@ class LoadBalancer < Sequel::Model
 
   def need_certificates?
     return false unless cert_enabled_lb?
-    return true if certs_dataset.empty?
 
-    certs_dataset.where { created_at > Time.now - 60 * 60 * 24 * 30 * 2 }.exclude(cert: nil).empty?
+    certs_dataset.with_cert.needing_recert.empty?
   end
 
   def active_cert
-    certs_dataset.where { created_at > Time.now - 60 * 60 * 24 * 30 * 3 }.exclude(cert: nil).order(Sequel.desc(:created_at)).first
+    certs_dataset.with_cert.active.by_most_recent.first
   end
 
   def ipv4_enabled?
