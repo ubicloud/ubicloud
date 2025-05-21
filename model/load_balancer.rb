@@ -46,7 +46,7 @@ class LoadBalancer < Sequel::Model
 
   def add_port(src_port, dst_port)
     DB.transaction do
-      port = LoadBalancerPort.create(load_balancer_id: id, src_port:, dst_port:)
+      port = super(src_port:, dst_port:)
       load_balancers_vms.each do |lb_vm|
         LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: lb_vm.id)
       end
