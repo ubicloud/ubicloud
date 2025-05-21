@@ -38,8 +38,7 @@ class Page < Sequel::Model
       links << {href: Config.pagerduty_log_link.gsub("<ubid>", ubid), text: "View #{ubid} Logs"} if Config.pagerduty_log_link
     end
 
-    incident = pagerduty_client.incident(OpenSSL::HMAC.hexdigest("SHA256", "ubicloud-page-key", tag))
-    incident.trigger(summary: summary, severity: severity, source: "clover", custom_details: details, links: links)
+    pagerduty_incident.trigger(summary:, severity:, source: "clover", custom_details: details, links:)
   end
 
   def resolve
@@ -47,8 +46,7 @@ class Page < Sequel::Model
 
     return unless Config.pagerduty_key
 
-    incident = pagerduty_client.incident(OpenSSL::HMAC.hexdigest("SHA256", "ubicloud-page-key", tag))
-    incident.resolve
+    pagerduty_incident.resolve
   end
 
   def self.generate_tag(*tag_parts)
@@ -58,6 +56,12 @@ class Page < Sequel::Model
   def self.from_tag_parts(*tag_parts)
     tag = Page.generate_tag(tag_parts)
     Page.active.where(tag: tag).first
+  end
+
+  private
+
+  def pagerduty_incident
+    pagerduty_client.incident(OpenSSL::HMAC.hexdigest("SHA256", "ubicloud-page-key", tag))
   end
 end
 
