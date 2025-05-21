@@ -76,8 +76,10 @@ host    replication     all             ::1/128                 scram-sha-256
 # HA standbys
 hostssl replication     ubi_replication all                     cert map=standby2replication
 
-# Allow connections from public internet with SCRAM authentication
-host    all             all             all                     scram-sha-256
+# Allow connections from public internet with md5 authentication
+# Note that if the password is encrypted as scram-sha-256, PostgreSQL
+# still uses scram-sha-256 for authentication.
+host    all             all             all                     md5
 PG_HBA
 safe_write_to_file("/etc/postgresql/#{v}/main/pg_hba.conf", pg_hba_entries)
 
