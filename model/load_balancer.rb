@@ -53,7 +53,7 @@ class LoadBalancer < Sequel::Model
   def remove_port(port)
     DB.transaction do
       vm_ports_dataset.where(load_balancer_port_id: port.id).destroy
-      port.destroy
+      ports_dataset.where(id: port.id).destroy
       incr_update_load_balancer
     end
   end
@@ -98,7 +98,7 @@ class LoadBalancer < Sequel::Model
 
   def remove_vm_port(vm_port)
     DB.transaction do
-      LoadBalancerVmPort.where(id: vm_port.id).destroy
+      vm_ports_dataset.where(Sequel[:load_balancer_vm_port][:id] => vm_port.id).destroy
       if vm_ports_dataset.where(load_balancer_vm_id: vm_port.load_balancer_vm_id).count.zero?
         load_balancers_vms_dataset[id: vm_port.load_balancer_vm_id].destroy
       end
