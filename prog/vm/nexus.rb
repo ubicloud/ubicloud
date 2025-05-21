@@ -310,7 +310,7 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   def write_params_json
-    host.sshable.cmd("sudo -u #{q_vm} tee #{params_path.shellescape}",
+    host.sshable.cmd("sudo -u #{q_vm} tee #{params_path.shellescape} > /dev/null",
       stdin: vm.params_json(**frame.slice("swap_size_bytes", "hugepages", "ch_version", "firmware_version").transform_keys!(&:to_sym)))
   end
 
