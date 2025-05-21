@@ -181,7 +181,7 @@ GEM
       rake
     fiddle (1.1.6)
     foreman (0.88.1)
-    hashdiff (1.1.2)
+    hashdiff (1.2.0)
     hashery (2.1.2)
     hashie (5.0.0)
     i18n (1.14.7)
@@ -307,7 +307,7 @@ GEM
     rack-unreloader (2.1.0)
     rackup (2.2.1)
       rack (>= 3)
-    rails-dom-testing (2.2.0)
+    rails-dom-testing (2.3.0)
       activesupport (>= 5.0.0)
       minitest
       nokogiri (>= 1.6)
@@ -341,7 +341,7 @@ GEM
       diff-lcs (>= 1.2.0, < 2.0)
       rspec-support (~> 3.13.0)
     rspec-support (3.13.3)
-    rubocop (1.75.5)
+    rubocop (1.75.6)
       json (~> 2.3)
       language_server-protocol (~> 3.17.0.2)
       lint_roller (~> 1.1.0)
