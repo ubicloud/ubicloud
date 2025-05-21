@@ -180,7 +180,8 @@ RSpec.describe Prog::Vm::HostNexus do
         Prog::LearnPci,
         Prog::InstallDnsmasq,
         Prog::SetupSysstat,
-        Prog::SetupNftables
+        Prog::SetupNftables,
+        Prog::SetupNodeExporter
       ])
     end
 
