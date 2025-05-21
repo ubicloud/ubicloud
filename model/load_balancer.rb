@@ -115,6 +115,7 @@ class LoadBalancer < Sequel::Model
   end
 
   def need_certificates?
+    return false unless health_check_protocol == "https"
     return true if certs_dataset.empty?
 
     certs_dataset.where { created_at > Time.now - 60 * 60 * 24 * 30 * 2 }.exclude(cert: nil).empty?
