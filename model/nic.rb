@@ -34,7 +34,7 @@ class Nic < Sequel::Model
   end
 
   def unlock
-    Semaphore.where(strand_id: strand.id, name: "lock").delete(force: true)
+    Semaphore.where(strand_id: id, name: "lock").delete(force: true)
   end
 end
 
