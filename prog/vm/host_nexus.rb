@@ -87,6 +87,7 @@ class Prog::Vm::HostNexus < Prog::Base
     bud Prog::InstallDnsmasq
     bud Prog::SetupSysstat
     bud Prog::SetupNftables
+    bud Prog::SetupNodeExporter
     hop_wait_prep
   end
 
