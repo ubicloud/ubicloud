@@ -6,7 +6,7 @@ RSpec.describe LoadBalancer do
   subject(:lb) {
     prj = Project.create_with_id(name: "test-prj")
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps")
-    Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080).subject
+    Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080, health_check_protocol: "https").subject
   }
 
   let(:vm1) {
@@ -183,6 +183,13 @@ RSpec.describe LoadBalancer do
       cert = Prog::Vnet::CertNexus.assemble(lb.hostname, dns_zone.id).subject
       lb.add_cert(cert)
       expect(lb.need_certificates?).to be(true)
+    end
+
+    it "returns false if health_check_protocol is not https" do
+      lb.update(health_check_protocol: "http")
+      expect(lb.need_certificates?).to be(false)
+      lb.update(health_check_protocol: "tcp")
+      expect(lb.need_certificates?).to be(false)
     end
   end
 
