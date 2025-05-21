@@ -42,7 +42,7 @@ class Page < Sequel::Model
   end
 
   def resolve
-    update(resolved_at: Time.now)
+    this.update(resolved_at: Sequel::CURRENT_TIMESTAMP)
 
     return unless Config.pagerduty_key
 
