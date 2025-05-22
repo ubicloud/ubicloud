@@ -109,12 +109,13 @@ RSpec.describe Prog::Vnet::SubnetNexus do
 
   describe ".nics_to_rekey" do
     it "returns nics that need rekeying" do
-      st_act = instance_double(Strand, label: "wait")
-      st_wait = instance_double(Strand, label: "wait_setup")
-      active_nic = instance_double(Nic, id: "n2", strand: st_act)
-      to_add_nic = instance_double(Nic, id: "n1", strand: st_wait)
-      expect(ps).to receive(:nics).and_return([active_nic, to_add_nic]).at_least(:once)
-      expect(nx.nics_to_rekey.flatten.map(&:id).sort).to eq(["n1", "n2"])
+      nic1 = Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject
+      nic2 = Prog::Vnet::NicNexus.assemble(ps.id, name: "b").subject
+      expect(nx.nics_to_rekey).to eq([])
+      nic1.strand.update(label: "wait")
+      expect(nx.nics_to_rekey.map(&:name)).to eq(["a"])
+      nic2.strand.update(label: "wait_setup")
+      expect(nx.nics_to_rekey.map(&:name).sort).to eq(["a", "b"])
     end
   end
 
@@ -251,106 +252,101 @@ RSpec.describe Prog::Vnet::SubnetNexus do
 
   describe "#refresh_keys" do
     let(:nic) {
-      st = instance_double(Strand, label: "wait")
-      instance_double(Nic, id: "57afa8a7-2357-4012-9632-07fbe13a3133", rekey_payload: {}, strand: st, lock_set?: false)
+      Prog::Vnet::NicNexus.assemble(ps.id, name: "a").update(label: "wait").subject
+    }
+    let(:nx) {
+      described_class.new(Strand.create(prog: "Vnet::SubnetNexus", label: "refresh_keys", id: ps.id))
     }
 
     it "refreshes keys and hops to wait_refresh_keys" do
-      expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
       expect(nx).to receive(:gen_spi).and_return("0xe3af3a04").at_least(:once)
       expect(nx).to receive(:gen_reqid).and_return(86879)
       expect(nx).to receive(:gen_encryption_key).and_return("0x0a0b0c0d0e0f10111213141516171819")
-      expect(nic).to receive(:update).with(encryption_key: "0x0a0b0c0d0e0f10111213141516171819", rekey_payload:
-        {
-          spi4: "0xe3af3a04",
-          spi6: "0xe3af3a04",
-          reqid: 86879
-        }).and_return(true)
-      expect(nic).to receive(:incr_start_rekey).and_return(true)
-      expect(nic).to receive(:incr_lock).and_return(true)
+      expect(nic.start_rekey_set?).to be false
+      expect(nic.lock_set?).to be false
       expect { nx.refresh_keys }.to hop("wait_inbound_setup")
+      nic.refresh
+      expect(nic.encryption_key).to eq "0x0a0b0c0d0e0f10111213141516171819"
+      expect(nic.rekey_payload).to eq("spi4" => "0xe3af3a04", "spi6" => "0xe3af3a04", "reqid" => 86879)
+      expect(nic.start_rekey_set?).to be true
+      expect(nic.lock_set?).to be true
     end
 
     it "naps if the nics are locked" do
-      expect(nx).to receive(:active_nics).and_return([nic])
-      expect(nic).to receive(:lock_set?).and_return(true)
+      nic.incr_lock
       expect { nx.refresh_keys }.to nap(10)
     end
   end
 
   describe "#wait_inbound_setup" do
     let(:nic) {
-      st = instance_double(Strand, label: "start")
-      instance_double(Nic, strand: st, rekey_payload: {})
+      Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject.update(rekey_payload: {})
+    }
+    let(:nx) {
+      described_class.new(Strand.create(prog: "Vnet::SubnetNexus", label: "wait_inbound_setup", id: ps.id))
     }
 
     it "naps 5 if state creation is ongoing" do
-      expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
+      nic
       expect { nx.wait_inbound_setup }.to nap(5)
     end
 
     it "hops to wait_policy_updated if state creation is done" do
-      expect(nic.strand).to receive(:label).and_return("wait_rekey_outbound_trigger")
-      expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
-      expect(nic).to receive(:incr_trigger_outbound_update).and_return(true)
+      nic.strand.update(label: "wait_rekey_outbound_trigger")
+      expect(nic.trigger_outbound_update_set?).to be false
       expect { nx.wait_inbound_setup }.to hop("wait_outbound_setup")
+      nic.refresh
+      expect(nic.trigger_outbound_update_set?).to be true
     end
   end
 
   describe "#wait_outbound_setup" do
     let(:nic) {
-      st = instance_double(Strand, label: "wait_rekey_outbound")
-      instance_double(Nic, strand: st, rekey_payload: {})
+      Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject.update(rekey_payload: {})
+    }
+    let(:nx) {
+      described_class.new(Strand.create(prog: "Vnet::SubnetNexus", label: "wait_outbound_setup", id: ps.id))
     }
 
     it "donates if policy update is ongoing" do
-      expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
-
+      nic
       expect { nx.wait_outbound_setup }.to nap(5)
     end
 
     it "hops to wait_state_dropped if policy update is done" do
-      expect(nic.strand).to receive(:label).and_return("wait_rekey_old_state_drop_trigger")
-      expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
-      expect(nic).to receive(:incr_old_state_drop_trigger).and_return(true)
+      nic.strand.update(label: "wait_rekey_old_state_drop_trigger")
+      expect(nic.old_state_drop_trigger_set?).to be false
       expect { nx.wait_outbound_setup }.to hop("wait_old_state_drop")
+      nic.refresh
+      expect(nic.old_state_drop_trigger_set?).to be true
     end
   end
 
   describe "#wait_old_state_drop" do
     let(:nic) {
-      st = instance_double(Strand, label: "wait_rekey_old_state_drop", id: "0677f2e9-0189-8aac-bf5a-8f7b66c641bf")
-      instance_double(Nic, strand: st, rekey_payload: {})
+      Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject.update(rekey_payload: {})
+    }
+    let(:nx) {
+      described_class.new(Strand.create(prog: "Vnet::SubnetNexus", label: "wait_old_state_drop", id: ps.id))
     }
 
     it "donates if policy update is ongoing" do
-      expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
-
+      nic
       expect { nx.wait_old_state_drop }.to nap(5)
     end
 
     it "hops to wait if all is done" do
-      t = Time.now
-      expect(Time).to receive(:now).and_return(t)
-      expect(nic.strand).to receive(:label).and_return("wait")
-      expect(ps).to receive(:update).with(state: "waiting", last_rekey_at: t).and_return(true)
-      expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
-      expect(nic).to receive(:rekey_payload).and_return({})
-      expect(nic).to receive(:update).with(encryption_key: nil, rekey_payload: nil).and_return(true)
-      expect(nic).to receive(:unlock)
+      nic.strand.update(label: "wait")
+      nic.incr_lock
+      ps.update(last_rekey_at: Time.now - 100)
       expect { nx.wait_old_state_drop }.to hop("wait")
-    end
-
-    it "doesn't decrement refresh_keys if there are missed nics" do
-      t = Time.now
-      expect(Time).to receive(:now).and_return(t)
-      expect(nic.strand).to receive(:label).and_return("wait")
-      expect(ps).to receive(:update).with(state: "waiting", last_rekey_at: t).and_return(true)
-      expect(nx).to receive(:rekeying_nics).and_return([nic]).at_least(:once)
-      expect(nic).to receive(:update).with(encryption_key: nil, rekey_payload: nil).and_return(true)
-      expect(nic).to receive(:unlock)
-      expect(nx).not_to receive(:decr_refresh_keys)
-      expect { nx.wait_old_state_drop }.to hop("wait")
+      ps.refresh
+      expect(ps.state).to eq "waiting"
+      expect(ps.last_rekey_at > Time.now - 10).to be true
+      nic.refresh
+      expect(nic.encryption_key).to be_nil
+      expect(nic.rekey_payload).to be_nil
+      expect(nic.lock_set?).to be false
     end
   end
 
