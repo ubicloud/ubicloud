@@ -6,9 +6,7 @@ class SpdkInstallation < Sequel::Model
   many_to_one :vm_host
   one_to_many :vm_storage_volumes
 
-  def self.generate_uuid
-    UBID.generate(UBID::TYPE_ETC).to_uuid
-  end
+  plugin ResourceMethods, etc_type: true
 
   def supports_bdev_ubi?
     # We version stock SPDK releases similar to v23.09, and add a ubi version
