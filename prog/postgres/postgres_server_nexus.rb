@@ -234,7 +234,7 @@ After=postgresql.service
 [Service]
 Type=oneshot
 User=ubi
-ExecStart=/home/ubi/postgres/bin/metrics-collector #{metrics_dir}
+ExecStart=/home/ubi/common/bin/metrics-collector #{metrics_dir}
 StandardOutput=journal
 StandardError=journal
 SERVICE
