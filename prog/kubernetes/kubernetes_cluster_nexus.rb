@@ -145,7 +145,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     decr_upgrade
 
     node_to_upgrade = kubernetes_cluster.cp_vms.find do |vm|
-      vm_version = kubernetes_cluster.client(session: vm.sshable.start_fresh_session).version
+      vm_version = kubernetes_cluster.client(session: vm.sshable.connect).version
       vm_minor_version = vm_version.match(/^v\d+\.(\d+)$/)&.captures&.first&.to_i
       cluster_minor_version = kubernetes_cluster.version.match(/^v\d+\.(\d+)$/)&.captures&.first&.to_i
 

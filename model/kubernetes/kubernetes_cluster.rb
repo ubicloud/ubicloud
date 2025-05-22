@@ -44,7 +44,7 @@ class KubernetesCluster < Sequel::Model
     api_server_lb.hostname
   end
 
-  def client(session: cp_vms.first.sshable.start_fresh_session)
+  def client(session: cp_vms.first.sshable.connect)
     Kubernetes::Client.new(self, session)
   end
 
