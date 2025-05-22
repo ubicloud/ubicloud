@@ -43,7 +43,7 @@ class PrivateSubnet < Sequel::Model
   end
 
   def display_location
-    Location[location_id].display_name
+    location.display_name
   end
 
   def path
