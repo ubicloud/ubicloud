@@ -143,9 +143,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can update database properties" do
-        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
-        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
-        expect(pg.representative_server).to receive(:storage_size_gib).and_return(128)
+        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
           size: "standard-8",
@@ -160,9 +158,9 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can scale down storage if the requested size is enough for existing data" do
-        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
+        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
+        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(PostgresResource.dataset.class, first: pg, association_join: instance_double(Sequel::Dataset, sum: 1))).twice
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
-        expect(pg.representative_server).to receive(:storage_size_gib).and_return(128)
         expect(pg.representative_server.vm.sshable).to receive(:cmd).and_return("10000000\n")
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {

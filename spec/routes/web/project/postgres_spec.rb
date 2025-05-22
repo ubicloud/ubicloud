@@ -307,9 +307,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can update PostgreSQL instance size configuration" do
-        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg)).at_least(:once)
-        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project).twice
-        expect(pg.representative_server).to receive(:storage_size_gib).and_return(128).at_least(:once)
+        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
         visit "#{project.path}#{pg.path}"
         expect(page).to have_content "Configure PostgreSQL database"
