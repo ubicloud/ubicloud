@@ -136,9 +136,10 @@ class Project < Sequel::Model
   end
 
   def default_private_subnet(location)
-    name = "default-#{location.display_name}"
-    ps = private_subnets_dataset.first(:location_id => location.id, Sequel[:private_subnet][:name] => name)
-    ps || Prog::Vnet::SubnetNexus.assemble(id, name: name, location_id: location.id).subject
+    name = "default-#{location.display_name[0, 55]}"
+    location_id = location.id
+    ps = private_subnets_dataset.first(location_id:, name:)
+    ps || Prog::Vnet::SubnetNexus.assemble(id, name:, location_id:).subject
   end
 
   def self.feature_flag(*flags, into: self)
