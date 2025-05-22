@@ -128,7 +128,7 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
         ))
       ).and_return("pod-123")
       expect { nexus.setup }.to hop("wait_setup")
-      expect(target_strand.subject).to have_attributes(state: {"pod_id" => "pod-123"})
+      expect(Strand[target_strand.id].subject).to have_attributes(state: {"pod_id" => "pod-123"})
     end
   end
 
