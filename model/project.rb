@@ -47,14 +47,11 @@ class Project < Sequel::Model
       .join(:location, id: :location_id)
       .where(allocation_state: "accepting")
       .select_group(:location_id)
-      .order { sum(Sequel[:total_cores] - Sequel[:used_cores]).desc }
-      .first
+      .reverse { sum(Sequel[:total_cores] - Sequel[:used_cores]) }
+      .single_value
 
-    if location_max_capacity.nil?
-      Location.find(visible: true).display_name
-    else
-      Location[location_max_capacity[:location_id]].display_name
-    end
+    cond = location_max_capacity ? {id: location_max_capacity} : {visible: true}
+    Location[cond].display_name
   end
 
   def disassociate_subject(subject_id)
