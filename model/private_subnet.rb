@@ -114,8 +114,7 @@ class PrivateSubnet < Sequel::Model
   end
 
   def connect_subnet(subnet)
-    small_id_ps, large_id_ps = [self, subnet].sort_by(&:id)
-    ConnectedSubnet.create_with_id(subnet_id_1: small_id_ps.id, subnet_id_2: large_id_ps.id)
+    ConnectedSubnet.create(subnet_hash(subnet))
     nics.each do |nic|
       create_tunnels(subnet.nics, nic)
     end
@@ -123,13 +122,12 @@ class PrivateSubnet < Sequel::Model
   end
 
   def disconnect_subnet(subnet)
-    small_id_ps, large_id_ps = [self, subnet].sort_by(&:id)
     nics.each do |nic|
       (nic.src_ipsec_tunnels + nic.dst_ipsec_tunnels).each do |tunnel|
         tunnel.destroy if tunnel.src_nic.private_subnet_id == subnet.id || tunnel.dst_nic.private_subnet_id == subnet.id
       end
     end
-    ConnectedSubnet.where(subnet_id_1: small_id_ps.id, subnet_id_2: large_id_ps.id).all.map(&:destroy)
+    ConnectedSubnet.where(subnet_hash(subnet)).destroy
     subnet.incr_refresh_keys
     incr_refresh_keys
   end
@@ -144,6 +142,13 @@ class PrivateSubnet < Sequel::Model
 
   def find_all_connected_nics(excluded_private_subnet_ids = [])
     nics + connected_subnets.select { |subnet| !excluded_private_subnet_ids.include?(subnet.id) }.flat_map { it.find_all_connected_nics(excluded_private_subnet_ids + [id]) }.uniq
+  end
+
+  private
+
+  def subnet_hash(subnet)
+    small_id_ps, large_id_ps = [self, subnet].sort_by(&:id)
+    {subnet_id_1: small_id_ps.id, subnet_id_2: large_id_ps.id}
   end
 end
 
