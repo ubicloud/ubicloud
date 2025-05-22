@@ -167,8 +167,8 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       expect(kn).to receive(:vms).and_return([first_vm, second_vm])
       allow(first_vm).to receive(:sshable).and_return(sshable0)
       allow(second_vm).to receive(:sshable).and_return(sshable1)
-      allow(sshable0).to receive(:start_fresh_session)
-      allow(sshable1).to receive(:start_fresh_session)
+      allow(sshable0).to receive(:connect)
+      allow(sshable1).to receive(:connect)
 
       expect(kn.cluster).to receive(:client).and_return(client).at_least(:once)
     end
