@@ -14,6 +14,15 @@ class GithubRunner < Sequel::Model
   include HealthMonitorMethods
   semaphore :destroy, :skip_deregistration
 
+  dataset_module do
+    def total_active_runner_vcpus
+      left_join(:strand, id: :id)
+        .exclude(Sequel[:strand][:label] => ["start", "wait_concurrency_limit"])
+        .select_map(Sequel[:github_runner][:label])
+        .sum { Github.runner_labels[it]["vm_size_data"].vcpus }
+    end
+  end
+
   def label_data
     @label_data ||= Github.runner_labels[label]
   end
