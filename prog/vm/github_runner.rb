@@ -46,6 +46,14 @@ class Prog::Vm::GithubRunner < Prog::Base
       allow_only_ssh: true
     ).subject
 
+    location_filter = [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID]
+    location_preference = [Location::GITHUB_RUNNERS_ID]
+    family_filter = [Validation.validate_vm_size(label_data["vm_size"], label_data["arch"]).family]
+    family_filter |= ["performance"] if github_runner.installation.free_runner_upgrade?
+
+    allocator_preferences = {location_filter:, location_preference:, family_filter:}.compact
+    allocator_preferences.merge!(github_runner.installation.allocator_preferences.compact)
+
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
       Config.github_runner_service_project_id,
       unix_user: "runneradmin",
@@ -58,7 +66,8 @@ class Prog::Vm::GithubRunner < Prog::Base
       enable_ip4: true,
       arch: label_data["arch"],
       swap_size_bytes: 4294963200, # ~4096MB, the same value with GitHub hosted runners
-      private_subnet_id: ps.id
+      private_subnet_id: ps.id,
+      allocator_preferences:
     )
 
     vm_st.subject

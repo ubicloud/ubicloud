@@ -31,4 +31,20 @@ RSpec.describe GithubInstallation do
 
     expect(installation.total_active_runner_vcpus).to eq(6)
   end
+
+  describe ".free_runner_upgrade?" do
+    it "returns nil if it is not set" do
+      expect(installation.free_runner_upgrade?).to be_nil
+    end
+
+    it "returns false if it is passed" do
+      installation.project.set_ff_free_runner_upgrade_until((Time.now - 100).to_s)
+      expect(installation.free_runner_upgrade?).to be(false)
+    end
+
+    it "returns true if it is from future" do
+      installation.project.set_ff_free_runner_upgrade_until((Time.now + 100).to_s)
+      expect(installation.free_runner_upgrade?).to be(true)
+    end
+  end
 end

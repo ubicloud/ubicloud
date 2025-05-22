@@ -303,6 +303,7 @@ end
 #  cpu_percent_limit       | integer                  |
 #  cpu_burst_percent_limit | integer                  |
 #  location_id             | uuid                     | NOT NULL
+#  allocator_preferences   | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 # Indexes:
 #  vm_pkey                             | PRIMARY KEY btree (id)
 #  vm_ephemeral_net6_key               | UNIQUE btree (ephemeral_net6)

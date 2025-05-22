@@ -25,10 +25,10 @@ RSpec.describe Prog::Vm::GithubRunner do
   let(:project) { Project.create(name: "default") }
 
   before do
-    runner_project = Project.create(name: "runner-project")
+    runner_project = Project.create_with_id(name: "default")
     allow(Config).to receive(:github_runner_service_project_id).and_return(runner_project.id)
     allow(Github).to receive(:installation_client).and_return(client)
-    allow(github_runner).to receive_messages(vm:, installation: instance_double(GithubInstallation, installation_id: 123, project:, allocator_preferences: {}, free_runner_upgrade?: false, premium_runner_enabled?: false))
+    allow(github_runner).to receive_messages(vm: vm, installation: instance_double(GithubInstallation, installation_id: 123, allocator_preferences: {}, performance_runner_enabled: false, free_runner_upgrade?: false))
     allow(vm).to receive_messages(sshable: sshable, vm_host: instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", data_center: "FSN1-DC1"))
   end
 
@@ -62,6 +62,8 @@ RSpec.describe Prog::Vm::GithubRunner do
   end
 
   describe ".pick_vm" do
+    let(:project) { Project.create_with_id(name: "default") }
+
     it "provisions a VM if the pool is not existing" do
       expect(VmPool).to receive(:where).and_return([])
       expect(Prog::Vnet::SubnetNexus).to receive(:assemble).and_call_original
@@ -107,13 +109,58 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm.name).to eq("dummy-vm")
     end
 
-    it "provisions a VM if the installation prefers premium runners" do
-      expect(github_runner.installation).to receive(:premium_runner_enabled?).and_return(true)
+    it "considers EU locations for github-runners" do
       expect(VmPool).to receive(:where).and_return([])
-      expect(Prog::Vnet::SubnetNexus).to receive(:assemble).and_call_original
-      expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
+
       vm = nx.pick_vm
       expect(vm).not_to be_nil
+      expect(vm.allocator_preferences["location_filter"]).to eq([Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID])
+      expect(vm.allocator_preferences["location_preference"]).to eq([Location::GITHUB_RUNNERS_ID])
+      expect(vm.allocator_preferences["family_filter"]).to eq(["standard"])
+    end
+
+    it "does not overwrite locations if nil for the installation" do
+      expect(github_runner.installation).to receive(:allocator_preferences).and_return({"location_filter" => [], "location_preference" => nil})
+      expect(VmPool).to receive(:where).and_return([])
+
+      vm = nx.pick_vm
+      expect(vm).not_to be_nil
+      expect(vm.allocator_preferences["location_filter"]).to eq([])
+      expect(vm.allocator_preferences["location_preference"]).to eq([Location::GITHUB_RUNNERS_ID])
+      expect(vm.allocator_preferences["family_filter"]).to eq(["standard"])
+    end
+
+    it "considers filtered locations for runners if set for the installation" do
+      expect(github_runner.installation).to receive(:allocator_preferences).and_return({"location_filter" => [Location::GITHUB_RUNNERS_ID, Location::LEASEWEB_WDC02_ID], "location_preference" => [Location::LEASEWEB_WDC02_ID]})
+      expect(VmPool).to receive(:where).and_return([])
+
+      vm = nx.pick_vm
+      expect(vm).not_to be_nil
+      expect(vm.allocator_preferences["location_filter"]).to eq([Location::GITHUB_RUNNERS_ID, Location::LEASEWEB_WDC02_ID])
+      expect(vm.allocator_preferences["location_preference"]).to eq([Location::LEASEWEB_WDC02_ID])
+      expect(vm.allocator_preferences["family_filter"]).to eq(["standard"])
+    end
+
+    it "considers preferred families for runners if set for the installation" do
+      expect(github_runner.installation).to receive(:allocator_preferences).and_return({"family_filter" => ["standard", "performance"]})
+      expect(VmPool).to receive(:where).and_return([])
+
+      vm = nx.pick_vm
+      expect(vm).not_to be_nil
+      expect(vm.allocator_preferences["location_filter"]).to eq([Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID])
+      expect(vm.allocator_preferences["location_preference"]).to eq([Location::GITHUB_RUNNERS_ID])
+      expect(vm.allocator_preferences["family_filter"]).to eq(["standard", "performance"])
+    end
+
+    it "allows performance family allocation if free runner upgrade runner is enabled" do
+      expect(github_runner.installation).to receive(:free_runner_upgrade?).and_return(true)
+      expect(VmPool).to receive(:where).and_return([])
+
+      vm = nx.pick_vm
+      expect(vm).not_to be_nil
+      expect(vm.allocator_preferences["location_filter"]).to eq([Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID])
+      expect(vm.allocator_preferences["location_preference"]).to eq([Location::GITHUB_RUNNERS_ID])
+      expect(vm.allocator_preferences["family_filter"]).to eq(["standard", "performance"])
     end
 
     it "provisions a VM if a free premium upgrade is enabled" do
