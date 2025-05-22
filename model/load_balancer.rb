@@ -64,7 +64,7 @@ class LoadBalancer < Sequel::Model
       ports.each { |port|
         LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: load_balancer_vm.id)
       }
-      Strand.create_with_id(prog: "Vnet::CertServer", label: "put_certificate", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id)
+      Strand.create(prog: "Vnet::CertServer", label: "put_certificate", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id) if cert_enabled_lb?
       incr_rewrite_dns_records
     end
   end
@@ -73,7 +73,7 @@ class LoadBalancer < Sequel::Model
     DB.transaction do
       ids_to_update = vm_ports_by_vm_and_state(vm, ["up", "down", "evacuating"]).map(&:id)
       LoadBalancerVmPort.where(id: ids_to_update).update(state: "detaching")
-      Strand.create_with_id(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id)
+      Strand.create(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id) if cert_enabled_lb?
       incr_update_load_balancer
     end
   end
@@ -82,7 +82,7 @@ class LoadBalancer < Sequel::Model
     DB.transaction do
       ids_to_update = vm_ports_by_vm_and_state(vm, ["up", "down"]).map(&:id)
       LoadBalancerVmPort.where(id: ids_to_update).update(state: "evacuating")
-      Strand.create_with_id(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id)
+      Strand.create(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id) if cert_enabled_lb?
       incr_update_load_balancer
       incr_rewrite_dns_records
     end
@@ -114,8 +114,12 @@ class LoadBalancer < Sequel::Model
     custom_hostname_dns_zone || DnsZone[project_id: Config.load_balancer_service_project_id, name: Config.load_balancer_service_hostname]
   end
 
+  def cert_enabled_lb?
+    health_check_protocol == "https"
+  end
+
   def need_certificates?
-    return false unless health_check_protocol == "https"
+    return false unless cert_enabled_lb?
     return true if certs_dataset.empty?
 
     certs_dataset.where { created_at > Time.now - 60 * 60 * 24 * 30 * 2 }.exclude(cert: nil).empty?
