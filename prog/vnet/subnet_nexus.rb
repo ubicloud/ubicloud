@@ -238,19 +238,25 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     selected_addr
   end
 
-  def to_be_added_nics
-    private_subnet.find_all_connected_nics.select { it.strand.label == "wait_setup" }
-  end
-
   def active_nics
-    private_subnet.find_all_connected_nics.select { it.strand.label == "wait" }
+    nics_with_strand_label("wait").all
   end
 
   def nics_to_rekey
-    (active_nics + to_be_added_nics).uniq
+    nics_with_strand_label(%w[wait wait_setup]).all
   end
 
   def rekeying_nics
-    private_subnet.find_all_connected_nics.select { !it.rekey_payload.nil? }
+    all_connected_nics.eager(:strand).exclude(rekey_payload: nil).all
+  end
+
+  private
+
+  def all_connected_nics
+    private_subnet.find_all_connected_nics
+  end
+
+  def nics_with_strand_label(label)
+    all_connected_nics.join(:strand, {id: :id, label:}).select_all(:nic)
   end
 end

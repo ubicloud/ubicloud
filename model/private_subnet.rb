@@ -140,8 +140,15 @@ class PrivateSubnet < Sequel::Model
     end
   end
 
-  def find_all_connected_nics(excluded_private_subnet_ids = [])
-    nics + connected_subnets.select { |subnet| !excluded_private_subnet_ids.include?(subnet.id) }.flat_map { it.find_all_connected_nics(excluded_private_subnet_ids + [id]) }.uniq
+  def find_all_connected_nics
+    Nic
+      .where(private_subnet_id: DB[:subnet].exclude(:is_cycle).select(:id))
+      .with_recursive(:subnet,
+        this.select(:id),
+        DB[:connected_subnet]
+          .join(:subnet, {id: [:subnet_id_1, :subnet_id_2]})
+          .select(Sequel.case({subnet_id_1: :subnet_id_2}, :subnet_id_1, Sequel[:subnet][:id])),
+        cycle: {columns: :id})
   end
 
   private
