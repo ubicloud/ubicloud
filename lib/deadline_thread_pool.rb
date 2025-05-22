@@ -49,7 +49,7 @@ class DeadlineThreadPool
 
   def check_deadlines
     # This .values.min is the most dubiously expensive thing in this.
-    return nil unless (earliest_deadline = @running_deadlines.values.min)
+    return nil unless (earliest_deadline = @running_deadlines.each_value.min)
     now = Time.now
       
     # Check if any deadline is passed.
