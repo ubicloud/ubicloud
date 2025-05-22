@@ -28,9 +28,9 @@ class PrivateSubnet < Sequel::Model
   include ObjectTag::Cleanup
 
   def connected_subnets
-    PrivateSubnet.where(
-      id: DB[:connected_subnet].where(subnet_id_1: id).or(subnet_id_2: id).select(Sequel.case({{subnet_id_1: id} => :subnet_id_2}, :subnet_id_1))
-    ).all
+    PrivateSubnet
+      .where(id: DB[:connected_subnet].where(id => [:subnet_id_1, :subnet_id_2]).select(Sequel.case({id => :subnet_id_2}, :subnet_id_1, :subnet_id_1)))
+      .all
   end
 
   def all_nics
