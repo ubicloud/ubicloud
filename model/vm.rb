@@ -59,12 +59,17 @@ class Vm < Sequel::Model
     (location.provider == "aws") ? ephemeral_net6.nth(0) : ephemeral_net6&.nth(2)
   end
 
+  def nic
+    nics.first
+  end
+
   def private_ipv4
-    (nics.first.private_ipv4.netmask.prefix_len == 32) ? nics.first.private_ipv4.network : nics.first.private_ipv4.nth(1)
+    ipv4 = nic.private_ipv4
+    (ipv4.netmask.prefix_len == 32) ? ipv4.network : ipv4.nth(1)
   end
 
   def private_ipv6
-    nics.first.private_ipv6.nth(2)
+    nic.private_ipv6.nth(2)
   end
 
   def runtime_token
@@ -215,7 +220,7 @@ class Vm < Sequel::Model
       public_ipv6: ephemeral_net6.to_s,
       public_ipv4: ip4.to_s || "",
       local_ipv4: local_vetho_ip.to_s.shellescape || "",
-      dns_ipv4: nics.first.private_subnet.net4.nth(2).to_s,
+      dns_ipv4: nic.private_subnet.net4.nth(2).to_s,
       unix_user:,
       ssh_public_keys: [public_key] + project_public_keys,
       nics: nics.map { [it.private_ipv6.to_s, it.private_ipv4.to_s, it.ubid_to_tap_name, it.mac, it.private_ipv4_gateway] },
