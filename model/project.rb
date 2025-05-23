@@ -22,7 +22,7 @@ class Project < Sequel::Model
   one_to_many :inference_endpoints
   one_to_many :kubernetes_clusters
 
-  RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters]
+  RESOURCE_ASSOCIATION_DATASET_METHODS = %w[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners].map { :"#{it}_dataset" }
 
   one_to_many :invoices, order: Sequel.desc(:created_at)
   one_to_many :quotas, class: :ProjectQuota
@@ -67,7 +67,7 @@ class Project < Sequel::Model
   end
 
   def has_resources
-    RESOURCE_ASSOCIATIONS.any? { !send(:"#{it}_dataset").empty? } || github_installations.flat_map(&:runners).count > 0
+    RESOURCE_ASSOCIATION_DATASET_METHODS.any? { !send(it).empty? }
   end
 
   def soft_delete
