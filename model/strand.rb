@@ -70,7 +70,7 @@ class Strand < Sequel::Model
       yield
     ensure
       if @deleted
-        unless DB["SELECT FROM strand WHERE id = ?", id].empty?
+        if exists?
           fail "BUG: strand with @deleted set still exists in the database"
         end
       else
