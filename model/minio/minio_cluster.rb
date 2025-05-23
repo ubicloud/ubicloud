@@ -10,7 +10,7 @@ class MinioCluster < Sequel::Model
   many_to_one :private_subnet
   many_to_one :location, key: :location_id
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
 
   semaphore :destroy, :reconfigure

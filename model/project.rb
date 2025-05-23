@@ -35,7 +35,7 @@ class Project < Sequel::Model
   plugin :association_dependencies, accounts: :nullify, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy, access_control_entries: :destroy, subject_tags: :destroy, action_tags: :destroy, object_tags: :destroy,
     locations: :destroy
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   def has_valid_payment_method?
     return true unless Config.stripe_secret_key
@@ -47,14 +47,11 @@ class Project < Sequel::Model
       .join(:location, id: :location_id)
       .where(allocation_state: "accepting")
       .select_group(:location_id)
-      .order { sum(Sequel[:total_cores] - Sequel[:used_cores]).desc }
-      .first
+      .reverse { sum(Sequel[:total_cores] - Sequel[:used_cores]) }
+      .single_value
 
-    if location_max_capacity.nil?
-      Location.find(visible: true).display_name
-    else
-      Location[location_max_capacity[:location_id]].display_name
-    end
+    cond = location_max_capacity ? {id: location_max_capacity} : {visible: true}
+    Location[cond].display_name
   end
 
   def disassociate_subject(subject_id)
@@ -139,9 +136,10 @@ class Project < Sequel::Model
   end
 
   def default_private_subnet(location)
-    name = "default-#{location.display_name}"
-    ps = private_subnets_dataset.first(:location_id => location.id, Sequel[:private_subnet][:name] => name)
-    ps || Prog::Vnet::SubnetNexus.assemble(id, name: name, location_id: location.id).subject
+    name = "default-#{location.display_name[0, 55]}"
+    location_id = location.id
+    ps = private_subnets_dataset.first(location_id:, name:)
+    ps || Prog::Vnet::SubnetNexus.assemble(id, name:, location_id:).subject
   end
 
   def self.feature_flag(*flags, into: self)

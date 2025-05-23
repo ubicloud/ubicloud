@@ -20,21 +20,24 @@ class Vm < Sequel::Model
   many_to_one :vm_host_slice
   many_to_one :location, key: :location_id
 
+  many_through_many :firewalls,
+    [
+      [:nic, :vm_id, :private_subnet_id],
+      [:private_subnet, :id, :id],
+      [:firewalls_private_subnets, :private_subnet_id, :firewall_id]
+    ]
+
   plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancers_vms: :destroy
 
   dataset_module Pagination
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
   include HealthMonitorMethods
   semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started
   semaphore :restart, :stop
 
   include ObjectTag::Cleanup
-
-  def firewalls
-    private_subnets.flat_map(&:firewalls)
-  end
 
   def display_location
     location.display_name
@@ -56,12 +59,17 @@ class Vm < Sequel::Model
     (location.provider == "aws") ? ephemeral_net6.nth(0) : ephemeral_net6&.nth(2)
   end
 
+  def nic
+    nics.first
+  end
+
   def private_ipv4
-    (nics.first.private_ipv4.netmask.prefix_len == 32) ? nics.first.private_ipv4.network : nics.first.private_ipv4.nth(1)
+    ipv4 = nic.private_ipv4
+    (ipv4.netmask.prefix_len == 32) ? ipv4.network : ipv4.nth(1)
   end
 
   def private_ipv6
-    nics.first.private_ipv6.nth(2)
+    nic.private_ipv6.nth(2)
   end
 
   def runtime_token
@@ -69,9 +77,10 @@ class Vm < Sequel::Model
   end
 
   def display_state
-    return "deleting" if destroy_set? || strand&.label == "destroy"
-    return "restarting" if restart_set? || strand&.label == "restart"
-    return "stopped" if stop_set? || strand&.label == "stopped"
+    label = strand&.label
+    return "deleting" if destroy_set? || label == "destroy"
+    return "restarting" if restart_set? || label == "restart"
+    return "stopped" if stop_set? || label == "stopped"
     if waiting_for_capacity_set?
       return "no capacity available" if Time.now - created_at > 15 * 60
       return "waiting for capacity"
@@ -92,11 +101,11 @@ class Vm < Sequel::Model
   #     }
   CloudHypervisorCpuTopo = Struct.new(:threads_per_core, :cores_per_die, :dies_per_package, :packages) do
     def to_s
-      to_a.map(&:to_s).join(":")
+      to_a.join(":")
     end
 
     def max_vcpus
-      @max_vcpus ||= to_a.reduce(&:*)
+      @max_vcpus ||= to_a.reduce(:*)
     end
   end
 
@@ -112,7 +121,7 @@ class Vm < Sequel::Model
     # Computed all-system statistics, now scale it down to meet VM needs.
     if vcpus == 1 && threads_per_core > 1
       # special case for single-threaded VMs
-      cores_from_cpus = Rational(vcpus)
+      cores_from_cpus = 1r
       threads_per_core = 1
     else
       cores_from_cpus = Rational(vcpus) / threads_per_core
@@ -131,7 +140,7 @@ class Vm < Sequel::Model
     }
 
     # :nocov:
-    unless topo.reduce(&:*) == vcpus
+    unless topo.reduce(:*) == vcpus
       fail "BUG: arithmetic does not result in the correct number of vcpus"
     end
     # :nocov:
@@ -211,7 +220,7 @@ class Vm < Sequel::Model
       public_ipv6: ephemeral_net6.to_s,
       public_ipv4: ip4.to_s || "",
       local_ipv4: local_vetho_ip.to_s.shellescape || "",
-      dns_ipv4: nics.first.private_subnet.net4.nth(2).to_s,
+      dns_ipv4: nic.private_subnet.net4.nth(2).to_s,
       unix_user:,
       ssh_public_keys: [public_key] + project_public_keys,
       nics: nics.map { [it.private_ipv6.to_s, it.private_ipv4.to_s, it.ubid_to_tap_name, it.mac, it.private_ipv4_gateway] },

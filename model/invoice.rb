@@ -8,9 +8,11 @@ require "prawn/table"
 require "stripe"
 
 class Invoice < Sequel::Model
+  unrestrict_primary_key
+
   many_to_one :project
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   def path
     "/invoice/#{id ? ubid : "current"}"
@@ -292,8 +294,6 @@ class Invoice < Sequel::Model
     )
   end
 end
-
-Invoice.unrestrict_primary_key
 
 # Table: invoice
 # Columns:

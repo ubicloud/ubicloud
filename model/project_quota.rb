@@ -3,6 +3,8 @@
 require_relative "../model"
 
 class ProjectQuota < Sequel::Model
+  unrestrict_primary_key
+
   # :nocov:
   def self.freeze
     default_quotas
@@ -16,8 +18,6 @@ class ProjectQuota < Sequel::Model
     end
   end
 end
-
-ProjectQuota.unrestrict_primary_key
 
 # Table: project_quota
 # Primary Key: (project_id, quota_id)

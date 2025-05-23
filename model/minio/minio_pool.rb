@@ -7,7 +7,7 @@ class MinioPool < Sequel::Model
   one_to_many :servers, key: :minio_pool_id, class: :MinioServer, order: :index
   one_to_one :strand, key: :id
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
 
   semaphore :destroy, :add_additional_pool

@@ -12,7 +12,7 @@ class GithubRepository < Sequel::Model
 
   plugin :association_dependencies, cache_entries: :destroy
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
 
   semaphore :destroy
@@ -23,9 +23,7 @@ class GithubRepository < Sequel::Model
 
   CACHE_SIZE_LIMIT = 10 * 1024 * 1024 * 1024 # 10GB
 
-  def bucket_name
-    ubid
-  end
+  alias_method :bucket_name, :ubid
 
   def blob_storage_client
     @blob_storage_client ||= s3_client(access_key, secret_key)

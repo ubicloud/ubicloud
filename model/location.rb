@@ -3,11 +3,12 @@
 require_relative "../model"
 
 class Location < Sequel::Model
-  include ResourceMethods
+  plugin ResourceMethods
   dataset_module Pagination
 
   one_to_one :location_credential, key: :id
   many_to_one :project
+  one_to_many :postgres_resources, read_only: true
 
   plugin :association_dependencies, location_credential: :destroy
 
@@ -41,7 +42,7 @@ class Location < Sequel::Model
 
   # Private Locations only support Postgres resources for now
   def has_resources
-    !project.postgres_resources_dataset.where(location_id: id).empty?
+    !postgres_resources_dataset.empty?
   end
 end
 

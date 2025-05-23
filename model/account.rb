@@ -10,7 +10,7 @@ class Account < Sequel::Model(:accounts)
 
   plugin :association_dependencies, usage_alerts: :destroy, projects: :nullify
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SubjectTag::Cleanup
 
   def create_project_with_default_policy(name, default_policy: true)
@@ -25,8 +25,7 @@ class Account < Sequel::Model(:accounts)
 
       # Also create a Member subject tag with access to member actions
       member_subject_tag = SubjectTag.create_with_id(project_id: project.id, name: "Member")
-      # Use Enumerable.find here, because ActionTag.global_by_name will be cached soon
-      AccessControlEntry.create_with_id(project_id: project.id, subject_id: member_subject_tag.id, action_id: ActionTag.global_by_name.find { |tag| tag.name == "Member" }.id)
+      AccessControlEntry.create_with_id(project_id: project.id, subject_id: member_subject_tag.id, action_id: ActionTag::MEMBER_ID)
     end
 
     project
@@ -36,7 +35,7 @@ class Account < Sequel::Model(:accounts)
     update(suspended_at: Time.now)
     DB[:account_active_session_keys].where(account_id: id).delete(force: true)
 
-    projects.each { it.billing_info&.payment_methods_dataset&.update(fraud: true) }
+    PaymentMethod.where(billing_info_id: projects_dataset.select(:billing_info_id)).update(fraud: true)
   end
 end
 

@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class Semaphore < Sequel::Model
-  include ResourceMethods
+  plugin ResourceMethods
 
   def self.incr(strand_id, name)
     DB.transaction do

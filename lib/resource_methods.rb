@@ -1,88 +1,98 @@
 # frozen_string_literal: true
 
 module ResourceMethods
-  def self.included(base)
-    base.extend(ClassMethods)
-    base.instance_variable_set(:@ubid_format, /\A#{base.ubid_type}[a-z0-9]{24}\z/)
-  end
-
-  def freeze
-    ubid
-    super
-  end
-
-  def ubid
-    @ubid ||= UBID.from_uuidish(id).to_s.downcase
-  end
-
-  def to_s
-    inspect_prefix
-  end
-
-  def inspect_pk
-    ubid if id
-  end
-
-  def before_validation
-    set_uuid
-    super
-  end
-
-  def set_uuid
-    self.id ||= self.class.generate_uuid if new?
-    self
-  end
-
-  def validate
-    super
-
-    if self.class.ubid_format.match?(values[:name])
-      errors.add(:name, "cannot be exactly 26 numbers/lowercase characters starting with #{self.class.ubid_type} to avoid overlap with id format")
+  def self.configure(model, etc_type: false)
+    model.instance_exec do
+      extend UbidTypeEtcMethods if etc_type
+      @ubid_format = /\A#{ubid_type}[a-z0-9]{24}\z/
     end
   end
 
-  INSPECT_CONVERTERS = {
-    "uuid" => lambda { |v| UBID.from_uuidish(v).to_s },
-    "cidr" => :to_s.to_proc,
-    "inet" => :to_s.to_proc,
-    "timestamp with time zone" => lambda { |v| v.strftime("%F %T") }
-  }.freeze
-  def inspect_values
-    inspect_values = {}
-    sch = db_schema
-    @values.except(*self.class.redacted_columns).each do |k, v|
-      next if k == :id
+  module UbidTypeEtcMethods
+    def ubid_type
+      UBID::TYPE_ETC
+    end
+  end
 
-      inspect_values[k] = if v
-        if (converter = INSPECT_CONVERTERS[sch[k][:db_type]])
-          converter.call(v)
+  module InstanceMethods
+    def freeze
+      ubid
+      super
+    end
+
+    def ubid
+      @ubid ||= UBID.from_uuidish(id).to_s.downcase
+    end
+
+    def to_s
+      inspect_prefix
+    end
+
+    def inspect_pk
+      ubid if id
+    end
+
+    def before_validation
+      set_uuid
+      super
+    end
+
+    def set_uuid
+      self.id ||= self.class.generate_uuid if new?
+      self
+    end
+
+    def validate
+      super
+
+      if self.class.ubid_format.match?(values[:name])
+        errors.add(:name, "cannot be exactly 26 numbers/lowercase characters starting with #{self.class.ubid_type} to avoid overlap with id format")
+      end
+    end
+
+    INSPECT_CONVERTERS = {
+      "uuid" => lambda { |v| UBID.from_uuidish(v).to_s },
+      "cidr" => :to_s.to_proc,
+      "inet" => :to_s.to_proc,
+      "timestamp with time zone" => lambda { |v| v.strftime("%F %T") }
+    }.freeze
+    def inspect_values
+      inspect_values = {}
+      sch = db_schema
+      @values.except(*self.class.redacted_columns).each do |k, v|
+        next if k == :id
+
+        inspect_values[k] = if v
+          if (converter = INSPECT_CONVERTERS[sch[k][:db_type]])
+            converter.call(v)
+          else
+            v
+          end
         else
           v
         end
-      else
-        v
       end
+      inspect_values.inspect
     end
-    inspect_values.inspect
-  end
 
-  NON_ARCHIVED_MODELS = ["ArchivedRecord", "Semaphore"]
-  def before_destroy
-    model_name = self.class.name
-    unless NON_ARCHIVED_MODELS.include?(model_name)
-      model_values = values.merge(model_name: model_name)
+    NON_ARCHIVED_MODELS = ["ArchivedRecord", "Semaphore"]
+    def before_destroy
+      model_name = self.class.name
+      unless NON_ARCHIVED_MODELS.include?(model_name)
+        model_values = values.merge(model_name: model_name)
 
-      encryption_metadata = self.class.instance_variable_get(:@column_encryption_metadata)
-      unless encryption_metadata.empty?
-        encryption_metadata.keys.each do |key|
-          model_values.delete(key)
+        encryption_metadata = self.class.instance_variable_get(:@column_encryption_metadata)
+        unless encryption_metadata.empty?
+          encryption_metadata.keys.each do |key|
+            model_values.delete(key)
+          end
         end
+
+        ArchivedRecord.create(model_name: model_name, model_values: model_values)
       end
 
-      ArchivedRecord.create(model_name: model_name, model_values: model_values)
+      super
     end
-
-    super
   end
 
   module ClassMethods

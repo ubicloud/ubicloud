@@ -7,9 +7,7 @@ require "openssl"
 
 class Page < Sequel::Model
   dataset_module do
-    def active
-      where(resolved_at: nil)
-    end
+    where :active, resolved_at: nil
   end
 
   # This cannot be covered, as the current coverage tests run without freezing models.
@@ -25,7 +23,7 @@ class Page < Sequel::Model
   end
 
   include SemaphoreMethods
-  include ResourceMethods
+  plugin ResourceMethods
   semaphore :resolve
 
   def pagerduty_client
@@ -40,17 +38,15 @@ class Page < Sequel::Model
       links << {href: Config.pagerduty_log_link.gsub("<ubid>", ubid), text: "View #{ubid} Logs"} if Config.pagerduty_log_link
     end
 
-    incident = pagerduty_client.incident(OpenSSL::HMAC.hexdigest("SHA256", "ubicloud-page-key", tag))
-    incident.trigger(summary: summary, severity: severity, source: "clover", custom_details: details, links: links)
+    pagerduty_incident.trigger(summary:, severity:, source: "clover", custom_details: details, links:)
   end
 
   def resolve
-    update(resolved_at: Time.now)
+    this.update(resolved_at: Sequel::CURRENT_TIMESTAMP)
 
     return unless Config.pagerduty_key
 
-    incident = pagerduty_client.incident(OpenSSL::HMAC.hexdigest("SHA256", "ubicloud-page-key", tag))
-    incident.resolve
+    pagerduty_incident.resolve
   end
 
   def self.generate_tag(*tag_parts)
@@ -60,6 +56,12 @@ class Page < Sequel::Model
   def self.from_tag_parts(*tag_parts)
     tag = Page.generate_tag(tag_parts)
     Page.active.where(tag: tag).first
+  end
+
+  private
+
+  def pagerduty_incident
+    pagerduty_client.incident(OpenSSL::HMAC.hexdigest("SHA256", "ubicloud-page-key", tag))
   end
 end
 

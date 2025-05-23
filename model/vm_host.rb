@@ -22,7 +22,7 @@ class VmHost < Sequel::Model
 
   plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, provider: :destroy, spdk_installations: :destroy, storage_devices: :destroy, pci_devices: :destroy, boot_images: :destroy, slices: :destroy, cpus: :destroy
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
   include HealthMonitorMethods
   semaphore :checkup, :reboot, :hardware_reset, :destroy, :graceful_reboot
@@ -391,11 +391,11 @@ class VmHost < Sequel::Model
   end
 
   def available_storage_gib
-    storage_devices.sum { it.available_storage_gib }
+    storage_devices.sum(&:available_storage_gib)
   end
 
   def total_storage_gib
-    storage_devices.sum { it.total_storage_gib }
+    storage_devices.sum(&:total_storage_gib)
   end
 
   def render_arch(arm64:, x64:)

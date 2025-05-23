@@ -5,7 +5,7 @@ require_relative "../model"
 class ApiKey < Sequel::Model
   many_to_one :project
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SubjectTag::Cleanup # personal access tokens
   include ObjectTag::Cleanup # inference tokens
 
@@ -17,24 +17,21 @@ class ApiKey < Sequel::Model
     SecureRandom.alphanumeric(32)
   end
 
-  def name
-    ubid
-  end
+  alias_method :name, :ubid
 
   def self.create_personal_access_token(account, project:)
-    create_with_id(owner_table: "accounts", owner_id: account.id, used_for: "api", project_id: project.id)
+    create(owner_table: "accounts", owner_id: account.id, used_for: "api", project_id: project.id)
   end
 
   def self.create_inference_api_key(project)
-    create_with_id(owner_table: "project", owner_id: project.id, used_for: "inference_endpoint", project_id: project.id)
+    create(owner_table: "project", owner_id: project.id, used_for: "inference_endpoint", project_id: project.id)
   end
 
-  def self.create_with_id(owner_table:, owner_id:, used_for:, project_id:)
-    unless %w[project inference_endpoint accounts].include?(owner_table.to_s)
+  def self.create(owner_table:, owner_id:, used_for:, project_id:, key: ApiKey.random_key)
+    unless %w[project accounts].include?(owner_table)
       fail "Invalid owner_table: #{owner_table}"
     end
 
-    key = ApiKey.random_key
     super(owner_table:, owner_id:, key:, used_for:, project_id:)
   end
 
@@ -54,7 +51,7 @@ class ApiKey < Sequel::Model
   end
 
   def rotate
-    new_key = SecureRandom.alphanumeric(32)
+    new_key = ApiKey.random_key
     update(key: new_key, updated_at: Time.now)
   end
 

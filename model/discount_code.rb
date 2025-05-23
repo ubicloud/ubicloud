@@ -3,7 +3,7 @@
 require "sequel"
 
 class DiscountCode < Sequel::Model
-  include ResourceMethods
+  plugin ResourceMethods
 end
 
 # Table: discount_code
