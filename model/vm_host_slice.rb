@@ -27,10 +27,11 @@ class VmHostSlice < Sequel::Model
   # It allocates the CPUs to the slice and updates the slice's cores and total_cpu_percent
   # Input (allowed_cpus) should be a list of cpu numbers.
   def set_allowed_cpus(allowed_cpus)
+    vm_host_cpu = Sequel[:vm_host_cpu]
     allocated_cpus = vm_host.cpus_dataset.where(
-      Sequel[:vm_host_cpu][:spdk] => false,
-      Sequel[:vm_host_cpu][:vm_host_slice_id] => nil,
-      Sequel[:vm_host_cpu][:cpu_number] => allowed_cpus
+      vm_host_cpu[:spdk] => false,
+      vm_host_cpu[:vm_host_slice_id] => nil,
+      vm_host_cpu[:cpu_number] => allowed_cpus
     ).update(vm_host_slice_id: id)
 
     # A concurrent xact might take some of the CPUs, so check if we got them all
