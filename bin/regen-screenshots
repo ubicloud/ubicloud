@@ -78,8 +78,8 @@ class RegenScreenshots
     puts "Saved screenshot: #{filename}"
   end
 
-  def resize(height)
-    Capybara.current_session.driver.browser.resize(width: 1200, height:)
+  def resize(height, width: 1200)
+    Capybara.current_session.driver.browser.resize(width:, height:)
   end
 
   def call
@@ -102,6 +102,7 @@ class RegenScreenshots
 
     click_button "Verify Account"
 
+    resize(900, width: 1600)
     visit "/"
     screenshot "quick-start/managed-services-1-screenshot.png"
 
@@ -162,6 +163,7 @@ class RegenScreenshots
     fill_in "Cluster Name", with: "kubernetes-demo"
     find('input[name="cp_nodes"][value="3"]:not([disabled])').trigger("click")
     find('select#worker_nodes option[value="5"]:not([disabled])').select_option
+    resize(900)
     screenshot "managed-kubernetes/create-screenshot.png"
 
     kc_ubid = "kcj4veqfy46a4pcxpmj3dzwzf5"
