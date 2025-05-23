@@ -20,7 +20,7 @@ class VmHostSlice < Sequel::Model
   # (comma-separated ranges of cpus)
   def allowed_cpus_cgroup
     @allowed_cpus_cgroup ||= cpus.map(&:cpu_number).sort.slice_when { |a, b| b != a + 1 }.map do |group|
-      (group.size > 1) ? "#{group.first}-#{group.last}" : group.first.to_s
+      (group.size > 1) ? "#{group.first}-#{group.last}" : group.first
     end.join(",")
   end
 
