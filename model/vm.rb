@@ -105,7 +105,7 @@ class Vm < Sequel::Model
     end
 
     def max_vcpus
-      @max_vcpus ||= to_a.reduce(&:*)
+      @max_vcpus ||= to_a.reduce(:*)
     end
   end
 
@@ -140,7 +140,7 @@ class Vm < Sequel::Model
     }
 
     # :nocov:
-    unless topo.reduce(&:*) == vcpus
+    unless topo.reduce(:*) == vcpus
       fail "BUG: arithmetic does not result in the correct number of vcpus"
     end
     # :nocov:
