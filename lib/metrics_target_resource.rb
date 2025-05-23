@@ -15,7 +15,7 @@ class MetricsTargetResource
 
     vmr = VictoriaMetricsResource.first(project_id: resource.metrics_config[:project_id])
     vms = vmr&.servers&.first
-    @tsdb_client = vms&.client
+    @tsdb_client = vms&.client || (VictoriaMetrics::Client.new(endpoint: "http://localhost:8428") if Config.development?)
   end
 
   def open_resource_session

@@ -489,6 +489,16 @@ RSpec.describe Clover, "postgres" do
         expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Metrics are not configured for this instance")
       end
 
+      it "uses local victoria-metrics client in development mode" do
+        allow(Config).to receive(:development?).and_return(true)
+        allow(VictoriaMetricsResource).to receive(:first).with(project_id: prj.id).and_return(nil)
+        allow(VictoriaMetrics::Client).to receive(:new).and_return(tsdb_client)
+        expect(tsdb_client).to receive(:query_range).at_least(:once).and_return([])
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics"
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["metrics"]).not_to be_empty
+      end
+
       it "handles empty metrics data properly" do
         expect(tsdb_client).to receive(:query_range).and_return([])
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics?key=cpu_usage"
