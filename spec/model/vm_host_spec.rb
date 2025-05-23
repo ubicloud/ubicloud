@@ -379,6 +379,13 @@ RSpec.describe VmHost do
     vh.init_health_monitor_session
   end
 
+  it "initiates a new health monitor session for metrics exporter" do
+    sshable = instance_double(Sshable)
+    expect(vh).to receive(:sshable).and_return(sshable)
+    expect(sshable).to receive(:start_fresh_session)
+    vh.init_metrics_export_session
+  end
+
   it "returns disk device ids when StorageDevice has unix_device_list" do
     sd = StorageDevice.create_with_id(vm_host_id: vh.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["wwn-random-id1", "wwn-random-id2"])
     allow(vh).to receive(:storage_devices).and_return([sd])
@@ -611,6 +618,24 @@ RSpec.describe VmHost do
     it "returns nil if there is no provider" do
       expect(vh).to receive(:provider).and_return(nil)
       expect(vh.provider_name).to be_nil
+    end
+  end
+
+  describe "#metrics_config" do
+    it "returns the right metrics config" do
+      sa = Sshable.create(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair)
+      vh = described_class.create(location_id: Location::HETZNER_FSN1_ID, family: "standard") { it.id = sa.id }
+      expect(Config).to receive(:monitoring_service_project_id).and_return("d272dc1f-52ba-4e52-9bcc-f90dce42a226")
+      expect(vh.metrics_config).to eq({
+        endpoints: [
+          "http://localhost:9100/metrics"
+        ],
+        max_file_retention: 120,
+        interval: "15s",
+        additional_labels: {ubicloud_resource_id: vh.ubid},
+        metrics_dir: "/home/rhizome/host/metrics",
+        project_id: "d272dc1f-52ba-4e52-9bcc-f90dce42a226"
+      })
     end
   end
 end
