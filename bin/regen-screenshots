@@ -102,6 +102,8 @@ class RegenScreenshots
 
     click_button "Verify Account"
 
+    project = Project.first
+
     resize(900, width: 1600)
     visit "/"
     screenshot "quick-start/managed-services-1-screenshot.png"
@@ -113,7 +115,10 @@ class RegenScreenshots
     click_link "GitHub Runners"
     screenshot "github-actions-integration/quickstart-2-screenshot.png"
 
-    project = Project.first
+    GithubInstallation.create(installation_id: 123, name: "ubicloud-demo", type: "Organization", project_id: project.id, allocator_preferences: {"family_filter" => ["premium", "standard"]})
+    page.refresh
+    click_link "Settings", class: "text-gray-500"
+    screenshot "github-actions-integration/use-premium-runners-1-screenshot.png"
 
     resize(650)
     click_link "Tokens"
