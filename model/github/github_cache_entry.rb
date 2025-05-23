@@ -36,15 +36,19 @@ class GithubCacheEntry < Sequel::Model
 
   def after_destroy
     super
+
+    bucket = repository.bucket_name
+    key = blob_key
+
     if committed_at.nil?
       begin
-        repository.blob_storage_client.abort_multipart_upload(bucket: repository.bucket_name, key: blob_key, upload_id: upload_id)
+        repository.blob_storage_client.abort_multipart_upload(bucket:, key:, upload_id:)
       rescue Aws::S3::Errors::NoSuchUpload
       end
     end
 
     begin
-      repository.blob_storage_client.delete_object(bucket: repository.bucket_name, key: blob_key)
+      repository.blob_storage_client.delete_object(bucket:, key:)
     rescue Aws::S3::Errors::NoSuchKey
     end
   end
