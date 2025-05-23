@@ -25,7 +25,8 @@ class VmHost < Sequel::Model
   include ResourceMethods
   include SemaphoreMethods
   include HealthMonitorMethods
-  semaphore :checkup, :reboot, :hardware_reset, :destroy, :graceful_reboot
+  include MetricsTargetMethods
+  semaphore :checkup, :reboot, :hardware_reset, :destroy, :graceful_reboot, :configure_metrics
 
   def host_prefix
     net6.netmask.prefix_len
@@ -354,6 +355,12 @@ class VmHost < Sequel::Model
     }
   end
 
+  def init_metrics_export_session
+    {
+      ssh_session: sshable.start_fresh_session
+    }
+  end
+
   def disk_device_ids
     # we use this next line to migrate data from the old formatting (storing device names) to the new (storing id) so we trigger the convert
     # whenever an element inside unix_device_list is not a SSD or NVMe id.
@@ -407,6 +414,26 @@ class VmHost < Sequel::Model
     else
       fail "BUG: inexhaustive render code"
     end
+  end
+
+  def metrics_config
+    # ignored_timeseries_patterns = []
+    # exclude_pattern = ignored_timeseries_patterns.join("|")
+    # query_params = {
+    #   "match[]": "{__name__!~'#{exclude_pattern}'}"
+    # }
+    # query_str = URI.encode_www_form(query_params)
+
+    {
+      endpoints: [
+        "http://localhost:9100/metrics"
+      ],
+      max_file_retention: 120,
+      interval: "15s",
+      additional_labels: {},
+      metrics_dir: "/home/rhizome/host/metrics",
+      project_id: Config.kubernetes_service_project_id
+    }
   end
 end
 
