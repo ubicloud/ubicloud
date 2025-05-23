@@ -101,7 +101,7 @@ class Vm < Sequel::Model
   #     }
   CloudHypervisorCpuTopo = Struct.new(:threads_per_core, :cores_per_die, :dies_per_package, :packages) do
     def to_s
-      to_a.map(&:to_s).join(":")
+      to_a.join(":")
     end
 
     def max_vcpus
