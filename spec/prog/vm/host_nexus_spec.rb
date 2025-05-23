@@ -326,6 +326,11 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.wait }.to hop("prep_hardware_reset")
     end
 
+    it "hops to configure_metrics when needed" do
+      expect(nx).to receive(:when_configure_metrics_set?).and_yield
+      expect { nx.wait }.to hop("configure_metrics")
+    end
+
     it "hops to unavailable based on the host's available status" do
       expect(nx).to receive(:when_checkup_set?).and_yield
       expect(nx).to receive(:available?).and_return(false)
@@ -407,6 +412,22 @@ RSpec.describe Prog::Vm::HostNexus do
     end
   end
 
+  describe "configure metrics" do
+    it "configures the metrics and hops to wait" do
+      metrics_config = {
+        metrics_dir: "/home/rhizome/host/metrics"
+      }
+      allow(vm_host).to receive(:metrics_config).and_return(metrics_config)
+      expect(sshable).to receive(:cmd).with("mkdir -p /home/rhizome/host/metrics")
+      expect(sshable).to receive(:cmd).with("tee /home/rhizome/host/metrics/config.json > /dev/null", stdin: metrics_config.to_json)
+      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/vmhost-metrics.service > /dev/null", stdin: "[Unit]\nDescription=VmHost Metrics Collection\nAfter=network-online.target\n\n[Service]\nType=oneshot\nUser=rhizome\nExecStart=/home/rhizome/common/bin/metrics-collector /home/rhizome/host/metrics\nStandardOutput=journal\nStandardError=journal\n")
+      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/vmhost-metrics.timer > /dev/null", stdin: "[Unit]\nDescription=Run VmHost Metrics Collection Periodically\n\n[Timer]\nOnBootSec=30s\nOnUnitActiveSec=15s\nAccuracySec=1s\n\n[Install]\nWantedBy=timers.target\n")
+      expect(sshable).to receive(:cmd).with("sudo systemctl daemon-reload")
+      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now vmhost-metrics.timer")
+      expect { nx.configure_metrics }.to hop("wait")
+    end
+  end
+
   describe "host reboot" do
     it "prep_reboot transitions to reboot" do
       expect(nx).to receive(:get_boot_id).and_return("xyz")
@@ -462,7 +483,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(vms).to all receive(:incr_start_after_host_reboot)
       expect(vm_host).to receive(:allocation_state).and_return("unprepared")
       expect(vm_host).to receive(:update).with(allocation_state: "accepting")
-      expect { nx.start_vms }.to hop("wait")
+      expect { nx.start_vms }.to hop("configure_metrics")
     end
 
     it "start_vms starts vms & becomes accepting & hops to wait if was draining an in graceful reboot" do
@@ -470,7 +491,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:when_graceful_reboot_set?).and_yield
       expect(vms).to all receive(:incr_start_after_host_reboot)
       expect(vm_host).to receive(:update).with(allocation_state: "accepting")
-      expect { nx.start_vms }.to hop("wait")
+      expect { nx.start_vms }.to hop("configure_metrics")
     end
 
     it "start_vms starts vms & raises if not in draining and in graceful reboot" do
@@ -480,16 +501,16 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.start_vms }.to raise_error(RuntimeError)
     end
 
-    it "start_vms starts vms & hops to wait if accepting" do
+    it "start_vms starts vms & hops to configure_metrics if accepting" do
       expect(vms).to all receive(:incr_start_after_host_reboot)
       expect(vm_host).to receive(:allocation_state).and_return("accepting")
-      expect { nx.start_vms }.to hop("wait")
+      expect { nx.start_vms }.to hop("configure_metrics")
     end
 
     it "start_vms starts vms & hops to wait if draining" do
       expect(vms).to all receive(:incr_start_after_host_reboot)
       expect(vm_host).to receive(:allocation_state).and_return("draining")
-      expect { nx.start_vms }.to hop("wait")
+      expect { nx.start_vms }.to hop("configure_metrics")
     end
 
     it "can get boot id" do
