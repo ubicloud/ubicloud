@@ -109,14 +109,13 @@ SQL
   def unsynchronized_run
     start_time = Time.now
     prog_label = "#{prog}.#{label}"
+    top_frame = stack.first
 
-    if label == stack.first["deadline_target"]
-      if (pg = Page.from_tag_parts("Deadline", id, prog, stack.first["deadline_target"]))
-        pg.incr_resolve
-      end
+    if label == top_frame["deadline_target"]
+      Page.from_tag_parts("Deadline", id, prog, top_frame["deadline_target"])&.incr_resolve
 
-      stack.first.delete("deadline_target")
-      stack.first.delete("deadline_at")
+      top_frame.delete("deadline_target")
+      top_frame.delete("deadline_at")
 
       modified!(:stack)
     end
@@ -147,8 +146,8 @@ SQL
       end
     end
 
-    unless stack.first["last_label_changed_at"]
-      stack.first["last_label_changed_at"] = Time.now.to_s
+    unless top_frame["last_label_changed_at"]
+      top_frame["last_label_changed_at"] = Time.now.to_s
       modified!(:stack)
     end
 
@@ -174,16 +173,16 @@ SQL
       changed_columns.delete(:schedule)
       e
     rescue Prog::Base::Hop => hp
-      last_changed_at = Time.parse(stack.first["last_label_changed_at"])
+      last_changed_at = Time.parse(top_frame["last_label_changed_at"])
       Clog.emit("hopped") { {strand_hopped: {duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}} }
-      stack.first["last_label_changed_at"] = Time.now.to_s
+      top_frame["last_label_changed_at"] = Time.now.to_s
       modified!(:stack)
 
       update(**hp.strand_update_args, try: 0)
 
       hp
     rescue Prog::Base::Exit => ext
-      last_changed_at = Time.parse(stack.first["last_label_changed_at"])
+      last_changed_at = Time.parse(top_frame["last_label_changed_at"])
       Clog.emit("exited") { {strand_exited: {duration: Time.now - last_changed_at, from: prog_label}} }
 
       update(exitval: ext.exitval, retval: nil)
