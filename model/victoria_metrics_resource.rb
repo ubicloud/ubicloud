@@ -29,12 +29,12 @@ class VictoriaMetricsResource < Sequel::Model
   end
 
   def set_firewall_rules
-    vm_firewall_rules = []
-    vm_firewall_rules.push({cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)})
-    vm_firewall_rules.push({cidr: "::/0", port_range: Sequel.pg_range(22..22)})
-    vm_firewall_rules.push({cidr: "0.0.0.0/0", port_range: Sequel.pg_range(8427..8427)})
-    vm_firewall_rules.push({cidr: "::/0", port_range: Sequel.pg_range(8427..8427)})
-    private_subnet.firewalls.first.replace_firewall_rules(vm_firewall_rules)
+    private_subnet.firewalls.first.replace_firewall_rules([
+      {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)},
+      {cidr: "::/0", port_range: Sequel.pg_range(22..22)},
+      {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(8427..8427)},
+      {cidr: "::/0", port_range: Sequel.pg_range(8427..8427)}
+    ])
   end
 
   def self.redacted_columns
