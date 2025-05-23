@@ -121,7 +121,7 @@ class Vm < Sequel::Model
     # Computed all-system statistics, now scale it down to meet VM needs.
     if vcpus == 1 && threads_per_core > 1
       # special case for single-threaded VMs
-      cores_from_cpus = Rational(vcpus)
+      cores_from_cpus = 1r
       threads_per_core = 1
     else
       cores_from_cpus = Rational(vcpus) / threads_per_core
