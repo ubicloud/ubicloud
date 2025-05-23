@@ -20,6 +20,13 @@ class Vm < Sequel::Model
   many_to_one :vm_host_slice
   many_to_one :location, key: :location_id
 
+  many_through_many :firewalls,
+    [
+      [:nic, :vm_id, :private_subnet_id],
+      [:private_subnet, :id, :id],
+      [:firewalls_private_subnets, :private_subnet_id, :firewall_id]
+    ]
+
   plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancers_vms: :destroy
 
   dataset_module Pagination
@@ -31,10 +38,6 @@ class Vm < Sequel::Model
   semaphore :restart, :stop
 
   include ObjectTag::Cleanup
-
-  def firewalls
-    private_subnets.flat_map(&:firewalls)
-  end
 
   def display_location
     location.display_name
