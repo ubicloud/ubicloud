@@ -286,6 +286,7 @@ RSpec.describe Clover, "github" do
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body).slice("cacheKey", "cacheVersion", "scope").values).to eq(["k1", "v1", "dev"])
+        expect(runner.reload.workflow_job["head_branch"]).to eq("dev")
       end
 
       it "returns a cache from default branch when no branch info" do
