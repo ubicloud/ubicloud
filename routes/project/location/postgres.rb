@@ -369,7 +369,7 @@ class Clover
 
         vmr = VictoriaMetricsResource.first(project_id: pg.representative_server.metrics_config[:project_id])
         vms = vmr&.servers&.first
-        tsdb_client = vms&.client
+        tsdb_client = vms&.client || (VictoriaMetrics::Client.new(endpoint: "http://localhost:8428") if Config.development?)
 
         if tsdb_client.nil?
           raise CloverError.new(404, "NotFound", "Metrics are not configured for this instance")
