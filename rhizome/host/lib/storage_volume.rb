@@ -135,7 +135,7 @@ class StorageVolume
       payload = {
         "method" => "aes256-gcm",
         "key" => key_wrapping_secrets["key"].strip,
-        "initial_vector" => key_wrapping_secrets["init_vector"].strip,
+        "init_vector" => key_wrapping_secrets["init_vector"].strip,
         "auth_data" => Base64.strict_encode64(key_wrapping_secrets["auth_data"]).strip
       }.to_yaml
 
