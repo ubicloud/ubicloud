@@ -25,17 +25,7 @@ RSpec.describe Strand do
     it "does an integrity check that deleted records are gone" do
       st.label = "hop_exit"
       st.save_changes
-      original = DB.method(:[])
-      original = original.super_method unless original.owner == Sequel::Database
-      expect(DB).to receive(:[]) do |*args, **kwargs|
-        case args
-        when ["SELECT FROM strand WHERE id = ?", st.id]
-          instance_double(Sequel::Dataset, empty?: false)
-        else
-          original.call(*args, **kwargs)
-        end
-      end.at_least(:once)
-
+      expect(st).to receive(:exists?).and_return(true)
       expect { st.run }.to raise_error RuntimeError, "BUG: strand with @deleted set still exists in the database"
     end
 
