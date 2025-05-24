@@ -11,11 +11,7 @@ class GithubInstallation < Sequel::Model
   include ResourceMethods
 
   def total_active_runner_vcpus
-    runners_dataset
-      .left_join(:strand, id: :id)
-      .exclude(Sequel[:strand][:label] => ["start", "wait_concurrency_limit"])
-      .select_map(Sequel[:github_runner][:label])
-      .sum { Github.runner_labels[it]["vm_size_data"].vcpus }
+    runners_dataset.total_active_runner_vcpus
   end
 
   def free_runner_upgrade?
