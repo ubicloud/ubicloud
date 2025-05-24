@@ -598,6 +598,15 @@ When you change any template file, format them with `erb-formatter`:
 $ rake linter:erb_formatter
 ```
 
+### Metrics setup
+
+To have the metrics system function during local development, start a
+VictoriaMetrics instance in the background with:
+
+```sh
+$ victoria-metrics -storageDataPath var/victoria-metrics-data
+```
+
 ### Cloudifying a Host for Development
 
 We show cloudifying a host from Hetzner, but the principles should work everywhere. Make sure that the Hetzner instance has at least one `One additional subnet /29` ordered and `Ubuntu 24.04 LTS base` is installed.
