@@ -102,15 +102,13 @@ end
 
   class FlowControl < RuntimeError; end
 
-  EMPTY_ARRAY = [].freeze
-
   class Exit < FlowControl
     attr_reader :exitval
 
     def initialize(strand, exitval)
       @strand = strand
       @exitval = exitval
-      set_backtrace EMPTY_ARRAY
+      set_backtrace []
     end
 
     def to_s
@@ -125,7 +123,7 @@ end
       @old_prog = old_prog
       @old_label = old_label
       @strand_update_args = strand_update_args
-      set_backtrace EMPTY_ARRAY
+      set_backtrace []
     end
 
     def new_label
@@ -146,7 +144,7 @@ end
 
     def initialize(seconds)
       @seconds = seconds
-      set_backtrace EMPTY_ARRAY
+      set_backtrace []
     end
 
     def to_s
