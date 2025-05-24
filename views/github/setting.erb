@@ -27,10 +27,10 @@
       </div>
       <ul role="list" class="mt-4 grid grid-cols-1 gap-4 text-sm/6 text-gray-600 sm:grid-cols-2">
         <% [
-          "Fast gaming CPUs",
           "Twice as fast",
           "One fifth the cost",
-          "10x better price/performance"
+          "10x better price-performance",
+          "100GB free cache storage",
         ].each do |text| %>
           <li class="flex gap-x-3">
             <%== part("components/icon", name: "hero-check", classes: "h-6 w-5 flex-none text-orange-600") %>
@@ -39,20 +39,19 @@
         <% end %>
       </ul>
     </div>
-    <div class="-mt-2 p-2 lg:mt-0 lg:w-full lg:max-w-md lg:shrink-0">
+    <div class="-mt-2 p-2 lg:mt-0 lg:w-full lg:max-w-sm lg:shrink-0">
       <div
         class="rounded-lg bg-gray-50 py-10 text-center ring-1 ring-inset ring-gray-900/5 lg:flex lg:flex-col lg:justify-center lg:py-16"
       >
-        <div class="mx-auto max-w-xs px-8 space-y-6">
-          <p class="text-base font-semibold text-gray-600">Boost your builds.
-            <br>
-            1/5th the cost of GitHub runners</p>
+        <div class="mx-auto max-w-sm px-8 space-y-8">
           <p class="flex items-baseline justify-center gap-x-2">
-            <span class="text-5xl font-semibold tracking-tight text-gray-900">$0.0016</span>
-            <span class="text-sm/6 font-semibold tracking-wide text-gray-600">/minute</span>
+            <span class="text-4xl font-semibold tracking-tight text-gray-900">Boost your builds</span>
           </p>
           <%== part("components/form/toggle_form", name: "premium_runner_enabled", action: "#{@project_data[:path]}/github/#{@installation.ubid}", active: @installation.premium_runner_enabled?) %>
-          <p class="mt-6 text-xs/5 text-gray-600"></p>
+          <div class="mt-6 text-sm/5 text-gray-600 italic">
+            <p class="font-semibold">1/5th the cost of GitHub runners</p>
+            <p>For example, 2 gaming vCPUs, 8GB of RAM, 80GB of NVMe storage comes at $0.0016/min.</p>
+          </div>
         </div>
       </div>
     </div>
