@@ -84,10 +84,12 @@ class StorageVolume
     key2 = key_encryption.wrap_key2(encryption_key[:key2]).delete("\n")
     vhost_block_backend = VhostBlockBackend.new(@vhost_block_backend_version)
     config_path = vhost_block_backend.config_path(@vm_name, @disk_index)
+    metadata_path = vhost_block_backend.metadata_path(@vm_name, @disk_index)
 
     config = {
       "path" => disk_file,
       "image_path" => @image_path,
+      "metadata_path" => metadata_path,
       "socket" => vhost_sock,
       "num_queues" => 4,
       "queue_size" => 64,
@@ -100,6 +102,13 @@ class StorageVolume
     File.write(config_path, config.to_yaml)
     FileUtils.chown @vm_name, @vm_name, config_path
     FileUtils.chmod "u=rw,g=,o=", config_path
+
+    # Create the metadata file
+    FileUtils.touch(metadata_path)
+    File.truncate(metadata_path, 8 * 1024 * 1024)
+    FileUtils.chown @vm_name, @vm_name, metadata_path
+    FileUtils.chmod "u=rw,g=,o=", metadata_path
+    r "#{vhost_block_backend.init_metadata_path} --config #{config_path.shellescape} --kek /dev/stdin", stdin: kek_yaml(key_wrapping_secrets)
 
     service_file_path = "/etc/systemd/system/#{@vm_name}-storage.service"
     File.write(service_file_path, <<~SERVICE)
@@ -121,6 +130,15 @@ class StorageVolume
     FileUtils.chmod "u=rw,g=r,o=", service_file_path
   end
 
+  def kek_yaml(key_wrapping_secrets)
+    {
+      "method" => "aes256-gcm",
+      "key" => key_wrapping_secrets["key"].strip,
+      "init_vector" => key_wrapping_secrets["init_vector"].strip,
+      "auth_data" => Base64.strict_encode64(key_wrapping_secrets["auth_data"]).strip
+    }.to_yaml
+  end
+
   def start(key_wrapping_secrets)
     encryption_key = read_data_encryption_key(key_wrapping_secrets) if @encrypted
 
@@ -130,17 +148,12 @@ class StorageVolume
       FileUtils.chmod "u=rwx,g=,o=", "/run/#{@vm_name}"
       File.delete(kek_pipe) if File.exist?(kek_pipe)
       File.mkfifo(kek_pipe, 0o600)
+      FileUtils.chmod "u=rw,g=,o=", kek_pipe
       FileUtils.chown @vm_name, @vm_name, kek_pipe
       r "systemctl start #{@vm_name}-storage"
-      payload = {
-        "method" => "aes256-gcm",
-        "key" => key_wrapping_secrets["key"].strip,
-        "init_vector" => key_wrapping_secrets["init_vector"].strip,
-        "auth_data" => Base64.strict_encode64(key_wrapping_secrets["auth_data"]).strip
-      }.to_yaml
 
       Timeout.timeout(5) do
-        File.open(kek_pipe, File::WRONLY) { |f| f.write(payload) }
+        File.open(kek_pipe, File::WRONLY) { |f| f.write(kek_yaml(key_wrapping_secrets)) }
       end
       return
     end
