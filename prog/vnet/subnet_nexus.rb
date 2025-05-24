@@ -127,8 +127,9 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
   label def refresh_keys
     decr_refresh_keys
-    nap 10 if active_nics.any? { |nic| nic.lock_set? }
-    active_nics.each do |nic|
+    nics = active_nics
+    nap 10 if nics.any? { |nic| nic.lock_set? }
+    nics.each do |nic|
       nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
       nic.incr_start_rekey
       nic.incr_lock
@@ -138,8 +139,9 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def wait_inbound_setup
-    if rekeying_nics.all? { |nic| nic.strand.label == "wait_rekey_outbound_trigger" }
-      rekeying_nics.each(&:incr_trigger_outbound_update)
+    nics = rekeying_nics
+    if nics.all? { |nic| nic.strand.label == "wait_rekey_outbound_trigger" }
+      nics.each(&:incr_trigger_outbound_update)
       hop_wait_outbound_setup
     end
 
@@ -147,8 +149,9 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def wait_outbound_setup
-    if rekeying_nics.all? { |nic| nic.strand.label == "wait_rekey_old_state_drop_trigger" }
-      rekeying_nics.each(&:incr_old_state_drop_trigger)
+    nics = rekeying_nics
+    if nics.all? { |nic| nic.strand.label == "wait_rekey_old_state_drop_trigger" }
+      nics.each(&:incr_old_state_drop_trigger)
       hop_wait_old_state_drop
     end
 
@@ -156,9 +159,10 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def wait_old_state_drop
-    if rekeying_nics.all? { |nic| nic.strand.label == "wait" }
+    nics = rekeying_nics
+    if nics.all? { |nic| nic.strand.label == "wait" }
       private_subnet.update(state: "waiting", last_rekey_at: Time.now)
-      rekeying_nics.each do |nic|
+      nics.each do |nic|
         nic.update(encryption_key: nil, rekey_payload: nil)
         nic.unlock
       end
@@ -238,19 +242,25 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     selected_addr
   end
 
-  def to_be_added_nics
-    private_subnet.find_all_connected_nics.select { it.strand.label == "wait_setup" }
-  end
-
   def active_nics
-    private_subnet.find_all_connected_nics.select { it.strand.label == "wait" }
+    nics_with_strand_label("wait").all
   end
 
   def nics_to_rekey
-    (active_nics + to_be_added_nics).uniq
+    nics_with_strand_label(%w[wait wait_setup]).all
   end
 
   def rekeying_nics
-    private_subnet.find_all_connected_nics.select { !it.rekey_payload.nil? }
+    all_connected_nics.eager(:strand).exclude(rekey_payload: nil).all
+  end
+
+  private
+
+  def all_connected_nics
+    private_subnet.find_all_connected_nics
+  end
+
+  def nics_with_strand_label(label)
+    all_connected_nics.join(:strand, {id: :id, label:}).select_all(:nic)
   end
 end
