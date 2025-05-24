@@ -33,16 +33,20 @@ class LoadBalancer < Sequel::Model
   end
 
   def vm_ports_by_vm(vm)
-    vm_ports_dataset.where(load_balancer_vm_id: load_balancers_vms_dataset.where(vm_id: vm.id).select(:id))
+    # Use subquery instead of joins as this is the basis for a dataset that will be used in an UPDATE query
+    LoadBalancerVmPort.where(
+      load_balancer_port_id: ports_dataset.select(:id),
+      load_balancer_vm_id: vms_dataset.where(vm_id: vm.id).select(Sequel[:load_balancers_vms][:id])
+    )
   end
 
   def vm_ports_by_vm_and_state(vm, state)
-    vm_ports_dataset.where(load_balancer_vm_id: load_balancers_vms_dataset.where(vm_id: vm.id).select(:id), state:)
+    vm_ports_by_vm(vm).where(state:)
   end
 
   def add_port(src_port, dst_port)
     DB.transaction do
-      port = LoadBalancerPort.create(load_balancer_id: id, src_port:, dst_port:)
+      port = super(src_port:, dst_port:)
       load_balancers_vms.each do |lb_vm|
         LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: lb_vm.id)
       end
@@ -53,7 +57,7 @@ class LoadBalancer < Sequel::Model
   def remove_port(port)
     DB.transaction do
       vm_ports_dataset.where(load_balancer_port_id: port.id).destroy
-      port.destroy
+      ports_dataset.where(id: port.id).destroy
       incr_update_load_balancer
     end
   end
@@ -71,21 +75,23 @@ class LoadBalancer < Sequel::Model
 
   def detach_vm(vm)
     DB.transaction do
-      ids_to_update = vm_ports_by_vm_and_state(vm, ["up", "down", "evacuating"]).map(&:id)
-      LoadBalancerVmPort.where(id: ids_to_update).update(state: "detaching")
-      Strand.create(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id) if cert_enabled_lb?
+      vm_ports_by_vm_and_state(vm, ["up", "down", "evacuating"]).update(state: "detaching")
+      remove_cert_server(vm.id)
       incr_update_load_balancer
     end
   end
 
   def evacuate_vm(vm)
     DB.transaction do
-      ids_to_update = vm_ports_by_vm_and_state(vm, ["up", "down"]).map(&:id)
-      LoadBalancerVmPort.where(id: ids_to_update).update(state: "evacuating")
-      Strand.create(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id) if cert_enabled_lb?
+      vm_ports_by_vm_and_state(vm, ["up", "down"]).update(state: "evacuating")
+      remove_cert_server(vm.id)
       incr_update_load_balancer
       incr_rewrite_dns_records
     end
+  end
+
+  def remove_cert_server(vm_id)
+    Strand.create(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id:}], parent_id: id) if cert_enabled_lb?
   end
 
   def remove_vm(vm)
@@ -98,7 +104,7 @@ class LoadBalancer < Sequel::Model
 
   def remove_vm_port(vm_port)
     DB.transaction do
-      LoadBalancerVmPort.where(id: vm_port.id).destroy
+      vm_ports_dataset.where(Sequel[:load_balancer_vm_port][:id] => vm_port.id).destroy
       if vm_ports_dataset.where(load_balancer_vm_id: vm_port.load_balancer_vm_id).count.zero?
         load_balancers_vms_dataset[id: vm_port.load_balancer_vm_id].destroy
       end

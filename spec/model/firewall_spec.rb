@@ -68,7 +68,6 @@ RSpec.describe Firewall do
   it "destroys firewall" do
     fw.associate_with_private_subnet(ps, apply_firewalls: false)
     expect(fw.reload.private_subnets.count).to eq(1)
-    expect(fw.private_subnets).to receive(:each).and_return([ps])
     expect(FirewallsPrivateSubnets.where(firewall_id: fw.id).count).to eq(1)
     fw.destroy
     expect(FirewallsPrivateSubnets.where(firewall_id: fw.id).count).to eq(0)
