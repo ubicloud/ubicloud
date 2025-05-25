@@ -434,11 +434,7 @@ class StorageVolume
     @vhost_sock ||= sp.vhost_sock
   end
 
-  def num_queues
-    @num_queues
-  end
+  attr_reader :num_queues
 
-  def queue_size
-    @queue_size
-  end
+  attr_reader :queue_size
 end
