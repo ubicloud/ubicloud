@@ -52,32 +52,26 @@ RSpec.describe GithubRepository do
     it "creates a bucket and token" do
       expect(Config).to receive_messages(github_cache_blob_storage_region: "weur")
       expect(blob_storage_client).to receive(:create_bucket).with({bucket: "gph0hh0ahdbj6ng2cc3rvdecr8", create_bucket_configuration: {location_constraint: "weur"}})
-      expected_policy = [
-        {
-          "effect" => "allow",
-          "permission_groups" => [{"id" => "2efd5506f9c8494dacb1fa10a3e7d5b6", "name" => "Workers R2 Storage Bucket Item Write"}],
-          "resources" => {"com.cloudflare.edge.r2.bucket.123_default_gph0hh0ahdbj6ng2cc3rvdecr8" => "*"}
-        }
-      ]
-      expect(cloudflare_client).to receive(:create_token).with("gph0hh0ahdbj6ng2cc3rvdecr8-token", expected_policy).and_return(["test-key", "test-secret"])
-      expect(github_repository).to receive(:update).with(access_key: "test-key", secret_key: Digest::SHA256.hexdigest("test-secret"))
+      expect(cloudflare_client).to receive(:create_temporary_token).with("gph0hh0ahdbj6ng2cc3rvdecr8", "object-read-write", 432000).and_return(["test-key", "test-secret", "test-token"])
+      expect(github_repository).to receive(:update).with(access_key: "test-key", secret_key: "test-secret", session_token: "test-token", last_token_refreshed_at: instance_of(Time))
       expect(github_repository).to receive(:lock!)
       github_repository.setup_blob_storage
     end
 
     it "succeeds if the bucket already exists and access key does not exist" do
-      expect(Config).to receive_messages(github_cache_blob_storage_region: "weur", github_cache_blob_storage_account_id: "123")
+      expect(Config).to receive_messages(github_cache_blob_storage_region: "weur")
       expect(blob_storage_client).to receive(:create_bucket).and_raise(Aws::S3::Errors::BucketAlreadyOwnedByYou.new(nil, nil))
-      expect(cloudflare_client).to receive(:create_token).and_return(["test-key", "test-secret"])
+      expect(cloudflare_client).to receive(:create_temporary_token).with("gph0hh0ahdbj6ng2cc3rvdecr8", "object-read-write", 432000).and_return(["test-key", "test-secret", "test-token"])
       expect(github_repository).to receive(:access_key).and_return(nil)
-      expect(github_repository).to receive(:update).with(access_key: "test-key", secret_key: Digest::SHA256.hexdigest("test-secret"))
+      expect(github_repository).to receive(:update).with(access_key: "test-key", secret_key: "test-secret", session_token: "test-token", last_token_refreshed_at: instance_of(Time))
       expect(github_repository).to receive(:lock!)
       github_repository.setup_blob_storage
     end
 
-    it "succeeds if the access and secret key already exist" do
+    it "succeeds if the access and secret key and token already exist" do
       expect(github_repository).to receive(:access_key).and_return("test-key")
       expect(github_repository).to receive(:secret_key).and_return(Digest::SHA256.hexdigest("test-secret"))
+      expect(github_repository).to receive(:session_token).and_return("test-token")
       expect(github_repository).to receive(:lock!)
       github_repository.setup_blob_storage
     end

@@ -25,7 +25,7 @@ RSpec.describe Clover, "github" do
     end
 
     it "vm has runner and repository" do
-      repository = GithubRepository.create_with_id(name: "test", access_key: "key")
+      repository = GithubRepository.create_with_id(name: "test", access_key: "key", secret_key: "secret", session_token: "token")
       GithubRunner.create_with_id(vm_id: vm.id, repository_name: "test", label: "ubicloud", repository_id: repository.id)
       get "/runtime/github"
 
@@ -61,7 +61,7 @@ RSpec.describe Clover, "github" do
   end
 
   describe "cache endpoints" do
-    let(:repository) { GithubRepository.create_with_id(name: "test", default_branch: "main", access_key: "123", installation:) }
+    let(:repository) { GithubRepository.create_with_id(name: "test", default_branch: "main", access_key: "123", session_token: "token", installation:) }
     let(:installation) { GithubInstallation.create_with_id(installation_id: 123, name: "test-user", type: "User", project: Project.create_with_id(name: "test")) }
     let(:runner) { GithubRunner.create_with_id(vm_id: create_vm.id, repository_name: "test", label: "ubicloud", repository_id: repository.id, workflow_job: {head_branch: "dev"}) }
     let(:url_presigner) { instance_double(Aws::S3::Presigner, presigned_request: "aa") }

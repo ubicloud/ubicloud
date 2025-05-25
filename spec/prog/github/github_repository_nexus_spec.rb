@@ -177,6 +177,20 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     end
   end
 
+  describe ".check_token_lifetime" do
+    it "refresh blob storage token if it has less than 2 days lifetime" do
+      expect(github_repository).to receive(:last_token_refreshed_at).and_return(Time.now - GithubRepository::BLOB_STORAGE_TOKEN_TTL)
+      expect(github_repository).to receive(:refresh_blob_storage_token)
+      nx.check_token_lifetime
+    end
+
+    it "does not refresh blob storage token if it has more than 2 days lifetime" do
+      expect(github_repository).to receive(:last_token_refreshed_at).and_return(Time.now - 24 * 60 * 60)
+      expect(github_repository).not_to receive(:refresh_blob_storage_token)
+      nx.check_token_lifetime
+    end
+  end
+
   describe "#before_run" do
     it "hops to destroy when needed" do
       expect(nx).to receive(:when_destroy_set?).and_yield
@@ -194,6 +208,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
   describe "#wait" do
     it "checks queued jobs and cache usage then naps" do
       expect(github_repository).to receive(:access_key).and_return("key")
+      expect(nx).to receive(:check_token_lifetime)
       expect(nx).to receive(:check_queued_jobs)
       expect(nx).to receive(:cleanup_cache)
       expect { nx.wait }.to nap(5 * 60)
@@ -204,6 +219,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(github_repository).to receive(:last_job_at).and_return(Time.now - 7 * 60 * 60)
       expect(nx).not_to receive(:check_queued_jobs)
       expect(nx).to receive(:cleanup_cache)
+      expect(nx).to receive(:check_token_lifetime)
       expect { nx.wait }.to nap(15 * 60)
     end
 
