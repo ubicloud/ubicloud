@@ -242,6 +242,7 @@ class Vm < Sequel::Model
   end
 
   def storage_volumes
+    topo = cloud_hypervisor_cpu_topology
     vm_storage_volumes.map { |s|
       {
         "boot" => s.boot,
@@ -259,7 +260,10 @@ class Vm < Sequel::Model
         "read_only" => s.size_gib == 0,
         "max_ios_per_sec" => s.max_ios_per_sec,
         "max_read_mbytes_per_sec" => s.max_read_mbytes_per_sec,
-        "max_write_mbytes_per_sec" => s.max_write_mbytes_per_sec
+        "max_write_mbytes_per_sec" => s.max_write_mbytes_per_sec,
+        "slice_name" => vm_host_slice&.inhost_name || "system.slice",
+        "num_queues" => (topo.max_vcpus > 1) ? topo.max_vcpus / 2 : 1,
+        "queue_size" => 128,
       }
     }
   end

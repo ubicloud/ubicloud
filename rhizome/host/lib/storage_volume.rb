@@ -35,6 +35,9 @@ class StorageVolume
     @max_ios_per_sec = params["max_ios_per_sec"]
     @max_read_mbytes_per_sec = params["max_read_mbytes_per_sec"]
     @max_write_mbytes_per_sec = params["max_write_mbytes_per_sec"]
+    @slice = params.fetch("slice_name", "system.slice")
+    @num_queues = params.fetch("num_queues", 1)
+    @queue_size = params.fetch("queue_size", 128)
   end
 
   def vp
@@ -91,9 +94,9 @@ class StorageVolume
       "image_path" => @image_path,
       "metadata_path" => metadata_path,
       "socket" => vhost_sock,
-      "num_queues" => 4,
-      "queue_size" => 64,
-      "seg_size_max" => 65536,
+      "num_queues" => @num_queues,
+      "queue_size" => @queue_size,
+      "seg_size_max" => 65536 * 2,
       "seg_count_max" => 4,
       "poll_queue_timeout_us" => 1000,
       "encryption_key" => [key1, key2]
@@ -117,7 +120,8 @@ class StorageVolume
         After=network.target
 
         [Service]
-        Environment=RUST_LOG=debug
+        Slice=#{@slice}
+        Environment=RUST_LOG=info
         ExecStart=#{vhost_block_backend.bin_path} --config #{config_path} --kek #{kek_pipe}
         Restart=always
         User=#{@vm_name}
@@ -428,5 +432,13 @@ class StorageVolume
 
   def vhost_sock
     @vhost_sock ||= sp.vhost_sock
+  end
+
+  def num_queues
+    @num_queues
+  end
+
+  def queue_size
+    @queue_size
   end
 end

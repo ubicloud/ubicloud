@@ -668,7 +668,7 @@ DNSMASQ_SERVICE
       if volume.read_only
         "path=#{volume.image_path},readonly=on"
       else
-        "vhost_user=true,socket=#{volume.vhost_sock},num_queues=1,queue_size=64"
+        "vhost_user=true,socket=#{volume.vhost_sock},num_queues=#{volume.num_queues},queue_size=#{volume.queue_size}"
       end
     }
     disk_params << "path=#{vp.cloudinit_img}"
