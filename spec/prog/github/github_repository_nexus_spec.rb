@@ -189,6 +189,19 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(github_repository).not_to receive(:refresh_blob_storage_token)
       nx.check_token_lifetime
     end
+
+    it "creates a page if the token has lifetime less than a day" do
+      expect(github_repository).to receive(:last_token_refreshed_at).and_return(Time.now - GithubRepository::BLOB_STORAGE_TOKEN_TTL + 12 * 60 * 60)
+      expect(github_repository).to receive(:refresh_blob_storage_token)
+      expect { nx.check_token_lifetime }.to change { Page.active.count }.from(0).to(1)
+
+      # resolve the page
+      expect(github_repository).to receive(:last_token_refreshed_at).and_return(Time.now)
+      page = instance_double(Page)
+      expect(page).to receive(:incr_resolve)
+      expect(Page).to receive(:from_tag_parts).and_return(page)
+      nx.check_token_lifetime
+    end
   end
 
   describe "#before_run" do
