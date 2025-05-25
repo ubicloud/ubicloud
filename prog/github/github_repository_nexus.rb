@@ -122,6 +122,18 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     end
   end
 
+  def check_token_lifetime
+    remaining_lifetime = GithubRepository::BLOB_STORAGE_TOKEN_TTL - (Time.now - github_repository.last_token_refreshed_at)
+    if remaining_lifetime < 24 * 60 * 60
+      Prog::PageNexus.assemble("Expiring blob storage token for #{github_repository.ubid}", ["ExpiringBlobToken", github_repository.id], github_repository.ubid)
+    else
+      Page.from_tag_parts("ExpiringBlobToken", github_repository.id)&.incr_resolve
+    end
+    if remaining_lifetime < 2 * 24 * 60 * 60
+      github_repository.refresh_blob_storage_token
+    end
+  end
+
   def before_run
     when_destroy_set? do
       if strand.label != "destroy"
@@ -132,7 +144,11 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   end
 
   label def wait
-    cleanup_cache if github_repository.access_key
+    if github_repository.access_key
+      check_token_lifetime
+      cleanup_cache
+    end
+
     nap 15 * 60 if Time.now - github_repository.last_job_at > 6 * 60 * 60
 
     begin

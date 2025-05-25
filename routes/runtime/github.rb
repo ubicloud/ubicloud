@@ -7,7 +7,7 @@ class Clover
     end
 
     begin
-      repository.setup_blob_storage unless repository.access_key
+      repository.setup_blob_storage unless repository.access_key && repository.session_token
     rescue Excon::Error::HTTPStatus => ex
       Clog.emit("Unable to setup blob storage") { {failed_blob_storage_setup: {ubid: runner.ubid, repository_ubid: repository.ubid, response: ex.response.body}} }
       fail CloverError.new(400, "InvalidRequest", "unable to setup blob storage")
