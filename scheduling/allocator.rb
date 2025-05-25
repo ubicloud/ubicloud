@@ -610,7 +610,7 @@ module Scheduling::Allocator
 
     def create_storage_volumes(vm, vm_host)
       @request.storage_volumes.each do |disk_index, volume|
-        if vm_host.vhost_block_backends.empty?
+        if vm_host.vhost_block_backends.sum(&:allocation_weight) == 0
           spdk_installation_id = StorageAllocation.allocate_spdk_installation(vm_host.spdk_installations)
           vhost_block_backend_id = nil
           use_bdev_ubi = SpdkInstallation[spdk_installation_id].supports_bdev_ubi? && volume["boot"]

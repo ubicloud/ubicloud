@@ -263,7 +263,7 @@ class Vm < Sequel::Model
         "max_write_mbytes_per_sec" => s.max_write_mbytes_per_sec,
         "slice_name" => vm_host_slice&.inhost_name || "system.slice",
         "num_queues" => (topo.max_vcpus > 1) ? topo.max_vcpus / 2 : 1,
-        "queue_size" => 128,
+        "queue_size" => 128
       }
     }
   end
