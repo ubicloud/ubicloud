@@ -880,6 +880,10 @@ paths:
                 cidr:
                   description: CIDR of the firewall rule
                   type: string
+                description:
+                  description: Description of the firewall rule
+                  type: string
+                  nullable: true
               additionalProperties: false
               required:
                 - cidr
@@ -1975,6 +1979,9 @@ components:
       properties:
         cidr:
           description: CIDR of the Postgres firewall rule
+          type: string
+        description:
+          description: Description of the Postgres firewall rule
           type: string
         id:
           description: ID of the Postgres firewall rule

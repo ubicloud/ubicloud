@@ -549,10 +549,12 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "Firewall rule is created"
 
         fill_in "cidr", with: "fd00::/64"
+        fill_in "description", with: "test description - new firewall rule"
         find(".firewall-rule-create-button").click
         expect(page).to have_content "Firewall rule is created"
         expect(page.status_code).to eq(200)
         expect(page).to have_content "fd00::/64"
+        expect(page).to have_content "test description - new firewall rule"
 
         expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
       end
