@@ -13,6 +13,7 @@ end
 #  id                   | uuid | PRIMARY KEY
 #  cidr                 | cidr | NOT NULL
 #  postgres_resource_id | uuid | NOT NULL
+#  description          | text |
 # Indexes:
 #  postgres_firewall_rule_pkey                          | PRIMARY KEY btree (id)
 #  postgres_firewall_rule_postgres_resource_id_cidr_key | UNIQUE btree (postgres_resource_id, cidr)
