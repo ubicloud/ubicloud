@@ -15,7 +15,7 @@ class Prog::Vm::Nexus < Prog::Base
     unix_user: "ubi", location_id: Location::HETZNER_FSN1_ID, boot_image: Config.default_boot_image_name,
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
     enable_ip4: false, pool_id: nil, arch: "x64", swap_size_bytes: nil,
-    distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0,
+    distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0, gpu_device: nil,
     hugepages: true, ch_version: nil, firmware_version: nil)
 
     unless (project = Project[project_id])
@@ -115,7 +115,10 @@ class Prog::Vm::Nexus < Prog::Base
       ) { it.id = ubid.to_uuid }
       nic.update(vm_id: vm.id)
 
-      gpu_count = 1 if gpu_count == 0 && vm_size.gpu
+      if vm_size.family == "standard-gpu"
+        gpu_count = 1
+        gpu_device = "27b0"
+      end
       label = (location.provider == "aws") ? "start_aws" : "start"
 
       Strand.create(
@@ -128,6 +131,7 @@ class Prog::Vm::Nexus < Prog::Base
           "force_host_id" => force_host_id,
           "exclude_host_ids" => exclude_host_ids,
           "gpu_count" => gpu_count,
+          "gpu_device" => gpu_device,
           "hugepages" => hugepages,
           "ch_version" => ch_version,
           "firmware_version" => firmware_version
@@ -201,6 +205,7 @@ class Prog::Vm::Nexus < Prog::Base
       distinct_storage_devices = frame["distinct_storage_devices"] || false
       host_exclusion_filter = frame["exclude_host_ids"] || []
       gpu_count = frame["gpu_count"] || 0
+      gpu_device = frame["gpu_device"] || nil
       runner = GithubRunner.first(vm_id: vm.id) if vm.location_id == Location::GITHUB_RUNNERS_ID
       allocation_state_filter, location_filter, location_preference, host_filter, family_filter =
         if frame["force_host_id"]
@@ -236,6 +241,7 @@ class Prog::Vm::Nexus < Prog::Base
         host_filter: host_filter,
         host_exclusion_filter: host_exclusion_filter,
         gpu_count: gpu_count,
+        gpu_device: gpu_device,
         family_filter: family_filter
       )
     rescue RuntimeError => ex
