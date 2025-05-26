@@ -6,7 +6,7 @@ class OptionTreeGenerator
     @parents = {}
   end
 
-  def add_option(name:, values: nil, parent: nil, &check)
+  def add_option(name:, values: nil, parent: nil, check: nil)
     @options << {name:, values:, parent:, check:}
   end
 
