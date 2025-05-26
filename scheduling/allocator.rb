@@ -12,7 +12,7 @@ module Scheduling::Allocator
     @target_host_utilization ||= Config.allocator_target_host_utilization
   end
 
-  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [])
+  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [])
     request = Request.new(
       vm.id,
       vm.vcpus,
@@ -22,6 +22,7 @@ module Scheduling::Allocator
       vm.boot_image,
       distinct_storage_devices,
       gpu_count,
+      gpu_device,
       vm.ip4_enabled,
       target_host_utilization,
       vm.arch,
@@ -53,6 +54,7 @@ module Scheduling::Allocator
     :boot_image,
     :distinct_storage_devices,
     :gpu_count,
+    :gpu_device,
     :ip4_enabled,
     :target_host_utilization,
     :arch_filter,
@@ -177,7 +179,8 @@ module Scheduling::Allocator
           .select_append { count.function.*.as(num_gpus) }
           .select_append { sum(Sequel.case({{vm_id: nil} => 1}, 0)).as(available_gpus) }
           .select_append { array_remove(array_agg(Sequel.case({{vm_id: nil} => :iommu_group}, nil)), nil).as(available_iommu_groups) }
-          .where(device_class: ["0300", "0302"]))
+          .where(device_class: ["0300", "0302"])
+          .where { (device =~ request.gpu_device) | request.gpu_device.nil? })
         .with(:vm_provisioning, DB[:vm]
           .select_group(:vm_host_id)
           .select_append { count.function.*.as(vm_provisioning_count) }
@@ -233,7 +236,7 @@ module Scheduling::Allocator
       ds = ds.where(location_id: request.location_filter) unless request.location_filter.empty?
       ds = ds.where(allocation_state: request.allocation_state_filter) unless request.allocation_state_filter.empty?
       ds = ds.where(Sequel[:vm_host][:family] => request.family_filter) unless request.family_filter.empty?
-      ds = ds.exclude(total_cores: 14, total_cpus: 14) unless request.family == "standard-gpu"
+      ds = ds.exclude(total_cores: 14, total_cpus: 14) unless request.gpu_count > 0
 
       # If we dont's want to use slices, place those only on hosts that do not accept them
       # If we require a shared slice (for burstable vm), allocate those only on hosts that accept slices
