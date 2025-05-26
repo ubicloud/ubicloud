@@ -135,6 +135,7 @@ jobs:
 
       run: |
         set -o pipefail
+        echo '${{ toJSON(env) }}' | jq -r 'to_entries[] | "\(.key)=\"\(.value|tostring)\""' > .env
         timeout 62m foreman start -m all=1,respirate=2 | tee foreman.log | grep --line-buffered -F "e2e.1"
 
     - name: Print logs
