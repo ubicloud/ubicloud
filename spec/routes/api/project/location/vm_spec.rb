@@ -217,6 +217,92 @@ RSpec.describe Clover, "vm" do
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id", {"private_subnet_id" => "Private subnet with the given id \"#{ps_id}\" is not found in the location \"eu-central-h1\""})
       end
+
+      it "invalid gpu format" do
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          unix_user: "ubi",
+          size: "standard-2",
+          enable_ip4: true,
+          gpu: "invalid-gpu-format"
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: gpu", {"gpu" => "gpu field must be in the format 'count:device_name'."})
+      end
+
+      it "invalid gpu count" do
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          unix_user: "ubi",
+          size: "standard-2",
+          enable_ip4: true,
+          gpu: "3:20b5"
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: gpu", {"gpu" => "gpu count must be one of the following: 0, 1, 2, 4, 8"})
+      end
+
+      it "feature flag not set for gpu vm" do
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          unix_user: "ubi",
+          size: "standard-2",
+          enable_ip4: true,
+          gpu: "1:20b5"
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: gpu", {"gpu" => "gpu not available for this project"})
+      end
+
+      it "unsupported gpu type" do
+        project.set_ff_gpu_vm(true)
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          unix_user: "ubi",
+          size: "standard-2",
+          enable_ip4: true,
+          gpu: "1:unsupported"
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: gpu", {"gpu" => "gpu type unsupported"})
+      end
+
+      it "unsupported gpu family" do
+        project.set_ff_gpu_vm(true)
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          unix_user: "ubi",
+          size: "burstable-2",
+          enable_ip4: true,
+          gpu: "1:20b5"
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: gpu", {"gpu" => "gpu not available for burstable vms"})
+      end
+
+      it "unspecified gpu type" do
+        project.set_ff_gpu_vm(true)
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          unix_user: "ubi",
+          enable_ip4: true,
+          gpu: "1:"
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: gpu", {"gpu" => "gpu type must be specified when gpu count is greater than 0."})
+      end
+    end
+
+    it "succeeds with gpu count of zero" do
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+        public_key: "ssh key",
+        unix_user: "ubi",
+        size: "standard-2",
+        enable_ip4: true,
+        gpu: "0:"
+      }.to_json
+
+      expect(last_response.status).to eq(200)
     end
 
     describe "show" do

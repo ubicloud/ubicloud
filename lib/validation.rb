@@ -79,6 +79,25 @@ module Validation
     storage_size
   end
 
+  def self.validate_vm_gpu(gpu, location, project, vm_size)
+    if (match = gpu.match(/^(\d+):(.*)$/))
+      gpu_count, gpu_device = match[1].to_i, match[2]
+    else
+      fail ValidationFailed.new({gpu: "gpu field must be in the format 'count:device_name'."})
+    end
+    valid_gpu_count = [0, 1, 2, 4, 8]
+    fail ValidationFailed.new({gpu: "gpu count must be one of the following: #{valid_gpu_count.join(", ")}"}) unless valid_gpu_count.include?(gpu_count)
+
+    return [0, nil] if gpu_count == 0
+
+    fail ValidationFailed.new({gpu: "gpu not available for burstable vms"}) if vm_size&.family == "burstable"
+    fail ValidationFailed.new({gpu: "gpu not available for this project"}) unless project.get_ff_gpu_vm
+    fail ValidationFailed.new({gpu: "gpu type must be specified when gpu count is greater than 0."}) if gpu_device.nil? || gpu_device.empty?
+    fail ValidationFailed.new({gpu: "gpu type unsupported"}) unless !!BillingRate.from_resource_properties("Gpu", gpu_device, location)
+
+    [gpu_count, gpu_device]
+  end
+
   def self.validate_boot_image(image_name)
     unless Option::BootImages.find { it.name == image_name }
       fail ValidationFailed.new({boot_image: "\"#{image_name}\" is not a valid boot image name. Available boot image names are: #{Option::BootImages.map(&:name)}"})
