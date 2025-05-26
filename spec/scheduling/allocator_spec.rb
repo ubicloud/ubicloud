@@ -15,7 +15,7 @@ RSpec.describe Al do
 
   # Creates a Request object with the given parameters
   #
-  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: true, require_shared_slice: false, diagnostics: false, family_filter: [])
+  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: true, require_shared_slice: false, diagnostics: false, family_filter: [])
     Al::Request.new(
       vm.id,
       vm.vcpus,
@@ -25,6 +25,7 @@ RSpec.describe Al do
       vm.boot_image,
       distinct_storage_devices,
       gpu_count,
+      gpu_device,
       true,
       target_host_utilization,
       vm.arch,
@@ -80,7 +81,7 @@ RSpec.describe Al do
           "2464de61-7501-8374-9ab0-416caebe31da", 2, 8, 33,
           [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
             [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-          "ubuntu-jammy", false, 0, true, Config.allocator_target_host_utilization, "x64", ["accepting"], [], [], [], [],
+          "ubuntu-jammy", false, 0, nil, true, Config.allocator_target_host_utilization, "x64", ["accepting"], [], [], [], [],
           "standard", 200, true, false, false, []
         )).and_return(al)
       expect(al).to receive(:update)
@@ -100,7 +101,7 @@ RSpec.describe Al do
         "2464de61-7501-8374-9ab0-416caebe31da", 4, 8, 33,
         [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-        "ubuntu-jammy", false, 0, true, 0.65, "x64", ["accepting"], [], [], [], [],
+        "ubuntu-jammy", false, 0, nil, true, 0.65, "x64", ["accepting"], [], [], [], [],
         "standard", 400, true, false, false, []
       )
     }
@@ -347,7 +348,7 @@ RSpec.describe Al do
         "2464de61-7501-8374-9ab0-416caebe31da", 4, 16, 33,
         [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-        "ubuntu-jammy", false, 0, true, 0.65, "x64", ["accepting"], [], [], [], [],
+        "ubuntu-jammy", false, 0, nil, true, 0.65, "x64", ["accepting"], [], [], [], [],
         "standard", 400
       )
     }
@@ -582,8 +583,8 @@ RSpec.describe Al do
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
       SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { it.id = vmh.id }
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
-      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
-      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
+      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
+      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
     end
 
     it "updates resources" do
@@ -802,7 +803,7 @@ RSpec.describe Al do
 
       vm = create_vm_from_size("standard-gpu-6", "x64")
       described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
-        {"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])
+        {"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}], gpu_count: 1, gpu_device: "27b0")
       vmh.reload
       vm.reload
 
@@ -820,8 +821,8 @@ RSpec.describe Al do
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
       SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { it.id = vmh.id }
       Address.create_with_id(cidr: "2.1.1.0/30", routed_to_host_id: vmh.id)
-      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
-      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
+      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
+      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
       (0..8).each do |i|
         VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, spdk: i < 1)
       end
