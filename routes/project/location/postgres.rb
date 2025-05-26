@@ -121,7 +121,8 @@ class Clover
             pg.incr_update_firewall_rules
             firewall_rule = PostgresFirewallRule.create_with_id(
               postgres_resource_id: pg.id,
-              cidr: parsed_cidr.to_s
+              cidr: parsed_cidr.to_s,
+              description: typecast_params.str("description")&.strip
             )
             audit_log(firewall_rule, "create", pg)
           end
