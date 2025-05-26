@@ -115,6 +115,22 @@ class Clover
       vm_size.storage_size_options.include?(storage_size.to_i)
     end
 
+    available_gpus = DB.from(DB[:pci_device].join(:vm_host, id: :vm_host_id).join(:location, id: :location_id).where(device_class: ["0300", "0302"], vm_id: nil).group_and_count(:vm_host_id, :name, :device))
+      .select { [name.as(location_name), device, max(:count).as(:max_count)] }.group(:name, :device)
+
+    gpu_counts = [1, 2, 4, 8]
+    gpu_options = available_gpus.map { it[:device] }.uniq.flat_map { |x| gpu_counts.map { |i| "#{i}:#{x}" } }
+    gpu_availability = available_gpus.each_with_object({}) do |entry, hash|
+      hash[entry[:location_name]] ||= {}
+      hash[entry[:location_name]][entry[:device]] = entry[:max_count]
+    end
+
+    options.add_option(name: "gpu", values: ["0:"] + gpu_options, parent: "family") do |location, family, gpu|
+      gpu = gpu.split(":")
+      gpu_count = gpu[0].to_i
+      gpu_count == 0 || (family == "standard" && !!BillingRate.from_resource_properties("Gpu", gpu[1], location.name) && gpu_availability[location.name] && gpu_availability[location.name][gpu[1]] && gpu_availability[location.name][gpu[1]] >= gpu_count)
+    end
+
     options.add_option(name: "boot_image", values: Option::BootImages.map(&:name))
     options.add_option(name: "unix_user")
     options.add_option(name: "public_key")

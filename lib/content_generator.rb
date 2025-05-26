@@ -48,6 +48,20 @@ module ContentGenerator
       ]
     end
 
+    def self.gpu(location, family, gpu)
+      gpu = gpu.split(":")
+      gpu_count = gpu[0].to_i
+
+      unit_price = (gpu_count == 0) ? 0 : BillingRate.unit_price_from_resource_properties("Gpu", gpu[1], location.name)
+
+      [
+        (gpu_count == 0) ? "No GPU" : "#{gpu_count}x #{PciDevice.device_name(gpu[1])}",
+        nil,
+        "$#{"%.2f" % (gpu_count * unit_price * 60 * 672)}/mo",
+        "$#{"%.3f" % (gpu_count * unit_price * 60)}/hour"
+      ]
+    end
+
     def self.boot_image(boot_image)
       Option::BootImages.find { it.name == boot_image }.display_name
     end
