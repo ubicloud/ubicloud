@@ -9,10 +9,6 @@ RSpec.describe Option do
       expect(Option::VmSizes.map { it.name.include?("burstable-") == (it.cpu_burst_percent_limit > 0) }.all?(true)).to be true
     end
 
-    it "no gpu allowed for non-GPU VMs" do
-      expect(Option::VmSizes.map { it.name.include?("gpu") == it.gpu }.all?(true)).to be true
-    end
-
     it "no odd number of vcpus allowed, except for 1" do
       expect(Option::VmSizes.all? { it.vcpus == 1 || it.vcpus.even? }).to be true
     end
