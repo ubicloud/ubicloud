@@ -2432,6 +2432,9 @@ components:
                   unix_user:
                     description: Unix user of the VM
                     type: string
+                  gpu:
+                    description: GPU configuration
+                    type: string
                 required:
                   - firewalls
                   - private_ipv4
