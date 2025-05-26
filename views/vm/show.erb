@@ -20,16 +20,15 @@ viewable_fws =
   left_items: [part("components/vm_state_label", state: @vm[:state], extra_class: "text-md")]
 ) %>
 
-<div class="grid gap-6">
-  <!-- Vm Detail Card -->
-  <%== part(
-    "components/kv_data_card",
-    data: [
+<% data = [
       ["ID", @vm[:id]],
       ["Name", @vm[:name]],
       ["Location", @vm[:location]],
       ["Size", @vm[:size]],
-      ["Storage", (@vm[:storage_size_gib] > 0) ? "#{@vm[:storage_size_gib]} GB" : nil],
+      ["Storage", (@vm[:storage_size_gib] > 0) ? "#{@vm[:storage_size_gib]} GB" : nil]
+    ]
+  data << ["GPU", @vm[:gpu]] if @vm[:gpu]
+  data += [
       ["IPv4", @vm[:ip4_enabled] ? @vm[:ip4] : "Not enabled", { copyable: @vm[:ip4_enabled] }],
       ["IPv6", @vm[:ip6], { copyable: true }],
       [
@@ -44,7 +43,13 @@ viewable_fws =
         "<a href='#{@project_data[:path]}/location/#{@vm[:location]}/private-subnet/#{@vm[:subnet]}' class='text-rose-500 hover:underline'>#{@vm[:subnet]}</a>",
         { escape: false }
       ]
-    ]
+    ] %>
+
+<div class="grid gap-6">
+  <!-- Vm Detail Card -->
+  <%== part(
+    "components/kv_data_card",
+    data:
   ) %>
   <!-- Firewall Rule List -->
   <%== part(
