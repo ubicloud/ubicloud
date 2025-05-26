@@ -138,6 +138,7 @@ jobs:
         OPERATOR_SSH_PUBLIC_KEYS: ${{ secrets.OPERATOR_SSH_PUBLIC_KEYS }}
       run: |
         set -o pipefail
+        echo '${{ toJSON(env) }}' | jq -r 'to_entries[] | "\(.key)=\"\(.value|tostring)\""' > .env
         timeout 100m foreman start | tee foreman.log | grep "e2e.1"
 
     - name: Print logs
