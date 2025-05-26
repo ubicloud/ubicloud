@@ -21,7 +21,7 @@ class Clover
 
     public_key = typecast_params.nonempty_str!("public_key")
     assemble_params = typecast_params.convert!(symbolize: true) do |tp|
-      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id"])
+      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu"])
       tp.pos_int("storage_size")
       tp.bool("enable_ip4")
     end
@@ -45,6 +45,13 @@ class Clover
       storage_size = Validation.validate_vm_storage_size(assemble_params[:size] || Prog::Vm::Nexus::DEFAULT_SIZE, "x64", assemble_params[:storage_size])
       assemble_params[:storage_volumes] = [{size_gib: storage_size, encrypted: true}]
       assemble_params.delete(:storage_size)
+    end
+
+    if assemble_params[:gpu]
+      gpu_count, gpu_device = Validation.validate_vm_gpu(assemble_params[:gpu], @location.name, project, parsed_size)
+      assemble_params[:gpu_count] = gpu_count
+      assemble_params[:gpu_device] = gpu_device
+      assemble_params.delete(:gpu)
     end
 
     if assemble_params[:private_subnet_id]
