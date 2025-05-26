@@ -209,6 +209,74 @@ RSpec.describe Clover, "vm" do
         expect(Vm.first.ip4_enabled).to be_truthy
       end
 
+      it "can create a virtual machine with gpu" do
+        project
+        project.set_ff_gpu_vm(true)
+        vmh = Prog::Vm::HostNexus.assemble("::1", location_id: Location::HETZNER_FSN1_ID).subject
+        pci = PciDevice.new_with_id(
+          vm_host_id: vmh.id,
+          slot: "01:00.0",
+          device_class: "0300",
+          vendor: "10de",
+          device: "20b5",
+          numa_node: nil,
+          iommu_group: 0
+        )
+        vmh.save_changes
+        pci.save_changes
+
+        visit "#{project.path}/vm/create"
+
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+        name = "dummy-vm"
+        fill_in "Name", with: name
+        fill_in "SSH Public Key", with: "a a"
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "ubuntu-jammy"
+        choose option: "standard-2"
+        choose option: "1:20b5"
+        expect(page).to have_content "GPU"
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
+        expect(Vm.count).to eq(1)
+        expect(Vm.first.project_id).to eq(project.id)
+
+        pci.update(vm_id: Vm.first.id)
+        page.refresh
+        expect(page).to have_content "1x NVIDIA A100 80GB PCIe"
+      end
+
+      it "cannot create a virtual machine with gpu if feature switch is disabled" do
+        project
+        vmh = Prog::Vm::HostNexus.assemble("::1", location_id: Location::HETZNER_FSN1_ID).subject
+        pci = PciDevice.new_with_id(
+          vm_host_id: vmh.id,
+          slot: "01:00.0",
+          device_class: "0300",
+          vendor: "10de",
+          device: "20b5",
+          numa_node: nil,
+          iommu_group: 0
+        )
+        vmh.save_changes
+        pci.save_changes
+
+        visit "#{project.path}/vm/create"
+
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+        name = "dummy-vm"
+        fill_in "Name", with: name
+        fill_in "SSH Public Key", with: "a a"
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "ubuntu-jammy"
+        choose option: "standard-2"
+
+        expect(page).to have_no_content "GPU"
+      end
+
       it "can create new virtual machine with chosen private subnet" do
         project
         ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1").id
