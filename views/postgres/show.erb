@@ -351,8 +351,8 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
         <thead class="bg-gray-50">
           <tr>
             <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">CIDR</th>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Port Range</th>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Description</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Port Range</th>
             <% if edit_perm %>
               <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
             <% end %>
@@ -362,8 +362,8 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
           <% @pg[:firewall_rules].each do |fwr| %>
             <tr>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:cidr] %></td>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">5432, 6432</td>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:description] %></td>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">5432, 6432</td>
               <% if edit_perm %>
                 <td
                   id="fwr-delete-<%=fwr[:id]%>"
@@ -388,9 +388,6 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
                   }
                 ) %>
               </td>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                5432, 6432
-              </td>
               <td>
                 <%== part(
                   "components/form/text",
@@ -400,6 +397,9 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
                     form: "form-pg-fwr-create"
                   }
                 ) %>
+              </td>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                5432, 6432
               </td>
               <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                 <form action="<%= "#{request.path}/firewall-rule" %>" role="form" method="POST" id="form-pg-fwr-create">
