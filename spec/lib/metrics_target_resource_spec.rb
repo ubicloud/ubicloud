@@ -88,7 +88,7 @@ RSpec.describe MetricsTargetResource do
 
     it "swallows exceptions and logs them" do
       expect(postgres_server).to receive(:export_metrics).and_raise(StandardError.new("Export failed"))
-      expect(Clog).to receive(:emit)
+      expect(Clog).to receive(:emit).and_call_original
       expect { resource.export_metrics }.not_to raise_error
     end
   end
@@ -125,7 +125,7 @@ RSpec.describe MetricsTargetResource do
     it "triggers Kernel.exit if pulse check is stuck" do
       resource.instance_variable_get(:@mutex).lock
       resource.instance_variable_set(:@export_started_at, Time.now - 200)
-      expect(Clog).to receive(:emit).at_least(:once)
+      expect(Clog).to receive(:emit).at_least(:once).and_call_original
       resource.force_stop_if_stuck
       resource.instance_variable_get(:@mutex).unlock
     end

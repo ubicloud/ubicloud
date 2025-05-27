@@ -1040,7 +1040,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "prevents destroy if the semaphore set" do
       expect(nx).to receive(:when_prevent_destroy_set?).and_yield
-      expect(Clog).to receive(:emit).with("Destroy prevented by the semaphore")
+      expect(Clog).to receive(:emit).with("Destroy prevented by the semaphore").and_call_original
       expect { nx.destroy }.to hop("prevent_destroy")
     end
 
