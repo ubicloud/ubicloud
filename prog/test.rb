@@ -22,6 +22,21 @@ class Prog::Test < Prog::Base
     pop frame["test_level"]
   end
 
+  label def synchronized
+    th = Thread.list.find { it.name == "clover_test" }
+    w = th[:clover_test_in]
+    th.thread_variable_set(:clover_test_out, Thread.current)
+    w.close
+    pop "done"
+  end
+
+  label def wait_exit
+    th = Thread.list.find { it.name == "clover_test" }
+    r = th[:clover_test_in]
+    r.read
+    pop "done"
+  end
+
   label def hop_entry
     hop_hop_exit
   end
