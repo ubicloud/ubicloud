@@ -137,7 +137,6 @@ jobs:
         HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
       run: |
         set -o pipefail
-        echo '${{ toJSON(env) }}' | jq -r 'to_entries[] | "\(.key)=\"\(.value|tostring)\""' > .env
         timeout 100m foreman start | tee foreman.log | grep "e2e.1"
 
     - name: Print logs
