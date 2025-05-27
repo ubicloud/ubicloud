@@ -45,7 +45,7 @@ class Clover
         204
       end
 
-      r.patch do
+      r.patch true do
         authorize("Postgres:edit", pg.id)
 
         target_vm_size = Validation.validate_postgres_size(pg.location, typecast_params.str("size") || pg.target_vm_size, @project.id)
