@@ -236,7 +236,7 @@ module Scheduling::Allocator
       ds = ds.where(location_id: request.location_filter) unless request.location_filter.empty?
       ds = ds.where(allocation_state: request.allocation_state_filter) unless request.allocation_state_filter.empty?
       ds = ds.where(Sequel[:vm_host][:family] => request.family_filter) unless request.family_filter.empty?
-      ds = ds.exclude(total_cores: 14, total_cpus: 14) unless request.gpu_count > 0
+      ds = ds.exclude { Sequel.function(:coalesce, num_gpus, 0) > 0 } unless request.gpu_count > 0 || request.host_filter.any?
 
       # If we dont's want to use slices, place those only on hosts that do not accept them
       # If we require a shared slice (for burstable vm), allocate those only on hosts that accept slices
