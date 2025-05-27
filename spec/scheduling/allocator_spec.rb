@@ -340,6 +340,26 @@ RSpec.describe Al do
       expect(cand.first[:vm_host_id]).to eq(vmh2.id)
       expect(cand.first[:available_iommu_groups].sort).to eq([3, 9])
     end
+
+    it "retrieves candidates with gpu if gpu_count is zero but host is forced" do
+      vmh1 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      vmh2 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      StorageDevice.create_with_id(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
+      Address.create_with_id(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id)
+      PciDevice.create_with_id(vm_host_id: vmh2.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
+      PciDevice.create_with_id(vm_host_id: vmh2.id, slot: "02:00.0", device_class: "0300", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 9)
+      PciDevice.create_with_id(vm_host_id: vmh2.id, slot: "03:00.0", device_class: "1234", vendor: "vd", device: "dv3", numa_node: 0, iommu_group: 11)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
+
+      req.host_filter = [vmh2.id]
+      cand = Al::Allocation.candidate_hosts(req)
+      expect(cand.size).to eq(1)
+      expect(cand.first[:vm_host_id]).to eq(vmh2.id)
+      expect(cand.first[:available_iommu_groups].sort).to eq([3, 9])
+    end
   end
 
   describe "Allocation" do
@@ -431,6 +451,16 @@ RSpec.describe Al do
       score_imbalance = Al::Allocation.new(vmhds, req).score
 
       expect(score_imbalance).to be > score_balance
+    end
+
+    it "penalizes non-gpu vms on hosts with gpu" do
+      expect(Al::VmHostCpuAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
+      expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
+      expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
+      vmhds[:location_id] = "6b9ef786-b842-8420-8c65-c25e3d4bdf3d"
+      vmhds[:num_gpus] = 1
+      req.host_filter = ["15e11815-3d4f-8771-9cac-ce4cdcbda5c1"]
+      expect(Al::Allocation.new(vmhds, req).score).to eq(5.0)
     end
 
     it "penalizes concurrent provisioning for github runners" do
@@ -583,8 +613,6 @@ RSpec.describe Al do
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
       SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { it.id = vmh.id }
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
-      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
-      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
     end
 
     it "updates resources" do
@@ -603,12 +631,13 @@ RSpec.describe Al do
       expect(used_cores + vm.cores).to eq(vmh.used_cores)
       expect(used_hugepages_1g + vm.memory_gib).to eq(vmh.used_hugepages_1g)
       expect(available_storage - 180).to eq(vmh.storage_devices.sum { it.available_storage_gib })
-      expect(vmh.pci_devices.map { it.vm_id }).to eq([nil, nil])
     end
 
     it "updates pci devices" do
       vm = create_vm
       vmh = VmHost.first
+      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
+      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
       used_cores = vmh.used_cores
       used_hugepages_1g = vmh.used_hugepages_1g
       available_storage = vmh.storage_devices.sum { it.available_storage_gib }
@@ -675,6 +704,8 @@ RSpec.describe Al do
     end
 
     it "fails concurrent allocations of gpus" do
+      PciDevice.create_with_id(vm_host_id: VmHost.first.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
+      PciDevice.create_with_id(vm_host_id: VmHost.first.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
       vm1 = create_vm
       vm2 = create_vm
       al1 = Al::Allocation.best_allocation(create_req(vm, vol, gpu_count: 1))
@@ -797,6 +828,8 @@ RSpec.describe Al do
     it "allocates standard-gpu VM correctly on GEX44 host" do
       vmh = VmHost.first
       # Set the host to match GEX44 specs - it is an x64 host, but with one thread per core
+      PciDevice.create_with_id(vm_host_id: VmHost.first.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
+      PciDevice.create_with_id(vm_host_id: VmHost.first.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
       vmh.update(arch: "x64", total_dies: 1, total_sockets: 1, total_cpus: 14, total_cores: 14, used_cores: 2)
       used_cores = vmh.used_cores
       used_memory = vmh.used_hugepages_1g
@@ -821,8 +854,6 @@ RSpec.describe Al do
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
       SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { it.id = vmh.id }
       Address.create_with_id(cidr: "2.1.1.0/30", routed_to_host_id: vmh.id)
-      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
-      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
       (0..8).each do |i|
         VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, spdk: i < 1)
       end
@@ -846,6 +877,8 @@ RSpec.describe Al do
 
     it "only allocates standard-gpu vms on GEX44 host" do
       vmh = VmHost.first
+      PciDevice.create_with_id(vm_host_id: VmHost.first.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
+      PciDevice.create_with_id(vm_host_id: VmHost.first.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
       vmh.update(arch: "x64", total_dies: 1, total_sockets: 1, total_cpus: 14, total_cores: 14, used_cores: 2)
 
       vm = create_vm
@@ -868,8 +901,6 @@ RSpec.describe Al do
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
       SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { it.id = vmh.id }
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
-      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
-      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
       (0..16).each do |i|
         VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, spdk: i < 2)
       end
@@ -938,8 +969,6 @@ RSpec.describe Al do
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
       SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { it.id = vmh.id }
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
-      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
-      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
       (0..16).each do |i|
         VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, spdk: i < 2)
       end
@@ -1163,8 +1192,6 @@ RSpec.describe Al do
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
       SpdkInstallation.create(vm_host_id: vmh2.id, version: "v1", allocation_weight: 100) { it.id = vmh2.id }
       Address.create_with_id(cidr: "1.2.1.0/30", routed_to_host_id: vmh2.id)
-      PciDevice.create_with_id(vm_host_id: vmh2.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
-      PciDevice.create_with_id(vm_host_id: vmh2.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
       (0..16).each do |i|
         VmHostCpu.create(vm_host_id: vmh2.id, cpu_number: i, spdk: i < 2)
       end
@@ -1210,8 +1237,6 @@ RSpec.describe Al do
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
       SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { it.id = vmh.id }
       Address.create_with_id(cidr: "2.1.1.0/30", routed_to_host_id: vmh.id)
-      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
-      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
       (0..12).each do |i|
         VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, spdk: i < 1)
       end
