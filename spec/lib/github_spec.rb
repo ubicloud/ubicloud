@@ -76,8 +76,8 @@ RSpec.describe Github do
       {guid: "3", status: "Fail", delivered_at: time + 3}
     ])
     expect(app_client).to receive(:last_response).and_return(instance_double(Sawyer::Response, rels: {next: instance_double(Sawyer::Relation, href: "next_url")}))
-    expect(Clog).to receive(:emit).with("failed deliveries page limit reached")
-    expect(Clog).to receive(:emit).with("fetched deliveries")
+    expect(Clog).to receive(:emit).with("failed deliveries page limit reached").and_call_original
+    expect(Clog).to receive(:emit).with("fetched deliveries").and_call_original
     failed_deliveries = described_class.failed_deliveries(time, 1)
     expect(failed_deliveries).to eq([{guid: "3", status: "Fail", delivered_at: time + 3}])
   end

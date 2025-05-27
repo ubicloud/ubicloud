@@ -96,7 +96,7 @@ RSpec.describe Clover, "billing" do
       expect(Stripe::Checkout::Session).to receive(:retrieve).with("session_123").and_return({"setup_intent" => "st_123456790"})
       expect(Stripe::SetupIntent).to receive(:retrieve).with("st_123456790").and_return({"customer" => "cs_1234567890", "payment_method" => "pm_1234567890"})
       expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_1234567890").and_return({"card" => {"brand" => "visa"}}).once
-      expect(Clog).to receive(:emit)
+      expect(Clog).to receive(:emit).and_call_original
 
       visit project.path
 

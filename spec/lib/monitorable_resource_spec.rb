@@ -68,7 +68,7 @@ RSpec.describe MonitorableResource do
       r_w_event_loop.instance_variable_set(:@session, session)
       expect(Thread).to receive(:new).and_yield
       expect(session[:ssh_session]).to receive(:loop).and_raise(StandardError)
-      expect(Clog).to receive(:emit)
+      expect(Clog).to receive(:emit).and_call_original
       expect(r_w_event_loop).to receive(:close_resource_session)
       r_w_event_loop.process_event_loop
     end
@@ -82,7 +82,7 @@ RSpec.describe MonitorableResource do
 
     it "swallows exception and logs it if check_pulse fails" do
       expect(vm_host).to receive(:check_pulse).and_raise(StandardError)
-      expect(Clog).to receive(:emit)
+      expect(Clog).to receive(:emit).and_call_original
       expect { r_without_event_loop.check_pulse }.not_to raise_error
     end
 
@@ -95,19 +95,19 @@ RSpec.describe MonitorableResource do
 
     it "logs the pulse if reading is not up" do
       expect(postgres_server).to receive(:check_pulse).and_return({reading: "down", reading_rpt: 5})
-      expect(Clog).to receive(:emit)
+      expect(Clog).to receive(:emit).and_call_original
       r_w_event_loop.check_pulse
     end
 
     it "does not log the pulse if reading is up and reading_rpt is not every 5th reading" do
       expect(postgres_server).to receive(:check_pulse).and_return({reading: "up", reading_rpt: 3})
-      expect(Clog).not_to receive(:emit)
+      expect(Clog).not_to receive(:emit).and_call_original
       r_w_event_loop.check_pulse
     end
 
     it "logs the pulse if reading is up and reading_rpt is every 5th reading" do
       expect(postgres_server).to receive(:check_pulse).and_return({reading: "up", reading_rpt: 6})
-      expect(Clog).to receive(:emit)
+      expect(Clog).to receive(:emit).and_call_original
       r_w_event_loop.check_pulse
     end
   end
@@ -147,7 +147,7 @@ RSpec.describe MonitorableResource do
     it "triggers Kernel.exit if pulse check is stuck" do
       r_w_event_loop.instance_variable_get(:@mutex).lock
       r_w_event_loop.instance_variable_set(:@pulse_check_started_at, Time.now - 200)
-      expect(Clog).to receive(:emit).at_least(:once)
+      expect(Clog).to receive(:emit).at_least(:once).and_call_original
       r_w_event_loop.force_stop_if_stuck
       r_w_event_loop.instance_variable_get(:@mutex).unlock
     end

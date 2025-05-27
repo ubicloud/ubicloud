@@ -365,7 +365,7 @@ RSpec.describe PostgresServer do
     expect(PostgresLsnMonitor).to receive(:new).and_return(lsn_monitor)
     expect(lsn_monitor).to receive(:insert_conflict).and_return(lsn_monitor)
     expect(lsn_monitor).to receive(:save_changes).and_raise(Sequel::Error)
-    expect(Clog).to receive(:emit).with("Failed to update PostgresLsnMonitor")
+    expect(Clog).to receive(:emit).with("Failed to update PostgresLsnMonitor").and_call_original
     expect(postgres_server).to receive(:primary?).and_return(true)
     postgres_server.check_pulse(session: {db_connection: DB}, previous_pulse: {})
   end
