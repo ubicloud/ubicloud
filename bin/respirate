@@ -31,9 +31,17 @@ Strand.dataset.insert_conflict.insert(id: "08200dd2-20ce-833a-de82-10fd5a082bff"
 
 clover_freeze
 
-loop do
-  d.start_cohort
-  next if d.wait_cohort > 0
-  duration_slept = sleep 1
-  Clog.emit("respirate finished sleep") { {sleep_duration_sec: duration_slept} }
+DB.synchronize do
+  until d.shutting_down
+    if d.start_cohort && !d.shutting_down
+      # Only sleep if not shutting down and there were no strands in previous scan
+      # Note that this results in an up to a 1 second delay to pick up new strands,
+      # but that is an accept tradeoff, because we do not want to busy loop the
+      # database (potentially, LISTEN/NOTIFY could be used to reduce this latency)
+      duration_slept = sleep 1
+      Clog.emit("respirate finished sleep") { {sleep_duration_sec: duration_slept} }
+    end
+  end
 end
+
+Clog.emit("Shutting down.") { {unfinished_strand_count: d.num_current_strands} }
