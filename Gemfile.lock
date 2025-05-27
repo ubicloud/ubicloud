@@ -16,15 +16,6 @@ GIT
       rack
 
 GIT
-  remote: https://github.com/jeremyevans/rodauth.git
-  revision: 6b853d8eabfbebe8b6036c55282fe0aae09a90ab
-  ref: 6b853d8eabfbebe8b6036c55282fe0aae09a90ab
-  specs:
-    rodauth (2.38.0)
-      roda (>= 2.6.0)
-      sequel (>= 4)
-
-GIT
   remote: https://github.com/jeremyevans/sequel.git
   revision: 4934f70a921395df9241ae4e214e8e9a395b6758
   ref: 4934f70a921395df9241ae4e214e8e9a395b6758
@@ -321,6 +312,9 @@ GEM
     reline (0.6.1)
       io-console (~> 0.5)
     rexml (3.4.1)
+    rodauth (2.39.0)
+      roda (>= 2.6.0)
+      sequel (>= 4)
     rodish (2.0.0)
       optparse
     rotp (6.3.0)
@@ -503,7 +497,7 @@ DEPENDENCIES
   refrigerator (>= 1)
   reline
   roda!
-  rodauth!
+  rodauth (>= 2.39)
   rodauth-omniauth!
   rodish (>= 2)
   rotp
