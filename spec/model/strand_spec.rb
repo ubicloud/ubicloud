@@ -103,12 +103,19 @@ WHERE id = \? AND lease = \?
     st.unsynchronized_run
   end
 
-  it "occasionally logs acquisition and release of lease" do
+  it "logs verbosely in test mode" do
     st.label = "napper"
     st.save_changes
-    expect(st).to receive(:rand).and_return(0)
     expect(Clog).to receive(:emit).with("obtained lease").and_call_original
     expect(Clog).to receive(:emit).with("lease cleared").and_call_original
+    st.take_lease_and_reload {}
+  end
+
+  it "does not log if configured not to" do
+    st.label = "napper"
+    st.save_changes
+    expect(st).to receive(:verbose_logging).and_return(false)
+    expect(Clog).not_to receive(:emit)
     st.take_lease_and_reload {}
   end
 end
