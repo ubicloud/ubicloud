@@ -225,6 +225,14 @@ RSpec.describe Clover, "github" do
         expect(last_response).to have_runtime_error(400, "Wrong parameters")
       end
 
+      it "fails if the s3 storage service is unavialable" do
+        GithubCacheEntry.create_with_id(key: "cache-key", version: "key-version", scope: "dev", repository_id: repository.id, created_by: runner.id, upload_id: "upload-id", size: 100)
+        expect(blob_storage_client).to receive(:complete_multipart_upload).and_raise(Aws::S3::Errors::ServiceUnavailable.new("error", "error"))
+        post "/runtime/github/caches/commit", {etags: ["etag-1", "etag-2"], uploadId: "upload-id", size: 100}
+
+        expect(last_response).to have_runtime_error(503, "Service unavailable")
+      end
+
       it "completes multipart upload" do
         entry = GithubCacheEntry.create_with_id(key: "cache-key", version: "key-version", scope: "dev", repository_id: repository.id, created_by: runner.id, upload_id: "upload-id", size: 100)
         expect(blob_storage_client).to receive(:complete_multipart_upload).with(
