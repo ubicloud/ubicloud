@@ -138,7 +138,8 @@ RSpec.describe Scheduling::Dispatcher do
 
   describe "#run_strand" do
     it "runs strand" do
-      st = Strand.create(prog: "Test", label: "napper", schedule: Time.now - 10)
+      Strand.create(prog: "Test", label: "napper", schedule: Time.now - 10)
+      st = di.scan.first
       start_queue = Queue.new
       finish_queue = Queue.new
       current_strands = di.instance_variable_get(:@current_strands)
