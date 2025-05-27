@@ -69,7 +69,6 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       default_boot_images: frame["default_boot_images"]
     ).subject
     update_stack({"vm_host_id" => vm_host.id})
-    Clog.emit("Setting up the vm host") { vm_host }
 
     hop_wait_setup_host
   end
