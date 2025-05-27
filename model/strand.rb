@@ -19,6 +19,18 @@ class Strand < Sequel::Model
     UBID.decode(ubid)
   end
 
+  if Config.test?
+    private def verbose_logging
+      true
+    end
+    # :nocov:
+  else
+    private def verbose_logging
+      rand(1000) == 0
+    end
+  end
+  # :nocov:
+
   def take_lease_and_reload
     unless (ps = DB.prepared_statement(:strand_take_lease_and_reload))
       # :nocov:
@@ -44,7 +56,7 @@ class Strand < Sequel::Model
     affected = ps.call(id:)
     return false unless affected
     lease_time = affected.fetch(:lease)
-    verbose_logging = rand(1000) == 0
+    verbose_logging = self.verbose_logging
 
     Clog.emit("obtained lease") { {lease_acquired: {time: lease_time, delay: Time.now - schedule}} } if verbose_logging
     # Also operate as reload query
