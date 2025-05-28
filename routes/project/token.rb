@@ -60,8 +60,8 @@ class Clover
           r.redirect "#{@project.path}/token/#{token.ubid}/access-control"
         end
 
-        r.on "access-control" do
-          r.get true do
+        r.is "access-control" do
+          r.get do
             uuids = {}
             aces = @project.access_control_entries_dataset.where(subject_id: token.id).all
             aces.each do |ace|
@@ -80,7 +80,7 @@ class Clover
             view "project/access-control"
           end
 
-          r.post true do
+          r.post do
             DB.transaction do
               typecast_params.array!(:Hash, "aces").each do
                 ubid, deleted, action_id, object_id = it.values_at("ubid", "deleted", "action", "object")
