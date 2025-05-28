@@ -13,7 +13,7 @@ class Clover
         filter[:location_id] = @location.id
         kc = @project.kubernetes_clusters_dataset.first(filter)
 
-        next 404 unless kc
+        check_found_object(kc)
 
         r.is do
           r.get do
