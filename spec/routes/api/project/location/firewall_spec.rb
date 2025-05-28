@@ -76,6 +76,23 @@ RSpec.describe Clover, "firewall" do
       expect(firewall).not_to exist
     end
 
+    it "raises unauthorized access error if one of firewall's private subnets is not authorized" do
+      ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps", location_id: Location::HETZNER_FSN1_ID).subject
+
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/attach-subnet", {
+        private_subnet_id: ps.ubid
+      }.to_json
+
+      AccessControlEntry.dataset.destroy
+      AccessControlEntry.create(project_id: project.id, subject_id: user.id, object_id: firewall.id)
+      AccessControlEntry.create(project_id: project.id, subject_id: @pat.id, object_id: firewall.id)
+
+      delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}"
+
+      expect(last_response.status).to eq(403)
+      expect(firewall).to exist
+    end
+
     it "delete for non-existant ubid" do
       delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{Firewall.generate_ubid}"
 
