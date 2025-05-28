@@ -360,7 +360,7 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
         </thead>
         <tbody class="divide-y divide-gray-200 bg-white">
           <% @pg[:firewall_rules].each do |fwr| %>
-            <tr>
+            <tr class="group">
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 inline-editable" scope="row"><%= fwr[:cidr] %></td>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 inline-editable" scope="row"><%= fwr[:description] %></td>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">5432, 6432</td>
@@ -369,10 +369,14 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
                   id="fwr-buttons-<%= fwr[:id] %>"
                   class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
                 >
-                  <%== part("components/edit_inline_button", fields: ["cidr", "description"], text: "") %>
-                  <%== part("components/save_inline_button", url: "#{request.path}/firewall-rule/#{fwr[:id]}", text: "", confirmation_message: "Firewall rule is updated successfully.", extra_class: "hidden") %>
-                  <%== part("components/cancel_inline_button", text: "", extra_class: "hidden") %>
-                  <%== part("components/delete_button", url: "#{request.path}/firewall-rule/#{fwr[:id]}", text: "") %>
+                  <div class="group-[.active]:hidden block">
+                    <%== part("components/edit_inline_button", fields: ["cidr", "description"], text: "") %>
+                    <%== part("components/delete_button", url: "#{request.path}/firewall-rule/#{fwr[:id]}", text: "") %>
+                  </div>
+                  <div class="group-[.active]:block transition-all hidden">
+                    <%== part("components/save_inline_button", url: "#{request.path}/firewall-rule/#{fwr[:id]}", text: "", confirmation_message: "Firewall rule is updated successfully.") %>
+                    <%== part("components/cancel_inline_button", text: "") %>
+                  </div>
                 </td>
               <% end %>
             </tr>

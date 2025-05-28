@@ -130,10 +130,7 @@ $(".edit-inline-btn").on("click", function (event) {
     currentFieldId++;
   });
 
-  row.find(".edit-inline-btn").hide();
-  row.find(".delete-btn").hide();
-  row.find(".save-inline-btn").show();
-  row.find(".cancel-inline-btn").show();
+  row.addClass("active");
 });
 
 $(".cancel-inline-btn").on("click", function (event) {
@@ -142,11 +139,7 @@ $(".cancel-inline-btn").on("click", function (event) {
     let originalValue = $(this).find("input").data("original-value");
     $(this).text(originalValue);
   });
-
-  row.find(".edit-inline-btn").show();
-  row.find(".delete-btn").show();
-  row.find(".save-inline-btn").hide();
-  row.find(".cancel-inline-btn").hide();
+  row.removeClass("active");
 });
 
 $(".save-inline-btn").on("click", function (event) {
@@ -171,12 +164,7 @@ $(".save-inline-btn").on("click", function (event) {
         let value = $(this).find("input").val();
         $(this).text(value);
       });
-
-      row.find(".edit-inline-btn").show();
-      row.find(".delete-btn").show();
-      row.find(".save-inline-btn").hide();
-      row.find(".cancel-inline-btn").hide();
-
+      row.removeClass("active");
       alert(confirmation_message);
     },
     error: function (xhr, ajaxOptions, thrownError) {
