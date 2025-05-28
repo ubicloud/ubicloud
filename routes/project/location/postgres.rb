@@ -135,6 +135,32 @@ class Clover
           end
         end
 
+        r.patch :ubid_uuid do |id|
+          authorize("Postgres:edit", pg.id)
+
+          if (fwr = pg.firewall_rules_dataset[id:])
+            DB.transaction do
+              current_cidr = fwr.cidr.to_s
+              new_cidr = Validation.validate_cidr(typecast_params.nonempty_str!("cidr")).to_s
+
+              fwr.update(
+                cidr: new_cidr,
+                description: typecast_params.str("description")&.strip
+              )
+              pg.incr_update_firewall_rules if current_cidr != new_cidr
+              audit_log(fwr, "update")
+            end
+
+            if api?
+              Serializers::PostgresFirewallRule.serialize(fwr)
+            else
+              204
+            end
+          else
+            404
+          end
+        end
+
         r.delete :ubid_uuid do |id|
           authorize("Postgres:edit", pg.id)
 
