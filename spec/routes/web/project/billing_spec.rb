@@ -629,7 +629,7 @@ RSpec.describe Clover, "billing" do
       end
 
       it "raises not found when invoice not exists" do
-        visit "#{project.path}/billing/invoice/08s56d4kaj94xsmrnf5v5m3mav"
+        visit "#{project.path}/billing/invoice/1vfp96nprnxe7gneajmxn5ncnh"
 
         expect(page.title).to eq("Ubicloud - ResourceNotFound")
         expect(page.status_code).to eq(404)
