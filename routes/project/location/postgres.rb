@@ -22,14 +22,64 @@ class Clover
       pg = @project.postgres_resources_dataset.first(filter)
       check_found_object(pg)
 
-      r.get true do
-        authorize("Postgres:view", pg.id)
-        response.headers["cache-control"] = "no-store"
+      r.is do
+        r.get do
+          authorize("Postgres:view", pg.id)
+          response.headers["cache-control"] = "no-store"
 
-        if api?
-          Serializers::Postgres.serialize(pg, {detailed: true})
-        else
-          r.redirect "#{@project.path}#{pg.path}/overview"
+          if api?
+            Serializers::Postgres.serialize(pg, {detailed: true})
+          else
+            r.redirect "#{@project.path}#{pg.path}/overview"
+          end
+        end
+
+        r.delete do
+          authorize("Postgres:delete", pg.id)
+          DB.transaction do
+            pg.incr_destroy
+            audit_log(pg, "destroy")
+          end
+          204
+        end
+
+        r.patch do
+          authorize("Postgres:edit", pg.id)
+
+          target_vm_size = Validation.validate_postgres_size(pg.location, typecast_params.str("size") || pg.target_vm_size, @project.id)
+          target_storage_size_gib = Validation.validate_postgres_storage_size(pg.location, target_vm_size.vm_size, typecast_params.pos_int("storage_size") || pg.target_storage_size_gib, @project.id)
+          ha_type = typecast_params.str("ha_type") || pg.ha_type
+          Validation.validate_postgres_ha_type(ha_type)
+
+          if pg.representative_server.nil? || target_storage_size_gib < pg.representative_server.storage_size_gib
+            begin
+              current_disk_usage = pg.representative_server.vm.sshable.cmd("df --output=used /dev/vdb | tail -n 1").strip.to_i / (1024 * 1024)
+            rescue
+              fail CloverError.new(400, "InvalidRequest", "Database is not ready for update", {})
+            end
+
+            if target_storage_size_gib * 0.8 < current_disk_usage
+              fail Validation::ValidationFailed.new({storage_size: "Insufficient storage size is requested. It is only possible to reduce the storage size if the current usage is less than 80% of the requested size."})
+            end
+          end
+
+          current_postgres_vcpu_count = (PostgresResource::TARGET_STANDBY_COUNT_MAP[pg.ha_type] + 1) * pg.representative_server.vm.vcpus
+          requested_postgres_vcpu_count = (PostgresResource::TARGET_STANDBY_COUNT_MAP[ha_type] + 1) * target_vm_size.vcpu
+          Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count - current_postgres_vcpu_count)
+
+          DB.transaction do
+            pg.update(target_vm_size: target_vm_size.vm_size, target_storage_size_gib:, ha_type:)
+            pg.read_replicas.map { it.update(target_vm_size: target_vm_size.vm_size, target_storage_size_gib:) }
+            audit_log(pg, "update")
+          end
+
+          if api?
+            Serializers::Postgres.serialize(pg, {detailed: true})
+          else
+            flash["notice"] = "'#{pg.name}' will be updated according to requested configuration"
+            response["location"] = "#{@project.path}#{pg.path}"
+            200
+          end
         end
       end
 
@@ -46,54 +96,6 @@ class Clover
         @page = page
 
         view "postgres/show"
-      end
-
-      r.delete true do
-        authorize("Postgres:delete", pg.id)
-        DB.transaction do
-          pg.incr_destroy
-          audit_log(pg, "destroy")
-        end
-        204
-      end
-
-      r.patch true do
-        authorize("Postgres:edit", pg.id)
-
-        target_vm_size = Validation.validate_postgres_size(pg.location, typecast_params.str("size") || pg.target_vm_size, @project.id)
-        target_storage_size_gib = Validation.validate_postgres_storage_size(pg.location, target_vm_size.vm_size, typecast_params.pos_int("storage_size") || pg.target_storage_size_gib, @project.id)
-        ha_type = typecast_params.str("ha_type") || pg.ha_type
-        Validation.validate_postgres_ha_type(ha_type)
-
-        if pg.representative_server.nil? || target_storage_size_gib < pg.representative_server.storage_size_gib
-          begin
-            current_disk_usage = pg.representative_server.vm.sshable.cmd("df --output=used /dev/vdb | tail -n 1").strip.to_i / (1024 * 1024)
-          rescue
-            fail CloverError.new(400, "InvalidRequest", "Database is not ready for update", {})
-          end
-
-          if target_storage_size_gib * 0.8 < current_disk_usage
-            fail Validation::ValidationFailed.new({storage_size: "Insufficient storage size is requested. It is only possible to reduce the storage size if the current usage is less than 80% of the requested size."})
-          end
-        end
-
-        current_postgres_vcpu_count = (PostgresResource::TARGET_STANDBY_COUNT_MAP[pg.ha_type] + 1) * pg.representative_server.vm.vcpus
-        requested_postgres_vcpu_count = (PostgresResource::TARGET_STANDBY_COUNT_MAP[ha_type] + 1) * target_vm_size.vcpu
-        Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count - current_postgres_vcpu_count)
-
-        DB.transaction do
-          pg.update(target_vm_size: target_vm_size.vm_size, target_storage_size_gib:, ha_type:)
-          pg.read_replicas.map { it.update(target_vm_size: target_vm_size.vm_size, target_storage_size_gib:) }
-          audit_log(pg, "update")
-        end
-
-        if api?
-          Serializers::Postgres.serialize(pg, {detailed: true})
-        else
-          flash["notice"] = "'#{pg.name}' will be updated according to requested configuration"
-          response["location"] = "#{@project.path}#{pg.path}"
-          200
-        end
       end
 
       r.post "restart" do
@@ -115,35 +117,37 @@ class Clover
       end
 
       r.on "firewall-rule" do
-        r.get api?, true do
-          authorize("Postgres:view", pg.id)
-          {
-            items: Serializers::PostgresFirewallRule.serialize(pg.firewall_rules),
-            count: pg.firewall_rules.count
-          }
-        end
-
-        r.post true do
-          authorize("Postgres:edit", pg.id)
-
-          parsed_cidr = Validation.validate_cidr(typecast_params.nonempty_str!("cidr"))
-
-          firewall_rule = nil
-          DB.transaction do
-            pg.incr_update_firewall_rules
-            firewall_rule = PostgresFirewallRule.create_with_id(
-              postgres_resource_id: pg.id,
-              cidr: parsed_cidr.to_s,
-              description: typecast_params.str("description")&.strip
-            )
-            audit_log(firewall_rule, "create", pg)
+        r.is do
+          r.get api? do
+            authorize("Postgres:view", pg.id)
+            {
+              items: Serializers::PostgresFirewallRule.serialize(pg.firewall_rules),
+              count: pg.firewall_rules.count
+            }
           end
 
-          if api?
-            Serializers::PostgresFirewallRule.serialize(firewall_rule)
-          else
-            flash["notice"] = "Firewall rule is created"
-            r.redirect "#{@project.path}#{pg.path}/networking"
+          r.post do
+            authorize("Postgres:edit", pg.id)
+
+            parsed_cidr = Validation.validate_cidr(typecast_params.nonempty_str!("cidr"))
+
+            firewall_rule = nil
+            DB.transaction do
+              pg.incr_update_firewall_rules
+              firewall_rule = PostgresFirewallRule.create_with_id(
+                postgres_resource_id: pg.id,
+                cidr: parsed_cidr.to_s,
+                description: typecast_params.str("description")&.strip
+              )
+              audit_log(firewall_rule, "create", pg)
+            end
+
+            if api?
+              Serializers::PostgresFirewallRule.serialize(firewall_rule)
+            else
+              flash["notice"] = "Firewall rule is created"
+              r.redirect "#{@project.path}#{pg.path}/networking"
+            end
           end
         end
 

@@ -2,39 +2,41 @@
 
 class Clover
   hash_branch("project") do |r|
-    r.get true do
-      no_authorization_needed
-      dataset = current_account.projects_dataset.where(visible: true)
+    r.is do
+      r.get do
+        no_authorization_needed
+        dataset = current_account.projects_dataset.where(visible: true)
 
-      if api?
-        paginated_result(dataset, Serializers::Project)
-      else
-        @projects = Serializers::Project.serialize(dataset.all, {include_path: true, web: true})
-        view "project/index"
-      end
-    end
-
-    r.post true do
-      no_authorization_needed
-      if current_account.projects_dataset.count >= 10
-        err_msg = "Project limit exceeded. You can create up to 10 projects. Contact support@ubicloud.com if you need more."
         if api?
-          fail CloverError.new(400, "InvalidRequest", err_msg)
+          paginated_result(dataset, Serializers::Project)
         else
-          flash["error"] = err_msg
-          r.redirect "/project"
+          @projects = Serializers::Project.serialize(dataset.all, {include_path: true, web: true})
+          view "project/index"
         end
       end
 
-      DB.transaction do
-        @project = current_account.create_project_with_default_policy(typecast_params.nonempty_str!("name"))
-        audit_log(@project, "create")
-      end
+      r.post do
+        no_authorization_needed
+        if current_account.projects_dataset.count >= 10
+          err_msg = "Project limit exceeded. You can create up to 10 projects. Contact support@ubicloud.com if you need more."
+          if api?
+            fail CloverError.new(400, "InvalidRequest", err_msg)
+          else
+            flash["error"] = err_msg
+            r.redirect "/project"
+          end
+        end
 
-      if api?
-        Serializers::Project.serialize(@project)
-      else
-        r.redirect @project.path
+        DB.transaction do
+          @project = current_account.create_project_with_default_policy(typecast_params.nonempty_str!("name"))
+          audit_log(@project, "create")
+        end
+
+        if api?
+          Serializers::Project.serialize(@project)
+        else
+          r.redirect @project.path
+        end
       end
     end
 
