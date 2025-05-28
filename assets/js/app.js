@@ -136,6 +136,19 @@ $(".edit-inline-btn").on("click", function (event) {
   row.find(".cancel-inline-btn").show();
 });
 
+$(".cancel-inline-btn").on("click", function (event) {
+  let row = $(this).closest("tr");
+  row.find("td.inline-editable").each(function () {
+    let originalValue = $(this).find("input").data("original-value");
+    $(this).text(originalValue);
+  });
+
+  row.find(".edit-inline-btn").show();
+  row.find(".delete-btn").show();
+  row.find(".save-inline-btn").hide();
+  row.find(".cancel-inline-btn").hide();
+});
+
 $(".restart-btn").on("click", function (event) {
   if (!confirm("Are you sure to restart?")) {
     event.preventDefault();
