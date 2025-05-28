@@ -25,7 +25,11 @@ class Clover
       r.is do
         r.delete do
           authorize("Firewall:delete", firewall.id)
-          firewall.private_subnets.map { authorize("PrivateSubnet:edit", it.id) }
+          ds = firewall.private_subnets_dataset
+          unless ds.exclude(id: dataset_authorize(ds, "PrivateSubnet:edit").select(:id)).empty?
+            fail Authorization::Unauthorized
+          end
+
           DB.transaction do
             firewall.destroy
             audit_log(firewall, "destroy")
