@@ -12,7 +12,9 @@
           locals: {
             name: "inference_endpoint",
             placeholder: "Pick an endpoint",
-            options: @inference_models.map { |ie| [ie[:url], ie[:model_name], nil, {"data-id": ie[:id]}] },
+            options: @inference_models.map { |ie|
+              [ie[:url], ie[:model_name], nil, {"data-id": ie[:id], "data-tags": ie[:tags].to_json}]
+            },
             selected: @inference_models.any? ? @inference_models.first[:url] : nil
           }
         ) %>
@@ -30,29 +32,40 @@
         ) %>
       </div>
     </div>
-    <div class="shadow-md rounded-lg p-2 bg-gray-50">
+    <div class="shadow-md rounded-lg p-4 bg-gray-50">
       <%== render(
         "components/form/textarea",
         locals: {
           name: "inference_prompt",
           attributes: {
             "autofocus" => true,
-            "placeholder" => "User prompt to be submitted to the inference endpoint"
-          }
-        }
-      ) %>
-      <%== render(
-        "components/button",
-        locals: {
-          text: "Submit",
-          attributes: {
-            "name" => "inference_submit",
-            "id" => "inference_submit",
-            "type" => "button"
+            "placeholder" => "User prompt to be submitted to the inference endpoint",
+            "rows" => 4,
           },
-          extra_class: "mt-2"
         }
       ) %>
+      <div class="flex flex-row items-center justify-between mt-2">
+        <input
+          type="file"
+          id="files"
+          accept=".jpg,.jpeg,.png,.pdf"
+          class="inline-flex items-center text-sm"
+          multiple
+          aria-label="Upload files"
+        >
+        <%== render(
+          "components/button",
+          locals: {
+            text: "Submit",
+            attributes: {
+              "name" => "inference_submit",
+              "id" => "inference_submit",
+              "type" => "button"
+            },
+            extra_class: "mt-2"
+          }
+        ) %>
+      </div>
     </div>
     <div class="border-b border-gray-200">
       <ul class="flex flex-wrap -mb-px text-sm font-medium text-center text-gray-500 dark:text-gray-400">
