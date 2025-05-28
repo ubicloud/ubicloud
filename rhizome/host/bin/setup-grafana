@@ -1,0 +1,65 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+require "securerandom"
+
+domain = ARGV.shift.to_s.strip
+cert_email = ARGV.shift.to_s.strip
+if domain.empty? || cert_email.empty?
+  puts "Error: Both domain and cert_email must be provided."
+  exit 1
+end
+admin_password = SecureRandom.hex(16)
+grafana_ini = "/etc/grafana/grafana.ini"
+
+r "sudo apt update"
+r "sudo apt install -y apt-transport-https software-properties-common wget nginx snapd"
+r "sudo snap install certbot --classic"
+
+r "sudo mkdir -p /etc/apt/keyrings/"
+r "wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null"
+r "echo \"deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main\" | sudo tee -a /etc/apt/sources.list.d/grafana.list"
+
+r "sudo apt update"
+r "sudo apt install -y grafana"
+
+r "sudo cp #{grafana_ini} #{grafana_ini}.bak"
+
+r "sudo sed -i \
+  -e 's/;admin_user = admin/admin_user = admin/' \
+  -e 's/;admin_password = admin/admin_password = #{admin_password}/' \
+  #{grafana_ini}"
+
+r "sudo mkdir -p /var/www/html"
+
+r %(
+sudo tee /etc/nginx/sites-available/grafana.conf > /dev/null <<'EOF'
+server {
+    listen 80;
+    server_name {{DOMAIN}};
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+EOF
+)
+r "sudo sed -i 's|{{DOMAIN}}|'#{domain.shellescape}'|' /etc/nginx/sites-available/grafana.conf"
+
+r "sudo ln -s /etc/nginx/sites-available/grafana.conf /etc/nginx/sites-enabled/"
+r "sudo systemctl start nginx"
+
+r "sudo certbot --nginx -d #{domain.shellescape} --non-interactive --agree-tos --email #{cert_email.shellescape}"
+r "sudo apt install -y ufw"
+r "sudo ufw allow 22"
+r "sudo ufw allow 80"
+r "sudo ufw allow 443"
+r "sudo ufw enable"
+
+r "sudo systemctl enable grafana-server"
+r "sudo systemctl start grafana-server"
