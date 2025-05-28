@@ -40,9 +40,13 @@ class Clover
           if api?
             @firewall
           else
-            project_subnets = dataset_authorize(@project.private_subnets_dataset.eager(:location).where(location_id: @location.id), "PrivateSubnet:view").all
-            attached_subnets = firewall.private_subnets_dataset.eager(:location).all
-            @attachable_subnets = Serializers::PrivateSubnet.serialize(project_subnets.reject { |ps| attached_subnets.find { |as| as.id == ps.id } })
+            attachable_subnets_dataset = dataset_authorize(@project
+                .private_subnets_dataset
+                .eager(:location)
+                .where(location_id: @location.id),
+              "PrivateSubnet:view")
+              .exclude(id: firewall.private_subnets_dataset.select(:id))
+            @attachable_subnets = Serializers::PrivateSubnet.serialize(attachable_subnets_dataset.all)
 
             view "networking/firewall/show"
           end
