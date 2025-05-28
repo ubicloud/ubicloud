@@ -297,6 +297,16 @@ function setupPlayground() {
     show_tab($(this).data("target"));
   });
 
+  // Disable the file input if the selected model is not multimodal.
+  function update_file_input_state() {
+    const selected_option = $('#inference_endpoint option:selected');
+    const tags = JSON.parse(selected_option.attr('data-tags') || '{}');
+    const is_multimodal = tags['multimodal'] || false;
+    $('#files').prop('disabled', !is_multimodal);
+  }
+  update_file_input_state();
+  $('#inference_endpoint').on('change', update_file_input_state);
+
   $('#inference_tab_preview').hide();
 
   let controller = null;
@@ -334,6 +344,41 @@ function setupPlayground() {
   };
   marked.use({ extensions: [reasoningExtension] });
 
+  function readFileAsDataURL(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function readFilesFromInput(input) {
+    if (input.disabled) {
+      return [];
+    }
+    const files = Array.from(input.files);
+    const contents = [];
+    for (const file of files) {
+      const result = await readFileAsDataURL(file);
+      const mimeType = file.type;
+      if (mimeType.startsWith("image/")) {
+        contents.push({
+          type: "image_url",
+          image_url: { url: result },
+        });
+      } else if (mimeType === "application/pdf") {
+        contents.push({
+          type: "file",
+          file: { filename: file.name, file_data: result },
+        });
+      } else {
+        throw new Error(`Unsupported file type ${mimeType} for file ${file.name}. Only images and PDFs are supported.`);
+      }
+    }
+    return contents;
+  }
+
   const generate = async () => {
     if (controller) {
       controller.abort();
@@ -359,6 +404,31 @@ function setupPlayground() {
       return;
     }
 
+    let file_contents;
+    try {
+      file_contents = await readFilesFromInput(document.getElementById('files'));
+    } catch (error) {
+      alert(`Failed to read file(s): ${error.message || error}`);
+      return;
+    }
+    const payload = JSON.stringify({
+      model: $('#inference_endpoint option:selected').text().trim(),
+      messages: [{
+        role: "user", content: [
+          { type: "text", text: prompt },
+          ...file_contents,
+        ]
+      }],
+      stream: true,
+    });
+
+    const MAX_PAYLOAD_MB = 50;
+    if (payload.length > MAX_PAYLOAD_MB << 20) {
+      alert(`The request payload is too large (${payload.length >> 20} MB).`
+        + ` Please reduce the size to less than ${MAX_PAYLOAD_MB} MB.`);
+      return;
+    }
+
     $('#inference_response_raw').text("");
     $('#inference_response_preview').text("");
     $('#inference_submit').text("Stop");
@@ -378,11 +448,7 @@ function setupPlayground() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${api_key}`,
         },
-        body: JSON.stringify({
-          model: $('#inference_endpoint option:selected').text().trim(),
-          messages: [{ role: "user", content: prompt }],
-          stream: true,
-        }),
+        body: payload,
         signal,
       });
 
