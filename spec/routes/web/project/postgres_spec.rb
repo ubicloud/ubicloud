@@ -510,7 +510,7 @@ RSpec.describe Clover, "postgres" do
         pg
         visit "#{project.path}#{pg.path}"
 
-        btn = find "#fwr-delete-#{pg.firewall_rules.first.ubid} .delete-btn"
+        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
         expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
@@ -522,7 +522,7 @@ RSpec.describe Clover, "postgres" do
         visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
         expect(page.title).to eq "Ubicloud - pg-without-permission"
 
-        expect { find "#fwr-delete-#{pg.firewall_rules.first.ubid} .delete-btn" }.to raise_error Capybara::ElementNotFound
+        expect { find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .delete-btn" }.to raise_error Capybara::ElementNotFound
       end
 
       it "does not show create firewall rule when does not have permissions" do
@@ -557,6 +557,46 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "test description - new firewall rule"
 
         expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
+      end
+
+      it "can update firewall rule" do
+        pg
+        visit "#{project.path}#{pg.path}"
+
+        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
+        url = btn["data-url"]
+        _csrf = btn["data-csrf"]
+        page.driver.submit :patch, url, {cidr: "0.0.0.0/1", description: "dummy-description", _csrf:}
+
+        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
+      end
+
+      it "can set nill description for firewall rule" do
+        pg
+        visit "#{project.path}#{pg.path}"
+
+        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
+        url = btn["data-url"]
+        _csrf = btn["data-csrf"]
+        page.driver.submit :patch, url, {cidr: "0.0.0.0/1", description: nil, _csrf:}
+
+        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
+      end
+
+      it "cannot delete firewall rule if it is not exist" do
+        pg
+        visit "#{project.path}#{pg.path}"
+
+        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
+        url = btn["data-url"]
+        _csrf = btn["data-csrf"]
+
+        fwr = pg.firewall_rules.first
+        fwr.update(cidr: "0.0.0.0/1", postgres_resource_id: pg_wo_permission.id)
+
+        page.driver.submit :patch, url, {cidr: "0.0.0.0/2", description: "dummy-description", _csrf:}
+
+        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).not_to be true
       end
     end
 

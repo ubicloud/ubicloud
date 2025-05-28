@@ -361,14 +361,17 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
         <tbody class="divide-y divide-gray-200 bg-white">
           <% @pg[:firewall_rules].each do |fwr| %>
             <tr>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:cidr] %></td>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:description] %></td>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 inline-editable" scope="row"><%= fwr[:cidr] %></td>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 inline-editable" scope="row"><%= fwr[:description] %></td>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">5432, 6432</td>
               <% if edit_perm %>
                 <td
-                  id="fwr-delete-<%=fwr[:id]%>"
+                  id="fwr-buttons-<%= fwr[:id] %>"
                   class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
                 >
+                  <%== part("components/edit_inline_button", fields: ["cidr", "description"], text: "") %>
+                  <%== part("components/save_inline_button", url: "#{request.path}/firewall-rule/#{fwr[:id]}", text: "", confirmation_message: "Firewall rule is updated successfully.", extra_class: "hidden") %>
+                  <%== part("components/cancel_inline_button", text: "", extra_class: "hidden") %>
                   <%== part("components/delete_button", url: "#{request.path}/firewall-rule/#{fwr[:id]}", text: "") %>
                 </td>
               <% end %>
@@ -388,7 +391,7 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
                   }
                 ) %>
               </td>
-              <td>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
                 <%== part(
                   "components/form/text",
                   name: "description",
