@@ -27,8 +27,8 @@ class Clover
         end
       end
 
-      r.on String do |ubid|
-        @token = token = token_ds.with_pk(UBID.to_uuid(ubid))
+      r.on :ubid_uuid do |uuid|
+        @token = token = token_ds.with_pk(uuid)
 
         r.delete true do
           if token
