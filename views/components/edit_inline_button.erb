@@ -1,0 +1,12 @@
+<%# locals: (fields: nil, text: "Edit") %>
+
+<%== part(
+  "components/button",
+  text: text,
+  icon: "hero-pencil",
+  extra_class: "edit-inline-btn",
+  type: "warning",
+  attributes: {
+    "data-fields" => fields
+  }
+) %>

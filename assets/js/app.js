@@ -110,6 +110,32 @@ $(".delete-btn").on("click", function (event) {
   });
 });
 
+$(".edit-inline-btn").on("click", function (event) {
+  let fields = $(this).data("fields");
+
+  let row = $(this).closest("tr");
+  let currentFieldId = 0;
+  row.find("td.inline-editable").each(function () {
+    let name = fields[currentFieldId];
+    let value = $(this).text().trim();
+
+    let input = $("<input>", {
+      type: "text",
+      name: name,
+      value: value,
+      "data-original-value": value,
+      class: "w-full rounded-md border-0 py-1.5 pl-3 pr-10 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-orange-600"});
+    $(this).html(input);
+
+    currentFieldId++;
+  });
+
+  row.find(".edit-inline-btn").hide();
+  row.find(".delete-btn").hide();
+  row.find(".save-inline-btn").show();
+  row.find(".cancel-inline-btn").show();
+});
+
 $(".restart-btn").on("click", function (event) {
   if (!confirm("Are you sure to restart?")) {
     event.preventDefault();
