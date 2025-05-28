@@ -82,7 +82,7 @@ class PostgresResource < Sequel::Model
       sslkey: "/etc/ssl/certs/server.key",
       sslmode: "verify-full",
       application_name: application_name
-    }.map { |k, v| "#{k}=#{v}" }.join("\\&")
+    }.map { |k, v| "#{k}=#{v}" }.join("&")
 
     URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: identity, query: query_parameters).to_s
   end
