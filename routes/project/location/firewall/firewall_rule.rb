@@ -24,7 +24,7 @@ class Clover
       firewall_rule = @firewall.firewall_rules_dataset[id:]
       check_found_object(firewall_rule)
 
-      r.delete true do
+      r.delete do
         authorize("Firewall:edit", @firewall.id)
         DB.transaction do
           @firewall.remove_firewall_rule(firewall_rule)
@@ -33,7 +33,7 @@ class Clover
         204
       end
 
-      r.get true do
+      r.get do
         authorize("Firewall:view", @firewall.id)
         Serializers::FirewallRule.serialize(firewall_rule)
       end

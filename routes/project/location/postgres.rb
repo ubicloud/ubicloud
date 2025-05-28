@@ -229,35 +229,33 @@ class Clover
         end
       end
 
-      r.on "read-replica" do
-        r.post true do
-          authorize("Postgres:edit", pg.id)
+      r.post "read-replica" do
+        authorize("Postgres:edit", pg.id)
 
-          name = typecast_params.nonempty_str!("name")
-          st = nil
-          DB.transaction do
-            st = Prog::Postgres::PostgresResourceNexus.assemble(
-              project_id: @project.id,
-              location_id: pg.location_id,
-              name:,
-              target_vm_size: pg.target_vm_size,
-              target_storage_size_gib: pg.target_storage_size_gib,
-              ha_type: PostgresResource::HaType::NONE,
-              version: pg.version,
-              flavor: pg.flavor,
-              parent_id: pg.id,
-              restore_target: nil
-            )
-            audit_log(pg, "create_replica", st.subject)
-          end
-          send_notification_mail_to_partners(st.subject, current_account.email)
+        name = typecast_params.nonempty_str!("name")
+        st = nil
+        DB.transaction do
+          st = Prog::Postgres::PostgresResourceNexus.assemble(
+            project_id: @project.id,
+            location_id: pg.location_id,
+            name:,
+            target_vm_size: pg.target_vm_size,
+            target_storage_size_gib: pg.target_storage_size_gib,
+            ha_type: PostgresResource::HaType::NONE,
+            version: pg.version,
+            flavor: pg.flavor,
+            parent_id: pg.id,
+            restore_target: nil
+          )
+          audit_log(pg, "create_replica", st.subject)
+        end
+        send_notification_mail_to_partners(st.subject, current_account.email)
 
-          if api?
-            Serializers::Postgres.serialize(st.subject, {detailed: true})
-          else
-            flash["notice"] = "'#{name}' will be ready in a few minutes"
-            r.redirect "#{@project.path}#{st.subject.path}/overview"
-          end
+        if api?
+          Serializers::Postgres.serialize(st.subject, {detailed: true})
+        else
+          flash["notice"] = "'#{name}' will be ready in a few minutes"
+          r.redirect "#{@project.path}#{st.subject.path}/overview"
         end
       end
 
