@@ -129,7 +129,7 @@ class Clover
           PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: stripe_id, card_fingerprint: card_fingerprint, preauth_intent_id: payment_intent.id, preauth_amount: preauth_amount)
         end
 
-        if !@project.billing_info.has_address?
+        unless @project.billing_info.has_address?
           Stripe::Customer.update(@project.billing_info.stripe_id, {
             address: stripe_payment_method["billing_details"]["address"].to_hash
           })
