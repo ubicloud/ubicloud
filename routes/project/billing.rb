@@ -154,22 +154,20 @@ class Clover
           r.redirect checkout.url, 303
         end
 
-        r.is :ubid_uuid do |id|
+        r.delete :ubid_uuid do |id|
           next unless (payment_method = PaymentMethod[id:, billing_info_id: @project.billing_info_id])
 
-          r.delete true do
-            unless payment_method.billing_info.payment_methods.count > 1
-              response.status = 400
-              next {error: {message: "You can't delete the last payment method of a project."}}
-            end
-
-            DB.transaction do
-              payment_method.destroy
-              audit_log(payment_method, "destroy")
-            end
-
-            204
+          unless payment_method.billing_info.payment_methods.count > 1
+            response.status = 400
+            next {error: {message: "You can't delete the last payment method of a project."}}
           end
+
+          DB.transaction do
+            payment_method.destroy
+            audit_log(payment_method, "destroy")
+          end
+
+          204
         end
       end
 
