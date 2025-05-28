@@ -5,119 +5,151 @@ require_relative "../model/spec_helper"
 RSpec.describe Scheduling::Dispatcher do
   subject(:di) { described_class.new }
 
+  after do
+    di.shutdown_and_cleanup_threads
+    Thread.current.name = nil
+  end
+
+  describe "#shutdown" do
+    it "sets shutting_down flag" do
+      expect { di.shutdown }.to change(di, :shutting_down).from(false).to(true)
+
+      # Test idempotent behavior
+      2.times { di.shutdown_and_cleanup_threads }
+    end
+  end
+
+  describe "#num_current_strands" do
+    it "returns the number of current strands being handled" do
+      expect(di.num_current_strands).to eq 0
+      di.instance_variable_get(:@current_strands)["a"] = true
+      expect(di.num_current_strands).to eq 1
+    end
+  end
+
   describe "#scan" do
-    it "exits if there's not enough database connections" do
-      expect(Config).to receive(:db_pool).and_return(0).at_least(:once)
-      expect(Clog).to receive(:emit).with("Not enough database connections.").and_call_original
-      di.scan
+    it "returns empty array if there are no strands ready for running" do
+      expect(di.scan).to eq([])
     end
 
-    it "does not return work when shutting down" do
-      expect { di.shutdown }.to change(di, :shutting_down).from(false).to(true)
+    it "returns array of strands ready for running" do
+      Strand.create(prog: "Test", label: "wait_exit")
+      st = Strand.first
+      expect(di.scan).to eq([])
+      st.update(schedule: Time.now + 10)
+      expect(di.scan).to eq([])
+      st.update(schedule: Time.now - 10)
+      expect(di.scan.map(&:id)).to eq([st.id])
+    end
+
+    it "returns empty array when shutting down" do
+      di.shutdown
       expect(di.scan).to eq([])
     end
   end
 
-  describe "#wait_cohort" do
-    it "operates when no threads are running" do
-      expect(di.wait_cohort).to be_zero
+  describe "#apoptosis_run" do
+    it "does not trigger exit if strand runs on time" do
+      expect(ThreadPrinter).not_to receive(:run)
+      expect(Kernel).not_to receive(:exit!)
+      start_queue = Queue.new
+      finish_queue = Queue.new
+      start_queue.push(true)
+      finish_queue.push(true)
+      expect(di.apoptosis_run(0, start_queue, finish_queue)).to be true
+    end
+  end
+
+  describe "#apoptosis_thread" do
+    it "triggers thread dumps and exit if the Prog takes too long" do
+      exited = false
+      expect(ThreadPrinter).to receive(:run)
+      expect(Kernel).to receive(:exit!).and_invoke(-> { exited = true })
+      di = described_class.new(apoptosis_timeout: 0.05)
+      start_queue = di.instance_variable_get(:@thread_data).dig(0, :start_queue)
+      start_queue.push(true)
+      t = Time.now
+      until exited
+        raise "no apoptosis within 1 second" if Time.now - t > 1
+        sleep 0.1
+      end
+      expect(exited).to be true
     end
 
-    it "separates completed threads" do
-      complete_r, complete_w = IO.pipe
-      complete_w.close
-      incomplete_r, incomplete_w = IO.pipe
-
-      di.notifiers.concat([complete_r, incomplete_r])
-      expect(di.wait_cohort).to eq 1
-
-      expect(di.notifiers).to eq([incomplete_r])
-    ensure
-      [complete_r, complete_w, incomplete_r, incomplete_w].each(&:close)
-    end
-
-    it "exits if all strands have finished when shutting down" do
-      expect { di.shutdown }.to change(di, :shutting_down).from(false).to(true)
-      expect(Kernel).to receive(:exit)
-      di.wait_cohort
-    end
-
-    it "waits for running strands when shutting down" do
-      complete_r, complete_w = IO.pipe
-      complete_w.close
-      di.notifiers.concat([complete_r])
-      expect { di.shutdown }.to change(di, :shutting_down).from(false).to(true)
-      expect(di.wait_cohort).to eq 1
-    ensure
-      [complete_r, complete_w].each(&:close)
+    it "triggers thread dumps and exit if the there is an exception raised" do
+      exited = false
+      expect(ThreadPrinter).to receive(:run)
+      expect(Kernel).to receive(:exit!).and_invoke(-> { exited = true })
+      di = described_class.new(apoptosis_timeout: 0.05)
+      thread_data = di.instance_variable_get(:@thread_data)
+      start_queue = thread_data.dig(0, :start_queue)
+      finish_queue = thread_data.dig(0, :finish_queue)
+      finish_queue.singleton_class.undef_method(:pop)
+      start_queue.push(true)
+      t = Time.now
+      until exited
+        raise "no apoptosis within 1 second" if Time.now - t > 1
+        sleep 0.1
+      end
+      expect(exited).to be true
     end
   end
 
   describe "#start_cohort" do
-    after do
-      Thread.list.each { it.join if it != Thread.current }
+    it "returns true if there are no strands" do
+      expect(di.start_cohort).to be true
+      expect(di.instance_variable_get(:@strand_queue).pop(timeout: 0)).to be_nil
+      expect(di.instance_variable_get(:@current_strands)).to be_empty
     end
 
-    it "can create threads" do
-      # Isolate some thread local variables used for communication
-      # within.
-      Thread.new do
-        th = Thread.current
-        r, w = IO.pipe
-
-        # Set a temporally-unique name that allows the Test strand to
-        # find this thread and read its variables.
-        th.name = "clover_test"
-
-        # Pass part of a pipe: the test will synchronize by blocking
-        # on it having been closed.
-        th[:clover_test_in] = w
-
-        # Ensure the test can be found by "#scan" and runs in a
-        # thread.
-        Strand.create_with_id(prog: "Test", label: "synchronized")
-        di.start_cohort
-        expect(di.notifiers.count).to be 1
-
-        # Blocks until :clover_test_out has been set.
-        r.read
-        r.close
-
-        # Wait until thread has changed "alive?" status to "false".
-        th.thread_variable_get(:clover_test_out).join
-
-        # Expect a dead thread to get reaped by wait_cohort.
-        di.wait_cohort
-        expect(di.notifiers).to be_empty
-      ensure
-        # Multiple transactions are required for this test across
-        # threads, so we need to clean up differently than using
-        # ROLLBACK on the main thread's transaction.
-        Strand.truncate(cascade: true)
-      end.join
+    it "returns false if the dispatcher is shutting down after the scan" do
+      Strand.create(prog: "Test", label: "wait_exit", schedule: Time.now - 10)
+      expect(di).to receive(:scan).and_wrap_original do |original_method|
+        res = original_method.call
+        di.shutdown
+        res
+      end
+      expect(di.start_cohort).to be false
+      expect(di.instance_variable_get(:@strand_queue).pop(timeout: 0)).to be_nil
+      expect(di.instance_variable_get(:@current_strands)).to be_empty
     end
 
-    it "can trigger thread dumps and exit if the Prog takes too long" do
-      expect(ThreadPrinter).to receive(:run)
-      expect(Kernel).to receive(:exit!)
-
-      Thread.new do
-        th = Thread.current
-        r, w = IO.pipe
-        th.name = "clover_test"
-        th[:clover_test_in] = r
-
-        di.instance_variable_set(:@apoptosis_timeout, 0)
-        Strand.create_with_id(prog: "Test", label: "wait_exit")
-        di.start_cohort
-        w.close
-        di.notifiers.each(&:read)
-      ensure
-        Strand.truncate(cascade: true)
-      end.join
+    it "returns true if the dispatcher is shutting down and there are no strands" do
+      di.shutdown
+      expect(di.start_cohort).to be true
+      expect(di.instance_variable_get(:@strand_queue).pop(timeout: 0)).to be_nil
+      expect(di.instance_variable_get(:@current_strands)).to be_empty
     end
 
-    it "can print exceptions if they are raised" do
+    it "returns false and pushes to strand queue if there are strands" do
+      st = Strand.create(prog: "Test", label: "wait_exit", schedule: Time.now - 10)
+      old_queue = di.instance_variable_get(:@strand_queue)
+      new_queue = di.instance_variable_set(:@strand_queue, Queue.new)
+      expect(di.start_cohort).to be false
+      expect(new_queue.pop(true).id).to eq st.id
+      expect(di.instance_variable_get(:@current_strands)).to eq(st.id => true)
+
+      # Check that we don't retrieve strands currently executing
+      di.instance_variable_set(:@strand_queue, old_queue)
+      expect(di.start_cohort).to be true
+      expect(di.instance_variable_get(:@current_strands)).to eq(st.id => true)
+    end
+  end
+
+  describe "#run_strand" do
+    it "runs strand" do
+      st = Strand.create(prog: "Test", label: "napper", schedule: Time.now - 10)
+      start_queue = Queue.new
+      finish_queue = Queue.new
+      current_strands = di.instance_variable_get(:@current_strands)
+      current_strands[st.id] = true
+      expect(di.run_strand(st, start_queue, finish_queue)).to be_a(Prog::Base::Nap)
+      expect(start_queue.pop(true)).to eq st.ubid
+      expect(finish_queue.pop(true)).to be true
+      expect(current_strands).to be_empty
+    end
+
+    it "print exceptions if they are raised" do
       ex = begin
         begin
           raise StandardError.new("nested test error")
@@ -128,7 +160,7 @@ RSpec.describe Scheduling::Dispatcher do
         ex
       end
 
-      st = instance_double(Strand, ubid: "st065wajns766jkqa7af15vm6g")
+      st = Strand.create(prog: "Test", label: "wait_exit", schedule: Time.now - 10)
       expect(st).to receive(:run).and_raise(ex)
 
       # Go to the trouble of emitting those exceptions to provoke
@@ -137,16 +169,14 @@ RSpec.describe Scheduling::Dispatcher do
       expect($stdout).to receive(:write).with(a_string_matching(/outer test error/))
       expect($stdout).to receive(:write).with(a_string_matching(/nested test error/))
 
-      notif = di.start_strand(st)
-      notif.read
-      di.wait_cohort
-    end
-
-    it "does not start new strands when shutting down" do
-      expect { di.shutdown }.to change(di, :shutting_down).from(false).to(true)
-      expect(di).to receive(:scan).and_return([Strand.new(prog: "Test", label: "test")])
-      expect(di).not_to receive(:start_strand)
-      di.start_cohort
+      start_queue = Queue.new
+      finish_queue = Queue.new
+      current_strands = di.instance_variable_get(:@current_strands)
+      current_strands[st.id] = true
+      expect(di.run_strand(st, start_queue, finish_queue)).to eq ex
+      expect(start_queue.pop(true)).to eq st.ubid
+      expect(finish_queue.pop(true)).to be true
+      expect(current_strands).to be_empty
     end
   end
 end
