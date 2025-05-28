@@ -85,7 +85,7 @@ class Clover
 
           DB.transaction do
             pg.update(target_vm_size: requested_parsed_size.name, target_storage_size_gib:, ha_type:)
-            pg.read_replicas.map { it.update(target_vm_size: requested_parsed_size.name, target_storage_size_gib:) }
+            pg.read_replicas_dataset.update(target_vm_size: requested_parsed_size.name, target_storage_size_gib:)
             audit_log(pg, "update")
           end
 
