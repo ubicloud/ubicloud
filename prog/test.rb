@@ -8,6 +8,43 @@ class Prog::Test < Prog::Base
   label def start
   end
 
+  private def fib(n)
+    if n < 2
+      1
+    else
+      fib(n - 2) + fib(n - 1)
+    end
+  end
+
+  megabyte = (" " * 1024 * 1024)
+
+  3.times do |n|
+    n1 = n + 1
+    label(define_method(:"smoke_test_#{n1}") do
+      when_test_semaphore_set? do
+        decr_test_semaphore
+        dynamic_hop :"smoke_test_#{n}"
+      end
+
+      incr_test_semaphore
+
+      # CPU
+      fib(rand(15...25))
+
+      # IO
+      rand(20).times do
+        File.write(File::NULL, megabyte)
+      end
+
+      print n1
+      nap rand
+    end)
+  end
+
+  label def smoke_test_0
+    nap 1000
+  end
+
   label def pusher1
     pop "1" if retval
     push Prog::Test, {test_level: "2"}, :pusher2
