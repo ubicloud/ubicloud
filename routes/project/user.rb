@@ -283,8 +283,8 @@ class Clover
             end
           end
 
-          r.on String do |ubid|
-            next unless (@tag = @tag_model[project_id: @project.id, id: UBID.to_uuid(ubid)])
+          r.on :ubid_uuid do |id|
+            next unless (@tag = @tag_model[project_id: @project.id, id:])
             # Metatag uuid is used to differentiate being allowed to manage
             # tag itself, compared to being able to manage things contained in
             # the tag.
