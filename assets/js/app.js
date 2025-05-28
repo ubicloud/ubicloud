@@ -110,6 +110,58 @@ $(".delete-btn").on("click", function (event) {
   });
 });
 
+$(".edit-inline-btn").on("click", function (event) {
+  let inline_editable_group = $(this).closest(".group\\/inline-editable");
+  inline_editable_group.find(".inline-editable").each(function () {
+    let value = $(this).find(".inline-editable-text").text();
+    $(this).find(".inline-editable-input").val(value);
+  });
+
+  inline_editable_group.addClass("active");
+});
+
+$(".cancel-inline-btn").on("click", function (event) {
+  $(this).closest(".group\\/inline-editable").removeClass("active");
+});
+
+$(".save-inline-btn").on("click", function (event) {
+  let inline_editable_group = $(this).closest(".group\\/inline-editable");
+  let data = {};
+  inline_editable_group.find(".inline-editable-input").each(function () {
+    data[$(this).attr("name")] = $(this).val();;
+  });
+
+  let url = $(this).data("url");
+  let csrf = $(this).data("csrf");
+  let confirmation_message = $(this).data("confirmation-message");
+
+  $.ajax({
+    url: url,
+    type: "PATCH",
+    data: { "_csrf": csrf, ...data },
+    dataType: "json",
+    headers: { "Accept": "application/json" },
+    success: function (result) {
+      inline_editable_group.find(".inline-editable").each(function () {
+        let value = $(this).find(".inline-editable-input").val();
+        $(this).find(".inline-editable-text").text(value);
+      });
+
+      inline_editable_group.removeClass("active");
+
+      alert(confirmation_message);
+    },
+    error: function (xhr, ajaxOptions, thrownError) {
+      let message = thrownError;
+      try {
+        response = JSON.parse(xhr.responseText);
+        message = response.error?.message
+      } catch { };
+      alert(`Error: ${message}`);
+    }
+  });
+});
+
 $(".restart-btn").on("click", function (event) {
   if (!confirm("Are you sure to restart?")) {
     event.preventDefault();
