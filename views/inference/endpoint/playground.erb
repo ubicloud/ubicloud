@@ -12,7 +12,7 @@
           locals: {
             name: "inference_endpoint",
             placeholder: "Pick an endpoint",
-            options: @inference_models.map { |ie| [ie[:url], ie[:model_name]] },
+            options: @inference_models.map { |ie| [ie[:url], ie[:model_name], nil, {"data-id": ie[:id]}] },
             selected: @inference_models.any? ? @inference_models.first[:url] : nil
           }
         ) %>

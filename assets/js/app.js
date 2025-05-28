@@ -326,6 +326,18 @@ function setupPlayground() {
     return;
   }
 
+  // Initialize the model selector based on the location hash.
+  const hash = window.location.hash.slice(1);
+  if (hash !== '') {
+    const $select = $('#inference_endpoint');
+    const $option = $select.find('option').filter(function () {
+      return $(this).data('id') === hash;
+    });
+    if ($option.length > 0) {
+      $select.val($option.val()).trigger('change');
+    }
+  }
+
   function show_tab(name) {
     $(".inference-tab").removeClass("active");
     $(".inference-response").hide();
@@ -499,25 +511,25 @@ function setupFormsWithPatchMethod() {
 
     var form = $(this);
     var jsonData = {};
-    form.serializeArray().forEach(function(item) {
-        jsonData[item.name] = item.value;
+    form.serializeArray().forEach(function (item) {
+      jsonData[item.name] = item.value;
     });
 
     $.ajax({
-        url: form.attr('action'),
-        type: 'PATCH',
-        dataType: "html",
-        data: jsonData,
-        success: function (response, status, xhr) {
-          var redirectUrl = xhr.getResponseHeader('Location');
-          if (redirectUrl) {
-              window.location.href = redirectUrl;
-          }
-        },
-        error: function (xhr, ajaxOptions, thrownError) {
-          let message = thrownError;
-          alert(`Error: ${message}`);
+      url: form.attr('action'),
+      type: 'PATCH',
+      dataType: "html",
+      data: jsonData,
+      success: function (response, status, xhr) {
+        var redirectUrl = xhr.getResponseHeader('Location');
+        if (redirectUrl) {
+          window.location.href = redirectUrl;
         }
+      },
+      error: function (xhr, ajaxOptions, thrownError) {
+        let message = thrownError;
+        alert(`Error: ${message}`);
+      }
     });
   });
 }
@@ -587,7 +599,7 @@ function setupInitialChartOptions(chartInstance) {
     color: colorPalette.map(p => p.color),
     tooltip: {
       trigger: 'axis',
-      formatter: function(params) {
+      formatter: function (params) {
         const isoDate = toLocalISOString(new Date(params[0].value[0]));
 
         // Build the tooltip HTML
@@ -766,8 +778,8 @@ function opsFormatter(unit, precision) {
   const unitName = unitParts[0];
 
   return function (value, index) {
-    if (value >= 1000 ** 3) return flexiblePrecision(value / (1000 ** 3), precision)+ ' G ' + unitName + suffix;
-    if (value >= 1000 ** 2) return flexiblePrecision(value / (1000 ** 2), precision)+ ' M ' + unitName + suffix;
+    if (value >= 1000 ** 3) return flexiblePrecision(value / (1000 ** 3), precision) + ' G ' + unitName + suffix;
+    if (value >= 1000 ** 2) return flexiblePrecision(value / (1000 ** 2), precision) + ' M ' + unitName + suffix;
     if (value >= 1000) return flexiblePrecision(value / 1000, precision) + ' K ' + unitName + suffix;
     return value + ' ' + unitName + suffix;
   }

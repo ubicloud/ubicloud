@@ -76,6 +76,16 @@ curl #{ie[:url]}#{path} \\
           <pre class="text-sm bg-gray-800 text-white p-2 rounded-lg overflow-scroll"><%== curl_snippet %></pre>
         </div>
       </div>
+      <%== render(
+        "components/button",
+        locals: {
+          text: "Try in Playground",
+          link: "#{@project_data[:path]}/inference-playground##{ie[:id]}",
+          attributes: {
+            "type" => "button"
+          }
+        }
+      ) %>
     </div>
   </div>
   <% end %>
