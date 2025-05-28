@@ -900,6 +900,31 @@ paths:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/postgres_database_reference'
       - $ref: '#/components/parameters/postgres_firewall_rule_id'
+    patch:
+      operationId: patchLocationPostgresFirewallRule
+      summary: Update a specific Postgres firewall rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cidr:
+                  description: CIDR of the firewall rule
+                  type: string
+                description:
+                  description: Description of the firewall rule
+                  type: string
+                  nullable: true
+              additionalProperties: false
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresFirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Firewall Rule
     delete:
       operationId: deleteLocationPostgresFirewallRule
       summary: Delete a specific firewall rule

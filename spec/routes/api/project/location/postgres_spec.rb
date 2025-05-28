@@ -255,6 +255,16 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(400, "Validation failed for following fields: cidr", {"cidr" => "Invalid CIDR"})
       end
 
+      it "firewall-rule edit" do
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/#{pg.firewall_rules.first.ubid}", {
+          cidr: "0.0.0.0/1",
+          description: "Updated rule"
+        }.to_json
+
+        expect(pg.firewall_rules.first.reload.description).to eq("Updated rule")
+        expect(last_response.status).to eq(200)
+      end
+
       it "metric-destination" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metric-destination", {
           url: "https://example.com",

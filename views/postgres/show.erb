@@ -360,16 +360,26 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
         </thead>
         <tbody class="divide-y divide-gray-200 bg-white">
           <% @pg[:firewall_rules].each do |fwr| %>
-            <tr>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:cidr] %></td>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:description] %></td>
+            <tr class="group/inline-editable">
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 inline-editable" scope="row">
+                <div class="inline-editable-text group-[.active]/inline-editable:hidden block"><%= fwr[:cidr] %></div>
+                <%== part("components/form/text", name: "cidr", attributes: {required: true}, extra_class: "inline-editable-input group-[.active]/inline-editable:block hidden") %>
+              </td>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 inline-editable" scope="row">
+                <div class="inline-editable-text group-[.active]/inline-editable:hidden block"><%= fwr[:description] %></div>
+                <%== part("components/form/text", name: "description", extra_class: "inline-editable-input group-[.active]/inline-editable:block hidden") %>
+              </td>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">5432, 6432</td>
               <% if edit_perm %>
                 <td
-                  id="fwr-delete-<%=fwr[:id]%>"
-                  class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
+                  id="fwr-buttons-<%= fwr[:id] %>"
+                  class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 flex gap-2 items-center justify-end"
                 >
-                  <%== part("components/delete_button", url: "#{request.path}/firewall-rule/#{fwr[:id]}", text: "") %>
+                  <%== part("components/inline_edit_buttons", url: "#{request.path}/firewall-rule/#{fwr[:id]}", confirmation_message: "Firewall rule is updated successfully.") %>
+
+                  <div class="group-[.active]/inline-editable:hidden block">
+                    <%== part("components/delete_button", url: "#{request.path}/firewall-rule/#{fwr[:id]}", text: "") %>
+                  </div>
                 </td>
               <% end %>
             </tr>
@@ -388,7 +398,7 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
                   }
                 ) %>
               </td>
-              <td>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
                 <%== part(
                   "components/form/text",
                   name: "description",

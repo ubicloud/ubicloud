@@ -510,7 +510,7 @@ RSpec.describe Clover, "postgres" do
         pg
         visit "#{project.path}#{pg.path}"
 
-        btn = find "#fwr-delete-#{pg.firewall_rules.first.ubid} .delete-btn"
+        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
         expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
@@ -522,7 +522,7 @@ RSpec.describe Clover, "postgres" do
         visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
         expect(page.title).to eq "Ubicloud - pg-without-permission"
 
-        expect { find "#fwr-delete-#{pg.firewall_rules.first.ubid} .delete-btn" }.to raise_error Capybara::ElementNotFound
+        expect { find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .delete-btn" }.to raise_error Capybara::ElementNotFound
       end
 
       it "does not show create firewall rule when does not have permissions" do
@@ -538,18 +538,18 @@ RSpec.describe Clover, "postgres" do
         pg
         visit "#{project.path}#{pg.path}"
 
-        fill_in "cidr", with: "1.1.1.2"
+        find('input[name="cidr"][form="form-pg-fwr-create"]').set("1.1.1.2")
         find(".firewall-rule-create-button").click
         expect(page).to have_content "Firewall rule is created"
         expect(page).to have_content "1.1.1.2/32"
         expect(page).to have_content "5432"
 
-        fill_in "cidr", with: "12.12.12.0/26"
+        find('input[name="cidr"][form="form-pg-fwr-create"]').set("12.12.12.0/26")
         find(".firewall-rule-create-button").click
         expect(page).to have_content "Firewall rule is created"
 
-        fill_in "cidr", with: "fd00::/64"
-        fill_in "description", with: "test description - new firewall rule"
+        find('input[name="cidr"][form="form-pg-fwr-create"]').set("fd00::/64")
+        find('input[name="description"][form="form-pg-fwr-create"]').set("test description - new firewall rule")
         find(".firewall-rule-create-button").click
         expect(page).to have_content "Firewall rule is created"
         expect(page.status_code).to eq(200)
@@ -557,6 +557,58 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "test description - new firewall rule"
 
         expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
+      end
+
+      it "can update firewall rule" do
+        pg
+        visit "#{project.path}#{pg.path}"
+
+        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
+        url = btn["data-url"]
+        _csrf = btn["data-csrf"]
+        page.driver.submit :patch, url, {cidr: "0.0.0.0/1", description: "dummy-description", _csrf:}
+
+        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
+      end
+
+      it "can set nil description for firewall rule" do
+        pg
+        visit "#{project.path}#{pg.path}"
+
+        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
+        url = btn["data-url"]
+        _csrf = btn["data-csrf"]
+        page.driver.submit :patch, url, {cidr: "0.0.0.0/1", description: nil, _csrf:}
+
+        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
+      end
+
+      it "doesn't increment update_firewall_rules semaphore if cidr is same" do
+        pg
+        visit "#{project.path}#{pg.path}"
+
+        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
+        url = btn["data-url"]
+        _csrf = btn["data-csrf"]
+        page.driver.submit :patch, url, {cidr: "0.0.0.0/0", description: "test", _csrf:}
+
+        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be false
+      end
+
+      it "cannot delete firewall rule if it doesn't exist" do
+        pg
+        visit "#{project.path}#{pg.path}"
+
+        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
+        url = btn["data-url"]
+        _csrf = btn["data-csrf"]
+
+        fwr = pg.firewall_rules.first
+        fwr.update(cidr: "0.0.0.0/1", postgres_resource_id: pg_wo_permission.id)
+
+        page.driver.submit :patch, url, {cidr: "0.0.0.0/2", description: "dummy-description", _csrf:}
+
+        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).not_to be true
       end
     end
 
