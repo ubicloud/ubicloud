@@ -79,13 +79,13 @@ class Clover
     end
   end
 
-  def generate_postgres_options(flavor: "standard")
+  def generate_postgres_options(flavor: "standard", location: nil)
     options = OptionTreeGenerator.new
     all_sizes_for_project = Option.customer_postgres_sizes_for_project(@project.id)
 
     options.add_option(name: "name")
     options.add_option(name: "flavor", values: flavor)
-    options.add_option(name: "location", values: Option.postgres_locations(project_id: @project.id), parent: "flavor", check: ->(flavor, location) {
+    options.add_option(name: "location", values: location || Option.postgres_locations(project_id: @project.id), parent: "flavor", check: ->(flavor, location) {
       !(location.provider == "aws" && flavor != PostgresResource::Flavor::STANDARD)
     })
     options.add_option(name: "family", values: all_sizes_for_project.map(&:vm_family).uniq, parent: "location", check: ->(flavor, location, family) {
@@ -114,42 +114,6 @@ class Clover
     options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS[flavor], parent: "flavor")
 
     options.add_option(name: "ha_type", values: [PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC], parent: "storage_size")
-    options.serialize
-  end
-
-  def generate_postgres_configure_options(flavor:, location:)
-    options = OptionTreeGenerator.new
-    all_sizes_for_project = Option.customer_postgres_sizes_for_project(@project.id)
-
-    options.add_option(name: "flavor", values: flavor)
-    options.add_option(name: "location", values: location, parent: "flavor")
-
-    options.add_option(name: "family", values: all_sizes_for_project.map(&:vm_family).uniq, parent: "location", check: ->(flavor, location, family) {
-      if location.provider == "aws" && family != "standard"
-        false
-      else
-        available_families = Option.families.map(&:name)
-        available_families.include?(family) && BillingRate.from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name)
-      end
-    })
-
-    options.add_option(name: "size", values: all_sizes_for_project.map(&:name).uniq, parent: "family", check: ->(flavor, location, family, size) {
-      if location.provider == "aws" && (size.split("-").last.to_i > 16 || size.split("-").first == "burstable")
-        false
-      else
-        pg_size = all_sizes_for_project.find { it.name == size && it.flavor == flavor && it.location_id == location.id }
-        vm_size = Option::VmSizes.find { it.name == pg_size.vm_size && it.arch == "x64" && it.visible }
-        vm_size.family == family
-      end
-    })
-
-    options.add_option(name: "storage_size", values: ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096", "118", "237", "475", "950", "1781", "1900", "3562", "3800"], parent: "size", check: ->(flavor, location, family, size, storage_size) {
-      pg_size = all_sizes_for_project.find { it.name == size && it.flavor == flavor && it.location_id == location.id }
-      pg_size.storage_size_options.include?(storage_size.to_i)
-    })
-
-    options.add_option(name: "ha_type", values: [PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC], parent: "storage_size")
-
     options.serialize
   end
 end

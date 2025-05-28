@@ -31,7 +31,7 @@ class Clover
         else
           @pg = Serializers::Postgres.serialize(pg, {detailed: true, include_path: true})
           @family = Validation.validate_vm_size(pg.target_vm_size, "x64").family
-          @option_tree, @option_parents = generate_postgres_configure_options(flavor: @pg[:flavor], location: @location)
+          @option_tree, @option_parents = generate_postgres_options(flavor: @pg[:flavor], location: @location)
           view "postgres/show"
         end
       end
