@@ -157,7 +157,7 @@ class Clover
         r.delete :ubid_uuid do |id|
           next unless (payment_method = PaymentMethod[id:, billing_info_id: @project.billing_info_id])
 
-          unless payment_method.billing_info.payment_methods.count > 1
+          unless payment_method.billing_info.payment_methods_dataset.count > 1
             response.status = 400
             next {error: {message: "You can't delete the last payment method of a project."}}
           end
