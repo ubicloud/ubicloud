@@ -84,7 +84,7 @@ class Clover
         stripe_id = setup_intent["payment_method"]
         stripe_payment_method = Stripe::PaymentMethod.retrieve(stripe_id)
         card_fingerprint = stripe_payment_method["card"]["fingerprint"]
-        if PaymentMethod.where(fraud: true).select_map(:card_fingerprint).include?(card_fingerprint)
+        unless PaymentMethod.where(fraud: true, card_fingerprint:).empty?
           flash["error"] = "Payment method you added is labeled as fraud. Please contact support."
           r.redirect @project.path + "/billing"
         end
