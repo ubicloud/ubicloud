@@ -1,0 +1,34 @@
+<%# locals: (url: request.path, csrf_url: url, confirmation_message: nil) %>
+
+<div class="group-[.active]/inline-editable:hidden block">
+<%== part(
+  "components/button",
+  text: "",
+  icon: "hero-pencil",
+  extra_class: "edit-inline-btn",
+  type: "warning"
+) %>
+</div>
+
+<div class="group-[.active]/inline-editable:block hidden">
+<%== part(
+  "components/button",
+  text: "",
+  icon: "hero-check-circle",
+  extra_class: "save-inline-btn",
+  type: "safe",
+  attributes: {
+    "data-url" => url,
+    "data-csrf" => csrf_token(csrf_url, "PATCH"),
+    "data-confirmation-message" => confirmation_message
+  }
+) %>
+
+<%== part(
+  "components/button",
+  text: "",
+  icon: "hero-x-circle",
+  extra_class: "cancel-inline-btn",
+  type: "danger"
+) %>
+</div>
