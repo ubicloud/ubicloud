@@ -18,18 +18,16 @@ class Clover
         r.redirect "#{@project.path}/billing"
       end
 
-      r.is :ubid_uuid do |id|
+      r.delete :ubid_uuid do |id|
         next unless (usage_alert = @project.usage_alerts_dataset[id:])
 
-        r.delete true do
-          DB.transaction do
-            usage_alert.destroy
-            audit_log(usage_alert, "destroy")
-          end
-
-          flash["notice"] = "Usage alert #{usage_alert.name} is deleted."
-          204
+        DB.transaction do
+          usage_alert.destroy
+          audit_log(usage_alert, "destroy")
         end
+
+        flash["notice"] = "Usage alert #{usage_alert.name} is deleted."
+        204
       end
     end
   end

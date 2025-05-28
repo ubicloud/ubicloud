@@ -291,7 +291,7 @@ class Clover
             @authorize_id = (tag_type == "object") ? @tag.metatag_uuid : @tag.id
 
             r.is do
-              r.get true do
+              r.get do
                 authorize("#{@tag.class}:view", @authorize_id)
 
                 members = @current_members = {}
