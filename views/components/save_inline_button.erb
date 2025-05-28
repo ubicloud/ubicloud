@@ -1,0 +1,14 @@
+<%# locals: (url: request.path, csrf_url: url, text: "Edit", extra_class: nil, confirmation_message: nil) %>
+
+<%== part(
+  "components/button",
+  text: text,
+  icon: "hero-check-circle",
+  extra_class: "save-inline-btn #{extra_class}",
+  type: "safe",
+  attributes: {
+    "data-url" => url,
+    "data-csrf" => csrf_token(csrf_url, "PATCH"),
+    "data-confirmation-message" => confirmation_message
+  }
+) %>

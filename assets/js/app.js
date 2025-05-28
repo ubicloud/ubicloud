@@ -149,6 +149,47 @@ $(".cancel-inline-btn").on("click", function (event) {
   row.find(".cancel-inline-btn").hide();
 });
 
+$(".save-inline-btn").on("click", function (event) {
+  let row = $(this).closest("tr");
+  let data = {};
+  row.find("td.inline-editable input").each(function () {
+    data[$(this).attr("name")] = $(this).val();;
+  });
+
+  let url = $(this).data("url");
+  let csrf = $(this).data("csrf");
+  let confirmation_message = $(this).data("confirmation-message");
+
+  $.ajax({
+    url: url,
+    type: "PATCH",
+    data: { "_csrf": csrf, ...data },
+    dataType: "json",
+    headers: { "Accept": "application/json" },
+    success: function (result) {
+      row.find("td.inline-editable").each(function () {
+        let value = $(this).find("input").val();
+        $(this).text(value);
+      });
+
+      row.find(".edit-inline-btn").show();
+      row.find(".delete-btn").show();
+      row.find(".save-inline-btn").hide();
+      row.find(".cancel-inline-btn").hide();
+
+      alert(confirmation_message);
+    },
+    error: function (xhr, ajaxOptions, thrownError) {
+      let message = thrownError;
+      try {
+        response = JSON.parse(xhr.responseText);
+        message = response.error?.message
+      } catch { };
+      alert(`Error: ${message}`);
+    }
+  });
+});
+
 $(".restart-btn").on("click", function (event) {
   if (!confirm("Are you sure to restart?")) {
     event.preventDefault();

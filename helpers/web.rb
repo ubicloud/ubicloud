@@ -30,6 +30,7 @@ class Clover < Roda
 
   BUTTON_COLOR = Hash.new { |h, k| raise "unsupported button type: #{k}" }.merge!(
     "primary" => "bg-orange-600 hover:bg-orange-700 focus-visible:outline-orange-600",
+    "safe" => "bg-green-600 hover:bg-green-700 focus-visible:outline-green-600",
     "warning" => "bg-amber-600 hover:bg-amber-700 focus-visible:outline-amber-600",
     "danger" => "bg-rose-600 hover:bg-rose-700 focus-visible:outline-rose-600"
   ).freeze
