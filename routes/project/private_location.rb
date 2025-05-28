@@ -2,44 +2,46 @@
 
 class Clover
   hash_branch(:project_prefix, "private-location") do |r|
-    r.get true do
-      authorize("Location:view", @project.id)
+    r.is do
+      r.get do
+        authorize("Location:view", @project.id)
 
-      @dataset = @project.locations_dataset
+        @dataset = @project.locations_dataset
 
-      if api?
-        paginated_result(@dataset, Serializers::PrivateLocation)
-      else
-        @locations = @dataset.all
-        view "private-location/index"
-      end
-    end
-
-    r.post true do
-      authorize("Location:create", @project.id)
-      name, provider_location_name, access_key, secret_key = typecast_params.nonempty_str!(["name", "provider_location_name", "access_key", "secret_key"])
-
-      Validation.validate_name(name)
-      Validation.validate_provider_location_name("aws", provider_location_name)
-
-      loc = nil
-      DB.transaction do
-        loc = Location.create(
-          display_name: name,
-          name: provider_location_name,
-          ui_name: name,
-          visible: true,
-          provider: "aws",
-          project_id: @project.id
-        )
-        LocationCredential.create(access_key:, secret_key:) { it.id = loc.id }
-        audit_log(loc, "create")
+        if api?
+          paginated_result(@dataset, Serializers::PrivateLocation)
+        else
+          @locations = @dataset.all
+          view "private-location/index"
+        end
       end
 
-      if api?
-        Serializers::PrivateLocation.serialize(loc)
-      else
-        r.redirect "#{@project.path}#{loc.path}"
+      r.post do
+        authorize("Location:create", @project.id)
+        name, provider_location_name, access_key, secret_key = typecast_params.nonempty_str!(["name", "provider_location_name", "access_key", "secret_key"])
+
+        Validation.validate_name(name)
+        Validation.validate_provider_location_name("aws", provider_location_name)
+
+        loc = nil
+        DB.transaction do
+          loc = Location.create(
+            display_name: name,
+            name: provider_location_name,
+            ui_name: name,
+            visible: true,
+            provider: "aws",
+            project_id: @project.id
+          )
+          LocationCredential.create(access_key:, secret_key:) { it.id = loc.id }
+          audit_log(loc, "create")
+        end
+
+        if api?
+          Serializers::PrivateLocation.serialize(loc)
+        else
+          r.redirect "#{@project.path}#{loc.path}"
+        end
       end
     end
 

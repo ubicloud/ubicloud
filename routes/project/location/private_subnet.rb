@@ -67,35 +67,37 @@ class Clover
         end
       end
 
-      request.get true do
-        authorize("PrivateSubnet:view", ps.id)
-        @ps = Serializers::PrivateSubnet.serialize(ps)
-        if api?
-          @ps
-        else
-          @nics = Serializers::Nic.serialize(ps.nics)
-          @connected_subnets = Serializers::PrivateSubnet.serialize(ps.connected_subnets)
-          connectable_subnets = ps.project.private_subnets.select do |ps1|
-            ps1_id = ps1.id
-            ps1_id != ps.id && !ps.connected_subnets.find { |cs| cs.id == ps1_id }
+      r.is do
+        r.get do
+          authorize("PrivateSubnet:view", ps.id)
+          @ps = Serializers::PrivateSubnet.serialize(ps)
+          if api?
+            @ps
+          else
+            @nics = Serializers::Nic.serialize(ps.nics)
+            @connected_subnets = Serializers::PrivateSubnet.serialize(ps.connected_subnets)
+            connectable_subnets = ps.project.private_subnets.select do |ps1|
+              ps1_id = ps1.id
+              ps1_id != ps.id && !ps.connected_subnets.find { |cs| cs.id == ps1_id }
+            end
+            @connectable_subnets = Serializers::PrivateSubnet.serialize(connectable_subnets)
+            view "networking/private_subnet/show"
           end
-          @connectable_subnets = Serializers::PrivateSubnet.serialize(connectable_subnets)
-          view "networking/private_subnet/show"
-        end
-      end
-
-      request.delete true do
-        authorize("PrivateSubnet:delete", ps.id)
-        unless ps.vms.all? { it.destroy_set? || it.strand.nil? || it.strand.label == "destroy" }
-          fail DependencyError.new("Private subnet '#{ps.name}' has VMs attached, first, delete them.")
         end
 
-        DB.transaction do
-          ps.incr_destroy
-          audit_log(ps, "destroy")
-        end
+        r.delete do
+          authorize("PrivateSubnet:delete", ps.id)
+          unless ps.vms.all? { it.destroy_set? || it.strand.nil? || it.strand.label == "destroy" }
+            fail DependencyError.new("Private subnet '#{ps.name}' has VMs attached, first, delete them.")
+          end
 
-        204
+          DB.transaction do
+            ps.incr_destroy
+            audit_log(ps, "destroy")
+          end
+
+          204
+        end
       end
     end
   end
