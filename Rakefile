@@ -272,6 +272,11 @@ task "check_separate_requires" do
   system({"RACK_ENV" => "test", "LOAD_FILES_SEPARATELY_CHECK" => "1"}, RbConfig.ruby, "-r", "./loader", "-e", "")
 end
 
+desc "Run respirate smoke tests"
+task :respirate_smoke_test do
+  system(RbConfig.ruby, "spec/respirate_smoke_test.rb")
+end
+
 desc "Run each spec file in a separate process"
 task :spec_separate do
   require "rbconfig"
