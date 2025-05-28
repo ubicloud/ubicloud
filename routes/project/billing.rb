@@ -173,27 +173,23 @@ class Clover
         end
       end
 
-      r.on "invoice" do
-        r.is String do |invoice_ubid|
-          next unless (invoice = (invoice_ubid == "current") ? @project.current_invoice : Invoice[id: UBID.to_uuid(invoice_ubid), project_id: @project.id])
+      r.get "invoice", ["current", :ubid_uuid] do |id|
+        next unless (invoice = (id == "current") ? @project.current_invoice : Invoice[id:, project_id: @project.id])
 
-          r.get true do
-            @invoice_data = Serializers::Invoice.serialize(invoice, {detailed: true})
+        @invoice_data = Serializers::Invoice.serialize(invoice, {detailed: true})
 
-            unless invoice.status == "current"
-              response["content-type"] = "application/pdf"
-              response["content-disposition"] = "inline; filename=\"#{invoice.filename}\""
-              begin
-                next Invoice.blob_storage_client.get_object(bucket: Config.invoices_bucket_name, key: invoice.blob_key).body.read
-              rescue Aws::S3::Errors::NoSuchKey
-                Clog.emit("Could not find the invoice") { {not_found_invoice: {invoice_ubid: invoice.ubid}} }
-                next invoice.generate_pdf(@invoice_data)
-              end
-            end
-
-            view "project/invoice"
+        unless invoice.status == "current"
+          response["content-type"] = "application/pdf"
+          response["content-disposition"] = "inline; filename=\"#{invoice.filename}\""
+          begin
+            next Invoice.blob_storage_client.get_object(bucket: Config.invoices_bucket_name, key: invoice.blob_key).body.read
+          rescue Aws::S3::Errors::NoSuchKey
+            Clog.emit("Could not find the invoice") { {not_found_invoice: {invoice_ubid: invoice.ubid}} }
+            next invoice.generate_pdf(@invoice_data)
           end
         end
+
+        view "project/invoice"
       end
     end
   end
