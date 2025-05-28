@@ -18,6 +18,7 @@
         </div>
         <div class="hidden opacity-0 scale-95 group-[.active]:block group-[.active]:opacity-100 group-[.active]:scale-100 transition ease-out duration-100 absolute -right-2 z-10 mt-2 w-72 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" role="menu" tabindex="-1">
           #{flavors.map do |flavor, (_, title, description)|
+            next if flavor == "lantern" && !@project.get_ff_postgres_lantern
             <<-ITEM
             <div class="py-1 hover:bg-gray-50" role="none">
               <a href="#{@project_data[:path]}/postgres/create?flavor=#{flavor}" class="block px-4 py-3 focus:outline-none">
@@ -63,7 +64,9 @@
 
   <div class="grid gap-6">
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-10">
-      <% flavors.each do |flavor, (brand, title, description)| %>
+      <% flavors.each do |flavor, (brand, title, description)| 
+          next if flavor == "lantern" && !@project.get_ff_postgres_lantern
+      %>
         <div class="rounded-lg shadow group relative bg-white p-6">
           <div>
             <span class="inline-flex rounded-lg overflow-hidden w-12 h-12">
@@ -83,7 +86,7 @@
             <%== part("components/icon", name: "hero-arrow-up-right") %>
           </span>
         </div>
-      <% end %>
+    <% end %>
     </div>
   </div>
 <% end %>
