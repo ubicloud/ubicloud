@@ -144,10 +144,14 @@ RSpec.describe Scheduling::Dispatcher do
       finish_queue = Queue.new
       current_strands = di.instance_variable_get(:@current_strands)
       current_strands[st.id] = true
+      session = instance_double(Net::SSH::Connection::Session)
+      expect(session).to receive(:close).and_raise(RuntimeError)
+      Thread.current[:clover_ssh_cache] = {nil => session}
       expect(di.run_strand(st, start_queue, finish_queue)).to be_a(Prog::Base::Nap)
       expect(start_queue.pop(true)).to eq st.ubid
       expect(finish_queue.pop(true)).to be true
       expect(current_strands).to be_empty
+      expect(Thread.current[:clover_ssh_cache]).to be_empty
     end
 
     it "print exceptions if they are raised" do
