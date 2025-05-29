@@ -52,46 +52,41 @@ class Clover
       @project_data = Serializers::Project.serialize(@project, {include_path: true, web: true})
       @project_permissions = all_permissions(@project.id) if web?
 
-      r.get true do
-        authorize("Project:view", @project.id)
+      r.is do
+        r.get do
+          authorize("Project:view", @project.id)
 
-        if api?
-          Serializers::Project.serialize(@project)
-        else
-          @quotas = ["VmVCpu", "PostgresVCpu"].map {
-            {
-              resource_type: it,
-              current_resource_usage: @project.current_resource_usage(it),
-              quota: @project.effective_quota_value(it)
+          if api?
+            Serializers::Project.serialize(@project)
+          else
+            @quotas = ["VmVCpu", "PostgresVCpu"].map {
+              {
+                resource_type: it,
+                current_resource_usage: @project.current_resource_usage(it),
+                quota: @project.effective_quota_value(it)
+              }
             }
-          }
 
-          view "project/show"
-        end
-      end
-
-      r.delete true do
-        authorize("Project:delete", @project.id)
-
-        if @project.has_resources?
-          fail DependencyError.new("'#{@project.name}' project has some resources. Delete all related resources first.")
+            view "project/show"
+          end
         end
 
-        DB.transaction do
-          @project.soft_delete
-          audit_log(@project, "destroy")
+        r.delete do
+          authorize("Project:delete", @project.id)
+
+          if @project.has_resources?
+            fail DependencyError.new("'#{@project.name}' project has some resources. Delete all related resources first.")
+          end
+
+          DB.transaction do
+            @project.soft_delete
+            audit_log(@project, "destroy")
+          end
+
+          204
         end
 
-        204
-      end
-
-      if web?
-        r.get("dashboard") do
-          no_authorization_needed
-          view("project/dashboard")
-        end
-
-        r.post true do
+        r.post web? do
           authorize("Project:edit", @project.id)
           @project.update(name: typecast_params.nonempty_str!("name"))
           audit_log(@project, "update")
@@ -100,6 +95,11 @@ class Clover
 
           r.redirect @project.path
         end
+      end
+
+      r.get(web?, "dashboard") do
+        no_authorization_needed
+        view("project/dashboard")
       end
 
       r.hash_branches(:project_prefix)
