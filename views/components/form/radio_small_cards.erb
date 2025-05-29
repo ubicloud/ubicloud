@@ -7,8 +7,7 @@ is_content_array = options[0][1].is_a?(Array) %>
   <label class="text-sm font-medium leading-6 text-gray-900"><%= label %></label>
   <fieldset class="radio-small-cards">
     <legend class="sr-only"><%= label %></legend>
-    <% grid_cols = is_content_array ? "md:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4" %>
-    <div class="grid gap-3 grid-cols-1 <%= grid_cols %>">
+    <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(285px,1fr))]">
       <% options.each_with_index do |(opt_val, opt_text, opt_classes, opt_attrs), idx| %>
         <label class="<%= opt_classes %>">
           <input
