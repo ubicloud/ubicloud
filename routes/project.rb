@@ -73,7 +73,7 @@ class Clover
       r.delete true do
         authorize("Project:delete", @project.id)
 
-        if @project.has_resources
+        if @project.has_resources?
           fail DependencyError.new("'#{@project.name}' project has some resources. Delete all related resources first.")
         end
 
