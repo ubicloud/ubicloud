@@ -140,7 +140,7 @@ class Clover
             Serializers::PostgresFirewallRule.serialize(firewall_rule)
           else
             flash["notice"] = "Firewall rule is created"
-            r.redirect "#{@project.path}#{pg.path}"
+            r.redirect "#{@project.path}#{pg.path}/networking"
           end
         end
 
