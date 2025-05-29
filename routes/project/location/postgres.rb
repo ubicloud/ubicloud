@@ -117,10 +117,7 @@ class Clover
       r.post "restart" do
         authorize("Postgres:edit", pg.id)
         DB.transaction do
-          pg.servers.each do |s|
-            s.incr_restart
-          rescue Sequel::ForeignKeyConstraintViolation
-          end
+          Semaphore.incr(pg.servers_dataset.select(:id), "restart")
           audit_log(pg, "restart")
         end
 
