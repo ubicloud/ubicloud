@@ -180,13 +180,13 @@ $(".copyable-content").on("click", ".copy-button", function (event) {
 })
 
 $(".revealable-content").on("click", ".reveal-button", function (event) {
-  $(this).parent().hide();
-  $(this).parent().siblings(".revealed-content").show();
+  $(this).closest(".shadow-content").hide();
+  $(this).closest(".shadow-content").siblings(".revealed-content").show();
 })
 
 $(".revealable-content").on("click", ".hide-button", function (event) {
-  $(this).parent().hide();
-  $(this).parent().siblings(".shadow-content").show();
+  $(this).closest(".revealed-content").hide();
+  $(this).closest(".revealed-content").siblings(".shadow-content").show();
 })
 
 $(".back-btn").on("click", function (event) {
