@@ -19,7 +19,7 @@ class Clover
       end
 
       filter[:location_id] = @location.id
-      firewall = @project.firewalls_dataset.eager(:location).first(filter)
+      firewall = @project.firewalls_dataset.first(filter)
       check_found_object(firewall)
 
       r.is do

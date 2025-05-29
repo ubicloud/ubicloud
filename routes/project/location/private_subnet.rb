@@ -19,7 +19,7 @@ class Clover
       end
 
       filter[:location_id] = @location.id
-      ps = @project.private_subnets_dataset.eager(:location).first(filter)
+      ps = @project.private_subnets_dataset.first(filter)
       check_found_object(ps)
 
       r.post "connect" do
