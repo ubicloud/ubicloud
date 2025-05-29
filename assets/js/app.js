@@ -246,6 +246,17 @@ function setupDatePicker() {
   });
 }
 
+$(".connection-info-format-selector select, .connection-info-format-selector input").on('change', function() {
+  let format = $(".connection-info-format-selector select").val();
+  let port = $(".connection-info-format-selector input").is(":checked") ? "6432" : "5432";
+  let reveal_status = $(".connection-info-box:visible").find(".group").hasClass('active')
+
+  $(".connection-info-box").hide();
+  $(".connection-info-box-" + format + "-" + port).find(".group").toggleClass('active', reveal_status);
+  $(".connection-info-box-" + format + "-" + port).show();
+});
+
+
 function setupFormOptionUpdates() {
   $('#creation-form').on('change', 'input', function () {
     let name = $(this).attr('name');
