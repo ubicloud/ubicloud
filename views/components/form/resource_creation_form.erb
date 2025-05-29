@@ -12,7 +12,8 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
   <div class="grid gap-6">
     <form action="<%= action %>" method="POST" id="creation-form" class="<%= method %>">
       <%== csrf_tag(action, method) %>
-      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
+      <% container_class = (mode == "create") ? "overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white" : "" %>
+      <div class="<%= container_class %>">
         <div class="px-4 py-5 sm:p-6">
           <div class="space-y-12">
             <div>
