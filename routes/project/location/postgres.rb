@@ -203,7 +203,7 @@ class Clover
             Serializers::Postgres.serialize(pg, {detailed: true})
           else
             flash["notice"] = "Metric destination is created"
-            r.redirect "#{@project.path}#{pg.path}"
+            r.redirect "#{@project.path}#{pg.path}/charts"
           end
         end
 
