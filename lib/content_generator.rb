@@ -184,7 +184,7 @@ module ContentGenerator
 
     def self.node_price(location, worker_size)
       worker_size.vcpus * BillingRate.unit_price_from_resource_properties("KubernetesWorkerVCpu", "standard", location.name) +
-        40 * BillingRate.unit_price_from_resource_properties("KubernetesWorkerStorage", "standard", location.name)
+        worker_size.storage_size_options.first * BillingRate.unit_price_from_resource_properties("KubernetesWorkerStorage", "standard", location.name)
     end
 
     def self.hourly_price(location, worker_size)
