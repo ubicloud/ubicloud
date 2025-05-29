@@ -355,7 +355,7 @@ class Clover
       r.get "ca-certificates" do
         authorize("Postgres:view", pg.id)
 
-        return 404 unless (certs = pg.ca_certificates)
+        next unless (certs = pg.ca_certificates)
 
         response.headers["content-disposition"] = "attachment; filename=\"#{pg.name}.pem\""
         response.headers["content-type"] = "application/x-pem-file"
