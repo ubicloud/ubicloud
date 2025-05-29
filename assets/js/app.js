@@ -727,7 +727,7 @@ function queryAndUpdateChart(chartInstance, start_time, end_time) {
     end: end_time.toISOString()
   }
   const queryString = new URLSearchParams(params).toString();
-  const url = `${document.location.href}/metrics?${queryString}`;
+  const url = `${new URL(document.location.href).pathname}/metrics?${queryString}`;
 
   fetch(url)
     .then(response => response.json())
