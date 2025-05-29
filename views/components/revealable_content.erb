@@ -1,11 +1,13 @@
 <%# locals: (content:) %>
 <div class="revealable-content">
-  <div class="shadow-content flex items-center">
+  <div class="shadow-content flex items-center gap-2">
     ●●●●●●
     <img src="/icons/hero-eye.svg" width="18px" class="reveal-button inline-block cursor-pointer ms1"/>
   </div>
-  <div class="revealed-content hidden flex items-center">
-    <%= content %>
-    <img src="/icons/hero-eye-slash.svg" width="18px" class="hide-button inline-block cursor-pointer ms1"/>
+  <div class="revealed-content hidden">
+    <div class="flex gap-2 items-center">
+      <div class="revealed-content-text"><%= content %></div>
+      <img src="/icons/hero-eye-slash.svg" width="18px" class="hide-button inline-block cursor-pointer ms1"/>
+    </div>
   </div>
 </div>
