@@ -170,7 +170,7 @@ module ContentGenerator
 
       [
         worker_size.display_name,
-        "#{worker_size.vcpus} vCPUs / #{worker_size.memory_gib} GB RAM",
+        "#{worker_size.vcpus} vCPUs / #{worker_size.memory_gib} GB RAM / #{worker_size.storage_size_options.first} GB NVMe Storage",
         "$#{"%.2f" % monthly_price(location, worker_size)}/mo",
         "$#{"%.3f" % hourly_price(location, worker_size)}/hour"
       ]

@@ -160,6 +160,10 @@ RSpec.describe Clover, "Kubernetes" do
         choose option: 3
         find('select#worker_nodes option[value="4"]:not([disabled])').select_option
 
+        [1, 2, 4, 8].each do
+          expect(page).to have_content "#{it * 2} vCPUs / #{it * 8} GB RAM / #{it * 40} GB NVMe Storage"
+        end
+
         click_button "Create"
         expect(page.title).to eq("Ubicloud - k8stest")
         expect(page).to have_flash_notice("'k8stest' will be ready in a few minutes")
