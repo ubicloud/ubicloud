@@ -66,7 +66,7 @@ curl #{ie[:url]}#{path} \\
       </div>
       <div class="sm:col-span-2">
         <h3 class="text-sm font-semibold text-gray-900">URL</h3>
-        <p class="text-gray-500"><%== part("components/copyable_content", content: ie[:url], message: "Copied URL") %></p>
+        <div class="text-gray-500"><%== part("components/copyable_content", content: ie[:url], message: "Copied URL") %></div>
       </div>
       <div class="sm:col-span-2">
         <h3 class="text-sm font-semibold text-gray-900">
