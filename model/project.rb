@@ -63,7 +63,7 @@ class Project < Sequel::Model
     "/project/#{ubid}"
   end
 
-  def has_resources
+  def has_resources?
     RESOURCE_ASSOCIATION_DATASET_METHODS.any? { !send(it).empty? }
   end
 
