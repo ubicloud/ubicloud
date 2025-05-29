@@ -217,6 +217,19 @@ class Scheduling::Dispatcher
     # even for non-StandardError exits
     finish_queue.push(true)
     @mutex.synchronize { @current_strands.delete(strand&.id) }
+
+    # If there are any sessions in the thread-local (really fiber-local) ssh
+    # cache after the strand run, close them eagerly to close the related
+    # file descriptors, then clear the cache to avoid a memory leak.
+    if (cache = Thread.current[:clover_ssh_cache]) && !cache.empty?
+      cache.each_value do
+        # closing the ssh connection shouldn't raise, but just in case it
+        # does, we want to ignore it so the strand thread doesn't exit.
+        it.close
+      rescue
+      end
+      cache.clear
+    end
   end
 
   # Find strands that need to be run, and push each onto the
