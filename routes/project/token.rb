@@ -29,20 +29,17 @@ class Clover
 
       r.on :ubid_uuid do |uuid|
         @token = token = token_ds.with_pk(uuid)
+        check_found_object(token)
 
         r.delete true do
-          if token
-            DB.transaction do
-              token.destroy
-              @project.disassociate_subject(token.id)
-              audit_log(token, "destroy")
-            end
-            flash["notice"] = "Personal access token deleted successfully"
+          DB.transaction do
+            token.destroy
+            @project.disassociate_subject(token.id)
+            audit_log(token, "destroy")
           end
+          flash["notice"] = "Personal access token deleted successfully"
           204
         end
-
-        next unless token
 
         r.post %w[unrestrict-access restrict-access] do |action|
           DB.transaction do
