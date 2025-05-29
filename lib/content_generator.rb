@@ -117,7 +117,7 @@ module ContentGenerator
 
       [
         ha_type.title,
-        ha_type.explanation,
+        "",
         "$#{"%.2f" % (standby_count * ((vcpu * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60 * 672)}/mo",
         "$#{"%.3f" % (standby_count * ((vcpu * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60)}/hour"
       ]
