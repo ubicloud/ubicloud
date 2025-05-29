@@ -15,7 +15,7 @@ class GithubInstallation < Sequel::Model
       .left_join(:strand, id: :id)
       .exclude(Sequel[:strand][:label] => ["start", "wait_concurrency_limit"])
       .select_map(Sequel[:github_runner][:label])
-      .sum { Github.runner_labels[it]["vm_size_data"].vcpus }
+      .sum { Github.runner_labels[it]["vcpus"] }
   end
 
   def free_runner_upgrade?
