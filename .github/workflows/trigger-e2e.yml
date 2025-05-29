@@ -1,0 +1,65 @@
+name: Trigger E2E tests
+
+permissions:
+  contents: read
+  actions: write
+  pull-requests: write
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+    pr_comment:
+      if: github.event.issue.pull_request && startsWith(github.event.comment.body, '/run-e2e')
+      runs-on: ubicloud
+      steps:
+        - name: Trigger E2E tests
+          uses: actions/github-script@v7
+          with:
+            script: |
+              // Check if the comment is from a contributor
+              const contributors = await github.rest.repos.listContributors({
+                owner: context.repo.owner,
+                repo: context.repo.repo
+              });
+              const contributorIds = contributors.data.map(c => c.id);
+              const isContributor = contributorIds.includes(context.payload.comment.user.id);
+
+              // Check if the given test cases string is secure or empty
+              const testCases = (context.payload.comment.body.trim().split(/\s+/)[1]) || '';
+              console.log(`testCases: ${testCases}`);
+              const isValid = testCases ? /^[a-zA-Z0-9_,-]+$/.test(testCases) : true;
+              console.log(`Is valid: ${isValid}`);
+
+              const allowedToRun = isContributor && isValid;
+
+              // Add a reaction to the comment
+              await github.rest.reactions.createForIssueComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: context.payload.comment.id,
+                content: allowedToRun ? 'rocket' : '-1'
+              })
+
+              if (!allowedToRun) {
+                console.log('Not allowed to run E2E tests');
+                process.exit(1);
+              }
+
+              // Get pull request details
+              const pullRequest = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.issue.number
+              });
+
+              // Create a workflow dispatch event
+              const inputs = testCases ? { test_cases: testCases } : {}
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'e2e.yml',
+                ref: pullRequest.data.head.ref,
+                inputs: inputs
+              });
