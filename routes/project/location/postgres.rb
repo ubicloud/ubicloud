@@ -164,14 +164,16 @@ class Clover
           end
         end
 
-        r.patch :ubid_uuid do |id|
+        r.is :ubid_uuid do |id|
           authorize("Postgres:edit", pg.id)
+          fwr = pg.firewall_rules_dataset[id:]
+          check_found_object(fwr)
 
-          if (fwr = pg.firewall_rules_dataset[id:])
+          r.patch do
+            current_cidr = fwr.cidr.to_s
+            new_cidr = Validation.validate_cidr(typecast_params.nonempty_str!("cidr")).to_s
+
             DB.transaction do
-              current_cidr = fwr.cidr.to_s
-              new_cidr = Validation.validate_cidr(typecast_params.nonempty_str!("cidr")).to_s
-
               fwr.update(
                 cidr: new_cidr,
                 description: typecast_params.str("description")&.strip
@@ -185,22 +187,17 @@ class Clover
             else
               204
             end
-          else
-            404
           end
-        end
 
-        r.delete :ubid_uuid do |id|
-          authorize("Postgres:edit", pg.id)
-
-          if (fwr = pg.firewall_rules_dataset[id:])
+          r.delete do
             DB.transaction do
               fwr.destroy
               pg.incr_update_firewall_rules
               audit_log(fwr, "destroy")
             end
+
+            204
           end
-          204
         end
       end
 
