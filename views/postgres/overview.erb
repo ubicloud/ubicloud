@@ -11,18 +11,27 @@ vm = @pg.representative_server.vm
     vmr = VictoriaMetricsResource.first(project_id: @pg.representative_server.metrics_config[:project_id])
     if vmr
       tsdb_client = vmr.servers.first.client
-      query = "node_filesystem_size_bytes{mountpoint='/dat', ubicloud_resource_id='#{@pg.ubid}', ubicloud_resource_role='primary'} - node_filesystem_avail_bytes{mountpoint='/dat', ubicloud_resource_id='#{@pg.ubid}', ubicloud_resource_role='primary'}"
-
+      query = Metrics::POSTGRES_METRICS[:disk_usage].series[0].query.gsub("$ubicloud_resource_id", @pg.ubid)
       disk_usage = begin
         tsdb_client.query_range(query:, start_ts: Time.now.to_i - 60 * 60, end_ts: Time.now.to_i)[0]
       rescue Excon::Error::Socket => e
         Clog.emit("Failed to fetch disk usage for #{@pg.ubid} from VictoriaMetrics") { Util.exception_to_hash(e) }
       end
 
+      # There is a brief period after creation when the representative server does not have
+      # volumes attachet yet, so we take the storage size from the resource.
+      storage_size_gib = @pg.representative_server.storage_size_gib || @pg.target_storage_size_gib
+
       disk_usage_subtext = if disk_usage
-        disk_usage_gib = disk_usage["values"].last[1].to_f / 1024 / 1024 / 1024
-        disk_usage_percentage = (100 * disk_usage_gib / @pg.representative_server.storage_size_gib)
-        "#{disk_usage_gib.round(2)} GB is used (#{disk_usage_percentage.round(2)}%)"
+        disk_usage_percentage = disk_usage["values"].last[1].to_f
+        disk_usage_gib = disk_usage_percentage * storage_size_gib / 100
+        subtext = "#{disk_usage_gib.round(2)} GB is used (#{disk_usage_percentage.round(2)}%)"
+
+        if disk_usage_percentage > 80
+          subtext = "<span class='text-red-600'>#{subtext}</span>"
+        end
+
+        subtext
       end
     end
 
@@ -30,7 +39,7 @@ vm = @pg.representative_server.vm
     
     [
       ["hero-cpu-chip", vm.display_size, "#{vm.vcpus} vCPU, #{vm.memory_gib} GB RAM"],
-      ["hero-circle-stack", "#{@pg.representative_server.storage_size_gib} GB", disk_usage_subtext],
+      ["hero-circle-stack", "#{storage_size_gib} GB", disk_usage_subtext],
       ["hero-square-2-stack-modified", ha_option.title, ha_option.explanation],
       ["hero-map-pin", @pg.location.display_name, "#{@pg.location.ui_name} (#{@pg.location.provider.capitalize})"],
       ["postgres-logo", "Version #{@pg.version}", ""],

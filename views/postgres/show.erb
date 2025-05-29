@@ -21,7 +21,8 @@
         <div class="pb-6 flex items-center justify-between">
           <div>
             <span class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:tracking-tight"><%= @pg.name %></span>
-            <span>(id: <%= @pg.ubid %>)</span>
+            <span>(id:
+              <%= @pg.ubid %>)</span>
           </div>
           <div>
             <%== part("components/pg_state_label", state: @pg.display_state, extra_class: "text-md") %>
