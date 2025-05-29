@@ -22,7 +22,8 @@ class Project < Sequel::Model
   one_to_many :inference_endpoints
   one_to_many :kubernetes_clusters
 
-  RESOURCE_ASSOCIATION_DATASET_METHODS = %w[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners].map { :"#{it}_dataset" }
+  RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners]
+  RESOURCE_ASSOCIATION_DATASET_METHODS = RESOURCE_ASSOCIATIONS.map { :"#{it}_dataset" }
 
   one_to_many :invoices, order: Sequel.desc(:created_at)
   one_to_many :quotas, class: :ProjectQuota
@@ -31,6 +32,19 @@ class Project < Sequel::Model
   one_to_many :locations
 
   dataset_module Pagination
+
+  dataset_module do
+    def first_project_with_resources
+      all = self.all
+      RESOURCE_ASSOCIATIONS.each do
+        if (obj = Project.association_reflection(it).associated_class.first(project: all))
+          return obj.project
+        end
+      end
+
+      nil
+    end
+  end
 
   plugin :association_dependencies, accounts: :nullify, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy, access_control_entries: :destroy, subject_tags: :destroy, action_tags: :destroy, object_tags: :destroy,
     locations: :destroy
