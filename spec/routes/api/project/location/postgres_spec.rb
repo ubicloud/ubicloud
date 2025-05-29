@@ -408,7 +408,7 @@ RSpec.describe Clover, "postgres" do
       before do
         allow(Config).to receive(:postgres_service_project_id).and_return(prj.id)
         allow(VictoriaMetricsResource).to receive(:first).with(project_id: prj.id).and_return(vmr)
-        allow(vmr).to receive(:servers).and_return([vm_server])
+        allow(vmr).to receive(:servers_dataset).and_return([vm_server])
         allow(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
       end
 
@@ -499,7 +499,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "returns 404 when victoria_metrics servers are not available" do
-        allow(vmr).to receive(:servers).and_return([])
+        allow(vmr).to receive(:servers_dataset).and_return([])
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics"
 
         expect(last_response.status).to eq(404)
