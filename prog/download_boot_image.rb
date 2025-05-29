@@ -10,7 +10,7 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   def version
-    @version ||= frame.fetch("version") { default_boot_image_version(image_name) }
+    @version ||= frame.fetch("version", nil) || default_boot_image_version(image_name)
   end
 
   def download_from_blob_storage?
@@ -133,13 +133,9 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   label def start
-    # YYY: we can remove this once we enforce it in the database layer.
-    # Although the default version is used if version is not passed, adding
-    # a sanity check here to make sure version is not passed as nil.
-    fail "Version can not be passed as nil" if version.nil?
-
     fail "Image already exists on host" if vm_host.boot_images_dataset.where(name: image_name, version: version).count > 0
 
+    # YYY: we should enforce version of boot image in the database layer.
     BootImage.create_with_id(
       vm_host_id: vm_host.id,
       name: image_name,
