@@ -141,7 +141,7 @@ class Clover < Roda
   def check_found_object(obj)
     unless obj
       response.status = if request.delete? && request.remaining_path.empty?
-        no_authorization_needed
+        no_authorization_needed if @still_need_authorization
         204
       else
         404
