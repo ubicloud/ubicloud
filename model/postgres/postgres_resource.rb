@@ -71,6 +71,8 @@ class PostgresResource < Sequel::Model
       scheme: "postgres",
       userinfo: "postgres:#{URI.encode_uri_component(superuser_password)}",
       host: hn,
+      port: 5432,
+      path: "/postgres",
       query: "channel_binding=require"
     ).to_s
   end
