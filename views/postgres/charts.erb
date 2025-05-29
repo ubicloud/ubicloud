@@ -1,0 +1,113 @@
+<% @enable_echarts = true %>
+
+<div id="metrics-container" class="p-6" data-metrics-url="<%= "#{@project_data[:path]}#{@pg.path}" %>">
+  <% if @pg.display_state != "creating" %>
+    <div class="mb-4 flex gap-2 justify-end">
+      <select
+        id="time-range"
+        class="py-1.5 md:align-top rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+        name="time-range"
+      >
+        <option value="30m">Last 30 minutes</option>
+        <option value="1h" selected>Last 1 hour</option>
+        <option value="3h">Last 3 hours</option>
+        <option value="6h">Last 6 hours</option>
+        <option value="12h">Last 12 hours</option>
+        <option value="1d">Last 1 day</option>
+        <option value="2d">Last 2 days</option>
+        <option value="7d">Last 7 days</option>
+        <option value="30d">Last 30 days</option>
+      </select>
+      <%== part("components/button", attributes: {id: "refresh-button"}, text: "  Refresh", type: "primary", icon: "hero-refresh") %>
+    </div>
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 border-t-0">
+      <% Metrics::POSTGRES_METRICS.each do |key, metric| %>
+        <div class="p-4 bg-gray-50 rounded-lg border border-gray-100">
+          <h4 class="text-sm font-medium text-gray-900 mb-2"><%= metric.name %></h4>
+          <p class="text-xs text-gray-500 mt-2"><%= metric.description %></p>
+          <div
+            class="metric-chart h-64 w-full"
+            id="<%= key %>-chart"
+            data-metric-key="<%= key %>"
+            data-metric-unit="<%= metric.unit %>"
+          >
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% else %>
+    <div class="flex flex-col items-center justify-center h-full">
+      <h2 class="text-2xl font-semibold text-gray-900">No metrics available</h2>
+      <p class="text-gray-500 mt-2">Metrics will be available once the database is running.</p>
+    </div>
+  <% end %>
+</div>
+
+<div class="p-6">
+  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+    <div class="min-w-0 flex-1">
+      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+        Metric Destinations
+      </h3>
+    </div>
+  </div>
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <table class="min-w-full divide-y divide-gray-300">
+      <thead class="bg-gray-50">
+        <tr>
+          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">URL</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Username</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Password</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 bg-white">
+        <% @pg.metric_destinations.each do |md| %>
+          <tr>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6"><%= md.url %></td>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6"><%= md.username %></td>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">-</td>
+            <td
+              id="md-delete-<%=md.ubid %>"
+              class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
+            >
+              <%== part("components/delete_button", url: "#{@project_data[:path]}#{@pg.path}/metric-destination/#{md.ubid}", text: "") %>
+            </td>
+          </tr>
+        <% end %>
+        <tr>
+          <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+            <%== part("components/form/text", name: "url", attributes: { form: "form-pg-md-create", required: true }) %>
+          </td>
+          <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+            <%== part("components/form/text", name: "username", attributes: { form: "form-pg-md-create", required: true }) %>
+          </td>
+          <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+            <%== part(
+                "components/form/text",
+                name: "metric-destination-password",
+                type: "password",
+                attributes: {
+                  required: true,
+                  form: "form-pg-md-create",
+                  autocomplete: "new-password"
+                },
+                extra_class: "metric-destination-password"
+              ) %>
+          </td>
+          <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+            <form
+              action="<%= "#{@project_data[:path]}#{@pg.path}/metric-destination" %>"
+              role="form"
+              method="POST"
+              id="form-pg-md-create"
+            >
+              <%== csrf_tag("#{@project_data[:path]}#{@pg.path}/metric-destination") %>
+              <%== part("components/form/submit_button", text: "Create", extra_class: "metric-destination-create-button") %>
+            </form>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
