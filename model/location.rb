@@ -40,7 +40,7 @@ class Location < Sequel::Model
   end
 
   # Private Locations only support Postgres resources for now
-  def has_resources
+  def has_resources?
     !project.postgres_resources_dataset.where(location_id: id).empty?
   end
 end
