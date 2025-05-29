@@ -246,6 +246,17 @@ function setupDatePicker() {
   });
 }
 
+$(".fork-icon").on("click", function () {
+  let target_datetime = $(this).data("target-datetime");
+  date_picker = flatpickr("#restore_target", {enableTime: true, dateFormat: "Y-m-d H:i"})
+  date_picker.setDate(target_datetime, true);
+
+  $("#restore_target").addClass("animate-flash transition-colors duration-1000");
+  setTimeout(() => {
+    $("#restore_target").removeClass('animate-flash');
+  }, 2000);
+})
+
 $(".connection-info-format-selector select, .connection-info-format-selector input").on('change', function() {
   let format = $(".connection-info-format-selector select").val();
   let port = $(".connection-info-format-selector input").is(":checked") ? "6432" : "5432";

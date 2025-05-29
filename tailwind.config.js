@@ -6,7 +6,17 @@ module.exports = {
     "./helpers/web.rb",
   ],
   theme: {
-    extend: {},
+    extend: {
+      keyframes: {
+        flash: {
+          '0%, 100%': { backgroundColor: 'transparent' },
+          '50%': { backgroundColor: '#fef08a' },
+        }
+      },
+      animation: {
+        flash: 'flash 1s ease-in-out infinite',
+      }
+    },
   },
   plugins: [
     require('@tailwindcss/forms'),
@@ -19,5 +29,7 @@ module.exports = {
     },
     ...['text-blue-600', 'text-green-400', 'text-amber-400', 'text-red-400',
     'text-sky-300', 'text-emerald-600', 'text-orange-500'],
+    'transition-colors',
+    'duration-1000'
   ]
 }
