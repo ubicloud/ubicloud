@@ -68,11 +68,11 @@ w.close
 
 finished_ds = ds.where(label: "smoke_test_0")
 deadline = Time.now + seconds_allowed
+print(partitioned ? "#{num_processes}/#{num_partitions} partitioned: " : "unpartitioned: ")
 until (count = finished_ds.count) == num_strands || Time.now > deadline
   print count, " "
   sleep 1
 end
-puts
 
 Process.kill(:TERM, *respirate_pids)
 sleep 1
@@ -82,15 +82,20 @@ sleep 1
 
 finished_count = finished_ds.count
 unless finished_count == num_strands
+  puts
   raise "Only #{finished_count}/#{num_strands} strands finished processing within #{seconds_allowed} seconds"
 end
 
 unless output.length == num_strands * 3
+  puts
   raise "unexpected output length: #{output.length}"
 end
 
 (1..3).each do |n|
   unless output.count(n.to_s) == num_strands
+    puts
     raise "Not all strands output expected information"
   end
 end
+
+puts "passed!"
