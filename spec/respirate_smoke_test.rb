@@ -23,6 +23,21 @@ at_exit do
   delete_strand_ds.delete(force: true)
 end
 
+if ENV["CONSISTENT"]
+  class Prog::Test
+    def rand(x = nil)
+      case x
+      when range
+        20
+      when Integer
+        10
+      else
+        0.5
+      end
+    end
+  end
+end
+
 # Use Vm uuids, because they are random, while Strand uuids are timestamp based
 # and will always be in the first partition
 strands = Array.new(num_strands) { Strand.create(prog: "Test", label: "smoke_test_3", id: Vm.generate_uuid) }
