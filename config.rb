@@ -79,6 +79,7 @@ module Config
   override :pretty_json, false, bool
   override :dispatcher_max_threads, 8, int
   override :dispatcher_min_threads, 1, int
+  override :dispatcher_queue_size_ratio, 4, int
   override :puma_max_threads, 16, int
   override :puma_min_threads, 1, int
   override :puma_workers, 3, int
