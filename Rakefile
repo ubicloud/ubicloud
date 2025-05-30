@@ -274,8 +274,15 @@ end
 
 desc "Run respirate smoke tests"
 task :respirate_smoke_test do
+  # not partitioned
   system(RbConfig.ruby, "spec/respirate_smoke_test.rb")
+
+  # 4-way partition
   system(RbConfig.ruby, "spec/respirate_smoke_test.rb", "4")
+
+  # 4-way partition, but only 3 processes. This simulates a crash/apoptosis
+  # in a respirate process, checking that other processes pick up the slack.
+  system(RbConfig.ruby, "spec/respirate_smoke_test.rb", "4", "3")
 end
 
 desc "Run each spec file in a separate process"
