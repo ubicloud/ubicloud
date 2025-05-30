@@ -326,13 +326,13 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "reset password invalid restore" do
-        pg.representative_server.update(timeline_access: "fetch")
+        pg.update(parent_id: "cde85384-4cf1-8ad0-aeb0-639f2ad94870")
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password", {
           password: "DummyPassword123"
         }.to_json
 
-        expect(last_response).to have_api_error(400, "Superuser password cannot be updated during restore!")
+        expect(last_response).to have_api_error(400, "Superuser password cannot be updated for read replicas!")
       end
 
       it "invalid password" do

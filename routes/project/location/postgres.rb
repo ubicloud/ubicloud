@@ -103,7 +103,7 @@ class Clover
           Serializers::Postgres.serialize(pg, {detailed: true})
         else
           flash["notice"] = "'#{pg.name}' will be restarted in a few seconds"
-          r.redirect "#{@project.path}#{pg.path}"
+          r.redirect "#{@project.path}#{pg.path}/settings"
         end
       end
 
@@ -272,7 +272,7 @@ class Clover
           Serializers::Postgres.serialize(pg)
         else
           flash["notice"] = "'#{pg.name}' will be promoted in a few minutes, please refresh the page"
-          r.redirect "#{@project.path}#{pg.path}"
+          r.redirect "#{@project.path}#{pg.path}/settings"
         end
       end
 
@@ -310,13 +310,8 @@ class Clover
       r.post "reset-superuser-password" do
         authorize("Postgres:view", pg.id)
 
-        unless pg.representative_server.primary?
-          if api?
-            fail CloverError.new(400, "InvalidRequest", "Superuser password cannot be updated during restore!")
-          else
-            flash["error"] = "Superuser password cannot be updated during restore!"
-            redirect_back_with_inputs
-          end
+        if pg.read_replica?
+          raise CloverError.new(400, "InvalidRequest", "Superuser password cannot be updated for read replicas!")
         end
 
         password = typecast_params.str!("password")
@@ -333,7 +328,7 @@ class Clover
           Serializers::Postgres.serialize(pg, {detailed: true})
         else
           flash["notice"] = "The superuser password will be updated in a few seconds"
-          r.redirect "#{@project.path}#{pg.path}"
+          r.redirect "#{@project.path}#{pg.path}/settings"
         end
       end
 
@@ -350,7 +345,7 @@ class Clover
           Serializers::Postgres.serialize(pg, {detailed: true})
         else
           flash["notice"] = "Maintenance window is set"
-          r.redirect "#{@project.path}#{pg.path}"
+          r.redirect "#{@project.path}#{pg.path}/settings"
         end
       end
 
