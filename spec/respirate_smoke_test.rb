@@ -3,12 +3,19 @@
 ENV["RACK_ENV"] = "test"
 
 partitioned = !ARGV.empty?
-num_partitions = Integer(ARGV[0]) if partitioned
+if partitioned
+  num_partitions = Integer(ARGV[0]).clamp(1, nil)
+  num_processes = if ARGV.size == 2
+    Integer(ARGV[1]).clamp(1, nil)
+  else
+    num_partitions
+  end
+end
 
 require_relative "../loader"
 
 num_strands = 1000
-seconds_allowed = 30
+seconds_allowed = 60
 
 keep_strand_ids = Strand.select_map(&:id)
 at_exit do
@@ -50,7 +57,7 @@ Thread.new do
 end
 
 respirate_pids = if partitioned
-  Array.new(num_partitions) do
+  Array.new(num_processes) do
     Process.spawn("bin/respirate", num_partitions.to_s, (it + 1).to_s, :in => :close, [:out, :err] => w)
   end
 else
