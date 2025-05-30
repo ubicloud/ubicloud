@@ -50,7 +50,7 @@ class Clover
 
         target_vm_size = Validation.validate_postgres_size(pg.location, typecast_params.str("size") || pg.target_vm_size, @project.id)
         target_storage_size_gib = Validation.validate_postgres_storage_size(pg.location, target_vm_size.vm_size, typecast_params.pos_int("storage_size") || pg.target_storage_size_gib, @project.id)
-        ha_type = typecast_params.str("ha_type") || PostgresResource::HaType::NONE
+        ha_type = typecast_params.str("ha_type") || pg.ha_type
         Validation.validate_postgres_ha_type(ha_type)
 
         if pg.representative_server.nil? || target_storage_size_gib < pg.representative_server.storage_size_gib
