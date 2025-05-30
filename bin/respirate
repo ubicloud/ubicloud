@@ -4,8 +4,10 @@
 num_partitions, partition_num = ARGV
 if num_partitions
   unless partition_num
-    if ENV["DYNO"]
-      partition_num = ENV["DYNO"].split(".", 2)[1]
+    if (dyno = ENV["DYNO"]) # Heroku
+      partition_num = dyno.split(".", 2)[1]
+    elsif (match = /respirate\.(\d+)\z/.match(ENV["PS"])) # Foreman
+      partition_num = match[1]
     else
       warn "must provide number of partitions as second argument"
       exit 1
