@@ -37,15 +37,17 @@ class Scheduling::Dispatcher
     # a database connection for the scan thread.
     pool_size = pool_size.clamp(1, Config.db_pool - 2)
 
+    # The queue size is 4 times the size of the thread pool by default, as that should
+    # ensure that for a busy thread pool, there are always strands to run.
+    # This should only cause issues if the thread pool can process more than
+    # 4 times its size in the time it takes the main thread to refill the queue.
+    queue_size = pool_size * Config.dispatcher_queue_size_ratio
+
     # The Queue that all threads in the thread pool pull from.  This is a
     # SizedQueue to allow for backoff in the case that the thread pool cannot
     # process jobs fast enough. When the queue is full, the main thread to
     # push strands into the queue blocks until the queue is no longer full.
-    # The queue size is 4 times the size of the thread pool, as that should
-    # ensure that for a busy thread pool, there are always strands to run.
-    # This should only cause issues if the thread pool can process more than
-    # 4 times its size in the time it takes the main thread to refill the queue.
-    @strand_queue = SizedQueue.new(pool_size * Config.dispatcher_queue_size_ratio)
+    @strand_queue = SizedQueue.new(queue_size)
 
     # An array of thread pool data.  This starts pool_size * 2 threads.  Half
     # of the threads are strand threads, responsible for running the strands.
@@ -66,7 +68,7 @@ class Scheduling::Dispatcher
         {exitval: nil}
       )
       .order_by(:schedule)
-      .limit(pool_size)
+      .limit(queue_size)
       .exclude(id: Sequel.function(:ANY, Sequel.cast(:$skip_strands, "uuid[]")))
       .select(:id, :schedule)
       .for_update
