@@ -40,7 +40,7 @@ class Scheduling::Dispatcher
     # ensure that for a busy thread pool, there are always strands to run.
     # This should only cause issues if the thread pool can process more than
     # 4 times its size in the time it takes the main thread to refill the queue.
-    @strand_queue = SizedQueue.new(pool_size * 4)
+    @strand_queue = SizedQueue.new(pool_size * Config.dispatcher_queue_size_ratio)
 
     # An array of thread pool data.  This starts pool_size * 2 threads.  Half
     # of the threads are strand threads, responsible for running the strands.
