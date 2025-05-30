@@ -1,0 +1,42 @@
+name: 'Setup Clover'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up environment variables
+      shell: bash
+      run: |
+        echo "DB_USER=clover" >> $GITHUB_ENV
+        echo "DB_PASSWORD=nonempty" >> $GITHUB_ENV
+        echo "DB_NAME=clover_test" >> $GITHUB_ENV
+        echo "CLOVER_DATABASE_URL=postgres://clover:nonempty@localhost:5432/clover_test" >> $GITHUB_ENV
+        echo "CLOVER_SESSION_SECRET=kbaf1V3biZ+R2QqFahgDLB5/lSomwxQusA4PwROUkFS1srn0xM/I47IdLW7HjbQoxWri6/aVgtkqTLFiP65h9g==" >> $GITHUB_ENV
+        echo "CLOVER_RUNTIME_TOKEN_SECRET=r3rV5RzYVpDMlXxY1VnrHlmoMnXdUVt5ABec/TWXnmO7Ok/riFRDNATAMmDWTvtH+cSyXAniH3hHL6EetHj/FA==" >> $GITHUB_ENV
+        echo "CLOVER_COLUMN_ENCRYPTION_KEY=TtlY0+hd4lvedPkNbu5qsj5H7giPKJSRX9KDBrvid7c=" >> $GITHUB_ENV
+
+    - name: Start PostgreSQL container
+      shell: bash
+      run: |
+        docker run -d \
+          --name postgres \
+          -e POSTGRES_USER=$DB_USER \
+          -e POSTGRES_PASSWORD=$DB_PASSWORD \
+          -e POSTGRES_DB=$DB_NAME \
+          -p 5432:5432 \
+          postgres:15.8
+        docker exec postgres bash -c 'until pg_isready -U clover; do sleep 1; done'
+
+    - name: Perform superuser-only actions, then remove superuser
+      shell: bash
+      run: |
+        psql "$CLOVER_DATABASE_URL" -c "CREATE EXTENSION citext; CREATE EXTENSION btree_gist; CREATE ROLE clover_password PASSWORD '${{ env.DB_PASSWORD }}' LOGIN; ALTER ROLE ${{ env.DB_USER }} NOSUPERUSER"
+
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: .tool-versions
+        bundler-cache: true
+
+    - name: Apply migrations
+      shell: bash
+      run: bundle exec rake _test_up
