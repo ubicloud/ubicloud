@@ -15,7 +15,7 @@ class Scheduling::Dispatcher
   #                      run before causing apoptosis
   # pool_size :: The number of threads in the thread pool
   # partition :: A range of UUIDs that this process will operate on.
-  def initialize(apoptosis_timeout: Strand::LEASE_EXPIRATION - 29, pool_size: Config.db_pool - 2, partition: nil)
+  def initialize(apoptosis_timeout: Strand::LEASE_EXPIRATION - 29, pool_size: Config.dispatcher_max_threads, partition: nil)
     @shutting_down = false
 
     # How long to wait in seconds from the start of strand run
@@ -28,14 +28,14 @@ class Scheduling::Dispatcher
     # Mutex for current strands
     @mutex = Mutex.new
 
-    # Set default limits on the thread pool size.  It needs to be at least 1, and we
-    # cannot use more threads than database connections (db_pool - 1), and we need
-    # a database connection for the scan thread.
-    pool_size = pool_size.clamp(1, Config.db_pool - 2)
-
     # Set configured limits on pool size. This will raise if the maximum number
     # of threads is lower than the minimum.
     pool_size = pool_size.clamp(Config.dispatcher_min_threads, Config.dispatcher_max_threads)
+
+    # Ensure thread pool size is sane.  It needs to be at least 1, we cannot
+    # use more threads than database connections (db_pool - 1), and we need
+    # a database connection for the scan thread.
+    pool_size = pool_size.clamp(1, Config.db_pool - 2)
 
     # The Queue that all threads in the thread pool pull from.  This is a
     # SizedQueue to allow for backoff in the case that the thread pool cannot
