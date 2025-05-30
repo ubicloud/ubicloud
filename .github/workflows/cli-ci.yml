@@ -13,12 +13,14 @@ on:
       - 'bin/ubi'
       - 'spec/cli_spec.rb'
       - '.github/workflows/cli-ci.yml'
+      - '.github/actions/setup-clover/action.yml'
   pull_request:
     paths:
       - 'cli/**'
       - 'bin/ubi'
       - 'spec/cli_spec.rb'
       - '.github/workflows/cli-ci.yml'
+      - '.github/actions/setup-clover/action.yml'
 
 jobs:
   cli-ci:
@@ -29,55 +31,23 @@ jobs:
     name: cli/ubi CI - ${{matrix.runs-on}}
     runs-on: ${{matrix.runs-on}}
 
-    env:
-      DB_USER: clover
-      DB_PASSWORD: nonempty
-      DB_NAME: clover_test
-
-    services:
-      postgres:
-        image: postgres:15.8
-        env:
-          POSTGRES_USER: ${{ env.DB_USER }}
-          POSTGRES_PASSWORD: ${{ env.DB_PASSWORD }}
-          POSTGRES_DB: ${{ env.DB_NAME }}
-        ports:
-          - 5432:5432
-        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
-
     steps:
-    - name: Perform superuser-only actions, then remove superuser
-      run: |
-        psql "postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}" \
-          -c "CREATE EXTENSION citext; CREATE EXTENSION btree_gist; CREATE ROLE clover_password PASSWORD '${{ env.DB_PASSWORD }}' LOGIN; ALTER ROLE ${{ env.DB_USER }} NOSUPERUSER"
-
     - name: Check out code
       uses: actions/checkout@v4
+
+    - name: Set up Clover
+      uses: ./.github/actions/setup-clover
 
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
         go-version-file: 'cli/go.mod'
 
-    - name: Set up Ruby
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: .tool-versions
-        bundler-cache: true
-
-    - name: Apply migrations
-      env:
-        CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
-      run: bundle exec rake _test_up
-
     - name: Build cli/ubi
       run: bundle exec rake ubi
 
     - name: Run cli/ubi tests
       env:
-        CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
-        CLOVER_SESSION_SECRET: kbaf1V3biZ+R2QqFahgDLB5/lSomwxQusA4PwROUkFS1srn0xM/I47IdLW7HjbQoxWri6/aVgtkqTLFiP65h9g==
-        CLOVER_COLUMN_ENCRYPTION_KEY: TtlY0+hd4lvedPkNbu5qsj5H7giPKJSRX9KDBrvid7c=
         UBI_CMD: ./cli/ubi
       run: bundle exec rspec spec/cli_spec.rb
 
