@@ -10,7 +10,12 @@ class Scheduling::Dispatcher
   STRAND_RUNTIME = Strand::LEASE_EXPIRATION / 4
   APOPTOSIS_MUTEX = Mutex.new
 
-  def initialize(apoptosis_timeout: Strand::LEASE_EXPIRATION - 29, pool_size: Config.db_pool - 2)
+  # Arguments:
+  # apoptosis_timeout :: The number of seconds a strand is allowed to
+  #                      run before causing apoptosis
+  # pool_size :: The number of threads in the thread pool
+  # partition :: A range of UUIDs that this process will operate on.
+  def initialize(apoptosis_timeout: Strand::LEASE_EXPIRATION - 29, pool_size: Config.dispatcher_max_threads, partition: nil)
     @shutting_down = false
 
     # How long to wait in seconds from the start of strand run
@@ -23,24 +28,26 @@ class Scheduling::Dispatcher
     # Mutex for current strands
     @mutex = Mutex.new
 
-    # Set default limits on the thread pool size.  It needs to be at least 1, and we
-    # cannot use more threads than database connections (db_pool - 1), and we need
-    # a database connection for the scan thread.
-    pool_size = pool_size.clamp(1, Config.db_pool - 2)
-
     # Set configured limits on pool size. This will raise if the maximum number
     # of threads is lower than the minimum.
     pool_size = pool_size.clamp(Config.dispatcher_min_threads, Config.dispatcher_max_threads)
+
+    # Ensure thread pool size is sane.  It needs to be at least 1, we cannot
+    # use more threads than database connections (db_pool - 1), and we need
+    # a database connection for the scan thread.
+    pool_size = pool_size.clamp(1, Config.db_pool - 2)
+
+    # The queue size is 4 times the size of the thread pool by default, as that should
+    # ensure that for a busy thread pool, there are always strands to run.
+    # This should only cause issues if the thread pool can process more than
+    # 4 times its size in the time it takes the main thread to refill the queue.
+    queue_size = pool_size * Config.dispatcher_queue_size_ratio
 
     # The Queue that all threads in the thread pool pull from.  This is a
     # SizedQueue to allow for backoff in the case that the thread pool cannot
     # process jobs fast enough. When the queue is full, the main thread to
     # push strands into the queue blocks until the queue is no longer full.
-    # The queue size is 4 times the size of the thread pool, as that should
-    # ensure that for a busy thread pool, there are always strands to run.
-    # This should only cause issues if the thread pool can process more than
-    # 4 times its size in the time it takes the main thread to refill the queue.
-    @strand_queue = SizedQueue.new(pool_size * Config.dispatcher_queue_size_ratio)
+    @strand_queue = SizedQueue.new(queue_size)
 
     # An array of thread pool data.  This starts pool_size * 2 threads.  Half
     # of the threads are strand threads, responsible for running the strands.
@@ -55,18 +62,31 @@ class Scheduling::Dispatcher
 
     # A prepared statement to get the strands to run.  A prepared statement
     # is used to reduce parsing/planning work in the database.
-    @strand_ps = Strand
+    ds = Strand
       .where(
         Sequel.|({lease: nil}, Sequel[:lease] < Sequel::CURRENT_TIMESTAMP) &
-        (Sequel[:schedule] < Sequel::CURRENT_TIMESTAMP) &
         {exitval: nil}
       )
       .order_by(:schedule)
-      .limit(pool_size)
+      .limit(queue_size)
       .exclude(id: Sequel.function(:ANY, Sequel.cast(:$skip_strands, "uuid[]")))
       .select(:id, :schedule)
       .for_update
       .skip_locked
+
+    # If a partition is given, limit the strands to the partition.
+    # Create a separate prepared statement for older strands, not tied to
+    # the current partition, to allow for graceful degradation.
+    if partition
+      @old_strand_ps = ds
+        .where(Sequel[:schedule] < Sequel::CURRENT_TIMESTAMP - Sequel.cast("5 seconds", :interval))
+        .prepare(:select, :get_old_strand_cohort)
+
+      ds = ds.where(id: partition)
+    end
+
+    @strand_ps = ds
+      .where(Sequel[:schedule] < Sequel::CURRENT_TIMESTAMP)
       .prepare(:select, :get_strand_cohort)
   end
 
@@ -134,8 +154,25 @@ class Scheduling::Dispatcher
   # If the process is shutting down, return an empty array.  Otherwise
   # call the database prepared statement to find the strands to run,
   # excluding the strands that are currently running in the thread pool.
+  # If respirate processes are partitioned, this will only return
+  # strands for the current partition.
   def scan
-    @shutting_down ? [] : @strand_ps.call(skip_strands: Sequel.pg_array(@mutex.synchronize { @current_strands.keys }))
+    @shutting_down ? [] : @strand_ps.call(skip_strands:)
+  end
+
+  # Similar to scan, but return older strands which may not be
+  # related to the current partition.  This is to allow for
+  # graceful degradation if a partitioned respirate process
+  # crashes or experiences apoptosis.
+  def scan_old
+    (@old_strand_ps&.call(skip_strands:) unless @shutting_down) || []
+  end
+
+  # A pg_array for the strand ids to skip.  These are the strand
+  # ids that have been enqueued or are currently being processed
+  # by strand threads.
+  def skip_strands
+    Sequel.pg_array(@mutex.synchronize { @current_strands.keys })
   end
 
   # The number of strands the thread pool is currently running.
@@ -233,10 +270,9 @@ class Scheduling::Dispatcher
   # Find strands that need to be run, and push each onto the
   # strand queue.  This can block if the strand queue is full,
   # to allow for backoff in the case of a busy thread pool.
-  def start_cohort
+  def start_cohort(strands = scan)
     strand_queue = @strand_queue
     current_strands = @current_strands
-    strands = scan
     strands.each do |strand|
       break if @shutting_down
       @mutex.synchronize { current_strands[strand.id] = true }
