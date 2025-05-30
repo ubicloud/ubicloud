@@ -23,16 +23,14 @@ class Scheduling::Dispatcher
     # Mutex for current strands
     @mutex = Mutex.new
 
-    # The thread pool size.  By default, set to one less than the maximum number of
-    # database connections (which is set to db_pool - 1), to ensure there is a
-    # connection always available for the main thread, for the query to find strands
-    # to run.
+    # Set default limits on the thread pool size.  It needs to be at least 1, and we
+    # cannot use more threads than database connections (db_pool - 1), and we need
+    # a database connection for the scan thread.
     pool_size = pool_size.clamp(1, Config.db_pool - 2)
 
-    # To avoid issues due to too many threads, if the number of database connections
-    # allowed is higher than 17, limit the maximum number of worker threads to 15,
-    # matching the limit in the puma config.
-    pool_size = pool_size.clamp(1, 15)
+    # Set configured limits on pool size. This will raise if the maximum number
+    # of threads is lower than the minimum.
+    pool_size = pool_size.clamp(Config.dispatcher_min_threads, Config.dispatcher_max_threads)
 
     # The Queue that all threads in the thread pool pull from.  This is a
     # SizedQueue to allow for backoff in the case that the thread pool cannot
