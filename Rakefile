@@ -275,6 +275,7 @@ end
 desc "Run respirate smoke tests"
 task :respirate_smoke_test do
   system(RbConfig.ruby, "spec/respirate_smoke_test.rb")
+  system(RbConfig.ruby, "spec/respirate_smoke_test.rb", "4")
 end
 
 desc "Run each spec file in a separate process"

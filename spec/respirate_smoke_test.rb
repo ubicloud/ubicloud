@@ -2,6 +2,9 @@
 
 ENV["RACK_ENV"] = "test"
 
+partitioned = !ARGV.empty?
+num_partitions = Integer(ARGV[0]) if partitioned
+
 require_relative "../loader"
 
 num_strands = 1000
@@ -20,7 +23,9 @@ at_exit do
   delete_strand_ds.delete(force: true)
 end
 
-strands = Array.new(num_strands) { Strand.create(prog: "Test", label: "smoke_test_3") }
+# Use Vm uuids, because they are random, while Strand uuids are timestamp based
+# and will always be in the first partition
+strands = Array.new(num_strands) { Strand.create(prog: "Test", label: "smoke_test_3", id: Vm.generate_uuid) }
 ds = Strand.where(id: strands.map(&:id))
 
 r, w = IO.pipe
@@ -28,18 +33,26 @@ output = +""
 Thread.new do
   output << r.read(4096).to_s
 end
-respirate_pid = Process.spawn("bin/respirate", :in => :close, [:out, :err] => w)
+
+respirate_pids = if partitioned
+  Array.new(num_partitions) do
+    Process.spawn("bin/respirate", num_partitions.to_s, (it + 1).to_s, :in => :close, [:out, :err] => w)
+  end
+else
+  [Process.spawn("bin/respirate", :in => :close, [:out, :err] => w)]
+end
+
 w.close
 
 finished_ds = ds.where(label: "smoke_test_0")
 deadline = Time.now + seconds_allowed
-until finished_ds.count == num_strands || Time.now > deadline
-  print "."
+until (count = finished_ds.count) == num_strands || Time.now > deadline
+  print count, " "
   sleep 1
 end
 puts
 
-Process.kill(:TERM, respirate_pid)
+Process.kill(:TERM, *respirate_pids)
 sleep 1
 
 # puts "output:"
