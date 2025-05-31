@@ -15,21 +15,36 @@ class Strand < Sequel::Model
 
   include ResourceMethods
 
+  ProcessingTimes = Struct.new(:scheduled, :scan_picked_up, :run_started, :lease_acquired, :lease_cleared, :run_finished) do
+    %i[scan_picked_up run_started lease_acquired run_finished].each do |meth|
+      define_method(:"#{meth}_delay") do
+        send(meth) - scheduled
+      end
+    end
+
+    def lease_clear_time
+      lease_cleared - lease_acquired
+    end
+
+    def run_time
+      run_started - run_finished
+    end
+  end
+
+  def processing_times
+    @processing_times ||= ProcessingTimes.new(scheduled: schedule.to_f)
+  end
+
+  (ProcessingTimes.members - [:scheduled]).each do |meth|
+    setter = :"#{meth}="
+    define_method(:"#{meth}!") do
+      processing_times.send(setter, Time.now.to_f)
+    end
+  end
+
   def subject
     UBID.decode(ubid)
   end
-
-  if Config.test?
-    private def verbose_logging
-      true
-    end
-    # :nocov:
-  else
-    private def verbose_logging
-      rand(1000) == 0
-    end
-  end
-  # :nocov:
 
   def take_lease_and_reload
     unless (ps = DB.prepared_statement(:strand_take_lease_and_reload))
@@ -56,9 +71,8 @@ class Strand < Sequel::Model
     affected = ps.call(id:)
     return false unless affected
     lease_time = affected.fetch(:lease)
-    verbose_logging = self.verbose_logging
+    lease_acquired!
 
-    Clog.emit("obtained lease") { {lease_acquired: {time: lease_time, delay: Time.now - schedule}} } if verbose_logging
     # Also operate as reload query
     @values = affected
 
@@ -77,7 +91,7 @@ UPDATE strand
 SET lease = now() - '1000 years'::interval
 WHERE id = ? AND lease = ?
 SQL
-          Clog.emit("lease cleared") { {lease_cleared: {num_updated: num_updated}} } if verbose_logging
+          lease_cleared!
           unless num_updated == 1
             Clog.emit("lease violated data") do
               {lease_clear_debug_snapshot: lease_clear_debug_snapshot}

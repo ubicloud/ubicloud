@@ -60,6 +60,9 @@ class Scheduling::Dispatcher
       start_thread_pair(@strand_queue)
     end
 
+    @metrics_queue = Queue.new
+    @metrics_thread = Thread.new { metrics_thread }
+
     # A prepared statement to get the strands to run.  A prepared statement
     # is used to reduce parsing/planning work in the database.
     ds = Strand
@@ -120,6 +123,33 @@ class Scheduling::Dispatcher
     @shutting_down = true
   end
 
+  METRIC_TYPES = %i[scan_picked_up_delay run_started_delay lease_acquired_delay run_finished_delay lease_clear_time run_time].freeze
+
+  def metrics_thread
+    array = []
+    while (metric = @metrics_queue.pop)
+      array << metric
+      if array.size == 1000
+        respirate_metrics = {}
+        METRIC_TYPES.each do |metric_type|
+          metrics = array.map(&metric_type)
+          metrics.sort!
+          average = metrics.sum / 1000
+          median = metrics[500]
+          p75 = metrics[750]
+          p85 = metrics[850]
+          p95 = metrics[950]
+          p99 = metrics[990]
+          max = metrics.last
+          respirate_metrics[metric_type] = {average:, median:, p75:, p85:, p95:, p99:, max:}
+        end
+        array.clear
+
+        Clog.emit("respirate metrics") { {respirate_metrics:} }
+      end
+    end
+  end
+
   # Start a strand/apoptosis thread pair, where the strand thread will
   # pull from the given strand queue.
   #
@@ -157,7 +187,7 @@ class Scheduling::Dispatcher
   # If respirate processes are partitioned, this will only return
   # strands for the current partition.
   def scan
-    @shutting_down ? [] : @strand_ps.call(skip_strands:)
+    @shutting_down ? [] : @strand_ps.call(skip_strands:).each(&:scan_picked_up!)
   end
 
   # Similar to scan, but return older strands which may not be
@@ -165,7 +195,7 @@ class Scheduling::Dispatcher
   # graceful degradation if a partitioned respirate process
   # crashes or experiences apoptosis.
   def scan_old
-    (@old_strand_ps&.call(skip_strands:) unless @shutting_down) || []
+    (@old_strand_ps&.call(skip_strands:)&.each(&:scan_picked_up!) unless @shutting_down) || []
   end
 
   # A pg_array for the strand ids to skip.  These are the strand
@@ -237,6 +267,7 @@ class Scheduling::Dispatcher
     strand_ubid = strand.ubid.freeze
     Thread.current.name = strand_ubid
     start_queue.push(strand_ubid)
+    strand.run_started!
     strand.run(STRAND_RUNTIME)
   rescue => ex
     Clog.emit("exception terminates strand run") { Util.exception_to_hash(ex) }
@@ -252,6 +283,9 @@ class Scheduling::Dispatcher
     # even for non-StandardError exits
     finish_queue.push(true)
     @mutex.synchronize { @current_strands.delete(strand&.id) }
+
+    strand.run_finished!
+    @metrics_queue.push(strand.processing_times)
 
     # If there are any sessions in the thread-local (really fiber-local) ssh
     # cache after the strand run, close them eagerly to close the related

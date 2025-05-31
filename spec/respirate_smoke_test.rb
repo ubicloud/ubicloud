@@ -88,6 +88,7 @@ end
 
 unless output.length == num_strands * 3
   puts
+  puts output
   raise "unexpected output length: #{output.length}"
 end
 
