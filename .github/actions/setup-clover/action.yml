@@ -14,22 +14,44 @@ runs:
         echo "CLOVER_RUNTIME_TOKEN_SECRET=r3rV5RzYVpDMlXxY1VnrHlmoMnXdUVt5ABec/TWXnmO7Ok/riFRDNATAMmDWTvtH+cSyXAniH3hHL6EetHj/FA==" >> $GITHUB_ENV
         echo "CLOVER_COLUMN_ENCRYPTION_KEY=TtlY0+hd4lvedPkNbu5qsj5H7giPKJSRX9KDBrvid7c=" >> $GITHUB_ENV
 
+    - shell: bash
+      run: printenv
+
     - name: Start PostgreSQL container
       shell: bash
       run: |
-        docker run -d \
-          --name postgres \
-          -e POSTGRES_USER=$DB_USER \
-          -e POSTGRES_PASSWORD=$DB_PASSWORD \
-          -e POSTGRES_DB=$DB_NAME \
-          -p 5432:5432 \
-          postgres:15.8
-        docker exec postgres bash -c 'until pg_isready -U clover; do sleep 1; done'
+        brew install postgresql@15
+        brew services start postgresql@15
+        export PATH="/opt/homebrew/opt/postgresql@15/bin:$PATH"
+        echo "/opt/homebrew/opt/postgresql@15/bin" >> $GITHUB_PATH
 
-    - name: Perform superuser-only actions, then remove superuser
-      shell: bash
-      run: |
-        psql "$CLOVER_DATABASE_URL" -c "CREATE EXTENSION citext; CREATE EXTENSION btree_gist; CREATE ROLE clover_password PASSWORD '${{ env.DB_PASSWORD }}' LOGIN; ALTER ROLE ${{ env.DB_USER }} NOSUPERUSER"
+        # RUNNER_OS=macOS
+        # One-liner wait
+        until pg_isready -q; do sleep 1; done
+
+        psql -d postgres -c "CREATE ROLE ${{ env.DB_USER }} PASSWORD '${{ env.DB_PASSWORD }}' LOGIN; CREATE ROLE ${{ env.DB_USER }}_password PASSWORD '${{ env.DB_PASSWORD }}' LOGIN"
+        psql -d postgres -c "CREATE DATABASE ${{ env.DB_NAME }} OWNER ${{ env.DB_USER }};"
+        psql "$CLOVER_DATABASE_URL" -c "CREATE EXTENSION citext; CREATE EXTENSION btree_gist;"
+
+        # ; ALTER ROLE ${{ env.DB_USER }} NOSUPERUSER
+        # createuser -U postgres clover
+        # createuser -U postgres clover_password
+
+        # psql -U postgres -c 'CREATE EXTENSION citext; CREATE EXTENSION btree_gist;' #{database_name}
+
+        # docker run -d \
+        #   --name postgres \
+        #   -e POSTGRES_USER=$DB_USER \
+        #   -e POSTGRES_PASSWORD=$DB_PASSWORD \
+        #   -e POSTGRES_DB=$DB_NAME \
+        #   -p 5432:5432 \
+        #   postgres:15.8
+        # docker exec postgres bash -c 'until pg_isready -q; do sleep 1; done'
+
+    # - name: Perform superuser-only actions, then remove superuser
+    #   shell: bash
+    #   run: |
+    #     psql "$CLOVER_DATABASE_URL" -c "CREATE EXTENSION citext; CREATE EXTENSION btree_gist; CREATE ROLE clover_password PASSWORD '${{ env.DB_PASSWORD }}' LOGIN; ALTER ROLE ${{ env.DB_USER }} NOSUPERUSER"
 
     - name: Set up Ruby
       uses: ruby/setup-ruby@v1
