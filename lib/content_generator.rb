@@ -170,7 +170,7 @@ module ContentGenerator
 
       [
         worker_size.display_name,
-        "#{worker_size.vcpus} vCPUs / #{worker_size.memory_gib} GB RAM",
+        "#{worker_size.vcpus} vCPUs / #{worker_size.memory_gib} GB RAM / #{worker_size.storage_size_options.first} GB NVMe Storage",
         "$#{"%.2f" % monthly_price(location, worker_size)}/mo",
         "$#{"%.3f" % hourly_price(location, worker_size)}/hour"
       ]
@@ -184,7 +184,7 @@ module ContentGenerator
 
     def self.node_price(location, worker_size)
       worker_size.vcpus * BillingRate.unit_price_from_resource_properties("KubernetesWorkerVCpu", "standard", location.name) +
-        40 * BillingRate.unit_price_from_resource_properties("KubernetesWorkerStorage", "standard", location.name)
+        worker_size.storage_size_options.first * BillingRate.unit_price_from_resource_properties("KubernetesWorkerStorage", "standard", location.name)
     end
 
     def self.hourly_price(location, worker_size)
