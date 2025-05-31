@@ -25,7 +25,7 @@ RSpec.describe Clover, "cli pg create" do
 
   it "creates PostgreSQL database with all options" do
     expect(PostgresResource.count).to eq 0
-    body = cli(%w[pg eu-central-h1/test-pg create -s standard-4 -S 128 -h async -v 17 -f lantern])
+    body = cli(%w[pg eu-central-h1/test-pg create -s standard-4 -S 128 -h async -v 17 -f paradedb])
     expect(PostgresResource.count).to eq 1
     pg = PostgresResource.first
     expect(pg).to be_a PostgresResource
@@ -35,7 +35,7 @@ RSpec.describe Clover, "cli pg create" do
     expect(pg.target_storage_size_gib).to eq 128
     expect(pg.ha_type).to eq "async"
     expect(pg.version).to eq "17"
-    expect(pg.flavor).to eq "lantern"
+    expect(pg.flavor).to eq "paradedb"
     expect(body).to eq "PostgreSQL database created with id: #{pg.ubid}\n"
   end
 end

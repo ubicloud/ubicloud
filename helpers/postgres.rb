@@ -5,6 +5,9 @@ class Clover
     authorize("Postgres:create", @project.id)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
+    flavor = typecast_params.nonempty_str("flavor") || PostgresResource::Flavor::STANDARD
+    fail Validation::ValidationFailed.new({postgres_lantern: "Project doesn't have access to Lantern Postgres"}) if flavor == PostgresResource::Flavor::LANTERN && !@project.get_ff_postgres_lantern
+
     Validation.validate_postgres_location(@location, @project.id)
 
     size = typecast_params.nonempty_str!("size")
@@ -30,7 +33,7 @@ class Clover
         target_storage_size_gib: typecast_params.nonempty_str("storage_size") || parsed_size.storage_size_options.first,
         ha_type:,
         version: typecast_params.nonempty_str("version") || PostgresResource::DEFAULT_VERSION,
-        flavor: typecast_params.nonempty_str("flavor") || PostgresResource::Flavor::STANDARD
+        flavor: flavor
       ).subject
       audit_log(pg, "create")
     end

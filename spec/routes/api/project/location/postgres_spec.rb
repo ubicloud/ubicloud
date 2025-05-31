@@ -124,6 +124,15 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(200)
       end
 
+      it "fails if lantern feature flag is not enabled" do
+        project.set_ff_postgres_lantern(false)
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-lantern", {
+          size: "standard-2",
+          flavor: "lantern"
+        }.to_json
+        expect(last_response.status).to eq(400)
+      end
+
       it "invalid location" do
         post "/project/#{project.ubid}/location/eu-north-h1/postgres/test-postgres", {
           size: "standard-2",
