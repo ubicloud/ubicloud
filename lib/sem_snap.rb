@@ -39,7 +39,7 @@ class SemSnap
 
   def incr(name)
     if (semaphore = Semaphore.incr(@strand_id, name))
-      add_semaphore_instance_to_snapshot(semaphore)
+      add_semaphore_instance_to_snapshot(Semaphore.with_pk(semaphore))
     end
   end
 
