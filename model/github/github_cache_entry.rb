@@ -34,6 +34,11 @@ class GithubCacheEntry < Sequel::Model
     # DELETE statement modified no rows due to filter
   end
 
+  def delete_blob_storage
+    repository.blob_storage_client.delete_object(bucket: repository.bucket_name, key: blob_key)
+  rescue Aws::S3::Errors::NoSuchKey
+  end
+
   def after_destroy
     super
     if committed_at.nil?
@@ -43,10 +48,7 @@ class GithubCacheEntry < Sequel::Model
       end
     end
 
-    begin
-      repository.blob_storage_client.delete_object(bucket: repository.bucket_name, key: blob_key)
-    rescue Aws::S3::Errors::NoSuchKey
-    end
+    delete_blob_storage
   end
 end
 
