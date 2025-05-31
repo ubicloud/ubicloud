@@ -74,7 +74,10 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   end
 
   label def wait_setup_host
-    nap 15 unless vm_host && vm_host.strand.label == "wait"
+    unless vm_host.strand.label == "wait"
+      Clog.emit(vm_host.sshable.cmd("ls -lah /var/storage/images").strip.tr("\n", "\t")) if vm_host.strand.label == "wait_download_boot_images"
+      nap 15
+    end
 
     if retval&.dig("msg") == "installed rhizome"
       verify_specs_installation(installed: true)
