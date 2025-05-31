@@ -16,7 +16,8 @@ class Strand < Sequel::Model
   include ResourceMethods
 
   def subject
-    UBID.decode(ubid)
+    return @subject if defined?(@subject)
+    @subject = UBID.decode(ubid)
   end
 
   if Config.test?
