@@ -16,14 +16,6 @@ GIT
       rack
 
 GIT
-  remote: https://github.com/jeremyevans/sequel.git
-  revision: 4934f70a921395df9241ae4e214e8e9a395b6758
-  ref: 4934f70a921395df9241ae4e214e8e9a395b6758
-  specs:
-    sequel (5.92.0)
-      bigdecimal
-
-GIT
   remote: https://github.com/ubicloud/erb-formatter.git
   revision: df3174476986706828f7baf3e5e6f5ec8ecd849b
   ref: df3174476986706828f7baf3e5e6f5ec8ecd849b
@@ -376,6 +368,8 @@ GEM
       addressable (>= 2.3.5)
       faraday (>= 0.17.3, < 3)
     securerandom (0.4.1)
+    sequel (5.93.0)
+      bigdecimal
     sequel-annotate (1.7.0)
       sequel (>= 4)
     sequel_pg (1.17.1)
@@ -509,7 +503,7 @@ DEPENDENCIES
   rubocop-rake
   rubocop-rspec
   rubocop-sequel
-  sequel!
+  sequel (>= 5.93)
   sequel-annotate
   sequel_pg (>= 1.8)
   shellwords
