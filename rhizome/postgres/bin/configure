@@ -98,6 +98,39 @@ standby2replication   #{identity}             ubi_replication
 PG_IDENT
 safe_write_to_file("/etc/postgresql/#{v}/main/pg_ident.conf", pg_ident_entries)
 
+# Configure system hugepages
+meminfo = File.read("/proc/meminfo")
+hugepage_size_kib = Integer(meminfo[/^Hugepagesize:\s*(\d+)\s*kB/, 1], 10)
+memory_total_kib = Integer(meminfo[/^MemTotal:\s*(\d+)\s*kB/, 1], 10)
+
+target_hugepages_size_kib = memory_total_kib / 4
+target_hugepages = target_hugepages_size_kib / hugepage_size_kib
+
+r "echo 'vm.nr_hugepages = #{target_hugepages}' | sudo tee /etc/sysctl.d/10-hugepages.conf"
+r "sync"
+r "echo 3 | sudo tee /proc/sys/vm/drop_caches"
+r "echo 1 | sudo tee /proc/sys/vm/compact_memory"
+r "sudo sysctl --system"
+
+meminfo = File.read("/proc/meminfo")
+allocated_hugepages = Integer(meminfo[/^HugePages_Total:\s*(\d+)/, 1], 10)
+
+if allocated_hugepages < target_hugepages
+  puts "Failed to allocate #{target_hugepages} hugepages. Only #{allocated_hugepages} were allocated."
+  exit 1
+else
+  puts "Successfully allocated #{allocated_hugepages} hugepages."
+end
+
+# Create drop-in directory for postgresql@.service to override
+# the default systemd service file with a custom ExecStartPre to configure hugepages.
+r "mkdir -p /etc/systemd/system/postgresql@.service.d"
+execstartpre_hugepages_conf = <<-HUGEPAGES_CONF
+[Service]
+ExecStartPre=/home/ubi/postgres/bin/configure-hugepages %i
+HUGEPAGES_CONF
+safe_write_to_file("/etc/systemd/system/postgresql@.service.d/hugepages.conf", execstartpre_hugepages_conf)
+
 # Reload the postmaster to apply changes
 r "pg_ctlcluster #{v} main reload || pg_ctlcluster #{v} main restart"
 
