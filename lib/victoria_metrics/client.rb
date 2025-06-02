@@ -7,14 +7,18 @@ require "digest"
 require "zlib"
 
 class VictoriaMetrics::Client
-  def initialize(endpoint:, ssl_ca_file_data: nil, socket: nil, username: nil, password: nil)
+  def initialize(endpoint:, ssl_ca_data: nil, socket: nil, username: nil, password: nil)
     @endpoint = endpoint
     @username = username
     @password = password
-    @client = if ssl_ca_file_data
-      ca_bundle_filename = File.join(Dir.pwd, "var", "ca_bundles", Digest::SHA256.hexdigest(ssl_ca_file_data) + ".crt")
-      Util.safe_write_to_file(ca_bundle_filename, ssl_ca_file_data) unless File.exist?(ca_bundle_filename)
-      Excon.new(endpoint, socket: socket, ssl_ca_file: ca_bundle_filename)
+    @client = if ssl_ca_data
+      cert_store = OpenSSL::X509::Store.new
+      certs_pem = ssl_ca_data.scan(/-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----/m)
+      certs_pem.each do |cert_pem|
+        cert = OpenSSL::X509::Certificate.new(cert_pem)
+        cert_store.add_cert(cert)
+      end
+      Excon.new(endpoint, socket: socket, ssl_cert_store: cert_store)
     else
       Excon.new(endpoint, socket: socket)
     end
