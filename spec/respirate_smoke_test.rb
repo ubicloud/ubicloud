@@ -2,14 +2,17 @@
 
 ENV["RACK_ENV"] = "test"
 
-partitioned = !ARGV.empty?
-if partitioned
-  num_partitions = Integer(ARGV[0]).clamp(1, nil)
-  num_processes = if ARGV.size == 2
-    Integer(ARGV[1]).clamp(1, nil)
+num_processes = if (arg = ARGV.shift)
+  num_partitions = Integer(arg).clamp(1, nil)
+  partitioned = true if num_partitions > 1
+
+  if (arg = ARGV.shift)
+    Integer(arg).clamp(1, nil)
   else
     num_partitions
   end
+else
+  1
 end
 
 require_relative "../loader"
@@ -55,24 +58,23 @@ output = +""
 Thread.new do
   output << r.read(4096).to_s
 end
+time = Time.now
 
-respirate_pids = if partitioned
-  Array.new(num_processes) do
-    Process.spawn("bin/respirate", num_partitions.to_s, (it + 1).to_s, :in => :close, [:out, :err] => w)
-  end
-else
-  [Process.spawn("bin/respirate", :in => :close, [:out, :err] => w)]
+respirate_pids = Array.new(num_processes) do
+  respirate_args = [num_partitions.to_s, (it + 1).to_s] if partitioned
+  Process.spawn("bin/respirate", *respirate_args, :in => :close, [:out, :err] => w)
 end
 
 w.close
 
 finished_ds = ds.where(label: "smoke_test_0")
 deadline = Time.now + seconds_allowed
-print(partitioned ? "#{num_processes}/#{num_partitions} partitioned: " : "unpartitioned: ")
+print(partitioned ? "#{num_processes}/#{num_partitions} partitioned: " : "#{num_processes} unpartitioned: ")
 until (count = finished_ds.count) == num_strands || Time.now > deadline
   print count, " "
   sleep 1
 end
+printf("%0.3f seconds ", Time.now - time)
 
 Process.kill(:TERM, *respirate_pids)
 sleep 1
@@ -88,6 +90,7 @@ end
 
 unless output.length == num_strands * 3
   puts
+  puts output
   raise "unexpected output length: #{output.length}"
 end
 

@@ -274,10 +274,13 @@ end
 
 desc "Run respirate smoke tests"
 task :respirate_smoke_test do
-  # not partitioned
+  # not partitioned, 1 process
   system(RbConfig.ruby, "spec/respirate_smoke_test.rb")
 
-  # 4-way partition
+  # not partitioned, 4 processes
+  system(RbConfig.ruby, "spec/respirate_smoke_test.rb", "1", "4")
+
+  # 4-way partition, 4 processes
   system(RbConfig.ruby, "spec/respirate_smoke_test.rb", "4")
 
   # 4-way partition, but only 3 processes. This simulates a crash/apoptosis
