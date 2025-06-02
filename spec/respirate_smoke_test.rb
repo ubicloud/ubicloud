@@ -77,7 +77,13 @@ end
 printf("%0.3f seconds ", Time.now - time)
 
 Process.kill(:TERM, *respirate_pids)
-sleep 1
+reap_queue = Queue.new
+Thread.new do
+  respirate_pids.each { Process.waitpid(it) }
+  reap_queue.push(true)
+end
+
+reap_queue.pop(timeout: 3)
 
 # puts "output:"
 # puts output
