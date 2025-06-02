@@ -60,6 +60,12 @@ class Scheduling::Dispatcher
       start_thread_pair(@strand_queue)
     end
 
+    # The Queue for submitting metrics.  This is pushed to for each strand run.
+    @metrics_queue = Queue.new
+
+    # The thread that processes the metrics queue and emits metrics.
+    @metrics_thread = Thread.new { metrics_thread(@metrics_queue) }
+
     # A prepared statement to get the strands to run.  A prepared statement
     # is used to reduce parsing/planning work in the database.
     ds = Strand
@@ -104,6 +110,10 @@ class Scheduling::Dispatcher
     # default in shutdown as pushing to the queue can block.
     @thread_data.each { @strand_queue.push(nil) }
 
+    # Close down the metrics processing
+    @metrics_queue.close
+    @metrics_thread.join
+
     # After all queues have been pushed to, it is safe to
     # attempt joining them.
     @thread_data.each do |data|
@@ -118,6 +128,69 @@ class Scheduling::Dispatcher
   # strand thread signals them to exit.
   def shutdown
     @shutting_down = true
+  end
+
+  # Thread responsible for collecting and emitting metrics. This emits after every
+  # 1000 strand runs, as that allows easy calculations of the related metrics and is
+  # not too to burdensome on the logging infrastructure, while still being helpful.
+  def metrics_thread(metrics_queue)
+    array = []
+    while (metric = metrics_queue.pop)
+      array << metric
+      if array.size == 1000
+        Clog.emit("respirate metrics") { {respirate_metrics: metrics_hash(array)} }
+        array.clear
+      end
+    end
+  end
+
+  METRIC_TYPES = %i[scan_delay queue_delay lease_delay queue_size available_workers].freeze
+
+  # Metrics to emit.  This assumes an array size of 1000.  The following metrics are emitted:
+  #
+  # Strand delay metrics:
+  #
+  # scan_delay :: Time between when the strand was scheduled, and when the scan query
+  #               picked the strand up.
+  # queue_delay :: Time between when the scan query picked up the strand, and when a
+  #                worker thread started working on the strand.
+  # lease_delay :: Time between when a worker thread started working on the strand, and
+  #                when it acquired (or failed to acquire) the strand's lease.
+  #
+  # Respirate internals metrics:
+  #
+  # queue_size :: The size of the strand queue after the worker thread picked up the strand.
+  #               This is the backlog of strands waiting to be processed.
+  # available_workers :: The number of idle worker threads that are waiting to work on strands.
+  #                      There should only be an idle worker if the queue size is currently 0.
+  #
+  # For the above metrics, we compute the average, median, P75, P85, P95, P99, and maximum
+  # values.
+  #
+  # In addition to the above metrics, there is one additional metric:
+  #
+  # lease_acquire_percentage :: Percentage of strands where the lease was successfully acquired.
+  #                             For single respirate processes, or normally running respirate
+  #                             partitioned processes (1 process per partition), this should be
+  #                             100.0. For multi-process, non-partitioned respirate, this can
+  #                             be significantly lower, as multiple processes try to process
+  #                             the same strand concurrently, and some fail to acquire the lease.
+  def metrics_hash(array)
+    respirate_metrics = {}
+    METRIC_TYPES.each do |metric_type|
+      metrics = array.map(&metric_type)
+      metrics.sort!
+      average = metrics.sum / 1000
+      median = metrics[500]
+      p75 = metrics[750]
+      p85 = metrics[850]
+      p95 = metrics[950]
+      p99 = metrics[990]
+      max = metrics.last
+      respirate_metrics[metric_type] = {average:, median:, p75:, p85:, p95:, p99:, max:}
+    end
+    respirate_metrics[:lease_acquire_percentage] = array.count(&:lease_acquired) / 10.0
+    respirate_metrics
   end
 
   # Start a strand/apoptosis thread pair, where the strand thread will
@@ -157,7 +230,7 @@ class Scheduling::Dispatcher
   # If respirate processes are partitioned, this will only return
   # strands for the current partition.
   def scan
-    @shutting_down ? [] : @strand_ps.call(skip_strands:)
+    @shutting_down ? [] : @strand_ps.call(skip_strands:).each(&:scan_picked_up!)
   end
 
   # Similar to scan, but return older strands which may not be
@@ -165,7 +238,7 @@ class Scheduling::Dispatcher
   # graceful degradation if a partitioned respirate process
   # crashes or experiences apoptosis.
   def scan_old
-    (@old_strand_ps&.call(skip_strands:) unless @shutting_down) || []
+    (@old_strand_ps&.call(skip_strands:)&.each(&:scan_picked_up!) unless @shutting_down) || []
   end
 
   # A pg_array for the strand ids to skip.  These are the strand
@@ -221,7 +294,13 @@ class Scheduling::Dispatcher
   # and then signalling the related apoptosis thread when the
   # strand run finishes.
   def strand_thread(strand_queue, start_queue, finish_queue)
-    run_strand(strand_queue.pop, start_queue, finish_queue) until @shutting_down
+    while !@shutting_down && (strand = strand_queue.pop)
+      strand.worker_started!
+      metrics = strand.respirate_metrics
+      metrics.queue_size = strand_queue.size
+      metrics.available_workers = strand_queue.num_waiting
+      run_strand(strand, start_queue, finish_queue)
+    end
   ensure
     # Signal related apoptosis thread to shutdown
     start_queue.push(nil)
@@ -231,9 +310,6 @@ class Scheduling::Dispatcher
   # thread via the start queue when starting, and the finish queue
   # when exiting.
   def run_strand(strand, start_queue, finish_queue)
-    # Shutdown indicated, return immediately
-    return unless strand
-
     strand_ubid = strand.ubid.freeze
     Thread.current.name = strand_ubid
     start_queue.push(strand_ubid)
@@ -251,7 +327,9 @@ class Scheduling::Dispatcher
     # Always signal apoptosis thread that the strand has finished,
     # even for non-StandardError exits
     finish_queue.push(true)
-    @mutex.synchronize { @current_strands.delete(strand&.id) }
+    @mutex.synchronize { @current_strands.delete(strand.id) }
+
+    @metrics_queue.push(strand.respirate_metrics)
 
     # If there are any sessions in the thread-local (really fiber-local) ssh
     # cache after the strand run, close them eagerly to close the related

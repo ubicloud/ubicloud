@@ -23,6 +23,37 @@ class Strand < Sequel::Model
     @subject = UBID.decode(ubid)
   end
 
+  RespirateMetrics = Struct.new(:scheduled, :scan_picked_up, :worker_started, :lease_checked, :lease_acquired, :queue_size, :available_workers) do
+    def scan_delay
+      scan_picked_up - scheduled
+    end
+
+    def queue_delay
+      worker_started - scan_picked_up
+    end
+
+    def lease_delay
+      lease_checked - worker_started
+    end
+  end
+
+  def respirate_metrics
+    @respirate_metrics ||= RespirateMetrics.new(scheduled: schedule)
+  end
+
+  def scan_picked_up!
+    respirate_metrics.scan_picked_up = Time.now
+  end
+
+  def worker_started!
+    respirate_metrics.worker_started = Time.now
+  end
+
+  def lease_checked!(affected)
+    respirate_metrics.lease_checked = Time.now
+    respirate_metrics.lease_acquired = true if affected
+  end
+
   if Config.test?
     private def verbose_logging
       true
@@ -58,6 +89,7 @@ class Strand < Sequel::Model
           schedule: Sequel::CURRENT_TIMESTAMP + (ps_sch * Sequel.cast("1 second", :interval)))
     end
     affected = ps.call(id:)
+    lease_checked!(affected)
     return false unless affected
     lease_time = affected.fetch(:lease)
     verbose_logging = self.verbose_logging
