@@ -179,20 +179,8 @@ $(".copyable-content").on("click", ".copy-button", function (event) {
   }
 })
 
-$(".revealable-content").on("click", ".reveal-button", function (event) {
-  $(this).closest(".shadow-content").hide();
-  $(this).closest(".shadow-content").siblings(".revealed-content").show();
-
-  // For some reason, adding this style directly to the element does not trigger
-  // layout reflow for handling overflow when it is made visible. However, adding
-  // the overflow-wrap dynamically makes the browser recalculate the layout and
-  // apply the style correctly.
-  $(this).closest(".shadow-content").siblings(".revealed-content").css("overflow-wrap", "anywhere");
-})
-
-$(".revealable-content").on("click", ".hide-button", function (event) {
-  $(this).closest(".revealed-content").hide();
-  $(this).closest(".revealed-content").siblings(".shadow-content").show();
+$(".revealable-button").on("click", function () {
+  $(this).closest(".revealable-content").toggleClass("active");
 })
 
 $(".back-btn").on("click", function (event) {
