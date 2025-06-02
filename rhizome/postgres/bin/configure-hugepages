@@ -1,0 +1,17 @@
+#!/usr/bin/env ruby
+
+# frozen_string_literal: true
+
+require_relative "../lib/hugepages_setup"
+require "logger"
+
+if ARGV.count != 1
+  fail "Wrong number of arguments. Expected 1, Given #{ARGV.count}"
+end
+
+instance = ARGV[0]
+
+logger = Logger.new($stdout)
+logger.level = Logger::INFO
+
+HugepagesSetup.new(instance, logger).setup
