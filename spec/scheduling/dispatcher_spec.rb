@@ -180,10 +180,44 @@ RSpec.describe Scheduling::Dispatcher do
     end
   end
 
-  describe "#run_strand" do
-    it "runs strand" do
+  describe "#metrics_thread" do
+    it "emits metrics every 1000 queue entries" do
+      q = Queue.new
+      1000.times { q.push 1 }
+      q.push nil
+      expect(di).to receive(:metrics_hash).with([1] * 1000).and_return({})
+      expect(Clog).to receive(:emit).and_call_original
+      di.metrics_thread(q)
+    end
+  end
+
+  describe "#metrics_hash" do
+    it "takes array of Strand::RespirateMetrics and returns hash of metric information" do
+      t = Time.now
+      arrays = []
+      rm = Strand::RespirateMetrics
+      arrays << Array.new(750) { rm.new(t, t + 1, t + 2, t + 3, true, 0, 0) }
+      arrays << Array.new(100) { rm.new(t, t + 2, t + 4, t + 7, true, 10, 9) }
+      arrays << Array.new(100) { rm.new(t, t + 3, t + 8, t + 12, true, 20, 7) }
+      arrays << Array.new(40) { rm.new(t, t + 5, t + 12, t + 21, false, 30, 5) }
+      arrays << Array.new(9) { rm.new(t, t + 6, t + 16, t + 29, true, 40, 3) }
+      arrays << Array.new(1) { rm.new(t, t + 7, t + 20, t + 37, false, 50, 1) }
+      expect(di.metrics_hash(arrays.flatten)).to eq({
+        available_workers: {average: 1, max: 9, median: 0, p75: 1, p85: 7, p95: 9, p99: 9},
+        lease_acquire_percentage: 95.9,
+        lease_delay: {average: 1.944, max: 17.0, median: 1.0, p75: 3.0, p85: 4.0, p95: 9.0, p99: 13.0},
+        queue_delay: {average: 1.833, max: 13.0, median: 1.0, p75: 2.0, p85: 5.0, p95: 7.0, p99: 10.0},
+        queue_size: {average: 4, max: 50, median: 0, p75: 10, p85: 20, p95: 30, p99: 40},
+        scan_delay: {average: 1.511, max: 7.0, median: 1.0, p75: 2.0, p85: 3.0, p95: 5.0, p99: 6.0}
+      })
+    end
+  end
+
+  describe "#strand_thread" do
+    it "runs strands pushed onto queue" do
       Strand.create(prog: "Test", label: "napper", schedule: Time.now - 10)
       st = di.scan.first
+      strand_queue = Queue.new
       start_queue = Queue.new
       finish_queue = Queue.new
       current_strands = di.instance_variable_get(:@current_strands)
@@ -191,13 +225,21 @@ RSpec.describe Scheduling::Dispatcher do
       session = instance_double(Net::SSH::Connection::Session)
       expect(session).to receive(:close).and_raise(RuntimeError)
       Thread.current[:clover_ssh_cache] = {nil => session}
-      expect(di.run_strand(st, start_queue, finish_queue)).to be_a(Prog::Base::Nap)
+      strand_queue.push(st)
+      strand_queue.push(nil)
+      expect(di.strand_thread(strand_queue, start_queue, finish_queue)).to be_nil
+      expect(Time.now - st.respirate_metrics.worker_started).to be_within(1).of(0)
+      expect(st.respirate_metrics.queue_size).to eq 1
+      expect(st.respirate_metrics.available_workers).to eq 0
       expect(start_queue.pop(true)).to eq st.ubid
+      expect(start_queue.pop(true)).to be_nil
       expect(finish_queue.pop(true)).to be true
       expect(current_strands).to be_empty
       expect(Thread.current[:clover_ssh_cache]).to be_empty
     end
+  end
 
+  describe "#run_strand" do
     it "print exceptions if they are raised" do
       ex = begin
         begin
