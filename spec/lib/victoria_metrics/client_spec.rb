@@ -5,6 +5,7 @@ require "spec_helper"
 RSpec.describe VictoriaMetrics::Client do
   let(:endpoint) { "http://localhost:8428" }
   let(:client) { described_class.new(endpoint: endpoint) }
+  let(:cert) { "-----BEGIN CERTIFICATE-----\nMIIDCzCCAfOgAwIBAgIUasLyHvpgRtp3/8N9pRPE7f89Gi4wDQYJKoZIhvcNAQEL\nBQAwFTETMBEGA1UEAwwKTXkgVGVzdCBDQTAeFw0yNTA2MDIwOTE2MjFaFw0zNTA1\nMzEwOTE2MjFaMBUxEzARBgNVBAMMCk15IFRlc3QgQ0EwggEiMA0GCSqGSIb3DQEB\nAQUAA4IBDwAwggEKAoIBAQC0WFDSoccSl95/VL4U73JYAYgg1ar96Mo9VJn5H+Y0\nvyfKUI7DWrqZtiqYlCr01nN52FFHwEBgCIYr+aa5MmMHZfe0nbeDK4AbsZKJHr0Z\nBfJfqI9pRxVd9MyRcU2XTAeDWRK3k3sRj6webU2MFxUvF7xB2Wx2+rNhLZhB+d8t\nZSRpwFiX9rgMKYkycY1kV4ZurUT72ct/Q+dNCTTUOel/brMDQhdn02PYAUKgh2UB\nELeooXt1JPedjSH41ShV2yEBA1NyTctaVp3tWfiq+b4p0ZiV/ekoBtkDe5WtaNo1\nxgvRGH/rcOfTraZKokgqCVCG1Ka4DrkvSsaTlOe9XrQlAgMBAAGjUzBRMB0GA1Ud\nDgQWBBQUnKN3Du3ihaNNK3Q9+lztEI4pajAfBgNVHSMEGDAWgBQUnKN3Du3ihaNN\nK3Q9+lztEI4pajAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQAG\ndJijmtiYx2dCw50V3QhjyVyTvhFf1B9XUKGP2i0IPApULXqDGll47iIGo6i1yD7V\n7hjpV0BCtFlNH5nH2bZ0zyUi3XCLTqlnHM8+tI6ZUMWRq2lJAgILVHH/D/VUTUl6\nS+h6rGbtzNBCz2jmP3LiL2lmfcPivJpim5RPtAbApyt7fvHWD8aGQWZHpLYn+2v5\n1laUkm55cvWlsnC27PeNT00/3Eu96dqMiLHFJgKkUGFJMr+49X+BTaLcCUXCja+s\n4nXqhVt+iVVk1RtVS/b1C17DvxnV5g1NAFiZQOx5Gfsr5v8SafKCgR/4xm/kGfEz\nIkfEWqyeWXMj/JRB2yCy\n-----END CERTIFICATE-----" }
 
   describe "#initialize" do
     it "creates a client with the given endpoint" do
@@ -12,30 +13,19 @@ RSpec.describe VictoriaMetrics::Client do
     end
 
     it "creates a client with SSL configuration" do
-      ssl_ca_file_data = "-----BEGIN CERTIFICATE-----\nMOCK_CERT\n-----END CERTIFICATE-----"
-      client = described_class.new(endpoint: endpoint, ssl_ca_file_data: ssl_ca_file_data)
+      client = described_class.new(endpoint: endpoint, ssl_ca_data: cert)
 
-      expect(client.instance_variable_get(:@client)).to be_a(Excon::Connection)
-      expect(client.instance_variable_get(:@client).data[:ssl_ca_file]).to include("ca_bundles")
+      excon_client = client.instance_variable_get(:@client)
+      expect(excon_client).to be_a(Excon::Connection)
+      expect(excon_client.data[:ssl_cert_store]).to be_a(OpenSSL::X509::Store)
     end
 
-    it "does not write the ca_bundle file if it exists" do
-      ssl_ca_file_data = "-----BEGIN CERTIFICATE-----\nMOCK_CERT\n-----END CERTIFICATE-----"
-      ssl_ca_file_name = Digest::SHA256.hexdigest(ssl_ca_file_data)
-      ca_bundle_filename = File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".crt")
-      expect(File).to receive(:exist?).with(ca_bundle_filename).and_return(true)
-      expect(File).not_to receive(:write)
-      described_class.new(endpoint: endpoint, ssl_ca_file_data: ssl_ca_file_data)
-    end
+    it "creates a client without SSL configuration when ssl_ca_data is not provided" do
+      client = described_class.new(endpoint: endpoint)
 
-    it "writes the ca_bundle file if it does not exist" do
-      ssl_ca_file_data = "-----BEGIN CERTIFICATE-----\nMOCK_CERT\n-----END CERTIFICATE-----"
-      ssl_ca_file_name = Digest::SHA256.hexdigest(ssl_ca_file_data)
-      ca_bundle_filename = File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".crt")
-      expect(File).to receive(:exist?).with(ca_bundle_filename).and_return(false)
-      expect(File).to receive(:write)
-      expect(File).to receive(:rename).with("#{ca_bundle_filename}.tmp", ca_bundle_filename)
-      described_class.new(endpoint: endpoint, ssl_ca_file_data: ssl_ca_file_data)
+      excon_client = client.instance_variable_get(:@client)
+      expect(excon_client).to be_a(Excon::Connection)
+      expect(excon_client.data[:ssl_cert_store]).to be_nil
     end
 
     context "with authentication" do
