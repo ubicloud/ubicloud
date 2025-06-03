@@ -246,6 +246,13 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
     end
 
+    it "skips deleting the dns record if acme_order doesn't exist" do
+      expect(cert).to receive(:cert).and_return(nil)
+      expect(nx).to receive(:acme_order).and_return(nil)
+
+      expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
+    end
+
     it "skips revocation and dns record deletion for self-signed certificates" do
       expect(Config).to receive(:development?).and_return(true)
       expect(cert).to receive(:dns_zone_id).and_return(nil)
