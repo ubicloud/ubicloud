@@ -158,7 +158,7 @@ class Prog::Vnet::CertNexus < Prog::Base
   end
 
   def dns_challenge
-    acme_order.authorizations.first.dns
+    acme_order&.authorizations&.first&.dns
   end
 
   def dns_record_name
