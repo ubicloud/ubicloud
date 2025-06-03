@@ -186,7 +186,7 @@ class Clover
 
           DB.transaction do
             md = PostgresMetricDestination.create(postgres_resource_id: pg.id, url:, username:, password:)
-            pg.servers.each(&:incr_configure_prometheus)
+            pg.servers.each(&:incr_configure_metrics)
             audit_log(md, "create", pg)
           end
 
@@ -204,7 +204,7 @@ class Clover
           if (md = pg.metric_destinations_dataset[id:])
             DB.transaction do
               md.destroy
-              pg.servers.each(&:incr_configure_prometheus)
+              pg.servers.each(&:incr_configure_metrics)
               audit_log(md, "destroy")
             end
           end
