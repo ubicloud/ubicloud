@@ -17,7 +17,7 @@ if num_partitions
   num_partitions = Integer(num_partitions)
   partition_num = Integer(partition_num)
 
-  unless (1..16).cover?(num_partitions)
+  unless (1..256).cover?(num_partitions)
     warn "invalid number of partitions: #{num_partitions}"
     exit 1
   end
@@ -28,20 +28,14 @@ if num_partitions
   end
 
   partition_num -= 1
+  partition_size = (16**8) / num_partitions.to_r
+  boundary = -> { "%08x-0000-0000-0000-000000000000" % (it * partition_size).to_i }
 
-  hex_chars = 1
-  chars = (0...16**hex_chars).map { ("%x" % it).rjust(hex_chars, "0") }
-  chars_per_partition = chars.size / num_partitions.to_r
-  start_char = chars[(chars_per_partition * partition_num).to_i]
-  uuid_suffix = "-0000-0000-0000-000000000000"
-  start_id = start_char.ljust(8, "0") + uuid_suffix
-
+  start_id = boundary.call(partition_num)
   partition = if num_partitions == partition_num + 1
     start_id.."ffffffff-ffff-ffff-ffff-ffffffffffff"
   else
-    end_char = chars[(chars_per_partition * (partition_num + 1)).to_i]
-    end_id = end_char.ljust(8, "0") + uuid_suffix
-    start_id...end_id
+    start_id...boundary.call(partition_num + 1)
   end
 end
 
