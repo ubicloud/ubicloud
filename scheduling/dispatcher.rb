@@ -186,10 +186,8 @@ class Scheduling::Dispatcher
     # A prepared statement to get the strands to run.  A prepared statement
     # is used to reduce parsing/planning work in the database.
     ds = Strand
-      .where(
-        Sequel.|({lease: nil}, Sequel[:lease] < Sequel::CURRENT_TIMESTAMP) &
-        {exitval: nil}
-      )
+      .where(Sequel[:lease] < Sequel::CURRENT_TIMESTAMP)
+      .where(exitval: nil)
       .order_by(:schedule)
       .limit(@queue_size)
       .exclude(id: Sequel.function(:ANY, Sequel.cast(:$skip_strands, "uuid[]")))
