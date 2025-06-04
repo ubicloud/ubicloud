@@ -142,7 +142,6 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   def quota_available?
-    github_runner.installation.project_dataset.for_update.all
     # In existing Github quota calculations, we compare total allocated cpu count
     # with the cpu limit and allow passing the limit once. This is because we
     # check quota and allocate VMs in different labels hence transactions and it
