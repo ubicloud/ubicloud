@@ -76,6 +76,7 @@ curl #{ie[:url]}#{path} \\
           <pre class="text-sm bg-gray-800 text-white p-2 rounded-lg overflow-scroll"><%== curl_snippet %></pre>
         </div>
       </div>
+      <% if ie[:tags]["capability"] == "Text Generation" %>
       <%== render(
         "components/button",
         locals: {
@@ -86,6 +87,7 @@ curl #{ie[:url]}#{path} \\
           }
         }
       ) %>
+      <% end %>
     </div>
   </div>
   <% end %>
