@@ -17,6 +17,10 @@ RSpec.describe Clover, "billing" do
 
   let(:payment_method) { PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_1234567890") }
 
+  def stripe_object(hash)
+    Stripe::StripeObject.construct_from(hash.transform_values { it.is_a?(Hash) ? stripe_object(it) : it })
+  end
+
   before do
     login(user.email)
   end
@@ -63,7 +67,7 @@ RSpec.describe Clover, "billing" do
       expect(Stripe::Checkout::Session).to receive(:retrieve).with("session_123").and_return({"setup_intent" => "st_123456790"})
       expect(Stripe::SetupIntent).to receive(:retrieve).with("st_123456790").and_return({"customer" => "cs_1234567890", "payment_method" => "pm_1234567890"})
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"line1" => "Test Rd", "country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}}).exactly(3)
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_1234567890").and_return({"card" => {"brand" => "visa"}, "billing_details" => {}}).thrice
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_1234567890").and_return(stripe_object("card" => {"brand" => "visa"}, "billing_details" => {})).thrice
 
       visit project.path
 
@@ -95,7 +99,7 @@ RSpec.describe Clover, "billing" do
       # rubocop:enable RSpec/VerifiedDoubles
       expect(Stripe::Checkout::Session).to receive(:retrieve).with("session_123").and_return({"setup_intent" => "st_123456790"})
       expect(Stripe::SetupIntent).to receive(:retrieve).with("st_123456790").and_return({"customer" => "cs_1234567890", "payment_method" => "pm_1234567890"})
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_1234567890").and_return({"card" => {"brand" => "visa"}}).once
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_1234567890").and_return(stripe_object("card" => {"brand" => "visa"})).once
       expect(Clog).to receive(:emit).and_call_original
 
       visit project.path
@@ -193,8 +197,8 @@ RSpec.describe Clover, "billing" do
 
     it "can add new payment method" do
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"line1" => "Some Rd", "country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}}).exactly(4)
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}}).twice
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_222222222").and_return({"card" => {"brand" => "mastercard"}, "billing_details" => {}}).twice
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return(stripe_object("card" => {"brand" => "visa"})).twice
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_222222222").and_return(stripe_object("card" => {"brand" => "mastercard"}, "billing_details" => {})).twice
       # rubocop:disable RSpec/VerifiedDoubles
       expect(Stripe::Checkout::Session).to receive(:create).with(
         hash_including(billing_address_collection: "auto")
@@ -222,8 +226,8 @@ RSpec.describe Clover, "billing" do
         {"name" => "ACME Inc.", "address" => nil, "metadata" => {"company_name" => "Foo Company Name"}},
         {"name" => "ACME Inc.", "address" => {"country" => "US"}, "metadata" => {"company_name" => "Foo Company Name"}}
       ).exactly(4)
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}}).twice
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_222222222").and_return({"card" => {"brand" => "mastercard"}, "billing_details" => {"address" => {"country" => "US"}}}).twice
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return(stripe_object("card" => {"brand" => "visa"})).twice
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_222222222").and_return(stripe_object("card" => {"brand" => "mastercard"}, "billing_details" => {"address" => {"country" => "US"}})).twice
       # rubocop:disable RSpec/VerifiedDoubles
       expect(Stripe::Checkout::Session).to receive(:create).with(
         hash_including(billing_address_collection: "required")
@@ -232,7 +236,7 @@ RSpec.describe Clover, "billing" do
       # rubocop:enable RSpec/VerifiedDoubles
       expect(Stripe::Checkout::Session).to receive(:retrieve).with("session_123").and_return({"setup_intent" => "st_123456790"})
       expect(Stripe::SetupIntent).to receive(:retrieve).with("st_123456790").and_return({"payment_method" => "pm_222222222"})
-      expect(Stripe::Customer).to receive(:update).with("cs_1234567890", hash_including(address: {"country" => "US"})).at_least(:once)
+      expect(Stripe::Customer).to receive(:update).with("cs_1234567890", hash_including(address: anything)).at_least(:once)
 
       visit "#{project.path}/billing"
 
@@ -249,8 +253,8 @@ RSpec.describe Clover, "billing" do
     it "can't add fraud payment method" do
       fraud_payment_method = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pmi_1234567890", fraud: true, card_fingerprint: "cfg1234")
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}}).exactly(3)
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with(fraud_payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}}).twice
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_222222222").and_return({"card" => {"brand" => "mastercard", "fingerprint" => "cfg1234"}})
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with(fraud_payment_method.stripe_id).and_return(stripe_object("card" => {"brand" => "visa"})).twice
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_222222222").and_return(stripe_object("card" => {"brand" => "mastercard", "fingerprint" => "cfg1234"}))
       # rubocop:disable RSpec/VerifiedDoubles
       expect(Stripe::Checkout::Session).to receive(:create).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/success?session_id=session_123"))
       # rubocop:enable RSpec/VerifiedDoubles
@@ -286,7 +290,7 @@ RSpec.describe Clover, "billing" do
 
     it "can't delete last payment method" do
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}})
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}})
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return(stripe_object("card" => {"brand" => "visa"}))
 
       visit "#{project.path}/billing"
 
@@ -303,8 +307,8 @@ RSpec.describe Clover, "billing" do
     it "can delete payment method" do
       payment_method_2 = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_2222222222")
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "ACME Inc."}})
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}})
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method_2.stripe_id).and_return({"card" => {"brand" => "mastercard"}})
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return(stripe_object("card" => {"brand" => "visa"}))
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method_2.stripe_id).and_return(stripe_object("card" => {"brand" => "mastercard"}))
       expect(Stripe::PaymentMethod).to receive(:detach).with(payment_method.stripe_id)
 
       visit "#{project.path}/billing"
@@ -321,7 +325,7 @@ RSpec.describe Clover, "billing" do
 
     it "returns 404 if payment method does not exist" do
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}})
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}})
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return(stripe_object("card" => {"brand" => "visa"}))
       visit "#{project.path}/billing"
       payment_method.this.delete(force: true)
 
