@@ -37,7 +37,8 @@ class StorageVolume
     @max_write_mbytes_per_sec = params["max_write_mbytes_per_sec"]
     @slice = params.fetch("slice_name", "system.slice")
     @num_queues = params.fetch("num_queues", 1)
-    @queue_size = params.fetch("queue_size", 128)
+    @queue_size = params.fetch("queue_size", 64)
+    @copy_on_read = params.fetch("copy_on_read", false)
   end
 
   def vp
@@ -81,6 +82,10 @@ class StorageVolume
     end
   end
 
+  def stripe_sector_count_shift
+    11
+  end
+
   def prep_vhost_block_backend(encryption_key, key_wrapping_secrets)
     key_encryption = StorageKeyEncryption.new(key_wrapping_secrets)
     key1 = key_encryption.wrap_key2(encryption_key[:key]).delete("\n")
@@ -96,8 +101,9 @@ class StorageVolume
       "socket" => vhost_sock,
       "num_queues" => @num_queues,
       "queue_size" => @queue_size,
-      "seg_size_max" => 65536 * 2,
+      "seg_size_max" => 64 * 1024,
       "seg_count_max" => 4,
+      "copy_on_read" => @copy_on_read,
       "poll_queue_timeout_us" => 1000,
       "encryption_key" => [key1, key2]
     }
@@ -111,7 +117,7 @@ class StorageVolume
     File.truncate(metadata_path, 8 * 1024 * 1024)
     FileUtils.chown @vm_name, @vm_name, metadata_path
     FileUtils.chmod "u=rw,g=,o=", metadata_path
-    r "#{vhost_block_backend.init_metadata_path} --config #{config_path.shellescape} --kek /dev/stdin", stdin: kek_yaml(key_wrapping_secrets)
+    r "#{vhost_block_backend.init_metadata_path} -s #{stripe_sector_count_shift}  --config #{config_path.shellescape} --kek /dev/stdin", stdin: kek_yaml(key_wrapping_secrets)
 
     service_file_path = "/etc/systemd/system/#{@vm_name}-storage.service"
     File.write(service_file_path, <<~SERVICE)
