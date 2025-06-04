@@ -160,7 +160,6 @@ module Config
   override :almalinux_9_version, "9.5-20241120", string
   override :github_ubuntu_2404_version, "20250511.1.1", string
   override :github_ubuntu_2204_version, "20250511.1.1", string
-  override :github_ubuntu_2004_version, "20250406.1.1", string
   override :github_gpu_ubuntu_2204_version, "20250511.1.1", string
   override :postgres16_ubuntu_2204_version, "20250425.1.1", string
   override :postgres17_ubuntu_2204_version, "20250425.1.1", string
