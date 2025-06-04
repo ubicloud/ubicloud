@@ -668,7 +668,7 @@ DNSMASQ_SERVICE
       if volume.read_only
         "path=#{volume.image_path},readonly=on"
       else
-        "vhost_user=true,socket=#{volume.vhost_sock},num_queues=1,queue_size=256"
+        "vhost_user=true,socket=#{volume.vhost_sock},num_queues=#{volume.num_queues},queue_size=#{volume.queue_size}"
       end
     }
     disk_params << "path=#{vp.cloudinit_img}"
@@ -679,7 +679,7 @@ DNSMASQ_SERVICE
       disk_params.map { |x| "--disk #{x}" }.join(" ")
     end
 
-    spdk_services = storage_volumes.map { |volume| volume.spdk_service }.uniq
+    spdk_services = storage_volumes.filter_map { |volume| volume.spdk_service }.uniq
     spdk_after = spdk_services.map { |s| "After=#{s}" }.join("\n")
     spdk_requires = spdk_services.map { |s| "Requires=#{s}" }.join("\n")
 

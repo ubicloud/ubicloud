@@ -6,6 +6,8 @@ require "fileutils"
 require "json"
 require "openssl"
 require "base64"
+require "timeout"
+require "yaml"
 require_relative "boot_image"
 require_relative "vm_path"
 require_relative "spdk_path"
@@ -13,11 +15,13 @@ require_relative "spdk_rpc"
 require_relative "spdk_setup"
 require_relative "storage_key_encryption"
 require_relative "storage_path"
+require_relative "vhost_block_backend"
 
 class StorageVolume
   attr_reader :image_path, :read_only
   def initialize(vm_name, params)
     @vm_name = vm_name
+    @vhost_block_backend_version = params["vhost_block_backend_version"]
     @disk_index = params["disk_index"]
     @device_id = params["device_id"]
     @encrypted = params["encrypted"]
@@ -31,6 +35,10 @@ class StorageVolume
     @max_ios_per_sec = params["max_ios_per_sec"]
     @max_read_mbytes_per_sec = params["max_read_mbytes_per_sec"]
     @max_write_mbytes_per_sec = params["max_write_mbytes_per_sec"]
+    @slice = params.fetch("slice_name", "system.slice")
+    @num_queues = params.fetch("num_queues", 1)
+    @queue_size = params.fetch("queue_size", 64)
+    @copy_on_read = params.fetch("copy_on_read", false)
   end
 
   def vp
@@ -47,7 +55,14 @@ class StorageVolume
     fail "Storage device directory doesn't exist: #{sp.device_path}" if !File.exist?(sp.device_path)
 
     FileUtils.mkdir_p storage_dir
+    FileUtils.chown @vm_name, @vm_name, storage_dir
     encryption_key = setup_data_encryption_key(key_wrapping_secrets) if @encrypted
+
+    if @vhost_block_backend_version
+      create_empty_disk_file
+      prep_vhost_block_backend(encryption_key, key_wrapping_secrets)
+      return
+    end
 
     if @image_path.nil?
       fail "bdev_ubi requires a base image" if @use_bdev_ubi
@@ -67,8 +82,91 @@ class StorageVolume
     end
   end
 
+  def stripe_sector_count_shift
+    11
+  end
+
+  def prep_vhost_block_backend(encryption_key, key_wrapping_secrets)
+    key_encryption = StorageKeyEncryption.new(key_wrapping_secrets)
+    key1 = key_encryption.wrap_key2(encryption_key[:key]).delete("\n")
+    key2 = key_encryption.wrap_key2(encryption_key[:key2]).delete("\n")
+    vhost_block_backend = VhostBlockBackend.new(@vhost_block_backend_version)
+    config_path = vhost_block_backend.config_path(@vm_name, @disk_index)
+    metadata_path = vhost_block_backend.metadata_path(@vm_name, @disk_index)
+
+    config = {
+      "path" => disk_file,
+      "image_path" => @image_path,
+      "metadata_path" => metadata_path,
+      "socket" => vhost_sock,
+      "num_queues" => @num_queues,
+      "queue_size" => @queue_size,
+      "seg_size_max" => 64 * 1024,
+      "seg_count_max" => 4,
+      "copy_on_read" => @copy_on_read,
+      "poll_queue_timeout_us" => 1000,
+      "encryption_key" => [key1, key2]
+    }
+
+    File.write(config_path, config.to_yaml)
+    FileUtils.chown @vm_name, @vm_name, config_path
+    FileUtils.chmod "u=rw,g=,o=", config_path
+
+    # Create the metadata file
+    FileUtils.touch(metadata_path)
+    File.truncate(metadata_path, 8 * 1024 * 1024)
+    FileUtils.chown @vm_name, @vm_name, metadata_path
+    FileUtils.chmod "u=rw,g=,o=", metadata_path
+    r "#{vhost_block_backend.init_metadata_path} -s #{stripe_sector_count_shift}  --config #{config_path.shellescape} --kek /dev/stdin", stdin: kek_yaml(key_wrapping_secrets)
+
+    service_file_path = "/etc/systemd/system/#{@vm_name}-storage.service"
+    File.write(service_file_path, <<~SERVICE)
+        [Unit]
+        Description=Vhost Block Backend Service for #{@vm_name}
+        After=network.target
+
+        [Service]
+        Slice=#{@slice}
+        Environment=RUST_LOG=info
+        ExecStart=#{vhost_block_backend.bin_path} --config #{config_path} --kek #{kek_pipe}
+        Restart=always
+        User=#{@vm_name}
+        Group=#{@vm_name}
+
+        [Install]
+        WantedBy=multi-user.target
+    SERVICE
+
+    FileUtils.chmod "u=rw,g=r,o=", service_file_path
+  end
+
+  def kek_yaml(key_wrapping_secrets)
+    {
+      "method" => "aes256-gcm",
+      "key" => key_wrapping_secrets["key"].strip,
+      "init_vector" => key_wrapping_secrets["init_vector"].strip,
+      "auth_data" => Base64.strict_encode64(key_wrapping_secrets["auth_data"]).strip
+    }.to_yaml
+  end
+
   def start(key_wrapping_secrets)
     encryption_key = read_data_encryption_key(key_wrapping_secrets) if @encrypted
+
+    if @vhost_block_backend_version
+      FileUtils.mkdir_p "/run/#{@vm_name}"
+      FileUtils.chown @vm_name, @vm_name, "/run/#{@vm_name}"
+      FileUtils.chmod "u=rwx,g=,o=", "/run/#{@vm_name}"
+      File.delete(kek_pipe) if File.exist?(kek_pipe)
+      File.mkfifo(kek_pipe, 0o600)
+      FileUtils.chmod "u=rw,g=,o=", kek_pipe
+      FileUtils.chown @vm_name, @vm_name, kek_pipe
+      r "systemctl start #{@vm_name}-storage"
+
+      Timeout.timeout(5) do
+        File.open(kek_pipe, File::WRONLY) { |f| f.write(kek_yaml(key_wrapping_secrets)) }
+      end
+      return
+    end
 
     retries = 0
     begin
@@ -87,7 +185,20 @@ class StorageVolume
     end
   end
 
+  def kek_pipe
+    @kek_pipe ||= "/run/#{@vm_name}/kek.yaml.pipe"
+  end
+
   def purge_spdk_artifacts
+    if @vhost_block_backend_version
+      service_file_path = "/etc/systemd/system/#{@vm_name}-storage.service"
+      r "systemctl stop #{@vm_name}-storage"
+      rm_if_exists(service_file_path)
+      rm_if_exists(vhost_sock)
+      rm_if_exists("/run/#{@vm_name}")
+      return
+    end
+
     vhost_controller = SpdkPath.vhost_controller(@vm_name, @disk_index)
 
     rpc_client.vhost_delete_controller(vhost_controller)
@@ -302,7 +413,7 @@ class StorageVolume
   end
 
   def spdk_service
-    @spdk_service ||= SpdkSetup.new(@spdk_version).spdk_service
+    @spdk_service ||= SpdkSetup.new(@spdk_version).spdk_service if @spdk_version
   end
 
   def sp
@@ -328,4 +439,8 @@ class StorageVolume
   def vhost_sock
     @vhost_sock ||= sp.vhost_sock
   end
+
+  attr_reader :num_queues
+
+  attr_reader :queue_size
 end
