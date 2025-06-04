@@ -3,7 +3,7 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Scheduling::Dispatcher do
-  subject(:di) { described_class.new }
+  subject(:di) { described_class.new(pool_size: 1) }
 
   after do
     (@di || di).shutdown_and_cleanup_threads
@@ -27,6 +27,50 @@ RSpec.describe Scheduling::Dispatcher do
     end
   end
 
+  describe "#repartition_thread" do
+    it "emits for invalid notify" do
+      di = @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
+      expect(Clog).to receive(:emit).with("invalid respirate repartition notification").and_wrap_original do |m, *args|
+        di.shutdown
+        m.call(*args)
+      end
+      Thread.new { DB.notify(:respirate, payload: "foo") }.join
+      di.instance_variable_get(:@repartition_thread).join
+    end
+
+    it "repartitions for new processes and stale processes" do
+      di = @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
+      args = []
+      q = Queue.new
+      expect(di).to receive(:setup_prepared_statements).with(num_partitions: 2).and_wrap_original do |m, **kw|
+        args << kw
+        m.call(**kw)
+      end
+      expect(di).to receive(:setup_prepared_statements).with(num_partitions: 3).and_wrap_original do |m, **kw|
+        args << kw
+        q.push nil
+        m.call(**kw)
+      end
+
+      # separate threads so they are not inside a transaction
+      Thread.new { DB.notify(:respirate, payload: "2") }.join
+      Thread.new { DB.notify(:respirate, payload: "3") }.join
+
+      q.pop
+      expect(args).to eq [{num_partitions: 2}, {num_partitions: 3}]
+      args.clear
+      expect(di).to receive(:setup_prepared_statements).with(num_partitions: 1).and_wrap_original do |m, **kw|
+        args << kw
+        q.push true
+        di.shutdown
+        m.call(**kw)
+      end
+      Thread.new { DB.notify(:respirate, payload: "1") until q.pop(timeout: 0.1) }.join
+      di.instance_variable_get(:@repartition_thread).join
+      expect(args.last).to eq(num_partitions: 1)
+    end
+  end
+
   describe "#scan" do
     it "returns empty array if there are no strands ready for running" do
       expect(di.scan).to eq([])
@@ -43,16 +87,17 @@ RSpec.describe Scheduling::Dispatcher do
     end
 
     it "does not include strands outside of partition" do
-      st = Strand.create(prog: "Test", label: "wait_exit")
-      id = "00000000-0000-0000-0000-000000000000"
-      di = @di = described_class.new(partition: id..id)
+      st = Strand.create(prog: "Test", label: "wait_exit", id: "00000000-0000-0000-0000-000000000000")
+      di = @di = described_class.new(partition_number: 2, listen_timeout: 0.01, pool_size: 1)
+      di.setup_prepared_statements(num_partitions: 2)
       st.update(schedule: Time.now - 10)
       expect(di.scan.map(&:id)).to eq([])
     end
 
     it "includes strands inside of partition" do
-      st = Strand.create(prog: "Test", label: "wait_exit")
-      di = @di = described_class.new(partition: st.id..st.id)
+      st = Strand.create(prog: "Test", label: "wait_exit", id: "00000000-0000-0000-0000-000000000000")
+      di = @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
+      di.setup_prepared_statements(num_partitions: 2)
       st.update(schedule: Time.now - 10)
       expect(di.scan.map(&:id)).to eq([st.id])
     end
@@ -69,16 +114,17 @@ RSpec.describe Scheduling::Dispatcher do
     end
 
     it "returns empty array when shutting down" do
-      id = "00000000-0000-0000-0000-000000000000"
-      di = @di = described_class.new(partition: id..id)
+      Strand.create(prog: "Test", label: "wait_exit", id: "00000000-0000-0000-0000-000000000000")
+      di = @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
+      di.setup_prepared_statements(num_partitions: 2)
       di.shutdown
       expect(di.scan_old).to eq([])
     end
 
     it "includes strands outside of partition" do
-      st = Strand.create(prog: "Test", label: "wait_exit")
-      id = "00000000-0000-0000-0000-000000000000"
-      di = @di = described_class.new(partition: id..id)
+      st = Strand.create(prog: "Test", label: "wait_exit", id: "00000000-0000-0000-0000-000000000000")
+      di = @di = described_class.new(partition_number: 2, listen_timeout: 0.01, pool_size: 1)
+      di.setup_prepared_statements(num_partitions: 2)
       st.update(schedule: Time.now - 3)
       expect(di.scan_old.map(&:id)).to eq([])
       st.update(schedule: Time.now - 7)

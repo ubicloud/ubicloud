@@ -1,47 +1,21 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-num_partitions, partition_num = ARGV
-if num_partitions
-  unless partition_num
-    if (dyno = ENV["DYNO"]) # Heroku
-      partition_num = dyno.split(".", 2)[1]
-    elsif (match = /respirate\.(\d+)\z/.match(ENV["PS"])) # Foreman
-      partition_num = match[1]
-    else
-      warn "must provide number of partitions as second argument"
-      exit 1
-    end
-  end
+partition_number = ARGV[0]
+partition_number ||= if (dyno = ENV["DYNO"])
+  dyno.split(".", 2)[1] # Heroku
+elsif (match = /respirate\.(\d+)\z/.match(ENV["PS"]))
+  match[1] # Foreman
+end
 
-  num_partitions = Integer(num_partitions)
-  partition_num = Integer(partition_num)
-
-  unless (1..256).cover?(num_partitions)
-    warn "invalid number of partitions: #{num_partitions}"
-    exit 1
-  end
-
-  unless (1..num_partitions).cover?(partition_num)
-    warn "invalid partition number #{partition_num}"
-    exit 1
-  end
-
-  partition_num -= 1
-  partition_size = (16**8) / num_partitions.to_r
-  boundary = -> { "%08x-0000-0000-0000-000000000000" % (it * partition_size).to_i }
-
-  start_id = boundary.call(partition_num)
-  partition = if num_partitions == partition_num + 1
-    start_id.."ffffffff-ffff-ffff-ffff-ffffffffffff"
-  else
-    start_id...boundary.call(partition_num + 1)
-  end
+if partition_number
+  partition_number = Integer(partition_number)
+  raise "invalid partition_number: #{partition_number}" if partition_number < 1
 end
 
 require_relative "../loader"
 
-d = Scheduling::Dispatcher.new(partition:)
+d = Scheduling::Dispatcher.new(partition_number:)
 Signal.trap("TERM") { d.shutdown }
 
 if Config.heartbeat_url
@@ -69,7 +43,7 @@ Strand.dataset.insert_conflict.insert(id: "08200dd2-20ce-833a-de82-10fd5a082bff"
 
 clover_freeze
 
-if partition
+if partition_number
   # Start with a random offset, so that multiple respirate processes are unlikely
   # to run the old strand scan at the same time.
   next_old_strand_scan = Time.now + (5 * rand)
@@ -82,7 +56,7 @@ DB.synchronize do
 
     break if d.shutting_down
 
-    if partition && next_old_strand_scan < Time.now
+    if next_old_strand_scan&.<(Time.now)
       # Check every 5 seconds for strands still not leased by another respirate
       # process.  However, if we find old strands, do not wait 5 seconds, because
       # if we are processing strands from another partition, we should ensure
