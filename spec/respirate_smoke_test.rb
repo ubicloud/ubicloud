@@ -61,9 +61,10 @@ end
 time = Time.now
 
 respirate_pids = Array.new(num_processes) do
-  respirate_args = [num_partitions.to_s, (it + 1).to_s] if partitioned
+  respirate_args = [(num_partitions - it).to_s] if partitioned
   Process.spawn("bin/respirate", *respirate_args, :in => :close, [:out, :err] => w)
 end
+respirate_pids.compact!
 
 w.close
 

@@ -12,10 +12,15 @@ class Scheduling::Dispatcher
 
   # Arguments:
   # apoptosis_timeout :: The number of seconds a strand is allowed to
-  #                      run before causing apoptosis
-  # pool_size :: The number of threads in the thread pool
-  # partition :: A range of UUIDs that this process will operate on.
-  def initialize(apoptosis_timeout: Strand::LEASE_EXPIRATION - 29, pool_size: Config.dispatcher_max_threads, partition: nil)
+  #                      run before causing apoptosis.
+  # listen_timeout :: The number of seconds to wait for a single notification
+  #                   when listening.  Only has an effect when the process uses
+  #                   partitioning. Generally only changed in the tests to make
+  #                   shutdown faster.
+  # pool_size :: The number of threads in the thread pool.
+  # partition_number :: The partition number of the current respirate process. A nil
+  #                     value means the process does not use partitioning.
+  def initialize(apoptosis_timeout: Strand::LEASE_EXPIRATION - 29, pool_size: Config.dispatcher_max_threads, partition_number: nil, listen_timeout: 1)
     @shutting_down = false
 
     # How long to wait in seconds from the start of strand run
@@ -32,22 +37,25 @@ class Scheduling::Dispatcher
     # of threads is lower than the minimum.
     pool_size = pool_size.clamp(Config.dispatcher_min_threads, Config.dispatcher_max_threads)
 
+    needed_db_connections = 1
+    needed_db_connections += 1 if partition_number
     # Ensure thread pool size is sane.  It needs to be at least 1, we cannot
     # use more threads than database connections (db_pool - 1), and we need
-    # a database connection for the scan thread.
-    pool_size = pool_size.clamp(1, Config.db_pool - 2)
+    # separate database connections for the scan thread and the repartition
+    # thread.
+    pool_size = pool_size.clamp(1, Config.db_pool - 1 - needed_db_connections)
 
     # The queue size is 4 times the size of the thread pool by default, as that should
     # ensure that for a busy thread pool, there are always strands to run.
     # This should only cause issues if the thread pool can process more than
     # 4 times its size in the time it takes the main thread to refill the queue.
-    queue_size = pool_size * Config.dispatcher_queue_size_ratio
+    @queue_size = pool_size * Config.dispatcher_queue_size_ratio
 
     # The Queue that all threads in the thread pool pull from.  This is a
     # SizedQueue to allow for backoff in the case that the thread pool cannot
     # process jobs fast enough. When the queue is full, the main thread to
     # push strands into the queue blocks until the queue is no longer full.
-    @strand_queue = SizedQueue.new(queue_size)
+    @strand_queue = SizedQueue.new(@queue_size)
 
     # An array of thread pool data.  This starts pool_size * 2 threads.  Half
     # of the threads are strand threads, responsible for running the strands.
@@ -66,34 +74,29 @@ class Scheduling::Dispatcher
     # The thread that processes the metrics queue and emits metrics.
     @metrics_thread = Thread.new { metrics_thread(@metrics_queue) }
 
-    # A prepared statement to get the strands to run.  A prepared statement
-    # is used to reduce parsing/planning work in the database.
-    ds = Strand
-      .where(
-        Sequel.|({lease: nil}, Sequel[:lease] < Sequel::CURRENT_TIMESTAMP) &
-        {exitval: nil}
-      )
-      .order_by(:schedule)
-      .limit(queue_size)
-      .exclude(id: Sequel.function(:ANY, Sequel.cast(:$skip_strands, "uuid[]")))
-      .select(:id, :schedule)
-      .for_update
-      .skip_locked
+    # The partition number for the current process.
+    @partition_number = partition_number
 
-    # If a partition is given, limit the strands to the partition.
-    # Create a separate prepared statement for older strands, not tied to
-    # the current partition, to allow for graceful degradation.
-    if partition
-      @old_strand_ps = ds
-        .where(Sequel[:schedule] < Sequel::CURRENT_TIMESTAMP - Sequel.cast("5 seconds", :interval))
-        .prepare(:select, :get_old_strand_cohort)
+    # The partition number as a string, used in NOTIFY statements.
+    @partition_number_string = partition_number.to_s
 
-      ds = ds.where(id: partition)
+    # How long to wait for each NOTIFY. By default, this is 1 second, to
+    # ensure that heartbeat NOTIFY for the current process and possible
+    # rebalancing takes place about once every second.
+    @listen_timeout = listen_timeout
+
+    # Ensure initial unpartitioned prepared statement setup before listening
+    # for partition changes.  In a partitioned environment, this should
+    # quickly be called be the repartition thread once it determines
+    # the number of partitions.  Assume by default that this is the highest
+    # partition.
+    setup_prepared_statements(num_partitions: partition_number)
+
+    if partition_number
+      # The thread that listens for changes in the number of respirate processes
+      # and adjusts the partition range accordingly.
+      @repartition_thread = Thread.new { repartition_thread }
     end
-
-    @strand_ps = ds
-      .where(Sequel[:schedule] < Sequel::CURRENT_TIMESTAMP)
-      .prepare(:select, :get_strand_cohort)
   end
 
   # Wait for all threads to exit after shutdown is set.
@@ -114,6 +117,10 @@ class Scheduling::Dispatcher
     @metrics_queue.close
     @metrics_thread.join
 
+    # Close down the repartition thread if is exists.  Note that
+    # this can block for up to a second.
+    @repartition_thread&.join
+
     # After all queues have been pushed to, it is safe to
     # attempt joining them.
     @thread_data.each do |data|
@@ -128,6 +135,103 @@ class Scheduling::Dispatcher
   # strand thread signals them to exit.
   def shutdown
     @shutting_down = true
+  end
+
+  def notify_partition
+    DB.notify(:respirate, payload: @partition_number_string)
+  end
+
+  def repartition_check(partition_times)
+    throw :stop if @shutting_down
+
+    t = Time.now
+    if t > @partition_recheck_time
+      @partition_recheck_time = t + (@listen_timeout * 2)
+      notify_partition
+      stale = t - (@listen_timeout * 4)
+      partition_times.reject! { |_, time| time < stale }
+      partition_times.keys.max
+    end
+  end
+
+  def repartition_thread
+    partition_times = {}
+    num_partitions = @partition_number
+
+    loop = proc do
+      if (max_partition = repartition_check(partition_times))&.<(num_partitions)
+        num_partitions = max_partition
+        setup_prepared_statements(num_partitions:)
+      end
+    end
+
+    # Set the initial recheck time.  Use rand to prevent the thundering herd.
+    @partition_recheck_time = Time.now + (@listen_timeout * rand * 2)
+
+    DB.listen(:respirate, loop:, after_listen: proc { notify_partition }, timeout: @listen_timeout) do |_, _, payload|
+      unless (partition_num = Integer(payload, exception: false))
+        Clog.emit("invalid respirate repartition notification") { {payload:} }
+        next
+      end
+
+      if partition_num > num_partitions
+        num_partitions = partition_num
+        setup_prepared_statements(num_partitions:)
+      end
+      partition_times[partition_num] = Time.now
+    end
+  end
+
+  def setup_prepared_statements(num_partitions: nil)
+    # A prepared statement to get the strands to run.  A prepared statement
+    # is used to reduce parsing/planning work in the database.
+    ds = Strand
+      .where(
+        Sequel.|({lease: nil}, Sequel[:lease] < Sequel::CURRENT_TIMESTAMP) &
+        {exitval: nil}
+      )
+      .order_by(:schedule)
+      .limit(@queue_size)
+      .exclude(id: Sequel.function(:ANY, Sequel.cast(:$skip_strands, "uuid[]")))
+      .select(:id, :schedule)
+      .for_update
+      .skip_locked
+
+    # If a partition is given, limit the strands to the partition.
+    # Create a separate prepared statement for older strands, not tied to
+    # the current partition, to allow for graceful degradation.
+    if @partition_number && num_partitions
+      # The old strand prepared statement does not change based on the
+      # number of partitions, so no reason to reprepare it.
+      @old_strand_ps ||= ds
+        .where(Sequel[:schedule] < Sequel::CURRENT_TIMESTAMP - Sequel.cast("5 seconds", :interval))
+        .prepare(:select, :get_old_strand_cohort)
+
+      partition = strand_id_range(num_partitions)
+      ds = ds.where(id: partition)
+      Clog.emit("respirate repartitioning") { {partition:} }
+    else
+      @old_strand_ps = nil
+    end
+
+    @strand_ps = ds
+      .where(Sequel[:schedule] < Sequel::CURRENT_TIMESTAMP)
+      .prepare(:select, :get_strand_cohort)
+  end
+
+  def partition_boundary(partition_num, partition_size)
+    "%08x-0000-0000-0000-000000000000" % (partition_num * partition_size).to_i
+  end
+
+  def strand_id_range(num_partitions)
+    partition_size = (16**8) / num_partitions.to_r
+    start_id = partition_boundary(@partition_number - 1, partition_size)
+
+    if num_partitions == @partition_number
+      start_id.."ffffffff-ffff-ffff-ffff-ffffffffffff"
+    else
+      start_id...partition_boundary(@partition_number, partition_size)
+    end
   end
 
   # Thread responsible for collecting and emitting metrics. This emits after every
