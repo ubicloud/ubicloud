@@ -87,8 +87,6 @@ class Prog::DownloadBootImage < Prog::Base
       ["github-ubuntu-2204", "x64", "20250511.1.1"] => "12b203bae016427b2472359694d392548d350d0c450e7274db9682c99de3507f",
       ["github-ubuntu-2204", "arm64", "20250406.1.1"] => "38c737311a0ae866ca6ca1858e23604974aafc56182b3c64eaf199aa8fe11c56",
       ["github-ubuntu-2204", "arm64", "20250511.1.1"] => "a2ff95fdd02f026c9b62385ffea17e1a7568b0c1ac858fb08f5ef5b1ef57850c",
-      ["github-ubuntu-2004", "x64", "20250406.1.1"] => "366f5aaf1fe6239bcb7963019bb5f5028f9fb38c6330ff6e0ad79f0be3e118e5",
-      ["github-ubuntu-2004", "arm64", "20250406.1.1"] => "51040a9818f4a9ca22d8cdd14e9c882a0f610f46cd66eadfe93073a1c6a1b837",
       ["github-gpu-ubuntu-2204", "x64", "20250406.1.1"] => "aa791d36933c579b988870ffb4c5730d6eef7323322417872bb41d9ec2fc3ebb",
       ["github-gpu-ubuntu-2204", "x64", "20250511.1.1"] => "829a2b1e0ba7ef7132a03125a8d86a0d80281591b7bc5e9b499135824baf075d",
       ["postgres16-ubuntu-2204", "x64", "20250425.1.1"] => "f59622da276d646ed2a1c03de546b0a7ec3fd48aeb27c0bfe2b8b8be98c062d2",
