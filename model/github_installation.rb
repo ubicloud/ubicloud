@@ -40,6 +40,8 @@ end
 #  used_vcpus            | integer | NOT NULL DEFAULT 0
 # Indexes:
 #  github_installation_pkey | PRIMARY KEY btree (id)
+# Check constraints:
+#  used_vcpus_not_negative | (used_vcpus >= 0)
 # Foreign key constraints:
 #  github_installation_project_id_fkey | (project_id) REFERENCES project(id)
 # Referenced By:
