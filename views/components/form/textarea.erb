@@ -2,13 +2,11 @@
 <% value = flash.dig("old", name) || value %>
 
 <div class="space-y-2">
-  <% if label %>
-    <label for="<%= name %>" class="block text-sm font-medium leading-6 text-gray-900"><%= label %></label>
-  <% end %>
+  <label for="<%= name %>" class="block text-sm font-medium leading-6 text-gray-900"><%= label %></label>
   <textarea
     id="<%= name %>"
     name="<%= name %>"
-    class="block w-full rounded-md border-0 sm:py-1.5 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-orange-600"
+    class="block w-full rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset text-sm sm:leading-6 text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-orange-600"
     <%== html_attrs(attributes) %>
   ><%= value %></textarea>
   <% if description %>
