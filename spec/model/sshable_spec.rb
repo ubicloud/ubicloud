@@ -94,8 +94,10 @@ RSpec.describe Sshable do
     end
 
     def simulate(cmd:, exit_status:, exit_signal:, stdout:, stderr:)
+      allow(session).to receive(:loop).and_yield
       expect(session).to receive(:open_channel) do |&blk|
         chan = instance_spy(Net::SSH::Connection::Channel)
+        allow(chan).to receive(:connection).and_return(session)
         expect(chan).to receive(:exec).with(cmd) do |&blk|
           chan2 = instance_spy(Net::SSH::Connection::Channel)
           expect(chan2).to receive(:on_request).with("exit-status") do |&blk|
@@ -111,6 +113,7 @@ RSpec.describe Sshable do
           end
           expect(chan2).to receive(:on_data).and_yield(instance_double(Net::SSH::Connection::Channel), stdout)
           expect(chan2).to receive(:on_extended_data).and_yield(nil, 1, stderr)
+          allow(chan2).to receive(:connection).and_return(session)
 
           blk.call(chan2, true)
         end
@@ -142,14 +145,37 @@ RSpec.describe Sshable do
             end
           end
           simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
-          expect(sa.cmd("echo hello", log: log_value)).to eq("hello")
+          expect(sa.cmd("echo hello", log: log_value, timeout: nil)).to eq("hello")
         end
       end
     end
 
-    it "raises an error with a non-zero exit status" do
+    it "raises an SshError with a non-zero exit status" do
       simulate(cmd: "exit 1", exit_status: 1, exit_signal: 127, stderr: "", stdout: "")
-      expect { sa.cmd("exit 1") }.to raise_error Sshable::SshError, "command exited with an error: exit 1"
+      expect { sa.cmd("exit 1", timeout: nil) }.to raise_error Sshable::SshError, "command exited with an error: exit 1"
+    end
+
+    it "raises an SshError with a nil exit status" do
+      simulate(cmd: "exit 1", exit_status: nil, exit_signal: nil, stderr: "", stdout: "")
+      expect { sa.cmd("exit 1", timeout: nil) }.to raise_error Sshable::SshTimeout, "command timed out: exit 1"
+    end
+
+    it "supports custom timeout" do
+      simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
+      expect(sa.cmd("echo hello", log: false, timeout: 2)).to eq("hello")
+    end
+
+    it "suports default timeout" do
+      simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
+      expect(sa.cmd("echo hello", log: false)).to eq("hello")
+    end
+
+    it "supports default timeout based on thread apoptosis_at variable if no explicit timeout is given if variable is available" do
+      Thread.current[:apoptosis_at] = Time.now + 60
+      simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
+      expect(sa.cmd("echo hello", log: false)).to eq("hello")
+    ensure
+      Thread.current[:apoptosis_at] = nil
     end
 
     it "invalidates the cache if the session raises an error" do
