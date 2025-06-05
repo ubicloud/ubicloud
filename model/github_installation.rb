@@ -37,6 +37,7 @@ end
 #  cache_enabled         | boolean | NOT NULL DEFAULT true
 #  use_docker_mirror     | boolean | NOT NULL DEFAULT false
 #  allocator_preferences | jsonb   | NOT NULL DEFAULT '{}'::jsonb
+#  used_vcpus            | integer | NOT NULL DEFAULT 0
 # Indexes:
 #  github_installation_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
