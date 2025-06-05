@@ -164,11 +164,11 @@ class Prog::Vm::GithubRunner < Prog::Base
       }.first.to_f
 
       unless utilization < 75
-        Clog.emit("Waiting for customer concurrency limit, utilization is high") { [github_runner, {utilization:}] }
+        Clog.emit("not allowed because of high utilization") { {reached_concurrency_limit: {utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
         nap rand(5..15)
       end
 
-      Clog.emit("Concurrency limit reached but allocation is allowed because of low utilization") { [github_runner, {utilization:}] }
+      Clog.emit("allowed because of low utilization") { {reached_concurrency_limit: {utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
       github_runner.installation_dataset.update(used_vcpus: new_used_vcpus)
     end
 

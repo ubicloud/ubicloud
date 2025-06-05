@@ -267,13 +267,15 @@ RSpec.describe Prog::Vm::GithubRunner do
       create_vm_host(location_id: Location::HETZNER_FSN1_ID, arch: "x64", total_cores: 16, used_cores: 16)
       create_vm_host(location_id: Location::GITHUB_RUNNERS_ID, arch: "arm64", total_cores: 16, used_cores: 0)
       installation.update(used_vcpus: 300)
-      expect(Clog).to receive(:emit).with("Waiting for customer concurrency limit, utilization is high").and_call_original
+      expect(Clog).to receive(:emit).with("not allowed because of high utilization").and_call_original
       expect { nx.start }.to nap
     end
 
     it "hops to allocate_vm when the customer doesn't have enough quota but the overall utilization is low" do
       create_vm_host(location_id: Location::HETZNER_FSN1_ID, arch: "x64", total_cores: 16, used_cores: 10)
       installation.update(used_vcpus: 300)
+      expect(Clog).to receive(:emit).with("allowed because of low utilization").and_call_original
+      expect(Clog).to receive(:emit).with("runner_capacity_waited").and_call_original
       expect { nx.start }.to hop("allocate_vm")
       expect(installation.reload.used_vcpus).to eq(304)
     end
