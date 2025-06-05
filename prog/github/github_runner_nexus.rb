@@ -252,14 +252,14 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
           hop_allocate_vm
         end
 
-        Clog.emit("Waiting for customer concurrency limit, utilization is high") { [github_runner, {utilization: family_utilization}] }
+        Clog.emit("not allowed because of high utilization", {reached_concurrency_limit: {family_utilization:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
         nap rand(5..15)
       end
 
       if x64? && ((prem_util > 75) || (installation.free_runner_upgrade? && prem_util > 50))
         github_runner.incr_not_upgrade_premium
       end
-      Clog.emit("Concurrency limit reached but allocation is allowed because of low utilization") { [github_runner, {utilization: family_utilization}] }
+      Clog.emit("allowed because of low utilization", {exceeded_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}})
       github_runner.installation_dataset.update(used_vcpus_column => new_used_vcpus)
     end
 
