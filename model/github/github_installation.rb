@@ -57,6 +57,8 @@ end
 #  cache_enabled         | boolean                  | NOT NULL DEFAULT true
 #  use_docker_mirror     | boolean                  | NOT NULL DEFAULT false
 #  allocator_preferences | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
+#  used_vcpus_x64        | integer                  | NOT NULL DEFAULT 0
+#  used_vcpus_arm64      | integer                  | NOT NULL DEFAULT 0
 #  created_at            | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 #  cache_scope_protected | boolean                  | NOT NULL DEFAULT true
 # Indexes:
