@@ -360,8 +360,8 @@ class Prog::Vm::GithubRunner < Prog::Base
 
     # We log the remaining limit DockerHub rate limit to analyze it
     docker_quota_limit_command = <<~COMMAND
-      TOKEN=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
-      curl -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
+      TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
+      curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
     COMMAND
     quota_output = vm.sshable.cmd(docker_quota_limit_command, log: false)
     if quota_output && (match = quota_output.match(/ratelimit-limit:\s*(\d+);w=(\d+).*?ratelimit-remaining:\s*(\d+);w=(\d+).*?docker-ratelimit-source:\s*([^\s]+)/m))
