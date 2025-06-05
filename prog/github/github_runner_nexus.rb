@@ -180,6 +180,10 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     "/repos/#{github_runner.repository_name}/actions/runners#{"/#{suffix}" if suffix}"
   end
 
+  def used_vcpus_column
+    x64? ? :used_vcpus_x64 : :used_vcpus_arm64
+  end
+
   def support_alien?
     label_data["vcpus"] <= 16
   end
@@ -198,74 +202,68 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       github_runner.destroy
       pop "Could not provision a GPU runner for this project"
     end
-    hop_wait_concurrency_limit unless quota_available?
-    hop_apply_custom_label_quota if github_runner.custom_label
-    hop_allocate_vm
-  end
 
-  def quota_available?
-    # In existing Github quota calculations, we compare total allocated cpu count
-    # with the cpu limit and allow passing the limit once. This is because we
-    # check quota and allocate VMs in different labels hence transactions and it
-    # is difficult to enforce quotas in the environment with lots of concurrent
-    # requests. There are some remedies, but it would require some refactoring
-    # that I'm not keen to do at the moment. Although it looks weird, passing 0
-    # as requested_additional_usage keeps the existing behavior.
+    requested_vcpus = label_data["vcpus"]
     resource_type = x64? ? "GithubRunnerVCpu" : "GithubRunnerVCpuArm"
-    project.quota_available?(resource_type, 0)
-  end
+    quota_vcpus = project.effective_quota_value(resource_type)
+    new_used_vcpus = Sequel[used_vcpus_column] + requested_vcpus
+    updated_rows = github_runner.installation_dataset
+      .where(new_used_vcpus <= quota_vcpus)
+      .update(used_vcpus_column => new_used_vcpus)
 
-  label def wait_concurrency_limit
-    if quota_available?
-      hop_apply_custom_label_quota if github_runner.custom_label
-      hop_allocate_vm
-    end
-
-    if project.reputation == "limited"
-      Clog.emit("not allowed because of limited reputation", {limited_reputation: {label: github_runner.label, repository_name: github_runner.repository_name}})
-      nap rand(5..15)
-    end
-
-    # check utilization, if it's high, wait for it to go down
-    family_utilization = VmHost.where(allocation_state: "accepting", arch:)
-      .select_group(:family)
-      .select_append { round(sum(:used_cores) * 100.0 / sum(:total_cores), 2).cast(:float).as(:utilization) }
-      .to_hash(:family, :utilization)
-
-    std_util = family_utilization.fetch("standard", 100)
-    prem_util = family_utilization.fetch("premium", 100)
-
-    is_high_util = if x64? && label_data["family"] == "standard" && installation.premium_runner_enabled?
-      prem_util > 75 && std_util > 80
-    else
-      family_utilization.fetch(label_data["family"], 0) > 80
-    end
-
-    if is_high_util
-      should_spill_over = support_alien? &&
-        project.get_ff_spill_to_alien_runners &&
-        Time.now - github_runner.created_at > Config.github_runner_aws_spill_threshold_seconds
-
-      if should_spill_over
-        spilled_vcpus = Vm.where(boot_image: AWS_AMI_VERSIONS).sum(:vcpus) || 0
-        if spilled_vcpus >= Config.github_runner_aws_spill_vcpu_capacity
-          Clog.emit("not allowed because of high utilization and spill capacity exceeded", {exceeded_spill_capacity: {family_utilization:, spilled_vcpus:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
-          nap rand(5..15)
-        end
-
-        Clog.emit("spilled over runner", {spilled_over_runner: {family_utilization:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
-        github_runner.incr_spill_over
-        hop_allocate_vm
+    # If the customer doesn't have enough quota, check the overall utilization
+    # and allow provisioning if it is low.
+    if updated_rows != 1
+      if project.reputation == "limited"
+        Clog.emit("not allowed because of limited reputation", {limited_reputation: {label: github_runner.label, repository_name: github_runner.repository_name}})
+        nap rand(5..15)
       end
 
-      Clog.emit("not allowed because of high utilization", {reached_concurrency_limit: {family_utilization:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
-      nap rand(5..15)
+      family_utilization = VmHost.where(allocation_state: "accepting", arch:)
+        .select_group(:family)
+        .select_append { round(sum(:used_cores) * 100.0 / sum(:total_cores), 2).cast(:float).as(:utilization) }
+        .to_hash(:family, :utilization)
+
+      std_util = family_utilization.fetch("standard", 100)
+      prem_util = family_utilization.fetch("premium", 100)
+
+      is_high_util = if x64? && label_data["family"] == "standard" && installation.premium_runner_enabled?
+        prem_util > 75 && std_util > 80
+      else
+        family_utilization.fetch(label_data["family"], 0) > 80
+      end
+
+      if is_high_util
+        should_spill_over = support_alien? &&
+          project.get_ff_spill_to_alien_runners &&
+          Time.now - github_runner.created_at > Config.github_runner_aws_spill_threshold_seconds
+
+        if should_spill_over
+          spilled_vcpus = Vm.where(boot_image: AWS_AMI_VERSIONS).sum(:vcpus) || 0
+          if spilled_vcpus >= Config.github_runner_aws_spill_vcpu_capacity
+            Clog.emit("not allowed because of high utilization and spill capacity exceeded", {exceeded_spill_capacity: {family_utilization:, spilled_vcpus:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
+            nap rand(5..15)
+          end
+
+          Clog.emit("spilled over runner", {spilled_over_runner: {family_utilization:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
+          github_runner.incr_spill_over
+          github_runner.installation_dataset.update(used_vcpus_column => new_used_vcpus)
+          hop_apply_custom_label_quota if github_runner.custom_label
+          hop_allocate_vm
+        end
+
+        Clog.emit("Waiting for customer concurrency limit, utilization is high") { [github_runner, {utilization: family_utilization}] }
+        nap rand(5..15)
+      end
+
+      if x64? && ((prem_util > 75) || (installation.free_runner_upgrade? && prem_util > 50))
+        github_runner.incr_not_upgrade_premium
+      end
+      Clog.emit("Concurrency limit reached but allocation is allowed because of low utilization") { [github_runner, {utilization: family_utilization}] }
+      github_runner.installation_dataset.update(used_vcpus_column => new_used_vcpus)
     end
 
-    if x64? && ((prem_util > 75) || (installation.free_runner_upgrade? && prem_util > 50))
-      github_runner.incr_not_upgrade_premium
-    end
-    Clog.emit("allowed because of low utilization", {exceeded_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}})
+    github_runner.log_duration("runner_capacity_waited", Time.now - github_runner.created_at)
 
     hop_apply_custom_label_quota if github_runner.custom_label
     hop_allocate_vm
@@ -573,6 +571,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
       vm.incr_destroy
     end
+
+    github_runner.installation_dataset.update(used_vcpus_column => Sequel[used_vcpus_column] - label_data["vcpus"])
 
     if github_runner.custom_label
       new_runner_count = Sequel[:allocated_runner_count] - 1

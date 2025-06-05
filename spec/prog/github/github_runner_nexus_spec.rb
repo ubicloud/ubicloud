@@ -311,29 +311,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   end
 
   describe "#start" do
-    it "hops to wait_concurrency_limit if there is no capacity" do
-      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-      expect(project).to receive(:active?).and_return(true)
-
-      expect { nx.start }.to hop("wait_concurrency_limit")
-    end
-
-    it "hops to allocate_vm if there is capacity" do
-      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
-      expect(project).to receive(:active?).and_return(true)
-
-      expect { nx.start }.to hop("allocate_vm")
-    end
-
-    it "hops to apply_custom_label if there is capacity and the label is a custom label" do
-      GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
-      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
-      expect(project).to receive(:active?).and_return(true)
-      expect(runner).to receive(:actual_label).and_return("custom-label-1")
-
-      expect { nx.start }.to hop("apply_custom_label_quota")
-    end
-
     it "pops if the project is not active" do
       expect(project).to receive(:active?).and_return(false)
 
@@ -346,160 +323,148 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.start }.to exit({"msg" => "Could not provision a GPU runner for this project"})
       expect(GithubRunner[runner.id]).to be_nil
     end
-  end
 
-  describe "#wait_concurrency_limit" do
-    before do
-      [
-        [Location::HETZNER_FSN1_ID, "x64", "standard"],
-        [Location::GITHUB_RUNNERS_ID, "x64", "standard"],
-        [Location::GITHUB_RUNNERS_ID, "x64", "premium"],
-        [Location::GITHUB_RUNNERS_ID, "arm64", "standard"]
-      ].each do |location_id, arch, family|
-        create_vm_host(location_id:, arch:, family:, total_cores: 16, used_cores: 16)
-      end
+    it "hops to allocate_vm if the customer has enough quota" do
+      expect { nx.start }.to hop("allocate_vm")
+      expect(installation.reload.used_vcpus_x64).to eq(4)
     end
 
-    it "hops to allocate_vm when customer concurrency limit frees up" do
-      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
-      expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
-    end
-
-    it "hops to apply_custom_label_quota when the label is a custom label" do
+    it "hops to apply_custom_label_quota if has quota and label is custom" do
       GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
-      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
       expect(runner).to receive(:actual_label).and_return("custom-label-1")
 
-      expect { nx.wait_concurrency_limit }.to hop("apply_custom_label_quota")
+      expect { nx.start }.to hop("apply_custom_label_quota")
+      expect(installation.reload.used_vcpus_x64).to eq(4)
     end
 
-    context "when standard runner" do
-      it "waits if standard utilization is high" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        expect { nx.wait_concurrency_limit }.to nap
+    context "when customer doesn't have enough quota" do
+      before do
+        installation.update(used_vcpus_x64: 300)
+        [
+          [Location::HETZNER_FSN1_ID, "x64", "standard"],
+          [Location::GITHUB_RUNNERS_ID, "x64", "standard"],
+          [Location::GITHUB_RUNNERS_ID, "x64", "premium"],
+          [Location::GITHUB_RUNNERS_ID, "arm64", "standard"]
+        ].each do |location_id, arch, family|
+          create_vm_host(location_id:, arch:, family:, total_cores: 16, used_cores: 16)
+        end
       end
 
-      it "waits if reputation is limited" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
-        project.update(reputation: "limited")
-        expect { nx.wait_concurrency_limit }.to nap
+      context "when standard runner" do
+        it "waits if standard utilization is high" do
+          expect { nx.start }.to nap
+        end
+
+        it "waits if reputation is limited" do
+          VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
+          project.update(reputation: "limited")
+          expect { nx.start }.to nap
+        end
+
+        it "waits if utilization is high and spill over enabled but not waited enough" do
+          project.set_ff_spill_to_alien_runners(true)
+
+          expect { nx.start }.to nap
+          expect(runner.spill_over_set?).to be(false)
+        end
+
+        it "waits if utilization is high, spill over enabled, and waited enough but spill vcpus limit exceeded" do
+          project.set_ff_spill_to_alien_runners(true)
+          runner.update(created_at: now - 40)
+          expect(Config).to receive(:github_runner_aws_spill_vcpu_capacity).and_return(10)
+          create_vm(vcpus: 16, boot_image: Config.github_ubuntu_2204_x64_aws_ami_version)
+
+          expect { nx.start }.to nap
+          expect(runner.spill_over_set?).to be(false)
+        end
+
+        it "allocates if utilization is high but spill over enabled and waited enough" do
+          project.set_ff_spill_to_alien_runners(true)
+          runner.update(created_at: now - 40)
+
+          expect { nx.start }.to hop("allocate_vm")
+          expect(runner.spill_over_set?).to be(true)
+          expect(installation.reload.used_vcpus_x64).to eq(304)
+        end
+
+        it "allocates if standard utilization is low" do
+          VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
+          expect { nx.start }.to hop("allocate_vm")
+          expect(installation.reload.used_vcpus_x64).to eq(304)
+        end
+
+        it "hops to apply_custom_label_quota if standard utilization is low and the label is a custom label" do
+          GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
+          expect(runner).to receive(:actual_label).and_return("custom-label-1")
+          VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
+          expect { nx.start }.to hop("apply_custom_label_quota")
+          expect(installation.reload.used_vcpus_x64).to eq(304)
+        end
       end
 
-      it "waits if utilization is high and spill over enabled but not waited enough" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        project.set_ff_spill_to_alien_runners(true)
+      context "when transparent premium runner" do
+        before { installation.update(allocator_preferences: {"family_filter" => ["premium", "standard"]}) }
 
-        expect { nx.wait_concurrency_limit }.to nap
-        expect(runner.spill_over_set?).to be(false)
+        it "waits if premium and standard utilizations are high" do
+          expect { nx.start }.to nap
+        end
+
+        it "allocates if standard utilization is high but premium utilization is low" do
+          VmHost[arch: "x64", family: "premium"].update(used_cores: 8)
+          expect { nx.start }.to hop("allocate_vm")
+          expect(runner.not_upgrade_premium_set?).to be(false)
+        end
+
+        it "allocates without upgrade if premium utilization is high but standard utilization is low" do
+          VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
+          expect { nx.start }.to hop("allocate_vm")
+          expect(runner.not_upgrade_premium_set?).to be(true)
+        end
+
+        it "allocates arm64 runners without checking premium utilization" do
+          installation.update(used_vcpus_arm64: 300)
+          runner.update(label: "ubicloud-standard-4-arm")
+          VmHost[arch: "arm64"].update(used_cores: 8)
+          expect { nx.start }.to hop("allocate_vm")
+        end
       end
 
-      it "waits if utilization is high, spill over enabled, and waited enough but spill vcpus limit exceeded" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        project.set_ff_spill_to_alien_runners(true)
-        runner.update(created_at: now - 40)
-        expect(Config).to receive(:github_runner_aws_spill_vcpu_capacity).and_return(10)
-        create_vm(vcpus: 16, boot_image: Config.github_ubuntu_2204_x64_aws_ami_version)
+      context "when explicit premium runner" do
+        before { runner.update(label: "ubicloud-premium-4") }
 
-        expect { nx.wait_concurrency_limit }.to nap
-        expect(runner.spill_over_set?).to be(false)
+        it "waits if premium and standard utilizations are high" do
+          expect { nx.start }.to nap
+        end
+
+        it "allocates if premium utilization is low" do
+          VmHost[arch: "x64", family: "premium"].update(used_cores: 8)
+          expect { nx.start }.to hop("allocate_vm")
+        end
+
+        it "waits if premium utilization is high but standard utilization is low" do
+          VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
+          expect { nx.start }.to nap
+        end
       end
 
-      it "allocates if utilization is high but spill over enabled and waited enough" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        project.set_ff_spill_to_alien_runners(true)
-        runner.update(created_at: now - 40)
+      context "when free premium runner" do
+        before { project.set_ff_free_runner_upgrade_until(Time.now + 100).reload }
 
-        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
-        expect(runner.spill_over_set?).to be(true)
-      end
+        it "waits if premium and standard utilizations are high" do
+          expect { nx.start }.to nap
+        end
 
-      it "allocates if standard utilization is low" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
-        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
-      end
+        it "allocates if premium utilization is low than 50" do
+          VmHost.where(arch: "x64").update(used_cores: 4)
+          expect { nx.start }.to hop("allocate_vm")
+          expect(runner.not_upgrade_premium_set?).to be(false)
+        end
 
-      it "hops to apply_custom_label_quota if standard utilization is low and the label is a custom label" do
-        GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
-        expect(runner).to receive(:actual_label).and_return("custom-label-1")
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
-        expect { nx.wait_concurrency_limit }.to hop("apply_custom_label_quota")
-      end
-    end
-
-    context "when transparent premium runner" do
-      before { installation.update(allocator_preferences: {"family_filter" => ["premium", "standard"]}) }
-
-      it "waits if premium and standard utilizations are high" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        expect { nx.wait_concurrency_limit }.to nap
-      end
-
-      it "allocates if standard utilization is high but premium utilization is low" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        VmHost[arch: "x64", family: "premium"].update(used_cores: 8)
-        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
-        expect(runner.not_upgrade_premium_set?).to be(false)
-      end
-
-      it "allocates without upgrade if premium utilization is high but standard utilization is low" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
-        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
-        expect(runner.not_upgrade_premium_set?).to be(true)
-      end
-
-      it "allocates arm64 runners without checking premium utilization" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpuArm", 0).and_return(false)
-        runner.update(label: "ubicloud-standard-4-arm")
-        VmHost[arch: "arm64"].update(used_cores: 8)
-        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
-      end
-    end
-
-    context "when explicit premium runner" do
-      before { runner.update(label: "ubicloud-premium-4") }
-
-      it "waits if premium and standard utilizations are high" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        expect { nx.wait_concurrency_limit }.to nap
-      end
-
-      it "allocates if premium utilization is low" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        VmHost[arch: "x64", family: "premium"].update(used_cores: 8)
-        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
-      end
-
-      it "waits if premium utilization is high but standard utilization is low" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
-        expect { nx.wait_concurrency_limit }.to nap
-      end
-    end
-
-    context "when free premium runner" do
-      before { project.set_ff_free_runner_upgrade_until(Time.now + 100).reload }
-
-      it "waits if premium and standard utilizations are high" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        expect { nx.wait_concurrency_limit }.to nap
-      end
-
-      it "allocates if premium utilization is low than 50" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        VmHost.where(arch: "x64").update(used_cores: 4)
-        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
-        expect(runner.not_upgrade_premium_set?).to be(false)
-      end
-
-      it "allocates without upgrade if premium utilization is higher than 50" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-        VmHost.where(arch: "x64").update(used_cores: 10)
-        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
-        expect(runner.not_upgrade_premium_set?).to be(true)
+        it "allocates without upgrade if premium utilization is higher than 50" do
+          VmHost.where(arch: "x64").update(used_cores: 10)
+          expect { nx.start }.to hop("allocate_vm")
+          expect(runner.not_upgrade_premium_set?).to be(true)
+        end
       end
     end
   end
@@ -1004,6 +969,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   end
 
   describe "#destroy" do
+    before { installation.update(used_vcpus_x64: 10) }
+
     it "naps if runner not deregistered yet" do
       expect(client).to receive(:get).and_return(busy: false)
       expect(client).to receive(:delete)
@@ -1031,6 +998,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
+      expect(installation.reload.used_vcpus_x64).to eq(6)
     end
 
     it "skip deregistration and destroy vm immediately" do
@@ -1041,6 +1009,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
+      expect(installation.reload.used_vcpus_x64).to eq(6)
     end
 
     it "does not collect telemetry if the vm not allocated" do
@@ -1051,6 +1020,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
+      expect(installation.reload.used_vcpus_x64).to eq(6)
     end
 
     it "does not destroy vm if it's already destroyed" do
@@ -1061,13 +1031,14 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(client).not_to receive(:delete)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
+      expect(installation.reload.used_vcpus_x64).to eq(6)
     end
 
     it "updates custom label allocated runner count" do
       custom_label = GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 5)
       expect(runner).to receive(:skip_deregistration_set?).and_return(true)
       expect(runner).to receive(:actual_label).and_return("custom-label-1").twice
-      expect(runner).to receive(:installation_id).and_return(installation.id).twice
+      expect(runner).to receive(:installation_id).and_return(installation.id).exactly(4).times
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
       custom_label.reload
@@ -1078,7 +1049,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       custom_label = GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
       expect(runner).to receive(:skip_deregistration_set?).and_return(true)
       expect(runner).to receive(:actual_label).and_return("custom-label-1").exactly(3).times
-      expect(runner).to receive(:installation_id).and_return(installation.id).exactly(3).times
+      expect(runner).to receive(:installation_id).and_return(installation.id).exactly(5).times
       expect(Clog).to receive(:emit).with("failed to decrement custom label allocated runner count", instance_of(Hash)).and_call_original
 
       expect { nx.destroy }.to hop("wait_vm_destroy")

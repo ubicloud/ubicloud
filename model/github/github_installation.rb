@@ -63,6 +63,9 @@ end
 #  cache_scope_protected | boolean                  | NOT NULL DEFAULT true
 # Indexes:
 #  github_installation_pkey | PRIMARY KEY btree (id)
+# Check constraints:
+#  used_vcpus_arm64_not_negative | (used_vcpus_arm64 >= 0)
+#  used_vcpus_x64_not_negative   | (used_vcpus_x64 >= 0)
 # Foreign key constraints:
 #  github_installation_project_id_fkey | (project_id) REFERENCES project(id)
 # Referenced By:
