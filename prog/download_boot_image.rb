@@ -126,7 +126,7 @@ class Prog::DownloadBootImage < Prog::Base
       endpoint: Config.ubicloud_images_blob_storage_endpoint,
       access_key: Config.ubicloud_images_blob_storage_access_key,
       secret_key: Config.ubicloud_images_blob_storage_secret_key,
-      ssl_ca_file_data: Config.ubicloud_images_blob_storage_certs
+      ssl_ca_data: Config.ubicloud_images_blob_storage_certs
     )
   end
 

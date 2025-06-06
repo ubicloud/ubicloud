@@ -86,7 +86,7 @@ RSpec.describe MinioServer do
   it "checks pulse" do
     session = {
       ssh_session: instance_double(Net::SSH::Connection::Session),
-      minio_client: Minio::Client.new(endpoint: "https://1.2.3.4:9000", access_key: "dummy-key", secret_key: "dummy-secret", ssl_ca_file_data: "data")
+      minio_client: Minio::Client.new(endpoint: "https://1.2.3.4:9000", access_key: "dummy-key", secret_key: "dummy-secret", ssl_ca_data: "data")
     }
 
     expect(ms.vm).to receive(:ephemeral_net4).and_return("1.2.3.4").at_least(:once)
