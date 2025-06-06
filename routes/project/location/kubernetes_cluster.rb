@@ -18,8 +18,12 @@ class Clover
         r.get true do
           authorize("KubernetesCluster:view", kc.id)
 
-          @kc = kc
-          view "kubernetes-cluster/show"
+          if api?
+            Serializers::KubernetesCluster.serialize(kc, {detailed: true})
+          else
+            @kc = kc
+            view "kubernetes-cluster/show"
+          end
         end
 
         r.delete true do

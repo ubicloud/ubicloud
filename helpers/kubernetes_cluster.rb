@@ -31,9 +31,14 @@ class Clover
   end
 
   def kubernetes_cluster_list
-    @kcs = dataset_authorize(@project.kubernetes_clusters_dataset, "KubernetesCluster:view").all
+    dataset = dataset_authorize(@project.kubernetes_clusters_dataset, "KubernetesCluster:view")
+    if api?
+      paginated_result(dataset, Serializers::KubernetesCluster)
+    else
+      @kcs = dataset.all
+      view "kubernetes-cluster/index"
+    end
 
-    view "kubernetes-cluster/index"
   end
 
   def generate_kubernetes_cluster_options
