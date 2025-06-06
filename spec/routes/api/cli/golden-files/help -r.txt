@@ -11,6 +11,7 @@ Commands:
     ai         Manage AI features
     fw         Manage firewalls
     help       Get command help
+    kc         Manage kubernetes clusters
     lb         Manage load balancers
     pg         Manage PostgreSQL databases
     ps         Manage private subnets
@@ -177,6 +178,29 @@ Usage:
 Options:
     -r, --recursive                  also show documentation for all subcommands of command
     -u, --usage                      only show usage
+
+
+Manage kubernetes clusters
+
+Usage:
+    ubi kc command [...]
+
+Commands:
+    list    List kubernetes clusters
+
+
+List kubernetes clusters
+
+Usage:
+    ubi kc list [options]
+
+Options:
+    -f, --fields=fields              show specific fields (comma separated)
+    -l, --location=location          only show kubernetes clusters in given location
+    -N, --no-headers                 do not show headers
+
+Allowed Option Values:
+    Fields: location name id display_state version cp_node_count
 
 
 Manage load balancers

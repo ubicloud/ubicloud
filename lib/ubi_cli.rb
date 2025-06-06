@@ -9,6 +9,7 @@ class UbiCli
   SDK_METHODS = {
     "fw" => "firewall",
     "ak" => "inference_api_key",
+    "kc" => "kubernetes_cluster",
     "lb" => "load_balancer",
     "pg" => "postgres",
     "ps" => "private_subnet",
@@ -18,6 +19,7 @@ class UbiCli
   CAPITALIZED_LABELS = {
     "fw" => "Firewall",
     "ak" => "Inference API key",
+    "kc" => "Kubernetes cluster",
     "lb" => "Load balancer",
     "pg" => "PostgreSQL database",
     "ps" => "Private subnet",

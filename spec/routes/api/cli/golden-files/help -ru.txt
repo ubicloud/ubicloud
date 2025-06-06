@@ -17,6 +17,8 @@ ubi fw (location/fw-name | fw-id) destroy [options]
 ubi fw (location/fw-name | fw-id) detach-subnet ps-id
 ubi fw (location/fw-name | fw-id) show [options]
 ubi help [options] [command [subcommand]]
+ubi kc command [...]
+ubi kc list [options]
 ubi lb command [...]
 ubi lb (location/lb-name | lb-id) post-command [...]
 ubi lb list [options]
