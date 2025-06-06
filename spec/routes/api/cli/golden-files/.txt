@@ -13,6 +13,7 @@ Commands:
     ai         Manage AI features
     fw         Manage firewalls
     help       Get command help
+    kc         Manage kubernetes clusters
     lb         Manage load balancers
     pg         Manage PostgreSQL databases
     ps         Manage private subnets
