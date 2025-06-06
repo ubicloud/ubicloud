@@ -18,7 +18,7 @@ class Clover
         r.get true do
           authorize("KubernetesCluster:view", kc.id)
 
-          @kc = kc
+          @kc = Serializers::KubernetesCluster.serialize(kc, {detailed: true})
           view "kubernetes-cluster/show"
         end
 

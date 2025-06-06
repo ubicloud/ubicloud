@@ -1,6 +1,6 @@
-<% @page_title = @kc.name %>
+<% @page_title = @kc[:name] %>
 
-<% if @kc.display_state != "running" %>
+<% if @kc[:display_state] != "running" %>
   <div class="auto-refresh hidden" data-interval="10"></div>
 <% end %>
 
@@ -10,24 +10,24 @@
     %w[Projects /project],
     [@project_data[:name], @project_data[:path]],
     ["Kubernetes Clusters", "#{@project_data[:path]}/kubernetes-cluster"],
-    [@kc.name, "#"]
+    [@kc[:name], "#"]
   ],
-  left_items: [part("components/kubernetes_state_label", state: @kc.display_state, extra_class: "text-md")]
+  left_items: [part("components/kubernetes_state_label", state: @kc[:display_state], extra_class: "text-md")]
 ) %>
 
 <div class="grid gap-6">
   <!-- Detail Card -->
   <% data = [
-    ["ID", @kc.ubid],
-    ["Name", @kc.name],
-    ["Location", @kc.display_location],
-    ["Kubernetes Version", @kc.version],
-    ["Control Plane Nodes", @kc.cp_node_count],
-    ["Worker Nodes", @kc.nodepools.sum { it.node_count }]
+    ["ID", @kc[:id]],
+    ["Name", @kc[:name]],
+    ["Location", @kc[:location]],
+    ["Kubernetes Version", @kc[:version]],
+    ["Control Plane Nodes", @kc[:cp_node_count]],
+    ["Worker Nodes", @kc[:nodepools].sum { it[:node_count] }]
   ]
   
-  if @kc.display_state == "running"
-    data.push(["Service URL", LoadBalancer[name: @kc.services_load_balancer_name].hostname]) # TODO: Assign LB to a column properly
+  if @kc[:display_state] == "running"
+    data.push(["Service URL", @kc[:services_load_balancer_url]])
     data.push(["Kubeconfig", part("components/download_button", link: "#{request.path}/kubeconfig"), { escape: false }])
   else
     data.push(["Kubeconfig", "Waiting for cluster to be ready..."])
@@ -38,17 +38,15 @@
   <% @nodes = []
   
   @nodes +=
-    @kc.cp_vms.map do |vm|
-      { name: vm.name, role: "Control Plane", state: vm.display_state, hostname: vm.ephemeral_net4.to_s }
+    @kc[:cp_vms].map do |vm|
+      { name: vm[:name], role: "Control Plane", state: vm[:display_state], hostname: vm[:ephemeral_net4] }
     end
   
-  @nodes +=
-    @kc
-      .nodepools_dataset
-      .eager(:vms)
-      .flat_map do |np|
-        np.vms.map { |vm| { name: vm.name, role: "Worker", state: vm.display_state, hostname: vm.ephemeral_net4.to_s } }
-      end %>
+  @nodes += @kc[:nodepools].flat_map do |pool|
+      pool[:vms].map do |vm|
+        { name: vm[:name], role: "Worker", state: vm[:display_state], hostname: vm[:ephemeral_net4] }
+    end
+  end %>
 
   <%== part(
     "components/table_card",
@@ -59,7 +57,7 @@
       @nodes.map { |n| [[n[:name], n[:role], n[:state], [n[:hostname], { copyable: true }]], { id: "node-#{n[:name]}" }] }
   ) %>
   <!-- Danger Zone -->
-  <% if has_permission?("KubernetesCluster:delete", @kc.ubid) %>
+  <% if has_permission?("KubernetesCluster:delete", @kc[:id]) %>
     <div>
       <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
         <div class="min-w-0 flex-1">
@@ -79,8 +77,8 @@
                   carefully.</p>
               </div>
             </div>
-            <div id="kc-delete-<%=@kc.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-              <%== part("components/delete_button", confirmation: @kc.name, redirect: "#{@project_data[:path]}/kubernetes-cluster") %>
+            <div id="kc-delete-<%=@kc[:id]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+              <%== part("components/delete_button", confirmation: @kc[:name], redirect: "#{@project_data[:path]}/kubernetes-cluster") %>
             </div>
           </div>
         </div>

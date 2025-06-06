@@ -31,8 +31,8 @@ class Clover
   end
 
   def kubernetes_cluster_list
-    @kcs = dataset_authorize(@project.kubernetes_clusters_dataset, "KubernetesCluster:view").all
-
+    dataset = dataset_authorize(@project.kubernetes_clusters_dataset, "KubernetesCluster:view")
+    @kcs = Serializers::KubernetesCluster.serialize(dataset.all)
     view "kubernetes-cluster/index"
   end
 

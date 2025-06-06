@@ -14,10 +14,10 @@
     rows: @kcs.map do |kc|
       [
         [
-          [kc.name, {link: @project_data[:path] + kc.path}],
-          kc.display_location,
-          kc.version,
-          ["kubernetes_state_label", {component: { state: kc.display_state }}]
+          [kc[:name], {link: "#{@project_data[:path]}/location/#{kc[:location]}/kubernetes-cluster/#{kc[:name]}"}],
+          kc[:location],
+          kc[:version],
+          ["kubernetes_state_label", {component: { state: kc[:display_state] }}]
         ],
         {id: "kc-#{kc[:id]}"}
       ]
