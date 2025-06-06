@@ -120,8 +120,11 @@ end
 #  secret_key                | text                     |
 #  latest_backup_started_at  | timestamp with time zone |
 #  blob_storage_id           | uuid                     |
+#  location_id               | uuid                     |
 #  cached_earliest_backup_at | timestamp with time zone |
 # Indexes:
 #  postgres_timeline_pkey | PRIMARY KEY btree (id)
+# Foreign key constraints:
+#  postgres_timeline_location_id_fkey | (location_id) REFERENCES location(id)
 # Referenced By:
 #  postgres_server | postgres_server_timeline_id_fkey | (timeline_id) REFERENCES postgres_timeline(id)
