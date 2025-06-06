@@ -70,6 +70,7 @@ end
 #  location_credential       | location_credential_id_fkey                | (id) REFERENCES location(id)
 #  minio_cluster             | minio_cluster_location_id_fkey             | (location_id) REFERENCES location(id)
 #  postgres_resource         | postgres_resource_location_id_fkey         | (location_id) REFERENCES location(id)
+#  postgres_timeline         | postgres_timeline_location_id_fkey         | (location_id) REFERENCES location(id)
 #  private_subnet            | private_subnet_location_id_fkey            | (location_id) REFERENCES location(id)
 #  victoria_metrics_resource | victoria_metrics_resource_location_id_fkey | (location_id) REFERENCES location(id)
 #  vm                        | vm_location_id_fkey                        | (location_id) REFERENCES location(id)
