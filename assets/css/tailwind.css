@@ -10,3 +10,22 @@
         @apply peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700;
     }
 }
+
+@layer utilities {
+  .mask-sweep {
+    @apply inline-block animate-sweep;
+    -webkit-mask: linear-gradient(90deg, transparent 0%, black 50%, transparent 100%) 0 0 / 200% 100%;
+    mask: linear-gradient(90deg, transparent 0%, black 50%, transparent 100%) 0 0 / 200% 100%;
+  }
+
+  @keyframes sweep {
+    to {
+      -webkit-mask-position: -200% 0;
+      mask-position: -200% 0;
+    }
+  }
+
+  .animate-sweep {
+    animation: sweep 1.6s linear infinite;
+  }
+}
