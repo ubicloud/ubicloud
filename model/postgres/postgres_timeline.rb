@@ -6,6 +6,7 @@ class PostgresTimeline < Sequel::Model
   one_to_one :strand, key: :id
   one_to_one :parent, key: :parent_id, class: self
   one_to_one :leader, class: :PostgresServer, key: :timeline_id, conditions: {timeline_access: "push"}
+  many_to_one :location
 
   plugin ResourceMethods
   include SemaphoreMethods
@@ -88,8 +89,14 @@ PGHOST=/var/run/postgresql
     Time.now
   end
 
+  def aws?
+    location.aws?
+  end
+
+  S3BlobStorage = Struct.new(:url)
+
   def blob_storage
-    @blob_storage ||= MinioCluster[blob_storage_id]
+    @blob_storage ||= MinioCluster[blob_storage_id] || (aws? ? S3BlobStorage.new("https://s3.#{location.name}.amazonaws.com") : nil)
   end
 
   def blob_storage_endpoint
@@ -101,7 +108,7 @@ PGHOST=/var/run/postgresql
       endpoint: blob_storage_endpoint,
       access_key: access_key,
       secret_key: secret_key,
-      ssl_ca_data: blob_storage.root_certs
+      ssl_ca_data: aws? ? "" : blob_storage.root_certs
     )
   end
 

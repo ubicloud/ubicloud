@@ -14,7 +14,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         PostgresTimeline,
         id: "f6644aae-9759-8ada-9aef-9b6cfccdc167",
         generate_walg_config: "walg config",
-        blob_storage: instance_double(MinioCluster, root_certs: "certs")
+        blob_storage: instance_double(MinioCluster, root_certs: "certs"),
+        aws?: false
       ),
       vm: instance_double(
         Vm,
@@ -240,6 +241,15 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "certs")
       expect(postgres_server).to receive(:primary?).and_return(false)
       expect { nx.configure_walg_credentials }.to hop("initialize_database_from_backup")
+    end
+
+    it "doesn't put the blob_storage_ca if the timeline is aws" do
+      expect(postgres_server.timeline).to receive(:aws?).and_return(true)
+      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg config")
+      expect(sshable).not_to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "certs")
+      expect(postgres_server).to receive(:primary?).and_return(true)
+
+      expect { nx.configure_walg_credentials }.to hop("initialize_empty_database")
     end
   end
 
