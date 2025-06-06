@@ -3,7 +3,7 @@
 require_relative "../spec_helper"
 
 RSpec.describe PostgresTimeline do
-  subject(:postgres_timeline) { described_class.create_with_id(access_key: "dummy-access-key", secret_key: "dummy-secret-key") }
+  subject(:postgres_timeline) { described_class.create_with_id(access_key: "dummy-access-key", secret_key: "dummy-secret-key", location_id: Location::HETZNER_FSN1_ID) }
 
   it "returns ubid as bucket name" do
     expect(postgres_timeline.bucket_name).to eq(postgres_timeline.ubid)

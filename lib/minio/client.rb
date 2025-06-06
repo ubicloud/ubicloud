@@ -15,7 +15,7 @@ class Minio::Client
 
     @creds = {access_key: access_key, secret_key: secret_key}
     @endpoint = endpoint
-    @client = Excon.new(endpoint, socket: socket, ssl_ca_file: ca_bundle_filename)
+    @client = Excon.new(endpoint, socket: socket, ssl_ca_file: ssl_ca_file_data.empty? ? nil : ca_bundle_filename)
     @signer = Minio::HeaderSigner.new
     @crypto = Minio::Crypto.new
   end
