@@ -44,6 +44,10 @@ class Location < Sequel::Model
   def has_resources
     !postgres_resources_dataset.empty?
   end
+
+  def aws?
+    provider == "aws"
+  end
 end
 
 # Table: location

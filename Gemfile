@@ -84,3 +84,5 @@ end
 group :test, :development do
   gem "sequel-annotate"
 end
+
+gem "aws-sdk-iam", "~> 1.123"
