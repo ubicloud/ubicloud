@@ -107,36 +107,41 @@ class Clover
           fail CloverError.new(400, "InvalidRequest", "The cache size is over the 10GB limit")
         end
 
-        entry, upload_id = nil, nil
-        DB.transaction do
-          begin
-            entry = GithubCacheEntry.create_with_id(repository_id: runner.repository.id, key: key, version: version, size: size, scope: scope, created_by: runner.id)
-          rescue Sequel::ValidationFailed, Sequel::UniqueConstraintViolation
-            fail CloverError.new(409, "AlreadyExists", "A cache entry for #{scope} scope already exists with #{key} key and #{version} version.")
-          end
+        unless GithubCacheEntry.where(repository_id: runner.repository.id, scope:, key:, version:).empty?
+          fail CloverError.new(409, "AlreadyExists", "A cache entry for #{scope} scope already exists with #{key} key and #{version} version.")
+        end
 
-          # Token creation on Cloudflare R2 takes time to propagate. Since that point is the
-          # first time we use the credentials, we are waiting it to be propagated. Note that,
-          # credential propagation will happen only while the bucket and token are being created
-          # initially. So, the retry block expected to run only while saving the first cache
-          # entry for a repository.
-          retries = 0
-          begin
-            upload_id = repository.blob_storage_client.create_multipart_upload(bucket: repository.bucket_name, key: entry.blob_key).upload_id
-          rescue Aws::S3::Errors::Unauthorized, Aws::S3::Errors::InternalError, Aws::S3::Errors::NoSuchBucket => ex
-            retries += 1
-            if retries < 3
-              # :nocov:
-              sleep(1) unless Config.test?
-              # :nocov:
-              retry
-            else
-              Clog.emit("Could not authorize multipart upload") { {could_not_authorize_multipart_upload: {ubid: runner.ubid, repository_ubid: repository.ubid, exception: Util.exception_to_hash(ex)}} }
-              fail CloverError.new(400, "InvalidRequest", "Could not authorize multipart upload")
-            end
-          end
+        # Need id for blob_key, but don't save record yet
+        entry = GithubCacheEntry.new_with_id(repository_id: runner.repository.id, key:, version:, size:, scope:, created_by: runner.id)
+        blob_key = entry.blob_key
+        bucket = repository.bucket_name
+        blob_storage_client = repository.blob_storage_client
 
+        # Token creation on Cloudflare R2 takes time to propagate. Since that point is the
+        # first time we use the credentials, we are waiting it to be propagated. Note that,
+        # credential propagation will happen only while the bucket and token are being created
+        # initially. So, the retry block expected to run only while saving the first cache
+        # entry for a repository.
+        retries = 0
+        begin
+          upload_id = blob_storage_client.create_multipart_upload(bucket:, key: blob_key).upload_id
+        rescue Aws::S3::Errors::Unauthorized, Aws::S3::Errors::InternalError, Aws::S3::Errors::NoSuchBucket => ex
+          retries += 1
+          if retries < 3
+            # :nocov:
+            sleep(1) unless Config.test?
+            # :nocov:
+            retry
+          else
+            Clog.emit("Could not authorize multipart upload") { {could_not_authorize_multipart_upload: {ubid: runner.ubid, repository_ubid: repository.ubid, exception: Util.exception_to_hash(ex)}} }
+            fail CloverError.new(400, "InvalidRequest", "Could not authorize multipart upload")
+          end
+        end
+
+        begin
           entry.update(upload_id:)
+        rescue Sequel::ValidationFailed, Sequel::UniqueConstraintViolation
+          fail CloverError.new(409, "AlreadyExists", "A cache entry for #{scope} scope already exists with #{key} key and #{version} version.")
         end
 
         # If size is not provided, it means that the client doesn't
