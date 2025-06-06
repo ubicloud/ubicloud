@@ -25,8 +25,12 @@ class Clover
       )
       audit_log(kc, "create")
 
-      flash["notice"] = "'#{name}' will be ready in a few minutes"
-      request.redirect "#{@project.path}#{kc.path}"
+      if api?
+        Serializers::KubernetesCluster.serialize(kc, {detailed: true})
+      else
+        flash["notice"] = "'#{name}' will be ready in a few minutes"
+        request.redirect "#{@project.path}#{kc.path}"
+      end
     end
   end
 
@@ -38,7 +42,6 @@ class Clover
       @kcs = dataset.all
       view "kubernetes-cluster/index"
     end
-
   end
 
   def generate_kubernetes_cluster_options
