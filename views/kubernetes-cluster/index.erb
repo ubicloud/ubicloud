@@ -10,7 +10,7 @@
 <div class="grid gap-6">
   <%== part(
     "components/table_card",
-    headers: ["Name", "Location", "Kubernetes Version"],
+    headers: ["Name", "Location", "Kubernetes Version", "State"],
     rows: @kcs.map do |kc|
       [
         [
