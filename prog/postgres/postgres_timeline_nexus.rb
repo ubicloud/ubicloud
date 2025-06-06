@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "forwardable"
+require "aws-sdk-iam"
 
 class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   subject_is :postgres_timeline
@@ -22,7 +23,8 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
         parent_id: parent_id,
         access_key: SecureRandom.hex(16),
         secret_key: SecureRandom.hex(32),
-        blob_storage_id: MinioCluster.first(project_id: Config.postgres_service_project_id, location_id: location.id)&.id
+        blob_storage_id: MinioCluster.first(project_id: Config.postgres_service_project_id, location_id: location.id)&.id,
+        location_id: location.id
       )
       Strand.create(prog: "Postgres::PostgresTimelineNexus", label: "start") { it.id = postgres_timeline.id }
     end
@@ -37,7 +39,18 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   label def start
-    setup_blob_storage if postgres_timeline.blob_storage
+    if postgres_timeline.blob_storage
+      setup_blob_storage
+      hop_setup_bucket
+    end
+
+    hop_wait_leader
+  end
+
+  label def setup_bucket
+    # Create bucket for the timeline
+    blob_storage_client.create_bucket(postgres_timeline.ubid)
+    blob_storage_client.set_lifecycle_policy(postgres_timeline.ubid, postgres_timeline.ubid, 8)
     hop_wait_leader
   end
 
@@ -89,32 +102,50 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   def destroy_blob_storage
-    admin_client = Minio::Client.new(
-      endpoint: postgres_timeline.blob_storage_endpoint,
-      access_key: postgres_timeline.blob_storage.admin_user,
-      secret_key: postgres_timeline.blob_storage.admin_password,
-      ssl_ca_data: postgres_timeline.blob_storage.root_certs
-    )
+    return destroy_aws_s3 if postgres_timeline.aws?
 
     admin_client.admin_remove_user(postgres_timeline.access_key)
     admin_client.admin_policy_remove(postgres_timeline.ubid)
   end
 
+  def destroy_aws_s3
+    iam = Aws::IAM::Client.new(access_key_id: postgres_timeline.location.location_credential.access_key, secret_access_key: postgres_timeline.location.location_credential.secret_key)
+    iam.list_attached_user_policies(user_name: postgres_timeline.ubid).attached_policies.each do |it|
+      iam.detach_user_policy(user_name: postgres_timeline.ubid, policy_arn: it.policy_arn)
+      iam.delete_policy(policy_arn: it.policy_arn)
+    end
+
+    iam.list_access_keys(user_name: postgres_timeline.ubid).access_key_metadata.each do |it|
+      iam.delete_access_key(user_name: postgres_timeline.ubid, access_key_id: it.access_key_id)
+    end
+    iam.delete_user(user_name: postgres_timeline.ubid)
+  end
+
   def setup_blob_storage
-    admin_client = Minio::Client.new(
-      endpoint: postgres_timeline.blob_storage_endpoint,
-      access_key: postgres_timeline.blob_storage.admin_user,
-      secret_key: postgres_timeline.blob_storage.admin_password,
-      ssl_ca_data: postgres_timeline.blob_storage.root_certs
-    )
+    return setup_aws_s3 if postgres_timeline.aws?
 
     # Setup user keys and policy for the timeline
     admin_client.admin_add_user(postgres_timeline.access_key, postgres_timeline.secret_key)
     admin_client.admin_policy_add(postgres_timeline.ubid, postgres_timeline.blob_storage_policy)
     admin_client.admin_policy_set(postgres_timeline.ubid, postgres_timeline.access_key)
+  end
 
-    # Create bucket for the timeline
-    blob_storage_client.create_bucket(postgres_timeline.ubid)
-    blob_storage_client.set_lifecycle_policy(postgres_timeline.ubid, postgres_timeline.ubid, PostgresTimeline::BACKUP_BUCKET_EXPIRATION_DAYS)
+  def setup_aws_s3
+    iam = Aws::IAM::Client.new(access_key_id: postgres_timeline.location.location_credential.access_key, secret_access_key: postgres_timeline.location.location_credential.secret_key)
+
+    iam.create_user(user_name: postgres_timeline.ubid)
+    policy = iam.create_policy(policy_name: postgres_timeline.ubid, policy_document: postgres_timeline.blob_storage_policy.to_json)
+    iam.attach_user_policy(user_name: postgres_timeline.ubid, policy_arn: policy.policy.arn)
+    response = iam.create_access_key(user_name: postgres_timeline.ubid)
+    postgres_timeline.update(access_key: response.access_key.access_key_id, secret_key: response.access_key.secret_access_key)
+  end
+
+  def admin_client
+    @admin_client ||= Minio::Client.new(
+      endpoint: postgres_timeline.blob_storage_endpoint,
+      access_key: postgres_timeline.blob_storage.admin_user,
+      secret_key: postgres_timeline.blob_storage.admin_password,
+      ssl_ca_data: postgres_timeline.blob_storage.root_certs
+    )
   end
 end
