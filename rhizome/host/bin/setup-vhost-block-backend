@@ -1,0 +1,26 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+require_relative "../lib/vhost_block_backend"
+require "fileutils"
+
+unless (verb = ARGV.shift)
+  puts "expected verb as argument"
+  exit 1
+end
+
+unless (version = ARGV.shift)
+  puts "expected version as argument"
+  exit 1
+end
+
+vhost_block_backend = VhostBlockBackend.new(version)
+
+case verb
+when "install"
+  vhost_block_backend.download
+else
+  puts "Unknown verb: #{verb}"
+  exit 1
+end
