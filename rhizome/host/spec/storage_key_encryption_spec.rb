@@ -24,11 +24,11 @@ RSpec.describe StorageKeyEncryption do
   it "can wrap a key" do
     dek = OpenSSL::Cipher.new("aes-256-xts").random_key.unpack1("H*")
     r1 = sek.wrap_key(dek[..63])
-    expect(Base64.decode64(r1[0]).length).to eq(64)
-    expect(Base64.decode64(r1[1]).length).to eq(16)
+    expect(r1[0].length).to eq(64)
+    expect(r1[1].length).to eq(16)
     r2 = sek.wrap_key(dek[64..])
-    expect(Base64.decode64(r2[0]).length).to eq(64)
-    expect(Base64.decode64(r2[1]).length).to eq(16)
+    expect(r2[0].length).to eq(64)
+    expect(r2[1].length).to eq(16)
   end
 
   it "fails if algorithm is not aes-256-gcm" do
@@ -50,7 +50,7 @@ RSpec.describe StorageKeyEncryption do
   it "fails if auth_tag is not 16" do
     key = "abcdefgh01234567abcdefgh01234567"
     wrapped = sek.wrap_key(key)
-    wrapped[1] = Base64.encode64(Base64.decode64(wrapped[1])[0])
+    wrapped[1] = wrapped[1][0]
 
     expect {
       sek.unwrap_key(wrapped)
