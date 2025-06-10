@@ -202,9 +202,9 @@ RSpec.describe VmHost do
     expect(r_address).to eq(address)
   end
 
-  context "when provider is leaseweb" do
+  context "when provider name is leaseweb" do
     before do
-      allow(vh).to receive(:provider).and_return("leaseweb")
+      allow(vh).to receive(:provider_name).and_return("leaseweb")
     end
 
     it "finds another address if it's already assigned" do
