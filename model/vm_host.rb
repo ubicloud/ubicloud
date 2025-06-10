@@ -142,7 +142,7 @@ class VmHost < Sequel::Model
     return ip4_random_vm_network if vm_addresses.map { it.ip.to_s }.include?("#{picked_subnet}/32")
 
     # For Leaseweb, avoid using the very first and the last ips
-    if provider == "leaseweb"
+    if provider_name == "leaseweb"
       subnet_size = 2**(32 - used_subnet.cidr.netmask.prefix_len)
       last_ip = used_subnet.cidr.nth(subnet_size - 1).to_s
       first_ip = used_subnet.cidr.network.to_s
