@@ -23,3 +23,4 @@ end
 # Referenced By:
 #  assigned_host_address | assigned_host_address_address_id_fkey | (address_id) REFERENCES address(id)
 #  assigned_vm_address   | assigned_vm_address_address_id_fkey   | (address_id) REFERENCES address(id)
+#  ipv4_address          | ipv4_address_cidr_fkey                | (cidr) REFERENCES address(cidr)
