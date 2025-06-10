@@ -101,14 +101,15 @@ end
 
 # Table: postgres_timeline
 # Columns:
-#  id                       | uuid                     | PRIMARY KEY
-#  created_at               | timestamp with time zone | NOT NULL DEFAULT now()
-#  updated_at               | timestamp with time zone | NOT NULL DEFAULT now()
-#  parent_id                | uuid                     |
-#  access_key               | text                     |
-#  secret_key               | text                     |
-#  latest_backup_started_at | timestamp with time zone |
-#  blob_storage_id          | uuid                     |
+#  id                        | uuid                     | PRIMARY KEY
+#  created_at                | timestamp with time zone | NOT NULL DEFAULT now()
+#  updated_at                | timestamp with time zone | NOT NULL DEFAULT now()
+#  parent_id                 | uuid                     |
+#  access_key                | text                     |
+#  secret_key                | text                     |
+#  latest_backup_started_at  | timestamp with time zone |
+#  blob_storage_id           | uuid                     |
+#  cached_earliest_backup_at | timestamp with time zone |
 # Indexes:
 #  postgres_timeline_pkey | PRIMARY KEY btree (id)
 # Referenced By:
