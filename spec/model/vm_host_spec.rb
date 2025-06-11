@@ -28,8 +28,8 @@ RSpec.describe VmHost do
   let(:hetzner_ips) {
     [
       ["1.1.1.0/30", "1.1.1.1", true],
-      ["1.1.1.2/32", "1.1.0.0", true],
-      ["1.1.1.3/32", "1.1.1.1", false],
+      ["1.1.1.12/32", "1.1.0.0", true],
+      ["1.1.1.13/32", "1.1.1.1", false],
       ["2a01:4f8:10a:128b::/64", "1.1.1.1", true]
     ].map {
       Hosting::HetznerApis::IpInfo.new(ip_address: _1, source_host_ip: _2, is_failover: _3)
