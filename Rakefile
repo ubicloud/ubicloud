@@ -277,15 +277,15 @@ task :respirate_smoke_test do
   # not partitioned, 1 process
   system(RbConfig.ruby, "spec/respirate_smoke_test.rb")
 
-  # not partitioned, 4 processes
-  system(RbConfig.ruby, "spec/respirate_smoke_test.rb", "1", "4")
+  # not partitioned, 8 processes
+  system(RbConfig.ruby, "spec/respirate_smoke_test.rb", "1", "8")
 
-  # 4-way partition, 4 processes
-  system(RbConfig.ruby, "spec/respirate_smoke_test.rb", "4")
+  # 8-way partition, 8 processes
+  system(RbConfig.ruby, "spec/respirate_smoke_test.rb", "8")
 
-  # 4-way partition, but only 3 processes. This simulates a crash/apoptosis
+  # 8-way partition, but only 7 processes. This simulates a crash/apoptosis
   # in a respirate process, checking that other processes pick up the slack.
-  system(RbConfig.ruby, "spec/respirate_smoke_test.rb", "4", "3")
+  system(RbConfig.ruby, "spec/respirate_smoke_test.rb", "8", "7")
 end
 
 desc "Run each spec file in a separate process"
