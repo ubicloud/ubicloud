@@ -600,6 +600,15 @@ function setupPlayground() {
           content += new_content || "";
           reasoning_content += new_reasoning_content || "";
           assistant_message.content[0].text = content;
+
+          // Scroll to the bottom of the page if the user is near the bottom.
+          const scrollTop = window.scrollY || document.documentElement.scrollTop;
+          if (document.documentElement.scrollHeight - (scrollTop + window.innerHeight) <= 1) {
+            requestAnimationFrame(() => {
+              window.scrollTo({ top: document.documentElement.scrollHeight });
+            });
+          }
+
           const rendered_response = DOMPurify.sanitize(
             reasoningExtension.format_reasoning(reasoning_content) + marked.parse(content));
           $assistant_message_container.html(rendered_response);
