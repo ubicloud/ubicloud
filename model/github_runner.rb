@@ -9,7 +9,7 @@ class GithubRunner < Sequel::Model
   many_to_one :repository, key: :repository_id, class: :GithubRepository
   one_to_one :vm, key: :id, primary_key: :vm_id
 
-  plugin ResourceMethods
+  plugin ResourceMethods, redacted_columns: :workflow_job
   include SemaphoreMethods
   include HealthMonitorMethods
   semaphore :destroy, :skip_deregistration
@@ -74,10 +74,6 @@ class GithubRunner < Sequel::Model
       "down"
     end
     aggregate_readings(previous_pulse: previous_pulse, reading: reading, data: {available_memory: available_memory})
-  end
-
-  def self.redacted_columns
-    super + [:workflow_job]
   end
 end
 
