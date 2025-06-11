@@ -258,8 +258,11 @@ TEMPLATE
     GloballyBlockedDnsname.each do |globally_blocked_dnsname|
       ips = globally_blocked_dnsname.ip_list || []
       ips.each do |ip|
-        globally_blocked_ipv4s << "#{ip}/32" if ip.ipv4?
-        globally_blocked_ipv6s << "#{ip}/128" if ip.ipv6?
+        if ip.version == 4
+          globally_blocked_ipv4s << "#{ip}/32"
+        else
+          globally_blocked_ipv6s << "#{ip}/128"
+        end
       end
     end
     summ_ipv4 = NetAddr.summ_IPv4Net(globally_blocked_ipv4s.map { NetAddr::IPv4Net.parse(it.to_s) })

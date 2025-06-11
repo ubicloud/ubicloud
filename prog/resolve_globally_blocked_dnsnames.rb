@@ -19,7 +19,7 @@ class Prog::ResolveGloballyBlockedDnsnames < Prog::Base
         info[3]
       end.uniq
 
-      globally_blocked_dnsname.update(ip_list: Sequel.lit("ARRAY[#{ip_list.map { |ip| "'#{ip}'::inet" }.join(",")}]"), last_check_at: Time.now)
+      globally_blocked_dnsname.update(ip_list:, last_check_at: Time.now)
     end
 
     nap 60 * 60
