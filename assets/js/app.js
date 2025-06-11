@@ -621,8 +621,6 @@ function setupPlayground() {
         errorMessage = `An error occurred: ${error.message}`;
       }
 
-      assistant_message.content[0].text = "";
-      $assistant_message_container.text("");
       $(`#inference_message_info_${assistant_message_id}`).text(errorMessage);
     } finally {
       $("#inference_submit").text("Submit");
