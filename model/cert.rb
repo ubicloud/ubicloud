@@ -9,7 +9,7 @@ class Cert < Sequel::Model
 
   plugin :association_dependencies, certs_load_balancers: :destroy
 
-  plugin ResourceMethods
+  plugin ResourceMethods, redacted_columns: :cert
   include SemaphoreMethods
   semaphore :destroy, :restarted
 
@@ -23,10 +23,6 @@ class Cert < Sequel::Model
     where(:needing_recert, Sequel::CURRENT_TIMESTAMP - Sequel.cast("60 days", :interval) < :created_at)
     where(:active, Sequel::CURRENT_TIMESTAMP - Sequel.cast("90 days", :interval) < :created_at)
     reverse(:by_most_recent, :created_at)
-  end
-
-  def self.redacted_columns
-    super + [:cert]
   end
 end
 

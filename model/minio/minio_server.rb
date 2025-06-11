@@ -11,7 +11,7 @@ class MinioServer < Sequel::Model
   many_to_one :pool, key: :minio_pool_id, class: :MinioPool
   one_through_one :cluster, join_table: :minio_pool, left_primary_key: :minio_pool_id, left_key: :id, class: :MinioCluster
 
-  plugin ResourceMethods
+  plugin ResourceMethods, redacted_columns: :cert
   include SemaphoreMethods
   include HealthMonitorMethods
 
@@ -100,10 +100,6 @@ class MinioServer < Sequel::Model
       ssl_ca_data: cluster.root_certs + cert,
       socket: socket
     )
-  end
-
-  def self.redacted_columns
-    super + [:cert]
   end
 end
 

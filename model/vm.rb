@@ -31,7 +31,7 @@ class Vm < Sequel::Model
 
   dataset_module Pagination
 
-  plugin ResourceMethods
+  plugin ResourceMethods, redacted_columns: :public_key
   include SemaphoreMethods
   include HealthMonitorMethods
   semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started
@@ -202,10 +202,6 @@ class Vm < Sequel::Model
     fail "SPDK version #{version} not found on host" unless spdk_installation
     vm_storage_volumes_dataset.update(spdk_installation_id: spdk_installation.id)
     incr_update_spdk_dependency
-  end
-
-  def self.redacted_columns
-    super + [:public_key]
   end
 
   def params_json(swap_size_bytes: nil, ch_version: nil, firmware_version: nil, hugepages: nil)

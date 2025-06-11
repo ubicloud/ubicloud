@@ -10,7 +10,7 @@ class MinioCluster < Sequel::Model
   many_to_one :private_subnet
   many_to_one :location, key: :location_id
 
-  plugin ResourceMethods
+  plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2]
   include SemaphoreMethods
 
   semaphore :destroy, :reconfigure
@@ -59,10 +59,6 @@ class MinioCluster < Sequel::Model
 
   def root_certs
     root_cert_1.to_s + root_cert_2.to_s
-  end
-
-  def self.redacted_columns
-    super + [:root_cert_1, :root_cert_2]
   end
 end
 

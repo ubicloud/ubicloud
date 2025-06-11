@@ -7,7 +7,7 @@ class VictoriaMetricsServer < Sequel::Model
   many_to_one :vm
   many_to_one :resource, class: :VictoriaMetricsResource, key: :victoria_metrics_resource_id
 
-  plugin ResourceMethods
+  plugin ResourceMethods, redacted_columns: :cert
   include SemaphoreMethods
   include HealthMonitorMethods
 
@@ -73,10 +73,6 @@ class VictoriaMetricsServer < Sequel::Model
       username: resource.admin_user,
       password: resource.admin_password
     )
-  end
-
-  def self.redacted_columns
-    super + [:cert]
   end
 end
 

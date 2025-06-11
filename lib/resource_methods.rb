@@ -1,10 +1,11 @@
 # frozen_string_literal: true
 
 module ResourceMethods
-  def self.configure(model, etc_type: false)
+  def self.configure(model, etc_type: false, redacted_columns: nil)
     model.instance_exec do
       extend UbidTypeEtcMethods if etc_type
       @ubid_format = /\A#{ubid_type}[a-z0-9]{24}\z/
+      @redacted_columns = Array(redacted_columns).freeze
     end
   end
 
@@ -141,7 +142,7 @@ module ResourceMethods
     end
 
     def redacted_columns
-      column_encryption_metadata.keys || []
+      (column_encryption_metadata.keys || []) + @redacted_columns
     end
   end
 end
