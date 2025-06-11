@@ -362,7 +362,7 @@ function setupPlayground() {
       text = text.trim().replace(/\n+/g, '<br>');
       if (text.length > 0) {
         return `
-          <div class="text-sm italic p-4 bg-gray-50 ">
+          <div class="text-sm italic p-4 bg-gray-50 mb-2">
             <div class="font-bold mb-4">Reasoning</div>
             ${text}
           </div>`;
