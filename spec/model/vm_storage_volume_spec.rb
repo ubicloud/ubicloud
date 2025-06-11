@@ -20,4 +20,23 @@ RSpec.describe VmStorageVolume do
     allow(v).to receive(:spdk_installation).and_return(si)
     expect(v.spdk_version).to eq("some-version")
   end
+
+  it "returns nil spdk version if no associated installation" do
+    v = described_class.new(disk_index: 7)
+    allow(v).to receive(:spdk_installation).and_return(nil)
+    expect(v.spdk_version).to be_nil
+  end
+
+  it "returns correct vhost_block_backend version if exists associated installation" do
+    vbb = VhostBlockBackend.new(version: "some-vhost-version")
+    v = described_class.new(disk_index: 7)
+    allow(v).to receive(:vhost_block_backend).and_return(vbb)
+    expect(v.vhost_block_backend_version).to eq("some-vhost-version")
+  end
+
+  it "returns nil vhost_block_backend version if no associated installation" do
+    v = described_class.new(disk_index: 7)
+    allow(v).to receive(:vhost_block_backend).and_return(nil)
+    expect(v.vhost_block_backend_version).to be_nil
+  end
 end
