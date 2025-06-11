@@ -13,6 +13,7 @@ class VmHost < Sequel::Model
   one_to_one :provider, key: :id, class: :HostProvider
   one_to_many :assigned_host_addresses, key: :host_id, class: :AssignedHostAddress
   one_to_many :spdk_installations, key: :vm_host_id
+  one_to_many :vhost_block_backends
   one_to_many :storage_devices, key: :vm_host_id
   one_to_many :pci_devices, key: :vm_host_id
   one_to_many :boot_images, key: :vm_host_id
