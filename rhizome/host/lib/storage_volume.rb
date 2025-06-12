@@ -6,6 +6,8 @@ require "fileutils"
 require "json"
 require "openssl"
 require "base64"
+require "timeout"
+require "yaml"
 require_relative "boot_image"
 require_relative "vm_path"
 require_relative "spdk_path"
@@ -13,11 +15,13 @@ require_relative "spdk_rpc"
 require_relative "spdk_setup"
 require_relative "storage_key_encryption"
 require_relative "storage_path"
+require_relative "vhost_block_backend"
 
 class StorageVolume
   attr_reader :image_path, :read_only
   def initialize(vm_name, params)
     @vm_name = vm_name
+    @vhost_backend_version = params["vhost_block_backend_version"]
     @disk_index = params["disk_index"]
     @device_id = params["device_id"]
     @encrypted = params["encrypted"]
@@ -31,6 +35,11 @@ class StorageVolume
     @max_ios_per_sec = params["max_ios_per_sec"]
     @max_read_mbytes_per_sec = params["max_read_mbytes_per_sec"]
     @max_write_mbytes_per_sec = params["max_write_mbytes_per_sec"]
+    @slice = params.fetch("slice_name", "system.slice")
+    @num_queues = params.fetch("num_queues", 1)
+    @queue_size = params.fetch("queue_size", 256)
+    @copy_on_read = params.fetch("copy_on_read", false)
+    @stripe_sector_count_shift = Integer(params.fetch("stripe_sector_count_shift", 11))
   end
 
   def vp
@@ -47,7 +56,14 @@ class StorageVolume
     fail "Storage device directory doesn't exist: #{sp.device_path}" if !File.exist?(sp.device_path)
 
     FileUtils.mkdir_p storage_dir
+    FileUtils.chown @vm_name, @vm_name, storage_dir
     encryption_key = setup_data_encryption_key(key_wrapping_secrets) if @encrypted
+
+    if @vhost_backend_version
+      create_empty_disk_file
+      prep_vhost_backend(encryption_key, key_wrapping_secrets)
+      return
+    end
 
     if @image_path.nil?
       fail "bdev_ubi requires a base image" if @use_bdev_ubi
@@ -67,9 +83,171 @@ class StorageVolume
     end
   end
 
-  def start(key_wrapping_secrets)
-    encryption_key = read_data_encryption_key(key_wrapping_secrets) if @encrypted
+  def prep_vhost_backend(encryption_key, key_wrapping_secrets)
+    vhost_backend_create_config(encryption_key, key_wrapping_secrets)
+    vhost_backend_create_metadata(key_wrapping_secrets) if @image_path
+    vhost_backend_create_service_file
+  end
 
+  def write_new_file(path, user)
+    rm_if_exists(path)
+
+    File.open(path, "w", 0o600, flags: File::CREAT | File::EXCL) do |file|
+      FileUtils.chown user, user, path
+      yield file
+    end
+  end
+
+  def vhost_backend_create_config(encryption_key, key_wrapping_secrets)
+    config_path = sp.vhost_backend_config
+    config = vhost_backend_config(encryption_key, key_wrapping_secrets)
+
+    write_new_file(config_path, @vm_name) do |file|
+      file.write(config.to_yaml)
+      fsync_or_fail(file)
+    end
+
+    sync_parent_dir(config_path)
+  end
+
+  def vhost_backend_create_metadata(key_wrapping_secrets)
+    vhost_backend = VhostBlockBackend.new(@vhost_backend_version)
+    metadata_path = sp.vhost_backend_metadata
+    config_path = sp.vhost_backend_config
+    if @encrypted
+      kek_yaml = vhost_backend_kek(key_wrapping_secrets).to_yaml
+      kek_arg = "--kek /dev/stdin"
+    else
+      kek_yaml = ""
+    end
+
+    write_new_file(metadata_path, @vm_name) do |file|
+      file.truncate(8 * 1024 * 1024)
+    end
+
+    r "#{vhost_backend.init_metadata_path.shellescape} -s #{@stripe_sector_count_shift}  --config #{config_path.shellescape} #{kek_arg}", stdin: kek_yaml
+    sync_parent_dir(metadata_path)
+  end
+
+  def vhost_backend_create_service_file
+    vhost_backend = VhostBlockBackend.new(@vhost_backend_version)
+
+    kek_arg = if @encrypted
+      "--kek #{sp.kek_pipe}"
+    end
+
+    # systemd-analyze security result:
+    # Overall exposure level for #{vhost_user_block_service}: 0.5 SAFE
+    service_file_path = "/etc/systemd/system/#{vhost_user_block_service}"
+    File.write(service_file_path, <<~SERVICE)
+        [Unit]
+        Description=Vhost Block Backend Service for #{@vm_name}
+        After=network.target
+
+        [Service]
+        Slice=#{@slice}
+        Environment=RUST_LOG=info
+        ExecStart=#{vhost_backend.bin_path} --config #{sp.vhost_backend_config} #{kek_arg}
+        Restart=always
+        User=#{@vm_name}
+        Group=#{@vm_name}
+
+        RemoveIPC=true
+        NoNewPrivileges=true
+        CapabilityBoundingSet=
+        AmbientCapabilities=
+        
+        PrivateDevices=true
+        DevicePolicy=closed
+        DeviceAllow=/dev/null rw
+        DeviceAllow=/dev/zero rw
+        DeviceAllow=/dev/urandom rw
+        DeviceAllow=/dev/random rw
+
+        ProtectSystem=full
+        ProtectHome=tmpfs
+        ReadWritePaths=#{storage_root}
+        PrivateTmp=true
+        PrivateMounts=true
+
+        ProtectKernelModules=true
+        ProtectKernelTunables=true
+        ProtectControlGroups=true
+        ProtectClock=true
+        ProtectHostname=true
+        LockPersonality=true
+        ProtectKernelLogs=true
+        ProtectProc=invisible
+        
+        RestrictAddressFamilies=AF_UNIX
+        RestrictNamespaces=true
+        SystemCallArchitectures=native
+        SystemCallFilter=@system-service
+
+        MemoryDenyWriteExecute=yes
+        RestrictSUIDSGID=yes
+        RestrictRealtime=yes
+        ProcSubset=pid
+        PrivateNetwork=yes
+        PrivateUsers=yes
+        IPAddressDeny=any
+
+        [Install]
+        WantedBy=multi-user.target
+    SERVICE
+  end
+
+  def wrap_key_b64(storage_key_encryption, key)
+    key_bytes = [key].pack("H*")
+    wrapped_key = storage_key_encryption.wrap_key(key_bytes).join
+    Base64.strict_encode64(wrapped_key).strip
+  end
+
+  def vhost_backend_config(encryption_key, key_wrapping_secrets)
+    config = {
+      "path" => disk_file,
+      "socket" => vhost_sock,
+      "num_queues" => @num_queues,
+      "queue_size" => @queue_size,
+      "seg_size_max" => 64 * 1024,
+      "seg_count_max" => 4,
+      "copy_on_read" => @copy_on_read,
+      "poll_queue_timeout_us" => 1000,
+      "device_id" => @device_id,
+      "skip_sync" => @skip_sync
+    }
+
+    if @image_path
+      config["image_path"] = @image_path
+      config["metadata_path"] = sp.vhost_backend_metadata
+    end
+
+    if @encrypted
+      key_encryption = StorageKeyEncryption.new(key_wrapping_secrets)
+      key1_wrapped_b64 = wrap_key_b64(key_encryption, encryption_key[:key])
+      key2_wrapped_b64 = wrap_key_b64(key_encryption, encryption_key[:key2])
+      config["encryption_key"] = [key1_wrapped_b64, key2_wrapped_b64]
+    end
+
+    config
+  end
+
+  def vhost_backend_kek(key_wrapping_secrets)
+    {
+      "method" => "aes256-gcm",
+      "key" => key_wrapping_secrets["key"].strip,
+      "init_vector" => key_wrapping_secrets["init_vector"].strip,
+      "auth_data" => Base64.strict_encode64(key_wrapping_secrets["auth_data"]).strip
+    }
+  end
+
+  def start(key_wrapping_secrets)
+    if @vhost_backend_version
+      vhost_backend_start(key_wrapping_secrets)
+      return
+    end
+
+    encryption_key = read_data_encryption_key(key_wrapping_secrets) if @encrypted
     retries = 0
     begin
       setup_spdk_bdev(encryption_key)
@@ -87,7 +265,41 @@ class StorageVolume
     end
   end
 
+  def vhost_backend_start(key_wrapping_secrets)
+    # Stop the service in case this is a retry.
+    r "systemctl stop #{q_vhost_user_block_service}"
+
+    unless @encrypted
+      r "systemctl start #{q_vhost_user_block_service}"
+      return
+    end
+
+    begin
+      kek_pipe = sp.kek_pipe
+      rm_if_exists(kek_pipe)
+      File.mkfifo(kek_pipe, 0o600)
+      FileUtils.chown @vm_name, @vm_name, kek_pipe
+
+      r "systemctl start #{q_vhost_user_block_service}"
+
+      Timeout.timeout(5) do
+        kek_yaml = vhost_backend_kek(key_wrapping_secrets).to_yaml
+        File.write(kek_pipe, kek_yaml)
+      end
+    ensure
+      FileUtils.rm_f(kek_pipe)
+    end
+  end
+
   def purge_spdk_artifacts
+    if @vhost_backend_version
+      service_file_path = "/etc/systemd/system/#{vhost_user_block_service}"
+      r "systemctl stop #{q_vhost_user_block_service}"
+      rm_if_exists(service_file_path)
+      rm_if_exists(vhost_sock)
+      return
+    end
+
     vhost_controller = SpdkPath.vhost_controller(@vm_name, @disk_index)
 
     rpc_client.vhost_delete_controller(vhost_controller)
@@ -302,7 +514,15 @@ class StorageVolume
   end
 
   def spdk_service
-    @spdk_service ||= SpdkSetup.new(@spdk_version).spdk_service
+    @spdk_service ||= SpdkSetup.new(@spdk_version).spdk_service if @spdk_version
+  end
+
+  def vhost_user_block_service
+    @vhost_user_block_service ||= "#{@vm_name}-#{@disk_index}-storage.service" if @vhost_backend_version
+  end
+
+  def q_vhost_user_block_service
+    @q_vhost_user_block_service ||= vhost_user_block_service.shellescape if vhost_user_block_service
   end
 
   def sp
@@ -328,4 +548,8 @@ class StorageVolume
   def vhost_sock
     @vhost_sock ||= sp.vhost_sock
   end
+
+  attr_reader :num_queues
+
+  attr_reader :queue_size
 end

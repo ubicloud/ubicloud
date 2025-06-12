@@ -26,6 +26,35 @@ RSpec.describe StorageVolume do
     }
     described_class.new("test", params)
   }
+
+  let(:encrypted_vhost_sv) {
+    params = {
+      "disk_index" => 2,
+      "device_id" => "xyz01",
+      "encrypted" => true,
+      "size_gib" => 12,
+      "image" => "kubuntu",
+      "vhost_block_backend_version" => "v0.1-5",
+      "num_queues" => 4,
+      "queue_size" => 128
+    }
+    described_class.new("test", params)
+  }
+
+  let(:unencrypted_vhost_sv) {
+    params = {
+      "disk_index" => 2,
+      "device_id" => "xyz01",
+      "encrypted" => false,
+      "size_gib" => 12,
+      "image" => "kubuntu",
+      "vhost_block_backend_version" => "v0.1-5",
+      "num_queues" => 4,
+      "queue_size" => 128
+    }
+    described_class.new("test", params)
+  }
+
   let(:image_path) {
     "/var/storage/images/kubuntu.raw"
   }
@@ -46,6 +75,7 @@ RSpec.describe StorageVolume do
       vol = described_class.new("test", {"disk_index" => 1, "encrypted" => false})
       expect(File).to receive(:exist?).with("/var/storage").and_return(true)
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/1")
+      expect(FileUtils).to receive(:chown).with("test", "test", "/var/storage/test/1")
       expect(vol).to receive(:create_empty_disk_file).with(no_args)
       vol.prep(nil)
     end
@@ -54,6 +84,7 @@ RSpec.describe StorageVolume do
       key_wrapping_secrets = "key_wrapping_secrets"
       vol = described_class.new("test", {"disk_index" => 1, "encrypted" => true})
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/1")
+      expect(FileUtils).to receive(:chown).with("test", "test", "/var/storage/test/1")
       expect(File).to receive(:exist?).with("/var/storage").and_return(true)
       expect(vol).to receive(:setup_data_encryption_key).with(key_wrapping_secrets)
       expect(vol).to receive(:create_empty_disk_file).with(no_args)
@@ -71,6 +102,7 @@ RSpec.describe StorageVolume do
       encryption_key = "test_key"
       key_wrapping_secrets = "key_wrapping_secrets"
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/2")
+      expect(FileUtils).to receive(:chown).with("test", "test", "/var/storage/test/2")
       expect(File).to receive(:exist?).with("/var/storage").and_return(true)
       expect(encrypted_sv).to receive(:verify_imaged_disk_size).with(no_args)
       expect(encrypted_sv).to receive(:setup_data_encryption_key).with(key_wrapping_secrets).and_return(encryption_key)
@@ -81,10 +113,23 @@ RSpec.describe StorageVolume do
 
     it "can prep an unencrypted imaged disk" do
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/2")
+      expect(FileUtils).to receive(:chown).with("test", "test", "/var/storage/test/2")
       expect(File).to receive(:exist?).with("/var/storage").and_return(true)
       expect(unencrypted_sv).to receive(:verify_imaged_disk_size).with(no_args)
       expect(unencrypted_sv).to receive(:unencrypted_image_copy).with(no_args)
       unencrypted_sv.prep(nil)
+    end
+
+    it "can prep an encrypted imaged disk with vhost backend" do
+      encryption_key = "test_key"
+      key_wrapping_secrets = "key_wrapping_secrets"
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/2")
+      expect(FileUtils).to receive(:chown).with("test", "test", "/var/storage/test/2")
+      expect(File).to receive(:exist?).with("/var/storage").and_return(true)
+      expect(encrypted_vhost_sv).to receive(:setup_data_encryption_key).with(key_wrapping_secrets).and_return(encryption_key)
+      expect(encrypted_vhost_sv).to receive(:create_empty_disk_file)
+      expect(encrypted_vhost_sv).to receive(:prep_vhost_backend).with(encryption_key, key_wrapping_secrets)
+      encrypted_vhost_sv.prep(key_wrapping_secrets)
     end
   end
 
@@ -126,6 +171,12 @@ RSpec.describe StorageVolume do
       )
       expect(unencrypted_sv).to receive(:purge_spdk_artifacts)
       expect { unencrypted_sv.start(nil) }.to raise_error SpdkExists
+    end
+
+    it "can start an encrypted storage volume with vhost backend" do
+      key_wrapping_secrets = "key_wrapping_secrets"
+      expect(encrypted_vhost_sv).to receive(:vhost_backend_start).with(key_wrapping_secrets)
+      encrypted_vhost_sv.start(key_wrapping_secrets)
     end
   end
 
@@ -307,6 +358,115 @@ RSpec.describe StorageVolume do
       expect(sv.disk_file).to eq("/var/storage/vm12345/3/disk.raw")
       expect(sv.data_encryption_key_path).to eq("/var/storage/vm12345/3/data_encryption_key.json")
       expect(sv.vhost_sock).to eq("/var/storage/vm12345/3/vhost.sock")
+    end
+  end
+
+  describe "#prep_vhost_backend" do
+    it "can prep vhost backend with metadata" do
+      encryption_key = "encryption_key"
+      key_wrapping_secrets = "key_wrapping_secrets"
+      expect(encrypted_vhost_sv).to receive(:vhost_backend_create_config).with(encryption_key, key_wrapping_secrets)
+      expect(encrypted_vhost_sv).to receive(:vhost_backend_create_metadata).with(key_wrapping_secrets)
+      expect(encrypted_vhost_sv).to receive(:vhost_backend_create_service_file)
+      encrypted_vhost_sv.prep_vhost_backend(encryption_key, key_wrapping_secrets)
+    end
+  end
+
+  describe "#vhost_backend_create_config" do
+    it "can create vhost backend config" do
+      encryption_key = {
+        key: "abcdefgh01234567abcdefgh01234567",
+        key2: "abcdefgh01234567abcdefgh01234567"
+      }
+      algorithm = "aes-256-gcm"
+      cipher = OpenSSL::Cipher.new(algorithm)
+      key_wrapping_secrets = {
+        "algorithm" => algorithm,
+        "key" => Base64.encode64(cipher.random_key),
+        "init_vector" => Base64.encode64(cipher.random_iv),
+        "auth_data" => "Ubicloud-Test-Auth"
+      }
+      config_path = "/var/storage/test/2/vhost-backend.conf"
+      f = instance_double(File)
+      expect(File).to receive(:open).with(config_path, "w", 0o600, flags: File::CREAT | File::EXCL).and_yield(f)
+      expect(FileUtils).to receive(:chown).with("test", "test", config_path)
+      expect(f).to receive(:write).with(/image_path/)
+      expect(encrypted_vhost_sv).to receive(:fsync_or_fail).with(f)
+      expect(encrypted_vhost_sv).to receive(:sync_parent_dir).with(config_path)
+      encrypted_vhost_sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets)
+    end
+  end
+
+  describe "#vhost_backend_create_metadata" do
+    it "can create vhost backend metadata" do
+      algorithm = "aes-256-gcm"
+      cipher = OpenSSL::Cipher.new(algorithm)
+      key_wrapping_secrets = {
+        "algorithm" => algorithm,
+        "key" => Base64.encode64(cipher.random_key),
+        "init_vector" => Base64.encode64(cipher.random_iv),
+        "auth_data" => "Ubicloud-Test-Auth"
+      }
+      metadata_path = "/var/storage/test/2/metadata"
+      f = instance_double(File)
+      expect(encrypted_vhost_sv).to receive(:rm_if_exists).with(metadata_path)
+      expect(File).to receive(:open).with(metadata_path, "w", 0o600, flags: File::CREAT | File::EXCL).and_yield(f)
+      expect(FileUtils).to receive(:chown).with("test", "test", metadata_path)
+      expect(f).to receive(:truncate).with(8 * 1024 * 1024)
+      expect(encrypted_vhost_sv).to receive(:sync_parent_dir).with(metadata_path)
+      expect(encrypted_vhost_sv).to receive(:r).with(/.*init-metadata.* --kek \/dev\/stdin/, stdin: /.*aes256-gcm.*/)
+      encrypted_vhost_sv.vhost_backend_create_metadata(key_wrapping_secrets)
+    end
+
+    it "can create vhost backend metadata for unencrypted vhost" do
+      metadata_path = "/var/storage/test/2/metadata"
+      f = instance_double(File)
+      expect(unencrypted_vhost_sv).to receive(:write_new_file).with(metadata_path, "test").and_yield(f)
+      expect(f).to receive(:truncate).with(8 * 1024 * 1024)
+      expect(unencrypted_vhost_sv).to receive(:sync_parent_dir).with(metadata_path)
+      expect(unencrypted_vhost_sv).to receive(:r).with(/.*init-metadata.*--config \/var\/storage\/test\/2\/vhost-backend.conf $/, stdin: "")
+      unencrypted_vhost_sv.vhost_backend_create_metadata(nil)
+    end
+  end
+
+  describe "#vhost_backend_create_service_file" do
+    it "can create vhost backend service file for encrypted vhost" do
+      service_file = "/etc/systemd/system/test-2-storage.service"
+      expect(File).to receive(:write).with(service_file, /vhost-backend.conf --kek/)
+      encrypted_vhost_sv.vhost_backend_create_service_file
+    end
+
+    it "can create vhost backend service file for unencrypted vhost" do
+      service_file = "/etc/systemd/system/test-2-storage.service"
+      expect(File).to receive(:write).with(service_file, /vhost-backend\.conf \nRestart=always/)
+      unencrypted_vhost_sv.vhost_backend_create_service_file
+    end
+  end
+
+  describe "#vhost_backend_start" do
+    it "can start an encrypted vhost backend" do
+      algorithm = "aes-256-gcm"
+      cipher = OpenSSL::Cipher.new(algorithm)
+      key_wrapping_secrets = {
+        "algorithm" => algorithm,
+        "key" => Base64.encode64(cipher.random_key),
+        "init_vector" => Base64.encode64(cipher.random_iv),
+        "auth_data" => "Ubicloud-Test-Auth"
+      }
+      kek_pipe = "/var/storage/test/2/kek.pipe"
+      expect(encrypted_vhost_sv).to receive(:rm_if_exists).with(kek_pipe)
+      expect(File).to receive(:mkfifo).with(kek_pipe, 0o600)
+      expect(FileUtils).to receive(:chown).with("test", "test", kek_pipe)
+      expect(encrypted_vhost_sv).to receive(:r).with("systemctl stop test-2-storage.service")
+      expect(encrypted_vhost_sv).to receive(:r).with("systemctl start test-2-storage.service")
+      expect(File).to receive(:write).with(kek_pipe, /aes256-gcm/)
+      encrypted_vhost_sv.vhost_backend_start(key_wrapping_secrets)
+    end
+
+    it "can start an unencrypted vhost backend" do
+      expect(unencrypted_vhost_sv).to receive(:r).with("systemctl stop test-2-storage.service")
+      expect(unencrypted_vhost_sv).to receive(:r).with("systemctl start test-2-storage.service")
+      unencrypted_vhost_sv.vhost_backend_start(nil)
     end
   end
 end
