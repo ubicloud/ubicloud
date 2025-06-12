@@ -2,11 +2,11 @@
 
 class Clover
   hash_branch(:project_prefix, "kubernetes-cluster") do |r|
-    r.web do
-      r.get true do
-        kubernetes_cluster_list
-      end
+    r.get true do
+      kubernetes_cluster_list
+    end
 
+    r.web do
       r.post true do
         check_visible_location
         kubernetes_cluster_post(typecast_params.nonempty_str("name"))
