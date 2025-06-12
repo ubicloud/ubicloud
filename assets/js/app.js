@@ -872,7 +872,7 @@ function queryAndUpdateChart(chartInstance, start_time, end_time) {
 }
 
 function updateMetricsCharts() {
-  const timeDuration = $('#metrics-container #time-range').val();
+  const timeDuration = $('#metrics-container #time-range').val() || "1h";
   const timeDurationSeconds = durationToSeconds(timeDuration);
   const start_time = new Date(Date.now() - timeDurationSeconds * 1000);
   const end_time = new Date(Date.now());
