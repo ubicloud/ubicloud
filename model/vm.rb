@@ -33,10 +33,9 @@ class Vm < Sequel::Model
   dataset_module Pagination
 
   plugin ResourceMethods, redacted_columns: :public_key
-  include SemaphoreMethods
+  plugin SemaphoreMethods, :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules,
+    :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started, :restart, :stop
   include HealthMonitorMethods
-  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started
-  semaphore :restart, :stop
 
   include ObjectTag::Cleanup
 

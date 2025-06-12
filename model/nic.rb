@@ -12,9 +12,7 @@ class Nic < Sequel::Model
   plugin :association_dependencies, src_ipsec_tunnels: :destroy, dst_ipsec_tunnels: :destroy, nic_aws_resource: :destroy
 
   plugin ResourceMethods
-  include SemaphoreMethods
-
-  semaphore :destroy, :start_rekey, :trigger_outbound_update,
+  plugin SemaphoreMethods, :destroy, :start_rekey, :trigger_outbound_update,
     :old_state_drop_trigger, :setup_nic, :repopulate, :lock, :vm_allocated
 
   plugin :column_encryption do |enc|

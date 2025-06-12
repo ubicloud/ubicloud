@@ -11,9 +11,7 @@ class InferenceRouter < Sequel::Model
   many_to_one :location
 
   plugin ResourceMethods
-  include SemaphoreMethods
-
-  semaphore :destroy, :maintenance
+  plugin SemaphoreMethods, :destroy, :maintenance
 end
 
 # Table: inference_router

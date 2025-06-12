@@ -16,10 +16,8 @@ class KubernetesCluster < Sequel::Model
   dataset_module Pagination
 
   plugin ResourceMethods
-  include SemaphoreMethods
+  plugin SemaphoreMethods, :destroy, :sync_kubernetes_services, :upgrade
   include HealthMonitorMethods
-
-  semaphore :destroy, :sync_kubernetes_services, :upgrade
 
   def validate
     super
