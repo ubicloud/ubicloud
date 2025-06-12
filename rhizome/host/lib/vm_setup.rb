@@ -668,7 +668,7 @@ DNSMASQ_SERVICE
       if volume.read_only
         "path=#{volume.image_path},readonly=on"
       else
-        "vhost_user=true,socket=#{volume.vhost_sock},num_queues=1,queue_size=256"
+        "vhost_user=true,socket=#{volume.vhost_sock},num_queues=#{volume.num_queues},queue_size=#{volume.queue_size}"
       end
     }
     disk_params << "path=#{vp.cloudinit_img}"
@@ -679,9 +679,13 @@ DNSMASQ_SERVICE
       disk_params.map { |x| "--disk #{x}" }.join(" ")
     end
 
-    spdk_services = storage_volumes.map { |volume| volume.spdk_service }.uniq
+    spdk_services = storage_volumes.filter_map { |volume| volume.spdk_service }.uniq
     spdk_after = spdk_services.map { |s| "After=#{s}" }.join("\n")
     spdk_requires = spdk_services.map { |s| "Requires=#{s}" }.join("\n")
+
+    vhost_user_block_services = storage_volumes.filter_map { |volume| volume.vhost_user_block_service }
+    vhost_user_block_after = vhost_user_block_services.map { |s| "After=#{s}" }.join("\n")
+    vhost_user_block_requires = vhost_user_block_services.map { |s| "Requires=#{s}" }.join("\n")
 
     net_params = nics.map { "--net mac=#{_1.mac},tap=#{_1.tap},ip=,mask=,num_queues=#{max_vcpus * 2 + 1}" }
     pci_device_params = pci_devices.map { " --device path=/sys/bus/pci/devices/0000:#{_1[0]}/" }.join
@@ -697,8 +701,10 @@ DNSMASQ_SERVICE
 Description=#{@vm_name}
 After=network.target
 #{spdk_after}
+#{vhost_user_block_after}
 After=#{@vm_name}-dnsmasq.service
 #{spdk_requires}
+#{vhost_user_block_requires}
 Wants=#{@vm_name}-dnsmasq.service
 
 [Service]

@@ -35,4 +35,16 @@ class StoragePath
   def vhost_sock
     @vhost_sock ||= File.join(storage_dir, "vhost.sock")
   end
+
+  def kek_pipe
+    @kek_pipe ||= File.join(storage_dir, "kek.pipe")
+  end
+
+  def vhost_backend_config
+    @vhost_backend_config ||= File.join(storage_dir, "vhost-backend.conf")
+  end
+
+  def vhost_backend_metadata
+    @vhost_backend_metadata ||= File.join(storage_dir, "metadata")
+  end
 end
