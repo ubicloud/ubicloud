@@ -8,14 +8,6 @@ GIT
       rodauth (~> 2.36)
 
 GIT
-  remote: https://github.com/jeremyevans/roda.git
-  revision: 0e8c8067c4b84b402d72b10168c925c79fdc8016
-  ref: 0e8c8067c4b84b402d72b10168c925c79fdc8016
-  specs:
-    roda (3.92.0)
-      rack
-
-GIT
   remote: https://github.com/ubicloud/erb-formatter.git
   revision: df3174476986706828f7baf3e5e6f5ec8ecd849b
   ref: df3174476986706828f7baf3e5e6f5ec8ecd849b
@@ -304,6 +296,8 @@ GEM
     reline (0.6.1)
       io-console (~> 0.5)
     rexml (3.4.1)
+    roda (3.93.0)
+      rack
     rodauth (2.39.0)
       roda (>= 2.6.0)
       sequel (>= 4)
@@ -490,7 +484,7 @@ DEPENDENCIES
   rake
   refrigerator (>= 1)
   reline
-  roda!
+  roda (>= 3.93)
   rodauth (>= 2.39)
   rodauth-omniauth!
   rodish (>= 2)
