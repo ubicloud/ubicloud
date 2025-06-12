@@ -22,9 +22,8 @@ class Page < Sequel::Model
     @pagerduty_client ||= Pagerduty.build(integration_key: Config.pagerduty_key, api_version: 2)
   end
 
-  include SemaphoreMethods
+  plugin SemaphoreMethods, :resolve
   plugin ResourceMethods
-  semaphore :resolve
 
   def pagerduty_client
     self.class.pagerduty_client

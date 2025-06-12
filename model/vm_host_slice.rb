@@ -9,9 +9,8 @@ class VmHostSlice < Sequel::Model
   one_to_many :cpus, class: :VmHostCpu, key: :vm_host_slice_id
 
   plugin ResourceMethods
-  include SemaphoreMethods
+  plugin SemaphoreMethods, :destroy, :start_after_host_reboot, :checkup
   include HealthMonitorMethods
-  semaphore :destroy, :start_after_host_reboot, :checkup
 
   plugin :association_dependencies, cpus: :nullify
 

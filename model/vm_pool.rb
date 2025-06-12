@@ -7,9 +7,7 @@ class VmPool < Sequel::Model
   one_to_many :vms, key: :pool_id
 
   plugin ResourceMethods
-
-  include SemaphoreMethods
-  semaphore :destroy
+  plugin SemaphoreMethods, :destroy
 
   def pick_vm
     # Find an available VM in the "running" state and not associated with a GitHub runner,

@@ -10,9 +10,7 @@ class DnsZone < Sequel::Model
   one_to_one :active_billing_record, class: :BillingRecord, key: :resource_id, &:active
 
   plugin ResourceMethods
-  include SemaphoreMethods
-
-  semaphore :refresh_dns_servers
+  plugin SemaphoreMethods, :refresh_dns_servers
 
   def insert_record(record_name:, type:, ttl:, data:)
     record_name = add_dot_if_missing(record_name)

@@ -11,9 +11,7 @@ class MinioCluster < Sequel::Model
   many_to_one :location, key: :location_id
 
   plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2]
-  include SemaphoreMethods
-
-  semaphore :destroy, :reconfigure
+  plugin SemaphoreMethods, :destroy, :reconfigure
 
   plugin :column_encryption do |enc|
     enc.column :admin_password

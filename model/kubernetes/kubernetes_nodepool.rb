@@ -8,9 +8,7 @@ class KubernetesNodepool < Sequel::Model
   many_to_many :vms, order: :created_at
 
   plugin ResourceMethods
-  include SemaphoreMethods
-
-  semaphore :destroy, :start_bootstrapping, :upgrade
+  plugin SemaphoreMethods, :destroy, :start_bootstrapping, :upgrade
 end
 
 # Table: kubernetes_nodepool

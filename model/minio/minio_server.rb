@@ -12,10 +12,8 @@ class MinioServer < Sequel::Model
   one_through_one :cluster, join_table: :minio_pool, left_primary_key: :minio_pool_id, left_key: :id, class: :MinioCluster
 
   plugin ResourceMethods, redacted_columns: :cert
-  include SemaphoreMethods
+  plugin SemaphoreMethods, :checkup, :destroy, :restart, :reconfigure, :refresh_certificates, :initial_provisioning
   include HealthMonitorMethods
-
-  semaphore :checkup, :destroy, :restart, :reconfigure, :refresh_certificates, :initial_provisioning
 
   plugin :column_encryption do |enc|
     enc.column :cert_key

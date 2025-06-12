@@ -8,10 +8,8 @@ class VictoriaMetricsServer < Sequel::Model
   many_to_one :resource, class: :VictoriaMetricsResource, key: :victoria_metrics_resource_id
 
   plugin ResourceMethods, redacted_columns: :cert
-  include SemaphoreMethods
+  plugin SemaphoreMethods, :checkup, :destroy, :initial_provisioning, :restart, :reconfigure
   include HealthMonitorMethods
-
-  semaphore :checkup, :destroy, :initial_provisioning, :restart, :reconfigure
 
   plugin :column_encryption do |enc|
     enc.column :cert_key
