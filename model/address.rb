@@ -31,17 +31,17 @@ class Address < Sequel::Model
     # Do nothing for ipv6 addresses, since VM addresses are chosen randomly from the /64.
     # Ignore /32 IPv4 addresses, since those would be used by the host itself and not for
     # VMs running on the host.
-    if cidr.is_a?(NetAddr::IPv4Net) && id != routed_to_host_id
-      addresses = Array.new(cidr.len) { [cidr.nth(it), cidr.to_s] }
+    return unless cidr.is_a?(NetAddr::IPv4Net) && id != routed_to_host_id
+    
+    addresses = Array.new(cidr.len) { [cidr.nth(it), cidr.to_s] }
 
-      if vm_host.provider_name == "leaseweb"
-        # Do not use first or last addresses for leaseweb
-        addresses.shift
-        addresses.pop
-      end
-
-      DB[:ipv4_address].import([:ip, :cidr], addresses)
+    if vm_host.provider_name == "leaseweb"
+      # Do not use first or last addresses for leaseweb
+      addresses.shift
+      addresses.pop
     end
+
+    DB[:ipv4_address].import([:ip, :cidr], addresses)
   end
 end
 
