@@ -249,7 +249,7 @@ class Prog::Vm::Nexus < Prog::Base
 
       incr_waiting_for_capacity unless vm.waiting_for_capacity_set?
       queued_vms = queued_vms.all
-      utilization = VmHost.where(allocation_state: "accepting", arch: vm.arch).select_map { sum(:used_cores) * 100.0 / sum(:total_cores) }.first.to_f
+      utilization = VmHost.where(allocation_state: "accepting", arch: vm.arch).cores_utilization
       Clog.emit("No capacity left") { {lack_of_capacity: {location: Location[vm.location_id].name, arch: vm.arch, family: vm.family, queue_size: queued_vms.count}} }
 
       unless Location[vm.location_id].name == "github-runners" && vm.created_at > Time.now - 60 * 60
