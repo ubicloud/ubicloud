@@ -56,7 +56,7 @@ jobs:
          node-version-file: "package.json"
 
     - name: Install node packages
-      run: npm ci
+      run: npm ci || npm ci --registry=https://registry.npmmirror.com
 
     - name: Run erb-formatter
       run: bundle exec rake linter:erb_formatter

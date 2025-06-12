@@ -376,7 +376,12 @@ end
 
 desc "Emit assets before deploying"
 task "assets:precompile" do
-  sh("npm", "install")
+  begin
+    sh("npm", "install")
+  rescue
+    puts "npm install failed, falling back to registry.npmmirror.com..."
+    sh("npm", "install", "--registry=https://registry.npmmirror.com")
+  end
   sh("npm", "run", "prod")
 end
 
