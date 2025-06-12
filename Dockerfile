@@ -4,7 +4,7 @@ COPY tailwind.config.js package.json package-lock.json ./
 COPY views/ ./views/
 COPY assets/ ./assets/
 COPY helpers/web.rb ./helpers/web.rb
-RUN npm ci
+RUN npm ci || npm ci --registry=https://registry.npmmirror.com
 RUN npm run prod
 
 
