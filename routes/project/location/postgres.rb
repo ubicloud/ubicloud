@@ -22,19 +22,23 @@ class Clover
       pg = @project.postgres_resources_dataset.first(filter)
       check_found_object(pg)
 
-      r.get true do
+      r.get api?, true do
         authorize("Postgres:view", pg.id)
         response.headers["cache-control"] = "no-store"
 
-        if api?
-          Serializers::Postgres.serialize(pg, {detailed: true})
-        else
-          @pg = pg
-          @family = Validation.validate_vm_size(pg.target_vm_size, "x64").family
-          @option_tree, @option_parents = generate_postgres_configure_options(flavor: @pg.flavor, location: @location)
+        Serializers::Postgres.serialize(pg, {detailed: true})
+      end
 
-          view "postgres/show"
-        end
+      r.get web?, String do |page|
+        authorize("Postgres:view", pg.id)
+        response.headers["cache-control"] = "no-store"
+
+        @pg = pg
+        @family = Validation.validate_vm_size(pg.target_vm_size, "x64").family
+        @option_tree, @option_parents = generate_postgres_configure_options(flavor: @pg.flavor, location: @location)
+        @page = page
+
+        view "postgres/show"
       end
 
       r.delete true do
@@ -241,7 +245,7 @@ class Clover
             Serializers::Postgres.serialize(st.subject, {detailed: true})
           else
             flash["notice"] = "'#{name}' will be ready in a few minutes"
-            r.redirect "#{@project.path}#{st.subject.path}"
+            r.redirect "#{@project.path}#{st.subject.path}/overview"
           end
         end
       end
@@ -299,7 +303,7 @@ class Clover
           Serializers::Postgres.serialize(st.subject, {detailed: true})
         else
           flash["notice"] = "'#{name}' will be ready in a few minutes"
-          r.redirect "#{@project.path}#{st.subject.path}"
+          r.redirect "#{@project.path}#{st.subject.path}/overview"
         end
       end
 
