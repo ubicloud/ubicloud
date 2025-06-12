@@ -160,7 +160,6 @@ class VmHost < Sequel::Model
     # not available subnet
     return [nil, nil] unless used_subnet
 
-    # we pick a random /31 subnet from the available subnet
     rand = SecureRandom.random_number(2**(32 - used_subnet.cidr.netmask.prefix_len)).to_i
     picked_subnet = used_subnet.cidr.nth(rand)
     # we check if the picked subnet is used by one of the vms
