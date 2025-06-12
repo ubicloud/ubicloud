@@ -33,7 +33,7 @@ gem "rack-unreloader", ">= 1.8"
 gem "rake"
 gem "refrigerator", ">= 1"
 gem "reline" # Remove it when pry adds it as a dependency
-gem "roda", github: "jeremyevans/roda", ref: "0e8c8067c4b84b402d72b10168c925c79fdc8016"
+gem "roda", ">= 3.93"
 gem "rodauth", ">= 2.39"
 gem "rodauth-omniauth", github: "janko/rodauth-omniauth", ref: "477810179ba0cab8d459be1a0d87dca5b57ec94b"
 gem "rodish", ">= 2"
