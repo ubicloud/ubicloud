@@ -43,7 +43,7 @@ class Clover
       Serializers::Postgres.serialize(pg, {detailed: true})
     else
       flash["notice"] = "'#{name}' will be ready in a few minutes"
-      request.redirect "#{@project.path}#{pg.path}"
+      request.redirect "#{@project.path}#{pg.path}/overview"
     end
   end
 

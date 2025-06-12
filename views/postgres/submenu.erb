@@ -1,0 +1,17 @@
+<aside class="lg:col-span-4 xl:col-span-3 2xl:col-span-2">
+  <nav class="space-y-1">
+    <% [
+        ["Overview", "overview", "hero-squares-plus"],
+      ].each do |label, page, icon| %>
+      <% url_class, icon_class = if @page == page
+        ["border-orange-600 bg-orange-50 text-orange-600 hover:bg-orange-50 hover:text-orange-700 group flex items-center border-l-4 px-3 py-2 text-sm font-medium", "text-orange-600 group-hover:text-orange-600"]
+ else
+        ["border-transparent text-gray-900 hover:bg-gray-50 hover:text-gray-900 group flex items-center border-l-4 px-3 py-2 text-sm font-medium", "text-gray-400 group-hover:text-gray-500"]
+      end %>
+      <a href="<%= @project_data[:path] + @pg.path + "/" + page %>" class="<%= url_class %>">
+        <%== part("components/icon", name: icon, classes: icon_class + " -ml-1 mr-3 h-6 w-6 flex-shrink-0") %>
+        <span class="truncate"><%= label %></span>
+      </a>
+    <% end %>
+  </nav>
+</aside>
