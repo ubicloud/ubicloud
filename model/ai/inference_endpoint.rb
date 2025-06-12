@@ -13,10 +13,8 @@ class InferenceEndpoint < Sequel::Model
   dataset_module Pagination
 
   plugin ResourceMethods
-  include SemaphoreMethods
+  plugin SemaphoreMethods, :destroy, :maintenance
   include ObjectTag::Cleanup
-
-  semaphore :destroy, :maintenance
 
   def display_location
     location.display_name

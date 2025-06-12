@@ -10,9 +10,8 @@ class GithubRunner < Sequel::Model
   one_to_one :vm, key: :id, primary_key: :vm_id
 
   plugin ResourceMethods, redacted_columns: :workflow_job
-  include SemaphoreMethods
+  plugin SemaphoreMethods, :destroy, :skip_deregistration
   include HealthMonitorMethods
-  semaphore :destroy, :skip_deregistration
 
   dataset_module do
     def total_active_runner_vcpus
