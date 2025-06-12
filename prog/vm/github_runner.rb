@@ -159,10 +159,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     # If the customer doesn't have enough quota, check the overall utilization
     # and allow provisioning if it is low.
     if updated_rows != 1
-      utilization = VmHost.where(allocation_state: "accepting", arch: github_runner.label_data["arch"]).select_map {
-        sum(:used_cores) * 100.0 / sum(:total_cores)
-      }.first.to_f
-
+      utilization = VmHost.where(allocation_state: "accepting", arch: github_runner.label_data["arch"]).cores_utilization
       unless utilization < 75
         Clog.emit("not allowed because of high utilization") { {reached_concurrency_limit: {utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
         nap rand(5..15)
