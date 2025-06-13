@@ -174,8 +174,8 @@ module Config
   override :kubernetes_v1_32_version, "20250320.1.0", string
   override :kubernetes_v1_33_version, "20250506.1.0", string
 
-  override :aws_based_postgres_16_ubuntu_2204_ami_version, "ami-030c060f85668b37d", string
-  override :aws_based_postgres_17_ubuntu_2204_ami_version, "ami-095e7210597188ca5", string
+  override :aws_based_postgres_16_ubuntu_2204_ami_version, "ami-0c15093fa829f190a", string
+  override :aws_based_postgres_17_ubuntu_2204_ami_version, "ami-0c8f8ddefeb7bd695", string
 
   # Allocator
   override :allocator_target_host_utilization, 0.55, float
