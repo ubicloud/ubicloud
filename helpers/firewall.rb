@@ -55,9 +55,9 @@ class Clover
         display_name: it.name
       }
     }
-    options.add_option(name: "private_subnet_id", values: subnets, parent: "location") do |location, private_subnet|
+    options.add_option(name: "private_subnet_id", values: subnets, parent: "location", check: ->(location, private_subnet) {
       private_subnet[:location_id] == location.id
-    end
+    })
     options.serialize
   end
 end

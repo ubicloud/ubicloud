@@ -97,23 +97,23 @@ class Clover
         display_name: it.name
       }
     }
-    options.add_option(name: "private_subnet_id", values: subnets, parent: "location") do |location, private_subnet|
+    options.add_option(name: "private_subnet_id", values: subnets, parent: "location", check: ->(location, private_subnet) {
       private_subnet[:location_id] == location.id
-    end
+    })
 
     options.add_option(name: "enable_ip4", values: ["1"], parent: "location")
-    options.add_option(name: "family", values: Option.families.map(&:name), parent: "location") do |location, family|
+    options.add_option(name: "family", values: Option.families.map(&:name), parent: "location", check: ->(location, family) {
       !!BillingRate.from_resource_properties("VmVCpu", family, location.name)
-    end
-    options.add_option(name: "size", values: Option::VmSizes.select { it.visible }.map { it.display_name }, parent: "family") do |location, family, size|
+    })
+    options.add_option(name: "size", values: Option::VmSizes.select { it.visible }.map { it.display_name }, parent: "family", check: ->(location, family, size) {
       vm_size = Option::VmSizes.find { it.display_name == size && it.arch == "x64" }
       vm_size.family == family
-    end
+    })
 
-    options.add_option(name: "storage_size", values: ["10", "20", "40", "80", "160", "320", "600", "640", "1200", "2400"], parent: "size") do |location, family, size, storage_size|
+    options.add_option(name: "storage_size", values: ["10", "20", "40", "80", "160", "320", "600", "640", "1200", "2400"], parent: "size", check: ->(location, family, size, storage_size) {
       vm_size = Option::VmSizes.find { it.display_name == size && it.arch == "x64" }
       vm_size.storage_size_options.include?(storage_size.to_i)
-    end
+    })
 
     available_gpus = DB.from(DB[:pci_device].join(:vm_host, id: :vm_host_id).join(:location, id: :location_id).where(device_class: ["0300", "0302"], vm_id: nil).group_and_count(:vm_host_id, :name, :device))
       .select { [name.as(location_name), device, max(:count).as(:max_count)] }.group(:name, :device)
@@ -125,11 +125,11 @@ class Clover
       hash[entry[:location_name]][entry[:device]] = entry[:max_count]
     end
 
-    options.add_option(name: "gpu", values: ["0:"] + gpu_options, parent: "family") do |location, family, gpu|
+    options.add_option(name: "gpu", values: ["0:"] + gpu_options, parent: "family", check: ->(location, family, gpu) {
       gpu = gpu.split(":")
       gpu_count = gpu[0].to_i
       gpu_count == 0 || (family == "standard" && !!BillingRate.from_resource_properties("Gpu", gpu[1], location.name) && gpu_availability[location.name] && gpu_availability[location.name][gpu[1]] && gpu_availability[location.name][gpu[1]] >= gpu_count)
-    end
+    })
 
     options.add_option(name: "boot_image", values: Option::BootImages.map(&:name))
     options.add_option(name: "unix_user")
