@@ -30,6 +30,24 @@ class VmStorageVolume < Sequel::Model
   def vhost_block_backend_version
     vhost_block_backend&.version
   end
+
+  def num_queues
+    @num_queues ||= if vhost_block_backend
+      [vm.vcpus / 2, 1].max
+    else
+      # SPDK volumes
+      1
+    end
+  end
+
+  def queue_size
+    @queue_size ||= if vhost_block_backend
+      64
+    else
+      # SPDK volumes
+      256
+    end
+  end
 end
 
 # Table: vm_storage_volume

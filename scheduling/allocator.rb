@@ -570,6 +570,19 @@ module Scheduling::Allocator
       rand_choice.id
     end
 
+    def self.allocate_vhost_block_backend(backends)
+      total_weight = backends.sum(&:allocation_weight)
+      fail "Total weight of all eligible vhost_block_backends shouldn't be zero." if total_weight == 0
+
+      rand_point = rand(total_weight)
+      weight_sum = 0
+      rand_choice = backends.find do |si|
+        weight_sum += si.allocation_weight
+        weight_sum > rand_point
+      end
+      rand_choice.id
+    end
+
     private
 
     def allocate_boot_image(vm_host, boot_image_name)
@@ -597,7 +610,13 @@ module Scheduling::Allocator
 
     def create_storage_volumes(vm, vm_host)
       @request.storage_volumes.each do |disk_index, volume|
-        spdk_installation_id = StorageAllocation.allocate_spdk_installation(vm_host.spdk_installations)
+        if vm_host.vhost_block_backends_dataset.exclude(allocation_weight: 0).empty?
+          spdk_installation_id = StorageAllocation.allocate_spdk_installation(vm_host.spdk_installations)
+          use_bdev_ubi = SpdkInstallation[spdk_installation_id].supports_bdev_ubi? && volume["boot"]
+        else
+          vhost_block_backend_id = StorageAllocation.allocate_vhost_block_backend(vm_host.vhost_block_backends)
+          use_bdev_ubi = false
+        end
 
         key_encryption_key = if volume["encrypted"]
           key_wrapping_algorithm = "aes-256-gcm"
@@ -623,12 +642,13 @@ module Scheduling::Allocator
           vm_id: vm.id,
           boot: volume["boot"],
           size_gib: volume["size_gib"],
-          use_bdev_ubi: SpdkInstallation[spdk_installation_id].supports_bdev_ubi? && volume["boot"],
+          use_bdev_ubi:,
           boot_image_id: image_id,
           skip_sync: volume["skip_sync"],
           disk_index: disk_index,
           key_encryption_key_1_id: key_encryption_key&.id,
           spdk_installation_id: spdk_installation_id,
+          vhost_block_backend_id:,
           storage_device_id: @volume_to_device_map[disk_index],
           max_ios_per_sec: volume["max_ios_per_sec"],
           max_read_mbytes_per_sec: volume["max_read_mbytes_per_sec"],
