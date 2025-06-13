@@ -32,6 +32,8 @@ class Clover
       r.get web?, %w[overview connection charts networking scale-up-down high-availability read-replica backup-restore settings] do |page|
         authorize("Postgres:view", pg.id)
 
+        next if pg.read_replica? && %w[scale-up-down high-availability read-replica backup-restore].include?(page)
+
         response.headers["cache-control"] = "no-store"
 
         @pg = pg
