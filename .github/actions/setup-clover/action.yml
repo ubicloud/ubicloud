@@ -1,0 +1,39 @@
+name: 'Setup Clover'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up environment variables
+      shell: bash
+      run: |
+        echo "DB_USER=clover" >> $GITHUB_ENV
+        echo "DB_PASSWORD=nonempty" >> $GITHUB_ENV
+        echo "DB_NAME=clover_test" >> $GITHUB_ENV
+        echo "CLOVER_DATABASE_URL=postgres://clover:nonempty@localhost:5432/clover_test" >> $GITHUB_ENV
+        echo "CLOVER_SESSION_SECRET=kbaf1V3biZ+R2QqFahgDLB5/lSomwxQusA4PwROUkFS1srn0xM/I47IdLW7HjbQoxWri6/aVgtkqTLFiP65h9g==" >> $GITHUB_ENV
+        echo "CLOVER_RUNTIME_TOKEN_SECRET=r3rV5RzYVpDMlXxY1VnrHlmoMnXdUVt5ABec/TWXnmO7Ok/riFRDNATAMmDWTvtH+cSyXAniH3hHL6EetHj/FA==" >> $GITHUB_ENV
+        echo "CLOVER_COLUMN_ENCRYPTION_KEY=TtlY0+hd4lvedPkNbu5qsj5H7giPKJSRX9KDBrvid7c=" >> $GITHUB_ENV
+
+    - name: Install PostgreSQL
+      shell: bash
+      run: |
+        sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+        wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+        sudo apt-get update
+        sudo apt-get install -y postgresql-15 postgresql-client-15
+        sudo systemctl start postgresql
+        until pg_isready -q; do sleep 1; done
+
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: .tool-versions
+        bundler-cache: true
+
+    - name: Setup database
+      shell: bash
+      run: |
+        sudo -u postgres psql -c "CREATE ROLE ${{ env.DB_USER }} PASSWORD '${{ env.DB_PASSWORD }}' LOGIN; CREATE ROLE ${{ env.DB_USER }}_password PASSWORD '${{ env.DB_PASSWORD }}' LOGIN"
+        bundle exec rake setup_database\[test,false\]
+        # sudo -u postgres psql -c "CREATE DATABASE ${{ env.DB_NAME }} OWNER ${{ env.DB_USER }};"
+        # psql "$CLOVER_DATABASE_URL" -c "CREATE EXTENSION citext; CREATE EXTENSION btree_gist;"
