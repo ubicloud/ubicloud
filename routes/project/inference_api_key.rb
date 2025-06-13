@@ -7,7 +7,7 @@ class Clover
         @inference_api_keys = Serializers::InferenceApiKey.serialize(inference_api_key_ds.all)
 
         if web?
-          @remaining_free_quota = FreeQuota.remaining_free_quota("inference-tokens", @project.id)
+          @remaining_free_quota = FreeQuota.remaining_free_quota("inference-tokens", @project)
           @free_quota_unit = "inference tokens"
           @has_valid_payment_method = @project.has_valid_payment_method?
           view "inference/api_key/index"
