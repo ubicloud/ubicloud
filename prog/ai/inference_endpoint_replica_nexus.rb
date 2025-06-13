@@ -238,7 +238,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       begin
         today_record = BillingRecord
           .where(project_id: project.id, resource_id: inference_endpoint.id, billing_rate_id: rate_id)
-          .where { Sequel.pg_range(it.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
+          .where_span(begin_time, end_time)
           .first
 
         if today_record
