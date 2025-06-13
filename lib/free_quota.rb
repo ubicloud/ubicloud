@@ -25,7 +25,7 @@ class FreeQuota
     free_quota = free_quotas[name]
     used_amount = BillingRecord
       .where(project_id:, billing_rate_id: free_quota["billing_rate_ids"])
-      .where { Sequel.pg_range(span).overlaps(Sequel.pg_range(FreeQuota.begin_of_month...Time.now)) }
+      .where_span(FreeQuota.begin_of_month, Time.now)
       .sum(:amount) || 0
     [0, free_quota["value"] - used_amount].max
   end
@@ -34,7 +34,7 @@ class FreeQuota
     free_quota = free_quotas[name]
     BillingRecord
       .where(billing_rate_id: free_quota["billing_rate_ids"])
-      .where { Sequel.pg_range(span).overlaps(Sequel.pg_range(FreeQuota.begin_of_month...Time.now)) }
+      .where_span(FreeQuota.begin_of_month, Time.now)
       .group(:project_id)
       .having { sum(:amount) >= free_quota["value"] }
       .select(:project_id)
