@@ -33,8 +33,9 @@ class Clover
         end
       end
 
-      r.get web?, String do |page|
+      r.get web?, %w[overview connection charts networking resize high-availability read-replica backup-restore settings] do |page|
         authorize("Postgres:view", pg.id)
+
         response.headers["cache-control"] = "no-store"
 
         @pg = pg
