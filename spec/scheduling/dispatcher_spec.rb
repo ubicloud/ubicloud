@@ -227,11 +227,12 @@ RSpec.describe Scheduling::Dispatcher do
   end
 
   describe "#metrics_thread" do
-    it "emits metrics every 1000 queue entries" do
+    it "emits metrics every 200 queue entries" do
       q = Queue.new
-      1000.times { q.push 1 }
+      n = described_class::METRICS_EVERY
+      n.times { q.push 1 }
       q.push nil
-      expect(di).to receive(:metrics_hash).with([1] * 1000).and_return({})
+      expect(di).to receive(:metrics_hash).with([1] * n).and_return({})
       expect(Clog).to receive(:emit).and_call_original
       di.metrics_thread(q)
     end
@@ -242,19 +243,20 @@ RSpec.describe Scheduling::Dispatcher do
       t = Time.now
       arrays = []
       rm = Strand::RespirateMetrics
-      arrays << Array.new(750) { rm.new(t, t + 1, t + 2, t + 3, true, 0, 0) }
-      arrays << Array.new(100) { rm.new(t, t + 2, t + 4, t + 7, true, 10, 9) }
-      arrays << Array.new(100) { rm.new(t, t + 3, t + 8, t + 12, true, 20, 7) }
-      arrays << Array.new(40) { rm.new(t, t + 5, t + 12, t + 21, false, 30, 5) }
-      arrays << Array.new(9) { rm.new(t, t + 6, t + 16, t + 29, true, 40, 3) }
+      arrays << Array.new(150) { rm.new(t, t + 1, t + 2, t + 3, true, 0, 0) }
+      arrays << Array.new(20) { rm.new(t, t + 2, t + 4, t + 7, true, 10, 9) }
+      arrays << Array.new(20) { rm.new(t, t + 3, t + 8, t + 12, true, 20, 7) }
+      arrays << Array.new(8) { rm.new(t, t + 5, t + 12, t + 21, false, 30, 5) }
+      arrays << Array.new(1) { rm.new(t, t + 6, t + 16, t + 29, true, 40, 3) }
       arrays << Array.new(1) { rm.new(t, t + 7, t + 20, t + 37, false, 50, 1) }
       expect(di.metrics_hash(arrays.flatten)).to eq({
         available_workers: {average: 1, max: 9, median: 0, p75: 1, p85: 7, p95: 9, p99: 9},
-        lease_acquire_percentage: 95.9,
-        lease_delay: {average: 1.944, max: 17.0, median: 1.0, p75: 3.0, p85: 4.0, p95: 9.0, p99: 13.0},
-        queue_delay: {average: 1.833, max: 13.0, median: 1.0, p75: 2.0, p85: 5.0, p95: 7.0, p99: 10.0},
+        lease_acquire_percentage: 95.5,
+        lease_delay: {average: 1.96, max: 17.0, median: 1.0, p75: 3.0, p85: 4.0, p95: 9.0, p99: 13.0},
+        queue_delay: {average: 1.845, max: 13.0, median: 1.0, p75: 2.0, p85: 5.0, p95: 7.0, p99: 10.0},
         queue_size: {average: 4, max: 50, median: 0, p75: 10, p85: 20, p95: 30, p99: 40},
-        scan_delay: {average: 1.511, max: 7.0, median: 1.0, p75: 2.0, p85: 3.0, p95: 5.0, p99: 6.0}
+        scan_delay: {average: 1.515, max: 7.0, median: 1.0, p75: 2.0, p85: 3.0, p95: 5.0, p99: 6.0},
+        strand_count: 200
       })
     end
   end

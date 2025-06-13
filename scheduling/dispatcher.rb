@@ -239,7 +239,7 @@ class Scheduling::Dispatcher
     array = []
     while (metric = metrics_queue.pop)
       array << metric
-      if array.size == 1000
+      if array.size == METRICS_EVERY
         Clog.emit("respirate metrics") { {respirate_metrics: metrics_hash(array)} }
         array.clear
       end
@@ -247,6 +247,21 @@ class Scheduling::Dispatcher
   end
 
   METRIC_TYPES = %i[scan_delay queue_delay lease_delay queue_size available_workers].freeze
+
+  # The batch size for metrics output.  Mezmo batches their real time graph in 30 second
+  # intervals, and a batch size of 1000 meant that there would be intervals where Mezmo
+  # would see no results.  Even when it saw results, the results would be choppy. By
+  # outputing more frequently, we should get smoother and more accurate graphs.
+  METRICS_EVERY = 200
+
+  # Calculate the necessary offsets up front for the median/p75/p85/p95/p99 numbers,
+  # and the multiplier to get the lease acquired percentage.
+  METRICS_MEDIAN = (METRICS_EVERY * 0.5r).floor
+  METRICS_P75 = (METRICS_EVERY * 0.75r).floor
+  METRICS_P85 = (METRICS_EVERY * 0.85r).floor
+  METRICS_P95 = (METRICS_EVERY * 0.95r).floor
+  METRICS_P99 = (METRICS_EVERY * 0.99r).floor
+  METRICS_LAP_MULTIPLIER = METRICS_EVERY / 100.0
 
   # Metrics to emit.  This assumes an array size of 1000.  The following metrics are emitted:
   #
@@ -282,16 +297,17 @@ class Scheduling::Dispatcher
     METRIC_TYPES.each do |metric_type|
       metrics = array.map(&metric_type)
       metrics.sort!
-      average = metrics.sum / 1000
-      median = metrics[500]
-      p75 = metrics[750]
-      p85 = metrics[850]
-      p95 = metrics[950]
-      p99 = metrics[990]
+      average = metrics.sum / METRICS_EVERY
+      median = metrics[METRICS_MEDIAN]
+      p75 = metrics[METRICS_P75]
+      p85 = metrics[METRICS_P85]
+      p95 = metrics[METRICS_P95]
+      p99 = metrics[METRICS_P99]
       max = metrics.last
       respirate_metrics[metric_type] = {average:, median:, p75:, p85:, p95:, p99:, max:}
     end
-    respirate_metrics[:lease_acquire_percentage] = array.count(&:lease_acquired) / 10.0
+    respirate_metrics[:lease_acquire_percentage] = array.count(&:lease_acquired) / METRICS_LAP_MULTIPLIER
+    respirate_metrics[:strand_count] = METRICS_EVERY
     respirate_metrics
   end
 
