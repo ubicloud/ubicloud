@@ -248,13 +248,18 @@ class Vm < Sequel::Model
         "disk_index" => s.disk_index,
         "encrypted" => !s.key_encryption_key_1.nil?,
         "spdk_version" => s.spdk_version,
+        "vhost_block_backend_version" => s.vhost_block_backend_version,
         "use_bdev_ubi" => s.use_bdev_ubi,
         "skip_sync" => s.skip_sync,
         "storage_device" => s.storage_device.name,
         "read_only" => s.size_gib == 0,
         "max_ios_per_sec" => s.max_ios_per_sec,
         "max_read_mbytes_per_sec" => s.max_read_mbytes_per_sec,
-        "max_write_mbytes_per_sec" => s.max_write_mbytes_per_sec
+        "max_write_mbytes_per_sec" => s.max_write_mbytes_per_sec,
+        "slice_name" => vm_host_slice&.inhost_name || "system.slice",
+        "num_queues" => s.num_queues,
+        "queue_size" => s.queue_size,
+        "copy_on_read" => false
       }
     }
   end
