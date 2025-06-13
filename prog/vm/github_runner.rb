@@ -48,7 +48,7 @@ class Prog::Vm::GithubRunner < Prog::Base
 
     ps = Prog::Vnet::SubnetNexus.assemble(
       Config.github_runner_service_project_id,
-      location_id: Location::GITHUB_RUNNERS_ID,
+      location_id: Location[display_name: "enes-aws"].id,
       allow_only_ssh: true
     ).subject
 
@@ -58,8 +58,8 @@ class Prog::Vm::GithubRunner < Prog::Base
       sshable_unix_user: "runneradmin",
       name: github_runner.ubid.to_s,
       size: label_data["vm_size"],
-      location_id: Location::GITHUB_RUNNERS_ID,
-      boot_image: label_data["boot_image"],
+      location_id: Location[display_name: "enes-aws"].id,
+      boot_image: "ami-0c8f8ddefeb7bd695",
       storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: true, skip_sync: true}],
       enable_ip4: true,
       arch: label_data["arch"],
@@ -203,10 +203,10 @@ class Prog::Vm::GithubRunner < Prog::Base
         "VM Family" => vm.family,
         "Arch" => vm.arch,
         "Image" => vm.boot_image,
-        "VM Host" => vm.vm_host.ubid,
+        "VM Host" => vm.vm_host&.ubid,
         "VM Pool" => vm.pool_id ? UBID.from_uuidish(vm.pool_id).to_s : nil,
-        "Location" => Location[vm.vm_host.location_id].name,
-        "Datacenter" => vm.vm_host.data_center,
+        "Location" => Location[display_name: "enes-aws"].name,
+        "Datacenter" => vm.vm_host&.data_center,
         "Project" => github_runner.installation.project.ubid,
         "Console URL" => "#{Config.base_url}#{github_runner.installation.project.path}/github"
       }.map { "#{_1}: #{_2}" }.join("\n")
