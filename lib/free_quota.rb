@@ -21,10 +21,10 @@ class FreeQuota
     @free_quotas
   end
 
-  def self.remaining_free_quota(name, project_id)
+  def self.remaining_free_quota(name, project)
     free_quota = free_quotas[name]
-    used_amount = BillingRecord
-      .where(project_id:, billing_rate_id: free_quota["billing_rate_ids"])
+    used_amount = project.billing_records_dataset
+      .where(billing_rate_id: free_quota["billing_rate_ids"])
       .where_span(FreeQuota.begin_of_month, Time.now)
       .sum(:amount) || 0
     [0, free_quota["value"] - used_amount].max
