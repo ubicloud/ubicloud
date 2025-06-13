@@ -237,10 +237,13 @@ class Scheduling::Dispatcher
   # not too to burdensome on the logging infrastructure, while still being helpful.
   def metrics_thread(metrics_queue)
     array = []
+    t = Time.now
     while (metric = metrics_queue.pop)
       array << metric
       if array.size == METRICS_EVERY
-        Clog.emit("respirate metrics") { {respirate_metrics: metrics_hash(array)} }
+        new_t = Time.now
+        Clog.emit("respirate metrics") { {respirate_metrics: metrics_hash(array, new_t - t)} }
+        t = new_t
         array.clear
       end
     end
@@ -292,7 +295,7 @@ class Scheduling::Dispatcher
   #                             100.0. For multi-process, non-partitioned respirate, this can
   #                             be significantly lower, as multiple processes try to process
   #                             the same strand concurrently, and some fail to acquire the lease.
-  def metrics_hash(array)
+  def metrics_hash(array, elapsed_time)
     respirate_metrics = {}
     METRIC_TYPES.each do |metric_type|
       metrics = array.map(&metric_type)
@@ -308,6 +311,7 @@ class Scheduling::Dispatcher
     end
     respirate_metrics[:lease_acquire_percentage] = array.count(&:lease_acquired) / METRICS_LAP_MULTIPLIER
     respirate_metrics[:strand_count] = METRICS_EVERY
+    respirate_metrics[:strands_per_second] = (METRICS_EVERY / elapsed_time).floor
     respirate_metrics
   end
 
