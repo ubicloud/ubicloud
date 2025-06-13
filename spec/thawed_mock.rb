@@ -125,7 +125,7 @@ module ThawedMock
   allow_mocking(Serializers::Vm, :serialize_internal)
   allow_mocking(SshKey, :generate)
   allow_mocking(ThreadPrinter, :puts, :run)
-  allow_mocking(Util, :create_certificate, :create_root_certificate, :rootish_ssh, :send_email)
+  allow_mocking(Util, :create_certificate, :create_root_certificate, :rootish_ssh, :send_email, :populate_ipv4_txt)
   allow_mocking(UBID, :class_match?)
   allow_mocking(VictoriaMetrics::Client, :new)
 end

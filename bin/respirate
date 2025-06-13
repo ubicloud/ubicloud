@@ -23,6 +23,7 @@ workers = [
   {ubid: "stcheckzvsagezalertszzzzza", prog: "CheckUsageAlerts"},
   {ubid: "stexp1repr0ject1nv1tat10na", prog: "ExpireProjectInvitations"},
   {ubid: "st10g0vmh0st0vt111zat10nzz", prog: "LogVmHostUtilizations"},
+  {ubid: "stp0pv1atez1pv4cachezzzzzz", prog: "PopulateIPv4Cache"},
   Config.heartbeat_url ? {ubid: "stheartbeatheartbheartheaz", prog: "Heartbeat"} : nil,
   Config.github_app_id ? {ubid: "stredelivergith0bfail0reaz", prog: "RedeliverGithubFailures", stack: [{last_check_at: Time.now}]} : nil
 ]
