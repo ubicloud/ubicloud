@@ -14,26 +14,26 @@ require_relative "../spec_helper"
         target_storage_size_gib: 64
       ).subject
       @ref = [@pg.display_location, @pg.name].join("/")
-      @conn_string = URI("postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?channel_binding=require")
+      @conn_string = URI("postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require")
       expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
       @dns_zone = DnsZone.new
       expect(Prog::Postgres::PostgresResourceNexus).to receive(:dns_zone).and_return(@dns_zone).at_least(:once)
     end
 
     it "connects to database via #{cmd}" do
-      expect(cli_exec(["pg", @ref, cmd])).to eq %W[#{cmd} -- postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?channel_binding=require]
+      expect(cli_exec(["pg", @ref, cmd])).to eq %W[#{cmd} -- postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require]
     end
 
     it "supports #{cmd} options" do
-      expect(cli_exec(["pg", @ref, cmd, "-a"])).to eq %W[#{cmd} -a -- postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?channel_binding=require]
+      expect(cli_exec(["pg", @ref, cmd, "-a"])).to eq %W[#{cmd} -a -- postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require]
     end
 
     it "supports -U option for user name" do
-      expect(cli_exec(["pg", @ref, "-Ufoo", cmd, "-a"])).to eq %W[#{cmd} -a -- postgres://foo@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?channel_binding=require]
+      expect(cli_exec(["pg", @ref, "-Ufoo", cmd, "-a"])).to eq %W[#{cmd} -a -- postgres://foo@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require]
     end
 
     it "supports -d option for database name" do
-      expect(cli_exec(["pg", @ref, "-dfoo", cmd, "-a"])).to eq %W[#{cmd} -a -- postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/foo?channel_binding=require]
+      expect(cli_exec(["pg", @ref, "-dfoo", cmd, "-a"])).to eq %W[#{cmd} -a -- postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/foo?sslmode=require]
     end
   end
 end

@@ -246,6 +246,28 @@ function setupDatePicker() {
   });
 }
 
+$(".fork-icon").on("click", function () {
+  let target_datetime = $(this).data("target-datetime");
+  date_picker = flatpickr("#restore_target", {enableTime: true, dateFormat: "Y-m-d H:i"})
+  date_picker.setDate(target_datetime, true);
+
+  $("#restore_target").addClass("animate-flash transition-colors duration-1000");
+  setTimeout(() => {
+    $("#restore_target").removeClass('animate-flash');
+  }, 2000);
+})
+
+$(document).on('change', '.connection-info-format-selector select, .connection-info-format-selector input', function() {
+  let format = $(".connection-info-format-selector select").val();
+  let port = $(".connection-info-format-selector input").is(":checked") ? "6432" : "5432";
+  let reveal_status = $(".connection-info-box:visible").find(".group").hasClass('active')
+
+  $(".connection-info-box").hide();
+  $(".connection-info-box-" + format + "-" + port).find(".group").toggleClass('active', reveal_status);
+  $(".connection-info-box-" + format + "-" + port).show();
+});
+
+
 function setupFormOptionUpdates() {
   $('#creation-form').on('change', 'input', function () {
     let name = $(this).attr('name');
@@ -791,7 +813,7 @@ function queryAndUpdateChart(chartInstance, start_time, end_time) {
     end: end_time.toISOString()
   }
   const queryString = new URLSearchParams(params).toString();
-  const url = `${new URL(document.location.href).pathname}/metrics?${queryString}`;
+  const url = $("#metrics-container").data("metrics-url") + "/metrics?" + queryString;
 
   fetch(url)
     .then(response => response.json())
@@ -869,7 +891,7 @@ function queryAndUpdateChart(chartInstance, start_time, end_time) {
 }
 
 function updateMetricsCharts() {
-  const timeDuration = $('#metrics-container #time-range').val();
+  const timeDuration = $('#metrics-container #time-range').val() || "1h";
   const timeDurationSeconds = durationToSeconds(timeDuration);
   const start_time = new Date(Date.now() - timeDurationSeconds * 1000);
   const end_time = new Date(Date.now());
