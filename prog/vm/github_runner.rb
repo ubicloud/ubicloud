@@ -217,16 +217,45 @@ class Prog::Vm::GithubRunner < Prog::Base
     command = <<~COMMAND
       # To make sure the script errors out if any command fails
       set -ueo pipefail
-      echo "image version: $ImageVersion"
+      # echo "image version: $ImageVersion"
       # runneradmin user on default Github hosted runners is a member of adm and
       # sudo groups. Having sudo access also allows us getting journalctl logs in
       # case of any issue on the destroy state below by runneradmin user.
       sudo usermod -a -G sudo,adm runneradmin
 
+      # Setup the runner script
+      mkdir -p actions-runner
+      curl -o actions-runner-linux-x64-2.325.0.tar.gz -L https://github.com/actions/runner/releases/download/v2.325.0/actions-runner-linux-x64-2.325.0.tar.gz
+      echo "5020da7139d85c776059f351e0de8fdec753affc9c558e892472d43ebeb518f4  actions-runner-linux-x64-2.325.0.tar.gz" | shasum -a 256 -c
+      tar xzf ./actions-runner-linux-x64-2.325.0.tar.gz -C actions-runner
+      ./actions-runner/env.sh
+      # Include /etc/environment in the runneradmin environment to move it to the
+      # runner environment at the end of this script, it's otherwise ignored, and
+      # this omission has caused problems.
+      # See https://github.com/actions/runner/issues/1703
+      cat <<EOT > ./actions-runner/run-withenv.sh
+      #!/bin/bash
+      mapfile -t env </etc/environment
+      exec env -- "\\${env[@]}" ./actions-runner/run.sh --jitconfig "\\$1"
+      EOT
+      chmod +x ./actions-runner/run-withenv.sh
+      echo "PATH=$PATH" >> ./actions-runner/.env
+      sudo userdel -rf runner || true
+      sudo groupdel -f runner || true
+      sudo userdel -rf prometheus || true
+      sudo groupdel -f prometheus || true
+      sudo addgroup --gid 1001 runner
+      sudo adduser --disabled-password --uid 1001 --gid 1001 --gecos '' runner
+      echo 'runner ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-runner
+      sudo usermod -a -G adm,systemd-journal runner
+
+      sudo mv ./actions-runner /home/runner/
+      sudo chown -R runner:runner /home/runner/actions-runner
+
       # The `imagedata.json` file contains information about the generated image.
       # I enrich it with details about the Ubicloud environment and placed it in the runner's home directory.
       # GitHub-hosted runners also use this file as setup_info to show on the GitHub UI.
-      jq '. += [#{setup_info.to_json}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
+      # jq '. += [#{setup_info.to_json}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
 
       # We use a JWT token to authenticate the virtual machines with our runtime API. This token is valid as long as the vm is running.
       # ubicloud/cache package which forked from the official actions/cache package, sends requests to UBICLOUD_CACHE_URL using this token.
