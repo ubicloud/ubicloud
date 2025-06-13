@@ -29,8 +29,9 @@ class Clover
         Serializers::Postgres.serialize(pg, {detailed: true})
       end
 
-      r.get web?, String do |page|
+      r.get web?, %w[overview connection charts networking scale-up-down high-availability read-replica backup-restore settings] do |page|
         authorize("Postgres:view", pg.id)
+
         response.headers["cache-control"] = "no-store"
 
         @pg = pg
