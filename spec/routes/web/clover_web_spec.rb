@@ -117,4 +117,18 @@ RSpec.describe Clover do
 
     expect(failures).to be_empty
   end
+
+  it "returns ipv4 list from cached file" do
+    vmh1, vmh2 = Array.new(2) { create_vm_host }
+    Address.create(cidr: "1.1.1.1/32", routed_to_host_id: vmh1.id) { it.id = vmh1.id }
+    Address.create(cidr: "3.3.3.3/27", routed_to_host_id: vmh2.id)
+    Address.create(cidr: "2.2.2.2/27", routed_to_host_id: vmh1.id)
+    Address.create(cidr: "3.3.3.3/28", routed_to_host_id: vmh2.id)
+    Util.populate_ipv4_txt
+
+    visit "/ips-v4"
+
+    expect(page.status_code).to eq(200)
+    expect(page.body).to eq("2.2.0.0/16\n3.3.0.0/16")
+  end
 end

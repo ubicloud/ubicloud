@@ -87,4 +87,12 @@ module Util
   def self.send_email(...)
     EmailRenderer.sendmail("/", ...)
   end
+
+  def self.populate_ipv4_txt
+    ips = Address.where { (family(cidr) =~ 4) & (routed_to_host_id !~ id) }
+      .map { NetAddr::IPv4Net.new(it.cidr.network, NetAddr::Mask32.new(16)).to_s }
+    ips.uniq!
+    ips.sort!
+    File.open("var/ips-v4.txt", "w") { it.write(ips.join("\n")) }
+  end
 end

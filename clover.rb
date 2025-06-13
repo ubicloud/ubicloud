@@ -668,6 +668,12 @@ class Clover < Roda
   # :nocov:
 
   route do |r|
+    r.is "ips-v4" do
+      response["content-type"] = "text/plain"
+      response["cache-control"] = "public, max-age=3600"
+      next File.read("var/ips-v4.txt")
+    end
+
     if api?
       unless /\ABearer:?\s+pat-/i.match?(env["HTTP_AUTHORIZATION"].to_s)
         if r.path_info == "/cli"
