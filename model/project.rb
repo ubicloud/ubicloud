@@ -10,6 +10,7 @@ class Project < Sequel::Model
   many_to_one :billing_info
   one_to_many :usage_alerts
   one_to_many :github_installations
+  one_to_many :billing_records
   many_to_many :github_runners, join_table: :github_installation, right_key: :id, right_primary_key: :installation_id
 
   many_to_many :accounts, join_table: :access_tag, right_key: :hyper_tag_id
