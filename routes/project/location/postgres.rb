@@ -92,7 +92,7 @@ class Clover
 
         @pg = pg
         @family = Validation.validate_vm_size(pg.target_vm_size, "x64").family
-        @option_tree, @option_parents = generate_postgres_configure_options(flavor: @pg.flavor, location: @location)
+        @option_tree, @option_parents = generate_postgres_options(flavor: @pg.flavor, location: @location)
         @page = page
 
         view "postgres/show"
