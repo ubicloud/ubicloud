@@ -239,6 +239,10 @@ RSpec.describe Vm do
       expect(vm).to receive(:location).and_return(instance_double(Location, provider: "aws"))
       expect(vm).to receive(:ephemeral_net6).and_return(NetAddr::IPv6Net.parse("2001:db8::/128"))
       expect(vm.ip6.to_s).to eq("2001:db8::")
+
+      expect(vm).to receive(:location).and_return(instance_double(Location, provider: "aws"))
+      expect(vm).to receive(:ephemeral_net6).and_return(nil)
+      expect(vm.ip6).to be_nil
     end
 
     it "returns the right private_ipv4 based on the netmask" do

@@ -11,6 +11,11 @@ RSpec.describe Minio::Client do
     expect(excon_client.data[:ssl_cert_store]).to be_a(OpenSSL::X509::Store)
   end
 
+  it "can initialize without ssl_ca_data" do
+    expect(Excon).to receive(:new).with(endpoint, socket: nil, ssl_cert_store: nil)
+    described_class.new(endpoint: endpoint, access_key: "minioadmin", secret_key: "minioadminpw", ssl_ca_data: "", socket: nil)
+  end
+
   describe "admin_info" do
     it "sends a GET request to /minio/admin/v3/info" do
       stub_request(:get, "#{endpoint}/minio/admin/v3/info").to_return(status: 200, body: "test")

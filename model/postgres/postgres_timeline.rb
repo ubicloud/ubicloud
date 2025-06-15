@@ -6,6 +6,7 @@ class PostgresTimeline < Sequel::Model
   one_to_one :strand, key: :id
   one_to_one :parent, key: :parent_id, class: self
   one_to_one :leader, class: :PostgresServer, key: :timeline_id, conditions: {timeline_access: "push"}
+  many_to_one :location
 
   plugin ResourceMethods
   include SemaphoreMethods
@@ -88,8 +89,14 @@ PGHOST=/var/run/postgresql
     Time.now
   end
 
+  def aws?
+    location.aws?
+  end
+
+  S3BlobStorage = Struct.new(:url)
+
   def blob_storage
-    @blob_storage ||= MinioCluster[blob_storage_id]
+    @blob_storage ||= MinioCluster[blob_storage_id] || (aws? ? S3BlobStorage.new("https://s3.#{location.name}.amazonaws.com") : nil)
   end
 
   def blob_storage_endpoint
@@ -101,7 +108,7 @@ PGHOST=/var/run/postgresql
       endpoint: blob_storage_endpoint,
       access_key: access_key,
       secret_key: secret_key,
-      ssl_ca_data: blob_storage.root_certs
+      ssl_ca_data: aws? ? "" : blob_storage.root_certs
     )
   end
 
@@ -120,8 +127,11 @@ end
 #  secret_key                | text                     |
 #  latest_backup_started_at  | timestamp with time zone |
 #  blob_storage_id           | uuid                     |
+#  location_id               | uuid                     |
 #  cached_earliest_backup_at | timestamp with time zone |
 # Indexes:
 #  postgres_timeline_pkey | PRIMARY KEY btree (id)
+# Foreign key constraints:
+#  postgres_timeline_location_id_fkey | (location_id) REFERENCES location(id)
 # Referenced By:
 #  postgres_server | postgres_server_timeline_id_fkey | (timeline_id) REFERENCES postgres_timeline(id)
