@@ -115,7 +115,7 @@ class Clover
       pg_size.storage_size_options.include?(storage_size.to_i)
     end
 
-    options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS[flavor], parent: "flavor")
+    options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS)
 
     options.add_option(name: "ha_type", values: [PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC], parent: "storage_size")
 

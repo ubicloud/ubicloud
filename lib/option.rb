@@ -108,12 +108,9 @@ module Option
     [PostgresResource::HaType::SYNC, 2, "2 Standbys", "Synchronous replication with quorum"]].map {
     PostgresHaOption.new(*it)
   }.freeze
+  # Postgres Global Options
 
-  POSTGRES_VERSION_OPTIONS = {
-    PostgresResource::Flavor::STANDARD => ["17", "16"],
-    PostgresResource::Flavor::PARADEDB => ["17", "16"],
-    PostgresResource::Flavor::LANTERN => ["16"]
-  }
+  POSTGRES_VERSION_OPTIONS = ["17", "16"].freeze
 
   AWS_LOCATIONS = ["us-east-1"].freeze
 
