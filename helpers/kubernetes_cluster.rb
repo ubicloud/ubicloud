@@ -43,10 +43,10 @@ class Clover
     options.add_option(name: "location", values: Option.kubernetes_locations)
     options.add_option(name: "version", values: Option.kubernetes_versions)
     options.add_option(name: "cp_nodes", values: Option::KubernetesCPOptions.map(&:cp_node_count), parent: "location")
-    options.add_option(name: "worker_size", values: Option::VmSizes.select { it.visible && it.vcpus <= 16 }.map { it.display_name }, parent: "location") do |location, size|
+    options.add_option(name: "worker_size", values: Option::VmSizes.select { it.visible && it.vcpus <= 16 }.map { it.display_name }, parent: "location", check: ->(location, size) {
       vm_size = Option::VmSizes.find { it.display_name == size && it.arch == "x64" }
       vm_size.family == "standard"
-    end
+    })
     options.add_option(name: "worker_nodes", values: (1..10).map { {value: it, display_name: "#{it} Node#{(it == 1) ? "" : "s"}"} }, parent: "worker_size")
 
     options.serialize
