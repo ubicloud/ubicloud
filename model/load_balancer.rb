@@ -19,10 +19,9 @@ class LoadBalancer < Sequel::Model
   plugin :association_dependencies, load_balancers_vms: :destroy, ports: :destroy, certs_load_balancers: :destroy
 
   plugin ResourceMethods
-  include SemaphoreMethods
+  plugin SemaphoreMethods, :destroy, :update_load_balancer, :rewrite_dns_records, :refresh_cert
   include ObjectTag::Cleanup
   dataset_module Pagination
-  semaphore :destroy, :update_load_balancer, :rewrite_dns_records, :refresh_cert
 
   def display_location
     private_subnet.display_location

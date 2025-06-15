@@ -8,9 +8,7 @@ class PostgresTimeline < Sequel::Model
   one_to_one :leader, class: :PostgresServer, key: :timeline_id, conditions: {timeline_access: "push"}
 
   plugin ResourceMethods
-  include SemaphoreMethods
-
-  semaphore :destroy
+  plugin SemaphoreMethods, :destroy
 
   plugin :column_encryption do |enc|
     enc.column :secret_key
