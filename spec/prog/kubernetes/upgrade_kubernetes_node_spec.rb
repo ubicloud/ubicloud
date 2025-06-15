@@ -2,15 +2,6 @@
 
 require_relative "../../model/spec_helper"
 
-class MockStringWithExitstatus < String
-  attr_accessor :exitstatus
-
-  def initialize(str, exitstatus = 0)
-    super(str)
-    self.exitstatus = exitstatus
-  end
-end
-
 RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
   subject(:prog) { described_class.new(Strand.new) }
 
@@ -190,20 +181,16 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
     end
 
     it "deletes the node object from kubernetes" do
-      result = instance_double(MockStringWithExitstatus)
       client = instance_double(Kubernetes::Client)
       expect(kubernetes_cluster).to receive(:client).and_return(client)
-      expect(client).to receive(:delete_node).with(prog.old_vm.name).and_return(result)
-      expect(result).to receive(:exitstatus).and_return(0)
+      expect(client).to receive(:delete_node).with(prog.old_vm.name).and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("success", 0))
       expect { prog.delete_node_object }.to hop("destroy_node")
     end
 
     it "raises if the error of delete node command is not successful" do
-      result = instance_double(MockStringWithExitstatus)
       client = instance_double(Kubernetes::Client)
       expect(kubernetes_cluster).to receive(:client).and_return(client)
-      expect(client).to receive(:delete_node).with(prog.old_vm.name).and_return(result)
-      expect(result).to receive(:exitstatus).and_return(1)
+      expect(client).to receive(:delete_node).with(prog.old_vm.name).and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("failed", 1))
       expect { prog.delete_node_object }.to raise_error(RuntimeError)
     end
   end
