@@ -85,6 +85,13 @@ class Scheduling::Dispatcher
     # rebalancing takes place about once every second.
     @listen_timeout = listen_timeout
 
+    # The delay experienced for strands for this partition. Stays at 0 for
+    # an unpartitioned respirate.  Partitioned respirate will update this
+    # every time it emits metrics, so that if it is backed up processing
+    # current strands, it assumes other respirate processes are also backed
+    # up, and will not pick up their strands for an additional time.
+    @current_strand_delay = 0
+
     # Ensure initial unpartitioned prepared statement setup before listening
     # for partition changes.  In a partitioned environment, this should
     # quickly be called be the repartition thread once it determines
@@ -202,7 +209,7 @@ class Scheduling::Dispatcher
       # The old strand prepared statement does not change based on the
       # number of partitions, so no reason to reprepare it.
       @old_strand_ps ||= ds
-        .where(Sequel[:schedule] < Sequel::CURRENT_TIMESTAMP - Sequel.cast("5 seconds", :interval))
+        .where(Sequel[:schedule] < Sequel::CURRENT_TIMESTAMP - Sequel.cast(Sequel.cast(:$old_strand_delay, String) + " seconds", :interval))
         .prepare(:select, :get_old_strand_cohort)
 
       partition = strand_id_range(num_partitions)
@@ -312,6 +319,13 @@ class Scheduling::Dispatcher
     respirate_metrics[:lease_acquire_percentage] = array.count(&:lease_acquired) / METRICS_LAP_MULTIPLIER
     respirate_metrics[:strand_count] = METRICS_EVERY
     respirate_metrics[:strands_per_second] = (METRICS_EVERY / elapsed_time).floor
+
+    # Use the p95 of total delay to set the delay for the current strands.
+    # Using the maximum/p99 numbers may cause too long delay if there are
+    # outliers.  Using lower numbers may not accurately reflect the
+    # current delay numbers if the delay is increasing rapidly.
+    @current_strand_delay = respirate_metrics[:total_delay][:p95]
+
     respirate_metrics
   end
 
@@ -360,7 +374,20 @@ class Scheduling::Dispatcher
   # graceful degradation if a partitioned respirate process
   # crashes or experiences apoptosis.
   def scan_old
-    (@old_strand_ps&.call(skip_strands:)&.each(&:scan_picked_up!) unless @shutting_down) || []
+    unless @shutting_down
+      @old_strand_ps&.call(skip_strands:, old_strand_delay:)&.each(&:scan_picked_up!)
+    end || []
+  end
+
+  # The number of seconds to wait before picking up strands from
+  # outside the current partition.  This uses how long it is
+  # taking to process strands in the current partition, adds 20%
+  # to that, then adds an additional 5 seconds.  The reason for
+  # 20% is the current strand delay is only recalculated every
+  # METRICS_EVERY, so this allows some padding in case the delay
+  # number is growing quickly.
+  def old_strand_delay
+    (@current_strand_delay * 1.2) + 5
   end
 
   # A pg_array for the strand ids to skip.  These are the strand

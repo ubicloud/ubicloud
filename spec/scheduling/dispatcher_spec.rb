@@ -157,13 +157,19 @@ RSpec.describe Scheduling::Dispatcher do
       expect(di.scan_old).to eq([])
     end
 
-    it "includes strands outside of partition" do
+    it "includes strands outside of partition, if they are older than old_strand_delay" do
       st = Strand.create(prog: "Test", label: "wait_exit", id: "00000000-0000-0000-0000-000000000000")
       di = @di = described_class.new(partition_number: 2, listen_timeout: 0.01, pool_size: 1)
       di.setup_prepared_statements(num_partitions: 2)
       st.update(schedule: Time.now - 3)
       expect(di.scan_old.map(&:id)).to eq([])
       st.update(schedule: Time.now - 7)
+      expect(di.scan_old.map(&:id)).to eq([st.id])
+      di.instance_variable_set(:@current_strand_delay, 10)
+      expect(di.scan_old.map(&:id)).to eq([])
+      st.update(schedule: Time.now - 16)
+      expect(di.scan_old.map(&:id)).to eq([])
+      st.update(schedule: Time.now - 18)
       expect(di.scan_old.map(&:id)).to eq([st.id])
     end
   end
@@ -296,6 +302,8 @@ RSpec.describe Scheduling::Dispatcher do
         strand_count: 200,
         strands_per_second: 400
       })
+      expect(di.instance_variable_get(:@current_strand_delay)).to eq 21.0
+      expect(di.old_strand_delay).to eq 30.2
     end
   end
 
