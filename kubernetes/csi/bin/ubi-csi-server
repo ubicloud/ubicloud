@@ -1,0 +1,32 @@
+# frozen_string_literal: true
+
+require "bundler/setup"
+require "ubi_csi"
+
+def main
+  $stdout.sync = true
+  puts "Starting main function..."
+  endpoint = ENV["CSI_ENDPOINT"].strip
+  raise "CSI_ENDPOINT environment variable is not set" if endpoint.nil? || endpoint.empty?
+  raise "CSI_ENDPOINT must have unix:// prefix" unless endpoint.start_with?("unix://")
+
+  puts "Creating gRPC server..."
+  server = GRPC::RpcServer.new
+  socket_path = endpoint.sub("unix://", "")
+  puts "Socket path: #{socket_path}"
+  File.delete(socket_path) if File.exist?(socket_path)
+  server.add_http2_port("unix:#{socket_path}", :this_port_is_insecure)
+
+  puts "Registering services..."
+  server.handle(Csi::V1::IdentityService)
+
+  puts "Starting UbiCSI server on #{endpoint}..."
+  begin
+    server.run_till_terminated
+  rescue => e
+    puts "Error starting server: #{e.message}"
+    raise
+  end
+end
+
+main if __FILE__ == $PROGRAM_NAME
