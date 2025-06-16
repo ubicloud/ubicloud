@@ -29,44 +29,80 @@ RSpec.describe Scheduling::Dispatcher do
 
   describe "#repartition_thread" do
     it "emits for invalid notify" do
-      di = @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
-      expect(Clog).to receive(:emit).with("invalid respirate repartition notification").and_wrap_original do |m, *args|
-        di.shutdown
-        m.call(*args)
+      t = Thread.new do
+        payload = nil
+        DB.listen(:respirate) { |_, _, pl| payload = pl }
+        payload
       end
-      Thread.new { DB.notify(:respirate, payload: "foo") }.join
-      di.instance_variable_get(:@repartition_thread).join
+      @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
+
+      # Wait until dispatcher has started listening and notified
+      t.join(5)
+      expect(t.value).to eq "1"
+
+      q = Queue.new
+      expect(Clog).to receive(:emit).at_least(:once).and_wrap_original do |m, arg|
+        q.push(true) if arg == "invalid respirate repartition notification"
+        m.call(arg)
+      end
+      Thread.new { DB.notify(:respirate, payload: "foo") }.join(5)
+      expect(q.pop(timeout: 5)).to be true
     end
 
     it "repartitions for new processes and stale processes" do
-      di = @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
-      args = []
       q = Queue.new
-      expect(di).to receive(:setup_prepared_statements).with(num_partitions: 2).and_wrap_original do |m, **kw|
-        args << kw
-        m.call(**kw)
+      t = Thread.new do
+        payload = nil
+        DB.listen(:respirate) { |_, _, pl| payload = pl }
+        payload
       end
-      expect(di).to receive(:setup_prepared_statements).with(num_partitions: 3).and_wrap_original do |m, **kw|
+
+      di = @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
+
+      # Wait until dispatcher has started listening and notified
+      t.join(5)
+      expect(t.value).to eq "1"
+
+      args = []
+      expect(di).to receive(:setup_prepared_statements).twice.and_wrap_original do |m, **kw|
         args << kw
-        q.push nil
+        q.push true if args.length == 2
         m.call(**kw)
       end
 
+      q2 = Queue.new
       # separate threads so they are not inside a transaction
-      Thread.new { DB.notify(:respirate, payload: "2") }.join
-      Thread.new { DB.notify(:respirate, payload: "3") }.join
+      Thread.new do
+        DB.notify(:respirate, payload: "2")
+        q2.push(true)
+      end.join(5)
+      Thread.new do
+        # Ensure payload 3 notify is after payload 2 notify
+        q2.pop(timeout: 5)
+        DB.notify(:respirate, payload: "3")
+      end.join(5)
 
-      q.pop
-      expect(args).to eq([{num_partitions: 2}, {num_partitions: 3}]).or([{num_partitions: 3}])
+      expect(q.pop(timeout: 5)).to be true
+      expect(args).to eq([{num_partitions: 2}, {num_partitions: 3}])
       args.clear
-      expect(di).to receive(:setup_prepared_statements).with(num_partitions: 1).and_wrap_original do |m, **kw|
+      q3 = Queue.new
+
+      expect(di).to receive(:setup_prepared_statements).at_least(:once).and_wrap_original do |m, **kw|
         args << kw
-        q.push true
-        di.shutdown
+        if kw == {num_partitions: 1}
+          q.push true
+          q3.push true
+        end
         m.call(**kw)
       end
-      Thread.new { DB.notify(:respirate, payload: "1") until q.pop(timeout: 0.1) }.join
-      di.instance_variable_get(:@repartition_thread).join
+      t = Thread.new do
+        until q.pop(timeout: 0.1)
+          DB.notify(:respirate, payload: "1")
+          sleep(0.005)
+        end
+      end
+      expect(q3.pop(timeout: 5)).to be true
+      t.join(5)
       expect(args.last).to eq(num_partitions: 1)
     end
   end
