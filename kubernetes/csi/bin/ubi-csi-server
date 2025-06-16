@@ -7,6 +7,7 @@ def main
   server = GRPC::RpcServer.new
   server.add_http2_port("0.0.0.0:8000", :this_port_is_insecure)
   server.handle(Csi::V1::IdentityService)
+  server.handle(Csi::V1::ControllerService)
 
   puts "Starting UbiCSI server on 0.0.0.0:8000..."
   server.run_till_terminated
