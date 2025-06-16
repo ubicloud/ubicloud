@@ -4,7 +4,7 @@
 <%== render("inference/tabbar") %>
 <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
   <div class="px-4 py-5 sm:p-6 grid gap-6">
-    <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-6 text-gray-900">
+    <div class="grid sm:grid-cols-2 gap-6 text-gray-900">
       <%== render(
         "components/form/select",
         locals: {
@@ -27,47 +27,56 @@
           selected: @inference_api_keys.any? ? @inference_api_keys.first[:key] : nil
         }
       ) %>
-      <%== render(
-        "components/form/text",
-        locals: {
-          name: "inference_temperature",
-          label: "Temperature (Optional)",
-          type: "number",
-          attributes: {
-            "placeholder" => 1.0,
-            "min" => 0.0,
-            "max" => 2.0,
-          },
-          extra_class: "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-        }
-      ) %>
-      <%== render(
-        "components/form/text",
-        locals: {
-          name: "inference_top_p",
-          label: "Top P (Optional)",
-          type: "number",
-          attributes: {
-            "placeholder" => 1.0,
-            "min" => 0.0,
-            "max" => 1.0,
-          },
-          extra_class: "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-        }
-      ) %>
     </div>
-    <div>
-      <%== render(
-        "components/form/textarea",
-        locals: {
-          name: "inference_system",
-          label: "System Message (Optional)",
-          attributes: {
-            "placeholder" => "System message to be submitted to the inference endpoint",
-            "rows" => 3,
-          },
-        }
-      ) %>
+    <%== part(
+      "components/form/checkbox",
+      name: "inference_config",
+      options: [["show_advanced", "Show advanced settings", nil, nil]]
+    ) %>
+    <div class="hidden grid gap-6" id="inference_config_advanced_settings">
+      <div class="grid sm:grid-cols-2 gap-6 text-gray-900">
+        <%== render(
+          "components/form/text",
+          locals: {
+            name: "inference_temperature",
+            label: "Temperature (Optional)",
+            type: "number",
+            attributes: {
+              "placeholder" => 1.0,
+              "min" => 0.0,
+              "max" => 2.0,
+            },
+            extra_class: "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          }
+        ) %>
+        <%== render(
+          "components/form/text",
+          locals: {
+            name: "inference_top_p",
+            label: "Top P (Optional)",
+            type: "number",
+            attributes: {
+              "placeholder" => 1.0,
+              "min" => 0.0,
+              "max" => 1.0,
+            },
+            extra_class: "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          }
+        ) %>
+      </div>
+      <div>
+        <%== render(
+          "components/form/textarea",
+          locals: {
+            name: "inference_system",
+            label: "System Message (Optional)",
+            attributes: {
+              "placeholder" => "System message to be submitted to the inference endpoint",
+              "rows" => 3,
+            },
+          }
+        ) %>
+      </div>
     </div>
   </div>
   <div class="px-4 py-5 sm:p-6 grid gap-6">
