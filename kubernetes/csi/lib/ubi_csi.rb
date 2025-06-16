@@ -9,3 +9,4 @@ module UbiCSI
 end
 
 require_relative "ubi_csi/identity_service"
+require_relative "ubi_csi/controller_service"
