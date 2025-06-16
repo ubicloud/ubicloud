@@ -1,0 +1,15 @@
+# frozen_string_literal: true
+
+require "bundler/setup"
+require "ubi_csi"
+
+def main
+  server = GRPC::RpcServer.new
+  server.add_http2_port("0.0.0.0:8000", :this_port_is_insecure)
+  server.handle(Csi::V1::IdentityService)
+
+  puts "Starting UbiCSI server on 0.0.0.0:8000..."
+  server.run_till_terminated
+end
+
+main if __FILE__ == $PROGRAM_NAME
