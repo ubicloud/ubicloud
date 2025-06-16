@@ -57,7 +57,7 @@ RSpec.describe Scheduling::Dispatcher do
       Thread.new { DB.notify(:respirate, payload: "3") }.join
 
       q.pop
-      expect(args).to eq([{num_partitions: 2}, {num_partitions: 3}]).or([{num_partitions: 3}])
+      expect(args).to eq([{num_partitions: 2}, {num_partitions: 3}]).or eq([{num_partitions: 3}])
       args.clear
       expect(di).to receive(:setup_prepared_statements).with(num_partitions: 1).and_wrap_original do |m, **kw|
         args << kw
