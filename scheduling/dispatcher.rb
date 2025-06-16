@@ -271,7 +271,7 @@ class Scheduling::Dispatcher
   METRICS_P85 = (METRICS_EVERY * 0.85r).floor
   METRICS_P95 = (METRICS_EVERY * 0.95r).floor
   METRICS_P99 = (METRICS_EVERY * 0.99r).floor
-  METRICS_LAP_MULTIPLIER = METRICS_EVERY / 100.0
+  METRICS_PERCENTAGE = 100.0 / METRICS_EVERY
 
   # Metrics to emit.  This assumes an array size of 1000.  The following metrics are emitted:
   #
@@ -294,7 +294,7 @@ class Scheduling::Dispatcher
   # For the above metrics, we compute the average, median, P75, P85, P95, P99, and maximum
   # values.
   #
-  # In addition to the above metrics, there is one additional metric:
+  # In addition to the above metrics, there are additional metrics:
   #
   # lease_acquire_percentage :: Percentage of strands where the lease was successfully acquired.
   #                             For single respirate processes, or normally running respirate
@@ -302,6 +302,8 @@ class Scheduling::Dispatcher
   #                             100.0. For multi-process, non-partitioned respirate, this can
   #                             be significantly lower, as multiple processes try to process
   #                             the same strand concurrently, and some fail to acquire the lease.
+  # old_strand_percentage :: Percentage of strands that were processed that were outside the
+  #                          current partition.  Should always be 0 if respirate is not partitioned.
   def metrics_hash(array, elapsed_time)
     respirate_metrics = {}
     METRIC_TYPES.each do |metric_type|
@@ -316,7 +318,8 @@ class Scheduling::Dispatcher
       max = metrics.last
       respirate_metrics[metric_type] = {average:, median:, p75:, p85:, p95:, p99:, max:}
     end
-    respirate_metrics[:lease_acquire_percentage] = array.count(&:lease_acquired) / METRICS_LAP_MULTIPLIER
+    respirate_metrics[:lease_acquire_percentage] = array.count(&:lease_acquired) * METRICS_PERCENTAGE
+    respirate_metrics[:old_strand_percentage] = array.count(&:old_strand) * METRICS_PERCENTAGE
     respirate_metrics[:strand_count] = METRICS_EVERY
     respirate_metrics[:strands_per_second] = (METRICS_EVERY / elapsed_time).floor
 
@@ -375,7 +378,7 @@ class Scheduling::Dispatcher
   # crashes or experiences apoptosis.
   def scan_old
     unless @shutting_down
-      @old_strand_ps&.call(skip_strands:, old_strand_delay:)&.each(&:scan_picked_up!)
+      @old_strand_ps&.call(skip_strands:, old_strand_delay:)&.each(&:scan_picked_up!)&.each(&:old_strand!)
     end || []
   end
 
