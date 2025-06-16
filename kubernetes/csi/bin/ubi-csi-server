@@ -19,6 +19,7 @@ def main
 
   puts "Registering services..."
   server.handle(Csi::V1::IdentityService)
+  server.handle(Csi::V1::ControllerService)
 
   puts "Starting UbiCSI server on #{endpoint}..."
   begin
