@@ -639,6 +639,25 @@ function setupPlayground() {
   };
 
   $('#inference_submit').on("click", generate);
+
+  let tokenClient;
+  let accessToken = null;
+  let pickerInited = false;
+  let gisInited = false;
+
+
+  gapi.load('picker', onPickerApiLoad);
+
+  function onPickerApiLoad() {
+    pickerInited = true;
+  }
+
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: 'CLIENT_ID',
+    scope: 'SCOPES',
+    callback: '', // defined later
+  });
+  gisInited = true;
 }
 
 function setupFormsWithPatchMethod() {

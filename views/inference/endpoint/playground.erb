@@ -102,7 +102,7 @@
           },
         }
       ) %>
-      <div class="grid grid-cols-2 gap-6 text-gray-900 flex pt-4">
+      <div class="text-gray-900 flex pt-4 justify-between">
         <div class="flex flex-row items-center">
           <input
             type="file"
@@ -112,6 +112,13 @@
             multiple
             aria-label="Upload files"
           >
+          <%== render(
+            "components/form/checkbox",
+            locals: {
+              name: "inference_options",
+              options: [["search_google_drive", "Search Google Drive"]]
+            }
+          ) %>
         </div>
         <div class="flex flex-row items-center justify-end">
           <%== render(
@@ -130,3 +137,5 @@
     </div>
   </div>
 </div>
+<script async defer src="https://apis.google.com/js/api.js"></script>
+<script async defer src="https://accounts.google.com/gsi/client"></script>
