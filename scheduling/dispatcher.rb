@@ -324,10 +324,13 @@ class Scheduling::Dispatcher
     respirate_metrics[:strands_per_second] = (METRICS_EVERY / elapsed_time).floor
 
     # Use the p95 of total delay to set the delay for the current strands.
+    # Ignore the delay for old strands when calculating delay for current strands.
     # Using the maximum/p99 numbers may cause too long delay if there are
-    # outliers.  Using lower numbers may not accurately reflect the
+    # outliers.  Using lower numbers (e.g. median/p75) may not accurately reflect the
     # current delay numbers if the delay is increasing rapidly.
-    @current_strand_delay = respirate_metrics[:total_delay][:p95]
+    array.reject!(&:old_strand)
+    array.map!(&:total_delay)
+    @current_strand_delay = array[(array.count * 0.95r).floor] || 0
 
     respirate_metrics
   end
