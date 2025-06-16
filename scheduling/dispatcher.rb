@@ -321,7 +321,7 @@ class Scheduling::Dispatcher
     respirate_metrics[:lease_acquire_percentage] = array.count(&:lease_acquired) * METRICS_PERCENTAGE
     respirate_metrics[:old_strand_percentage] = array.count(&:old_strand) * METRICS_PERCENTAGE
     respirate_metrics[:strand_count] = METRICS_EVERY
-    respirate_metrics[:strands_per_second] = (METRICS_EVERY / elapsed_time).floor
+    respirate_metrics[:strands_per_second] = METRICS_EVERY / elapsed_time
 
     # Use the p95 of total delay to set the delay for the current strands.
     # Ignore the delay for old strands when calculating delay for current strands.
