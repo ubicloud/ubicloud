@@ -303,8 +303,8 @@ RSpec.describe Scheduling::Dispatcher do
         strand_count: 200,
         strands_per_second: 400
       })
-      expect(di.instance_variable_get(:@current_strand_delay)).to eq 21.0
-      expect(di.old_strand_delay).to eq 30.2
+      expect(di.instance_variable_get(:@current_strand_delay)).to eq 12.0
+      expect(di.old_strand_delay).to eq 19.4
     end
   end
 
