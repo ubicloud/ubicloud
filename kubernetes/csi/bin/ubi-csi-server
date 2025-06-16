@@ -25,6 +25,7 @@ server.add_http2_port("unix:#{socket_path}", :this_port_is_insecure)
 
 logger.debug("Registering services")
 server.handle(Csi::V1::IdentityService.new(logger:))
+server.handle(Csi::V1::ControllerService.new(logger:))
 
 logger.debug("Starting UbiCSI server on #{endpoint}")
 begin
