@@ -1,0 +1,35 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "bundler/setup"
+require "ubi_csi"
+require "logger"
+
+$stdout.sync = true
+logger = Logger.new($stdout)
+logger.level = $VERBOSE ? Logger::DEBUG : Logger::INFO
+
+logger.debug("Starting main function")
+
+endpoint = ENV["CSI_ENDPOINT"].dup
+raise "CSI_ENDPOINT environment variable is not set" if endpoint.nil?
+endpoint.strip!
+raise "CSI_ENDPOINT must have unix:// prefix" unless endpoint.start_with?("unix://")
+
+logger.debug("Creating gRPC server")
+server = GRPC::RpcServer.new
+socket_path = endpoint.sub("unix://", "")
+logger.debug("Socket path: #{socket_path}")
+File.delete(socket_path) if File.exist?(socket_path)
+server.add_http2_port("unix:#{socket_path}", :this_port_is_insecure)
+
+logger.debug("Registering services")
+server.handle(Csi::V1::IdentityService.new(logger:))
+
+logger.debug("Starting UbiCSI server on #{endpoint}")
+begin
+  server.run_till_terminated
+rescue => e
+  warn("Error starting server: #{e.message}\n#{e.backtrace.join("\n")}")
+  raise
+end
