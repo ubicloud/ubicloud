@@ -14,6 +14,7 @@ def main
   server.add_http2_port("unix:#{socket_path}", :this_port_is_insecure)
 
   server.handle(Csi::V1::IdentityService)
+  server.handle(Csi::V1::ControllerService)
 
   puts "Starting UbiCSI server on #{endpoint}..."
   server.run_till_terminated
