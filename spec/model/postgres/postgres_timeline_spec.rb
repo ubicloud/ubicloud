@@ -143,6 +143,14 @@ PGHOST=/var/run/postgresql
     expect(postgres_timeline.blob_storage_client).to eq("dummy-client")
   end
 
+  it "returns blob storage client when aws properly" do
+    expect(postgres_timeline).to receive(:location).and_return(nil)
+    expect(postgres_timeline).to receive(:blob_storage_endpoint).and_return("https://blob-endpoint")
+    expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, root_certs: "certs")).once
+    expect(Minio::Client).to receive(:new).and_return("dummy-client").once
+    expect(postgres_timeline.blob_storage_client).to eq("dummy-client")
+  end
+
   it "returns blob storage policy" do
     policy = {Version: "2012-10-17", Statement: [{Effect: "Allow", Action: ["s3:*"], Resource: ["arn:aws:s3:::dummy-ubid*"]}]}
     expect(postgres_timeline).to receive(:ubid).and_return("dummy-ubid")

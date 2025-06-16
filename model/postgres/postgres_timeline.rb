@@ -90,7 +90,7 @@ PGHOST=/var/run/postgresql
   end
 
   def aws?
-    location.aws?
+    location&.aws?
   end
 
   S3BlobStorage = Struct.new(:url)
