@@ -639,6 +639,9 @@ function setupPlayground() {
   };
 
   $('#inference_submit').on("click", generate);
+  $('#inference_config-show_advanced-0').on("change", function() {
+    $('#inference_config_advanced_settings').toggleClass("hidden", !$(this).is(":checked"));
+  });
 }
 
 function setupFormsWithPatchMethod() {
