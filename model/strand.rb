@@ -35,6 +35,10 @@ class Strand < Sequel::Model
     def lease_delay
       lease_checked - worker_started
     end
+
+    def total_delay
+      lease_checked - scheduled
+    end
   end
 
   def respirate_metrics

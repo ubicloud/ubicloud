@@ -249,7 +249,7 @@ class Scheduling::Dispatcher
     end
   end
 
-  METRIC_TYPES = %i[scan_delay queue_delay lease_delay queue_size available_workers].freeze
+  METRIC_TYPES = %i[scan_delay queue_delay lease_delay total_delay queue_size available_workers].freeze
 
   # The batch size for metrics output.  Mezmo batches their real time graph in 30 second
   # intervals, and a batch size of 1000 meant that there would be intervals where Mezmo
