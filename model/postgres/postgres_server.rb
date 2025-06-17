@@ -96,6 +96,8 @@ class PostgresServer < Sequel::Model
 
     {
       configs: configs,
+      user_config: resource.user_config,
+      pgbouncer_user_config: resource.pgbouncer_user_config,
       private_subnets: vm.private_subnets.map {
         {
           net4: it.net4.to_s,
