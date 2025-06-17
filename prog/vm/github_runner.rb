@@ -234,32 +234,6 @@ class Prog::Vm::GithubRunner < Prog::Base
       UBICLOUD_CACHE_URL=#{Config.base_url}/runtime/github/" | sudo tee -a /etc/environment
     COMMAND
 
-    if github_runner.installation.use_docker_mirror
-      mirror_address = "mirror.gcr.io"
-      command += <<~COMMAND
-        # Configure Docker daemon with registry mirror
-        if [ -f /etc/docker/daemon.json ] && [ -s /etc/docker/daemon.json ]; then
-          sudo jq '. + {"registry-mirrors": ["https://#{mirror_address}"]}' /etc/docker/daemon.json | sudo tee /etc/docker/daemon.json.tmp
-          sudo mv /etc/docker/daemon.json.tmp /etc/docker/daemon.json
-        else
-          echo '{"registry-mirrors": ["https://#{mirror_address}"]}' | sudo tee /etc/docker/daemon.json
-        fi
-
-        # Configure BuildKit to use the mirror
-        sudo mkdir -p /etc/buildkit
-        echo '
-          [registry."docker.io"]
-            mirrors = ["#{mirror_address}"]
-
-          [registry."#{mirror_address}"]
-            http = false
-            insecure = false' | sudo tee -a /etc/buildkit/buildkitd.toml
-
-        sudo systemctl daemon-reload
-        sudo systemctl restart docker
-      COMMAND
-    end
-
     if github_runner.installation.cache_enabled
       command += <<~COMMAND
         echo "CUSTOM_ACTIONS_CACHE_URL=http://#{vm.private_ipv4}:51123/random_token/" | sudo tee -a /etc/environment
