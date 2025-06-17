@@ -132,9 +132,13 @@ class Clover
     end
 
     options.add_option(name: "gpu", values: ["0:"] + gpu_options, parent: "family") do |location, family, gpu|
-      gpu = gpu.split(":")
-      gpu_count = gpu[0].to_i
-      gpu_count == 0 || (family == "standard" && !!BillingRate.from_resource_properties("Gpu", gpu[1], location.name) && gpu_availability[location.name] && gpu_availability[location.name][gpu[1]] && gpu_availability[location.name][gpu[1]] >= gpu_count)
+      gpu_count, device = gpu.split(":", 2)
+      gpu_count = gpu_count.to_i
+      next true if gpu_count == 0
+
+      family == "standard" &&
+        !!BillingRate.from_resource_properties("Gpu", device, location.name) &&
+        gpu_availability.dig(location.name, device)&.>=(gpu_count)
     end
 
     options.add_option(name: "boot_image", values: Option::BootImages.map(&:name))
