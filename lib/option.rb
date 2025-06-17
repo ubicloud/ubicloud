@@ -122,6 +122,18 @@ module Option
     ["burstable", "Shared CPU"]
   ].map { |args| PostgresFamilyOption.new(*args) }.freeze
 
+  PostgresSizeOption = Data.define(:name, :family, :vcpu_count, :memory_gib)
+  POSTGRES_SIZE_OPTIONS = [
+    ["standard", 2, 8],
+    ["standard", 4, 16],
+    ["standard", 8, 32],
+    ["standard", 16, 64],
+    ["standard", 30, 120],
+    ["standard", 60, 240],
+    ["burstable", 1, 2],
+    ["burstable", 2, 4]
+  ].map { |args| PostgresSizeOption.new("#{args[0]}-#{args[1]}", *args) }.freeze
+
   POSTGRES_VERSION_OPTIONS = ["17", "16"].freeze
 
   AWS_LOCATIONS = ["us-east-1"].freeze
