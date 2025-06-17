@@ -38,6 +38,11 @@ class GithubRepository < Sequel::Model
   end
 
   def destroy_blob_storage
+    # Abort any ongoing multipart uploads to ensure the bucket is empty before deleting it
+    blob_storage_client.list_multipart_uploads(bucket: bucket_name).uploads.each do
+      blob_storage_client.abort_multipart_upload(bucket: bucket_name, key: it.key, upload_id: it.upload_id)
+    end
+
     begin
       admin_client.delete_bucket(bucket: bucket_name)
     rescue Aws::S3::Errors::NoSuchBucket
