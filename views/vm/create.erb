@@ -24,15 +24,17 @@
     {name: "size", type: "radio_small_cards", label: "Server size", required: "required", content_generator: ContentGenerator::Vm.method(:size)},
     {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required", content_generator: ContentGenerator::Vm.method(:storage_size)}
   ]
+
   if @show_gpu != false
     form_elements <<
       {name: "gpu", type: "radio_small_cards", label: "GPU", required: "required", content_generator: ContentGenerator::Vm.method(:gpu)}
   end
-  form_elements += [
+
+  form_elements.push(
     {name: "boot_image", type: "radio_small_cards", label: "Boot Image", required: "required", content_generator: ContentGenerator::Vm.method(:boot_image)},
     {name: "unix_user", type: "text", label: "Username", placeholder: "ubi", value: "ubi", required: "required", opening_tag: "<div class='sm:col-span-2'>"},
     {name: "public_key", type: "textarea", label: "SSH Public Key", required: "required", placeholder: "ssh-ed25519 AAAA...", description: "SSH keys are a more secure method of logging into a server."}
-  ]
+  )
 
   if @project.get_ff_gpu_vm
     form_elements << {name: "show_gpu", type: "hidden", value: @show_gpu}
