@@ -87,35 +87,23 @@ class Clover
   def generate_vm_options
     options = OptionTreeGenerator.new
 
-    options.add_option(name: "name")
-    options.add_option(name: "location", values: Option.locations(feature_flags: @project.feature_flags))
-
-    subnets = dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view").map {
-      {
-        location_id: it.location_id,
-        value: it.ubid,
-        display_name: it.name
-      }
-    }
-    options.add_option(name: "private_subnet_id", values: subnets, parent: "location") do |location, private_subnet|
-      private_subnet[:location_id] == location.id
+    @show_gpu = if flash["old"]
+      case flash["old"]["show_gpu"]
+      when "true"
+        true
+      when "false"
+        false
+      end
+    else
+      typecast_params.bool("show_gpu")
     end
+    @show_gpu = false unless @project.get_ff_gpu_vm
+    # @show_gpu:
+    # true: Only show options valid for GPU configurations
+    # false: Do not show GPU options
+    # nil: Show GPU options, but also show options not valid for GPU configurations
 
-    options.add_option(name: "enable_ip4", values: ["1"], parent: "location")
-    options.add_option(name: "family", values: Option.families.map(&:name), parent: "location") do |location, family|
-      !!BillingRate.from_resource_properties("VmVCpu", family, location.name)
-    end
-    options.add_option(name: "size", values: Option::VmSizes.select { it.visible }.map { it.display_name }, parent: "family") do |location, family, size|
-      vm_size = Option::VmSizes.find { it.display_name == size && it.arch == "x64" }
-      vm_size.family == family
-    end
-
-    options.add_option(name: "storage_size", values: ["10", "20", "40", "80", "160", "320", "600", "640", "1200", "2400"], parent: "size") do |location, family, size, storage_size|
-      vm_size = Option::VmSizes.find { it.display_name == size && it.arch == "x64" }
-      vm_size.storage_size_options.include?(storage_size.to_i)
-    end
-
-    if @project.get_ff_gpu_vm
+    if @show_gpu != false
       available_gpus = DB[:pci_device]
         .join(:vm_host, id: :vm_host_id)
         .join(:location, id: :location_id)
@@ -131,15 +119,65 @@ class Clover
         hash[entry[:location_name]] ||= {}
         hash[entry[:location_name]][entry[:device]] = entry[:max_count]
       end
+      gpu_locations = gpu_availability.keys
 
-      options.add_option(name: "gpu", values: ["0:"] + gpu_options, parent: "family") do |location, family, gpu|
+      if @show_gpu
+        if gpu_locations.empty? && web?
+          flash["error"] = "Unfortunately, no virtual machines with GPUs are currently available."
+          request.redirect "#{@project.path}/vm/create"
+        end
+
+        location_family_check = lambda do |location, family|
+          !gpu_locations.include?(location.name) || family == "burstable"
+        end
+      end
+    end
+
+    options.add_option(name: "name")
+    options.add_option(name: "location", values: Option.locations(feature_flags: @project.feature_flags)) do |location|
+      !@show_gpu || gpu_locations.include?(location.name)
+    end
+
+    subnets = dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view").map {
+      {
+        location_id: it.location_id,
+        value: it.ubid,
+        display_name: it.name
+      }
+    }
+    options.add_option(name: "private_subnet_id", values: subnets, parent: "location") do |location, private_subnet|
+      private_subnet[:location_id] == location.id
+    end
+
+    options.add_option(name: "enable_ip4", values: ["1"], parent: "location")
+
+    options.add_option(name: "family", values: Option.families.map(&:name), parent: "location") do |location, family|
+      next false if location_family_check&.call(location, family)
+      !!BillingRate.from_resource_properties("VmVCpu", family, location.name)
+    end
+
+    options.add_option(name: "size", values: Option::VmSizes.select(&:visible).map(&:display_name), parent: "family") do |location, family, size|
+      vm_size = Option::VmSizes.find { it.display_name == size && it.arch == "x64" }
+      vm_size.family == family
+    end
+
+    options.add_option(name: "storage_size", values: ["10", "20", "40", "80", "160", "320", "600", "640", "1200", "2400"], parent: "size") do |location, family, size, storage_size|
+      vm_size = Option::VmSizes.find { it.display_name == size && it.arch == "x64" }
+      vm_size.storage_size_options.include?(storage_size.to_i)
+    end
+
+    if @show_gpu != false
+      base_gpu_options = @show_gpu ? [] : ["0:"]
+      options.add_option(name: "gpu", values: base_gpu_options + gpu_options, parent: "family") do |location, family, gpu|
         gpu_count, device = gpu.split(":", 2)
         gpu_count = gpu_count.to_i
+        device_availability = gpu_availability.dig(location.name, device)
         next true if gpu_count == 0
 
         family == "standard" &&
           !!BillingRate.from_resource_properties("Gpu", device, location.name) &&
-          gpu_availability.dig(location.name, device)&.>=(gpu_count)
+          device_availability &&
+          device_availability >= gpu_count
       end
     end
 

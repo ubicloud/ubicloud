@@ -4,9 +4,15 @@
 <%== part(
   "components/page_header",
   breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Virtual Machines", "#"]],
-  right_items: (!@vms.empty? && has_project_permission("Vm:create")) ? [
-    part("components/button", text: "Create Virtual Machine", link: "vm/create")
-  ] : []
+  right_items: (!@vms.empty? && has_project_permission("Vm:create")) ?
+    (if @project.get_ff_gpu_vm
+      [
+        part("components/button", text: "Create Virtual Machine", link: "vm/create?show_gpu=f", extra_class: "mr-2"),
+        part("components/button", text: "Create GPU Virtual Machine", link: "vm/create?show_gpu=t"),
+      ]
+     else
+      [part("components/button", text: "Create Virtual Machine", link: "vm/create")]
+     end) : []
 ) %>
 
 <div class="grid gap-6">
@@ -32,8 +38,15 @@
       description: "You don't have permission to create virtual machines."
     }.merge(has_project_permission("Vm:create") ? {
       description: "Get started by creating a new virtual machine.",
-      button_link: "#{@project_data[:path]}/vm/create",
-      button_title: "Create Virtual Machine"
+      buttons: (
+        if @project.get_ff_gpu_vm
+          {
+            "Create Virtual Machine" => "#{@project_data[:path]}/vm/create?show_gpu=f",
+            "Create GPU Virtual Machine" => "#{@project_data[:path]}/vm/create?show_gpu=t",
+          }
+        else
+          {"Create Virtual Machine" => "#{@project_data[:path]}/vm/create"}
+        end)
     } : {})
   ) %>
 </div>
