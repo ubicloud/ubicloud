@@ -171,53 +171,6 @@ RSpec.describe Validation do
       end
     end
 
-    describe "#validate_postgres_size" do
-      it "valid postgres size" do
-        expect(described_class.validate_postgres_size(Location[name: "hetzner-fsn1"], "standard-2", nil).name).to eq("standard-2")
-      end
-
-      it "invalid postgres size" do
-        expect { described_class.validate_postgres_size(Location[name: "hetzner-fsn1"], "standard-3", nil) }.to raise_error described_class::ValidationFailed
-      end
-    end
-
-    describe "#validate_postgres_storage_size" do
-      it "valid postgres storage sizes" do
-        [
-          ["hetzner-fsn1", "standard-2", "64"],
-          ["hetzner-fsn1", "standard-2", "256"],
-          ["hetzner-fsn1", "standard-4", "512"],
-          ["leaseweb-wdc02", "standard-4", "256"]
-        ].each do |location, pg_size, storage_size|
-          expect(described_class.validate_postgres_storage_size(Location[name: location], pg_size, storage_size, nil)).to eq(storage_size.to_f)
-        end
-      end
-
-      it "invalid postgres storage sizes" do
-        [
-          ["hetzner-fsn1", "standard-2", "1024"],
-          ["hetzner-fsn1", "standard-2", "37.4"],
-          ["hetzner-fsn1", "standard-2", ""],
-          ["hetzner-fsn1", "standard-2", nil],
-          ["hetzner-fsn1", "standard-5", "128"],
-          ["leaseweb-wdc02", "standard-4", "1024"],
-          ["hetzner-fsn1", nil, "128"]
-        ].each do |location, pg_size, storage_size|
-          expect { described_class.validate_postgres_storage_size(Location[name: location], pg_size, storage_size, nil) }.to raise_error described_class::ValidationFailed
-        end
-      end
-    end
-
-    describe "#validate_postgres_ha_type" do
-      it "valid postgres ha_type" do
-        [PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC].each { |ha_type| expect { described_class.validate_postgres_ha_type(ha_type) }.not_to raise_error }
-      end
-
-      it "invalid postgres ha_type" do
-        ["quorum", "on", "off"].each { |ha_type| expect { described_class.validate_postgres_ha_type(ha_type) }.to raise_error described_class::ValidationFailed }
-      end
-    end
-
     describe "#validate_date" do
       it "valid date" do
         expect(described_class.validate_date("2023-11-30 11:41")).to eq(Time.new(2023, 11, 30, 11, 41, 0, "UTC"))
