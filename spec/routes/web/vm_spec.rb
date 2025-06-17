@@ -225,7 +225,13 @@ RSpec.describe Clover, "vm" do
         vmh.save_changes
         pci.save_changes
 
+        # Older links allow selecting both GPU and non-GPU options
         visit "#{project.path}/vm/create"
+
+        click_button "Create"
+        expect(page).to have_content "GPU"
+        expect(page).to have_content "Finland"
+        expect(page).to have_content "Burstable"
 
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
         name = "dummy-vm"
@@ -236,6 +242,8 @@ RSpec.describe Clover, "vm" do
         choose option: "standard-2"
         choose option: "1:20b5"
         expect(page).to have_content "GPU"
+        expect(page).to have_content "Finland"
+        expect(page).to have_content "Burstable"
 
         click_button "Create"
 
@@ -247,6 +255,109 @@ RSpec.describe Clover, "vm" do
         pci.update(vm_id: Vm.first.id)
         page.refresh
         expect(page).to have_content "1x NVIDIA A100 80GB PCIe"
+      end
+
+      it "handles case where no gpus are available on create gpu virtual machine page by redirecting" do
+        project
+        project.set_ff_gpu_vm(true)
+        visit "#{project.path}/vm"
+        click_link "Create GPU Virtual Machine"
+
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+        expect(page).to have_flash_error("Unfortunately, no virtual machines with GPUs are currently available.")
+      end
+
+      it "can create a virtual machine with gpu on create gpu virtual machine page" do
+        project
+        project.set_ff_gpu_vm(true)
+
+        vmh = Prog::Vm::HostNexus.assemble("::1", location_id: Location::HETZNER_FSN1_ID).subject
+        pci = PciDevice.new_with_id(
+          vm_host_id: vmh.id,
+          slot: "01:00.0",
+          device_class: "0300",
+          vendor: "10de",
+          device: "20b5",
+          numa_node: nil,
+          iommu_group: 0
+        )
+        vmh.save_changes
+        pci.save_changes
+
+        visit "#{project.path}/vm"
+        click_link "Create GPU Virtual Machine"
+
+        expect(page.title).to eq("Ubicloud - Create GPU Virtual Machine")
+        expect(page).to have_content "GPU"
+        expect(page).to have_no_content "Finland"
+        expect(page).to have_no_content "Burstable"
+        click_button "Create"
+        expect(page).to have_flash_error("empty string provided for parameter public_key")
+
+        name = "dummy-vm"
+        fill_in "Name", with: name
+        fill_in "SSH Public Key", with: "a a"
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "ubuntu-jammy"
+        choose option: "standard-2"
+        choose option: "1:20b5"
+        expect(page).to have_content "GPU"
+        expect(page).to have_no_content "Finland"
+        expect(page).to have_no_content "Burstable"
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
+        expect(Vm.count).to eq(1)
+        expect(Vm.first.project_id).to eq(project.id)
+
+        pci.update(vm_id: Vm.first.id)
+        page.refresh
+        expect(page).to have_content "1x NVIDIA A100 80GB PCIe"
+
+        visit "#{project.path}/vm"
+        click_link "Create Virtual Machine"
+        expect(page).to have_no_content "GPU"
+      end
+
+      it "cannot create a virtual machine with gpu if choosing create virtual machine page" do
+        project
+        project.set_ff_gpu_vm(true)
+        vmh = Prog::Vm::HostNexus.assemble("::1", location_id: Location::HETZNER_FSN1_ID).subject
+        pci = PciDevice.new_with_id(
+          vm_host_id: vmh.id,
+          slot: "01:00.0",
+          device_class: "0300",
+          vendor: "10de",
+          device: "20b5",
+          numa_node: nil,
+          iommu_group: 0
+        )
+        vmh.save_changes
+        pci.save_changes
+
+        visit "#{project.path}/vm"
+        click_link "Create Virtual Machine"
+
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+        expect(page).to have_no_content "GPU"
+        expect(page).to have_content "Finland"
+        expect(page).to have_content "Burstable"
+
+        click_button "Create"
+        expect(page).to have_flash_error("empty string provided for parameter public_key")
+
+        name = "dummy-vm"
+        fill_in "Name", with: name
+        fill_in "SSH Public Key", with: "a a"
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "ubuntu-jammy"
+        choose option: "standard-2"
+
+        expect(page).to have_no_content "GPU"
+        expect(page).to have_content "Finland"
+        expect(page).to have_content "Burstable"
       end
 
       it "cannot create a virtual machine with gpu if feature switch is disabled" do
