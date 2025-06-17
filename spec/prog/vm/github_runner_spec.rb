@@ -346,36 +346,6 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "hops to register_runner" do
       expect(vm).to receive(:runtime_token).and_return("my_token")
-      runner.installation.update(use_docker_mirror: true, cache_enabled: false)
-      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND)
-        set -ueo pipefail
-        echo "image version: $ImageVersion"
-        sudo usermod -a -G sudo,adm runneradmin
-        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{runner.ubid}\\nLabel: ubicloud-standard-4\\nVM Family: standard\\nArch: x64\\nImage: github-ubuntu-2204\\nVM Host: #{vm.vm_host.ubid}\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: #{project.ubid}\\nConsole URL: http://localhost:9292/project/#{project.ubid}/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
-        echo "UBICLOUD_RUNTIME_TOKEN=my_token
-        UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment
-        if [ -f /etc/docker/daemon.json ] && [ -s /etc/docker/daemon.json ]; then
-          sudo jq '. + {"registry-mirrors": ["https://mirror.gcr.io"]}' /etc/docker/daemon.json | sudo tee /etc/docker/daemon.json.tmp
-          sudo mv /etc/docker/daemon.json.tmp /etc/docker/daemon.json
-        else
-          echo '{"registry-mirrors": ["https://mirror.gcr.io"]}' | sudo tee /etc/docker/daemon.json
-        fi
-        sudo mkdir -p /etc/buildkit
-        echo '
-          [registry."docker.io"]
-            mirrors = ["mirror.gcr.io"]
-          [registry."mirror.gcr.io"]
-            http = false
-            insecure = false' | sudo tee -a /etc/buildkit/buildkitd.toml
-        sudo systemctl daemon-reload
-        sudo systemctl restart docker
-      COMMAND
-
-      expect { nx.setup_environment }.to hop("register_runner")
-    end
-
-    it "hops to register_runner without setting up registry mirror" do
-      expect(vm).to receive(:runtime_token).and_return("my_token")
       installation.update(use_docker_mirror: false, cache_enabled: false)
       expect(vm.sshable).to receive(:cmd).with(<<~COMMAND)
         set -ueo pipefail
