@@ -8,7 +8,7 @@ RSpec.describe Clover, "cli pg delete-firewall-rule" do
   end
 
   it "deletes the specified firewall rule for the database" do
-    cli(%w[pg eu-central-h1/test-pg create])
+    cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
     pg = PostgresResource.first
     fwr = pg.firewall_rules_dataset.first
     expect(cli(%w[pg eu-central-h1/test-pg delete-firewall-rule a/b], status: 400)).to eq "! Invalid firewall rule id format\n"

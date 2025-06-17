@@ -35,7 +35,7 @@ RSpec.describe Clover, "cli" do
     expect(Firewall).to receive(:generate_uuid).and_return("30a3eec9-afb5-81fc-bbb5-8691d252ef03")
     expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("nc2kyevjaqey6h0et8qj89zvm1"))
 
-    cli(%w[pg eu-central-h1/test-pg create])
+    cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
     cli(%w[pg eu-central-h1/test-pg reset-superuser-password bar456FOO123])
     cli(%w[pg eu-central-h1/test-pg add-metric-destination foo bar https://baz.example.com])
 
