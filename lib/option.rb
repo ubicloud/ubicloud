@@ -116,6 +116,12 @@ module Option
     [PostgresResource::Flavor::LANTERN, "lantern", "Lantern PostgreSQL Database", "Lantern is a PostgreSQL-based vector database designed specifically for building AI applications. Lantern instances are managed by the Lantern team and are optimal for AI workloads."]
   ].map { |args| PostgresFlavorOption.new(*args) }.freeze
 
+  PostgresFamilyOption = Data.define(:name, :description)
+  POSTGRES_FAMILY_OPTIONS = [
+    ["standard", "Dedicated CPU"],
+    ["burstable", "Shared CPU"]
+  ].map { |args| PostgresFamilyOption.new(*args) }.freeze
+
   POSTGRES_VERSION_OPTIONS = ["17", "16"].freeze
 
   AWS_LOCATIONS = ["us-east-1"].freeze

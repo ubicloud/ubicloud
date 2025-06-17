@@ -91,13 +91,8 @@ class Clover
       flavor == PostgresResource::Flavor::STANDARD || location.provider != "aws"
     end
 
-    options.add_option(name: "family", values: all_sizes_for_project.map(&:vm_family).uniq, parent: "location") do |flavor, location, family|
-      if location.provider == "aws" && family != "standard"
-        false
-      else
-        available_families = Option.families.map(&:name)
-        available_families.include?(family) && BillingRate.from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name)
-      end
+    options.add_option(name: "family", values: Option::POSTGRES_FAMILY_OPTIONS.map(&:name), parent: "location") do |flavor, location, family|
+      family == "standard" || location.provider != "aws"
     end
 
     options.add_option(name: "size", values: all_sizes_for_project.map(&:name).uniq, parent: "family") do |flavor, location, family, size|
