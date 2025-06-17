@@ -450,6 +450,16 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect { nx.wait }.to nap(0)
     end
 
+    it "destroys runner if it does not pick a job in five minutes and already deleted" do
+      runner.update(ready_at: now - 6 * 60, workflow_job: nil)
+      expect(client).to receive(:get).and_raise(Octokit::NotFound)
+      expect(vm.sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
+      expect(runner).to receive(:incr_destroy)
+      expect(Clog).to receive(:emit).with("The runner does not pick a job").and_call_original
+
+      expect { nx.wait }.to nap(0)
+    end
+
     it "does not destroy runner if it doesn not pick a job but two minutes not pass yet" do
       runner.update(ready_at: now - 60, workflow_job: nil)
       expect(vm.sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
