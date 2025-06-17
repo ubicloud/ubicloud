@@ -109,6 +109,12 @@ module Option
     PostgresHaOption.new(*it)
   }.freeze
   # Postgres Global Options
+  PostgresFlavorOption = Data.define(:name, :brand, :title, :description)
+  POSTGRES_FLAVOR_OPTIONS = [
+    [PostgresResource::Flavor::STANDARD, "ubicloud", "PostgreSQL Database", "Get started by creating a new PostgreSQL database which is managed by Ubicloud team. It's a good choice for general purpose databases."],
+    [PostgresResource::Flavor::PARADEDB, "paradedb", "ParadeDB PostgreSQL Database", "ParadeDB is an Elasticsearch alternative built on Postgres. ParadeDB instances are managed by the ParadeDB team and are optimal for search and analytics workloads."],
+    [PostgresResource::Flavor::LANTERN, "lantern", "Lantern PostgreSQL Database", "Lantern is a PostgreSQL-based vector database designed specifically for building AI applications. Lantern instances are managed by the Lantern team and are optimal for AI workloads."]
+  ].map { |args| PostgresFlavorOption.new(*args) }.freeze
 
   POSTGRES_VERSION_OPTIONS = ["17", "16"].freeze
 

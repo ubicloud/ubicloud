@@ -1,11 +1,6 @@
 <%
-  @page_title, logo = if @flavor == PostgresResource::Flavor::PARADEDB
-    ["Create ParadeDB PostgreSQL Database", "logo-paradedb.png"]
-  elsif @flavor == PostgresResource::Flavor::LANTERN
-    ["Create Lantern PostgreSQL Database", "logo-lantern.png"]
-  else
-    ["Create PostgreSQL Database", nil]
-  end
+  @page_title, logo = postgres_flavors.find { it.name == @flavor }.yield_self { ["Create #{it.title}", "logo-#{it.brand}.png"] }
+  logo = nil if @flavor == PostgresResource::Flavor::STANDARD
 %>
 
 <%== render("components/billing_warning") %>

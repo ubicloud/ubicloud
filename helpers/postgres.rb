@@ -121,4 +121,8 @@ class Clover
 
     options.serialize
   end
+
+  def postgres_flavors
+    Option::POSTGRES_FLAVOR_OPTIONS.reject { it.name == PostgresResource::Flavor::LANTERN && !@project.get_ff_postgres_lantern }
+  end
 end
