@@ -1,10 +1,11 @@
 # frozen_string_literal: true
 
 class PgBouncerSetup
-  def initialize(version, max_connections, num_instances)
+  def initialize(version, max_connections, num_instances, user_config)
     @version = version
     @max_connections = max_connections
     @num_instances = num_instances
+    @user_config = user_config
   end
 
   def service_template_name
@@ -105,6 +106,8 @@ user = postgres
 
 max_client_conn = #{5000 / @num_instances.to_i}
 max_db_connections = #{@max_connections.to_i / @num_instances.to_i}
+
+#{@user_config.map { |k, v| "#{k} = #{v}" }.join("\n")}
 
 ; Peer configuration, to correctly forward cancellation requests.
 #{peer_config}
