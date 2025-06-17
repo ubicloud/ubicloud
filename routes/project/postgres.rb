@@ -15,7 +15,7 @@ class Clover
       r.get "create" do
         authorize("Postgres:create", @project.id)
 
-        flavor = typecast_params.nonempty_str("flavor") || PostgresResource::Flavor::STANDARD
+        flavor = typecast_params.nonempty_str("flavor", PostgresResource::Flavor::STANDARD)
         Validation.validate_postgres_flavor(flavor)
 
         @flavor = flavor
