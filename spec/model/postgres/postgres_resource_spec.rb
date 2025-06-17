@@ -115,8 +115,12 @@ RSpec.describe PostgresResource do
   end
 
   it "returns target_standby_count correctly" do
-    expect(postgres_resource).to receive(:ha_type).and_return(PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC)
-    (0..2).each { expect(postgres_resource.target_standby_count).to eq(it) }
+    allow(postgres_resource).to receive(:ha_type).and_return(PostgresResource::HaType::NONE).at_least(:once)
+    expect(postgres_resource.target_standby_count).to eq(0)
+    allow(postgres_resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC).at_least(:once)
+    expect(postgres_resource.target_standby_count).to eq(1)
+    allow(postgres_resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC).at_least(:once)
+    expect(postgres_resource.target_standby_count).to eq(2)
   end
 
   it "returns target_server_count correctly" do

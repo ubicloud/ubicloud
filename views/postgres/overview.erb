@@ -35,12 +35,12 @@ vm = @pg.representative_server.vm
       end
     end
 
-    ha_option = Option::PostgresHaOptions.find { |ha_type| ha_type.name == @pg.ha_type }
+    ha_option = Option::POSTGRES_HA_OPTIONS.find { |ha_type| ha_type.name == @pg.ha_type }
     
     [
       ["hero-cpu-chip", vm.display_size, "#{vm.vcpus} vCPU, #{vm.memory_gib} GB RAM"],
       ["hero-circle-stack", "#{storage_size_gib} GB", disk_usage_subtext],
-      ["hero-square-2-stack-modified", ha_option.title, ha_option.explanation],
+      ["hero-square-2-stack-modified", ha_option.description, ""],
       ["hero-map-pin", @pg.location.display_name, "#{@pg.location.ui_name} (#{@pg.location.provider.capitalize})"],
       ["postgres-logo", "Version #{@pg.version}", ""],
     ].each do |icon, text, subtext|
