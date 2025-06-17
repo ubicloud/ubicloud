@@ -62,18 +62,6 @@ class Strand < Sequel::Model
     respirate_metrics.old_strand = true
   end
 
-  if Config.test?
-    private def verbose_logging
-      true
-    end
-    # :nocov:
-  else
-    private def verbose_logging
-      rand(1000) == 0
-    end
-  end
-  # :nocov:
-
   def take_lease_and_reload
     unless (ps = DB.prepared_statement(:strand_take_lease_and_reload))
       # :nocov:
@@ -100,9 +88,7 @@ class Strand < Sequel::Model
     lease_checked!(affected)
     return false unless affected
     lease_time = affected.fetch(:lease)
-    verbose_logging = self.verbose_logging
 
-    Clog.emit("obtained lease") { {lease_acquired: {time: lease_time, delay: Time.now - schedule}} } if verbose_logging
     # Also operate as reload query
     @values = affected
 
@@ -121,7 +107,6 @@ UPDATE strand
 SET lease = now() - '1000 years'::interval
 WHERE id = ? AND lease = ?
 SQL
-          Clog.emit("lease cleared") { {lease_cleared: {num_updated: num_updated}} } if verbose_logging
           unless num_updated == 1
             Clog.emit("lease violated data") do
               {lease_clear_debug_snapshot: lease_clear_debug_snapshot}
