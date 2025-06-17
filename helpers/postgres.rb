@@ -79,12 +79,12 @@ class Clover
     end
   end
 
-  def generate_postgres_options(flavor: "standard", location: nil)
+  def generate_postgres_options(flavor: nil, location: nil)
     options = OptionTreeGenerator.new
 
     options.add_option(name: "name")
 
-    options.add_option(name: "flavor", values: flavor)
+    options.add_option(name: "flavor", values: flavor || postgres_flavors.map(&:name))
 
     options.add_option(name: "location", values: location || postgres_locations, parent: "flavor") do |flavor, location|
       flavor == PostgresResource::Flavor::STANDARD || location.provider != "aws"
