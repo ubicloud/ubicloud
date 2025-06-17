@@ -115,30 +115,32 @@ class Clover
       vm_size.storage_size_options.include?(storage_size.to_i)
     end
 
-    available_gpus = DB[:pci_device]
-      .join(:vm_host, id: :vm_host_id)
-      .join(:location, id: :location_id)
-      .where(device_class: ["0300", "0302"], vm_id: nil)
-      .group_and_count(:vm_host_id, :name, :device)
-      .from_self
-      .select_group { [name.as(:location_name), device] }
-      .select_append { max(:count).as(:max_count) }
+    if @project.get_ff_gpu_vm
+      available_gpus = DB[:pci_device]
+        .join(:vm_host, id: :vm_host_id)
+        .join(:location, id: :location_id)
+        .where(device_class: ["0300", "0302"], vm_id: nil)
+        .group_and_count(:vm_host_id, :name, :device)
+        .from_self
+        .select_group { [name.as(:location_name), device] }
+        .select_append { max(:count).as(:max_count) }
 
-    gpu_counts = [1, 2, 4, 8]
-    gpu_options = available_gpus.map { it[:device] }.uniq.flat_map { |x| gpu_counts.map { |i| "#{i}:#{x}" } }
-    gpu_availability = available_gpus.each_with_object({}) do |entry, hash|
-      hash[entry[:location_name]] ||= {}
-      hash[entry[:location_name]][entry[:device]] = entry[:max_count]
-    end
+      gpu_counts = [1, 2, 4, 8]
+      gpu_options = available_gpus.map { it[:device] }.uniq.flat_map { |x| gpu_counts.map { |i| "#{i}:#{x}" } }
+      gpu_availability = available_gpus.each_with_object({}) do |entry, hash|
+        hash[entry[:location_name]] ||= {}
+        hash[entry[:location_name]][entry[:device]] = entry[:max_count]
+      end
 
-    options.add_option(name: "gpu", values: ["0:"] + gpu_options, parent: "family") do |location, family, gpu|
-      gpu_count, device = gpu.split(":", 2)
-      gpu_count = gpu_count.to_i
-      next true if gpu_count == 0
+      options.add_option(name: "gpu", values: ["0:"] + gpu_options, parent: "family") do |location, family, gpu|
+        gpu_count, device = gpu.split(":", 2)
+        gpu_count = gpu_count.to_i
+        next true if gpu_count == 0
 
-      family == "standard" &&
-        !!BillingRate.from_resource_properties("Gpu", device, location.name) &&
-        gpu_availability.dig(location.name, device)&.>=(gpu_count)
+        family == "standard" &&
+          !!BillingRate.from_resource_properties("Gpu", device, location.name) &&
+          gpu_availability.dig(location.name, device)&.>=(gpu_count)
+      end
     end
 
     options.add_option(name: "boot_image", values: Option::BootImages.map(&:name))
