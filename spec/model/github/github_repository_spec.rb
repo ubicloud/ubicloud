@@ -15,6 +15,11 @@ RSpec.describe GithubRepository do
 
   describe ".destroy_blob_storage" do
     it "deletes the bucket and token" do
+      uploads = instance_double(Aws::S3::Types::ListMultipartUploadsOutput, uploads: [
+        instance_double(Aws::S3::Types::MultipartUpload, key: "test-key", upload_id: "test-upload-id")
+      ])
+      expect(blob_storage_client).to receive(:list_multipart_uploads).and_return(uploads)
+      expect(blob_storage_client).to receive(:abort_multipart_upload).with(bucket: "gph0hh0ahdbj6ng2cc3rvdecr8", key: "test-key", upload_id: "test-upload-id")
       expect(blob_storage_client).to receive(:delete_bucket).with(bucket: "gph0hh0ahdbj6ng2cc3rvdecr8")
       expect(cloudflare_client).to receive(:delete_token).with(github_repository.access_key)
       expect(github_repository).to receive(:this).and_return(github_repository)
@@ -23,6 +28,7 @@ RSpec.describe GithubRepository do
     end
 
     it "succeeds if the bucket is already deleted" do
+      expect(blob_storage_client).to receive(:list_multipart_uploads).and_return(instance_double(Aws::S3::Types::ListMultipartUploadsOutput, uploads: []))
       expect(blob_storage_client).to receive(:delete_bucket).and_raise(Aws::S3::Errors::NoSuchBucket.new(nil, nil))
       expect(cloudflare_client).to receive(:delete_token).with(github_repository.access_key)
       expect(github_repository).to receive(:this).and_return(github_repository)
