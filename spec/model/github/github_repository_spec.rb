@@ -31,25 +31,6 @@ RSpec.describe GithubRepository do
     end
   end
 
-  describe ".after_destroy" do
-    it "deletes the blob storage and cache entries" do
-      github_repository.save_changes
-      GithubCacheEntry.create_with_id(repository_id: github_repository.id, key: "k1", version: "v1", scope: "main", upload_id: "upload-123", committed_at: Time.now, created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b")
-      expect(blob_storage_client).to receive(:delete_object)
-      expect(github_repository).to receive(:destroy_blob_storage)
-
-      github_repository.destroy
-    end
-
-    it "do not delete the blob storage if does not have one" do
-      github_repository.save_changes
-      expect(github_repository).to receive(:access_key)
-      expect(github_repository).not_to receive(:destroy_blob_storage)
-
-      github_repository.destroy
-    end
-  end
-
   describe ".setup_blob_storage" do
     it "creates a bucket and token" do
       expect(Config).to receive_messages(github_cache_blob_storage_region: "weur", github_cache_blob_storage_account_id: "123")

@@ -37,11 +37,6 @@ class GithubRepository < Sequel::Model
     @admin_client ||= s3_client(Config.github_cache_blob_storage_access_key, Config.github_cache_blob_storage_secret_key)
   end
 
-  def after_destroy
-    super
-    destroy_blob_storage if access_key
-  end
-
   def destroy_blob_storage
     begin
       admin_client.delete_bucket(bucket: bucket_name)

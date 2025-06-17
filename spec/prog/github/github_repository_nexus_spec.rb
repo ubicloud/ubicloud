@@ -234,6 +234,17 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect { nx.destroy }.to nap(5 * 60)
     end
 
+    it "destroys blob storage if has one" do
+      github_repository.update(access_key: "access_key")
+      GithubCacheEntry.create(repository_id: github_repository.id, key: "k1", version: "v1", scope: "main", upload_id: "upload-123", committed_at: Time.now, created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b")
+      blob_storage_client = instance_double(Aws::S3::Client)
+      expect(Aws::S3::Client).to receive(:new).and_return(blob_storage_client)
+      expect(blob_storage_client).to receive(:delete_object)
+      expect(github_repository).to receive(:destroy_blob_storage)
+
+      expect { nx.destroy }.to exit({"msg" => "github repository destroyed"})
+    end
+
     it "deletes resource and pops" do
       expect(nx).to receive(:decr_destroy)
       expect(github_repository).to receive(:destroy)
