@@ -95,14 +95,12 @@ class Clover
       family == "standard" || location.provider != "aws"
     end
 
-    options.add_option(name: "size", values: all_sizes_for_project.map(&:name).uniq, parent: "family") do |flavor, location, family, size|
-      if location.provider == "aws" && (size.split("-").last.to_i > 16 || size.split("-").first == "burstable")
-        false
-      else
-        pg_size = all_sizes_for_project.find { it.name == size && it.flavor == flavor && it.location_id == location.id }
-        vm_size = Option::VmSizes.find { it.name == pg_size.vm_size && it.arch == "x64" && it.visible }
-        vm_size.family == family
-      end
+    options.add_option(name: "size", values: Option::POSTGRES_SIZE_OPTIONS.map(&:name), parent: "family") do |flavor, location, family, size|
+      family_from_size, vcpu_count = size.split("-")
+
+      next false if family_from_size != family
+      next false if location.provider == "aws" && vcpu_count.to_i > 16
+      true
     end
 
     options.add_option(name: "storage_size", values: ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096", "118", "237", "475", "950", "1781", "1900", "3562", "3800"], parent: "size") do |flavor, location, family, size, storage_size|
