@@ -115,8 +115,14 @@ class Clover
       vm_size.storage_size_options.include?(storage_size.to_i)
     end
 
-    available_gpus = DB.from(DB[:pci_device].join(:vm_host, id: :vm_host_id).join(:location, id: :location_id).where(device_class: ["0300", "0302"], vm_id: nil).group_and_count(:vm_host_id, :name, :device))
-      .select { [name.as(location_name), device, max(:count).as(:max_count)] }.group(:name, :device)
+    available_gpus = DB[:pci_device]
+      .join(:vm_host, id: :vm_host_id)
+      .join(:location, id: :location_id)
+      .where(device_class: ["0300", "0302"], vm_id: nil)
+      .group_and_count(:vm_host_id, :name, :device)
+      .from_self
+      .select_group { [name.as(:location_name), device] }
+      .select_append { max(:count).as(:max_count) }
 
     gpu_counts = [1, 2, 4, 8]
     gpu_options = available_gpus.map { it[:device] }.uniq.flat_map { |x| gpu_counts.map { |i| "#{i}:#{x}" } }
