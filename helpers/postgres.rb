@@ -81,7 +81,6 @@ class Clover
 
   def generate_postgres_options(flavor: "standard", location: nil)
     options = OptionTreeGenerator.new
-    all_sizes_for_project = Option.customer_postgres_sizes_for_project(@project.id)
 
     options.add_option(name: "name")
 
@@ -103,9 +102,18 @@ class Clover
       true
     end
 
-    options.add_option(name: "storage_size", values: ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096", "118", "237", "475", "950", "1781", "1900", "3562", "3800"], parent: "size") do |flavor, location, family, size, storage_size|
-      pg_size = all_sizes_for_project.find { it.name == size && it.flavor == flavor && it.location_id == location.id }
-      pg_size.storage_size_options.include?(storage_size.to_i)
+    aws_storage_size_options = {2 => ["118"], 4 => ["238"], 8 => ["475"], 16 => ["950"]}
+    storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS + aws_storage_size_options.values.flatten.uniq
+    options.add_option(name: "storage_size", values: storage_size_options, parent: "size") do |flavor, location, family, size, storage_size|
+      vcpu_count = size.split("-").last.to_i
+
+      if location.provider == "aws"
+        aws_storage_size_options[vcpu_count].include?(storage_size)
+      else
+        min_storage = (vcpu_count >= 30) ? 1024 : vcpu_count * 32
+        min_storage /= 2 if family == "burstable"
+        [min_storage, min_storage * 2, min_storage * 4].include?(storage_size.to_i)
+      end
     end
 
     options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS)

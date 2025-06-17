@@ -134,6 +134,8 @@ module Option
     ["burstable", 2, 4]
   ].map { |args| PostgresSizeOption.new("#{args[0]}-#{args[1]}", *args) }.freeze
 
+  POSTGRES_STORAGE_SIZE_OPTIONS = ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096"].freeze
+
   POSTGRES_VERSION_OPTIONS = ["17", "16"].freeze
 
   AWS_LOCATIONS = ["us-east-1"].freeze
