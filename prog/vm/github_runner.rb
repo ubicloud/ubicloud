@@ -131,6 +131,11 @@ class Prog::Vm::GithubRunner < Prog::Base
     @github_client ||= Github.installation_client(github_runner.installation.installation_id)
   end
 
+  def busy?
+    github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")[:busy]
+  rescue Octokit::NotFound
+  end
+
   def before_run
     when_destroy_set? do
       unless ["destroy", "wait_vm_destroy"].include?(strand.label)
@@ -311,8 +316,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     # GitHub API, but sometimes GitHub assigns a job at the last second.
     # Therefore, we wait a few extra seconds beyond the 5 minute mark.
     if github_runner.workflow_job.nil? && Time.now > github_runner.ready_at + 5 * 60 + 10
-      response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
-      unless response[:busy]
+      unless busy?
         Clog.emit("The runner does not pick a job") { github_runner }
         github_runner.incr_destroy
         nap 0
@@ -367,18 +371,17 @@ class Prog::Vm::GithubRunner < Prog::Base
     # destroy, this prevents the underlying VM from being destroyed and the job
     # from failing. However, in certain situations like fraudulent activity, we
     # might need to bypass this verification and immediately remove the runner.
+    # If the busy? returns nil, it means it has already been deleted, so noop.
     unless github_runner.skip_deregistration_set?
-      begin
-        response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
-        if response[:busy]
-          Clog.emit("The runner is still running a job") { github_runner }
-          register_deadline(nil, 15 * 60, allow_extension: true)
-          register_deadline("wait_vm_destroy", 2 * 60 * 60)
-          nap 15
-        end
+      case busy?
+      when true
+        Clog.emit("The runner is still running a job") { github_runner }
+        register_deadline(nil, 15 * 60, allow_extension: true)
+        register_deadline("wait_vm_destroy", 2 * 60 * 60)
+        nap 15
+      when false
         github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
         nap 5
-      rescue Octokit::NotFound
       end
     end
 
