@@ -8,7 +8,7 @@ RSpec.describe Clover, "cli pg delete-metric-destination" do
   end
 
   it "deletes the specified metric destination for the database" do
-    cli(%w[pg eu-central-h1/test-pg create])
+    cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
     cli(%w[pg eu-central-h1/test-pg add-metric-destination foo bar https://baz.example.com])
     pg = PostgresResource.first
     md = pg.metric_destinations.first

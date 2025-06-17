@@ -89,6 +89,7 @@ RSpec.describe Clover, "postgres" do
       it "success" do
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-no-ha", {
           size: "standard-2",
+          storage_size: "64",
           ha_type: "none"
         }.to_json
 
@@ -97,6 +98,7 @@ RSpec.describe Clover, "postgres" do
 
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-async", {
           size: "standard-2",
+          storage_size: "64",
           ha_type: "async"
         }.to_json
 
@@ -105,6 +107,7 @@ RSpec.describe Clover, "postgres" do
 
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-sync", {
           size: "standard-2",
+          storage_size: "64",
           ha_type: "sync"
         }.to_json
 
@@ -118,6 +121,7 @@ RSpec.describe Clover, "postgres" do
 
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-no-ha", {
           size: "standard-2",
+          storage_size: "64",
           flavor: "paradedb"
         }.to_json
 
@@ -128,6 +132,7 @@ RSpec.describe Clover, "postgres" do
         project.set_ff_postgres_lantern(false)
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-lantern", {
           size: "standard-2",
+          storage_size: "64",
           flavor: "lantern"
         }.to_json
         expect(last_response.status).to eq(400)
@@ -136,6 +141,7 @@ RSpec.describe Clover, "postgres" do
       it "invalid location" do
         post "/project/#{project.ubid}/location/eu-north-h1/postgres/test-postgres", {
           size: "standard-2",
+          storage_size: "64",
           ha_type: "sync"
         }.to_json
 
@@ -145,6 +151,7 @@ RSpec.describe Clover, "postgres" do
       it "location not exist" do
         post "/project/#{project.ubid}/location/not-exist-location/postgres/test-postgres", {
           size: "standard-2",
+          storage_size: "64",
           ha_type: "sync"
         }.to_json
 
@@ -384,6 +391,7 @@ RSpec.describe Clover, "postgres" do
 
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/postgres/test-postgres", {
           size: "standard-2",
+          storage_size: "64",
           ha_type: "sync"
         }.to_json
 

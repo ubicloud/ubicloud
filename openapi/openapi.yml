@@ -793,6 +793,7 @@ paths:
               additionalProperties: false
               required:
                 - size
+                - storage_size
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabase'
