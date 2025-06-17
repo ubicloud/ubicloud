@@ -325,4 +325,22 @@ module Validation
     msg = "\"#{datetime_str}\" is not a valid date for \"#{param}\"."
     fail ValidationFailed.new({param => msg})
   end
+
+  def self.validate_from_option_tree(option_tree, option_parents, params)
+    params.sort_by { |k, _| option_parents[k].count }.each do |key, value|
+      parents = option_parents[key]
+      subtree = option_tree
+
+      parents.each do |parent|
+        parent_value = params[parent]
+        subtree = subtree[parent][parent_value]
+      end
+
+      if subtree[key][value].nil?
+        display_key = key.tr("_", " ")
+        available_options = subtree[key].keys.map! { it.is_a?(Location) ? it.display_name : it.to_s }.join(", ")
+        fail ValidationFailed.new({key.to_sym => "Invalid #{display_key}. Available options: #{available_options}"})
+      end
+    end
+  end
 end
