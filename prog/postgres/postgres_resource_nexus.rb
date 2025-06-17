@@ -22,18 +22,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       fail "No existing location"
     end
 
-    unless Validation.validate_location_for_project(location, project_id)
-      fail "Location is not in the project"
-    end
-
-    Validation.validate_name(name)
-    vm_size = Validation.validate_vm_size(target_vm_size, "x64")
-    Validation.validate_postgres_ha_type(ha_type)
-    Validation.validate_billing_rate("PostgresVCpu", "#{flavor}-#{vm_size.family}", location.name)
-
     DB.transaction do
       superuser_password, timeline_id, timeline_access, version = if parent_id.nil?
-        target_storage_size_gib = Validation.validate_postgres_storage_size(location, target_vm_size, target_storage_size_gib, project_id)
         [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location_id: location.id).id, "push", version]
       else
         unless (parent = PostgresResource[parent_id])
@@ -42,10 +32,6 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
         if version && version != parent.version
           fail Validation::ValidationFailed.new({version: "Version must be the same as the parent"})
-        end
-
-        if target_storage_size_gib != parent.target_storage_size_gib
-          target_storage_size_gib = Validation.validate_postgres_storage_size(location, target_vm_size, target_storage_size_gib, project_id)
         end
 
         if restore_target

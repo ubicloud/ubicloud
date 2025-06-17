@@ -46,10 +46,21 @@ class Clover
         r.patch do
           authorize("Postgres:edit", pg.id)
 
-          target_vm_size = Validation.validate_postgres_size(pg.location, typecast_params.str("size") || pg.target_vm_size, @project.id)
-          target_storage_size_gib = Validation.validate_postgres_storage_size(pg.location, target_vm_size.vm_size, typecast_params.pos_int("storage_size") || pg.target_storage_size_gib, @project.id)
-          ha_type = typecast_params.str("ha_type") || pg.ha_type
-          Validation.validate_postgres_ha_type(ha_type)
+          size = typecast_params.nonempty_str("size", pg.target_vm_size)
+          target_storage_size_gib = typecast_params.pos_int("storage_size", pg.target_storage_size_gib)
+          ha_type = typecast_params.nonempty_str("ha_type", pg.ha_type)
+
+          postgres_params = {
+            "flavor" => pg.flavor,
+            "location" => pg.location,
+            "family" => size.split("-").first,
+            "size" => size,
+            "storage_size" => target_storage_size_gib.to_s,
+            "ha_type" => ha_type,
+            "version" => pg.version
+          }
+
+          validate_postgres_input(pg.name, postgres_params)
 
           if pg.representative_server.nil? || target_storage_size_gib < pg.representative_server.storage_size_gib
             begin
@@ -63,13 +74,18 @@ class Clover
             end
           end
 
-          current_postgres_vcpu_count = (PostgresResource::TARGET_STANDBY_COUNT_MAP[pg.ha_type] + 1) * pg.representative_server.vm.vcpus
-          requested_postgres_vcpu_count = (PostgresResource::TARGET_STANDBY_COUNT_MAP[ha_type] + 1) * target_vm_size.vcpu
+          current_parsed_size = Option::POSTGRES_SIZE_OPTIONS.find { it.name == pg.target_vm_size }
+          current_postgres_vcpu_count = pg.target_server_count * current_parsed_size.vcpu_count
+
+          requested_parsed_size = Option::POSTGRES_SIZE_OPTIONS.find { it.name == postgres_params["size"] }
+          requested_standby_count = Option::POSTGRES_HA_OPTIONS.find { it.name == postgres_params["ha_type"] }.standby_count
+          requested_postgres_vcpu_count = (requested_standby_count + 1) * requested_parsed_size.vcpu_count
+
           Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count - current_postgres_vcpu_count)
 
           DB.transaction do
-            pg.update(target_vm_size: target_vm_size.vm_size, target_storage_size_gib:, ha_type:)
-            pg.read_replicas.map { it.update(target_vm_size: target_vm_size.vm_size, target_storage_size_gib:) }
+            pg.update(target_vm_size: requested_parsed_size.name, target_storage_size_gib:, ha_type:)
+            pg.read_replicas.map { it.update(target_vm_size: requested_parsed_size.name, target_storage_size_gib:) }
             audit_log(pg, "update")
           end
 

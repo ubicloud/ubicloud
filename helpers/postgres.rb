@@ -5,22 +5,27 @@ class Clover
     authorize("Postgres:create", @project.id)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
-    flavor = typecast_params.nonempty_str("flavor") || PostgresResource::Flavor::STANDARD
-    fail Validation::ValidationFailed.new({postgres_lantern: "Project doesn't have access to Lantern Postgres"}) if flavor == PostgresResource::Flavor::LANTERN && !@project.get_ff_postgres_lantern
-
-    Validation.validate_postgres_location(@location, @project.id)
-
+    flavor = typecast_params.nonempty_str("flavor", PostgresResource::Flavor::STANDARD)
     size = typecast_params.nonempty_str!("size")
-    parsed_size = Validation.validate_postgres_size(@location, size, @project.id)
+    storage_size = typecast_params.pos_int("storage_size")
+    ha_type = typecast_params.nonempty_str("ha_type", PostgresResource::HaType::NONE)
+    version = typecast_params.nonempty_str("version", PostgresResource::DEFAULT_VERSION)
 
-    ha_type = typecast_params.nonempty_str("ha_type") || PostgresResource::HaType::NONE
-    requested_standby_count = case ha_type
-    when PostgresResource::HaType::ASYNC then 1
-    when PostgresResource::HaType::SYNC then 2
-    else 0
-    end
+    postgres_params = {
+      "flavor" => flavor,
+      "location" => @location,
+      "family" => size.split("-").first,
+      "size" => size,
+      "storage_size" => storage_size.to_s,
+      "ha_type" => ha_type,
+      "version" => version
+    }
 
-    requested_postgres_vcpu_count = (requested_standby_count + 1) * parsed_size.vcpu
+    validate_postgres_input(name, postgres_params)
+
+    parsed_size = Option::POSTGRES_SIZE_OPTIONS.find { it.name == postgres_params["size"] }
+    requested_standby_count = Option::POSTGRES_HA_OPTIONS.find { it.name == postgres_params["ha_type"] }.standby_count
+    requested_postgres_vcpu_count = (requested_standby_count + 1) * parsed_size.vcpu_count
     Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count)
 
     pg = nil
@@ -29,11 +34,11 @@ class Clover
         project_id: @project.id,
         location_id: @location.id,
         name:,
-        target_vm_size: parsed_size.vm_size,
-        target_storage_size_gib: typecast_params.nonempty_str("storage_size") || parsed_size.storage_size_options.first,
+        target_vm_size: parsed_size.name,
+        target_storage_size_gib: storage_size,
         ha_type:,
-        version: typecast_params.nonempty_str("version") || PostgresResource::DEFAULT_VERSION,
-        flavor: flavor
+        version:,
+        flavor:
       ).subject
       audit_log(pg, "create")
     end
@@ -129,5 +134,12 @@ class Clover
 
   def postgres_locations
     Location.where(name: ["hetzner-fsn1", "leaseweb-wdc02"]).all + @project.locations
+  end
+
+  def validate_postgres_input(name, postgres_params)
+    Validation.validate_name(name)
+
+    option_tree, option_parents = generate_postgres_options
+    Validation.validate_from_option_tree(option_tree, option_parents, postgres_params)
   end
 end

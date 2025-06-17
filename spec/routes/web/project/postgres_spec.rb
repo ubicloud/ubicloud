@@ -145,7 +145,7 @@ RSpec.describe Clover, "postgres" do
 
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         expect(page).to have_flash_error("Validation failed for following fields: storage_size")
-        expect(page).to have_content("Storage size must be one of the following: 1024.0, 2048.0, 4096.0")
+        expect(page).to have_content("Invalid storage size. Available options: 1024, 2048, 4096")
         expect(PostgresResource.count).to eq(0)
       end
 
