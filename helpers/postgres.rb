@@ -87,8 +87,8 @@ class Clover
 
     options.add_option(name: "flavor", values: flavor)
 
-    options.add_option(name: "location", values: location || Option.postgres_locations(project_id: @project.id), parent: "flavor") do |flavor, location|
-      !(location.provider == "aws" && flavor != PostgresResource::Flavor::STANDARD)
+    options.add_option(name: "location", values: location || postgres_locations, parent: "flavor") do |flavor, location|
+      flavor == PostgresResource::Flavor::STANDARD || location.provider != "aws"
     end
 
     options.add_option(name: "family", values: all_sizes_for_project.map(&:vm_family).uniq, parent: "location") do |flavor, location, family|
@@ -124,5 +124,9 @@ class Clover
 
   def postgres_flavors
     Option::POSTGRES_FLAVOR_OPTIONS.reject { it.name == PostgresResource::Flavor::LANTERN && !@project.get_ff_postgres_lantern }
+  end
+
+  def postgres_locations
+    Location.where(name: ["hetzner-fsn1", "leaseweb-wdc02"]).all + @project.locations
   end
 end
