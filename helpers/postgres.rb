@@ -118,7 +118,7 @@ class Clover
 
     options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS)
 
-    options.add_option(name: "ha_type", values: [PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC], parent: "storage_size")
+    options.add_option(name: "ha_type", values: Option::POSTGRES_HA_OPTIONS.map(&:name), parent: "storage_size")
 
     options.serialize
   end

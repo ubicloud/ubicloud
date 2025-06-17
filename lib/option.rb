@@ -138,6 +138,13 @@ module Option
 
   POSTGRES_VERSION_OPTIONS = ["17", "16"].freeze
 
+  PostgresHaOption = Data.define(:name, :standby_count, :description)
+  POSTGRES_HA_OPTIONS = [
+    [PostgresResource::HaType::NONE, 0, "No Standbys"],
+    [PostgresResource::HaType::ASYNC, 1, "1 Standby"],
+    [PostgresResource::HaType::SYNC, 2, "2 Standbys"]
+  ].map { |args| PostgresHaOption.new(*args) }.freeze
+
   AWS_LOCATIONS = ["us-east-1"].freeze
 
   KubernetesCPOption = Struct.new(:cp_node_count, :title, :explanation)
