@@ -49,8 +49,8 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
   label def setup_bucket
     # Create bucket for the timeline
-    blob_storage_client.create_bucket(postgres_timeline.ubid)
-    blob_storage_client.set_lifecycle_policy(postgres_timeline.ubid, postgres_timeline.ubid, 8)
+    postgres_timeline.create_bucket
+    postgres_timeline.set_lifecycle_policy
     hop_wait_leader
   end
 
