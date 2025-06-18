@@ -41,8 +41,14 @@ class Strand < Sequel::Model
     end
   end
 
+  # If the lease time is after this, we must be dealing with an
+  # expired lease, since normal lease times are either in the future
+  # or 1000 years in the past.
+  EXPIRED_LEASE_TIME = Time.utc(2025)
+
   def respirate_metrics
-    @respirate_metrics ||= RespirateMetrics.new(scheduled: schedule)
+    lease_expired = lease > EXPIRED_LEASE_TIME
+    @respirate_metrics ||= RespirateMetrics.new(scheduled: lease_expired ? lease : schedule)
   end
 
   def scan_picked_up!

@@ -203,7 +203,7 @@ class Scheduling::Dispatcher
       .order_by(:schedule)
       .limit(@queue_size)
       .exclude(id: Sequel.function(:ANY, Sequel.cast(:$skip_strands, "uuid[]")))
-      .select(:id, :schedule)
+      .select(:id, :schedule, :lease)
       .for_update
       .skip_locked
 

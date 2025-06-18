@@ -137,7 +137,23 @@ RSpec.describe Scheduling::Dispatcher do
       di = @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
       di.setup_prepared_statements(num_partitions: 2)
       st.update(schedule: Time.now - 10)
-      expect(di.scan.map(&:id)).to eq([st.id])
+      strands = di.scan
+      expect(strands.length).to eq 1
+      strand = strands.first
+      expect(strand.id).to eq st.id
+      expect(strand.respirate_metrics.scheduled).to eq strand.schedule
+    end
+
+    it "uses lease time instead of schedule time as scheduled if lease has expired" do
+      st = Strand.create(prog: "Test", label: "wait_exit", id: "00000000-0000-0000-0000-000000000000", lease: Time.now - 1)
+      di = @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
+      di.setup_prepared_statements(num_partitions: 2)
+      st.update(schedule: Time.now - 10)
+      strands = di.scan
+      expect(strands.length).to eq 1
+      strand = strands.first
+      expect(strand.id).to eq st.id
+      expect(strand.respirate_metrics.scheduled).to eq strand.lease
     end
 
     it "returns empty array when shutting down" do
