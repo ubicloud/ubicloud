@@ -11,9 +11,9 @@ RSpec.describe Clover, "private-location" do
 
   let(:private_location) do
     loc = Location.create(
-      name: "us-east-1",
-      display_name: "aws-us-east-1",
-      ui_name: "aws-us-east-1",
+      name: "us-west-2",
+      display_name: "aws-us-west-2",
+      ui_name: "aws-us-west-2",
       visible: true,
       provider: "aws",
       project_id: project.id
@@ -41,7 +41,7 @@ RSpec.describe Clover, "private-location" do
     it "cannot create without login" do
       post "/project/#{project.ubid}/private-location", {
         name: "region-1",
-        private_location_name: "us-east-1",
+        private_location_name: "us-west-2",
         aws_access_key: "access-key-id",
         aws_secret_key: "secret-access-key"
       }.to_json
@@ -84,14 +84,14 @@ RSpec.describe Clover, "private-location" do
       it "success" do
         post "/project/#{project.ubid}/private-location", {
           name: "hello",
-          provider_location_name: "us-east-1",
+          provider_location_name: "us-west-2",
           access_key: "access-key-id",
           secret_key: "secret-access-key"
         }.to_json
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["ui_name"]).to eq("hello")
-        expect(JSON.parse(last_response.body)["name"]).to eq("us-east-1")
+        expect(JSON.parse(last_response.body)["name"]).to eq("us-west-2")
       end
     end
 

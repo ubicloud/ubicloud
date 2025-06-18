@@ -96,9 +96,9 @@ RSpec.configure do |config|
 
     def create_private_location(project:)
       loc = Location.create(
-        name: "us-east-1",
-        display_name: "aws-us-east-1",
-        ui_name: "aws-us-east-1",
+        name: "us-west-2",
+        display_name: "aws-us-west-2",
+        ui_name: "aws-us-west-2",
         visible: true,
         provider: "aws",
         project_id: project.id

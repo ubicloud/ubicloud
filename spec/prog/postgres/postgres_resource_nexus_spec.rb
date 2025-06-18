@@ -50,9 +50,9 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     let(:postgres_project) { Project.create_with_id(name: "default") }
     let(:private_location) {
       loc = Location.create(
-        name: "us-east-1",
-        display_name: "aws-us-east-1",
-        ui_name: "aws-us-east-1",
+        name: "us-west-2",
+        display_name: "aws-us-west-2",
+        ui_name: "aws-us-west-2",
         visible: true,
         provider: "aws",
         project_id: postgres_project.id
