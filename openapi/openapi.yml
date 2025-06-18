@@ -853,6 +853,65 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/config':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    get:
+      operationId: getPostgresDatabaseConfig
+      summary: Get configuration for a specific Postgres Database
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresConfig'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
+    post:
+      operationId: updatePostgresDatabaseConfig
+      summary: Update configuration for a specific Postgres Database
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostgresConfig'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresConfig'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
+    patch:
+      operationId: patchPostgresDatabaseConfig
+      summary: Partially update configuration for a specific Postgres Database
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostgresConfig'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresConfig'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/firewall-rule':
     parameters:
       - $ref: '#/components/parameters/location'
@@ -1719,6 +1778,25 @@ components:
       additionalProperties: false
       required:
         - error
+    PostgresConfig:
+      type: object
+      properties:
+        pg_config:
+          type: object
+          example:
+            max_connections: '100'
+          additionalProperties:
+            type: string
+        pgbouncer_config:
+          type: object
+          example:
+            max_client_conn: '100'
+          additionalProperties:
+            type: string
+      additionalProperties: false
+      required:
+        - pg_config
+        - pgbouncer_config
     PrivateLocation:
       type: object
       properties:
