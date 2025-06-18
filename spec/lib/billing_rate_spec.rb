@@ -65,10 +65,10 @@ RSpec.describe BillingRate do
     project = Project.create_with_id(name: "test")
 
     loc = Location.create(
-      name: "us-east-1",
+      name: "us-west-2",
       provider: "aws",
-      ui_name: "aws-us-east-1",
-      display_name: "aws-us-east-1",
+      ui_name: "aws-us-west-2",
+      display_name: "aws-us-west-2",
       visible: false,
       project_id: project.id
     )

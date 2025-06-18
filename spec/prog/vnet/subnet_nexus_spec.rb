@@ -139,14 +139,14 @@ RSpec.describe Prog::Vnet::SubnetNexus do
 
   describe "#start" do
     it "creates a vpc if location is aws and starts to wait for it" do
-      loc = Location.create_with_id(name: "aws-us-east-1", provider: "aws", project_id: prj.id, display_name: "aws-us-east-1", ui_name: "AWS US East 1", visible: true)
+      loc = Location.create_with_id(name: "aws-us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
       expect(ps).to receive(:location).and_return(loc).at_least(:once)
       expect(nx).to receive(:bud).with(Prog::Aws::Vpc, {"subject_id" => ps.id}, :create_vpc)
       expect { nx.start }.to hop("wait_vpc_created")
     end
 
     it "does not create the PrivateSubnetAwsResource if it already exists" do
-      loc = Location.create_with_id(name: "aws-us-east-1", provider: "aws", project_id: prj.id, display_name: "aws-us-east-1", ui_name: "AWS US East 1", visible: true)
+      loc = Location.create_with_id(name: "aws-us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
       expect(ps).to receive(:location).and_return(loc).at_least(:once)
       expect(ps).to receive(:private_subnet_aws_resource).and_return(instance_double(PrivateSubnetAwsResource, id: "123")).at_least(:once)
       expect(nx).to receive(:bud).with(Prog::Aws::Vpc, {"subject_id" => ps.id}, :create_vpc)
@@ -430,7 +430,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
 
     it "hops to wait_aws_vpc_destroyed if location is aws" do
-      expect(ps).to receive(:location).and_return(Location.create_with_id(name: "aws-us-east-1", provider: "aws", project_id: prj.id, display_name: "aws-us-east-1", ui_name: "AWS US East 1", visible: true))
+      expect(ps).to receive(:location).and_return(Location.create_with_id(name: "aws-us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true))
       expect(nx).to receive(:private_subnet).and_return(ps).at_least(:once)
       expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
       expect(nic).to receive(:incr_destroy)
