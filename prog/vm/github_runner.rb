@@ -299,6 +299,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def wait
+    register_deadline(nil, 5 * 24 * 60 * 60)
     case vm.sshable.cmd("systemctl show -p SubState --value runner-script").chomp
     when "exited"
       github_runner.incr_destroy
