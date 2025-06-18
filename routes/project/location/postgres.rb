@@ -464,6 +464,66 @@ class Clover
           metrics: results
         }
       end
+
+      r.is "config" do
+        r.get do
+          authorize("Postgres:view", pg.id)
+
+          {
+            pg_config: pg.user_config,
+            pgbouncer_config: pg.pgbouncer_user_config
+          }
+        end
+
+        r.post do
+          authorize("Postgres:edit", pg.id)
+
+          pg_config = typecast_params.Hash("pg_config")
+          pgbouncer_config = typecast_params.Hash("pgbouncer_config")
+
+          pg_validator = Validation::PostgresConfigValidator.new(pg.version)
+          pg_validator.validate(pg_config)
+
+          pgbouncer_validator = Validation::PostgresConfigValidator.new("pgbouncer")
+          pgbouncer_validator.validate(pgbouncer_config)
+
+          pg.update(user_config: pg_config, pgbouncer_user_config: pgbouncer_config)
+          audit_log(pg, "update")
+
+          pg.servers.each(&:incr_configure)
+
+          {
+            pg_config: pg.user_config,
+            pgbouncer_config: pg.pgbouncer_user_config
+          }
+        end
+
+        r.patch do
+          authorize("Postgres:edit", pg.id)
+
+          pg_config = typecast_params.Hash("pg_config")
+          pgbouncer_config = typecast_params.Hash("pgbouncer_config")
+
+          pg_config = pg.user_config.merge(pg_config).compact
+          pgbouncer_config = pg.pgbouncer_user_config.merge(pgbouncer_config).compact
+
+          pg_validator = Validation::PostgresConfigValidator.new(pg.version)
+          pg_validator.validate(pg_config)
+
+          pgbouncer_validator = Validation::PostgresConfigValidator.new("pgbouncer")
+          pgbouncer_validator.validate(pgbouncer_config)
+
+          pg.update(user_config: pg_config, pgbouncer_user_config: pgbouncer_config)
+          audit_log(pg, "update")
+
+          pg.servers.each(&:incr_configure)
+
+          {
+            pg_config: pg.user_config,
+            pgbouncer_config: pg.pgbouncer_user_config
+          }
+        end
+      end
     end
   end
 end
