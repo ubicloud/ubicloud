@@ -704,16 +704,15 @@ class Clover < Roda
 
       check_csrf!
       rodauth.load_memory
+      rodauth.check_active_session
 
       r.root do
-        if rodauth.logged_in?
+        if current_account
           redirect_default_project_dashboard
         else
           r.redirect rodauth.login_route
         end
       end
-
-      rodauth.check_active_session
     end
 
     r.rodauth
