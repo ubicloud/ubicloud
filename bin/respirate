@@ -69,7 +69,7 @@ DB.synchronize do
       # Note that this results in an up to a 1 second delay to pick up new strands,
       # but that is an accept tradeoff, because we do not want to busy loop the
       # database (potentially, LISTEN/NOTIFY could be used to reduce this latency)
-      duration_slept = sleep 1
+      duration_slept = sleep d.sleep_duration
       Clog.emit("respirate finished sleep") { {sleep_duration_sec: duration_slept} }
     end
   end
