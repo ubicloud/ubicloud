@@ -327,8 +327,48 @@ RSpec.describe Scheduling::Dispatcher do
   end
 
   describe "#sleep_duration" do
-    it "is 1" do
+    it "is 1 when dispatcher is idle" do
+      st = Strand.create(prog: "Test", label: "wait_exit", schedule: Time.now - 10)
+      q = Queue.new
+      expect(st).to receive(:run).and_wrap_original do |m|
+        m.call
+        q.push true
+      end
+      di.start_cohort([st])
+      expect(q.pop(timeout: 5)).to be true
+      Thread.new do
+        until di.instance_variable_get(:@thread_data).size == di.instance_variable_get(:@strand_queue).num_waiting
+          sleep 0.01
+        end
+      end.join(5)
       expect(di.sleep_duration).to eq 1
+    end
+
+    it "depends on number of available workers and strands per second" do
+      st = Strand.create(prog: "Test", label: "wait_exit", schedule: Time.now - 10)
+      q = Queue.new
+      q2 = Queue.new
+      expect(st).to receive(:run).and_wrap_original do |m|
+        q.push true
+        q2.pop(timeout: 5)
+        m.call
+      end
+      di
+      Thread.new do
+        until di.instance_variable_get(:@thread_data).size == di.instance_variable_get(:@strand_queue).num_waiting
+          sleep 0.01
+        end
+      end.join(5)
+      di.start_cohort([st, st])
+      q.pop(timeout: 5)
+      expect(di.sleep_duration).to eq 0.75
+      di.instance_variable_set(:@strands_per_second, 3)
+      expect(di.sleep_duration).to eq 0.25
+      di.instance_variable_set(:@strands_per_second, 5)
+      expect(di.sleep_duration).to eq 0.2
+      di.instance_variable_set(:@strands_per_second, 0.5)
+      expect(di.sleep_duration).to eq 1
+      q2.push true
     end
   end
 
