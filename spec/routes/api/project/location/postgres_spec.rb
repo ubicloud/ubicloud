@@ -655,5 +655,50 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(204)
       end
     end
+
+    describe "config" do
+      it "read" do
+        pg.update(user_config: {"max_connections" => "100"}, pgbouncer_user_config: {"max_client_conn" => "100"})
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config"
+
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["pg_config"]).to eq({"max_connections" => "100"})
+        expect(response_body["pgbouncer_config"]).to eq({"max_client_conn" => "100"})
+      end
+
+      it "full update" do
+        pg.update(user_config: {"max_connections" => "100"}, pgbouncer_user_config: {"max_client_conn" => "100"})
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
+          pg_config: {"huge_pages" => "on"},
+          pgbouncer_config: {"admin_users" => "postgres"}
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["pg_config"]).to eq({"huge_pages" => "on"})
+        expect(response_body["pgbouncer_config"]).to eq({"admin_users" => "postgres"})
+
+        expect(pg.reload.user_config).to eq({"huge_pages" => "on"})
+        expect(pg.reload.pgbouncer_user_config).to eq({"admin_users" => "postgres"})
+      end
+
+      it "partial update" do
+        pg.update(user_config: {"max_connections" => "100", "default_transaction_isolation" => "serializable"}, pgbouncer_user_config: {"max_client_conn" => "100", "pool_mode" => "session"})
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
+          pg_config: {"huge_pages" => "on", "max_connections" => "120"},
+          pgbouncer_config: {"admin_users" => "postgres"}
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["pg_config"]).to eq({"max_connections" => "120", "huge_pages" => "on", "default_transaction_isolation" => "serializable"})
+        expect(response_body["pgbouncer_config"]).to eq({"max_client_conn" => "100", "admin_users" => "postgres", "pool_mode" => "session"})
+
+        expect(pg.reload.user_config).to eq({"max_connections" => "120", "huge_pages" => "on", "default_transaction_isolation" => "serializable"})
+        expect(pg.reload.pgbouncer_user_config).to eq({"max_client_conn" => "100", "admin_users" => "postgres", "pool_mode" => "session"})
+      end
+    end
   end
 end

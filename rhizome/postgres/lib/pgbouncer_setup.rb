@@ -122,7 +122,7 @@ PGBOUNCER_CONFIG
 
   def enable_and_start_service
     (1..@num_instances.to_i).each do |i|
-      r "systemctl enable --now #{service_template_name}#{port_num(i)}"
+      r "systemctl reload #{service_template_name}#{port_num(i)} || systemctl enable --now #{service_template_name}#{port_num(i)}"
     end
   end
 
