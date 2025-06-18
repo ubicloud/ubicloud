@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../../model"
+require "aws-sdk-s3"
 
 class PostgresTimeline < Sequel::Model
   one_to_one :strand, key: :id
@@ -29,7 +30,7 @@ WALG_S3_PREFIX=s3://#{ubid}
 AWS_ENDPOINT=#{blob_storage_endpoint}
 AWS_ACCESS_KEY_ID=#{access_key}
 AWS_SECRET_ACCESS_KEY=#{secret_key}
-AWS_REGION: us-east-1
+AWS_REGION: #{aws? ? location.name : "us-east-1"}
 AWS_S3_FORCE_PATH_STYLE=true
 PGHOST=/var/run/postgresql
     WALG_CONF
@@ -50,8 +51,7 @@ PGHOST=/var/run/postgresql
     return [] if blob_storage.nil?
 
     begin
-      blob_storage_client
-        .list_objects(ubid, "basebackups_005/")
+      list_objects("basebackups_005/")
         .select { it.key.end_with?("backup_stop_sentinel.json") }
     rescue => ex
       recoverable_errors = ["The Access Key Id you provided does not exist in our records.", "AccessDenied", "No route to host", "Connection refused"]
@@ -104,16 +104,59 @@ PGHOST=/var/run/postgresql
   end
 
   def blob_storage_client
-    @blob_storage_client ||= Minio::Client.new(
+    @blob_storage_client ||= aws? ? Aws::S3::Client.new(
+      region: location.name,
+      access_key_id: access_key,
+      secret_access_key: secret_key,
+      endpoint: blob_storage_endpoint,
+      force_path_style: true
+    ) : Minio::Client.new(
       endpoint: blob_storage_endpoint,
       access_key: access_key,
       secret_key: secret_key,
-      ssl_ca_data: aws? ? "" : blob_storage.root_certs
+      ssl_ca_data: blob_storage.root_certs
     )
   end
 
   def blob_storage_policy
     {Version: "2012-10-17", Statement: [{Effect: "Allow", Action: ["s3:*"], Resource: ["arn:aws:s3:::#{ubid}*"]}]}
+  end
+
+  def list_objects(prefix)
+    aws? ?
+      blob_storage_client.list_objects_v2(bucket: ubid, prefix: prefix).contents
+    : blob_storage_client.list_objects(ubid, prefix)
+  end
+
+  def create_bucket
+    aws? ?
+      blob_storage_client.create_bucket({
+        bucket: ubid,
+        create_bucket_configuration: {
+          location_constraint: location.name
+        }
+      })
+    : blob_storage_client.create_bucket(ubid)
+  end
+
+  def set_lifecycle_policy
+    aws? ?
+      blob_storage_client.put_bucket_lifecycle_configuration({
+        bucket: ubid,
+        lifecycle_configuration: {
+          rules: [
+            {
+              id: "DeleteOldBackups",
+              prefix: "basebackups_005/",
+              status: "Enabled",
+              expiration: {
+                days: BACKUP_BUCKET_EXPIRATION_DAYS
+              }
+            }
+          ]
+        }
+      })
+    : blob_storage_client.set_lifecycle_policy(ubid, ubid, BACKUP_BUCKET_EXPIRATION_DAYS)
   end
 end
 

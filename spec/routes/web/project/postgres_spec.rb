@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../spec_helper"
+require "aws-sdk-s3"
 
 RSpec.describe Clover, "postgres" do
   let(:user) { create_account }
@@ -120,10 +121,6 @@ RSpec.describe Clover, "postgres" do
         choose option: "standard-2"
         choose option: PostgresResource::HaType::NONE
         choose option: "118"
-
-        s3_client = Aws::S3::Client.new(stub_responses: true)
-        s3_client.stub_responses(:list_objects_v2, {contents: []})
-        expect(Aws::S3::Client).to receive(:new).and_return(s3_client)
 
         click_button "Create"
 
