@@ -490,7 +490,7 @@ class Scheduling::Dispatcher
     finish_queue.push(true)
     @mutex.synchronize { @current_strands.delete(strand.id) }
 
-    @metrics_queue.push(strand.respirate_metrics)
+    @metrics_queue.push(strand.respirate_metrics) unless @shutting_down
 
     # If there are any sessions in the thread-local (really fiber-local) ssh
     # cache after the strand run, close them eagerly to close the related
