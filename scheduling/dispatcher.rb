@@ -340,6 +340,12 @@ class Scheduling::Dispatcher
     respirate_metrics
   end
 
+  # The amount of time to sleep if no strands or old strands were picked up
+  # during the last scan loop.
+  def sleep_duration
+    1
+  end
+
   # Start a strand/apoptosis thread pair, where the strand thread will
   # pull from the given strand queue.
   #

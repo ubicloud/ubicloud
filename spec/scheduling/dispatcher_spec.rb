@@ -326,6 +326,12 @@ RSpec.describe Scheduling::Dispatcher do
     end
   end
 
+  describe "#sleep_duration" do
+    it "is 1" do
+      expect(di.sleep_duration).to eq 1
+    end
+  end
+
   describe "#strand_thread" do
     it "runs strands pushed onto queue" do
       Strand.create(prog: "Test", label: "napper", schedule: Time.now - 10)
