@@ -15,12 +15,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       ubid = PostgresServer.generate_ubid
 
       postgres_resource = PostgresResource[resource_id]
-      boot_image = if postgres_resource.location.provider == "aws"
-        case postgres_resource.version
-        when "16" then Config.aws_based_postgres_16_ubuntu_2204_ami_version
-        when "17" then Config.aws_based_postgres_17_ubuntu_2204_ami_version
-        else raise "Unsupported PostgreSQL version for AWS: #{postgres_resource.version}"
-        end
+      boot_image = if postgres_resource.location.aws?
+        postgres_resource.location.pg_ami(postgres_resource.version)
       else
         flavor_suffix = case postgres_resource.flavor
         when PostgresResource::Flavor::STANDARD then ""

@@ -121,6 +121,10 @@ RSpec.describe Clover, "postgres" do
         choose option: PostgresResource::HaType::NONE
         choose option: "118"
 
+        s3_client = Aws::S3::Client.new(stub_responses: true)
+        s3_client.stub_responses(:list_objects_v2, {contents: []})
+        expect(Aws::S3::Client).to receive(:new).and_return(s3_client)
+
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - #{name}")
