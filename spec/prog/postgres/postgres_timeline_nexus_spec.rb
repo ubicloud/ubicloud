@@ -107,12 +107,9 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
   end
 
   describe "#setup_bucket" do
-    let(:blob_storage_client) { instance_double(Minio::Client) }
-
     it "hops to wait_leader if bucket is created" do
-      expect(postgres_timeline).to receive(:blob_storage_client).and_return(blob_storage_client).twice
-      expect(blob_storage_client).to receive(:create_bucket).with(postgres_timeline.ubid).and_return(200)
-      expect(blob_storage_client).to receive(:set_lifecycle_policy).with(postgres_timeline.ubid, postgres_timeline.ubid, 8).and_return(200)
+      expect(postgres_timeline).to receive(:create_bucket).and_return(true)
+      expect(postgres_timeline).to receive(:set_lifecycle_policy).and_return(true)
       expect { nx.setup_bucket }.to hop("wait_leader")
     end
   end
