@@ -92,6 +92,10 @@ class Scheduling::Dispatcher
     # up, and will not pick up their strands for an additional time.
     @current_strand_delay = 0
 
+    # Default number of strands per second. This will be updated based on
+    # based on metrics. Used for calculating the sleep duration.
+    @strands_per_second = 1
+
     # Ensure initial unpartitioned prepared statement setup before listening
     # for partition changes.  In a partitioned environment, this should
     # quickly be called be the repartition thread once it determines
@@ -326,7 +330,8 @@ class Scheduling::Dispatcher
     respirate_metrics[:lease_acquire_percentage] = array.count(&:lease_acquired) * METRICS_PERCENTAGE
     respirate_metrics[:old_strand_percentage] = array.count(&:old_strand) * METRICS_PERCENTAGE
     respirate_metrics[:strand_count] = METRICS_EVERY
-    respirate_metrics[:strands_per_second] = METRICS_EVERY / elapsed_time
+    @strands_per_second = METRICS_EVERY / elapsed_time
+    respirate_metrics[:strands_per_second] = @strands_per_second
 
     # Use the p95 of total delay to set the delay for the current strands.
     # Ignore the delay for old strands when calculating delay for current strands.
@@ -343,7 +348,27 @@ class Scheduling::Dispatcher
   # The amount of time to sleep if no strands or old strands were picked up
   # during the last scan loop.
   def sleep_duration
-    1
+    # Set base sleep duration based on on queue size and the number of strands processed
+    # per second.  If you are processing 10 strands per second, and there are 5 strands
+    # in the queue, it should take about 0.5 seconds to get through the existing strands.
+    # Multiply by 0.75, since @strands_per_second is only updated occassionally by
+    # the metrics thread.
+    sleep_duration = ((@strand_queue.size * 0.75) / @strands_per_second)
+
+    # You don't want to query the database too often, especially when the queue is empty
+    # and respirate is idle.  Estimate how idle the respirate process is by looking at
+    # the percentage of available workers, and use that as a lower bound. If you have
+    # 6 available workers and 8 total workers, that's close to idle, set a minimum
+    # sleep time of 0.75 seconds.  If you have 2 available workers and 8 total workers,
+    # that's pretty busy, set a minimum sleep time of 0.25 seconds.
+    available_workers = @strand_queue.num_waiting
+    workers = @thread_data.size
+    sleep_duration = sleep_duration.clamp(available_workers.fdiv(workers), nil)
+
+    # Finally, set asbolute minimum sleep time to 0.2 seconds, to not overload the
+    # database, and set absolute maximum sleep time to 1 second, to not wait too long
+    # to pick up strands.
+    sleep_duration.clamp(0.2, 1)
   end
 
   # Start a strand/apoptosis thread pair, where the strand thread will
