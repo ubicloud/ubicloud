@@ -316,6 +316,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     # GitHub API, but sometimes GitHub assigns a job at the last second.
     # Therefore, we wait a few extra seconds beyond the 5 minute mark.
     if github_runner.workflow_job.nil? && Time.now > github_runner.ready_at + 5 * 60 + 10
+      register_deadline(nil, 2 * 60 * 60)
       unless busy?
         Clog.emit("The runner does not pick a job") { github_runner }
         github_runner.incr_destroy
