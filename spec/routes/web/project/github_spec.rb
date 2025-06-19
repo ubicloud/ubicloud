@@ -7,8 +7,8 @@ RSpec.describe Clover, "github" do
   let(:user) { create_account }
   let(:project) { user.create_project_with_default_policy("project-1") }
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
-  let(:installation) { GithubInstallation.create_with_id(installation_id: 123, name: "test-user", type: "User", project_id: project.id) }
-  let(:repository) { GithubRepository.create_with_id(name: "test-repo", installation_id: installation.id) }
+  let(:installation) { GithubInstallation.create(installation_id: 123, name: "test-user", type: "User", project_id: project.id, created_at: Time.now - 10 * 24 * 60 * 60) }
+  let(:repository) { GithubRepository.create(name: "test-repo", installation_id: installation.id) }
 
   before do
     login(user.email)
@@ -130,6 +130,14 @@ RSpec.describe Clover, "github" do
       expect(installation.reload.premium_runner_enabled?).to be false
     end
 
+    it "shows badge for free premium runner upgrade" do
+      installation.update(created_at: Time.now)
+
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+      expect(page.status_code).to eq(200)
+      expect(page).to have_content "You’re eligible for an exclusive 50% off premium runners"
+    end
+
     it "enables cache for installation" do
       installation.update(cache_enabled: false)
       expect(installation.cache_enabled).to be false
@@ -182,6 +190,13 @@ RSpec.describe Clover, "github" do
   end
 
   describe "runner" do
+    it "shows no active runner page" do
+      visit "#{project.path}/github/#{installation.ubid}/runner"
+      expect(page.status_code).to eq(200)
+      expect(page).to have_content "No active runners"
+      expect(page).to have_no_content "You’re eligible for an exclusive 50% off premium runners"
+    end
+
     it "can list active runners" do
       now = Time.now
       expect(Time).to receive(:now).and_return(now).at_least(:once)
@@ -243,6 +258,18 @@ RSpec.describe Clover, "github" do
       page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
       expect(page.status_code).to eq(404)
+    end
+
+    it "shows badge for free premium runner upgrade" do
+      installation.update(created_at: Time.now)
+
+      visit "#{project.path}/github/#{installation.ubid}/runner"
+      expect(page.status_code).to eq(200)
+      expect(page).to have_content "You’re eligible for an exclusive 50% off premium runners"
+
+      find("a", text: /^You’re eligible/).click
+      expect(page.status_code).to eq(200)
+      expect(page.title).to eq("Ubicloud - GitHub Runner Settings")
     end
   end
 
