@@ -7,7 +7,7 @@
   <div class="overflow-hidden rounded-lg ring-1 ring-black ring-opacity-5 bg-white lg:flex shadow">
     <div class="p-8 sm:p-10 lg:flex-auto">
       <div class="flex items-center">
-        <h3 class="text-3xl font-semibold tracking-tight text-gray-900">
+        <h3 class="text-3xl font-semibold tracking-tight text-gray-900 whitespace-nowrap">
           Premium Runners
         </h3>
         <% if @installation.premium_runner_enabled? %>
@@ -16,6 +16,14 @@
           </span>
         <% end %>
       </div>
+      <% if @installation.free_runner_upgrade? %>
+        <span class="rounded-full bg-green-600/10 px-2.5 py-1 text-xs/5 font-medium text-green-600">
+          You’re eligible for an exclusive
+          <span class="font-semibold">50% off</span>
+          premium runners until
+          <span class="font-semibold"><%= @installation.free_runner_upgrade_expires_at.strftime("%B %d, %Y") %></span>
+        </span>
+      <% end %>
       <p class="mt-4 text-base/7 text-gray-600">
         Speed up your builds with cutting edge gaming CPUs! We automatically route your jobs to premium machines. If
         capacity's full, you seamlessly fall back to standard runners with no extra wait time. You always get billed by
@@ -41,7 +49,7 @@
     </div>
     <div class="-mt-2 p-2 lg:mt-0 lg:w-full lg:max-w-sm lg:shrink-0">
       <div
-        class="rounded-lg bg-gray-50 py-10 text-center ring-1 ring-inset ring-gray-900/5 lg:flex lg:flex-col lg:justify-center lg:py-16"
+        class="rounded-lg h-full bg-gray-50 py-10 text-center ring-1 ring-inset ring-gray-900/5 lg:flex lg:flex-col lg:justify-center lg:py-16"
       >
         <div class="mx-auto max-w-sm px-8 space-y-8">
           <p class="flex items-baseline justify-center gap-x-2">
