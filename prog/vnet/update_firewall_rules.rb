@@ -210,26 +210,25 @@ TEMPLATE
     }).security_groups.first
 
     # Remove existing rules that aren't in our current rules list
-    permissions_to_revoke = security_group.ip_permissions.select do |permission|
-      permission.ip_protocol == "tcp" && # Skip if not TCP for now
-        ip4_rules.none? { |r|
-          r.cidr.to_s == permission.ip_ranges.first&.cidr_ip &&
-            r.port_range.begin == permission.from_port &&
-            r.port_range.end - 1 == permission.to_port
-        } &&
-        ip6_rules.none? { |r|
-          r.cidr.to_s == permission.ipv_6_ranges.first&.cidr_ipv_6 &&
-            r.port_range.begin == permission.from_port &&
-            r.port_range.end - 1 == permission.to_port
-        }
-    end.map! do |permission|
+    permissions_to_revoke = security_group.ip_permissions.filter_map do |permission|
+      next unless permission.ip_protocol == "tcp"
+      ip_ranges_to_revoke = permission.ip_ranges.select do |ip_range|
+        ip4_rules.none? { |r| r.cidr.to_s == ip_range.cidr_ip && r.port_range.begin == permission.from_port && r.port_range.end - 1 == permission.to_port }
+      end
+
+      ipv_6_ranges_to_revoke = permission.ipv_6_ranges.select do |ip_range|
+        ip6_rules.none? { |r| r.cidr.to_s == ip_range.cidr_ipv_6 && r.port_range.begin == permission.from_port && r.port_range.end - 1 == permission.to_port }
+      end
+
+      next if ip_ranges_to_revoke.empty? && ipv_6_ranges_to_revoke.empty?
+
       perm = {
         ip_protocol: "tcp",
         from_port: permission.from_port,
         to_port: permission.to_port
       }
-      perm[:ip_ranges] = permission.ip_ranges if permission.ip_ranges.any?
-      perm[:ipv_6_ranges] = permission.ipv_6_ranges if permission.ipv_6_ranges.any?
+      perm[:ip_ranges] = ip_ranges_to_revoke if ip_ranges_to_revoke.any?
+      perm[:ipv_6_ranges] = ipv_6_ranges_to_revoke if ipv_6_ranges_to_revoke.any?
       perm
     end
 
