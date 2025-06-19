@@ -311,6 +311,7 @@ RSpec.describe Scheduling::Dispatcher do
       arrays << Array.new(1) { rm.new(t, t + 7, t + 20, t + 37, false, 50, 1, true, true) }
       expect(di.metrics_hash(arrays.flatten, 0.5)).to eq({
         available_workers: {average: 1, max: 9, median: 0, p75: 1, p85: 7, p95: 9, p99: 9},
+        current_strand_delay: 12.0,
         lease_acquire_percentage: 95.5,
         lease_expired_percentage: 0.5,
         lease_delay: {average: 1.96, max: 17.0, median: 1.0, p75: 3.0, p85: 4.0, p95: 9.0, p99: 13.0},
