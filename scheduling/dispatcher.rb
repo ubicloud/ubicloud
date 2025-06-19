@@ -49,7 +49,7 @@ class Scheduling::Dispatcher
     # ensure that for a busy thread pool, there are always strands to run.
     # This should only cause issues if the thread pool can process more than
     # 4 times its size in the time it takes the main thread to refill the queue.
-    @queue_size = pool_size * Config.dispatcher_queue_size_ratio
+    @queue_size = (pool_size * Config.dispatcher_queue_size_ratio).round.clamp(1, nil)
 
     # The Queue that all threads in the thread pool pull from.  This is a
     # SizedQueue to allow for backoff in the case that the thread pool cannot
