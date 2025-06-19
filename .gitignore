@@ -11,6 +11,7 @@
 /sql_query_parameterization_analysis.txt
 /spec/routes/api/cli/spec-output-files
 /cli-golden-files.diff
+/cache-text-*
 
 # Used by rake by
 /bin/by
