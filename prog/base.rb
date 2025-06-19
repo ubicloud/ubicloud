@@ -181,7 +181,7 @@ end
   end
 
   def donate
-    strand.children.map(&:run)
+    strand.children_dataset.each(&:run)
     nap 1
   end
 
