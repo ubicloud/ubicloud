@@ -15,7 +15,15 @@ class GithubInstallation < Sequel::Model
   end
 
   def free_runner_upgrade?
-    (upgrade_until = project.get_ff_free_runner_upgrade_until) && Time.parse(upgrade_until) > Time.now
+    free_runner_upgrade_expires_at > Time.now
+  end
+
+  def free_runner_upgrade_expires_at
+    dates = [created_at + 7 * 24 * 60 * 60]
+    if (upgrade_until = project.get_ff_free_runner_upgrade_until)
+      dates.push(Time.parse(upgrade_until))
+    end
+    dates.max
   end
 
   def premium_runner_enabled?
