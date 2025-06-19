@@ -75,7 +75,7 @@ class Clover
       r.delete do
         authorize("Location:delete", @project.id)
 
-        if @location.has_resources
+        if @location.has_resources?
           fail DependencyError.new("Private location '#{@location.ui_name}' has some resources, first, delete them.")
         end
 

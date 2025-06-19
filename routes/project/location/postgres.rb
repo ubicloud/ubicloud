@@ -69,7 +69,7 @@ class Clover
 
           DB.transaction do
             pg.update(target_vm_size: target_vm_size.vm_size, target_storage_size_gib:, ha_type:)
-            pg.read_replicas.map { it.update(target_vm_size: target_vm_size.vm_size, target_storage_size_gib:) }
+            pg.read_replicas_dataset.update(target_vm_size: target_vm_size.vm_size, target_storage_size_gib:)
             audit_log(pg, "update")
           end
 
@@ -101,10 +101,7 @@ class Clover
       r.post "restart" do
         authorize("Postgres:edit", pg.id)
         DB.transaction do
-          pg.servers.each do |s|
-            s.incr_restart
-          rescue Sequel::ForeignKeyConstraintViolation
-          end
+          Semaphore.incr(pg.servers_dataset.select(:id), "restart")
           audit_log(pg, "restart")
         end
 

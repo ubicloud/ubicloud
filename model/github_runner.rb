@@ -8,6 +8,7 @@ class GithubRunner < Sequel::Model
   many_to_one :installation, key: :installation_id, class: :GithubInstallation
   many_to_one :repository, key: :repository_id, class: :GithubRepository
   one_to_one :vm, key: :id, primary_key: :vm_id
+  one_through_one :project, join_table: :github_installation, left_key: :id, left_primary_key: :installation_id, read_only: true
 
   plugin ResourceMethods, redacted_columns: :workflow_job
   include SemaphoreMethods

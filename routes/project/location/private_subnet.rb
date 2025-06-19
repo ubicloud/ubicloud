@@ -76,18 +76,26 @@ class Clover
           else
             @nics = Serializers::Nic.serialize(ps.nics)
             @connected_subnets = Serializers::PrivateSubnet.serialize(ps.connected_subnets)
-            connectable_subnets = ps.project.private_subnets.select do |ps1|
-              ps1_id = ps1.id
-              ps1_id != ps.id && !ps.connected_subnets.find { |cs| cs.id == ps1_id }
-            end
-            @connectable_subnets = Serializers::PrivateSubnet.serialize(connectable_subnets)
+            connectable_subnets_dataset = ps.project.private_subnets_dataset.exclude(id: ps.connected_subnets.map(&:id))
+            @connectable_subnets = Serializers::PrivateSubnet.serialize(connectable_subnets_dataset.all)
             view "networking/private_subnet/show"
           end
         end
 
         r.delete do
           authorize("PrivateSubnet:delete", ps.id)
-          unless ps.vms.all? { it.destroy_set? || it.strand.nil? || it.strand.label == "destroy" }
+
+          vms_dataset = ps.vms_dataset
+            .association_join(:strand)
+            .exclude(label: "destroy")
+            .exclude(Sequel[:vm][:id] => Semaphore
+              .where(
+                strand_id: DB[:nic].where(private_subnet_id: ps.id).select(:vm_id),
+                name: "destroy"
+              )
+              .select(:strand_id))
+
+          unless vms_dataset.empty?
             fail DependencyError.new("Private subnet '#{ps.name}' has VMs attached, first, delete them.")
           end
 
