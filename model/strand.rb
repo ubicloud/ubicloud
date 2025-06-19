@@ -23,7 +23,7 @@ class Strand < Sequel::Model
     @subject = UBID.decode(ubid)
   end
 
-  RespirateMetrics = Struct.new(:scheduled, :scan_picked_up, :worker_started, :lease_checked, :lease_acquired, :queue_size, :available_workers, :old_strand) do
+  RespirateMetrics = Struct.new(:scheduled, :scan_picked_up, :worker_started, :lease_checked, :lease_acquired, :queue_size, :available_workers, :old_strand, :lease_expired) do
     def scan_delay
       scan_picked_up - scheduled
     end
@@ -48,7 +48,7 @@ class Strand < Sequel::Model
 
   def respirate_metrics
     lease_expired = lease > EXPIRED_LEASE_TIME
-    @respirate_metrics ||= RespirateMetrics.new(scheduled: lease_expired ? lease : schedule)
+    @respirate_metrics ||= RespirateMetrics.new(scheduled: lease_expired ? lease : schedule, lease_expired:)
   end
 
   def scan_picked_up!
