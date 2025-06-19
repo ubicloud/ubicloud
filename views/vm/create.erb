@@ -20,15 +20,24 @@
     {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::Vm.method(:location)},
     {name: "private_subnet_id", type: "select", label: "Private Subnet", placeholder: "Default", description_html: ps_description, content_generator: ContentGenerator::Vm.method(:private_subnet), opening_tag: "<div class='sm:col-span-3'>"},
     {name: "enable_ip4", type: "checkbox", label: "Public IPv4 Support", description: "Needed for inbound and outbound public IPv4 connections. Websites that do not support IPv6 will be inaccessible without an IPv4 address.", content_generator: ContentGenerator::Vm.method(:enable_ipv4)},
-    {name: "family", type: "radio_small_cards", label: "Server family", required: "required", content_generator: ContentGenerator::Vm.method(:family)},
+    {name: "family", type: "radio_small_cards", label: "Server family", required: "required", content_generator: ContentGenerator::Vm.method(:family)}
+  ]
+
+  elements = [
     {name: "size", type: "radio_small_cards", label: "Server size", required: "required", content_generator: ContentGenerator::Vm.method(:size)},
     {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required", content_generator: ContentGenerator::Vm.method(:storage_size)}
   ]
 
   if @show_gpu != false
-    form_elements <<
-      {name: "gpu", type: "radio_small_cards", label: "GPU", required: "required", content_generator: ContentGenerator::Vm.method(:gpu)}
+    gpu = {name: "gpu", type: "radio_small_cards", label: "GPU", required: "required", content_generator: ContentGenerator::Vm.method(:gpu)}
+    if @show_gpu
+      elements.unshift gpu
+    else
+      elements.push gpu
+    end
   end
+
+  form_elements.concat(elements)
 
   form_elements.push(
     {name: "boot_image", type: "radio_small_cards", label: "Boot Image", required: "required", content_generator: ContentGenerator::Vm.method(:boot_image)},
