@@ -132,7 +132,7 @@ class VmHost < Sequel::Model
     ipv4_ds = DB[:ipv4_address].join(:address, [:cidr]).where(cidr: assigned_subnets_dataset.select(:cidr))
 
     res = ipv4_ds
-      .exclude(ip: assigned_vm_addresses_dataset.select(:ip))
+      .exclude(assigned_vm_addresses_dataset.where(ip: Sequel[:ipv4_address][:ip]).select(1).exists)
       .order { random.function }
       .first
 
