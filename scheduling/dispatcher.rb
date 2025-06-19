@@ -329,6 +329,7 @@ class Scheduling::Dispatcher
     end
     respirate_metrics[:lease_acquire_percentage] = array.count(&:lease_acquired) * METRICS_PERCENTAGE
     respirate_metrics[:old_strand_percentage] = array.count(&:old_strand) * METRICS_PERCENTAGE
+    respirate_metrics[:lease_expired_percentage] = array.count(&:lease_expired) * METRICS_PERCENTAGE
     respirate_metrics[:strand_count] = METRICS_EVERY
     @strands_per_second = METRICS_EVERY / elapsed_time
     respirate_metrics[:strands_per_second] = @strands_per_second

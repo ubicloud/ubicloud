@@ -308,10 +308,11 @@ RSpec.describe Scheduling::Dispatcher do
       arrays << Array.new(20) { rm.new(t, t + 3, t + 8, t + 12, true, 20, 7) }
       arrays << Array.new(8) { rm.new(t, t + 5, t + 12, t + 21, false, 30, 5) }
       arrays << Array.new(1) { rm.new(t, t + 6, t + 16, t + 29, true, 40, 3, true) }
-      arrays << Array.new(1) { rm.new(t, t + 7, t + 20, t + 37, false, 50, 1, true) }
+      arrays << Array.new(1) { rm.new(t, t + 7, t + 20, t + 37, false, 50, 1, true, true) }
       expect(di.metrics_hash(arrays.flatten, 0.5)).to eq({
         available_workers: {average: 1, max: 9, median: 0, p75: 1, p85: 7, p95: 9, p99: 9},
         lease_acquire_percentage: 95.5,
+        lease_expired_percentage: 0.5,
         lease_delay: {average: 1.96, max: 17.0, median: 1.0, p75: 3.0, p85: 4.0, p95: 9.0, p99: 13.0},
         old_strand_percentage: 1.0,
         queue_delay: {average: 1.845, max: 13.0, median: 1.0, p75: 2.0, p85: 5.0, p95: 7.0, p99: 10.0},
