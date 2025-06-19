@@ -22,6 +22,22 @@ RSpec.describe Strand do
       expect(did_it).to be :did_it
     end
 
+    it "clears cached instance state" do
+      st.save_changes
+      st.set(label: "smoke_test_0")
+      st.associations[:parent] = st
+      st2 = st.subject
+      expect(st.subject).to equal st2
+      expect(st.changed_columns).not_to be_empty
+      st.take_lease_and_reload {
+        expect(st.label).to eq "start"
+        expect(st.changed_columns).to be_empty
+        expect(st.associations).to be_empty
+        expect(st.subject.id).to eq st.id
+        expect(st.subject).not_to equal st2
+      }
+    end
+
     it "does an integrity check that deleted records are gone" do
       st.label = "hop_exit"
       st.save_changes

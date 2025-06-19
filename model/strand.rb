@@ -19,7 +19,7 @@ class Strand < Sequel::Model
   plugin ResourceMethods
 
   def subject
-    return @subject if defined?(@subject)
+    return @subject if defined?(@subject) && @subject != :reload
     @subject = UBID.decode(ubid)
   end
 
@@ -90,7 +90,9 @@ class Strand < Sequel::Model
     lease_time = affected.fetch(:lease)
 
     # Also operate as reload query
-    @values = affected
+    _refresh_set_values(affected)
+    _clear_changed_columns(:refresh)
+    @subject = :reload
 
     begin
       yield
