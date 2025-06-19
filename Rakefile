@@ -127,7 +127,7 @@ task :prod_up do
   migrate.call("production", nil)
 end
 
-desc "Refresh schema and index caches"
+desc "Refresh Sequel caches"
 task :refresh_sequel_caches do
   %w[schema index static_cache pg_auto_constraint_validations].each do |type|
     filename = "cache/#{type}.cache"
@@ -140,6 +140,18 @@ task :refresh_sequel_caches do
      Sequel::Model.dump_static_cache_cache
      Sequel::Model.dump_pg_auto_constraint_validations_cache
   END
+end
+
+desc "Dump Sequel caches to text, useful for diffing"
+task :dump_sequel_caches do
+  load_db.call("test")
+  require "pp"
+  text_dir = "cache-text-#{Time.now.to_i}"
+  Dir.mkdir(text_dir)
+  puts "Writing diffable version of cache files to #{text_dir}"
+  %w[schema index static_cache pg_auto_constraint_validations].each do |type|
+    File.write(File.join(text_dir, "#{type}.txt"), Marshal.load(File.binread("cache/#{type}.cache")).pretty_inspect)
+  end
 end
 
 # Database setup
