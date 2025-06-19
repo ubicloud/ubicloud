@@ -483,7 +483,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "considers filtered locations for runners if set for the installation" do
-      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, allocator_preferences: {"location_filter" => [Location::GITHUB_RUNNERS_ID, Location::LEASEWEB_WDC02_ID]})
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, created_at: Time.now - 8 * 24 * 60 * 60, allocator_preferences: {"location_filter" => [Location::GITHUB_RUNNERS_ID, Location::LEASEWEB_WDC02_ID]})
       GithubRunner.create(vm_id: vm.id, repository_name: "ubicloud/test", label: "ubicloud", installation_id: installation.id)
       vm.location_id = Location::GITHUB_RUNNERS_ID
 
@@ -503,7 +503,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "considers preferred locations for runners if set for the installation" do
-      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, allocator_preferences: {
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, created_at: Time.now - 8 * 24 * 60 * 60, allocator_preferences: {
         "location_filter" => [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID, Location::LEASEWEB_WDC02_ID],
         "location_preference" => [Location::LEASEWEB_WDC02_ID]
       })

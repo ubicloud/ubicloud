@@ -14,7 +14,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   let(:runner) do
     customer_project = Project.create(name: "customer")
     runner_project = Project.create(name: "runner-service")
-    installation_id = GithubInstallation.create(installation_id: 123, project_id: customer_project.id, name: "ubicloud", type: "Organization").id
+    installation_id = GithubInstallation.create(installation_id: 123, project_id: customer_project.id, name: "ubicloud", type: "Organization", created_at: now - 8 * 24 * 60 * 60).id
     vm_id = create_vm(location_id: Location::GITHUB_RUNNERS_ID, project_id: runner_project.id, boot_image: "github-ubuntu-2204").id
     Sshable.create { it.id = vm_id }
     GithubRunner.create(installation_id:, vm_id:, repository_name: "test-repo", label: "ubicloud-standard-4", created_at: now, allocated_at: now + 10, ready_at: now + 20, workflow_job: {"id" => 123})
@@ -169,7 +169,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       vm.update(family: "premium")
       runner.update(label: "ubicloud-standard-2", ready_at: now - 5 * 60)
 
-      expect(runner.installation).to receive(:free_runner_upgrade?).and_return(true)
+      expect(installation).to receive(:free_runner_upgrade?).and_return(true)
       expect(BillingRecord).to receive(:create_with_id).and_call_original
       nx.update_billing_record
 
