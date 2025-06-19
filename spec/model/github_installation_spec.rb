@@ -4,9 +4,7 @@ require_relative "spec_helper"
 
 RSpec.describe GithubInstallation do
   subject(:installation) {
-    project = Project.create_with_id(name: "default")
-
-    described_class.create_with_id(installation_id: 123, project_id: project.id, name: "test-user", type: "User")
+    described_class.create(installation_id: 123, project_id: Project.create(name: "default").id, name: "test-user", type: "User")
   }
 
   it "returns sum of used vm cores" do
@@ -30,5 +28,22 @@ RSpec.describe GithubInstallation do
     end
 
     expect(installation.total_active_runner_vcpus).to eq(6)
+  end
+
+  describe "#cache_storage_gib" do
+    it "returns effective quota if the premium is not enabled" do
+      expect(installation.cache_storage_gib).to eq(30)
+    end
+
+    it "returns 100GB if the premium is enabled" do
+      installation.update(allocator_preferences: {"family_filter" => ["standard", "premium"]})
+      expect(installation.cache_storage_gib).to eq(100)
+    end
+
+    it "returns effective quota if it is larger than premium" do
+      installation.update(allocator_preferences: {"family_filter" => ["standard", "premium"]})
+      installation.project.add_quota(quota_id: ProjectQuota.default_quotas["GithubRunnerCacheStorage"]["id"], value: 300)
+      expect(installation.cache_storage_gib).to eq(300)
+    end
   end
 end

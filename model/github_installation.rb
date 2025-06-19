@@ -21,6 +21,10 @@ class GithubInstallation < Sequel::Model
   def premium_runner_enabled?
     !!allocator_preferences["family_filter"]&.include?("premium")
   end
+
+  def cache_storage_gib
+    [project.effective_quota_value("GithubRunnerCacheStorage"), premium_runner_enabled? ? 100 : 0].max
+  end
 end
 
 # Table: github_installation
