@@ -130,6 +130,16 @@ PGHOST=/var/run/postgresql
     expect(postgres_timeline.backups.map(&:key)).to eq(["backup_stop_sentinel.json"])
   end
 
+  it "returns list of backups for AWS regions" do
+    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, name: "us-west-2")).at_least(:once)
+
+    minio_client = Minio::Client.new(endpoint: "https://s3.us-west-2.amazonaws.com", access_key: "access_key", secret_key: "secret_key", ssl_ca_data: "data")
+    expect(minio_client).to receive(:list_objects).with(postgres_timeline.ubid, "basebackups_005/").and_return([instance_double(Minio::Client::Blob, key: "backup_stop_sentinel.json"), instance_double(Minio::Client::Blob, key: "unrelated_file.txt")])
+    expect(Minio::Client).to receive(:new).and_return(minio_client)
+
+    expect(postgres_timeline.backups.map(&:key)).to eq(["backup_stop_sentinel.json"])
+  end
+
   it "returns blob storage endpoint" do
     expect(MinioCluster).to receive(:[]).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
     expect(postgres_timeline.blob_storage_endpoint).to eq("https://blob-endpoint")
