@@ -45,9 +45,9 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
     let(:victoria_metrics_project) { Project.create_with_id(name: "default") }
     let(:private_location) {
       loc = Location.create(
-        name: "us-east-1",
-        display_name: "aws-us-east-1",
-        ui_name: "aws-us-east-1",
+        name: "us-west-2",
+        display_name: "aws-us-west-2",
+        ui_name: "aws-us-west-2",
         visible: true,
         provider: "aws",
         project_id: victoria_metrics_project.id

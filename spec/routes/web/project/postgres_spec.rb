@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../spec_helper"
+require "aws-sdk-s3"
 
 RSpec.describe Clover, "postgres" do
   let(:user) { create_account }

@@ -1430,8 +1430,7 @@ paths:
                   description: Provider location name of the private location
                   type: string
                   enum:
-                    - us-east-1
-                    - eu-west-1
+                    - us-west-2
                 access_key:
                   description: Access key for the private location
                   type: string

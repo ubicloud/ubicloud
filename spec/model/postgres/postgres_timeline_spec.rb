@@ -23,6 +23,9 @@ PGHOST=/var/run/postgresql
     WALG_CONF
 
     expect(postgres_timeline.generate_walg_config).to eq(walg_config)
+    expect(postgres_timeline).to receive(:aws?).and_return(true)
+    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2"))
+    expect(postgres_timeline.generate_walg_config).to eq(walg_config.sub("us-east-1", "us-east-2"))
   end
 
   describe "#need_backup?" do
@@ -133,10 +136,10 @@ PGHOST=/var/run/postgresql
   it "returns list of backups for AWS regions" do
     expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, name: "us-west-2")).at_least(:once)
 
-    minio_client = Minio::Client.new(endpoint: "https://s3.us-west-2.amazonaws.com", access_key: "access_key", secret_key: "secret_key", ssl_ca_data: "data")
-    expect(minio_client).to receive(:list_objects).with(postgres_timeline.ubid, "basebackups_005/").and_return([instance_double(Minio::Client::Blob, key: "backup_stop_sentinel.json"), instance_double(Minio::Client::Blob, key: "unrelated_file.txt")])
-    expect(Minio::Client).to receive(:new).and_return(minio_client)
-
+    s3_client = Aws::S3::Client.new(stub_responses: true)
+    s3_client.stub_responses(:list_objects_v2, {contents: [{key: "backup_stop_sentinel.json"}, {key: "unrelated_file.txt"}]})
+    expect(s3_client).to receive(:list_objects_v2).with(bucket: postgres_timeline.ubid, prefix: "basebackups_005/").and_call_original
+    expect(Aws::S3::Client).to receive(:new).and_return(s3_client)
     expect(postgres_timeline.backups.map(&:key)).to eq(["backup_stop_sentinel.json"])
   end
 
@@ -170,5 +173,47 @@ PGHOST=/var/run/postgresql
   it "returns earliest restore time" do
     expect(postgres_timeline).to receive(:backups).and_return([instance_double(Minio::Client::Blob, last_modified: Time.now - 60 * 60 * 24 * 5)])
     expect(postgres_timeline.earliest_restore_time.to_i).to be_within(5 * 60).of(Time.now.to_i - 60 * 60 * 24 * 5 + 5 * 60)
+  end
+
+  describe "aws" do
+    let(:s3_client) { Aws::S3::Client.new(stub_responses: true) }
+
+    before do
+      expect(postgres_timeline).to receive(:aws?).and_return(true).at_least(:once)
+      expect(Aws::S3::Client).to receive(:new).and_return(s3_client).at_least(:once)
+    end
+
+    it "creates bucket" do
+      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2")).at_least(:once)
+      s3_client.stub_responses(:create_bucket)
+      expect(s3_client).to receive(:create_bucket).with({bucket: postgres_timeline.ubid, create_bucket_configuration: {location_constraint: "us-east-2"}}).and_return(true)
+      expect(postgres_timeline.create_bucket).to be(true)
+    end
+
+    it "sets lifecycle policy" do
+      s3_client.stub_responses(:put_bucket_lifecycle_configuration)
+      expect(s3_client).to receive(:put_bucket_lifecycle_configuration).with({bucket: postgres_timeline.ubid, lifecycle_configuration: {rules: [{id: "DeleteOldBackups", status: "Enabled", prefix: "basebackups_005/", expiration: {days: 8}}]}}).and_return(true)
+      expect(postgres_timeline.set_lifecycle_policy).to be(true)
+    end
+  end
+
+  describe "minio" do
+    let(:minio_client) { instance_double(Minio::Client) }
+
+    before do
+      expect(postgres_timeline).to receive(:aws?).and_return(false).at_least(:once)
+      expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs")).at_least(:once)
+      expect(Minio::Client).to receive(:new).and_return(minio_client).at_least(:once)
+    end
+
+    it "creates bucket" do
+      expect(minio_client).to receive(:create_bucket).with(postgres_timeline.ubid).and_return(true)
+      expect(postgres_timeline.create_bucket).to be(true)
+    end
+
+    it "sets lifecycle policy" do
+      expect(minio_client).to receive(:set_lifecycle_policy).with(postgres_timeline.ubid, postgres_timeline.ubid, 8).and_return(true)
+      expect(postgres_timeline.set_lifecycle_policy).to be(true)
+    end
   end
 end
