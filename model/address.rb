@@ -30,17 +30,17 @@ class Address < Sequel::Model
   def populate_ipv4_addresses
     # Do nothing for ipv6 addresses, since VM addresses are chosen randomly from the /64.
     # Ignore the host's sshable IP address.
-    if cidr.is_a?(NetAddr::IPv4Net) && vm_host.sshable.host != cidr.network.to_s
-      addresses = Array.new(cidr.len) { [cidr.nth(it), cidr.to_s] }
+    return unless cidr.is_a?(NetAddr::IPv4Net) && vm_host.sshable.host != cidr.network.to_s
 
-      if vm_host.provider_name == "leaseweb"
-        # Do not use first or last addresses for leaseweb
-        addresses.shift
-        addresses.pop
-      end
+    addresses = Array.new(cidr.len) { [cidr.nth(it), cidr.to_s] }
 
-      DB[:ipv4_address].import([:ip, :cidr], addresses)
+    if vm_host.provider_name == "leaseweb"
+      # Do not use first or last addresses for leaseweb
+      addresses.shift
+      addresses.pop
     end
+
+    DB[:ipv4_address].import([:ip, :cidr], addresses)
   end
 end
 
