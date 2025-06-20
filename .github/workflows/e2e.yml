@@ -37,7 +37,14 @@ jobs:
           POSTGRES_DB: ${{ env.DB_NAME }}
         ports:
           - 5432:5432
-        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+        options: >-
+          --name ci-postgres
+          -c log_statement=all
+          -c log_min_duration_statement=0
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
     - name: Perform superuser-only actions, then remove superuser
@@ -150,6 +157,16 @@ jobs:
       with:
         name: e2e-${{ github.run_id }}-logs
         path: foreman.log
+
+    - name: Dump Postgres log
+      if: always()
+      run: docker logs ci-postgres > postgres.log
+
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: postgres-${{ github.run_id }}.log
+        path: postgres.log
 
     - name: Send notification if failed
       if: ${{ failure() && github.ref_name == 'main' }}
