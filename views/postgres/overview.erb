@@ -35,7 +35,7 @@ vm = @pg.representative_server.vm
       end
     end
 
-    ha_option = Option::POSTGRES_HA_OPTIONS.find { |ha_type| ha_type.name == @pg.ha_type }
+    ha_option = Option::POSTGRES_HA_OPTIONS[@pg.ha_type]
     
     [
       ["hero-cpu-chip", vm.display_size, "#{vm.vcpus} vCPU, #{vm.memory_gib} GB RAM"],

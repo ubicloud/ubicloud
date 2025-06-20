@@ -23,8 +23,8 @@ class Clover
 
     validate_postgres_input(name, postgres_params)
 
-    parsed_size = Option::POSTGRES_SIZE_OPTIONS.find { it.name == postgres_params["size"] }
-    requested_standby_count = Option::POSTGRES_HA_OPTIONS.find { it.name == postgres_params["ha_type"] }.standby_count
+    parsed_size = Option::POSTGRES_SIZE_OPTIONS[postgres_params["size"]]
+    requested_standby_count = Option::POSTGRES_HA_OPTIONS[postgres_params["ha_type"]].standby_count
     requested_postgres_vcpu_count = (requested_standby_count + 1) * parsed_size.vcpu_count
     Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count)
 
@@ -89,17 +89,17 @@ class Clover
 
     options.add_option(name: "name")
 
-    options.add_option(name: "flavor", values: flavor || postgres_flavors.map(&:name))
+    options.add_option(name: "flavor", values: flavor || postgres_flavors.keys)
 
     options.add_option(name: "location", values: location || postgres_locations, parent: "flavor") do |flavor, location|
       flavor == PostgresResource::Flavor::STANDARD || location.provider != "aws"
     end
 
-    options.add_option(name: "family", values: Option::POSTGRES_FAMILY_OPTIONS.map(&:name), parent: "location") do |flavor, location, family|
+    options.add_option(name: "family", values: Option::POSTGRES_FAMILY_OPTIONS.keys, parent: "location") do |flavor, location, family|
       family == "standard" || location.provider != "aws"
     end
 
-    options.add_option(name: "size", values: Option::POSTGRES_SIZE_OPTIONS.map(&:name), parent: "family") do |flavor, location, family, size|
+    options.add_option(name: "size", values: Option::POSTGRES_SIZE_OPTIONS.keys, parent: "family") do |flavor, location, family, size|
       family_from_size, vcpu_count = size.split("-")
 
       next false if family_from_size != family
@@ -123,13 +123,13 @@ class Clover
 
     options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS)
 
-    options.add_option(name: "ha_type", values: Option::POSTGRES_HA_OPTIONS.map(&:name), parent: "storage_size")
+    options.add_option(name: "ha_type", values: Option::POSTGRES_HA_OPTIONS.keys, parent: "storage_size")
 
     options.serialize
   end
 
   def postgres_flavors
-    Option::POSTGRES_FLAVOR_OPTIONS.reject { it.name == PostgresResource::Flavor::LANTERN && !@project.get_ff_postgres_lantern }
+    Option::POSTGRES_FLAVOR_OPTIONS.reject { |k, _| k == PostgresResource::Flavor::LANTERN && !@project.get_ff_postgres_lantern }
   end
 
   def postgres_locations

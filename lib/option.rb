@@ -76,13 +76,13 @@ module Option
     [PostgresResource::Flavor::STANDARD, "ubicloud", "PostgreSQL Database", "Get started by creating a new PostgreSQL database which is managed by Ubicloud team. It's a good choice for general purpose databases."],
     [PostgresResource::Flavor::PARADEDB, "paradedb", "ParadeDB PostgreSQL Database", "ParadeDB is an Elasticsearch alternative built on Postgres. ParadeDB instances are managed by the ParadeDB team and are optimal for search and analytics workloads."],
     [PostgresResource::Flavor::LANTERN, "lantern", "Lantern PostgreSQL Database", "Lantern is a PostgreSQL-based vector database designed specifically for building AI applications. Lantern instances are managed by the Lantern team and are optimal for AI workloads."]
-  ].map { |args| PostgresFlavorOption.new(*args) }.freeze
+  ].map { |args| [args[0], PostgresFlavorOption.new(*args)] }.to_h.freeze
 
   PostgresFamilyOption = Data.define(:name, :description)
   POSTGRES_FAMILY_OPTIONS = [
     ["standard", "Dedicated CPU"],
     ["burstable", "Shared CPU"]
-  ].map { |args| PostgresFamilyOption.new(*args) }.freeze
+  ].map { |args| [args[0], PostgresFamilyOption.new(*args)] }.to_h.freeze
 
   PostgresSizeOption = Data.define(:name, :family, :vcpu_count, :memory_gib)
   POSTGRES_SIZE_OPTIONS = [
@@ -94,7 +94,7 @@ module Option
     ["standard", 60, 240],
     ["burstable", 1, 2],
     ["burstable", 2, 4]
-  ].map { |args| PostgresSizeOption.new("#{args[0]}-#{args[1]}", *args) }.freeze
+  ].map { |args| ["#{args[0]}-#{args[1]}", PostgresSizeOption.new("#{args[0]}-#{args[1]}", *args)] }.to_h.freeze
 
   POSTGRES_STORAGE_SIZE_OPTIONS = ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096"].freeze
 
@@ -105,7 +105,7 @@ module Option
     [PostgresResource::HaType::NONE, 0, "No Standbys"],
     [PostgresResource::HaType::ASYNC, 1, "1 Standby"],
     [PostgresResource::HaType::SYNC, 2, "2 Standbys"]
-  ].map { |args| PostgresHaOption.new(*args) }.freeze
+  ].map { |args| [args[0], PostgresHaOption.new(*args)] }.to_h.freeze
 
   AWS_LOCATIONS = ["us-east-1"].freeze
 

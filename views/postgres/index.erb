@@ -9,7 +9,7 @@
         <div>#{part("components/button", text: "Create PostgreSQL Database", right_icon: "hero-chevron-down")}
         </div>
         <div class="hidden opacity-0 scale-95 group-[.active]:block group-[.active]:opacity-100 group-[.active]:scale-100 transition ease-out duration-100 absolute -right-2 z-10 mt-2 w-72 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" role="menu" tabindex="-1">
-          #{postgres_flavors.map do
+          #{postgres_flavors.values.map do
             <<-ITEM
             <div class="py-1 hover:bg-gray-50" role="none">
               <a href="#{@project_data[:path]}/postgres/create?flavor=#{it.name}" class="block px-4 py-3 focus:outline-none">
@@ -29,7 +29,7 @@
       "components/table_card",
       headers: ["Name", "Compute", "Storage", "Version", "Parent", "Managed by", "Location", "State"],
       rows: @postgres_databases.map do |pg|
-        brand = Option::POSTGRES_FLAVOR_OPTIONS.find { |f| f.name == pg[:flavor] }.brand
+        brand = Option::POSTGRES_FLAVOR_OPTIONS[pg[:flavor]].brand
         [
           [
             [pg[:name], {link: @project_data[:path] + pg[:path] + "/overview"}],
@@ -55,7 +55,7 @@
 
   <div class="grid gap-6">
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-10">
-      <% postgres_flavors.each do %>
+      <% postgres_flavors.values.each do %>
         <div class="rounded-lg shadow group relative bg-white p-6">
           <div>
             <span class="inline-flex rounded-lg overflow-hidden w-12 h-12">

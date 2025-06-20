@@ -1,5 +1,5 @@
 <%
-  @page_title, logo = postgres_flavors.find { it.name == @flavor }.yield_self { ["Create #{it.title}", "logo-#{it.brand}.png"] }
+  @page_title, logo = postgres_flavors[@flavor].yield_self { ["Create #{it.title}", "logo-#{it.brand}.png"] }
   logo = nil if @flavor == PostgresResource::Flavor::STANDARD
 %>
 

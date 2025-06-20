@@ -74,11 +74,11 @@ class Clover
             end
           end
 
-          current_parsed_size = Option::POSTGRES_SIZE_OPTIONS.find { it.name == pg.target_vm_size }
+          current_parsed_size = Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size]
           current_postgres_vcpu_count = pg.target_server_count * current_parsed_size.vcpu_count
 
-          requested_parsed_size = Option::POSTGRES_SIZE_OPTIONS.find { it.name == postgres_params["size"] }
-          requested_standby_count = Option::POSTGRES_HA_OPTIONS.find { it.name == postgres_params["ha_type"] }.standby_count
+          requested_parsed_size = Option::POSTGRES_SIZE_OPTIONS[postgres_params["size"]]
+          requested_standby_count = Option::POSTGRES_HA_OPTIONS[postgres_params["ha_type"]].standby_count
           requested_postgres_vcpu_count = (requested_standby_count + 1) * requested_parsed_size.vcpu_count
 
           Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count - current_postgres_vcpu_count)

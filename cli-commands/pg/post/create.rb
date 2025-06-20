@@ -10,10 +10,10 @@ UbiCli.on("pg").run_on("create") do
     on("-S", "--storage-size=size", "storage size GB")
     on("-v", "--version=version", "PostgreSQL version")
   end
-  help_option_values("Flavor:", Option::POSTGRES_FLAVOR_OPTIONS.map(&:name))
-  help_option_values("Replication Type:", Option::POSTGRES_HA_OPTIONS.map(&:name))
-  help_option_values("Size:", Option::POSTGRES_SIZE_OPTIONS.map(&:name))
-  help_option_values("Storage Size:", Option::POSTGRES_STORAGE_SIZE_OPTIONS.map(&:to_i))
+  help_option_values("Flavor:", Option::POSTGRES_FLAVOR_OPTIONS.keys)
+  help_option_values("Replication Type:", Option::POSTGRES_HA_OPTIONS.keys)
+  help_option_values("Size:", Option::POSTGRES_SIZE_OPTIONS.keys)
+  help_option_values("Storage Size:", Option::POSTGRES_STORAGE_SIZE_OPTIONS)
   help_option_values("Version:", Option::POSTGRES_VERSION_OPTIONS)
 
   run do |opts|
