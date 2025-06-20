@@ -90,7 +90,7 @@ class PostgresResource < Sequel::Model
   end
 
   def target_standby_count
-    Option::POSTGRES_HA_OPTIONS.find { it.name == ha_type }.standby_count
+    Option::POSTGRES_HA_OPTIONS[ha_type].standby_count
   end
 
   def target_server_count
