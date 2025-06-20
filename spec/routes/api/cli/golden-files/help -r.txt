@@ -184,9 +184,13 @@ Manage kubernetes clusters
 
 Usage:
     ubi kc command [...]
+    ubi kc (location/kc-name | kc-id) post-command [...]
 
 Commands:
-    list    List kubernetes clusters
+    list      List kubernetes clusters
+
+Post Commands:
+    create    Create a Kubernetes cluster
 
 
 List kubernetes clusters
@@ -201,6 +205,22 @@ Options:
 
 Allowed Option Values:
     Fields: location name id display_state version cp_node_count
+
+
+Create a Kubernetes cluster
+
+Usage:
+    ubi kc location/kc-name create [options]
+
+Options:
+    -v, --version=version            Kubernetes version
+    -c, --cp-node-count=count        Control plane node count
+    -w, --worker-node-count=count    Worker node count
+    -z, --worker-size=size           Worker size
+
+Allowed Option Values:
+    Version: v1.33 v1.32
+    Control Plane Node Count: 1 3
 
 
 Manage load balancers
