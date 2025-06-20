@@ -42,6 +42,8 @@ jobs:
     steps:
     - name: Perform superuser-only actions, then remove superuser
       run: |
+        echo "ALTER SYSTEM SET log_statement = 'all'; ALTER SYSTEM SET log_min_duration_statement = 0; ALTER SYSTEM SET log_destination = 'stderr'; SELECT pg_reload_conf();" | \
+          psql "postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}"
         psql "postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}" \
           -c "CREATE EXTENSION citext; CREATE EXTENSION btree_gist; CREATE ROLE clover_password PASSWORD '${{ env.DB_PASSWORD }}' LOGIN; ALTER ROLE ${{ env.DB_USER }} NOSUPERUSER"
 
@@ -150,6 +152,17 @@ jobs:
       with:
         name: e2e-${{ github.run_id }}-logs
         path: foreman.log
+
+    - name: Dump Postgres logs
+      if: always()
+      run: docker logs ${{ job.services.postgres.id }} > postgres.log 2>&1
+
+    - name: Upload Postgres logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: postgres-${{ github.run_id }}.log
+        path: postgres.log
 
     - name: Send notification if failed
       if: ${{ failure() && github.ref_name == 'main' }}
