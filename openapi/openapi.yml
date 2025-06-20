@@ -254,6 +254,22 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Inference Api Key
+  '/project/{project_id}/kubernetes-cluster':
+    get:
+      operationId: listProjectKubernetesClusters
+      summary: List all KubernetesClusters created under the given project ID and visible to logged in user
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          $ref: '#/components/responses/KubernetesClusters'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Kubernetes Cluster
   '/project/{project_id}/load-balancer':
     get:
       operationId: listLoadBalancers
@@ -536,6 +552,83 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
+  '/project/{project_id}/location/{location}/kubernetes-cluster':
+    get:
+      operationId: listLocationKubernetesClusters
+      summary: List KubernetesClusters in a specific location of a project
+      parameters:
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          $ref: '#/components/responses/KubernetesClusters'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Kubernetes Cluster
+  '/project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_reference}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/kubernetes_cluster_reference'
+    delete:
+      operationId: deleteKubernetesCluster
+      summary: Delete a specific KubernetesCluster
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Kubernetes Cluster
+    get:
+      operationId: getKubernetesClusterDetails
+      summary: Get details of a specific KubernetesCluster in a location
+      responses:
+        '200':
+          $ref: '#/components/responses/KubernetesCluster'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Kubernetes Cluster
+    post:
+      operationId: createKubernetesCluster
+      summary: Create a new KubernetesCluster in a specific location of a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version:
+                  description: Version of the kubernetes cluster
+                  type: string
+                worker_size:
+                  description: Size of each worker VM
+                  type: string
+                cp_nodes:
+                  description: Number of control plane nodes
+                  type: integer
+                worker_nodes:
+                  description: Number of worker nodes
+                  type: integer
+              additionalProperties: false
+              required:
+                - version
+                - worker_size
+                - cp_nodes
+                - worker_nodes
+      responses:
+        '200':
+          $ref: '#/components/responses/KubernetesCluster'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Kubernetes Cluster
   '/project/{project_id}/location/{location}/load-balancer':
     get:
       operationId: listLocationLoadBalancers
@@ -1620,6 +1713,18 @@ components:
         type: string
         example: akkkmx0f2vke4h36nk9cm8v8q0
         pattern: '^ak[0-9a-hj-km-np-tv-z]{24}$'
+    kubernetes_cluster_reference:
+      description: Kubernetes cluster ID or name
+      examples:
+        id:
+          value: kcn30gjk1d1e2jj34v9x0dq4rp
+        name:
+          value: kubernetes-cluster-name
+      in: path
+      name: kubernetes_cluster_reference
+      required: true
+      schema:
+        $ref: '#/components/schemas/Reference'
     load_balancer_reference:
       description: Load balancer ID or name
       examples:
@@ -2224,6 +2329,89 @@ components:
         - state
         - storage_size_gib
         - unix_user
+    KubernetesCluster:
+      type: object
+      properties:
+        cp_node_count:
+          description: Number of control plane nodes
+          type: integer
+        cp_vms:
+          type: array
+          items:
+            $ref: '#/components/schemas/Vm'
+        display_state:
+          description: State of the KubernetesCluster
+          type: string
+        id:
+          description: ID of the KubernetesCluster
+          type: string
+          example: kcqxhqbg86sj0ng5e9ck5n191z
+          pattern: '^kc[0-9a-hj-km-np-tv-z]{24}$'
+        location:
+          description: Location of the KubernetesCluster
+          type: string
+          example: eu-central-h1
+        name:
+          description: Name of the KubernetesCluster
+          type: string
+          example: my-cluster-name
+        node_size:
+          description: Size of each control plane node
+          type: string
+        nodepools:
+          type: array
+          items:
+            $ref: '#/components/schemas/KubernetesNodepool'
+        services_load_balancer_url:
+          description: Services
+          type: string
+          nullable: true
+        version:
+          description: Version of the KubernetesCluster
+          type: string
+      additionalProperties: false
+      required:
+        - cp_node_count
+        - id
+        - location
+        - name
+        - node_size
+        - version
+    KubernetesNodepool:
+      type: object
+      properties:
+        kubernetes_cluster_id:
+          description: Parent KubernetesCluster id
+          type: string
+          example: kcqxhqbg86sj0ng5e9ck5n191z
+          pattern: '^kc[0-9a-hj-km-np-tv-z]{24}$'
+        id:
+          description: ID of the KubernetesNodepool
+          type: string
+          example: knqxhqbg86sj0ng5e9ck5n191z
+          pattern: '^kn[0-9a-hj-km-np-tv-z]{24}$'
+        name:
+          description: Name of the KubernetesNodepool
+          type: string
+          example: my-nodepool-name
+        node_count:
+          description: Count of worker nodes
+          type: integer
+        node_size:
+          description: Size of each worker node
+          type: string
+        vms:
+          description: Worker VMs definition
+          type: array
+          items:
+            $ref: '#/components/schemas/Vm'
+      additionalProperties: false
+      required:
+        - kubernetes_cluster_id
+        - id
+        - name
+        - node_count
+        - node_size
   responses:
     Delete:
       description: An empty response after successful resource delete
@@ -2571,6 +2759,32 @@ components:
             required:
               - count
               - items
+    KubernetesCluster:
+      description: A KubernetesCluster
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            allOf:
+              - $ref: '#/components/schemas/KubernetesCluster'
+    KubernetesClusters:
+      description: A list of KubernetesClusters
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/KubernetesCluster'
+            additionalProperties: false
+            required:
+              - count
+              - items
   securitySchemes:
     BearerAuth:
       bearerFormat: JWT
@@ -2601,5 +2815,7 @@ tags:
     name: Virtual Machine
   - description: Private Location Operations
     name: Private Location
+  - description: Kubernetes Cluster Operations
+    name: Kubernetes Cluster
 security:
   - BearerAuth: []
