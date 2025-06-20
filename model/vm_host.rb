@@ -21,8 +21,6 @@ class VmHost < Sequel::Model
   one_to_many :cpus, class: :VmHostCpu, key: :vm_host_id
   many_to_one :location, key: :location_id, class: :Location
 
-  many_to_many :assigned_vm_addresses, join_table: :address, left_key: :routed_to_host_id, right_key: :id, right_primary_key: :address_id, read_only: true
-
   plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, provider: :destroy, spdk_installations: :destroy, storage_devices: :destroy, pci_devices: :destroy, boot_images: :destroy, slices: :destroy, cpus: :destroy
 
   plugin ResourceMethods
@@ -129,37 +127,15 @@ class VmHost < Sequel::Model
   end
 
   def ip4_random_vm_network
-    ipv4_ds = DB[:ipv4_address].join(:address, [:cidr]).where(cidr: assigned_subnets_dataset.select(:cidr))
-
-    res = ipv4_ds
-      .exclude(assigned_vm_addresses_dataset.where(ip: Sequel[:ipv4_address][:ip]).select(1).exists)
-      .order { random.function }
-      .first
-
-    return [res.delete(:ip), Address.call(res)] if res
-
     # we get the available subnets and if the subnet is /32, we eliminate it
     available_subnets = assigned_subnets.select { |a| a.cidr.version == 4 && a.cidr.network.to_s != sshable.host }
-
-    if ipv4_ds.empty? && !available_subnets.empty?
-      # In case there is a bug and the ipv4_address table is not populated correctly,
-      # we fallback to the previous slow implementation.  After a certain amount of time,
-      # if we don't see any of these logs emitted in production, we can remove the fallback
-      # and rely on the ipv4_address table being populated.
-      Clog.emit("ipv4_address table not populated for ipv4 address range") { {vm_host_id: id} }
-    else
-      # ipv4_address table populated or there aren't any subnets, no point in
-      # doing further work.  This would not correctly handle cases where the ipv4
-      # address table is partially populated instead of fully populated.
-      return [nil, nil]
-    end
-
     # we eliminate the subnets that are full
     used_subnet = available_subnets.select { |as| as.assigned_vm_addresses.count != 2**(32 - as.cidr.netmask.prefix_len) }.sample
 
     # not available subnet
     return [nil, nil] unless used_subnet
 
+    # we pick a random /31 subnet from the available subnet
     rand = SecureRandom.random_number(2**(32 - used_subnet.cidr.netmask.prefix_len)).to_i
     picked_subnet = used_subnet.cidr.nth(rand)
     # we check if the picked subnet is used by one of the vms
