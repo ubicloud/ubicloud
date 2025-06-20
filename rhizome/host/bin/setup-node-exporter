@@ -1,0 +1,49 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+require_relative "../../common/lib/arch"
+require "fileutils"
+
+unless (version = ARGV.shift)
+  fail "No version provided"
+end
+
+file_name = "node_exporter-#{version}.linux-#{Arch.render(x64: "amd64", arm64: "arm64")}"
+url = "https://github.com/prometheus/node_exporter/releases/download/v#{version}/#{file_name}.tar.gz"
+
+r "wget -q \"#{url}\""
+r "tar xvfz #{file_name}.tar.gz"
+r "sudo mv #{file_name}/node_exporter /usr/local/bin/"
+r "sudo rm -rf #{file_name}*"
+
+safe_write_to_file("/etc/systemd/system/node_exporter.service", <<NODEEXPORTERCONFIG)
+[Unit]
+Description=Prometheus Node Exporter
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+MemoryDenyWriteExecute=yes
+LockPersonality=yes
+Type=simple
+ExecStart=/usr/local/bin/node_exporter --web.listen-address=127.0.0.1:9100
+Restart=always
+User=nobody
+Group=nogroup
+
+[Install]
+WantedBy=multi-user.target
+NODEEXPORTERCONFIG
+
+r "sudo systemctl daemon-reload"
+r "sudo systemctl enable node_exporter"
+r "sudo systemctl start node_exporter"

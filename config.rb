@@ -221,4 +221,7 @@ module Config
   optional :invoices_blob_storage_endpoint, string
   optional :invoices_blob_storage_access_key, string, clear: true
   optional :invoices_blob_storage_secret_key, string, clear: true
+
+  # Monitoring
+  optional :monitoring_service_project_id, string
 end
