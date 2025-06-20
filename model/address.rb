@@ -29,9 +29,8 @@ class Address < Sequel::Model
 
   def populate_ipv4_addresses
     # Do nothing for ipv6 addresses, since VM addresses are chosen randomly from the /64.
-    # Ignore /32 IPv4 addresses, since those would be used by the host itself and not for
-    # VMs running on the host.
-    if cidr.is_a?(NetAddr::IPv4Net) && id != routed_to_host_id
+    # Ignore the host's sshable IP address.
+    if cidr.is_a?(NetAddr::IPv4Net) && vm_host.sshable.host != cidr.network.to_s
       addresses = Array.new(cidr.len) { [cidr.nth(it), cidr.to_s] }
 
       if vm_host.provider_name == "leaseweb"
