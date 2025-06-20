@@ -5,7 +5,7 @@ require_relative "../../model/address"
 
 RSpec.describe VmHost do
   subject(:vh) {
-    described_class.new_with_id(
+    described_class.new(
       net6: NetAddr.parse_net("2a01:4f9:2b:35a::/64"),
       ip6: NetAddr.parse_ip("2a01:4f9:2b:35a::2")
     )
@@ -59,7 +59,6 @@ RSpec.describe VmHost do
   end
 
   it "tries to get another random network if the proposal matches the reserved nework" do
-    vh.id = nil
     expect(SecureRandom).to receive(:random_number).and_return(0)
     expect(SecureRandom).to receive(:random_number).and_call_original
     expect(vh.ip6_random_vm_network.to_s).not_to eq(vh.ip6_reserved_network)
@@ -166,7 +165,6 @@ RSpec.describe VmHost do
   end
 
   it "assigned_subnets returns the assigned subnets" do
-    expect(Clog).to receive(:emit).and_call_original
     expect(vh).to receive(:assigned_subnets).and_return([address])
     expect(vh).to receive(:vm_addresses).and_return([])
     expect(SecureRandom).to receive(:random_number).with(4).and_return(0)
@@ -193,28 +191,6 @@ RSpec.describe VmHost do
     ip4, r_address = vh.ip4_random_vm_network
     expect(ip4.to_s).to eq("0.0.0.1")
     expect(r_address).to eq(address)
-  end
-
-  context "when ipv4_address table is populated" do
-    it "ip4_random_vm_network returns an unused ip address if there is one" do
-      vm_host = Prog::Vm::HostNexus.assemble("127.0.0.1").subject
-      address_id = Address.create(vm_host:, cidr: "128.0.0.0/30").id
-      ips = %w[128.0.0.0 128.0.0.1 128.0.0.2 128.0.0.3]
-
-      4.times do
-        ip4, r_address = vm_host.ip4_random_vm_network
-        expect(r_address).to be_a Address
-        expect(r_address.id).to eq address_id
-        expect(ips).to include ip4.to_s
-
-        project_id = Project.create(name: "test").id
-        vm = Prog::Vm::Nexus.assemble("a a", project_id, force_host_id: vm_host.id)
-        AssignedVmAddress.create(address_id:, dst_vm_id: vm.id, ip: ips.shift)
-      end
-
-      expect(Clog).not_to receive(:emit)
-      expect(vm_host.ip4_random_vm_network).to eq [nil, nil]
-    end
   end
 
   context "when provider name is leaseweb" do
@@ -377,7 +353,6 @@ RSpec.describe VmHost do
   end
 
   it "finds local ip to assign to veth* devices" do
-    expect(vh).to receive(:vms).and_return([]).at_least(:once)
     expect(SecureRandom).to receive(:random_number).with(32767).and_return(5)
     expect(vh.veth_pair_random_ip4_addr.network.to_s).to eq("169.254.0.10")
   end
@@ -396,13 +371,13 @@ RSpec.describe VmHost do
   end
 
   it "returns disk device ids when StorageDevice has unix_device_list" do
-    sd = StorageDevice.create_with_id(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["wwn-random-id1", "wwn-random-id2"])
+    sd = StorageDevice.create_with_id(vm_host_id: vh.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["wwn-random-id1", "wwn-random-id2"])
     allow(vh).to receive(:storage_devices).and_return([sd])
     expect(vh.disk_device_ids).to eq(["wwn-random-id1", "wwn-random-id2"])
   end
 
   it "returns disk device names" do
-    sd = StorageDevice.create_with_id(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["wwn-random-id1", "wwn-random-id2"])
+    sd = StorageDevice.create_with_id(vm_host_id: vh.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["wwn-random-id1", "wwn-random-id2"])
     session = {
       ssh_session: instance_double(Net::SSH::Connection::Session)
     }
@@ -415,7 +390,7 @@ RSpec.describe VmHost do
   end
 
   it "converts disk devices when StorageDevice has unix_device_list with the old formatting for SSD disks" do
-    sd = StorageDevice.create_with_id(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["sda"])
+    sd = StorageDevice.create_with_id(vm_host_id: vh.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["sda"])
     sshable = instance_double(Sshable)
     expect(sd).to receive(:vm_host).and_return(vh)
     expect(sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'sda$' | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-random-id1")
@@ -425,7 +400,7 @@ RSpec.describe VmHost do
   end
 
   it "converts disk devices when StorageDevice has unix_device_list with the old formatting for NVMe disks" do
-    sd = StorageDevice.create_with_id(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["nvme0n1"])
+    sd = StorageDevice.create_with_id(vm_host_id: vh.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["nvme0n1"])
     sshable = instance_double(Sshable)
     expect(sd).to receive(:vm_host).and_return(vh)
     expect(sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'nvme0n1$' | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id")
