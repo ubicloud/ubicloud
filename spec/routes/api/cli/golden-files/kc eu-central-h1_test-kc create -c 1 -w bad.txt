@@ -1,0 +1,16 @@
+! Invalid argument: -w bad
+
+Create a Kubernetes cluster
+
+Usage:
+    ubi kc location/kc-name create [options]
+
+Options:
+    -v, --version=version            Kubernetes version
+    -c, --cp-node-count=count        Control plane node count
+    -w, --worker-node-count=count    Worker node count
+    -z, --worker-size=size           Worker size
+
+Allowed Option Values:
+    Version: v1.33 v1.32
+    Control Plane Node Count: 1 3
