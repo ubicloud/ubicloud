@@ -66,7 +66,8 @@
             <h3 class="text-base font-semibold leading-6 text-gray-900">
               <a href="<%= @project_data[:path] %>/postgres/create?flavor=<%= it.name %>" class="focus:outline-none">
                 <span class="absolute inset-0" aria-hidden="true"></span>
-                Create <%= it.title %>
+                Create
+                <%= it.title %>
               </a>
             </h3>
             <p class="mt-2 text-sm text-gray-500"><%= it.description %></p>
@@ -75,7 +76,7 @@
             <%== part("components/icon", name: "hero-arrow-up-right") %>
           </span>
         </div>
-    <% end %>
+      <% end %>
     </div>
   </div>
 <% end %>

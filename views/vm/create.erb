@@ -12,8 +12,7 @@
   ]
 ) %>
 
-<%
-  ps_description = "<p class='mt-1 text-sm leading-6 text-gray-600'>We recommend using the default subnet for most use-cases. If you'd like to learn more about private subnets, please visit <a href='https://www.ubicloud.com/docs/networking/private-subnet' class='text-orange-600 hover:text-orange-700'>Private Subnets</a> page.</p>"
+<% ps_description = "<p class='mt-1 text-sm leading-6 text-gray-600'>We recommend using the default subnet for most use-cases. If you'd like to learn more about private subnets, please visit <a href='https://www.ubicloud.com/docs/networking/private-subnet' class='text-orange-600 hover:text-orange-700'>Private Subnets</a> page.</p>"
 
   form_elements = [
     {name: "name", type: "text", label: "Name", placeholder: "Enter name", required: "required", opening_tag: "<div class='sm:col-span-3'>"},
@@ -49,7 +48,6 @@
     form_elements << {name: "show_gpu", type: "hidden", value: @show_gpu}
   end
 
-  action = "#{@project_data[:path]}/vm"
-%>
+  action = "#{@project_data[:path]}/vm" %>
 
 <%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents) %>

@@ -440,9 +440,12 @@ namespace :linter do
     Bundler.setup(:lint)
     puts "Running ERB::Formatter..."
     require "erb/formatter/command_line"
-    files = Dir.glob("views/**/[!icon]*.erb").entries
+    files = Dir.glob("views/**/*.erb").entries
+    files.delete("views/components/icon.erb")
     files.delete("views/components/form/select.erb")
     files.delete("views/github/runner.erb")
+    files.delete("views/inference/endpoint/index.erb")
+    files.delete("views/postgres/overview.erb")
     ERB::Formatter::CommandLine.new(files + ["--write", "--print-width", "120"]).run
   end
 
