@@ -128,6 +128,7 @@ jobs:
         E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
         HETZNER_SSH_PUBLIC_KEY: ${{ secrets.HETZNER_SSH_PUBLIC_KEY }}
         HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+        DATABASE_LOGGER_LEVEL: info
       run: |
         set -o pipefail
         timeout 55m foreman start | tee foreman.log | grep "e2e.1"
