@@ -30,6 +30,12 @@ class VmHost < Sequel::Model
   include HealthMonitorMethods
   semaphore :checkup, :reboot, :hardware_reset, :destroy, :graceful_reboot
 
+  dataset_module do
+    def cores_utilization
+      get { sum(:used_cores) * 100.0 / sum(:total_cores) }.to_f.round(2)
+    end
+  end
+
   def host_prefix
     net6.netmask.prefix_len
   end

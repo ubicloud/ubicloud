@@ -148,36 +148,29 @@ class Prog::Vm::GithubRunner < Prog::Base
 
   label def start
     pop "Could not provision a runner for inactive project" unless github_runner.installation.project.active?
-    hop_wait_concurrency_limit unless quota_available?
-    hop_allocate_vm
-  end
 
-  def quota_available?
-    # In existing Github quota calculations, we compare total allocated cpu count
-    # with the cpu limit and allow passing the limit once. This is because we
-    # check quota and allocate VMs in different labels hence transactions and it
-    # is difficult to enforce quotas in the environment with lots of concurrent
-    # requests. There are some remedies, but it would require some refactoring
-    # that I'm not keen to do at the moment. Although it looks weird, passing 0
-    # as requested_additional_usage keeps the existing behavior.
-    github_runner.installation.project.quota_available?("GithubRunnerVCpu", 0)
-  end
+    requested_vcpus = github_runner.label_data["vcpus"]
+    quota_vcpus = github_runner.installation.project.effective_quota_value("GithubRunnerVCpu")
+    new_used_vcpus = Sequel[:used_vcpus] + requested_vcpus
+    updated_rows = github_runner.installation_dataset
+      .where(new_used_vcpus <= quota_vcpus)
+      .update(used_vcpus: new_used_vcpus)
 
-  label def wait_concurrency_limit
-    unless quota_available?
-      # check utilization, if it's high, wait for it to go down
-      utilization = VmHost.where(allocation_state: "accepting", arch: github_runner.label_data["arch"]).select_map {
-        sum(:used_cores) * 100.0 / sum(:total_cores)
-      }.first.to_f
-
+    # If the customer doesn't have enough quota, check the overall utilization
+    # and allow provisioning if it is low.
+    if updated_rows != 1
+      utilization = VmHost.where(allocation_state: "accepting", arch: github_runner.label_data["arch"]).cores_utilization
       unless utilization < 75
-        Clog.emit("Waiting for customer concurrency limit, utilization is high") { [github_runner, {utilization: utilization}] }
+        Clog.emit("not allowed because of high utilization") { {reached_concurrency_limit: {utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
         nap rand(5..15)
       end
 
-      Clog.emit("Concurrency limit reached but allocation is allowed because of low utilization") { [github_runner, {utilization: utilization}] }
+      Clog.emit("allowed because of low utilization") { {reached_concurrency_limit: {utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
+      github_runner.installation_dataset.update(used_vcpus: new_used_vcpus)
     end
+
     github_runner.log_duration("runner_capacity_waited", Time.now - github_runner.created_at)
+
     hop_allocate_vm
   end
 
@@ -397,6 +390,8 @@ class Prog::Vm::GithubRunner < Prog::Base
 
       vm.incr_destroy
     end
+
+    github_runner.installation_dataset.update(used_vcpus: Sequel[:used_vcpus] - github_runner.label_data["vcpus"])
 
     hop_wait_vm_destroy
   end

@@ -252,51 +252,32 @@ RSpec.describe Prog::Vm::GithubRunner do
   end
 
   describe "#start" do
-    it "hops to wait_concurrency_limit if there is no capacity" do
-      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-      expect(project).to receive(:active?).and_return(true)
-
-      expect { nx.start }.to hop("wait_concurrency_limit")
-    end
-
-    it "hops to allocate_vm if there is capacity" do
-      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
-      expect(project).to receive(:active?).and_return(true)
-
-      expect { nx.start }.to hop("allocate_vm")
-    end
-
     it "pops if the project is not active" do
       expect(project).to receive(:active?).and_return(false)
 
       expect { nx.start }.to exit({"msg" => "Could not provision a runner for inactive project"})
     end
-  end
 
-  describe "#wait_concurrency_limit" do
-    before do
-      [[Location::HETZNER_FSN1_ID, "x64"], [Location::GITHUB_RUNNERS_ID, "x64"], [Location::GITHUB_RUNNERS_ID, "arm64"]].each do |location_id, arch|
-        create_vm_host(location_id:, arch:, total_cores: 16, used_cores: 16)
-      end
+    it "hops to allocate_vm if the customer has enough quota" do
+      expect { nx.start }.to hop("allocate_vm")
+      expect(installation.reload.used_vcpus).to eq(4)
     end
 
-    it "waits until customer concurrency limit frees up" do
-      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-
-      expect { nx.wait_concurrency_limit }.to nap
+    it "waits if the customer doesn't have enough quota and overall utilization is high" do
+      create_vm_host(location_id: Location::HETZNER_FSN1_ID, arch: "x64", total_cores: 16, used_cores: 16)
+      create_vm_host(location_id: Location::GITHUB_RUNNERS_ID, arch: "arm64", total_cores: 16, used_cores: 0)
+      installation.update(used_vcpus: 300)
+      expect(Clog).to receive(:emit).with("not allowed because of high utilization").and_call_original
+      expect { nx.start }.to nap
     end
 
-    it "hops to allocate_vm when customer concurrency limit frees up" do
-      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
-
-      expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
-    end
-
-    it "hops to allocate_vm when customer concurrency limit is full but the overall utilization is low" do
-      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-
-      VmHost[arch: "x64"].update(used_cores: 1)
-      expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+    it "hops to allocate_vm when the customer doesn't have enough quota but the overall utilization is low" do
+      create_vm_host(location_id: Location::HETZNER_FSN1_ID, arch: "x64", total_cores: 16, used_cores: 10)
+      installation.update(used_vcpus: 300)
+      expect(Clog).to receive(:emit).with("allowed because of low utilization").and_call_original
+      expect(Clog).to receive(:emit).with("runner_capacity_waited").and_call_original
+      expect { nx.start }.to hop("allocate_vm")
+      expect(installation.reload.used_vcpus).to eq(304)
     end
   end
 
@@ -549,6 +530,8 @@ RSpec.describe Prog::Vm::GithubRunner do
   end
 
   describe "#destroy" do
+    before { installation.update(used_vcpus: 10) }
+
     it "naps if runner not deregistered yet" do
       expect(client).to receive(:get).and_return(busy: false)
       expect(client).to receive(:delete)
@@ -576,6 +559,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
+      expect(installation.reload.used_vcpus).to eq(6)
     end
 
     it "skip deregistration and destroy vm immediately" do
@@ -586,6 +570,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
+      expect(installation.reload.used_vcpus).to eq(6)
     end
 
     it "does not collect telemetry if the vm not allocated" do
@@ -596,6 +581,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
+      expect(installation.reload.used_vcpus).to eq(6)
     end
 
     it "does not destroy vm if it's already destroyed" do
@@ -606,6 +592,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(client).not_to receive(:delete)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
+      expect(installation.reload.used_vcpus).to eq(6)
     end
   end
 
