@@ -135,7 +135,23 @@ RSpec.describe Scheduling::Dispatcher do
       di = @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
       di.setup_prepared_statements(num_partitions: 2)
       st.update(schedule: Time.now - 10)
-      expect(di.scan.map(&:id)).to eq([st.id])
+      strands = di.scan
+      expect(strands.length).to eq 1
+      strand = strands.first
+      expect(strand.id).to eq st.id
+      expect(strand.respirate_metrics.scheduled).to eq strand.schedule
+    end
+
+    it "uses lease time instead of schedule time as scheduled if lease has expired" do
+      st = Strand.create(prog: "Test", label: "wait_exit", id: "00000000-0000-0000-0000-000000000000", lease: Time.now - 1)
+      di = @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
+      di.setup_prepared_statements(num_partitions: 2)
+      st.update(schedule: Time.now - 10)
+      strands = di.scan
+      expect(strands.length).to eq 1
+      strand = strands.first
+      expect(strand.id).to eq st.id
+      expect(strand.respirate_metrics.scheduled).to eq strand.lease
     end
 
     it "returns empty array when shutting down" do
@@ -290,10 +306,12 @@ RSpec.describe Scheduling::Dispatcher do
       arrays << Array.new(20) { rm.new(t, t + 3, t + 8, t + 12, true, 20, 7) }
       arrays << Array.new(8) { rm.new(t, t + 5, t + 12, t + 21, false, 30, 5) }
       arrays << Array.new(1) { rm.new(t, t + 6, t + 16, t + 29, true, 40, 3, true) }
-      arrays << Array.new(1) { rm.new(t, t + 7, t + 20, t + 37, false, 50, 1, true) }
+      arrays << Array.new(1) { rm.new(t, t + 7, t + 20, t + 37, false, 50, 1, true, true) }
       expect(di.metrics_hash(arrays.flatten, 0.5)).to eq({
         available_workers: {average: 1, max: 9, median: 0, p75: 1, p85: 7, p95: 9, p99: 9},
+        current_strand_delay: 12.0,
         lease_acquire_percentage: 95.5,
+        lease_expired_percentage: 0.5,
         lease_delay: {average: 1.96, max: 17.0, median: 1.0, p75: 3.0, p85: 4.0, p95: 9.0, p99: 13.0},
         old_strand_percentage: 1.0,
         queue_delay: {average: 1.845, max: 13.0, median: 1.0, p75: 2.0, p85: 5.0, p95: 7.0, p99: 10.0},
@@ -305,6 +323,52 @@ RSpec.describe Scheduling::Dispatcher do
       })
       expect(di.instance_variable_get(:@current_strand_delay)).to eq 12.0
       expect(di.old_strand_delay).to eq 19.4
+    end
+  end
+
+  describe "#sleep_duration" do
+    it "is 1 when dispatcher is idle" do
+      st = Strand.create(prog: "Test", label: "wait_exit", schedule: Time.now - 10)
+      q = Queue.new
+      expect(st).to receive(:run).and_wrap_original do |m|
+        m.call
+        q.push true
+      end
+      di.start_cohort([st])
+      expect(q.pop(timeout: 5)).to be true
+      Thread.new do
+        until di.instance_variable_get(:@thread_data).size == di.instance_variable_get(:@strand_queue).num_waiting
+          sleep 0.01
+        end
+      end.join(5)
+      expect(di.sleep_duration).to eq 1
+    end
+
+    it "depends on number of available workers and strands per second" do
+      st = Strand.create(prog: "Test", label: "wait_exit", schedule: Time.now - 10)
+      q = Queue.new
+      q2 = Queue.new
+      expect(st).to receive(:run).and_wrap_original do |m|
+        q.push true
+        q2.pop(timeout: 5)
+        m.call
+      end
+      di
+      Thread.new do
+        until di.instance_variable_get(:@thread_data).size == di.instance_variable_get(:@strand_queue).num_waiting
+          sleep 0.01
+        end
+      end.join(5)
+      di.start_cohort([st, st])
+      q.pop(timeout: 5)
+      expect(di.sleep_duration).to eq 0.75
+      di.instance_variable_set(:@strands_per_second, 3)
+      expect(di.sleep_duration).to eq 0.25
+      di.instance_variable_set(:@strands_per_second, 5)
+      expect(di.sleep_duration).to eq 0.2
+      di.instance_variable_set(:@strands_per_second, 0.5)
+      expect(di.sleep_duration).to eq 1
+      q2.push true
     end
   end
 

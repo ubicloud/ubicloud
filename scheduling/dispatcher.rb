@@ -49,7 +49,7 @@ class Scheduling::Dispatcher
     # ensure that for a busy thread pool, there are always strands to run.
     # This should only cause issues if the thread pool can process more than
     # 4 times its size in the time it takes the main thread to refill the queue.
-    @queue_size = pool_size * Config.dispatcher_queue_size_ratio
+    @queue_size = (pool_size * Config.dispatcher_queue_size_ratio).round.clamp(1, nil)
 
     # The Queue that all threads in the thread pool pull from.  This is a
     # SizedQueue to allow for backoff in the case that the thread pool cannot
@@ -91,6 +91,10 @@ class Scheduling::Dispatcher
     # current strands, it assumes other respirate processes are also backed
     # up, and will not pick up their strands for an additional time.
     @current_strand_delay = 0
+
+    # Default number of strands per second. This will be updated based on
+    # based on metrics. Used for calculating the sleep duration.
+    @strands_per_second = 1
 
     # Ensure initial unpartitioned prepared statement setup before listening
     # for partition changes.  In a partitioned environment, this should
@@ -198,7 +202,7 @@ class Scheduling::Dispatcher
       .order_by(:schedule)
       .limit(@queue_size)
       .exclude(id: Sequel.function(:ANY, Sequel.cast(:$skip_strands, "uuid[]")))
-      .select(:id, :schedule)
+      .select(:id, :schedule, :lease)
       .for_update
       .skip_locked
 
@@ -320,8 +324,10 @@ class Scheduling::Dispatcher
     end
     respirate_metrics[:lease_acquire_percentage] = array.count(&:lease_acquired) * METRICS_PERCENTAGE
     respirate_metrics[:old_strand_percentage] = array.count(&:old_strand) * METRICS_PERCENTAGE
+    respirate_metrics[:lease_expired_percentage] = array.count(&:lease_expired) * METRICS_PERCENTAGE
     respirate_metrics[:strand_count] = METRICS_EVERY
-    respirate_metrics[:strands_per_second] = METRICS_EVERY / elapsed_time
+    @strands_per_second = METRICS_EVERY / elapsed_time
+    respirate_metrics[:strands_per_second] = @strands_per_second
 
     # Use the p95 of total delay to set the delay for the current strands.
     # Ignore the delay for old strands when calculating delay for current strands.
@@ -330,9 +336,35 @@ class Scheduling::Dispatcher
     # current delay numbers if the delay is increasing rapidly.
     array.reject!(&:old_strand)
     array.map!(&:total_delay)
-    @current_strand_delay = array[(array.count * 0.95r).floor] || 0
+    respirate_metrics[:current_strand_delay] = @current_strand_delay = array[(array.count * 0.95r).floor] || 0
 
     respirate_metrics
+  end
+
+  # The amount of time to sleep if no strands or old strands were picked up
+  # during the last scan loop.
+  def sleep_duration
+    # Set base sleep duration based on on queue size and the number of strands processed
+    # per second.  If you are processing 10 strands per second, and there are 5 strands
+    # in the queue, it should take about 0.5 seconds to get through the existing strands.
+    # Multiply by 0.75, since @strands_per_second is only updated occassionally by
+    # the metrics thread.
+    sleep_duration = ((@strand_queue.size * 0.75) / @strands_per_second)
+
+    # You don't want to query the database too often, especially when the queue is empty
+    # and respirate is idle.  Estimate how idle the respirate process is by looking at
+    # the percentage of available workers, and use that as a lower bound. If you have
+    # 6 available workers and 8 total workers, that's close to idle, set a minimum
+    # sleep time of 0.75 seconds.  If you have 2 available workers and 8 total workers,
+    # that's pretty busy, set a minimum sleep time of 0.25 seconds.
+    available_workers = @strand_queue.num_waiting
+    workers = @thread_data.size
+    sleep_duration = sleep_duration.clamp(available_workers.fdiv(workers), nil)
+
+    # Finally, set asbolute minimum sleep time to 0.2 seconds, to not overload the
+    # database, and set absolute maximum sleep time to 1 second, to not wait too long
+    # to pick up strands.
+    sleep_duration.clamp(0.2, 1)
   end
 
   # Start a strand/apoptosis thread pair, where the strand thread will
@@ -484,7 +516,7 @@ class Scheduling::Dispatcher
     finish_queue.push(true)
     @mutex.synchronize { @current_strands.delete(strand.id) }
 
-    @metrics_queue.push(strand.respirate_metrics)
+    @metrics_queue.push(strand.respirate_metrics) unless @shutting_down
 
     # If there are any sessions in the thread-local (really fiber-local) ssh
     # cache after the strand run, close them eagerly to close the related

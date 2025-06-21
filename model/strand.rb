@@ -23,7 +23,7 @@ class Strand < Sequel::Model
     @subject = UBID.decode(ubid)
   end
 
-  RespirateMetrics = Struct.new(:scheduled, :scan_picked_up, :worker_started, :lease_checked, :lease_acquired, :queue_size, :available_workers, :old_strand) do
+  RespirateMetrics = Struct.new(:scheduled, :scan_picked_up, :worker_started, :lease_checked, :lease_acquired, :queue_size, :available_workers, :old_strand, :lease_expired) do
     def scan_delay
       scan_picked_up - scheduled
     end
@@ -41,8 +41,14 @@ class Strand < Sequel::Model
     end
   end
 
+  # If the lease time is after this, we must be dealing with an
+  # expired lease, since normal lease times are either in the future
+  # or 1000 years in the past.
+  EXPIRED_LEASE_TIME = Time.utc(2025)
+
   def respirate_metrics
-    @respirate_metrics ||= RespirateMetrics.new(scheduled: schedule)
+    lease_expired = lease > EXPIRED_LEASE_TIME
+    @respirate_metrics ||= RespirateMetrics.new(scheduled: lease_expired ? lease : schedule, lease_expired:)
   end
 
   def scan_picked_up!
