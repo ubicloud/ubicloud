@@ -1,7 +1,5 @@
-<%
-  @page_title, logo = postgres_flavors[@flavor].yield_self { ["Create #{it.title}", "logo-#{it.brand}.png"] }
-  logo = nil if @flavor == PostgresResource::Flavor::STANDARD
-%>
+<% @page_title, logo = postgres_flavors[@flavor].yield_self { ["Create #{it.title}", "logo-#{it.brand}.png"] }
+  logo = nil if @flavor == PostgresResource::Flavor::STANDARD %>
 
 <%== render("components/billing_warning") %>
 
@@ -16,8 +14,7 @@
   right_items: [logo ? "<img src=\"/#{logo}\" class=\"h-6 object-contain\"/>" : nil]
 ) %>
 
-<%
-  form_elements = [
+<% form_elements = [
     {name: "flavor", type: "hidden", value: @flavor},
     {name: "name", type: "text", label: "Name", required: "required", placeholder: "Enter name", opening_tag: "<div class='sm:col-span-3'>"},
     {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::Postgres.method(:location)},
@@ -32,7 +29,6 @@
     form_elements << {name: "partnership_notice", type: "partnership_notice", label: "Partnership Notice", required: "required", content_generator: ContentGenerator::Postgres.method(:partnership_notice)}
   end
 
-  action = "#{@project_data[:path]}/postgres"
-%>
+  action = "#{@project_data[:path]}/postgres" %>
 
 <%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents) %>

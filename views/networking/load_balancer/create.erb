@@ -10,8 +10,7 @@
   ]
 ) %>
 
-<%
-  form_elements = [
+<% form_elements = [
     {name: "name", type: "text", label: "Name", required: "required", placeholder: "Enter name", opening_tag: "<div class='col-span-6 col-start-1 md:col-end-4 xl:col-end-3'>"},
     {name: "private_subnet_id", type: "select", label: "Private Subnet", placeholder: "Select private subnet", content_generator: ContentGenerator::LoadBalancer.method(:select_option), opening_tag: "<div class='col-span-6 col-start-1 md:col-end-4 xl:col-end-3'>"},
     {name: "algorithm", type: "select", label: "Load Balancing Algorithm", content_generator: ContentGenerator::LoadBalancer.method(:select_option), opening_tag: "<div class='col-span-6 col-start-1 md:col-end-4 xl:col-end-3'>"},
@@ -24,7 +23,6 @@
     {name: "health_check_protocol", type: "select", label: "Health Check Protocol", required: "required", content_generator: ContentGenerator::LoadBalancer.method(:select_option), opening_tag: "<div class='col-span-6 col-start-1 md:col-start-3 md:col-end-5'>"}
   ]
 
-  action = "#{@project_data[:path]}/load-balancer"
-%>
+  action = "#{@project_data[:path]}/load-balancer" %>
 
 <%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents) %>
