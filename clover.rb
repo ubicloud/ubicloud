@@ -211,7 +211,8 @@ class Clover < Roda
     when Sequel::SerializationFailure
       code = 500
       type = "InternalServerError"
-      message = e.message
+      message = "There was a temporary error attempting to make this change, please try again."
+      Clog.emit("route exception") { Util.exception_to_hash(e) }
     else
       raise e if Config.test? && e.message != "test error"
       Clog.emit("route exception") { Util.exception_to_hash(e) }
