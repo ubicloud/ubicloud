@@ -66,7 +66,7 @@ jobs:
         cache: "npm"
 
     - name: Install node packages
-      run: npm ci
+      run: npm ci || npm ci --registry=https://registry.npmmirror.com
 
     - name: Build assets
       run: npm run prod
