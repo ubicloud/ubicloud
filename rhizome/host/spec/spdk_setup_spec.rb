@@ -16,9 +16,17 @@ RSpec.describe SpdkSetup do
       expect { described_class.prep }.not_to raise_error
     end
 
-    it "continues if user already exists" do
+    it "continues if user already exists (ubuntu 22.04)" do
       expect(described_class).to receive(:r).with(/apt-get -y .*/)
-      expect(described_class).to receive(:r).with(/adduser .*/).and_raise CommandFail.new("adduser: The user `spdk' already exists.", "", "")
+      expect(described_class).to receive(:r).with(/adduser .*/).and_raise CommandFail.new("Warning: The home dir /home/spdk you specified already exists.\nadduser: The user `spdk' already exists.", "", "")
+      expect(FileUtils).to receive(:mkdir_p).with(SpdkPath.vhost_dir)
+      expect(FileUtils).to receive(:chown).with("spdk", "spdk", SpdkPath.vhost_dir)
+      expect { described_class.prep }.not_to raise_error
+    end
+
+    it "continues if user already exists (ubuntu 24.04)" do
+      expect(described_class).to receive(:r).with(/apt-get -y .*/)
+      expect(described_class).to receive(:r).with(/adduser .*/).and_raise CommandFail.new("info: The home dir /home/spdk you specified already exists.\n\nfatal: The user `spdk' already exists.", "", "")
       expect(FileUtils).to receive(:mkdir_p).with(SpdkPath.vhost_dir)
       expect(FileUtils).to receive(:chown).with("spdk", "spdk", SpdkPath.vhost_dir)
       expect { described_class.prep }.not_to raise_error
