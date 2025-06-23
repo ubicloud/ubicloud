@@ -30,12 +30,17 @@ RSpec.describe Prog::Base do
 
   it "keeps children array state in sync even in consecutive-run mode" do
     parent = Strand.create_with_id(prog: "Test", label: "reap_exit_no_children")
-    Strand.create_with_id(parent_id: parent.id, prog: "Test", label: "popper")
+    child = Strand.create_with_id(parent_id: parent.id, prog: "Test", label: "napper")
     prg = parent.load
-    expect(prg).to receive(:nap).and_raise(Prog::Base::Nap.new(0))
     expect(parent).to receive(:load).twice.and_return(prg)
-    expect(parent).to receive(:unsynchronized_run).twice.and_call_original
-    parent.run(10)
+
+    expect(prg).to receive(:nap).and_raise(Prog::Base::Nap.new(1))
+    expect(parent.run(10)).to be_a Prog::Base::Nap
+    expect(parent.associations).to be_empty
+
+    child.destroy
+    expect(parent.run(10)).to be_a Prog::Base::Exit
+    expect(parent.associations).to be_empty
   end
 
   describe "#pop" do
