@@ -333,7 +333,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
           project_completion_tps_limit: 10000
         }])
         expect(json_sent["routes"][0]["endpoints"].size).to eq(2)
-        expect(json_sent["routes"][0]["endpoints"][0].map { |h| h.transform_keys(&:to_sym) }).to eq([{
+        expect(json_sent["routes"][0]["endpoints"][0].sort_by { it["id"] }.map { |h| h.transform_keys(&:to_sym) }).to eq([{
           id: "test-target-a",
           host: "test-host-a",
           api_key: "test-key-a",
