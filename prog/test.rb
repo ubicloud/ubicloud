@@ -103,12 +103,12 @@ class Prog::Test < Prog::Base
 
   label def increment_semaphore
     incr_test_semaphore
-    donate
+    nap 1
   end
 
   label def decrement_semaphore
     decr_test_semaphore
-    donate
+    nap 1
   end
 
   label def set_expired_deadline
