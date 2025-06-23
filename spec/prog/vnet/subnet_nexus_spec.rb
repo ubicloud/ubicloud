@@ -161,14 +161,15 @@ RSpec.describe Prog::Vnet::SubnetNexus do
 
   describe "#wait_vpc_created" do
     it "reaps and hops to wait if leaf" do
-      expect(nx).to receive(:reap)
-      expect(nx).to receive(:leaf?).and_return(true)
+      st.update(prog: "Vnet::SubnetNexus", label: "wait_vpc_created", stack: [{}])
       expect { nx.wait_vpc_created }.to hop("wait")
     end
 
     it "naps if not leaf" do
-      expect(nx).to receive(:reap)
-      expect(nx).to receive(:leaf?).and_return(false)
+      st.update(prog: "Vnet::SubnetNexus", label: "wait_vpc_created", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "Aws::Vpc", label: "create_vpc", stack: [{}], lease: Time.now + 10)
+      # Cover case where reap without reaper argument has results in reapable children
+      Strand.create(parent_id: st.id, prog: "Aws::Vpc", label: "create_vpc", stack: [{}]).this.update(exitval: '"subnet created"')
       expect { nx.wait_vpc_created }.to nap(2)
     end
   end
@@ -466,17 +467,16 @@ RSpec.describe Prog::Vnet::SubnetNexus do
 
   describe "#wait_aws_vpc_destroyed" do
     it "deletes the vpc and pops if leaf" do
+      st.update(prog: "Vnet::SubnetNexus", label: "wait_vpc_created", stack: [{}])
       expect(nx).to receive(:private_subnet).and_return(ps).at_least(:once)
       expect(ps).to receive(:destroy).and_return(true)
       expect(ps).to receive(:private_subnet_aws_resource).and_return(instance_double(PrivateSubnetAwsResource, id: "123", destroy: true))
-      expect(nx).to receive(:reap)
-      expect(nx).to receive(:leaf?).and_return(true)
       expect { nx.wait_aws_vpc_destroyed }.to exit({"msg" => "vpc destroyed"})
     end
 
     it "naps if not leaf" do
-      expect(nx).to receive(:reap)
-      expect(nx).to receive(:leaf?).and_return(false)
+      st.update(prog: "Vnet::SubnetNexus", label: "wait_aws_vpc_destroyed", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "Aws::Vpc", label: "destroy", stack: [{}])
       expect { nx.wait_aws_vpc_destroyed }.to nap(10)
     end
   end

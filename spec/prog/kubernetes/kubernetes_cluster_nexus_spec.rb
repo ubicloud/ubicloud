@@ -3,7 +3,9 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
-  subject(:nx) { described_class.new(Strand.new(id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77")) }
+  subject(:nx) { described_class.new(st) }
+
+  let(:st) { Strand.new(id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77") }
 
   let(:customer_project) { Project.create(name: "default") }
   let(:subnet) { PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id) }
@@ -181,18 +183,14 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   end
 
   describe "#wait_control_plane_node" do
-    before { expect(nx).to receive(:reap) }
-
     it "hops back to bootstrap_control_plane_vms if there are no sub-programs running" do
-      expect(nx).to receive(:leaf?).and_return true
-
+      st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "wait_control_plane_node", stack: [{}])
       expect { nx.wait_control_plane_node }.to hop("bootstrap_control_plane_vms")
     end
 
     it "donates if there are sub-programs running" do
-      expect(nx).to receive(:leaf?).and_return false
-      expect(nx).to receive(:donate).and_call_original
-
+      st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "wait_control_plane_node", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_control_plane_node }.to nap(1)
     end
   end
@@ -310,28 +308,26 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
   describe "#wait_upgrade" do
     it "hops back to upgrade if there are no sub-programs running" do
-      expect(nx).to receive(:leaf?).and_return true
+      st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
       expect { nx.wait_upgrade }.to hop("upgrade")
     end
 
     it "donates if there are sub-programs running" do
-      expect(nx).to receive(:leaf?).and_return false
-      expect(nx).to receive(:donate).and_call_original
+      st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_upgrade }.to nap(1)
     end
   end
 
   describe "#destroy" do
-    before { expect(nx).to receive(:reap) }
-
     it "donates if there are sub-programs running (Provision...)" do
-      expect(nx).to receive(:leaf?).and_return false
-      expect(nx).to receive(:donate).and_call_original
-
+      st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.destroy }.to nap(1)
     end
 
     it "triggers deletion of associated resources and naps until all nodepools are gone" do
+      st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
       expect(kubernetes_cluster.api_server_lb).to receive(:incr_destroy)
 
       expect(kubernetes_cluster.cp_vms).to all(receive(:incr_destroy))
@@ -343,6 +339,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     end
 
     it "completes destroy when nodepools are gone" do
+      st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
       kubernetes_cluster.nodepools.first.destroy
       kubernetes_cluster.reload
 

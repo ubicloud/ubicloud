@@ -3,7 +3,9 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Postgres::PostgresServerNexus do
-  subject(:nx) { described_class.new(Strand.create(id: "0d77964d-c416-8edb-9237-7e7dd5d6fcf8", prog: "Postgres::PostgresServerNexus", label: "start")) }
+  subject(:nx) { described_class.new(st) }
+
+  let(:st) { Strand.create(id: "0d77964d-c416-8edb-9237-7e7dd5d6fcf8", prog: "Postgres::PostgresServerNexus", label: "start") }
 
   let(:postgres_server) {
     instance_double(
@@ -182,18 +184,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#wait_bootstrap_rhizome" do
-    before { expect(nx).to receive(:reap) }
-
     it "hops to mount_data_disk if there are no sub-programs running" do
-      expect(nx).to receive(:leaf?).and_return true
-
       expect { nx.wait_bootstrap_rhizome }.to hop("mount_data_disk")
     end
 
     it "donates if there are sub-programs running" do
-      expect(nx).to receive(:leaf?).and_return false
-      expect(nx).to receive(:donate).and_call_original
-
+      Strand.create(parent_id: st.id, prog: "BootstrapRhizome", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_bootstrap_rhizome }.to nap(1)
     end
   end
@@ -723,11 +719,10 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "does not bud restart if there is already one restart going on" do
-      expect(postgres_server).to receive(:trigger_failover).and_return(false).twice
-      expect(nx).to receive(:available?).and_return(false)
+      Strand.create(parent_id: st.id, prog: "Postgres::PostgresServerNexus", label: "restart", stack: [{}], lease: Time.now + 10)
+      expect(postgres_server).to receive(:trigger_failover).and_return(false)
       expect { nx.unavailable }.to nap(5)
-      expect(nx).not_to receive(:bud).with(described_class, {}, :restart)
-      expect { nx.unavailable }.to nap(5)
+      expect(Strand.where(prog: "Postgres::PostgresServerNexus", label: "restart").count).to eq 1
     end
 
     it "trigger_failover succeeds, naps 0" do

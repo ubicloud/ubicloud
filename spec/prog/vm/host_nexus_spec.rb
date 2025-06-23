@@ -206,38 +206,39 @@ RSpec.describe Prog::Vm::HostNexus do
 
   describe "#wait_prep" do
     it "updates the vm_host record from the finished programs" do
-      expect(nx).to receive(:leaf?).and_return(true)
-      expect(vm_host).to receive(:update).with(total_mem_gib: 1)
-      expect(vm_host).to receive(:update).with(os_version: "ubuntu-22.04", accepts_slices: false)
-      expect(vm_host).to receive(:update).with(arch: "arm64", total_cores: 4, total_cpus: 5, total_dies: 3, total_sockets: 2)
-      expect(nx).to receive(:reap).and_return([
-        instance_double(Strand, prog: "LearnMemory", exitval: {"mem_gib" => 1}),
-        instance_double(Strand, prog: "LearnOs", exitval: {"os_version" => "ubuntu-22.04"}),
-        instance_double(Strand, prog: "LearnCpu", exitval: {"arch" => "arm64", "total_sockets" => 2, "total_dies" => 3, "total_cores" => 4, "total_cpus" => 5}),
-        instance_double(Strand, prog: "ArbitraryOtherProg")
-      ])
+      Strand.create(parent_id: st.id, prog: "LearnMemory", label: "start", stack: [{}], exitval: {"mem_gib" => 1})
+      Strand.create(parent_id: st.id, prog: "LearnOs", label: "start", stack: [{}], exitval: {"os_version" => "ubuntu-22.04"})
+      Strand.create(parent_id: st.id, prog: "LearnCpu", label: "start", stack: [{}], exitval: {"arch" => "arm64", "total_sockets" => 2, "total_dies" => 3, "total_cores" => 4, "total_cpus" => 5})
+      Strand.create(parent_id: st.id, prog: "ArbitraryOtherProg", label: "start", stack: [{}], exitval: {})
 
-      (0..4).each do |i|
-        expect(VmHostCpu).to receive(:create).with(vm_host_id: vm_host.id, cpu_number: i, spdk: i < 2)
-      end
-
+      vm_host = st.subject
+      nx.singleton_class.remove_method(:vm_host)
+      nx.define_singleton_method(:vm_host) { vm_host }
       expect { nx.wait_prep }.to hop("setup_hugepages")
+
+      vm_host.reload
+      expect(vm_host.total_mem_gib).to eq 1
+      expect(vm_host.os_version).to eq "ubuntu-22.04"
+      expect(vm_host.arch).to eq "arm64"
+      expect(vm_host.total_cores).to eq 4
+      expect(vm_host.total_cpus).to eq 5
+      expect(vm_host.total_dies).to eq 3
+      expect(vm_host.total_sockets).to eq 2
+      expect(VmHostCpu.where(vm_host_id: vm_host.id).select_order_map([:cpu_number, :spdk])).to eq [[0, true], [1, true], [2, false], [3, false], [4, false]]
     end
 
     it "crashes if an expected field is not set for LearnMemory" do
-      expect(nx).to receive(:reap).and_return([instance_double(Strand, prog: "LearnMemory", exitval: {})])
+      Strand.create(parent_id: st.id, prog: "LearnMemory", label: "start", stack: [{}], exitval: {})
       expect { nx.wait_prep }.to raise_error KeyError, "key not found: \"mem_gib\""
     end
 
     it "crashes if an expected field is not set for LearnCpu" do
-      expect(nx).to receive(:reap).and_return([instance_double(Strand, prog: "LearnCpu", exitval: {})])
+      Strand.create(parent_id: st.id, prog: "LearnCpu", label: "start", stack: [{}], exitval: {})
       expect { nx.wait_prep }.to raise_error KeyError, "key not found: \"arch\""
     end
 
     it "donates to children if they are not exited yet" do
-      expect(nx).to receive(:reap).and_return([])
-      expect(nx).to receive(:leaf?).and_return(false)
-      expect(nx).to receive(:donate).and_call_original
+      Strand.create(parent_id: st.id, prog: "LearnCpu", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_prep }.to nap(1)
     end
   end
@@ -290,17 +291,11 @@ RSpec.describe Prog::Vm::HostNexus do
 
   describe "#wait_download_boot_images" do
     it "hops to prep_reboot if all tasks are done" do
-      expect(nx).to receive(:reap).and_return([])
-      expect(nx).to receive(:leaf?).and_return true
-
       expect { nx.wait_download_boot_images }.to hop("prep_reboot")
     end
 
     it "donates its time if child strands are still running" do
-      expect(nx).to receive(:reap).and_return([])
-      expect(nx).to receive(:leaf?).and_return false
-      expect(nx).to receive(:donate).and_call_original
-
+      Strand.create(parent_id: st.id, prog: "DownloadBootImage", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_download_boot_images }.to nap(1)
     end
   end

@@ -194,9 +194,7 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   label def wait_aws_vm_started
-    reap
-    hop_wait_sshable if leaf?
-    nap 10
+    reap(:wait_sshable, nap: 10)
   end
 
   label def start
@@ -554,12 +552,10 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   label def wait_aws_vm_destroyed
-    reap
-    if leaf?
+    reap(nap: 10) do
       final_clean_up
       pop "vm deleted"
     end
-    nap 10
   end
 
   label def wait_lb_expiry

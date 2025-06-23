@@ -7,8 +7,7 @@ RSpec.describe Prog::Base do
     parent = Strand.create_with_id(prog: "Test", label: "budder")
     expect {
       parent.unsynchronized_run
-      parent.reload
-    }.to change { parent.load.leaf? }.from(true).to(false)
+    }.to change { parent.children_dataset.empty? }.from(true).to(false)
 
     child_id = parent.children.first.id
     Semaphore.incr(child_id, :should_get_deleted)
@@ -19,7 +18,7 @@ RSpec.describe Prog::Base do
 
       # Parent notices exitval is set and reaps the child.
       parent.run
-    }.to change { parent.load.leaf? }.from(false).to(true).and change {
+    }.to change { parent.children_dataset.empty? }.from(false).to(true).and change {
       Semaphore.where(strand_id: child_id).empty?
     }.from(false).to(true).and change {
       parent.children.empty?

@@ -39,9 +39,7 @@ class Prog::Vnet::NicNexus < Prog::Base
   end
 
   label def wait_aws_nic_created
-    reap
-    hop_wait if leaf?
-    nap 10
+    reap(:wait, nap: 10)
   end
 
   label def wait_allocation
@@ -134,12 +132,10 @@ class Prog::Vnet::NicNexus < Prog::Base
   end
 
   label def wait_aws_nic_destroyed
-    reap
-    if leaf?
+    reap(nap: 10) do
       nic.destroy
       pop "nic deleted"
     end
-    nap 10
   end
   # Generate a MAC with the "local" (generated, non-manufacturer) bit
   # set and the multicast bit cleared in the first octet.

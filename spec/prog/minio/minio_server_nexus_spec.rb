@@ -3,7 +3,9 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Minio::MinioServerNexus do
-  subject(:nx) { described_class.new(described_class.assemble(minio_pool.id, 0)) }
+  subject(:nx) { described_class.new(st) }
+
+  let(:st) { described_class.assemble(minio_pool.id, 0) }
 
   let(:minio_pool) {
     ps = Prog::Vnet::SubnetNexus.assemble(
@@ -154,16 +156,12 @@ RSpec.describe Prog::Minio::MinioServerNexus do
   end
 
   describe "#wait_bootstrap_rhizome" do
-    before { expect(nx).to receive(:reap) }
-
     it "donates if bootstrap rhizome continues" do
-      expect(nx).to receive(:leaf?).and_return(false)
-      expect(nx).to receive(:donate).and_call_original
+      Strand.create(parent_id: st.id, prog: "BootstrapRhizome", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_bootstrap_rhizome }.to nap(1)
     end
 
     it "hops to setup if bootstrap rhizome is done" do
-      expect(nx).to receive(:leaf?).and_return(true)
       expect { nx.wait_bootstrap_rhizome }.to hop("create_minio_user")
     end
   end
@@ -199,16 +197,12 @@ RSpec.describe Prog::Minio::MinioServerNexus do
   end
 
   describe "#wait_setup" do
-    before { expect(nx).to receive(:reap) }
-
     it "donates if setup continues" do
-      expect(nx).to receive(:leaf?).and_return(false)
-      expect(nx).to receive(:donate).and_call_original
+      Strand.create(parent_id: st.id, prog: "SetupMinio", label: "mount_data_disks", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_setup }.to nap(1)
     end
 
     it "hops to wait if setup is done" do
-      expect(nx).to receive(:leaf?).and_return(true)
       expect { nx.wait_setup }.to hop("wait")
     end
   end
@@ -323,16 +317,12 @@ RSpec.describe Prog::Minio::MinioServerNexus do
   end
 
   describe "#wait_reconfigure" do
-    before { expect(nx).to receive(:reap) }
-
     it "donates if reconfigure continues" do
-      expect(nx).to receive(:leaf?).and_return(false)
-      expect(nx).to receive(:donate).and_call_original
+      Strand.create(parent_id: st.id, prog: "SetupMinio", label: "configure_minio", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_reconfigure }.to nap(1)
     end
 
     it "hops to wait if reconfigure is done" do
-      expect(nx).to receive(:leaf?).and_return(true)
       expect { nx.wait_reconfigure }.to hop("wait")
     end
   end

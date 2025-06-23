@@ -108,9 +108,7 @@ TEMPLATE
   end
 
   label def wait_bootstrap_rhizome
-    reap
-    hop_assign_role if leaf?
-    donate
+    reap(:assign_role)
   end
 
   label def assign_role

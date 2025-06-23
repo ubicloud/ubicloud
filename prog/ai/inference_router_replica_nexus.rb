@@ -62,9 +62,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
   end
 
   label def wait_bootstrap_rhizome
-    reap
-    hop_setup if leaf?
-    donate
+    reap(:setup)
   end
 
   label def setup

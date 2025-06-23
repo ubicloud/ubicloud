@@ -91,9 +91,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   end
 
   label def wait_control_plane_node
-    reap
-    hop_bootstrap_control_plane_vms if leaf?
-    donate
+    reap(:bootstrap_control_plane_vms)
   end
 
   label def wait_nodes
@@ -160,22 +158,20 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   end
 
   label def wait_upgrade
-    reap
-    hop_upgrade if leaf?
-    donate
+    reap(:upgrade)
   end
 
   label def destroy
-    reap
-    donate unless leaf?
-    decr_destroy
-    kubernetes_cluster.api_server_lb.incr_destroy
-    kubernetes_cluster.cp_vms.each(&:incr_destroy)
-    kubernetes_cluster.remove_all_cp_vms
-    kubernetes_cluster.nodepools.each { it.incr_destroy }
-    kubernetes_cluster.private_subnet.incr_destroy
-    nap 5 unless kubernetes_cluster.nodepools.empty?
-    kubernetes_cluster.destroy
-    pop "kubernetes cluster is deleted"
+    reap do
+      decr_destroy
+      kubernetes_cluster.api_server_lb.incr_destroy
+      kubernetes_cluster.cp_vms.each(&:incr_destroy)
+      kubernetes_cluster.remove_all_cp_vms
+      kubernetes_cluster.nodepools.each { it.incr_destroy }
+      kubernetes_cluster.private_subnet.incr_destroy
+      nap 5 unless kubernetes_cluster.nodepools.empty?
+      kubernetes_cluster.destroy
+      pop "kubernetes cluster is deleted"
+    end
   end
 end
