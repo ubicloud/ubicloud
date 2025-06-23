@@ -186,28 +186,19 @@ end
   end
 
   def reap
-    reapable = strand.children_dataset.where(
-      Sequel.lit("(lease IS NULL OR lease < now()) AND exitval IS NOT NULL")
-    ).all
-
-    reaped_ids = reapable.map do |child|
+    strand.children_dataset.where(Sequel.lit("lease < now() AND exitval IS NOT NULL")).all do |child|
       # Clear any semaphores that get added to a exited Strand prog,
       # since incr is entitled to be run at *any time* (including
       # after exitval is set, though it doesn't do anything) and any
       # such incements will prevent deletion of a Strand via
       # foreign_key
-      Semaphore.where(strand_id: child.id).destroy
+      child.semaphores_dataset.destroy
       child.destroy
-      child.id
-    end.freeze
-
-    strand.children.delete_if { reaped_ids.include?(it.id) }
-
-    reapable
+    end
   end
 
   def leaf?
-    strand.children.empty?
+    strand.children_dataset.empty?
   end
 
   # A hop is a kind of jump, as in, like a jump instruction.
