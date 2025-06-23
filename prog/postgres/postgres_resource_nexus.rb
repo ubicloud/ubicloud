@@ -118,9 +118,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     postgres_resource.server_cert, postgres_resource.server_cert_key = create_certificate
     postgres_resource.save_changes
 
-    reap
-    hop_wait_servers if leaf?
-    nap 5
+    reap(:wait_servers, nap: 5)
   end
 
   label def refresh_certificates
@@ -184,9 +182,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def wait
-    reap
+    reap(fallthrough: true)
 
-    if postgres_resource.needs_convergence? && strand.children.none? { it.prog == "Postgres::ConvergePostgresResource" }
+    if postgres_resource.needs_convergence? && strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").empty?
       bud Prog::Postgres::ConvergePostgresResource, frame, :start
     end
 

@@ -66,9 +66,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def wait_verify_vms
-    reap
-    hop_verify_host_capacity if leaf?
-    donate
+    reap(:verify_host_capacity)
   end
 
   label def verify_host_capacity

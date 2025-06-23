@@ -17,9 +17,7 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
 
   def before_run
     if kubernetes_cluster.strand.label == "destroy" && strand.label != "destroy"
-      reap
-      donate unless leaf?
-      pop "upgrade cancelled"
+      reap { pop "upgrade cancelled" }
     end
   end
 
@@ -36,14 +34,20 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
   end
 
   label def wait_new_node
-    res = reap
-    donate if res.empty?
+    vm_id = nil
+    reaper = lambda do |child|
+      vm_id = child.exitval.fetch("vm_id")
+    end
 
-    current_frame = strand.stack.first
-    current_frame["new_vm_id"] = res.first.exitval.fetch("vm_id")
-    strand.modified!(:stack)
+    reap(reaper:) do
+      current_frame = strand.stack.first
+      # This will not work correctly if the strand has multiple children.
+      # However, the strand has only has a single child created in start.
+      current_frame["new_vm_id"] = vm_id
+      strand.modified!(:stack)
 
-    hop_drain_old_node
+      hop_drain_old_node
+    end
   end
 
   label def drain_old_node

@@ -71,9 +71,7 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   end
 
   label def wait_worker_node
-    reap
-    hop_wait if leaf?
-    donate
+    reap(:wait)
   end
 
   label def wait
@@ -102,22 +100,20 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   end
 
   label def wait_upgrade
-    reap
-    hop_upgrade if leaf?
-    donate
+    reap(:upgrade)
   end
 
   label def destroy
-    reap
-    donate unless leaf?
-    decr_destroy
+    reap do
+      decr_destroy
 
-    lb = LoadBalancer[name: kubernetes_nodepool.cluster.services_load_balancer_name]
-    lb&.dns_zone&.delete_record(record_name: "*.#{lb.hostname}.")
-    lb&.incr_destroy
-    kubernetes_nodepool.vms.each(&:incr_destroy)
-    kubernetes_nodepool.remove_all_vms
-    kubernetes_nodepool.destroy
-    pop "kubernetes nodepool is deleted"
+      lb = LoadBalancer[name: kubernetes_nodepool.cluster.services_load_balancer_name]
+      lb&.dns_zone&.delete_record(record_name: "*.#{lb.hostname}.")
+      lb&.incr_destroy
+      kubernetes_nodepool.vms.each(&:incr_destroy)
+      kubernetes_nodepool.remove_all_vms
+      kubernetes_nodepool.destroy
+      pop "kubernetes nodepool is deleted"
+    end
   end
 end

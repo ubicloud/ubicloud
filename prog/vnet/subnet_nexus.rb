@@ -70,9 +70,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def wait_vpc_created
-    reap
-    hop_wait if leaf?
-    nap 2
+    reap(:wait, nap: 2)
   end
 
   label def wait
@@ -206,13 +204,11 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def wait_aws_vpc_destroyed
-    reap
-    if leaf?
+    reap(nap: 10) do
       private_subnet.private_subnet_aws_resource.destroy
       private_subnet.destroy
       pop "vpc destroyed"
     end
-    nap 10
   end
 
   def self.random_private_ipv6(location, project)

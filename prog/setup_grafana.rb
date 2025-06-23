@@ -29,9 +29,7 @@ class Prog::SetupGrafana < Prog::Base
   end
 
   label def wait_for_rhizome
-    reap
-    hop_install_grafana if leaf?
-    donate
+    reap(:install_grafana)
   end
 
   label def install_grafana

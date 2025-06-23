@@ -64,9 +64,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
   end
 
   label def wait_bootstrap_rhizome
-    reap
-    hop_download_lb_cert if leaf?
-    donate
+    reap(:download_lb_cert)
   end
 
   label def download_lb_cert

@@ -96,7 +96,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def wait_prep
-    reap.each do |st|
+    reaper = lambda do |st|
       case st.prog
       when "LearnOs"
         os_version = st.exitval.fetch("os_version")
@@ -126,10 +126,7 @@ class Prog::Vm::HostNexus < Prog::Base
       end
     end
 
-    if leaf?
-      hop_setup_hugepages
-    end
-    donate
+    reap(:setup_hugepages, reaper:)
   end
 
   label def setup_hugepages
@@ -166,9 +163,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def wait_download_boot_images
-    reap
-    hop_prep_reboot if leaf?
-    donate
+    reap(:prep_reboot)
   end
 
   label def prep_reboot

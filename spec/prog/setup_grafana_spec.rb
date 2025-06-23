@@ -3,9 +3,9 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Prog::SetupGrafana do
-  subject(:sn) {
-    described_class.new(Strand.create(prog: "SetupGrafana", label: "start", stack: [{"subject_id" => sshable.id, "cert_email" => "email@gmail.com", "domain" => "grafana.domain.com"}]))
-  }
+  subject(:sn) { described_class.new(st) }
+
+  let(:st) { Strand.create(prog: "SetupGrafana", label: "start", stack: [{"subject_id" => sshable.id, "cert_email" => "email@gmail.com", "domain" => "grafana.domain.com"}]) }
 
   let(:sshable) { Sshable.create(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair) }
 
@@ -53,18 +53,12 @@ RSpec.describe Prog::SetupGrafana do
   end
 
   describe "#wait_for_rhizome" do
-    before { expect(sn).to receive(:reap) }
-
     it "donates if install_rhizome is not done" do
-      expect(sn).to receive(:leaf?).and_return false
-      expect(sn).to receive(:donate).and_call_original
-
+      Strand.create(parent_id: st.id, prog: "BootstrapRhizome", label: "start", stack: [{}], lease: Time.now + 10)
       expect { sn.wait_for_rhizome }.to nap(1)
     end
 
     it "hops to install_grafana when rhizome is done" do
-      expect(sn).to receive(:leaf?).and_return true
-
       expect { sn.wait_for_rhizome }.to hop("install_grafana")
     end
   end

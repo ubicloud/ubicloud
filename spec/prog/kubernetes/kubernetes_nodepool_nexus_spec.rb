@@ -3,11 +3,11 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
-  subject(:nx) { described_class.new(Strand.new(id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77")) }
+  subject(:st) { Strand.new(id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77") }
 
+  let(:nx) { described_class.new(st) }
   let(:project) { Project.create(name: "default") }
   let(:subnet) { PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: project.id) }
-
   let(:kc) {
     kc = KubernetesCluster.create(
       name: "k8scluster",
@@ -26,7 +26,6 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     kc.update(api_server_lb_id: lb.id)
     kc
   }
-
   let(:kn) { KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2") }
 
   before do
@@ -133,15 +132,13 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
 
   describe "#wait_worker_node" do
     it "hops back to bootstrap_worker_vms if there are no sub-programs running" do
-      expect(nx).to receive(:leaf?).and_return true
-
+      st.update(prog: "Kubernetes::KubernetesNodepoolNexus", label: "wait_worker_node", stack: [{}])
       expect { nx.wait_worker_node }.to hop("wait")
     end
 
     it "donates if there are sub-programs running" do
-      expect(nx).to receive(:leaf?).and_return false
-      expect(nx).to receive(:donate).and_call_original
-
+      st.update(prog: "Kubernetes::KubernetesNodepoolNexus", label: "wait_worker_node", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_worker_node }.to nap(1)
     end
   end
@@ -220,24 +217,21 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
 
   describe "#wait_upgrade" do
     it "hops back to upgrade if there are no sub-programs running" do
-      expect(nx).to receive(:leaf?).and_return true
+      st.update(prog: "Kubernetes::KubernetesNodepoolNexus", label: "wait_upgrade", stack: [{}])
       expect { nx.wait_upgrade }.to hop("upgrade")
     end
 
     it "donates if there are sub-programs running" do
-      expect(nx).to receive(:leaf?).and_return false
-      expect(nx).to receive(:donate).and_call_original
+      st.update(prog: "Kubernetes::KubernetesNodepoolNexus", label: "wait_upgrade", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "Kubernetes::UpgradeKubernetesNode", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_upgrade }.to nap(1)
     end
   end
 
   describe "#destroy" do
-    before { expect(nx).to receive(:reap) }
-
     it "donates if there are sub-programs running (Provision...)" do
-      expect(nx).to receive(:leaf?).and_return false
-      expect(nx).to receive(:donate).and_call_original
-
+      st.update(prog: "Kubernetes::KubernetesNodepoolNexus", label: "wait_upgrade", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "Kubernetes::UpgradeKubernetesNode", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.destroy }.to nap(1)
     end
 
