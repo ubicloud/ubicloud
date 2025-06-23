@@ -180,13 +180,6 @@ end
     )
   end
 
-  def donate
-    strand.children_dataset.each do |child|
-      nap 0 if child.run
-    end
-    nap 1
-  end
-
   # Process child strands
   #
   # Reapable children (child strands that have exited) are destroyed.
@@ -234,7 +227,14 @@ end
     unless fallthrough
       # Parent is not a leaf, nap for given time, or donate if no
       # nap time is given.
-      nap ? nap(nap) : donate
+      if nap
+        nap(nap)
+      else
+        active_children.each do |child|
+          nap 0 if child.run
+        end
+        nap 1
+      end
     end
   end
 
