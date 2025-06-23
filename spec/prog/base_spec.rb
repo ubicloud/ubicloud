@@ -14,8 +14,11 @@ RSpec.describe Prog::Base do
     Semaphore.incr(child_id, :should_get_deleted)
 
     expect {
-      # Execution donated to child sets the exitval.
+      # Naps
       parent.run
+
+      # Child runs
+      parent.children_dataset.first.run
 
       # Parent notices exitval is set and reaps the child.
       parent.run
@@ -29,13 +32,11 @@ RSpec.describe Prog::Base do
   end
 
   it "keeps children array state in sync even in consecutive-run mode" do
-    parent = Strand.create_with_id(prog: "Test", label: "reap_exit_no_children")
-    Strand.create_with_id(parent_id: parent.id, prog: "Test", label: "popper")
-    prg = parent.load
-    expect(prg).to receive(:nap).and_raise(Prog::Base::Nap.new(0))
-    expect(parent).to receive(:load).twice.and_return(prg)
-    expect(parent).to receive(:unsynchronized_run).twice.and_call_original
-    parent.run(10)
+    parent = Strand.create(prog: "Test", label: "reap_exit_no_children")
+    child = Strand.create(parent_id: parent.id, prog: "Test", label: "popper")
+    expect(parent.run(10)).to be_a Prog::Base::Nap
+    child.destroy
+    expect(parent.run(10)).to be_a Prog::Base::Exit
   end
 
   describe "#pop" do
@@ -220,9 +221,9 @@ RSpec.describe Prog::Base do
     it "resolves the page of the budded prog when pop" do
       st = Strand.create_with_id(prog: "Test", label: :set_popping_deadline_via_bud)
       st.unsynchronized_run
-      st.unsynchronized_run
+      st.children_dataset.first.unsynchronized_run
       expect {
-        st.unsynchronized_run
+        st.children_dataset.first.unsynchronized_run
       }.to change { Page.active.count }.from(0).to(1)
 
       expect {

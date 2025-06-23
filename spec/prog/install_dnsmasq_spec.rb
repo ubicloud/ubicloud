@@ -20,8 +20,6 @@ RSpec.describe Prog::InstallDnsmasq do
     before { expect(idm).to receive(:reap) }
 
     it "donates if any sub-progs are still running" do
-      expect(idm).to receive(:donate).and_call_original
-      expect(idm).to receive(:strand).and_return(instance_double(Strand, children_dataset: []))
       expect(idm).to receive(:leaf?).and_return false
       expect { idm.wait_downloads }.to nap(1)
     end

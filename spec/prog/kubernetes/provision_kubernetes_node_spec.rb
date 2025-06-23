@@ -176,9 +176,6 @@ table ip6 pod_access {
 
     it "donates if there are sub-programs running" do
       expect(prog).to receive(:leaf?).and_return false
-      expect(prog).to receive(:donate).and_call_original
-      expect(prog).to receive(:strand).and_return(instance_double(Strand, children_dataset: []))
-
       expect { prog.wait_bootstrap_rhizome }.to nap(1)
     end
   end

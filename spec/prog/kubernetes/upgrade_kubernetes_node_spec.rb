@@ -65,7 +65,6 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
       prog.strand.label = "somestep"
       expect(prog).to receive(:reap)
       expect(prog).to receive(:leaf?).and_return(false)
-      expect(prog.strand).to receive(:children_dataset).and_return([])
       expect { prog.before_run }.to nap(1)
     end
   end
@@ -85,9 +84,6 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
   describe "#wait_new_node" do
     it "donates if there are sub-programs running" do
       expect(prog).to receive(:reap).and_return([])
-      expect(prog).to receive(:donate).and_call_original
-      expect(prog.strand).to receive(:children_dataset).and_return([])
-
       expect { prog.wait_new_node }.to nap(1)
     end
 
