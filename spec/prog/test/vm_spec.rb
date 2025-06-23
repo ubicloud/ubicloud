@@ -105,10 +105,31 @@ RSpec.describe Prog::Test::Vm do
     end
   end
 
+  describe "#umount_if_mounted" do
+    it "unmounts if mounted" do
+      mount_path = "/home/ubi/mnt0"
+      expect(sshable).to receive(:cmd).with("sudo umount #{mount_path}")
+      expect { vm_test.umount_if_mounted(mount_path) }.not_to raise_error
+    end
+
+    it "does not raise error if not mounted" do
+      mount_path = "/home/ubi/mnt0"
+      expect(sshable).to receive(:cmd).with("sudo umount #{mount_path}").and_raise(Sshable::SshError.new("sudo umount #{mount_path}", "", "umount: #{mount_path}: not mounted.\n", nil, nil))
+      expect { vm_test.umount_if_mounted(mount_path) }.not_to raise_error
+    end
+
+    it "raises error for unexpected ssh error" do
+      mount_path = "/home/ubi/mnt0"
+      expect(sshable).to receive(:cmd).with("sudo umount #{mount_path}").and_raise(Sshable::SshError.new("unexpected error", "", "", nil, nil))
+      expect { vm_test.umount_if_mounted(mount_path) }.to raise_error Sshable::SshError, /unexpected error/
+    end
+  end
+
   describe "#verify_extra_disks" do
     it "verifies extra disks" do
       disk_path = "/dev/disk/by-id/disk_1"
       mount_path = "/home/ubi/mnt0"
+      expect(vm_test).to receive(:umount_if_mounted).with(mount_path)
       expect(sshable).to receive(:cmd).with("mkdir -p #{mount_path}")
       expect(sshable).to receive(:cmd).with("sudo mkfs.ext4 #{disk_path}")
       expect(sshable).to receive(:cmd).with("sudo mount #{disk_path} #{mount_path}")
