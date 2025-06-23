@@ -181,7 +181,9 @@ end
   end
 
   def donate
-    strand.children_dataset.each(&:run)
+    strand.children_dataset.each do |child|
+      nap 0 if child.run
+    end
     nap 1
   end
 

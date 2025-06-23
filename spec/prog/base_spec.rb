@@ -3,6 +3,30 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Prog::Base do
+  it "does not allow failure of one child strand inside donate to affect other strands" do
+    parent = Strand.create(prog: "Test", label: "reap_exit_no_children")
+    popper = Strand.create(parent_id: parent.id, prog: "Test", label: "popper")
+    leased = Strand.create(parent_id: parent.id, prog: "Test", label: "napper", lease: Time.now + 10)
+    failer = Strand.create(parent_id: parent.id, prog: "Test", label: "failer")
+    array = [popper, leased, failer]
+
+    # Avoid RSpec::Mocks::MockExpectationError by defining methods directly
+    def array.where(_)
+      a = []
+
+      def a.all
+        self
+      end
+
+      a
+    end
+
+    expect(parent).to receive(:children_dataset).exactly(4).and_return(array)
+    expect { parent.run(10) }.to raise_error(RuntimeError)
+    expect(popper.this.get(:exitval)).to eq("msg" => "popped")
+    expect(failer.this.get(:exitval)).to be_nil
+  end
+
   it "can bud and reap" do
     parent = Strand.create_with_id(prog: "Test", label: "budder")
     expect {

@@ -81,6 +81,10 @@ class Prog::Test < Prog::Base
     donate
   end
 
+  label def failer
+    fail "failure"
+  end
+
   label def napper
     nap(123)
   end
