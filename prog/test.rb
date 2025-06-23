@@ -76,6 +76,10 @@ class Prog::Test < Prog::Base
     reap { pop({msg: "reap_exit_no_children"}) }
   end
 
+  label def failer
+    fail "failure"
+  end
+
   label def napper
     nap(123)
   end
