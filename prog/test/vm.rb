@@ -37,15 +37,24 @@ class Prog::Test::Vm < Prog::Test::Base
     hop_verify_extra_disks
   end
 
+  def umount_if_mounted(mount_path)
+    sshable.cmd("sudo umount #{mount_path.shellescape}")
+  rescue Sshable::SshError => e
+    raise unless e.stderr.include?("not mounted")
+  end
+
   label def verify_extra_disks
     vm.vm_storage_volumes[1..].each_with_index { |volume, disk_index|
       mount_path = "/home/ubi/mnt#{disk_index}"
-      sshable.cmd("mkdir -p #{mount_path}")
+      sshable.cmd("mkdir -p #{mount_path.shellescape}")
+      # this might be a retry, so ensure the mount point is not already mounted
+      umount_if_mounted(mount_path)
       sshable.cmd("sudo mkfs.ext4 #{volume.device_path.shellescape}")
-      sshable.cmd("sudo mount #{volume.device_path.shellescape} #{mount_path}")
-      sshable.cmd("sudo chown ubi #{mount_path}")
-      sshable.cmd("dd if=/dev/urandom of=#{mount_path}/1.txt bs=512 count=10000")
-      sshable.cmd("sync #{mount_path}/1.txt")
+      sshable.cmd("sudo mount #{volume.device_path.shellescape} #{mount_path.shellescape}")
+      sshable.cmd("sudo chown ubi #{mount_path.shellescape}")
+      test_file = File.join(mount_path, "1.txt")
+      sshable.cmd("dd if=/dev/urandom of=#{test_file.shellescape} bs=512 count=10000")
+      sshable.cmd("sync #{test_file.shellescape}")
     }
 
     hop_ping_google
