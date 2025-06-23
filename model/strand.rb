@@ -102,7 +102,7 @@ class Strand < Sequel::Model
           fail "BUG: strand with @deleted set still exists in the database"
         end
       else
-        DB.transaction do
+        DB.transaction(savepoint: true) do
           lease_clear_debug_snapshot = this.for_update.all
           num_updated = DB[<<SQL, id, lease_time].update
 UPDATE strand
@@ -178,7 +178,7 @@ SQL
       modified!(:stack)
     end
 
-    DB.transaction do
+    DB.transaction(savepoint: true) do
       SemSnap.use(id) do |snap|
         prg = load(snap)
         prg.public_send(:before_run) if prg.respond_to?(:before_run)
