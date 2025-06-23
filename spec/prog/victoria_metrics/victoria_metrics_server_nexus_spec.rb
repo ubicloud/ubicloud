@@ -5,9 +5,10 @@ require_relative "../../model/spec_helper"
 RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
   subject(:nx) {
     allow(Config).to receive(:victoria_metrics_service_project_id).and_return(project.id)
-    described_class.new(Strand.new(id: "e29d876b-9437-4ba3-9949-99075ad8767d", prog: "VictoriaMetrics::VictoriaMetricsServerNexus", label: "start"))
+    described_class.new(st)
   }
 
+  let(:st) { Strand.new(id: "e29d876b-9437-4ba3-9949-99075ad8767d", prog: "VictoriaMetrics::VictoriaMetricsServerNexus", label: "start") }
   let(:project) { Project.create_with_id(name: "default") }
 
   let(:vm) {
@@ -91,13 +92,13 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
 
   describe "#wait_bootstrap_rhizome" do
     it "hops to create_victoria_metrics_user if bootstrap is complete" do
-      expect(nx).to receive(:leaf?).and_return(true)
+      st.update(prog: "VictoriaMetrics::VictoriaMetricsServerNexus", label: "wait_bootstrap_rhizome", stack: [{}])
       expect { nx.wait_bootstrap_rhizome }.to hop("create_victoria_metrics_user")
     end
 
     it "donates if bootstrap is not complete" do
-      expect(nx).to receive(:leaf?).and_return(false)
-      expect(nx).to receive(:donate).and_call_original
+      st.update(prog: "VictoriaMetrics::VictoriaMetricsServerNexus", label: "wait_bootstrap_rhizome", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "BootstrapRhizome", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_bootstrap_rhizome }.to nap(1)
     end
   end

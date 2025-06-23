@@ -95,9 +95,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def wait_bootstrap_rhizome
-    reap
-    hop_mount_data_disk if leaf?
-    donate
+    reap(:mount_data_disk)
   end
 
   label def mount_data_disk
@@ -459,8 +457,8 @@ SQL
 
     nap 0 if postgres_server.trigger_failover
 
-    reap
-    nap 5 unless strand.children.select { it.prog == "Postgres::PostgresServerNexus" && it.label == "restart" }.empty?
+    reap(fallthrough: true)
+    nap 5 unless strand.children_dataset.where(prog: "Postgres::PostgresServerNexus", label: "restart").empty?
 
     if available?
       decr_checkup

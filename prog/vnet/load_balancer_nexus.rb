@@ -137,13 +137,10 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   end
 
   label def wait_update_vm_load_balancers
-    reap
-    if strand.children_dataset.where(prog: "Vnet::UpdateLoadBalancerNode").all? { it.exitval == "load balancer is updated" } || strand.children.empty?
+    reap(nap: 1) do
       decr_update_load_balancer
       hop_wait
     end
-
-    nap 1
   end
 
   label def destroy
@@ -168,14 +165,11 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   end
 
   label def wait_destroy
-    reap
-    if leaf?
+    reap(nap: 5) do
       load_balancer.destroy
 
       pop "load balancer deleted"
     end
-
-    nap 5
   end
 
   label def rewrite_dns_records

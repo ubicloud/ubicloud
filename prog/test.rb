@@ -69,16 +69,11 @@ class Prog::Test < Prog::Base
 
   label def reaper
     # below loop is only for ensuring we are able to process reaped strands
-    reap.each do |st|
-      st.exitval
-    end
-    donate
+    reap(reaper: :exitval.to_proc)
   end
 
   label def reap_exit_no_children
-    reap
-    pop({msg: "reap_exit_no_children"}) if leaf?
-    donate
+    reap { pop({msg: "reap_exit_no_children"}) }
   end
 
   label def napper

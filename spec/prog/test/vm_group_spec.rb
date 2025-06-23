@@ -3,7 +3,9 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Test::VmGroup do
-  subject(:vg_test) { described_class.new(described_class.assemble(boot_images: ["ubuntu-noble", "debian-12"])) }
+  subject(:vg_test) { described_class.new(st) }
+
+  let(:st) { described_class.assemble(boot_images: ["ubuntu-noble", "debian-12"]) }
 
   describe "#start" do
     it "hops to setup_vms" do
@@ -68,15 +70,11 @@ RSpec.describe Prog::Test::VmGroup do
 
   describe "#wait_verify_vms" do
     it "hops to hop_wait_verify_vms" do
-      expect(vg_test).to receive(:reap)
-      expect(vg_test).to receive(:leaf?).and_return(true)
       expect { vg_test.wait_verify_vms }.to hop("verify_host_capacity")
     end
 
     it "stays in wait_verify_vms" do
-      expect(vg_test).to receive(:reap)
-      expect(vg_test).to receive(:leaf?).and_return(false)
-      expect(vg_test).to receive(:donate).and_call_original
+      Strand.create(parent_id: st.id, prog: "Test::Vm", label: "start", stack: [{}], lease: Time.now + 10)
       expect { vg_test.wait_verify_vms }.to nap(1)
     end
   end
@@ -191,21 +189,19 @@ RSpec.describe Prog::Test::VmGroup do
   end
 
   describe "#wait_reboot" do
-    let(:st) { instance_double(Strand) }
-
     before do
       allow(vg_test).to receive(:vm_host).and_return(instance_double(VmHost))
-      allow(vg_test.vm_host).to receive(:strand).and_return(st)
+      allow(vg_test.vm_host).to receive(:strand).and_return(instance_double(Strand))
     end
 
     it "naps if strand is busy" do
-      expect(st).to receive(:label).and_return("reboot")
+      expect(vg_test.vm_host.strand).to receive(:label).and_return("reboot")
       expect { vg_test.wait_reboot }.to nap(20)
     end
 
     it "runs vm tests if reboot done" do
-      expect(st).to receive(:label).and_return("wait")
-      expect(st).to receive(:semaphores).and_return([])
+      expect(vg_test.vm_host.strand).to receive(:label).and_return("wait")
+      expect(vg_test.vm_host.strand).to receive(:semaphores).and_return([])
       expect { vg_test.wait_reboot }.to hop("verify_vms")
     end
   end

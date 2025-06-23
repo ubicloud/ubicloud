@@ -65,9 +65,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
   end
 
   label def wait_bootstrap_rhizome
-    reap
-    hop_create_victoria_metrics_user if leaf?
-    donate
+    reap(:create_victoria_metrics_user)
   end
 
   label def create_victoria_metrics_user

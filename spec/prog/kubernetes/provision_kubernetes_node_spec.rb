@@ -3,7 +3,9 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
-  subject(:prog) { described_class.new(Strand.new) }
+  subject(:prog) { described_class.new(st) }
+
+  let(:st) { Strand.new }
 
   let(:project) {
     Project.create(name: "default")
@@ -166,19 +168,14 @@ table ip6 pod_access {
   end
 
   describe "#wait_bootstrap_rhizome" do
-    before { expect(prog).to receive(:reap) }
-
     it "hops to assign_role if there are no sub-programs running" do
-      expect(prog).to receive(:leaf?).and_return true
-
+      st.update(prog: "Kubernetes::ProvisionKubernetesNode", label: "wait_bootstrap_rhizome", stack: [{}])
       expect { prog.wait_bootstrap_rhizome }.to hop("assign_role")
     end
 
     it "donates if there are sub-programs running" do
-      expect(prog).to receive(:leaf?).and_return false
-      expect(prog).to receive(:donate).and_call_original
-      expect(prog).to receive(:strand).and_return(instance_double(Strand, children_dataset: []))
-
+      st.update(prog: "Kubernetes::ProvisionKubernetesNode", label: "wait_bootstrap_rhizome", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "BootstrapRhizome", label: "start", stack: [{}], lease: Time.now + 10)
       expect { prog.wait_bootstrap_rhizome }.to nap(1)
     end
   end

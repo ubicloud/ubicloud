@@ -3,7 +3,9 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Postgres::PostgresResourceNexus do
-  subject(:nx) { described_class.new(Strand.new(id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77")) }
+  subject(:nx) { described_class.new(st) }
+
+  let(:st) { Strand.new(id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77") }
 
   let(:postgres_resource) {
     instance_double(
@@ -211,9 +213,10 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "naps if there are children" do
+      st.update(prog: "Postgres::PostgresResourceNexus", label: "initialize_certificates", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "Postgres::PostgresResourceNexus", label: "trigger_pg_current_xact_id_on_parent", stack: [{}], lease: Time.now + 10)
       expect(Util).to receive(:create_root_certificate).twice
       expect(nx).to receive(:create_certificate)
-      expect(nx).to receive(:leaf?).and_return(false)
       expect { nx.initialize_certificates }.to nap(5)
     end
   end

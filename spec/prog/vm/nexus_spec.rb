@@ -237,14 +237,13 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#wait_aws_vm_started" do
     it "reaps and naps if not leaf" do
-      expect(nx).to receive(:reap)
-      expect(nx).to receive(:leaf?).and_return(false)
+      st.update(prog: "Vm::Nexus", label: "wait_aws_vm_started", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "Aws::Instance", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_aws_vm_started }.to nap(10)
     end
 
     it "hops to wait_sshable if leaf" do
-      expect(nx).to receive(:reap)
-      expect(nx).to receive(:leaf?).and_return(true)
+      st.update(prog: "Vm::Nexus", label: "wait_aws_vm_started", stack: [{}])
       expect { nx.wait_aws_vm_started }.to hop("wait_sshable")
     end
   end
@@ -1137,15 +1136,14 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#wait_aws_vm_destroyed" do
     it "reaps and pops if leaf" do
-      expect(nx).to receive(:reap)
-      expect(nx).to receive(:leaf?).and_return(true)
+      st.update(prog: "Vm::Nexus", label: "wait_aws_vm_destroyed", stack: [{}])
       expect(nx).to receive(:final_clean_up)
       expect { nx.wait_aws_vm_destroyed }.to exit({"msg" => "vm deleted"})
     end
 
     it "naps if not leaf" do
-      expect(nx).to receive(:reap)
-      expect(nx).to receive(:leaf?).and_return(false)
+      st.update(prog: "Vm::Nexus", label: "wait_aws_vm_destroyed", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "Aws::Instance", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_aws_vm_destroyed }.to nap(10)
     end
   end

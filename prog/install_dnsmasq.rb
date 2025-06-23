@@ -14,9 +14,7 @@ class Prog::InstallDnsmasq < Prog::Base
   end
 
   label def wait_downloads
-    reap
-    hop_compile_and_install if leaf?
-    donate
+    reap(:compile_and_install)
   end
 
   label def compile_and_install
