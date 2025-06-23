@@ -17,7 +17,7 @@ class SpdkSetup
     begin
       r "adduser #{SpdkPath.user.shellescape} --disabled-password --gecos '' --home #{SpdkPath.home.shellescape}"
     rescue CommandFail => ex
-      raise unless /adduser: The user `.*' already exists\./.match?(ex.message)
+      raise unless /The user `.*' already exists\./.match?(ex.message)
     end
 
     # Directory to put vhost sockets.
