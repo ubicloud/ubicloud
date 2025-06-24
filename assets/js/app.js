@@ -5,6 +5,7 @@ $(function () {
   setupPlayground();
   setupFormsWithPatchMethod();
   setupMetricsCharts();
+  setupPgConfigCard();
 });
 
 $(".toggle-mobile-menu").on("click", function (event) {
@@ -992,4 +993,130 @@ function flexiblePrecision(value, precision) {
   const increasedPrecision = Math.max(1, precision);
 
   return (value < 10) ? value.toFixed(increasedPrecision) : value.toFixed(precision);
+}
+
+function setupPgConfigCard() {
+  $(".delete-config-btn").on("click", function (event) {
+    const configGroup = $(this).closest(".group");
+    configGroup.remove();
+  });
+
+  $(".add-config-btn").on("click", function (event) {
+    event.preventDefault();
+    addConfigRow(event.target);
+  });
+
+  $(".save-config-btn").on("click", async function (event) {
+    event.preventDefault();
+
+    // If the new config row is non-empty, add the row.
+    // This is to ensure that the user doesn't have to click the add before save
+    // button if the last row is non-empty.
+    const newPGConfigGroup = $('.pg-config-card .new-config');
+    if (newPGConfigGroup.find("input").eq(0).val() !== "") {
+      addConfigRow(newPGConfigGroup.find(".add-config-btn"));
+    }
+
+    const newPGBouncerConfigGroup = $('.pgbouncer-config-card .new-config');
+    if (newPGBouncerConfigGroup.find("input").eq(0).val() !== "") {
+      addConfigRow(newPGBouncerConfigGroup.find(".add-config-btn"));
+    }
+
+    const csrfToken = $('.pg-config input[name=_csrf]').attr('value');
+
+    const pgConfig = Object.fromEntries($('.pg-config-card .config-group .config-entry').toArray().map((e) => {
+      const key = $(e).find('input[name="key"]').val();
+      const val = $(e).find('input[name="value"]').val();
+      return [key, val];
+    }))
+
+    const pgBouncerConfig = Object.fromEntries($('.pgbouncer-config-card .config-group .config-entry').toArray().map((e) => {
+      const key = $(e).find('input[name="key"]').val();
+      const val = $(e).find('input[name="value"]').val();
+      return [key, val];
+    }))
+
+    const url = window.location.href;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body: JSON.stringify({
+        "pg_config": pgConfig,
+        "pgbouncer_config": pgBouncerConfig,
+        "_csrf": csrfToken
+      })
+    }).catch(error => {
+      console.error("There was a problem with the fetch operation:", error);
+    });
+
+    $('.pg-config-card .config-entry input').removeClass('border-red-500');
+    $('.pgbouncer-config-card .config-entry input').removeClass('border-red-500');
+    $('.pg-config-card .config-entry .error').hide();
+    $('.pgbouncer-config-card .config-entry .error').hide();
+
+    if (response.status !== 200) {
+      notification("❌ Failed to save configuration.");
+      const responseBody = await response.json();
+      const errorDetails = responseBody.error?.details;
+
+      if (!errorDetails) {
+        alert("Failed to save configuration. Please try again.");
+        return;
+      }
+      
+      Object.entries(errorDetails).forEach(([key, value]) => {
+        showError(key, value);
+      });
+    } else {
+      notification("✅ Configuration saved successfully.");
+    }
+  });
+
+  function addConfigRow(addBtn) {
+    const createConfigGroup = $(addBtn).closest(".group");
+    const keyInput = createConfigGroup.find("input").eq(0);
+    const valueInput = createConfigGroup.find("input").eq(1);
+    if (!keyInput[0].reportValidity()) return;
+    
+    const placeHolderGroup = $(addBtn).closest(".group").prev();
+    const configId = placeHolderGroup.data("config-id");
+
+    const newConfigId = configId + 1;
+    const newConfigGroup = placeHolderGroup.clone(true);
+    newConfigGroup.data("config-id", newConfigId);
+    newConfigGroup.find("input").prop("disabled", false);
+
+    // Remove hidden class
+    newConfigGroup.removeClass("hidden");
+    newConfigGroup.removeClass("config-placeholder-group");
+    newConfigGroup.addClass("config-group");
+
+    // Set value
+    newConfigGroup.find("input").eq(0).prop("value", keyInput.val());
+    newConfigGroup.find("input").eq(1).prop("value", valueInput.val());
+
+    keyInput.val("");
+    valueInput.val("");
+
+    $(addBtn).closest(".group").before(newConfigGroup);
+  }
+
+  function showError(key, message) {
+    const keyEntries = $('.pg-config-card .config-entry input[name="key"], .pgbouncer-config-card .config-entry input[name="key"]').toArray();
+    const targetEntry = keyEntries.filter((e) => {
+      return $(e).val() == key;
+    });
+
+    if (typeof message == "string") {
+      $(targetEntry).addClass('border-red-500');
+    } else {
+      $(targetEntry).siblings('input[name="value"]').addClass('border-red-500');
+    }
+
+    $(targetEntry).siblings('.error').text(message).show();
+  }
 }

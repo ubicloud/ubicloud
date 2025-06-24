@@ -811,5 +811,45 @@ RSpec.describe Clover, "postgres" do
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
       end
     end
+
+    describe "config" do
+      it "can view configuration" do
+        pg.update(user_config: {"max_connections" => "120"})
+        visit "#{project.path}#{pg.path}/config"
+
+        expect(page).to have_content "PostgreSQL Configuration"
+        expect(page).to have_field "key", with: "max_connections"
+        expect(page).to have_field "value", with: "120"
+      end
+
+      it "does not show update button when user does not have permissions" do
+        pg_wo_permission.update(user_config: {"max_connections" => "120"})
+        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+
+        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/config"
+        expect(page.title).to eq "Ubicloud - pg-without-permission"
+
+        expect { find ".delete-config-btn" }.to raise_error Capybara::ElementNotFound
+        expect { find ".save-config-btn" }.to raise_error Capybara::ElementNotFound
+      end
+
+      it "shows update button when user has permissions" do
+        visit "#{project.path}#{pg.path}/config"
+        expect(page).to have_button "Save"
+
+        expect { find ".pg-config-card .delete-config-btn" }.not_to raise_error
+        expect { find ".save-config-btn" }.not_to raise_error
+      end
+
+      it "can update configuration" do
+        pg
+        pg.update(user_config: {"max_connections" => "120"})
+        visit "#{project.path}#{pg.path}/config"
+
+        click_button "Save"
+        expect(page).to have_field "key", with: "max_connections"
+        expect(page).to have_field "value", with: "120"
+      end
+    end
   end
 end
