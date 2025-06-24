@@ -1,0 +1,79 @@
+<%# locals: (title: nil, config: {}, empty_message: 'No configuration found') %>
+
+<div class="bg-white rounded-lg shadow overflow-hidden mb-6">
+  <div class="px-6 py-4 border-b border-gray-200">
+    <h3 class="text-lg font-medium text-gray-900"><%= title %></h3>
+  </div>
+
+  <div class="divide-y divide-gray-200 w-full max-h-64 overflow-y-auto" id="config-container">
+    <% config.each_with_index do |(key, value), index| %>
+      <div class="px-6 py-2 hover:bg-gray-50 group" data-config-id="<%= index %>">
+        <div class="flex items-center justify-between">
+          <div class="flex flex-wrap items-center justify-between">
+            <input
+              type="text"
+              class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500 mr-2"
+              value="<%= key %>"
+              name="config[<%= index %>][key]"
+            />
+            <input
+              type="text"
+              value="<%= value %>"
+              class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500"
+              name="config[<%= index %>][value]"
+            />
+          </div>
+          <div class="min-w-24 flex items-center space-x-2">
+            <%== part("components/button", type: "danger", text: "", icon: "hero-trash", extra_class: "delete-config-btn") %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+    <!-- Hidden row for generating new entries -->
+    <div class="px-6 py-2 hover:bg-gray-50 group group/inline-editable hidden" data-config-id="">
+      <div class="flex items-center justify-between">
+        <div class="flex flex-wrap items-center justify-between">
+          <input
+            type="text"
+            class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500 mr-2"
+            value=""
+            name="config[new][key]"
+            disabled
+          />
+          <input
+            type="text"
+            value=""
+            class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500"
+            name="config[new][value]"
+            disabled
+          />
+        </div>
+        <div class="min-w-24 flex items-center space-x-2">
+          <%== part("components/button", type: "danger", text: "", icon: "hero-trash", extra_class: "delete-config-btn") %>
+        </div>
+      </div>
+    </div>
+    <!-- Empty row for new configuration -->
+    <div class="px-6 py-2 hover:bg-gray-50 group">
+      <div class="flex items-center justify-between">
+        <div class="flex flex-wrap items-center">
+          <input
+            type="text"
+            class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500 mr-2"
+            placeholder="New Key"
+            name="config[new][key]"
+          />
+          <input
+            type="text"
+            placeholder="New Value"
+            class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500"
+            name="config[new][value]"
+          />
+        </div>
+        <div class="min-w-24 flex items-center space-x-2">
+          <%== part("components/button", text: "", type: "safe", icon: "hero-plus", extra_class: "add-config-btn") %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

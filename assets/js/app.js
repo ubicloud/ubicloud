@@ -5,6 +5,7 @@ $(function () {
   setupPlayground();
   setupFormsWithPatchMethod();
   setupMetricsCharts();
+  setupPgConfigCard();
 });
 
 $(".toggle-mobile-menu").on("click", function (event) {
@@ -135,31 +136,34 @@ $(".save-inline-btn").on("click", function (event) {
   let csrf = $(this).data("csrf");
   let confirmation_message = $(this).data("confirmation-message");
 
-  $.ajax({
-    url: url,
-    type: "PATCH",
-    data: { "_csrf": csrf, ...data },
-    dataType: "json",
-    headers: { "Accept": "application/json" },
-    success: function (result) {
-      inline_editable_group.find(".inline-editable").each(function () {
-        let value = $(this).find(".inline-editable-input").val();
-        $(this).find(".inline-editable-text").text(value);
-      });
 
-      inline_editable_group.removeClass("active");
+  if (url) {
+    $.ajax({
+      url: url,
+      type: "PATCH",
+      data: { "_csrf": csrf, ...data },
+      dataType: "json",
+      headers: { "Accept": "application/json" },
+      success: function (result) {
+        inline_editable_group.find(".inline-editable").each(function () {
+          let value = $(this).find(".inline-editable-input").val();
+          $(this).find(".inline-editable-text").text(value);
+        });
 
-      alert(confirmation_message);
-    },
-    error: function (xhr, ajaxOptions, thrownError) {
-      let message = thrownError;
-      try {
-        response = JSON.parse(xhr.responseText);
-        message = response.error?.message
-      } catch { };
-      alert(`Error: ${message}`);
-    }
-  });
+        inline_editable_group.removeClass("active");
+
+        alert(confirmation_message);
+      },
+      error: function (xhr, ajaxOptions, thrownError) {
+        let message = thrownError;
+        try {
+          response = JSON.parse(xhr.responseText);
+          message = response.error?.message
+        } catch { };
+        alert(`Error: ${message}`);
+      }
+    });
+  }
 });
 
 $(".restart-btn").on("click", function (event) {
@@ -992,4 +996,36 @@ function flexiblePrecision(value, precision) {
   const increasedPrecision = Math.max(1, precision);
 
   return (value < 10) ? value.toFixed(increasedPrecision) : value.toFixed(precision);
+}
+
+function setupPgConfigCard() {
+  $(".delete-config-btn").on("click", function(event) {
+    const configGroup = $(this).closest(".group");
+    configGroup.remove();
+  });
+
+  $(".add-config-btn").on("click", function (event) {
+    const createConfigGroup = $(this).closest(".group");
+    const placeHolderGroup = $(this).closest(".group").prev();
+    const configId = placeHolderGroup.data("config-id");
+
+    const newConfigId = configId + 1;
+    const newConfigGroup = placeHolderGroup.clone(true);
+    newConfigGroup.data("config-id", newConfigId);
+    newConfigGroup.find("input").prop("disabled", false);
+
+    // Remove hidden class
+    newConfigGroup.removeClass("hidden");
+
+    // Set value
+    const keyInput = createConfigGroup.find("input").eq(0);
+    const valueInput = createConfigGroup.find("input").eq(1);
+    newConfigGroup.find("input").eq(0).prop("value", keyInput.val());
+    newConfigGroup.find("input").eq(1).prop("value", valueInput.val());
+
+    keyInput.val("");
+    valueInput.val("");
+
+    $(this).closest(".group").before(newConfigGroup);
+  });
 }
