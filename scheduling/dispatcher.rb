@@ -449,7 +449,7 @@ class Scheduling::Dispatcher
   # and then signalling the related apoptosis thread when the
   # strand run finishes.
   def strand_thread(strand_queue, start_queue, finish_queue)
-    while !@shutting_down && (strand = strand_queue.pop)
+    while (strand = strand_queue.pop) && !@shutting_down
       strand.worker_started!
       metrics = strand.respirate_metrics
       metrics.queue_size = strand_queue.size
