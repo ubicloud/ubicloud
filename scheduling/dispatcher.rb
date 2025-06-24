@@ -118,10 +118,15 @@ class Scheduling::Dispatcher
 
     # Signal all threads to shutdown. This isn't done by
     # default in shutdown as pushing to the queue can block.
-    @thread_data.each { @strand_queue.push(nil) }
+    # We use SizedQueue#close here to allow shutdown to proceed
+    # even if the scan thread is blocked on pushing to the queue
+    # and all strand threads are busy processing strands.
+    @strand_queue.close
 
-    # Close down the metrics processing
-    @metrics_queue.close
+    # Close down the metrics processing. This pushes nil to the
+    # metrics_queue instead of using close, avoiding the need
+    # to rescue ClosedQueueError in the run_strand ensure block.
+    @metrics_queue.push(nil)
     @metrics_thread.join
 
     # Close down the repartition thread if is exists.  Note that
@@ -510,6 +515,7 @@ class Scheduling::Dispatcher
       break if @shutting_down
       @mutex.synchronize { current_strands[strand.id] = true }
       strand_queue.push(strand)
+    rescue ClosedQueueError
     end
 
     strands.size == 0
