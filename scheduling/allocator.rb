@@ -132,8 +132,7 @@ module Scheduling::Allocator
     def self.candidate_hosts(request)
       ds = DB[:vm_host]
         .join(:storage_devices, vm_host_id: Sequel[:vm_host][:id])
-        .join(:total_ipv4, routed_to_host_id: Sequel[:vm_host][:id])
-        .join(:used_ipv4, routed_to_host_id: Sequel[:vm_host][:id])
+        .join(:available_ipv4, routed_to_host_id: Sequel[:vm_host][:id])
         .left_join(:gpus, vm_host_id: Sequel[:vm_host][:id])
         .left_join(:vm_provisioning, vm_host_id: Sequel[:vm_host][:id])
         .select(
@@ -148,8 +147,7 @@ module Scheduling::Allocator
           :available_storage_gib,
           :total_storage_gib,
           :storage_devices,
-          :total_ipv4,
-          :used_ipv4,
+          :ipv4_available,
           Sequel.function(:coalesce, :num_gpus, 0).as(:num_gpus),
           Sequel.function(:coalesce, :available_gpus, 0).as(:available_gpus),
           :available_iommu_groups,
@@ -158,13 +156,12 @@ module Scheduling::Allocator
           :family
         )
         .where(arch: request.arch_filter)
-        .with(:total_ipv4, DB[:address]
+        .with(:available_ipv4, DB[:ipv4_address]
+          .left_join(:assigned_vm_address, ip: :ip)
+          .join(:address, [:cidr])
+          .where { assigned_vm_address[:ip] =~ nil }
           .select_group(:routed_to_host_id)
-          .select_append { round(sum(power(2, 32 - masklen(cidr)))).cast(:integer).as(total_ipv4) }
-          .where { (family(cidr) =~ 4) })
-        .with(:used_ipv4, DB[:address].left_join(:assigned_vm_address, address_id: :id)
-          .select_group(:routed_to_host_id)
-          .select_append { (count(Sequel[:assigned_vm_address][:id]) + 1).as(used_ipv4) })
+          .select_append { (count.function.* > 0).as(:ipv4_available) })
         .with(:storage_devices, DB[:storage_device]
           .select_group(:vm_host_id)
           .select_append { count.function.*.as(num_storage_devices) }
@@ -229,7 +226,7 @@ module Scheduling::Allocator
           .exclude(Sequel[table_alias][:activated_at] => nil)
       end
 
-      ds = ds.where { used_ipv4 < total_ipv4 } if request.ip4_enabled
+      ds = ds.where(:ipv4_available) if request.ip4_enabled
       ds = ds.where { available_gpus >= request.gpu_count } if request.gpu_count > 0
       ds = ds.where(Sequel[:vm_host][:id] => request.host_filter) unless request.host_filter.empty?
       ds = ds.exclude(Sequel[:vm_host][:id] => request.host_exclusion_filter) unless request.host_exclusion_filter.empty?
