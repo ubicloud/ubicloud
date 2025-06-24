@@ -1,0 +1,10 @@
+<% 
+  pg_config = @pg.user_config || {}
+  pgbouncer_config = @pg.pgbouncer_user_config || {}
+%>
+
+<div action="<%= "#{@project_data[:path]}#{@pg.path}/config" %>" role="form" method="POST" class="min-w-2/3 pg-config">
+    <%== csrf_tag(path: "#{@project_data[:path]}#{@pg.path}/config", method: "PATCH") %>
+    <%== part("components/config_card", title: "PostgreSQL Configuration", config: pg_config, name: "pg-config") %>
+    <%== part("components/config_card", title: "PgBouncer Configuration", config: pgbouncer_config, name: "pgbouncer-config") %>
+</div>

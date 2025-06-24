@@ -1,0 +1,17 @@
+<%# locals: (url: request.path, csrf_url: url, text: "Add", confirmation: nil, confirmation_message: nil, redirect: request.path, method: "DELETE") %>
+
+<%== part(
+  "components/button",
+  text: text,
+  icon: "hero-plus",
+  extra_class: "add-btn",
+  type: "safe",
+  attributes: {
+    "data-url" => url,
+    "data-csrf" => csrf_token(csrf_url, method),
+    "data-confirmation" => confirmation,
+    "data-confirmation-message" => confirmation_message,
+    "data-redirect" => redirect,
+    "data-method" => method
+  }
+) %>

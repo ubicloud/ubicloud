@@ -5,6 +5,7 @@ $(function () {
   setupPlayground();
   setupFormsWithPatchMethod();
   setupMetricsCharts();
+  setupPgConfigCard();
 });
 
 $(".toggle-mobile-menu").on("click", function (event) {
@@ -992,4 +993,59 @@ function flexiblePrecision(value, precision) {
   const increasedPrecision = Math.max(1, precision);
 
   return (value < 10) ? value.toFixed(increasedPrecision) : value.toFixed(precision);
+}
+
+function setupPgConfigCard() {
+  $(".pg-config .add-btn, .delete-btn, .save-btn").on("click", async function (event) {
+    event.preventDefault();
+    const configEntryClass = $(this).hasClass("add-btn") ? "new-config-entry" : "config-entry";
+
+    const entry = $(this).closest("." + configEntryClass);
+
+    if ($(this).hasClass("delete-btn")) {
+      let inline_editable_group = $(this).closest(".group\\/inline-editable");
+      inline_editable_group.find(".inline-editable").each(function () {
+        let value = $(this).find(".inline-editable-text").text();
+        $(this).find(".inline-editable-input").val(value);
+      });
+    }
+
+    const keyInput = entry.find('input[name="key"]');
+    if (!keyInput[0].reportValidity()) {
+      return;
+    }
+
+    const key = keyInput.val();
+    const val = entry.find('input[name="value"]').val();
+
+    let pgConfig = {};
+    let pgBouncerConfig = {};
+
+    const configName = entry.data("config-name");
+
+    if (configName === "pg-config") {
+      pgConfig[key] = $(this).hasClass("delete-btn") ? null : val;
+    } else if (configName === "pgbouncer-config") {
+      pgBouncerConfig[key] = $(this).hasClass("delete-btn") ? null : val;
+    }
+
+    const url = window.location.href;
+    const csrfToken = $(this).data("csrf");
+
+    const response = await fetch(url, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        "pg_config": pgConfig,
+        "pgbouncer_config": pgBouncerConfig,
+        "_csrf": csrfToken
+      }),
+      redirect: "manual"
+    });
+
+    // Redirect to same page to show flash message.
+    window.location.href = url;
+  });
 }
