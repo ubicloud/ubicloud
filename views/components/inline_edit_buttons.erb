@@ -1,4 +1,4 @@
-<%# locals: (url: request.path, csrf_url: url, confirmation_message: nil) %>
+<%# locals: (url: request.path, csrf_url: url, confirmation_message: nil, custom_save_behavior: false) %>
 
 <div class="group-[.active]/inline-editable:hidden block">
 <%== part(
@@ -20,7 +20,8 @@
   attributes: {
     "data-url" => url,
     "data-csrf" => csrf_token(csrf_url, "PATCH"),
-    "data-confirmation-message" => confirmation_message
+    "data-confirmation-message" => confirmation_message,
+    "data-custom-save-behavior" => custom_save_behavior
   }
 ) %>
 

@@ -1,0 +1,53 @@
+<%# locals: (title: nil, config: {}, extra_class: nil, name: nil) %>
+
+<div class="bg-white rounded-lg shadow overflow-hidden mb-6 <%= extra_class %> <%= name %>-card">
+  <div class="px-6 py-4 border-b border-gray-200">
+    <h3 class="text-lg font-medium text-gray-900"><%= title %></h3>
+  </div>
+
+  <table class="min-w-full divide-y divide-gray-300">
+    <thead class="bg-gray-50">
+      <tr>
+        <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Key</th>
+        <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900">Value</th>
+        <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900"></th>
+      </tr>
+    </thead>
+
+    <tbody class="divide-y divide-gray-200 bg-white">
+      <% config.each_with_index do |(key, value), index| %>
+        <tr class="group/inline-editable config-entry" data-config-name="<%= name %>">
+          <td class="w-1/2 py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 inline-editable font-mono">
+            <div class="inline-editable-text group-[.active]/inline-editable:hidden key-text"><%= key %></div>
+            <%== part("components/form/text", name: "key", attributes: {required: true}, extra_class: "inline-editable-input group-[.active]/inline-editable:block hidden") %>
+          </td>
+          <td class="w-1/2 py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 inline-editable font-mono">
+            <div class="inline-editable-text group-[.active]/inline-editable:hidden value-text"><%= value %></div>
+            <%== part("components/form/text", name: "value", extra_class: "inline-editable-input group-[.active]/inline-editable:block hidden") %>
+          </td>
+          <td class="min-w-32 py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 flex gap-2 items-center justify-end">
+            <% if @edit_perm %>
+              <%== part("components/inline_edit_buttons", url: "#{@project_data[:path]}#{@pg.path}/config", csrf_url: "#{@project_data[:path]}#{@pg.path}/config", custom_save_behavior: true) %>
+              <div class="group-[.active]/inline-editable:hidden block">
+                <%== part("components/delete_button", text: "", url: "#{@project_data[:path]}#{@pg.path}/config", method: "PATCH", confirmation_message: nil) %>
+              </div>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+      <% if @edit_perm %>
+        <tr class="new-config-entry" data-config-name="<%= name %>">
+          <td class="w-1/2 py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 inline-editable font-mono">
+            <%== part("components/form/text", name: "key", attributes: {required: true}, extra_class: "inline-editable-input group-[.active]/inline-editable:block") %>
+          </td>
+          <td class="w-1/2 py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 inline-editable font-mono">
+            <%== part("components/form/text", name: "value", extra_class: "inline-editable-input group-[.active]/inline-editable:block") %>
+          </td>
+          <td class="min-w-32 py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 flex gap-2 items-center justify-end">
+            <%== part("components/add_button", text: "", url: "#{@project_data[:path]}#{@pg.path}/config", method: "PATCH") %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
