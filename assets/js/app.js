@@ -5,6 +5,7 @@ $(function () {
   setupPlayground();
   setupFormsWithPatchMethod();
   setupMetricsCharts();
+  setupPgConfigCard();
 });
 
 $(".toggle-mobile-menu").on("click", function (event) {
@@ -133,33 +134,37 @@ $(".save-inline-btn").on("click", function (event) {
 
   let url = $(this).data("url");
   let csrf = $(this).data("csrf");
+  console.log("csrf", csrf)
   let confirmation_message = $(this).data("confirmation-message");
 
-  $.ajax({
-    url: url,
-    type: "PATCH",
-    data: { "_csrf": csrf, ...data },
-    dataType: "json",
-    headers: { "Accept": "application/json" },
-    success: function (result) {
-      inline_editable_group.find(".inline-editable").each(function () {
-        let value = $(this).find(".inline-editable-input").val();
-        $(this).find(".inline-editable-text").text(value);
-      });
 
-      inline_editable_group.removeClass("active");
+  if (url) {
+    $.ajax({
+      url: url,
+      type: "PATCH",
+      data: { "_csrf": csrf, ...data },
+      dataType: "json",
+      headers: { "Accept": "application/json" },
+      success: function (result) {
+        inline_editable_group.find(".inline-editable").each(function () {
+          let value = $(this).find(".inline-editable-input").val();
+          $(this).find(".inline-editable-text").text(value);
+        });
 
-      alert(confirmation_message);
-    },
-    error: function (xhr, ajaxOptions, thrownError) {
-      let message = thrownError;
-      try {
-        response = JSON.parse(xhr.responseText);
-        message = response.error?.message
-      } catch { };
-      alert(`Error: ${message}`);
-    }
-  });
+        inline_editable_group.removeClass("active");
+
+        alert(confirmation_message);
+      },
+      error: function (xhr, ajaxOptions, thrownError) {
+        let message = thrownError;
+        try {
+          response = JSON.parse(xhr.responseText);
+          message = response.error?.message
+        } catch { };
+        alert(`Error: ${message}`);
+      }
+    });
+  }
 });
 
 $(".restart-btn").on("click", function (event) {
@@ -248,7 +253,7 @@ function setupDatePicker() {
 
 $(".fork-icon").on("click", function () {
   let target_datetime = $(this).data("target-datetime");
-  date_picker = flatpickr("#restore_target", {enableTime: true, dateFormat: "Y-m-d H:i"})
+  date_picker = flatpickr("#restore_target", { enableTime: true, dateFormat: "Y-m-d H:i" })
   date_picker.setDate(target_datetime, true);
 
   $("#restore_target").addClass("animate-flash transition-colors duration-1000");
@@ -257,7 +262,7 @@ $(".fork-icon").on("click", function () {
   }, 2000);
 })
 
-$(".connection-info-format-selector select, .connection-info-format-selector input").on('change', function() {
+$(".connection-info-format-selector select, .connection-info-format-selector input").on('change', function () {
   let format = $(".connection-info-format-selector select").val();
   let port = $(".connection-info-format-selector input").is(":checked") ? "6432" : "5432";
   let reveal_status = $(".connection-info-box:visible").find(".group").hasClass('active')
@@ -663,7 +668,7 @@ function setupPlayground() {
   };
 
   $('#inference_submit').on("click", generate);
-  $('#inference_config-show_advanced-0').on("change", function() {
+  $('#inference_config-show_advanced-0').on("change", function () {
     $('#inference_config_advanced_settings').toggleClass("hidden", !$(this).is(":checked"));
   });
 }
@@ -992,4 +997,84 @@ function flexiblePrecision(value, precision) {
   const increasedPrecision = Math.max(1, precision);
 
   return (value < 10) ? value.toFixed(increasedPrecision) : value.toFixed(precision);
+}
+
+function setupPgConfigCard() {
+  $(".delete-config-btn").on("click", function (event) {
+    const configGroup = $(this).closest(".group");
+    configGroup.remove();
+  });
+
+  $(".add-config-btn").on("click", function (event) {
+    event.preventDefault();
+
+    const createConfigGroup = $(this).closest(".group");
+    const keyInput = createConfigGroup.find("input").eq(0);
+    const valueInput = createConfigGroup.find("input").eq(1);
+    if (!keyInput[0].reportValidity()) return;
+    
+    const placeHolderGroup = $(this).closest(".group").prev();
+    const configId = placeHolderGroup.data("config-id");
+
+    const newConfigId = configId + 1;
+    const newConfigGroup = placeHolderGroup.clone(true);
+    newConfigGroup.data("config-id", newConfigId);
+    newConfigGroup.find("input").prop("disabled", false);
+
+    // Remove hidden class
+    newConfigGroup.removeClass("hidden");
+    newConfigGroup.removeClass("config-placeholder-group");
+    newConfigGroup.addClass("config-group");
+
+    // Set value
+    newConfigGroup.find("input").eq(0).prop("value", keyInput.val());
+    newConfigGroup.find("input").eq(1).prop("value", valueInput.val());
+
+    keyInput.val("");
+    valueInput.val("");
+
+    $(this).closest(".group").before(newConfigGroup);
+  });
+
+  $(".save-config-btn").on("click", async function (event) {
+    event.preventDefault();
+
+    const csrfToken = $('.pg-config input[name=_csrf]').attr('value');
+
+    const pgConfig = Object.fromEntries($('.pg-config-card .config-group .config-entry').toArray().map((e) => {
+      const key = $(e).find('input[name="key"]').val();
+      const val = $(e).find('input[name="value"]').val();
+      return [key, val];
+    }))
+
+    const pgBouncerConfig = Object.fromEntries($('.pgbouncer-config-card .config-group .config-entry').toArray().map((e) => {
+      const key = $(e).find('input[name="key"]').val();
+      const val = $(e).find('input[name="value"]').val();
+      return [key, val];
+    }))
+
+    const url = window.location.href;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        "pg_config": pgConfig,
+        "pgbouncer_config": pgBouncerConfig,
+        "_csrf": csrfToken
+      }),
+      redirect: "manual"
+    });
+
+    // Status 0 means a redirect, so we move to the same page to show
+    // the confirmation flash message. Otherwise we show the error flash message
+    // received in the response.
+    if (response.status === 0) {
+      window.location.href = url;
+    } else {
+      $("body").html(await response.text());
+    }
+  });
 }
