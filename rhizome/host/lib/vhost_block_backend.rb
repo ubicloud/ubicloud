@@ -9,10 +9,10 @@ class VhostBlockBackend
   end
 
   def sha256
-    if @version == "v0.1-5" && Arch.x64?
-      "f34de686dd7d1d7fcc26ba6ab593e81253600195610823ab1c61f603f337c6cc"
-    elsif @version == "v0.1-5" && Arch.arm64?
-      "ee6298fa0024aa15543dfa7fd6f2f6795ab15db3134ea14ae44803c07d3a35ee"
+    if @version == "v0.1-6" && Arch.x64?
+      "9e7e105e71e9316af40df5a79d6ef1cbbf48dea5d590cf82da60b6a7f99885dc"
+    elsif @version == "v0.1-6" && Arch.arm64?
+      "f9bce53f07f43e276077735461203ceed000c47554a7fab0fcc64db04bb17452"
     else
       fail "Unsupported version: #{@version}, #{Arch.sym}"
     end
