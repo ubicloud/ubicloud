@@ -21,7 +21,7 @@ RSpec.describe Validation::PostgresConfigValidator do
   describe "#validate" do
     context "with valid configurations" do
       it "returns no errors for valid max_connections" do
-        config = {"max_connections" => 100}
+        config = {"max_connections" => "100"}
         expect { validator.validate(config) }.not_to raise_error
       end
 
@@ -36,7 +36,7 @@ RSpec.describe Validation::PostgresConfigValidator do
       end
 
       it "returns no errors for valid autovacuum_analyze_scale_factor" do
-        config = {"autovacuum_analyze_scale_factor" => 0.1}
+        config = {"autovacuum_analyze_scale_factor" => "0.1"}
         expect { validator.validate(config) }.not_to raise_error
       end
 
@@ -63,7 +63,7 @@ RSpec.describe Validation::PostgresConfigValidator do
       end
 
       it "returns error for out of range max_connections" do
-        config = {"max_connections" => 10001}
+        config = {"max_connections" => "10001"}
         expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed)
       end
 
@@ -83,12 +83,17 @@ RSpec.describe Validation::PostgresConfigValidator do
       end
 
       it "returns error for out of range float value" do
-        config = {"autovacuum_analyze_scale_factor" => -1.0}
+        config = {"autovacuum_analyze_scale_factor" => "-1.0"}
         expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed)
       end
 
       it "returns error for invalid bool value" do
         config = {"allow_system_table_mods" => "invalid"}
+        expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed)
+      end
+
+      it "returns error for empty value" do
+        config = {"max_connections" => ""}
         expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed)
       end
     end
