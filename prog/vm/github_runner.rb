@@ -265,7 +265,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     vm.sshable.cmd("sudo -- xargs -0 -- systemd-run --uid runner --gid runner " \
                    "--working-directory '/home/runner' --unit runner-script --remain-after-exit -- " \
                    "/home/runner/actions-runner/run-withenv.sh",
-      stdin: response[:encoded_jit_config])
+      stdin: response[:encoded_jit_config].gsub("$", "$$"))
 
     hop_wait
   rescue Octokit::Conflict => e
