@@ -468,4 +468,61 @@ RSpec.describe StorageVolume do
       unencrypted_vhost_sv.vhost_backend_start(nil)
     end
   end
+
+  describe "#systemd_io_rate_limits" do
+    it "returns rate limits if they are set" do
+      sv = described_class.new("test", {
+        "disk_index" => 1,
+        "device_id" => "xyz01",
+        "max_read_mbytes_per_sec" => 2000,
+        "max_write_mbytes_per_sec" => 3000
+      })
+      expect(sv).to receive(:persistent_device_id).with("/var/storage/test/1").and_return("/dev/disk/by-id/dev1")
+      expect(sv.systemd_io_rate_limits).to eq(<<~RESULT
+        IOReadBandwidthMax=/dev/disk/by-id/dev1 2097152000
+        IOWriteBandwidthMax=/dev/disk/by-id/dev1 3145728000
+      RESULT
+      .strip)
+    end
+
+    it "returns empty string if no rate limits are set" do
+      sv = described_class.new("test", {
+        "disk_index" => 1,
+        "device_id" => "xyz01"
+      })
+      expect(sv.systemd_io_rate_limits).to eq("")
+    end
+  end
+
+  describe "#persistent_device_id" do
+    it "returns the persistent device id for a path" do
+      paths = ["/dev/disk/by-id/md-name-rescue:0", "/dev/disk/by-id/md-uuid-8e4083eb:1111111:f1c64530:5faaca1b", "/dev/disk/by-id/md-uuid-8e4083eb:4c4a19fb:f1c64530:5faaca1b"]
+      expect(Dir).to receive(:[]).with("/dev/disk/by-id/*").and_return(paths)
+      expect(File).to receive(:realpath).with(paths[0]).and_return("/dev/md0")
+      expect(File).to receive(:realpath).with(paths[1]).and_return("/dev/md1")
+      expect(File).to receive(:realpath).with(paths[2]).and_return("/dev/md0")
+      expect(File).to receive(:stat).with("/dev/md0").and_return(instance_double(File::Stat, rdev_major: 8, rdev_minor: 0)).twice
+      expect(File).to receive(:stat).with("/dev/md1").and_return(instance_double(File::Stat, rdev_major: 9, rdev_minor: 0))
+
+      expect(File).to receive(:stat).with("storage_path").and_return(instance_double(File::Stat, dev_major: 8, dev_minor: 0))
+      expect(encrypted_sv.persistent_device_id("storage_path")).to eq(paths.last)
+    end
+
+    it "handles system call errors gracefully" do
+      paths = ["/dev/disk/by-id/md-name-rescue:0", "/dev/disk/by-id/md-uuid-8e4083eb:4c4a19fb:f1c64530:5faaca1b"]
+      expect(Dir).to receive(:[]).with("/dev/disk/by-id/*").and_return(paths)
+      expect(File).to receive(:realpath).with(paths.first).and_raise(Errno::EACCES)
+      expect(File).to receive(:realpath).with(paths.last).and_return("/dev/md0")
+      expect(File).to receive(:stat).with("/dev/md0").and_return(instance_double(File::Stat, rdev_major: 8, rdev_minor: 0))
+
+      expect(File).to receive(:stat).with("storage_path").and_return(instance_double(File::Stat, dev_major: 8, dev_minor: 0))
+      expect(encrypted_sv.persistent_device_id("storage_path")).to eq(paths.last)
+    end
+
+    it "raises an error if no matching device is found" do
+      expect(Dir).to receive(:[]).with("/dev/disk/by-id/*").and_return([])
+      expect(File).to receive(:stat).with("storage_path").and_return(instance_double(File::Stat, dev_major: 8, dev_minor: 0))
+      expect { encrypted_sv.persistent_device_id("storage_path") }.to raise_error RuntimeError, "No persistent device ID found for storage path: storage_path"
+    end
+  end
 end
