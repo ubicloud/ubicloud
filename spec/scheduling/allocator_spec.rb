@@ -166,11 +166,10 @@ RSpec.describe Al do
                  used_cores: vmh.used_cores,
                  used_hugepages_1g: vmh.used_hugepages_1g,
                  vm_host_id: vmh.id,
-                 total_ipv4: 4,
+                 ipv4_available: true,
                  num_gpus: 0,
                  available_gpus: 0,
                  available_iommu_groups: nil,
-                 used_ipv4: 1,
                  vm_provisioning_count: 0,
                  accepts_slices: false,
                  family: "standard"}])
@@ -196,11 +195,10 @@ RSpec.describe Al do
                  used_cores: vmh.used_cores,
                  used_hugepages_1g: vmh.used_hugepages_1g,
                  vm_host_id: vmh.id,
-                 total_ipv4: 4,
+                 ipv4_available: true,
                  num_gpus: 0,
                  available_gpus: 0,
                  available_iommu_groups: nil,
-                 used_ipv4: 1,
                  vm_provisioning_count: 2,
                  accepts_slices: false,
                  family: "standard"}])
@@ -297,10 +295,15 @@ RSpec.describe Al do
       StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
-      Address.create(cidr: "2.1.1.0/32", routed_to_host_id: vmh2.id)
+      address = Address.create(cidr: "2.1.1.0/32", routed_to_host_id: vmh2.id)
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
+      cand = Al::Allocation.candidate_hosts(req)
+      expect(cand.size).to eq(2)
+
+      vm.update(project_id: Project.create(name: "test").id, public_key: "a a", cores: 1)
+      AssignedVmAddress.create(dst_vm_id: vm.id, address_id: address.id, ip: "2.1.1.0")
       cand = Al::Allocation.candidate_hosts(req)
       expect(cand.size).to eq(1)
       expect(cand.first[:vm_host_id]).to eq(vmh1.id)
