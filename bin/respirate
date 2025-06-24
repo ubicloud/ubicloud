@@ -78,3 +78,10 @@ DB.synchronize do
 end
 
 Clog.emit("Shutting down.") { {unfinished_strand_count: d.num_current_strands} }
+
+# Wait up to 2 seconds for all strand threads to exit.
+# We cannot wait very long, as every second we wait is potentially an
+# additional second that no respirate process is processing new strands.
+Thread.new do
+  d.shutdown_and_cleanup_threads
+end.join(2)
