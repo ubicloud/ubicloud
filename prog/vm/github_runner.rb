@@ -262,9 +262,9 @@ class Prog::Vm::GithubRunner < Prog::Base
 
     # We initiate an API call and a SSH connection under the same label to avoid
     # having to store the encoded_jit_config.
-    vm.sshable.cmd("sudo -- xargs -0I{} -- systemd-run --uid runner --gid runner " \
+    vm.sshable.cmd("sudo -- xargs -0 -- systemd-run --uid runner --gid runner " \
                    "--working-directory '/home/runner' --unit runner-script --remain-after-exit -- " \
-                   "/home/runner/actions-runner/run-withenv.sh {}",
+                   "/home/runner/actions-runner/run-withenv.sh",
       stdin: response[:encoded_jit_config])
 
     hop_wait
