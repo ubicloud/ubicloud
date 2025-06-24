@@ -32,7 +32,6 @@ class StorageVolume
     @device = params["storage_device"] || DEFAULT_STORAGE_DEVICE
     @spdk_version = params["spdk_version"]
     @read_only = params["read_only"] || false
-    @max_ios_per_sec = params["max_ios_per_sec"]
     @max_read_mbytes_per_sec = params["max_read_mbytes_per_sec"]
     @max_write_mbytes_per_sec = params["max_write_mbytes_per_sec"]
     @slice = params.fetch("slice_name", "system.slice")
@@ -479,11 +478,10 @@ class StorageVolume
   end
 
   def set_qos_limits
-    return unless @max_ios_per_sec || @max_read_mbytes_per_sec || @max_write_mbytes_per_sec
+    return unless @max_read_mbytes_per_sec || @max_write_mbytes_per_sec
 
     rpc_client.bdev_set_qos_limit(
       @device_id,
-      rw_ios_per_sec: @max_ios_per_sec,
       r_mbytes_per_sec: @max_read_mbytes_per_sec,
       w_mbytes_per_sec: @max_write_mbytes_per_sec
     )
