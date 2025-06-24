@@ -291,14 +291,13 @@ RSpec.describe StorageVolume do
       sv = described_class.new("test", {
         "disk_index" => 1,
         "device_id" => "xyz01",
-        "max_ios_per_sec" => 100,
         "max_read_mbytes_per_sec" => 200,
         "max_write_mbytes_per_sec" => 300
       })
       rpc_client = instance_double(SpdkRpc)
       allow(sv).to receive(:rpc_client).and_return(rpc_client)
       expect(rpc_client).to receive(:bdev_set_qos_limit).with(
-        "xyz01", rw_ios_per_sec: 100, r_mbytes_per_sec: 200, w_mbytes_per_sec: 300
+        "xyz01", r_mbytes_per_sec: 200, w_mbytes_per_sec: 300
       )
       sv.set_qos_limits
     end
