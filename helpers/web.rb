@@ -179,4 +179,10 @@ class Clover < Roda
       raise Authorization::Unauthorized
     end
   end
+
+  def config_hash_from_kvs(keys, values)
+    hash = keys.map(&:strip).zip(values.map(&:strip)).to_h.compact
+    hash.delete_if { |key, value| key.empty? && value.empty? }
+    hash
+  end
 end

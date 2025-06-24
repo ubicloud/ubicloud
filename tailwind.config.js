@@ -30,6 +30,7 @@ module.exports = {
     ...['text-blue-600', 'text-green-400', 'text-amber-400', 'text-red-400',
     'text-sky-300', 'text-emerald-600', 'text-orange-500'],
     'transition-colors',
-    'duration-1000'
+    'duration-1000',
+    'border-red-500'
   ]
 }
