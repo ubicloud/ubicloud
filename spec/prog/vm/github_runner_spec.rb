@@ -380,7 +380,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   describe "#register_runner" do
     it "registers runner hops" do
       expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.label])).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC"})
-      expect(vm.sshable).to receive(:cmd).with("sudo -- xargs -0I{} -- systemd-run --uid runner --gid runner --working-directory '/home/runner' --unit runner-script --remain-after-exit -- /home/runner/actions-runner/run-withenv.sh {}",
+      expect(vm.sshable).to receive(:cmd).with("sudo -- xargs -0 -- systemd-run --uid runner --gid runner --working-directory '/home/runner' --unit runner-script --remain-after-exit -- /home/runner/actions-runner/run-withenv.sh",
         stdin: "AABBCC")
       expect { nx.register_runner }.to hop("wait")
       expect(runner.runner_id).to eq(123)
