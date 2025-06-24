@@ -150,6 +150,7 @@ class StorageVolume
         Restart=always
         User=#{@vm_name}
         Group=#{@vm_name}
+        #{systemd_io_rate_limits}
 
         RemoveIPC=true
         NoNewPrivileges=true
@@ -194,6 +195,40 @@ class StorageVolume
         [Install]
         WantedBy=multi-user.target
     SERVICE
+  end
+
+  def systemd_io_rate_limits
+    limits = {IOReadBandwidthMax: @max_read_mbytes_per_sec,
+              IOWriteBandwidthMax: @max_write_mbytes_per_sec}.compact
+    return "" if limits.empty?
+
+    dev = persistent_device_id(storage_dir)
+    limits
+      .map { |(key, mb)| "#{key}=#{dev} #{mb * 1024 * 1024}" }
+      .join("\n")
+  end
+
+  def persistent_device_id(path)
+    path_stat = File.stat(path)
+
+    Dir["/dev/disk/by-id/*"].each do |id|
+      dev_path = File.realpath(id)
+      dev_stat = File.stat(dev_path)
+      next unless dev_stat.rdev_major == path_stat.dev_major && dev_stat.rdev_minor == path_stat.dev_minor
+
+      # Choose stable symlink types by subsystem:
+      #  - SSDs: Use identifiers starting with 'wwn' (World Wide Name), globally unique.
+      #  - NVMe: Use identifiers starting with 'nvme-eui', also globally unique.
+      #  - MD devices: Use uuid identifiers.
+      dev = File.basename(dev_path)
+      return id if (dev.start_with?("nvme") && id.include?("nvme-eui-")) ||
+        (dev.start_with?("sd") && id.include?("wwn-")) ||
+        (dev.start_with?("md") && id.include?("md-uuid-"))
+    rescue SystemCallError
+      next
+    end
+
+    raise "No persistent device ID found for storage path: #{path}"
   end
 
   def wrap_key_b64(storage_key_encryption, key)
