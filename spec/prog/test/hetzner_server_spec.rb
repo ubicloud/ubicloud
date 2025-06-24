@@ -144,7 +144,19 @@ RSpec.describe Prog::Test::HetznerServer do
         "sudo RUN_E2E_TESTS=1 SPDK_TESTS_TMP_DIR=#{tmp_dir} bundle exec rspec host/e2e"
       )
       expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo rm -rf #{tmp_dir}")
-      expect { hs_test.run_integration_specs }.to hop("wait")
+      expect { hs_test.run_integration_specs }.to hop("install_vhost_backend")
+    end
+  end
+
+  describe "#install_vhost_backend" do
+    it "hops to wait if vhost_backend is installed" do
+      expect(hs_test).to receive(:retval).and_return({"msg" => "VhostBlockBackend was setup"})
+      expect { hs_test.install_vhost_backend }.to hop("wait")
+    end
+
+    it "pushes SetupVhostBlockBackend if not installed" do
+      expect(hs_test).to receive(:retval).and_return(nil)
+      expect { hs_test.install_vhost_backend }.to hop("start", "Storage::SetupVhostBlockBackend")
     end
   end
 
