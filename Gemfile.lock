@@ -305,7 +305,7 @@ GEM
     rodauth (2.39.0)
       roda (>= 2.6.0)
       sequel (>= 4)
-    rodish (2.0.0)
+    rodish (2.0.1)
       optparse
     rotp (6.3.0)
     rqrcode (3.1.0)
@@ -492,7 +492,7 @@ DEPENDENCIES
   roda (>= 3.93)
   rodauth (>= 2.39)
   rodauth-omniauth!
-  rodish (>= 2)
+  rodish (>= 2.0.1)
   rotp
   rqrcode
   rspec
