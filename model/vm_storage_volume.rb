@@ -64,7 +64,6 @@ end
 #  skip_sync                | boolean | NOT NULL DEFAULT false
 #  storage_device_id        | uuid    |
 #  boot_image_id            | uuid    |
-#  max_ios_per_sec          | integer |
 #  max_read_mbytes_per_sec  | integer |
 #  max_write_mbytes_per_sec | integer |
 #  vhost_block_backend_id   | uuid    |
