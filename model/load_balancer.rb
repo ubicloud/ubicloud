@@ -185,5 +185,6 @@ end
 #  inference_endpoint   | inference_endpoint_load_balancer_id_fkey   | (load_balancer_id) REFERENCES load_balancer(id)
 #  inference_router     | inference_router_load_balancer_id_fkey     | (load_balancer_id) REFERENCES load_balancer(id)
 #  kubernetes_cluster   | kubernetes_cluster_api_server_lb_id_fkey   | (api_server_lb_id) REFERENCES load_balancer(id)
+#  kubernetes_cluster   | kubernetes_cluster_services_lb_id_fkey     | (services_lb_id) REFERENCES load_balancer(id)
 #  load_balancer_port   | load_balancer_port_load_balancer_id_fkey   | (load_balancer_id) REFERENCES load_balancer(id)
 #  load_balancers_vms   | load_balancers_vms_load_balancer_id_fkey   | (load_balancer_id) REFERENCES load_balancer(id)
