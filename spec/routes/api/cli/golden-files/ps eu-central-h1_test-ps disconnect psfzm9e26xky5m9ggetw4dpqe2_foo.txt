@@ -1,1 +1,6 @@
 ! Invalid private subnet id format
+
+Disconnect a private subnet from another private subnet
+
+Usage:
+    ubi ps (location/ps-name | ps-id) disconnect ps-id

@@ -19,13 +19,13 @@ UbiCli.on("fw").run_on("show") do
   help_option_values("Private Subnet Fields:", private_subnet_fields)
   help_option_values("Firewall Rule Fields:", firewall_rule_fields)
 
-  run do |opts|
+  run do |opts, cmd|
     data = sdk_object.info
     opts = opts[:fw_show]
-    keys = underscore_keys(check_fields(opts[:fields], fields, "fw show -f option"))
-    firewall_rule_keys = underscore_keys(check_fields(opts[:"rule-fields"], firewall_rule_fields, "fw show -r option"))
-    private_subnet_keys = underscore_keys(check_fields(opts[:"priv-subnet-fields"], private_subnet_fields, "fw show -p option"))
-    nic_keys = underscore_keys(check_fields(opts[:"nic-fields"], nic_fields, "fw show -n option"))
+    keys = underscore_keys(check_fields(opts[:fields], fields, "fw show -f option", cmd))
+    firewall_rule_keys = underscore_keys(check_fields(opts[:"rule-fields"], firewall_rule_fields, "fw show -r option", cmd))
+    private_subnet_keys = underscore_keys(check_fields(opts[:"priv-subnet-fields"], private_subnet_fields, "fw show -p option", cmd))
+    nic_keys = underscore_keys(check_fields(opts[:"nic-fields"], nic_fields, "fw show -n option", cmd))
 
     body = []
 

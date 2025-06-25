@@ -1,0 +1,17 @@
+! Invalid argument: -s bad
+
+Create a load balancer
+
+Usage:
+    ubi lb location/lb-name create [options] ps-id src-port dst-port
+
+Options:
+    -a, --algorithm=alg              set the algorithm to use
+    -e, --check-endpoint=path        set the health check endpoint (default: /up)
+    -p, --check-protocol=proto       set the health check protocol
+    -s, --stack=stack                set the stack
+
+Allowed Option Values:
+    Algorithm: round_robin hash_based
+    Health Check Protocol: http https tcp
+    Stack: dual ipv4 ipv6

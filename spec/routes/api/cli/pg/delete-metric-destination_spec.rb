@@ -12,7 +12,7 @@ RSpec.describe Clover, "cli pg delete-metric-destination" do
     cli(%w[pg eu-central-h1/test-pg add-metric-destination foo bar https://baz.example.com])
     pg = PostgresResource.first
     md = pg.metric_destinations.first
-    expect(cli(%w[pg eu-central-h1/test-pg delete-metric-destination a/b], status: 400)).to eq "! Invalid metric destination id format\n"
+    expect(cli(%w[pg eu-central-h1/test-pg delete-metric-destination a/b], status: 400)).to start_with "! Invalid metric destination id format\n"
     expect(pg.metric_destinations_dataset).not_to be_empty
     expect(cli(%W[pg eu-central-h1/test-pg delete-metric-destination #{md.ubid}])).to eq "Metric destination, if it exists, has been scheduled for deletion\n"
     expect(pg.metric_destinations_dataset).to be_empty
