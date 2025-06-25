@@ -62,29 +62,32 @@ class Strand < Sequel::Model
     respirate_metrics.old_strand = true
   end
 
-  def take_lease_and_reload
-    unless (ps = DB.prepared_statement(:strand_take_lease_and_reload))
-      # :nocov:
-      ps_sch = if Config.development?
-        Sequel.function(:least, 5, :try)
-      # :nocov:
-      else
-        Sequel.function(:least, Sequel[2]**Sequel.function(:least, :try, 20), 600) * Sequel.function(:random)
-      end
+  # :nocov:
+  ps_sch = if Config.development?
+    Sequel.function(:least, 5, :try)
+  # :nocov:
+  else
+    Sequel.function(:least, Sequel[2]**Sequel.function(:least, :try, 20), 600) * Sequel.function(:random)
+  end
 
-      ps = DB[:strand]
-        .returning
-        .where(
-          Sequel[id: DB[:strand].select(:id).where(id: :$id).for_update.skip_locked, exitval: nil] &
-            (Sequel[:lease] < Sequel::CURRENT_TIMESTAMP)
-        )
-        .prepare_sql_type(:update)
-        .prepare(:first, :strand_take_lease_and_reload,
-          lease: Sequel::CURRENT_TIMESTAMP + Sequel.cast("120 seconds", :interval),
-          try: Sequel[:try] + 1,
-          schedule: Sequel::CURRENT_TIMESTAMP + (ps_sch * Sequel.cast("1 second", :interval)))
-    end
-    affected = ps.call(id:)
+  TAKE_LEASE_PS = DB[:strand]
+    .returning
+    .where(
+      Sequel[id: DB[:strand].select(:id).where(id: :$id).for_update.skip_locked, exitval: nil] &
+        (Sequel[:lease] < Sequel::CURRENT_TIMESTAMP)
+    )
+    .prepare_sql_type(:update)
+    .prepare(:first, :strand_take_lease_and_reload,
+      lease: Sequel::CURRENT_TIMESTAMP + Sequel.cast("120 seconds", :interval),
+      try: Sequel[:try] + 1,
+      schedule: Sequel::CURRENT_TIMESTAMP + (ps_sch * Sequel.cast("1 second", :interval)))
+
+  RELEASE_LEASE_PS = DB[<<SQL, :$id, :$lease_time].prepare(:update, :strand_release_lease)
+UPDATE strand SET lease = now() - '1000 years'::interval WHERE id = ? AND lease = ?
+SQL
+
+  def take_lease_and_reload
+    affected = TAKE_LEASE_PS.call(id:)
     lease_checked!(affected)
     return false unless affected
     lease_time = affected.fetch(:lease)
@@ -102,13 +105,7 @@ class Strand < Sequel::Model
           fail "BUG: strand with @deleted set still exists in the database"
         end
       else
-        unless (ps = DB.prepared_statement(:strand_release_lease))
-          ps = DB[<<SQL, :$id, :$lease_time].prepare(:update, :strand_release_lease)
-UPDATE strand SET lease = now() - '1000 years'::interval WHERE id = ? AND lease = ?
-SQL
-        end
-
-        unless ps.call(id:, lease_time:) == 1
+        unless RELEASE_LEASE_PS.call(id:, lease_time:) == 1
           Clog.emit("lease violated data") { {lease_clear_debug_snapshot: this.for_update.all} }
           fail "BUG: lease violated"
         end
