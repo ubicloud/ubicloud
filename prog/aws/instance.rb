@@ -5,7 +5,7 @@ class Prog::Aws::Instance < Prog::Base
   subject_is :vm
 
   label def start
-    public_keys = vm.sshable.keys.map(&:public_key).join("\n")
+    public_keys = (vm.sshable.keys.map(&:public_key) + (vm.project.get_ff_vm_public_ssh_keys || [])).join("\n")
     # Define user data script to set a custom username
     user_data = <<~USER_DATA
 #!/bin/bash
