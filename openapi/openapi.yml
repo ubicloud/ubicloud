@@ -620,8 +620,6 @@ paths:
               required:
                 - version
                 - worker_size
-                - cp_nodes
-                - worker_nodes
       responses:
         '200':
           $ref: '#/components/responses/KubernetesCluster'
