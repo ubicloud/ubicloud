@@ -102,11 +102,14 @@ class Strand < Sequel::Model
           fail "BUG: strand with @deleted set still exists in the database"
         end
       else
-        num_updated = DB[<<SQL, id, lease_time].update
+        unless (ps = DB.prepared_statement(:strand_release_lease))
+          ps = DB[<<SQL, :$id, :$lease_time].prepare(:update, :strand_release_lease)
 UPDATE strand SET lease = now() - '1000 years'::interval WHERE id = ? AND lease = ?
 SQL
-        unless num_updated == 1
-          Clog.emit("lease violated data") {}
+        end
+
+        unless ps.call(id:, lease_time:) == 1
+          Clog.emit("lease violated data") { {lease_clear_debug_snapshot: this.for_update.all} }
           fail "BUG: lease violated"
         end
       end
