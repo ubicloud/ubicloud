@@ -73,8 +73,6 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       custom_hostname_prefix: custom_apiserver_hostname_prefix
     ).subject
 
-    kubernetes_cluster.update(api_server_lb_id: api_server_lb.id)
-
     services_lb = Prog::Vnet::LoadBalancerNexus.assemble(
       kubernetes_cluster.private_subnet_id,
       name: kubernetes_cluster.services_load_balancer_name,
@@ -90,7 +88,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       custom_hostname_prefix: custom_services_hostname_prefix,
       stack: LoadBalancer::Stack::IPV4 # TODO: Can we change this to DUAL?
     ).subject
-    kubernetes_cluster.update(services_lb_id: services_lb.id)
+
+    kubernetes_cluster.update(api_server_lb_id: api_server_lb.id, services_lb_id: services_lb.id)
 
     services_lb.dns_zone&.insert_record(record_name: "*.#{services_lb.hostname}.", type: "CNAME", ttl: 3600, data: "#{services_lb.hostname}.")
 
@@ -195,7 +194,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
         services_lb.incr_destroy
       end
 
-      kubernetes_cluster.api_server_lb.incr_destroy
+      kubernetes_cluster.api_server_lb&.incr_destroy
       kubernetes_cluster.cp_vms.each(&:incr_destroy)
       kubernetes_cluster.remove_all_cp_vms
       kubernetes_cluster.nodepools.each { it.incr_destroy }
