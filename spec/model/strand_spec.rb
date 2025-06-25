@@ -48,19 +48,10 @@ RSpec.describe Strand do
     it "does an integrity check that the lease was modified as expected" do
       st.label = "napper"
       st.save_changes
-      original = DB.method(:prepared_statement)
-      original = original.super_method unless original.owner == Sequel::Database
-      expect(DB).to receive(:prepared_statement) do |ps_name|
-        case ps_name
-        when :strand_release_lease
-          instance_double(Sequel::Dataset, call: 0)
-        else
-          original.call(ps_name)
-        end
-      end.at_least(:once)
-
+      expect(st).to receive(:unsynchronized_run) do
+        st.this.update(lease: Sequel[:lease] + Sequel.cast("1 second", :interval))
+      end
       expect(Clog).to receive(:emit).with("lease violated data").and_call_original
-      allow(Clog).to receive(:emit).and_call_original
       expect { st.run }.to raise_error RuntimeError, "BUG: lease violated"
     end
   end
