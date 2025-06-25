@@ -37,7 +37,7 @@ gem "reline" # Remove it when pry adds it as a dependency
 gem "roda", ">= 3.93"
 gem "rodauth", ">= 2.39"
 gem "rodauth-omniauth", github: "janko/rodauth-omniauth", ref: "477810179ba0cab8d459be1a0d87dca5b57ec94b"
-gem "rodish", ">= 2"
+gem "rodish", ">= 2.0.1"
 gem "rotp"
 gem "rqrcode"
 gem "sequel", ">= 5.93"
