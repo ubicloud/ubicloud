@@ -10,8 +10,7 @@ class Cert < Sequel::Model
   plugin :association_dependencies, certs_load_balancers: :destroy
 
   plugin ResourceMethods, redacted_columns: :cert
-  include SemaphoreMethods
-  semaphore :destroy, :restarted
+  plugin SemaphoreMethods, :destroy, :restarted
 
   plugin :column_encryption do |enc|
     enc.column :account_key

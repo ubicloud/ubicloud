@@ -60,8 +60,7 @@ class PrivateSubnet < Sequel::Model
     (state == "waiting") ? "available" : state
   end
 
-  include SemaphoreMethods
-  semaphore :destroy, :refresh_keys, :add_new_nic, :update_firewall_rules
+  plugin SemaphoreMethods, :destroy, :refresh_keys, :add_new_nic, :update_firewall_rules
 
   def self.random_subnet
     subnet_dict = PRIVATE_SUBNET_RANGES.each_with_object({}) do |subnet, hash|

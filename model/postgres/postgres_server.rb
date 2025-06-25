@@ -14,12 +14,10 @@ class PostgresServer < Sequel::Model
   plugin :association_dependencies, lsn_monitor: :destroy
 
   plugin ResourceMethods
-  include SemaphoreMethods
+  plugin SemaphoreMethods, :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup,
+    :restart, :configure, :take_over, :configure_metrics, :destroy, :recycle, :promote
   include HealthMonitorMethods
   include MetricsTargetMethods
-
-  semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup
-  semaphore :restart, :configure, :take_over, :configure_metrics, :destroy, :recycle, :promote
 
   def configure_hash
     configs = {

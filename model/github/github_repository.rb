@@ -13,9 +13,7 @@ class GithubRepository < Sequel::Model
   plugin :association_dependencies, cache_entries: :destroy
 
   plugin ResourceMethods
-  include SemaphoreMethods
-
-  semaphore :destroy
+  plugin SemaphoreMethods, :destroy
 
   plugin :column_encryption do |enc|
     enc.column :secret_key

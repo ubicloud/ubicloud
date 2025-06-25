@@ -26,9 +26,8 @@ class VmHost < Sequel::Model
   plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, provider: :destroy, spdk_installations: :destroy, storage_devices: :destroy, pci_devices: :destroy, boot_images: :destroy, slices: :destroy, cpus: :destroy
 
   plugin ResourceMethods
-  include SemaphoreMethods
+  plugin SemaphoreMethods, :checkup, :reboot, :hardware_reset, :destroy, :graceful_reboot
   include HealthMonitorMethods
-  semaphore :checkup, :reboot, :hardware_reset, :destroy, :graceful_reboot
 
   def host_prefix
     net6.netmask.prefix_len

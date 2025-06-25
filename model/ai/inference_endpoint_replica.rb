@@ -9,9 +9,7 @@ class InferenceEndpointReplica < Sequel::Model
   one_through_one :load_balancer_vm_port, left_key: :vm_id, left_primary_key: :vm_id, right_key: :id, right_primary_key: :load_balancer_vm_id, join_table: :load_balancers_vms
 
   plugin ResourceMethods
-  include SemaphoreMethods
-
-  semaphore :destroy
+  plugin SemaphoreMethods, :destroy
 end
 
 # Table: inference_endpoint_replica

@@ -10,9 +10,7 @@ class PostgresTimeline < Sequel::Model
   many_to_one :location
 
   plugin ResourceMethods
-  include SemaphoreMethods
-
-  semaphore :destroy
+  plugin SemaphoreMethods, :destroy
 
   plugin :column_encryption do |enc|
     enc.column :secret_key

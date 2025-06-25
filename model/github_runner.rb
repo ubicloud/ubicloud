@@ -11,9 +11,8 @@ class GithubRunner < Sequel::Model
   one_through_one :project, join_table: :github_installation, left_key: :id, left_primary_key: :installation_id, read_only: true
 
   plugin ResourceMethods, redacted_columns: :workflow_job
-  include SemaphoreMethods
+  plugin SemaphoreMethods, :destroy, :skip_deregistration
   include HealthMonitorMethods
-  semaphore :destroy, :skip_deregistration
 
   dataset_module do
     def total_active_runner_vcpus
