@@ -109,7 +109,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   def destroy_aws_s3
-    iam = Aws::IAM::Client.new(access_key_id: postgres_timeline.location.location_credential.access_key, secret_access_key: postgres_timeline.location.location_credential.secret_key)
+    iam = Aws::IAM::Client.new(access_key_id: postgres_timeline.location.location_credential.access_key, secret_access_key: postgres_timeline.location.location_credential.secret_key, region: postgres_timeline.location.name)
     iam.list_attached_user_policies(user_name: postgres_timeline.ubid).attached_policies.each do |it|
       iam.detach_user_policy(user_name: postgres_timeline.ubid, policy_arn: it.policy_arn)
       iam.delete_policy(policy_arn: it.policy_arn)
@@ -131,7 +131,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   def setup_aws_s3
-    iam = Aws::IAM::Client.new(access_key_id: postgres_timeline.location.location_credential.access_key, secret_access_key: postgres_timeline.location.location_credential.secret_key)
+    iam = Aws::IAM::Client.new(access_key_id: postgres_timeline.location.location_credential.access_key, secret_access_key: postgres_timeline.location.location_credential.secret_key, region: postgres_timeline.location.name)
 
     iam.create_user(user_name: postgres_timeline.ubid)
     policy = iam.create_policy(policy_name: postgres_timeline.ubid, policy_document: postgres_timeline.blob_storage_policy.to_json)
