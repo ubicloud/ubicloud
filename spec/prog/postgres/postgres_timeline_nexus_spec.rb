@@ -87,7 +87,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     describe "when blob storage is aws s3" do
       it "creates user and policies and hops" do
         expect(postgres_timeline).to receive(:aws?).and_return(true)
-        expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, location_credential: instance_double(LocationCredential, access_key: "access-key", secret_key: "secret-key"))).at_least(:once)
+        expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-west-2", location_credential: instance_double(LocationCredential, access_key: "access-key", secret_key: "secret-key"))).at_least(:once)
         client = Aws::IAM::Client.new(stub_responses: true)
         expect(Aws::IAM::Client).to receive(:new).and_return(client)
         client.stub_responses(:create_user)
@@ -217,7 +217,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     describe "when blob storage is aws s3" do
       before do
         expect(postgres_timeline).to receive(:aws?).and_return(true)
-        expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, location_credential: instance_double(LocationCredential, access_key: "access-key", secret_key: "secret-key"))).at_least(:once)
+        expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-west-2", location_credential: instance_double(LocationCredential, access_key: "access-key", secret_key: "secret-key"))).at_least(:once)
       end
 
       it "destroys blob storage and postgres timeline" do
