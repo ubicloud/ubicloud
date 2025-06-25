@@ -42,21 +42,18 @@ RSpec.describe Validation do
 
       it "no IO limits for standard x64" do
         io_limits = described_class.validate_vm_size("standard-2", "x64").io_limits
-        expect(io_limits.max_ios_per_sec).to be_nil
         expect(io_limits.max_read_mbytes_per_sec).to be_nil
         expect(io_limits.max_write_mbytes_per_sec).to be_nil
       end
 
       it "no IO limits for standard arm64" do
         io_limits = described_class.validate_vm_size("standard-2", "arm64").io_limits
-        expect(io_limits.max_ios_per_sec).to be_nil
         expect(io_limits.max_read_mbytes_per_sec).to be_nil
         expect(io_limits.max_write_mbytes_per_sec).to be_nil
       end
 
       it "no IO limits for standard-gpu" do
         io_limits = described_class.validate_vm_size("standard-gpu-6", "x64").io_limits
-        expect(io_limits.max_ios_per_sec).to be_nil
         expect(io_limits.max_read_mbytes_per_sec).to be_nil
         expect(io_limits.max_write_mbytes_per_sec).to be_nil
       end
@@ -123,7 +120,7 @@ RSpec.describe Validation do
       end
 
       it "succeeds if rate limits are set" do
-        expect { described_class.validate_storage_volumes([{encrypted: true, max_ios_per_sec: 100, max_read_mbytes_per_sec: 10, max_write_mbytes_per_sec: 10}], 0) }.not_to raise_error
+        expect { described_class.validate_storage_volumes([{encrypted: true, max_read_mbytes_per_sec: 10, max_write_mbytes_per_sec: 10}], 0) }.not_to raise_error
       end
 
       it "fails if no volumes" do

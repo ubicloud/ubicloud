@@ -726,11 +726,10 @@ RSpec.describe Al do
       vm = create_vm
       vol = [{
         "size_gib" => 5, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => false,
-        "boot" => false, "max_ios_per_sec" => 100, "max_read_mbytes_per_sec" => 200,
+        "boot" => false, "max_read_mbytes_per_sec" => 200,
         "max_write_mbytes_per_sec" => 300, "rate_limit_bytes_write" => 400
       }]
       described_class.allocate(vm, vol)
-      expect(vm.reload.vm_storage_volumes.first.max_ios_per_sec).to eq(100)
       expect(vm.vm_storage_volumes.first.max_read_mbytes_per_sec).to eq(200)
       expect(vm.vm_storage_volumes.first.max_write_mbytes_per_sec).to eq(300)
     end
@@ -738,7 +737,6 @@ RSpec.describe Al do
     it "creates volume with no rate limits" do
       vm = create_vm
       described_class.allocate(vm, vol)
-      expect(vm.reload.vm_storage_volumes.first.max_ios_per_sec).to be_nil
       expect(vm.vm_storage_volumes.first.max_read_mbytes_per_sec).to be_nil
       expect(vm.vm_storage_volumes.first.max_write_mbytes_per_sec).to be_nil
     end

@@ -43,8 +43,8 @@ module Option
     ["burstable", "Shared CPU", true, true]
   ].map { |args| VmFamily.new(*args) }
 
-  IoLimits = Struct.new(:max_ios_per_sec, :max_read_mbytes_per_sec, :max_write_mbytes_per_sec)
-  NO_IO_LIMITS = IoLimits.new(nil, nil, nil).freeze
+  IoLimits = Data.define(:max_read_mbytes_per_sec, :max_write_mbytes_per_sec)
+  NO_IO_LIMITS = IoLimits.new(nil, nil)
 
   VmSize = Struct.new(:name, :family, :vcpus, :cpu_percent_limit, :cpu_burst_percent_limit, :memory_gib, :storage_size_options, :io_limits, :visible, :arch) do
     alias_method :display_name, :name
@@ -62,11 +62,11 @@ module Option
     VmSize.new("premium-#{it}", "premium", it, it * 100, 0, it * 4, storage_size_options, NO_IO_LIMITS, false, "x64")
   }).concat([1, 2].map {
     storage_size_options = [it * 10, it * 20]
-    io_limits = IoLimits.new(nil, it * 50, it * 50)
+    io_limits = IoLimits.new(it * 50, it * 50)
     VmSize.new("burstable-#{it}", "burstable", it, it * 50, it * 50, it * 2, storage_size_options, io_limits, true, "x64")
   }).concat([1, 2].map {
     storage_size_options = [it * 10, it * 20]
-    io_limits = IoLimits.new(nil, it * 50, it * 50)
+    io_limits = IoLimits.new(it * 50, it * 50)
     VmSize.new("burstable-#{it}", "burstable", it, it * 50, it * 50, (it * 1.6).to_i, storage_size_options, io_limits, false, "arm64")
   }).freeze
 
