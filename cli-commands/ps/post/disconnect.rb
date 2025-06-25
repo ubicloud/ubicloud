@@ -7,8 +7,8 @@ UbiCli.on("ps").run_on("disconnect") do
 
   args 1
 
-  run do |ps_id|
-    check_no_slash(ps_id, "invalid private subnet id format")
+  run do |ps_id, _, cmd|
+    check_no_slash(ps_id, "invalid private subnet id format", cmd)
     id = sdk_object.disconnect(ps_id).id
     response("Disconnected private subnets with ids #{ps_id} and #{id}")
   end

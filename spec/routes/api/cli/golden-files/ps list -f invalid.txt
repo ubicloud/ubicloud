@@ -1,1 +1,14 @@
 ! Invalid field(s) given in ps list -f option: invalid
+
+List private subnets
+
+Usage:
+    ubi ps list [options]
+
+Options:
+    -f, --fields=fields              show specific fields (comma separated)
+    -l, --location=location          only show private subnets in given location
+    -N, --no-headers                 do not show headers
+
+Allowed Option Values:
+    Fields: location name id net4 net6

@@ -6,7 +6,13 @@
 --confirm foo ps eu-central-h1/test-ps destroy
 --confirm foo vm eu-central-h1/test-vm destroy
 ai api-key badc0j48r8kj4nharh6yagf3eb show
+fw eu-central-h1/default-eu-central-h1-default add-rule foo
+fw eu-central-h1/default-eu-central-h1-default add-rule -s a 10.10.10.0
+fw eu-central-h1/default-eu-central-h1-default add-rule -e a 10.10.10.0
 fw eu-central-h1/default-eu-central-h1-default show -f bad
+fw eu-central-h1/default-eu-central-h1-default show -n bad
+fw eu-central-h1/default-eu-central-h1-default show -p bad
+fw eu-central-h1/default-eu-central-h1-default show -r bad
 fw eu-central-h1/test2-fw create invalid
 fw eu-central-h1/test-ps-default destroy invalid
 fw list -f invalid
@@ -14,12 +20,25 @@ fw list invalid
 help invalid
 invalid
 lb list -f invalid
+lb list -N=1 invalid
 lb list invalid
+lb eu-central-h1/test2-lb create psfzm9e26xky5m9ggetw4dpqe2 a 54321
+lb eu-central-h1/test2-lb create psfzm9e26xky5m9ggetw4dpqe2 54321 a
+lb eu-central-h1/test2-lb create -a bad psfzm9e26xky5m9ggetw4dpqe2 12345 54321
+lb eu-central-h1/test2-lb create -p bad psfzm9e26xky5m9ggetw4dpqe2 12345 54321
+lb eu-central-h1/test2-lb create -s bad psfzm9e26xky5m9ggetw4dpqe2 12345 54321
 lb eu-central-h1/test-lb show -f bad
 lb eu-central-h1/test-lb attach-vm vmdzyppz6j166jh5e9t2dwrfas
 lb eu-central-h1/test-lb update bad 1234 54321 /up2 vmdzyppz6j166jh5e9t2dwrfas
+lb eu-central-h1/test-lb update https a 54321 /up2 vmdzyppz6j166jh5e9t2dwrfas
+lb eu-central-h1/test-lb update https 54321 a /up2 vmdzyppz6j166jh5e9t2dwrfas
 lb eu-central-h1/test2-lb create
 pg eu-central-h1/test2-pg create invalid
+pg eu-central-h1/test2-pg create -s bad -S 64
+pg eu-central-h1/test2-pg create -s standard-2 -S bad
+pg eu-central-h1/test2-pg create -s standard-2 -S 64 -f bad
+pg eu-central-h1/test2-pg create -s standard-2 -S 64 -h bad
+pg eu-central-h1/test2-pg create -s standard-2 -S 64 -v bad
 pg eu-central-h1/test-pg add-firewall-rule
 pg eu-central-h1/test-pg add-metric-destination
 pg eu-central-h1/test-pg delete-firewall-rule
@@ -41,6 +60,9 @@ ps list invalid
 vm eu-central-h1/test2-vm create
 vm eu-central-h1/test2-vm create a
 vm eu-central-h1/test2-vm create "# a"
+vm eu-central-h1/test2-vm create -S bad "a a"
+vm eu-central-h1/test2-vm create -b bad "a a"
+vm eu-central-h1/test2-vm create -s bad "a a"
 vm eu-central-h1/test-vm destroy invalid
 vm eu-central-h1/test-vm show -f invalid
 vm eu-central-h1/test-vm -u foo scp :remote-path local-path invalid

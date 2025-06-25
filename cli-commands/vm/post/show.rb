@@ -16,12 +16,12 @@ UbiCli.on("vm").run_on("show") do
   help_option_values("Firewall Rule Fields:", firewall_rule_fields)
   help_option_values("Firewall Fields:", firewall_fields)
 
-  run do |opts|
+  run do |opts, cmd|
     data = sdk_object.info
     opts = opts[:vm_show]
-    keys = check_fields(opts[:fields], fields, "vm show -f option")
-    firewall_keys = check_fields(opts[:"firewall-fields"], firewall_fields, "vm show -w option")
-    firewall_rule_keys = check_fields(opts[:"rule-fields"], firewall_rule_fields, "vm show -r option")
+    keys = check_fields(opts[:fields], fields, "vm show -f option", cmd)
+    firewall_keys = check_fields(opts[:"firewall-fields"], firewall_fields, "vm show -w option", cmd)
+    firewall_rule_keys = check_fields(opts[:"rule-fields"], firewall_rule_fields, "vm show -r option", cmd)
 
     body = []
 

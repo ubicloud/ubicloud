@@ -1,0 +1,21 @@
+! Invalid argument: -s bad
+
+Create a PostgreSQL database
+
+Usage:
+    ubi pg location/pg-name create [options]
+
+Options:
+    -f, --flavor=type                flavor
+    -h, --ha-type=type               replication type
+    -s, --size=size                  server size
+    -S, --storage-size=size          storage size GB
+    -v, --version=version            PostgreSQL version
+
+Allowed Option Values:
+    Flavor: standard paradedb lantern
+    Replication Type: none async sync
+    Size: standard-2 standard-4 standard-8 standard-16 standard-30 standard-32
+          standard-60 standard-64 burstable-1 burstable-2
+    Storage Size: 16 32 64 128 256 512 1024 2048 4096
+    Version: 17 16

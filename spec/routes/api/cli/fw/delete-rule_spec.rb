@@ -19,7 +19,7 @@ RSpec.describe Clover, "cli fw add-rule" do
   end
 
   it "errors for invalid rule id format" do
-    expect(cli(%W[fw eu-central-h1/test-fw delete-rule #{@fwr.ubid}/], status: 400)).to eq "! Invalid rule id format\n"
+    expect(cli(%W[fw eu-central-h1/test-fw delete-rule #{@fwr.ubid}/], status: 400)).to start_with "! Invalid rule id format\n"
     expect(FirewallRule.count).to eq 1
   end
 end

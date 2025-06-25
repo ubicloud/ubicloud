@@ -3,18 +3,21 @@
 UbiCli.on("vm").run_on("create") do
   desc "Create a virtual machine"
 
+  vm_sizes = Option::VmSizes.select(&:visible)
+  server_sizes = vm_sizes.map(&:name).uniq.freeze
+  storage_sizes = vm_sizes.map(&:storage_size_options).flatten.uniq.sort.map(&:to_s).freeze.each(&:freeze)
+
   options("ubi vm location/vm-name create [options] public_key", key: :vm_create) do
     on("-6", "--ipv6-only", "do not enable IPv4")
-    on("-b", "--boot-image=image_name", "boot image")
+    on("-b", "--boot-image=image_name", Option::BootImages.map(&:name), "boot image")
     on("-p", "--private-subnet-id=id", "place VM into specific private subnet")
-    on("-s", "--size=size", "server size")
-    on("-S", "--storage-size=size", "storage size")
+    on("-s", "--size=size", server_sizes, "server size")
+    on("-S", "--storage-size=size", storage_sizes, "storage size")
     on("-u", "--unix-user=username", "username (default: ubi)")
   end
-  vm_sizes = Option::VmSizes.select(&:visible)
   help_option_values("Boot Image:", Option::BootImages.map(&:name))
-  help_option_values("Size:", vm_sizes.map(&:name).uniq)
-  help_option_values("Storage Size:", vm_sizes.map(&:storage_size_options).flatten.uniq.sort)
+  help_option_values("Size:", server_sizes)
+  help_option_values("Storage Size:", storage_sizes)
 
   help_example 'ubi vm eu-central-h1/my-vm-name create "$(cat ~/.ssh/id_ed25519.pub)"'
   help_example 'ubi vm eu-central-h1/my-vm-name create "$(cat ~/.ssh/authorized_keys)"'
