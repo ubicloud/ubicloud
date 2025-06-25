@@ -231,7 +231,8 @@ RSpec.describe Kubernetes::Client do
 
   describe "any_lb_services_modified?" do
     before do
-      @lb = Prog::Vnet::LoadBalancerNexus.assemble(private_subnet.id, name: kubernetes_cluster.services_load_balancer_name, src_port: 80, dst_port: 8000).subject
+      lb = Prog::Vnet::LoadBalancerNexus.assemble(private_subnet.id, name: kubernetes_cluster.services_load_balancer_name, src_port: 80, dst_port: 8000).subject
+      kubernetes_cluster.update(services_lb: lb)
       @response = {
         "items" => ["metadata" => {"name" => "svc", "namespace" => "default", "creationTimestamp" => "2024-01-03T00:00:00Z"}]
       }.to_json
@@ -291,7 +292,8 @@ RSpec.describe Kubernetes::Client do
 
   describe "sync_kubernetes_services" do
     before do
-      @lb = Prog::Vnet::LoadBalancerNexus.assemble(private_subnet.id, name: kubernetes_cluster.services_load_balancer_name, src_port: 443, dst_port: 8443).subject
+      lb = Prog::Vnet::LoadBalancerNexus.assemble(private_subnet.id, name: kubernetes_cluster.services_load_balancer_name, src_port: 80, dst_port: 8000).subject
+      kubernetes_cluster.update(services_lb: lb)
       @response = {
         "items" => [
           "metadata" => {"name" => "svc", "namespace" => "default", "creationTimestamp" => "2024-01-03T00:00:00Z"}
@@ -301,14 +303,14 @@ RSpec.describe Kubernetes::Client do
     end
 
     it "reconciles with pre existing lb with not ready loadbalancer" do
-      @lb.strand.update(label: "not waiting")
+      kubernetes_cluster.services_lb.strand.update(label: "not waiting")
       missing_port = [80, 8000]
       missing_vm = create_vm
       extra_vm = create_vm
       allow(kubernetes_client).to receive(:lb_desired_ports).and_return([[30122, 80]])
       allow(kubernetes_cluster).to receive_messages(
         vm_diff_for_lb: [[extra_vm], [missing_vm]],
-        port_diff_for_lb: [[@lb.ports.first], [missing_port]]
+        port_diff_for_lb: [[kubernetes_cluster.services_lb.ports.first], [missing_port]]
       )
       expect(kubernetes_client).not_to receive(:set_load_balancer_hostname)
       kubernetes_client.sync_kubernetes_services
@@ -321,14 +323,14 @@ RSpec.describe Kubernetes::Client do
       allow(kubernetes_client).to receive(:lb_desired_ports).and_return([[30122, 80]])
       allow(kubernetes_cluster).to receive_messages(
         vm_diff_for_lb: [[extra_vm], [missing_vm]],
-        port_diff_for_lb: [[@lb.ports.first], [missing_port]]
+        port_diff_for_lb: [[kubernetes_cluster.services_lb.ports.first], [missing_port]]
       )
       expect(kubernetes_client).to receive(:set_load_balancer_hostname)
       kubernetes_client.sync_kubernetes_services
     end
 
     it "raises error with non existing lb" do
-      kubernetes_client = described_class.new(instance_double(KubernetesCluster, services_load_balancer_name: "random_name"), instance_double(Net::SSH::Connection::Session))
+      kubernetes_client = described_class.new(instance_double(KubernetesCluster, services_lb: nil), instance_double(Net::SSH::Connection::Session))
       allow(kubernetes_client).to receive(:kubectl).with("get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return({"items" => [{}]}.to_json)
       expect { kubernetes_client.sync_kubernetes_services }.to raise_error("services load balancer does not exist.")
     end

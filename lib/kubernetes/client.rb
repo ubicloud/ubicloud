@@ -4,7 +4,7 @@ class Kubernetes::Client
   def initialize(kubernetes_cluster, session)
     @session = session
     @kubernetes_cluster = kubernetes_cluster
-    @load_balancer = LoadBalancer.where(name: kubernetes_cluster.services_load_balancer_name).first
+    @load_balancer = kubernetes_cluster.services_lb
   end
 
   def service_deleted?(svc)
