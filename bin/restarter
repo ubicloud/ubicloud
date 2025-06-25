@@ -41,7 +41,7 @@ loop do
       success: status.success?
     }
   })
-  break if shutting_down
+  exit status.exitstatus if shutting_down
 
   sleep(rand(1..10))
 

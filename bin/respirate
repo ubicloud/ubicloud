@@ -84,4 +84,6 @@ Clog.emit("Shutting down.") { {unfinished_strand_count: d.num_current_strands} }
 # additional second that no respirate process is processing new strands.
 Thread.new do
   d.shutdown_and_cleanup_threads
+  exit 0
 end.join(2)
+exit 1
