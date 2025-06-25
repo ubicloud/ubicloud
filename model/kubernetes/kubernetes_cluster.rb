@@ -23,7 +23,7 @@ class KubernetesCluster < Sequel::Model
 
   def validate
     super
-    errors.add(:cp_node_count, "must be greater than 0") if cp_node_count <= 0
+    errors.add(:cp_node_count, "must be a positive integer") unless cp_node_count.is_a?(Integer) && cp_node_count > 0
     errors.add(:version, "must be a valid Kubernetes version") unless Option.kubernetes_versions.include?(version)
   end
 
