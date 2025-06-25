@@ -18,7 +18,7 @@ RSpec.describe Clover, "Kubernetes" do
       location_id: Location::HETZNER_FSN1_ID
     ).subject
 
-    Prog::Vnet::LoadBalancerNexus.assemble(
+    services_lb = Prog::Vnet::LoadBalancerNexus.assemble(
       cluster.private_subnet_id,
       name: cluster.services_load_balancer_name,
       algorithm: "hash_based",
@@ -30,8 +30,9 @@ RSpec.describe Clover, "Kubernetes" do
       health_check_endpoint: "/",
       health_check_protocol: "tcp",
       stack: LoadBalancer::Stack::IPV4
-    )
+    ).subject
 
+    cluster.update(services_lb_id: services_lb.id)
     cluster
   end
 

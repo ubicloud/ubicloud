@@ -22,11 +22,32 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     )
     KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
 
-    lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", health_check_endpoint: "/foo", project_id: Config.kubernetes_service_project_id)
-    LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 123, dst_port: 456)
+    dns_zone = DnsZone.create(project_id: Project.first.id, name: "somezone", last_purged_at: Time.now)
+
+    apiserver_lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", health_check_endpoint: "/foo", project_id: Config.kubernetes_service_project_id)
+    LoadBalancerPort.create(load_balancer_id: apiserver_lb.id, src_port: 123, dst_port: 456)
     kc.add_cp_vm(create_vm)
     kc.add_cp_vm(create_vm)
-    kc.update(api_server_lb_id: lb.id)
+    kc.update(api_server_lb_id: apiserver_lb.id)
+
+    services_lb = Prog::Vnet::LoadBalancerNexus.assemble(
+      subnet.id,
+      name: "somelb2",
+      algorithm: "hash_based",
+      # TODO: change the api to support LBs without ports
+      # The next two fields will be later modified by the sync_kubernetes_services label
+      # These are just set for passing the creation validations
+      src_port: 443,
+      dst_port: 6443,
+      health_check_endpoint: "/",
+      health_check_protocol: "tcp",
+      custom_hostname_dns_zone_id: dns_zone.id,
+      custom_hostname_prefix: "someprefix",
+      stack: LoadBalancer::Stack::IPV4
+    ).subject
+
+    kc.update(services_lb_id: services_lb.id)
+    kc
   }
 
   before do
@@ -114,16 +135,18 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   describe "#start" do
     it "registers deadline and hops" do
       expect(nx).to receive(:register_deadline)
-      expect { nx.start }.to hop("create_load_balancer")
+      expect { nx.start }.to hop("create_load_balancers")
     end
   end
 
-  describe "#create_load_balancer" do
-    it "creates a load balancer with the right dns zone on prod for api server and hops" do
+  describe "#create_load_balancers" do
+    it "creates api server and services load balancers with the right dns zone on prod and hops" do
+      kubernetes_cluster.update(api_server_lb_id: nil, services_lb_id: nil)
+
       allow(Config).to receive(:kubernetes_service_hostname).and_return("k8s.ubicloud.com")
       dns_zone = DnsZone.create(project_id: Project.first.id, name: "k8s.ubicloud.com", last_purged_at: Time.now)
 
-      expect { nx.create_load_balancer }.to hop("bootstrap_control_plane_vms")
+      expect { nx.create_load_balancers }.to hop("bootstrap_control_plane_vms")
 
       expect(kubernetes_cluster.api_server_lb.name).to eq "#{kubernetes_cluster.ubid}-apiserver"
       expect(kubernetes_cluster.api_server_lb.ports.first.src_port).to eq 443
@@ -134,10 +157,16 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster.api_server_lb.private_subnet_id).to eq subnet.id
       expect(kubernetes_cluster.api_server_lb.custom_hostname_dns_zone_id).to eq dns_zone.id
       expect(kubernetes_cluster.api_server_lb.custom_hostname).to eq "k8scluster-apiserver-#{kubernetes_cluster.ubid[-5...]}.k8s.ubicloud.com"
+
+      expect(kubernetes_cluster.services_lb.name).to eq "#{kubernetes_cluster.ubid}-services"
+      expect(kubernetes_cluster.services_lb.stack).to eq LoadBalancer::Stack::IPV4
+      expect(kubernetes_cluster.services_lb.private_subnet_id).to eq subnet.id
+      expect(kubernetes_cluster.services_lb.custom_hostname_dns_zone_id).to eq dns_zone.id
+      expect(kubernetes_cluster.services_lb.custom_hostname).to eq "k8scluster-services-#{kubernetes_cluster.ubid[-5...]}.k8s.ubicloud.com"
     end
 
-    it "creates a load balancer with dns zone id on development for api server and hops" do
-      expect { nx.create_load_balancer }.to hop("bootstrap_control_plane_vms")
+    it "creates load balancers with dns zone id on development for api server and services, then hops" do
+      expect { nx.create_load_balancers }.to hop("bootstrap_control_plane_vms")
 
       expect(kubernetes_cluster.api_server_lb.name).to eq "#{kubernetes_cluster.ubid}-apiserver"
       expect(kubernetes_cluster.api_server_lb.ports.first.src_port).to eq 443
@@ -147,6 +176,10 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster.api_server_lb.stack).to eq LoadBalancer::Stack::DUAL
       expect(kubernetes_cluster.api_server_lb.private_subnet_id).to eq subnet.id
       expect(kubernetes_cluster.api_server_lb.custom_hostname).to be_nil
+
+      expect(kubernetes_cluster.services_lb.name).to eq "#{kubernetes_cluster.ubid}-services"
+      expect(kubernetes_cluster.services_lb.private_subnet_id).to eq subnet.id
+      expect(kubernetes_cluster.services_lb.custom_hostname).to be_nil
     end
   end
 
@@ -329,6 +362,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     it "triggers deletion of associated resources and naps until all nodepools are gone" do
       st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
       expect(kubernetes_cluster.api_server_lb).to receive(:incr_destroy)
+      expect(kubernetes_cluster.services_lb).to receive(:incr_destroy)
 
       expect(kubernetes_cluster.cp_vms).to all(receive(:incr_destroy))
       expect(kubernetes_cluster.nodepools).to all(receive(:incr_destroy))
@@ -344,10 +378,29 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       kubernetes_cluster.reload
 
       expect(kubernetes_cluster.api_server_lb).to receive(:incr_destroy)
+      expect(kubernetes_cluster.services_lb).to receive(:incr_destroy)
       expect(kubernetes_cluster.cp_vms).to all(receive(:incr_destroy))
 
       expect(kubernetes_cluster.nodepools).to be_empty
 
+      expect { nx.destroy }.to exit({"msg" => "kubernetes cluster is deleted"})
+    end
+
+    it "deletes the sub-subdomain DNS record if the DNS zone exists" do
+      dns_zone = DnsZone.create_with_id(project_id: Project.first.id, name: "k8s.ubicloud.com", last_purged_at: Time.now)
+      kubernetes_cluster.services_lb.update(custom_hostname_dns_zone_id: dns_zone.id)
+
+      dns_zone.insert_record(record_name: "*.#{kubernetes_cluster.services_lb.hostname}.", type: "CNAME", ttl: 123, data: "whatever.")
+      expect(DnsRecord[name: "*.#{kubernetes_cluster.services_lb.hostname}.", tombstoned: false]).not_to be_nil
+
+      expect { nx.destroy }.to nap(5)
+      expect(DnsRecord[name: "*.#{kubernetes_cluster.services_lb.hostname}.", tombstoned: true]).not_to be_nil
+    end
+
+    it "completes the destroy process even if the load balancers do not exist" do
+      kubernetes_cluster.update(api_server_lb_id: nil, services_lb_id: nil)
+      kubernetes_cluster.nodepools.first.destroy
+      kubernetes_cluster.reload
       expect { nx.destroy }.to exit({"msg" => "kubernetes cluster is deleted"})
     end
   end

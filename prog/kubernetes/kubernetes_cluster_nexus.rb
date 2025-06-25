@@ -48,15 +48,20 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
   label def start
     register_deadline("wait", 120 * 60)
-    hop_create_load_balancer
+    hop_create_load_balancers
   end
 
-  label def create_load_balancer
+  label def create_load_balancers
     custom_hostname_dns_zone_id = DnsZone[name: Config.kubernetes_service_hostname]&.id
-    custom_hostname_prefix = if custom_hostname_dns_zone_id
+    custom_apiserver_hostname_prefix = if custom_hostname_dns_zone_id
       "#{kubernetes_cluster.name}-apiserver-#{kubernetes_cluster.ubid.to_s[-5...]}"
     end
-    load_balancer = Prog::Vnet::LoadBalancerNexus.assemble(
+
+    custom_services_hostname_prefix = if custom_hostname_dns_zone_id
+      "#{kubernetes_cluster.name}-services-#{kubernetes_cluster.ubid.to_s[-5...]}"
+    end
+
+    api_server_lb = Prog::Vnet::LoadBalancerNexus.assemble(
       kubernetes_cluster.private_subnet_id,
       name: kubernetes_cluster.apiserver_load_balancer_name,
       algorithm: "hash_based",
@@ -65,9 +70,29 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       health_check_endpoint: "/healthz",
       health_check_protocol: "tcp",
       custom_hostname_dns_zone_id:,
-      custom_hostname_prefix:
+      custom_hostname_prefix: custom_apiserver_hostname_prefix
     ).subject
-    kubernetes_cluster.update(api_server_lb_id: load_balancer.id)
+
+    kubernetes_cluster.update(api_server_lb_id: api_server_lb.id)
+
+    services_lb = Prog::Vnet::LoadBalancerNexus.assemble(
+      kubernetes_cluster.private_subnet_id,
+      name: kubernetes_cluster.services_load_balancer_name,
+      algorithm: "hash_based",
+      # TODO: change the api to support LBs without ports
+      # The next two fields will be later modified by the sync_kubernetes_services label
+      # These are just set for passing the creation validations
+      src_port: 443,
+      dst_port: 6443,
+      health_check_endpoint: "/",
+      health_check_protocol: "tcp",
+      custom_hostname_dns_zone_id:,
+      custom_hostname_prefix: custom_services_hostname_prefix,
+      stack: LoadBalancer::Stack::IPV4 # TODO: Can we change this to DUAL?
+    ).subject
+    kubernetes_cluster.update(services_lb_id: services_lb.id)
+
+    services_lb.dns_zone&.insert_record(record_name: "*.#{services_lb.hostname}.", type: "CNAME", ttl: 3600, data: "#{services_lb.hostname}.")
 
     hop_bootstrap_control_plane_vms
   end
@@ -164,6 +189,12 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def destroy
     reap do
       decr_destroy
+
+      if (services_lb = kubernetes_cluster.services_lb)
+        services_lb.dns_zone.delete_record(record_name: "*.#{services_lb.hostname}.")
+        services_lb.incr_destroy
+      end
+
       kubernetes_cluster.api_server_lb.incr_destroy
       kubernetes_cluster.cp_vms.each(&:incr_destroy)
       kubernetes_cluster.remove_all_cp_vms
