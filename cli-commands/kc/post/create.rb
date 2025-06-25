@@ -14,8 +14,8 @@ UbiCli.on("kc").run_on("create") do
 
   run do |opts|
     params = underscore_keys(opts[:kc_create])
-    params[:cp_nodes] = params.delete(:cp_node_count)
-    params[:worker_nodes] = params.delete(:worker_node_count)
+    params[:cp_nodes] = params.delete(:cp_node_count) if params[:cp_node_count]
+    params[:worker_nodes] = params.delete(:worker_node_count) if params[:worker_node_count]
     id = sdk.kubernetes_cluster.create(location: @location, name: @name, **params).id
     response("Kubernetes cluster created with id: #{id}")
   end
