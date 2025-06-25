@@ -52,10 +52,7 @@ RSpec.describe Strand do
       original = original.super_method unless original.owner == Sequel::Database
       expect(DB).to receive(:[]) do |*args, **kwargs|
         case args[0]
-        when /UPDATE strand
-SET lease = .*
-WHERE id = \? AND lease = \?
-/
+        when /UPDATE strand SET lease = .* WHERE id = \? AND lease = \?/
           instance_double(Sequel::Dataset, update: 0)
         else
           original.call(*args, **kwargs)

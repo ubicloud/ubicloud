@@ -102,19 +102,12 @@ class Strand < Sequel::Model
           fail "BUG: strand with @deleted set still exists in the database"
         end
       else
-        DB.transaction do
-          lease_clear_debug_snapshot = this.for_update.all
-          num_updated = DB[<<SQL, id, lease_time].update
-UPDATE strand
-SET lease = now() - '1000 years'::interval
-WHERE id = ? AND lease = ?
+        num_updated = DB[<<SQL, id, lease_time].update
+UPDATE strand SET lease = now() - '1000 years'::interval WHERE id = ? AND lease = ?
 SQL
-          unless num_updated == 1
-            Clog.emit("lease violated data") do
-              {lease_clear_debug_snapshot: lease_clear_debug_snapshot}
-            end
-            fail "BUG: lease violated"
-          end
+        unless num_updated == 1
+          Clog.emit("lease violated data") {}
+          fail "BUG: lease violated"
         end
       end
     end
