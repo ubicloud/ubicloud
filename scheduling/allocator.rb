@@ -650,7 +650,6 @@ module Scheduling::Allocator
           spdk_installation_id: spdk_installation_id,
           vhost_block_backend_id:,
           storage_device_id: @volume_to_device_map[disk_index],
-          max_ios_per_sec: volume["max_ios_per_sec"],
           max_read_mbytes_per_sec: volume["max_read_mbytes_per_sec"],
           max_write_mbytes_per_sec: volume["max_write_mbytes_per_sec"]
         )

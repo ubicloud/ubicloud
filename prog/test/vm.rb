@@ -65,18 +65,6 @@ class Prog::Test::Vm < Prog::Test::Base
     hop_verify_io_rates
   end
 
-  def get_iops
-    fio_ios_cmd = <<~CMD
-      sudo fio --filename=./f --size=100M --direct=1 --rw=randrw --bs=4k --ioengine=libaio \\
-              --iodepth=256 --runtime=4 --numjobs=1 --time_based --group_reporting \\
-              --name=test-job --eta-newline=1 --output-format=json
-    CMD
-
-    fio_ios_output = JSON.parse(sshable.cmd(fio_ios_cmd))
-
-    fio_ios_output.dig("jobs", 0, "read", "iops") + fio_ios_output.dig("jobs", 0, "write", "iops")
-  end
-
   def get_read_bw_bytes
     fio_read_cmd = <<~CMD
       sudo fio --filename=./f --size=100M --direct=1 --rw=randread --bs=1M --ioengine=libaio \\
@@ -103,11 +91,7 @@ class Prog::Test::Vm < Prog::Test::Base
 
   label def verify_io_rates
     vol = vm.vm_storage_volumes.first
-    hop_ping_vms_in_subnet if vol.max_ios_per_sec.nil?
-
-    # Verify that the max_ios_per_sec is working
-    iops = get_iops
-    fail_test "exceeded iops limit: #{iops}" if iops > vol.max_ios_per_sec * 1.2
+    hop_ping_vms_in_subnet if vol.max_read_mbytes_per_sec.nil?
 
     # Verify that the max_read_mbytes_per_sec is working
     read_bw_bytes = get_read_bw_bytes

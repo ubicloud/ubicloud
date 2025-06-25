@@ -253,7 +253,6 @@ class Vm < Sequel::Model
         "skip_sync" => s.skip_sync,
         "storage_device" => s.storage_device.name,
         "read_only" => s.size_gib == 0,
-        "max_ios_per_sec" => s.max_ios_per_sec,
         "max_read_mbytes_per_sec" => s.max_read_mbytes_per_sec,
         "max_write_mbytes_per_sec" => s.max_write_mbytes_per_sec,
         "slice_name" => vm_host_slice&.inhost_name || "system.slice",
