@@ -1,1 +1,14 @@
 ! Invalid field(s) given in lb show -f option: bad
+
+Show details for a load balancer
+
+Usage:
+    ubi lb (location/lb-name | lb-id) show [options]
+
+Options:
+    -f, --fields=fields              show specific fields (comma separated)
+
+Allowed Option Values:
+    Fields: id name state location hostname algorithm stack
+            health-check-endpoint health-check-protocol src-port dst-port subnet
+            vms

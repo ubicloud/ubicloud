@@ -1,4 +1,4 @@
-! Invalid field(s) given in fw show -f option: bad
+! Invalid field(s) given in fw show -p option: bad
 
 Show details for a firewall
 

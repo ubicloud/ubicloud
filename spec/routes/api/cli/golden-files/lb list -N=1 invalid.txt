@@ -1,4 +1,4 @@
-! Invalid field(s) given in lb list -f option: invalid
+! Needless argument: -N=1
 
 List load balancers
 
