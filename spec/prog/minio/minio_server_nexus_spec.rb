@@ -158,7 +158,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
   describe "#wait_bootstrap_rhizome" do
     it "donates if bootstrap rhizome continues" do
       Strand.create(parent_id: st.id, prog: "BootstrapRhizome", label: "start", stack: [{}], lease: Time.now + 10)
-      expect { nx.wait_bootstrap_rhizome }.to nap(1)
+      expect { nx.wait_bootstrap_rhizome }.to nap(120)
     end
 
     it "hops to setup if bootstrap rhizome is done" do
@@ -199,7 +199,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
   describe "#wait_setup" do
     it "donates if setup continues" do
       Strand.create(parent_id: st.id, prog: "SetupMinio", label: "mount_data_disks", stack: [{}], lease: Time.now + 10)
-      expect { nx.wait_setup }.to nap(1)
+      expect { nx.wait_setup }.to nap(120)
     end
 
     it "hops to wait if setup is done" do
@@ -319,7 +319,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
   describe "#wait_reconfigure" do
     it "donates if reconfigure continues" do
       Strand.create(parent_id: st.id, prog: "SetupMinio", label: "configure_minio", stack: [{}], lease: Time.now + 10)
-      expect { nx.wait_reconfigure }.to nap(1)
+      expect { nx.wait_reconfigure }.to nap(120)
     end
 
     it "hops to wait if reconfigure is done" do

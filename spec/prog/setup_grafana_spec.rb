@@ -55,7 +55,7 @@ RSpec.describe Prog::SetupGrafana do
   describe "#wait_for_rhizome" do
     it "donates if install_rhizome is not done" do
       Strand.create(parent_id: st.id, prog: "BootstrapRhizome", label: "start", stack: [{}], lease: Time.now + 10)
-      expect { sn.wait_for_rhizome }.to nap(1)
+      expect { sn.wait_for_rhizome }.to nap(120)
     end
 
     it "hops to install_grafana when rhizome is done" do

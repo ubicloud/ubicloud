@@ -111,9 +111,32 @@ SQL
           fail "BUG: strand with @deleted set still exists in the database"
         end
       else
-        unless RELEASE_LEASE_PS.call(id:, lease_time:) == 1
-          Clog.emit("lease violated data") { {lease_clear_debug_snapshot: this.all} }
-          fail "BUG: lease violated"
+        begin
+          unless RELEASE_LEASE_PS.call(id:, lease_time:) == 1
+            Clog.emit("lease violated data") { {lease_clear_debug_snapshot: this.all} }
+            fail "BUG: lease violated"
+          end
+        ensure
+          if @exited
+            active_siblings_ds = Strand.from { strand.as(:siblings) }
+              .where(parent_id: Sequel[:strand][:id])
+              .where(Sequel.lit("lease < now() AND exitval IS NOT NULL"))
+              .select(1)
+
+            # If exited child has no active siblings, schedule parent immediately,
+            # so all exited children can be reaped.
+            #
+            # To avoid race conditions, we do this after the lease for the child
+            # has been released. It's possible that multiple children could be
+            # calling this update concurrently, but that is fine. We must avoid
+            # the case where this is not called by the last exiting child, as
+            # that otherwise can result in up to 120s delay in parent strand
+            # execution.
+            Strand
+              .where(id: parent_id)
+              .exclude(active_siblings_ds.exists)
+              .update(schedule: Sequel::CURRENT_TIMESTAMP)
+          end
         end
       end
     end
@@ -212,7 +235,9 @@ SQL
       Clog.emit("exited") { {strand_exited: {duration: Time.now - last_changed_at, from: prog_label}} }
 
       update(exitval: ext.exitval, retval: nil)
-      if parent_id.nil?
+      if parent_id
+        @exited = true
+      else
         # No parent Strand to reap here, so self-reap.
         semaphores_dataset.destroy
         destroy

@@ -240,7 +240,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "donates to children if they are not exited yet" do
       Strand.create(parent_id: st.id, prog: "LearnCpu", label: "start", stack: [{}], lease: Time.now + 10)
-      expect { nx.wait_prep }.to nap(1)
+      expect { nx.wait_prep }.to nap(120)
     end
   end
 
@@ -297,7 +297,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "donates its time if child strands are still running" do
       Strand.create(parent_id: st.id, prog: "DownloadBootImage", label: "start", stack: [{}], lease: Time.now + 10)
-      expect { nx.wait_download_boot_images }.to nap(1)
+      expect { nx.wait_download_boot_images }.to nap(120)
     end
   end
 
