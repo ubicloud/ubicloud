@@ -112,7 +112,7 @@ SQL
         end
       else
         unless RELEASE_LEASE_PS.call(id:, lease_time:) == 1
-          Clog.emit("lease violated data") { {lease_clear_debug_snapshot: this.for_update.all} }
+          Clog.emit("lease violated data") { {lease_clear_debug_snapshot: this.all} }
           fail "BUG: lease violated"
         end
       end
