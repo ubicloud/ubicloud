@@ -376,16 +376,15 @@ RSpec.describe VmHost do
     }.to raise_error RuntimeError, "BUG: failover ip 1.1.1.0/30 is already assigned to a vm"
   end
 
-  it "finds local ip to assign to veth* devices" do
-    expect(vh).to receive(:vms).and_return([]).at_least(:once)
-    expect(SecureRandom).to receive(:random_number).with(32767).and_return(5)
-    expect(vh.veth_pair_random_ip4_addr.network.to_s).to eq("169.254.0.10")
-  end
-
   it "finds local ip to assign to veth* devices and eliminates already assigned" do
-    expect(vh).to receive(:vms).and_return([instance_double(Vm, local_vetho_ip: "169.254.0.10")]).at_least(:once)
-    expect(SecureRandom).to receive(:random_number).with(32767).and_return(5, 10)
-    expect(vh.veth_pair_random_ip4_addr.network.to_s).to eq("169.254.0.20")
+    vm_host = Prog::Vm::HostNexus.assemble("127.0.0.1").subject
+    project_id = Project.create(name: "test").id
+    vm = Prog::Vm::Nexus.assemble("a a", project_id, force_host_id: vm_host.id).subject
+
+    expect(SecureRandom).to receive(:random_number).with(32767 - 1024).and_return(5, 5)
+    expect(vm_host.veth_pair_random_ip4_addr.network.to_s).to eq("169.254.0.10")
+    vm.update(local_vetho_ip: "169.254.0.10", vm_host_id: vm_host.id)
+    expect(vm_host.veth_pair_random_ip4_addr.network.to_s).to eq("169.254.0.12")
   end
 
   it "initiates a new health monitor session" do
