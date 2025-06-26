@@ -10,6 +10,9 @@ def main
   raise "CSI_ENDPOINT environment variable is not set" if endpoint.nil? || endpoint.empty?
   raise "CSI_ENDPOINT must have unix:// prefix" unless endpoint.start_with?("unix://")
 
+  puts "Checking NODE_ID..."
+  raise "NODE_ID environment variable is not set" if ENV["NODE_ID"].nil? || ENV["NODE_ID"].strip.empty?
+
   puts "Creating gRPC server..."
   server = GRPC::RpcServer.new
   socket_path = endpoint.sub("unix://", "")
@@ -20,6 +23,7 @@ def main
   puts "Registering services..."
   server.handle(Csi::V1::IdentityService)
   server.handle(Csi::V1::ControllerService)
+  server.handle(Csi::V1::NodeService)
 
   puts "Starting UbiCSI server on #{endpoint}..."
   begin
