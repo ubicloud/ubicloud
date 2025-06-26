@@ -16,6 +16,11 @@ raise "CSI_ENDPOINT environment variable is not set" if endpoint.nil?
 endpoint.strip!
 raise "CSI_ENDPOINT must have unix:// prefix" unless endpoint.start_with?("unix://")
 
+node_id = ENV["NODE_ID"].dup
+raise "NODE_ID environment variable is not set" if node_id.nil?
+node_id.strip!
+raise "NODE_ID cannot be nil" if node_id.empty?
+
 logger.debug("Creating gRPC server")
 server = GRPC::RpcServer.new
 socket_path = endpoint.sub("unix://", "")
@@ -26,6 +31,7 @@ server.add_http2_port("unix:#{socket_path}", :this_port_is_insecure)
 logger.debug("Registering services")
 server.handle(Csi::V1::IdentityService.new(logger:))
 server.handle(Csi::V1::ControllerService.new(logger:))
+server.handle(Csi::V1::NodeService.new(logger:, node_id:))
 
 logger.debug("Starting UbiCSI server on #{endpoint}")
 begin
