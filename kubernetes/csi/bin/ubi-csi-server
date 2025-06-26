@@ -15,6 +15,7 @@ def main
 
   server.handle(Csi::V1::IdentityService)
   server.handle(Csi::V1::ControllerService)
+  server.handle(Csi::V1::NodeService)
 
   puts "Starting UbiCSI server on #{endpoint}..."
   server.run_till_terminated
