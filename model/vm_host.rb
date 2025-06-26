@@ -162,7 +162,7 @@ class VmHost < Sequel::Model
   end
 
   def sshable_address
-    assigned_host_addresses.find { |a| a.ip.version == 4 }
+    assigned_host_addresses_dataset.first { {family(ip) => 4} }
   end
 
   def spdk_cpu_count

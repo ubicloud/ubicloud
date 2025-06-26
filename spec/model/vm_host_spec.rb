@@ -192,8 +192,8 @@ RSpec.describe VmHost do
   end
 
   it "sshable_address returns the sshable address" do
-    expect(vh).to receive(:assigned_host_addresses).and_return([assigned_host_address])
-    expect(vh.sshable_address).to eq(assigned_host_address)
+    vm_host = Prog::Vm::HostNexus.assemble("128.0.0.1").subject
+    expect(vm_host.sshable_address.ip.network.to_s).to eq("128.0.0.1")
   end
 
   it "hetznerifies a host" do
