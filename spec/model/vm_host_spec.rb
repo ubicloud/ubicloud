@@ -165,90 +165,30 @@ RSpec.describe VmHost do
     expect { vh.download_cloud_hypervisor(version_x64: "35.1", version_arm64: "35.1") }.to raise_error("BUG: unexpected architecture")
   end
 
-  it "assigned_subnets returns the assigned subnets" do
-    expect(Clog).to receive(:emit).and_call_original
-    expect(vh).to receive(:assigned_subnets).and_return([address])
-    expect(vh).to receive(:vm_addresses).and_return([])
-    expect(SecureRandom).to receive(:random_number).with(4).and_return(0)
-    expect(vh).to receive(:sshable).and_return(instance_double(Sshable, host: "0.0.0.2")).at_least(:once)
-    ip4, r_address = vh.ip4_random_vm_network
-    expect(ip4.to_s).to eq("0.0.0.0")
-    expect(r_address).to eq(address)
-  end
-
-  it "returns nil if there is no available subnet" do
-    expect(vh).to receive(:assigned_subnets).and_return([address])
-    expect(address.assigned_vm_addresses).to receive(:count).and_return(4)
-    expect(vh).to receive(:sshable).and_return(instance_double(Sshable, host: "0.0.0.2")).at_least(:once)
+  it "ip4_random_vm_network returns nil if there is no available subnet" do
     ip4, address = vh.ip4_random_vm_network
     expect(ip4).to be_nil
     expect(address).to be_nil
   end
 
-  it "finds another address if it's already assigned" do
-    expect(vh).to receive(:assigned_subnets).and_return([address]).at_least(:once)
-    expect(vh).to receive(:vm_addresses).and_return([instance_double(AssignedVmAddress, ip: NetAddr::IPv4Net.parse("0.0.0.0"))]).at_least(:once)
-    expect(vh).to receive(:sshable).and_return(instance_double(Sshable, host: "0.0.0.2")).at_least(:once)
-    expect(SecureRandom).to receive(:random_number).with(4).and_return(0, 1)
-    ip4, r_address = vh.ip4_random_vm_network
-    expect(ip4.to_s).to eq("0.0.0.1")
-    expect(r_address).to eq(address)
-  end
+  it "ip4_random_vm_network returns an unused ip address if there is one" do
+    vm_host = Prog::Vm::HostNexus.assemble("127.0.0.1").subject
+    address_id = Address.create(vm_host:, cidr: "128.0.0.0/30").id
+    ips = %w[128.0.0.0 128.0.0.1 128.0.0.2 128.0.0.3]
 
-  context "when ipv4_address table is populated" do
-    it "ip4_random_vm_network returns an unused ip address if there is one" do
-      vm_host = Prog::Vm::HostNexus.assemble("127.0.0.1").subject
-      address_id = Address.create(vm_host:, cidr: "128.0.0.0/30").id
-      ips = %w[128.0.0.0 128.0.0.1 128.0.0.2 128.0.0.3]
+    4.times do
+      ip4, r_address = vm_host.ip4_random_vm_network
+      expect(r_address).to be_a Address
+      expect(r_address.id).to eq address_id
+      expect(ips).to include ip4.to_s
 
-      4.times do
-        ip4, r_address = vm_host.ip4_random_vm_network
-        expect(r_address).to be_a Address
-        expect(r_address.id).to eq address_id
-        expect(ips).to include ip4.to_s
-
-        project_id = Project.create(name: "test").id
-        vm = Prog::Vm::Nexus.assemble("a a", project_id, force_host_id: vm_host.id)
-        AssignedVmAddress.create(address_id:, dst_vm_id: vm.id, ip: ips.shift)
-      end
-
-      expect(Clog).not_to receive(:emit)
-      expect(vm_host.ip4_random_vm_network).to eq [nil, nil]
-    end
-  end
-
-  context "when provider name is leaseweb" do
-    before do
-      allow(vh).to receive(:provider_name).and_return("leaseweb")
+      project_id = Project.create(name: "test").id
+      vm = Prog::Vm::Nexus.assemble("a a", project_id, force_host_id: vm_host.id)
+      AssignedVmAddress.create(address_id:, dst_vm_id: vm.id, ip: ips.shift)
     end
 
-    it "finds another address if it's already assigned" do
-      expect(vh).to receive(:assigned_subnets).and_return([address]).at_least(:once)
-      expect(vh).to receive(:vm_addresses).and_return([instance_double(AssignedVmAddress, ip: NetAddr::IPv4Net.parse("0.0.0.0"))]).at_least(:once)
-      expect(vh).to receive(:sshable).and_return(instance_double(Sshable, host: "0.0.0.2")).at_least(:once)
-      expect(SecureRandom).to receive(:random_number).with(4).and_return(0, 1)
-      ip4, r_address = vh.ip4_random_vm_network
-      expect(ip4.to_s).to eq("0.0.0.1")
-      expect(r_address).to eq(address)
-    end
-
-    it "finds another address if it's the very first ip" do
-      expect(vh).to receive(:assigned_subnets).and_return([address]).at_least(:once)
-      expect(vh).to receive(:sshable).and_return(instance_double(Sshable, host: "0.0.0.2")).at_least(:once)
-      expect(SecureRandom).to receive(:random_number).with(4).and_return(0, 1)
-      ip4, r_address = vh.ip4_random_vm_network
-      expect(ip4.to_s).to eq("0.0.0.1")
-      expect(r_address).to eq(address)
-    end
-
-    it "finds another address if it's the very last ip" do
-      expect(vh).to receive(:assigned_subnets).and_return([address]).at_least(:once)
-      expect(vh).to receive(:sshable).and_return(instance_double(Sshable, host: "0.0.0.1")).at_least(:once)
-      expect(SecureRandom).to receive(:random_number).with(4).and_return(3, 2)
-      ip4, r_address = vh.ip4_random_vm_network
-      expect(ip4.to_s).to eq("0.0.0.2")
-      expect(r_address).to eq(address)
-    end
+    expect(Clog).not_to receive(:emit)
+    expect(vm_host.ip4_random_vm_network).to eq [nil, nil]
   end
 
   it "sshable_address returns the sshable address" do
