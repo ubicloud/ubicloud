@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "open3"
 require "securerandom"
 
 module Csi
@@ -15,6 +16,17 @@ module Csi
       resp = yield(req_id)
       log_with_id(req_id, "#{type} response: #{resp.inspect}")
       resp
+    end
+
+    def log_run_cmd(req_id, cmd)
+      log_with_id(req_id, "Running command: #{cmd.join(" ")}")
+      yield
+    end
+
+    def run_cmd(*cmd, req_id:)
+      log_run_cmd(req_id, cmd) do
+        Open3.capture2e(*cmd)
+      end
     end
   end
 end
