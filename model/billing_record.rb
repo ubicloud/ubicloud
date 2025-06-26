@@ -7,6 +7,10 @@ class BillingRecord < Sequel::Model
 
   dataset_module do
     where(:active, Sequel.function(:upper, :span) => nil)
+
+    def where_span(begin_time, end_time)
+      where(Sequel.pg_range(:span).overlaps(Sequel::Postgres::PGRange.new(begin_time, end_time)))
+    end
   end
 
   plugin ResourceMethods

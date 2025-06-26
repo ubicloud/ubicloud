@@ -95,9 +95,9 @@ class Prog::Vm::GithubRunner < Prog::Base
       duration = Time.now - github_runner.ready_at
       used_amount = (duration / 60).ceil
       github_runner.log_duration("runner_completed", duration)
-      today_record = BillingRecord
-        .where(project_id: project.id, resource_id: project.id, billing_rate_id: rate_id)
-        .where { Sequel.pg_range(it.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
+      today_record = project.billing_records_dataset
+        .where(resource_id: project.id, billing_rate_id: rate_id)
+        .where_span(begin_time, end_time)
         .first
 
       if today_record

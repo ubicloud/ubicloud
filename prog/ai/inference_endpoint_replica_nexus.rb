@@ -234,9 +234,9 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       project = Project[id: UBID.to_uuid(usage["ubid"])]
 
       begin
-        today_record = BillingRecord
-          .where(project_id: project.id, resource_id: inference_endpoint.id, billing_rate_id: rate_id)
-          .where { Sequel.pg_range(it.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
+        today_record = project.billing_records_dataset
+          .where(resource_id: inference_endpoint.id, billing_rate_id: rate_id)
+          .where_span(begin_time, end_time)
           .first
 
         if today_record
