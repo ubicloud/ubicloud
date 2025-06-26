@@ -28,25 +28,27 @@ RSpec.describe Scheduling::Dispatcher do
   end
 
   describe "#repartition_thread" do
-    it "emits for invalid notify" do
-      t = Thread.new do
-        payload = nil
-        DB.listen(:respirate) { |_, _, pl| payload = pl }
-        payload
-      end
-      @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
+    %w[foo 257].each do |notification|
+      it "emits for respirate NOTIFY #{notification}" do
+        t = Thread.new do
+          payload = nil
+          DB.listen(:respirate) { |_, _, pl| payload = pl }
+          payload
+        end
+        @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
 
-      # Wait until dispatcher has started listening and notified
-      t.join(5)
-      expect(t.value).to eq "1"
+        # Wait until dispatcher has started listening and notified
+        t.join(5)
+        expect(t.value).to eq "1"
 
-      q = Queue.new
-      expect(Clog).to receive(:emit).at_least(:once).and_wrap_original do |m, arg|
-        q.push(true) if arg == "invalid respirate repartition notification"
-        m.call(arg)
+        q = Queue.new
+        expect(Clog).to receive(:emit).at_least(:once).and_wrap_original do |m, arg|
+          q.push(true) if arg == "invalid respirate repartition notification"
+          m.call(arg)
+        end
+        Thread.new { DB.notify(:respirate, payload: notification) }.join(5)
+        expect(q.pop(timeout: 5)).to be true
       end
-      Thread.new { DB.notify(:respirate, payload: "foo") }.join(5)
-      expect(q.pop(timeout: 5)).to be true
     end
 
     it "repartitions for new processes and stale processes" do

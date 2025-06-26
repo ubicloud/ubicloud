@@ -181,7 +181,7 @@ class Scheduling::Dispatcher
     @partition_recheck_time = Time.now + (@listen_timeout * rand * 2)
 
     DB.listen(:respirate, loop:, after_listen: proc { notify_partition }, timeout: @listen_timeout) do |_, _, payload|
-      unless (partition_num = Integer(payload, exception: false))
+      unless (partition_num = Integer(payload, exception: false)) && (partition_num <= 256)
         Clog.emit("invalid respirate repartition notification") { {payload:} }
         next
       end
