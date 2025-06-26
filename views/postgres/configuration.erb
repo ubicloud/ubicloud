@@ -1,17 +1,14 @@
 <% 
-  pg_config_schema = @pg.version == "17" ? Validation::PostgresConfigValidator::PG_17_CONFIG_SCHEMA : Validation::PostgresConfigValidator::PG_16_CONFIG_SCHEMA 
-  pgbouncer_config_schema = Validation::PostgresConfigValidator::PGBOUNCER_CONFIG_SCHEMA
-
   pg_config = @pg.user_config || {}
   pgbouncer_config = @pg.pgbouncer_user_config || {}
 %>
 
-<div class="min-w-2/3">
-    <%== part("components/pg_config_card", title: "PostgreSQL Configuration", config: pg_config) %>
-    <%== part("components/pg_config_card", title: "PgBouncer Configuration", config: pgbouncer_config) %>
+<div class="min-w-2/3 pg-config">
+    <%== part("components/pg_config_card", title: "PostgreSQL Configuration", config: pg_config, extra_class: "pg-config-card") %>
+    <%== part("components/pg_config_card", title: "PgBouncer Configuration", config: pgbouncer_config, extra_class: "pgbouncer-config-card") %>
     <div class="flex justify-end">
         <% if @edit_perm %>
-            <%== part("components/button", text: "Save") %>
+            <%== part("components/button", text: "Save", extra_class: "save-config-btn") %>
         <% end %>
     </div>
 </div>
