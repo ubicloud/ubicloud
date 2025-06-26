@@ -136,16 +136,29 @@ class VmHost < Sequel::Model
     res ? [res.delete(:ip), Address.call(res)] : [nil, nil]
   end
 
-  def veth_pair_random_ip4_addr
-    addr = NetAddr::IPv4Net.parse("169.254.0.0/16")
-    # we get 1 address here and use the next address to assign
-    # route for vetho* and vethi* devices. So, we are splitting the local address
-    # space to two but only store 1 of them for the existence check.
-    # that's why the range is 2 * ((addr.len - 2) / 2)
-    selected_addr = NetAddr::IPv4Net.new(addr.nth(2 * SecureRandom.random_number((addr.len - 2) / 2)), NetAddr::Mask32.new(32))
+  # IPv4 range to use for setting local_vetho_ip for VM in hosts.
+  APIPA_RANGE = NetAddr::IPv4Net.parse("169.254.0.0/16").freeze
 
-    return veth_pair_random_ip4_addr if selected_addr.network.to_s.nil? || vms.any? { |vm| vm.local_vetho_ip == selected_addr.network.to_s }
-    selected_addr
+  # Calculate number of usable addresses in above range.  However, substract 1024.
+  # If the random assignment conflict with an already used address, we increment
+  # instead of looking for a different random assignment. Doing so can have problems
+  # when you are near the top of the range, so carve out 1024 spots at the top of
+  # the range. This should work correctly as long as a host does not run more than
+  # 1024 VMs.
+  #
+  # we get 1 address here and use the next address to assign
+  # route for vetho* and vethi* devices. So, we are splitting the local address
+  # space to two but only store 1 of them for the existence check.
+  # that's why the range is 2 * ((addr.len - 2) / 2)
+  APIPA_LEN = ((APIPA_RANGE.len - 2) / 2) - 1024
+
+  APIPA_MASK = NetAddr::Mask32.new(32).freeze
+
+  def veth_pair_random_ip4_addr
+    ips = vms_dataset.select_map(:local_vetho_ip)
+    ip = APIPA_RANGE.nth(2 * SecureRandom.random_number(APIPA_LEN))
+    ip = ip.next.next while ips.include?(ip.to_s)
+    NetAddr::IPv4Net.new(ip, APIPA_MASK)
   end
 
   def sshable_address
