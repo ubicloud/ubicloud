@@ -2,10 +2,8 @@
 # frozen_string_literal: true
 
 partition_number = ARGV[0]
-partition_number ||= if (dyno = ENV["DYNO"])
-  dyno.split(".", 2)[1] # Heroku
-elsif (match = /respirate\.(\d+)\z/.match(ENV["PS"]))
-  match[1] # Foreman
+partition_number ||= if (match = /respirate\.(\d+)\z/.match(ENV["DYNO"] || ENV["PS"]))
+  match[1] # Heroku/Foreman
 end
 
 if partition_number
