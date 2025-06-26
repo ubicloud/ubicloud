@@ -35,10 +35,6 @@ class VmHost < Sequel::Model
     net6.netmask.prefix_len
   end
 
-  def vm_addresses
-    vms.filter_map(&:assigned_vm_address)
-  end
-
   def provider_name
     provider&.provider_name
   end
@@ -130,52 +126,14 @@ class VmHost < Sequel::Model
   end
 
   def ip4_random_vm_network
-    ipv4_ds = DB[:ipv4_address].join(:address, [:cidr]).where(cidr: assigned_subnets_dataset.select(:cidr))
-
-    res = ipv4_ds
+    res = DB[:ipv4_address]
+      .join(:address, [:cidr])
+      .where(cidr: assigned_subnets_dataset.select(:cidr))
       .exclude(assigned_vm_addresses_dataset.where(ip: Sequel[:ipv4_address][:ip]).select(1).exists)
       .order { random.function }
       .first
 
-    return [res.delete(:ip), Address.call(res)] if res
-
-    # we get the available subnets and if the subnet is /32, we eliminate it
-    available_subnets = assigned_subnets.select { |a| a.cidr.version == 4 && a.cidr.network.to_s != sshable.host }
-
-    if ipv4_ds.empty? && !available_subnets.empty?
-      # In case there is a bug and the ipv4_address table is not populated correctly,
-      # we fallback to the previous slow implementation.  After a certain amount of time,
-      # if we don't see any of these logs emitted in production, we can remove the fallback
-      # and rely on the ipv4_address table being populated.
-      Clog.emit("ipv4_address table not populated for ipv4 address range") { {vm_host_id: id} }
-    else
-      # ipv4_address table populated or there aren't any subnets, no point in
-      # doing further work.  This would not correctly handle cases where the ipv4
-      # address table is partially populated instead of fully populated.
-      return [nil, nil]
-    end
-
-    # we eliminate the subnets that are full
-    used_subnet = available_subnets.select { |as| as.assigned_vm_addresses.count != 2**(32 - as.cidr.netmask.prefix_len) }.sample
-
-    # not available subnet
-    return [nil, nil] unless used_subnet
-
-    rand = SecureRandom.random_number(2**(32 - used_subnet.cidr.netmask.prefix_len)).to_i
-    picked_subnet = used_subnet.cidr.nth(rand)
-    # we check if the picked subnet is used by one of the vms
-    return ip4_random_vm_network if vm_addresses.map { it.ip.to_s }.include?("#{picked_subnet}/32")
-
-    # For Leaseweb, avoid using the very first and the last ips
-    if provider_name == "leaseweb"
-      subnet_size = 2**(32 - used_subnet.cidr.netmask.prefix_len)
-      last_ip = used_subnet.cidr.nth(subnet_size - 1).to_s
-      first_ip = used_subnet.cidr.network.to_s
-      if picked_subnet.to_s == first_ip.to_s || picked_subnet.to_s == last_ip.to_s
-        return ip4_random_vm_network
-      end
-    end
-    [picked_subnet, used_subnet]
+    res ? [res.delete(:ip), Address.call(res)] : [nil, nil]
   end
 
   def veth_pair_random_ip4_addr
