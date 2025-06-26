@@ -208,7 +208,7 @@ SQL
       update(exitval: ext.exitval, retval: nil)
       if parent_id.nil?
         # No parent Strand to reap here, so self-reap.
-        Semaphore.where(strand_id: id).destroy
+        semaphores_dataset.destroy
         destroy
         @deleted = true
       end
