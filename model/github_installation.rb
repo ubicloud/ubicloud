@@ -29,14 +29,15 @@ end
 
 # Table: github_installation
 # Columns:
-#  id                    | uuid    | PRIMARY KEY
-#  installation_id       | bigint  | NOT NULL
-#  name                  | text    | NOT NULL
-#  type                  | text    | NOT NULL
-#  project_id            | uuid    |
-#  cache_enabled         | boolean | NOT NULL DEFAULT true
-#  use_docker_mirror     | boolean | NOT NULL DEFAULT false
-#  allocator_preferences | jsonb   | NOT NULL DEFAULT '{}'::jsonb
+#  id                    | uuid                     | PRIMARY KEY
+#  installation_id       | bigint                   | NOT NULL
+#  name                  | text                     | NOT NULL
+#  type                  | text                     | NOT NULL
+#  project_id            | uuid                     |
+#  cache_enabled         | boolean                  | NOT NULL DEFAULT true
+#  use_docker_mirror     | boolean                  | NOT NULL DEFAULT false
+#  allocator_preferences | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
+#  created_at            | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 # Indexes:
 #  github_installation_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
