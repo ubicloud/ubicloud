@@ -235,7 +235,23 @@ end
         active_children.each do |child|
           nap 0 if child.run
         end
-        nap 1
+
+        schedule = strand.schedule
+
+        # Lock this parent strand. This is run inside a transaction,
+        # and will make exited child strands attempting to update the
+        # parent's schedule block until the transaction commits.
+        strand.lock!
+
+        # lock! does an implicit reload, so check the new schedule
+        new_schedule = strand.schedule
+
+        # In case the exiting child updated the parent schedule before
+        # the lock, check whether the schedule changed. If the schedule
+        # changed, assume it was set to CURRENT_TIMESTAMP, and nap 0.
+        # Otherwise, nap for 120s and rely on the exiting child strand
+        # scheduling this parent sooner in most cases.
+        nap((schedule != new_schedule) ? 0 : 120)
       end
     end
   end

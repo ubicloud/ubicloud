@@ -191,7 +191,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     it "donates if there are sub-programs running" do
       st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "wait_control_plane_node", stack: [{}])
       Strand.create(parent_id: st.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{}], lease: Time.now + 10)
-      expect { nx.wait_control_plane_node }.to nap(1)
+      expect { nx.wait_control_plane_node }.to nap(120)
     end
   end
 
@@ -315,7 +315,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     it "donates if there are sub-programs running" do
       st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
       Strand.create(parent_id: st.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{}], lease: Time.now + 10)
-      expect { nx.wait_upgrade }.to nap(1)
+      expect { nx.wait_upgrade }.to nap(120)
     end
   end
 
@@ -323,7 +323,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     it "donates if there are sub-programs running (Provision...)" do
       st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
       Strand.create(parent_id: st.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{}], lease: Time.now + 10)
-      expect { nx.destroy }.to nap(1)
+      expect { nx.destroy }.to nap(120)
     end
 
     it "triggers deletion of associated resources and naps until all nodepools are gone" do

@@ -64,7 +64,7 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
       st.update(prog: "Kubernetes::UpgradeKubernetesNode", label: "somestep", stack: [{}])
       Strand.create(parent_id: st.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{}], lease: Time.now + 10)
       kubernetes_cluster.strand.label = "destroy"
-      expect { prog.before_run }.to nap(1)
+      expect { prog.before_run }.to nap(120)
     end
   end
 
@@ -84,7 +84,7 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
     it "donates if there are sub-programs running" do
       st.update(prog: "Kubernetes::UpgradeKubernetesNode", label: "wait_new_node", stack: [{}])
       Strand.create(parent_id: st.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{}], lease: Time.now + 10)
-      expect { prog.wait_new_node }.to nap(1)
+      expect { prog.wait_new_node }.to nap(120)
     end
 
     it "hops to assign_role if there are no sub-programs running" do

@@ -75,7 +75,17 @@ RSpec.describe Prog::Test::VmGroup do
 
     it "stays in wait_verify_vms" do
       Strand.create(parent_id: st.id, prog: "Test::Vm", label: "start", stack: [{}], lease: Time.now + 10)
-      expect { vg_test.wait_verify_vms }.to nap(1)
+      expect { vg_test.wait_verify_vms }.to nap(120)
+
+      expect(st).to receive(:lock!).and_wrap_original do |m|
+        # Pretend child strand updated schedule before lock.
+        # After the lock, shouldn't be possible as the child
+        # strand's update of the parent will block until
+        # parent strand commits.
+        st.this.update(schedule: Time.now - 1)
+        m.call
+      end
+      expect { vg_test.wait_verify_vms }.to nap(0)
     end
   end
 

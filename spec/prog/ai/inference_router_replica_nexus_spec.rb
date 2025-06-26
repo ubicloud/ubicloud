@@ -129,7 +129,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
 
     it "donates if there are sub-programs running" do
       Strand.create(parent_id: st.id, prog: "BootstrapRhizome", label: "start", stack: [{}], lease: Time.now + 10)
-      expect { nx.wait_bootstrap_rhizome }.to nap(1)
+      expect { nx.wait_bootstrap_rhizome }.to nap(120)
     end
   end
 

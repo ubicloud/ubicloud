@@ -22,7 +22,7 @@ RSpec.describe Prog::InstallDnsmasq do
     it "donates if any sub-progs are still running" do
       st.update(label: "wait_downloads", stack: [{}])
       Strand.create(parent_id: st.id, prog: "InstallDnsmasq", label: "install_build_dependencies", stack: [{}], lease: Time.now + 10)
-      expect { idm.wait_downloads }.to nap(1)
+      expect { idm.wait_downloads }.to nap(120)
     end
 
     it "hops to compile_and_install when the downloads are done" do

@@ -99,7 +99,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
     it "donates if bootstrap is not complete" do
       st.update(prog: "VictoriaMetrics::VictoriaMetricsServerNexus", label: "wait_bootstrap_rhizome", stack: [{}])
       Strand.create(parent_id: st.id, prog: "BootstrapRhizome", label: "start", stack: [{}], lease: Time.now + 10)
-      expect { nx.wait_bootstrap_rhizome }.to nap(1)
+      expect { nx.wait_bootstrap_rhizome }.to nap(120)
     end
   end
 

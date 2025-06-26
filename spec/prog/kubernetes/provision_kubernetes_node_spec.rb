@@ -176,7 +176,7 @@ table ip6 pod_access {
     it "donates if there are sub-programs running" do
       st.update(prog: "Kubernetes::ProvisionKubernetesNode", label: "wait_bootstrap_rhizome", stack: [{}])
       Strand.create(parent_id: st.id, prog: "BootstrapRhizome", label: "start", stack: [{}], lease: Time.now + 10)
-      expect { prog.wait_bootstrap_rhizome }.to nap(1)
+      expect { prog.wait_bootstrap_rhizome }.to nap(120)
     end
   end
 
