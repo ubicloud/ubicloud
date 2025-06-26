@@ -465,7 +465,7 @@ class Clover
         }
       end
 
-      r.is "config" do
+      r.is "configuration" do
         r.get do
           authorize("Postgres:view", pg.id)
 

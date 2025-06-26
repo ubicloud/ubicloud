@@ -1,15 +1,15 @@
-<%# locals: (title: nil, config: {}, empty_message: 'No configuration found') %>
+<%# locals: (title: nil, config: {}, extra_class: nil) %>
 
-<div class="bg-white rounded-lg shadow overflow-hidden mb-6">
+<div class="bg-white rounded-lg shadow overflow-hidden mb-6 <%= extra_class %>">
   <div class="px-6 py-4 border-b border-gray-200">
     <h3 class="text-lg font-medium text-gray-900"><%= title %></h3>
   </div>
 
   <div class="divide-y divide-gray-200 w-full max-h-64 overflow-y-auto" id="config-container">
     <% config.each_with_index do |(key, value), index| %>
-      <div class="px-6 py-2 hover:bg-gray-50 group" data-config-id="<%= index %>">
+      <div class="px-6 py-2 hover:bg-gray-50 pg-config group" data-config-id="<%= index %>">
         <div class="flex items-center justify-between">
-          <div class="flex flex-wrap items-center justify-between">
+          <div class="flex flex-wrap items-center justify-between pg-config-entry">
             <input
               type="text"
               class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500 mr-2"
@@ -30,9 +30,9 @@
       </div>
     <% end %>
     <!-- Hidden row for generating new entries -->
-    <div class="px-6 py-2 hover:bg-gray-50 group group/inline-editable hidden" data-config-id="">
+    <div class="px-6 py-2 hover:bg-gray-50 group pg-config hidden" data-config-id="">
       <div class="flex items-center justify-between">
-        <div class="flex flex-wrap items-center justify-between">
+        <div class="flex flex-wrap items-center justify-between pg-config-entry">
           <input
             type="text"
             class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500 mr-2"
@@ -54,7 +54,7 @@
       </div>
     </div>
     <!-- Empty row for new configuration -->
-    <div class="px-6 py-2 hover:bg-gray-50 group">
+    <div class="px-6 py-2 hover:bg-gray-50 group new-config">
       <div class="flex items-center justify-between">
         <div class="flex flex-wrap items-center">
           <input

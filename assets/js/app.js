@@ -1028,4 +1028,49 @@ function setupPgConfigCard() {
 
     $(this).closest(".group").before(newConfigGroup);
   });
+
+  $(".save-config-btn").on("click", (e) => {
+    e.preventDefault();
+
+    const pgConfigEntries = $('.pg-config-card').find(".pg-config:not(.hidden) .pg-config-entry");
+    const pgConfig = new Map(pgConfigEntries.toArray().map((entry) => {
+      const key = $(entry).find("input").eq(0).val();
+      const value = $(entry).find("input").eq(1).val();
+      return [key, value]
+    }));
+
+    const pgbouncerConfigEntries = $('.pgbouncer-config-card').find(".pg-config:not(.hidden) .pg-config-entry");
+    const pgbouncerConfig = new Map(pgbouncerConfigEntries.toArray().map((entry) => {
+      const key = $(entry).find("input").eq(0).val();
+      const value = $(entry).find("input").eq(1).val();
+      return [key, value]
+    }));
+
+    const data = JSON.stringify({ "pg_config": Object.fromEntries(pgConfig), "pgbouncer_config": Object.fromEntries(pgbouncerConfig) });
+
+    $.ajax({
+      url: window.location.href,
+      type: "POST",
+      data: data,
+      contentType: "application/json",
+      dataType: "json",
+      headers: { "Accept": "application/json" },
+      success: function (result) {
+        window.location.href = redirect;
+      },
+      error: function (xhr, ajaxOptions, thrownError) {
+        if (xhr.status == 404) {
+          window.location.href = redirect;
+          return;
+        }
+
+        let message = thrownError;
+        try {
+          response = JSON.parse(xhr.responseText);
+          message = response.error?.message
+        } catch { };
+        alert(`Error: ${message}`);
+      }
+    });
+  });
 }
