@@ -66,7 +66,7 @@ RSpec.describe Clover, "inference-playground" do
       expect(page).to have_no_content("e5-mistral-8b-it")
       expect(page).to have_no_content("llama-guard-3-8b")
       expect(page).to have_no_content("llama-3-2-3b-it")
-      expect(page).to have_select("inference_endpoint", selected: "mistral-small-3", with_options: ["mistral-small-3", "test-model", "meta-llama/Llama-3.2-1B-Instruct"])
+      expect(page).to have_select("inference_endpoint", selected: "meta-llama/Llama-3.2-1B-Instruct", with_options: ["meta-llama/Llama-3.2-1B-Instruct", "mistral-small-3", "test-model"])
     end
 
     it "gives choice of inference api keys" do
