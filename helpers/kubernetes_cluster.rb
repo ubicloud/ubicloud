@@ -6,7 +6,8 @@ class Clover
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
     version, target_node_size = typecast_params.nonempty_str!(["version", "worker_size"])
-    cp_node_count, node_count = typecast_params.pos_int!(["cp_nodes", "worker_nodes"])
+    node_count = typecast_params.pos_int("worker_nodes", 1)
+    cp_node_count = typecast_params.pos_int("cp_nodes", 1)
 
     DB.transaction do
       kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
@@ -25,15 +26,23 @@ class Clover
       )
       audit_log(kc, "create")
 
-      flash["notice"] = "'#{name}' will be ready in a few minutes"
-      request.redirect "#{@project.path}#{kc.path}"
+      if api?
+        Serializers::KubernetesCluster.serialize(kc, {detailed: true})
+      else
+        flash["notice"] = "'#{name}' will be ready in a few minutes"
+        request.redirect "#{@project.path}#{kc.path}"
+      end
     end
   end
 
   def kubernetes_cluster_list
-    @kcs = dataset_authorize(@project.kubernetes_clusters_dataset, "KubernetesCluster:view").all
-
-    view "kubernetes-cluster/index"
+    dataset = dataset_authorize(@project.kubernetes_clusters_dataset, "KubernetesCluster:view")
+    if api?
+      paginated_result(dataset, Serializers::KubernetesCluster)
+    else
+      @kcs = dataset.all
+      view "kubernetes-cluster/index"
+    end
   end
 
   def generate_kubernetes_cluster_options

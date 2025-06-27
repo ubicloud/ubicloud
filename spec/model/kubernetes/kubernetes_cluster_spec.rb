@@ -95,7 +95,7 @@ RSpec.describe KubernetesCluster do
     it "validates cp_node_count" do
       kc.cp_node_count = 0
       expect(kc.valid?).to be false
-      expect(kc.errors[:cp_node_count]).to eq(["must be greater than 0"])
+      expect(kc.errors[:cp_node_count]).to eq(["must be a positive integer"])
 
       kc.cp_node_count = 2
       expect(kc.valid?).to be true
@@ -108,6 +108,18 @@ RSpec.describe KubernetesCluster do
 
       kc.version = "v1.32"
       expect(kc.valid?).to be true
+    end
+
+    it "adds error if cp_node_count is nil" do
+      kc.cp_node_count = nil
+      expect(kc.valid?).to be false
+      expect(kc.errors[:cp_node_count]).to include("must be a positive integer")
+    end
+
+    it "adds error if cp_node_count is not an integer" do
+      kc.cp_node_count = "three"
+      expect(kc.valid?).to be false
+      expect(kc.errors[:cp_node_count]).to include("must be a positive integer")
     end
   end
 
