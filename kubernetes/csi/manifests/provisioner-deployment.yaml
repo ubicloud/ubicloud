@@ -1,0 +1,74 @@
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: ubicsi-provisioner
+  namespace: ubicsi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ubicsi
+      component: provisioner
+  template:
+    metadata:
+      labels:
+        app: ubicsi
+        component: provisioner
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - ubicsi
+                  - key: component
+                    operator: In
+                    values:
+                      - provisioner
+              topologyKey: "kubernetes.io/hostname"
+      serviceAccountName: ubicsi-provisioner
+      priorityClassName: system-cluster-critical
+      containers:
+        - name: ubicsi
+          image: mohiklnt/ubicsi:0.1.10
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: CSI_ENDPOINT
+              value: "unix:///csi/csi.sock"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: csi-provisioner
+          image: registry.k8s.io/sig-storage/csi-provisioner:v5.3.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--csi-address=unix:///csi/csi.sock"
+            - "--v=1"
+            - "--leader-election=true"
+            - "--default-fstype=ext4"
+            - "--extra-create-metadata=true"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: csi-attacher
+          image: registry.k8s.io/sig-storage/csi-attacher:v4.9.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--csi-address=unix:///csi/csi.sock"
+            - "--v=1"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+      volumes:
+        - name: socket-dir
+          emptyDir: {
+            medium: "Memory"
+          }
