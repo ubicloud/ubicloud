@@ -12,7 +12,9 @@ RSpec.describe PostgresServer do
       PostgresResource,
       representative_server: postgres_server,
       identity: "pgubid.postgres.ubicloud.com",
-      ha_type: PostgresResource::HaType::NONE
+      ha_type: PostgresResource::HaType::NONE,
+      user_config: {},
+      pgbouncer_user_config: {}
     )
   }
 
