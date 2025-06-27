@@ -1,0 +1,5 @@
+*.sock
+sock/
+.rspec_status
+coverage/
+csi.proto
