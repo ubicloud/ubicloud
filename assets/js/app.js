@@ -496,7 +496,7 @@ function setupPlayground() {
 
     const system = $('#inference_system').val();
     const prompt = $('#inference_prompt').val();
-    const endpoint = $('#inference_endpoint').val();
+    const endpoint_name = $('#inference_endpoint').val();
     const api_key = $('#inference_api_key').val();
     const temperature = parseFloat($('#inference_temperature').val()) || 1.0;
     const top_p = parseFloat($('#inference_top_p').val()) || 1.0;
@@ -505,7 +505,7 @@ function setupPlayground() {
       alert("Please enter a prompt.");
       return;
     }
-    if (!endpoint) {
+    if (!endpoint_name) {
       alert("Please select an inference endpoint.");
       return;
     }
@@ -513,6 +513,8 @@ function setupPlayground() {
       alert("Please select an inference api key.");
       return;
     }
+
+    const endpoint_url = $('#inference_endpoint option:selected').attr('data-url');
 
     const messages = [];
     if (system.length > 0) {
@@ -534,7 +536,7 @@ function setupPlayground() {
     };
     messages.push(user_message);
     const payload = JSON.stringify({
-      model: $("#inference_endpoint option:selected").text().trim(),
+      model: endpoint_name,
       messages: messages,
       stream: true,
       stream_options: { include_usage: true },
@@ -571,7 +573,7 @@ function setupPlayground() {
     let showing_processing = true;
 
     try {
-      const response = await fetch(`${endpoint}/v1/chat/completions`, {
+      const response = await fetch(`${endpoint_url}/v1/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

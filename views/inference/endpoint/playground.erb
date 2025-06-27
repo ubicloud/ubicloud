@@ -12,9 +12,13 @@
           label: "Inference Endpoint",
           placeholder: "Pick an endpoint",
           options: @inference_models.map { |ie|
-            [ie[:url], ie[:model_name], nil, {"data-id": ie[:id], "data-tags": ie[:tags].to_json}]
+            [ie[:model_name], ie[:model_name], nil, {
+              "data-id": ie[:id],
+              "data-url": ie[:url],
+              "data-tags": ie[:tags].to_json
+            }]
           },
-          selected: @inference_models.any? ? @inference_models.first[:url] : nil,
+          selected: @inference_models.any? ? @inference_models.first[:model_name] : nil,
         }
       ) %>
       <%== render(
