@@ -1,0 +1,4 @@
+*.sock
+sock/
+.rspec_status
+coverage/
