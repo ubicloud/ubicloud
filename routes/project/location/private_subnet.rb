@@ -90,7 +90,7 @@ class Clover
             .exclude(label: "destroy")
             .exclude(Sequel[:vm][:id] => Semaphore
               .where(
-                strand_id: DB[:nic].where(private_subnet_id: ps.id).select(:vm_id),
+                strand_id: ps.nics_dataset.select(:vm_id),
                 name: "destroy"
               )
               .select(:strand_id))
