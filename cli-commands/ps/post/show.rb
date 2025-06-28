@@ -19,13 +19,13 @@ UbiCli.on("ps").run_on("show") do
   help_option_values("Firewall Rule Fields:", firewall_rule_fields)
   help_option_values("Firewall Fields:", firewall_fields)
 
-  run do |opts|
+  run do |opts, cmd|
     data = sdk_object.info
     opts = opts[:ps_show]
-    keys = underscore_keys(check_fields(opts[:fields], fields, "ps show -f option"))
-    firewall_keys = underscore_keys(check_fields(opts[:"firewall-fields"], firewall_fields, "ps show -w option"))
-    firewall_rule_keys = underscore_keys(check_fields(opts[:"rule-fields"], firewall_rule_fields, "ps show -r option"))
-    nic_keys = underscore_keys(check_fields(opts[:"nic-fields"], nic_fields, "ps show -n option"))
+    keys = underscore_keys(check_fields(opts[:fields], fields, "ps show -f option", cmd))
+    firewall_keys = underscore_keys(check_fields(opts[:"firewall-fields"], firewall_fields, "ps show -w option", cmd))
+    firewall_rule_keys = underscore_keys(check_fields(opts[:"rule-fields"], firewall_rule_fields, "ps show -r option", cmd))
+    nic_keys = underscore_keys(check_fields(opts[:"nic-fields"], nic_fields, "ps show -n option", cmd))
 
     body = []
 

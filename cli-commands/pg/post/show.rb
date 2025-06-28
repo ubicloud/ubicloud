@@ -10,10 +10,10 @@ UbiCli.on("pg").run_on("show") do
   end
   help_option_values("Fields:", fields)
 
-  run do |opts|
+  run do |opts, cmd|
     data = sdk_object.info
     opts = opts[:pg_show]
-    keys = check_fields(opts[:fields], fields, "pg show -f option")
+    keys = check_fields(opts[:fields], fields, "pg show -f option", cmd)
 
     body = []
 

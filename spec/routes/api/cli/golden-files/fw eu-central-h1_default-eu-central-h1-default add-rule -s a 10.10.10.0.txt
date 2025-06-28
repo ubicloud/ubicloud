@@ -1,0 +1,10 @@
+! Invalid argument: -s a
+
+Add a firewall rule
+
+Usage:
+    ubi fw (location/fw-name | fw-id) add-rule cidr
+
+Options:
+    -s, --start-port=port            starting (or only) port to allow (default: 0)
+    -e, --end-port=port              ending port to allow (default: 65535)
