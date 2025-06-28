@@ -1,0 +1,27 @@
+# frozen_string_literal: true
+
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+$LOAD_PATH.unshift(File.expand_path("..", __dir__))
+
+require "bundler/setup"
+require "ubi_csi"
+
+def main
+  endpoint = ENV["CSI_ENDPOINT"].strip
+  raise "CSI_ENDPOINT environment variable is not set" if endpoint.nil? || endpoint.empty?
+  raise "CSI_ENDPOINT must have unix:// prefix" unless endpoint.start_with?("unix://")
+
+  server = GRPC::RpcServer.new
+  socket_path = endpoint.sub("unix://", "")
+  File.delete(socket_path) if File.exist?(socket_path)
+  server.add_http2_port("unix:#{socket_path}", :this_port_is_insecure)
+
+  server.handle(Csi::V1::IdentityService)
+  server.handle(Csi::V1::ControllerService)
+  server.handle(Csi::V1::NodeService)
+
+  puts "Starting UbiCSI server on #{endpoint}..."
+  server.run_till_terminated
+end
+
+main if __FILE__ == $PROGRAM_NAME
