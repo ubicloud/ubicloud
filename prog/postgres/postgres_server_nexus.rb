@@ -440,6 +440,7 @@ SQL
         update_stack_lsn(lsn)
         # Even if it is lagging, it has applied new wal files, so, we should
         # give it a chance to catch up
+        decr_recycle
         nap 15 * 60
       else
         # It has not applied any new wal files while has been napping for the
