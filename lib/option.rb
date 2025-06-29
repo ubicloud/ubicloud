@@ -22,6 +22,8 @@ module Option
     Option::VmFamilies.select { it.visible }
   end
 
+  AWS_STORAGE_SIZE_OPTIONS = {2 => ["118"], 4 => ["237"], 8 => ["474"], 16 => ["950"], 32 => ["1900"], 64 => ["3800"]}.freeze
+
   BootImage = Struct.new(:name, :display_name)
   BootImages = [
     ["ubuntu-noble", "Ubuntu Noble 24.04 LTS"],
