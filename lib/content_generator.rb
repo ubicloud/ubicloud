@@ -73,11 +73,11 @@ module ContentGenerator
     end
 
     def self.family(flavor, location, family)
-      vm_family = Option::VmFamilies.find { it.name == family }
+      pg_family = Option::POSTGRES_FAMILY_OPTIONS[family]
 
       [
-        vm_family.display_name,
-        vm_family.ui_descriptor
+        pg_family.name,
+        pg_family.description
       ]
     end
 
