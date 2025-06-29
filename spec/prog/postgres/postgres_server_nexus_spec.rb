@@ -699,7 +699,19 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
         expect(nx.strand).to receive(:stack).and_return([{"lsn" => "1/A"}]).at_least(:once)
         expect(postgres_server).to receive(:lsn_diff).with("1/A", "1/A").and_return(0)
+        expect(postgres_server).to receive(:recycle_set?).and_return(false)
         expect(postgres_server).to receive(:incr_recycle)
+        expect { nx.wait }.to nap(60)
+      end
+
+      it "does not increment recycle if it is incremented already" do
+        expect(postgres_server).to receive(:lsn_caught_up).and_return(false)
+        expect(postgres_server).to receive(:current_lsn).and_return("1/A")
+
+        expect(nx.strand).to receive(:stack).and_return([{"lsn" => "1/A"}]).at_least(:once)
+        expect(postgres_server).to receive(:lsn_diff).with("1/A", "1/A").and_return(0)
+        expect(postgres_server).to receive(:recycle_set?).and_return(true)
+        expect(postgres_server).not_to receive(:incr_recycle)
         expect { nx.wait }.to nap(60)
       end
 
