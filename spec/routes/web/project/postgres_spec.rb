@@ -118,7 +118,7 @@ RSpec.describe Clover, "postgres" do
         name = "new-pg-db"
         fill_in "Name", with: name
         choose option: private_location.ubid
-        choose option: "standard-2"
+        choose option: "c6gd-2"
         choose option: PostgresResource::HaType::NONE
         choose option: "118"
 

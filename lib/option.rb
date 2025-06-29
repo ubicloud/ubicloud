@@ -88,7 +88,11 @@ module Option
   PostgresFamilyOption = Data.define(:name, :description)
   POSTGRES_FAMILY_OPTIONS = [
     ["standard", "Dedicated CPU"],
-    ["burstable", "Shared CPU"]
+    ["burstable", "Shared CPU"],
+    ["c6gd", "Compute Optimized, Graviton2"],
+    ["m6id", "General Purpose, Intel Xeon"],
+    ["m6gd", "General Purpose, Graviton2"],
+    ["m8gd", "General Purpose, Graviton3"]
   ].map { |args| [args[0], PostgresFamilyOption.new(*args)] }.to_h.freeze
 
   PostgresSizeOption = Data.define(:name, :family, :vcpu_count, :memory_gib)
@@ -98,11 +102,33 @@ module Option
     ["standard", 8, 32],
     ["standard", 16, 64],
     ["standard", 30, 120],
-    ["standard", 32, 128],
     ["standard", 60, 240],
-    ["standard", 64, 256],
     ["burstable", 1, 2],
-    ["burstable", 2, 4]
+    ["burstable", 2, 4],
+    ["c6gd", 2, 4],
+    ["c6gd", 4, 8],
+    ["c6gd", 8, 16],
+    ["c6gd", 16, 32],
+    ["c6gd", 32, 64],
+    ["c6gd", 64, 128],
+    ["m6id", 2, 8],
+    ["m6id", 4, 16],
+    ["m6id", 8, 32],
+    ["m6id", 16, 64],
+    ["m6id", 32, 128],
+    ["m6id", 64, 256],
+    ["m6gd", 2, 8],
+    ["m6gd", 4, 16],
+    ["m6gd", 8, 32],
+    ["m6gd", 16, 64],
+    ["m6gd", 32, 128],
+    ["m6gd", 64, 256],
+    ["m8gd", 2, 8],
+    ["m8gd", 4, 16],
+    ["m8gd", 8, 32],
+    ["m8gd", 16, 64],
+    ["m8gd", 32, 128],
+    ["m8gd", 64, 256]
   ].map { |args| ["#{args[0]}-#{args[1]}", PostgresSizeOption.new("#{args[0]}-#{args[1]}", *args)] }.to_h.freeze
 
   POSTGRES_STORAGE_SIZE_OPTIONS = ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096"].freeze
