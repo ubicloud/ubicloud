@@ -14,7 +14,7 @@ class Clover
     postgres_params = {
       "flavor" => flavor,
       "location" => @location,
-      "family" => size.split("-").first,
+      "family" => Option::POSTGRES_SIZE_OPTIONS[size]&.family,
       "size" => size,
       "storage_size" => storage_size.to_s,
       "ha_type" => ha_type,
@@ -100,18 +100,17 @@ class Clover
     end
 
     options.add_option(name: "size", values: Option::POSTGRES_SIZE_OPTIONS.keys, parent: "family") do |flavor, location, family, size|
-      family_from_size, vcpu_count = size.split("-")
-
-      next false if family_from_size != family
-      next false if location.provider == "aws" && [30, 60].include?(vcpu_count.to_i)
-      next false if location.provider != "aws" && [32, 64].include?(vcpu_count.to_i)
+      size_option = Option::POSTGRES_SIZE_OPTIONS[size]
+      next false if size_option.family != family
+      next false if location.provider == "aws" && [30, 60].include?(size_option.vcpu_count)
+      next false if location.provider != "aws" && [32, 64].include?(size_option.vcpu_count)
       true
     end
 
     aws_storage_size_options = {2 => ["118"], 4 => ["237"], 8 => ["474"], 16 => ["950"], 32 => ["1900"], 64 => ["3800"]}
     storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS + aws_storage_size_options.values.flatten.uniq
     options.add_option(name: "storage_size", values: storage_size_options, parent: "size") do |flavor, location, family, size, storage_size|
-      vcpu_count = size.split("-").last.to_i
+      vcpu_count = Option::POSTGRES_SIZE_OPTIONS[size].vcpu_count
 
       if location.provider == "aws"
         aws_storage_size_options[vcpu_count].include?(storage_size)
