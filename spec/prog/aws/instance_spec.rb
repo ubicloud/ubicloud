@@ -82,7 +82,7 @@ usermod -L ubuntu
         min_count: 1,
         max_count: 1,
         user_data: Base64.encode64(user_data),
-        tag_specifications: [{resource_type: "instance", tags: [{key: "Ubicloud", value: "true"}]}]
+        tag_specifications: [{resource_type: "instance", tags: [{key: "Ubicloud", value: "true"}, {key: "Name", value: vm.name}]}]
       }).and_call_original
       expect(vm).to receive(:update).with(name: "i-0123456789abcdefg")
       expect { nx.start }.to hop("wait_instance_created")

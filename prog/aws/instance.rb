@@ -66,7 +66,8 @@ usermod -L ubuntu
         {
           resource_type: "instance",
           tags: [
-            {key: "Ubicloud", value: "true"}
+            {key: "Ubicloud", value: "true"},
+            {key: "Name", value: vm.name}
           ]
         }
       ]
