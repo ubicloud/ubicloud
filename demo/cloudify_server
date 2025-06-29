@@ -7,6 +7,7 @@ require_relative "../loader"
 require "timeout"
 
 LOCATIONS = Location.where(visible: true).map { |l| [l, "#{l.provider} #{l.name} (#{l.display_name})"] }.to_h
+REQUIRED_ENV_VARS = %w[HETZNER_USER HETZNER_PASSWORD HETZNER_SSH_PUBLIC_KEY HETZNER_SSH_PRIVATE_KEY].freeze
 
 def get_input(msg, default = nil)
   prompt = "#{msg}#{default.nil? ? "" : " [default: #{default}]"}: "
@@ -46,32 +47,39 @@ def select_option(msg, options, default = nil)
   selected
 end
 
+unless REQUIRED_ENV_VARS.all? { Config.public_send(it.downcase) }
+  puts "Please set the following variables in the .env file and re-run docker-compose up:"
+  puts REQUIRED_ENV_VARS.join("\n")
+  exit 1
+end
+
 hostname = get_input("Enter host IP address")
 host_id = get_input("Enter host identifier", "")
 location = select_option("Select provider and location", LOCATIONS, 1)
 
 puts "\n\nCloudifying '#{hostname}' server for '#{LOCATIONS[location]}' \n\n"
 
-strand = Prog::Vm::HostNexus.assemble(
-  hostname,
-  provider_name: location.provider,
-  server_identifier: host_id,
-  location: location.name,
-  default_boot_images: ["ubuntu-jammy"]
-)
-
-puts "Waiting public SSH keys\n\n"
-until (ssh_key = strand.reload.subject.sshable.keys.map(&:public_key).first)
-  sleep 2
+if location.provider != HostProvider::HETZNER_PROVIDER_NAME
+  puts "Currently only Hetzner is supported for this demo. Please use a Hetzner server for cloudification."
+  exit 1
 end
-puts "Add following public SSH key to '/root/.ssh/authorized_keys' on your machine\n\n"
-puts ssh_key
 
-print "\n\nPress enter after you add the above SSH key to your machine\n\n"
-gets.chomp
+strand = if (vmh = VmHost.all.find { it.sshable.host == hostname && it.location == location && it.provider.server_identifier == host_id })
+  puts "Found existing cloudified server for '#{hostname}' with ID: #{vmh.id}"
+  vmh.strand
+else
+  # Create a new strand for the cloudified server
+  Prog::Vm::HostNexus.assemble(
+    hostname,
+    provider_name: location.provider,
+    server_identifier: host_id,
+    location_id: location.id,
+    default_boot_images: ["ubuntu-jammy"]
+  )
+end
 
 begin
-  Timeout.timeout(10 * 60) do
+  Timeout.timeout(30 * 60) do
     puts "Waiting for server to be cloudified"
     previous_state = nil
     while (state = strand.reload.label) != "wait"
@@ -84,7 +92,7 @@ begin
   end
 rescue Timeout::Error
   puts "\n\n"
-  puts "Could not cloudify server in 10 minutes. Probably something went wrong."
+  puts "Could not cloudify server in 30 minutes. Probably something went wrong."
   puts "Last state: #{strand.label}. Server ID for debug: #{strand.id}"
   puts "Please check your hostname/IP address and be sure that you added the correct public SSH key to your server."
   puts "You can ask for help on GitHub discussion page: https://github.com/ubicloud/ubicloud/discussions"
