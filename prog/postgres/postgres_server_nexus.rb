@@ -445,7 +445,7 @@ SQL
       else
         # It has not applied any new wal files while has been napping for the
         # last 15 minutes, so, there should be something wrong, we are recycling
-        postgres_server.incr_recycle
+        postgres_server.incr_recycle unless postgres_server.recycle_set?
       end
       nap 60
     end
