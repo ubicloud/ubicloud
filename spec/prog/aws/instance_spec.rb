@@ -13,7 +13,7 @@ RSpec.describe Prog::Aws::Instance do
     prj = Project.create_with_id(name: "test-prj")
     loc = Location.create_with_id(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
     LocationCredential.create_with_id(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = loc.id }
-    Prog::Vm::Nexus.assemble("dummy-public key", prj.id, location_id: loc.id, unix_user: "test-user-aws", boot_image: "ami-030c060f85668b37d", name: "testvm").subject
+    Prog::Vm::Nexus.assemble("dummy-public key", prj.id, location_id: loc.id, unix_user: "test-user-aws", boot_image: "ami-030c060f85668b37d", name: "testvm", size: "m6gd.large", arch: "arm64").subject
   }
 
   let(:client) {
@@ -55,7 +55,7 @@ usermod -L ubuntu
 
       expect(client).to receive(:run_instances).with({
         image_id: "ami-030c060f85668b37d",
-        instance_type: "m6id.large",
+        instance_type: "m6gd.large",
         block_device_mappings: [
           {
             device_name: "/dev/sda1",
