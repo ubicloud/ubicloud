@@ -22,7 +22,7 @@ cp /home/ubuntu/.ssh/authorized_keys /home/$custom_user/.ssh/
 chown -R $custom_user:$custom_user /home/$custom_user/.ssh
 chmod 700 /home/$custom_user/.ssh
 chmod 600 /home/$custom_user/.ssh/authorized_keys
-echo #{public_keys} > /home/$custom_user/.ssh/authorized_keys
+echo #{public_keys.shellescape} > /home/$custom_user/.ssh/authorized_keys
 usermod -L ubuntu
     USER_DATA
 
