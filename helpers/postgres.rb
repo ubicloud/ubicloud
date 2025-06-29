@@ -141,6 +141,12 @@ class Clover
     Validation.validate_name(name)
 
     option_tree, option_parents = generate_postgres_options
-    Validation.validate_from_option_tree(option_tree, option_parents, postgres_params)
+
+    begin
+      Validation.validate_from_option_tree(option_tree, option_parents, postgres_params)
+    rescue Validation::ValidationFailed => e
+      fail Validation::ValidationFailed.new({size: "Invalid size."}) if e.details.key?(:family)
+      raise e
+    end
   end
 end
