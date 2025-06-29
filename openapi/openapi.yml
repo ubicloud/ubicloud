@@ -288,40 +288,7 @@ paths:
       operationId: createLoadBalancer
       summary: Create a new Load Balancer in a project
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                algorithm:
-                  description: Algorithm of the Load Balancer
-                  type: string
-                stack:
-                  description: 'Networking stack of the Load Balancer (ipv4, ipv6, or dual)'
-                  type: string
-                dst_port:
-                  description: Destination port for the Load Balancer
-                  type: integer
-                health_check_endpoint:
-                  description: Health check endpoint URL
-                  type: string
-                health_check_protocol:
-                  description: Health check endpoint protocol
-                  type: string
-                private_subnet_id:
-                  description: ID of Private Subnet
-                  type: string
-                src_port:
-                  description: Source port for the Load Balancer
-                  type: integer
-              additionalProperties: false
-              required:
-                - algorithm
-                - dst_port
-                - health_check_protocol
-                - private_subnet_id
-                - src_port
+        $ref: '#/components/requestBodies/LoadBalancer'
       responses:
         '200':
           $ref: '#/components/responses/LoadBalancer'
@@ -626,40 +593,7 @@ paths:
       operationId: createLocationLoadBalancer
       summary: Create a new Load Balancer in a specific location of a project
       requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                algorithm:
-                  description: Algorithm of the Load Balancer
-                  type: string
-                stack:
-                  description: 'Networking stack of the Load Balancer (ipv4, ipv6, or dual)'
-                  type: string
-                dst_port:
-                  description: Destination port for the Load Balancer
-                  type: integer
-                health_check_endpoint:
-                  description: Health check endpoint URL
-                  type: string
-                health_check_protocol:
-                  description: Health check endpoint protocol
-                  type: string
-                private_subnet_id:
-                  description: ID of Private Subnet
-                  type: string
-                src_port:
-                  description: Source port for the Load Balancer
-                  type: integer
-              additionalProperties: false
-              required:
-                - algorithm
-                - dst_port
-                - health_check_protocol
-                - private_subnet_id
-                - src_port
+        $ref: '#/components/requestBodies/LoadBalancer'
       responses:
         '200':
           $ref: '#/components/responses/LoadBalancer'
@@ -2146,6 +2080,42 @@ components:
         - state
         - storage_size_gib
         - unix_user
+  requestBodies:
+    LoadBalancer:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              algorithm:
+                description: Algorithm of the Load Balancer
+                type: string
+              stack:
+                description: 'Networking stack of the Load Balancer (ipv4, ipv6, or dual)'
+                type: string
+              dst_port:
+                description: Destination port for the Load Balancer
+                type: integer
+              health_check_endpoint:
+                description: Health check endpoint URL
+                type: string
+              health_check_protocol:
+                description: Health check endpoint protocol
+                type: string
+              private_subnet_id:
+                description: ID of Private Subnet
+                type: string
+              src_port:
+                description: Source port for the Load Balancer
+                type: integer
+            additionalProperties: false
+            required:
+              - algorithm
+              - dst_port
+              - health_check_protocol
+              - private_subnet_id
+              - src_port
   responses:
     Delete:
       description: An empty response after successful resource delete
