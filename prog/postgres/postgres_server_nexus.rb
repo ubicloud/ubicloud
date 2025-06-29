@@ -41,6 +41,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         boot_image: boot_image,
         private_subnet_id: postgres_resource.private_subnet_id,
         enable_ip4: true,
+        arch: Option::VmSizes.find { |it| it.name == postgres_resource.target_vm_size }.arch,
         exclude_host_ids: exclude_host_ids
       )
 
