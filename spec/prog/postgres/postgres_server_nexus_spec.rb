@@ -723,6 +723,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
         expect(nx.strand).to receive(:stack).and_return([{"lsn" => "1/9"}]).at_least(:once)
         expect(postgres_server).to receive(:lsn_diff).with("1/A", "1/9").and_return(1)
+        expect(nx).to receive(:decr_recycle)
         expect(nx).to receive(:update_stack_lsn).with("1/A")
         expect { nx.wait }.to nap(900)
       end
