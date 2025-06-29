@@ -16,8 +16,11 @@ Allowed Option Values:
     Flavor: standard paradedb lantern
     Replication Type: none async sync
     Size: standard-2 standard-4 standard-8 standard-16 standard-30 standard-60
-          burstable-1 burstable-2 c6gd-2 c6gd-4 c6gd-8 c6gd-16 c6gd-32 c6gd-64
-          m6id-2 m6id-4 m6id-8 m6id-16 m6id-32 m6id-64 m6gd-2 m6gd-4 m6gd-8
-          m6gd-16 m6gd-32 m6gd-64 m8gd-2 m8gd-4 m8gd-8 m8gd-16 m8gd-32 m8gd-64
+          burstable-1 burstable-2 c6gd.large c6gd.xlarge c6gd.2xlarge
+          c6gd.4xlarge c6gd.8xlarge c6gd.16xlarge m6id.large m6id.xlarge
+          m6id.2xlarge m6id.4xlarge m6id.8xlarge m6id.16xlarge m6gd.large
+          m6gd.xlarge m6gd.2xlarge m6gd.4xlarge m6gd.8xlarge m6gd.16xlarge
+          m8gd.large m8gd.xlarge m8gd.2xlarge m8gd.4xlarge m8gd.8xlarge
+          m8gd.16xlarge
     Storage Size: 16 32 64 128 256 512 1024 2048 4096
     Version: 17 16
