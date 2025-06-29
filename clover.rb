@@ -366,7 +366,15 @@ class Clover < Roda
     create_account_set_password? true
     password_confirm_label "Password Confirmation"
     before_create_account do
-      Validation.validate_cloudflare_turnstile(param("cf-turnstile-response"))
+      cf_response = scope.typecast_params.str("cf-turnstile-response").to_s if Config.cloudflare_turnstile_site_key
+
+      if cf_response&.empty?
+        Clog.emit("cloudflare turnstile parameter not submitted") { {user_agent: scope.env["HTTP_USER_AGENT"]} }
+        scope.flash["error"] = "Could not create account. Please ensure JavaScript is enabled and access to Cloudflare is not blocked, then try again."
+        request.redirect("/create-account")
+      end
+
+      Validation.validate_cloudflare_turnstile(cf_response)
       scope.before_rodauth_create_account(account, param("name"))
     end
     after_create_account do

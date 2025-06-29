@@ -109,6 +109,20 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - #{p.name} Dashboard")
   end
 
+  it "can not create new account without cloudflare turnstile key if turnstile usage enabled" do
+    expect(Config).to receive(:cloudflare_turnstile_site_key).and_return("cf_site_key").thrice
+    visit "/create-account"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Full Name", with: "Joe User"
+    fill_in "Password", with: TEST_USER_PASSWORD
+    fill_in "Password Confirmation", with: TEST_USER_PASSWORD
+    click_button "Create Account"
+
+    expect(page.title).to eq("Ubicloud - Create Account")
+    expect(Mail::TestMailer.deliveries.length).to eq 0
+    expect(page).to have_content("Could not create account. Please ensure JavaScript is enabled and access to Cloudflare is not blocked, then try again.")
+  end
+
   it "can create new account, verify it, and visit project which invited with default policy" do
     p = Project.create_with_id(name: "Invited-project")
     subject_id = SubjectTag.create_with_id(project_id: p.id, name: "Admin").id
@@ -119,7 +133,7 @@ RSpec.describe Clover, "auth" do
     expect(Config).to receive(:cloudflare_turnstile_site_key).and_return("1")
     visit "/create-account"
     expect(page.find(".cf-turnstile")["data-sitekey"]).to eq "1"
-    expect(Config).to receive(:cloudflare_turnstile_site_key).and_return(nil)
+    expect(Config).to receive(:cloudflare_turnstile_site_key).and_return(nil).at_least(:once)
     fill_in "Full Name", with: "John Doe"
     fill_in "Email Address", with: TEST_USER_EMAIL
     fill_in "Password", with: TEST_USER_PASSWORD
