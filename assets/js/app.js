@@ -128,7 +128,7 @@ $(".save-inline-btn").on("click", function (event) {
   let inline_editable_group = $(this).closest(".group\\/inline-editable");
   let data = {};
   inline_editable_group.find(".inline-editable-input").each(function () {
-    data[$(this).attr("name")] = $(this).val();;
+    data[$(this).attr("name")] = $(this).val();
   });
 
   let url = $(this).data("url");
@@ -282,7 +282,7 @@ function setupFormOptionUpdates() {
 
 function redrawChildOptions(name) {
   if (option_children[name]) {
-    let value = $("input[name=" + name + "]:checked").val();
+    let value = $("input[name=" + name + "]:checked").val().replace(/\./g, '-');;
     let classes = $("input[name=" + name + "]:checked").parent().attr('class');
     classes = classes ? classes.split(" ") : [];
     classes = "." + classes.concat("form_" + name, "form_" + name + "_" + value).join('.');
