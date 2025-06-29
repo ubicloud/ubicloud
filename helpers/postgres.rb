@@ -14,7 +14,7 @@ class Clover
     postgres_params = {
       "flavor" => flavor,
       "location" => @location,
-      "family" => size.split("-").first,
+      "family" => Option::POSTGRES_SIZE_OPTIONS[size]&.family,
       "size" => size,
       "storage_size" => storage_size.to_s,
       "ha_type" => ha_type,
@@ -100,20 +100,18 @@ class Clover
     end
 
     options.add_option(name: "size", values: Option::POSTGRES_SIZE_OPTIONS.keys, parent: "family") do |flavor, location, family, size|
-      family_from_size, vcpu_count = size.split("-")
-
-      next false if family_from_size != family
-      next false if location.provider == "aws" && vcpu_count.to_i > 16
+      size_option = Option::POSTGRES_SIZE_OPTIONS[size]
+      next false if size_option.family != family
+      next false if location.provider == "aws" && size_option.vcpu_count > 16
       true
     end
 
-    aws_storage_size_options = {2 => ["118"], 4 => ["238"], 8 => ["475"], 16 => ["950"]}
-    storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS + aws_storage_size_options.values.flatten.uniq
+    storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS + Option::AWS_STORAGE_SIZE_OPTIONS.values.flatten.uniq
     options.add_option(name: "storage_size", values: storage_size_options, parent: "size") do |flavor, location, family, size, storage_size|
-      vcpu_count = size.split("-").last.to_i
+      vcpu_count = Option::POSTGRES_SIZE_OPTIONS[size].vcpu_count
 
       if location.provider == "aws"
-        aws_storage_size_options[vcpu_count].include?(storage_size)
+        Option::AWS_STORAGE_SIZE_OPTIONS[vcpu_count].include?(storage_size)
       else
         min_storage = (vcpu_count >= 30) ? 1024 : vcpu_count * 32
         min_storage /= 2 if family == "burstable"
@@ -140,6 +138,12 @@ class Clover
     Validation.validate_name(name)
 
     option_tree, option_parents = generate_postgres_options
-    Validation.validate_from_option_tree(option_tree, option_parents, postgres_params)
+
+    begin
+      Validation.validate_from_option_tree(option_tree, option_parents, postgres_params)
+    rescue Validation::ValidationFailed => e
+      fail Validation::ValidationFailed.new({size: "Invalid size."}) if e.details.key?(:family)
+      raise e
+    end
   end
 end

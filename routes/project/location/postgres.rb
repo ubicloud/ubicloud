@@ -53,7 +53,7 @@ class Clover
           postgres_params = {
             "flavor" => pg.flavor,
             "location" => pg.location,
-            "family" => size.split("-").first,
+            "family" => Option::POSTGRES_SIZE_OPTIONS[size]&.family,
             "size" => size,
             "storage_size" => target_storage_size_gib.to_s,
             "ha_type" => ha_type,
@@ -107,7 +107,6 @@ class Clover
         response.headers["cache-control"] = "no-store"
 
         @pg = pg
-        @family = Validation.validate_vm_size(pg.target_vm_size, "x64").family
         @option_tree, @option_parents = generate_postgres_options(flavor: @pg.flavor, location: @location)
         @page = page
 

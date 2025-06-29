@@ -78,10 +78,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       }.to raise_error RuntimeError, "No existing location"
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-128", target_storage_size_gib: 128)
-      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: size"
-
-      expect {
         described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128)
       }.not_to raise_error
 

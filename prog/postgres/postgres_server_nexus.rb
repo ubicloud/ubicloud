@@ -41,6 +41,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         boot_image: boot_image,
         private_subnet_id: postgres_resource.private_subnet_id,
         enable_ip4: true,
+        arch: Option::VmSizes.find { |it| it.name == postgres_resource.target_vm_size }.arch,
         exclude_host_ids: exclude_host_ids
       )
 
@@ -440,11 +441,12 @@ SQL
         update_stack_lsn(lsn)
         # Even if it is lagging, it has applied new wal files, so, we should
         # give it a chance to catch up
+        decr_recycle
         nap 15 * 60
       else
         # It has not applied any new wal files while has been napping for the
         # last 15 minutes, so, there should be something wrong, we are recycling
-        postgres_server.incr_recycle
+        postgres_server.incr_recycle unless postgres_server.recycle_set?
       end
       nap 60
     end

@@ -158,6 +158,15 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(404, "Validation failed for following path components: location")
       end
 
+      it "invalid size" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
+          size: "invalid-size",
+          storage_size: "64"
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "Invalid size."})
+      end
+
       it "can update database properties" do
         pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
@@ -201,6 +210,17 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "returns error message if current usage is unknown" do
+        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          size: "standard-3"
+        }.to_json
+
+        expect(pg.reload.target_vm_size).to eq("standard-2")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: size")
+      end
+
+      it "returns error message if invalid size is requested" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
         expect(pg.representative_server).to receive(:storage_size_gib).and_return(128)

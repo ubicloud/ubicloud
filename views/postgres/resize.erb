@@ -8,7 +8,7 @@
 pre_selected_values = {
   "flavor" => @pg.flavor,
   "location" => @location.ubid,
-  "family" => @family,
+  "family" => Option::POSTGRES_SIZE_OPTIONS[@pg.target_vm_size].family,
   "size" => @pg.target_vm_size,
   "storage_size" => @pg.target_storage_size_gib
 } %>
