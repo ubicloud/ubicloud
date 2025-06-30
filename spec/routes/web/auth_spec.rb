@@ -486,6 +486,27 @@ RSpec.describe Clover, "auth" do
       OmniAuth.config.test_mode = true
     end
 
+    it "can login via OIDC flow" do
+      visit "/auth/#{OidcProvider.generate_ubid}"
+      expect(page.status_code).to eq 404
+
+      oidc_provider = OidcProvider.create(display_name: "Test", url: "https://example.com", client_id: "123", client_secret: "456")
+      visit "/auth/#{oidc_provider.ubid}"
+      expect(page.status_code).to eq 200
+      expect(page.title).to eq "Ubicloud - Login to Test via OIDC"
+
+      mock_provider(oidc_provider.ubid, mock_config: false)
+      click_button "Login"
+
+      # Currently, OidcProviders are only parsed at startup, so you cannot
+      # reach the rodauth-omniauth/omniauth_openid_connect handling during
+      # tests. Even if you could, it just redirects to a different site,
+      # and the tests don't handle that.  Since this isn't handled by the
+      # r.rodauth routing, and the session is not authenticated, you get
+      # the login page.
+      expect(page.title).to eq("Ubicloud - Login")
+    end
+
     it "shows error message if attempting to create an account where social login has no email" do
       mock_provider(:github, nil)
 
