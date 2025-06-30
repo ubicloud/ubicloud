@@ -258,7 +258,7 @@ TIMER
       vm.sshable.cmd("sudo systemctl enable --now prometheus")
       vm.sshable.cmd("sudo systemctl enable --now postgres-metrics.timer")
 
-      hop_configure
+      hop_setup_hugepages
     end
 
     vm.sshable.cmd("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
@@ -266,6 +266,18 @@ TIMER
     vm.sshable.cmd("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
 
     hop_wait
+  end
+
+  label def setup_hugepages
+    case vm.sshable.d_check("setup_hugepages")
+    when "Succeeded"
+      vm.sshable.d_clean("setup_hugepages")
+      hop_configure
+    when "Failed", "NotStarted"
+      vm.sshable.d_run("setup_hugepages", "sudo", "postgres/bin/setup-hugepages")
+    end
+
+    nap 5
   end
 
   label def configure
