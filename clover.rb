@@ -397,7 +397,7 @@ class Clover < Roda
         flash["error"] = "Social login is only allowed if social login provider provides email"
         redirect "/login"
       end
-      scope.before_rodauth_create_account(account, omniauth_name)
+      scope.before_rodauth_create_account(account, omniauth_name || account[:email].split("@", 2)[0].gsub(/[^A-Za-z]+/, " ").capitalize)
     end
 
     after_omniauth_create_account do

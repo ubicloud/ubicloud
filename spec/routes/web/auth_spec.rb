@@ -469,13 +469,13 @@ RSpec.describe Clover, "auth" do
   end
 
   describe "social login" do
-    def mock_provider(provider, email = TEST_USER_EMAIL)
-      expect(Config).to receive("omniauth_#{provider}_id").and_return("12345").at_least(:once)
+    def mock_provider(provider, email = TEST_USER_EMAIL, name: "John Doe", mock_config: true)
+      expect(Config).to receive("omniauth_#{provider}_id").and_return("12345").at_least(:once) if mock_config
       OmniAuth.config.add_mock(provider, {
         provider: provider,
         uid: "123456790",
         info: {
-          name: "John Doe",
+          name:,
           email: email
         }
       })
@@ -494,6 +494,15 @@ RSpec.describe Clover, "auth" do
 
       expect(page.title).to eq("Ubicloud - Login")
       expect(page).to have_flash_error(/Social login is only allowed if social login provider provides email/)
+    end
+
+    it "can create new account even if social account doesn't have a name" do
+      mock_provider(:github, name: nil)
+
+      visit "/login"
+      click_button "GitHub"
+
+      expect(Account[email: TEST_USER_EMAIL].name).to eq "User"
     end
 
     it "can create new account" do
