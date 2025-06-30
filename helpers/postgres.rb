@@ -103,11 +103,12 @@ class Clover
       family_from_size, vcpu_count = size.split("-")
 
       next false if family_from_size != family
-      next false if location.provider == "aws" && vcpu_count.to_i > 16
+      next false if location.provider == "aws" && [30, 60].include?(vcpu_count.to_i)
+      next false if location.provider != "aws" && [32, 64].include?(vcpu_count.to_i)
       true
     end
 
-    aws_storage_size_options = {2 => ["118"], 4 => ["238"], 8 => ["475"], 16 => ["950"]}
+    aws_storage_size_options = {2 => ["118"], 4 => ["238"], 8 => ["475"], 16 => ["950"], 32 => ["1900"], 64 => ["3800"]}
     storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS + aws_storage_size_options.values.flatten.uniq
     options.add_option(name: "storage_size", values: storage_size_options, parent: "size") do |flavor, location, family, size, storage_size|
       vcpu_count = size.split("-").last.to_i

@@ -68,6 +68,9 @@ module Option
     storage_size_options = [it * 10, it * 20]
     io_limits = IoLimits.new(it * 50, it * 50)
     VmSize.new("burstable-#{it}", "burstable", it, it * 50, it * 50, (it * 1.6).to_i, storage_size_options, io_limits, false, "arm64")
+  }).concat([32, 64].map {
+    storage_size_options = [it * 20, it * 40]
+    VmSize.new("standard-#{it}", "standard", it, it * 100, 0, it * 4, storage_size_options, NO_IO_LIMITS, false, "x64")
   }).freeze
 
   # Postgres Global Options
@@ -91,7 +94,9 @@ module Option
     ["standard", 8, 32],
     ["standard", 16, 64],
     ["standard", 30, 120],
+    ["standard", 32, 128],
     ["standard", 60, 240],
+    ["standard", 64, 256],
     ["burstable", 1, 2],
     ["burstable", 2, 4]
   ].map { |args| ["#{args[0]}-#{args[1]}", PostgresSizeOption.new("#{args[0]}-#{args[1]}", *args)] }.to_h.freeze

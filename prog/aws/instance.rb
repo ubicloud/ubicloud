@@ -30,7 +30,9 @@ usermod -L ubuntu
       2 => "m6id.large",
       4 => "m6id.xlarge",
       8 => "m6id.2xlarge",
-      16 => "m6id.4xlarge"
+      16 => "m6id.4xlarge",
+      32 => "m6id.8xlarge",
+      64 => "m6id.16xlarge"
     }
     instance_response = client.run_instances({
       image_id: vm.boot_image, # AMI ID
