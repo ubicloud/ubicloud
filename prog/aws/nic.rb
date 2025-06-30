@@ -28,13 +28,16 @@ class Prog::Aws::Nic < Prog::Base
   label def wait_network_interface_created
     network_interface_response = client.describe_network_interfaces({filters: [{name: "network-interface-id", values: [nic.name]}, {name: "tag:Ubicloud", values: ["true"]}]}).network_interfaces[0]
     if network_interface_response.status == "available"
-      eip_response = client.allocate_address
-      nic.nic_aws_resource.update(eip_allocation_id: eip_response.allocation_id)
-
-      hop_attach_eip_network_interface
+      hop_allocate_eip
     end
 
     nap 1
+  end
+
+  label def allocate_eip
+    eip_response = client.allocate_address
+    nic.nic_aws_resource.update(eip_allocation_id: eip_response.allocation_id)
+    hop_attach_eip_network_interface
   end
 
   label def attach_eip_network_interface

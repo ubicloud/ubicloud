@@ -51,9 +51,17 @@ RSpec.describe Prog::Aws::Nic do
       client.stub_responses(:describe_network_interfaces, network_interfaces: [{status: "available"}])
       client.stub_responses(:allocate_address, allocation_id: "eip-0123456789abcdefg")
       expect(client).to receive(:describe_network_interfaces).with({filters: [{name: "network-interface-id", values: [nic.name]}, {name: "tag:Ubicloud", values: ["true"]}]}).and_call_original
-      expect(nic.nic_aws_resource).to receive(:update).with(eip_allocation_id: "eip-0123456789abcdefg").and_call_original
 
-      expect { nx.wait_network_interface_created }.to hop("attach_eip_network_interface")
+      expect { nx.wait_network_interface_created }.to hop("allocate_eip")
+    end
+  end
+
+  describe "#allocate_eip" do
+    it "allocates an elastic ip" do
+      client.stub_responses(:allocate_address, allocation_id: "eip-0123456789abcdefg")
+      expect(client).to receive(:allocate_address).and_call_original
+      expect(nic.nic_aws_resource).to receive(:update).with(eip_allocation_id: "eip-0123456789abcdefg")
+      expect { nx.allocate_eip }.to hop("attach_eip_network_interface")
     end
   end
 
