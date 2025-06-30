@@ -390,6 +390,33 @@ class Clover < Roda
       require "omniauth-google-oauth2"
       omniauth_provider :google_oauth2, Config.omniauth_google_id, Config.omniauth_google_secret, name: :google
     end
+    unless OidcProvider.empty?
+      require "omniauth_openid_connect"
+
+      # This can be uncommented for easier debugging
+      #
+      # ::OpenIDConnect.debug!
+      # ::WebFinger.url_builder = URI::HTTP
+      # ::SWD.url_builder = URI::HTTP
+
+      OidcProvider.each do |oidc_provider|
+        uri = URI(oidc_provider.url)
+        omniauth_provider :openid_connect, {
+          name: oidc_provider.ubid.to_sym,
+          scope: %i[openid email],
+          state: -> { Base64.urlsafe_encode64(SecureRandom.hex(32)) },
+          discovery: true,
+          client_options: {
+            port: uri.port,
+            scheme: uri.scheme,
+            host: uri.host,
+            identifier: oidc_provider.client_id,
+            secret: oidc_provider.client_secret,
+            redirect_uri: oidc_provider.callback_url
+          }
+        }
+      end
+    end
     # :nocov:
 
     before_omniauth_create_account do
@@ -715,6 +742,15 @@ class Clover < Roda
       r.on "webhook" do
         before_main_hash_branches
         r.hash_branches(:webhook_prefix)
+      end
+
+      r.get "auth", :ubid_uuid do |id|
+        next unless (@oidc_provider = OidcProvider[id])
+
+        r.get do
+          content_security_policy.add_form_action(@oidc_provider.url)
+          view "auth/oidc_login"
+        end
       end
 
       check_csrf!

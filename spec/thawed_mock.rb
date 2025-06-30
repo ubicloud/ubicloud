@@ -69,6 +69,7 @@ module ThawedMock
   allow_mocking(LoadBalancer, :[], :generate_uuid)
   allow_mocking(MinioCluster, :[])
   allow_mocking(Nic, :[], :create, :generate_ubid)
+  allow_mocking(OidcProvider, :generate_uuid)
   allow_mocking(Page, :from_tag_parts)
   allow_mocking(PrivateSubnet, :[], :random_subnet, :generate_ubid)
   allow_mocking(PostgresFirewallRule, :generate_uuid)
