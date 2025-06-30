@@ -42,13 +42,20 @@ The control plane is responsible for cloudifying bare metal Linux machines.
 The easiest way to build your own cloud is to lease instances from one of those
 providers. For example: https://www.hetzner.com/sb
 
-Once you lease instance(s), run the following script for each instance to cloudify
-the instance. By default, the script cloudifies bare metal instances leased from 
-Hetzner. After you cloudify your instances, you can provision and manage cloud 
+Once you lease instance(s), update the `.env` file with the following environment
+variables:
+- `HETZNER_USER`
+- `HETZNER_PASSWORD`
+- `HETZNER_SSH_PUBLIC_KEY`
+- `HETZNER_SSH_PRIVATE_KEY`
+
+Then, run the following script for each instance to cloudify it.
+Currently, the script cloudifies bare metal instances leased from Hetzner.
+After you cloudify your instances, you can provision and manage cloud
 resources on these machines.
 
 ```
-# Enter hostname/IP and provider, and install SSH key as instructed by script
+# Enter hostname/IP and provider
 docker exec -it ubicloud-app ./demo/cloudify_server
 ```
 
