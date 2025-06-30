@@ -386,7 +386,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:cmd).with("sudo systemctl daemon-reload")
       expect(sshable).to receive(:cmd).with("sudo systemctl enable --now postgres-metrics.timer")
 
-      expect { nx.configure_metrics }.to hop("configure")
+      expect { nx.configure_metrics }.to hop("setup_hugepages")
     end
 
     it "configures prometheus and metrics and hops to wait at times other than initial provisioning" do
@@ -429,6 +429,31 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
       expect(resource).to receive(:representative_server).and_return(instance_double(PostgresServer, id: "random-id"))
       expect { nx.configure_metrics }.to hop("wait")
+    end
+  end
+
+  describe "#setup_hugepages" do
+    it "hops to configure if the setup succeeds" do
+      expect(sshable).to receive(:d_check).with("setup_hugepages").and_return("Succeeded")
+      expect(sshable).to receive(:d_clean).with("setup_hugepages")
+      expect { nx.setup_hugepages }.to hop("configure")
+    end
+
+    it "retries the setup if it fails" do
+      expect(sshable).to receive(:d_check).with("setup_hugepages").and_return("Failed")
+      expect(sshable).to receive(:d_run).with("setup_hugepages", "sudo", "postgres/bin/setup-hugepages")
+      expect { nx.setup_hugepages }.to nap(5)
+    end
+
+    it "starts the setup if it is not started" do
+      expect(sshable).to receive(:d_check).with("setup_hugepages").and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with("setup_hugepages", "sudo", "postgres/bin/setup-hugepages")
+      expect { nx.setup_hugepages }.to nap(5)
+    end
+
+    it "naps for 5 seconds if the setup is unknown" do
+      expect(sshable).to receive(:d_check).with("setup_hugepages").and_return("Unknown")
+      expect { nx.setup_hugepages }.to nap(5)
     end
   end
 
