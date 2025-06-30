@@ -14,7 +14,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   let(:runner) do
     customer_project = Project.create(name: "customer")
     runner_project = Project.create(name: "runner-service")
-    installation_id = GithubInstallation.create(installation_id: 123, project_id: customer_project.id, name: "ubicloud", type: "Organization").id
+    installation_id = GithubInstallation.create(installation_id: 123, project_id: customer_project.id, name: "ubicloud", type: "Organization", created_at: now - 8 * 24 * 60 * 60).id
     vm_id = create_vm(location_id: Location::GITHUB_RUNNERS_ID, project_id: runner_project.id, boot_image: "github-ubuntu-2204").id
     Sshable.create { it.id = vm_id }
     GithubRunner.create(installation_id:, vm_id:, repository_name: "test-repo", label: "ubicloud-standard-4", created_at: now, allocated_at: now + 10, ready_at: now + 20, workflow_job: {"id" => 123})
@@ -169,7 +169,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       vm.update(family: "premium")
       runner.update(label: "ubicloud-standard-2", ready_at: now - 5 * 60)
 
-      expect(runner.installation).to receive(:free_runner_upgrade?).and_return(true)
+      expect(installation).to receive(:free_runner_upgrade?).and_return(true)
       expect(BillingRecord).to receive(:create_with_id).and_call_original
       nx.update_billing_record
 
@@ -178,6 +178,16 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(br.duration(now, now)).to eq(1)
       expect(br.billing_rate["resource_family"]).to eq("standard-2")
       expect(runner.billed_vm_size).to eq("standard-2")
+    end
+
+    it "do not update billed_vm_size if it is already filled" do
+      runner.update(ready_at: now - 5 * 60, billed_vm_size: "standard-4")
+
+      expect(runner).not_to receive(:update)
+      expect(BillingRecord).to receive(:create_with_id).and_call_original
+      nx.update_billing_record
+
+      expect(runner.billed_vm_size).to eq("standard-4")
     end
 
     it "updates the amount of existing billing record" do
@@ -309,6 +319,27 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(runner.vm_id).to eq(picked_vm.id)
       expect(runner.allocated_at).to eq(now)
       expect(picked_vm.name).to eq(runner.ubid)
+    end
+
+    it "uses separate billing vm size for arm64 runners" do
+      runner.update(label: "ubicloud-standard-4-arm")
+      expect(nx).to receive(:pick_vm).and_return(create_vm(name: "picked-vm"))
+      expect { nx.allocate_vm }.to hop("wait_vm")
+      expect(runner.billed_vm_size).to eq("standard-4-arm")
+    end
+
+    it "uses the premium billing vm size for upgraded runners" do
+      runner.update(label: "ubicloud-standard-8")
+      expect(nx).to receive(:pick_vm).and_return(create_vm(name: "picked-vm", family: "premium", vcpus: 8))
+      expect { nx.allocate_vm }.to hop("wait_vm")
+      expect(runner.billed_vm_size).to eq("premium-8")
+    end
+
+    it "uses the original billing vm size for runners that were upgraded for free" do
+      expect(nx).to receive(:pick_vm).and_return(create_vm(name: "picked-vm", family: "premium"))
+      expect(runner.installation).to receive(:free_runner_upgrade?).and_return(true)
+      expect { nx.allocate_vm }.to hop("wait_vm")
+      expect(runner.billed_vm_size).to eq("standard-4")
     end
   end
 
