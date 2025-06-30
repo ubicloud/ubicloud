@@ -97,24 +97,19 @@ usermod -L ubuntu
     it "updates the vm with the instance id" do
       time = Time.now
       expect(Time).to receive(:now).and_return(time).at_least(:once)
-      expect(vm.strand).to receive(:stack).and_return([{"storage_volumes" => [{"boot" => false, "size_gib" => 10}]}], label: "start").at_least(:once)
       expect(client).to receive(:describe_instances).with({filters: [{name: "instance-id", values: [vm.name]}, {name: "tag:Ubicloud", values: ["true"]}]}).and_call_original
       expect(vm).to receive(:update).with(cores: 1, allocated_at: time, ephemeral_net6: "2a01:4f8:173:1ed3:aa7c::/79")
       expect { nx.wait_instance_created }.to exit({"msg" => "vm created"})
-      expect(VmStorageVolume.count).to eq(1)
-      expect(VmStorageVolume.first).to have_attributes(size_gib: 10, boot: false, use_bdev_ubi: false, disk_index: 1)
     end
 
-    it "doesn't create vm_storage_volumes if there are no storage volumes" do
+    it "updates the vm with the instance id and updates ip according to the sshable" do
       time = Time.now
       expect(Time).to receive(:now).and_return(time).at_least(:once)
       sshable = instance_double(Sshable)
       expect(vm).to receive(:sshable).and_return(sshable)
       expect(sshable).to receive(:update).with(host: "1.2.3.4")
-      expect(vm.strand).to receive(:stack).and_return([{"storage_volumes" => [{"boot" => true, "size_gib" => 10}]}], label: "start").at_least(:once)
       expect(vm).to receive(:update).with(cores: 1, allocated_at: time, ephemeral_net6: "2a01:4f8:173:1ed3:aa7c::/79")
       expect { nx.wait_instance_created }.to exit({"msg" => "vm created"})
-      expect(VmStorageVolume.count).to eq(0)
     end
 
     it "naps if the instance is not running" do

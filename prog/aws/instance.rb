@@ -90,16 +90,6 @@ usermod -L ubuntu
       vm.sshable&.update(host: public_ipv4)
       vm.update(cores: vm.vcpus / 2, allocated_at: Time.now, ephemeral_net6: instance_response.dig(:network_interfaces, 0, :ipv_6_addresses, 0, :ipv_6_address))
 
-      if (disk_size = vm.strand.stack.first["storage_volumes"].find { it["boot"] == false }&.dig("size_gib") || 0) > 0
-        VmStorageVolume.create_with_id(
-          vm_id: vm.id,
-          size_gib: disk_size,
-          boot: false,
-          use_bdev_ubi: false,
-          disk_index: 1
-        )
-      end
-
       pop "vm created"
     end
     nap 1

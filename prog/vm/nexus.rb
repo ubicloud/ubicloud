@@ -118,7 +118,21 @@ class Prog::Vm::Nexus < Prog::Base
         gpu_count = 1
         gpu_device = "27b0"
       end
-      label = (location.provider == "aws") ? "start_aws" : "start"
+
+      label = if location.provider == "aws"
+        storage_volumes.each_with_index do |volume, disk_index|
+          VmStorageVolume.create_with_id(
+            vm_id: vm.id,
+            size_gib: volume[:size_gib],
+            boot: volume[:boot],
+            use_bdev_ubi: false,
+            disk_index: disk_index
+          )
+        end
+        "start_aws"
+      else
+        "start"
+      end
 
       Strand.create(
         prog: "Vm::Nexus",
