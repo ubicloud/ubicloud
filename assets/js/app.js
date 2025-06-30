@@ -617,7 +617,7 @@ function setupPlayground() {
             $(`#inference_message_info_${assistant_message_id}`).text(`Usage: ${prompt_tokens} input tokens and ${completion_tokens} output tokens.`);
           }
           const new_content = parsedLine?.choices?.[0]?.delta?.content;
-          const new_reasoning_content = parsedLine?.choices?.[0]?.delta?.reasoning_content;
+          const new_reasoning_content = parsedLine?.choices?.[0]?.delta?.reasoning_content ?? parsedLine?.choices?.[0]?.delta?.reasoning;
           if (!new_content && !new_reasoning_content) {
             return;
           }
