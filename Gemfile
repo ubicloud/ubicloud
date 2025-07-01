@@ -55,6 +55,7 @@ group :development do
   gem "foreman"
   gem "pry-byebug"
   gem "rackup"
+  gem "debug"
 end
 
 group :rubocop do
