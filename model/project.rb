@@ -171,7 +171,7 @@ class Project < Sequel::Model
   end
 
   feature_flag :vm_public_ssh_keys, :location_latitude_fra, :access_all_cache_scopes, :allocator_diagnostics
-  feature_flag :private_locations, :enable_c6gd, :enable_m6id, :enable_m8gd
+  feature_flag :private_locations, :enable_c6gd, :enable_m6gd, :enable_m8gd
   feature_flag :free_runner_upgrade_until, :gpu_vm, :postgres_lantern
 end
 
