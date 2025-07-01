@@ -15,8 +15,9 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       ubid = PostgresServer.generate_ubid
 
       postgres_resource = PostgresResource[resource_id]
+      arch = Option::VmSizes.find { |it| it.name == postgres_resource.target_vm_size }.arch
       boot_image = if postgres_resource.location.aws?
-        postgres_resource.location.pg_ami(postgres_resource.version)
+        postgres_resource.location.pg_ami(postgres_resource.version, arch)
       else
         flavor_suffix = case postgres_resource.flavor
         when PostgresResource::Flavor::STANDARD then ""
@@ -41,7 +42,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         boot_image: boot_image,
         private_subnet_id: postgres_resource.private_subnet_id,
         enable_ip4: true,
-        arch: Option::VmSizes.find { |it| it.name == postgres_resource.target_vm_size }.arch,
+        arch: arch,
         exclude_host_ids: exclude_host_ids
       )
 

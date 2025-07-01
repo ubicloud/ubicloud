@@ -49,8 +49,8 @@ class Location < Sequel::Model
     provider == "aws"
   end
 
-  def pg_ami(pg_version)
-    PgAwsAmi.find(aws_location_name: name, pg_version: pg_version).aws_ami_id
+  def pg_ami(pg_version, arch)
+    PgAwsAmi.find(aws_location_name: name, pg_version:, arch:).aws_ami_id
   end
 end
 
