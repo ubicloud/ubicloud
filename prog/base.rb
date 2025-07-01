@@ -241,7 +241,7 @@ end
         # Lock this parent strand. This is run inside a transaction,
         # and will make exited child strands attempting to update the
         # parent's schedule block until the transaction commits.
-        strand.lock!
+        strand.lock!(:no_key_update)
 
         # lock! does an implicit reload, so check the new schedule
         new_schedule = strand.schedule

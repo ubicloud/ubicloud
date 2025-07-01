@@ -208,7 +208,7 @@ class Scheduling::Dispatcher
       .limit(@queue_size)
       .exclude(id: Sequel.function(:ANY, Sequel.cast(:$skip_strands, "uuid[]")))
       .select(:id, :schedule, :lease)
-      .for_update
+      .for_no_key_update
       .skip_locked
 
     # If a partition is given, limit the strands to the partition.
