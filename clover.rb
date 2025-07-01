@@ -431,6 +431,11 @@ class Clover < Roda
       scope.after_rodauth_create_account(account_id)
     end
 
+    omniauth_on_failure do
+      Clog.emit("omniauth failure") { {omniauth_error:, omniauth_error_type:, omniauth_error_strategy:, backtrace: omniauth_error.backtrace} }
+      super()
+    end
+
     before_omniauth_callback_route do
       account = Account[account_from_omniauth&.[](:id)]
       if authenticated?
