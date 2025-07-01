@@ -390,34 +390,102 @@ class Clover < Roda
       require "omniauth-google-oauth2"
       omniauth_provider :google_oauth2, Config.omniauth_google_id, Config.omniauth_google_secret, name: :google
     end
-    unless OidcProvider.empty?
-      require "omniauth_openid_connect"
+    # :nocov:
 
-      # This can be uncommented for easier debugging
-      #
-      # ::OpenIDConnect.debug!
-      # ::WebFinger.url_builder = URI::HTTP
-      # ::SWD.url_builder = URI::HTTP
+    # This needs to be required early in order to work with a frozen environment. Maybe we
+    # should opt this in with a Config setting?
+    require "omniauth_openid_connect"
 
-      OidcProvider.each do |oidc_provider|
-        uri = URI(oidc_provider.url)
-        omniauth_provider :openid_connect, {
-          name: oidc_provider.ubid.to_sym,
+    # Turn on OpenID Connect debugging in development, helpful for seeing the internal
+    # requests being made:
+    #
+    # Setup phase (OIDC login button clicked, redirects to OIDC provider):
+    # * WebFinger: request: GET https://host/.well-known/webfinger
+    # * SWD: request: GET https://host/.well-known/openid-configuration
+    #
+    # Callback phase (OIDC provider redirects to this, successful authentication result in login):
+    # * WebFinger: request: GET https://host/.well-known/webfinger
+    # * SWD: request: GET https://host/.well-known/openid-configuration
+    # * Rack::OAuth2: request: POST https://host/token
+    # * OpenIDConnect: request: GET https://host/jwks
+    # * Rack::OAuth2: request: GET https://host/userinfo
+    #
+    # ::OpenIDConnect.debug!
+
+    # These should be uncommented for easier debugging when testing against the rodauth-oauth
+    # OIDC application server running http and not https (technically, OIDC is only supported
+    # over https, but it does work over http in development)
+    #
+    # ::WebFinger.url_builder = URI::HTTP
+    # ::SWD.url_builder = URI::HTTP
+
+    auth_class_eval do
+      # If the route isn't already handled and matches a known provider,
+      # get the app specific to that provider, and then run it.
+      def route_omniauth!
+        super
+        if (match = %r{\A/auth/(0p[a-tv-z0-9]{24})(?:/callback)?\z}.match(request.path_info)) &&
+            (provider = OidcProvider[match[1]])
+          omniauth_run omniauth_app_for_provider(provider)
+
+          # :nocov:
+          # Not reached in testing due to omniauth_setup throw above.
+          handle_omniauth_callback
+          # :nocov:
+        end
+        nil
+      end
+
+      omniauth_apps = {}
+      omniauth_app_mutex = Mutex.new
+      state_proc = -> { Base64.urlsafe_encode64(SecureRandom.hex(32)) }
+
+      # Test for coverage
+      state_proc.call
+
+      # Return OIDC-provider specific omniauth app.  If there isn't an existing
+      # app for the provider in this process, build one.
+      define_method(:omniauth_app_for_provider) do |provider|
+        name = provider.ubid
+        if (app = omniauth_app_mutex.synchronize { omniauth_apps[name] })
+          return app
+        end
+
+        # This part is copied from rodauth-omniauth's omniauth_app method in order
+        # to integrate with rodauth-omniauth.
+        builder = OmniAuth::Builder.new
+        builder.options(
+          path_prefix: omniauth_prefix,
+          setup: ->(env) { env["rodauth.omniauth.instance"].send(:omniauth_setup) }
+        )
+        builder.configure do |config|
+          [:request_validation_phase, :before_request_phase, :before_callback_phase, :on_failure].each do |hook|
+            config.send(:"#{hook}=", ->(env) { env["rodauth.omniauth.instance"].send(:"omniauth_#{hook}") })
+          end
+        end
+
+        # Only use the provider passed to the method. rodauth-omniauth uses all
+        # statically configured providers in omniauth_app
+        uri = URI(provider.url)
+        builder.provider :openid_connect,
+          name: name.to_sym,
           scope: %i[openid email],
-          state: -> { Base64.urlsafe_encode64(SecureRandom.hex(32)) },
+          state: state_proc,
           discovery: true,
           client_options: {
             port: uri.port,
             scheme: uri.scheme,
             host: uri.host,
-            identifier: oidc_provider.client_id,
-            secret: oidc_provider.client_secret,
-            redirect_uri: oidc_provider.callback_url
+            identifier: provider.client_id,
+            secret: provider.client_secret,
+            redirect_uri: provider.callback_url
           }
-        }
+
+        builder.run ->(env) { [404, {}, []] } # pass through
+        app = builder.to_app
+        omniauth_app_mutex.synchronize { omniauth_apps[name] ||= app }
       end
     end
-    # :nocov:
 
     before_omniauth_create_account do
       unless account[:email]
