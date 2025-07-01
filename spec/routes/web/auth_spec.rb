@@ -490,21 +490,32 @@ RSpec.describe Clover, "auth" do
       visit "/auth/#{OidcProvider.generate_ubid}"
       expect(page.status_code).to eq 404
 
-      oidc_provider = OidcProvider.create(display_name: "Test", url: "https://example.com", client_id: "123", client_secret: "456")
-      visit "/auth/#{oidc_provider.ubid}"
-      expect(page.status_code).to eq 200
-      expect(page.title).to eq "Ubicloud - Login to Test via OIDC"
+      provider = OidcProvider.create(display_name: "TestOIDC", client_id: "123", client_secret: "456",
+        url: "http://example.com") do
+        it.id = UBID.to_uuid("0pzzzzzzzz021gzzz00p0m0ck0")
+      end
+      omniauth_key = provider.ubid.to_sym
 
-      mock_provider(oidc_provider.ubid, mock_config: false)
+      visit "/auth/#{provider.ubid}"
+      expect(page.status_code).to eq 200
+      expect(page.title).to eq "Ubicloud - Login to TestOIDC via OIDC"
+
+      OmniAuth.config.mock_auth[omniauth_key] = :invalid_credentials
       click_button "Login"
 
-      # Currently, OidcProviders are only parsed at startup, so you cannot
-      # reach the rodauth-omniauth/omniauth_openid_connect handling during
-      # tests. Even if you could, it just redirects to a different site,
-      # and the tests don't handle that.  Since this isn't handled by the
-      # r.rodauth routing, and the session is not authenticated, you get
-      # the login page.
       expect(page.title).to eq("Ubicloud - Login")
+      expect(page).to have_flash_error("There was an error logging in with the external provider")
+
+      visit "/auth/#{provider.ubid}"
+      OmniAuth.config.add_mock(omniauth_key, provider: provider.ubid, uid: "789",
+        info: {email: "user@example.com"})
+      click_button "Login"
+
+      account = Account.first
+      expect(account.email).to eq "user@example.com"
+      expect(AccountIdentity.select_hash(:account_id, :provider)).to eq(account.id => provider.ubid)
+      expect(page.title).to eq("Ubicloud - Default Dashboard")
+      expect(page).to have_flash_notice("You have been logged in")
     end
 
     it "shows error message if attempting to create an account where social login has no email" do
