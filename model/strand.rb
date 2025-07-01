@@ -79,7 +79,7 @@ class Strand < Sequel::Model
   TAKE_LEASE_PS = DB[:strand]
     .returning
     .where(
-      Sequel[id: DB[:strand].select(:id).where(id: :$id).for_update.skip_locked, exitval: nil] &
+      Sequel[id: DB[:strand].select(:id).where(id: :$id).for_no_key_update.skip_locked, exitval: nil] &
         (Sequel[:lease] < Sequel::CURRENT_TIMESTAMP)
     )
     .prepare_sql_type(:update)

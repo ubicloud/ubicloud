@@ -13,11 +13,11 @@ class VmPool < Sequel::Model
 
   def pick_vm
     # Find an available VM in the "running" state and not associated with a GitHub runner,
-    # and lock it with FOR UPDATE SKIP LOCKED.
+    # and lock it with FOR NO KEY UPDATE SKIP LOCKED.
     vms_dataset
       .where(Sequel[:vm][:display_state] => "running")
       .exclude(id: DB[:github_runner].exclude(vm_id: nil).select(:vm_id))
-      .for_update
+      .for_no_key_update
       .skip_locked
       .first
   end
