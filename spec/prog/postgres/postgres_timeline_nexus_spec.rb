@@ -95,6 +95,8 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         client.stub_responses(:attach_user_policy)
         client.stub_responses(:create_access_key, access_key: {access_key_id: "access-key", secret_access_key: "secret-key", user_name: "username", status: "Active"})
         expect(postgres_timeline).to receive(:update).with(access_key: "access-key", secret_key: "secret-key").and_return(postgres_timeline)
+        expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "wait"))).at_least(:once)
+        expect(postgres_timeline.leader).to receive(:incr_refresh_walg_credentials)
         expect { nx.start }.to hop("setup_bucket")
       end
     end

@@ -20,6 +20,7 @@ class PostgresServer < Sequel::Model
 
   semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup
   semaphore :restart, :configure, :take_over, :configure_metrics, :destroy, :recycle, :promote
+  semaphore :refresh_walg_credentials
 
   def configure_hash
     configs = {

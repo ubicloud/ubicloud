@@ -700,6 +700,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.wait }.to hop("configure")
     end
 
+    it "decrements and calls refresh_walg_credentials if refresh_walg_credentials is set" do
+      expect(nx).to receive(:when_refresh_walg_credentials_set?).and_yield
+      expect(nx).to receive(:decr_refresh_walg_credentials)
+      expect(nx).to receive(:refresh_walg_credentials)
+      expect { nx.wait }.to nap(6 * 60 * 60)
+    end
+
     it "pushes restart if restart is set" do
       expect(nx).to receive(:when_restart_set?).and_yield
       expect(nx).to receive(:push).with(described_class, {}, "restart").and_call_original
