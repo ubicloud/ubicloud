@@ -120,14 +120,21 @@ class Prog::Vm::Nexus < Prog::Base
       end
 
       label = if location.provider == "aws"
-        storage_volumes.each_with_index do |volume, disk_index|
-          VmStorageVolume.create_with_id(
-            vm_id: vm.id,
-            size_gib: volume[:size_gib],
-            boot: volume[:boot],
-            use_bdev_ubi: false,
-            disk_index: disk_index
-          )
+        disk_index = 0
+        storage_volumes.each do |volume|
+          disk_count = (volume[:size_gib] == 3800) ? 2 : 1
+
+          disk_count.times do
+            VmStorageVolume.create_with_id(
+              vm_id: vm.id,
+              size_gib: volume[:size_gib] / disk_count,
+              boot: volume[:boot],
+              use_bdev_ubi: false,
+              disk_index:
+            )
+
+            disk_index += 1
+          end
         end
         "start_aws"
       else

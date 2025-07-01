@@ -103,14 +103,28 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   label def mount_data_disk
     case vm.sshable.cmd("common/bin/daemonizer --check format_disk")
     when "Succeeded"
-      vm.sshable.cmd("sudo mkdir -p /dat")
+      storage_device_paths = postgres_server.storage_device_paths
+      device_path = if storage_device_paths.count > 1
+        vm.sshable.cmd("sudo mdadm --detail --scan | sudo tee -a /etc/mdadm/mdadm.conf")
+        vm.sshable.cmd("sudo update-initramfs -u")
+        "/dev/md0"
+      else
+        storage_device_paths.first
+      end
 
-      vm.sshable.cmd("sudo common/bin/add_to_fstab #{postgres_server.data_device_path} /dat ext4 defaults 0 0")
-      vm.sshable.cmd("sudo mount #{postgres_server.data_device_path} /dat")
+      vm.sshable.cmd("sudo mkdir -p /dat")
+      vm.sshable.cmd("sudo common/bin/add_to_fstab #{device_path} /dat ext4 defaults 0 0")
+      vm.sshable.cmd("sudo mount #{device_path} /dat")
 
       hop_configure_walg_credentials
     when "Failed", "NotStarted"
-      vm.sshable.cmd("common/bin/daemonizer 'sudo mkfs --type ext4 #{postgres_server.data_device_path}' format_disk")
+      storage_device_paths = postgres_server.storage_device_paths
+      if storage_device_paths.count == 1
+        vm.sshable.cmd("common/bin/daemonizer 'sudo mkfs --type ext4 #{storage_device_paths.first}' format_disk")
+      else
+        vm.sshable.cmd("sudo mdadm --create --verbose /dev/md0 --level=0 --raid-devices=#{storage_device_paths.count} #{storage_device_paths.join(" ")}")
+        vm.sshable.cmd("common/bin/daemonizer 'sudo mkfs --type ext4 /dev/md0' format_disk")
+      end
     end
 
     nap 5
