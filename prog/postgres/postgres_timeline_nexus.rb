@@ -138,6 +138,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     iam.attach_user_policy(user_name: postgres_timeline.ubid, policy_arn: policy.policy.arn)
     response = iam.create_access_key(user_name: postgres_timeline.ubid)
     postgres_timeline.update(access_key: response.access_key.access_key_id, secret_key: response.access_key.secret_access_key)
+    postgres_timeline.leader.incr_refresh_walg_credentials
   end
 
   def admin_client

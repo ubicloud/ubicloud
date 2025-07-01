@@ -424,6 +424,11 @@ SQL
       hop_taking_over
     end
 
+    when_refresh_walg_credentials_set? do
+      decr_refresh_walg_credentials
+      refresh_walg_credentials
+    end
+
     if postgres_server.read_replica? && postgres_server.resource.parent
       nap 60 if postgres_server.lsn_caught_up
 
