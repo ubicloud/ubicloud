@@ -110,6 +110,7 @@ class Clover
         @family = Validation.validate_vm_size(pg.target_vm_size, "x64").family
         @option_tree, @option_parents = generate_postgres_options(flavor: @pg.flavor, location: @location)
         @page = page
+        @read_replica_locations = @project.locations_dataset.where(provider: @location.provider)
 
         view "postgres/show"
       end
@@ -243,11 +244,14 @@ class Clover
         authorize("Postgres:edit", pg.id)
 
         name = typecast_params.nonempty_str!("name")
+        read_replica_location_id = typecast_params.str("read_replica_location")
+        @location = Location.visible_or_for_project(@project.id).first(id: read_replica_location_id) if read_replica_location_id
+
         st = nil
         DB.transaction do
           st = Prog::Postgres::PostgresResourceNexus.assemble(
             project_id: @project.id,
-            location_id: pg.location_id,
+            location_id: @location.id,
             name:,
             target_vm_size: pg.target_vm_size,
             target_storage_size_gib: pg.target_storage_size_gib,

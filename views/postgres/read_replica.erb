@@ -9,6 +9,9 @@
       <thead class="bg-gray-50">
         <tr>
           <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+          <% if @read_replica_locations.count > 1 %>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Location</th>
+          <% end %>
           <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">State</th>
         </tr>
       </thead>
@@ -20,6 +23,11 @@
                 <%= read_replica.name %>
               </a>
             </td>
+            <% if @read_replica_locations.count > 1 %>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+                <%= read_replica.location.display_name %>
+              </td>
+            <% end %>
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
               <%== part("components/pg_state_label", state: read_replica.display_state, extra_class: "text-md") %>
             </td>
@@ -30,6 +38,19 @@
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
               <%== part("components/form/text", name: "name", attributes: { placeholder: @pg.name + "-read-replica", required: true, form: "form-pg-read-replica-create" }) %>
             </td>
+            <% if @read_replica_locations.count > 1 %>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                <%== part(
+                  "components/form/select",
+                  name: "read_replica_location",
+                  options: @read_replica_locations.map { |s| [s[:id], s[:display_name]] },
+                  selected: @location.id,
+              attributes: {
+                form: "form-pg-read-replica-create"
+              }
+            ) %>
+              </td>
+            <% end %>
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
               <form
                 action="<%= "#{@project_data[:path]}#{@pg.path}/read-replica" %>"

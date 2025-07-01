@@ -94,11 +94,11 @@ RSpec.configure do |config|
       account
     end
 
-    def create_private_location(project:)
+    def create_private_location(project:, name: "us-west-2")
       loc = Location.create(
-        name: "us-west-2",
-        display_name: "aws-us-west-2",
-        ui_name: "aws-us-west-2",
+        name: name,
+        display_name: "aws-#{name}",
+        ui_name: "aws-#{name}",
         visible: true,
         provider: "aws",
         project_id: project.id
