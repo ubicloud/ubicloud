@@ -1,4 +1,4 @@
-<%# locals: (title: nil, config: {}, extra_class: nil) %>
+<%# locals: (title: nil, config: {}, extra_class: nil, name: nil) %>
 
 <div class="bg-white rounded-lg shadow overflow-hidden mb-6 <%= extra_class %>">
   <div class="px-6 py-4 border-b border-gray-200">
@@ -14,13 +14,13 @@
               type="text"
               class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500 mr-2"
               value="<%= key %>"
-              name="config[<%= index %>][key]"
+              name="<%= name %>[<%= index %>][key]"
             />
             <input
               type="text"
               value="<%= value %>"
               class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500"
-              name="config[<%= index %>][value]"
+              name="<%= name %>[<%= index %>][value]"
             />
           </div>
           <div class="min-w-24 flex items-center space-x-2">
@@ -37,14 +37,14 @@
             type="text"
             class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500 mr-2"
             value=""
-            name="config[new][key]"
+            name="<%= name %>[new][key]"
             disabled
           />
           <input
             type="text"
             value=""
             class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500"
-            name="config[new][value]"
+            name="<%= name %>[new][value]"
             disabled
           />
         </div>
@@ -61,13 +61,13 @@
             type="text"
             class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500 mr-2"
             placeholder="New Key"
-            name="config[new][key]"
+            name="<%= name %>[new][key]"
           />
           <input
             type="text"
             placeholder="New Value"
             class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500"
-            name="config[new][value]"
+            name="<%= name %>[new][value]"
           />
         </div>
         <div class="min-w-24 flex items-center space-x-2">

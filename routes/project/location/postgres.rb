@@ -478,6 +478,11 @@ class Clover
         r.post do
           authorize("Postgres:edit", pg.id)
 
+          # List all keys received.
+          r.params.each do |key, value|
+            Clog.emit("Received key") { {key: key, value: value} }
+          end
+
           pg_config = typecast_params.Hash("pg_config")
           pgbouncer_config = typecast_params.Hash("pgbouncer_config")
 
