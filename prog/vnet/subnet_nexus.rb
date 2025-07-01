@@ -60,7 +60,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def start
-    if private_subnet.location.provider == "aws"
+    if private_subnet.location.aws?
       PrivateSubnetAwsResource.create { it.id = private_subnet.id } unless private_subnet.private_subnet_aws_resource
       bud Prog::Aws::Vpc, {"subject_id" => private_subnet.id}, :create_vpc
       hop_wait_vpc_created
@@ -181,7 +181,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
     decr_destroy
     strand.children.each { it.destroy }
-    if private_subnet.location.provider == "aws"
+    if private_subnet.location.aws?
       private_subnet.nics.map(&:incr_destroy)
       private_subnet.firewalls.map(&:destroy)
       bud Prog::Aws::Vpc, {"subject_id" => private_subnet.id}, :destroy

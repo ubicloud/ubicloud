@@ -1123,7 +1123,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "hops to wait_aws_vm_destroyed if vm is in aws" do
-      vm = instance_double(Vm, location: instance_double(Location, provider: "aws"), id: "vm_id")
+      vm = instance_double(Vm, location: instance_double(Location, aws?: true), id: "vm_id")
       expect(vm).to receive(:update).with(display_state: "deleting")
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
       expect(nx).to receive(:bud).with(Prog::Aws::Instance, {"subject_id" => "vm_id"}, :destroy)

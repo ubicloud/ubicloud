@@ -16,7 +16,7 @@ class Prog::Vnet::NicNexus < Prog::Base
 
     DB.transaction do
       nic = Nic.create(private_ipv6: ipv6_addr, private_ipv4: ipv4_addr, mac: gen_mac, name: name, private_subnet_id: private_subnet_id) { it.id = ubid.to_uuid }
-      label = if subnet.location.provider == "aws"
+      label = if subnet.location.aws?
         "create_aws_nic"
       else
         "wait_allocation"
@@ -120,7 +120,7 @@ class Prog::Vnet::NicNexus < Prog::Base
 
     decr_destroy
 
-    if nic.private_subnet.location.provider == "aws"
+    if nic.private_subnet.location.aws?
       bud Prog::Aws::Nic, {"subject_id" => nic.id}, :destroy
       hop_wait_aws_nic_destroyed
     end

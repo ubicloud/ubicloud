@@ -229,18 +229,18 @@ RSpec.describe Vm do
     end
 
     it "can compute the ipv6 addresses" do
-      expect(vm).to receive(:location).and_return(instance_double(Location, provider: "hetzner")).twice
+      expect(vm).to receive(:location).and_return(instance_double(Location, aws?: false)).twice
       expect(vm).to receive(:ephemeral_net6).and_return(NetAddr::IPv6Net.parse("2001:db8::/64"))
       expect(vm.ip6.to_s).to eq("2001:db8::2")
 
       expect(vm).to receive(:ephemeral_net6).and_return(nil)
       expect(vm.ip6).to be_nil
 
-      expect(vm).to receive(:location).and_return(instance_double(Location, provider: "aws"))
+      expect(vm).to receive(:location).and_return(instance_double(Location, aws?: true))
       expect(vm).to receive(:ephemeral_net6).and_return(NetAddr::IPv6Net.parse("2001:db8::/128"))
       expect(vm.ip6.to_s).to eq("2001:db8::")
 
-      expect(vm).to receive(:location).and_return(instance_double(Location, provider: "aws"))
+      expect(vm).to receive(:location).and_return(instance_double(Location, aws?: true))
       expect(vm).to receive(:ephemeral_net6).and_return(nil)
       expect(vm.ip6).to be_nil
     end

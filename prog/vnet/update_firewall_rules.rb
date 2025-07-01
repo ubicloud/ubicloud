@@ -10,7 +10,7 @@ class Prog::Vnet::UpdateFirewallRules < Prog::Base
   end
 
   label def update_firewall_rules
-    if vm.location.provider == "aws"
+    if vm.location.aws?
       hop_update_aws_firewall_rules
     end
 
