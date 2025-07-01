@@ -70,7 +70,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def wait_vpc_created
-    reap(:wait, nap: 2)
+    reap(:wait, nap: 1)
   end
 
   label def wait

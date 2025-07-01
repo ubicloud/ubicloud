@@ -171,7 +171,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       Strand.create(parent_id: st.id, prog: "Aws::Vpc", label: "create_vpc", stack: [{}], lease: Time.now + 10)
       # Cover case where reap without reaper argument has results in reapable children
       Strand.create(parent_id: st.id, prog: "Aws::Vpc", label: "create_vpc", stack: [{}]).this.update(exitval: '"subnet created"')
-      expect { nx.wait_vpc_created }.to nap(2)
+      expect { nx.wait_vpc_created }.to nap(1)
     end
   end
 

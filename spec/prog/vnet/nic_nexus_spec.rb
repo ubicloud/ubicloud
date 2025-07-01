@@ -87,7 +87,7 @@ RSpec.describe Prog::Vnet::NicNexus do
   describe "#create_aws_nic" do
     it "naps if subnet is not created" do
       expect(nx).to receive(:nic).and_return(instance_double(Nic, private_subnet: instance_double(PrivateSubnet, strand: instance_double(Strand, label: "create_aws_vpc"))))
-      expect { nx.create_aws_nic }.to nap(10)
+      expect { nx.create_aws_nic }.to nap(1)
     end
 
     it "hops to wait_aws_nic_created if subnet is created" do
@@ -109,7 +109,7 @@ RSpec.describe Prog::Vnet::NicNexus do
     it "naps if not leaf" do
       st.update(prog: "Vnet::NicNexus", label: "wait_aws_nic_created", stack: [{}])
       Strand.create(parent_id: st.id, prog: "Aws::Nic", label: "create_network_interface", stack: [{}], lease: Time.now + 10)
-      expect { nx.wait_aws_nic_created }.to nap(10)
+      expect { nx.wait_aws_nic_created }.to nap(1)
     end
   end
 
