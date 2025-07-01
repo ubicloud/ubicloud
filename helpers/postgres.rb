@@ -96,7 +96,7 @@ class Clover
     end
 
     options.add_option(name: "family", values: Option::POSTGRES_FAMILY_OPTIONS.keys, parent: "location") do |flavor, location, family|
-      if location.provider == "aws"
+      if location.aws?
         family == "m6id" || (Option::AWS_FAMILY_OPTIONS.include?(family) && @project.send(:"get_ff_enable_#{family}"))
       else
         family == "standard" || family == "burstable"
@@ -111,7 +111,7 @@ class Clover
     options.add_option(name: "storage_size", values: storage_size_options, parent: "size") do |flavor, location, family, size, storage_size|
       vcpu_count = Option::POSTGRES_SIZE_OPTIONS[size].vcpu_count
 
-      if location.provider == "aws"
+      if location.aws?
         Option::AWS_STORAGE_SIZE_OPTIONS[vcpu_count].include?(storage_size)
       else
         min_storage = (vcpu_count >= 30) ? 1024 : vcpu_count * 32

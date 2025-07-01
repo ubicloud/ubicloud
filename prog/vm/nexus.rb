@@ -119,7 +119,7 @@ class Prog::Vm::Nexus < Prog::Base
         gpu_device = "27b0"
       end
 
-      label = if location.provider == "aws"
+      label = if location.aws?
         disk_index = 0
         storage_volumes.each do |volume|
           disk_count = (volume[:size_gib] == 3800) ? 2 : 1
@@ -374,7 +374,7 @@ class Prog::Vm::Nexus < Prog::Base
       amount: vm.vcpus
     )
 
-    unless vm.location.provider == "aws"
+    unless vm.location.aws?
       vm.storage_volumes.each do |vol|
         BillingRecord.create_with_id(
           project_id: project.id,
@@ -519,7 +519,7 @@ class Prog::Vm::Nexus < Prog::Base
     end
 
     vm.update(display_state: "deleting")
-    if vm.location.provider == "aws"
+    if vm.location.aws?
       bud Prog::Aws::Instance, {"subject_id" => vm.id}, :destroy
       hop_wait_aws_vm_destroyed
     end
