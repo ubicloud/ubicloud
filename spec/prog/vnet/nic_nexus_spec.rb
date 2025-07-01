@@ -53,7 +53,7 @@ RSpec.describe Prog::Vnet::NicNexus do
     end
 
     it "hops to create_aws_nic if location is aws" do
-      expect(ps).to receive(:location).and_return(instance_double(Location, provider: "aws"))
+      expect(ps).to receive(:location).and_return(instance_double(Location, aws?: true))
       expect(PrivateSubnet).to receive(:[]).with("57afa8a7-2357-4012-9632-07fbe13a3133").and_return(ps).at_least(:once)
       expect(ps).to receive(:random_private_ipv6).and_return("fd10:9b0b:6b4b:8fbb::/128")
       expect(ps).to receive(:random_private_ipv4).and_return("10.0.0.12/32")
@@ -260,7 +260,7 @@ RSpec.describe Prog::Vnet::NicNexus do
     it "buds aws nic destroy if location is aws" do
       expect(nic).to receive(:private_subnet).and_return(ps).at_least(:once)
       expect(nx).to receive(:bud).with(Prog::Aws::Nic, {"subject_id" => "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"}, :destroy)
-      expect(ps).to receive(:location).and_return(instance_double(Location, provider: "aws"))
+      expect(ps).to receive(:location).and_return(instance_double(Location, aws?: true))
       expect { nx.destroy }.to hop("wait_aws_nic_destroyed")
     end
   end

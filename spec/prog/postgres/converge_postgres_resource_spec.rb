@@ -14,7 +14,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
         instance_double(PostgresServer)
       ],
       timeline: instance_double(PostgresTimeline, id: "timeline-id"),
-      location: instance_double(Location, provider: "hetzner")
+      location: instance_double(Location, aws?: false)
     )
   }
 

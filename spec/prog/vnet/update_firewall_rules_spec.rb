@@ -33,7 +33,7 @@ RSpec.describe Prog::Vnet::UpdateFirewallRules do
   describe "update_firewall_rules" do
     it "hops to update_aws_firewall_rules if vm is aws" do
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
-      expect(vm).to receive(:location).and_return(instance_double(Location, provider: "aws"))
+      expect(vm).to receive(:location).and_return(instance_double(Location, aws?: true))
       expect { nx.update_firewall_rules }.to hop("update_aws_firewall_rules")
     end
 

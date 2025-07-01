@@ -57,7 +57,7 @@ class Vm < Sequel::Model
   end
 
   def ip6
-    (location.provider == "aws") ? ephemeral_net6&.nth(0) : ephemeral_net6&.nth(2)
+    location.aws? ? ephemeral_net6&.nth(0) : ephemeral_net6&.nth(2)
   end
 
   def nic

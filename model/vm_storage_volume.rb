@@ -20,7 +20,7 @@ class VmStorageVolume < Sequel::Model
   end
 
   def device_path
-    (vm.location.provider == "aws") ? "/dev/nvme#{disk_index}n1" : "/dev/disk/by-id/virtio-#{device_id}"
+    vm.location.aws? ? "/dev/nvme#{disk_index}n1" : "/dev/disk/by-id/virtio-#{device_id}"
   end
 
   def spdk_version
