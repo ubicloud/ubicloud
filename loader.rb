@@ -15,6 +15,18 @@ require "mail"
 require "warning"
 require "rack/unreloader"
 
+# openid_connect gem requires this, and it needs to be added before the
+# Object.method_added method is added, as it defines many methods on Object.
+require "active_support"
+require "active_support/core_ext"
+
+# Unbreak json after active_support is required
+ActiveSupport::ToJsonWithActiveSupportEncoder.send(:remove_method, :to_json)
+
+# Silence Rails-related warnings
+DateAndTime::Compatibility.singleton_class.send(:alias_method, :preserve_timezone, :preserve_timezone)
+DateAndTime::Compatibility.define_singleton_method(:preserve_timezone) { false }
+
 REPL = false unless defined? REPL
 Warning.ignore(/To use (retry|multipart) middleware with Faraday v2\.0\+, install `faraday-(retry|multipart)` gem/)
 
