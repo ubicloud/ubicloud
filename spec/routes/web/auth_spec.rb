@@ -583,6 +583,57 @@ RSpec.describe Clover, "auth" do
         login(account.email)
       end
 
+      it "can connect and disconnect existing account to OIDC provider" do
+        provider = OidcProvider.create(display_name: "TestOIDC", client_id: "123", client_secret: "456",
+          url: "http://example.com") do
+          it.id = UBID.to_uuid("0pzzzzzzzz021gzzz00p0m0ck0")
+        end
+        omniauth_key = provider.ubid.to_sym
+
+        visit "/account/login-method/oidc"
+        expect(page.title).to eq("Ubicloud - Login Methods")
+        expect(page).to have_flash_error("No valid OIDC provider with that ID")
+
+        visit "/account/login-method"
+        within "#login-method-connect-oidc" do
+          fill_in "OIDC Provider ID", with: provider.ubid
+          click_button "Connect"
+        end
+
+        expect(AccountIdentity).to be_empty
+
+        OmniAuth.config.mock_auth[omniauth_key] = :invalid_credentials
+        click_button "Connect"
+
+        expect(AccountIdentity).to be_empty
+        expect(page.title).to eq("Ubicloud - Default Dashboard")
+        expect(page).to have_flash_error("There was an error logging in with the external provider")
+
+        visit "/account/login-method"
+        within "#login-method-connect-oidc" do
+          fill_in "OIDC Provider ID", with: provider.ubid
+          click_button "Connect"
+        end
+
+        OmniAuth.config.add_mock(omniauth_key, provider: provider.ubid, uid: "789",
+          info: {email: account.email})
+        click_button "Connect"
+
+        expect(AccountIdentity.select_hash(:account_id, :provider)).to eq(account.id => provider.ubid)
+        expect(page.title).to eq("Ubicloud - Login Methods")
+        expect(page).to have_flash_notice("You have successfully connected your account with TestOIDC.")
+
+        within "#login-method-disconnect-oidc-#{provider.ubid}" do
+          click_button "Disconnect"
+        end
+
+        expect(AccountIdentity).to be_empty
+        expect(page.title).to eq("Ubicloud - Login Methods")
+        expect(page).to have_flash_notice("Your account has been disconnected from TestOIDC")
+      ensure
+        OmniAuth.config.mock_auth[omniauth_key] = nil
+      end
+
       it "can connect to existing account" do
         mock_provider(:github, "uSer@example.com")
 

@@ -345,7 +345,7 @@ class Clover < Roda
     after_login do
       remember_login if scope.typecast_params.str("remember-me") == "on"
       if omniauth_identity && (url = omniauth_params["redirect_url"])
-        flash["notice"] = "You have successfully connected your account with #{omniauth_provider.capitalize}."
+        flash["notice"] = "You have successfully connected your account with #{scope.omniauth_provider_name(omniauth_provider)}."
         redirect url
       end
     end
@@ -508,13 +508,14 @@ class Clover < Roda
       account = Account[account_from_omniauth&.[](:id)]
       if authenticated?
         unless account && account.id == scope.current_account.id
-          flash["error"] = "Your account's email address is different from the email address associated with the #{omniauth_provider.capitalize} account."
+          flash["error"] = "Your account's email address is different from the email address associated with the #{scope.omniauth_provider_name(omniauth_provider)} account."
           redirect "/account/login-method"
         end
       elsif account && account.identities_dataset.where(provider: omniauth_provider.to_s).empty?
-        flash["error"] = "There is already an account with this email address, and it has not been linked to the #{omniauth_provider.capitalize} account.
-        Please login to the existing account normally, and then link it to the #{omniauth_provider.capitalize} account from your account settings.
-        Then you can can login using the #{omniauth_provider.capitalize} account."
+        provider_name = scope.omniauth_provider_name(omniauth_provider)
+        flash["error"] = "There is already an account with this email address, and it has not been linked to the #{provider_name} account.
+        Please login to the existing account normally, and then link it to the #{provider_name} account from your account settings.
+        Then you can login using the #{provider_name} account."
         redirect "/login"
       end
     end
