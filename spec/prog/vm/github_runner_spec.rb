@@ -428,6 +428,26 @@ RSpec.describe Prog::Vm::GithubRunner do
         .and_raise(Octokit::Conflict.new({body: "409 - Another issue"}))
       expect { nx.register_runner }.to raise_error Octokit::Conflict
     end
+
+    it "logs if fails due to runner script failure" do
+      expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.label])).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC$"})
+      expect(vm.sshable).to receive(:cmd).with("sudo -- xargs -0 -- systemd-run --uid runner --gid runner --working-directory '/home/runner' --unit runner-script --description runner-script --remain-after-exit -- /home/runner/actions-runner/run-withenv.sh",
+        stdin: "AABBCC$$").and_raise Sshable::SshError.new("command", "", "Job for runner-script.service failed.\n Check logs", 123, nil)
+      expect(Clog).to receive(:emit).with("Failed to start runner script").and_call_original
+      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND)
+        journalctl -xeu runner-script.service
+        cat /run/systemd/transient/runner-script.service || true
+      COMMAND
+      expect { nx.register_runner }.to raise_error Sshable::SshError
+    end
+
+    it "fails without a log if the ssh error doesn't match" do
+      expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.label])).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC$"})
+      expect(vm.sshable).to receive(:cmd).with("sudo -- xargs -0 -- systemd-run --uid runner --gid runner --working-directory '/home/runner' --unit runner-script --description runner-script --remain-after-exit -- /home/runner/actions-runner/run-withenv.sh",
+        stdin: "AABBCC$$").and_raise Sshable::SshError.new("command", "", "unknown command", 123, nil)
+      expect(Clog).not_to receive(:emit).with("Failed to start runner script").and_call_original
+      expect { nx.register_runner }.to raise_error Sshable::SshError
+    end
   end
 
   describe "#wait" do

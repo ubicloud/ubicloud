@@ -258,16 +258,24 @@ class Prog::Vm::GithubRunner < Prog::Base
     data = {name: github_runner.ubid.to_s, labels: [github_runner.label], runner_group_id: 1, work_folder: "/home/runner/work"}
     response = github_client.post("/repos/#{github_runner.repository_name}/actions/runners/generate-jitconfig", data)
     github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
-    github_runner.log_duration("runner_registered", github_runner.ready_at - github_runner.allocated_at)
-
     # We initiate an API call and a SSH connection under the same label to avoid
     # having to store the encoded_jit_config.
     vm.sshable.cmd("sudo -- xargs -0 -- systemd-run --uid runner --gid runner " \
                    "--working-directory '/home/runner' --unit runner-script --description runner-script --remain-after-exit -- " \
                    "/home/runner/actions-runner/run-withenv.sh",
       stdin: response[:encoded_jit_config].gsub("$", "$$"))
+    github_runner.log_duration("runner_registered", github_runner.ready_at - github_runner.allocated_at)
 
     hop_wait
+  rescue Sshable::SshError => e
+    if e.stderr.include?("Job for runner-script.service failed")
+      Clog.emit("Failed to start runner script") { {failed_to_start_runner: response.to_h} }
+      vm.sshable.cmd(<<~COMMAND)
+        journalctl -xeu runner-script.service
+        cat /run/systemd/transient/runner-script.service || true
+      COMMAND
+    end
+    raise
   rescue Octokit::Conflict => e
     raise unless e.message.include?("Already exists")
 
