@@ -481,6 +481,19 @@ RSpec.describe Clover, "auth" do
       })
     end
 
+    let(:oidc_provider) do
+      OidcProvider.create(
+        display_name: "TestOIDC",
+        client_id: "123",
+        client_secret: "456",
+        url: "http://example.com",
+        authorization_endpoint: "/auth",
+        token_endpoint: "/tok",
+        userinfo_endpoint: "/ui",
+        jwks_uri: "https://host/jw"
+      )
+    end
+
     before do
       OmniAuth.config.logger = Logger.new(IO::NULL)
       OmniAuth.config.test_mode = true
@@ -490,10 +503,7 @@ RSpec.describe Clover, "auth" do
       visit "/auth/#{OidcProvider.generate_ubid}"
       expect(page.status_code).to eq 404
 
-      provider = OidcProvider.create(display_name: "TestOIDC", client_id: "123", client_secret: "456",
-        url: "http://example.com") do
-        it.id = UBID.to_uuid("0pzzzzzzzz021gzzz00p0m0ck0")
-      end
+      provider = oidc_provider
       omniauth_key = provider.ubid.to_sym
 
       visit "/auth/#{provider.ubid}"
@@ -584,10 +594,7 @@ RSpec.describe Clover, "auth" do
       end
 
       it "can connect and disconnect existing account to OIDC provider" do
-        provider = OidcProvider.create(display_name: "TestOIDC", client_id: "123", client_secret: "456",
-          url: "http://example.com") do
-          it.id = UBID.to_uuid("0pzzzzzzzz021gzzz00p0m0ck0")
-        end
+        provider = oidc_provider
         omniauth_key = provider.ubid.to_sym
 
         visit "/account/login-method/oidc"
