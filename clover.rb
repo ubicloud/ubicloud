@@ -397,27 +397,14 @@ class Clover < Roda
     require "omniauth_openid_connect"
 
     # Turn on OpenID Connect debugging in development, helpful for seeing the internal
-    # requests being made:
+    # requests being made during callback phase (OIDC provider redirects to this, successful
+    # authentication results in login):
     #
-    # Setup phase (OIDC login button clicked, redirects to OIDC provider):
-    # * WebFinger: request: GET https://host/.well-known/webfinger
-    # * SWD: request: GET https://host/.well-known/openid-configuration
-    #
-    # Callback phase (OIDC provider redirects to this, successful authentication result in login):
-    # * WebFinger: request: GET https://host/.well-known/webfinger
-    # * SWD: request: GET https://host/.well-known/openid-configuration
     # * Rack::OAuth2: request: POST https://host/token
     # * OpenIDConnect: request: GET https://host/jwks
     # * Rack::OAuth2: request: GET https://host/userinfo
     #
     # ::OpenIDConnect.debug!
-
-    # These should be uncommented for easier debugging when testing against the rodauth-oauth
-    # OIDC application server running http and not https (technically, OIDC is only supported
-    # over https, but it does work over http in development)
-    #
-    # ::WebFinger.url_builder = URI::HTTP
-    # ::SWD.url_builder = URI::HTTP
 
     auth_class_eval do
       # If the route isn't already handled and matches a known provider,
@@ -469,16 +456,21 @@ class Clover < Roda
         uri = URI(provider.url)
         builder.provider :openid_connect,
           name: name.to_sym,
+          issuer: provider.url,
           scope: %i[openid email],
           state: state_proc,
-          discovery: true,
+          discovery: false,
           client_options: {
             port: uri.port,
             scheme: uri.scheme,
             host: uri.host,
             identifier: provider.client_id,
             secret: provider.client_secret,
-            redirect_uri: provider.callback_url
+            redirect_uri: provider.callback_url,
+            authorization_endpoint: provider.authorization_endpoint,
+            token_endpoint: provider.token_endpoint,
+            userinfo_endpoint: provider.userinfo_endpoint,
+            jwks_uri: provider.jwks_uri
           }
 
         builder.run ->(env) { [404, {}, []] } # pass through
