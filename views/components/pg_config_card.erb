@@ -5,7 +5,7 @@
     <h3 class="text-lg font-medium text-gray-900"><%= title %></h3>
   </div>
 
-  <div class="divide-y divide-gray-200 w-full max-h-64 overflow-y-auto" id="config-container">
+  <div class="divide-y divide-gray-200 w-full max-h-64 overflow-y-auto">
     <% config.each_with_index do |(key, value), index| %>
       <div class="px-6 py-2 hover:bg-gray-50 pg-config group" data-config-id="<%= index %>">
         <div class="flex items-center justify-between">
