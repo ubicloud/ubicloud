@@ -4,6 +4,10 @@ require_relative "../model"
 require "excon"
 
 class OidcProvider < Sequel::Model
+  def self.name_for_ubid(ubid)
+    OidcProvider[UBID.to_uuid(ubid)]&.display_name
+  end
+
   # Register a new OIDC Provider. Currently, you must restart the application after
   # adding the provider (or require clover.rb to be reloaded).
   def self.register(display_name, url)
