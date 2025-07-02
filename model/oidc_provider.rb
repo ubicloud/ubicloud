@@ -15,12 +15,14 @@ class OidcProvider < Sequel::Model
 
     uri = URI(url)
     uri.path = "/.well-known/openid-configuration"
-    response = Excon.get(uri.to_s,
-      headers: {"Accept" => "application/json"},
-      expects: 200)
+    response = Excon.get(uri.to_s, headers: {"Accept" => "application/json"}, expects: 200)
+    config_info = JSON.parse(response.body)
+    authorization_endpoint = URI(config_info.fetch("authorization_endpoint")).path
+    token_endpoint = URI(config_info.fetch("token_endpoint")).path
+    userinfo_endpoint = URI(config_info.fetch("userinfo_endpoint")).path
+    jwks_uri = config_info.fetch("jwks_uri")
 
-    info = JSON.parse(response.body)
-    response = Excon.post(info["registration_endpoint"],
+    response = Excon.post(config_info["registration_endpoint"],
       headers: {"Accept" => "application/json", "Content-Type" => "application/json"},
       body: {
         client_name: "Ubicloud",
@@ -28,17 +30,28 @@ class OidcProvider < Sequel::Model
         scopes: "openid email"
       }.to_json)
 
-    info = JSON.parse(response.body)
-    raise "Unable to register with oidc provider: #{response.status} #{info.inspect}" unless response.status == 201
+    registration_info = JSON.parse(response.body)
+    raise "Unable to register with oidc provider: #{response.status} #{registration_info.inspect}" unless response.status == 201
 
     uri.path = ""
-    oidc_provider.update(url: uri, client_id: info["client_id"], client_secret: info["client_secret"])
+    oidc_provider.update(
+      url: uri.to_s,
+      client_id: registration_info.fetch("client_id"),
+      client_secret: registration_info.fetch("client_secret"),
+      authorization_endpoint:,
+      token_endpoint:,
+      userinfo_endpoint:,
+      jwks_uri:,
+      registration_client_uri: registration_info["registration_client_uri"],
+      registration_access_token: registration_info["registration_access_token"]
+    )
   end
 
   plugin ResourceMethods
 
   plugin :column_encryption do |enc|
     enc.column :client_secret
+    enc.column :registration_access_token
   end
 
   def callback_url
