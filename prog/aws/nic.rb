@@ -51,6 +51,7 @@ class Prog::Aws::Nic < Prog::Base
 
   label def destroy
     ignore_invalid_nic do
+      nap 5 if client.describe_network_interfaces({filters: [{name: "network-interface-id", values: [nic.name]}, {name: "tag:Ubicloud", values: ["true"]}]}).network_interfaces.first&.status == "in-use"
       client.delete_network_interface({network_interface_id: nic.name})
     end
     hop_release_eip

@@ -75,9 +75,21 @@ RSpec.describe Prog::Aws::Nic do
   end
 
   describe "#destroy" do
+    it "naps if the network interface is in use" do
+      client.stub_responses(:describe_network_interfaces, network_interfaces: [{status: "in-use"}])
+      expect { nx.destroy }.to nap(5)
+    end
+
     it "deletes the network interface" do
+      client.stub_responses(:describe_network_interfaces, network_interfaces: [{status: "available"}])
       client.stub_responses(:delete_network_interface)
       expect(client).to receive(:delete_network_interface).with({network_interface_id: nic.name}).and_call_original
+      expect { nx.destroy }.to hop("release_eip")
+    end
+
+    it "doesn't nap if network_interfaces are empty" do
+      client.stub_responses(:describe_network_interfaces, network_interfaces: [])
+      client.stub_responses(:delete_network_interface, Aws::EC2::Errors::InvalidNetworkInterfaceIDNotFound.new(nil, "The network interface 'eni-0123456789abcdefg' does not exist."))
       expect { nx.destroy }.to hop("release_eip")
     end
 

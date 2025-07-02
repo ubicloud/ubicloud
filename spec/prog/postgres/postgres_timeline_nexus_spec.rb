@@ -112,6 +112,24 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect(postgres_timeline).to receive(:set_lifecycle_policy).and_return(true)
       expect { nx.setup_bucket }.to hop("wait_leader")
     end
+
+    it "naps if aws and the key is not available" do
+      expect(postgres_timeline).to receive(:aws?).and_return(true)
+      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-west-2", location_credential: instance_double(LocationCredential, access_key: "access-key", secret_key: "secret-key"))).at_least(:once)
+      iam_client = Aws::IAM::Client.new(stub_responses: true)
+      expect(Aws::IAM::Client).to receive(:new).and_return(iam_client)
+      iam_client.stub_responses(:list_access_keys, access_key_metadata: [{access_key_id: "access-key"}])
+      expect(postgres_timeline).to receive(:access_key).and_return("not-access-key")
+      expect { nx.setup_bucket }.to nap(1)
+    end
+
+    it "hops to wait_leader if aws and the key is available" do
+      expect(postgres_timeline).to receive(:aws?).and_return(true)
+      expect(nx).to receive(:aws_access_key_is_available?).and_return(true)
+      expect(postgres_timeline).to receive(:create_bucket).and_return(true)
+      expect(postgres_timeline).to receive(:set_lifecycle_policy).and_return(true)
+      expect { nx.setup_bucket }.to hop("wait_leader")
+    end
   end
 
   describe "#wait_leader" do

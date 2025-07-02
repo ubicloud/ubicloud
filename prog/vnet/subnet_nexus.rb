@@ -205,6 +205,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
   label def wait_aws_vpc_destroyed
     reap(nap: 10) do
+      nap 5 unless private_subnet.nics.empty?
       private_subnet.private_subnet_aws_resource.destroy
       private_subnet.destroy
       pop "vpc destroyed"
