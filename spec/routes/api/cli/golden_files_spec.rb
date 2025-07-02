@@ -72,8 +72,14 @@ RSpec.describe Clover, "cli" do
       cli_commands.concat File.readlines(f).map { [it, {command_execute: cmd}] }
     end
 
+    cli_commands_hash = {}
     cli_commands.each do |cmd, kws|
       cmd.chomp!
+      lowercase_cmd = cmd.downcase
+      if (other_cmd = cli_commands_hash[lowercase_cmd])
+        raise "Golden file commands differ only in case and would break on case insensitive file systems:\n#{cmd}\n#{other_cmd}"
+      end
+      cli_commands_hash[lowercase_cmd] = cmd
       body = DB.transaction(savepoint: true, rollback: :always) do
         cli(cmd.shellsplit, **kws)
       end
