@@ -396,12 +396,30 @@ class Clover < Roda
     # should opt this in with a Config setting?
     require "omniauth_openid_connect"
 
+    # Turn off OIDC ID Token verification. OIDC spec 3.1.3.7.6 allow trusting the TLS
+    # server validation. This makes sense, because if the server we are connecting to
+    # is giving us a bogus token, they could just as easily also give us bogus data
+    # for the jwks endpoint.
+    class ::OmniAuth::Strategies::OpenIDConnect
+      # This can't be covered by the tests, as the tests use a mock provider.
+      # :nocov:
+      alias_method :verify_id_token!, :verify_id_token!
+      def verify_id_token!(id_token)
+        decode_id_token(id_token) if id_token
+      end
+
+      alias_method :decode_id_token, :decode_id_token
+      def decode_id_token(id_token)
+        ::OpenIDConnect::ResponseObject::IdToken.new(JSON::JWT.decode(id_token, :skip_verification))
+      end
+      # :nocov:
+    end
+
     # Turn on OpenID Connect debugging in development, helpful for seeing the internal
     # requests being made during callback phase (OIDC provider redirects to this, successful
     # authentication results in login):
     #
     # * Rack::OAuth2: request: POST https://host/token
-    # * OpenIDConnect: request: GET https://host/jwks
     # * Rack::OAuth2: request: GET https://host/userinfo
     #
     # ::OpenIDConnect.debug!
@@ -470,7 +488,7 @@ class Clover < Roda
             authorization_endpoint: provider.authorization_endpoint,
             token_endpoint: provider.token_endpoint,
             userinfo_endpoint: provider.userinfo_endpoint,
-            jwks_uri: provider.jwks_uri
+            jwks_uri: nil
           }
 
         builder.run ->(env) { [404, {}, []] } # pass through
