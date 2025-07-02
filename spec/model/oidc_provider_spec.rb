@@ -4,6 +4,12 @@ require_relative "spec_helper"
 require_relative "../../model/address"
 
 RSpec.describe OidcProvider do
+  it ".name_for_ubid returns the name for the provider, if there is one" do
+    expect(described_class.name_for_ubid(described_class.generate_ubid.to_s)).to be_nil
+    provider = described_class.create(display_name: "TestOIDC", client_id: "123", client_secret: "456", url: "http://example.com")
+    expect(described_class.name_for_ubid(provider.ubid)).to eq "TestOIDC"
+  end
+
   it ".register registers a new provider" do
     Excon.stub({path: "/.well-known/openid-configuration", method: :get}, {status: 200, body: {registration_endpoint: "https://example.com/register"}.to_json})
 
