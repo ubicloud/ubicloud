@@ -119,9 +119,15 @@ class Prog::Aws::Vpc < Prog::Base
   end
 
   label def destroy
-    client.delete_subnet({subnet_id: private_subnet.private_subnet_aws_resource.subnet_id})
-    hop_delete_security_group
-  rescue Aws::EC2::Errors::InvalidSubnetIDNotFound
+    subnet = client.describe_subnets({filters: [{name: "subnet-id", values: [private_subnet.private_subnet_aws_resource.subnet_id]}]}).subnets.first
+    hop_delete_security_group unless subnet
+
+    nap 5 if subnet.state != "available"
+    begin
+      client.delete_subnet({subnet_id: private_subnet.private_subnet_aws_resource.subnet_id})
+    rescue Aws::EC2::Errors::DependencyViolation
+      nap 5
+    end
     hop_delete_security_group
   end
 

@@ -462,6 +462,13 @@ RSpec.describe Prog::Vnet::SubnetNexus do
   end
 
   describe "#wait_aws_vpc_destroyed" do
+    it "naps if there are nics" do
+      st.update(prog: "Vnet::SubnetNexus", label: "wait_aws_vpc_destroyed", stack: [{}])
+      expect(nx).to receive(:private_subnet).and_return(ps).at_least(:once)
+      expect(ps).to receive(:nics).and_return([1]).at_least(:once)
+      expect { nx.wait_aws_vpc_destroyed }.to nap(5)
+    end
+
     it "deletes the vpc and pops if leaf" do
       st.update(prog: "Vnet::SubnetNexus", label: "wait_aws_vpc_destroyed", stack: [{}])
       expect(nx).to receive(:private_subnet).and_return(ps).at_least(:once)

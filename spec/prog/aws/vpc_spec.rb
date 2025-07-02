@@ -130,6 +130,12 @@ RSpec.describe Prog::Aws::Vpc do
   describe "#destroy" do
     before do
       ps.private_subnet_aws_resource.update(subnet_id: "subnet-0123456789abcdefg", security_group_id: "sg-0123456789abcdefg", internet_gateway_id: "igw-0123456789abcdefg")
+      client.stub_responses(:describe_subnets, subnets: [{state: "available"}])
+    end
+
+    it "naps if subnet is not available" do
+      client.stub_responses(:describe_subnets, subnets: [{state: "pending"}])
+      expect { nx.destroy }.to nap(5)
     end
 
     it "deletes the subnet and hops to delete_security_group" do
@@ -139,8 +145,13 @@ RSpec.describe Prog::Aws::Vpc do
     end
 
     it "hops to delete_security_group if subnet is not found" do
-      client.stub_responses(:delete_subnet, Aws::EC2::Errors::InvalidSubnetIDNotFound.new(nil, nil))
+      client.stub_responses(:describe_subnets, subnets: [])
       expect { nx.destroy }.to hop("delete_security_group")
+    end
+
+    it "naps if delete_subnet gives dependency violation" do
+      client.stub_responses(:delete_subnet, Aws::EC2::Errors::DependencyViolation.new(nil, nil))
+      expect { nx.destroy }.to nap(5)
     end
 
     it "deletes the security group and hops to delete_internet_gateway" do

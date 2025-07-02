@@ -48,6 +48,8 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   label def setup_bucket
+    nap 1 if postgres_timeline.aws? && !aws_access_key_is_available?
+
     # Create bucket for the timeline
     postgres_timeline.create_bucket
     postgres_timeline.set_lifecycle_policy
@@ -109,16 +111,15 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   def destroy_aws_s3
-    iam = Aws::IAM::Client.new(access_key_id: postgres_timeline.location.location_credential.access_key, secret_access_key: postgres_timeline.location.location_credential.secret_key, region: postgres_timeline.location.name)
-    iam.list_attached_user_policies(user_name: postgres_timeline.ubid).attached_policies.each do |it|
-      iam.detach_user_policy(user_name: postgres_timeline.ubid, policy_arn: it.policy_arn)
-      iam.delete_policy(policy_arn: it.policy_arn)
+    iam_client.list_attached_user_policies(user_name: postgres_timeline.ubid).attached_policies.each do |it|
+      iam_client.detach_user_policy(user_name: postgres_timeline.ubid, policy_arn: it.policy_arn)
+      iam_client.delete_policy(policy_arn: it.policy_arn)
     end
 
-    iam.list_access_keys(user_name: postgres_timeline.ubid).access_key_metadata.each do |it|
-      iam.delete_access_key(user_name: postgres_timeline.ubid, access_key_id: it.access_key_id)
+    iam_client.list_access_keys(user_name: postgres_timeline.ubid).access_key_metadata.each do |it|
+      iam_client.delete_access_key(user_name: postgres_timeline.ubid, access_key_id: it.access_key_id)
     end
-    iam.delete_user(user_name: postgres_timeline.ubid)
+    iam_client.delete_user(user_name: postgres_timeline.ubid)
   end
 
   def setup_blob_storage
@@ -131,14 +132,20 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   def setup_aws_s3
-    iam = Aws::IAM::Client.new(access_key_id: postgres_timeline.location.location_credential.access_key, secret_access_key: postgres_timeline.location.location_credential.secret_key, region: postgres_timeline.location.name)
-
-    iam.create_user(user_name: postgres_timeline.ubid)
-    policy = iam.create_policy(policy_name: postgres_timeline.ubid, policy_document: postgres_timeline.blob_storage_policy.to_json)
-    iam.attach_user_policy(user_name: postgres_timeline.ubid, policy_arn: policy.policy.arn)
-    response = iam.create_access_key(user_name: postgres_timeline.ubid)
+    iam_client.create_user(user_name: postgres_timeline.ubid)
+    policy = iam_client.create_policy(policy_name: postgres_timeline.ubid, policy_document: postgres_timeline.blob_storage_policy.to_json)
+    iam_client.attach_user_policy(user_name: postgres_timeline.ubid, policy_arn: policy.policy.arn)
+    response = iam_client.create_access_key(user_name: postgres_timeline.ubid)
     postgres_timeline.update(access_key: response.access_key.access_key_id, secret_key: response.access_key.secret_access_key)
     postgres_timeline.leader.incr_refresh_walg_credentials
+  end
+
+  def aws_access_key_is_available?
+    iam_client.list_access_keys(user_name: postgres_timeline.ubid).access_key_metadata.any? { |it| it.access_key_id == postgres_timeline.access_key }
+  end
+
+  def iam_client
+    @iam_client ||= Aws::IAM::Client.new(access_key_id: postgres_timeline.location.location_credential.access_key, secret_access_key: postgres_timeline.location.location_credential.secret_key, region: postgres_timeline.location.name)
   end
 
   def admin_client
