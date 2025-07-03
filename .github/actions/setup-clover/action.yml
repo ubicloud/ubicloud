@@ -6,20 +6,32 @@ runs:
     - name: Setup PostgreSQL
       shell: bash
       run: |
-        # Remove the default PostgreSQL cluster on the runner
-        sudo -u postgres pg_dropcluster 14 main --stop
-        # Install PostgreSQL
-        sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-        wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
-        sudo apt-get update
-        sudo apt-get install -y postgresql-15 postgresql-client-15
-        # Allow runner user to access PostgreSQL
-        echo 'runner_map runner postgres
-        runner_map runner clover
-        runner_map runner clover_password' | sudo tee -a /etc/postgresql/15/main/pg_ident.conf > /dev/null
-        sudo sed -i '1i local   all   all   peer map=runner_map' /etc/postgresql/15/main/pg_hba.conf
-        sudo systemctl start postgresql
-        until pg_isready -q; do sleep 1; done
+        if [ "$RUNNER_OS" = "Linux" ]; then
+          # Remove the default PostgreSQL cluster on the runner
+          sudo -u postgres pg_dropcluster 14 main --stop
+          # Install PostgreSQL
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+          sudo apt-get update
+          sudo apt-get install -y postgresql-15 postgresql-client-15
+          # Allow runner user to access PostgreSQL
+          echo 'runner_map runner postgres
+          runner_map runner clover
+          runner_map runner clover_password' | sudo tee -a /etc/postgresql/15/main/pg_ident.conf > /dev/null
+          sudo sed -i '1i local   all   all   peer map=runner_map' /etc/postgresql/15/main/pg_hba.conf
+          sudo systemctl start postgresql
+          until pg_isready -q; do sleep 1; done
+        elif [ "$RUNNER_OS" = "macOS" ]; then
+          brew install postgresql@15
+          export PATH="/opt/homebrew/opt/postgresql@15/bin:$PATH"
+          echo "/opt/homebrew/opt/postgresql@15/bin" >> $GITHUB_PATH
+          brew services start postgresql@15
+          until pg_isready -q; do sleep 1; done
+          psql -d postgres -c "CREATE ROLE postgres WITH LOGIN SUPERUSER CREATEDB CREATEROLE;"
+        else
+          echo "Unsupported RUNNER_OS: $RUNNER_OS"
+          exit 1
+        fi
 
     - name: Set up Ruby
       uses: ruby/setup-ruby@v1
