@@ -55,7 +55,8 @@ class PostgresServer < Sequel::Model
       "lc_monetary" => "'C.UTF-8'",
       "lc_numeric" => "'C.UTF-8'",
       "lc_time" => "'C.UTF-8'",
-      "shared_preload_libraries" => "'pg_cron,pg_stat_statements'"
+      "shared_preload_libraries" => "'pg_cron,pg_stat_statements'",
+      "cron.use_background_workers" => "on"
     }
 
     if resource.flavor == PostgresResource::Flavor::PARADEDB
