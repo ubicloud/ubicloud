@@ -394,38 +394,6 @@ class Clover < Roda
     end
     # :nocov:
 
-    # This needs to be required early in order to work with a frozen environment. Maybe we
-    # should opt this in with a Config setting?
-    require "omniauth_openid_connect"
-
-    # Turn off OIDC ID Token verification. OIDC spec 3.1.3.7.6 allow trusting the TLS
-    # server validation. This makes sense, because if the server we are connecting to
-    # is giving us a bogus token, they could just as easily also give us bogus data
-    # for the jwks endpoint.
-    class ::OmniAuth::Strategies::OpenIDConnect
-      # This can't be covered by the tests, as the tests use a mock provider.
-      # :nocov:
-      alias_method :verify_id_token!, :verify_id_token!
-      def verify_id_token!(id_token)
-        decode_id_token(id_token) if id_token
-      end
-
-      alias_method :decode_id_token, :decode_id_token
-      def decode_id_token(id_token)
-        ::OpenIDConnect::ResponseObject::IdToken.new(JSON::JWT.decode(id_token, :skip_verification))
-      end
-      # :nocov:
-    end
-
-    # Turn on OpenID Connect debugging in development, helpful for seeing the internal
-    # requests being made during callback phase (OIDC provider redirects to this, successful
-    # authentication results in login):
-    #
-    # * Rack::OAuth2: request: POST https://host/token
-    # * Rack::OAuth2: request: GET https://host/userinfo
-    #
-    # ::OpenIDConnect.debug!
-
     auth_class_eval do
       # If the route isn't already handled and matches a known provider,
       # get the app specific to that provider, and then run it.
@@ -445,10 +413,7 @@ class Clover < Roda
 
       omniauth_apps = {}
       omniauth_app_mutex = Mutex.new
-      state_proc = -> { Base64.urlsafe_encode64(SecureRandom.hex(32)) }
-
-      # Test for coverage
-      state_proc.call
+      builder_app = ->(env) { [404, {}, []] }
 
       # Return OIDC-provider specific omniauth app.  If there isn't an existing
       # app for the provider in this process, build one.
@@ -457,6 +422,13 @@ class Clover < Roda
         if (app = omniauth_app_mutex.synchronize { omniauth_apps[name] })
           return app
         end
+
+        # Delay loading of omniauth_oidc until it is needed. Generally, this type of
+        # runtime require doesn't work with a frozen environment, but it does in this
+        # as the file does not modify any frozen constants. This is helpful so that
+        # users do not have to pay the cost of loading the file if they do not have
+        # any OidcProviders.
+        require_relative "vendor/omniauth_oidc"
 
         # This part is copied from rodauth-omniauth's omniauth_app method in order
         # to integrate with rodauth-omniauth.
@@ -474,12 +446,9 @@ class Clover < Roda
         # Only use the provider passed to the method. rodauth-omniauth uses all
         # statically configured providers in omniauth_app
         uri = URI(provider.url)
-        builder.provider :openid_connect,
+        builder.provider :oidc,
           name: name.to_sym,
           issuer: provider.url,
-          scope: %i[openid email],
-          state: state_proc,
-          discovery: false,
           client_options: {
             port: uri.port,
             scheme: uri.scheme,
@@ -489,11 +458,10 @@ class Clover < Roda
             redirect_uri: provider.callback_url,
             authorization_endpoint: provider.authorization_endpoint,
             token_endpoint: provider.token_endpoint,
-            userinfo_endpoint: provider.userinfo_endpoint,
-            jwks_uri: nil
+            userinfo_endpoint: provider.userinfo_endpoint
           }
 
-        builder.run ->(env) { [404, {}, []] } # pass through
+        builder.run builder_app
         app = builder.to_app
         omniauth_app_mutex.synchronize { omniauth_apps[name] ||= app }
       end
