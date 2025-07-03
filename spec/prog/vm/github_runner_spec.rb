@@ -165,11 +165,11 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(runner.billed_vm_size).to eq("premium-2")
     end
 
-    it "uses the original billing rate for runners who were upgraded for free" do
+    it "uses the original billing rate for runners who were upgraded for free based on runner creation time" do
       vm.update(family: "premium")
-      runner.update(label: "ubicloud-standard-2", ready_at: now - 5 * 60)
+      runner.update(label: "ubicloud-standard-2", ready_at: now - 5 * 60, created_at: now - 100)
 
-      expect(installation).to receive(:free_runner_upgrade?).and_return(true)
+      expect(installation).to receive(:free_runner_upgrade_expires_at).and_return(now - 50)
       expect(BillingRecord).to receive(:create_with_id).and_call_original
       nx.update_billing_record
 
