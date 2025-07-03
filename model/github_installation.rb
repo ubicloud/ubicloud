@@ -14,8 +14,8 @@ class GithubInstallation < Sequel::Model
     runners_dataset.total_active_runner_vcpus
   end
 
-  def free_runner_upgrade?
-    free_runner_upgrade_expires_at > Time.now
+  def free_runner_upgrade?(at = Time.now)
+    free_runner_upgrade_expires_at > at
   end
 
   def free_runner_upgrade_expires_at

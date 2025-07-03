@@ -77,7 +77,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     label_data = github_runner.label_data
     billed_vm_size = if label_data["arch"] == "arm64"
       "#{label_data["vm_size"]}-arm"
-    elsif github_runner.installation.free_runner_upgrade?
+    elsif github_runner.installation.free_runner_upgrade?(github_runner.created_at)
       # If we enable free upgrades for the project, we should charge
       # the customer for the label's VM size instead of the effective VM size.
       label_data["vm_size"]
