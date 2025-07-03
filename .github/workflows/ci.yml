@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [ubicloud-standard-8, ubicloud-standard-8-arm]
+        runs-on: [ubicloud-standard-8, ubicloud-standard-8-arm, macos-latest]
     name: Ruby CI - ${{matrix.runs-on}}
     runs-on: ${{matrix.runs-on}}
     timeout-minutes: 25
@@ -75,6 +75,10 @@ jobs:
 
     - name: Run controlplane tests
       run: bundle exec rake
+
+    - name: Create /etc/os-release on macOS
+      if: runner.os == 'macOS'
+      run: echo 'VERSION_ID="24.04"' | sudo tee /etc/os-release
 
     - name: Run dataplane tests
       run: bundle exec rake rhizome_spec
