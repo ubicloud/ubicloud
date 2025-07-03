@@ -245,6 +245,31 @@ class Prog::Vm::GithubRunner < Prog::Base
       COMMAND
     end
 
+    if github_runner.installation.project.get_ff_runner_jit_file
+      # After testing in production for a while, we can move these files to the image generation process
+      command += <<~COMMAND
+        sudo tee /etc/systemd/system/runner-script.service > /dev/null > /dev/null <<'EOT'
+        [Unit]
+        Description=runner-script
+
+        [Service]
+        RemainAfterExit=yes
+        User=runner
+        Group=runner
+        WorkingDirectory=/home/runner
+        ExecStart=/home/runner/actions-runner/run-withenv.sh
+        EOT
+
+        sudo -u runner tee /home/runner/actions-runner/run-withenv.sh > /dev/null <<'EOT'
+        #!/bin/bash
+        mapfile -t env </etc/environment
+        JIT_CONFIG="$(cat ./actions-runner/.jit_token)"
+        exec env -- "${env[@]}" ./actions-runner/run.sh --jitconfig "$JIT_CONFIG"
+        EOT
+        sudo systemctl daemon-reload
+      COMMAND
+    end
+
     # Remove comments and empty lines before sending them to the machine
     vm.sshable.cmd(command.gsub(/^(\s*# .*)?\n/, ""))
 
@@ -258,12 +283,19 @@ class Prog::Vm::GithubRunner < Prog::Base
     data = {name: github_runner.ubid.to_s, labels: [github_runner.label], runner_group_id: 1, work_folder: "/home/runner/work"}
     response = github_client.post("/repos/#{github_runner.repository_name}/actions/runners/generate-jitconfig", data)
     github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
-    # We initiate an API call and a SSH connection under the same label to avoid
-    # having to store the encoded_jit_config.
-    vm.sshable.cmd("sudo -- xargs -0 -- systemd-run --uid runner --gid runner " \
-                   "--working-directory '/home/runner' --unit runner-script --description runner-script --remain-after-exit -- " \
-                   "/home/runner/actions-runner/run-withenv.sh",
-      stdin: response[:encoded_jit_config].gsub("$", "$$"))
+    if github_runner.installation.project.get_ff_runner_jit_file
+      vm.sshable.cmd(<<~COMMAND, stdin: response[:encoded_jit_config])
+      sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
+      sudo systemctl start runner-script.service
+      COMMAND
+    else
+      # We initiate an API call and a SSH connection under the same label to avoid
+      # having to store the encoded_jit_config.
+      vm.sshable.cmd("sudo -- xargs -0 -- systemd-run --uid runner --gid runner " \
+                    "--working-directory '/home/runner' --unit runner-script --description runner-script --remain-after-exit -- " \
+                    "/home/runner/actions-runner/run-withenv.sh",
+        stdin: response[:encoded_jit_config].gsub("$", "$$"))
+    end
     github_runner.log_duration("runner_registered", github_runner.ready_at - github_runner.allocated_at)
 
     hop_wait
