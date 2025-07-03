@@ -85,3 +85,5 @@ end
 group :test, :development do
   gem "sequel-annotate"
 end
+
+gem "roda-enhanced_logger"

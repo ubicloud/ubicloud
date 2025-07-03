@@ -4,11 +4,12 @@
 %>
 
 <form action="<%= "#{@project_data[:path]}#{@pg.path}/configuration" %>" role="form" method="POST" class="min-w-2/3 pg-config">
+    <%== csrf_tag("#{@project_data[:path]}#{@pg.path}/configuration") %>
+
     <%== part("components/pg_config_card", title: "PostgreSQL Configuration", config: pg_config, extra_class: "pg-config-card", name: "pg_config") %>
     <%== part("components/pg_config_card", title: "PgBouncer Configuration", config: pgbouncer_config, extra_class: "pgbouncer-config-card", name: "pgbouncer_config") %>
     <div class="flex justify-end">
         <% if @edit_perm %>
-            <%== csrf_tag("#{@project_data[:path]}#{@pg.path}/configuration") %>
             <%== part("components/form/submit_button", text: "Save", extra_class: "save-config-btn") %>
         <% end %>
     </div>

@@ -140,7 +140,8 @@ class Clover < Roda
     $stderr
     # :nocov:
   end
-  plugin :common_logger, logger
+  # plugin :common_logger, logger
+  plugin :enhanced_logger, trace_all: true # or trace_missed: true for only missed routes
 
   plugin :not_found do
     next if runtime?
@@ -738,7 +739,7 @@ class Clover < Roda
       # (which is thought to be cheaper)
       begin
         @schema_validator = SCHEMA_ROUTER.build_schema_validator(r)
-        @schema_validator.request_validate(r)
+        # @schema_validator.request_validate(r)
 
         next unless @schema_validator.link_exist?
       rescue JSON::ParserError => e
@@ -755,7 +756,7 @@ class Clover < Roda
     status, headers, body = res
     next unless api? && status && headers && body
     @schema_validator ||= SCHEMA_ROUTER.build_schema_validator(request)
-    @schema_validator.response_validate(status, headers, body, true) if @schema_validator.link_exist?
+    # @schema_validator.response_validate(status, headers, body, true) if @schema_validator.link_exist?
   rescue JSON::ParserError => e
     raise Committee::InvalidResponse.new("Response body wasn't valid JSON.", original_error: e)
   end

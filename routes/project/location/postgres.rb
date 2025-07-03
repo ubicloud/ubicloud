@@ -497,10 +497,16 @@ class Clover
 
           pg.servers.each(&:incr_configure)
 
-          {
-            pg_config: pg.user_config,
-            pgbouncer_config: pg.pgbouncer_user_config
-          }
+          if web?
+            flash["notice"] = "Configuration saved successfully"
+
+            r.redirect "#{@project.path}#{pg.path}/configuration"
+          else
+            {
+              pg_config: pg.user_config,
+              pgbouncer_config: pg.pgbouncer_user_config
+            }
+          end
         end
 
         r.patch do

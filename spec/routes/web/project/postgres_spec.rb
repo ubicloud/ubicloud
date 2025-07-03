@@ -766,5 +766,13 @@ RSpec.describe Clover, "postgres" do
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
       end
     end
+
+    describe "config" do
+      it "can view configuration" do
+        visit "#{project.path}#{pg.path}/configuration"
+
+        expect(page).to have_content "PostgreSQL Configuration"
+      end
+    end
   end
 end

@@ -1033,10 +1033,17 @@ function setupPgConfigCard() {
   $(".save-config-btn").on("click", function (event) {
     event.preventDefault();
 
+    const csrfToken = $('.pg-config input[name=_csrf]').attr('value');
+    console.log("csrfToken", csrfToken);
+
     $.ajax({
       url: $(this).data("url"),
       type: "POST",
       data: "{\"pg_config\": {}, \"pgbouncer_config\": {}}",
+      headers: {
+        "Accept": "application/json",
+        "X-CSRF-Token": csrfToken
+      },
       contentType: "application/json",
       dataType: "json",
       success: function (data) {
