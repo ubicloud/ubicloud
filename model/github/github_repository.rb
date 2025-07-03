@@ -39,17 +39,27 @@ class GithubRepository < Sequel::Model
 
   def destroy_blob_storage
     # Abort any ongoing multipart uploads to ensure the bucket is empty before deleting it
-    blob_storage_client.list_multipart_uploads(bucket: bucket_name).uploads.each do
-      blob_storage_client.abort_multipart_upload(bucket: bucket_name, key: it.key, upload_id: it.upload_id)
+    # It might fail with Unauthorized error if the bucket or token is deleted already.
+    begin
+      blob_storage_client.list_multipart_uploads(bucket: bucket_name).uploads.each do
+        blob_storage_client.abort_multipart_upload(bucket: bucket_name, key: it.key, upload_id: it.upload_id)
+      end
+    rescue Aws::S3::Errors::Unauthorized
+      Clog.emit("Repository credentials failed to abort multipart uploads") { {failed_abort_multipart_uploads: {bucket_name: bucket_name}} }
     end
 
     begin
       admin_client.delete_bucket(bucket: bucket_name)
     rescue Aws::S3::Errors::NoSuchBucket
+      Clog.emit("Bucket already deleted") { {failed_bucket_destroy: {bucket_name: bucket_name}} }
     end
 
-    CloudflareClient.new(Config.github_cache_blob_storage_api_key).delete_token(access_key)
-    this.update(access_key: nil, secret_key: nil)
+    begin
+      CloudflareClient.new(Config.github_cache_blob_storage_api_key).delete_token(access_key)
+      this.update(access_key: nil, secret_key: nil)
+    rescue Excon::Error::HTTPStatus
+      Clog.emit("Repository credentials failed to delete Cloudflare token") { {failed_cloudflare_token_delete: {bucket_name: bucket_name}} }
+    end
   end
 
   def setup_blob_storage
