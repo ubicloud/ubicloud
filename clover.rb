@@ -344,9 +344,11 @@ class Clover < Roda
     already_logged_in { redirect login_redirect }
     after_login do
       remember_login if scope.typecast_params.str("remember-me") == "on"
-      if omniauth_identity && (url = omniauth_params["redirect_url"])
+      if omniauth_identity && omniauth_params["redirect_url"]
         flash["notice"] = "You have successfully connected your account with #{scope.omniauth_provider_name(omniauth_provider)}."
-        redirect url
+        # Don't trust the omniauth params, always redirect to the login methods page,
+        # as that is the only page that should be setting redirect_url
+        redirect "/account/login-method"
       end
     end
 
