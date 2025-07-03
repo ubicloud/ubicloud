@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [ubicloud, ubicloud-arm]
+        runs-on: [ubicloud-standard-8, ubicloud-standard-8-arm]
     name: Ruby CI - ${{matrix.runs-on}}
     runs-on: ${{matrix.runs-on}}
     timeout-minutes: 25

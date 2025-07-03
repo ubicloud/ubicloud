@@ -36,4 +36,4 @@ runs:
       run: |
         createuser -U postgres clover
         createuser -U postgres clover_password
-        bundle exec rake setup_database\[test,false\]
+        bundle exec rake setup_database\[test,true\]
