@@ -13,6 +13,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
     vm_pool_service_project = Project.create(name: "Vm-Pool-Service-Project") { it.id = Config.vm_pool_project_id }
 
     github_test_project = Project.create(name: "Github-Runner-Test-Project")
+    github_test_project.set_ff_runner_jit_file(true)
     GithubInstallation.create(
       installation_id: Config.e2e_github_installation_id,
       name: "TestUser",
