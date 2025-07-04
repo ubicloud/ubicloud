@@ -67,6 +67,7 @@ jobs:
     - name: Run tests
       env:
         BASE_URL: https://${{ secrets.CLOUDFLARED_ADDRESS }}
+        CLOVER_DATABASE_URL: postgres:///clover_test?user=clover
         RACK_ENV: production
         IS_E2E: "true"
         CI_HETZNER_SACRIFICIAL_SERVER_ID: ${{ secrets.CI_HETZNER_SACRIFICIAL_SERVER_ID }}
