@@ -269,8 +269,10 @@ RSpec.describe Prog::Vnet::NicNexus do
     it "reaps and destroys nic if leaf" do
       st.update(prog: "Vnet::NicNexus", label: "wait_aws_nic_destroyed", stack: [{}])
       nic = instance_double(Nic, id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
-      expect(nx).to receive(:nic).and_return(nic)
+      expect(nx).to receive(:nic).and_return(nic).at_least(:once)
       expect(nic).to receive(:destroy)
+      expect(nic).to receive(:private_subnet).and_return(ps)
+      expect(ps).to receive(:incr_refresh_keys)
       expect { nx.wait_aws_nic_destroyed }.to exit({"msg" => "nic deleted"})
     end
 
