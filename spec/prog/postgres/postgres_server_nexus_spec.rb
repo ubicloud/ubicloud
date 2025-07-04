@@ -25,7 +25,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         sshable: sshable,
         ephemeral_net4: "1.1.1.1",
         private_subnets: [instance_double(PrivateSubnet)]
-      )
+      ),
+      data_device_path: "/dev/vdb"
     )
   }
 
@@ -221,7 +222,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#mount_data_disk" do
     it "formats data disk if format command is not sent yet or failed" do
-      expect(postgres_server.vm).to receive(:vm_storage_volumes).and_return([instance_double(VmStorageVolume, boot: true, device_path: "/dev/vda"), instance_double(VmStorageVolume, boot: false, device_path: "/dev/vdb")]).twice
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo mkfs --type ext4 /dev/vdb' format_disk").twice
 
       # NotStarted
@@ -235,7 +235,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "mounts data disk if format disk is succeeded and hops to configure_walg_credentials" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check format_disk").and_return("Succeeded")
-      expect(postgres_server.vm).to receive(:vm_storage_volumes).and_return([instance_double(VmStorageVolume, boot: true, device_path: "/dev/vda"), instance_double(VmStorageVolume, boot: false, device_path: "/dev/vdb")])
       expect(sshable).to receive(:cmd).with("sudo mkdir -p /dat")
       expect(sshable).to receive(:cmd).with("sudo common/bin/add_to_fstab /dev/vdb /dat ext4 defaults 0 0")
       expect(sshable).to receive(:cmd).with("sudo mount /dev/vdb /dat")

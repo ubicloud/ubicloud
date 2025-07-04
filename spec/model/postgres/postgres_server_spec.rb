@@ -36,7 +36,8 @@ RSpec.describe PostgresServer do
       nics: [
         instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.70.205.205/32"))
       ],
-      private_ipv4: NetAddr::IPv4Net.parse("10.70.205.205/32").network
+      private_ipv4: NetAddr::IPv4Net.parse("10.70.205.205/32").network,
+      location: instance_double(Location, aws?: false)
     )
   }
 
@@ -375,5 +376,16 @@ RSpec.describe PostgresServer do
   it "runs query on vm" do
     expect(postgres_server.vm.sshable).to receive(:cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: "SELECT 1").and_return("1\n")
     expect(postgres_server.run_query("SELECT 1")).to eq("1")
+  end
+
+  it "returns the right data_device_path for AWS" do
+    expect(postgres_server.vm.location).to receive(:aws?).and_return(true)
+    expect(postgres_server.vm.sshable).to receive(:cmd).with("lsblk -b -d -o NAME,SIZE | sort -n -k2 | tail -n1 |  awk '{print \"/dev/\"$1}'").and_return("/dev/vdb")
+    expect(postgres_server.data_device_path).to eq("/dev/vdb")
+  end
+
+  it "returns the right data_device_path for Hetzner" do
+    expect(postgres_server.vm).to receive(:vm_storage_volumes).and_return([instance_double(VmStorageVolume, boot: false, device_path: "/dev/vdb")])
+    expect(postgres_server.data_device_path).to eq("/dev/vdb")
   end
 end

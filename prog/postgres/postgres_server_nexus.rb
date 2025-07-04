@@ -103,15 +103,13 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     case vm.sshable.cmd("common/bin/daemonizer --check format_disk")
     when "Succeeded"
       vm.sshable.cmd("sudo mkdir -p /dat")
-      device_path = vm.vm_storage_volumes.find { it.boot == false }.device_path.shellescape
 
-      vm.sshable.cmd("sudo common/bin/add_to_fstab #{device_path} /dat ext4 defaults 0 0")
-      vm.sshable.cmd("sudo mount #{device_path} /dat")
+      vm.sshable.cmd("sudo common/bin/add_to_fstab #{postgres_server.data_device_path} /dat ext4 defaults 0 0")
+      vm.sshable.cmd("sudo mount #{postgres_server.data_device_path} /dat")
 
       hop_configure_walg_credentials
     when "Failed", "NotStarted"
-      device_path = vm.vm_storage_volumes.find { it.boot == false }.device_path.shellescape
-      vm.sshable.cmd("common/bin/daemonizer 'sudo mkfs --type ext4 #{device_path}' format_disk")
+      vm.sshable.cmd("common/bin/daemonizer 'sudo mkfs --type ext4 #{postgres_server.data_device_path}' format_disk")
     end
 
     nap 5
