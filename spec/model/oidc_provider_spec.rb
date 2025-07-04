@@ -59,6 +59,22 @@ RSpec.describe OidcProvider do
     expect(oidc_provider.registration_access_token).to eq "789"
   end
 
+  it ".register registers a new provider with given client_id and client_secret" do
+    Excon.stub({path: "/.well-known/openid-configuration", method: :get}, {status: 200, body: registration_body})
+    expect(described_class).to receive(:generate_uuid).and_return("9a2d00a7-7d70-8816-82db-4c9e34e1d008")
+    oidc_provider = described_class.register("Test", "https://example.com", client_id: "123", client_secret: "456")
+    expect(described_class.all).to eq [oidc_provider]
+    expect(oidc_provider.url).to eq "https://example.com"
+    expect(oidc_provider.client_id).to eq "123"
+    expect(oidc_provider.client_secret).to eq "456"
+    expect(oidc_provider.authorization_endpoint).to eq "/auth"
+    expect(oidc_provider.token_endpoint).to eq "/tok"
+    expect(oidc_provider.userinfo_endpoint).to eq "/ui"
+    expect(oidc_provider.jwks_uri).to eq "https://host/jw"
+    expect(oidc_provider.registration_client_uri).to be_nil
+    expect(oidc_provider.registration_access_token).to be_nil
+  end
+
   it ".register handles errors registering a new provider" do
     Excon.stub({path: "/.well-known/openid-configuration", method: :get}, {status: 200, body: registration_body})
 
