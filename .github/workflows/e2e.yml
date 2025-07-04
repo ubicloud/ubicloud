@@ -48,6 +48,15 @@ jobs:
     - name: Set cloudflared token
       run: sudo cloudflared service install ${{ secrets.CLOUDFLARED_TOKEN }}
 
+    - name: Install mailpit
+      run: |
+        curl -sfL -m 90 -o mailpit.tar.gz https://github.com/axllent/mailpit/releases/download/v1.27.0/mailpit-linux-amd64.tar.gz
+        tar zxf mailpit.tar.gz
+        mv mailpit /usr/local/bin/
+        sudo systemd-run --setenv="MP_UI_AUTH=${{ secrets.MAIL_USER }}:${{ secrets.MAIL_PASSWORD }}" \
+          --setenv="MP_SMTP_AUTH=${{ secrets.MAIL_USER }}:${{ secrets.MAIL_PASSWORD }}" --setenv="MP_SMTP_AUTH_ALLOW_INSECURE=true" \
+          --unit mailpit -- mailpit
+
     - name: Install foreman
       run: gem install foreman
 
@@ -96,6 +105,12 @@ jobs:
         POSTGRES_SERVICE_PROJECT_ID: "546a1ed8-53e5-86d2-966c-fb782d2ae5ab"
         MINIO_SERVICE_PROJECT_ID: "37ad2a8d-0220-4e8b-a67f-38db95d6c657"
         VM_POOL_PROJECT_ID: "e4b93fb7-5125-8ad2-9d29-730ff4506bc3"
+        MAIL_FROM: test@example.com
+        SMTP_USER: ${{ secrets.MAIL_USER }}
+        SMTP_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+        SMTP_HOSTNAME: localhost
+        SMTP_PORT: 1025
+        SMTP_TLS: false
       run: |
         set -o pipefail
         timeout 55m foreman start | tee foreman.log | grep "e2e.1"
