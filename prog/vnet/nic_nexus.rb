@@ -32,14 +32,14 @@ class Prog::Vnet::NicNexus < Prog::Base
   end
 
   label def create_aws_nic
-    nap 10 unless nic.private_subnet.strand.label == "wait"
+    nap 1 unless nic.private_subnet.strand.label == "wait"
     NicAwsResource.create { it.id = nic.id }
     bud Prog::Aws::Nic, {"subject_id" => nic.id}, :create_network_interface
     hop_wait_aws_nic_created
   end
 
   label def wait_aws_nic_created
-    reap(:wait, nap: 10)
+    reap(:wait, nap: 1)
   end
 
   label def wait_allocation

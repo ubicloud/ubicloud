@@ -201,13 +201,13 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   label def start_aws
-    nap 5 unless vm.nics.all? { |nic| nic.strand.label == "wait" }
+    nap 1 unless vm.nics.all? { |nic| nic.strand.label == "wait" }
     bud Prog::Aws::Instance, {"subject_id" => vm.id}, :start
     hop_wait_aws_vm_started
   end
 
   label def wait_aws_vm_started
-    reap(:wait_sshable, nap: 10)
+    reap(:wait_sshable, nap: 1)
   end
 
   label def start
@@ -337,7 +337,8 @@ class Prog::Vm::Nexus < Prog::Base
       # This is the first time we get into this state and we know that
       # wait_sshable will take definitely more than 8 seconds. So, we nap here
       # to reduce the amount of load on the control plane unnecessarily.
-      nap 8
+      # This comment is not true for AWS, therefore, we don't nap for AWS.
+      nap 8 unless vm.location.provider == "aws"
     end
     addr = vm.ephemeral_net4
     hop_create_billing_record unless addr

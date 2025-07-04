@@ -225,7 +225,7 @@ RSpec.describe Prog::Vm::Nexus do
   describe "#start_aws" do
     it "naps if vm nics are not in wait state" do
       expect(nx).to receive(:vm).and_return(instance_double(Vm, nics: [instance_double(Nic, strand: instance_double(Strand, label: "start"))]))
-      expect { nx.start_aws }.to nap(5)
+      expect { nx.start_aws }.to nap(1)
     end
 
     it "hops to wait_aws_vm_started if vm nics are in wait state" do
@@ -239,7 +239,7 @@ RSpec.describe Prog::Vm::Nexus do
     it "reaps and naps if not leaf" do
       st.update(prog: "Vm::Nexus", label: "wait_aws_vm_started", stack: [{}])
       Strand.create(parent_id: st.id, prog: "Aws::Instance", label: "start", stack: [{}], lease: Time.now + 10)
-      expect { nx.wait_aws_vm_started }.to nap(10)
+      expect { nx.wait_aws_vm_started }.to nap(1)
     end
 
     it "hops to wait_sshable if leaf" do
@@ -699,6 +699,16 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm).to receive(:update_firewall_rules_set?).and_return(true)
       expect(vm.ephemeral_net4).to be_nil
       expect(vm).not_to receive(:ephemeral_net6)
+      expect { nx.wait_sshable }.to hop("create_billing_record")
+    end
+
+    it "doesn't nap if the location is AWS" do
+      expect(vm.location).to receive(:provider).and_return("aws").at_least(:once)
+      expect(vm).to receive(:update_firewall_rules_set?).and_return(false)
+      expect(vm).to receive(:incr_update_firewall_rules)
+      vm_addr = instance_double(AssignedVmAddress, id: "46ca6ded-b056-4723-bd91-612959f52f6f", ip: NetAddr::IPv4Net.parse("10.0.0.1"))
+      expect(vm).to receive(:assigned_vm_address).and_return(vm_addr).at_least(:once)
+      expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
       expect { nx.wait_sshable }.to hop("create_billing_record")
     end
   end
