@@ -103,10 +103,16 @@ module OmniAuth
           base_url_for(:token_endpoint),
           headers: {
             'Authorization' => "Basic #{Base64.strict_encode64([CGI.escape(opts[:identifier]), CGI.escape(opts[:secret])].join(':'))}",
-            "Content-Type" => "application/json",
+            "Content-Type" => "application/x-www-form-urlencoded",
             "Accept" => "application/json",
           },
-          body: {"scope" => "openid email", "grant_type" => "authorization_code", "code" => params["code"], "redirect_uri" => redirect_uri}.compact.to_json,
+          body: query_string_for({
+            "grant_type" => "authorization_code",
+            "code" => params["code"],
+            "redirect_uri" => redirect_uri,
+            "client_id" => opts[:identifier],
+            "client_secret" => opts[:secret]
+          }.compact),
           expects: [200, 201]
         )
 
@@ -125,7 +131,9 @@ module OmniAuth
           token = token[0] if token.is_a?(Array)
           if token.is_a?(Hash)
             nonce = session.delete('omniauth.nonce')
-            if token["iss"] != options.issuer || token["client_id"] != client_options.identifier || token["nonce"] != nonce
+            aud = token["aud"]
+            aud = [aud] if aud.is_a?(String)
+            if token["iss"] != options.issuer || !aud.include?(client_options.identifier) || token["nonce"] != nonce
               fail!(:unable_to_verify_id_token, RuntimeError.new("Unable to verify id token"))
               return
             end
