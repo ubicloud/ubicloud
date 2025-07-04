@@ -490,10 +490,15 @@ SQL
 
   label def prepare_for_take_over
     decr_take_over
+    representative_server = postgres_server.resource.representative_server
+    hop_taking_over if representative_server.nil?
 
-    hop_taking_over if postgres_server.resource.representative_server.nil?
+    begin
+      representative_server.vm.sshable.cmd("sudo pg_ctlcluster #{postgres_server.resource.version} main stop -m immediate")
+    rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
+    end
 
-    postgres_server.resource.representative_server.incr_destroy
+    representative_server.incr_destroy
 
     nap 5
   end
