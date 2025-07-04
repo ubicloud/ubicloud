@@ -74,6 +74,11 @@ usermod -L ubuntu
       ]
     })
     instance_id = instance_response.instances[0].instance_id
+    subnet_id = instance_response.instances[0].network_interfaces[0].subnet_id
+    subnet_response = client.describe_subnets(subnet_ids: [subnet_id])
+    az_id = subnet_response.subnets[0].availability_zone_id
+
+    AwsInstance.create(instance_id: instance_id, az_id: az_id) { it.id = vm.id }
 
     vm.update(name: instance_id)
     hop_wait_instance_created
@@ -97,6 +102,8 @@ usermod -L ubuntu
 
   label def destroy
     client.terminate_instances({instance_ids: [vm.name]})
+    vm.aws_instance&.destroy
+
     pop "vm destroyed"
   end
 

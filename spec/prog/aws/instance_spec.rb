@@ -48,7 +48,8 @@ usermod -L ubuntu
 
   describe "#start" do
     it "creates an instance" do
-      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg"}])
+      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}]}])
+      client.stub_responses(:describe_subnets, subnets: [{availability_zone_id: "use1-az1"}])
       expect(vm).to receive(:vcpus).and_return(2)
       expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
 
@@ -85,6 +86,7 @@ usermod -L ubuntu
         tag_specifications: [{resource_type: "instance", tags: [{key: "Ubicloud", value: "true"}]}]
       }).and_call_original
       expect(vm).to receive(:update).with(name: "i-0123456789abcdefg")
+      expect(AwsInstance).to receive(:create).with(instance_id: "i-0123456789abcdefg", az_id: "use1-az1")
       expect { nx.start }.to hop("wait_instance_created")
     end
   end

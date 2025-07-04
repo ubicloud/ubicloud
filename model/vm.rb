@@ -19,6 +19,7 @@ class Vm < Sequel::Model
   many_to_many :load_balancer_vm_ports, join_table: :load_balancers_vms, right_key: :id, right_primary_key: :load_balancer_vm_id, class: :LoadBalancerVmPort, read_only: true
   many_to_one :vm_host_slice
   many_to_one :location, key: :location_id
+  one_to_one :aws_instance, key: :id
 
   many_through_many :firewalls,
     [
