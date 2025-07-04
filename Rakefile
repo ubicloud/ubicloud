@@ -183,10 +183,12 @@ when "test"
   ENV["CLOVER_SESSION_SECRET"] ||= "#{SecureRandom.base64(64)}"
   ENV["CLOVER_DATABASE_URL"] ||= "postgres:///clover_test\#{ENV["TEST_ENV_NUMBER"]}?user=clover"
   ENV["CLOVER_COLUMN_ENCRYPTION_KEY"] ||= "#{SecureRandom.base64(32)}"
+  ENV["CLOVER_RUNTIME_TOKEN_SECRET"] ||= "#{SecureRandom.base64(64)}"
 else
   ENV["CLOVER_SESSION_SECRET"] ||= "#{SecureRandom.base64(64)}"
   ENV["CLOVER_DATABASE_URL"] ||= "postgres:///clover_development?user=clover"
   ENV["CLOVER_COLUMN_ENCRYPTION_KEY"] ||= "#{SecureRandom.base64(32)}"
+  ENV["CLOVER_RUNTIME_TOKEN_SECRET"] ||= "#{SecureRandom.base64(64)}"
 end
 ENVRB
 end
