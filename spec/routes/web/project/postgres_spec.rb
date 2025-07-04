@@ -352,6 +352,18 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_css(".metric-chart")
       end
 
+      it "shows connections if the resource is running" do
+        pg.strand.update(label: "wait")
+        visit "#{project.path}#{pg.path}/connection"
+        expect(page).to have_no_content "No connection information available"
+      end
+
+      it "does not show connections if the resource is creating" do
+        pg.strand.update(label: "wait_servers")
+        visit "#{project.path}#{pg.path}/connection"
+        expect(page).to have_content "No connection information available"
+      end
+
       it "shows 404 for invalid pages for read replicas" do
         pg
         pg.update(parent_id: pg_wo_permission.id)
