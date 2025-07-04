@@ -84,6 +84,14 @@ class Clover < Roda
     end
   end
 
+  def omniauth_provider_name(provider)
+    if omniauth_providers.map { |provider,| provider.to_s }.include?(provider)
+      provider.capitalize
+    else
+      OidcProvider.name_for_ubid(provider) || provider
+    end
+  end
+
   def omniauth_providers
     @omniauth_providers ||= [
       # :nocov:

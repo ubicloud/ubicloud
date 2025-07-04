@@ -344,9 +344,11 @@ class Clover < Roda
     already_logged_in { redirect login_redirect }
     after_login do
       remember_login if scope.typecast_params.str("remember-me") == "on"
-      if omniauth_identity && (url = omniauth_params["redirect_url"])
-        flash["notice"] = "You have successfully connected your account with #{omniauth_provider.capitalize}."
-        redirect url
+      if omniauth_identity && omniauth_params["redirect_url"]
+        flash["notice"] = "You have successfully connected your account with #{scope.omniauth_provider_name(omniauth_provider)}."
+        # Don't trust the omniauth params, always redirect to the login methods page,
+        # as that is the only page that should be setting redirect_url
+        redirect "/account/login-method"
       end
     end
 
@@ -392,29 +394,108 @@ class Clover < Roda
     end
     # :nocov:
 
+    auth_class_eval do
+      # If the route isn't already handled and matches a known provider,
+      # get the app specific to that provider, and then run it.
+      def route_omniauth!
+        super
+        if (match = %r{\A/auth/(0p[a-tv-z0-9]{24})(?:/callback)?\z}.match(request.path_info)) &&
+            (provider = OidcProvider[match[1]])
+          omniauth_run omniauth_app_for_provider(provider)
+
+          # :nocov:
+          # Not reached in testing due to omniauth_setup throw above.
+          handle_omniauth_callback
+          # :nocov:
+        end
+        nil
+      end
+
+      omniauth_apps = {}
+      omniauth_app_mutex = Mutex.new
+      builder_app = ->(env) { [404, {}, []] }
+
+      # Return OIDC-provider specific omniauth app.  If there isn't an existing
+      # app for the provider in this process, build one.
+      define_method(:omniauth_app_for_provider) do |provider|
+        name = provider.ubid
+        if (app = omniauth_app_mutex.synchronize { omniauth_apps[name] })
+          return app
+        end
+
+        # Delay loading of omniauth_oidc until it is needed. Generally, this type of
+        # runtime require doesn't work with a frozen environment, but it does in this
+        # as the file does not modify any frozen constants. This is helpful so that
+        # users do not have to pay the cost of loading the file if they do not have
+        # any OidcProviders.
+        require_relative "vendor/omniauth_oidc"
+
+        # This part is copied from rodauth-omniauth's omniauth_app method in order
+        # to integrate with rodauth-omniauth.
+        builder = OmniAuth::Builder.new
+        builder.options(
+          path_prefix: omniauth_prefix,
+          setup: ->(env) { env["rodauth.omniauth.instance"].send(:omniauth_setup) }
+        )
+        builder.configure do |config|
+          [:request_validation_phase, :before_request_phase, :before_callback_phase, :on_failure].each do |hook|
+            config.send(:"#{hook}=", ->(env) { env["rodauth.omniauth.instance"].send(:"omniauth_#{hook}") })
+          end
+        end
+
+        # Only use the provider passed to the method. rodauth-omniauth uses all
+        # statically configured providers in omniauth_app
+        uri = URI(provider.url)
+        builder.provider :oidc,
+          name: name.to_sym,
+          issuer: provider.url,
+          client_options: {
+            port: uri.port,
+            scheme: uri.scheme,
+            host: uri.host,
+            identifier: provider.client_id,
+            secret: provider.client_secret,
+            redirect_uri: provider.callback_url,
+            authorization_endpoint: provider.authorization_endpoint,
+            token_endpoint: provider.token_endpoint,
+            userinfo_endpoint: provider.userinfo_endpoint
+          }
+
+        builder.run builder_app
+        app = builder.to_app
+        omniauth_app_mutex.synchronize { omniauth_apps[name] ||= app }
+      end
+    end
+
     before_omniauth_create_account do
       unless account[:email]
         flash["error"] = "Social login is only allowed if social login provider provides email"
         redirect "/login"
       end
-      scope.before_rodauth_create_account(account, omniauth_name)
+      scope.before_rodauth_create_account(account, omniauth_name || account[:email].split("@", 2)[0].gsub(/[^A-Za-z]+/, " ").capitalize)
     end
 
     after_omniauth_create_account do
       scope.after_rodauth_create_account(account_id)
     end
 
+    omniauth_on_failure do
+      Clog.emit("omniauth failure") { {omniauth_error:, omniauth_error_type:, omniauth_error_strategy:, backtrace: omniauth_error.backtrace} }
+      super()
+    end
+
     before_omniauth_callback_route do
       account = Account[account_from_omniauth&.[](:id)]
       if authenticated?
         unless account && account.id == scope.current_account.id
-          flash["error"] = "Your account's email address is different from the email address associated with the #{omniauth_provider.capitalize} account."
+          flash["error"] = "Your account's email address is different from the email address associated with the #{scope.omniauth_provider_name(omniauth_provider)} account."
           redirect "/account/login-method"
         end
       elsif account && account.identities_dataset.where(provider: omniauth_provider.to_s).empty?
-        flash["error"] = "There is already an account with this email address, and it has not been linked to the #{omniauth_provider.capitalize} account.
-        Please login to the existing account normally, and then link it to the #{omniauth_provider.capitalize} account from your account settings.
-        Then you can can login using the #{omniauth_provider.capitalize} account."
+        provider_name = scope.omniauth_provider_name(omniauth_provider)
+        flash["error"] = "There is already an account with this email address, and it has not been linked to the #{provider_name} account.
+        Please login to the existing account normally, and then link it to the #{provider_name} account from your account settings.
+        Then you can login using the #{provider_name} account."
         redirect "/login"
       end
     end
@@ -715,6 +796,15 @@ class Clover < Roda
       r.on "webhook" do
         before_main_hash_branches
         r.hash_branches(:webhook_prefix)
+      end
+
+      r.get "auth", :ubid_uuid do |id|
+        next unless (@oidc_provider = OidcProvider[id])
+
+        r.get do
+          content_security_policy.add_form_action(@oidc_provider.url)
+          view "auth/oidc_login"
+        end
       end
 
       check_csrf!
