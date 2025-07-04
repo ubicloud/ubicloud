@@ -101,9 +101,24 @@ RSpec.describe Prog::Aws::Nic do
 
   describe "#release_eip" do
     it "releases the elastic ip" do
-      expect(nic.nic_aws_resource).to receive(:eip_allocation_id).and_return("eip-0123456789abcdefg")
+      expect(nic.nic_aws_resource).to receive(:eip_allocation_id).and_return("eip-0123456789abcdefg").at_least(:once)
       client.stub_responses(:release_address)
       expect(client).to receive(:release_address).with({allocation_id: "eip-0123456789abcdefg"}).and_call_original
+      expect { nx.release_eip }.to exit({"msg" => "nic destroyed"})
+    end
+
+    it "gracefully continues if the nic is not found" do
+      expect(nic.nic_aws_resource).to receive(:eip_allocation_id).and_return(nil).at_least(:once)
+      expect { nx.release_eip }.to exit({"msg" => "nic destroyed"})
+    end
+
+    it "gracefully continues if the nic_aws_resource is not found" do
+      expect(nic).to receive(:nic_aws_resource).and_return(nil).at_least(:once)
+      expect { nx.release_eip }.to exit({"msg" => "nic destroyed"})
+    end
+
+    it "continues if the eip_allocation_id is found" do
+      expect(nic.nic_aws_resource).to receive(:eip_allocation_id).and_return("eip-0123456789abcdefg").at_least(:once)
       expect { nx.release_eip }.to exit({"msg" => "nic destroyed"})
     end
 

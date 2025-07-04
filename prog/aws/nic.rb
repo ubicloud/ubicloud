@@ -58,12 +58,9 @@ class Prog::Aws::Nic < Prog::Base
   end
 
   label def release_eip
-    begin
-      client.release_address({allocation_id: nic.nic_aws_resource.eip_allocation_id})
-    rescue Aws::EC2::Errors::InvalidAllocationIDNotFound
-      # Ignore if the address is not found
-      # This can happen if the address was already released or never existed
-      # In this case, we just pop the stack
+    ignore_invalid_nic do
+      allocation_id = nic.nic_aws_resource&.eip_allocation_id
+      client.release_address({allocation_id: allocation_id}) if allocation_id
     end
     pop "nic destroyed"
   end
@@ -87,6 +84,11 @@ class Prog::Aws::Nic < Prog::Base
 
   def ignore_invalid_nic
     yield
-  rescue Aws::EC2::Errors::InvalidNetworkInterfaceIDNotFound
+  rescue Aws::EC2::Errors::InvalidNetworkInterfaceIDNotFound,
+    Aws::EC2::Errors::InvalidNetworkInterfaceIdMalformed,
+    Aws::EC2::Errors::InvalidNetworkInterfaceIDMalformed,
+    Aws::EC2::Errors::InvalidAllocationIDNotFound,
+    Aws::EC2::Errors::InvalidAllocationIDMalformed => e
+    Clog.emit("ID not found or malformed") { {exception: {error_code: e.code, error_message: e.message}} }
   end
 end
