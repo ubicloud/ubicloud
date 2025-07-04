@@ -53,6 +53,7 @@ module ThawedMock
   allow_mocking(ApiKey, :generate_uuid, :random_key)
   allow_mocking(ArchivedRecord, :create)
   allow_mocking(AssignedVmAddress, :create_with_id)
+  allow_mocking(AwsInstance, :create)
   allow_mocking(BillingRecord, :create_with_id)
   allow_mocking(BootImage, :where)
   allow_mocking(DnsRecord, :[], :create)

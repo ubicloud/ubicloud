@@ -68,7 +68,8 @@ usermod -L ubuntu
         {
           resource_type: "instance",
           tags: [
-            {key: "Ubicloud", value: "true"}
+            {key: "Ubicloud", value: "true"},
+            {key: "Name", value: vm.name}
           ]
         }
       ]
@@ -80,12 +81,11 @@ usermod -L ubuntu
 
     AwsInstance.create(instance_id: instance_id, az_id: az_id) { it.id = vm.id }
 
-    vm.update(name: instance_id)
     hop_wait_instance_created
   end
 
   label def wait_instance_created
-    instance_response = client.describe_instances({filters: [{name: "instance-id", values: [vm.name]}, {name: "tag:Ubicloud", values: ["true"]}]}).reservations[0].instances[0]
+    instance_response = client.describe_instances({filters: [{name: "instance-id", values: [vm.aws_instance.instance_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).reservations[0].instances[0]
     if instance_response.dig(:state, :name) == "running"
       public_ipv4 = instance_response.dig(:network_interfaces, 0, :association, :public_ip)
       AssignedVmAddress.create_with_id(
@@ -101,8 +101,10 @@ usermod -L ubuntu
   end
 
   label def destroy
-    client.terminate_instances({instance_ids: [vm.name]})
-    vm.aws_instance&.destroy
+    if vm.aws_instance
+      client.terminate_instances({instance_ids: [vm.aws_instance.instance_id]})
+      vm.aws_instance.destroy
+    end
 
     pop "vm destroyed"
   end
