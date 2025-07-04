@@ -257,6 +257,20 @@ RSpec.describe PostgresServer do
       expect(postgres_server.lsn_caught_up).to be_truthy
     end
 
+    it "returns true if read replica and the parent representative server is nil" do
+      expect(postgres_server).to receive(:read_replica?).and_return(true)
+      expect(parent_resource).to receive(:representative_server).and_return(nil)
+      expect(postgres_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F").twice
+      expect(postgres_server.lsn_caught_up).to be_truthy
+    end
+
+    it "returns true if read replica and the parent is nil" do
+      expect(postgres_server).to receive(:read_replica?).and_return(true)
+      expect(postgres_server.resource).to receive(:parent).and_return(nil)
+      expect(postgres_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F").twice
+      expect(postgres_server.lsn_caught_up).to be_truthy
+    end
+
     it "returns false if the diff is less than 80MB" do
       expect(postgres_server).to receive(:read_replica?).and_return(true)
       expect(postgres_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("1/00000000")
