@@ -55,6 +55,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       .take(postgres_resource.target_standby_count) + [postgres_resource.representative_server]
     (postgres_resource.servers - servers_to_keep).each.each(&:incr_destroy)
 
+    servers_to_keep.each(&:incr_configure)
     postgres_resource.incr_update_billing_records
 
     pop "postgres resource is converged"

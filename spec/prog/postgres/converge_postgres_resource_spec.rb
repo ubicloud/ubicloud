@@ -125,6 +125,8 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect(postgres_resource.servers[2]).to receive(:incr_destroy)
       expect(postgres_resource.servers[4]).to receive(:incr_destroy)
 
+      expect(postgres_resource.servers[0]).to receive(:incr_configure)
+      expect(postgres_resource.servers[3]).to receive(:incr_configure)
       expect(postgres_resource).to receive(:incr_update_billing_records)
 
       expect { nx.prune_servers }.to exit
