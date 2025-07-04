@@ -514,7 +514,6 @@ class Prog::Vm::Nexus < Prog::Base
     vm.update(display_state: "deleting")
     if vm.location.provider == "aws"
       bud Prog::Aws::Instance, {"subject_id" => vm.id}, :destroy
-      vm.nics.map(&:incr_destroy)
       hop_wait_aws_vm_destroyed
     end
 

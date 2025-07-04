@@ -133,6 +133,7 @@ class Prog::Vnet::NicNexus < Prog::Base
 
   label def wait_aws_nic_destroyed
     reap(nap: 10) do
+      nic.private_subnet.incr_refresh_keys
       nic.destroy
       pop "nic deleted"
     end
