@@ -325,6 +325,13 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "128 GB"
       end
 
+      it "shows AZ id for AWS PostgreSQL instance" do
+        AwsInstance.create(instance_id: "i-0123456789abcdefg", az_id: "usw2-az2") { |it| it.id = pg.representative_server.vm.id }
+
+        visit "#{project.path}#{pg.path}/overview"
+        expect(page).to have_content "usw2-az2 (AWS)"
+      end
+
       it "shows total disk if VictoriaMetricsResource is not accessible" do
         pg
         pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
