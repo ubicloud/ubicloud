@@ -27,9 +27,8 @@
   <div class="grid gap-6">
     <%== part(
       "components/table_card",
-      headers: ["Name", "Compute", "Storage", "Version", "Parent", "Managed by", "Location", "State"],
+      headers: ["Name", "Compute", "Storage", "Version", "Parent", "Location", "State"],
       rows: @postgres_databases.map do |pg|
-        brand = Option::POSTGRES_FLAVOR_OPTIONS[pg[:flavor]].brand
         [
           [
             [pg[:name], {link: @project_data[:path] + pg[:path] + "/overview"}],
@@ -37,7 +36,6 @@
             [pg[:storage_size_gib]],
             [pg[:version]],
             [pg[:parent] ? pg[:parent].split("/").last : "", {link: pg[:parent] ? @project_data[:path] + pg[:parent] : ""}],
-            ["<div class='inline-flex gap-x-1 items-center'><img src='/icons/pg-#{brand}.png' class='object-cover rounded-lg overflow-hidden w-6 h-6'/><p>#{brand}</p></div>", {escape: false}],
             pg[:location],
             ["pg_state_label", {component: { state: pg[:state] }}]
           ],
