@@ -96,7 +96,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def wait_bootstrap_rhizome
-    reap(:mount_data_disk)
+    reap(:mount_data_disk, nap: 5)
   end
 
   label def mount_data_disk
