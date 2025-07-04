@@ -283,6 +283,17 @@ class PostgresServer < Sequel::Model
       project_id: Config.postgres_service_project_id
     }
   end
+
+  def data_device_path
+    if vm.location.aws?
+      # On AWS, pick the largest block device to use as the data disk,
+      # since the device path detected by the VmStorageVolume is not always
+      # correct.
+      vm.sshable.cmd("lsblk -b -d -o NAME,SIZE | sort -n -k2 | tail -n1 |  awk '{print \"/dev/\"$1}'").strip
+    else
+      vm.vm_storage_volumes.find { it.boot == false }.device_path.shellescape
+    end
+  end
 end
 
 # Table: postgres_server
