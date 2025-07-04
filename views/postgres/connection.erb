@@ -18,37 +18,44 @@
 %>
 
 <div class="p-6">
-  <div class="flex items-center gap-6 connection-info-format-selector">
-    <div class="flex items-center gap-2">
-      Format:
-      <div>
-  <%== part(
-    "components/form/select",
-    options: connection_infos.keys.map { it.split("-").first }.uniq.map { [it, it] },
-    attributes: {
-      "data-hostname" => @pg.hostname,
-      "data-username" => "postgres",
-      "data-password" => @pg.superuser_password,
-      "data-database" => "postgres"
-    },
-  ) %>
+  <% if @pg.display_state != "creating" %>
+    <div class="flex items-center gap-6 connection-info-format-selector">
+      <div class="flex items-center gap-2">
+        Format:
+        <div>
+          <%== part(
+            "components/form/select",
+            options: connection_infos.keys.map { it.split("-").first }.uniq.map { [it, it] },
+            attributes: {
+              "data-hostname" => @pg.hostname,
+              "data-username" => "postgres",
+              "data-password" => @pg.superuser_password,
+              "data-database" => "postgres"
+            },
+          ) %>
+        </div>
       </div>
+      <div><%== part("components/form/checkbox", options: [["1", "Use pgBouncer?", "", {}]]) %></div>
     </div>
-    <div><%== part("components/form/checkbox", options: [["1", "Use pgBouncer?", "", {}]]) %></div>
-  </div>
 
-<%
-  connection_infos.each_with_index do |(key, value), index|
-  hidden_class = index == 0 ? "" : "hidden"
-%>
-  <div class="bg-gray-200 rounded-md p-6 mt-5 connection-info-box connection-info-box-<%= key %> <%= hidden_class %>">
-  <%== part("components/copyable_content", content: value, revealable: true, classes: "!flex justify-between") %>
-  </div>
-<% end %>
+    <%
+      connection_infos.each_with_index do |(key, value), index|
+      hidden_class = index == 0 ? "" : "hidden"
+    %>
+      <div class="bg-gray-200 rounded-md p-6 mt-5 connection-info-box connection-info-box-<%= key %> <%= hidden_class %>">
+      <%== part("components/copyable_content", content: value, revealable: true, classes: "!flex justify-between") %>
+      </div>
+    <% end %>
 
-  <div class="mt-5 flex items-center gap-2">
-    CA Certificates: <%== part("components/download_button", link: "#{@project_data[:path]}#{@pg.path}/ca-certificates")%>
-  </div>
+    <div class="mt-5 flex items-center gap-2">
+      CA Certificates: <%== part("components/download_button", link: "#{@project_data[:path]}#{@pg.path}/ca-certificates")%>
+    </div>
+  <% else %>
+    <div class="flex flex-col items-center justify-center h-full">
+      <h2 class="text-2xl font-semibold text-gray-900">No connection information available</h2>
+      <p class="text-gray-500 mt-2">Connection information will be available once the database is running.</p>
+    </div>
+  <% end %>
 </div>
 
 
