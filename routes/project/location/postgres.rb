@@ -242,6 +242,11 @@ class Clover
         authorize("Postgres:edit", pg.id)
 
         name = typecast_params.nonempty_str!("name")
+
+        Validation.validate_name(name)
+
+        Validation.validate_vcpu_quota(@project, "PostgresVCpu", Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size].vcpu_count)
+
         st = nil
         DB.transaction do
           st = Prog::Postgres::PostgresResourceNexus.assemble(
@@ -300,6 +305,10 @@ class Clover
 
         name, restore_target = typecast_params.nonempty_str!(["name", "restore_target"])
         st = nil
+
+        Validation.validate_name(name)
+
+        Validation.validate_vcpu_quota(@project, "PostgresVCpu", Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size].vcpu_count)
 
         DB.transaction do
           st = Prog::Postgres::PostgresResourceNexus.assemble(
