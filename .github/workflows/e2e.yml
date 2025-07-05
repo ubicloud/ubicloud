@@ -115,7 +115,7 @@ jobs:
         STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
       run: |
         set -o pipefail
-        timeout 55m foreman start | tee foreman.log | grep "e2e.1"
+        timeout 55m foreman start -m all=1,respirate=2 | tee foreman.log | grep "e2e.1"
 
     - name: Print logs
       if: always()
