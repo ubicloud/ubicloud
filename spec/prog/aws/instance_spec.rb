@@ -88,7 +88,8 @@ usermod -L ubuntu
         min_count: 1,
         max_count: 1,
         user_data: Base64.encode64(user_data),
-        tag_specifications: Util.aws_tag_specifications("instance", vm.name)
+        tag_specifications: Util.aws_tag_specifications("instance", vm.name),
+        client_token: vm.id
       }).and_call_original
       expect(AwsInstance).to receive(:create).with(instance_id: "i-0123456789abcdefg", az_id: "use1-az1")
       expect { nx.start }.to hop("wait_instance_created")
