@@ -12,14 +12,12 @@ class Prog::Aws::Nic < Prog::Base
       groups: [
         nic.private_subnet.private_subnet_aws_resource.security_group_id
       ],
-      tag_specifications: Util.aws_tag_specifications("network-interface", nic.name)
+      tag_specifications: Util.aws_tag_specifications("network-interface", nic.name),
+      client_token: nic.id
     })
     network_interface_id = network_interface_response.network_interface.network_interface_id
 
-    client.assign_ipv_6_addresses({
-      network_interface_id:,
-      ipv_6_address_count: 1
-    })
+    client.assign_ipv_6_addresses({network_interface_id:, ipv_6_address_count: 1}) if network_interface_response.network_interface.ipv_6_addresses.empty?
 
     nic.nic_aws_resource.update(network_interface_id:)
     hop_wait_network_interface_created
