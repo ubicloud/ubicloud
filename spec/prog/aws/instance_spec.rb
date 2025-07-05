@@ -57,6 +57,7 @@ usermod -L ubuntu
       expect(vm).to receive(:vcpus).and_return(2)
       expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
 
+      expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
       expect(client).to receive(:run_instances).with({
         image_id: "ami-030c060f85668b37d",
         instance_type: "m6gd.large",
@@ -75,7 +76,7 @@ usermod -L ubuntu
         ],
         network_interfaces: [
           {
-            network_interface_id: vm.nics.first.name,
+            network_interface_id: "eni-0123456789abcdefg",
             device_index: 0
           }
         ],

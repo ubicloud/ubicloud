@@ -21,12 +21,12 @@ class Prog::Aws::Nic < Prog::Base
       ipv_6_address_count: 1
     })
 
-    nic.update(name: network_interface_id)
+    nic.nic_aws_resource.update(network_interface_id:)
     hop_wait_network_interface_created
   end
 
   label def wait_network_interface_created
-    network_interface_response = client.describe_network_interfaces({filters: [{name: "network-interface-id", values: [nic.name]}, {name: "tag:Ubicloud", values: ["true"]}]}).network_interfaces[0]
+    network_interface_response = client.describe_network_interfaces({filters: [{name: "network-interface-id", values: [nic.nic_aws_resource.network_interface_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).network_interfaces[0]
     if network_interface_response.status == "available"
       hop_allocate_eip
     end
@@ -51,8 +51,8 @@ class Prog::Aws::Nic < Prog::Base
 
   label def destroy
     ignore_invalid_nic do
-      nap 5 if client.describe_network_interfaces({filters: [{name: "network-interface-id", values: [nic.name]}, {name: "tag:Ubicloud", values: ["true"]}]}).network_interfaces.first&.status == "in-use"
-      client.delete_network_interface({network_interface_id: nic.name})
+      nap 5 if client.describe_network_interfaces({filters: [{name: "network-interface-id", values: [nic.nic_aws_resource.network_interface_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).network_interfaces.first&.status == "in-use"
+      client.delete_network_interface({network_interface_id: nic.nic_aws_resource.network_interface_id})
     end
     hop_release_eip
   end
