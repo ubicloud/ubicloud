@@ -9,7 +9,7 @@ RSpec.describe Prog::Test::HetznerServer do
   let(:vm_host) { Prog::Vm::HostNexus.assemble("1.1.1.1").subject }
 
   before {
-    allow(Config).to receive(:ci_hetzner_sacrificial_server_id).and_return("1.1.1.1")
+    allow(Config).to receive(:e2e_hetzner_server_id).and_return("1.1.1.1")
     allow(hs_test).to receive_messages(frame: {"vm_host_id" => vm_host.id,
                                                "hetzner_ssh_keypair" => "oOtAbOGFVHJjFyeQBgSfghi+YBuyQzBRsKABGZhOmDpmwxqx681mscsGBLaQ\n2iWQsOYBBVLDtQWe/gf3NRNyBw==\n",
                                                "server_id" => "1234",
@@ -19,9 +19,9 @@ RSpec.describe Prog::Test::HetznerServer do
   }
 
   describe "#assemble" do
-    it "fails if CI_HETZNER_SACRIFICIAL_SERVER_ID not provided" do
-      expect(Config).to receive(:ci_hetzner_sacrificial_server_id).and_return("")
-      expect { described_class.assemble }.to raise_error RuntimeError, "CI_HETZNER_SACRIFICIAL_SERVER_ID must be a nonempty string"
+    it "fails if E2E_HETZNER_SERVER_ID not provided" do
+      expect(Config).to receive(:e2e_hetzner_server_id).and_return("")
+      expect { described_class.assemble }.to raise_error RuntimeError, "E2E_HETZNER_SERVER_ID must be a nonempty string"
     end
 
     it "uses exiting vm host if given" do
