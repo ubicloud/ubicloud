@@ -111,6 +111,8 @@ jobs:
         SMTP_HOSTNAME: localhost
         SMTP_PORT: 1025
         SMTP_TLS: false
+        STRIPE_PUBLIC_KEY: ${{ secrets.STRIPE_PUBLIC_KEY }}
+        STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
       run: |
         set -o pipefail
         timeout 55m foreman start | tee foreman.log | grep "e2e.1"
