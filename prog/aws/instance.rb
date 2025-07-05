@@ -87,7 +87,11 @@ usermod -L ubuntu
 
   label def destroy
     if vm.aws_instance
-      client.terminate_instances({instance_ids: [vm.aws_instance.instance_id]})
+      begin
+        client.terminate_instances(instance_ids: [vm.aws_instance.instance_id])
+      rescue Aws::EC2::Errors::InvalidInstanceIDNotFound
+      end
+
       vm.aws_instance.destroy
     end
 
