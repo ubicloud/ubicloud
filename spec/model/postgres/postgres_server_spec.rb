@@ -230,16 +230,16 @@ RSpec.describe PostgresServer do
   describe "storage_size_gib" do
     it "returns the storage size in GiB" do
       volume_dataset = instance_double(Sequel::Dataset)
-      expect(volume_dataset).to receive(:first).and_return(instance_double(VmStorageVolume, boot: false, size_gib: 64))
+      expect(volume_dataset).to receive(:reject).and_return([instance_double(VmStorageVolume, boot: false, size_gib: 64)])
       expect(vm).to receive(:vm_storage_volumes_dataset).and_return(volume_dataset)
       expect(postgres_server.storage_size_gib).to eq(64)
     end
 
     it "returns nil if there is no storage volume" do
       volume_dataset = instance_double(Sequel::Dataset)
-      expect(volume_dataset).to receive(:first).and_return(nil)
+      expect(volume_dataset).to receive(:reject).and_return([])
       expect(vm).to receive(:vm_storage_volumes_dataset).and_return(volume_dataset)
-      expect(postgres_server.storage_size_gib).to be_nil
+      expect(postgres_server.storage_size_gib).to be_zero
     end
   end
 
@@ -378,14 +378,15 @@ RSpec.describe PostgresServer do
     expect(postgres_server.run_query("SELECT 1")).to eq("1")
   end
 
-  it "returns the right data_device_path for AWS" do
+  it "returns the right storage_device_paths for AWS" do
     expect(postgres_server.vm.location).to receive(:aws?).and_return(true)
-    expect(postgres_server.vm.sshable).to receive(:cmd).with("lsblk -b -d -o NAME,SIZE | sort -n -k2 | tail -n1 |  awk '{print \"/dev/\"$1}'").and_return("/dev/vdb")
-    expect(postgres_server.data_device_path).to eq("/dev/vdb")
+    expect(postgres_server.vm).to receive(:vm_storage_volumes).and_return([instance_double(VmStorageVolume, boot: true, device_path: "/dev/vda"), instance_double(VmStorageVolume, boot: false, device_path: "/dev/nvme1n1"), instance_double(VmStorageVolume, boot: false, device_path: "/dev/nvme2n1")])
+    expect(postgres_server.vm.sshable).to receive(:cmd).with("lsblk -b -d -o NAME,SIZE | sort -n -k2 | tail -n2 |  awk '{print \"/dev/\"$1}'").and_return("/dev/nvme1n1\n/dev/nvme2n1\n")
+    expect(postgres_server.storage_device_paths).to eq(["/dev/nvme1n1", "/dev/nvme2n1"])
   end
 
-  it "returns the right data_device_path for Hetzner" do
+  it "returns the right storage_device_paths for Hetzner" do
     expect(postgres_server.vm).to receive(:vm_storage_volumes).and_return([instance_double(VmStorageVolume, boot: false, device_path: "/dev/vdb")])
-    expect(postgres_server.data_device_path).to eq("/dev/vdb")
+    expect(postgres_server.storage_device_paths).to eq(["/dev/vdb"])
   end
 end

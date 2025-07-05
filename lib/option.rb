@@ -22,6 +22,19 @@ module Option
     Option::VmFamilies.select { it.visible }
   end
 
+  def self.aws_instance_type_name(family, vcpu_count)
+    suffix = if vcpu_count == 2
+      "large"
+    elsif vcpu_count == 4
+      "xlarge"
+    else
+      "#{vcpu_count / 4}xlarge"
+    end
+
+    "#{family}.#{suffix}"
+  end
+
+  AWS_FAMILY_OPTIONS = ["c6gd", "m6id", "m6gd", "m8gd"].freeze
   AWS_STORAGE_SIZE_OPTIONS = {2 => ["118"], 4 => ["237"], 8 => ["474"], 16 => ["950"], 32 => ["1900"], 64 => ["3800"]}.freeze
 
   BootImage = Struct.new(:name, :display_name)
@@ -70,9 +83,10 @@ module Option
     storage_size_options = [it * 10, it * 20]
     io_limits = IoLimits.new(it * 50, it * 50)
     VmSize.new("burstable-#{it}", "burstable", it, it * 50, it * 50, (it * 1.6).to_i, storage_size_options, io_limits, false, "arm64")
-  }).concat([32, 64].map {
-    storage_size_options = [it * 20, it * 40]
-    VmSize.new("standard-#{it}", "standard", it, it * 100, 0, it * 4, storage_size_options, NO_IO_LIMITS, false, "x64")
+  }).concat(AWS_FAMILY_OPTIONS.product([2, 4, 8, 16, 32, 64]).map { |family, vcpu|
+    memory_coefficient = (family == "c6gd") ? 2 : 4
+    arch = (family == "m6id") ? "x64" : "arm64"
+    VmSize.new(aws_instance_type_name(family, vcpu), family, vcpu, vcpu * 100, 0, vcpu * memory_coefficient, AWS_STORAGE_SIZE_OPTIONS[vcpu], NO_IO_LIMITS, false, arch)
   }).freeze
 
   # Postgres Global Options
@@ -86,7 +100,11 @@ module Option
   PostgresFamilyOption = Data.define(:name, :description)
   POSTGRES_FAMILY_OPTIONS = [
     ["standard", "Dedicated CPU"],
-    ["burstable", "Shared CPU"]
+    ["burstable", "Shared CPU"],
+    ["c6gd", "Compute Optimized, Graviton2"],
+    ["m6id", "General Purpose, Intel Xeon"],
+    ["m6gd", "General Purpose, Graviton2"],
+    ["m8gd", "General Purpose, Graviton3"]
   ].map { |args| [args[0], PostgresFamilyOption.new(*args)] }.to_h.freeze
 
   PostgresSizeOption = Data.define(:name, :family, :vcpu_count, :memory_gib)
@@ -96,12 +114,42 @@ module Option
     ["standard", 8, 32],
     ["standard", 16, 64],
     ["standard", 30, 120],
-    ["standard", 32, 128],
     ["standard", 60, 240],
-    ["standard", 64, 256],
     ["burstable", 1, 2],
-    ["burstable", 2, 4]
-  ].map { |args| ["#{args[0]}-#{args[1]}", PostgresSizeOption.new("#{args[0]}-#{args[1]}", *args)] }.to_h.freeze
+    ["burstable", 2, 4],
+    ["c6gd", 2, 4],
+    ["c6gd", 4, 8],
+    ["c6gd", 8, 16],
+    ["c6gd", 16, 32],
+    ["c6gd", 32, 64],
+    ["c6gd", 64, 128],
+    ["m6id", 2, 8],
+    ["m6id", 4, 16],
+    ["m6id", 8, 32],
+    ["m6id", 16, 64],
+    ["m6id", 32, 128],
+    ["m6id", 64, 256],
+    ["m6gd", 2, 8],
+    ["m6gd", 4, 16],
+    ["m6gd", 8, 32],
+    ["m6gd", 16, 64],
+    ["m6gd", 32, 128],
+    ["m6gd", 64, 256],
+    ["m8gd", 2, 8],
+    ["m8gd", 4, 16],
+    ["m8gd", 8, 32],
+    ["m8gd", 16, 64],
+    ["m8gd", 32, 128],
+    ["m8gd", 64, 256]
+  ].map do |args|
+    name = if AWS_FAMILY_OPTIONS.include?(args[0])
+      aws_instance_type_name(args[0], args[1])
+    else
+      "#{args[0]}-#{args[1]}"
+    end
+
+    [name, PostgresSizeOption.new(name, *args)]
+  end.to_h.freeze
 
   POSTGRES_STORAGE_SIZE_OPTIONS = ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096"].freeze
 

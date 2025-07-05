@@ -26,17 +26,9 @@ echo #{public_keys.shellescape} > /home/$custom_user/.ssh/authorized_keys
 usermod -L ubuntu
     USER_DATA
 
-    instance_size_map = {
-      2 => "m6id.large",
-      4 => "m6id.xlarge",
-      8 => "m6id.2xlarge",
-      16 => "m6id.4xlarge",
-      32 => "m6id.8xlarge",
-      64 => "m6id.16xlarge"
-    }
     instance_response = client.run_instances({
       image_id: vm.boot_image, # AMI ID
-      instance_type: instance_size_map[vm.vcpus], # Instance type
+      instance_type: Option.aws_instance_type_name(vm.family, vm.vcpus),
       block_device_mappings: [
         {
           device_name: "/dev/sda1",

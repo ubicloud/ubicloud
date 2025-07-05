@@ -26,7 +26,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         ephemeral_net4: "1.1.1.1",
         private_subnets: [instance_double(PrivateSubnet)]
       ),
-      data_device_path: "/dev/vdb"
+      storage_device_paths: ["/dev/vdb"]
     )
   }
 
@@ -222,14 +222,19 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#mount_data_disk" do
     it "formats data disk if format command is not sent yet or failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo mkfs --type ext4 /dev/vdb' format_disk").twice
+      expect(postgres_server).to receive(:storage_device_paths).and_return(["/dev/vdb"])
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo mkfs --type ext4 /dev/vdb' format_disk")
 
-      # NotStarted
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check format_disk").and_return("NotStarted")
       expect { nx.mount_data_disk }.to nap(5)
+    end
 
-      # Failed
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check format_disk").and_return("Failed")
+    it "formats data disk correctly when there are multiple storage volumes" do
+      expect(postgres_server).to receive(:storage_device_paths).and_return(["/dev/nvme1n1", "/dev/nvme2n1"])
+      expect(sshable).to receive(:cmd).with("sudo mdadm --create --verbose /dev/md0 --level=0 --raid-devices=2 /dev/nvme1n1 /dev/nvme2n1")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo mkfs --type ext4 /dev/md0' format_disk")
+
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check format_disk").and_return("NotStarted")
       expect { nx.mount_data_disk }.to nap(5)
     end
 
@@ -238,6 +243,17 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:cmd).with("sudo mkdir -p /dat")
       expect(sshable).to receive(:cmd).with("sudo common/bin/add_to_fstab /dev/vdb /dat ext4 defaults 0 0")
       expect(sshable).to receive(:cmd).with("sudo mount /dev/vdb /dat")
+      expect { nx.mount_data_disk }.to hop("configure_walg_credentials")
+    end
+
+    it "mounts data disk correctly when there are multiple storage volumes" do
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check format_disk").and_return("Succeeded")
+      expect(postgres_server).to receive(:storage_device_paths).and_return(["/dev/nvme1n1", "/dev/nvme2n1"])
+      expect(sshable).to receive(:cmd).with("sudo mdadm --detail --scan | sudo tee -a /etc/mdadm/mdadm.conf")
+      expect(sshable).to receive(:cmd).with("sudo update-initramfs -u")
+      expect(sshable).to receive(:cmd).with("sudo mkdir -p /dat")
+      expect(sshable).to receive(:cmd).with("sudo common/bin/add_to_fstab /dev/md0 /dat ext4 defaults 0 0")
+      expect(sshable).to receive(:cmd).with("sudo mount /dev/md0 /dat")
       expect { nx.mount_data_disk }.to hop("configure_walg_credentials")
     end
 

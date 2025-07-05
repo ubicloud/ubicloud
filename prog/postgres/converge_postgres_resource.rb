@@ -13,7 +13,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   label def provision_servers
     hop_wait_servers_to_be_ready if postgres_resource.has_enough_fresh_servers?
 
-    if postgres_resource.servers.all? { it.vm.vm_host } || postgres_resource.location.provider == "aws"
+    if postgres_resource.servers.all? { it.vm.vm_host } || postgres_resource.location.aws?
       exclude_host_ids = []
       if !(Config.development? || Config.is_e2e) && postgres_resource.location.provider == HostProvider::HETZNER_PROVIDER_NAME
         used_data_centers = postgres_resource.servers.map { it.vm.vm_host.data_center }.uniq
