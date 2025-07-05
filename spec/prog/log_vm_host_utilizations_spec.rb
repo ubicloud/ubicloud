@@ -23,6 +23,7 @@ RSpec.describe Prog::LogVmHostUtilizations do
         if dat[:location_id] == Location::HETZNER_FSN1_ID && dat[:arch] == "x64" && dat[:family] == "standard" && dat[:allocation_state] == "accepting"
           expect(dat[:core_utilization]).to eq(30.0)
           expect(dat[:hugepage_utilization]).to eq(25.0)
+          expect(dat[:available_standard_8_count]).to eq(1)
         elsif dat[:location_id] == Location::HETZNER_FSN1_ID && dat[:arch] == "x64" && dat[:family] == "standard" && dat[:allocation_state] == "draining"
           expect(dat[:core_utilization]).to eq(25.0)
           expect(dat[:hugepage_utilization]).to eq(33.33)
@@ -34,12 +35,15 @@ RSpec.describe Prog::LogVmHostUtilizations do
         if dat[:arch] == "x64" && dat[:family] == "standard"
           expect(dat[:core_utilization]).to eq(25)
           expect(dat[:hugepage_utilization]).to eq(22.22)
+          expect(dat[:available_standard_4_count]).to eq(7)
+          expect(dat[:available_standard_30_count]).to eq(0)
         elsif dat[:arch] == "x64" && dat[:family] == "premium"
           expect(dat[:core_utilization]).to eq(62.5)
           expect(dat[:hugepage_utilization]).to eq(31.25)
         elsif dat[:arch] == "arm64" && dat[:family] == "standard"
           expect(dat[:core_utilization]).to eq(12.5)
           expect(dat[:hugepage_utilization]).to eq(15.0)
+          expect(dat[:available_standard_30_count]).to eq(2)
         end
       end.exactly(3)
 
