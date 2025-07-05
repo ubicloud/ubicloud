@@ -4,10 +4,6 @@ vm = @pg.representative_server.vm
 
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 database-overview">
   <%
-    # There is a brief period after creation when the representative server does not have
-    # volumes attachet yet, so we take the storage size from the resource.
-    storage_size_gib = @pg.representative_server.storage_size_gib || @pg.target_storage_size_gib
-
     vmr = VictoriaMetricsResource.first(project_id: @pg.representative_server.metrics_config[:project_id])
     if vmr
       tsdb_client = vmr.servers.first.client
@@ -20,7 +16,7 @@ vm = @pg.representative_server.vm
 
       disk_usage_subtext = if disk_usage
         disk_usage_percentage = disk_usage["values"].last[1].to_f
-        disk_usage_gib = disk_usage_percentage * storage_size_gib / 100
+        disk_usage_gib = disk_usage_percentage * @pg.representative_server.storage_size_gib / 100
         subtext = "#{disk_usage_gib.round(2)} GB is used (#{disk_usage_percentage.round(2)}%)"
 
         if disk_usage_percentage > 80
@@ -41,7 +37,7 @@ vm = @pg.representative_server.vm
 
     [
       ["hero-cpu-chip", vm.display_size, "#{vm.vcpus} vCPU, #{vm.memory_gib} GB RAM"],
-      ["hero-circle-stack", "#{storage_size_gib} GB", disk_usage_subtext],
+      ["hero-circle-stack", "#{@pg.representative_server.storage_size_gib} GB", disk_usage_subtext],
       ["hero-square-2-stack-modified", ha_option.description, ""],
       ["hero-map-pin", @pg.location.display_name, "#{location_details} (#{provider})"],
       ["postgres-logo", "Version #{@pg.version}", ""],
