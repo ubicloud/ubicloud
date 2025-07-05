@@ -56,7 +56,8 @@ usermod -L ubuntu
       min_count: 1,
       max_count: 1,
       user_data: Base64.encode64(user_data),
-      tag_specifications: Util.aws_tag_specifications("instance", vm.name)
+      tag_specifications: Util.aws_tag_specifications("instance", vm.name),
+      client_token: vm.id
     })
     instance_id = instance_response.instances[0].instance_id
     subnet_id = instance_response.instances[0].network_interfaces[0].subnet_id
