@@ -18,10 +18,6 @@ vm = @pg.representative_server.vm
         Clog.emit("Failed to fetch disk usage for #{@pg.ubid} from VictoriaMetrics") { Util.exception_to_hash(e) }
       end
 
-      # There is a brief period after creation when the representative server does not have
-      # volumes attachet yet, so we take the storage size from the resource.
-      storage_size_gib = @pg.representative_server.storage_size_gib || @pg.target_storage_size_gib
-
       disk_usage_subtext = if disk_usage
         disk_usage_percentage = disk_usage["values"].last[1].to_f
         disk_usage_gib = disk_usage_percentage * storage_size_gib / 100
