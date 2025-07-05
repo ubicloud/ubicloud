@@ -44,7 +44,7 @@ usermod -L ubuntu
       ],
       network_interfaces: [
         {
-          network_interface_id: vm.nics.first.name,
+          network_interface_id: vm.nics.first.nic_aws_resource.network_interface_id,
           device_index: 0
         }
       ],

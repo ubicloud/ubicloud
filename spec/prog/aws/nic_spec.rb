@@ -35,7 +35,6 @@ RSpec.describe Prog::Aws::Nic do
       client.stub_responses(:assign_ipv_6_addresses)
       expect(client).to receive(:create_network_interface).with({subnet_id: "subnet-0123456789abcdefg", private_ip_address: nic.private_ipv4.network.to_s, ipv_6_prefix_count: 1, groups: ["sg-0123456789abcdefg"], tag_specifications: Util.aws_tag_specifications("network-interface", nic.name)}).and_call_original
       expect(client).to receive(:assign_ipv_6_addresses).with({network_interface_id: "eni-0123456789abcdefg", ipv_6_address_count: 1}).and_call_original
-      expect(nic).to receive(:update).with(name: "eni-0123456789abcdefg")
       expect { nx.create_network_interface }.to hop("wait_network_interface_created")
     end
   end
@@ -43,14 +42,16 @@ RSpec.describe Prog::Aws::Nic do
   describe "#wait_network_interface_created" do
     it "checks if network interface is available, if not naps" do
       client.stub_responses(:describe_network_interfaces, network_interfaces: [{status: "pending"}])
-      expect(client).to receive(:describe_network_interfaces).with({filters: [{name: "network-interface-id", values: [nic.name]}, {name: "tag:Ubicloud", values: ["true"]}]}).and_call_original
+      expect(nic.nic_aws_resource).to receive(:network_interface_id).and_return("eni-0123456789abcdefg").at_least(:once)
+      expect(client).to receive(:describe_network_interfaces).with({filters: [{name: "network-interface-id", values: ["eni-0123456789abcdefg"]}, {name: "tag:Ubicloud", values: ["true"]}]}).and_call_original
       expect { nx.wait_network_interface_created }.to nap(1)
     end
 
     it "checks if network interface is available, if it is, it allocates an elastic ip and associates it with the network interface" do
       client.stub_responses(:describe_network_interfaces, network_interfaces: [{status: "available"}])
       client.stub_responses(:allocate_address, allocation_id: "eip-0123456789abcdefg")
-      expect(client).to receive(:describe_network_interfaces).with({filters: [{name: "network-interface-id", values: [nic.name]}, {name: "tag:Ubicloud", values: ["true"]}]}).and_call_original
+      expect(nic.nic_aws_resource).to receive(:network_interface_id).and_return("eni-0123456789abcdefg").at_least(:once)
+      expect(client).to receive(:describe_network_interfaces).with({filters: [{name: "network-interface-id", values: ["eni-0123456789abcdefg"]}, {name: "tag:Ubicloud", values: ["true"]}]}).and_call_original
 
       expect { nx.wait_network_interface_created }.to hop("allocate_eip")
     end
@@ -83,18 +84,21 @@ RSpec.describe Prog::Aws::Nic do
     it "deletes the network interface" do
       client.stub_responses(:describe_network_interfaces, network_interfaces: [{status: "available"}])
       client.stub_responses(:delete_network_interface)
-      expect(client).to receive(:delete_network_interface).with({network_interface_id: nic.name}).and_call_original
+      expect(nic.nic_aws_resource).to receive(:network_interface_id).and_return("eni-0123456789abcdefg").at_least(:once)
+      expect(client).to receive(:delete_network_interface).with({network_interface_id: "eni-0123456789abcdefg"}).and_call_original
       expect { nx.destroy }.to hop("release_eip")
     end
 
     it "doesn't nap if network_interfaces are empty" do
       client.stub_responses(:describe_network_interfaces, network_interfaces: [])
       client.stub_responses(:delete_network_interface, Aws::EC2::Errors::InvalidNetworkInterfaceIDNotFound.new(nil, "The network interface 'eni-0123456789abcdefg' does not exist."))
+      expect(nic.nic_aws_resource).to receive(:network_interface_id).and_return("eni-0123456789abcdefg").at_least(:once)
       expect { nx.destroy }.to hop("release_eip")
     end
 
     it "hops to release_eip if the network interface is not found" do
       client.stub_responses(:delete_network_interface, Aws::EC2::Errors::InvalidNetworkInterfaceIDNotFound.new(nil, "The network interface 'eni-0123456789abcdefg' does not exist."))
+      expect(nic.nic_aws_resource).to receive(:network_interface_id).and_return("eni-0123456789abcdefg").at_least(:once)
       expect { nx.destroy }.to hop("release_eip")
     end
   end
