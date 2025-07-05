@@ -18,7 +18,7 @@ on:
 jobs:
   run-ci:
     if: vars.RUN_E2E == 'true'
-    runs-on: ubicloud
+    runs-on: ubicloud-standard-4
     environment: E2E-CI
     timeout-minutes: 60
     concurrency: e2e_environment
@@ -70,6 +70,7 @@ jobs:
         CLOVER_DATABASE_URL: postgres:///clover_test?user=clover
         RACK_ENV: production
         IS_E2E: "true"
+        DISPATCHER_MAX_THREADS: 16
         CI_HETZNER_SACRIFICIAL_SERVER_ID: ${{ secrets.CI_HETZNER_SACRIFICIAL_SERVER_ID }}
         HETZNER_USER: ${{ secrets.HETZNER_USER }}
         HETZNER_PASSWORD: ${{ secrets.HETZNER_PASSWORD }}
