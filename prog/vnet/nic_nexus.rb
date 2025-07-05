@@ -121,6 +121,7 @@ class Prog::Vnet::NicNexus < Prog::Base
     decr_destroy
 
     if nic.private_subnet.location.aws?
+      strand.children.select { it.prog == "Aws::Nic" }.each { it.destroy }
       bud Prog::Aws::Nic, {"subject_id" => nic.id}, :destroy
       hop_wait_aws_nic_destroyed
     end
