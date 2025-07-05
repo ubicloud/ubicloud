@@ -149,11 +149,12 @@ class PostgresServer < Sequel::Model
 
   def lsn_caught_up
     parent_server = if read_replica?
-      resource.parent.representative_server
+      resource.parent&.representative_server
     else
       resource.representative_server
     end
-    lsn_diff(parent_server.current_lsn, current_lsn) < 80 * 1024 * 1024
+
+    lsn_diff(parent_server&.current_lsn || current_lsn, current_lsn) < 80 * 1024 * 1024
   end
 
   def current_lsn
