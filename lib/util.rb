@@ -87,4 +87,9 @@ module Util
   def self.send_email(...)
     EmailRenderer.sendmail("/", ...)
   end
+
+  def self.aws_tag_specifications(resource_type, name, additional_tags = {})
+    tags = [{key: "Ubicloud", value: "true"}, {key: "Name", value: name}].concat(additional_tags.map { |k, v| {key: k.to_s, value: v.to_s} })
+    [{resource_type:, tags:}].compact
+  end
 end

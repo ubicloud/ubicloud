@@ -29,7 +29,7 @@ RSpec.describe Prog::Aws::Vpc do
 
   describe "#create_vpc" do
     it "creates a vpc" do
-      expect(client).to receive(:create_vpc).with({cidr_block: ps.net4.to_s, amazon_provided_ipv_6_cidr_block: true, tag_specifications: [{resource_type: "vpc", tags: [{key: "Ubicloud", value: "true"}]}]}).and_return(instance_double(Aws::EC2::Types::CreateVpcResult, vpc: instance_double(Aws::EC2::Types::Vpc, vpc_id: "vpc-0123456789abcdefg")))
+      expect(client).to receive(:create_vpc).with({cidr_block: ps.net4.to_s, amazon_provided_ipv_6_cidr_block: true, tag_specifications: Util.aws_tag_specifications("vpc", ps.name)}).and_return(instance_double(Aws::EC2::Types::CreateVpcResult, vpc: instance_double(Aws::EC2::Types::Vpc, vpc_id: "vpc-0123456789abcdefg")))
       expect(ps).to receive(:update).with(name: "vpc-0123456789abcdefg")
       expect(ps.private_subnet_aws_resource).to receive(:update).with(vpc_id: "vpc-0123456789abcdefg")
       expect { nx.create_vpc }.to hop("wait_vpc_created")
@@ -51,7 +51,7 @@ RSpec.describe Prog::Aws::Vpc do
       client.stub_responses(:describe_vpcs, vpcs: [{state: "available"}])
 
       expect(client).to receive(:describe_vpcs).with({filters: [{name: "vpc-id", values: [ps.name]}]}).and_call_original
-      expect(client).to receive(:create_security_group).with({group_name: "aws-us-west-2-#{ps.ubid}", description: "Security group for aws-us-west-2-#{ps.ubid}", vpc_id: ps.name, tag_specifications: [{resource_type: "security-group", tags: [{key: "Ubicloud", value: "true"}]}]}).and_call_original
+      expect(client).to receive(:create_security_group).with({group_name: "aws-us-west-2-#{ps.ubid}", description: "Security group for aws-us-west-2-#{ps.ubid}", vpc_id: ps.name, tag_specifications: Util.aws_tag_specifications("security-group", ps.name)}).and_call_original
       ps.firewalls.map { it.firewall_rules.map { |fw| fw.destroy } }
       FirewallRule.create_with_id(firewall_id: ps.firewalls.first.id, cidr: "0.0.0.1/32", port_range: 22..80)
       ps.reload

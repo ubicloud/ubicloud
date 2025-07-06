@@ -33,7 +33,7 @@ RSpec.describe Prog::Aws::Nic do
     it "creates a network interface" do
       client.stub_responses(:create_network_interface, network_interface: {network_interface_id: "eni-0123456789abcdefg"})
       client.stub_responses(:assign_ipv_6_addresses)
-      expect(client).to receive(:create_network_interface).with({subnet_id: "subnet-0123456789abcdefg", private_ip_address: nic.private_ipv4.network.to_s, ipv_6_prefix_count: 1, groups: ["sg-0123456789abcdefg"], tag_specifications: [{resource_type: "network-interface", tags: [{key: "Ubicloud", value: "true"}]}]}).and_call_original
+      expect(client).to receive(:create_network_interface).with({subnet_id: "subnet-0123456789abcdefg", private_ip_address: nic.private_ipv4.network.to_s, ipv_6_prefix_count: 1, groups: ["sg-0123456789abcdefg"], tag_specifications: Util.aws_tag_specifications("network-interface", nic.name)}).and_call_original
       expect(client).to receive(:assign_ipv_6_addresses).with({network_interface_id: "eni-0123456789abcdefg", ipv_6_address_count: 1}).and_call_original
       expect(nic).to receive(:update).with(name: "eni-0123456789abcdefg")
       expect { nx.create_network_interface }.to hop("wait_network_interface_created")

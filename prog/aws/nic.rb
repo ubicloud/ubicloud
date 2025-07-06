@@ -12,7 +12,7 @@ class Prog::Aws::Nic < Prog::Base
       groups: [
         nic.private_subnet.private_subnet_aws_resource.security_group_id
       ],
-      tag_specifications: tag_specifications("network-interface")
+      tag_specifications: Util.aws_tag_specifications("network-interface", nic.name)
     })
     network_interface_id = network_interface_response.network_interface.network_interface_id
 
@@ -67,17 +67,6 @@ class Prog::Aws::Nic < Prog::Base
 
   def client
     @client ||= nic.private_subnet.location.location_credential.client
-  end
-
-  def tag_specifications(resource_type)
-    [
-      {
-        resource_type: resource_type,
-        tags: [
-          {key: "Ubicloud", value: "true"}
-        ]
-      }
-    ]
   end
 
   private
