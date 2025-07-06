@@ -214,7 +214,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
       root_cert_key = OpenSSL::PKey::EC.new(resource.root_cert_key_2)
     end
 
-    ip_san = (Config.development? || Config.is_e2e) ? ",IP:#{vm.ephemeral_net4},IP:#{vm.ephemeral_net6.nth(2)}" : nil
+    ip_san = (Config.development? || Config.is_e2e) ? ",IP:#{vm.ephemeral_net4},IP:#{vm.ip6}" : nil
 
     Util.create_certificate(
       subject: "/C=US/O=Ubicloud/CN=#{resource.ubid} Server Certificate",
