@@ -93,10 +93,20 @@ RSpec.describe Prog::Aws::Vpc do
   describe "#create_subnet" do
     it "creates a subnet and hops to wait_subnet_created" do
       client.stub_responses(:describe_vpcs, vpcs: [{ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}], vpc_id: ps.name}])
+      client.stub_responses(:describe_subnets, subnets: [])
       client.stub_responses(:create_subnet, subnet: {subnet_id: "subnet-0123456789abcdefg"})
       client.stub_responses(:modify_subnet_attribute)
       expect(client).to receive(:modify_subnet_attribute).with({subnet_id: "subnet-0123456789abcdefg", assign_ipv_6_address_on_creation: {value: true}}).and_call_original
       expect(ps.private_subnet_aws_resource).to receive(:update).with(subnet_id: "subnet-0123456789abcdefg")
+      expect { nx.create_subnet }.to hop("wait_subnet_created")
+    end
+
+    it "reuses existing subnet" do
+      client.stub_responses(:describe_vpcs, vpcs: [{ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}], vpc_id: ps.name}])
+      client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-existing"}])
+      client.stub_responses(:modify_subnet_attribute)
+      expect(client).not_to receive(:create_subnet)
+      expect(ps.private_subnet_aws_resource).to receive(:update).with(subnet_id: "subnet-existing")
       expect { nx.create_subnet }.to hop("wait_subnet_created")
     end
   end
