@@ -82,9 +82,16 @@ RSpec.describe Prog::Aws::Nic do
 
   describe "#attach_eip_network_interface" do
     it "associates the elastic ip with the network interface" do
-      expect(nic.nic_aws_resource).to receive(:eip_allocation_id).and_return("eip-0123456789abcdefg")
+      expect(nic.nic_aws_resource).to receive(:eip_allocation_id).and_return("eip-0123456789abcdefg").at_least(:once)
+      client.stub_responses(:describe_addresses, addresses: [{allocation_id: "eip-0123456789abcdefg", network_interface_id: nil}])
       client.stub_responses(:associate_address)
-      expect(client).to receive(:associate_address).with({allocation_id: "eip-0123456789abcdefg", network_interface_id: nic.name}).and_call_original
+      expect(client).to receive(:associate_address).with({allocation_id: "eip-0123456789abcdefg", network_interface_id: nic.nic_aws_resource.network_interface_id}).and_call_original
+      expect { nx.attach_eip_network_interface }.to exit({"msg" => "nic created"})
+    end
+
+    it "skips association if elastic ip is already associated" do
+      client.stub_responses(:describe_addresses, addresses: [{allocation_id: "eip-0123456789abcdefg", network_interface_id: "eni-existing"}])
+      expect(client).not_to receive(:associate_address)
       expect { nx.attach_eip_network_interface }.to exit({"msg" => "nic created"})
     end
   end
