@@ -343,7 +343,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
     it "adds IP SAN if running in development or E2E environment" do
       allow(Config).to receive(:development?).and_return(true)
       expect(victoria_metrics_server.vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
-      expect(victoria_metrics_server.vm).to receive(:ephemeral_net6).and_return(NetAddr::IPv6Net.parse("2a01:4f8:10a:128b:814c::/79"))
+      expect(victoria_metrics_server.vm).to receive(:ip6).and_return(NetAddr::IPv6Net.parse("2a01:4f8:10a:128b:814c::/79").nth(2))
 
       expect(Util).to receive(:create_certificate).with(
         subject: "/C=US/O=Ubicloud/CN=#{victoria_metrics_server.resource.ubid} Server Certificate",
