@@ -45,11 +45,10 @@ class Prog::Aws::Nic < Prog::Base
   end
 
   label def attach_eip_network_interface
-    # Associate the Elastic IP with your network interface
-    client.associate_address({
-      allocation_id: nic.nic_aws_resource.eip_allocation_id,
-      network_interface_id: nic.name
-    })
+    eip_response = client.describe_addresses({filters: [{name: "allocation-id", values: [nic.nic_aws_resource.eip_allocation_id]}]})
+    if eip_response.addresses.first.network_interface_id.nil?
+      client.associate_address({allocation_id: nic.nic_aws_resource.eip_allocation_id, network_interface_id: nic.nic_aws_resource.network_interface_id})
+    end
     pop "nic created"
   end
 
