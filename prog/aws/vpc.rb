@@ -7,7 +7,7 @@ class Prog::Aws::Vpc < Prog::Base
   label def create_vpc
     vpc_response = client.create_vpc({cidr_block: private_subnet.net4.to_s,
       amazon_provided_ipv_6_cidr_block: true,
-      tag_specifications: tag_specifications("vpc")})
+      tag_specifications: Util.aws_tag_specifications("vpc", private_subnet.name)})
     private_subnet.update(name: vpc_response.vpc.vpc_id)
     private_subnet.private_subnet_aws_resource.update(vpc_id: vpc_response.vpc.vpc_id)
     hop_wait_vpc_created
@@ -22,7 +22,7 @@ class Prog::Aws::Vpc < Prog::Base
           group_name: "aws-#{location.name}-#{private_subnet.ubid}",
           description: "Security group for aws-#{location.name}-#{private_subnet.ubid}",
           vpc_id: private_subnet.name,
-          tag_specifications: tag_specifications("security-group")
+          tag_specifications: Util.aws_tag_specifications("security-group", private_subnet.name)
         })
       rescue Aws::EC2::Errors::InvalidGroupDuplicate
         client.describe_security_groups({filters: [{name: "group-name", values: ["aws-#{location.name}-#{private_subnet.ubid}"]}]}).security_groups[0]
@@ -55,7 +55,7 @@ class Prog::Aws::Vpc < Prog::Base
       cidr_block: private_subnet.net4.to_s,
       ipv_6_cidr_block: "#{ipv_6_cidr_block}/64",
       availability_zone: location.name + "a", # YYY: This is a hack since we don't support multiple AZs yet
-      tag_specifications: tag_specifications("subnet")
+      tag_specifications: Util.aws_tag_specifications("subnet", private_subnet.name)
     })
 
     subnet_id = subnet_response.subnet.subnet_id
@@ -86,7 +86,7 @@ class Prog::Aws::Vpc < Prog::Base
     route_table_id = route_table_response.route_tables[0].route_table_id
     private_subnet.private_subnet_aws_resource.update(route_table_id: route_table_id)
     internet_gateway_response = client.create_internet_gateway({
-      tag_specifications: tag_specifications("internet-gateway")
+      tag_specifications: Util.aws_tag_specifications("internet-gateway", private_subnet.name)
     })
     internet_gateway_id = internet_gateway_response.internet_gateway.internet_gateway_id
     private_subnet.private_subnet_aws_resource.update(internet_gateway_id: internet_gateway_id)
@@ -169,16 +169,5 @@ class Prog::Aws::Vpc < Prog::Base
 
   def client
     @client ||= location.location_credential.client
-  end
-
-  def tag_specifications(resource_type)
-    [
-      {
-        resource_type: resource_type,
-        tags: [
-          {key: "Ubicloud", value: "true"}
-        ]
-      }
-    ]
   end
 end
