@@ -96,12 +96,22 @@ class Prog::Aws::Vpc < Prog::Base
     route_table_response = client.describe_route_tables({filters: [{name: "vpc-id", values: [private_subnet.private_subnet_aws_resource.vpc_id]}]})
     route_table_id = route_table_response.route_tables[0].route_table_id
     private_subnet.private_subnet_aws_resource.update(route_table_id: route_table_id)
-    internet_gateway_response = client.create_internet_gateway({
-      tag_specifications: Util.aws_tag_specifications("internet-gateway", private_subnet.name)
-    })
-    internet_gateway_id = internet_gateway_response.internet_gateway.internet_gateway_id
-    private_subnet.private_subnet_aws_resource.update(internet_gateway_id: internet_gateway_id)
-    client.attach_internet_gateway({internet_gateway_id: internet_gateway_id, vpc_id: private_subnet.private_subnet_aws_resource.vpc_id})
+    internet_gateway_response = client.describe_internet_gateways({filters: [{name: "tag:Name", values: [private_subnet.name]}]})
+
+    if internet_gateway_response.internet_gateways.empty?
+      internet_gateway_id = client.create_internet_gateway({
+        tag_specifications: Util.aws_tag_specifications("internet-gateway", private_subnet.name)
+      }).internet_gateway.internet_gateway_id
+      private_subnet.private_subnet_aws_resource.update(internet_gateway_id:)
+      client.attach_internet_gateway({internet_gateway_id:, vpc_id: private_subnet.private_subnet_aws_resource.vpc_id})
+    else
+      internet_gateway = internet_gateway_response.internet_gateways.first
+      internet_gateway_id = internet_gateway.internet_gateway_id
+      private_subnet.private_subnet_aws_resource.update(internet_gateway_id:)
+      if internet_gateway.attachments.empty?
+        client.attach_internet_gateway({internet_gateway_id:, vpc_id: private_subnet.private_subnet_aws_resource.vpc_id})
+      end
+    end
 
     begin
       client.create_route({
@@ -118,10 +128,13 @@ class Prog::Aws::Vpc < Prog::Base
     rescue Aws::EC2::Errors::RouteAlreadyExists
     end
 
-    client.associate_route_table({
-      route_table_id: route_table_id,
-      subnet_id: private_subnet.private_subnet_aws_resource.subnet_id
-    })
+    route_table_details = client.describe_route_tables({route_table_ids: [route_table_id]}).route_tables.first
+    if route_table_details.associations.empty?
+      client.associate_route_table({
+        route_table_id:,
+        subnet_id: private_subnet.private_subnet_aws_resource.subnet_id
+      })
+    end
 
     pop "subnet created"
   end
