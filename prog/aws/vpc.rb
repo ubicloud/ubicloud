@@ -5,10 +5,17 @@ class Prog::Aws::Vpc < Prog::Base
   subject_is :private_subnet
 
   label def create_vpc
-    vpc_response = client.create_vpc({cidr_block: private_subnet.net4.to_s,
-      amazon_provided_ipv_6_cidr_block: true,
-      tag_specifications: Util.aws_tag_specifications("vpc", private_subnet.name)})
-    private_subnet.private_subnet_aws_resource.update(vpc_id: vpc_response.vpc.vpc_id)
+    vpc_response = client.describe_vpcs({filters: [{name: "tag:Name", values: [private_subnet.name]}]})
+
+    vpc_id = if vpc_response.vpcs.empty?
+      client.create_vpc({cidr_block: private_subnet.net4.to_s,
+        amazon_provided_ipv_6_cidr_block: true,
+        tag_specifications: Util.aws_tag_specifications("vpc", private_subnet.name)}).vpc.vpc_id
+    else
+      vpc_response.vpcs.first.vpc_id
+    end
+
+    private_subnet.private_subnet_aws_resource.update(vpc_id: vpc_id)
     hop_wait_vpc_created
   end
 
