@@ -38,15 +38,18 @@ class Prog::Aws::Vpc < Prog::Base
 
       private_subnet.firewalls.flat_map(&:firewall_rules).each do |firewall_rule|
         next if firewall_rule.ip6?
-        client.authorize_security_group_ingress({
-          group_id: security_group_response.group_id,
-          ip_permissions: [{
-            ip_protocol: "tcp",
-            from_port: firewall_rule.port_range.first,
-            to_port: firewall_rule.port_range.last - 1,
-            ip_ranges: [{cidr_ip: firewall_rule.cidr.to_s}]
-          }]
-        })
+        begin
+          client.authorize_security_group_ingress({
+            group_id: security_group_response.group_id,
+            ip_permissions: [{
+              ip_protocol: "tcp",
+              from_port: firewall_rule.port_range.first,
+              to_port: firewall_rule.port_range.last - 1,
+              ip_ranges: [{cidr_ip: firewall_rule.cidr.to_s}]
+            }]
+          })
+        rescue Aws::EC2::Errors::InvalidPermissionDuplicate
+        end
       end
       hop_create_subnet
     end
