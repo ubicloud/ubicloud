@@ -124,8 +124,9 @@ RSpec.describe Prog::Aws::Vpc do
   end
 
   describe "#create_route_table" do
-    it "creates a route table and hops to wait_route_table_created" do
-      client.stub_responses(:describe_route_tables, route_tables: [{route_table_id: "rtb-0123456789abcdefg"}])
+    it "creates a route table with new internet gateway" do
+      client.stub_responses(:describe_route_tables, route_tables: [{route_table_id: "rtb-0123456789abcdefg", associations: []}])
+      client.stub_responses(:describe_internet_gateways, internet_gateways: [])
       client.stub_responses(:create_internet_gateway, internet_gateway: {internet_gateway_id: "igw-0123456789abcdefg"})
       client.stub_responses(:create_route)
       client.stub_responses(:attach_internet_gateway)
@@ -140,19 +141,70 @@ RSpec.describe Prog::Aws::Vpc do
       expect { nx.create_route_table }.to exit({"msg" => "subnet created"})
     end
 
+    it "reuses existing internet gateway and attaches if needed" do
+      client.stub_responses(:describe_route_tables, route_tables: [{route_table_id: "rtb-0123456789abcdefg", associations: []}])
+      client.stub_responses(:describe_internet_gateways, internet_gateways: [{internet_gateway_id: "igw-existing", attachments: []}])
+      client.stub_responses(:create_route)
+      client.stub_responses(:attach_internet_gateway)
+      client.stub_responses(:associate_route_table)
+      expect(client).not_to receive(:create_internet_gateway)
+      expect(ps.private_subnet_aws_resource).to receive(:update).with(internet_gateway_id: "igw-existing")
+      expect(ps.private_subnet_aws_resource).to receive(:update).with(route_table_id: "rtb-0123456789abcdefg")
+      expect(ps.private_subnet_aws_resource).to receive(:vpc_id).and_return("vpc-0123456789abcdefg").at_least(:once)
+      expect(client).to receive(:attach_internet_gateway).with({internet_gateway_id: "igw-existing", vpc_id: "vpc-0123456789abcdefg"}).and_call_original
+      expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_ipv_6_cidr_block: "::/0", gateway_id: "igw-existing"}).and_call_original
+      expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_cidr_block: "0.0.0.0/0", gateway_id: "igw-existing"}).and_call_original
+      expect(client).to receive(:associate_route_table).with({route_table_id: "rtb-0123456789abcdefg", subnet_id: ps.private_subnet_aws_resource.subnet_id}).and_call_original
+      expect { nx.create_route_table }.to exit({"msg" => "subnet created"})
+    end
+
+    it "reuses existing internet gateway and skips attachment if already attached" do
+      client.stub_responses(:describe_route_tables, route_tables: [{route_table_id: "rtb-0123456789abcdefg", associations: []}])
+      client.stub_responses(:describe_internet_gateways, internet_gateways: [{internet_gateway_id: "igw-existing", attachments: [{vpc_id: "vpc-0123456789abcdefg"}]}])
+      client.stub_responses(:create_route)
+      client.stub_responses(:associate_route_table)
+      expect(client).not_to receive(:create_internet_gateway)
+      expect(client).not_to receive(:attach_internet_gateway)
+      expect(ps.private_subnet_aws_resource).to receive(:update).with(internet_gateway_id: "igw-existing")
+      expect(ps.private_subnet_aws_resource).to receive(:update).with(route_table_id: "rtb-0123456789abcdefg")
+      expect(ps.private_subnet_aws_resource).to receive(:vpc_id).and_return("vpc-0123456789abcdefg").at_least(:once)
+      expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_ipv_6_cidr_block: "::/0", gateway_id: "igw-existing"}).and_call_original
+      expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_cidr_block: "0.0.0.0/0", gateway_id: "igw-existing"}).and_call_original
+      expect(client).to receive(:associate_route_table).with({route_table_id: "rtb-0123456789abcdefg", subnet_id: ps.private_subnet_aws_resource.subnet_id}).and_call_original
+      expect { nx.create_route_table }.to exit({"msg" => "subnet created"})
+    end
+
     it "omits if the route already exists" do
-      client.stub_responses(:describe_route_tables, route_tables: [{route_table_id: "rtb-0123456789abcdefg"}])
+      client.stub_responses(:describe_route_tables, route_tables: [{route_table_id: "rtb-0123456789abcdefg", associations: []}])
+      client.stub_responses(:describe_internet_gateways, internet_gateways: [])
       client.stub_responses(:create_internet_gateway, internet_gateway: {internet_gateway_id: "igw-0123456789abcdefg"})
       client.stub_responses(:create_route, Aws::EC2::Errors::RouteAlreadyExists.new(nil, nil))
       client.stub_responses(:attach_internet_gateway)
       client.stub_responses(:associate_route_table)
       expect(client).to receive(:describe_route_tables).with({filters: [{name: "vpc-id", values: ["vpc-0123456789abcdefg"]}]}).and_call_original
+      expect(client).to receive(:describe_route_tables).with({route_table_ids: ["rtb-0123456789abcdefg"]}).and_call_original
       expect(ps.private_subnet_aws_resource).to receive(:update).with(internet_gateway_id: "igw-0123456789abcdefg")
       expect(ps.private_subnet_aws_resource).to receive(:update).with(route_table_id: "rtb-0123456789abcdefg")
       expect(ps.private_subnet_aws_resource).to receive(:vpc_id).and_return("vpc-0123456789abcdefg").at_least(:once)
       expect(client).to receive(:attach_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg", vpc_id: "vpc-0123456789abcdefg"}).and_call_original
       expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_ipv_6_cidr_block: "::/0", gateway_id: "igw-0123456789abcdefg"}).and_call_original
       expect(client).to receive(:associate_route_table).with({route_table_id: "rtb-0123456789abcdefg", subnet_id: ps.private_subnet_aws_resource.subnet_id})
+      expect { nx.create_route_table }.to exit({"msg" => "subnet created"})
+    end
+
+    it "skips route table association if already associated" do
+      client.stub_responses(:describe_route_tables, route_tables: [{route_table_id: "rtb-0123456789abcdefg", associations: [{subnet_id: "subnet-existing"}]}])
+      client.stub_responses(:describe_internet_gateways, internet_gateways: [])
+      client.stub_responses(:create_internet_gateway, internet_gateway: {internet_gateway_id: "igw-0123456789abcdefg"})
+      client.stub_responses(:create_route)
+      client.stub_responses(:attach_internet_gateway)
+      expect(client).not_to receive(:associate_route_table)
+      expect(ps.private_subnet_aws_resource).to receive(:update).with(internet_gateway_id: "igw-0123456789abcdefg")
+      expect(ps.private_subnet_aws_resource).to receive(:update).with(route_table_id: "rtb-0123456789abcdefg")
+      expect(ps.private_subnet_aws_resource).to receive(:vpc_id).and_return("vpc-0123456789abcdefg").at_least(:once)
+      expect(client).to receive(:attach_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg", vpc_id: "vpc-0123456789abcdefg"}).and_call_original
+      expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_ipv_6_cidr_block: "::/0", gateway_id: "igw-0123456789abcdefg"}).and_call_original
+      expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_cidr_block: "0.0.0.0/0", gateway_id: "igw-0123456789abcdefg"}).and_call_original
       expect { nx.create_route_table }.to exit({"msg" => "subnet created"})
     end
   end
