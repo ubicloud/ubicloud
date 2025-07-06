@@ -59,22 +59,26 @@ class Prog::Aws::Vpc < Prog::Base
   label def create_subnet
     vpc_response = client.describe_vpcs({filters: [{name: "vpc-id", values: [private_subnet.private_subnet_aws_resource.vpc_id]}]}).vpcs[0]
     ipv_6_cidr_block = vpc_response.ipv_6_cidr_block_association_set[0].ipv_6_cidr_block.gsub("/56", "")
-    subnet_response = client.create_subnet({
-      vpc_id: vpc_response.vpc_id,
-      cidr_block: private_subnet.net4.to_s,
-      ipv_6_cidr_block: "#{ipv_6_cidr_block}/64",
-      availability_zone: location.name + "a", # YYY: This is a hack since we don't support multiple AZs yet
-      tag_specifications: Util.aws_tag_specifications("subnet", private_subnet.name)
-    })
 
-    subnet_id = subnet_response.subnet.subnet_id
-    # Enable auto-assign ipv_6 addresses for the subnet
+    subnet_response = client.describe_subnets({filters: [{name: "tag:Name", values: [private_subnet.name]}]})
+    subnet_id = if subnet_response.subnets.empty?
+      client.create_subnet({
+        vpc_id: vpc_response.vpc_id,
+        cidr_block: private_subnet.net4.to_s,
+        ipv_6_cidr_block: "#{ipv_6_cidr_block}/64",
+        availability_zone: location.name + "a", # YYY: This is a hack since we don't support multiple AZs yet
+        tag_specifications: Util.aws_tag_specifications("subnet", private_subnet.name)
+      }).subnet.subnet_id
+    else
+      subnet_response.subnets.first.subnet_id
+    end
+
     client.modify_subnet_attribute({
-      subnet_id: subnet_id,
+      subnet_id:,
       assign_ipv_6_address_on_creation: {value: true}
     })
 
-    private_subnet.private_subnet_aws_resource.update(subnet_id: subnet_id)
+    private_subnet.private_subnet_aws_resource.update(subnet_id:)
     hop_wait_subnet_created
   end
 
