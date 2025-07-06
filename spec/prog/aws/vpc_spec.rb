@@ -78,6 +78,16 @@ RSpec.describe Prog::Aws::Vpc do
       ps.reload
       expect { nx.wait_vpc_created }.to hop("create_subnet")
     end
+
+    it "skips security group ingress rule if it already exists" do
+      client.stub_responses(:describe_vpcs, vpcs: [{state: "available"}])
+      client.stub_responses(:authorize_security_group_ingress, Aws::EC2::Errors::InvalidPermissionDuplicate.new(nil, nil))
+
+      ps.firewalls.map { it.firewall_rules.map { |fw| fw.destroy } }
+      FirewallRule.create_with_id(firewall_id: ps.firewalls.first.id, cidr: "0.0.0.1/32", port_range: 22..80)
+      ps.reload
+      expect { nx.wait_vpc_created }.to hop("create_subnet")
+    end
   end
 
   describe "#create_subnet" do
