@@ -65,8 +65,16 @@ RSpec.describe Prog::Aws::Nic do
 
   describe "#allocate_eip" do
     it "allocates an elastic ip" do
+      client.stub_responses(:describe_addresses, addresses: [])
       client.stub_responses(:allocate_address, allocation_id: "eip-0123456789abcdefg")
       expect(client).to receive(:allocate_address).and_call_original
+      expect(nic.nic_aws_resource).to receive(:update).with(eip_allocation_id: "eip-0123456789abcdefg")
+      expect { nx.allocate_eip }.to hop("attach_eip_network_interface")
+    end
+
+    it "reuses an existing elastic ip if available" do
+      client.stub_responses(:describe_addresses, addresses: [{allocation_id: "eip-0123456789abcdefg"}])
+      expect(client).not_to receive(:allocate_address)
       expect(nic.nic_aws_resource).to receive(:update).with(eip_allocation_id: "eip-0123456789abcdefg")
       expect { nx.allocate_eip }.to hop("attach_eip_network_interface")
     end

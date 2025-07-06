@@ -33,8 +33,14 @@ class Prog::Aws::Nic < Prog::Base
   end
 
   label def allocate_eip
-    eip_response = client.allocate_address
-    nic.nic_aws_resource.update(eip_allocation_id: eip_response.allocation_id)
+    eip_response = client.describe_addresses({filters: [{name: "tag:Name", values: [nic.name]}]})
+    eip_allocation_id = if eip_response.addresses.empty?
+      client.allocate_address(tag_specifications: Util.aws_tag_specifications("elastic-ip", nic.nic_aws_resource.network_interface_id)).allocation_id
+    else
+      eip_response.addresses[0].allocation_id
+    end
+
+    nic.nic_aws_resource.update(eip_allocation_id:)
     hop_attach_eip_network_interface
   end
 
