@@ -29,8 +29,16 @@ RSpec.describe Prog::Aws::Vpc do
 
   describe "#create_vpc" do
     it "creates a vpc" do
+      client.stub_responses(:describe_vpcs, vpcs: [])
       expect(client).to receive(:create_vpc).with({cidr_block: ps.net4.to_s, amazon_provided_ipv_6_cidr_block: true, tag_specifications: Util.aws_tag_specifications("vpc", ps.name)}).and_return(instance_double(Aws::EC2::Types::CreateVpcResult, vpc: instance_double(Aws::EC2::Types::Vpc, vpc_id: "vpc-0123456789abcdefg")))
       expect(ps.private_subnet_aws_resource).to receive(:update).with(vpc_id: "vpc-0123456789abcdefg")
+      expect { nx.create_vpc }.to hop("wait_vpc_created")
+    end
+
+    it "reuses existing vpc" do
+      client.stub_responses(:describe_vpcs, vpcs: [{vpc_id: "vpc-existing"}])
+      expect(client).not_to receive(:create_vpc)
+      expect(ps.private_subnet_aws_resource).to receive(:update).with(vpc_id: "vpc-existing")
       expect { nx.create_vpc }.to hop("wait_vpc_created")
     end
   end
