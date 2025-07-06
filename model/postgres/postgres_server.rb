@@ -113,7 +113,7 @@ class PostgresServer < Sequel::Model
     }
   end
 
-  def trigger_failover
+  def trigger_failover(mode:)
     unless representative_at
       Clog.emit("Cannot trigger failover on a non-representative server") { {ubid: ubid} }
       return false
@@ -124,7 +124,7 @@ class PostgresServer < Sequel::Model
       return false
     end
 
-    standby.incr_take_over
+    standby.send(:"incr_#{mode}_take_over")
     true
   end
 
