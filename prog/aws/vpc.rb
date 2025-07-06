@@ -8,20 +8,19 @@ class Prog::Aws::Vpc < Prog::Base
     vpc_response = client.create_vpc({cidr_block: private_subnet.net4.to_s,
       amazon_provided_ipv_6_cidr_block: true,
       tag_specifications: Util.aws_tag_specifications("vpc", private_subnet.name)})
-    private_subnet.update(name: vpc_response.vpc.vpc_id)
     private_subnet.private_subnet_aws_resource.update(vpc_id: vpc_response.vpc.vpc_id)
     hop_wait_vpc_created
   end
 
   label def wait_vpc_created
-    vpc = client.describe_vpcs({filters: [{name: "vpc-id", values: [private_subnet.name]}]}).vpcs[0]
+    vpc = client.describe_vpcs({filters: [{name: "vpc-id", values: [private_subnet.private_subnet_aws_resource.vpc_id]}]}).vpcs[0]
 
     if vpc.state == "available"
       security_group_response = begin
         client.create_security_group({
           group_name: "aws-#{location.name}-#{private_subnet.ubid}",
           description: "Security group for aws-#{location.name}-#{private_subnet.ubid}",
-          vpc_id: private_subnet.name,
+          vpc_id: private_subnet.private_subnet_aws_resource.vpc_id,
           tag_specifications: Util.aws_tag_specifications("security-group", private_subnet.name)
         })
       rescue Aws::EC2::Errors::InvalidGroupDuplicate
@@ -48,7 +47,7 @@ class Prog::Aws::Vpc < Prog::Base
   end
 
   label def create_subnet
-    vpc_response = client.describe_vpcs({filters: [{name: "vpc-id", values: [private_subnet.name]}]}).vpcs[0]
+    vpc_response = client.describe_vpcs({filters: [{name: "vpc-id", values: [private_subnet.private_subnet_aws_resource.vpc_id]}]}).vpcs[0]
     ipv_6_cidr_block = vpc_response.ipv_6_cidr_block_association_set[0].ipv_6_cidr_block.gsub("/56", "")
     subnet_response = client.create_subnet({
       vpc_id: vpc_response.vpc_id,
@@ -70,7 +69,7 @@ class Prog::Aws::Vpc < Prog::Base
   end
 
   label def wait_subnet_created
-    subnet_response = client.describe_subnets({filters: [{name: "vpc-id", values: [private_subnet.name]}]}).subnets[0]
+    subnet_response = client.describe_subnets({filters: [{name: "vpc-id", values: [private_subnet.private_subnet_aws_resource.vpc_id]}]}).subnets[0]
 
     if subnet_response.state == "available"
       hop_create_route_table
@@ -80,9 +79,7 @@ class Prog::Aws::Vpc < Prog::Base
 
   label def create_route_table
     # Step 3: Update the route table for ipv_6 traffic
-    route_table_response = client.describe_route_tables({
-      filters: [{name: "vpc-id", values: [private_subnet.name]}]
-    })
+    route_table_response = client.describe_route_tables({filters: [{name: "vpc-id", values: [private_subnet.private_subnet_aws_resource.vpc_id]}]})
     route_table_id = route_table_response.route_tables[0].route_table_id
     private_subnet.private_subnet_aws_resource.update(route_table_id: route_table_id)
     internet_gateway_response = client.create_internet_gateway({
@@ -90,10 +87,7 @@ class Prog::Aws::Vpc < Prog::Base
     })
     internet_gateway_id = internet_gateway_response.internet_gateway.internet_gateway_id
     private_subnet.private_subnet_aws_resource.update(internet_gateway_id: internet_gateway_id)
-    client.attach_internet_gateway({
-      internet_gateway_id: internet_gateway_id,
-      vpc_id: private_subnet.name
-    })
+    client.attach_internet_gateway({internet_gateway_id: internet_gateway_id, vpc_id: private_subnet.private_subnet_aws_resource.vpc_id})
 
     begin
       client.create_route({
@@ -140,7 +134,7 @@ class Prog::Aws::Vpc < Prog::Base
 
   label def delete_internet_gateway
     ignore_invalid_id do
-      client.detach_internet_gateway({internet_gateway_id: private_subnet.private_subnet_aws_resource.internet_gateway_id, vpc_id: private_subnet.name})
+      client.detach_internet_gateway({internet_gateway_id: private_subnet.private_subnet_aws_resource.internet_gateway_id, vpc_id: private_subnet.private_subnet_aws_resource.vpc_id})
       client.delete_internet_gateway({internet_gateway_id: private_subnet.private_subnet_aws_resource.internet_gateway_id})
     end
     hop_delete_vpc
@@ -148,7 +142,7 @@ class Prog::Aws::Vpc < Prog::Base
 
   label def delete_vpc
     ignore_invalid_id do
-      client.delete_vpc({vpc_id: private_subnet.name})
+      client.delete_vpc({vpc_id: private_subnet.private_subnet_aws_resource.vpc_id})
     end
     pop "vpc destroyed"
   end
