@@ -114,13 +114,18 @@ class PostgresServer < Sequel::Model
   end
 
   def trigger_failover
-    if representative_at && (standby = failover_target)
-      standby.incr_take_over
-      true
-    else
-      Clog.emit("Failed to trigger failover")
-      false
+    unless representative_at
+      Clog.emit("Cannot trigger failover on a non-representative server") { {ubid: ubid} }
+      return false
     end
+
+    unless (standby = failover_target)
+      Clog.emit("No suitable standby found for failover") { {ubid: ubid} }
+      return false
+    end
+
+    standby.incr_take_over
+    true
   end
 
   def primary?
