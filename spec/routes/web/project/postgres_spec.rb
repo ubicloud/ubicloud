@@ -375,6 +375,7 @@ RSpec.describe Clover, "postgres" do
 
       it "does not show delete or edit options without the appropriate permissions" do
         pg
+        pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
 
         visit "#{project.path}#{pg.path}/networking"
         expect(page).to have_css(".firewall-rule-create-button")
@@ -500,7 +501,9 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "cannot create a read replica if there is no backup, yet" do
+        pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
         visit "#{project.path}#{pg.path}/read-replica"
+        pg.timeline.update(cached_earliest_backup_at: nil)
 
         fill_in "#{pg.name}-read-replica", with: "my-read-replica"
 
