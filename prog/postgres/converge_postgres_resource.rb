@@ -40,7 +40,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       nap 10 * 60 unless postgres_resource.in_maintenance_window?
 
       register_deadline(nil, 10 * 60)
-      rs.trigger_failover
+      rs.trigger_failover(mode: "planned")
     end
 
     nap 60

@@ -168,7 +168,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "cancels the destroy if the server is picked up for take over" do
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect(resource).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
-      expect(nx.strand).to receive(:label).and_return("prepare_for_take_over").at_least(:once)
+      expect(nx.strand).to receive(:label).and_return("prepare_for_planned_take_over").at_least(:once)
       expect(nx).to receive(:decr_destroy)
       expect { nx.before_run }.not_to hop("destroy")
     end
@@ -678,9 +678,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
 
-    it "hops to prepare_for_take_over if take_over is set" do
-      expect(nx).to receive(:when_take_over_set?).and_yield
-      expect { nx.wait }.to hop("prepare_for_take_over")
+    it "hops to fence if fence is set" do
+      expect(nx).to receive(:when_fence_set?).and_yield
+      expect { nx.wait }.to hop("fence")
+    end
+
+    it "hops to prepare_for_planned_take_over if planned_take_over is set" do
+      expect(nx).to receive(:when_planned_take_over_set?).and_yield
+      expect { nx.wait }.to hop("prepare_for_planned_take_over")
     end
 
     it "hops to refresh_certificates if refresh_certificates is set" do
@@ -816,20 +821,48 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
   end
 
-  describe "#prepare_for_take_over" do
-    it "naps if primary still exists" do
-      expect(nx).to receive(:decr_take_over)
-      representative_server = instance_double(PostgresServer, id: "something", vm: instance_double(Vm, sshable: instance_double(Sshable)))
-      expect(representative_server.vm.sshable).to receive(:cmd).with("sudo pg_ctlcluster 16 main stop -m immediate").and_raise(Sshable::SshError.new("", "", "", "", ""))
-      expect(representative_server).to receive(:incr_destroy)
-      expect(postgres_server.resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
-      expect { nx.prepare_for_take_over }.to nap(5)
+  describe "#fence" do
+    it "runs checkpoints and perform lockout" do
+      expect(nx).to receive(:decr_fence)
+      expect(postgres_server).to receive(:run_query).with("CHECKPOINT; CHECKPOINT; CHECKPOINT;")
+      expect(sshable).to receive(:cmd).with("sudo postgres/bin/lockout 16")
+      expect { nx.fence }.to nap(6 * 60 * 60)
+    end
+  end
+
+  describe "#prepare_for_planned_take_over" do
+    it "starts fencing on representative server" do
+      expect(nx).to receive(:decr_planned_take_over)
+      representative_server = instance_double(PostgresServer)
+      expect(postgres_server.resource).to receive(:representative_server).and_return(representative_server)
+      expect(representative_server).to receive(:incr_fence)
+      expect { nx.prepare_for_planned_take_over }.to hop("wait_fencing_of_old_primary")
+    end
+  end
+
+  describe "#wait_fencing_of_old_primary" do
+    it "naps immediately if fence is set" do
+      representative_server = instance_double(PostgresServer)
+      expect(postgres_server.resource).to receive(:representative_server).and_return(representative_server)
+      expect(representative_server).to receive(:fence_set?).and_return(true)
+      expect { nx.wait_fencing_of_old_primary }.to nap(0)
     end
 
-    it "hops to taking_over if primary still exists" do
-      expect(nx).to receive(:decr_take_over)
-      expect(postgres_server.resource).to receive(:representative_server).and_return(nil)
-      expect { nx.prepare_for_take_over }.to hop("taking_over")
+    it "naps immediately if LSN is not caught up" do
+      representative_server = instance_double(PostgresServer)
+      expect(postgres_server.resource).to receive(:representative_server).and_return(representative_server)
+      expect(representative_server).to receive(:fence_set?).and_return(false)
+      expect(postgres_server).to receive(:lsn_caught_up).and_return(false)
+      expect { nx.wait_fencing_of_old_primary }.to nap(0)
+    end
+
+    it "destroys old primary and hops to taking_over when fence is not set and LSN is caught up" do
+      representative_server = instance_double(PostgresServer)
+      expect(postgres_server.resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
+      expect(representative_server).to receive(:fence_set?).and_return(false)
+      expect(postgres_server).to receive(:lsn_caught_up).and_return(true)
+      expect(representative_server).to receive(:incr_destroy)
+      expect { nx.wait_fencing_of_old_primary }.to hop("taking_over")
     end
   end
 
