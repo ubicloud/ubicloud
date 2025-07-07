@@ -271,7 +271,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     if e.stderr.include?("Job for runner-script.service failed")
       Clog.emit("Failed to start runner script") { {failed_to_start_runner: response.to_h} }
       vm.sshable.cmd(<<~COMMAND)
-        journalctl -xeu runner-script.service
+        sudo journalctl -xeu runner-script.service
         cat /run/systemd/transient/runner-script.service || true
       COMMAND
     end
