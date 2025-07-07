@@ -485,6 +485,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can create a read replica of a PostgreSQL database" do
+        pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
         visit "#{project.path}#{pg.path}/read-replica"
 
         fill_in "#{pg.name}-read-replica", with: "my-read-replica"
@@ -498,7 +499,19 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content("my-read-replica")
       end
 
+      it "cannot create a read replica if there is no backup, yet" do
+        visit "#{project.path}#{pg.path}/read-replica"
+
+        fill_in "#{pg.name}-read-replica", with: "my-read-replica"
+
+        find(".pg-read-replica-create-btn").click
+
+        expect(page.status_code).to eq(400)
+        expect(page).to have_content("Parent server is not ready for read replicas. There are no backups, yet.")
+      end
+
       it "can promote a read replica" do
+        pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
         visit "#{project.path}#{pg.path}/read-replica"
 
         fill_in "#{pg.name}-read-replica", with: "my-read-replica"
@@ -515,6 +528,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "fails to promote if not a read replica" do
+        pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
         visit "#{project.path}#{pg.path}/read-replica"
         expect(page).to have_content "Read Replicas"
 
