@@ -41,7 +41,7 @@ puts "Reloading PostgreSQL configuration..."
 r "pg_ctlcluster #{v} main reload"
 
 # Terminate all existing connections except our own
-puts "Terminating all existing connections..."
-r "sudo -u postgres psql -c \"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid <> pg_backend_pid();\""
+puts "Terminating all existing connections except for the current session and ubi_replication user..."
+r "sudo -u postgres psql -c \"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename != 'ubi_replication' AND pid <> pg_backend_pid();\""
 
 puts "PostgreSQL is now in lockout mode - only UNIX socket connections and ubi_replication are allowed."
