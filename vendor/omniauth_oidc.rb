@@ -66,7 +66,8 @@ module OmniAuth
       end
 
       def request_phase
-        nonce = session['omniauth.nonce'] = Base64.urlsafe_encode64(SecureRandom.bytes(32))
+        t = Time.now
+        nonce = session['omniauth.nonce'] = Base64.urlsafe_encode64("#{t.to_i}#{t.nsec}#{SecureRandom.bytes(13)}")
         state = session['omniauth.state'] = Base64.urlsafe_encode64(SecureRandom.bytes(32))
 
         opts = client_options
