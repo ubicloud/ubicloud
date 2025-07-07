@@ -683,7 +683,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.wait }.to hop("fence")
     end
 
-    it "hops to prepare_for_planned_take_over if planned_take_over is set" do
+    it "hops to prepare_for_unplanned_take_over if take_over is set" do
+      expect(nx).to receive(:when_unplanned_take_over_set?).and_yield
+      expect { nx.wait }.to hop("prepare_for_unplanned_take_over")
+    end
+
+    it "hops to prepare_for_planned_take_over if take_over is set" do
       expect(nx).to receive(:when_planned_take_over_set?).and_yield
       expect { nx.wait }.to hop("prepare_for_planned_take_over")
     end
@@ -827,6 +832,30 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_server).to receive(:run_query).with("CHECKPOINT; CHECKPOINT; CHECKPOINT;")
       expect(sshable).to receive(:cmd).with("sudo postgres/bin/lockout 16")
       expect { nx.fence }.to nap(6 * 60 * 60)
+    end
+  end
+
+  describe "#prepare_for_unplanned_take_over" do
+    it "stops postgres in representative server and destroys it" do
+      representative_server = instance_double(PostgresServer)
+      expect(postgres_server.resource).to receive(:representative_server).and_return(representative_server)
+      expect(nx).to receive(:decr_unplanned_take_over)
+      expect(representative_server).to receive(:vm).and_return(instance_double(Vm, sshable: sshable))
+      expect(sshable).to receive(:cmd).with("sudo pg_ctlcluster 16 main stop -m immediate")
+      expect(representative_server).to receive(:incr_destroy)
+
+      expect { nx.prepare_for_unplanned_take_over }.to hop("taking_over")
+    end
+
+    it "handles SSH connection errors gracefully and continues with destroy" do
+      representative_server = instance_double(PostgresServer)
+      expect(postgres_server.resource).to receive(:representative_server).and_return(representative_server)
+      expect(nx).to receive(:decr_unplanned_take_over)
+      expect(representative_server).to receive(:vm).and_return(instance_double(Vm, sshable: sshable))
+      expect(sshable).to receive(:cmd).with("sudo pg_ctlcluster 16 main stop -m immediate").and_raise(Sshable::SshError.new("", "", "", "", ""))
+      expect(representative_server).to receive(:incr_destroy)
+
+      expect { nx.prepare_for_unplanned_take_over }.to hop("taking_over")
     end
   end
 
