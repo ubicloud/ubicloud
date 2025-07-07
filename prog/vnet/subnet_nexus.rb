@@ -74,6 +74,12 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def wait
+    if private_subnet.location.aws?
+      check_firewall_update
+      private_subnet.semaphores.each(&:destroy)
+      nap 60 * 60 * 24 * 365
+    end
+
     when_refresh_keys_set? do
       private_subnet.update(state: "refreshing_keys")
       hop_refresh_keys
@@ -84,16 +90,20 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       hop_add_new_nic
     end
 
-    when_update_firewall_rules_set? do
-      private_subnet.vms.map(&:incr_update_firewall_rules)
-      decr_update_firewall_rules
-    end
+    check_firewall_update
 
     if private_subnet.last_rekey_at < Time.now - 60 * 60 * 24
       private_subnet.incr_refresh_keys
     end
 
     nap 10 * 60
+  end
+
+  def check_firewall_update
+    when_update_firewall_rules_set? do
+      private_subnet.vms.each(&:incr_update_firewall_rules)
+      decr_update_firewall_rules
+    end
   end
 
   def gen_encryption_key

@@ -150,6 +150,18 @@ RSpec.describe Prog::Vnet::NicNexus do
   end
 
   describe "#wait" do
+    let(:nic) { instance_double(Nic, private_subnet: instance_double(PrivateSubnet, location: instance_double(Location, aws?: false), incr_refresh_keys: true)) }
+
+    before do
+      allow(nx).to receive(:nic).and_return(nic)
+    end
+
+    it "waits if location is aws" do
+      expect(nic.private_subnet.location).to receive(:aws?).and_return(true)
+      expect(nic).to receive(:semaphores).and_return([])
+      expect { nx.wait }.to nap(60 * 60 * 24 * 365)
+    end
+
     it "naps if nothing to do" do
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
@@ -161,8 +173,6 @@ RSpec.describe Prog::Vnet::NicNexus do
 
     it "hops to repopulate if needed" do
       expect(nx).to receive(:when_repopulate_set?).and_yield
-      ps = instance_double(PrivateSubnet, incr_refresh_keys: true)
-      expect(nx).to receive(:nic).and_return(instance_double(Nic, private_subnet: ps))
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
   end

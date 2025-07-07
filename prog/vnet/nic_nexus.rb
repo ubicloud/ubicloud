@@ -64,6 +64,11 @@ class Prog::Vnet::NicNexus < Prog::Base
   end
 
   label def wait
+    if nic.private_subnet.location.aws?
+      nic.semaphores.each(&:destroy)
+      nap 60 * 60 * 24 * 365
+    end
+
     when_repopulate_set? do
       nic.private_subnet.incr_refresh_keys
       decr_repopulate

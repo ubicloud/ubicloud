@@ -176,6 +176,12 @@ RSpec.describe Prog::Vnet::SubnetNexus do
   end
 
   describe "#wait" do
+    it "naps if location is aws" do
+      expect(ps.location).to receive(:aws?).and_return(true)
+      expect(ps).to receive(:semaphores).and_return([])
+      expect { nx.wait }.to nap(60 * 60 * 24 * 365)
+    end
+
     it "hops to refresh_keys if when_refresh_keys_set?" do
       expect(nx).to receive(:when_refresh_keys_set?).and_yield
       expect(ps).to receive(:update).with(state: "refreshing_keys").and_return(true)
