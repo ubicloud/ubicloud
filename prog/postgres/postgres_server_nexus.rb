@@ -560,8 +560,8 @@ SQL
       postgres_server.resource.incr_refresh_dns_record
       postgres_server.resource.servers.each(&:incr_configure)
       postgres_server.resource.servers.each(&:incr_configure_metrics)
+      postgres_server.resource.servers.each(&:incr_restart)
       postgres_server.resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
-      postgres_server.incr_restart
       hop_configure
     when "Failed", "NotStarted"
       vm.sshable.cmd("common/bin/daemonizer 'sudo pg_ctlcluster #{postgres_server.resource.version} main promote' promote_postgres")
