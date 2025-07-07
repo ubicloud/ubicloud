@@ -115,22 +115,22 @@ RSpec.describe PostgresServer do
     it "logs error when server is not primary" do
       expect(postgres_server).to receive(:representative_at).and_return(nil)
       expect(Clog).to receive(:emit).with("Cannot trigger failover on a non-representative server")
-      expect(postgres_server.trigger_failover).to be false
+      expect(postgres_server.trigger_failover(mode: "planned")).to be false
     end
 
     it "logs error when no suitable standby found" do
       expect(postgres_server).to receive(:representative_at).and_return(Time.now)
       expect(postgres_server).to receive(:failover_target).and_return(nil)
       expect(Clog).to receive(:emit).with("No suitable standby found for failover")
-      expect(postgres_server.trigger_failover).to be false
+      expect(postgres_server.trigger_failover(mode: "planned")).to be false
     end
 
     it "returns true only when failover is successfully triggered" do
       standby = instance_double(described_class)
       expect(postgres_server).to receive(:representative_at).and_return(Time.now)
       expect(postgres_server).to receive(:failover_target).and_return(standby)
-      expect(standby).to receive(:incr_take_over)
-      expect(postgres_server.trigger_failover).to be true
+      expect(standby).to receive(:incr_planned_take_over)
+      expect(postgres_server.trigger_failover(mode: "planned")).to be true
     end
   end
 

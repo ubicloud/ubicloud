@@ -63,7 +63,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   def before_run
     when_destroy_set? do
       is_destroying = ["destroy", nil].include?(postgres_server.resource&.strand&.label)
-      is_taking_over = @snap.set?(:take_over) || ["prepare_for_take_over", "taking_over"].include?(strand.label)
+      protected_labels = ["prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over"]
+      is_taking_over = @snap.set?(:take_over) || protected_labels.include?(strand.label)
 
       if is_destroying || !is_taking_over
         if strand.label != "destroy"
@@ -413,8 +414,12 @@ SQL
   label def wait
     decr_initial_provisioning
 
-    when_take_over_set? do
-      hop_prepare_for_take_over
+    when_fence_set? do
+      hop_fence
+    end
+
+    when_planned_take_over_set? do
+      hop_prepare_for_planned_take_over
     end
 
     when_refresh_certificates_set? do
@@ -501,19 +506,27 @@ SQL
     nap 5
   end
 
-  label def prepare_for_take_over
-    decr_take_over
-    representative_server = postgres_server.resource.representative_server
-    hop_taking_over if representative_server.nil?
+  label def fence
+    decr_fence
 
-    begin
-      representative_server.vm.sshable.cmd("sudo pg_ctlcluster #{postgres_server.resource.version} main stop -m immediate")
-    rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
-    end
+    postgres_server.run_query("CHECKPOINT; CHECKPOINT; CHECKPOINT;")
+    postgres_server.vm.sshable.cmd("sudo postgres/bin/lockout #{postgres_server.resource.version}")
 
-    representative_server.incr_destroy
+    nap 6 * 60 * 60
+  end
 
-    nap 5
+  label def prepare_for_planned_take_over
+    decr_planned_take_over
+
+    postgres_server.resource.representative_server.incr_fence
+    hop_wait_fencing_of_old_primary
+  end
+
+  label def wait_fencing_of_old_primary
+    nap 0 if postgres_server.resource.representative_server.fence_set? || !postgres_server.lsn_caught_up
+
+    postgres_server.resource.representative_server.incr_destroy
+    hop_taking_over
   end
 
   label def taking_over

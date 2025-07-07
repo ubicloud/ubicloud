@@ -19,7 +19,7 @@ class PostgresServer < Sequel::Model
   include MetricsTargetMethods
 
   semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup
-  semaphore :restart, :configure, :take_over, :configure_metrics, :destroy, :recycle, :promote
+  semaphore :restart, :configure, :fence, :planned_take_over, :configure_metrics, :destroy, :recycle, :promote
   semaphore :refresh_walg_credentials
 
   def configure_hash
