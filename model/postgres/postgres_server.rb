@@ -73,10 +73,11 @@ class PostgresServer < Sequel::Model
     end
 
     if timeline.blob_storage
+      configs[:archive_mode] = "on"
+      configs[:archive_timeout] = "60"
+      configs[:archive_command] = "'bash -c \"echo pushing %p >> /dat/postgres_archive.log; /usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env >> /dat/postgres_archive.log 2>&1\"'"
+
       if primary?
-        configs[:archive_mode] = "on"
-        configs[:archive_timeout] = "60"
-        configs[:archive_command] = "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'"
         if resource.ha_type == PostgresResource::HaType::SYNC
           caught_up_standbys = resource.servers.select { it.standby? && it.synchronization_status == "ready" }
           configs[:synchronous_standby_names] = "'ANY 1 (#{caught_up_standbys.map(&:ubid).join(",")})'" unless caught_up_standbys.empty?
