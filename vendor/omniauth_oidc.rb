@@ -109,9 +109,7 @@ module OmniAuth
           body: query_string_for({
             "grant_type" => "authorization_code",
             "code" => params["code"],
-            "redirect_uri" => redirect_uri,
-            "client_id" => opts[:identifier],
-            "client_secret" => opts[:secret]
+            "redirect_uri" => redirect_uri
           }.compact),
           expects: [200, 201]
         )
