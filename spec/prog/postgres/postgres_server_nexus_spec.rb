@@ -926,6 +926,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(standby).to receive(:update).with(synchronization_status: "catching_up")
       expect(standby).to receive(:incr_configure)
       expect(standby).to receive(:incr_configure_metrics)
+      expect(standby).to receive(:incr_restart)
 
       expect(postgres_server.resource).to receive(:servers).at_least(:once).and_return([postgres_server, standby])
 
