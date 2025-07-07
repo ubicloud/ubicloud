@@ -7,7 +7,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
   let(:st) {
     cert = Prog::Vnet::CertNexus.assemble("test-host-name", dns_zone.id).subject
-    lb = described_class.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080).subject
+    lb = described_class.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080, health_check_protocol: "https").subject
     lb.add_cert(cert)
     lb.strand
   }
@@ -190,7 +190,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     end
 
     it "naps for 1 second if not all children are done" do
-      expect(nx).to receive(:reap)
+      Strand.create(parent_id: st.id, prog: "UpdateLoadBalancerNode", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_update_vm_load_balancers }.to nap(1)
     end
 
@@ -287,15 +287,11 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
   describe "#wait_destroy" do
     it "naps for 5 seconds if not all children are done" do
-      expect(nx).to receive(:reap)
-      expect(nx).to receive(:leaf?).and_return(false)
-
+      Strand.create(parent_id: st.id, prog: "UpdateLoadBalancerNode", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_destroy }.to nap(5)
     end
 
     it "deletes the load balancer and pops" do
-      expect(nx).to receive(:reap)
-      expect(nx).to receive(:leaf?).and_return(true)
       expect(nx.load_balancer).to receive(:destroy)
       expect { nx.wait_destroy }.to exit({"msg" => "load balancer deleted"})
       expect(LoadBalancersVms.count).to eq 0
@@ -306,8 +302,6 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       lb = st.subject
       lb.add_cert(cert)
       expect(lb.certs.count).to eq 2
-      expect(nx).to receive(:reap)
-      expect(nx).to receive(:leaf?).and_return(true)
       expect { nx.wait_destroy }.to exit({"msg" => "load balancer deleted"})
       expect(CertsLoadBalancers.count).to eq 0
       expect(cert.destroy_set?).to be true

@@ -7,10 +7,10 @@ class KubernetesNodepool < Sequel::Model
   many_to_one :cluster, key: :kubernetes_cluster_id, class: :KubernetesCluster
   many_to_many :vms, order: :created_at
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
 
-  semaphore :destroy, :start_bootstrapping
+  semaphore :destroy, :start_bootstrapping, :upgrade
 end
 
 # Table: kubernetes_nodepool

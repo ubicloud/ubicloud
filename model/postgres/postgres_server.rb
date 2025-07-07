@@ -13,13 +13,14 @@ class PostgresServer < Sequel::Model
 
   plugin :association_dependencies, lsn_monitor: :destroy
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
   include HealthMonitorMethods
   include MetricsTargetMethods
 
   semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup
-  semaphore :restart, :configure, :take_over, :configure_prometheus, :configure_metrics, :destroy, :recycle, :promote
+  semaphore :restart, :configure, :fence, :planned_take_over, :unplanned_take_over, :configure_metrics
+  semaphore :destroy, :recycle, :promote, :refresh_walg_credentials
 
   def configure_hash
     configs = {
@@ -55,7 +56,8 @@ class PostgresServer < Sequel::Model
       "lc_monetary" => "'C.UTF-8'",
       "lc_numeric" => "'C.UTF-8'",
       "lc_time" => "'C.UTF-8'",
-      "shared_preload_libraries" => "'pg_cron,pg_stat_statements'"
+      "shared_preload_libraries" => "'pg_cron,pg_stat_statements'",
+      "cron.use_background_workers" => "on"
     }
 
     if resource.flavor == PostgresResource::Flavor::PARADEDB
@@ -71,10 +73,11 @@ class PostgresServer < Sequel::Model
     end
 
     if timeline.blob_storage
+      configs[:archive_mode] = "on"
+      configs[:archive_timeout] = "60"
+      configs[:archive_command] = "'bash -c \"echo pushing %p >> /dat/postgres_archive.log; /usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env >> /dat/postgres_archive.log 2>&1\"'"
+
       if primary?
-        configs[:archive_mode] = "on"
-        configs[:archive_timeout] = "60"
-        configs[:archive_command] = "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'"
         if resource.ha_type == PostgresResource::HaType::SYNC
           caught_up_standbys = resource.servers.select { it.standby? && it.synchronization_status == "ready" }
           configs[:synchronous_standby_names] = "'ANY 1 (#{caught_up_standbys.map(&:ubid).join(",")})'" unless caught_up_standbys.empty?
@@ -96,6 +99,8 @@ class PostgresServer < Sequel::Model
 
     {
       configs: configs,
+      user_config: resource.user_config,
+      pgbouncer_user_config: resource.pgbouncer_user_config,
       private_subnets: vm.private_subnets.map {
         {
           net4: it.net4.to_s,
@@ -109,14 +114,19 @@ class PostgresServer < Sequel::Model
     }
   end
 
-  def trigger_failover
-    if representative_at && (standby = failover_target)
-      standby.incr_take_over
-      true
-    else
-      Clog.emit("Failed to trigger failover")
-      false
+  def trigger_failover(mode:)
+    unless representative_at
+      Clog.emit("Cannot trigger failover on a non-representative server") { {ubid: ubid} }
+      return false
     end
+
+    unless (standby = failover_target)
+      Clog.emit("No suitable standby found for failover") { {ubid: ubid} }
+      return false
+    end
+
+    standby.send(:"incr_#{mode}_take_over")
+    true
   end
 
   def primary?
@@ -136,7 +146,7 @@ class PostgresServer < Sequel::Model
   end
 
   def storage_size_gib
-    vm.vm_storage_volumes_dataset.first(boot: false)&.size_gib
+    vm.vm_storage_volumes_dataset.reject(&:boot).sum(&:size_gib)
   end
 
   def needs_recycling?
@@ -145,11 +155,12 @@ class PostgresServer < Sequel::Model
 
   def lsn_caught_up
     parent_server = if read_replica?
-      resource.parent.representative_server
+      resource.parent&.representative_server
     else
       resource.representative_server
     end
-    lsn_diff(parent_server.current_lsn, current_lsn) < 80 * 1024 * 1024
+
+    lsn_diff(parent_server&.current_lsn || current_lsn, current_lsn) < 80 * 1024 * 1024
   end
 
   def current_lsn
@@ -249,12 +260,8 @@ class PostgresServer < Sequel::Model
     lsn2int(lsn1) - lsn2int(lsn2)
   end
 
-  def self.run_query(vm, query)
-    vm.sshable.cmd("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: query).chomp
-  end
-
   def run_query(query)
-    self.class.run_query(vm, query)
+    vm.sshable.cmd("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: query).chomp
   end
 
   def metrics_config
@@ -279,6 +286,24 @@ class PostgresServer < Sequel::Model
       project_id: Config.postgres_service_project_id
     }
   end
+
+  def storage_device_paths
+    if vm.location.aws?
+      # On AWS, pick the largest block device to use as the data disk,
+      # since the device path detected by the VmStorageVolume is not always
+      # correct.
+      storage_device_count = vm.vm_storage_volumes.count { it.boot == false }
+      vm.sshable.cmd("lsblk -b -d -o NAME,SIZE | sort -n -k2 | tail -n#{storage_device_count} |  awk '{print \"/dev/\"$1}'").strip.split
+    else
+      [vm.vm_storage_volumes.find { it.boot == false }.device_path.shellescape]
+    end
+  end
+
+  def taking_over?
+    unplanned_take_over_set? || planned_take_over_set? || FAILOVER_LABELS.include?(strand.label)
+  end
+
+  FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over"].freeze
 end
 
 # Table: postgres_server

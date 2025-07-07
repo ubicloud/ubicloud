@@ -22,7 +22,8 @@ class Project < Sequel::Model
   one_to_many :inference_endpoints
   one_to_many :kubernetes_clusters
 
-  RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters]
+  RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners]
+  RESOURCE_ASSOCIATION_DATASET_METHODS = RESOURCE_ASSOCIATIONS.map { :"#{it}_dataset" }
 
   one_to_many :invoices, order: Sequel.desc(:created_at)
   one_to_many :quotas, class: :ProjectQuota
@@ -32,10 +33,23 @@ class Project < Sequel::Model
 
   dataset_module Pagination
 
+  dataset_module do
+    def first_project_with_resources
+      all = self.all
+      RESOURCE_ASSOCIATIONS.each do
+        if (obj = Project.association_reflection(it).associated_class.first(project: all))
+          return obj.project
+        end
+      end
+
+      nil
+    end
+  end
+
   plugin :association_dependencies, accounts: :nullify, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy, access_control_entries: :destroy, subject_tags: :destroy, action_tags: :destroy, object_tags: :destroy,
     locations: :destroy
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   def has_valid_payment_method?
     return true unless Config.stripe_secret_key
@@ -47,14 +61,11 @@ class Project < Sequel::Model
       .join(:location, id: :location_id)
       .where(allocation_state: "accepting")
       .select_group(:location_id)
-      .order { sum(Sequel[:total_cores] - Sequel[:used_cores]).desc }
-      .first
+      .reverse { sum(Sequel[:total_cores] - Sequel[:used_cores]) }
+      .single_value
 
-    if location_max_capacity.nil?
-      Location.find(visible: true).display_name
-    else
-      Location[location_max_capacity[:location_id]].display_name
-    end
+    cond = location_max_capacity ? {id: location_max_capacity} : {visible: true}
+    Location[cond].display_name
   end
 
   def disassociate_subject(subject_id)
@@ -66,8 +77,8 @@ class Project < Sequel::Model
     "/project/#{ubid}"
   end
 
-  def has_resources
-    RESOURCE_ASSOCIATIONS.any? { !send(:"#{it}_dataset").empty? } || github_installations.flat_map(&:runners).count > 0
+  def has_resources?
+    RESOURCE_ASSOCIATION_DATASET_METHODS.any? { !send(it).empty? }
   end
 
   def soft_delete
@@ -113,9 +124,9 @@ class Project < Sequel::Model
 
   def current_resource_usage(resource_type)
     case resource_type
-    when "VmVCpu" then vms.sum(&:vcpus)
-    when "GithubRunnerVCpu" then github_installations.sum(&:total_active_runner_vcpus)
-    when "PostgresVCpu" then postgres_resources.flat_map { it.servers.map { |s| s.vm.vcpus } }.sum
+    when "VmVCpu" then vms_dataset.sum(:vcpus) || 0
+    when "GithubRunnerVCpu" then GithubRunner.where(installation_id: github_installations_dataset.select(:id)).total_active_runner_vcpus
+    when "PostgresVCpu" then postgres_resources_dataset.association_join(servers: :vm).sum(:vcpus) || 0
     else
       raise "Unknown resource type: #{resource_type}"
     end
@@ -139,16 +150,17 @@ class Project < Sequel::Model
   end
 
   def default_private_subnet(location)
-    name = "default-#{location.display_name}"
-    ps = private_subnets_dataset.first(:location_id => location.id, Sequel[:private_subnet][:name] => name)
-    ps || Prog::Vnet::SubnetNexus.assemble(id, name: name, location_id: location.id).subject
+    name = "default-#{location.display_name[0, 55]}"
+    location_id = location.id
+    ps = private_subnets_dataset.first(location_id:, name:)
+    ps || Prog::Vnet::SubnetNexus.assemble(id, name:, location_id:).subject
   end
 
   def self.feature_flag(*flags, into: self)
-    flags.map(&:to_s).each do |flag|
+    flags.map!(&:to_s).each do |flag|
       into.module_eval do
         define_method :"set_ff_#{flag}" do |value|
-          update(feature_flags: feature_flags.merge({flag => value}))
+          update(feature_flags: feature_flags.merge({flag => value}).slice(*flags))
         end
 
         define_method :"get_ff_#{flag}" do
@@ -158,7 +170,9 @@ class Project < Sequel::Model
     end
   end
 
-  feature_flag :vm_public_ssh_keys, :location_latitude_fra, :access_all_cache_scopes, :allocator_diagnostics, :private_locations, :postgres_metrics, :free_runner_upgrade_until
+  feature_flag :vm_public_ssh_keys, :location_latitude_fra, :access_all_cache_scopes, :allocator_diagnostics
+  feature_flag :private_locations, :enable_c6gd, :enable_m6gd, :enable_m8gd
+  feature_flag :free_runner_upgrade_until, :gpu_vm, :postgres_lantern
 end
 
 # Table: project

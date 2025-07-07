@@ -4,7 +4,7 @@ class Kubernetes::Client
   def initialize(kubernetes_cluster, session)
     @session = session
     @kubernetes_cluster = kubernetes_cluster
-    @load_balancer = LoadBalancer.where(name: kubernetes_cluster.services_load_balancer_name).first
+    @load_balancer = kubernetes_cluster.services_lb
   end
 
   def service_deleted?(svc)
@@ -32,6 +32,14 @@ class Kubernetes::Client
 
   def kubectl(cmd)
     @session.exec!("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf #{cmd}")
+  end
+
+  def version
+    kubectl("version --client")[/Client Version: (v1\.\d\d)\.\d/, 1]
+  end
+
+  def delete_node(node_name)
+    kubectl("delete node #{node_name.shellescape}")
   end
 
   def set_load_balancer_hostname(svc, hostname)

@@ -11,6 +11,7 @@ Commands:
     ai         Manage AI features
     fw         Manage firewalls
     help       Get command help
+    kc         Manage kubernetes clusters
     lb         Manage load balancers
     pg         Manage PostgreSQL databases
     ps         Manage private subnets
@@ -179,6 +180,49 @@ Options:
     -u, --usage                      only show usage
 
 
+Manage kubernetes clusters
+
+Usage:
+    ubi kc command [...]
+    ubi kc (location/kc-name | kc-id) post-command [...]
+
+Commands:
+    list      List kubernetes clusters
+
+Post Commands:
+    create    Create a Kubernetes cluster
+
+
+List kubernetes clusters
+
+Usage:
+    ubi kc list [options]
+
+Options:
+    -f, --fields=fields              show specific fields (comma separated)
+    -l, --location=location          only show kubernetes clusters in given location
+    -N, --no-headers                 do not show headers
+
+Allowed Option Values:
+    Fields: location name id display_state version cp_node_count
+
+
+Create a Kubernetes cluster
+
+Usage:
+    ubi kc location/kc-name create [options]
+
+Options:
+    -v, --version=version            Kubernetes version
+    -c, --cp-node-count=count        Control plane node count
+    -w, --worker-node-count=count    Worker node count
+    -z, --worker-size=size           Worker size
+
+Allowed Option Values:
+    Version: v1.33 v1.32
+    Control Plane Node Count: 1 3
+
+
 Manage load balancers
 
 Usage:
@@ -340,7 +384,12 @@ Allowed Option Values:
     Flavor: standard paradedb lantern
     Replication Type: none async sync
     Size: standard-2 standard-4 standard-8 standard-16 standard-30 standard-60
-          burstable-1 burstable-2
+          burstable-1 burstable-2 c6gd.large c6gd.xlarge c6gd.2xlarge
+          c6gd.4xlarge c6gd.8xlarge c6gd.16xlarge m6id.large m6id.xlarge
+          m6id.2xlarge m6id.4xlarge m6id.8xlarge m6id.16xlarge m6gd.large
+          m6gd.xlarge m6gd.2xlarge m6gd.4xlarge m6gd.8xlarge m6gd.16xlarge
+          m8gd.large m8gd.xlarge m8gd.2xlarge m8gd.4xlarge m8gd.8xlarge
+          m8gd.16xlarge
     Storage Size: 16 32 64 128 256 512 1024 2048 4096
     Version: 17 16
 

@@ -4,8 +4,10 @@ require_relative "../model/spec_helper"
 
 RSpec.describe Prog::InstallDnsmasq do
   subject(:idm) {
-    described_class.new(Strand.new(prog: "InstallDnsmasq"))
+    described_class.new(st)
   }
+
+  let(:st) { Strand.new(prog: "InstallDnsmasq") }
 
   describe "#start" do
     it "starts sub-programs to install dependencies and download dnsmasq concurrently" do
@@ -17,16 +19,14 @@ RSpec.describe Prog::InstallDnsmasq do
   end
 
   describe "#wait_downloads" do
-    before { expect(idm).to receive(:reap) }
-
     it "donates if any sub-progs are still running" do
-      expect(idm).to receive(:donate).and_call_original
-      expect(idm).to receive(:leaf?).and_return false
-      expect { idm.wait_downloads }.to nap(1)
+      st.update(label: "wait_downloads", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "InstallDnsmasq", label: "install_build_dependencies", stack: [{}], lease: Time.now + 10)
+      expect { idm.wait_downloads }.to nap(120)
     end
 
     it "hops to compile_and_install when the downloads are done" do
-      expect(idm).to receive(:leaf?).and_return true
+      st.update(label: "wait_downloads", stack: [{}])
       expect { idm.wait_downloads }.to hop("compile_and_install")
     end
   end

@@ -6,6 +6,7 @@ require "json"
 
 command = ARGV.dup.freeze
 start_time = Time.now
+shutting_down = false
 
 iso_start = start_time.utc.strftime("%Y-%m-%dT%H:%M:%S%:z").freeze
 puts JSON.generate(restarter: {
@@ -17,7 +18,12 @@ puts JSON.generate(restarter: {
 })
 
 loop do
-  system(*command)
+  pid = Process.spawn(*command)
+  Signal.trap("TERM") do
+    Process.kill(:TERM, pid)
+    shutting_down = true
+  end
+  Process.wait(pid)
   status = $?
 
   # Extra newline to prevent blending with subprocess just in
@@ -35,6 +41,7 @@ loop do
       success: status.success?
     }
   })
+  exit status.exitstatus if shutting_down
 
   sleep(rand(1..10))
 

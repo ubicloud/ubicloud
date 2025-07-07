@@ -6,10 +6,6 @@ class PciDevice < Sequel::Model
   many_to_one :vm_host
   many_to_one :vm
 
-  def self.ubid_type
-    UBID::TYPE_ETC
-  end
-
   def self.device_name(device_id)
     # https://download.nvidia.com/XFree86/Linux-x86_64/535.98/README/supportedchips.html
     case device_id
@@ -22,7 +18,7 @@ class PciDevice < Sequel::Model
     end
   end
 
-  include ResourceMethods
+  plugin ResourceMethods, etc_type: true
 
   def is_gpu
     ["0300", "0302"].include? device_class

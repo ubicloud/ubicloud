@@ -66,14 +66,16 @@ class Clover < Roda
   plugin :part
   plugin :request_headers
   plugin :plain_hash_response_headers
+  plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
   plugin :typecast_params do
-    handle_type(:ubid_uuid) do
+    invalid_value_message(:pos_int64, "Value must be an integer greater than 0 for parameter")
+
+    handle_type(:ubid_uuid, invalid_value_message: "Value provided not a valid id for parameter") do
       if it.is_a?(String) && it.bytesize == 26
         UBID.to_uuid(it)
       end
     end
   end
-  plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
 
   plugin :symbol_matchers
   symbol_matcher(:ubid_uuid, /([a-tv-z0-9]{26})/) do |s|
@@ -175,7 +177,7 @@ class Clover < Roda
     end
 
     case e
-    when Sequel::ValidationFailed, Roda::RodaPlugins::InvalidRequestBody::Error
+    when Sequel::ValidationFailed, Roda::RodaPlugins::InvalidRequestBody::Error, Roda::RodaPlugins::TypecastParams::Error
       code = 400
       type = "InvalidRequest"
       message = e.to_s
@@ -206,10 +208,11 @@ class Clover < Roda
         message = "Validation failed for following fields: body"
         details = {"body" => "Request body must include required parameters: #{keys.join(", ")}"}
       end
-    when Committee::InvalidResponse, Sequel::SerializationFailure
+    when Sequel::SerializationFailure
       code = 500
       type = "InternalServerError"
-      message = e.message
+      message = "There was a temporary error attempting to make this change, please try again."
+      Clog.emit("route exception") { Util.exception_to_hash(e) }
     else
       raise e if Config.test? && e.message != "test error"
       Clog.emit("route exception") { Util.exception_to_hash(e) }
@@ -233,7 +236,7 @@ class Clover < Roda
     else
       @error = error
 
-      if e.is_a?(Sequel::ValidationFailed) || e.is_a?(DependencyError)
+      if e.is_a?(Sequel::ValidationFailed) || e.is_a?(DependencyError) || e.is_a?(Roda::RodaPlugins::TypecastParams::Error)
         flash["error"] = message
         redirect_back_with_inputs
       elsif e.is_a?(Sequel::SerializationFailure)
@@ -340,10 +343,12 @@ class Clover < Roda
     two_factor_auth_return_to_requested_location? true
     already_logged_in { redirect login_redirect }
     after_login do
-      remember_login if request.params["remember-me"] == "on"
-      if omniauth_identity && (url = omniauth_params["redirect_url"])
-        flash["notice"] = "You have successfully connected your account with #{omniauth_provider.capitalize}."
-        redirect url
+      remember_login if scope.typecast_params.str("remember-me") == "on"
+      if omniauth_identity && omniauth_params["redirect_url"]
+        flash["notice"] = "You have successfully connected your account with #{scope.omniauth_provider_name(omniauth_provider)}."
+        # Don't trust the omniauth params, always redirect to the login methods page,
+        # as that is the only page that should be setting redirect_url
+        redirect "/account/login-method"
       end
     end
 
@@ -363,7 +368,15 @@ class Clover < Roda
     create_account_set_password? true
     password_confirm_label "Password Confirmation"
     before_create_account do
-      Validation.validate_cloudflare_turnstile(param("cf-turnstile-response"))
+      cf_response = scope.typecast_params.str("cf-turnstile-response").to_s if Config.cloudflare_turnstile_site_key
+
+      if cf_response&.empty?
+        Clog.emit("cloudflare turnstile parameter not submitted") { {user_agent: scope.env["HTTP_USER_AGENT"]} }
+        scope.flash["error"] = "Could not create account. Please ensure JavaScript is enabled and access to Cloudflare is not blocked, then try again."
+        request.redirect("/create-account")
+      end
+
+      Validation.validate_cloudflare_turnstile(cf_response)
       scope.before_rodauth_create_account(account, param("name"))
     end
     after_create_account do
@@ -381,29 +394,108 @@ class Clover < Roda
     end
     # :nocov:
 
+    auth_class_eval do
+      # If the route isn't already handled and matches a known provider,
+      # get the app specific to that provider, and then run it.
+      def route_omniauth!
+        super
+        if (match = %r{\A/auth/(0p[a-tv-z0-9]{24})(?:/callback)?\z}.match(request.path_info)) &&
+            (provider = OidcProvider[match[1]])
+          omniauth_run omniauth_app_for_provider(provider)
+
+          # :nocov:
+          # Not reached in testing due to omniauth_setup throw above.
+          handle_omniauth_callback
+          # :nocov:
+        end
+        nil
+      end
+
+      omniauth_apps = {}
+      omniauth_app_mutex = Mutex.new
+      builder_app = ->(env) { [404, {}, []] }
+
+      # Return OIDC-provider specific omniauth app.  If there isn't an existing
+      # app for the provider in this process, build one.
+      define_method(:omniauth_app_for_provider) do |provider|
+        name = provider.ubid
+        if (app = omniauth_app_mutex.synchronize { omniauth_apps[name] })
+          return app
+        end
+
+        # Delay loading of omniauth_oidc until it is needed. Generally, this type of
+        # runtime require doesn't work with a frozen environment, but it does in this
+        # as the file does not modify any frozen constants. This is helpful so that
+        # users do not have to pay the cost of loading the file if they do not have
+        # any OidcProviders.
+        require_relative "vendor/omniauth_oidc"
+
+        # This part is copied from rodauth-omniauth's omniauth_app method in order
+        # to integrate with rodauth-omniauth.
+        builder = OmniAuth::Builder.new
+        builder.options(
+          path_prefix: omniauth_prefix,
+          setup: ->(env) { env["rodauth.omniauth.instance"].send(:omniauth_setup) }
+        )
+        builder.configure do |config|
+          [:request_validation_phase, :before_request_phase, :before_callback_phase, :on_failure].each do |hook|
+            config.send(:"#{hook}=", ->(env) { env["rodauth.omniauth.instance"].send(:"omniauth_#{hook}") })
+          end
+        end
+
+        # Only use the provider passed to the method. rodauth-omniauth uses all
+        # statically configured providers in omniauth_app
+        uri = URI(provider.url)
+        builder.provider :oidc,
+          name: name.to_sym,
+          issuer: provider.url,
+          client_options: {
+            port: uri.port,
+            scheme: uri.scheme,
+            host: uri.host,
+            identifier: provider.client_id,
+            secret: provider.client_secret,
+            redirect_uri: provider.callback_url,
+            authorization_endpoint: provider.authorization_endpoint,
+            token_endpoint: provider.token_endpoint,
+            userinfo_endpoint: provider.userinfo_endpoint
+          }
+
+        builder.run builder_app
+        app = builder.to_app
+        omniauth_app_mutex.synchronize { omniauth_apps[name] ||= app }
+      end
+    end
+
     before_omniauth_create_account do
       unless account[:email]
         flash["error"] = "Social login is only allowed if social login provider provides email"
         redirect "/login"
       end
-      scope.before_rodauth_create_account(account, omniauth_name)
+      scope.before_rodauth_create_account(account, omniauth_name || account[:email].split("@", 2)[0].gsub(/[^A-Za-z]+/, " ").capitalize)
     end
 
     after_omniauth_create_account do
       scope.after_rodauth_create_account(account_id)
     end
 
+    omniauth_on_failure do
+      Clog.emit("omniauth failure") { {omniauth_error:, omniauth_error_type:, omniauth_error_strategy:, backtrace: omniauth_error.backtrace} }
+      super()
+    end
+
     before_omniauth_callback_route do
       account = Account[account_from_omniauth&.[](:id)]
       if authenticated?
         unless account && account.id == scope.current_account.id
-          flash["error"] = "Your account's email address is different from the email address associated with the #{omniauth_provider.capitalize} account."
+          flash["error"] = "Your account's email address is different from the email address associated with the #{scope.omniauth_provider_name(omniauth_provider)} account."
           redirect "/account/login-method"
         end
       elsif account && account.identities_dataset.where(provider: omniauth_provider.to_s).empty?
-        flash["error"] = "There is already an account with this email address, and it has not been linked to the #{omniauth_provider.capitalize} account.
-        Please login to the existing account normally, and then link it to the #{omniauth_provider.capitalize} account from your account settings.
-        Then you can can login using the #{omniauth_provider.capitalize} account."
+        provider_name = scope.omniauth_provider_name(omniauth_provider)
+        flash["error"] = "There is already an account with this email address, and it has not been linked to the #{provider_name} account.
+        Please login to the existing account normally, and then link it to the #{provider_name} account from your account settings.
+        Then you can login using the #{provider_name} account."
         redirect "/login"
       end
     end
@@ -481,7 +573,13 @@ class Clover < Roda
       account = Account[account_id]
       # Do not allow to close account if the project has resources and
       # the account is the only user
-      if (project = account.projects.find { it.accounts.count == 1 && it.has_resources })
+      projects_dataset = Project
+        .where(id: DB[:access_tag]
+          .select_group(:project_id)
+          .where(project_id: account.projects_dataset.select(Sequel[:project][:id]))
+          .having(Sequel.function(:count).* => 1))
+
+      if (project = projects_dataset.first_project_with_resources)
         fail DependencyError.new("'#{project.name}' project has some resources. Delete all related resources first.")
       end
     end
@@ -548,7 +646,7 @@ class Clover < Roda
     webauthn_setup_button "Setup Security Key"
     webauthn_setup_notice_flash "Security key is now setup, please make note of your recovery codes"
     webauthn_setup_error_flash "Error setting up security key"
-    webauthn_key_insert_hash { |credential| super(credential).merge(name: request.params["name"]) }
+    webauthn_key_insert_hash { |credential| super(credential).merge(name: scope.typecast_params.nonempty_str!("name")) }
 
     # :nocov:
     after_webauthn_setup do
@@ -594,12 +692,7 @@ class Clover < Roda
   if Config.test?
     # :nocov:
     hash_branch(:webhook_prefix, "test-error") do |r|
-      raise(r.params["message"] || "test error")
-    end
-
-    hash_branch("test-missing-request-params") do |r|
-      no_authorization_needed
-      check_required_web_params(%w[foo])
+      raise(typecast_params.str("message") || "test error")
     end
 
     hash_branch(:webhook_prefix, "test-no-audit-logging") do |r|
@@ -693,6 +786,7 @@ class Clover < Roda
           fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
         end
 
+        before_main_hash_branches
         r.hash_branches(:runtime_prefix)
       end
 
@@ -700,21 +794,30 @@ class Clover < Roda
       r.assets
 
       r.on "webhook" do
+        before_main_hash_branches
         r.hash_branches(:webhook_prefix)
+      end
+
+      r.get "auth", :ubid_uuid do |id|
+        next unless (@oidc_provider = OidcProvider[id])
+
+        r.get do
+          content_security_policy.add_form_action(@oidc_provider.url)
+          view "auth/oidc_login"
+        end
       end
 
       check_csrf!
       rodauth.load_memory
+      rodauth.check_active_session
 
       r.root do
-        if rodauth.logged_in?
+        if current_account
           redirect_default_project_dashboard
         else
           r.redirect rodauth.login_route
         end
       end
-
-      rodauth.check_active_session
     end
 
     r.rodauth
@@ -733,8 +836,7 @@ class Clover < Roda
       end
     end
 
-    @still_need_audit_logging = true
-    @still_need_authorization = true
+    before_authenticated_hash_branches
     r.hash_branches("")
   end
 
@@ -768,6 +870,10 @@ class Clover < Roda
           when Authorization::Unauthorized
             next
           end
+
+          # Allow easier debugging of issues, by not raising a RuntimeError if there is a separate
+          # error being raised and you are explicitly requesting showing it.
+          next if ENV["SHOW_ERRORS"]
         end
 
         raise "no authorization check for #{request.request_method} #{request.path_info}"
@@ -779,6 +885,35 @@ class Clover < Roda
     end
 
     prepend(Module.new do
+      def before_authenticated_hash_branches
+        # Set the audit logging and authorization flags, which will be unset by
+        # the related methods, to ensure that all routes have some form of authorization,
+        # all add non-GET routes have some form of audit logging.
+        @still_need_audit_logging = true
+        @still_need_authorization = true
+        before_main_hash_branches
+      end
+
+      def before_main_hash_branches
+        # Disallow direct access of request.params in routes, only allow access
+        # through typecast_params
+        typecast_params
+        request.singleton_class.send(:undef_method, :params)
+
+        # Need to rewind body so webhook github requests work
+        request.body.rewind unless request.get?
+      end
+
+      def redirect_back_with_inputs_params
+        # This currently needs all parameters. We could change the related views to
+        # use typecast_params with the flash["old"] value, but in the long term,
+        # should avoid the redirect_back_with_inputs approach completely.
+        # Use super for coverage, even though it will raise an exception.
+        super
+      rescue
+        request.instance_variable_get(:@params)
+      end
+
       def audit_log(...)
         @still_need_audit_logging = false
         super

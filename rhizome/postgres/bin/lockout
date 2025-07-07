@@ -1,0 +1,47 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../../common/lib/util"
+
+if ARGV.count != 1
+  fail "Wrong number of arguments. Expected 1, Given #{ARGV.count}"
+end
+
+v = ARGV[0]
+
+# Create lockout pg_hba.conf that only allows UNIX socket connections
+# and connections from ubi_replication user
+lockout_pg_hba_entries = <<-PG_HBA
+# PostgreSQL Client Authentication Configuration File - LOCKOUT MODE
+# ================================================================
+#
+# This configuration restricts connections to UNIX sockets only
+# and ubi_replication user for replication.
+
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+# Database administrative login by Unix domain socket
+local   all             postgres                                peer map=system2postgres
+
+# Allow connections from localhost with ubi_monitoring OS user as
+# ubi_monitoring database user. This will be used by postgres_exporter
+# to scrape metrics and expose them to prometheus.
+local   all             ubi_monitoring                          peer
+
+# Allow replication connection using special replication user for
+# HA standbys (SSL connections from ubi_replication user only)
+hostssl replication     ubi_replication all                     cert map=standby2replication
+PG_HBA
+
+# Write the lockout pg_hba.conf
+safe_write_to_file("/etc/postgresql/#{v}/main/pg_hba.conf", lockout_pg_hba_entries)
+
+# Reload PostgreSQL configuration to apply the new pg_hba.conf
+puts "Reloading PostgreSQL configuration..."
+r "pg_ctlcluster #{v} main reload"
+
+# Terminate all existing connections except our own
+puts "Terminating all existing connections..."
+r "sudo -u postgres psql -c \"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid <> pg_backend_pid();\""
+
+puts "PostgreSQL is now in lockout mode - only UNIX socket connections and ubi_replication are allowed."

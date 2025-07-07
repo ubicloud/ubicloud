@@ -87,14 +87,20 @@ class Prog::Vm::HostNexus < Prog::Base
     bud Prog::InstallDnsmasq
     bud Prog::SetupSysstat
     bud Prog::SetupNftables
+    bud Prog::SetupNodeExporter
     hop_wait_prep
   end
 
+  def os_supports_slices?(os_version)
+    os_version == "ubuntu-24.04"
+  end
+
   label def wait_prep
-    reap.each do |st|
+    reaper = lambda do |st|
       case st.prog
       when "LearnOs"
-        vm_host.update(os_version: st.exitval.fetch("os_version"))
+        os_version = st.exitval.fetch("os_version")
+        vm_host.update(os_version: os_version, accepts_slices: os_supports_slices?(os_version))
       when "LearnMemory"
         mem_gib = st.exitval.fetch("mem_gib")
         vm_host.update(total_mem_gib: mem_gib)
@@ -120,10 +126,7 @@ class Prog::Vm::HostNexus < Prog::Base
       end
     end
 
-    if leaf?
-      hop_setup_hugepages
-    end
-    donate
+    reap(:setup_hugepages, reaper:)
   end
 
   label def setup_hugepages
@@ -160,9 +163,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def wait_download_boot_images
-    reap
-    hop_prep_reboot if leaf?
-    donate
+    reap(:prep_reboot)
   end
 
   label def prep_reboot
@@ -281,7 +282,7 @@ class Prog::Vm::HostNexus < Prog::Base
 
     vm_host.update(allocation_state: "accepting") if vm_host.allocation_state == "unprepared"
 
-    hop_wait
+    hop_configure_metrics
   end
 
   label def prep_graceful_reboot
@@ -301,6 +302,47 @@ class Prog::Vm::HostNexus < Prog::Base
     nap 30
   end
 
+  label def configure_metrics
+    metrics_dir = vm_host.metrics_config[:metrics_dir]
+    sshable.cmd("mkdir -p #{metrics_dir}")
+    sshable.cmd("tee #{metrics_dir}/config.json > /dev/null", stdin: vm_host.metrics_config.to_json)
+
+    metrics_service = <<SERVICE
+[Unit]
+Description=VmHost Metrics Collection
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=rhizome
+ExecStart=/home/rhizome/common/bin/metrics-collector #{metrics_dir}
+StandardOutput=journal
+StandardError=journal
+SERVICE
+    sshable.cmd("sudo tee /etc/systemd/system/vmhost-metrics.service > /dev/null", stdin: metrics_service)
+
+    metrics_interval = vm_host.metrics_config[:interval] || "15s"
+
+    metrics_timer = <<TIMER
+[Unit]
+Description=Run VmHost Metrics Collection Periodically
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=#{metrics_interval}
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target
+TIMER
+    sshable.cmd("sudo tee /etc/systemd/system/vmhost-metrics.timer > /dev/null", stdin: metrics_timer)
+
+    sshable.cmd("sudo systemctl daemon-reload")
+    sshable.cmd("sudo systemctl enable --now vmhost-metrics.timer")
+
+    hop_wait
+  end
+
   label def wait
     when_graceful_reboot_set? do
       hop_prep_graceful_reboot
@@ -317,6 +359,11 @@ class Prog::Vm::HostNexus < Prog::Base
     when_checkup_set? do
       hop_unavailable if !available?
       decr_checkup
+    end
+
+    when_configure_metrics_set? do
+      decr_configure_metrics
+      hop_configure_metrics
     end
 
     nap 6 * 60 * 60

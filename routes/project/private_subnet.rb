@@ -9,7 +9,7 @@ class Clover
     r.web do
       r.post true do
         check_visible_location
-        private_subnet_post(r.params["name"])
+        private_subnet_post(typecast_params.nonempty_str("name"))
       end
 
       r.get "create" do

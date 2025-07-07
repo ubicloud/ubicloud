@@ -3,9 +3,9 @@
 require_relative "../model"
 
 class LoadBalancerVmPort < Sequel::Model
-  many_to_one :load_balancer_vm, class: LoadBalancersVms, key: :load_balancer_vm_id
+  many_to_one :load_balancer_vm, class: :LoadBalancersVms, key: :load_balancer_vm_id
   many_to_one :load_balancer_port
-  include ResourceMethods
+  plugin ResourceMethods
   include HealthMonitorMethods
 
   def load_balancer

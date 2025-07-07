@@ -3,7 +3,9 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Test::VmGroup do
-  subject(:vg_test) { described_class.new(described_class.assemble(boot_images: ["ubuntu-noble", "debian-12"])) }
+  subject(:vg_test) { described_class.new(st) }
+
+  let(:st) { described_class.assemble(boot_images: ["ubuntu-noble", "debian-12"]) }
 
   describe "#start" do
     it "hops to setup_vms" do
@@ -68,16 +70,22 @@ RSpec.describe Prog::Test::VmGroup do
 
   describe "#wait_verify_vms" do
     it "hops to hop_wait_verify_vms" do
-      expect(vg_test).to receive(:reap)
-      expect(vg_test).to receive(:leaf?).and_return(true)
       expect { vg_test.wait_verify_vms }.to hop("verify_host_capacity")
     end
 
     it "stays in wait_verify_vms" do
-      expect(vg_test).to receive(:reap)
-      expect(vg_test).to receive(:leaf?).and_return(false)
-      expect(vg_test).to receive(:donate).and_call_original
-      expect { vg_test.wait_verify_vms }.to nap(1)
+      Strand.create(parent_id: st.id, prog: "Test::Vm", label: "start", stack: [{}], lease: Time.now + 10)
+      expect { vg_test.wait_verify_vms }.to nap(120)
+
+      expect(st).to receive(:lock!).and_wrap_original do |m|
+        # Pretend child strand updated schedule before lock.
+        # After the lock, shouldn't be possible as the child
+        # strand's update of the parent will block until
+        # parent strand commits.
+        st.this.update(schedule: Time.now - 1)
+        m.call
+      end
+      expect { vg_test.wait_verify_vms }.to nap(0)
     end
   end
 
@@ -91,13 +99,13 @@ RSpec.describe Prog::Test::VmGroup do
         slices: [instance_double(VmHostSlice, cores: 1)],
         cpus: [])
       expect(vg_test).to receive_messages(vm_host: vm_host, frame: {"verify_host_capacity" => true})
-      expect { vg_test.verify_host_capacity }.to hop("verify_vm_host_slices")
+      expect { vg_test.verify_host_capacity }.to hop("verify_storage_backends")
     end
 
     it "skips if verify_host_capacity is not set" do
       expect(vg_test).to receive(:frame).and_return({"verify_host_capacity" => false})
       expect(vg_test).not_to receive(:vm_host)
-      expect { vg_test.verify_host_capacity }.to hop("verify_vm_host_slices")
+      expect { vg_test.verify_host_capacity }.to hop("verify_storage_backends")
     end
 
     it "fails if used cores do not match allocated VMs" do
@@ -115,6 +123,38 @@ RSpec.describe Prog::Test::VmGroup do
       expect(strand).to receive(:update).with(exitval: {msg: "Host used cores does not match the allocated VMs cores (vm_cores=2, slice_cores=1, spdk_cores=0, used_cores=5)"})
 
       expect { vg_test.verify_host_capacity }.to hop("failed")
+    end
+  end
+
+  describe "#verify_storage_backends" do
+    it "fails if no vhost block backends" do
+      vm_host = instance_double(VmHost, vhost_block_backends: [])
+      expect(vg_test).to receive_messages(vm_host: vm_host)
+      expect { vg_test.verify_storage_backends }.to hop("failed")
+    end
+
+    it "checks that no SPDK volumes are present if vhost block backends exist" do
+      sshable = instance_double(Sshable)
+      vm_host = instance_double(VmHost,
+        vhost_block_backends: [instance_double(VhostBlockBackend)],
+        spdk_installations: [instance_double(SpdkInstallation, version: "23.09")],
+        sshable: sshable)
+      expect(vg_test).to receive_messages(vm_host: vm_host)
+      expect(sshable).to receive(:cmd).with("sudo /opt/spdk-23.09/scripts/rpc.py -s /home/spdk/spdk-23.09.sock bdev_get_bdevs").and_return("[]\n")
+
+      expect { vg_test.verify_storage_backends }.to hop("verify_vm_host_slices")
+    end
+
+    it "fails if SPDK volumes are present while vhost block backends exist" do
+      sshable = instance_double(Sshable)
+      vm_host = instance_double(VmHost,
+        vhost_block_backends: [instance_double(VhostBlockBackend)],
+        spdk_installations: [instance_double(SpdkInstallation, version: "23.09")],
+        sshable: sshable)
+      expect(vg_test).to receive_messages(vm_host: vm_host)
+      expect(sshable).to receive(:cmd).with("sudo /opt/spdk-23.09/scripts/rpc.py -s /home/spdk/spdk-23.09.sock bdev_get_bdevs").and_return('[{"name": "spdk_volume"}]')
+
+      expect { vg_test.verify_storage_backends }.to hop("failed")
     end
   end
 
@@ -191,21 +231,19 @@ RSpec.describe Prog::Test::VmGroup do
   end
 
   describe "#wait_reboot" do
-    let(:st) { instance_double(Strand) }
-
     before do
       allow(vg_test).to receive(:vm_host).and_return(instance_double(VmHost))
-      allow(vg_test.vm_host).to receive(:strand).and_return(st)
+      allow(vg_test.vm_host).to receive(:strand).and_return(instance_double(Strand))
     end
 
     it "naps if strand is busy" do
-      expect(st).to receive(:label).and_return("reboot")
+      expect(vg_test.vm_host.strand).to receive(:label).and_return("reboot")
       expect { vg_test.wait_reboot }.to nap(20)
     end
 
     it "runs vm tests if reboot done" do
-      expect(st).to receive(:label).and_return("wait")
-      expect(st).to receive(:semaphores).and_return([])
+      expect(vg_test.vm_host.strand).to receive(:label).and_return("wait")
+      expect(vg_test.vm_host.strand).to receive(:semaphores).and_return([])
       expect { vg_test.wait_reboot }.to hop("verify_vms")
     end
   end

@@ -200,7 +200,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "hops to start_aws if location is aws" do
-      loc = Location.create_with_id(name: "us-east-1", provider: "aws", project_id: prj.id, display_name: "us-east-1", ui_name: "us-east-1", visible: true)
+      loc = Location.create_with_id(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
       st = described_class.assemble("some_ssh key", prj.id, location_id: loc.id)
       expect(st.label).to eq("start_aws")
     end
@@ -237,14 +237,13 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#wait_aws_vm_started" do
     it "reaps and naps if not leaf" do
-      expect(nx).to receive(:reap)
-      expect(nx).to receive(:leaf?).and_return(false)
+      st.update(prog: "Vm::Nexus", label: "wait_aws_vm_started", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "Aws::Instance", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_aws_vm_started }.to nap(10)
     end
 
     it "hops to wait_sshable if leaf" do
-      expect(nx).to receive(:reap)
-      expect(nx).to receive(:leaf?).and_return(true)
+      st.update(prog: "Vm::Nexus", label: "wait_aws_vm_started", stack: [{}])
       expect { nx.wait_aws_vm_started }.to hop("wait_sshable")
     end
   end
@@ -443,6 +442,7 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::HETZNER_FSN1_ID],
         location_preference: [],
         gpu_count: 0,
+        gpu_device: nil,
         family_filter: ["standard"]
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -459,6 +459,7 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID],
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
+        gpu_device: nil,
         family_filter: ["standard"]
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -475,13 +476,14 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::HETZNER_FSN1_ID],
         location_preference: [],
         gpu_count: 0,
+        gpu_device: nil,
         family_filter: ["standard"]
       )
       expect { nx.start }.to hop("create_unix_user")
     end
 
     it "considers filtered locations for runners if set for the installation" do
-      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, allocator_preferences: {"location_filter" => [Location::GITHUB_RUNNERS_ID, Location::LEASEWEB_WDC02_ID]})
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, created_at: Time.now - 8 * 24 * 60 * 60, allocator_preferences: {"location_filter" => [Location::GITHUB_RUNNERS_ID, Location::LEASEWEB_WDC02_ID]})
       GithubRunner.create(vm_id: vm.id, repository_name: "ubicloud/test", label: "ubicloud", installation_id: installation.id)
       vm.location_id = Location::GITHUB_RUNNERS_ID
 
@@ -494,13 +496,14 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::GITHUB_RUNNERS_ID, Location::LEASEWEB_WDC02_ID],
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
+        gpu_device: nil,
         family_filter: ["standard"]
       )
       expect { nx.start }.to hop("create_unix_user")
     end
 
     it "considers preferred locations for runners if set for the installation" do
-      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, allocator_preferences: {
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, created_at: Time.now - 8 * 24 * 60 * 60, allocator_preferences: {
         "location_filter" => [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID, Location::LEASEWEB_WDC02_ID],
         "location_preference" => [Location::LEASEWEB_WDC02_ID]
       })
@@ -516,6 +519,7 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID, Location::LEASEWEB_WDC02_ID],
         location_preference: [Location::LEASEWEB_WDC02_ID],
         gpu_count: 0,
+        gpu_device: nil,
         family_filter: ["standard"]
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -535,6 +539,7 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID],
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
+        gpu_device: nil,
         family_filter: ["standard", "premium"]
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -554,6 +559,7 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID],
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
+        gpu_device: nil,
         family_filter: ["standard", "premium"]
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -574,6 +580,7 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [],
         location_preference: [],
         gpu_count: 0,
+        gpu_device: nil,
         family_filter: []
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -594,6 +601,7 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::HETZNER_FSN1_ID],
         location_preference: [],
         gpu_count: 0,
+        gpu_device: nil,
         family_filter: ["standard"]
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -622,6 +630,7 @@ RSpec.describe Prog::Vm::Nexus do
         host_exclusion_filter: [],
         location_preference: [],
         gpu_count: 0,
+        gpu_device: nil,
         family_filter: ["standard"]
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -642,6 +651,7 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: [Location::HETZNER_FSN1_ID],
         location_preference: [],
         gpu_count: 3,
+        gpu_device: nil,
         family_filter: ["standard"]
       )
       expect { nx.start }.to hop("create_unix_user")
@@ -734,7 +744,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "doesn't create billing records for storage volumes, ip4 and pci devices if the location provider is aws" do
-      loc = Location.create_with_id(name: "us-east-1", provider: "aws", project_id: prj.id, display_name: "aws-us-east-1", ui_name: "AWS US East 1", visible: true)
+      loc = Location.create_with_id(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
       vm.location = loc
       expect(vm).to receive(:project).and_return(prj).at_least(:once)
       expect(vm).not_to receive(:ip4_enabled)
@@ -1029,7 +1039,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "prevents destroy if the semaphore set" do
       expect(nx).to receive(:when_prevent_destroy_set?).and_yield
-      expect(Clog).to receive(:emit).with("Destroy prevented by the semaphore")
+      expect(Clog).to receive(:emit).with("Destroy prevented by the semaphore").and_call_original
       expect { nx.destroy }.to hop("prevent_destroy")
     end
 
@@ -1113,28 +1123,24 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "hops to wait_aws_vm_destroyed if vm is in aws" do
-      vm = instance_double(Vm, location: instance_double(Location, provider: "aws"), id: "vm_id")
+      vm = instance_double(Vm, location: instance_double(Location, aws?: true), id: "vm_id")
       expect(vm).to receive(:update).with(display_state: "deleting")
-      nics = [instance_double(Nic, strand: instance_double(Strand, label: "wait"))]
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
-      expect(vm).to receive(:nics).and_return(nics)
       expect(nx).to receive(:bud).with(Prog::Aws::Instance, {"subject_id" => "vm_id"}, :destroy)
-      expect(nics.first).to receive(:incr_destroy)
       expect { nx.destroy }.to hop("wait_aws_vm_destroyed")
     end
   end
 
   describe "#wait_aws_vm_destroyed" do
     it "reaps and pops if leaf" do
-      expect(nx).to receive(:reap)
-      expect(nx).to receive(:leaf?).and_return(true)
+      st.update(prog: "Vm::Nexus", label: "wait_aws_vm_destroyed", stack: [{}])
       expect(nx).to receive(:final_clean_up)
       expect { nx.wait_aws_vm_destroyed }.to exit({"msg" => "vm deleted"})
     end
 
     it "naps if not leaf" do
-      expect(nx).to receive(:reap)
-      expect(nx).to receive(:leaf?).and_return(false)
+      st.update(prog: "Vm::Nexus", label: "wait_aws_vm_destroyed", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "Aws::Instance", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_aws_vm_destroyed }.to nap(10)
     end
   end

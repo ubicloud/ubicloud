@@ -229,25 +229,29 @@ RSpec.describe Vm do
     end
 
     it "can compute the ipv6 addresses" do
-      expect(vm).to receive(:location).and_return(instance_double(Location, provider: "hetzner")).twice
+      expect(vm).to receive(:location).and_return(instance_double(Location, aws?: false)).twice
       expect(vm).to receive(:ephemeral_net6).and_return(NetAddr::IPv6Net.parse("2001:db8::/64"))
       expect(vm.ip6.to_s).to eq("2001:db8::2")
 
       expect(vm).to receive(:ephemeral_net6).and_return(nil)
       expect(vm.ip6).to be_nil
 
-      expect(vm).to receive(:location).and_return(instance_double(Location, provider: "aws"))
+      expect(vm).to receive(:location).and_return(instance_double(Location, aws?: true))
       expect(vm).to receive(:ephemeral_net6).and_return(NetAddr::IPv6Net.parse("2001:db8::/128"))
       expect(vm.ip6.to_s).to eq("2001:db8::")
+
+      expect(vm).to receive(:location).and_return(instance_double(Location, aws?: true))
+      expect(vm).to receive(:ephemeral_net6).and_return(nil)
+      expect(vm.ip6).to be_nil
     end
 
     it "returns the right private_ipv4 based on the netmask" do
       nic = instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("192.168.12.13/32"))
-      expect(vm).to receive(:nics).and_return([nic]).twice
+      expect(vm).to receive(:nics).and_return([nic])
       expect(vm.private_ipv4.to_s).to eq("192.168.12.13")
 
       nic = instance_double(Nic, private_ipv4: NetAddr.parse_net("10.10.240.0/24"))
-      expect(vm).to receive(:nics).and_return([nic]).twice
+      expect(vm).to receive(:nics).and_return([nic])
       expect(vm.private_ipv4.to_s).to eq("10.10.240.1")
     end
   end
@@ -313,14 +317,16 @@ RSpec.describe Vm do
         size_gib: 1, boot: true, boot_image: boot_image,
         key_encryption_key_1: "key", spdk_version: "spdk1",
         use_bdev_ubi: false, skip_sync: false,
-        storage_device: storage_device, max_ios_per_sec: nil,
-        max_read_mbytes_per_sec: nil, max_write_mbytes_per_sec: nil),
+        storage_device: storage_device,
+        max_read_mbytes_per_sec: nil, max_write_mbytes_per_sec: nil,
+        vhost_block_backend_version: nil, num_queues: 1, queue_size: 256),
       instance_double(VmStorageVolume, disk_index: 1, device_id: "dev2",
         size_gib: 100, boot: false, boot_image: nil,
         key_encryption_key_1: nil, spdk_version: "spdk2",
         use_bdev_ubi: true, skip_sync: true,
-        storage_device: storage_device, max_ios_per_sec: 100,
-        max_read_mbytes_per_sec: 200, max_write_mbytes_per_sec: 300)
+        storage_device: storage_device,
+        max_read_mbytes_per_sec: 200, max_write_mbytes_per_sec: 300,
+        vhost_block_backend_version: "v0.1-5", num_queues: 4, queue_size: 64)
     ]
     expect(vm).to receive(:vm_storage_volumes).and_return(volumes)
     expect(vm.storage_volumes).to eq([
@@ -328,14 +334,18 @@ RSpec.describe Vm do
        "device_id" => "dev1", "disk_index" => 0, "encrypted" => true,
        "spdk_version" => "spdk1", "use_bdev_ubi" => false, "skip_sync" => false,
        "storage_device" => "default", "read_only" => false,
-       "max_ios_per_sec" => nil, "max_read_mbytes_per_sec" => nil,
-       "max_write_mbytes_per_sec" => nil},
+       "max_read_mbytes_per_sec" => nil,
+       "max_write_mbytes_per_sec" => nil,
+       "vhost_block_backend_version" => nil, "num_queues" => 1, "queue_size" => 256,
+       "copy_on_read" => false, "slice_name" => "system.slice"},
       {"boot" => false, "image" => nil, "image_version" => nil, "size_gib" => 100,
        "device_id" => "dev2", "disk_index" => 1, "encrypted" => false,
        "spdk_version" => "spdk2", "use_bdev_ubi" => true, "skip_sync" => true,
        "storage_device" => "default", "read_only" => false,
-       "max_ios_per_sec" => 100, "max_read_mbytes_per_sec" => 200,
-       "max_write_mbytes_per_sec" => 300}
+       "max_read_mbytes_per_sec" => 200,
+       "max_write_mbytes_per_sec" => 300,
+       "vhost_block_backend_version" => "v0.1-5", "num_queues" => 4, "queue_size" => 64,
+       "copy_on_read" => false, "slice_name" => "system.slice"}
     ])
   end
 end

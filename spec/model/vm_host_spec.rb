@@ -3,18 +3,9 @@
 require_relative "spec_helper"
 require_relative "../../model/address"
 
-class MockStringWithExitstatus < String
-  attr_accessor :exitstatus
-
-  def initialize(str, exitstatus = 0)
-    super(str)
-    self.exitstatus = exitstatus
-  end
-end
-
 RSpec.describe VmHost do
   subject(:vh) {
-    described_class.new(
+    described_class.new_with_id(
       net6: NetAddr.parse_net("2a01:4f9:2b:35a::/64"),
       ip6: NetAddr.parse_ip("2a01:4f9:2b:35a::2")
     )
@@ -37,8 +28,8 @@ RSpec.describe VmHost do
   let(:hetzner_ips) {
     [
       ["1.1.1.0/30", "1.1.1.1", true],
-      ["1.1.1.2/32", "1.1.0.0", true],
-      ["1.1.1.3/32", "1.1.1.1", false],
+      ["1.1.1.12/32", "1.1.0.0", true],
+      ["1.1.1.13/32", "1.1.1.1", false],
       ["2a01:4f8:10a:128b::/64", "1.1.1.1", true]
     ].map {
       Hosting::HetznerApis::IpInfo.new(ip_address: _1, source_host_ip: _2, is_failover: _3)
@@ -68,6 +59,7 @@ RSpec.describe VmHost do
   end
 
   it "tries to get another random network if the proposal matches the reserved nework" do
+    vh.id = nil
     expect(SecureRandom).to receive(:random_number).and_return(0)
     expect(SecureRandom).to receive(:random_number).and_call_original
     expect(vh.ip6_random_vm_network.to_s).not_to eq(vh.ip6_reserved_network)
@@ -173,72 +165,35 @@ RSpec.describe VmHost do
     expect { vh.download_cloud_hypervisor(version_x64: "35.1", version_arm64: "35.1") }.to raise_error("BUG: unexpected architecture")
   end
 
-  it "assigned_subnets returns the assigned subnets" do
-    expect(vh).to receive(:assigned_subnets).and_return([address])
-    expect(vh).to receive(:vm_addresses).and_return([])
-    expect(SecureRandom).to receive(:random_number).with(4).and_return(0)
-    expect(vh).to receive(:sshable).and_return(instance_double(Sshable, host: "0.0.0.2")).at_least(:once)
-    ip4, r_address = vh.ip4_random_vm_network
-    expect(ip4.to_s).to eq("0.0.0.0")
-    expect(r_address).to eq(address)
-  end
-
-  it "returns nil if there is no available subnet" do
-    expect(vh).to receive(:assigned_subnets).and_return([address])
-    expect(address.assigned_vm_addresses).to receive(:count).and_return(4)
-    expect(vh).to receive(:sshable).and_return(instance_double(Sshable, host: "0.0.0.2")).at_least(:once)
+  it "ip4_random_vm_network returns nil if there is no available subnet" do
     ip4, address = vh.ip4_random_vm_network
     expect(ip4).to be_nil
     expect(address).to be_nil
   end
 
-  it "finds another address if it's already assigned" do
-    expect(vh).to receive(:assigned_subnets).and_return([address]).at_least(:once)
-    expect(vh).to receive(:vm_addresses).and_return([instance_double(AssignedVmAddress, ip: NetAddr::IPv4Net.parse("0.0.0.0"))]).at_least(:once)
-    expect(vh).to receive(:sshable).and_return(instance_double(Sshable, host: "0.0.0.2")).at_least(:once)
-    expect(SecureRandom).to receive(:random_number).with(4).and_return(0, 1)
-    ip4, r_address = vh.ip4_random_vm_network
-    expect(ip4.to_s).to eq("0.0.0.1")
-    expect(r_address).to eq(address)
-  end
+  it "ip4_random_vm_network returns an unused ip address if there is one" do
+    vm_host = Prog::Vm::HostNexus.assemble("127.0.0.1").subject
+    address_id = Address.create(vm_host:, cidr: "128.0.0.0/30").id
+    ips = %w[128.0.0.0 128.0.0.1 128.0.0.2 128.0.0.3]
 
-  context "when provider is leaseweb" do
-    before do
-      allow(vh).to receive(:provider).and_return("leaseweb")
+    4.times do
+      ip4, r_address = vm_host.ip4_random_vm_network
+      expect(r_address).to be_a Address
+      expect(r_address.id).to eq address_id
+      expect(ips).to include ip4.to_s
+
+      project_id = Project.create(name: "test").id
+      vm = Prog::Vm::Nexus.assemble("a a", project_id, force_host_id: vm_host.id)
+      AssignedVmAddress.create(address_id:, dst_vm_id: vm.id, ip: ips.shift)
     end
 
-    it "finds another address if it's already assigned" do
-      expect(vh).to receive(:assigned_subnets).and_return([address]).at_least(:once)
-      expect(vh).to receive(:vm_addresses).and_return([instance_double(AssignedVmAddress, ip: NetAddr::IPv4Net.parse("0.0.0.0"))]).at_least(:once)
-      expect(vh).to receive(:sshable).and_return(instance_double(Sshable, host: "0.0.0.2")).at_least(:once)
-      expect(SecureRandom).to receive(:random_number).with(4).and_return(0, 1)
-      ip4, r_address = vh.ip4_random_vm_network
-      expect(ip4.to_s).to eq("0.0.0.1")
-      expect(r_address).to eq(address)
-    end
-
-    it "finds another address if it's the very first ip" do
-      expect(vh).to receive(:assigned_subnets).and_return([address]).at_least(:once)
-      expect(vh).to receive(:sshable).and_return(instance_double(Sshable, host: "0.0.0.2")).at_least(:once)
-      expect(SecureRandom).to receive(:random_number).with(4).and_return(0, 1)
-      ip4, r_address = vh.ip4_random_vm_network
-      expect(ip4.to_s).to eq("0.0.0.1")
-      expect(r_address).to eq(address)
-    end
-
-    it "finds another address if it's the very last ip" do
-      expect(vh).to receive(:assigned_subnets).and_return([address]).at_least(:once)
-      expect(vh).to receive(:sshable).and_return(instance_double(Sshable, host: "0.0.0.1")).at_least(:once)
-      expect(SecureRandom).to receive(:random_number).with(4).and_return(3, 2)
-      ip4, r_address = vh.ip4_random_vm_network
-      expect(ip4.to_s).to eq("0.0.0.2")
-      expect(r_address).to eq(address)
-    end
+    expect(Clog).not_to receive(:emit)
+    expect(vm_host.ip4_random_vm_network).to eq [nil, nil]
   end
 
   it "sshable_address returns the sshable address" do
-    expect(vh).to receive(:assigned_host_addresses).and_return([assigned_host_address])
-    expect(vh.sshable_address).to eq(assigned_host_address)
+    vm_host = Prog::Vm::HostNexus.assemble("128.0.0.1").subject
+    expect(vm_host.sshable_address.ip.network.to_s).to eq("128.0.0.1")
   end
 
   it "hetznerifies a host" do
@@ -361,15 +316,15 @@ RSpec.describe VmHost do
     }.to raise_error RuntimeError, "BUG: failover ip 1.1.1.0/30 is already assigned to a vm"
   end
 
-  it "finds local ip to assign to veth* devices" do
-    expect(SecureRandom).to receive(:random_number).with(32767).and_return(5)
-    expect(vh.veth_pair_random_ip4_addr.network.to_s).to eq("169.254.0.10")
-  end
-
   it "finds local ip to assign to veth* devices and eliminates already assigned" do
-    expect(vh).to receive(:vms).and_return([instance_double(Vm, local_vetho_ip: "169.254.0.10")]).at_least(:once)
-    expect(SecureRandom).to receive(:random_number).with(32767).and_return(5, 10)
-    expect(vh.veth_pair_random_ip4_addr.network.to_s).to eq("169.254.0.20")
+    vm_host = Prog::Vm::HostNexus.assemble("127.0.0.1").subject
+    project_id = Project.create(name: "test").id
+    vm = Prog::Vm::Nexus.assemble("a a", project_id, force_host_id: vm_host.id).subject
+
+    expect(SecureRandom).to receive(:random_number).with(32767 - 1024).and_return(5, 5)
+    expect(vm_host.veth_pair_random_ip4_addr.network.to_s).to eq("169.254.0.10")
+    vm.update(local_vetho_ip: "169.254.0.10", vm_host_id: vm_host.id)
+    expect(vm_host.veth_pair_random_ip4_addr.network.to_s).to eq("169.254.0.12")
   end
 
   it "initiates a new health monitor session" do
@@ -379,14 +334,21 @@ RSpec.describe VmHost do
     vh.init_health_monitor_session
   end
 
+  it "initiates a new health monitor session for metrics exporter" do
+    sshable = instance_double(Sshable)
+    expect(vh).to receive(:sshable).and_return(sshable)
+    expect(sshable).to receive(:start_fresh_session)
+    vh.init_metrics_export_session
+  end
+
   it "returns disk device ids when StorageDevice has unix_device_list" do
-    sd = StorageDevice.create_with_id(vm_host_id: vh.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["wwn-random-id1", "wwn-random-id2"])
+    sd = StorageDevice.create_with_id(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["wwn-random-id1", "wwn-random-id2"])
     allow(vh).to receive(:storage_devices).and_return([sd])
     expect(vh.disk_device_ids).to eq(["wwn-random-id1", "wwn-random-id2"])
   end
 
   it "returns disk device names" do
-    sd = StorageDevice.create_with_id(vm_host_id: vh.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["wwn-random-id1", "wwn-random-id2"])
+    sd = StorageDevice.create_with_id(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["wwn-random-id1", "wwn-random-id2"])
     session = {
       ssh_session: instance_double(Net::SSH::Connection::Session)
     }
@@ -399,7 +361,7 @@ RSpec.describe VmHost do
   end
 
   it "converts disk devices when StorageDevice has unix_device_list with the old formatting for SSD disks" do
-    sd = StorageDevice.create_with_id(vm_host_id: vh.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["sda"])
+    sd = StorageDevice.create_with_id(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["sda"])
     sshable = instance_double(Sshable)
     expect(sd).to receive(:vm_host).and_return(vh)
     expect(sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'sda$' | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-random-id1")
@@ -409,7 +371,7 @@ RSpec.describe VmHost do
   end
 
   it "converts disk devices when StorageDevice has unix_device_list with the old formatting for NVMe disks" do
-    sd = StorageDevice.create_with_id(vm_host_id: vh.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["nvme0n1"])
+    sd = StorageDevice.create_with_id(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["nvme0n1"])
     sshable = instance_double(Sshable)
     expect(sd).to receive(:vm_host).and_return(vh)
     expect(sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'nvme0n1$' | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id")
@@ -429,12 +391,12 @@ RSpec.describe VmHost do
     }
 
     allow(vh).to receive(:disk_device_names).and_return(["sda"])
-    allow(session[:ssh_session]).to receive(:exec!).with("sudo smartctl -j -H /dev/sda -d scsi | jq .smart_status.passed").and_return(MockStringWithExitstatus.new("true\n", 0))
-    allow(session[:ssh_session]).to receive(:exec!).with("lsblk --json").and_return(MockStringWithExitstatus.new('{"blockdevices": [{"name": "fd0","maj:min": "2:0","rm": true,"size": "4K","ro": false,"type": "disk","mountpoints": [null]},{"name": "sda","maj:min": "8:0","rm": false,"size": "2.2G","ro": false,"type": "disk","mountpoints": [null],"children": [{"name": "sda1","maj:min": "8:1","rm": false,"size": "2.1G","ro": false,"type": "part","mountpoints": ["/"]},{"name": "sda14","maj:min": "8:14","rm": false,"size": "4M","ro": false,"type": "part","mountpoints": [null]}]}]}', 0))
-    allow(session[:ssh_session]).to receive(:exec!).with("sudo bash -c \"head -c 1M </dev/zero > /test-file\"").and_return(MockStringWithExitstatus.new("", 0))
-    allow(session[:ssh_session]).to receive(:exec!).with("sha256sum /test-file").and_return(MockStringWithExitstatus.new("30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58  /test-file\n", 0))
-    allow(session[:ssh_session]).to receive(:exec!).with("sudo rm /test-file").and_return(MockStringWithExitstatus.new("", 0))
-    allow(session[:ssh_session]).to receive(:exec!).with("journalctl -kS -1min --no-pager").and_return(MockStringWithExitstatus.new("random ok logs", 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("sudo smartctl -j -H /dev/sda -d scsi | jq .smart_status.passed").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("true\n", 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("lsblk --json").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new('{"blockdevices": [{"name": "fd0","maj:min": "2:0","rm": true,"size": "4K","ro": false,"type": "disk","mountpoints": [null]},{"name": "sda","maj:min": "8:0","rm": false,"size": "2.2G","ro": false,"type": "disk","mountpoints": [null],"children": [{"name": "sda1","maj:min": "8:1","rm": false,"size": "2.1G","ro": false,"type": "part","mountpoints": ["/"]},{"name": "sda14","maj:min": "8:14","rm": false,"size": "4M","ro": false,"type": "part","mountpoints": [null]}]}]}', 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("sudo bash -c \"head -c 1M </dev/zero > /test-file\"").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("sha256sum /test-file").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58  /test-file\n", 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("sudo rm /test-file").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("journalctl -kS -1min --no-pager").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("random ok logs", 0))
     expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("up")
 
     expect(session[:ssh_session]).to receive(:exec!).and_raise Sshable::SshError
@@ -456,7 +418,7 @@ RSpec.describe VmHost do
 
     expect(vh).to receive(:check_storage_smartctl).and_return(true)
     expect(vh).to receive(:check_storage_read_write).and_return(true)
-    allow(session[:ssh_session]).to receive(:exec!).with("journalctl -kS -1min --no-pager").and_return(MockStringWithExitstatus.new("Nov 04 12:18:04 ubuntu kernel: Buffer I/O error on dev sda, logical block 1032, lost async page write", 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("journalctl -kS -1min --no-pager").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("Nov 04 12:18:04 ubuntu kernel: Buffer I/O error on dev sda, logical block 1032, lost async page write", 0))
     expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
   end
 
@@ -472,10 +434,10 @@ RSpec.describe VmHost do
     allow(vh).to receive(:disk_device_names).and_return(["sda"])
 
     expect(vh).to receive(:check_storage_smartctl).and_return(true)
-    expect(session[:ssh_session]).to receive(:exec!).with("lsblk --json").and_return(MockStringWithExitstatus.new('{"blockdevices": [{"name": "fd0","maj:min": "2:0","rm": true,"size": "4K","ro": false,"type": "disk","mountpoints": [null]},{"name": "sda","maj:min": "8:0","rm": false,"size": "2.2G","ro": false,"type": "disk","mountpoints": [null],"children": [{"name": "sda1","maj:min": "8:1","rm": false,"size": "2.1G","ro": false,"type": "part","mountpoints": ["/"]},{"name": "sda14","maj:min": "8:14","rm": false,"size": "4M","ro": false,"type": "part","mountpoints": [null]}]}]}', 0))
-    expect(session[:ssh_session]).to receive(:exec!).with("sudo bash -c \"head -c 1M </dev/zero > /test-file\"").and_return(MockStringWithExitstatus.new("failed to write file", 1))
-    expect(session[:ssh_session]).to receive(:exec!).with("sha256sum /test-file").and_return(MockStringWithExitstatus.new("30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58  /test-file\n", 0))
-    expect(session[:ssh_session]).to receive(:exec!).with("sudo rm /test-file").and_return(MockStringWithExitstatus.new("could not remove file", 1))
+    expect(session[:ssh_session]).to receive(:exec!).with("lsblk --json").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new('{"blockdevices": [{"name": "fd0","maj:min": "2:0","rm": true,"size": "4K","ro": false,"type": "disk","mountpoints": [null]},{"name": "sda","maj:min": "8:0","rm": false,"size": "2.2G","ro": false,"type": "disk","mountpoints": [null],"children": [{"name": "sda1","maj:min": "8:1","rm": false,"size": "2.1G","ro": false,"type": "part","mountpoints": ["/"]},{"name": "sda14","maj:min": "8:14","rm": false,"size": "4M","ro": false,"type": "part","mountpoints": [null]}]}]}', 0))
+    expect(session[:ssh_session]).to receive(:exec!).with("sudo bash -c \"head -c 1M </dev/zero > /test-file\"").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("failed to write file", 1))
+    expect(session[:ssh_session]).to receive(:exec!).with("sha256sum /test-file").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58  /test-file\n", 0))
+    expect(session[:ssh_session]).to receive(:exec!).with("sudo rm /test-file").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("could not remove file", 1))
     expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
   end
 
@@ -493,7 +455,7 @@ RSpec.describe VmHost do
     expect(vh).to receive(:check_storage_smartctl).and_return(true)
     expect(vh).to receive(:check_storage_nvme).and_return(true)
     expect(vh).to receive(:check_storage_read_write).and_return(true)
-    allow(session[:ssh_session]).to receive(:exec!).with("journalctl -kS -1min --no-pager").and_return(MockStringWithExitstatus.new("exit code 1", 1))
+    allow(session[:ssh_session]).to receive(:exec!).with("journalctl -kS -1min --no-pager").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("exit code 1", 1))
     expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
   end
 
@@ -508,7 +470,7 @@ RSpec.describe VmHost do
     }
     allow(vh).to receive(:disk_device_names).and_return(["nvme0n1"])
 
-    allow(session[:ssh_session]).to receive(:exec!).with("sudo smartctl -j -H /dev/nvme0n1 | jq .smart_status.passed").and_return(MockStringWithExitstatus.new("false\n", 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("sudo smartctl -j -H /dev/nvme0n1 | jq .smart_status.passed").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("false\n", 0))
     expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
   end
 
@@ -524,7 +486,7 @@ RSpec.describe VmHost do
     allow(vh).to receive(:disk_device_names).and_return(["nvme0n1"])
 
     expect(vh).to receive(:check_storage_smartctl).and_return(true)
-    allow(session[:ssh_session]).to receive(:exec!).with("sudo nvme smart-log /dev/nvme0n1 | grep \"critical_warning\" | awk '{print $3}'").and_return(MockStringWithExitstatus.new("1\n", 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("sudo nvme smart-log /dev/nvme0n1 | grep \"critical_warning\" | awk '{print $3}'").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("1\n", 0))
     expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
   end
 
@@ -540,7 +502,7 @@ RSpec.describe VmHost do
     allow(vh).to receive(:disk_device_names).and_return(["nvme0n1"])
 
     expect(vh).to receive(:check_storage_smartctl).and_return(true)
-    allow(session[:ssh_session]).to receive(:exec!).with("sudo nvme smart-log /dev/nvme0n1 | grep \"critical_warning\" | awk '{print $3}'").and_return(MockStringWithExitstatus.new("0\n", 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("sudo nvme smart-log /dev/nvme0n1 | grep \"critical_warning\" | awk '{print $3}'").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("0\n", 0))
     expect(vh).to receive(:check_storage_read_write).and_return(true)
     expect(vh).to receive(:check_storage_kernel_logs).and_return(true)
     expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("up")
@@ -559,10 +521,10 @@ RSpec.describe VmHost do
 
     expect(vh).to receive(:check_storage_smartctl).and_return(true)
     expect(vh).to receive(:check_storage_nvme).and_return(true)
-    allow(session[:ssh_session]).to receive(:exec!).with("lsblk --json").and_return(MockStringWithExitstatus.new('{"blockdevices": [{"name": "fd0","maj:min": "2:0","rm": true,"size": "4K","ro": false,"type": "disk","mountpoints": [null]},{"name": "sda","maj:min": "8:0","rm": false,"size": "2.2G","ro": false,"type": "disk","mountpoints": [null],"children": [{"name": "sda1","maj:min": "8:1","rm": false,"size": "2.1G","ro": false,"type": "part","mountpoints": ["/random-mountpoint"]},{"name": "sda14","maj:min": "8:14","rm": false,"size": "4M","ro": false,"type": "part","mountpoints": [null]}]}]}', 0))
-    allow(session[:ssh_session]).to receive(:exec!).with("sudo bash -c \"head -c 1M </dev/zero > /random-mountpoint/test-file\"").and_return(MockStringWithExitstatus.new("", 0))
-    allow(session[:ssh_session]).to receive(:exec!).with("sha256sum /random-mountpoint/test-file").and_return(MockStringWithExitstatus.new("wrong-hash  /test-file\n", 0))
-    allow(session[:ssh_session]).to receive(:exec!).with("sudo rm /random-mountpoint/test-file").and_return(MockStringWithExitstatus.new("", 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("lsblk --json").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new('{"blockdevices": [{"name": "fd0","maj:min": "2:0","rm": true,"size": "4K","ro": false,"type": "disk","mountpoints": [null]},{"name": "sda","maj:min": "8:0","rm": false,"size": "2.2G","ro": false,"type": "disk","mountpoints": [null],"children": [{"name": "sda1","maj:min": "8:1","rm": false,"size": "2.1G","ro": false,"type": "part","mountpoints": ["/random-mountpoint"]},{"name": "sda14","maj:min": "8:14","rm": false,"size": "4M","ro": false,"type": "part","mountpoints": [null]}]}]}', 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("sudo bash -c \"head -c 1M </dev/zero > /random-mountpoint/test-file\"").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("sha256sum /random-mountpoint/test-file").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("wrong-hash  /test-file\n", 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("sudo rm /random-mountpoint/test-file").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
     expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
   end
 
@@ -611,6 +573,24 @@ RSpec.describe VmHost do
     it "returns nil if there is no provider" do
       expect(vh).to receive(:provider).and_return(nil)
       expect(vh.provider_name).to be_nil
+    end
+  end
+
+  describe "#metrics_config" do
+    it "returns the right metrics config" do
+      sa = Sshable.create(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair)
+      vh = described_class.create(location_id: Location::HETZNER_FSN1_ID, family: "standard") { it.id = sa.id }
+      expect(Config).to receive(:monitoring_service_project_id).and_return("d272dc1f-52ba-4e52-9bcc-f90dce42a226")
+      expect(vh.metrics_config).to eq({
+        endpoints: [
+          "http://localhost:9100/metrics"
+        ],
+        max_file_retention: 120,
+        interval: "15s",
+        additional_labels: {ubicloud_resource_id: vh.ubid},
+        metrics_dir: "/home/rhizome/host/metrics",
+        project_id: "d272dc1f-52ba-4e52-9bcc-f90dce42a226"
+      })
     end
   end
 end

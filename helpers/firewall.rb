@@ -11,23 +11,14 @@ class Clover
 
   def firewall_list_api_response(dataset)
     dataset = dataset.where(location_id: @location.id) if @location
-    result = dataset.eager(:firewall_rules).paginated_result(
-      start_after: request.params["start_after"],
-      page_size: request.params["page_size"],
-      order_column: request.params["order_column"]
-    )
-
-    {
-      items: Serializers::Firewall.serialize(result[:records]),
-      count: result[:count]
-    }
+    paginated_result(dataset.eager(:firewall_rules), Serializers::Firewall)
   end
 
   def firewall_post(firewall_name)
     authorize("Firewall:create", @project.id)
     Validation.validate_name(firewall_name)
 
-    description = request.params["description"] || ""
+    description = typecast_params.str("description") || ""
 
     firewall = nil
     DB.transaction do

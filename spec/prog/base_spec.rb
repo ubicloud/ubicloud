@@ -3,12 +3,27 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Prog::Base do
+  it "does not allow failure of one child strand inside donate to affect other strands" do
+    parent = Strand.create(prog: "Test", label: "reap_exit_no_children")
+    popper = Strand.create(parent_id: parent.id, prog: "Test", label: "popper")
+    failer = Strand.create(parent_id: parent.id, prog: "Test", label: "failer")
+    Strand.create(parent_id: parent.id, prog: "Test", label: "napper", lease: Time.now + 10)
+
+    expect(parent).to receive(:children_dataset).twice.and_wrap_original do
+      # Force popper before failer
+      it.call.order(Sequel.case({"popper" => 1}, 2, :label))
+    end
+
+    expect { parent.run(10) }.to raise_error(RuntimeError)
+    expect(popper.this.get(:exitval)).to eq("msg" => "popped")
+    expect(failer.this.get(:exitval)).to be_nil
+  end
+
   it "can bud and reap" do
     parent = Strand.create_with_id(prog: "Test", label: "budder")
     expect {
       parent.unsynchronized_run
-      parent.reload
-    }.to change { parent.load.leaf? }.from(true).to(false)
+    }.to change { parent.children_dataset.empty? }.from(true).to(false)
 
     child_id = parent.children.first.id
     Semaphore.incr(child_id, :should_get_deleted)
@@ -19,7 +34,7 @@ RSpec.describe Prog::Base do
 
       # Parent notices exitval is set and reaps the child.
       parent.run
-    }.to change { parent.load.leaf? }.from(false).to(true).and change {
+    }.to change { parent.children_dataset.empty? }.from(false).to(true).and change {
       Semaphore.where(strand_id: child_id).empty?
     }.from(false).to(true).and change {
       parent.children.empty?
@@ -30,12 +45,17 @@ RSpec.describe Prog::Base do
 
   it "keeps children array state in sync even in consecutive-run mode" do
     parent = Strand.create_with_id(prog: "Test", label: "reap_exit_no_children")
-    Strand.create_with_id(parent_id: parent.id, prog: "Test", label: "popper")
+    child = Strand.create_with_id(parent_id: parent.id, prog: "Test", label: "napper")
     prg = parent.load
-    expect(prg).to receive(:nap).and_raise(Prog::Base::Nap.new(0))
     expect(parent).to receive(:load).twice.and_return(prg)
-    expect(parent).to receive(:unsynchronized_run).twice.and_call_original
-    parent.run(10)
+
+    expect(prg).to receive(:nap).and_raise(Prog::Base::Nap.new(1))
+    expect(parent.run(10)).to be_a Prog::Base::Nap
+    expect(parent.associations).to be_empty
+
+    child.destroy
+    expect(parent.run(10)).to be_a Prog::Base::Exit
+    expect(parent.associations).to be_empty
   end
 
   describe "#pop" do

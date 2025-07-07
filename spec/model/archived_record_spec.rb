@@ -10,6 +10,16 @@ RSpec.describe ArchivedRecord do
   it "needs new partitions (action required)" do
     # if this test starts to fail, it's time to create new partitions for table archived_record. if this is ignored,
     # ArchivedRecord.create will start to fail in 45 days or less. it's also a good time to see if old partitions can be dropped.
+    # Add a warning 60 days out, so the issue can be fixed before the warning turns into an test failure.
+
+    begin
+      DB.transaction(savepoint: true) do
+        described_class.create(archived_at: Time.now + 60 * 60 * 24 * 60, model_name: "Vm", model_values: {"state" => "creating"})
+      end
+    rescue Sequel::ConstraintViolation
+      warn "\n\nNEED TO CREATE MORE archived_record PARTITIONS!\n\n\n"
+    end
+
     expect { described_class.create(archived_at: Time.now + 60 * 60 * 24 * 45, model_name: "Vm", model_values: {"state" => "creating"}) }.not_to raise_error
   end
 

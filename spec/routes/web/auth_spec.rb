@@ -109,6 +109,20 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - #{p.name} Dashboard")
   end
 
+  it "can not create new account without cloudflare turnstile key if turnstile usage enabled" do
+    expect(Config).to receive(:cloudflare_turnstile_site_key).and_return("cf_site_key").thrice
+    visit "/create-account"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Full Name", with: "Joe User"
+    fill_in "Password", with: TEST_USER_PASSWORD
+    fill_in "Password Confirmation", with: TEST_USER_PASSWORD
+    click_button "Create Account"
+
+    expect(page.title).to eq("Ubicloud - Create Account")
+    expect(Mail::TestMailer.deliveries.length).to eq 0
+    expect(page).to have_content("Could not create account. Please ensure JavaScript is enabled and access to Cloudflare is not blocked, then try again.")
+  end
+
   it "can create new account, verify it, and visit project which invited with default policy" do
     p = Project.create_with_id(name: "Invited-project")
     subject_id = SubjectTag.create_with_id(project_id: p.id, name: "Admin").id
@@ -119,7 +133,7 @@ RSpec.describe Clover, "auth" do
     expect(Config).to receive(:cloudflare_turnstile_site_key).and_return("1")
     visit "/create-account"
     expect(page.find(".cf-turnstile")["data-sitekey"]).to eq "1"
-    expect(Config).to receive(:cloudflare_turnstile_site_key).and_return(nil)
+    expect(Config).to receive(:cloudflare_turnstile_site_key).and_return(nil).at_least(:once)
     fill_in "Full Name", with: "John Doe"
     fill_in "Email Address", with: TEST_USER_EMAIL
     fill_in "Password", with: TEST_USER_PASSWORD
@@ -455,21 +469,63 @@ RSpec.describe Clover, "auth" do
   end
 
   describe "social login" do
-    def mock_provider(provider, email = TEST_USER_EMAIL)
-      expect(Config).to receive("omniauth_#{provider}_id").and_return("12345").at_least(:once)
+    def mock_provider(provider, email = TEST_USER_EMAIL, name: "John Doe", mock_config: true)
+      expect(Config).to receive("omniauth_#{provider}_id").and_return("12345").at_least(:once) if mock_config
       OmniAuth.config.add_mock(provider, {
         provider: provider,
         uid: "123456790",
         info: {
-          name: "John Doe",
+          name:,
           email: email
         }
       })
     end
 
+    let(:oidc_provider) do
+      OidcProvider.create(
+        display_name: "TestOIDC",
+        client_id: "123",
+        client_secret: "456",
+        url: "http://example.com",
+        authorization_endpoint: "/auth",
+        token_endpoint: "/tok",
+        userinfo_endpoint: "/ui",
+        jwks_uri: "https://host/jw"
+      )
+    end
+
     before do
       OmniAuth.config.logger = Logger.new(IO::NULL)
       OmniAuth.config.test_mode = true
+    end
+
+    it "can login via OIDC flow" do
+      visit "/auth/#{OidcProvider.generate_ubid}"
+      expect(page.status_code).to eq 404
+
+      provider = oidc_provider
+      omniauth_key = provider.ubid.to_sym
+
+      visit "/auth/#{provider.ubid}"
+      expect(page.status_code).to eq 200
+      expect(page.title).to eq "Ubicloud - Login to TestOIDC via OIDC"
+
+      OmniAuth.config.mock_auth[omniauth_key] = :invalid_credentials
+      click_button "Login"
+
+      expect(page.title).to eq("Ubicloud - Login")
+      expect(page).to have_flash_error("There was an error logging in with the external provider")
+
+      visit "/auth/#{provider.ubid}"
+      OmniAuth.config.add_mock(omniauth_key, provider: provider.ubid, uid: "789",
+        info: {email: "user@example.com"})
+      click_button "Login"
+
+      account = Account.first
+      expect(account.email).to eq "user@example.com"
+      expect(AccountIdentity.select_hash(:account_id, :provider)).to eq(account.id => provider.ubid)
+      expect(page.title).to eq("Ubicloud - Default Dashboard")
+      expect(page).to have_flash_notice("You have been logged in")
     end
 
     it "shows error message if attempting to create an account where social login has no email" do
@@ -480,6 +536,15 @@ RSpec.describe Clover, "auth" do
 
       expect(page.title).to eq("Ubicloud - Login")
       expect(page).to have_flash_error(/Social login is only allowed if social login provider provides email/)
+    end
+
+    it "can create new account even if social account doesn't have a name" do
+      mock_provider(:github, name: nil)
+
+      visit "/login"
+      click_button "GitHub"
+
+      expect(Account[email: TEST_USER_EMAIL].name).to eq "User"
     end
 
     it "can create new account" do
@@ -526,6 +591,54 @@ RSpec.describe Clover, "auth" do
 
       before do
         login(account.email)
+      end
+
+      it "can connect and disconnect existing account to OIDC provider" do
+        provider = oidc_provider
+        omniauth_key = provider.ubid.to_sym
+
+        visit "/account/login-method/oidc"
+        expect(page.title).to eq("Ubicloud - Login Methods")
+        expect(page).to have_flash_error("No valid OIDC provider with that ID")
+
+        visit "/account/login-method"
+        within "#login-method-connect-oidc" do
+          fill_in "OIDC Provider ID", with: provider.ubid
+          click_button "Connect"
+        end
+
+        expect(AccountIdentity).to be_empty
+
+        OmniAuth.config.mock_auth[omniauth_key] = :invalid_credentials
+        click_button "Connect"
+
+        expect(AccountIdentity).to be_empty
+        expect(page.title).to eq("Ubicloud - Default Dashboard")
+        expect(page).to have_flash_error("There was an error logging in with the external provider")
+
+        visit "/account/login-method"
+        within "#login-method-connect-oidc" do
+          fill_in "OIDC Provider ID", with: provider.ubid
+          click_button "Connect"
+        end
+
+        OmniAuth.config.add_mock(omniauth_key, provider: provider.ubid, uid: "789",
+          info: {email: account.email})
+        click_button "Connect"
+
+        expect(AccountIdentity.select_hash(:account_id, :provider)).to eq(account.id => provider.ubid)
+        expect(page.title).to eq("Ubicloud - Login Methods")
+        expect(page).to have_flash_notice("You have successfully connected your account with TestOIDC.")
+
+        within "#login-method-disconnect-oidc-#{provider.ubid}" do
+          click_button "Disconnect"
+        end
+
+        expect(AccountIdentity).to be_empty
+        expect(page.title).to eq("Ubicloud - Login Methods")
+        expect(page).to have_flash_notice("Your account has been disconnected from TestOIDC")
+      ensure
+        OmniAuth.config.mock_auth[omniauth_key] = nil
       end
 
       it "can connect to existing account" do

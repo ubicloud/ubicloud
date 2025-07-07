@@ -12,7 +12,7 @@ class InferenceEndpoint < Sequel::Model
 
   dataset_module Pagination
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
   include ObjectTag::Cleanup
 
@@ -27,8 +27,9 @@ class InferenceEndpoint < Sequel::Model
   end
 
   def display_state
-    return "running" if ["wait"].include?(strand.label)
-    return "deleting" if destroy_set? || strand.label == "destroy"
+    label = strand.label
+    return "running" if label == "wait"
+    return "deleting" if destroy_set? || label == "destroy"
     "creating"
   end
 

@@ -63,12 +63,11 @@ lb list -l eu-north-h1
 lb list -l eu-north-h1 -f name,id
 lb list -l eu-north-h1 -N -f name,id
 lb list -N
-pg eu-central-h1/test2-pg create
-pg eu-central-h1/test2-pg create -f lantern
-pg eu-central-h1/test2-pg create -h sync
-pg eu-central-h1/test2-pg create -S 128
-pg eu-central-h1/test2-pg create -s standard-4
-pg eu-central-h1/test2-pg create -v 17
+pg eu-central-h1/test2-pg create -s standard-2 -S 64
+pg eu-central-h1/test2-pg create -s standard-2 -S 64 -f paradedb
+pg eu-central-h1/test2-pg create -s standard-2 -S 64 -h sync
+pg eu-central-h1/test2-pg create -s standard-4 -S 128
+pg eu-central-h1/test2-pg create -s standard-2 -S 64 -v 17
 pg eu-central-h1/test-pg add-firewall-rule 1.2.3.0/24
 pg eu-central-h1/test-pg add-metric-destination foo bar https://md.example.com
 pg eu-central-h1/test-pg delete-firewall-rule pfb9g14e5ndt6qf59wfk8109bg

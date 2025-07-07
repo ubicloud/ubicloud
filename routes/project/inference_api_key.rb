@@ -33,8 +33,8 @@ class Clover
       end
     end
 
-    r.is String do |ubid|
-      iak = inference_api_key_ds.with_pk(UBID.to_uuid(ubid))
+    r.is :ubid_uuid do |id|
+      iak = inference_api_key_ds.with_pk(id)
 
       r.get api? do
         if iak

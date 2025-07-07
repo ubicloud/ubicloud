@@ -19,7 +19,7 @@ class Clover
       end
 
       filter[:location_id] = @location.id
-      vm = @project.vms_dataset.eager(:location).first(filter)
+      vm = @project.vms_dataset.first(filter)
       check_found_object(vm)
 
       r.get true do

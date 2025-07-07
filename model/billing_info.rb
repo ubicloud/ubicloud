@@ -9,7 +9,7 @@ class BillingInfo < Sequel::Model
   one_to_many :payment_methods, order: Sequel.desc(:created_at)
   one_to_one :project
 
-  include ResourceMethods
+  plugin ResourceMethods, etc_type: true
 
   def stripe_data
     if (Stripe.api_key = Config.stripe_secret_key)
@@ -50,10 +50,10 @@ class BillingInfo < Sequel::Model
 
   def validate_vat
     response = Excon.get("https://ec.europa.eu/taxation_customs/vies/rest-api/ms/#{stripe_data["country"]}/vat/#{stripe_data["tax_id"]}", expects: 200)
-    status = JSON.parse(response.body)["userError"]
-    if status == "VALID"
+    case (status = JSON.parse(response.body)["userError"])
+    when "VALID"
       true
-    elsif status == "INVALID" || status == "INVALID_INPUT"
+    when "INVALID", "INVALID_INPUT"
       false
     else
       fail "Unexpected response from VAT service: #{status}"

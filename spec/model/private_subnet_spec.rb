@@ -129,11 +129,12 @@ RSpec.describe PrivateSubnet do
 
   describe "destroy" do
     it "destroys firewalls private subnets" do
-      ps = described_class.create_with_id(name: "test-ps", location_id: Location::HETZNER_FSN1_ID, net6: "2001:db8::/64", net4: "10.0.0.0/24", project_id: Project.create(name: "test").id)
-      fwps = instance_double(FirewallsPrivateSubnets)
-      expect(FirewallsPrivateSubnets).to receive(:where).with(private_subnet_id: ps.id).and_return(instance_double(Sequel::Dataset, all: [fwps]))
-      expect(fwps).to receive(:destroy).once
+      project_id = Project.create(name: "test").id
+      ps = described_class.create_with_id(name: "test-ps", location_id: Location::HETZNER_FSN1_ID, net6: "2001:db8::/64", net4: "10.0.0.0/24", project_id:)
+      ps.add_firewall(project_id:, location_id: Location::HETZNER_FSN1_ID)
+      expect(ps.firewalls_dataset.count).to eq 1
       ps.destroy
+      expect(ps.firewalls_dataset.count).to eq 0
     end
   end
 

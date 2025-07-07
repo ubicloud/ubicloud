@@ -1,1 +1,17 @@
 ! Invalid field(s) given in vm show -f option: invalid
+
+Show details for a virtual machine
+
+Usage:
+    ubi vm (location/vm-name | vm-id) show [options]
+
+Options:
+    -f, --fields=fields              show specific fields (comma separated)
+    -r, --rule-fields=fields         show specific firewall rule fields (comma separated)
+    -w, --firewall-fields=fields     show specific firewall fields (comma separated)
+
+Allowed Option Values:
+    Fields: id name state location size unix-user storage-size-gib ip6
+            ip4-enabled ip4 private-ipv4 private-ipv6 subnet firewalls
+    Firewall Rule Fields: id cidr port-range
+    Firewall Fields: id name description location path firewall-rules

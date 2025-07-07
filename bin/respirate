@@ -1,9 +1,19 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+partition_number = ARGV[0]
+partition_number ||= if (match = /respirate\.(\d+)\z/.match(ENV["DYNO"] || ENV["PS"]))
+  match[1] # Heroku/Foreman
+end
+
+if partition_number
+  partition_number = Integer(partition_number)
+  raise "invalid partition_number: #{partition_number}" if partition_number < 1
+end
+
 require_relative "../loader"
 
-d = Scheduling::Dispatcher.new
+d = Scheduling::Dispatcher.new(partition_number:)
 Signal.trap("TERM") { d.shutdown }
 
 if Config.heartbeat_url
@@ -31,9 +41,47 @@ Strand.dataset.insert_conflict.insert(id: "08200dd2-20ce-833a-de82-10fd5a082bff"
 
 clover_freeze
 
-loop do
-  d.start_cohort
-  next if d.wait_cohort > 0
-  duration_slept = sleep 1
-  Clog.emit("respirate finished sleep") { {sleep_duration_sec: duration_slept} }
+if partition_number
+  # Start with a random offset, so that multiple respirate processes are unlikely
+  # to run the old strand scan at the same time.
+  next_old_strand_scan = Time.now + (5 * rand)
 end
+no_old_strands = true
+
+DB.synchronize do
+  until d.shutting_down
+    no_strands = d.start_cohort
+
+    break if d.shutting_down
+
+    if next_old_strand_scan&.<(Time.now)
+      # Check every 5 seconds for strands still not leased by another respirate
+      # process.  However, if we find old strands, do not wait 5 seconds, because
+      # if we are processing strands from another partition, we should ensure
+      # they are all processed.
+      if (no_old_strands = d.start_cohort(d.scan_old))
+        next_old_strand_scan = Time.now + 5
+      end
+    end
+
+    if no_strands && no_old_strands && !d.shutting_down
+      # Only sleep if not shutting down and there were no strands in previous scan.
+      # Note that this results in an up to a 1 second delay to pick up new strands,
+      # but that is an accept tradeoff, because we do not want to busy loop the
+      # database (potentially, LISTEN/NOTIFY could be used to reduce this latency)
+      duration_slept = sleep d.sleep_duration
+      Clog.emit("respirate finished sleep") { {sleep_duration_sec: duration_slept} }
+    end
+  end
+end
+
+Clog.emit("Shutting down.") { {unfinished_strand_count: d.num_current_strands} }
+
+# Wait up to 2 seconds for all strand threads to exit.
+# We cannot wait very long, as every second we wait is potentially an
+# additional second that no respirate process is processing new strands.
+Thread.new do
+  d.shutdown_and_cleanup_threads
+  exit 0
+end.join(2)
+exit 1

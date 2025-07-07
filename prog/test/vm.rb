@@ -37,15 +37,24 @@ class Prog::Test::Vm < Prog::Test::Base
     hop_verify_extra_disks
   end
 
+  def umount_if_mounted(mount_path)
+    sshable.cmd("sudo umount #{mount_path.shellescape}")
+  rescue Sshable::SshError => e
+    raise unless e.stderr.include?("not mounted")
+  end
+
   label def verify_extra_disks
     vm.vm_storage_volumes[1..].each_with_index { |volume, disk_index|
       mount_path = "/home/ubi/mnt#{disk_index}"
-      sshable.cmd("mkdir -p #{mount_path}")
+      sshable.cmd("mkdir -p #{mount_path.shellescape}")
+      # this might be a retry, so ensure the mount point is not already mounted
+      umount_if_mounted(mount_path)
       sshable.cmd("sudo mkfs.ext4 #{volume.device_path.shellescape}")
-      sshable.cmd("sudo mount #{volume.device_path.shellescape} #{mount_path}")
-      sshable.cmd("sudo chown ubi #{mount_path}")
-      sshable.cmd("dd if=/dev/urandom of=#{mount_path}/1.txt bs=512 count=10000")
-      sshable.cmd("sync #{mount_path}/1.txt")
+      sshable.cmd("sudo mount #{volume.device_path.shellescape} #{mount_path.shellescape}")
+      sshable.cmd("sudo chown ubi #{mount_path.shellescape}")
+      test_file = File.join(mount_path, "1.txt")
+      sshable.cmd("dd if=/dev/urandom of=#{test_file.shellescape} bs=512 count=10000")
+      sshable.cmd("sync #{test_file.shellescape}")
     }
 
     hop_ping_google
@@ -54,18 +63,6 @@ class Prog::Test::Vm < Prog::Test::Base
   label def ping_google
     sshable.cmd("ping -c 2 google.com")
     hop_verify_io_rates
-  end
-
-  def get_iops
-    fio_ios_cmd = <<~CMD
-      sudo fio --filename=./f --size=100M --direct=1 --rw=randrw --bs=4k --ioengine=libaio \\
-              --iodepth=256 --runtime=4 --numjobs=1 --time_based --group_reporting \\
-              --name=test-job --eta-newline=1 --output-format=json
-    CMD
-
-    fio_ios_output = JSON.parse(sshable.cmd(fio_ios_cmd))
-
-    fio_ios_output.dig("jobs", 0, "read", "iops") + fio_ios_output.dig("jobs", 0, "write", "iops")
   end
 
   def get_read_bw_bytes
@@ -94,11 +91,7 @@ class Prog::Test::Vm < Prog::Test::Base
 
   label def verify_io_rates
     vol = vm.vm_storage_volumes.first
-    hop_ping_vms_in_subnet if vol.max_ios_per_sec.nil?
-
-    # Verify that the max_ios_per_sec is working
-    iops = get_iops
-    fail_test "exceeded iops limit: #{iops}" if iops > vol.max_ios_per_sec * 1.2
+    hop_ping_vms_in_subnet if vol.max_read_mbytes_per_sec.nil?
 
     # Verify that the max_read_mbytes_per_sec is working
     read_bw_bytes = get_read_bw_bytes

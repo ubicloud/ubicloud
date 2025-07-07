@@ -8,7 +8,7 @@ RSpec.describe Clover, "cli pg add-metric-destination" do
   end
 
   it "adds a metric desintation to the database" do
-    cli(%w[pg eu-central-h1/test-pg create])
+    cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
     pg = PostgresResource.first
     expect(pg.metric_destinations_dataset).to be_empty
     body = cli(%w[pg eu-central-h1/test-pg add-metric-destination foo bar https://baz.example.com])

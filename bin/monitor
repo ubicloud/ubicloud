@@ -14,7 +14,7 @@ health_monitor_queue = SizedQueue.new(health_monitor_queue_size)
 metrics_target_resources = {}
 metrics_export_mutex = Mutex.new
 metrics_export_thread_pool_size = (Config.max_metrics_export_threads - 2).clamp(1, nil)
-metrics_target_resource_types = [PostgresServer]
+metrics_target_resource_types = [PostgresServer, VmHost]
 metrics_export_queue_size = metrics_export_thread_pool_size + (metrics_target_resource_types.sum(&:count) * 1.5).round
 metrics_export_queue = SizedQueue.new(metrics_export_queue_size)
 

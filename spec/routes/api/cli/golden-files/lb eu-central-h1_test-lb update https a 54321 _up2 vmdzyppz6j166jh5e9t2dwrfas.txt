@@ -1,0 +1,6 @@
+! Invalid src-port argument: "a"
+
+Update a load balancer
+
+Usage:
+    ubi lb (location/lb-name | lb-id) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]

@@ -571,7 +571,7 @@ RSpec.describe Clover, "access control" do
       end
 
       it "shows not found page for invalid #{type} tag ubid" do
-        visit "#{project.path}/user/access-control/tag/#{type}/#{model.generate_uuid}"
+        visit "#{project.path}/user/access-control/tag/#{type}/#{model.generate_ubid}"
         expect(page.status_code).to eq 404
       end
 

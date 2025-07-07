@@ -31,7 +31,7 @@ RSpec.describe MetricsTargetMethods do
     context "when scrape results are empty" do
       before do
         allow(test_instance).to receive(:scrape_endpoints).and_return([])
-        allow(Clog).to receive(:emit)
+        allow(Clog).to receive(:emit).and_call_original
       end
 
       it "does not call import_prometheus or mark_pending_scrapes_as_done" do
@@ -50,7 +50,7 @@ RSpec.describe MetricsTargetMethods do
 
       before do
         allow(test_instance).to receive(:scrape_endpoints).and_return(scrape_results)
-        allow(Clog).to receive(:emit)
+        allow(Clog).to receive(:emit).and_call_original
         allow(test_instance).to receive(:mark_pending_scrapes_as_done)
       end
 

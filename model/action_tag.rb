@@ -3,8 +3,10 @@
 require_relative "../model"
 
 class ActionTag < Sequel::Model
-  include ResourceMethods
+  plugin ResourceMethods
   include AccessControlModelTag
+
+  MEMBER_ID = "ffffffff-ff00-834a-87ff-ff828ea2dd80"
 
   dataset_module do
     where :global, project_id: nil

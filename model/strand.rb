@@ -5,6 +5,9 @@ require_relative "../model"
 require "time"
 
 class Strand < Sequel::Model
+  # We need to unrestrict primary key so strand.add_child works in Prog::Base.
+  unrestrict_primary_key
+
   Strand.plugin :defaults_setter, cache: true
   Strand.default_values[:stack] = proc { [{}] }
 
@@ -13,64 +16,126 @@ class Strand < Sequel::Model
   one_to_many :children, key: :parent_id, class: self
   one_to_many :semaphores
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   def subject
-    UBID.decode(ubid)
+    return @subject if defined?(@subject) && @subject != :reload
+    @subject = UBID.decode(ubid)
   end
 
-  def take_lease_and_reload
-    unless (ps = DB.prepared_statement(:strand_take_lease_and_reload))
-      # :nocov:
-      ps_sch = if Config.development?
-        Sequel.function(:least, 5, :try)
-      # :nocov:
-      else
-        Sequel.function(:least, Sequel[2]**Sequel.function(:least, :try, 20), 600) * Sequel.function(:random)
-      end
-
-      ps = DB[:strand]
-        .returning
-        .where(
-          Sequel[id: DB[:strand].select(:id).where(id: :$id).for_update.skip_locked, exitval: nil] &
-            (Sequel[:lease] < Sequel::CURRENT_TIMESTAMP)
-        )
-        .prepare_sql_type(:update)
-        .prepare(:first, :strand_take_lease_and_reload,
-          lease: Sequel::CURRENT_TIMESTAMP + Sequel.cast("120 seconds", :interval),
-          try: Sequel[:try] + 1,
-          schedule: Sequel::CURRENT_TIMESTAMP + (ps_sch * Sequel.cast("1 second", :interval)))
+  RespirateMetrics = Struct.new(:scheduled, :scan_picked_up, :worker_started, :lease_checked, :lease_acquired, :queue_size, :available_workers, :old_strand, :lease_expired) do
+    def scan_delay
+      scan_picked_up - scheduled
     end
-    affected = ps.call(id:)
+
+    def queue_delay
+      worker_started - scan_picked_up
+    end
+
+    def lease_delay
+      lease_checked - worker_started
+    end
+
+    def total_delay
+      lease_checked - scheduled
+    end
+  end
+
+  # If the lease time is after this, we must be dealing with an
+  # expired lease, since normal lease times are either in the future
+  # or 1000 years in the past.
+  EXPIRED_LEASE_TIME = Time.utc(2025)
+
+  def respirate_metrics
+    lease_expired = lease > EXPIRED_LEASE_TIME
+    @respirate_metrics ||= RespirateMetrics.new(scheduled: lease_expired ? lease : schedule, lease_expired:)
+  end
+
+  def scan_picked_up!
+    respirate_metrics.scan_picked_up = Time.now
+  end
+
+  def worker_started!
+    respirate_metrics.worker_started = Time.now
+  end
+
+  def lease_checked!(affected)
+    respirate_metrics.lease_checked = Time.now
+    respirate_metrics.lease_acquired = true if affected
+  end
+
+  def old_strand!
+    respirate_metrics.old_strand = true
+  end
+
+  # :nocov:
+  ps_sch = if Config.development?
+    Sequel.function(:least, 5, :try)
+  # :nocov:
+  else
+    Sequel.function(:least, Sequel[2]**Sequel.function(:least, :try, 20), 600) * Sequel.function(:random)
+  end
+
+  TAKE_LEASE_PS = DB[:strand]
+    .returning
+    .where(
+      Sequel[id: DB[:strand].select(:id).where(id: :$id).for_no_key_update.skip_locked, exitval: nil] &
+        (Sequel[:lease] < Sequel::CURRENT_TIMESTAMP)
+    )
+    .prepare_sql_type(:update)
+    .prepare(:first, :strand_take_lease_and_reload,
+      lease: Sequel::CURRENT_TIMESTAMP + Sequel.cast("120 seconds", :interval),
+      try: Sequel[:try] + 1,
+      schedule: Sequel::CURRENT_TIMESTAMP + (ps_sch * Sequel.cast("1 second", :interval)))
+
+  RELEASE_LEASE_PS = DB[<<SQL, :$id, :$lease_time].prepare(:update, :strand_release_lease)
+UPDATE strand SET lease = now() - '1000 years'::interval WHERE id = ? AND lease = ?
+SQL
+
+  def take_lease_and_reload
+    affected = TAKE_LEASE_PS.call(id:)
+    lease_checked!(affected)
     return false unless affected
     lease_time = affected.fetch(:lease)
-    verbose_logging = rand(1000) == 0
 
-    Clog.emit("obtained lease") { {lease_acquired: {time: lease_time, delay: Time.now - schedule}} } if verbose_logging
     # Also operate as reload query
-    @values = affected
+    _refresh_set_values(affected)
+    _clear_changed_columns(:refresh)
+    @subject = :reload
 
     begin
       yield
     ensure
       if @deleted
-        unless DB["SELECT FROM strand WHERE id = ?", id].empty?
+        if exists?
           fail "BUG: strand with @deleted set still exists in the database"
         end
       else
-        DB.transaction do
-          lease_clear_debug_snapshot = this.for_update.all
-          num_updated = DB[<<SQL, id, lease_time].update
-UPDATE strand
-SET lease = now() - '1000 years'::interval
-WHERE id = ? AND lease = ?
-SQL
-          Clog.emit("lease cleared") { {lease_cleared: {num_updated: num_updated}} } if verbose_logging
-          unless num_updated == 1
-            Clog.emit("lease violated data") do
-              {lease_clear_debug_snapshot: lease_clear_debug_snapshot}
-            end
+        begin
+          unless RELEASE_LEASE_PS.call(id:, lease_time:) == 1
+            Clog.emit("lease violated data") { {lease_clear_debug_snapshot: this.all} }
             fail "BUG: lease violated"
+          end
+        ensure
+          if @exited
+            active_siblings_ds = Strand.from { strand.as(:siblings) }
+              .where(parent_id: Sequel[:strand][:id])
+              .where(Sequel.lit("lease < now() AND exitval IS NOT NULL"))
+              .select(1)
+
+            # If exited child has no active siblings, schedule parent immediately,
+            # so all exited children can be reaped.
+            #
+            # To avoid race conditions, we do this after the lease for the child
+            # has been released. It's possible that multiple children could be
+            # calling this update concurrently, but that is fine. We must avoid
+            # the case where this is not called by the last exiting child, as
+            # that otherwise can result in up to 120s delay in parent strand
+            # execution.
+            Strand
+              .where(id: parent_id)
+              .exclude(active_siblings_ds.exists)
+              .update(schedule: Sequel::CURRENT_TIMESTAMP)
           end
         end
       end
@@ -93,14 +158,13 @@ SQL
   def unsynchronized_run
     start_time = Time.now
     prog_label = "#{prog}.#{label}"
+    top_frame = stack.first
 
-    if label == stack.first["deadline_target"]
-      if (pg = Page.from_tag_parts("Deadline", id, prog, stack.first["deadline_target"]))
-        pg.incr_resolve
-      end
+    if label == top_frame["deadline_target"]
+      Page.from_tag_parts("Deadline", id, prog, top_frame["deadline_target"])&.incr_resolve
 
-      stack.first.delete("deadline_target")
-      stack.first.delete("deadline_at")
+      top_frame.delete("deadline_target")
+      top_frame.delete("deadline_at")
 
       modified!(:stack)
     end
@@ -131,8 +195,8 @@ SQL
       end
     end
 
-    unless stack.first["last_label_changed_at"]
-      stack.first["last_label_changed_at"] = Time.now.to_s
+    unless top_frame["last_label_changed_at"]
+      top_frame["last_label_changed_at"] = Time.now.to_s
       modified!(:stack)
     end
 
@@ -158,22 +222,24 @@ SQL
       changed_columns.delete(:schedule)
       e
     rescue Prog::Base::Hop => hp
-      last_changed_at = Time.parse(stack.first["last_label_changed_at"])
+      last_changed_at = Time.parse(top_frame["last_label_changed_at"])
       Clog.emit("hopped") { {strand_hopped: {duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}} }
-      stack.first["last_label_changed_at"] = Time.now.to_s
+      top_frame["last_label_changed_at"] = Time.now.to_s
       modified!(:stack)
 
       update(**hp.strand_update_args, try: 0)
 
       hp
     rescue Prog::Base::Exit => ext
-      last_changed_at = Time.parse(stack.first["last_label_changed_at"])
+      last_changed_at = Time.parse(top_frame["last_label_changed_at"])
       Clog.emit("exited") { {strand_exited: {duration: Time.now - last_changed_at, from: prog_label}} }
 
       update(exitval: ext.exitval, retval: nil)
-      if parent_id.nil?
+      if parent_id
+        @exited = true
+      else
         # No parent Strand to reap here, so self-reap.
-        Semaphore.where(strand_id: id).destroy
+        semaphores_dataset.destroy
         destroy
         @deleted = true
       end
@@ -203,9 +269,6 @@ SQL
     end
   end
 end
-
-# We need to unrestrict primary key so strand.add_child works in Prog::Base.
-Strand.unrestrict_primary_key
 
 # Table: strand
 # Columns:

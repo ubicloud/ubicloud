@@ -12,7 +12,7 @@ class GithubRepository < Sequel::Model
 
   plugin :association_dependencies, cache_entries: :destroy
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
 
   semaphore :destroy
@@ -23,9 +23,7 @@ class GithubRepository < Sequel::Model
 
   CACHE_SIZE_LIMIT = 10 * 1024 * 1024 * 1024 # 10GB
 
-  def bucket_name
-    ubid
-  end
+  alias_method :bucket_name, :ubid
 
   def blob_storage_client
     @blob_storage_client ||= s3_client(access_key, secret_key)
@@ -39,24 +37,34 @@ class GithubRepository < Sequel::Model
     @admin_client ||= s3_client(Config.github_cache_blob_storage_access_key, Config.github_cache_blob_storage_secret_key)
   end
 
-  def after_destroy
-    super
-    destroy_blob_storage if access_key
-  end
-
   def destroy_blob_storage
+    # Abort any ongoing multipart uploads to ensure the bucket is empty before deleting it
+    # It might fail with Unauthorized error if the bucket or token is deleted already.
+    begin
+      blob_storage_client.list_multipart_uploads(bucket: bucket_name).uploads.each do
+        blob_storage_client.abort_multipart_upload(bucket: bucket_name, key: it.key, upload_id: it.upload_id)
+      end
+    rescue Aws::S3::Errors::Unauthorized
+      Clog.emit("Repository credentials failed to abort multipart uploads") { {failed_abort_multipart_uploads: {bucket_name: bucket_name}} }
+    end
+
     begin
       admin_client.delete_bucket(bucket: bucket_name)
     rescue Aws::S3::Errors::NoSuchBucket
+      Clog.emit("Bucket already deleted") { {failed_bucket_destroy: {bucket_name: bucket_name}} }
     end
 
-    CloudflareClient.new(Config.github_cache_blob_storage_api_key).delete_token(access_key)
-    this.update(access_key: nil, secret_key: nil)
+    begin
+      CloudflareClient.new(Config.github_cache_blob_storage_api_key).delete_token(access_key)
+      this.update(access_key: nil, secret_key: nil)
+    rescue Excon::Error::HTTPStatus
+      Clog.emit("Repository credentials failed to delete Cloudflare token") { {failed_cloudflare_token_delete: {bucket_name: bucket_name}} }
+    end
   end
 
   def setup_blob_storage
     DB.transaction do
-      lock!
+      lock!(:no_key_update)
       return if access_key && secret_key
 
       begin

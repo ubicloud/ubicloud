@@ -64,9 +64,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
   end
 
   label def wait_bootstrap_rhizome
-    reap
-    hop_download_lb_cert if leaf?
-    donate
+    reap(:download_lb_cert)
   end
 
   label def download_lb_cert
@@ -190,8 +188,13 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
     eligible_projects_ds = Project.where(api_key_ds)
     free_quota_exhausted_projects_ds = FreeQuota.get_exhausted_projects("inference-tokens")
     eligible_projects_ds = eligible_projects_ds.where(id: inference_endpoint.project.id) unless inference_endpoint.is_public
+    valid_payment_method_ds = DB[:payment_method]
+      .where(fraud: false)
+      .select_group(:billing_info_id)
+      .select_append { Sequel.as(Sequel.lit("1"), :valid_payment_method) }
     eligible_projects_ds = eligible_projects_ds
-      .exclude(billing_info_id: nil, credit: 0.0, id: free_quota_exhausted_projects_ds)
+      .left_outer_join(valid_payment_method_ds, [:billing_info_id])
+      .exclude(valid_payment_method: nil, credit: 0.0, id: free_quota_exhausted_projects_ds)
 
     eligible_projects = eligible_projects_ds.all
       .select(&:active?)

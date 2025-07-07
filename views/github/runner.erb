@@ -5,15 +5,26 @@
 <%== render("github/tabbar") %>
 
 <div class="grid gap-6">
+  <%
+    free_upgrade_badge = if @installation.free_runner_upgrade?
+      <<~CONTENT
+        <a href="#{@project_data[:path]}/github/#{@installation.ubid}/setting">
+          <span class="rounded-full bg-green-600/10 px-2.5 py-1 text-xs/5 font-medium text-green-600">
+            You’re eligible for an exclusive <span class="font-semibold">50% off</span> premium runners until
+            <span class="font-semibold">#{@installation.free_runner_upgrade_expires_at.strftime("%B %d, %Y")}</span>
+          </span>
+        </a>
+      CONTENT
+    end
+  %>
   <%== part(
     "components/table_card",
     headers: ["Repository", "Runner", "Workflow Job", "", ""],
     rows:
       @runners.map do |runner|
         destroy_url = "#{@project_data[:path]}/github/#{@installation.ubid}/runner/#{runner.ubid}"
-        vm_size = runner.label_data["vm_size_data"]
         os = runner.label_data["boot_image"].match(/(ubuntu-\d{2})\d{2}/)[1]
-        family = runner.vm&.family || vm_size.family
+        family = runner.vm&.family || runner.label_data["family"]
         [
           [
             [[
@@ -24,9 +35,9 @@
               [runner.ubid, {link: runner.runner_url}],
               [<<~CONTENT, {escape: false}],
                 <div class="flex gap-1">
-                  <div class="rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800">#{vm_size.vcpus} vCPU</div>
+                  <div class="rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800">#{runner.label_data["vcpus"]} vCPU</div>
                   <div class="rounded-md px-2 text-xs font-medium leading-5 #{(family == "premium") ? "bg-orange-100 text-orange-600" : "bg-slate-100 text-slate-800"}">#{family}</div>
-                  <div class="rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800">#{vm_size.arch}</div>
+                  <div class="rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800">#{runner.label_data["arch"]}</div>
                   <div class="rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800">#{os}</div>
                 </div>
               CONTENT
@@ -93,18 +104,21 @@
         ]
       end,
     empty_state: <<~EMPTY
-      <h3 class="text-xl leading-10 font-medium mb-2">No active runners</h3>
-      <p class="leading-6">
-        To use Ubicloud runners, you need to change
-        <span class="text-rose-500 text-sm font-medium bg-slate-100 py-0.5 px-2 rounded font-mono whitespace-nowrap">runs-on: ...</span>
-        line to one of our labels such as
-        <span class="text-rose-500 text-sm font-medium bg-slate-100 py-0.5 px-2 rounded font-mono whitespace-nowrap">runs-on: ubicloud-standard-2</span>
-        in your workflow file. Then, trigger your workflow to start a runner.
-        <br>
-        Check out
-        <a href="https://www.ubicloud.com/docs/github-actions-integration/quickstart" class="text-orange-500 font-medium">our documentation</a>
-        for using larger runners, using arm64, enabling GPU.
-      </p>
+      <div class="flex flex-col gap-3">
+        <h3 class="text-xl leading-10 font-medium">No active runners</h3>
+        <p class="leading-6">
+          To use Ubicloud runners, you need to change
+          <span class="text-rose-500 text-sm font-medium bg-slate-100 py-0.5 px-2 rounded font-mono whitespace-nowrap">runs-on: ...</span>
+          line to one of our labels such as
+          <span class="text-rose-500 text-sm font-medium bg-slate-100 py-0.5 px-2 rounded font-mono whitespace-nowrap">runs-on: ubicloud-standard-2</span>
+          in your workflow file. Then, trigger your workflow to start a runner.
+          <br>
+          Check out
+          <a href="https://www.ubicloud.com/docs/github-actions-integration/quickstart" class="text-orange-500 font-medium">our documentation</a>
+          for using larger runners, using arm64, enabling GPU.
+        </p>
+        #{free_upgrade_badge}
+      </div>
     EMPTY
   ) %>
 </div>

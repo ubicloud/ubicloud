@@ -1,0 +1,27 @@
+<% form_elements = [
+  {name: "family", type: "radio_small_cards", label: "Server family", required: "required", content_generator: ContentGenerator::Postgres.method(:family)},
+  {name: "size", type: "radio_small_cards", label: "Server size", required: "required", content_generator: ContentGenerator::Postgres.method(:size)},
+  {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required", content_generator: ContentGenerator::Postgres.method(:storage_size)},
+  {name: "failover_time_notice", type: "section", content: "If a maintenance window is configured, failover to the new server with the desired configuration will occur during the first available maintenance window after the new server is ready. Otherwise, failover will take place as soon as the new server becomes ready. Depending on the size of the data, it may take several hours for the new server to become ready.", separator: false}
+]
+
+pre_selected_values = {
+  "flavor" => @pg.flavor,
+  "location" => @location.ubid,
+  "family" => Option::POSTGRES_SIZE_OPTIONS[@pg.target_vm_size].family,
+  "size" => @pg.target_vm_size,
+  "storage_size" => @pg.target_storage_size_gib
+} %>
+
+<%== render(
+  "components/form/resource_creation_form",
+  locals: {
+    action: "#{@project_data[:path]}#{@pg.path}",
+    method: "PATCH",
+    form_elements:,
+    pre_selected_values:,
+    option_tree: @option_tree,
+    option_parents: @option_parents,
+    mode: "update"
+  }
+) %>

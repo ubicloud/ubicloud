@@ -12,54 +12,58 @@ class Prog::Aws::Nic < Prog::Base
       groups: [
         nic.private_subnet.private_subnet_aws_resource.security_group_id
       ],
-      tag_specifications: tag_specifications("network-interface")
+      tag_specifications: Util.aws_tag_specifications("network-interface", nic.name),
+      client_token: nic.id
     })
     network_interface_id = network_interface_response.network_interface.network_interface_id
 
-    client.assign_ipv_6_addresses({
-      network_interface_id:,
-      ipv_6_address_count: 1
-    })
+    client.assign_ipv_6_addresses({network_interface_id:, ipv_6_address_count: 1}) if network_interface_response.network_interface.ipv_6_addresses.empty?
 
-    nic.update(name: network_interface_id)
+    nic.nic_aws_resource.update(network_interface_id:)
     hop_wait_network_interface_created
   end
 
   label def wait_network_interface_created
-    network_interface_response = client.describe_network_interfaces({filters: [{name: "network-interface-id", values: [nic.name]}, {name: "tag:Ubicloud", values: ["true"]}]}).network_interfaces[0]
+    network_interface_response = client.describe_network_interfaces({filters: [{name: "network-interface-id", values: [nic.nic_aws_resource.network_interface_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).network_interfaces[0]
     if network_interface_response.status == "available"
-      eip_response = client.allocate_address
-      nic.nic_aws_resource.update(eip_allocation_id: eip_response.allocation_id)
-
-      hop_attach_eip_network_interface
+      hop_allocate_eip
     end
 
     nap 1
   end
 
+  label def allocate_eip
+    eip_response = client.describe_addresses({filters: [{name: "tag:Name", values: [nic.name]}]})
+    eip_allocation_id = if eip_response.addresses.empty?
+      client.allocate_address(tag_specifications: Util.aws_tag_specifications("elastic-ip", nic.nic_aws_resource.network_interface_id)).allocation_id
+    else
+      eip_response.addresses[0].allocation_id
+    end
+
+    nic.nic_aws_resource.update(eip_allocation_id:)
+    hop_attach_eip_network_interface
+  end
+
   label def attach_eip_network_interface
-    # Associate the Elastic IP with your network interface
-    client.associate_address({
-      allocation_id: nic.nic_aws_resource.eip_allocation_id,
-      network_interface_id: nic.name
-    })
+    eip_response = client.describe_addresses({filters: [{name: "allocation-id", values: [nic.nic_aws_resource.eip_allocation_id]}]})
+    if eip_response.addresses.first.network_interface_id.nil?
+      client.associate_address({allocation_id: nic.nic_aws_resource.eip_allocation_id, network_interface_id: nic.nic_aws_resource.network_interface_id})
+    end
     pop "nic created"
   end
 
   label def destroy
     ignore_invalid_nic do
-      client.delete_network_interface({network_interface_id: nic.name})
+      nap 5 if client.describe_network_interfaces({filters: [{name: "network-interface-id", values: [nic.nic_aws_resource.network_interface_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).network_interfaces.first&.status == "in-use"
+      client.delete_network_interface({network_interface_id: nic.nic_aws_resource.network_interface_id})
     end
     hop_release_eip
   end
 
   label def release_eip
-    begin
-      client.release_address({allocation_id: nic.nic_aws_resource.eip_allocation_id})
-    rescue Aws::EC2::Errors::InvalidAllocationIDNotFound
-      # Ignore if the address is not found
-      # This can happen if the address was already released or never existed
-      # In this case, we just pop the stack
+    ignore_invalid_nic do
+      allocation_id = nic.nic_aws_resource&.eip_allocation_id
+      client.release_address({allocation_id: allocation_id}) if allocation_id
     end
     pop "nic destroyed"
   end
@@ -68,21 +72,14 @@ class Prog::Aws::Nic < Prog::Base
     @client ||= nic.private_subnet.location.location_credential.client
   end
 
-  def tag_specifications(resource_type)
-    [
-      {
-        resource_type: resource_type,
-        tags: [
-          {key: "Ubicloud", value: "true"}
-        ]
-      }
-    ]
-  end
-
   private
 
   def ignore_invalid_nic
     yield
-  rescue Aws::EC2::Errors::InvalidNetworkInterfaceIDNotFound
+  rescue ArgumentError,
+    Aws::EC2::Errors::InvalidNetworkInterfaceIDNotFound,
+    Aws::EC2::Errors::InvalidAllocationIDNotFound,
+    Aws::EC2::Errors::InvalidAddressIDNotFound => e
+    Clog.emit("ID not found") { Util.exception_to_hash(e) }
   end
 end

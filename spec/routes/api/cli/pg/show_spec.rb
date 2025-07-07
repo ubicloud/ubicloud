@@ -32,7 +32,7 @@ RSpec.describe Clover, "cli pg show" do
       version: 17
       ha_type: none
       flavor: standard
-      connection_string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com?channel_binding=require
+      connection_string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require
       primary: true
       earliest_restore_time: 
       firewall rules:

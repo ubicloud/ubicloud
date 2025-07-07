@@ -3,7 +3,9 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Postgres::PostgresResourceNexus do
-  subject(:nx) { described_class.new(Strand.new(id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77")) }
+  subject(:nx) { described_class.new(st) }
+
+  let(:st) { Strand.new(id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77") }
 
   let(:postgres_resource) {
     instance_double(
@@ -50,9 +52,9 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     let(:postgres_project) { Project.create_with_id(name: "default") }
     let(:private_location) {
       loc = Location.create(
-        name: "us-east-1",
-        display_name: "aws-us-east-1",
-        ui_name: "aws-us-east-1",
+        name: "us-west-2",
+        display_name: "aws-us-west-2",
+        ui_name: "aws-us-west-2",
         visible: true,
         provider: "aws",
         project_id: postgres_project.id
@@ -76,24 +78,12 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       }.to raise_error RuntimeError, "No existing location"
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg/server/name", target_vm_size: "standard-2", target_storage_size_gib: 128)
-      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: name"
-
-      expect {
-        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-128", target_storage_size_gib: 128)
-      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: size"
-
-      expect {
         described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128)
       }.not_to raise_error
 
       expect {
         described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: "69c0f4cd-99c1-8ed0-acfe-7b013ce2fa0b")
       }.to raise_error RuntimeError, "No existing parent"
-
-      expect {
-        described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128)
-      }.to raise_error RuntimeError, "Location is not in the project"
 
       private_location.update(project_id: customer_project.id)
       described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 118)
@@ -112,23 +102,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect {
         described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, version: "17", restore_target: Time.now)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: version"
-    end
-
-    it "validates storage size during restore if the storage size is different from the parent" do
-      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
-      parent = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
-      parent.update(target_storage_size_gib: 1024)
-      expect(parent.timeline).to receive(:earliest_restore_time).and_return(Time.now - 10 * 60)
-      expect(PostgresResource).to receive(:[]).with(parent.id).and_return(parent).at_least(:once)
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: parent.timeline.id, timeline_access: "fetch")).and_return(instance_double(Strand, subject: postgres_resource.representative_server))
-
-      expect {
-        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 1024, parent_id: parent.id, restore_target: Time.now)
-      }.not_to raise_error
-
-      expect {
-        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 2048, parent_id: parent.id, restore_target: Time.now)
-      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: storage_size"
     end
 
     it "passes timeline of parent resource if parent is passed" do
@@ -236,9 +209,10 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "naps if there are children" do
+      st.update(prog: "Postgres::PostgresResourceNexus", label: "initialize_certificates", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "Postgres::PostgresResourceNexus", label: "trigger_pg_current_xact_id_on_parent", stack: [{}], lease: Time.now + 10)
       expect(Util).to receive(:create_root_certificate).twice
       expect(nx).to receive(:create_certificate)
-      expect(nx).to receive(:leaf?).and_return(false)
       expect { nx.initialize_certificates }.to nap(5)
     end
   end

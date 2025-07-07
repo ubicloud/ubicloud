@@ -8,7 +8,7 @@ RSpec.describe Clover, "cli pg add-firewall-rule" do
   end
 
   it "adds a firewall rule to the database" do
-    cli(%w[pg eu-central-h1/test-pg create])
+    cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
     pg = PostgresResource.first
     expect(pg.firewall_rules_dataset.select_order_map(:cidr).map(&:to_s)).to eq %w[0.0.0.0/0]
     expect(cli(%w[pg eu-central-h1/test-pg add-firewall-rule 1.2.3.0/24])).to eq <<~END

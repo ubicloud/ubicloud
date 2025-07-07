@@ -12,7 +12,9 @@ RSpec.describe PostgresServer do
       PostgresResource,
       representative_server: postgres_server,
       identity: "pgubid.postgres.ubicloud.com",
-      ha_type: PostgresResource::HaType::NONE
+      ha_type: PostgresResource::HaType::NONE,
+      user_config: {},
+      pgbouncer_user_config: {}
     )
   }
 
@@ -34,7 +36,8 @@ RSpec.describe PostgresServer do
       nics: [
         instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.70.205.205/32"))
       ],
-      private_ipv4: NetAddr::IPv4Net.parse("10.70.205.205/32").network
+      private_ipv4: NetAddr::IPv4Net.parse("10.70.205.205/32").network,
+      location: instance_double(Location, aws?: false)
     )
   }
 
@@ -109,23 +112,25 @@ RSpec.describe PostgresServer do
   end
 
   describe "#trigger_failover" do
-    it "fails if server is not primary" do
-      expect(postgres_server).to receive(:representative_at).and_return(false)
-      expect(postgres_server.trigger_failover).to be_falsey
+    it "logs error when server is not primary" do
+      expect(postgres_server).to receive(:representative_at).and_return(nil)
+      expect(Clog).to receive(:emit).with("Cannot trigger failover on a non-representative server")
+      expect(postgres_server.trigger_failover(mode: "planned")).to be false
     end
 
-    it "fails if there is no suitable standby" do
-      expect(postgres_server).to receive(:representative_at).and_return(true)
+    it "logs error when no suitable standby found" do
+      expect(postgres_server).to receive(:representative_at).and_return(Time.now)
       expect(postgres_server).to receive(:failover_target).and_return(nil)
-      expect(postgres_server.trigger_failover).to be_falsey
+      expect(Clog).to receive(:emit).with("No suitable standby found for failover")
+      expect(postgres_server.trigger_failover(mode: "planned")).to be false
     end
 
-    it "increments take over semaphore" do
+    it "returns true only when failover is successfully triggered" do
       standby = instance_double(described_class)
-      expect(postgres_server).to receive(:representative_at).and_return(true)
+      expect(postgres_server).to receive(:representative_at).and_return(Time.now)
       expect(postgres_server).to receive(:failover_target).and_return(standby)
-      expect(standby).to receive(:incr_take_over)
-      expect(postgres_server.trigger_failover).to be_truthy
+      expect(standby).to receive(:incr_planned_take_over)
+      expect(postgres_server.trigger_failover(mode: "planned")).to be true
     end
   end
 
@@ -227,16 +232,16 @@ RSpec.describe PostgresServer do
   describe "storage_size_gib" do
     it "returns the storage size in GiB" do
       volume_dataset = instance_double(Sequel::Dataset)
-      expect(volume_dataset).to receive(:first).and_return(instance_double(VmStorageVolume, boot: false, size_gib: 64))
+      expect(volume_dataset).to receive(:reject).and_return([instance_double(VmStorageVolume, boot: false, size_gib: 64)])
       expect(vm).to receive(:vm_storage_volumes_dataset).and_return(volume_dataset)
       expect(postgres_server.storage_size_gib).to eq(64)
     end
 
     it "returns nil if there is no storage volume" do
       volume_dataset = instance_double(Sequel::Dataset)
-      expect(volume_dataset).to receive(:first).and_return(nil)
+      expect(volume_dataset).to receive(:reject).and_return([])
       expect(vm).to receive(:vm_storage_volumes_dataset).and_return(volume_dataset)
-      expect(postgres_server.storage_size_gib).to be_nil
+      expect(postgres_server.storage_size_gib).to be_zero
     end
   end
 
@@ -252,6 +257,20 @@ RSpec.describe PostgresServer do
     it "returns true if the diff is less than 80MB" do
       expect(postgres_server).to receive(:read_replica?).and_return(true)
       expect(postgres_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
+      expect(postgres_server.lsn_caught_up).to be_truthy
+    end
+
+    it "returns true if read replica and the parent representative server is nil" do
+      expect(postgres_server).to receive(:read_replica?).and_return(true)
+      expect(parent_resource).to receive(:representative_server).and_return(nil)
+      expect(postgres_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F").twice
+      expect(postgres_server.lsn_caught_up).to be_truthy
+    end
+
+    it "returns true if read replica and the parent is nil" do
+      expect(postgres_server).to receive(:read_replica?).and_return(true)
+      expect(postgres_server.resource).to receive(:parent).and_return(nil)
+      expect(postgres_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F").twice
       expect(postgres_server.lsn_caught_up).to be_truthy
     end
 
@@ -365,7 +384,7 @@ RSpec.describe PostgresServer do
     expect(PostgresLsnMonitor).to receive(:new).and_return(lsn_monitor)
     expect(lsn_monitor).to receive(:insert_conflict).and_return(lsn_monitor)
     expect(lsn_monitor).to receive(:save_changes).and_raise(Sequel::Error)
-    expect(Clog).to receive(:emit).with("Failed to update PostgresLsnMonitor")
+    expect(Clog).to receive(:emit).with("Failed to update PostgresLsnMonitor").and_call_original
     expect(postgres_server).to receive(:primary?).and_return(true)
     postgres_server.check_pulse(session: {db_connection: DB}, previous_pulse: {})
   end
@@ -373,5 +392,29 @@ RSpec.describe PostgresServer do
   it "runs query on vm" do
     expect(postgres_server.vm.sshable).to receive(:cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: "SELECT 1").and_return("1\n")
     expect(postgres_server.run_query("SELECT 1")).to eq("1")
+  end
+
+  it "returns the right storage_device_paths for AWS" do
+    expect(postgres_server.vm.location).to receive(:aws?).and_return(true)
+    expect(postgres_server.vm).to receive(:vm_storage_volumes).and_return([instance_double(VmStorageVolume, boot: true, device_path: "/dev/vda"), instance_double(VmStorageVolume, boot: false, device_path: "/dev/nvme1n1"), instance_double(VmStorageVolume, boot: false, device_path: "/dev/nvme2n1")])
+    expect(postgres_server.vm.sshable).to receive(:cmd).with("lsblk -b -d -o NAME,SIZE | sort -n -k2 | tail -n2 |  awk '{print \"/dev/\"$1}'").and_return("/dev/nvme1n1\n/dev/nvme2n1\n")
+    expect(postgres_server.storage_device_paths).to eq(["/dev/nvme1n1", "/dev/nvme2n1"])
+  end
+
+  it "returns the right storage_device_paths for Hetzner" do
+    expect(postgres_server.vm).to receive(:vm_storage_volumes).and_return([instance_double(VmStorageVolume, boot: false, device_path: "/dev/vdb")])
+    expect(postgres_server.storage_device_paths).to eq(["/dev/vdb"])
+  end
+
+  describe "#taking_over?" do
+    it "returns true if the strand label is 'taking_over'" do
+      expect(postgres_server).to receive(:strand).and_return(instance_double(Strand, label: "taking_over"))
+      expect(postgres_server.taking_over?).to be true
+    end
+
+    it "returns false if the strand label is not 'wait'" do
+      expect(postgres_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      expect(postgres_server.taking_over?).to be false
+    end
   end
 end

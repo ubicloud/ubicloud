@@ -18,7 +18,7 @@ class LoadBalancer < Sequel::Model
 
   plugin :association_dependencies, load_balancers_vms: :destroy, ports: :destroy, certs_load_balancers: :destroy
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
   include ObjectTag::Cleanup
   dataset_module Pagination
@@ -33,16 +33,20 @@ class LoadBalancer < Sequel::Model
   end
 
   def vm_ports_by_vm(vm)
-    vm_ports_dataset.where(load_balancer_vm_id: load_balancers_vms_dataset.where(vm_id: vm.id).select(:id))
+    # Use subquery instead of joins as this is the basis for a dataset that will be used in an UPDATE query
+    LoadBalancerVmPort.where(
+      load_balancer_port_id: ports_dataset.select(:id),
+      load_balancer_vm_id: vms_dataset.where(vm_id: vm.id).select(Sequel[:load_balancers_vms][:id])
+    )
   end
 
   def vm_ports_by_vm_and_state(vm, state)
-    vm_ports_dataset.where(load_balancer_vm_id: load_balancers_vms_dataset.where(vm_id: vm.id).select(:id), state:)
+    vm_ports_by_vm(vm).where(state:)
   end
 
   def add_port(src_port, dst_port)
     DB.transaction do
-      port = LoadBalancerPort.create(load_balancer_id: id, src_port:, dst_port:)
+      port = super(src_port:, dst_port:)
       load_balancers_vms.each do |lb_vm|
         LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: lb_vm.id)
       end
@@ -53,7 +57,7 @@ class LoadBalancer < Sequel::Model
   def remove_port(port)
     DB.transaction do
       vm_ports_dataset.where(load_balancer_port_id: port.id).destroy
-      port.destroy
+      ports_dataset.where(id: port.id).destroy
       incr_update_load_balancer
     end
   end
@@ -64,28 +68,30 @@ class LoadBalancer < Sequel::Model
       ports.each { |port|
         LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: load_balancer_vm.id)
       }
-      Strand.create_with_id(prog: "Vnet::CertServer", label: "put_certificate", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id)
+      Strand.create(prog: "Vnet::CertServer", label: "put_certificate", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id) if cert_enabled_lb?
       incr_rewrite_dns_records
     end
   end
 
   def detach_vm(vm)
     DB.transaction do
-      ids_to_update = vm_ports_by_vm_and_state(vm, ["up", "down", "evacuating"]).map(&:id)
-      LoadBalancerVmPort.where(id: ids_to_update).update(state: "detaching")
-      Strand.create_with_id(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id)
+      vm_ports_by_vm_and_state(vm, ["up", "down", "evacuating"]).update(state: "detaching")
+      remove_cert_server(vm.id)
       incr_update_load_balancer
     end
   end
 
   def evacuate_vm(vm)
     DB.transaction do
-      ids_to_update = vm_ports_by_vm_and_state(vm, ["up", "down"]).map(&:id)
-      LoadBalancerVmPort.where(id: ids_to_update).update(state: "evacuating")
-      Strand.create_with_id(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id)
+      vm_ports_by_vm_and_state(vm, ["up", "down"]).update(state: "evacuating")
+      remove_cert_server(vm.id)
       incr_update_load_balancer
       incr_rewrite_dns_records
     end
+  end
+
+  def remove_cert_server(vm_id)
+    Strand.create(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id:}], parent_id: id) if cert_enabled_lb?
   end
 
   def remove_vm(vm)
@@ -98,7 +104,7 @@ class LoadBalancer < Sequel::Model
 
   def remove_vm_port(vm_port)
     DB.transaction do
-      LoadBalancerVmPort.where(id: vm_port.id).destroy
+      vm_ports_dataset.where(Sequel[:load_balancer_vm_port][:id] => vm_port.id).destroy
       if vm_ports_dataset.where(load_balancer_vm_id: vm_port.load_balancer_vm_id).count.zero?
         load_balancers_vms_dataset[id: vm_port.load_balancer_vm_id].destroy
       end
@@ -114,14 +120,18 @@ class LoadBalancer < Sequel::Model
     custom_hostname_dns_zone || DnsZone[project_id: Config.load_balancer_service_project_id, name: Config.load_balancer_service_hostname]
   end
 
-  def need_certificates?
-    return true if certs_dataset.empty?
+  def cert_enabled_lb?
+    health_check_protocol == "https"
+  end
 
-    certs_dataset.where { created_at > Time.now - 60 * 60 * 24 * 30 * 2 }.exclude(cert: nil).empty?
+  def need_certificates?
+    return false unless cert_enabled_lb?
+
+    certs_dataset.with_cert.needing_recert.empty?
   end
 
   def active_cert
-    certs_dataset.where { created_at > Time.now - 60 * 60 * 24 * 30 * 3 }.exclude(cert: nil).order(Sequel.desc(:created_at)).first
+    certs_dataset.with_cert.active.by_most_recent.first
   end
 
   def ipv4_enabled?
@@ -141,20 +151,21 @@ end
 
 # Table: load_balancer
 # Columns:
-#  id                          | uuid           | PRIMARY KEY
-#  name                        | text           | NOT NULL
-#  algorithm                   | lb_algorithm   | NOT NULL DEFAULT 'round_robin'::lb_algorithm
-#  private_subnet_id           | uuid           | NOT NULL
-#  health_check_endpoint       | text           | NOT NULL
-#  health_check_interval       | integer        | NOT NULL DEFAULT 10
-#  health_check_timeout        | integer        | NOT NULL DEFAULT 5
-#  health_check_up_threshold   | integer        | NOT NULL DEFAULT 5
-#  health_check_down_threshold | integer        | NOT NULL DEFAULT 3
-#  health_check_protocol       | lb_hc_protocol | NOT NULL DEFAULT 'http'::lb_hc_protocol
-#  custom_hostname             | text           |
-#  custom_hostname_dns_zone_id | uuid           |
-#  stack                       | lb_stack       | NOT NULL DEFAULT 'dual'::lb_stack
-#  project_id                  | uuid           | NOT NULL
+#  id                          | uuid                     | PRIMARY KEY
+#  name                        | text                     | NOT NULL
+#  algorithm                   | lb_algorithm             | NOT NULL DEFAULT 'round_robin'::lb_algorithm
+#  private_subnet_id           | uuid                     | NOT NULL
+#  health_check_endpoint       | text                     | NOT NULL
+#  health_check_interval       | integer                  | NOT NULL DEFAULT 10
+#  health_check_timeout        | integer                  | NOT NULL DEFAULT 5
+#  health_check_up_threshold   | integer                  | NOT NULL DEFAULT 5
+#  health_check_down_threshold | integer                  | NOT NULL DEFAULT 3
+#  health_check_protocol       | lb_hc_protocol           | NOT NULL DEFAULT 'http'::lb_hc_protocol
+#  custom_hostname             | text                     |
+#  custom_hostname_dns_zone_id | uuid                     |
+#  stack                       | lb_stack                 | NOT NULL DEFAULT 'dual'::lb_stack
+#  project_id                  | uuid                     | NOT NULL
+#  created_at                  | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 # Indexes:
 #  load_balancer_pkey                        | PRIMARY KEY btree (id)
 #  load_balancer_custom_hostname_key         | UNIQUE btree (custom_hostname)
@@ -175,5 +186,6 @@ end
 #  inference_endpoint   | inference_endpoint_load_balancer_id_fkey   | (load_balancer_id) REFERENCES load_balancer(id)
 #  inference_router     | inference_router_load_balancer_id_fkey     | (load_balancer_id) REFERENCES load_balancer(id)
 #  kubernetes_cluster   | kubernetes_cluster_api_server_lb_id_fkey   | (api_server_lb_id) REFERENCES load_balancer(id)
+#  kubernetes_cluster   | kubernetes_cluster_services_lb_id_fkey     | (services_lb_id) REFERENCES load_balancer(id)
 #  load_balancer_port   | load_balancer_port_load_balancer_id_fkey   | (load_balancer_id) REFERENCES load_balancer(id)
 #  load_balancers_vms   | load_balancers_vms_load_balancer_id_fkey   | (load_balancer_id) REFERENCES load_balancer(id)

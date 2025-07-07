@@ -180,7 +180,8 @@ RSpec.describe Prog::Vm::HostNexus do
         Prog::LearnPci,
         Prog::InstallDnsmasq,
         Prog::SetupSysstat,
-        Prog::SetupNftables
+        Prog::SetupNftables,
+        Prog::SetupNodeExporter
       ])
     end
 
@@ -197,41 +198,49 @@ RSpec.describe Prog::Vm::HostNexus do
     end
   end
 
+  describe "#os_supports_slices?" do
+    it "returns true if the OS supports slices" do
+      expect(nx.os_supports_slices?("ubuntu-22.04")).to be false
+      expect(nx.os_supports_slices?("ubuntu-24.04")).to be true
+    end
+  end
+
   describe "#wait_prep" do
     it "updates the vm_host record from the finished programs" do
-      expect(nx).to receive(:leaf?).and_return(true)
-      expect(vm_host).to receive(:update).with(total_mem_gib: 1)
-      expect(vm_host).to receive(:update).with(os_version: "ubuntu-22.04")
-      expect(vm_host).to receive(:update).with(arch: "arm64", total_cores: 4, total_cpus: 5, total_dies: 3, total_sockets: 2)
-      expect(nx).to receive(:reap).and_return([
-        instance_double(Strand, prog: "LearnMemory", exitval: {"mem_gib" => 1}),
-        instance_double(Strand, prog: "LearnOs", exitval: {"os_version" => "ubuntu-22.04"}),
-        instance_double(Strand, prog: "LearnCpu", exitval: {"arch" => "arm64", "total_sockets" => 2, "total_dies" => 3, "total_cores" => 4, "total_cpus" => 5}),
-        instance_double(Strand, prog: "ArbitraryOtherProg")
-      ])
+      Strand.create(parent_id: st.id, prog: "LearnMemory", label: "start", stack: [{}], exitval: {"mem_gib" => 1})
+      Strand.create(parent_id: st.id, prog: "LearnOs", label: "start", stack: [{}], exitval: {"os_version" => "ubuntu-22.04"})
+      Strand.create(parent_id: st.id, prog: "LearnCpu", label: "start", stack: [{}], exitval: {"arch" => "arm64", "total_sockets" => 2, "total_dies" => 3, "total_cores" => 4, "total_cpus" => 5})
+      Strand.create(parent_id: st.id, prog: "ArbitraryOtherProg", label: "start", stack: [{}], exitval: {})
 
-      (0..4).each do |i|
-        expect(VmHostCpu).to receive(:create).with(vm_host_id: vm_host.id, cpu_number: i, spdk: i < 2)
-      end
-
+      vm_host = st.subject
+      nx.singleton_class.remove_method(:vm_host)
+      nx.define_singleton_method(:vm_host) { vm_host }
       expect { nx.wait_prep }.to hop("setup_hugepages")
+
+      vm_host.reload
+      expect(vm_host.total_mem_gib).to eq 1
+      expect(vm_host.os_version).to eq "ubuntu-22.04"
+      expect(vm_host.arch).to eq "arm64"
+      expect(vm_host.total_cores).to eq 4
+      expect(vm_host.total_cpus).to eq 5
+      expect(vm_host.total_dies).to eq 3
+      expect(vm_host.total_sockets).to eq 2
+      expect(VmHostCpu.where(vm_host_id: vm_host.id).select_order_map([:cpu_number, :spdk])).to eq [[0, true], [1, true], [2, false], [3, false], [4, false]]
     end
 
     it "crashes if an expected field is not set for LearnMemory" do
-      expect(nx).to receive(:reap).and_return([instance_double(Strand, prog: "LearnMemory", exitval: {})])
+      Strand.create(parent_id: st.id, prog: "LearnMemory", label: "start", stack: [{}], exitval: {})
       expect { nx.wait_prep }.to raise_error KeyError, "key not found: \"mem_gib\""
     end
 
     it "crashes if an expected field is not set for LearnCpu" do
-      expect(nx).to receive(:reap).and_return([instance_double(Strand, prog: "LearnCpu", exitval: {})])
+      Strand.create(parent_id: st.id, prog: "LearnCpu", label: "start", stack: [{}], exitval: {})
       expect { nx.wait_prep }.to raise_error KeyError, "key not found: \"arch\""
     end
 
     it "donates to children if they are not exited yet" do
-      expect(nx).to receive(:reap).and_return([])
-      expect(nx).to receive(:leaf?).and_return(false)
-      expect(nx).to receive(:donate).and_call_original
-      expect { nx.wait_prep }.to nap(1)
+      Strand.create(parent_id: st.id, prog: "LearnCpu", label: "start", stack: [{}], lease: Time.now + 10)
+      expect { nx.wait_prep }.to nap(120)
     end
   end
 
@@ -283,18 +292,12 @@ RSpec.describe Prog::Vm::HostNexus do
 
   describe "#wait_download_boot_images" do
     it "hops to prep_reboot if all tasks are done" do
-      expect(nx).to receive(:reap).and_return([])
-      expect(nx).to receive(:leaf?).and_return true
-
       expect { nx.wait_download_boot_images }.to hop("prep_reboot")
     end
 
     it "donates its time if child strands are still running" do
-      expect(nx).to receive(:reap).and_return([])
-      expect(nx).to receive(:leaf?).and_return false
-      expect(nx).to receive(:donate).and_call_original
-
-      expect { nx.wait_download_boot_images }.to nap(1)
+      Strand.create(parent_id: st.id, prog: "DownloadBootImage", label: "start", stack: [{}], lease: Time.now + 10)
+      expect { nx.wait_download_boot_images }.to nap(120)
     end
   end
 
@@ -316,6 +319,11 @@ RSpec.describe Prog::Vm::HostNexus do
     it "hops to prep_hardware_reset when needed" do
       expect(nx).to receive(:when_hardware_reset_set?).and_yield
       expect { nx.wait }.to hop("prep_hardware_reset")
+    end
+
+    it "hops to configure_metrics when needed" do
+      expect(nx).to receive(:when_configure_metrics_set?).and_yield
+      expect { nx.wait }.to hop("configure_metrics")
     end
 
     it "hops to unavailable based on the host's available status" do
@@ -399,6 +407,22 @@ RSpec.describe Prog::Vm::HostNexus do
     end
   end
 
+  describe "configure metrics" do
+    it "configures the metrics and hops to wait" do
+      metrics_config = {
+        metrics_dir: "/home/rhizome/host/metrics"
+      }
+      allow(vm_host).to receive(:metrics_config).and_return(metrics_config)
+      expect(sshable).to receive(:cmd).with("mkdir -p /home/rhizome/host/metrics")
+      expect(sshable).to receive(:cmd).with("tee /home/rhizome/host/metrics/config.json > /dev/null", stdin: metrics_config.to_json)
+      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/vmhost-metrics.service > /dev/null", stdin: "[Unit]\nDescription=VmHost Metrics Collection\nAfter=network-online.target\n\n[Service]\nType=oneshot\nUser=rhizome\nExecStart=/home/rhizome/common/bin/metrics-collector /home/rhizome/host/metrics\nStandardOutput=journal\nStandardError=journal\n")
+      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/vmhost-metrics.timer > /dev/null", stdin: "[Unit]\nDescription=Run VmHost Metrics Collection Periodically\n\n[Timer]\nOnBootSec=30s\nOnUnitActiveSec=15s\nAccuracySec=1s\n\n[Install]\nWantedBy=timers.target\n")
+      expect(sshable).to receive(:cmd).with("sudo systemctl daemon-reload")
+      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now vmhost-metrics.timer")
+      expect { nx.configure_metrics }.to hop("wait")
+    end
+  end
+
   describe "host reboot" do
     it "prep_reboot transitions to reboot" do
       expect(nx).to receive(:get_boot_id).and_return("xyz")
@@ -454,7 +478,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(vms).to all receive(:incr_start_after_host_reboot)
       expect(vm_host).to receive(:allocation_state).and_return("unprepared")
       expect(vm_host).to receive(:update).with(allocation_state: "accepting")
-      expect { nx.start_vms }.to hop("wait")
+      expect { nx.start_vms }.to hop("configure_metrics")
     end
 
     it "start_vms starts vms & becomes accepting & hops to wait if was draining an in graceful reboot" do
@@ -462,7 +486,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:when_graceful_reboot_set?).and_yield
       expect(vms).to all receive(:incr_start_after_host_reboot)
       expect(vm_host).to receive(:update).with(allocation_state: "accepting")
-      expect { nx.start_vms }.to hop("wait")
+      expect { nx.start_vms }.to hop("configure_metrics")
     end
 
     it "start_vms starts vms & raises if not in draining and in graceful reboot" do
@@ -472,16 +496,16 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.start_vms }.to raise_error(RuntimeError)
     end
 
-    it "start_vms starts vms & hops to wait if accepting" do
+    it "start_vms starts vms & hops to configure_metrics if accepting" do
       expect(vms).to all receive(:incr_start_after_host_reboot)
       expect(vm_host).to receive(:allocation_state).and_return("accepting")
-      expect { nx.start_vms }.to hop("wait")
+      expect { nx.start_vms }.to hop("configure_metrics")
     end
 
     it "start_vms starts vms & hops to wait if draining" do
       expect(vms).to all receive(:incr_start_after_host_reboot)
       expect(vm_host).to receive(:allocation_state).and_return("draining")
-      expect { nx.start_vms }.to hop("wait")
+      expect { nx.start_vms }.to hop("configure_metrics")
     end
 
     it "can get boot id" do

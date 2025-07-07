@@ -60,13 +60,13 @@ end
     fail Nap.new(seconds)
   end
 
-  def pop(*args)
+  def pop(arg)
     outval = Sequel.pg_jsonb_wrap(
-      case args
-      in [String => s]
-        {"msg" => s}
-      in [Hash => h]
-        h
+      case arg
+      when String
+        {"msg" => arg}
+      when Hash
+        arg
       else
         fail "BUG: must pop with string or hash"
       end
@@ -182,34 +182,78 @@ end
     )
   end
 
-  def donate
-    strand.children.map(&:run)
-    nap 1
-  end
+  # Process child strands
+  #
+  # Reapable children (child strands that have exited) are destroyed.
+  # If a reaper argument is given, it is called with each child after
+  # the child is destroyed.
+  #
+  # If there are no reapable children:
+  #
+  # * If hop is given: hops to the target
+  # * If block is given: yields to block
+  #
+  # If there are still active children:
+  #
+  # * If fallthrough is given: returns nil
+  # * If nap is given: naps for given time
+  # * Otherwise, donates to run a child process
+  def reap(hop = nil, reaper: nil, nap: nil, fallthrough: false)
+    children = strand
+      .children_dataset
+      .select_append(Sequel.lit("lease < now() AND exitval IS NOT NULL").as(:reapable))
+      .all
 
-  def reap
-    reapable = strand.children_dataset.where(
-      Sequel.lit("(lease IS NULL OR lease < now()) AND exitval IS NOT NULL")
-    ).all
+    reapable_children, active_children = children.partition { it.values.delete(:reapable) }
 
-    reaped_ids = reapable.map do |child|
+    reapable_children.each do |child|
       # Clear any semaphores that get added to a exited Strand prog,
       # since incr is entitled to be run at *any time* (including
       # after exitval is set, though it doesn't do anything) and any
       # such incements will prevent deletion of a Strand via
       # foreign_key
-      Semaphore.where(strand_id: child.id).destroy
+      child.semaphores_dataset.destroy
       child.destroy
-      child.id
-    end.freeze
+      reaper&.call(child)
+    end
 
-    strand.children.delete_if { reaped_ids.include?(it.id) }
+    # Parent is now a leaf, hop to given label, or yield if no label
+    if active_children.empty?
+      if hop
+        dynamic_hop(hop)
+      elsif block_given?
+        yield
+      end
+    end
 
-    reapable
-  end
+    unless fallthrough
+      # Parent is not a leaf, nap for given time, or donate if no
+      # nap time is given.
+      if nap
+        nap(nap)
+      else
+        active_children.each do |child|
+          nap 0 if child.run
+        end
 
-  def leaf?
-    strand.children.empty?
+        schedule = strand.schedule
+
+        # Lock this parent strand. This is run inside a transaction,
+        # and will make exited child strands attempting to update the
+        # parent's schedule block until the transaction commits.
+        strand.lock!(:no_key_update)
+
+        # lock! does an implicit reload, so check the new schedule
+        new_schedule = strand.schedule
+
+        # In case the exiting child updated the parent schedule before
+        # the lock, check whether the schedule changed. If the schedule
+        # changed, assume it was set to CURRENT_TIMESTAMP, and nap 0.
+        # Otherwise, nap for 120s and rely on the exiting child strand
+        # scheduling this parent sooner in most cases.
+        nap((schedule != new_schedule) ? 0 : 120)
+      end
+    end
   end
 
   # A hop is a kind of jump, as in, like a jump instruction.

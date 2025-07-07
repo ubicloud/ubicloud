@@ -28,31 +28,29 @@ class PrivateSubnet < Sequel::Model
   include ObjectTag::Cleanup
 
   def connected_subnets
-    PrivateSubnet.where(
-      id: DB[:connected_subnet].where(subnet_id_1: id).or(subnet_id_2: id).select(Sequel.case({{subnet_id_1: id} => :subnet_id_2}, :subnet_id_1))
-    ).all
+    PrivateSubnet
+      .where(id: DB[:connected_subnet].where(id => [:subnet_id_1, :subnet_id_2]).select(Sequel.case({id => :subnet_id_2}, :subnet_id_1, :subnet_id_1)))
+      .all
   end
 
   def all_nics
     nics + connected_subnets.flat_map(&:nics)
   end
 
-  def destroy
-    DB.transaction do
-      FirewallsPrivateSubnets.where(private_subnet_id: id).all.each(&:destroy)
-      super
-    end
+  def before_destroy
+    FirewallsPrivateSubnets.where(private_subnet_id: id).destroy
+    super
   end
 
   def display_location
-    Location[location_id].display_name
+    location.display_name
   end
 
   def path
     "/location/#{display_location}/private-subnet/#{name}"
   end
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   def self.ubid_to_name(ubid)
     ubid.to_s[0..7]
@@ -116,8 +114,7 @@ class PrivateSubnet < Sequel::Model
   end
 
   def connect_subnet(subnet)
-    small_id_ps, large_id_ps = [self, subnet].sort_by(&:id)
-    ConnectedSubnet.create_with_id(subnet_id_1: small_id_ps.id, subnet_id_2: large_id_ps.id)
+    ConnectedSubnet.create(subnet_hash(subnet))
     nics.each do |nic|
       create_tunnels(subnet.nics, nic)
     end
@@ -125,13 +122,12 @@ class PrivateSubnet < Sequel::Model
   end
 
   def disconnect_subnet(subnet)
-    small_id_ps, large_id_ps = [self, subnet].sort_by(&:id)
-    nics.each do |nic|
+    nics(eager: {src_ipsec_tunnels: [:src_nic, :dst_nic]}, dst_ipsec_tunnels: [:src_nic, :dst_nic]).each do |nic|
       (nic.src_ipsec_tunnels + nic.dst_ipsec_tunnels).each do |tunnel|
         tunnel.destroy if tunnel.src_nic.private_subnet_id == subnet.id || tunnel.dst_nic.private_subnet_id == subnet.id
       end
     end
-    ConnectedSubnet.where(subnet_id_1: small_id_ps.id, subnet_id_2: large_id_ps.id).all.map(&:destroy)
+    ConnectedSubnet.where(subnet_hash(subnet)).destroy
     subnet.incr_refresh_keys
     incr_refresh_keys
   end
@@ -144,8 +140,22 @@ class PrivateSubnet < Sequel::Model
     end
   end
 
-  def find_all_connected_nics(excluded_private_subnet_ids = [])
-    nics + connected_subnets.select { |subnet| !excluded_private_subnet_ids.include?(subnet.id) }.flat_map { it.find_all_connected_nics(excluded_private_subnet_ids + [id]) }.uniq
+  def find_all_connected_nics
+    Nic
+      .where(private_subnet_id: DB[:subnet].exclude(:is_cycle).select(:id))
+      .with_recursive(:subnet,
+        this.select(:id),
+        DB[:connected_subnet]
+          .join(:subnet, {id: [:subnet_id_1, :subnet_id_2]})
+          .select(Sequel.case({subnet_id_1: :subnet_id_2}, :subnet_id_1, Sequel[:subnet][:id])),
+        cycle: {columns: :id})
+  end
+
+  private
+
+  def subnet_hash(subnet)
+    small_id_ps, large_id_ps = [self, subnet].sort_by(&:id)
+    {subnet_id_1: small_id_ps.id, subnet_id_2: large_id_ps.id}
   end
 end
 

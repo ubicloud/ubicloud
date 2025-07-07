@@ -5,19 +5,27 @@ class Clover
     authorize("Postgres:create", @project.id)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
-    Validation.validate_postgres_location(@location, @project.id)
+    flavor = typecast_params.nonempty_str("flavor", PostgresResource::Flavor::STANDARD)
+    size = typecast_params.nonempty_str!("size")
+    storage_size = typecast_params.pos_int("storage_size")
+    ha_type = typecast_params.nonempty_str("ha_type", PostgresResource::HaType::NONE)
+    version = typecast_params.nonempty_str("version", PostgresResource::DEFAULT_VERSION)
 
-    params = check_required_web_params(%w[size name location])
-    parsed_size = Validation.validate_postgres_size(@location, params["size"], @project.id)
+    postgres_params = {
+      "flavor" => flavor,
+      "location" => @location,
+      "family" => Option::POSTGRES_SIZE_OPTIONS[size]&.family,
+      "size" => size,
+      "storage_size" => storage_size.to_s,
+      "ha_type" => ha_type,
+      "version" => version
+    }
 
-    ha_type = params["ha_type"] || PostgresResource::HaType::NONE
-    requested_standby_count = case ha_type
-    when PostgresResource::HaType::ASYNC then 1
-    when PostgresResource::HaType::SYNC then 2
-    else 0
-    end
+    validate_postgres_input(name, postgres_params)
 
-    requested_postgres_vcpu_count = (requested_standby_count + 1) * parsed_size.vcpu
+    parsed_size = Option::POSTGRES_SIZE_OPTIONS[postgres_params["size"]]
+    requested_standby_count = Option::POSTGRES_HA_OPTIONS[postgres_params["ha_type"]].standby_count
+    requested_postgres_vcpu_count = (requested_standby_count + 1) * parsed_size.vcpu_count
     Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count)
 
     pg = nil
@@ -26,11 +34,11 @@ class Clover
         project_id: @project.id,
         location_id: @location.id,
         name:,
-        target_vm_size: parsed_size.vm_size,
-        target_storage_size_gib: params["storage_size"] || parsed_size.storage_size_options.first,
-        ha_type: params["ha_type"] || PostgresResource::HaType::NONE,
-        version: params["version"] || PostgresResource::DEFAULT_VERSION,
-        flavor: params["flavor"] || PostgresResource::Flavor::STANDARD
+        target_vm_size: parsed_size.name,
+        target_storage_size_gib: storage_size,
+        ha_type:,
+        version:,
+        flavor:
       ).subject
       audit_log(pg, "create")
     end
@@ -40,7 +48,7 @@ class Clover
       Serializers::Postgres.serialize(pg, {detailed: true})
     else
       flash["notice"] = "'#{name}' will be ready in a few minutes"
-      request.redirect "#{@project.path}#{pg.path}"
+      request.redirect "#{@project.path}#{pg.path}/overview"
     end
   end
 
@@ -48,16 +56,7 @@ class Clover
     dataset = dataset_authorize(@project.postgres_resources_dataset.eager, "Postgres:view").eager(:semaphores, :location, strand: :children)
     if api?
       dataset = dataset.where(location_id: @location.id) if @location
-      result = dataset.paginated_result(
-        start_after: request.params["start_after"],
-        page_size: request.params["page_size"],
-        order_column: request.params["order_column"]
-      )
-
-      {
-        items: Serializers::Postgres.serialize(result[:records]),
-        count: result[:count]
-      }
+      paginated_result(dataset, Serializers::Postgres)
     else
       dataset = dataset.eager(:representative_server, :timeline)
       resources = dataset.all
@@ -85,77 +84,67 @@ class Clover
     end
   end
 
-  def generate_postgres_options(flavor: "standard")
+  def generate_postgres_options(flavor: nil, location: nil)
     options = OptionTreeGenerator.new
-    all_sizes_for_project = Option.customer_postgres_sizes_for_project(@project.id)
 
     options.add_option(name: "name")
-    options.add_option(name: "flavor", values: flavor)
-    options.add_option(name: "location", values: Option.postgres_locations(project_id: @project.id), parent: "flavor") do |flavor, location|
-      !(location.provider == "aws" && flavor != PostgresResource::Flavor::STANDARD)
+
+    options.add_option(name: "flavor", values: flavor || postgres_flavors.keys)
+
+    options.add_option(name: "location", values: location || postgres_locations, parent: "flavor") do |flavor, location|
+      flavor == PostgresResource::Flavor::STANDARD || location.provider != "aws"
     end
-    options.add_option(name: "family", values: all_sizes_for_project.map(&:vm_family).uniq, parent: "location") do |flavor, location, family|
-      if location.provider == "aws" && family != "standard"
-        false
+
+    options.add_option(name: "family", values: Option::POSTGRES_FAMILY_OPTIONS.keys, parent: "location") do |flavor, location, family|
+      if location.aws?
+        family == "m6id" || (Option::AWS_FAMILY_OPTIONS.include?(family) && @project.send(:"get_ff_enable_#{family}"))
       else
-        available_families = Option.families.map(&:name)
-        available_families.include?(family) && BillingRate.from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name)
-      end
-    end
-    options.add_option(name: "size", values: all_sizes_for_project.map(&:name).uniq, parent: "family") do |flavor, location, family, size|
-      if location.provider == "aws" && (size.split("-").last.to_i > 16 || size.split("-").first == "burstable")
-        false
-      else
-        pg_size = all_sizes_for_project.find { it.name == size && it.flavor == flavor && it.location_id == location.id }
-        vm_size = Option::VmSizes.find { it.name == pg_size.vm_size && it.arch == "x64" && it.visible }
-        vm_size.family == family
+        family == "standard" || family == "burstable"
       end
     end
 
-    options.add_option(name: "storage_size", values: ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096", "118", "237", "475", "950", "1781", "1900", "3562", "3800"], parent: "size") do |flavor, location, family, size, storage_size|
-      pg_size = all_sizes_for_project.find { it.name == size && it.flavor == flavor && it.location_id == location.id }
-      pg_size.storage_size_options.include?(storage_size.to_i)
+    options.add_option(name: "size", values: Option::POSTGRES_SIZE_OPTIONS.keys, parent: "family") do |flavor, location, family, size|
+      Option::POSTGRES_SIZE_OPTIONS[size].family == family
     end
 
-    options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS[flavor], parent: "flavor")
+    storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS + Option::AWS_STORAGE_SIZE_OPTIONS.values.flatten.uniq
+    options.add_option(name: "storage_size", values: storage_size_options, parent: "size") do |flavor, location, family, size, storage_size|
+      vcpu_count = Option::POSTGRES_SIZE_OPTIONS[size].vcpu_count
 
-    options.add_option(name: "ha_type", values: [PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC], parent: "storage_size")
+      if location.aws?
+        Option::AWS_STORAGE_SIZE_OPTIONS[vcpu_count].include?(storage_size)
+      else
+        min_storage = (vcpu_count >= 30) ? 1024 : vcpu_count * 32
+        min_storage /= 2 if family == "burstable"
+        [min_storage, min_storage * 2, min_storage * 4].include?(storage_size.to_i)
+      end
+    end
+
+    options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS)
+
+    options.add_option(name: "ha_type", values: Option::POSTGRES_HA_OPTIONS.keys, parent: "storage_size")
+
     options.serialize
   end
 
-  def generate_postgres_configure_options(flavor:, location:)
-    options = OptionTreeGenerator.new
-    all_sizes_for_project = Option.customer_postgres_sizes_for_project(@project.id)
+  def postgres_flavors
+    Option::POSTGRES_FLAVOR_OPTIONS.reject { |k, _| k == PostgresResource::Flavor::LANTERN && !@project.get_ff_postgres_lantern }
+  end
 
-    options.add_option(name: "flavor", values: flavor)
-    options.add_option(name: "location", values: location, parent: "flavor")
+  def postgres_locations
+    Location.where(name: ["hetzner-fsn1", "leaseweb-wdc02"]).all + @project.locations
+  end
 
-    options.add_option(name: "family", values: all_sizes_for_project.map(&:vm_family).uniq, parent: "location") do |flavor, location, family|
-      if location.provider == "aws" && family != "standard"
-        false
-      else
-        available_families = Option.families.map(&:name)
-        available_families.include?(family) && BillingRate.from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name)
-      end
+  def validate_postgres_input(name, postgres_params)
+    Validation.validate_name(name)
+
+    option_tree, option_parents = generate_postgres_options
+
+    begin
+      Validation.validate_from_option_tree(option_tree, option_parents, postgres_params)
+    rescue Validation::ValidationFailed => e
+      fail Validation::ValidationFailed.new({size: "Invalid size."}) if e.details.key?(:family)
+      raise e
     end
-
-    options.add_option(name: "size", values: all_sizes_for_project.map(&:name).uniq, parent: "family") do |flavor, location, family, size|
-      if location.provider == "aws" && (size.split("-").last.to_i > 16 || size.split("-").first == "burstable")
-        false
-      else
-        pg_size = all_sizes_for_project.find { it.name == size && it.flavor == flavor && it.location_id == location.id }
-        vm_size = Option::VmSizes.find { it.name == pg_size.vm_size && it.arch == "x64" && it.visible }
-        vm_size.family == family
-      end
-    end
-
-    options.add_option(name: "storage_size", values: ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096", "118", "237", "475", "950", "1781", "1900", "3562", "3800"], parent: "size") do |flavor, location, family, size, storage_size|
-      pg_size = all_sizes_for_project.find { it.name == size && it.flavor == flavor && it.location_id == location.id }
-      pg_size.storage_size_options.include?(storage_size.to_i)
-    end
-
-    options.add_option(name: "ha_type", values: [PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC], parent: "storage_size")
-
-    options.serialize
   end
 end

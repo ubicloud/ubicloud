@@ -8,7 +8,7 @@ class VmHostSlice < Sequel::Model
   one_to_many :vms
   one_to_many :cpus, class: :VmHostCpu, key: :vm_host_slice_id
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
   include HealthMonitorMethods
   semaphore :destroy, :start_after_host_reboot, :checkup
@@ -20,17 +20,18 @@ class VmHostSlice < Sequel::Model
   # (comma-separated ranges of cpus)
   def allowed_cpus_cgroup
     @allowed_cpus_cgroup ||= cpus.map(&:cpu_number).sort.slice_when { |a, b| b != a + 1 }.map do |group|
-      (group.size > 1) ? "#{group.first}-#{group.last}" : group.first.to_s
+      (group.size > 1) ? "#{group.first}-#{group.last}" : group.first
     end.join(",")
   end
 
   # It allocates the CPUs to the slice and updates the slice's cores and total_cpu_percent
   # Input (allowed_cpus) should be a list of cpu numbers.
   def set_allowed_cpus(allowed_cpus)
+    vm_host_cpu = Sequel[:vm_host_cpu]
     allocated_cpus = vm_host.cpus_dataset.where(
-      Sequel[:vm_host_cpu][:spdk] => false,
-      Sequel[:vm_host_cpu][:vm_host_slice_id] => nil,
-      Sequel[:vm_host_cpu][:cpu_number] => allowed_cpus
+      vm_host_cpu[:spdk] => false,
+      vm_host_cpu[:vm_host_slice_id] => nil,
+      vm_host_cpu[:cpu_number] => allowed_cpus
     ).update(vm_host_slice_id: id)
 
     # A concurrent xact might take some of the CPUs, so check if we got them all

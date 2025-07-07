@@ -1,0 +1,39 @@
+name: 'Setup Clover'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup PostgreSQL
+      shell: bash
+      run: |
+        # Remove the default PostgreSQL cluster on the runner
+        sudo -u postgres pg_dropcluster 14 main --stop
+        # Install PostgreSQL
+        sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+        wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+        sudo apt-get update
+        sudo apt-get install -y postgresql-15 postgresql-client-15
+        # Allow runner user to access PostgreSQL
+        echo 'runner_map runner postgres
+        runner_map runner clover
+        runner_map runner clover_password' | sudo tee -a /etc/postgresql/15/main/pg_ident.conf > /dev/null
+        sudo sed -i '1i local   all   all   peer map=runner_map' /etc/postgresql/15/main/pg_hba.conf
+        sudo systemctl start postgresql
+        until pg_isready -q; do sleep 1; done
+
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: .tool-versions
+        bundler-cache: true
+
+    - name: Create .env.rb file
+      shell: bash
+      run: bundle exec rake overwrite_envrb
+
+    - name: Setup clover database
+      shell: bash
+      run: |
+        createuser -U postgres clover
+        createuser -U postgres clover_password
+        bundle exec rake setup_database\[test,true\]

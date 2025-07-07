@@ -11,7 +11,7 @@ class Nic < Sequel::Model
   one_to_one :nic_aws_resource, key: :id
   plugin :association_dependencies, src_ipsec_tunnels: :destroy, dst_ipsec_tunnels: :destroy, nic_aws_resource: :destroy
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
 
   semaphore :destroy, :start_rekey, :trigger_outbound_update,
@@ -34,7 +34,7 @@ class Nic < Sequel::Model
   end
 
   def unlock
-    Semaphore.where(strand_id: strand.id, name: "lock").delete(force: true)
+    Semaphore.where(strand_id: id, name: "lock").delete(force: true)
   end
 end
 

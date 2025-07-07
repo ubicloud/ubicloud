@@ -30,6 +30,8 @@ class Clover < Roda
 
   BUTTON_COLOR = Hash.new { |h, k| raise "unsupported button type: #{k}" }.merge!(
     "primary" => "bg-orange-600 hover:bg-orange-700 focus-visible:outline-orange-600",
+    "safe" => "bg-green-600 hover:bg-green-700 focus-visible:outline-green-600",
+    "warning" => "bg-amber-600 hover:bg-amber-700 focus-visible:outline-amber-600",
     "danger" => "bg-rose-600 hover:bg-rose-700 focus-visible:outline-rose-600"
   ).freeze
 
@@ -53,7 +55,7 @@ class Clover < Roda
 
     request.redirect "/" unless uri
 
-    flash["old"] = request.params
+    flash["old"] = redirect_back_with_inputs_params
 
     if uri && env["REQUEST_METHOD"] != "GET"
       # Force flash rotation, so flash works correctly for internal redirects
@@ -70,11 +72,23 @@ class Clover < Roda
     end
   end
 
+  def redirect_back_with_inputs_params
+    request.params
+  end
+
   def redirect_default_project_dashboard
     if (project = current_account.projects_dataset.order(:created_at, :name).first)
       request.redirect "#{project.path}/dashboard"
     else
       request.redirect "/project"
+    end
+  end
+
+  def omniauth_provider_name(provider)
+    if omniauth_providers.map { |provider,| provider.to_s }.include?(provider)
+      provider.capitalize
+    else
+      OidcProvider.name_for_ubid(provider) || provider
     end
   end
 

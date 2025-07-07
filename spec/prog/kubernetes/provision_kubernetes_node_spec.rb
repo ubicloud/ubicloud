@@ -3,7 +3,9 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
-  subject(:prog) { described_class.new(Strand.new) }
+  subject(:prog) { described_class.new(st) }
+
+  let(:st) { Strand.new }
 
   let(:project) {
     Project.create(name: "default")
@@ -71,48 +73,6 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
 
       prog.strand.label = "destroy"
       prog.before_run # Nothing happens
-    end
-  end
-
-  describe "#write_hosts_file_if_needed" do
-    it "exits early if the environment is not dev" do
-      expect(prog.vm).not_to receive(:sshable)
-      expect(Config).to receive(:development?).and_return(false)
-      prog.write_hosts_file_if_needed
-    end
-
-    it "exits early if /etc/hosts file contains an entry about the cluster endpoint already" do
-      sshable = instance_double(Sshable)
-      allow(prog.vm).to receive(:sshable).and_return(sshable)
-      expect(Config).to receive(:development?).and_return(true)
-
-      expect(sshable).to receive(:cmd).with("cat /etc/hosts").and_return("something #{kubernetes_cluster.endpoint} something")
-      expect(sshable).not_to receive(:cmd).with(/echo/)
-      prog.write_hosts_file_if_needed
-    end
-
-    it "creates an /etc/hosts entry linking the cluster endpoint to the IP4 of the first VM" do
-      sshable = instance_double(Sshable)
-      allow(prog.vm).to receive(:sshable).and_return(sshable)
-      expect(Config).to receive(:development?).and_return(true)
-
-      expect(sshable).to receive(:cmd).with("cat /etc/hosts").and_return("nothing relevant")
-      expect(kubernetes_cluster).to receive(:sshable).and_return(instance_double(Sshable, host: "SOMEIP"))
-      expect(sshable).to receive(:cmd).with("sudo tee -a /etc/hosts", {stdin: /SOMEIP somelb\..*\n/})
-
-      prog.write_hosts_file_if_needed
-    end
-
-    it "uses the given IP an /etc/hosts entry linking the cluster endpoint to the IP4 of the first VM" do
-      sshable = instance_double(Sshable)
-      expect(prog.vm).to receive(:sshable).and_return(sshable).twice
-      expect(Config).to receive(:development?).and_return(true)
-
-      expect(sshable).to receive(:cmd).with("cat /etc/hosts").and_return("nothing relevant")
-      expect(kubernetes_cluster).not_to receive(:sshable)
-      expect(sshable).to receive(:cmd).with("sudo tee -a /etc/hosts", {stdin: /ANOTHERIP somelb\..*\n/})
-
-      prog.write_hosts_file_if_needed "ANOTHERIP"
     end
   end
 
@@ -208,25 +168,20 @@ table ip6 pod_access {
   end
 
   describe "#wait_bootstrap_rhizome" do
-    before { expect(prog).to receive(:reap) }
-
     it "hops to assign_role if there are no sub-programs running" do
-      expect(prog).to receive(:leaf?).and_return true
-
+      st.update(prog: "Kubernetes::ProvisionKubernetesNode", label: "wait_bootstrap_rhizome", stack: [{}])
       expect { prog.wait_bootstrap_rhizome }.to hop("assign_role")
     end
 
     it "donates if there are sub-programs running" do
-      expect(prog).to receive(:leaf?).and_return false
-      expect(prog).to receive(:donate).and_call_original
-
-      expect { prog.wait_bootstrap_rhizome }.to nap(1)
+      st.update(prog: "Kubernetes::ProvisionKubernetesNode", label: "wait_bootstrap_rhizome", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "BootstrapRhizome", label: "start", stack: [{}], lease: Time.now + 10)
+      expect { prog.wait_bootstrap_rhizome }.to nap(120)
     end
   end
 
   describe "#assign_role" do
     it "hops to init_cluster if this is the first vm of the cluster" do
-      expect(prog).to receive(:write_hosts_file_if_needed)
       expect(prog.kubernetes_cluster.cp_vms).to receive(:count).and_return(1)
       expect { prog.assign_role }.to hop("init_cluster")
     end

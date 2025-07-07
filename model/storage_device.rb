@@ -6,11 +6,7 @@ require_relative "../lib/system_parser"
 class StorageDevice < Sequel::Model
   many_to_one :vm_host
 
-  def self.ubid_type
-    UBID::TYPE_ETC
-  end
-
-  include ResourceMethods
+  plugin ResourceMethods, etc_type: true
 
   def migrate_device_name_to_device_id
     update(unix_device_list: unix_device_list.map { |device_name| StorageDevice.convert_device_name_to_device_id(vm_host.sshable, device_name) })

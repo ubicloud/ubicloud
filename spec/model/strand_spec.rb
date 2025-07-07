@@ -22,42 +22,36 @@ RSpec.describe Strand do
       expect(did_it).to be :did_it
     end
 
+    it "clears cached instance state" do
+      st.save_changes
+      st.set(label: "smoke_test_0")
+      st.associations[:parent] = st
+      st2 = st.subject
+      expect(st.subject).to equal st2
+      expect(st.changed_columns).not_to be_empty
+      st.take_lease_and_reload {
+        expect(st.label).to eq "start"
+        expect(st.changed_columns).to be_empty
+        expect(st.associations).to be_empty
+        expect(st.subject.id).to eq st.id
+        expect(st.subject).not_to equal st2
+      }
+    end
+
     it "does an integrity check that deleted records are gone" do
       st.label = "hop_exit"
       st.save_changes
-      original = DB.method(:[])
-      original = original.super_method unless original.owner == Sequel::Database
-      expect(DB).to receive(:[]) do |*args, **kwargs|
-        case args
-        when ["SELECT FROM strand WHERE id = ?", st.id]
-          instance_double(Sequel::Dataset, empty?: false)
-        else
-          original.call(*args, **kwargs)
-        end
-      end.at_least(:once)
-
+      expect(st).to receive(:exists?).and_return(true)
       expect { st.run }.to raise_error RuntimeError, "BUG: strand with @deleted set still exists in the database"
     end
 
     it "does an integrity check that the lease was modified as expected" do
       st.label = "napper"
       st.save_changes
-      original = DB.method(:[])
-      original = original.super_method unless original.owner == Sequel::Database
-      expect(DB).to receive(:[]) do |*args, **kwargs|
-        case args[0]
-        when /UPDATE strand
-SET lease = .*
-WHERE id = \? AND lease = \?
-/
-          instance_double(Sequel::Dataset, update: 0)
-        else
-          original.call(*args, **kwargs)
-        end
-      end.at_least(:once)
-
+      expect(st).to receive(:unsynchronized_run) do
+        st.this.update(lease: Sequel[:lease] + Sequel.cast("1 second", :interval))
+      end
       expect(Clog).to receive(:emit).with("lease violated data").and_call_original
-      allow(Clog).to receive(:emit).and_call_original
       expect { st.run }.to raise_error RuntimeError, "BUG: lease violated"
     end
   end
@@ -101,14 +95,5 @@ WHERE id = \? AND lease = \?
     expect(Time).to receive(:now).and_return(Time.now - 10, Time.now, Time.now)
     expect(Clog).to receive(:emit).with("finished strand").and_call_original
     st.unsynchronized_run
-  end
-
-  it "occasionally logs acquisition and release of lease" do
-    st.label = "napper"
-    st.save_changes
-    expect(st).to receive(:rand).and_return(0)
-    expect(Clog).to receive(:emit).with("obtained lease").and_call_original
-    expect(Clog).to receive(:emit).with("lease cleared").and_call_original
-    st.take_lease_and_reload {}
   end
 end

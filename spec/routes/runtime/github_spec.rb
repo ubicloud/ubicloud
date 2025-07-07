@@ -42,7 +42,7 @@ RSpec.describe Clover, "github" do
 
     post "/runtime/github/caches"
 
-    expect(last_response).to have_runtime_error(400, "Wrong parameters")
+    expect(last_response).to have_runtime_error(400, "missing parameter for key")
   end
 
   it "handles errors when attempting to setup blob storage" do
@@ -82,7 +82,7 @@ RSpec.describe Clover, "github" do
           params = {key: key, version: version}.compact
           post "/runtime/github/caches", params
 
-          expect(last_response).to have_runtime_error(400, "Wrong parameters")
+          expect(last_response).to have_runtime_error(400, /missing parameter for/)
         end
       end
 
@@ -99,8 +99,24 @@ RSpec.describe Clover, "github" do
         expect(last_response).to have_runtime_error(400, "The cache size is over the 10GB limit")
       end
 
-      it "fails if the cache entry already exists" do
+      it "fails if the cache entry already exists before upload" do
         GithubCacheEntry.create_with_id(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
+
+        expect(last_response).to have_runtime_error(409, "A cache entry for dev scope already exists with k1 key and v1 version.")
+      end
+
+      it "fails if the cache entry already exists after upload" do
+        s3_client = instance_double(Aws::S3::Client, create_multipart_upload: nil, delete_object: nil)
+        repository_id = repository.id
+        created_by = runner.id
+        expect(s3_client).to receive(:create_multipart_upload) do |key:, bucket:|
+          GithubCacheEntry.create(key: "k1", version: "v1", scope: "dev", repository_id:, created_by:, committed_at: Time.now)
+          Struct.new(:upload_id).new("1")
+        end
+        expect(s3_client).not_to receive(:delete_object)
+        expect(Aws::S3::Client).to receive(:new).with(anything).and_return(s3_client)
+
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
 
         expect(last_response).to have_runtime_error(409, "A cache entry for dev scope already exists with k1 key and v1 version.")
@@ -191,7 +207,7 @@ RSpec.describe Clover, "github" do
           params = {etags: etags, uploadId: upload_id, size: size}.compact
           post "/runtime/github/caches/commit", params
 
-          expect(last_response).to have_runtime_error(400, "Wrong parameters")
+          expect(last_response).to have_runtime_error(400, /missing parameter for /)
         end
       end
 
@@ -207,6 +223,14 @@ RSpec.describe Clover, "github" do
         post "/runtime/github/caches/commit", {etags: ["etag-1", "etag-2"], uploadId: "upload-id", size: 100}
 
         expect(last_response).to have_runtime_error(400, "Wrong parameters")
+      end
+
+      it "fails if the s3 storage service is unavailable" do
+        GithubCacheEntry.create_with_id(key: "cache-key", version: "key-version", scope: "dev", repository_id: repository.id, created_by: runner.id, upload_id: "upload-id", size: 100)
+        expect(blob_storage_client).to receive(:complete_multipart_upload).and_raise(Aws::S3::Errors::ServiceUnavailable.new("error", "error"))
+        post "/runtime/github/caches/commit", {etags: ["etag-1", "etag-2"], uploadId: "upload-id", size: 100}
+
+        expect(last_response).to have_runtime_error(503, "Service unavailable")
       end
 
       it "completes multipart upload" do
@@ -243,7 +267,7 @@ RSpec.describe Clover, "github" do
           params = {keys: keys, version: version}.compact
           get "/runtime/github/cache", params
 
-          expect(last_response).to have_runtime_error(400, "Wrong parameters")
+          expect(last_response).to have_runtime_error(400, /missing parameter for |empty string provided for parameter keys/)
         end
       end
 

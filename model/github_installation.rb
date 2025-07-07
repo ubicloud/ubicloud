@@ -8,35 +8,44 @@ class GithubInstallation < Sequel::Model
   one_to_many :repositories, key: :installation_id, class: :GithubRepository
   many_to_many :cache_entries, join_table: :github_repository, right_key: :id, right_primary_key: :repository_id, left_key: :installation_id, class: :GithubCacheEntry
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   def total_active_runner_vcpus
-    runners_dataset
-      .left_join(:strand, id: :id)
-      .exclude(Sequel[:strand][:label] => ["start", "wait_concurrency_limit"])
-      .select_map(Sequel[:github_runner][:label])
-      .sum { Github.runner_labels[it]["vm_size_data"].vcpus }
+    runners_dataset.total_active_runner_vcpus
   end
 
-  def free_runner_upgrade?
-    (upgrade_until = project.get_ff_free_runner_upgrade_until) && Time.parse(upgrade_until) > Time.now
+  def free_runner_upgrade?(at = Time.now)
+    free_runner_upgrade_expires_at > at
+  end
+
+  def free_runner_upgrade_expires_at
+    dates = [created_at + 7 * 24 * 60 * 60]
+    if (upgrade_until = project.get_ff_free_runner_upgrade_until)
+      dates.push(Time.parse(upgrade_until))
+    end
+    dates.max
   end
 
   def premium_runner_enabled?
     !!allocator_preferences["family_filter"]&.include?("premium")
   end
+
+  def cache_storage_gib
+    [project.effective_quota_value("GithubRunnerCacheStorage"), premium_runner_enabled? ? 100 : 0].max
+  end
 end
 
 # Table: github_installation
 # Columns:
-#  id                    | uuid    | PRIMARY KEY
-#  installation_id       | bigint  | NOT NULL
-#  name                  | text    | NOT NULL
-#  type                  | text    | NOT NULL
-#  project_id            | uuid    |
-#  cache_enabled         | boolean | NOT NULL DEFAULT true
-#  use_docker_mirror     | boolean | NOT NULL DEFAULT false
-#  allocator_preferences | jsonb   | NOT NULL DEFAULT '{}'::jsonb
+#  id                    | uuid                     | PRIMARY KEY
+#  installation_id       | bigint                   | NOT NULL
+#  name                  | text                     | NOT NULL
+#  type                  | text                     | NOT NULL
+#  project_id            | uuid                     |
+#  cache_enabled         | boolean                  | NOT NULL DEFAULT true
+#  use_docker_mirror     | boolean                  | NOT NULL DEFAULT false
+#  allocator_preferences | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
+#  created_at            | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 # Indexes:
 #  github_installation_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:

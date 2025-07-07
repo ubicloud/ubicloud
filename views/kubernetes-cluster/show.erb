@@ -27,7 +27,7 @@
   ]
   
   if @kc.display_state == "running"
-    data.push(["Service URL", LoadBalancer[name: @kc.services_load_balancer_name].hostname]) # TODO: Assign LB to a column properly
+    data.push(["Service URL", @kc.services_lb.hostname, { copyable: true }]) # TODO: Assign LB to a column properly
     data.push(["Kubeconfig", part("components/download_button", link: "#{request.path}/kubeconfig"), { escape: false }])
   else
     data.push(["Kubeconfig", "Waiting for cluster to be ready..."])

@@ -48,6 +48,20 @@ module ContentGenerator
       ]
     end
 
+    def self.gpu(location, family, gpu)
+      gpu = gpu.split(":")
+      gpu_count = gpu[0].to_i
+
+      unit_price = (gpu_count == 0) ? 0 : BillingRate.unit_price_from_resource_properties("Gpu", gpu[1], location.name)
+
+      [
+        (gpu_count == 0) ? "No GPU" : "#{gpu_count}x #{PciDevice.device_name(gpu[1])}",
+        nil,
+        "$#{"%.2f" % (gpu_count * unit_price * 60 * 672)}/mo",
+        "$#{"%.3f" % (gpu_count * unit_price * 60)}/hour"
+      ]
+    end
+
     def self.boot_image(boot_image)
       Option::BootImages.find { it.name == boot_image }.display_name
     end
@@ -59,23 +73,23 @@ module ContentGenerator
     end
 
     def self.family(flavor, location, family)
-      vm_family = Option::VmFamilies.find { it.name == family }
+      pg_family = Option::POSTGRES_FAMILY_OPTIONS[family]
 
       [
-        vm_family.display_name,
-        vm_family.ui_descriptor
+        pg_family.name,
+        pg_family.description
       ]
     end
 
     def self.size(flavor, location, family, size)
-      size = Option::PostgresSizes.find { it.display_name == size }
+      size = Option::POSTGRES_SIZE_OPTIONS[size]
       unit_price = BillingRate.unit_price_from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name)
 
       [
-        size.display_name,
-        "#{size.vcpu} vCPUs / #{size.memory} GB RAM",
-        "$#{"%.2f" % (size.vcpu * unit_price * 60 * 672)}/mo",
-        "$#{"%.3f" % (size.vcpu * unit_price * 60)}/hour"
+        size.name,
+        "#{size.vcpu_count} vCPUs / #{size.memory_gib} GB RAM",
+        "$#{"%.2f" % (size.vcpu_count * unit_price * 60 * 672)}/mo",
+        "$#{"%.3f" % (size.vcpu_count * unit_price * 60)}/hour"
       ]
     end
 
@@ -90,22 +104,22 @@ module ContentGenerator
       ]
     end
 
-    def self.version(flavor, version)
+    def self.version(version)
       "Postgres #{version}"
     end
 
     def self.ha_type(flavor, location, family, vm_size, storage_size, ha_type)
-      vcpu = Option::PostgresSizes.find { it.display_name == vm_size }.vcpu
-      ha_type = Option::PostgresHaOptions.find { it.name == ha_type }
+      vcpu_count = Option::POSTGRES_SIZE_OPTIONS[vm_size].vcpu_count
+      ha_type = Option::POSTGRES_HA_OPTIONS[ha_type]
       compute_unit_price = BillingRate.unit_price_from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name)
       storage_unit_price = BillingRate.unit_price_from_resource_properties("PostgresStorage", flavor, location.name)
       standby_count = ha_type.standby_count
 
       [
-        ha_type.title,
-        ha_type.explanation,
-        "$#{"%.2f" % (standby_count * ((vcpu * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60 * 672)}/mo",
-        "$#{"%.3f" % (standby_count * ((vcpu * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60)}/hour"
+        ha_type.description,
+        "",
+        "$#{"%.2f" % (standby_count * ((vcpu_count * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60 * 672)}/mo",
+        "$#{"%.3f" % (standby_count * ((vcpu_count * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60)}/hour"
       ]
     end
 
@@ -141,21 +155,44 @@ module ContentGenerator
     end
 
     def self.cp_nodes(location, cp_nodes)
-      node_price = 2 * BillingRate.unit_price_from_resource_properties("KubernetesControlPlaneVCpu", "standard", location.name)
+      cp_node_price = 2 * BillingRate.unit_price_from_resource_properties("KubernetesControlPlaneVCpu", "standard", location.name)
       data = Option::KubernetesCPOptions.find { it.cp_node_count == cp_nodes }
       [
         data.title,
         data.explanation,
-        "$#{"%.2f" % (cp_nodes * node_price * 60 * 672)}/mo",
-        "$#{"%.3f" % (cp_nodes * node_price * 60)}/hour"
+        "$#{"%.2f" % (cp_nodes * cp_node_price * 60 * 672)}/mo",
+        "$#{"%.3f" % (cp_nodes * cp_node_price * 60)}/hour"
       ]
     end
 
-    def self.worker_nodes(location, cp_nodes, worker_nodes)
-      node_price = 2 * BillingRate.unit_price_from_resource_properties("KubernetesWorkerVCpu", "standard", location.name) +
-        40 * BillingRate.unit_price_from_resource_properties("KubernetesWorkerStorage", "standard", location.name)
+    def self.worker_size(location, size)
+      worker_size = Option::VmSizes.find { it.display_name == size }
 
-      "#{worker_nodes[:display_name]} - $#{"%.2f" % (worker_nodes[:value] * node_price * 60 * 672)}/mo ($#{"%.3f" % (worker_nodes[:value] * node_price * 60)}/hour)"
+      [
+        worker_size.display_name,
+        "#{worker_size.vcpus} vCPUs / #{worker_size.memory_gib} GB RAM / #{worker_size.storage_size_options.first} GB NVMe Storage",
+        "$#{"%.2f" % monthly_price(location, worker_size)}/mo",
+        "$#{"%.3f" % hourly_price(location, worker_size)}/hour"
+      ]
+    end
+
+    def self.worker_nodes(location, size, worker_nodes)
+      worker_size = Option::VmSizes.find { it.display_name == size }
+
+      "#{worker_nodes[:display_name]} - $#{"%.2f" % (worker_nodes[:value] * monthly_price(location, worker_size))}/mo ($#{"%.3f" % (worker_nodes[:value] * hourly_price(location, worker_size))}/hour)"
+    end
+
+    def self.node_price(location, worker_size)
+      worker_size.vcpus * BillingRate.unit_price_from_resource_properties("KubernetesWorkerVCpu", "standard", location.name) +
+        worker_size.storage_size_options.first * BillingRate.unit_price_from_resource_properties("KubernetesWorkerStorage", "standard", location.name)
+    end
+
+    def self.hourly_price(location, worker_size)
+      node_price(location, worker_size) * 60
+    end
+
+    def self.monthly_price(location, worker_size)
+      node_price(location, worker_size) * 60 * 672
     end
 
     def self.version(version)

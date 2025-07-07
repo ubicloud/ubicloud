@@ -13,7 +13,7 @@ module Metrics
       series: [
         TimeSeries.new(
           labels: {},
-          query: "(1 - sum(avg(rate(node_cpu_seconds_total{mode=\"idle\", ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m])))) * 100"
+          query: "avg(rate(node_cpu_seconds_total{mode=~\"(iowait|user|system|steal)\", ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m])) by (mode) * 100"
         )
       ]
     ),
@@ -62,6 +62,22 @@ module Metrics
         TimeSeries.new(
           labels: {name: "Used Space"},
           query: "100 - (sum(node_filesystem_avail_bytes{mountpoint=\"/dat\", ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"} / node_filesystem_size_bytes{mountpoint=\"/dat\", ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}) * 100)"
+        )
+      ]
+    ),
+    disk_io:
+    MetricDefinition.new(
+      name: "Disk I/O",
+      description: "I/O operations per second",
+      unit: "IOPS",
+      series: [
+        TimeSeries.new(
+          labels: {name: "Reads"},
+          query: "sum(rate(node_disk_reads_completed_total{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
+        ),
+        TimeSeries.new(
+          labels: {name: "Writes"},
+          query: "sum(rate(node_disk_writes_completed_total{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
         )
       ]
     ),
@@ -154,6 +170,22 @@ module Metrics
         TimeSeries.new(
           labels: {},
           query: "topk(5, sum(pg_database_size_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\", datname!~\"template0|template1\"}) by (datname))"
+        )
+      ]
+    ),
+    transactions:
+    MetricDefinition.new(
+      name: "Transactions",
+      description: "Committed vs rolled back transactions",
+      unit: "count/s",
+      series: [
+        TimeSeries.new(
+          labels: {name: "Commits"},
+          query: "sum(rate(pg_stat_database_xact_commit{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
+        ),
+        TimeSeries.new(
+          labels: {name: "Rollbacks"},
+          query: "sum(rate(pg_stat_database_xact_rollback{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
         )
       ]
     )

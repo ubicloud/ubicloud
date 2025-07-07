@@ -218,6 +218,8 @@ def clover_freeze
     Prog::Vnet::RekeyNicTunnel::Xfrm,
     ResourceMethods,
     ResourceMethods::ClassMethods,
+    ResourceMethods::InstanceMethods,
+    ResourceMethods::UbidTypeEtcMethods,
     Scheduling,
     Scheduling::Allocator,
     Scheduling::Allocator::Allocation,
@@ -240,5 +242,6 @@ def clover_freeze
     Validation::ValidationFailed
   ].each(&:freeze)
 
+  RubyVM::YJIT.enable
   Refrigerator.freeze_core
 end

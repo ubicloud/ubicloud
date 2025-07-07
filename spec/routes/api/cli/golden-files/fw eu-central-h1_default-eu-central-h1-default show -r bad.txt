@@ -1,0 +1,18 @@
+! Invalid field(s) given in fw show -r option: bad
+
+Show details for a firewall
+
+Usage:
+    ubi fw (location/fw-name | fw-id) show [options]
+
+Options:
+    -f, --fields=fields              show specific fields (comma separated)
+    -n, --nic-fields=fields          show specific nic fields (comma separated)
+    -p, --priv-subnet-fields=fields  show specific private subnet fields (comma separated)
+    -r, --rule-fields=fields         show specific firewall rule fields (comma separated)
+
+Allowed Option Values:
+    Fields: id name location description firewall-rules private-subnets
+    Nic Fields: id name private-ipv4 private-ipv6 vm-name
+    Private Subnet Fields: id name state location net4 net6 nics
+    Firewall Rule Fields: id cidr port-range

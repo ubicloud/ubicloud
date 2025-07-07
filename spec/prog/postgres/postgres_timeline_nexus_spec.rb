@@ -15,7 +15,8 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       blob_storage_client: instance_double(Minio::Client),
       access_key: "dummy-access-key",
       secret_key: "dummy-secret-key",
-      blob_storage_policy: {"Version" => "2012-10-17", "Statement" => [{"Action" => ["s3:GetBucketLocation"], "Effect" => "Allow", "Principal" => {"AWS" => ["*"]}, "Resource" => ["arn:aws:s3:::test"], "Sid" => ""}]}
+      blob_storage_policy: {"Version" => "2012-10-17", "Statement" => [{"Action" => ["s3:GetBucketLocation"], "Effect" => "Allow", "Principal" => {"AWS" => ["*"]}, "Resource" => ["arn:aws:s3:::test"], "Sid" => ""}]},
+      aws?: false
     )
   }
 
@@ -71,24 +72,65 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
   describe "#start" do
     let(:admin_blob_storage_client) { instance_double(Minio::Client) }
-    let(:blob_storage_client) { instance_double(Minio::Client) }
 
-    it "creates bucket and hops" do
-      expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs", admin_user: "admin", admin_password: "secret")).at_least(:once)
-      expect(Minio::Client).to receive(:new).with(endpoint: "https://blob-endpoint", access_key: "admin", secret_key: "secret", ssl_ca_file_data: "certs").and_return(admin_blob_storage_client)
-      expect(postgres_timeline).to receive(:blob_storage_client).and_return(blob_storage_client).twice
-      expect(admin_blob_storage_client).to receive(:admin_add_user).with(postgres_timeline.access_key, postgres_timeline.secret_key).and_return(200)
-      expect(admin_blob_storage_client).to receive(:admin_policy_add).with(postgres_timeline.ubid, postgres_timeline.blob_storage_policy).and_return(200)
-      expect(admin_blob_storage_client).to receive(:admin_policy_set).with(postgres_timeline.ubid, postgres_timeline.access_key).and_return(200)
-      expect(blob_storage_client).to receive(:create_bucket).with(postgres_timeline.ubid).and_return(200)
-      expect(blob_storage_client).to receive(:set_lifecycle_policy).with(postgres_timeline.ubid, postgres_timeline.ubid, 8).and_return(200)
-      expect { nx.start }.to hop("wait_leader")
+    describe "when blob storage is minio" do
+      it "creates user and policies and hops" do
+        expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs", admin_user: "admin", admin_password: "secret")).at_least(:once)
+        expect(Minio::Client).to receive(:new).with(endpoint: "https://blob-endpoint", access_key: "admin", secret_key: "secret", ssl_ca_data: "certs").and_return(admin_blob_storage_client)
+        expect(admin_blob_storage_client).to receive(:admin_add_user).with(postgres_timeline.access_key, postgres_timeline.secret_key).and_return(200)
+        expect(admin_blob_storage_client).to receive(:admin_policy_add).with(postgres_timeline.ubid, postgres_timeline.blob_storage_policy).and_return(200)
+        expect(admin_blob_storage_client).to receive(:admin_policy_set).with(postgres_timeline.ubid, postgres_timeline.access_key).and_return(200)
+        expect { nx.start }.to hop("setup_bucket")
+      end
     end
 
-    it "hops without creating bucket if blob storage is not configures" do
+    describe "when blob storage is aws s3" do
+      it "creates user and policies and hops" do
+        expect(postgres_timeline).to receive(:aws?).and_return(true)
+        expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-west-2", location_credential: instance_double(LocationCredential, access_key: "access-key", secret_key: "secret-key"))).at_least(:once)
+        client = Aws::IAM::Client.new(stub_responses: true)
+        expect(Aws::IAM::Client).to receive(:new).and_return(client)
+        client.stub_responses(:create_user)
+        client.stub_responses(:create_policy)
+        client.stub_responses(:attach_user_policy)
+        client.stub_responses(:create_access_key, access_key: {access_key_id: "access-key", secret_access_key: "secret-key", user_name: "username", status: "Active"})
+        expect(postgres_timeline).to receive(:update).with(access_key: "access-key", secret_key: "secret-key").and_return(postgres_timeline)
+        expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "wait"))).at_least(:once)
+        expect(postgres_timeline.leader).to receive(:incr_refresh_walg_credentials)
+        expect { nx.start }.to hop("setup_bucket")
+      end
+    end
+
+    it "hops without creating bucket if blob storage is not configured" do
       expect(postgres_timeline).to receive(:blob_storage).and_return(nil)
-      expect(postgres_timeline.blob_storage_client).not_to receive(:create_bucket)
+      expect(nx).not_to receive(:setup_blob_storage)
       expect { nx.start }.to hop("wait_leader")
+    end
+  end
+
+  describe "#setup_bucket" do
+    it "hops to wait_leader if bucket is created" do
+      expect(postgres_timeline).to receive(:create_bucket).and_return(true)
+      expect(postgres_timeline).to receive(:set_lifecycle_policy).and_return(true)
+      expect { nx.setup_bucket }.to hop("wait_leader")
+    end
+
+    it "naps if aws and the key is not available" do
+      expect(postgres_timeline).to receive(:aws?).and_return(true)
+      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-west-2", location_credential: instance_double(LocationCredential, access_key: "access-key", secret_key: "secret-key"))).at_least(:once)
+      iam_client = Aws::IAM::Client.new(stub_responses: true)
+      expect(Aws::IAM::Client).to receive(:new).and_return(iam_client)
+      iam_client.stub_responses(:list_access_keys, access_key_metadata: [{access_key_id: "access-key"}])
+      expect(postgres_timeline).to receive(:access_key).and_return("not-access-key")
+      expect { nx.setup_bucket }.to nap(1)
+    end
+
+    it "hops to wait_leader if aws and the key is available" do
+      expect(postgres_timeline).to receive(:aws?).and_return(true)
+      expect(nx).to receive(:aws_access_key_is_available?).and_return(true)
+      expect(postgres_timeline).to receive(:create_bucket).and_return(true)
+      expect(postgres_timeline).to receive(:set_lifecycle_policy).and_return(true)
+      expect { nx.setup_bucket }.to hop("wait_leader")
     end
   end
 
@@ -180,14 +222,35 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
     end
 
-    it "destroys blob storage and postgres timeline" do
-      expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs", admin_user: "admin", admin_password: "secret")).at_least(:once)
-      expect(postgres_timeline).to receive(:destroy)
+    describe "when blob storage is minio" do
+      it "destroys blob storage and postgres timeline" do
+        expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs", admin_user: "admin", admin_password: "secret")).at_least(:once)
+        expect(postgres_timeline).to receive(:destroy)
 
-      expect(Minio::Client).to receive(:new).with(endpoint: postgres_timeline.blob_storage_endpoint, access_key: "admin", secret_key: "secret", ssl_ca_file_data: "certs").and_return(admin_blob_storage_client)
-      expect(admin_blob_storage_client).to receive(:admin_remove_user).with(postgres_timeline.access_key).and_return(200)
-      expect(admin_blob_storage_client).to receive(:admin_policy_remove).with(postgres_timeline.ubid).and_return(200)
-      expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
+        expect(Minio::Client).to receive(:new).with(endpoint: postgres_timeline.blob_storage_endpoint, access_key: "admin", secret_key: "secret", ssl_ca_data: "certs").and_return(admin_blob_storage_client)
+        expect(admin_blob_storage_client).to receive(:admin_remove_user).with(postgres_timeline.access_key).and_return(200)
+        expect(admin_blob_storage_client).to receive(:admin_policy_remove).with(postgres_timeline.ubid).and_return(200)
+        expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
+      end
+    end
+
+    describe "when blob storage is aws s3" do
+      before do
+        expect(postgres_timeline).to receive(:aws?).and_return(true)
+        expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-west-2", location_credential: instance_double(LocationCredential, access_key: "access-key", secret_key: "secret-key"))).at_least(:once)
+      end
+
+      it "destroys blob storage and postgres timeline" do
+        client = Aws::IAM::Client.new(stub_responses: true)
+        expect(Aws::IAM::Client).to receive(:new).and_return(client)
+        client.stub_responses(:delete_user)
+        client.stub_responses(:list_attached_user_policies, attached_policies: [{policy_arn: "arn:aws:iam::aws:policy/AmazonS3FullAccess"}])
+        client.stub_responses(:delete_policy)
+        client.stub_responses(:list_access_keys, access_key_metadata: [{access_key_id: "access-key"}])
+        client.stub_responses(:delete_access_key)
+        expect(postgres_timeline).to receive(:destroy)
+        expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
+      end
     end
   end
 end

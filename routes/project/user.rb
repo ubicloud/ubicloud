@@ -23,8 +23,7 @@ class Clover
         end
 
         r.post do
-          email = r.params["email"]
-          policy = r.params["policy"]
+          email = typecast_params.nonempty_str!("email")
 
           if ProjectInvitation[project_id: @project.id, email: email]
             flash["error"] = "'#{email}' already invited to join the project."
@@ -34,7 +33,7 @@ class Clover
             r.redirect "#{@project.path}/user"
           end
 
-          unless policy == ""
+          if (policy = typecast_params.nonempty_str("policy"))
             unless (tag = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").first(name: policy))
               flash["error"] = "You don't have permission to invite users with this subject tag."
               r.redirect "#{@project_data[:path]}/user"
@@ -196,67 +195,69 @@ class Clover
       end
 
       r.on "access-control" do
-        r.get true do
-          authorize("Project:viewaccess", @project.id)
+        r.is do
+          r.get do
+            authorize("Project:viewaccess", @project.id)
 
-          uuids = {}
-          @project.access_control_entries.each do |ace|
-            # Omit personal action token subjects
-            uuids[ace.subject_id] = nil unless UBID.uuid_class_match?(ace.subject_id, ApiKey)
-            uuids[ace.action_id] = nil if ace.action_id
-            uuids[ace.object_id] = nil if ace.object_id
-          end
-          UBID.resolve_map(uuids)
-          @aces = @project.access_control_entries.map do |ace|
-            next unless (subject = uuids[ace.subject_id])
-            editable = !(subject.is_a?(SubjectTag) && subject.name == "Admin")
-            [ace.ubid, [subject, uuids[ace.action_id], uuids[ace.object_id]], editable]
-          end
-          @aces.compact!
-          sort_aces!(@aces)
-
-          @subject_options = {nil => [["", "Choose a Subject"]], **SubjectTag.options_for_project(@project)}
-          @action_options = {nil => [["", "All Actions"]], **ActionTag.options_for_project(@project)}
-          @object_options = {nil => [["", "All Objects"]], **ObjectTag.options_for_project(@project)}
-
-          view "project/access-control"
-        end
-
-        r.post true do
-          authorize("Project:editaccess", @project.id)
-
-          DB.transaction do
-            typecast_params.array!(:Hash, "aces").each do
-              ubid, deleted, subject_id, action_id, object_id = it.values_at("ubid", "deleted", "subject", "action", "object")
-              subject_id = nil if subject_id == ""
-              action_id = nil if action_id == ""
-              object_id = nil if object_id == ""
-
-              next unless subject_id
-              check_ace_subject(UBID.to_uuid(subject_id)) unless deleted
-
-              if ubid == "template"
-                next if deleted == "true"
-                ace = AccessControlEntry.new_with_id(project_id: @project.id)
-                audit_action = "create"
-              else
-                next unless (ace = AccessControlEntry[project_id: @project.id, id: UBID.to_uuid(ubid)])
-                check_ace_subject(ace.subject_id)
-                if deleted == "true"
-                  ace.destroy
-                  audit_log(ace, "destroy")
-                  next
-                end
-                audit_action = "update"
-              end
-              ace.update_from_ubids(subject_id:, action_id:, object_id:)
-              audit_log(ace, audit_action, [subject_id, action_id, object_id])
+            uuids = {}
+            @project.access_control_entries.each do |ace|
+              # Omit personal action token subjects
+              uuids[ace.subject_id] = nil unless UBID.uuid_class_match?(ace.subject_id, ApiKey)
+              uuids[ace.action_id] = nil if ace.action_id
+              uuids[ace.object_id] = nil if ace.object_id
             end
+            UBID.resolve_map(uuids)
+            @aces = @project.access_control_entries.map do |ace|
+              next unless (subject = uuids[ace.subject_id])
+              editable = !(subject.is_a?(SubjectTag) && subject.name == "Admin")
+              [ace.ubid, [subject, uuids[ace.action_id], uuids[ace.object_id]], editable]
+            end
+            @aces.compact!
+            sort_aces!(@aces)
+
+            @subject_options = {nil => [["", "Choose a Subject"]], **SubjectTag.options_for_project(@project)}
+            @action_options = {nil => [["", "All Actions"]], **ActionTag.options_for_project(@project)}
+            @object_options = {nil => [["", "All Objects"]], **ObjectTag.options_for_project(@project)}
+
+            view "project/access-control"
           end
 
-          flash["notice"] = "Access control entries saved successfully"
+          r.post do
+            authorize("Project:editaccess", @project.id)
 
-          r.redirect "#{@project_data[:path]}/user/access-control"
+            DB.transaction do
+              typecast_params.array!(:Hash, "aces").each do
+                ubid, deleted, subject_id, action_id, object_id = it.values_at("ubid", "deleted", "subject", "action", "object")
+                subject_id = nil if subject_id == ""
+                action_id = nil if action_id == ""
+                object_id = nil if object_id == ""
+
+                next unless subject_id
+                check_ace_subject(UBID.to_uuid(subject_id)) unless deleted
+
+                if ubid == "template"
+                  next if deleted == "true"
+                  ace = AccessControlEntry.new_with_id(project_id: @project.id)
+                  audit_action = "create"
+                else
+                  next unless (ace = AccessControlEntry[project_id: @project.id, id: UBID.to_uuid(ubid)])
+                  check_ace_subject(ace.subject_id)
+                  if deleted == "true"
+                    ace.destroy
+                    audit_log(ace, "destroy")
+                    next
+                  end
+                  audit_action = "update"
+                end
+                ace.update_from_ubids(subject_id:, action_id:, object_id:)
+                audit_log(ace, audit_action, [subject_id, action_id, object_id])
+              end
+            end
+
+            flash["notice"] = "Access control entries saved successfully"
+
+            r.redirect "#{@project_data[:path]}/user/access-control"
+          end
         end
 
         r.on "tag", %w[subject action object] do |tag_type|
@@ -264,31 +265,33 @@ class Clover
           @display_tag_type = tag_type.capitalize
           @tag_model = Object.const_get(:"#{@display_tag_type}Tag")
 
-          r.get true do
-            authorize("Project:viewaccess", @project.id)
-            @tags = dataset_authorize(@tag_model.where(project_id: @project.id).order(:name), "#{@tag_model}:view").all
-            view "project/tag-list"
-          end
-
-          r.post true do
-            authorize(tag_perm_map[tag_type], @project.id)
-            DB.transaction do
-              tag = @tag_model.create_with_id(project_id: @project.id, name: typecast_params.nonempty_str("name"))
-              audit_log(tag, "create")
+          r.is do
+            r.get do
+              authorize("Project:viewaccess", @project.id)
+              @tags = dataset_authorize(@tag_model.where(project_id: @project.id).order(:name), "#{@tag_model}:view").all
+              view "project/tag-list"
             end
-            flash["notice"] = "#{@display_tag_type} tag created successfully"
-            r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}"
+
+            r.post do
+              authorize(tag_perm_map[tag_type], @project.id)
+              DB.transaction do
+                tag = @tag_model.create_with_id(project_id: @project.id, name: typecast_params.nonempty_str("name"))
+                audit_log(tag, "create")
+              end
+              flash["notice"] = "#{@display_tag_type} tag created successfully"
+              r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}"
+            end
           end
 
-          r.on String do |ubid|
-            next unless (@tag = @tag_model[project_id: @project.id, id: UBID.to_uuid(ubid)])
+          r.on :ubid_uuid do |id|
+            next unless (@tag = @tag_model[project_id: @project.id, id:])
             # Metatag uuid is used to differentiate being allowed to manage
             # tag itself, compared to being able to manage things contained in
             # the tag.
             @authorize_id = (tag_type == "object") ? @tag.metatag_uuid : @tag.id
 
             r.is do
-              r.get true do
+              r.get do
                 authorize("#{@tag.class}:view", @authorize_id)
 
                 members = @current_members = {}

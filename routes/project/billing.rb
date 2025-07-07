@@ -27,22 +27,24 @@ class Clover
       r.post true do
         if (billing_info = @project.billing_info)
           current_tax_id = billing_info.stripe_data["tax_id"]
-          new_tax_id = r.params["tax_id"].gsub(/[^a-zA-Z0-9]/, "")
+          tp = typecast_params
+          new_tax_id = tp.str!("tax_id").gsub(/[^a-zA-Z0-9]/, "")
+
           begin
             Stripe::Customer.update(billing_info.stripe_id, {
-              name: r.params["name"],
-              email: r.params["email"].strip,
+              name: tp.str!("name"),
+              email: tp.str!("email").strip,
               address: {
-                country: r.params["country"],
-                state: r.params["state"],
-                city: r.params["city"],
-                postal_code: r.params["postal_code"],
-                line1: r.params["address"],
+                country: tp.str!("country"),
+                state: tp.str!("state"),
+                city: tp.str!("city"),
+                postal_code: tp.str!("postal_code"),
+                line1: tp.str!("address"),
                 line2: nil
               },
               metadata: {
                 tax_id: new_tax_id,
-                company_name: r.params["company_name"]
+                company_name: tp.str!("company_name")
               }
             })
             if new_tax_id != current_tax_id
@@ -76,13 +78,13 @@ class Clover
       end
 
       r.get "success" do
-        checkout_session = Stripe::Checkout::Session.retrieve(r.params["session_id"])
+        checkout_session = Stripe::Checkout::Session.retrieve(typecast_params.str!("session_id"))
         setup_intent = Stripe::SetupIntent.retrieve(checkout_session["setup_intent"])
 
         stripe_id = setup_intent["payment_method"]
         stripe_payment_method = Stripe::PaymentMethod.retrieve(stripe_id)
         card_fingerprint = stripe_payment_method["card"]["fingerprint"]
-        if PaymentMethod.where(fraud: true).select_map(:card_fingerprint).include?(card_fingerprint)
+        unless PaymentMethod.where(fraud: true, card_fingerprint:).empty?
           flash["error"] = "Payment method you added is labeled as fraud. Please contact support."
           r.redirect @project.path + "/billing"
         end
@@ -127,7 +129,7 @@ class Clover
           PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: stripe_id, card_fingerprint: card_fingerprint, preauth_intent_id: payment_intent.id, preauth_amount: preauth_amount)
         end
 
-        if !@project.billing_info.has_address?
+        unless @project.billing_info.has_address?
           Stripe::Customer.update(@project.billing_info.stripe_id, {
             address: stripe_payment_method["billing_details"]["address"].to_hash
           })
@@ -152,44 +154,38 @@ class Clover
           r.redirect checkout.url, 303
         end
 
-        r.is :ubid_uuid do |id|
+        r.delete :ubid_uuid do |id|
           next unless (payment_method = PaymentMethod[id:, billing_info_id: @project.billing_info_id])
 
-          r.delete true do
-            unless payment_method.billing_info.payment_methods.count > 1
-              response.status = 400
-              next {error: {message: "You can't delete the last payment method of a project."}}
-            end
-
-            DB.transaction do
-              payment_method.destroy
-              audit_log(payment_method, "destroy")
-            end
-
-            204
+          unless payment_method.billing_info.payment_methods_dataset.count > 1
+            response.status = 400
+            next {error: {message: "You can't delete the last payment method of a project."}}
           end
+
+          DB.transaction do
+            payment_method.destroy
+            audit_log(payment_method, "destroy")
+          end
+
+          204
         end
       end
 
-      r.on "invoice" do
-        r.is String do |invoice_ubid|
-          next unless (invoice = (invoice_ubid == "current") ? @project.current_invoice : Invoice[id: UBID.to_uuid(invoice_ubid), project_id: @project.id])
+      r.get "invoice", ["current", :ubid_uuid] do |id|
+        next unless (invoice = (id == "current") ? @project.current_invoice : Invoice[id:, project_id: @project.id])
 
-          r.get true do
-            @invoice_data = Serializers::Invoice.serialize(invoice, {detailed: true})
+        @invoice_data = Serializers::Invoice.serialize(invoice, {detailed: true})
 
-            unless invoice.status == "current"
-              response["content-type"] = "application/pdf"
-              response["content-disposition"] = "inline; filename=\"#{invoice.filename}\""
-              begin
-                next Invoice.blob_storage_client.get_object(bucket: Config.invoices_bucket_name, key: invoice.blob_key).body.read
-              rescue Aws::S3::Errors::NoSuchKey
-                Clog.emit("Could not find the invoice") { {not_found_invoice: {invoice_ubid: invoice.ubid}} }
-                next invoice.generate_pdf(@invoice_data)
-              end
-            end
-
-            view "project/invoice"
+        if invoice.status == "current"
+          view "project/invoice"
+        else
+          response["content-type"] = "application/pdf"
+          response["content-disposition"] = "inline; filename=\"#{invoice.filename}\""
+          begin
+            Invoice.blob_storage_client.get_object(bucket: Config.invoices_bucket_name, key: invoice.blob_key).body.read
+          rescue Aws::S3::Errors::NoSuchKey
+            Clog.emit("Could not find the invoice") { {not_found_invoice: {invoice_ubid: invoice.ubid}} }
+            invoice.generate_pdf(@invoice_data)
           end
         end
       end

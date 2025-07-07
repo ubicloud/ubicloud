@@ -36,12 +36,12 @@ class Clover
         end
 
         r.post true do
-          unless r.params["cache_enabled"].nil?
-            @installation.cache_enabled = r.params["cache_enabled"] == "true"
+          if typecast_params.present?("cache_enabled")
+            @installation.cache_enabled = typecast_params.bool("cache_enabled")
           end
 
-          unless r.params["premium_runner_enabled"].nil?
-            @installation.allocator_preferences["family_filter"] = if r.params["premium_runner_enabled"] == "true"
+          if typecast_params.present?("premium_runner_enabled")
+            @installation.allocator_preferences["family_filter"] = if typecast_params.bool("premium_runner_enabled")
               ["premium", "standard"]
             end
             @installation.modified!(:allocator_preferences)
@@ -81,7 +81,7 @@ class Clover
           r.get true do
             entries = @installation.cache_entries_dataset.exclude(committed_at: nil).eager(:repository).reverse(:created_at).all
             @entries_by_repo = Serializers::GithubCacheEntry.serialize(entries).group_by { it[:repository][:id] }
-            @quota_per_repo = "#{@project.effective_quota_value("GithubRunnerCacheStorage")} GB"
+            @quota_per_repo = "#{@installation.cache_storage_gib} GB"
 
             view "github/cache"
           end

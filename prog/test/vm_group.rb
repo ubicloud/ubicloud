@@ -32,7 +32,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
     boot_images = frame.fetch("boot_images")
     storage_options = [
       [{encrypted:, skip_sync: true}, {encrypted:, size_gib: 5}],
-      [{encrypted:, skip_sync: false, max_read_mbytes_per_sec: 200, max_write_mbytes_per_sec: 150, max_ios_per_sec: 25600}],
+      [{encrypted:, skip_sync: false, max_read_mbytes_per_sec: 200, max_write_mbytes_per_sec: 150}],
       [{encrypted:, skip_sync: false}]
     ]
     vm_count = [boot_images.size, storage_options.size, size_options.size].max
@@ -66,19 +66,31 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def wait_verify_vms
-    reap
-    hop_verify_host_capacity if leaf?
-    donate
+    reap(:verify_host_capacity)
   end
 
   label def verify_host_capacity
-    hop_verify_vm_host_slices if !frame["verify_host_capacity"]
+    hop_verify_storage_backends if !frame["verify_host_capacity"]
 
     vm_cores = vm_host.vms.sum(&:cores)
     slice_cores = vm_host.slices.sum(&:cores)
     spdk_cores = vm_host.cpus.count { it.spdk } * vm_host.total_cores / vm_host.total_cpus
 
     fail_test "Host used cores does not match the allocated VMs cores (vm_cores=#{vm_cores}, slice_cores=#{slice_cores}, spdk_cores=#{spdk_cores}, used_cores=#{vm_host.used_cores})" if vm_cores + slice_cores + spdk_cores != vm_host.used_cores
+
+    hop_verify_storage_backends
+  end
+
+  label def verify_storage_backends
+    fail_test "Expected a vhost block backend" if vm_host.vhost_block_backends.empty?
+
+    Clog.emit("vm_host.vhost_block_backends not empty; performing verification that SPDK is not used")
+
+    spdk_version = vm_host.spdk_installations.first.version
+    spdk_socket = "/home/spdk/spdk-#{spdk_version}.sock"
+    rpc_result = vm_host.sshable.cmd("sudo /opt/spdk-#{spdk_version}/scripts/rpc.py -s #{spdk_socket} bdev_get_bdevs")
+
+    fail_test "SPDK has bdevs but a vhost block backend also exists: #{rpc_result}" unless JSON.parse(rpc_result).empty?
 
     hop_verify_vm_host_slices
   end

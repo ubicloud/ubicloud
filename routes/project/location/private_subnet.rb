@@ -8,7 +8,7 @@ class Clover
 
     r.on PRIVATE_SUBNET_NAME_OR_UBID do |ps_name, ps_id|
       if ps_name
-        r.post true do
+        r.post api? do
           check_visible_location
           private_subnet_post(ps_name)
         end
@@ -19,7 +19,7 @@ class Clover
       end
 
       filter[:location_id] = @location.id
-      ps = @project.private_subnets_dataset.eager(:location).first(filter)
+      ps = @project.private_subnets_dataset.first(filter)
       check_found_object(ps)
 
       r.post "connect" do
@@ -67,35 +67,45 @@ class Clover
         end
       end
 
-      request.get true do
-        authorize("PrivateSubnet:view", ps.id)
-        @ps = Serializers::PrivateSubnet.serialize(ps)
-        if api?
-          @ps
-        else
-          @nics = Serializers::Nic.serialize(ps.nics)
-          @connected_subnets = Serializers::PrivateSubnet.serialize(ps.connected_subnets)
-          connectable_subnets = ps.project.private_subnets.select do |ps1|
-            ps1_id = ps1.id
-            ps1_id != ps.id && !ps.connected_subnets.find { |cs| cs.id == ps1_id }
+      r.is do
+        r.get do
+          authorize("PrivateSubnet:view", ps.id)
+          @ps = Serializers::PrivateSubnet.serialize(ps)
+          if api?
+            @ps
+          else
+            @nics = Serializers::Nic.serialize(ps.nics)
+            @connected_subnets = Serializers::PrivateSubnet.serialize(ps.connected_subnets)
+            connectable_subnets_dataset = ps.project.private_subnets_dataset.exclude(id: ps.connected_subnets.map(&:id))
+            @connectable_subnets = Serializers::PrivateSubnet.serialize(connectable_subnets_dataset.all)
+            view "networking/private_subnet/show"
           end
-          @connectable_subnets = Serializers::PrivateSubnet.serialize(connectable_subnets)
-          view "networking/private_subnet/show"
-        end
-      end
-
-      request.delete true do
-        authorize("PrivateSubnet:delete", ps.id)
-        unless ps.vms.all? { it.destroy_set? || it.strand.nil? || it.strand.label == "destroy" }
-          fail DependencyError.new("Private subnet '#{ps.name}' has VMs attached, first, delete them.")
         end
 
-        DB.transaction do
-          ps.incr_destroy
-          audit_log(ps, "destroy")
-        end
+        r.delete do
+          authorize("PrivateSubnet:delete", ps.id)
 
-        204
+          vms_dataset = ps.vms_dataset
+            .association_join(:strand)
+            .exclude(label: "destroy")
+            .exclude(Sequel[:vm][:id] => Semaphore
+              .where(
+                strand_id: ps.nics_dataset.select(:vm_id),
+                name: "destroy"
+              )
+              .select(:strand_id))
+
+          unless vms_dataset.empty?
+            fail DependencyError.new("Private subnet '#{ps.name}' has VMs attached, first, delete them.")
+          end
+
+          DB.transaction do
+            ps.incr_destroy
+            audit_log(ps, "destroy")
+          end
+
+          204
+        end
       end
     end
   end

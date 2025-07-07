@@ -13,7 +13,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   label def provision_servers
     hop_wait_servers_to_be_ready if postgres_resource.has_enough_fresh_servers?
 
-    if postgres_resource.servers.all? { it.vm.vm_host } || postgres_resource.location.provider == "aws"
+    if postgres_resource.servers.all? { it.vm.vm_host } || postgres_resource.location.aws?
       exclude_host_ids = []
       if !(Config.development? || Config.is_e2e) && postgres_resource.location.provider == HostProvider::HETZNER_PROVIDER_NAME
         used_data_centers = postgres_resource.servers.map { it.vm.vm_host.data_center }.uniq
@@ -34,13 +34,14 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   end
 
   label def recycle_representative_server
-    if (rs = postgres_resource.representative_server)
+    if (rs = postgres_resource.representative_server) && !postgres_resource.ongoing_failover?
       hop_prune_servers unless rs.needs_recycling?
+      hop_provision_servers unless postgres_resource.has_enough_ready_servers?
 
       nap 10 * 60 unless postgres_resource.in_maintenance_window?
 
       register_deadline(nil, 10 * 60)
-      rs.trigger_failover
+      rs.trigger_failover(mode: "planned")
     end
 
     nap 60
@@ -55,6 +56,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       .take(postgres_resource.target_standby_count) + [postgres_resource.representative_server]
     (postgres_resource.servers - servers_to_keep).each.each(&:incr_destroy)
 
+    servers_to_keep.each(&:incr_configure)
     postgres_resource.incr_update_billing_records
 
     pop "postgres resource is converged"

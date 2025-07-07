@@ -2,49 +2,41 @@
 
 class Clover
   hash_branch("project") do |r|
-    r.get true do
-      no_authorization_needed
-      dataset = current_account.projects_dataset.where(visible: true)
+    r.is do
+      r.get do
+        no_authorization_needed
+        dataset = current_account.projects_dataset.where(visible: true)
 
-      if api?
-        result = dataset.paginated_result(
-          start_after: r.params["start_after"],
-          page_size: r.params["page_size"],
-          order_column: r.params["order_column"]
-        )
-
-        {
-          items: Serializers::Project.serialize(result[:records]),
-          count: result[:count]
-        }
-      else
-        @projects = Serializers::Project.serialize(dataset.all, {include_path: true, web: true})
-        view "project/index"
-      end
-    end
-
-    r.post true do
-      no_authorization_needed
-      if current_account.projects_dataset.count >= 10
-        err_msg = "Project limit exceeded. You can create up to 10 projects. Contact support@ubicloud.com if you need more."
         if api?
-          fail CloverError.new(400, "InvalidRequest", err_msg)
+          paginated_result(dataset, Serializers::Project)
         else
-          flash["error"] = err_msg
-          r.redirect "/project"
+          @projects = Serializers::Project.serialize(dataset.all, {include_path: true, web: true})
+          view "project/index"
         end
       end
 
-      params = check_required_web_params(["name"])
-      DB.transaction do
-        @project = current_account.create_project_with_default_policy(params["name"])
-        audit_log(@project, "create")
-      end
+      r.post do
+        no_authorization_needed
+        if current_account.projects_dataset.count >= 10
+          err_msg = "Project limit exceeded. You can create up to 10 projects. Contact support@ubicloud.com if you need more."
+          if api?
+            fail CloverError.new(400, "InvalidRequest", err_msg)
+          else
+            flash["error"] = err_msg
+            r.redirect "/project"
+          end
+        end
 
-      if api?
-        Serializers::Project.serialize(@project)
-      else
-        r.redirect @project.path
+        DB.transaction do
+          @project = current_account.create_project_with_default_policy(typecast_params.nonempty_str!("name"))
+          audit_log(@project, "create")
+        end
+
+        if api?
+          Serializers::Project.serialize(@project)
+        else
+          r.redirect @project.path
+        end
       end
     end
 
@@ -60,54 +52,54 @@ class Clover
       @project_data = Serializers::Project.serialize(@project, {include_path: true, web: true})
       @project_permissions = all_permissions(@project.id) if web?
 
-      r.get true do
-        authorize("Project:view", @project.id)
+      r.is do
+        r.get do
+          authorize("Project:view", @project.id)
 
-        if api?
-          Serializers::Project.serialize(@project)
-        else
-          @quotas = ["VmVCpu", "PostgresVCpu"].map {
-            {
-              resource_type: it,
-              current_resource_usage: @project.current_resource_usage(it),
-              quota: @project.effective_quota_value(it)
+          if api?
+            Serializers::Project.serialize(@project)
+          else
+            @quotas = ["VmVCpu", "PostgresVCpu"].map {
+              {
+                resource_type: it,
+                current_resource_usage: @project.current_resource_usage(it),
+                quota: @project.effective_quota_value(it)
+              }
             }
-          }
 
-          view "project/show"
-        end
-      end
-
-      r.delete true do
-        authorize("Project:delete", @project.id)
-
-        if @project.has_resources
-          fail DependencyError.new("'#{@project.name}' project has some resources. Delete all related resources first.")
+            view "project/show"
+          end
         end
 
-        DB.transaction do
-          @project.soft_delete
-          audit_log(@project, "destroy")
+        r.delete do
+          authorize("Project:delete", @project.id)
+
+          if @project.has_resources?
+            fail DependencyError.new("'#{@project.name}' project has some resources. Delete all related resources first.")
+          end
+
+          DB.transaction do
+            @project.soft_delete
+            audit_log(@project, "destroy")
+          end
+
+          204
         end
 
-        204
-      end
-
-      if web?
-        r.get("dashboard") do
-          no_authorization_needed
-          view("project/dashboard")
-        end
-
-        r.post true do
+        r.post web? do
           authorize("Project:edit", @project.id)
-          @project.update(name: r.params["name"])
+          @project.update(name: typecast_params.nonempty_str!("name"))
           audit_log(@project, "update")
 
           flash["notice"] = "The project name is updated to '#{@project.name}'."
 
           r.redirect @project.path
         end
+      end
+
+      r.get(web?, "dashboard") do
+        no_authorization_needed
+        view("project/dashboard")
       end
 
       r.hash_branches(:project_prefix)

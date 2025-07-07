@@ -19,42 +19,50 @@ class Clover
       end
 
       filter[:location_id] = @location.id
-      firewall = @project.firewalls_dataset.eager(:location).first(filter)
+      firewall = @project.firewalls_dataset.first(filter)
       check_found_object(firewall)
 
-      r.delete true do
-        authorize("Firewall:delete", firewall.id)
-        firewall.private_subnets.map { authorize("PrivateSubnet:edit", it.id) }
-        DB.transaction do
-          firewall.destroy
-          audit_log(firewall, "destroy")
+      r.is do
+        r.delete do
+          authorize("Firewall:delete", firewall.id)
+          ds = firewall.private_subnets_dataset
+          unless ds.exclude(id: dataset_authorize(ds, "PrivateSubnet:edit").select(:id)).empty?
+            fail Authorization::Unauthorized
+          end
+
+          DB.transaction do
+            firewall.destroy
+            audit_log(firewall, "destroy")
+          end
+          204
         end
-        204
-      end
 
-      r.get true do
-        authorize("Firewall:view", firewall.id)
-        @firewall = Serializers::Firewall.serialize(firewall, {detailed: true})
+        r.get do
+          authorize("Firewall:view", firewall.id)
+          @firewall = Serializers::Firewall.serialize(firewall, {detailed: true})
 
-        if api?
-          @firewall
-        else
-          project_subnets = dataset_authorize(@project.private_subnets_dataset.eager(:location).where(location_id: @location.id), "PrivateSubnet:view").all
-          attached_subnets = firewall.private_subnets_dataset.eager(:location).all
-          @attachable_subnets = Serializers::PrivateSubnet.serialize(project_subnets.reject { |ps| attached_subnets.find { |as| as.id == ps.id } })
+          if api?
+            @firewall
+          else
+            attachable_subnets_dataset = dataset_authorize(@project
+                .private_subnets_dataset
+                .eager(:location)
+                .where(location_id: @location.id),
+              "PrivateSubnet:view")
+              .exclude(id: firewall.private_subnets_dataset.select(:id))
+            @attachable_subnets = Serializers::PrivateSubnet.serialize(attachable_subnets_dataset.all)
 
-          view "networking/firewall/show"
+            view "networking/firewall/show"
+          end
         end
       end
 
       r.post %w[attach-subnet detach-subnet] do |action|
         authorize("Firewall:view", firewall.id)
 
-        private_subnet_id = check_required_web_params(["private_subnet_id"])["private_subnet_id"]
-
         unless (private_subnet = authorized_private_subnet(location_id: @location.id, perm: "PrivateSubnet:edit"))
           if api?
-            fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{private_subnet_id}\" and the location \"#{@location.display_name}\" is not found"})
+            fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{typecast_params.str("private_subnet_id")}\" and the location \"#{@location.display_name}\" is not found"})
           else
             flash["error"] = "Private subnet not found"
             r.redirect "#{@project.path}#{firewall.path}"
@@ -92,13 +100,8 @@ class Clover
         r.post true do
           authorize("Firewall:edit", firewall.id)
 
-          port_range = if r.params["port_range"].empty?
-            [0, 65535]
-          else
-            Validation.validate_port_range(r.params["port_range"])
-          end
-
-          parsed_cidr = Validation.validate_cidr(r.params["cidr"])
+          parsed_cidr = Validation.validate_cidr(typecast_params.str!("cidr"))
+          port_range = Validation.validate_port_range(typecast_params.str("port_range"))
           pg_range = Sequel.pg_range(port_range.first..port_range.last)
 
           DB.transaction do

@@ -1,10 +1,10 @@
-<%# locals: (content:, message: "Copied", revealable: false) %>
+<%# locals: (content:, message: "Copied", revealable: false, classes: "") %>
 
-<span class="copyable-content inline-flex items-center" data-content="<%= content %>" data-message="<%= message %>">
+<div class="copyable-content inline-flex items-center gap-1 <%= classes %>" data-content="<%= content %>" data-message="<%= message %>">
   <% if revealable %>
     <%== part("components/revealable_content", content:) %>
   <% else %>
     <%= content %>
   <% end %>
   <img src="/icons/hero-clipboard-document.svg" width="18px" class="inline-block copy-button cursor-pointer ms1"/>
-</span>
+</div>

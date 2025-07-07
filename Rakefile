@@ -127,7 +127,7 @@ task :prod_up do
   migrate.call("production", nil)
 end
 
-desc "Refresh schema and index caches"
+desc "Refresh Sequel caches"
 task :refresh_sequel_caches do
   %w[schema index static_cache pg_auto_constraint_validations].each do |type|
     filename = "cache/#{type}.cache"
@@ -140,6 +140,18 @@ task :refresh_sequel_caches do
      Sequel::Model.dump_static_cache_cache
      Sequel::Model.dump_pg_auto_constraint_validations_cache
   END
+end
+
+desc "Dump Sequel caches to text, useful for diffing"
+task :dump_sequel_caches do
+  load_db.call("test")
+  require "pp"
+  text_dir = "cache-text-#{Time.now.to_i}"
+  Dir.mkdir(text_dir)
+  puts "Writing diffable version of cache files to #{text_dir}"
+  %w[schema index static_cache pg_auto_constraint_validations].each do |type|
+    File.write(File.join(text_dir, "#{type}.txt"), Marshal.load(File.binread("cache/#{type}.cache")).pretty_inspect)
+  end
 end
 
 # Database setup
@@ -171,10 +183,12 @@ when "test"
   ENV["CLOVER_SESSION_SECRET"] ||= "#{SecureRandom.base64(64)}"
   ENV["CLOVER_DATABASE_URL"] ||= "postgres:///clover_test\#{ENV["TEST_ENV_NUMBER"]}?user=clover"
   ENV["CLOVER_COLUMN_ENCRYPTION_KEY"] ||= "#{SecureRandom.base64(32)}"
+  ENV["CLOVER_RUNTIME_TOKEN_SECRET"] ||= "#{SecureRandom.base64(64)}"
 else
   ENV["CLOVER_SESSION_SECRET"] ||= "#{SecureRandom.base64(64)}"
   ENV["CLOVER_DATABASE_URL"] ||= "postgres:///clover_development?user=clover"
   ENV["CLOVER_COLUMN_ENCRYPTION_KEY"] ||= "#{SecureRandom.base64(32)}"
+  ENV["CLOVER_RUNTIME_TOKEN_SECRET"] ||= "#{SecureRandom.base64(64)}"
 end
 ENVRB
 end
@@ -270,6 +284,22 @@ desc "Check that model files work when required separately"
 task "check_separate_requires" do
   require "rbconfig"
   system({"RACK_ENV" => "test", "LOAD_FILES_SEPARATELY_CHECK" => "1"}, RbConfig.ruby, "-r", "./loader", "-e", "")
+end
+
+desc "Run respirate smoke tests"
+task :respirate_smoke_test do
+  # not partitioned, 1 process
+  system(RbConfig.ruby, "spec/respirate_smoke_test.rb")
+
+  # not partitioned, 8 processes
+  system(RbConfig.ruby, "spec/respirate_smoke_test.rb", "1", "8")
+
+  # 8-way partition, 8 processes
+  system(RbConfig.ruby, "spec/respirate_smoke_test.rb", "8")
+
+  # 8-way partition, but only 7 processes. This simulates a crash/apoptosis
+  # in a respirate process, checking that other processes pick up the slack.
+  system(RbConfig.ruby, "spec/respirate_smoke_test.rb", "8", "7")
 end
 
 desc "Run each spec file in a separate process"

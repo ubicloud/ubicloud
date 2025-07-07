@@ -60,7 +60,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def start
-    if private_subnet.location.provider == "aws"
+    if private_subnet.location.aws?
       PrivateSubnetAwsResource.create { it.id = private_subnet.id } unless private_subnet.private_subnet_aws_resource
       bud Prog::Aws::Vpc, {"subject_id" => private_subnet.id}, :create_vpc
       hop_wait_vpc_created
@@ -70,12 +70,16 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def wait_vpc_created
-    reap
-    hop_wait if leaf?
-    nap 2
+    reap(:wait, nap: 2)
   end
 
   label def wait
+    if private_subnet.location.aws?
+      check_firewall_update
+      private_subnet.semaphores.each(&:destroy)
+      nap 60 * 60 * 24 * 365
+    end
+
     when_refresh_keys_set? do
       private_subnet.update(state: "refreshing_keys")
       hop_refresh_keys
@@ -86,16 +90,20 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       hop_add_new_nic
     end
 
-    when_update_firewall_rules_set? do
-      private_subnet.vms.map(&:incr_update_firewall_rules)
-      decr_update_firewall_rules
-    end
+    check_firewall_update
 
     if private_subnet.last_rekey_at < Time.now - 60 * 60 * 24
       private_subnet.incr_refresh_keys
     end
 
     nap 10 * 60
+  end
+
+  def check_firewall_update
+    when_update_firewall_rules_set? do
+      private_subnet.vms.each(&:incr_update_firewall_rules)
+      decr_update_firewall_rules
+    end
   end
 
   def gen_encryption_key
@@ -127,8 +135,9 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
   label def refresh_keys
     decr_refresh_keys
-    nap 10 if active_nics.any? { |nic| nic.lock_set? }
-    active_nics.each do |nic|
+    nics = active_nics
+    nap 10 if nics.any? { |nic| nic.lock_set? }
+    nics.each do |nic|
       nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
       nic.incr_start_rekey
       nic.incr_lock
@@ -138,8 +147,9 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def wait_inbound_setup
-    if rekeying_nics.all? { |nic| nic.strand.label == "wait_rekey_outbound_trigger" }
-      rekeying_nics.each(&:incr_trigger_outbound_update)
+    nics = rekeying_nics
+    if nics.all? { |nic| nic.strand.label == "wait_rekey_outbound_trigger" }
+      nics.each(&:incr_trigger_outbound_update)
       hop_wait_outbound_setup
     end
 
@@ -147,8 +157,9 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def wait_outbound_setup
-    if rekeying_nics.all? { |nic| nic.strand.label == "wait_rekey_old_state_drop_trigger" }
-      rekeying_nics.each(&:incr_old_state_drop_trigger)
+    nics = rekeying_nics
+    if nics.all? { |nic| nic.strand.label == "wait_rekey_old_state_drop_trigger" }
+      nics.each(&:incr_old_state_drop_trigger)
       hop_wait_old_state_drop
     end
 
@@ -156,9 +167,10 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def wait_old_state_drop
-    if rekeying_nics.all? { |nic| nic.strand.label == "wait" }
+    nics = rekeying_nics
+    if nics.all? { |nic| nic.strand.label == "wait" }
       private_subnet.update(state: "waiting", last_rekey_at: Time.now)
-      rekeying_nics.each do |nic|
+      nics.each do |nic|
         nic.update(encryption_key: nil, rekey_payload: nil)
         nic.unlock
       end
@@ -179,7 +191,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
     decr_destroy
     strand.children.each { it.destroy }
-    if private_subnet.location.provider == "aws"
+    if private_subnet.location.aws?
       private_subnet.nics.map(&:incr_destroy)
       private_subnet.firewalls.map(&:destroy)
       bud Prog::Aws::Vpc, {"subject_id" => private_subnet.id}, :destroy
@@ -202,13 +214,12 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def wait_aws_vpc_destroyed
-    reap
-    if leaf?
+    reap(nap: 10) do
+      nap 5 unless private_subnet.nics.empty?
       private_subnet.private_subnet_aws_resource.destroy
       private_subnet.destroy
       pop "vpc destroyed"
     end
-    nap 10
   end
 
   def self.random_private_ipv6(location, project)
@@ -238,19 +249,25 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     selected_addr
   end
 
-  def to_be_added_nics
-    private_subnet.find_all_connected_nics.select { it.strand.label == "wait_setup" }
-  end
-
   def active_nics
-    private_subnet.find_all_connected_nics.select { it.strand.label == "wait" }
+    nics_with_strand_label("wait").all
   end
 
   def nics_to_rekey
-    (active_nics + to_be_added_nics).uniq
+    nics_with_strand_label(%w[wait wait_setup]).all
   end
 
   def rekeying_nics
-    private_subnet.find_all_connected_nics.select { !it.rekey_payload.nil? }
+    all_connected_nics.eager(:strand).exclude(rekey_payload: nil).all
+  end
+
+  private
+
+  def all_connected_nics
+    private_subnet.find_all_connected_nics
+  end
+
+  def nics_with_strand_label(label)
+    all_connected_nics.join(:strand, {id: :id, label:}).select_all(:nic)
   end
 end

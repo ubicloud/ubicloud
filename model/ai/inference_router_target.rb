@@ -3,10 +3,14 @@
 require_relative "../../model"
 
 class InferenceRouterTarget < Sequel::Model
+  one_to_one :strand, key: :id
   many_to_one :inference_router
   many_to_one :inference_router_model
 
-  include ResourceMethods
+  plugin ResourceMethods
+  include SemaphoreMethods
+
+  semaphore :destroy
 
   plugin :column_encryption do |enc|
     enc.column :api_key
@@ -27,6 +31,9 @@ end
 #  enabled                   | boolean                  | NOT NULL DEFAULT false
 #  inference_router_model_id | uuid                     | NOT NULL
 #  inference_router_id       | uuid                     | NOT NULL
+#  type                      | text                     | NOT NULL DEFAULT 'manual'::text
+#  config                    | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
+#  state                     | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 # Indexes:
 #  inference_router_target_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:

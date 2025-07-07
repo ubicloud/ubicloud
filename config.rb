@@ -77,6 +77,9 @@ module Config
   override :force_ssl, true, bool
   override :port, 3000, int
   override :pretty_json, false, bool
+  override :dispatcher_max_threads, 8, int
+  override :dispatcher_min_threads, 1, int
+  override :dispatcher_queue_size_ratio, 4, float
   override :puma_max_threads, 16, int
   override :puma_min_threads, 1, int
   override :puma_workers, 3, int
@@ -87,7 +90,6 @@ module Config
   override :versioning, false, bool
   optional :hetzner_user, string, clear: true
   optional :hetzner_password, string, clear: true
-  override :ci_hetzner_sacrificial_server_id, string
   override :hetzner_connection_string, "https://robot-ws.your-server.de", string
   override :managed_service, false, bool
   override :sanctioned_countries, "CU,IR,KP,SY", array(string)
@@ -129,6 +131,9 @@ module Config
   # Spdk
   override :spdk_version, "v23.09-ubi-0.3"
 
+  # Vhost Block Backend
+  override :vhost_block_backend_version, "v0.1-6"
+
   # Boot Images
   override :default_boot_image_name, "ubuntu-jammy", string
 
@@ -154,14 +159,13 @@ module Config
   optional :ubicloud_images_blob_storage_secret_key, string, clear: true
   optional :ubicloud_images_blob_storage_certs, string
 
-  override :ubuntu_noble_version, "20240702", string
-  override :ubuntu_jammy_version, "20240701", string
-  override :debian_12_version, "20241004-1890", string
+  override :ubuntu_noble_version, "20250502.1", string
+  override :ubuntu_jammy_version, "20250508", string
+  override :debian_12_version, "20250428-2096", string
   override :almalinux_9_version, "9.5-20241120", string
-  override :github_ubuntu_2404_version, "20250406.1.1", string
-  override :github_ubuntu_2204_version, "20250406.1.1", string
-  override :github_ubuntu_2004_version, "20250406.1.1", string
-  override :github_gpu_ubuntu_2204_version, "20250406.1.1", string
+  override :github_ubuntu_2404_version, "20250622.1.0", string
+  override :github_ubuntu_2204_version, "20250622.1.0", string
+  override :github_gpu_ubuntu_2204_version, "20250622.1.0", string
   override :postgres16_ubuntu_2204_version, "20250425.1.1", string
   override :postgres17_ubuntu_2204_version, "20250425.1.1", string
   override :postgres16_paradedb_ubuntu_2204_version, "20250425.1.1", string
@@ -172,14 +176,15 @@ module Config
   override :kubernetes_v1_32_version, "20250320.1.0", string
   override :kubernetes_v1_33_version, "20250506.1.0", string
 
-  override :aws_based_postgres_16_ubuntu_2204_ami_version, "ami-030c060f85668b37d", string
-  override :aws_based_postgres_17_ubuntu_2204_ami_version, "ami-095e7210597188ca5", string
+  override :aws_based_postgres_16_ubuntu_2204_ami_version, "ami-0c15093fa829f190a", string
+  override :aws_based_postgres_17_ubuntu_2204_ami_version, "ami-0c8f8ddefeb7bd695", string
 
   # Allocator
   override :allocator_target_host_utilization, 0.55, float
   override :allocator_max_random_score, 0.1, float
 
   # e2e
+  override :e2e_hetzner_server_id, string
   optional :e2e_github_installation_id, string
   override :is_e2e, false, bool
 
@@ -219,4 +224,7 @@ module Config
   optional :invoices_blob_storage_endpoint, string
   optional :invoices_blob_storage_access_key, string, clear: true
   optional :invoices_blob_storage_secret_key, string, clear: true
+
+  # Monitoring
+  optional :monitoring_service_project_id, string
 end

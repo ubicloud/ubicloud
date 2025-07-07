@@ -3,7 +3,7 @@
 require_relative "../../lib/util"
 
 class Prog::Test::HetznerServer < Prog::Test::Base
-  semaphore :verify_cleanup_and_destroy, :allow_slices, :disallow_slices
+  semaphore :verify_cleanup_and_destroy, :disallow_slices
 
   def self.assemble(vm_host_id: nil, default_boot_images: [])
     frame = if vm_host_id
@@ -15,13 +15,13 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       }
     else
       {
-        server_id: Config.ci_hetzner_sacrificial_server_id, setup_host: true,
+        server_id: Config.e2e_hetzner_server_id, setup_host: true,
         default_boot_images:, provider_name: HostProvider::HETZNER_PROVIDER_NAME
       }
     end
 
     if frame[:server_id].nil? || frame[:server_id].empty?
-      fail "CI_HETZNER_SACRIFICIAL_SERVER_ID must be a nonempty string"
+      fail "E2E_HETZNER_SERVER_ID must be a nonempty string"
     end
 
     Strand.create_with_id(
@@ -74,7 +74,10 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   end
 
   label def wait_setup_host
-    nap 15 unless vm_host && vm_host.strand.label == "wait"
+    unless vm_host.strand.label == "wait"
+      Clog.emit(vm_host.sshable.cmd("ls -lah /var/storage/images").strip.tr("\n", "\t")) if vm_host.strand.label == "wait_download_boot_images"
+      nap 15
+    end
 
     if retval&.dig("msg") == "installed rhizome"
       verify_specs_installation(installed: true)
@@ -102,7 +105,16 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     vm_host.sshable.cmd("sudo RUN_E2E_TESTS=1 SPDK_TESTS_TMP_DIR=#{tmp_dir} bundle exec rspec host/e2e")
     vm_host.sshable.cmd("sudo rm -rf #{tmp_dir}")
 
-    hop_wait
+    hop_install_vhost_backend
+  end
+
+  label def install_vhost_backend
+    hop_wait if retval&.dig("msg") == "VhostBlockBackend was setup"
+    push Prog::Storage::SetupVhostBlockBackend, {
+      "subject_id" => vm_host.id,
+      "version" => Config.vhost_block_backend_version,
+      "allocation_weight" => 100
+    }
   end
 
   label def wait
@@ -110,22 +122,11 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       hop_verify_cleanup
     end
 
-    when_allow_slices_set? do
-      hop_allow_slices
-    end
-
     when_disallow_slices_set? do
       hop_disallow_slices
     end
 
     nap 15
-  end
-
-  label def allow_slices
-    vm_host.allow_slices
-    Semaphore.where(strand_id: strand.id, name: "allow_slices").destroy
-
-    hop_wait
   end
 
   label def disallow_slices

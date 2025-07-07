@@ -5,7 +5,7 @@ require_relative "../model"
 class PrivateSubnetAwsResource < Sequel::Model
   many_to_one :private_subnet, key: :id
 
-  include ResourceMethods
+  plugin ResourceMethods
 end
 
 # Table: private_subnet_aws_resource

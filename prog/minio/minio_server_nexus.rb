@@ -73,9 +73,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   end
 
   label def wait_bootstrap_rhizome
-    reap
-    hop_create_minio_user if leaf?
-    donate
+    reap(:create_minio_user)
   end
 
   label def create_minio_user
@@ -97,11 +95,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   end
 
   label def wait_setup
-    reap
-    if leaf?
-      hop_wait
-    end
-    donate
+    reap(:wait)
   end
 
   label def wait
@@ -144,11 +138,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
   label def wait_reconfigure
     decr_reconfigure
-    reap
-    if leaf?
-      hop_wait
-    end
-    donate
+    reap(:wait)
   end
 
   label def minio_restart
@@ -165,8 +155,8 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   label def unavailable
     register_deadline("wait", 10 * 60)
 
-    reap
-    nap 5 unless strand.children.select { it.prog == "Minio::MinioServerNexus" && it.label == "minio_restart" }.empty?
+    reap(fallthrough: true)
+    nap 5 unless strand.children_dataset.where(prog: "Minio::MinioServerNexus", label: "minio_restart").empty?
 
     if available?
       decr_checkup

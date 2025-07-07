@@ -6,12 +6,10 @@ class BillingRecord < Sequel::Model
   many_to_one :project
 
   dataset_module do
-    def active
-      where { {Sequel.function(:upper, :span) => nil} }
-    end
+    where(:active, Sequel.function(:upper, :span) => nil)
   end
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   def duration(begin_time, end_time)
     # Billing logic differs based on the resource type: some are billed by duration, others
@@ -35,8 +33,9 @@ class BillingRecord < Sequel::Model
     (duration_end - duration_begin) / 60
   end
 
+  CURRENT_SPAN = Sequel.lit("tstzrange(lower(span), now())").freeze
   def finalize
-    self.class.where(id: id).update(span: Sequel.lit("tstzrange(lower(span), now())"))
+    this.update(span: CURRENT_SPAN)
   end
 
   def billing_rate

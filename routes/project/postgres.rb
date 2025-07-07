@@ -9,13 +9,13 @@ class Clover
     r.web do
       r.post true do
         check_visible_location
-        postgres_post(r.params["name"])
+        postgres_post(typecast_params.nonempty_str("name"))
       end
 
       r.get "create" do
         authorize("Postgres:create", @project.id)
 
-        flavor = r.params["flavor"] || PostgresResource::Flavor::STANDARD
+        flavor = typecast_params.nonempty_str("flavor", PostgresResource::Flavor::STANDARD)
         Validation.validate_postgres_flavor(flavor)
 
         @flavor = flavor

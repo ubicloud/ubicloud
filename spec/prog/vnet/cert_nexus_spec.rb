@@ -114,24 +114,33 @@ RSpec.describe Prog::Vnet::CertNexus do
 
     it "hops to restart if dns_challenge validation fails" do
       expect(challenge).to receive(:status).and_return("failed")
-      expect(Clog).to receive(:emit).with("DNS validation failed")
+      expect(Clog).to receive(:emit).with("DNS validation failed").and_call_original
       expect(dns_zone).to receive(:delete_record).with(record_name: "test-record-name.cert-hostname")
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect { nx.wait_dns_validation }.to hop("restart")
     end
 
-    it "finalizes the certificate when dns_challenge is valid" do
+    it "hops to cert_finalization when dns_challenge is valid" do
       expect(challenge).to receive(:status).and_return("valid")
 
       key = Clec::Cert.ec_key
       expect(OpenSSL::PKey::EC).to receive(:generate).and_return(key)
+      expect(cert).to receive(:update).with(csr_key: key.to_der)
+      expect { nx.wait_dns_validation }.to hop("cert_finalization")
+    end
+  end
+
+  describe "#cert_finalization" do
+    it "finalizes the certificate" do
       csr = instance_double(Acme::Client::CertificateRequest)
       acme_order = instance_double(Acme::Client::Resources::Order)
       expect(nx).to receive(:acme_order).and_return(acme_order).at_least(:once)
-      expect(Acme::Client::CertificateRequest).to receive(:new).with(private_key: key, common_name: "cert-hostname").and_return(csr)
+      ec = instance_double(OpenSSL::PKey::EC)
+      expect(cert).to receive(:csr_key).and_return("der_key")
+      expect(OpenSSL::PKey::EC).to receive(:new).with("der_key").and_return(ec)
+      expect(Acme::Client::CertificateRequest).to receive(:new).with(private_key: ec, common_name: "cert-hostname").and_return(csr)
       expect(acme_order).to receive(:finalize).with(csr: csr)
-      expect(cert).to receive(:update).with(csr_key: key.to_der)
-      expect { nx.wait_dns_validation }.to hop("wait_cert_finalization")
+      expect { nx.cert_finalization }.to hop("wait_cert_finalization")
     end
   end
 
@@ -152,7 +161,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       challenge = instance_double(Acme::Client::Resources::Challenges::DNS01, status: "pending", record_name: "test-record-name", record_content: "content")
       expect(nx).to receive(:dns_challenge).and_return(challenge).at_least(:once)
       expect(acme_order).to receive(:status).and_return("failed")
-      expect(Clog).to receive(:emit).with("Certificate finalization failed")
+      expect(Clog).to receive(:emit).with("Certificate finalization failed").and_call_original
       expect(dns_zone).to receive(:delete_record).with(record_name: "test-record-name.cert-hostname")
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect { nx.wait_cert_finalization }.to hop("restart")
@@ -237,6 +246,13 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
     end
 
+    it "skips deleting the dns record if acme_order doesn't exist" do
+      expect(cert).to receive(:cert).and_return(nil)
+      expect(nx).to receive(:acme_order).and_return(nil)
+
+      expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
+    end
+
     it "skips revocation and dns record deletion for self-signed certificates" do
       expect(Config).to receive(:development?).and_return(true)
       expect(cert).to receive(:dns_zone_id).and_return(nil)
@@ -251,7 +267,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(nx).to receive(:acme_client).and_return(client)
       expect(client).to receive(:revoke).and_raise(Acme::Client::Error::AlreadyRevoked.new("already revoked"))
 
-      expect(Clog).to receive(:emit).with("Certificate is already revoked")
+      expect(Clog).to receive(:emit).with("Certificate is already revoked").and_call_original
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect(dns_zone).to receive(:delete_record).with(record_name: "test-record-name.cert-hostname")
       expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name")).at_least(:once)
@@ -266,7 +282,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(nx).to receive(:acme_client).and_return(client)
       expect(client).to receive(:revoke).and_raise(Acme::Client::Error::NotFound.new("not found"))
 
-      expect(Clog).to receive(:emit).with("Certificate is not found")
+      expect(Clog).to receive(:emit).with("Certificate is not found").and_call_original
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect(dns_zone).to receive(:delete_record).with(record_name: "test-record-name.cert-hostname")
       expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name")).at_least(:once)
@@ -281,7 +297,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(nx).to receive(:acme_client).and_return(client)
       expect(client).to receive(:revoke).and_raise(Acme::Client::Error::Unauthorized.new("The certificate has expired and cannot be revoked"))
 
-      expect(Clog).to receive(:emit).with("Certificate is expired and cannot be revoked")
+      expect(Clog).to receive(:emit).with("Certificate is expired and cannot be revoked").and_call_original
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect(dns_zone).to receive(:delete_record).with(record_name: "test-record-name.cert-hostname")
       expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name")).at_least(:once)

@@ -99,6 +99,14 @@ class Clover < Roda
     AUDIT_LOG_DS.insert(project_id:, ubid_type:, action:, subject_id:, object_ids:)
   end
 
+  def before_authenticated_hash_branches
+    # nothing, only existing for setting up test-specific code
+  end
+
+  def before_main_hash_branches
+    # nothing, only existing for setting up test-specific code
+  end
+
   def no_audit_log
     # Do nothing, this is a no-op method only used to check in the specs
     # that all non-GET requests have some form of audit logging, as an explicit
@@ -133,7 +141,7 @@ class Clover < Roda
   def check_found_object(obj)
     unless obj
       response.status = if request.delete? && request.remaining_path.empty?
-        no_authorization_needed
+        no_authorization_needed if @still_need_authorization
         204
       else
         404
@@ -215,7 +223,9 @@ class Clover < Roda
     #
     # If location not previously retrieved, require it be visible or tied to the current project
     # when retrieving it.  This is called when creating resources in the web routes.
-    @location ||= Location.visible_or_for_project(@project.id).first(id: request.params["location"])
+    @location ||= if (id = typecast_params.ubid_uuid("location"))
+      Location.visible_or_for_project(@project.id).first(id:)
+    end
     handle_invalid_location unless @location&.visible_or_for_project?(@project.id)
   end
 
@@ -233,20 +243,6 @@ class Clover < Roda
 
     response.status = 404
     request.halt
-  end
-
-  def check_required_web_params(required_keys)
-    params = request.params
-
-    # Committee handles validation for API
-    if web?
-      missing_required_keys = required_keys - params.keys
-      unless missing_required_keys.empty?
-        fail Validation::ValidationFailed.new({body: "Request body must include required parameters: #{missing_required_keys.join(", ")}"})
-      end
-    end
-
-    params
   end
 
   def fetch_location_based_prices(*resource_types)

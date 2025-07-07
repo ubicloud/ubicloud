@@ -3,14 +3,25 @@
 require_relative "../model"
 
 class Semaphore < Sequel::Model
-  include ResourceMethods
+  plugin ResourceMethods
 
-  def self.incr(strand_id, name)
-    DB.transaction do
-      if Strand.where(id: strand_id).update(schedule: Sequel::CURRENT_TIMESTAMP) == 1
-        create(strand_id:, name:)
-      end
+  def self.incr(id, name)
+    case name
+    when Symbol
+      name = name.to_s
+    when String
+      # nothing
+    else
+      raise "invalid name given to Semaphore.incr: #{name.inspect}"
     end
+
+    with(:updated_strand,
+      Strand
+        .where(id:)
+        .returning(:id)
+        .with_sql(:update_sql, schedule: Sequel::CURRENT_TIMESTAMP))
+      .insert([:id, :strand_id, :name],
+        DB[:updated_strand].select(Sequel[:gen_timestamp_ubid_uuid].function(820), :id, name))
   end
 end
 

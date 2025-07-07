@@ -42,21 +42,18 @@ RSpec.describe Validation do
 
       it "no IO limits for standard x64" do
         io_limits = described_class.validate_vm_size("standard-2", "x64").io_limits
-        expect(io_limits.max_ios_per_sec).to be_nil
         expect(io_limits.max_read_mbytes_per_sec).to be_nil
         expect(io_limits.max_write_mbytes_per_sec).to be_nil
       end
 
       it "no IO limits for standard arm64" do
         io_limits = described_class.validate_vm_size("standard-2", "arm64").io_limits
-        expect(io_limits.max_ios_per_sec).to be_nil
         expect(io_limits.max_read_mbytes_per_sec).to be_nil
         expect(io_limits.max_write_mbytes_per_sec).to be_nil
       end
 
       it "no IO limits for standard-gpu" do
         io_limits = described_class.validate_vm_size("standard-gpu-6", "x64").io_limits
-        expect(io_limits.max_ios_per_sec).to be_nil
         expect(io_limits.max_read_mbytes_per_sec).to be_nil
         expect(io_limits.max_write_mbytes_per_sec).to be_nil
       end
@@ -123,7 +120,7 @@ RSpec.describe Validation do
       end
 
       it "succeeds if rate limits are set" do
-        expect { described_class.validate_storage_volumes([{encrypted: true, max_ios_per_sec: 100, max_read_mbytes_per_sec: 10, max_write_mbytes_per_sec: 10}], 0) }.not_to raise_error
+        expect { described_class.validate_storage_volumes([{encrypted: true, max_read_mbytes_per_sec: 10, max_write_mbytes_per_sec: 10}], 0) }.not_to raise_error
       end
 
       it "fails if no volumes" do
@@ -168,53 +165,6 @@ RSpec.describe Validation do
         ].each do |name|
           expect { described_class.validate_minio_username(name) }.to raise_error described_class::ValidationFailed
         end
-      end
-    end
-
-    describe "#validate_postgres_size" do
-      it "valid postgres size" do
-        expect(described_class.validate_postgres_size(Location[name: "hetzner-fsn1"], "standard-2", nil).name).to eq("standard-2")
-      end
-
-      it "invalid postgres size" do
-        expect { described_class.validate_postgres_size(Location[name: "hetzner-fsn1"], "standard-3", nil) }.to raise_error described_class::ValidationFailed
-      end
-    end
-
-    describe "#validate_postgres_storage_size" do
-      it "valid postgres storage sizes" do
-        [
-          ["hetzner-fsn1", "standard-2", "64"],
-          ["hetzner-fsn1", "standard-2", "256"],
-          ["hetzner-fsn1", "standard-4", "512"],
-          ["leaseweb-wdc02", "standard-4", "256"]
-        ].each do |location, pg_size, storage_size|
-          expect(described_class.validate_postgres_storage_size(Location[name: location], pg_size, storage_size, nil)).to eq(storage_size.to_f)
-        end
-      end
-
-      it "invalid postgres storage sizes" do
-        [
-          ["hetzner-fsn1", "standard-2", "1024"],
-          ["hetzner-fsn1", "standard-2", "37.4"],
-          ["hetzner-fsn1", "standard-2", ""],
-          ["hetzner-fsn1", "standard-2", nil],
-          ["hetzner-fsn1", "standard-5", "128"],
-          ["leaseweb-wdc02", "standard-4", "1024"],
-          ["hetzner-fsn1", nil, "128"]
-        ].each do |location, pg_size, storage_size|
-          expect { described_class.validate_postgres_storage_size(Location[name: location], pg_size, storage_size, nil) }.to raise_error described_class::ValidationFailed
-        end
-      end
-    end
-
-    describe "#validate_postgres_ha_type" do
-      it "valid postgres ha_type" do
-        [PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC].each { |ha_type| expect { described_class.validate_postgres_ha_type(ha_type) }.not_to raise_error }
-      end
-
-      it "invalid postgres ha_type" do
-        ["quorum", "on", "off"].each { |ha_type| expect { described_class.validate_postgres_ha_type(ha_type) }.to raise_error described_class::ValidationFailed }
       end
     end
 
@@ -330,17 +280,6 @@ RSpec.describe Validation do
         expect { described_class.validate_short_text("'", "name") }.to raise_error described_class::ValidationFailed
         expect { described_class.validate_short_text("%", "name") }.to raise_error described_class::ValidationFailed
         expect { described_class.validate_short_text("~", "name") }.to raise_error described_class::ValidationFailed
-      end
-    end
-
-    describe "#validate_usage_limit" do
-      it "valid usage limit" do
-        expect(described_class.validate_usage_limit("123")).to eq(123)
-      end
-
-      it "invalid usage limit" do
-        expect { described_class.validate_usage_limit("abc") }.to raise_error described_class::ValidationFailed
-        expect { described_class.validate_usage_limit("0") }.to raise_error described_class::ValidationFailed
       end
     end
 
@@ -501,8 +440,8 @@ RSpec.describe Validation do
 
   describe "#validate_private_location_name" do
     it "validates aws region names" do
-      expect { described_class.validate_provider_location_name("aws", "us-east-1") }.not_to raise_error
-      expect { described_class.validate_provider_location_name("aws", "us-west-2") }.to raise_error described_class::ValidationFailed
+      expect { described_class.validate_provider_location_name("aws", "us-west-2") }.not_to raise_error
+      expect { described_class.validate_provider_location_name("aws", "eu-central-1") }.to raise_error described_class::ValidationFailed
       expect { described_class.validate_provider_location_name("azure", "us-east-1") }.to raise_error described_class::ValidationFailed
     end
   end

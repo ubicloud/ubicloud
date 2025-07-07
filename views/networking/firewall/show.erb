@@ -61,7 +61,6 @@
               <%== part(
                 "components/form/text",
                 name: "cidr",
-                type: "cidr",
                 attributes: {
                   placeholder: "0.0.0.0/0",
                   required: true,
@@ -73,7 +72,6 @@
               <%== part(
                 "components/form/text",
                 name: "port_range",
-                type: "text",
                 attributes: {
                   placeholder: "0..65536",
                   form: "form-fw-create-rule-#{@firewall[:id]}"

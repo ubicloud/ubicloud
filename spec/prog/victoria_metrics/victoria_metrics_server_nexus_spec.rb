@@ -5,9 +5,10 @@ require_relative "../../model/spec_helper"
 RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
   subject(:nx) {
     allow(Config).to receive(:victoria_metrics_service_project_id).and_return(project.id)
-    described_class.new(Strand.new(id: "e29d876b-9437-4ba3-9949-99075ad8767d", prog: "VictoriaMetrics::VictoriaMetricsServerNexus", label: "start"))
+    described_class.new(st)
   }
 
+  let(:st) { Strand.new(id: "e29d876b-9437-4ba3-9949-99075ad8767d", prog: "VictoriaMetrics::VictoriaMetricsServerNexus", label: "start") }
   let(:project) { Project.create_with_id(name: "default") }
 
   let(:vm) {
@@ -91,14 +92,14 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
 
   describe "#wait_bootstrap_rhizome" do
     it "hops to create_victoria_metrics_user if bootstrap is complete" do
-      expect(nx).to receive(:leaf?).and_return(true)
+      st.update(prog: "VictoriaMetrics::VictoriaMetricsServerNexus", label: "wait_bootstrap_rhizome", stack: [{}])
       expect { nx.wait_bootstrap_rhizome }.to hop("create_victoria_metrics_user")
     end
 
     it "donates if bootstrap is not complete" do
-      expect(nx).to receive(:leaf?).and_return(false)
-      expect(nx).to receive(:donate).and_call_original
-      expect { nx.wait_bootstrap_rhizome }.to nap(1)
+      st.update(prog: "VictoriaMetrics::VictoriaMetricsServerNexus", label: "wait_bootstrap_rhizome", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "BootstrapRhizome", label: "start", stack: [{}], lease: Time.now + 10)
+      expect { nx.wait_bootstrap_rhizome }.to nap(120)
     end
   end
 
@@ -342,7 +343,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
     it "adds IP SAN if running in development or E2E environment" do
       allow(Config).to receive(:development?).and_return(true)
       expect(victoria_metrics_server.vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
-      expect(victoria_metrics_server.vm).to receive(:ephemeral_net6).and_return(NetAddr::IPv6Net.parse("2a01:4f8:10a:128b:814c::/79"))
+      expect(victoria_metrics_server.vm).to receive(:ip6).and_return(NetAddr::IPv6Net.parse("2a01:4f8:10a:128b:814c::/79").nth(2))
 
       expect(Util).to receive(:create_certificate).with(
         subject: "/C=US/O=Ubicloud/CN=#{victoria_metrics_server.resource.ubid} Server Certificate",
@@ -408,7 +409,8 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
       client = instance_double(VictoriaMetrics::Client)
       expect(client).to receive(:health).and_raise(StandardError.new("Connection failed"))
       expect(victoria_metrics_server).to receive(:client).and_return(client)
-      expect(Clog).to receive(:emit).with("victoria_metrics server is down")
+      expect(victoria_metrics_server).to receive(:ubid).and_return(nil)
+      expect(Clog).to receive(:emit).with("victoria_metrics server is down").and_call_original
       expect(nx.available?).to be false
     end
   end

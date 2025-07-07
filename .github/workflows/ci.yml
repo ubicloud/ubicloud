@@ -15,40 +15,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [ubicloud, ubicloud-arm]
+        runs-on: [ubicloud-standard-8, ubicloud-standard-8-arm]
     name: Ruby CI - ${{matrix.runs-on}}
     runs-on: ${{matrix.runs-on}}
-
-    env:
-      DB_USER: clover
-      DB_PASSWORD: nonempty
-      DB_NAME: clover_test
-
-    services:
-      postgres:
-        image: postgres:15.8
-        env:
-          POSTGRES_USER: ${{ env.DB_USER }}
-          POSTGRES_PASSWORD: ${{ env.DB_PASSWORD }}
-          POSTGRES_DB: ${{ env.DB_NAME }}
-        ports:
-          - 5432:5432
-        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    timeout-minutes: 25
 
     steps:
-    - name: Perform superuser-only actions, then remove superuser
-      run: |
-        psql "postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}" \
-          -c "CREATE EXTENSION citext; CREATE EXTENSION btree_gist; CREATE ROLE clover_password PASSWORD '${{ env.DB_PASSWORD }}' LOGIN; ALTER ROLE ${{ env.DB_USER }} NOSUPERUSER"
-
     - name: Check out code
       uses: actions/checkout@v4
 
-    - name: Set up Ruby
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: .tool-versions
-        bundler-cache: true
+    - name: Set up Clover
+      uses: ./.github/actions/setup-clover
 
     - name: Set up Node.js
       uses: actions/setup-node@v4
@@ -76,23 +53,10 @@ jobs:
     - name: Run linter:openapi
       run: bundle exec rake linter:openapi
 
-    - name: Apply migrations
-      env:
-        CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
-      run: bundle exec rake _test_up
-
     - name: Run annotate
-      env:
-        CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
-        CLOVER_SESSION_SECRET: kbaf1V3biZ+R2QqFahgDLB5/lSomwxQusA4PwROUkFS1srn0xM/I47IdLW7HjbQoxWri6/aVgtkqTLFiP65h9g==
-        CLOVER_COLUMN_ENCRYPTION_KEY: TtlY0+hd4lvedPkNbu5qsj5H7giPKJSRX9KDBrvid7c=
       run: bundle exec rake annotate
 
     - name: Refresh sequel caches
-      env:
-        CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
-        CLOVER_SESSION_SECRET: kbaf1V3biZ+R2QqFahgDLB5/lSomwxQusA4PwROUkFS1srn0xM/I47IdLW7HjbQoxWri6/aVgtkqTLFiP65h9g==
-        CLOVER_COLUMN_ENCRYPTION_KEY: TtlY0+hd4lvedPkNbu5qsj5H7giPKJSRX9KDBrvid7c=
       run: bundle exec rake refresh_sequel_caches
 
     - name: Check that source code formatters and annotations make no changes
@@ -100,16 +64,10 @@ jobs:
 
     - name: Check production puma loads
       env:
-        CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
-        CLOVER_SESSION_SECRET: kbaf1V3biZ+R2QqFahgDLB5/lSomwxQusA4PwROUkFS1srn0xM/I47IdLW7HjbQoxWri6/aVgtkqTLFiP65h9g==
-        CLOVER_COLUMN_ENCRYPTION_KEY: TtlY0+hd4lvedPkNbu5qsj5H7giPKJSRX9KDBrvid7c=
+        CLOVER_DATABASE_URL: postgres:///clover_test?user=clover
       run: ruby bin/production_check
 
     - name: Run controlplane tests
-      env:
-        CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
-        CLOVER_SESSION_SECRET: kbaf1V3biZ+R2QqFahgDLB5/lSomwxQusA4PwROUkFS1srn0xM/I47IdLW7HjbQoxWri6/aVgtkqTLFiP65h9g==
-        CLOVER_COLUMN_ENCRYPTION_KEY: TtlY0+hd4lvedPkNbu5qsj5H7giPKJSRX9KDBrvid7c=
       run: bundle exec rake
 
     - name: Run dataplane tests

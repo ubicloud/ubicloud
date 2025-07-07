@@ -10,9 +10,9 @@ UbiCli.on("lb").run_on("show") do
   end
   help_option_values("Fields:", fields)
 
-  run do |opts|
+  run do |opts, cmd|
     data = sdk_object.info
-    keys = underscore_keys(check_fields(opts[:lb_show][:fields], fields, "lb show -f option"))
+    keys = underscore_keys(check_fields(opts[:lb_show][:fields], fields, "lb show -f option", cmd))
 
     body = []
 

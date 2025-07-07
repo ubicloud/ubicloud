@@ -25,24 +25,30 @@ class Prog::Vm::GithubRunner < Prog::Base
 
   def pick_vm
     label_data = github_runner.label_data
+    installation = github_runner.installation
+
+    vm_size = if installation.premium_runner_enabled? || installation.free_runner_upgrade?
+      "premium-#{label_data["vcpus"]}"
+    else
+      label_data["vm_size"]
+    end
     pool = VmPool.where(
-      vm_size: label_data["vm_size"],
+      vm_size:,
       boot_image: label_data["boot_image"],
-      location_id: Location[name: label_data["location"]].id,
+      location_id: Location::GITHUB_RUNNERS_ID,
       storage_size_gib: label_data["storage_size_gib"],
       storage_encrypted: true,
       storage_skip_sync: true,
       arch: label_data["arch"]
     ).first
 
-    installation = github_runner.installation
-    if !(installation.premium_runner_enabled? || installation.free_runner_upgrade?) && (picked_vm = pool&.pick_vm)
+    if (picked_vm = pool&.pick_vm)
       return picked_vm
     end
 
     ps = Prog::Vnet::SubnetNexus.assemble(
       Config.github_runner_service_project_id,
-      location_id: Location[name: label_data["location"]].id,
+      location_id: Location::GITHUB_RUNNERS_ID,
       allow_only_ssh: true
     ).subject
 
@@ -52,7 +58,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       sshable_unix_user: "runneradmin",
       name: github_runner.ubid.to_s,
       size: label_data["vm_size"],
-      location_id: Location[name: label_data["location"]].id,
+      location_id: Location::GITHUB_RUNNERS_ID,
       boot_image: label_data["boot_image"],
       storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: true, skip_sync: true}],
       enable_ip4: true,
@@ -71,7 +77,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     label_data = github_runner.label_data
     billed_vm_size = if label_data["arch"] == "arm64"
       "#{label_data["vm_size"]}-arm"
-    elsif github_runner.installation.free_runner_upgrade?
+    elsif github_runner.installation.free_runner_upgrade?(github_runner.created_at)
       # If we enable free upgrades for the project, we should charge
       # the customer for the label's VM size instead of the effective VM size.
       label_data["vm_size"]
@@ -125,6 +131,11 @@ class Prog::Vm::GithubRunner < Prog::Base
     @github_client ||= Github.installation_client(github_runner.installation.installation_id)
   end
 
+  def busy?
+    github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")[:busy]
+  rescue Octokit::NotFound
+  end
+
   def before_run
     when_destroy_set? do
       unless ["destroy", "wait_vm_destroy"].include?(strand.label)
@@ -142,7 +153,6 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   def quota_available?
-    github_runner.installation.project_dataset.for_update.all
     # In existing Github quota calculations, we compare total allocated cpu count
     # with the cpu limit and allow passing the limit once. This is because we
     # check quota and allocate VMs in different labels hence transactions and it
@@ -160,7 +170,7 @@ class Prog::Vm::GithubRunner < Prog::Base
         sum(:used_cores) * 100.0 / sum(:total_cores)
       }.first.to_f
 
-      unless utilization < 70
+      unless utilization < 75
         Clog.emit("Waiting for customer concurrency limit, utilization is high") { [github_runner, {utilization: utilization}] }
         nap rand(5..15)
       end
@@ -229,32 +239,6 @@ class Prog::Vm::GithubRunner < Prog::Base
       UBICLOUD_CACHE_URL=#{Config.base_url}/runtime/github/" | sudo tee -a /etc/environment
     COMMAND
 
-    if github_runner.installation.use_docker_mirror
-      mirror_address = "mirror.gcr.io"
-      command += <<~COMMAND
-        # Configure Docker daemon with registry mirror
-        if [ -f /etc/docker/daemon.json ] && [ -s /etc/docker/daemon.json ]; then
-          sudo jq '. + {"registry-mirrors": ["https://#{mirror_address}"]}' /etc/docker/daemon.json | sudo tee /etc/docker/daemon.json.tmp
-          sudo mv /etc/docker/daemon.json.tmp /etc/docker/daemon.json
-        else
-          echo '{"registry-mirrors": ["https://#{mirror_address}"]}' | sudo tee /etc/docker/daemon.json
-        fi
-
-        # Configure BuildKit to use the mirror
-        sudo mkdir -p /etc/buildkit
-        echo '
-          [registry."docker.io"]
-            mirrors = ["#{mirror_address}"]
-
-          [registry."#{mirror_address}"]
-            http = false
-            insecure = false' | sudo tee -a /etc/buildkit/buildkitd.toml
-
-        sudo systemctl daemon-reload
-        sudo systemctl restart docker
-      COMMAND
-    end
-
     if github_runner.installation.cache_enabled
       command += <<~COMMAND
         echo "CUSTOM_ACTIONS_CACHE_URL=http://#{vm.private_ipv4}:51123/random_token/" | sudo tee -a /etc/environment
@@ -274,16 +258,24 @@ class Prog::Vm::GithubRunner < Prog::Base
     data = {name: github_runner.ubid.to_s, labels: [github_runner.label], runner_group_id: 1, work_folder: "/home/runner/work"}
     response = github_client.post("/repos/#{github_runner.repository_name}/actions/runners/generate-jitconfig", data)
     github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
-    github_runner.log_duration("runner_registered", github_runner.ready_at - github_runner.allocated_at)
-
     # We initiate an API call and a SSH connection under the same label to avoid
     # having to store the encoded_jit_config.
-    vm.sshable.cmd("sudo -- xargs -I{} -- systemd-run --uid runner --gid runner " \
-                   "--working-directory '/home/runner' --unit runner-script --remain-after-exit -- " \
-                   "/home/runner/actions-runner/run-withenv.sh {}",
-      stdin: response[:encoded_jit_config])
+    vm.sshable.cmd("sudo -- xargs -0 -- systemd-run --uid runner --gid runner " \
+                   "--working-directory '/home/runner' --unit runner-script --description runner-script --remain-after-exit -- " \
+                   "/home/runner/actions-runner/run-withenv.sh",
+      stdin: response[:encoded_jit_config].gsub("$", "$$"))
+    github_runner.log_duration("runner_registered", github_runner.ready_at - github_runner.allocated_at)
 
     hop_wait
+  rescue Sshable::SshError => e
+    if e.stderr.include?("Job for runner-script.service failed")
+      Clog.emit("Failed to start runner script") { {failed_to_start_runner: response.to_h} }
+      vm.sshable.cmd(<<~COMMAND)
+        sudo journalctl -xeu runner-script.service
+        cat /run/systemd/transient/runner-script.service || true
+      COMMAND
+    end
+    raise
   rescue Octokit::Conflict => e
     raise unless e.message.include?("Already exists")
 
@@ -315,6 +307,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def wait
+    register_deadline(nil, 5 * 24 * 60 * 60)
     case vm.sshable.cmd("systemctl show -p SubState --value runner-script").chomp
     when "exited"
       github_runner.incr_destroy
@@ -332,8 +325,8 @@ class Prog::Vm::GithubRunner < Prog::Base
     # GitHub API, but sometimes GitHub assigns a job at the last second.
     # Therefore, we wait a few extra seconds beyond the 5 minute mark.
     if github_runner.workflow_job.nil? && Time.now > github_runner.ready_at + 5 * 60 + 10
-      response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
-      unless response[:busy]
+      register_deadline(nil, 2 * 60 * 60)
+      unless busy?
         Clog.emit("The runner does not pick a job") { github_runner }
         github_runner.incr_destroy
         nap 0
@@ -361,8 +354,8 @@ class Prog::Vm::GithubRunner < Prog::Base
 
     # We log the remaining limit DockerHub rate limit to analyze it
     docker_quota_limit_command = <<~COMMAND
-      TOKEN=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
-      curl -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
+      TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
+      curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
     COMMAND
     quota_output = vm.sshable.cmd(docker_quota_limit_command, log: false)
     if quota_output && (match = quota_output.match(/ratelimit-limit:\s*(\d+);w=(\d+).*?ratelimit-remaining:\s*(\d+);w=(\d+).*?docker-ratelimit-source:\s*([^\s]+)/m))
@@ -388,18 +381,17 @@ class Prog::Vm::GithubRunner < Prog::Base
     # destroy, this prevents the underlying VM from being destroyed and the job
     # from failing. However, in certain situations like fraudulent activity, we
     # might need to bypass this verification and immediately remove the runner.
+    # If the busy? returns nil, it means it has already been deleted, so noop.
     unless github_runner.skip_deregistration_set?
-      begin
-        response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
-        if response[:busy]
-          Clog.emit("The runner is still running a job") { github_runner }
-          register_deadline(nil, 15 * 60, allow_extension: true)
-          register_deadline("wait_vm_destroy", 2 * 60 * 60)
-          nap 15
-        end
+      case busy?
+      when true
+        Clog.emit("The runner is still running a job") { github_runner }
+        register_deadline(nil, 15 * 60, allow_extension: true)
+        register_deadline("wait_vm_destroy", 2 * 60 * 60)
+        nap 15
+      when false
         github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
         nap 5
-      rescue Octokit::NotFound
       end
     end
 

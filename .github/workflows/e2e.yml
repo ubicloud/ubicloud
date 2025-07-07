@@ -9,7 +9,7 @@ on:
       test_cases:
         description: 'Comma-separated list of test cases (vm)'
         required: true
-        default: 'vm,github_runner_ubuntu_2404,github_runner_ubuntu_2204,github_runner_ubuntu_2004,postgres_standard,postgres_ha'
+        default: 'vm,github_runner_ubuntu_2404,github_runner_ubuntu_2204,postgres_standard,postgres_ha'
         type: string
 
   schedule:
@@ -18,47 +18,17 @@ on:
 jobs:
   run-ci:
     if: vars.RUN_E2E == 'true'
-    runs-on: ubicloud
+    runs-on: ubicloud-standard-4
     environment: E2E-CI
-    # TODO: Revert it when the internal MinIO cluster is stabilized
-    timeout-minutes: 105
+    timeout-minutes: 60
     concurrency: e2e_environment
 
-    env:
-      DB_USER: clover
-      DB_PASSWORD: nonempty
-      DB_NAME: clover_test
-
-    services:
-      postgres:
-        image: postgres:15.8
-        env:
-          POSTGRES_USER: ${{ env.DB_USER }}
-          POSTGRES_PASSWORD: ${{ env.DB_PASSWORD }}
-          POSTGRES_DB: ${{ env.DB_NAME }}
-        ports:
-          - 5432:5432
-        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
-
     steps:
-    - name: Perform superuser-only actions, then remove superuser
-      run: |
-        psql "postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}" \
-          -c "CREATE EXTENSION citext; CREATE EXTENSION btree_gist; CREATE ROLE clover_password PASSWORD '${{ env.DB_PASSWORD }}' LOGIN; ALTER ROLE ${{ env.DB_USER }} NOSUPERUSER"
-
     - name: Check out code
       uses: actions/checkout@v4
 
-    - name: Set up Ruby
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: .tool-versions
-        bundler-cache: true
-
-    - name: Apply migrations
-      env:
-        CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
-      run: bundle exec rake _test_up
+    - name: Set up Clover
+      uses: ./.github/actions/setup-clover
 
     - name: Set up Node.js
       uses: actions/setup-node@v4
@@ -78,6 +48,15 @@ jobs:
     - name: Set cloudflared token
       run: sudo cloudflared service install ${{ secrets.CLOUDFLARED_TOKEN }}
 
+    - name: Install mailpit
+      run: |
+        curl -sfL -m 90 -o mailpit.tar.gz https://github.com/axllent/mailpit/releases/download/v1.27.0/mailpit-linux-amd64.tar.gz
+        tar zxf mailpit.tar.gz
+        mv mailpit /usr/local/bin/
+        sudo systemd-run --setenv="MP_UI_AUTH=${{ secrets.MAIL_USER }}:${{ secrets.MAIL_PASSWORD }}" \
+          --setenv="MP_SMTP_AUTH=${{ secrets.MAIL_USER }}:${{ secrets.MAIL_PASSWORD }}" --setenv="MP_SMTP_AUTH_ALLOW_INSECURE=true" \
+          --unit mailpit -- mailpit
+
     - name: Install foreman
       run: gem install foreman
 
@@ -88,22 +67,23 @@ jobs:
     - name: Add e2e script to Procfile
       run: |
         test_cases="$(yq -r '[.[].name] | join(",")' config/e2e_test_cases.yml)"
-        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.test_cases }}" ]]; then
           test_cases="${{ inputs.test_cases }}"
         fi
         echo "Running e2e test cases: $test_cases"
-        echo "e2e: bin/ci --test-cases=$test_cases" >> Procfile
+        echo "e2e: bin/e2e --test-cases=$test_cases" >> Procfile
 
     - name: Run tests
       env:
         BASE_URL: https://${{ secrets.CLOUDFLARED_ADDRESS }}
+        CLOVER_DATABASE_URL: postgres:///clover_test?user=clover
         RACK_ENV: production
         IS_E2E: "true"
-        CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
-        CLOVER_SESSION_SECRET: kbaf1V3biZ+R2QqFahgDLB5/lSomwxQusA4PwROUkFS1srn0xM/I47IdLW7HjbQoxWri6/aVgtkqTLFiP65h9g==
-        CLOVER_RUNTIME_TOKEN_SECRET: r3rV5RzYVpDMlXxY1VnrHlmoMnXdUVt5ABec/TWXnmO7Ok/riFRDNATAMmDWTvtH+cSyXAniH3hHL6EetHj/FA==
-        CLOVER_COLUMN_ENCRYPTION_KEY: TtlY0+hd4lvedPkNbu5qsj5H7giPKJSRX9KDBrvid7c=
-        CI_HETZNER_SACRIFICIAL_SERVER_ID: ${{ secrets.CI_HETZNER_SACRIFICIAL_SERVER_ID }}
+        DISPATCHER_MAX_THREADS: 16
+        E2E_HETZNER_SERVER_ID: ${{ secrets.E2E_HETZNER_SERVER_ID }}
+        E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
+        HETZNER_SSH_PUBLIC_KEY: ${{ secrets.HETZNER_SSH_PUBLIC_KEY }}
+        HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
         HETZNER_USER: ${{ secrets.HETZNER_USER }}
         HETZNER_PASSWORD: ${{ secrets.HETZNER_PASSWORD }}
         UBICLOUD_IMAGES_BLOB_STORAGE_ENDPOINT: ${{ secrets.UBICLOUD_IMAGES_BLOB_STORAGE_ENDPOINT }}
@@ -116,7 +96,7 @@ jobs:
         GITHUB_APP_CLIENT_SECRET: ${{ secrets.GH_APP_CLIENT_SECRET }}
         GITHUB_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
         GITHUB_APP_WEBHOOK_SECRET: ${{ secrets.GH_APP_WEBHOOK_SECRET }}
-        GITHUB_RUNNER_SERVICE_PROJECT_ID: ${{ secrets.GH_RUNNER_SERVICE_PROJECT_ID }}
+        GITHUB_RUNNER_SERVICE_PROJECT_ID: "89841457-35a2-8ed2-a88a-424ea5ddd83b"
         GITHUB_CACHE_BLOB_STORAGE_ENDPOINT: ${{ secrets.GH_CACHE_BLOB_STORAGE_ENDPOINT }}
         GITHUB_CACHE_BLOB_STORAGE_REGION: ${{ secrets.GH_CACHE_BLOB_STORAGE_REGION }}
         GITHUB_CACHE_BLOB_STORAGE_ACCESS_KEY: ${{ secrets.GH_CACHE_BLOB_STORAGE_ACCESS_KEY }}
@@ -125,13 +105,18 @@ jobs:
         GITHUB_CACHE_BLOB_STORAGE_API_KEY: ${{ secrets.GH_CACHE_BLOB_STORAGE_API_KEY }}
         POSTGRES_SERVICE_PROJECT_ID: "546a1ed8-53e5-86d2-966c-fb782d2ae5ab"
         MINIO_SERVICE_PROJECT_ID: "37ad2a8d-0220-4e8b-a67f-38db95d6c657"
-        VM_POOL_PROJECT_ID: ${{ secrets.VM_POOL_PROJECT_ID }}
-        E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
-        HETZNER_SSH_PUBLIC_KEY: ${{ secrets.HETZNER_SSH_PUBLIC_KEY }}
-        HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+        VM_POOL_PROJECT_ID: "e4b93fb7-5125-8ad2-9d29-730ff4506bc3"
+        MAIL_FROM: test@example.com
+        SMTP_USER: ${{ secrets.MAIL_USER }}
+        SMTP_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+        SMTP_HOSTNAME: localhost
+        SMTP_PORT: 1025
+        SMTP_TLS: false
+        STRIPE_PUBLIC_KEY: ${{ secrets.STRIPE_PUBLIC_KEY }}
+        STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
       run: |
         set -o pipefail
-        timeout 100m foreman start | tee foreman.log | grep "e2e.1"
+        timeout 55m foreman start -m all=1,respirate=2 | tee foreman.log | grep "e2e.1"
 
     - name: Print logs
       if: always()

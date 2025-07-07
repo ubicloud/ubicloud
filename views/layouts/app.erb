@@ -53,7 +53,7 @@
   </head>
 
   <body class="h-full">
-    <% if rodauth.authenticated? %>
+    <% if rodauth.authenticated? && !@use_page_message %>
       <div>
         <%== render("layouts/sidebar/desktop") %>
         <%== render("layouts/sidebar/mobile") %>

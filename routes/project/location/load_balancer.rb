@@ -55,64 +55,65 @@ class Clover
         end
       end
 
-      r.get true do
-        authorize("LoadBalancer:view", lb.id)
-        @lb = Serializers::LoadBalancer.serialize(lb, {detailed: true, vms_serialized: !api?})
-        if api?
-          @lb
-        else
-          vms = dataset_authorize(lb.private_subnet.vms_dataset.eager(:location), "Vm:view").exclude(Sequel[:vm][:id] => lb.vms_dataset.select(Sequel[:vm][:id])).all
-          @attachable_vms = Serializers::Vm.serialize(vms)
+      r.is do
+        r.get do
+          authorize("LoadBalancer:view", lb.id)
+          @lb = Serializers::LoadBalancer.serialize(lb, {detailed: true, vms_serialized: !api?})
+          if api?
+            @lb
+          else
+            vms = dataset_authorize(lb.private_subnet.vms_dataset.eager(:location), "Vm:view").exclude(Sequel[:vm][:id] => lb.vms_dataset.select(Sequel[:vm][:id])).all
+            @attachable_vms = Serializers::Vm.serialize(vms)
 
-          view "networking/load_balancer/show"
-        end
-      end
-
-      r.delete true do
-        authorize("LoadBalancer:delete", lb.id)
-        DB.transaction do
-          lb.incr_destroy
-          audit_log(lb, "destroy")
-        end
-        204
-      end
-
-      r.patch api? do
-        authorize("LoadBalancer:edit", lb.id)
-        params = check_required_web_params(%w[algorithm src_port dst_port health_check_endpoint vms])
-        DB.transaction do
-          lb.update(
-            algorithm: params["algorithm"],
-            health_check_endpoint: params["health_check_endpoint"]
-          )
-          lb.ports.first.update(src_port: Validation.validate_port(:src_port, params["src_port"]),
-            dst_port: Validation.validate_port(:dst_port, params["dst_port"]))
-
-          vm_ids = params["vms"].map { UBID.to_uuid(it.delete("\"")) }
-          new_vms = dataset_authorize(@project.vms_dataset, "Vm:view").eager(:load_balancer).where(id: vm_ids).all
-
-          unless vm_ids.length == new_vms.length
-            fail Validation::ValidationFailed.new("vms" => "VM not found")
+            view "networking/load_balancer/show"
           end
+        end
 
-          new_vms.each do |vm|
-            if (lb_id = vm.load_balancer&.id)
-              next if lb_id == lb.id
-              fail Validation::ValidationFailed.new("vms" => "VM is already attached to a load balancer")
+        r.delete do
+          authorize("LoadBalancer:delete", lb.id)
+          DB.transaction do
+            lb.incr_destroy
+            audit_log(lb, "destroy")
+          end
+          204
+        end
+
+        r.patch api? do
+          authorize("LoadBalancer:edit", lb.id)
+          algorithm, health_check_endpoint = typecast_params.nonempty_str!(%w[algorithm health_check_endpoint])
+          src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port])
+          vm_ids = typecast_params.array(:ubid_uuid, "vms")
+
+          DB.transaction do
+            lb.update(algorithm:, health_check_endpoint:)
+            lb.ports.first.update(src_port: Validation.validate_port(:src_port, src_port),
+              dst_port: Validation.validate_port(:dst_port, dst_port))
+
+            new_vms = dataset_authorize(@project.vms_dataset, "Vm:view").eager(:load_balancer).where(id: vm_ids).all
+
+            unless vm_ids.length == new_vms.length
+              fail Validation::ValidationFailed.new("vms" => "VM not found")
             end
-            lb.add_vm(vm)
-          end
 
-          lb.vms.each do |vm|
-            next if new_vms.any? { it.id == vm.id }
-            lb.evacuate_vm(vm)
-            lb.remove_vm(vm)
-          end
+            new_vms.each do |vm|
+              if (lb_id = vm.load_balancer&.id)
+                next if lb_id == lb.id
+                fail Validation::ValidationFailed.new("vms" => "VM is already attached to a load balancer")
+              end
+              lb.add_vm(vm)
+            end
 
-          lb.incr_update_load_balancer
-          audit_log(lb, "update")
+            lb.vms.each do |vm|
+              next if new_vms.any? { it.id == vm.id }
+              lb.evacuate_vm(vm)
+              lb.remove_vm(vm)
+            end
+
+            lb.incr_update_load_balancer
+            audit_log(lb, "update")
+          end
+          Serializers::LoadBalancer.serialize(lb.reload, {detailed: true})
         end
-        Serializers::LoadBalancer.serialize(lb.reload, {detailed: true})
       end
     end
   end

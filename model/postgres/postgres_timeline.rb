@@ -1,13 +1,15 @@
 # frozen_string_literal: true
 
 require_relative "../../model"
+require "aws-sdk-s3"
 
 class PostgresTimeline < Sequel::Model
   one_to_one :strand, key: :id
   one_to_one :parent, key: :parent_id, class: self
   one_to_one :leader, class: :PostgresServer, key: :timeline_id, conditions: {timeline_access: "push"}
+  many_to_one :location
 
-  include ResourceMethods
+  plugin ResourceMethods
   include SemaphoreMethods
 
   semaphore :destroy
@@ -15,6 +17,8 @@ class PostgresTimeline < Sequel::Model
   plugin :column_encryption do |enc|
     enc.column :secret_key
   end
+
+  BACKUP_BUCKET_EXPIRATION_DAYS = 8
 
   def bucket_name
     ubid
@@ -26,7 +30,7 @@ WALG_S3_PREFIX=s3://#{ubid}
 AWS_ENDPOINT=#{blob_storage_endpoint}
 AWS_ACCESS_KEY_ID=#{access_key}
 AWS_SECRET_ACCESS_KEY=#{secret_key}
-AWS_REGION: us-east-1
+AWS_REGION: #{aws? ? location.name : "us-east-1"}
 AWS_S3_FORCE_PATH_STYLE=true
 PGHOST=/var/run/postgresql
     WALG_CONF
@@ -47,11 +51,11 @@ PGHOST=/var/run/postgresql
     return [] if blob_storage.nil?
 
     begin
-      blob_storage_client
-        .list_objects(ubid, "basebackups_005/")
+      list_objects("basebackups_005/")
         .select { it.key.end_with?("backup_stop_sentinel.json") }
     rescue => ex
       recoverable_errors = ["The Access Key Id you provided does not exist in our records.", "AccessDenied", "No route to host", "Connection refused"]
+      Clog.emit("Backup fetch exception") { Util.exception_to_hash(ex) }
       return [] if recoverable_errors.any? { ex.message.include?(it) }
       raise
     end
@@ -63,12 +67,21 @@ PGHOST=/var/run/postgresql
     backup.key.delete_prefix("basebackups_005/").delete_suffix("_backup_stop_sentinel.json")
   end
 
-  # This method is called from serializer and needs to access our blob storage
-  # to calculate the answer, so it is inherently slow. It would be good if we
-  # can cache this somehow.
   def earliest_restore_time
-    if (earliest_backup = backups.map(&:last_modified).min)
-      earliest_backup + 5 * 60
+    # Check if we have cached earliest backup time, if not, calculate it.
+    # The cached time is valid if its within BACKUP_BUCKET_EXPIRATION_DAYS.
+    time_limit = Time.now - BACKUP_BUCKET_EXPIRATION_DAYS * 24 * 60 * 60
+
+    if cached_earliest_backup_at.nil? || cached_earliest_backup_at <= time_limit
+      earliest_backup = backups
+        .select { |b| b.last_modified > time_limit }
+        .map(&:last_modified).min
+
+      update(cached_earliest_backup_at: earliest_backup)
+    end
+
+    if cached_earliest_backup_at
+      cached_earliest_backup_at + 5 * 60
     end
   end
 
@@ -76,8 +89,14 @@ PGHOST=/var/run/postgresql
     Time.now
   end
 
+  def aws?
+    location&.aws?
+  end
+
+  S3BlobStorage = Struct.new(:url)
+
   def blob_storage
-    @blob_storage ||= MinioCluster[blob_storage_id]
+    @blob_storage ||= MinioCluster[blob_storage_id] || (aws? ? S3BlobStorage.new("https://s3.#{location.name}.amazonaws.com") : nil)
   end
 
   def blob_storage_endpoint
@@ -85,30 +104,77 @@ PGHOST=/var/run/postgresql
   end
 
   def blob_storage_client
-    @blob_storage_client ||= Minio::Client.new(
+    @blob_storage_client ||= aws? ? Aws::S3::Client.new(
+      region: location.name,
+      access_key_id: access_key,
+      secret_access_key: secret_key,
+      endpoint: blob_storage_endpoint,
+      force_path_style: true
+    ) : Minio::Client.new(
       endpoint: blob_storage_endpoint,
       access_key: access_key,
       secret_key: secret_key,
-      ssl_ca_file_data: blob_storage.root_certs
+      ssl_ca_data: blob_storage.root_certs
     )
   end
 
   def blob_storage_policy
     {Version: "2012-10-17", Statement: [{Effect: "Allow", Action: ["s3:*"], Resource: ["arn:aws:s3:::#{ubid}*"]}]}
   end
+
+  def list_objects(prefix)
+    aws? ?
+      blob_storage_client.list_objects_v2(bucket: ubid, prefix: prefix).contents
+    : blob_storage_client.list_objects(ubid, prefix)
+  end
+
+  def create_bucket
+    aws? ?
+      blob_storage_client.create_bucket({
+        bucket: ubid,
+        create_bucket_configuration: {
+          location_constraint: location.name
+        }
+      })
+    : blob_storage_client.create_bucket(ubid)
+  end
+
+  def set_lifecycle_policy
+    aws? ?
+      blob_storage_client.put_bucket_lifecycle_configuration({
+        bucket: ubid,
+        lifecycle_configuration: {
+          rules: [
+            {
+              id: "DeleteOldBackups",
+              prefix: "basebackups_005/",
+              status: "Enabled",
+              expiration: {
+                days: BACKUP_BUCKET_EXPIRATION_DAYS
+              }
+            }
+          ]
+        }
+      })
+    : blob_storage_client.set_lifecycle_policy(ubid, ubid, BACKUP_BUCKET_EXPIRATION_DAYS)
+  end
 end
 
 # Table: postgres_timeline
 # Columns:
-#  id                       | uuid                     | PRIMARY KEY
-#  created_at               | timestamp with time zone | NOT NULL DEFAULT now()
-#  updated_at               | timestamp with time zone | NOT NULL DEFAULT now()
-#  parent_id                | uuid                     |
-#  access_key               | text                     |
-#  secret_key               | text                     |
-#  latest_backup_started_at | timestamp with time zone |
-#  blob_storage_id          | uuid                     |
+#  id                        | uuid                     | PRIMARY KEY
+#  created_at                | timestamp with time zone | NOT NULL DEFAULT now()
+#  updated_at                | timestamp with time zone | NOT NULL DEFAULT now()
+#  parent_id                 | uuid                     |
+#  access_key                | text                     |
+#  secret_key                | text                     |
+#  latest_backup_started_at  | timestamp with time zone |
+#  blob_storage_id           | uuid                     |
+#  location_id               | uuid                     |
+#  cached_earliest_backup_at | timestamp with time zone |
 # Indexes:
 #  postgres_timeline_pkey | PRIMARY KEY btree (id)
+# Foreign key constraints:
+#  postgres_timeline_location_id_fkey | (location_id) REFERENCES location(id)
 # Referenced By:
 #  postgres_server | postgres_server_timeline_id_fkey | (timeline_id) REFERENCES postgres_timeline(id)

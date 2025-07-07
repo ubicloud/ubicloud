@@ -11,9 +11,9 @@ RSpec.describe Clover, "location-credential" do
 
   let(:private_location) do
     loc = Location.create(
-      display_name: "aws-us-east-1",
-      name: "us-east-1",
-      ui_name: "aws-us-east-1",
+      display_name: "aws-us-west-2",
+      name: "us-west-2",
+      ui_name: "aws-us-west-2",
       visible: false,
       provider: "aws",
       project_id: project.id
@@ -120,7 +120,7 @@ RSpec.describe Clover, "location-credential" do
         fill_in "Ubicloud Region Name", with: name
         fill_in "AWS Access Key", with: "access_key"
         fill_in "AWS Secret Key", with: "secret_key"
-        select "us-east-1", from: "AWS Region Name"
+        select "us-west-2", from: "AWS Region Name"
 
         click_button "Create"
 
@@ -129,7 +129,7 @@ RSpec.describe Clover, "location-credential" do
         expect(LocationCredential.first.access_key).to eq("access_key")
         expect(LocationCredential.first.secret_key).to eq("secret_key")
         expect(LocationCredential.first.location.display_name).to eq(name)
-        expect(LocationCredential.first.location.name).to eq("us-east-1")
+        expect(LocationCredential.first.location.name).to eq("us-west-2")
         expect(LocationCredential.first.location.project_id).to eq(project.id)
       end
 
@@ -142,7 +142,7 @@ RSpec.describe Clover, "location-credential" do
         fill_in "Ubicloud Region Name", with: private_location.display_name
         fill_in "AWS Access Key", with: "access_key"
         fill_in "AWS Secret Key", with: "secret_key"
-        select "us-east-1", from: "AWS Region Name"
+        select "us-west-2", from: "AWS Region Name"
 
         click_button "Create"
 

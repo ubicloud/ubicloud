@@ -6,20 +6,11 @@ require "stripe"
 class PaymentMethod < Sequel::Model
   many_to_one :billing_info
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   def stripe_data
     if (Stripe.api_key = Config.stripe_secret_key)
-      @stripe_data ||= begin
-        data = Stripe::PaymentMethod.retrieve(stripe_id)
-        card = data["card"]
-        {
-          "last4" => card["last4"],
-          "brand" => card["brand"],
-          "exp_month" => card["exp_month"],
-          "exp_year" => card["exp_year"]
-        }
-      end
+      @stripe_data ||= Stripe::PaymentMethod.retrieve(stripe_id)["card"].to_h.transform_keys!(&:to_s).slice(*%w[last4 brand exp_month exp_year])
     end
   end
 

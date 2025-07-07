@@ -4,7 +4,9 @@ require "spec_helper"
 require_relative "../../../prog/ai/inference_endpoint_replica_nexus"
 
 RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
-  subject(:nx) { described_class.new(Strand.create(prog: "Prog::Ai::InferenceEndpointReplicaNexus", label: "start")) }
+  subject(:nx) { described_class.new(st) }
+
+  let(:st) { Strand.create(prog: "Prog::Ai::InferenceEndpointReplicaNexus", label: "start") }
 
   let(:project) { Project.create(name: "test") }
   let(:private_subnet) { PrivateSubnet.create(project_id: project.id, name: "test", location_id: Location::HETZNER_HEL1_ID, net6: "fe80::/64", net4: "192.168.0.0/24") }
@@ -120,19 +122,13 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
   end
 
   describe "#wait_bootstrap_rhizome" do
-    before { expect(nx).to receive(:reap) }
-
     it "hops to setup if there are no sub-programs running" do
-      expect(nx).to receive(:leaf?).and_return true
-
       expect { nx.wait_bootstrap_rhizome }.to hop("download_lb_cert")
     end
 
     it "donates if there are sub-programs running" do
-      expect(nx).to receive(:leaf?).and_return false
-      expect(nx).to receive(:donate).and_call_original
-
-      expect { nx.wait_bootstrap_rhizome }.to nap(1)
+      Strand.create(parent_id: st.id, prog: "BootstrapRhizome", label: "start", stack: [{}], lease: Time.now + 10)
+      expect { nx.wait_bootstrap_rhizome }.to nap(120)
     end
   end
 

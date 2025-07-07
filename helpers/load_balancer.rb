@@ -5,16 +5,7 @@ class Clover
     dataset = dataset_authorize(@project.load_balancers_dataset, "LoadBalancer:view").eager(:private_subnet)
     dataset = dataset.join(:private_subnet, id: Sequel[:load_balancer][:private_subnet_id]).where(location_id: @location.id).select_all(:load_balancer) if @location
     if api?
-      result = dataset.paginated_result(
-        start_after: request.params["start_after"],
-        page_size: request.params["page_size"],
-        order_column: request.params["order_column"]
-      )
-
-      {
-        items: Serializers::LoadBalancer.serialize(result[:records]),
-        count: result[:count]
-      }
+      paginated_result(dataset, Serializers::LoadBalancer)
     else
       @lbs = Serializers::LoadBalancer.serialize(dataset.all, {include_path: true})
       view "networking/load_balancer/index"
@@ -24,7 +15,9 @@ class Clover
   def load_balancer_post(name)
     authorize("LoadBalancer:create", @project.id)
 
-    params = check_required_web_params(%w[private_subnet_id algorithm src_port dst_port health_check_protocol stack name])
+    algorithm, health_check_protocol, stack = typecast_params.nonempty_str!(%w[algorithm health_check_protocol stack])
+    src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port])
+    health_check_endpoint = typecast_params.nonempty_str("health_check_endpoint") || Prog::Vnet::LoadBalancerNexus::DEFAULT_HEALTH_CHECK_ENDPOINT
 
     unless (ps = authorized_private_subnet)
       fail Validation::ValidationFailed.new("private_subnet_id" => "Private subnet not found")
@@ -35,12 +28,12 @@ class Clover
       lb = Prog::Vnet::LoadBalancerNexus.assemble(
         ps.id,
         name:,
-        algorithm: params["algorithm"],
-        stack: Validation.validate_load_balancer_stack(params["stack"]),
-        src_port: Validation.validate_port(:src_port, params["src_port"]),
-        dst_port: Validation.validate_port(:dst_port, params["dst_port"]),
-        health_check_endpoint: params["health_check_endpoint"] || Prog::Vnet::LoadBalancerNexus::DEFAULT_HEALTH_CHECK_ENDPOINT,
-        health_check_protocol: params["health_check_protocol"]
+        algorithm:,
+        stack: Validation.validate_load_balancer_stack(stack),
+        src_port: Validation.validate_port(:src_port, src_port),
+        dst_port: Validation.validate_port(:dst_port, dst_port),
+        health_check_endpoint:,
+        health_check_protocol:
       ).subject
       audit_log(lb, "create")
     end

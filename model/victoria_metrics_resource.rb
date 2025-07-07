@@ -9,7 +9,7 @@ class VictoriaMetricsResource < Sequel::Model
   one_to_many :servers, class: :VictoriaMetricsServer, key: :victoria_metrics_resource_id
   many_to_one :private_subnet
 
-  include ResourceMethods
+  plugin ResourceMethods, redacted_columns: [:admin_password, :root_cert_1, :root_cert_2]
   include SemaphoreMethods
 
   semaphore :destroy, :reconfigure
@@ -29,16 +29,12 @@ class VictoriaMetricsResource < Sequel::Model
   end
 
   def set_firewall_rules
-    vm_firewall_rules = []
-    vm_firewall_rules.push({cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)})
-    vm_firewall_rules.push({cidr: "::/0", port_range: Sequel.pg_range(22..22)})
-    vm_firewall_rules.push({cidr: "0.0.0.0/0", port_range: Sequel.pg_range(8427..8427)})
-    vm_firewall_rules.push({cidr: "::/0", port_range: Sequel.pg_range(8427..8427)})
-    private_subnet.firewalls.first.replace_firewall_rules(vm_firewall_rules)
-  end
-
-  def self.redacted_columns
-    super + [:admin_password, :root_cert_1, :root_cert_2]
+    private_subnet.firewalls.first.replace_firewall_rules([
+      {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)},
+      {cidr: "::/0", port_range: Sequel.pg_range(22..22)},
+      {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(8427..8427)},
+      {cidr: "::/0", port_range: Sequel.pg_range(8427..8427)}
+    ])
   end
 end
 

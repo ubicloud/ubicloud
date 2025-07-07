@@ -53,7 +53,7 @@ RSpec.describe Prog::Vnet::NicNexus do
     end
 
     it "hops to create_aws_nic if location is aws" do
-      expect(ps).to receive(:location).and_return(instance_double(Location, provider: "aws"))
+      expect(ps).to receive(:location).and_return(instance_double(Location, aws?: true))
       expect(PrivateSubnet).to receive(:[]).with("57afa8a7-2357-4012-9632-07fbe13a3133").and_return(ps).at_least(:once)
       expect(ps).to receive(:random_private_ipv6).and_return("fd10:9b0b:6b4b:8fbb::/128")
       expect(ps).to receive(:random_private_ipv4).and_return("10.0.0.12/32")
@@ -102,14 +102,13 @@ RSpec.describe Prog::Vnet::NicNexus do
 
   describe "#wait_aws_nic_created" do
     it "reaps and hops to wait if leaf" do
-      expect(nx).to receive(:reap)
-      expect(nx).to receive(:leaf?).and_return(true)
+      st.update(prog: "Vnet::NicNexus", label: "wait_aws_nic_created", stack: [{}])
       expect { nx.wait_aws_nic_created }.to hop("wait")
     end
 
     it "naps if not leaf" do
-      expect(nx).to receive(:reap)
-      expect(nx).to receive(:leaf?).and_return(false)
+      st.update(prog: "Vnet::NicNexus", label: "wait_aws_nic_created", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "Aws::Nic", label: "create_network_interface", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_aws_nic_created }.to nap(10)
     end
   end
@@ -151,6 +150,18 @@ RSpec.describe Prog::Vnet::NicNexus do
   end
 
   describe "#wait" do
+    let(:nic) { instance_double(Nic, private_subnet: instance_double(PrivateSubnet, location: instance_double(Location, aws?: false), incr_refresh_keys: true)) }
+
+    before do
+      allow(nx).to receive(:nic).and_return(nic)
+    end
+
+    it "waits if location is aws" do
+      expect(nic.private_subnet.location).to receive(:aws?).and_return(true)
+      expect(nic).to receive(:semaphores).and_return([])
+      expect { nx.wait }.to nap(60 * 60 * 24 * 365)
+    end
+
     it "naps if nothing to do" do
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
@@ -162,8 +173,6 @@ RSpec.describe Prog::Vnet::NicNexus do
 
     it "hops to repopulate if needed" do
       expect(nx).to receive(:when_repopulate_set?).and_yield
-      ps = instance_double(PrivateSubnet, incr_refresh_keys: true)
-      expect(nx).to receive(:nic).and_return(instance_double(Nic, private_subnet: ps))
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
   end
@@ -261,24 +270,25 @@ RSpec.describe Prog::Vnet::NicNexus do
     it "buds aws nic destroy if location is aws" do
       expect(nic).to receive(:private_subnet).and_return(ps).at_least(:once)
       expect(nx).to receive(:bud).with(Prog::Aws::Nic, {"subject_id" => "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"}, :destroy)
-      expect(ps).to receive(:location).and_return(instance_double(Location, provider: "aws"))
+      expect(ps).to receive(:location).and_return(instance_double(Location, aws?: true))
       expect { nx.destroy }.to hop("wait_aws_nic_destroyed")
     end
   end
 
   describe "#wait_aws_nic_destroyed" do
     it "reaps and destroys nic if leaf" do
-      expect(nx).to receive(:reap)
-      expect(nx).to receive(:leaf?).and_return(true)
+      st.update(prog: "Vnet::NicNexus", label: "wait_aws_nic_destroyed", stack: [{}])
       nic = instance_double(Nic, id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
-      expect(nx).to receive(:nic).and_return(nic)
+      expect(nx).to receive(:nic).and_return(nic).at_least(:once)
       expect(nic).to receive(:destroy)
+      expect(nic).to receive(:private_subnet).and_return(ps)
+      expect(ps).to receive(:incr_refresh_keys)
       expect { nx.wait_aws_nic_destroyed }.to exit({"msg" => "nic deleted"})
     end
 
     it "naps if not leaf" do
-      expect(nx).to receive(:reap)
-      expect(nx).to receive(:leaf?).and_return(false)
+      st.update(prog: "Vnet::NicNexus", label: "wait_aws_nic_destroyed", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "Aws::Nic", label: "destroy", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_aws_nic_destroyed }.to nap(10)
     end
   end

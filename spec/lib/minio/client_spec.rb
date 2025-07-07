@@ -2,19 +2,18 @@
 
 RSpec.describe Minio::Client do
   let(:endpoint) { "https://localhost:9000" }
-  let(:minio_client) { described_class.new(endpoint: endpoint, access_key: "minioadmin", secret_key: "minioadminpw", ssl_ca_file_data: "data") }
+  let(:cert) { "-----BEGIN CERTIFICATE-----\nMIIDCzCCAfOgAwIBAgIUasLyHvpgRtp3/8N9pRPE7f89Gi4wDQYJKoZIhvcNAQEL\nBQAwFTETMBEGA1UEAwwKTXkgVGVzdCBDQTAeFw0yNTA2MDIwOTE2MjFaFw0zNTA1\nMzEwOTE2MjFaMBUxEzARBgNVBAMMCk15IFRlc3QgQ0EwggEiMA0GCSqGSIb3DQEB\nAQUAA4IBDwAwggEKAoIBAQC0WFDSoccSl95/VL4U73JYAYgg1ar96Mo9VJn5H+Y0\nvyfKUI7DWrqZtiqYlCr01nN52FFHwEBgCIYr+aa5MmMHZfe0nbeDK4AbsZKJHr0Z\nBfJfqI9pRxVd9MyRcU2XTAeDWRK3k3sRj6webU2MFxUvF7xB2Wx2+rNhLZhB+d8t\nZSRpwFiX9rgMKYkycY1kV4ZurUT72ct/Q+dNCTTUOel/brMDQhdn02PYAUKgh2UB\nELeooXt1JPedjSH41ShV2yEBA1NyTctaVp3tWfiq+b4p0ZiV/ekoBtkDe5WtaNo1\nxgvRGH/rcOfTraZKokgqCVCG1Ka4DrkvSsaTlOe9XrQlAgMBAAGjUzBRMB0GA1Ud\nDgQWBBQUnKN3Du3ihaNNK3Q9+lztEI4pajAfBgNVHSMEGDAWgBQUnKN3Du3ihaNN\nK3Q9+lztEI4pajAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQAG\ndJijmtiYx2dCw50V3QhjyVyTvhFf1B9XUKGP2i0IPApULXqDGll47iIGo6i1yD7V\n7hjpV0BCtFlNH5nH2bZ0zyUi3XCLTqlnHM8+tI6ZUMWRq2lJAgILVHH/D/VUTUl6\nS+h6rGbtzNBCz2jmP3LiL2lmfcPivJpim5RPtAbApyt7fvHWD8aGQWZHpLYn+2v5\n1laUkm55cvWlsnC27PeNT00/3Eu96dqMiLHFJgKkUGFJMr+49X+BTaLcCUXCja+s\n4nXqhVt+iVVk1RtVS/b1C17DvxnV5g1NAFiZQOx5Gfsr5v8SafKCgR/4xm/kGfEz\nIkfEWqyeWXMj/JRB2yCy\n-----END CERTIFICATE-----" }
+  let(:minio_client) { described_class.new(endpoint: endpoint, access_key: "minioadmin", secret_key: "minioadminpw", ssl_ca_data: cert) }
 
-  it "can use ssl_ca_file_data" do
-    ssl_ca_file_name = "3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7"
-    expect(File).to receive(:exist?).with(File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".crt")).and_return(false)
-    expect(FileUtils).to receive(:mkdir_p).with(File.dirname(File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".crt")))
-    lock_file = instance_double(File, flock: true)
-    expect(File).to receive(:open).with(File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".crt.tmp.lock"), File::RDWR | File::CREAT).and_yield(lock_file)
-    expect(lock_file).to receive(:flock).with(File::LOCK_EX)
-    expect(File).to receive(:write)
-    expect(File).to receive(:rename).with(File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".crt.tmp").to_s, File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".crt"))
+  it "can use ssl_ca_data" do
+    excon_client = minio_client.instance_variable_get(:@client)
+    expect(excon_client).to be_a(Excon::Connection)
+    expect(excon_client.data[:ssl_cert_store]).to be_a(OpenSSL::X509::Store)
+  end
 
-    minio_client
+  it "can initialize without ssl_ca_data" do
+    expect(Excon).to receive(:new).with(endpoint, socket: nil, ssl_cert_store: nil)
+    described_class.new(endpoint: endpoint, access_key: "minioadmin", secret_key: "minioadminpw", ssl_ca_data: "", socket: nil)
   end
 
   describe "admin_info" do

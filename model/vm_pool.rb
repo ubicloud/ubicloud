@@ -6,18 +6,18 @@ class VmPool < Sequel::Model
   one_to_one :strand, key: :id
   one_to_many :vms, key: :pool_id
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   include SemaphoreMethods
   semaphore :destroy
 
   def pick_vm
     # Find an available VM in the "running" state and not associated with a GitHub runner,
-    # and lock it with FOR UPDATE SKIP LOCKED.
+    # and lock it with FOR NO KEY UPDATE SKIP LOCKED.
     vms_dataset
       .where(Sequel[:vm][:display_state] => "running")
       .exclude(id: DB[:github_runner].exclude(vm_id: nil).select(:vm_id))
-      .for_update
+      .for_no_key_update
       .skip_locked
       .first
   end

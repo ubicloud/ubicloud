@@ -9,7 +9,7 @@ class Serializers::InferenceRouterModel < Serializers::Base
     load_balancer = irm.inference_router.load_balancer
     {
       id: irm.ubid,
-      name: irm.model_name,
+      name: irm.tags["display_name"] || irm.model_name,
       model_name: irm.model_name,
       tags: irm.tags,
       url: "#{load_balancer.health_check_protocol}://#{load_balancer.hostname}",

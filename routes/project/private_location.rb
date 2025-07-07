@@ -2,56 +2,46 @@
 
 class Clover
   hash_branch(:project_prefix, "private-location") do |r|
-    r.get true do
-      authorize("Location:view", @project.id)
+    r.is do
+      r.get do
+        authorize("Location:view", @project.id)
 
-      @dataset = @project.locations_dataset
+        @dataset = @project.locations_dataset
 
-      if api?
-        result = @dataset.paginated_result(
-          start_after: r.params["start_after"],
-          page_size: r.params["page_size"],
-          order_column: r.params["order_column"]
-        )
-
-        {
-          items: Serializers::PrivateLocation.serialize(result[:records]),
-          count: result[:count]
-        }
-      else
-        @locations = @dataset.all
-        view "private-location/index"
-      end
-    end
-
-    r.post true do
-      authorize("Location:create", @project.id)
-      params = check_required_web_params(["name", "provider_location_name", "access_key", "secret_key"])
-
-      Validation.validate_name(params["name"])
-      Validation.validate_provider_location_name("aws", params["provider_location_name"])
-
-      loc = DB.transaction do
-        loc = Location.create(
-          display_name: params["name"],
-          name: params["provider_location_name"],
-          ui_name: params["name"],
-          visible: true,
-          provider: "aws",
-          project_id: @project.id
-        )
-        LocationCredential.create(
-          access_key: params["access_key"],
-          secret_key: params["secret_key"]
-        ) { it.id = loc.id }
-        audit_log(loc, "create")
-        loc
+        if api?
+          paginated_result(@dataset, Serializers::PrivateLocation)
+        else
+          @locations = @dataset.all
+          view "private-location/index"
+        end
       end
 
-      if api?
-        Serializers::PrivateLocation.serialize(loc)
-      else
-        r.redirect "#{@project.path}#{loc.path}"
+      r.post do
+        authorize("Location:create", @project.id)
+        name, provider_location_name, access_key, secret_key = typecast_params.nonempty_str!(["name", "provider_location_name", "access_key", "secret_key"])
+
+        Validation.validate_name(name)
+        Validation.validate_provider_location_name("aws", provider_location_name)
+
+        loc = nil
+        DB.transaction do
+          loc = Location.create(
+            display_name: name,
+            name: provider_location_name,
+            ui_name: name,
+            visible: true,
+            provider: "aws",
+            project_id: @project.id
+          )
+          LocationCredential.create(access_key:, secret_key:) { it.id = loc.id }
+          audit_log(loc, "create")
+        end
+
+        if api?
+          Serializers::PrivateLocation.serialize(loc)
+        else
+          r.redirect "#{@project.path}#{loc.path}"
+        end
       end
     end
 
@@ -85,7 +75,7 @@ class Clover
       r.delete do
         authorize("Location:delete", @project.id)
 
-        if @location.has_resources
+        if @location.has_resources?
           fail DependencyError.new("Private location '#{@location.ui_name}' has some resources, first, delete them.")
         end
 
@@ -100,10 +90,11 @@ class Clover
 
       r.post do
         authorize("Location:edit", @project.id)
-        Validation.validate_name(r.params["name"])
+        name = typecast_params.nonempty_str("name")
+        Validation.validate_name(name)
 
         DB.transaction do
-          @location.update(ui_name: r.params["name"], display_name: r.params["name"])
+          @location.update(ui_name: name, display_name: name)
           audit_log(@location, "update")
         end
 

@@ -8,6 +8,43 @@ class Prog::Test < Prog::Base
   label def start
   end
 
+  private def fib(n)
+    if n < 2
+      1
+    else
+      fib(n - 2) + fib(n - 1)
+    end
+  end
+
+  megabyte = (" " * 1024 * 1024)
+
+  3.times do |n|
+    n1 = n + 1
+    label(define_method(:"smoke_test_#{n1}") do
+      when_test_semaphore_set? do
+        decr_test_semaphore
+        dynamic_hop :"smoke_test_#{n}"
+      end
+
+      incr_test_semaphore
+
+      # CPU
+      fib(rand(15...25))
+
+      # IO
+      rand(20).times do
+        File.write(File::NULL, megabyte)
+      end
+
+      print n1
+      nap rand
+    end)
+  end
+
+  label def smoke_test_0
+    nap 1000
+  end
+
   label def pusher1
     pop "1" if retval
     push Prog::Test, {test_level: "2"}, :pusher2
@@ -22,21 +59,6 @@ class Prog::Test < Prog::Base
     pop frame["test_level"]
   end
 
-  label def synchronized
-    th = Thread.list.find { it.name == "clover_test" }
-    w = th[:clover_test_in]
-    th.thread_variable_set(:clover_test_out, Thread.current)
-    w.close
-    pop "done"
-  end
-
-  label def wait_exit
-    th = Thread.list.find { it.name == "clover_test" }
-    r = th[:clover_test_in]
-    r.read
-    pop "done"
-  end
-
   label def hop_entry
     hop_hop_exit
   end
@@ -47,16 +69,15 @@ class Prog::Test < Prog::Base
 
   label def reaper
     # below loop is only for ensuring we are able to process reaped strands
-    reap.each do |st|
-      st.exitval
-    end
-    donate
+    reap(reaper: :exitval.to_proc)
   end
 
   label def reap_exit_no_children
-    reap
-    pop({msg: "reap_exit_no_children"}) if leaf?
-    donate
+    reap { pop({msg: "reap_exit_no_children"}) }
+  end
+
+  label def failer
+    fail "failure"
   end
 
   label def napper
@@ -82,12 +103,12 @@ class Prog::Test < Prog::Base
 
   label def increment_semaphore
     incr_test_semaphore
-    donate
+    nap 1
   end
 
   label def decrement_semaphore
     decr_test_semaphore
-    donate
+    nap 1
   end
 
   label def set_expired_deadline

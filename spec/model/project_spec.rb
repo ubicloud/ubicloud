@@ -81,17 +81,6 @@ RSpec.describe Project do
       project.update(billing_info_id: bi.id, credit: 100)
       expect(project.has_valid_payment_method?).to be true
     end
-
-    it "sets and gets feature flags" do
-      mod = Module.new
-      described_class.feature_flag(:dummy_flag, into: mod)
-      project = described_class.create_with_id(name: "dummy-name")
-      project.extend(mod)
-
-      expect(project.get_ff_dummy_flag).to be_nil
-      project.set_ff_dummy_flag("new-value")
-      expect(project.get_ff_dummy_flag).to eq "new-value"
-    end
   end
 
   describe ".soft_delete" do
@@ -146,14 +135,48 @@ RSpec.describe Project do
     end
   end
 
+  it "sets and gets feature flags" do
+    mod = Module.new
+    described_class.feature_flag(:dummy_flag1, :dummy_flag2, into: mod)
+    project = described_class.create(name: "dummy-name", feature_flags: {"dummy_flag2" => "val2", "not_exists_flag" => "no"})
+    project.extend(mod)
+
+    expect(project.get_ff_dummy_flag1).to be_nil
+    expect(project.get_ff_dummy_flag2).to eq("val2")
+    expect(project.feature_flags).to have_key("not_exists_flag")
+    project.set_ff_dummy_flag1("new-value")
+    expect(project.get_ff_dummy_flag1).to eq("new-value")
+    expect(project.get_ff_dummy_flag2).to eq("val2")
+    expect(project.feature_flags).not_to have_key("not_exists_flag")
+  end
+
   it "calculates current resource usage" do
-    expect(project).to receive(:vms).and_return([instance_double(Vm, vcpus: 2), instance_double(Vm, vcpus: 4)])
+    expect(project.current_resource_usage("VmVCpu")).to eq 0
+    vm1 = Prog::Vm::Nexus.assemble("a a", project.id).subject
+    expect(project.current_resource_usage("VmVCpu")).to eq 2
+    Prog::Vm::Nexus.assemble("a a", project.id, size: "standard-4")
     expect(project.current_resource_usage("VmVCpu")).to eq 6
 
-    expect(project).to receive(:github_installations).and_return([instance_double(GithubInstallation, total_active_runner_vcpus: 10), instance_double(GithubInstallation, total_active_runner_vcpus: 20)])
-    expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 30
+    expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 0
+    gi = GithubInstallation.create(installation_id: 1, name: "a", project_id: project.id, type: "a")
+    gr = gi.add_runner(label: "ubicloud", repository_name: "a/a")
+    gr.update(vm_id: vm1.id)
+    expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 0
+    grst = Strand.new(id: gr.id, label: "start", prog: "Prog::Vm::GithubRunner")
+    expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 0
+    grst.update(label: "wait_vm")
+    expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 2
+    gr2 = gi.add_runner(label: "ubicloud-standard-60", repository_name: "a/a")
+    grst2 = Strand.new(id: gr2.id, label: "wait_concurrency_limit", prog: "Prog::Vm::GithubRunner")
+    expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 2
+    grst2.update(label: "wait_vm")
+    expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 62
 
-    expect(project).to receive(:postgres_resources).and_return([instance_double(PostgresResource, servers: [instance_double(PostgresServer, vm: instance_double(Vm, vcpus: 2)), instance_double(PostgresServer, vm: instance_double(Vm, vcpus: 4))])])
+    expect(Config).to receive(:postgres_service_project_id).and_return(project.id).at_least(:once)
+    expect(project.current_resource_usage("PostgresVCpu")).to eq 0
+    Prog::Postgres::PostgresResourceNexus.assemble(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "a", target_vm_size: "standard-2", target_storage_size_gib: 64)
+    expect(project.current_resource_usage("PostgresVCpu")).to eq 2
+    Prog::Postgres::PostgresResourceNexus.assemble(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "b", target_vm_size: "standard-4", target_storage_size_gib: 128)
     expect(project.current_resource_usage("PostgresVCpu")).to eq 6
 
     expect { project.current_resource_usage("UnknownResource") }.to raise_error(RuntimeError)

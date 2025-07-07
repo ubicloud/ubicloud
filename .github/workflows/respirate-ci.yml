@@ -1,0 +1,46 @@
+name: respirate CI
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'bin/respirate'
+      - 'scheduling/dispatcher.rb'
+      - 'model/strand.rb'
+      - 'prog/test.rb'
+      - 'spec/respirate_smoke_test.rb'
+      - '.github/workflows/respirate-ci.yml'
+      - '.github/actions/setup-clover/action.yml'
+  pull_request:
+    paths:
+      - 'bin/respirate'
+      - 'scheduling/dispatcher.rb'
+      - 'model/strand.rb'
+      - 'prog/test.rb'
+      - 'spec/respirate_smoke_test.rb'
+      - '.github/workflows/respirate-ci.yml'
+      - '.github/actions/setup-clover/action.yml'
+
+jobs:
+  cli-ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on: [ubicloud, ubicloud-arm]
+    name: respirate CI - ${{matrix.runs-on}}
+    runs-on: ${{matrix.runs-on}}
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Clover
+      uses: ./.github/actions/setup-clover
+
+    - name: Run respirate smoke test
+      run: bundle exec rake respirate_smoke_test

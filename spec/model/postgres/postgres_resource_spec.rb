@@ -13,17 +13,17 @@ RSpec.describe PostgresResource do
   it "returns connection string without ubid qualifier" do
     expect(Prog::Postgres::PostgresResourceNexus).to receive(:dns_zone).and_return("something").at_least(:once)
     expect(postgres_resource).to receive(:hostname_version).and_return("v1")
-    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.postgres.ubicloud.com?channel_binding=require")
+    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.postgres.ubicloud.com:5432/postgres?sslmode=require")
   end
 
   it "returns connection string with ubid qualifier" do
     expect(Prog::Postgres::PostgresResourceNexus).to receive(:dns_zone).and_return("something").at_least(:once)
-    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.pgc60xvcr00a5kbnggj1js4kkq.postgres.ubicloud.com?channel_binding=require")
+    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.pgc60xvcr00a5kbnggj1js4kkq.postgres.ubicloud.com:5432/postgres?sslmode=require")
   end
 
   it "returns connection string with ip address if config is not set" do
     expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, vm: instance_double(Vm, ephemeral_net4: "1.2.3.4"))).at_least(:once)
-    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@1.2.3.4?channel_binding=require")
+    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@1.2.3.4:5432/postgres?sslmode=require")
   end
 
   it "returns connection string as nil if there is no server" do
@@ -72,26 +72,6 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.display_state).to eq("unavailable")
     end
 
-    it "returns 'converging' when the resource has enough ready servers and in maintenance window" do
-      expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait", children: [instance_double(Strand, prog: "Postgres::ConvergePostgresResource")])).at_least(:once)
-      expect(postgres_resource).to receive(:has_enough_ready_servers?).and_return(true).at_least(:once)
-      expect(postgres_resource).to receive(:in_maintenance_window?).and_return(true)
-      expect(postgres_resource.display_state).to eq("converging")
-    end
-
-    it "returns 'waiting for maintenance window' when the resource has enough ready servers and not in maintenance window" do
-      expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait", children: [instance_double(Strand, prog: "Postgres::ConvergePostgresResource")])).at_least(:once)
-      expect(postgres_resource).to receive(:has_enough_ready_servers?).and_return(true).at_least(:once)
-      expect(postgres_resource).to receive(:in_maintenance_window?).and_return(false).at_least(:once)
-      expect(postgres_resource.display_state).to eq("waiting for maintenance window")
-    end
-
-    it "returns 'preparing for convergence' when the resource doesn't have enough ready servers" do
-      expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait", children: [instance_double(Strand, prog: "Postgres::ConvergePostgresResource")])).at_least(:once)
-      expect(postgres_resource).to receive(:has_enough_ready_servers?).and_return(false).at_least(:once)
-      expect(postgres_resource.display_state).to eq("preparing for convergence")
-    end
-
     it "returns 'running' when strand label is 'wait' and has no children" do
       expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait", children: [])).at_least(:once)
       expect(postgres_resource.display_state).to eq("running")
@@ -115,8 +95,12 @@ RSpec.describe PostgresResource do
   end
 
   it "returns target_standby_count correctly" do
-    expect(postgres_resource).to receive(:ha_type).and_return(PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC)
-    (0..2).each { expect(postgres_resource.target_standby_count).to eq(it) }
+    allow(postgres_resource).to receive(:ha_type).and_return(PostgresResource::HaType::NONE).at_least(:once)
+    expect(postgres_resource.target_standby_count).to eq(0)
+    allow(postgres_resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC).at_least(:once)
+    expect(postgres_resource.target_standby_count).to eq(1)
+    allow(postgres_resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC).at_least(:once)
+    expect(postgres_resource.target_standby_count).to eq(2)
   end
 
   it "returns target_server_count correctly" do
@@ -139,5 +123,17 @@ RSpec.describe PostgresResource do
       {cidr: "fd19:9c92:e9b9:a1a::/64", port_range: Sequel.pg_range(6432..6432)}
     ])
     postgres_resource.set_firewall_rules
+  end
+
+  describe "#ongoing_failover?" do
+    it "returns false if there is no ongoing failover" do
+      expect(postgres_resource).to receive(:servers).and_return([instance_double(PostgresServer, taking_over?: false), instance_double(PostgresServer, taking_over?: false)])
+      expect(postgres_resource.ongoing_failover?).to be false
+    end
+
+    it "returns true if there is an ongoing failover" do
+      expect(postgres_resource).to receive(:servers).and_return([instance_double(PostgresServer, taking_over?: true), instance_double(PostgresServer, taking_over?: false)])
+      expect(postgres_resource.ongoing_failover?).to be true
+    end
   end
 end

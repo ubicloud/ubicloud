@@ -53,18 +53,18 @@ RSpec.describe Clover, "cli pg list" do
   end
 
   it "shows error for empty fields" do
-    expect(cli(%w[pg list -Nf] + [""], status: 400)).to eq "! No fields given in pg list -f option\n"
+    expect(cli(%w[pg list -Nf] + [""], status: 400)).to start_with "! No fields given in pg list -f option\n"
   end
 
   it "shows error for duplicate fields" do
-    expect(cli(%w[pg list -Nfid,id], status: 400)).to eq "! Duplicate field(s) in pg list -f option\n"
+    expect(cli(%w[pg list -Nfid,id], status: 400)).to start_with "! Duplicate field(s) in pg list -f option\n"
   end
 
   it "shows error for invalid fields" do
-    expect(cli(%w[pg list -Nffoo], status: 400)).to eq "! Invalid field(s) given in pg list -f option: foo\n"
+    expect(cli(%w[pg list -Nffoo], status: 400)).to start_with "! Invalid field(s) given in pg list -f option: foo\n"
   end
 
   it "shows error for invalid location" do
-    expect(cli(%w[pg list -Nleu-/-h1], status: 400)).to eq "! Invalid location provided in pg list -l option\n"
+    expect(cli(%w[pg list -Nleu-/-h1], status: 400)).to start_with "! Invalid location provided in pg list -l option\n"
   end
 end

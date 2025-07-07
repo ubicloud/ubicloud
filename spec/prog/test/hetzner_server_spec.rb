@@ -9,7 +9,7 @@ RSpec.describe Prog::Test::HetznerServer do
   let(:vm_host) { Prog::Vm::HostNexus.assemble("1.1.1.1").subject }
 
   before {
-    allow(Config).to receive(:ci_hetzner_sacrificial_server_id).and_return("1.1.1.1")
+    allow(Config).to receive(:e2e_hetzner_server_id).and_return("1.1.1.1")
     allow(hs_test).to receive_messages(frame: {"vm_host_id" => vm_host.id,
                                                "hetzner_ssh_keypair" => "oOtAbOGFVHJjFyeQBgSfghi+YBuyQzBRsKABGZhOmDpmwxqx681mscsGBLaQ\n2iWQsOYBBVLDtQWe/gf3NRNyBw==\n",
                                                "server_id" => "1234",
@@ -19,9 +19,9 @@ RSpec.describe Prog::Test::HetznerServer do
   }
 
   describe "#assemble" do
-    it "fails if CI_HETZNER_SACRIFICIAL_SERVER_ID not provided" do
-      expect(Config).to receive(:ci_hetzner_sacrificial_server_id).and_return("")
-      expect { described_class.assemble }.to raise_error RuntimeError, "CI_HETZNER_SACRIFICIAL_SERVER_ID must be a nonempty string"
+    it "fails if E2E_HETZNER_SERVER_ID not provided" do
+      expect(Config).to receive(:e2e_hetzner_server_id).and_return("")
+      expect { described_class.assemble }.to raise_error RuntimeError, "E2E_HETZNER_SERVER_ID must be a nonempty string"
     end
 
     it "uses exiting vm host if given" do
@@ -84,12 +84,19 @@ RSpec.describe Prog::Test::HetznerServer do
 
   describe "#wait_setup_host" do
     it "naps if the vm host is not ready yet" do
-      expect(vm_host.strand).to receive(:label).and_return("wait_prep")
+      expect(vm_host.strand).to receive(:label).and_return("wait_prep").at_least(:once)
+      expect { hs_test.wait_setup_host }.to nap(15)
+    end
+
+    it "puts the image sizes if the vm host is downloading images" do
+      expect(vm_host.strand).to receive(:label).and_return("wait_download_boot_images").at_least(:once)
+      expect(vm_host.sshable).to receive(:cmd).and_return("image_1\nimage_2\n")
+      expect(Clog).to receive(:emit).with("image_1\timage_2")
       expect { hs_test.wait_setup_host }.to nap(15)
     end
 
     it "hops to run_integration_specs if rhizome installed" do
-      expect(vm_host.strand).to receive(:label).and_return("wait")
+      expect(vm_host.strand).to receive(:label).and_return("wait").at_least(:once)
       expect(hs_test).to receive(:retval).and_return({"msg" => "installed rhizome"})
       expect(hs_test).to receive(:verify_specs_installation).with(installed: true)
       expect { hs_test.wait_setup_host }.to hop("run_integration_specs")
@@ -97,14 +104,14 @@ RSpec.describe Prog::Test::HetznerServer do
 
     it "verifies specs haven't been installed when we setup the host & installs rhizome with specs" do
       expect(hs_test).to receive(:frame).and_return({"setup_host" => true})
-      expect(vm_host.strand).to receive(:label).and_return("wait")
+      expect(vm_host.strand).to receive(:label).and_return("wait").at_least(:once)
       expect(hs_test).to receive(:verify_specs_installation).with(installed: false)
       expect { hs_test.wait_setup_host }.to hop("start", "InstallRhizome")
     end
 
     it "doesn't verify specs not installed if we didn't setup the host" do
       expect(hs_test).to receive(:frame).and_return({"setup_host" => false})
-      expect(vm_host.strand).to receive(:label).and_return("wait")
+      expect(vm_host.strand).to receive(:label).and_return("wait").at_least(:once)
       expect(hs_test).not_to receive(:verify_specs_installation)
       expect { hs_test.wait_setup_host }.to hop("start", "InstallRhizome")
     end
@@ -137,7 +144,19 @@ RSpec.describe Prog::Test::HetznerServer do
         "sudo RUN_E2E_TESTS=1 SPDK_TESTS_TMP_DIR=#{tmp_dir} bundle exec rspec host/e2e"
       )
       expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo rm -rf #{tmp_dir}")
-      expect { hs_test.run_integration_specs }.to hop("wait")
+      expect { hs_test.run_integration_specs }.to hop("install_vhost_backend")
+    end
+  end
+
+  describe "#install_vhost_backend" do
+    it "hops to wait if vhost_backend is installed" do
+      expect(hs_test).to receive(:retval).and_return({"msg" => "VhostBlockBackend was setup"})
+      expect { hs_test.install_vhost_backend }.to hop("wait")
+    end
+
+    it "pushes SetupVhostBlockBackend if not installed" do
+      expect(hs_test).to receive(:retval).and_return(nil)
+      expect { hs_test.install_vhost_backend }.to hop("start", "Storage::SetupVhostBlockBackend")
     end
   end
 
@@ -147,11 +166,6 @@ RSpec.describe Prog::Test::HetznerServer do
       expect { hs_test.wait }.to hop("verify_cleanup")
     end
 
-    it "hops to allow_slices when signaled" do
-      expect(hs_test).to receive(:when_allow_slices_set?).and_yield
-      expect { hs_test.wait }.to hop("allow_slices")
-    end
-
     it "hops to disallow_slices when signaled" do
       expect(hs_test).to receive(:when_disallow_slices_set?).and_yield
       expect { hs_test.wait }.to hop("disallow_slices")
@@ -159,13 +173,6 @@ RSpec.describe Prog::Test::HetznerServer do
 
     it "naps" do
       expect { hs_test.wait }.to nap(15)
-    end
-  end
-
-  describe "#allow_slices" do
-    it "allows slices" do
-      expect(vm_host).to receive(:allow_slices)
-      expect { hs_test.allow_slices }.to hop("wait")
     end
   end
 

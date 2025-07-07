@@ -7,7 +7,7 @@ class VictoriaMetricsServer < Sequel::Model
   many_to_one :vm
   many_to_one :resource, class: :VictoriaMetricsResource, key: :victoria_metrics_resource_id
 
-  include ResourceMethods
+  plugin ResourceMethods, redacted_columns: :cert
   include SemaphoreMethods
   include HealthMonitorMethods
 
@@ -68,15 +68,11 @@ class VictoriaMetricsServer < Sequel::Model
   def client(socket: nil)
     VictoriaMetrics::Client.new(
       endpoint: endpoint,
-      ssl_ca_file_data: resource.root_certs + cert,
+      ssl_ca_data: resource.root_certs + cert,
       socket: socket,
       username: resource.admin_user,
       password: resource.admin_password
     )
-  end
-
-  def self.redacted_columns
-    super + [:cert]
   end
 end
 

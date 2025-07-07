@@ -1,4 +1,4 @@
-<%# locals: (action:, form_elements:, option_tree:, option_parents:, method: "POST", form_title: nil, pre_selected_values: {}, mode: "create") %>
+<%# locals: (action:, form_elements:, option_tree:, option_parents:, method: "POST", pre_selected_values: {}, mode: "create") %>
 <% nonce = SecureRandom.base64(32)
 content_security_policy.add_script_src [:nonce, nonce] %>
 
@@ -9,20 +9,11 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
 </script>
 
 <div>
-  <% if form_title %>
-    <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
-      <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-          <%= form_title %>
-        </h3>
-      </div>
-    </div>
-  <% end %>
-
   <div class="grid gap-6">
     <form action="<%= action %>" method="POST" id="creation-form" class="<%= method %>">
       <%== csrf_tag(action, method) %>
-      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
+      <% container_class = (mode == "create") ? "overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white" : "" %>
+      <div class="<%= container_class %>">
         <div class="px-4 py-5 sm:p-6">
           <div class="space-y-12">
             <div>
@@ -39,7 +30,7 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
     has_option = ["radio_small_cards", "select", "checkbox"].include?(type)
     options = OptionTreeGenerator.generate_allowed_options(name, option_tree, option_parents).map do |option|
       opt_val = if option[name].is_a?(Sequel::Model)
-        option[name].id
+        option[name].ubid
       elsif type == "select"
         option[name][:value]
       else
@@ -48,7 +39,7 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
 
       opt_text = content_generator.call(*option.values)
 
-      parents = option.reject { |k, v| k == name }.transform_values { |v| v.is_a?(Sequel::Model) ? v.id : v }
+      parents = option.reject { |k, v| k == name }.transform_values { |v| v.is_a?(Sequel::Model) ? v.ubid : v }
 
       parents_selected = parents.all? { |k, v| selected_options[k] == v }
       submitted_value = flash.dig("old", name)
@@ -58,7 +49,7 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
       checked = parents_selected && (selected_in_form_submission || selected_in_pre_selection || first_of_its_kind)
       selected_options[name] = opt_val if checked
 
-      opt_classes = parents.map { |k, v| "form_#{k} form_#{k}_#{v}" }
+      opt_classes = parents.map { |k, v| "form_#{k} form_#{k}_#{v.tr(".", "-")}" }
       opt_classes << "hidden" unless parents_selected
       opt_classes = opt_classes.join(" ")
 

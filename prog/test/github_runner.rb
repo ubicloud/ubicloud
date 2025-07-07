@@ -12,13 +12,13 @@ class Prog::Test::GithubRunner < Prog::Test::Base
 
     vm_pool_service_project = Project.create(name: "Vm-Pool-Service-Project") { it.id = Config.vm_pool_project_id }
 
-    github_test_project = Project.create_with_id(name: "Github-Runner-Test-Project")
-    GithubInstallation.create_with_id(
+    github_test_project = Project.create(name: "Github-Runner-Test-Project")
+    GithubInstallation.create(
       installation_id: Config.e2e_github_installation_id,
       name: "TestUser",
       type: "User",
       project_id: github_test_project.id,
-      use_docker_mirror: true
+      created_at: Time.now - 8 * 24 * 60 * 60
     )
 
     Strand.create_with_id(
@@ -44,7 +44,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       size: 1,
       vm_size: label_data["vm_size"],
       boot_image: label_data["boot_image"],
-      location_id: Location[name: label_data["location"]].id,
+      location_id: Location::GITHUB_RUNNERS_ID,
       storage_size_gib: label_data["storage_size_gib"],
       arch: label_data["arch"],
       storage_encrypted: true,

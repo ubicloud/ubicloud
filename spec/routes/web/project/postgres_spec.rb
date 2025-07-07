@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../spec_helper"
+require "aws-sdk-s3"
 
 RSpec.describe Clover, "postgres" do
   let(:user) { create_account }
@@ -49,6 +50,11 @@ RSpec.describe Clover, "postgres" do
 
       client = instance_double(Minio::Client, list_objects: [])
       allow(Minio::Client).to receive(:new).and_return(client)
+
+      vmc = instance_double(VictoriaMetrics::Client, query_range: [nil])
+      vms = instance_double(VictoriaMetricsServer, client: vmc)
+      vmr = instance_double(VictoriaMetricsResource, servers: [vms])
+      allow(VictoriaMetricsResource).to receive(:first).and_return(vmr)
     end
 
     describe "list" do
@@ -72,6 +78,14 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content pg.name
         expect(page).to have_no_content pg_wo_permission.name
       end
+
+      it "can list PostgreSQL databases with parents" do
+        pg
+        pg.update(parent_id: pg_wo_permission.id)
+        visit "#{project.path}/postgres"
+
+        expect(page).to have_content pg_wo_permission.name
+      end
     end
 
     describe "create" do
@@ -81,7 +95,7 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         name = "new-pg-db"
         fill_in "Name", with: name
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
         choose option: "standard-2"
         choose option: PostgresResource::HaType::NONE
 
@@ -103,8 +117,8 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         name = "new-pg-db"
         fill_in "Name", with: name
-        choose option: private_location.id
-        choose option: "standard-2"
+        choose option: private_location.ubid
+        choose option: "m6id.large"
         choose option: PostgresResource::HaType::NONE
         choose option: "118"
 
@@ -124,7 +138,7 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         name = "new-pg-db"
         fill_in "Name", with: name
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
         choose option: "standard-60"
         choose option: PostgresResource::HaType::NONE
 
@@ -132,7 +146,7 @@ RSpec.describe Clover, "postgres" do
 
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         expect(page).to have_flash_error("Validation failed for following fields: storage_size")
-        expect(page).to have_content("Storage size must be one of the following: 1024.0, 2048.0, 4096.0")
+        expect(page).to have_content("Invalid storage size. Available options: 1024, 2048, 4096")
         expect(PostgresResource.count).to eq(0)
       end
 
@@ -141,7 +155,7 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         name = "new-pg-db"
         fill_in "Name", with: name
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
         choose option: "standard-60"
         choose option: PostgresResource::HaType::NONE
         Location[Location::HETZNER_FSN1_ID].destroy
@@ -160,13 +174,32 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - Create ParadeDB PostgreSQL Database")
         name = "new-pg-db"
         fill_in "Name", with: name
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
         choose option: "standard-2"
         choose option: PostgresResource::HaType::NONE
         check "Accept Terms of Service and Privacy Policy"
 
         click_button "Create"
 
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
+        expect(PostgresResource.count).to eq(1)
+        expect(PostgresResource.first.project_id).to eq(project.id)
+      end
+
+      it "can create new Lantern PostgreSQL database when the feature flag is enabled" do
+        project.set_ff_postgres_lantern(true)
+        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::LANTERN}"
+
+        expect(page.title).to eq("Ubicloud - Create Lantern PostgreSQL Database")
+        name = "new-pg-db"
+        fill_in "Name", with: name
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "standard-2"
+        choose option: PostgresResource::HaType::NONE
+        check "Accept Terms of Service and Privacy Policy"
+
+        click_button "Create"
         expect(page.title).to eq("Ubicloud - #{name}")
         expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
         expect(PostgresResource.count).to eq(1)
@@ -198,7 +231,7 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
 
         fill_in "Name", with: pg.name
-        choose option: Location::HETZNER_FSN1_ID
+        choose option: Location::HETZNER_FSN1_UBID
         choose option: "standard-2"
         choose option: PostgresResource::HaType::NONE
 
@@ -242,56 +275,131 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - PostgreSQL Databases")
         expect(page).to have_content pg.name
 
-        click_link pg.name, href: "#{project.path}#{pg.path}"
+        click_link pg.name, href: "#{project.path}#{pg.path}/overview"
 
         expect(page.title).to eq("Ubicloud - #{pg.name}")
         expect(page).to have_content pg.name
-        expect(page).to have_content "Waiting for host to be ready..."
+      end
 
-        expect(Prog::Postgres::PostgresResourceNexus).to receive(:dns_zone).and_return(true)
-        pg.update(root_cert_1: "root_cert_1", root_cert_2: "root_cert_2")
-        page.refresh
-        expect(page).to have_content "#{pg.name}.#{pg.ubid}.postgres.ubicloud.com"
-        expect(page).to have_no_content "Waiting for host to be ready..."
-        expect(page).to have_content "Download"
+      it "can show PostgreSQL database details even when no subpage is specified" do
+        pg
+        visit "#{project.path}#{pg.path}"
+
+        expect(page.title).to eq("Ubicloud - #{pg.name}")
+        expect(page).to have_content pg.name
+      end
+
+      it "can show disk usage details" do
+        pg
+        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
+
+        vmc = instance_double(VictoriaMetrics::Client, query_range: [{"values" => [[Time.now.utc.to_i, "50"]]}])
+        vms = instance_double(VictoriaMetricsServer, client: vmc)
+        vmr = instance_double(VictoriaMetricsResource, servers: [vms])
+        expect(VictoriaMetricsResource).to receive(:first).and_return(vmr)
+
+        visit "#{project.path}#{pg.path}/overview"
+        expect(page).to have_content "64.0 GB is used (50.0%)"
+      end
+
+      it "shows the disk usage in red if usage is high" do
+        pg
+        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
+
+        vmc = instance_double(VictoriaMetrics::Client, query_range: [{"values" => [[Time.now.utc.to_i, "90"]]}])
+        vms = instance_double(VictoriaMetricsServer, client: vmc)
+        vmr = instance_double(VictoriaMetricsResource, servers: [vms])
+        expect(VictoriaMetricsResource).to receive(:first).and_return(vmr)
+
+        visit "#{project.path}#{pg.path}/overview"
+        expect(page).to have_css("span.text-red-600", text: "115.2 GB is used (90.0%)")
+      end
+
+      it "shows total disk if there is no VictoriaMetricsResource" do
+        pg
+        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
+
+        expect(VictoriaMetricsResource).to receive(:first).and_return(nil)
+
+        visit "#{project.path}#{pg.path}/overview"
+        expect(page).to have_content "128 GB"
+      end
+
+      it "shows AZ id for AWS PostgreSQL instance" do
+        AwsInstance.create(instance_id: "i-0123456789abcdefg", az_id: "usw2-az2") { |it| it.id = pg.representative_server.vm.id }
+
+        visit "#{project.path}#{pg.path}/overview"
+        expect(page).to have_content "usw2-az2 (AWS)"
+      end
+
+      it "shows total disk if VictoriaMetricsResource is not accessible" do
+        pg
+        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
+
+        vmc = instance_double(VictoriaMetrics::Client)
+        expect(vmc).to receive(:query_range).and_raise(Excon::Error::Socket)
+        vms = instance_double(VictoriaMetricsServer, client: vmc)
+        vmr = instance_double(VictoriaMetricsResource, servers: [vms])
+        expect(VictoriaMetricsResource).to receive(:first).and_return(vmr)
+
+        visit "#{project.path}#{pg.path}/overview"
+        expect(page).to have_content "128 GB"
+      end
+
+      it "can show basic metrics on overview page" do
+        pg.strand.update(label: "wait")
+        visit "#{project.path}#{pg.path}/overview"
+        expect(page).to have_css(".metric-chart")
+      end
+
+      it "shows connections if the resource is running" do
+        pg.strand.update(label: "wait")
+        visit "#{project.path}#{pg.path}/connection"
+        expect(page).to have_no_content "No connection information available"
+      end
+
+      it "does not show connections if the resource is creating" do
+        pg.strand.update(label: "wait_servers")
+        visit "#{project.path}#{pg.path}/connection"
+        expect(page).to have_content "No connection information available"
+      end
+
+      it "shows 404 for invalid pages for read replicas" do
+        pg
+        pg.update(parent_id: pg_wo_permission.id)
+        visit "#{project.path}#{pg.path}/resize"
+
+        expect(page.title).to eq("Ubicloud - ResourceNotFound")
+        expect(page.status_code).to eq(404)
       end
 
       it "does not show delete or edit options without the appropriate permissions" do
         pg
-        visit "#{project.path}/postgres"
-        click_link pg.name, href: "#{project.path}#{pg.path}"
-        expect(page.title).to eq("Ubicloud - #{pg.name}")
-        expect(page.body).to include "metric-destination-password"
-        expect(page.body).to include "form-pg-md-create"
-        expect(page.body).not_to include "Lantern is a PostgreSQL-based vector database"
-        expect(page).to have_content "Danger Zone"
 
-        pg.this.update(flavor: PostgresResource::Flavor::LANTERN)
-        backup = Struct.new(:key, :last_modified)
-        restore_target = Time.now.utc
-        expect(MinioCluster).to receive(:[]).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
-        expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
-        page.refresh
-        fill_in "#{pg.name}-fork", with: "restored-server"
-        fill_in "Target Time (UTC)", with: restore_target.strftime("%Y-%m-%d %H:%M"), visible: false
-        click_button "Fork"
-        expect(page.body).to include "metric-destination-password"
-        expect(page.body).to include "form-pg-md-create"
-        expect(page.body).to include "Lantern is a PostgreSQL-based vector database"
+        visit "#{project.path}#{pg.path}/networking"
+        expect(page).to have_css(".firewall-rule-create-button")
+
+        visit "#{project.path}#{pg.path}/read-replica"
+        expect(page).to have_css(".pg-read-replica-create-btn")
+
+        visit "#{project.path}#{pg.path}/settings"
         expect(page).to have_content "Danger Zone"
 
         AccessControlEntry.dataset.destroy
         AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
-        page.refresh
-        expect(page.title).to eq("Ubicloud - restored-server")
-        expect(page.body).not_to include "metric-destination-password"
-        expect(page.body).not_to include "form-pg-md-create"
-        expect(page.body).to include "Lantern is a PostgreSQL-based vector database"
+
+        visit "#{project.path}#{pg.path}/networking"
+        expect(page).to have_no_css(".firewall-rule-create-button")
+
+        visit "#{project.path}#{pg.path}/read-replica"
+        expect(page).to have_no_css(".pg-read-replica-create-btn")
+
+        visit "#{project.path}#{pg.path}/settings"
         expect(page).to have_no_content "Danger Zone"
       end
 
       it "raises forbidden when does not have permissions" do
-        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
+        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/overview"
 
         expect(page.title).to eq("Ubicloud - Forbidden")
         expect(page.status_code).to eq(403)
@@ -299,7 +407,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "raises not found when PostgreSQL database not exists" do
-        visit "#{project.path}/location/eu-central-h1/postgres/08s56d4kaj94xsmrnf5v5m3mav"
+        visit "#{project.path}/location/eu-central-h1/postgres/08s56d4kaj94xsmrnf5v5m3mav/overview"
 
         expect(page.title).to eq("Ubicloud - ResourceNotFound")
         expect(page.status_code).to eq(404)
@@ -307,16 +415,12 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can update PostgreSQL instance size configuration" do
-        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg)).at_least(:once)
-        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project).twice
-        expect(pg.representative_server).to receive(:storage_size_gib).and_return(128).at_least(:once)
+        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
-        visit "#{project.path}#{pg.path}"
-        expect(page).to have_content "Configure PostgreSQL database"
+        visit "#{project.path}#{pg.path}/resize"
 
         choose option: "standard-8"
         choose option: 256
-        choose option: PostgresResource::HaType::ASYNC
 
         # We send PATCH request manually instead of just clicking to button because PATCH action triggered by JavaScript.
         # UI tests run without a JavaScript engine.
@@ -324,18 +428,15 @@ RSpec.describe Clover, "postgres" do
         _csrf = form.find("input[name='_csrf']", visible: false).value
         size = form.find(:radio_button, "size", checked: true).value
         storage_size = form.find(:radio_button, "storage_size", checked: true).value
-        ha_type = form.find(:radio_button, "ha_type", checked: true).value
-        page.driver.submit :patch, form["action"], {size: size, storage_size: storage_size, ha_type: ha_type, _csrf:}
+        page.driver.submit :patch, form["action"], {size:, storage_size:, _csrf:}
 
         pg.reload
         expect(pg.target_vm_size).to eq("standard-8")
         expect(pg.target_storage_size_gib).to eq(256)
-        expect(pg.ha_type).to eq(PostgresResource::HaType::ASYNC)
       end
 
       it "handles errors during scale up/down" do
-        visit "#{project.path}#{pg.path}"
-        expect(page).to have_content "Configure PostgreSQL database"
+        visit "#{project.path}#{pg.path}/resize"
 
         choose option: "standard-8"
         choose option: 64
@@ -346,10 +447,10 @@ RSpec.describe Clover, "postgres" do
         _csrf = form.find("input[name='_csrf']", visible: false).value
         size = form.find(:radio_button, "size", checked: true).value
         storage_size = form.find(:radio_button, "storage_size", checked: true).value
-        page.driver.submit :patch, form["action"], {size: size, storage_size: storage_size, _csrf:}
+        page.driver.submit :patch, form["action"], {size:, storage_size:, _csrf:}
 
         # Normally we follow the redirect through javascript handler. Here, we are simulating that by reloading the page.
-        visit "#{project.path}#{pg.path}"
+        visit "#{project.path}#{pg.path}/resize"
         expect(page).to have_flash_error "Validation failed for following fields: storage_size"
 
         pg.reload
@@ -363,7 +464,7 @@ RSpec.describe Clover, "postgres" do
         expect(MinioCluster).to receive(:[]).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
         expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
 
-        visit "#{project.path}#{pg.path}"
+        visit "#{project.path}#{pg.path}/backup-restore"
         expect(page).to have_content "Fork PostgreSQL database"
 
         fill_in "#{pg.name}-fork", with: "restored-server"
@@ -375,9 +476,16 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - restored-server")
       end
 
+      it "shows proper message when there is no backups to restore" do
+        expect(MinioCluster).to receive(:[]).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
+        expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [])).at_least(:once)
+
+        visit "#{project.path}#{pg.path}/backup-restore"
+        expect(page).to have_content "No backups available for this PostgreSQL database."
+      end
+
       it "can create a read replica of a PostgreSQL database" do
-        visit "#{project.path}#{pg.path}"
-        expect(page).to have_content "Read Replicas"
+        visit "#{project.path}#{pg.path}/read-replica"
 
         fill_in "#{pg.name}-read-replica", with: "my-read-replica"
 
@@ -386,16 +494,12 @@ RSpec.describe Clover, "postgres" do
         expect(page.status_code).to eq(200)
         expect(page.title).to eq("Ubicloud - my-read-replica")
 
-        visit "#{project.path}#{pg.path}"
-        expect(page).to have_content("my-read-replica")
-
-        visit "#{project.path}/postgres"
+        visit "#{project.path}#{pg.path}/read-replica"
         expect(page).to have_content("my-read-replica")
       end
 
       it "can promote a read replica" do
-        visit "#{project.path}#{pg.path}"
-        expect(page).to have_content "Read Replicas"
+        visit "#{project.path}#{pg.path}/read-replica"
 
         fill_in "#{pg.name}-read-replica", with: "my-read-replica"
 
@@ -404,13 +508,14 @@ RSpec.describe Clover, "postgres" do
         expect(page.status_code).to eq(200)
         expect(page.title).to eq("Ubicloud - my-read-replica")
 
+        visit "#{project.path}#{pg.read_replicas.first.path}/settings"
         find(".promote-btn").click
         expect(PostgresResource[name: "my-read-replica"].semaphores.count).to eq(1)
         expect(page).to have_content "'my-read-replica' will be promoted in a few minutes, please refresh the page"
       end
 
       it "fails to promote if not a read replica" do
-        visit "#{project.path}#{pg.path}"
+        visit "#{project.path}#{pg.path}/read-replica"
         expect(page).to have_content "Read Replicas"
 
         fill_in "#{pg.name}-read-replica", with: "my-read-replica"
@@ -419,6 +524,9 @@ RSpec.describe Clover, "postgres" do
 
         expect(page.status_code).to eq(200)
         expect(page.title).to eq("Ubicloud - my-read-replica")
+
+        pg_read_replica = PostgresResource[name: "my-read-replica"]
+        visit "#{project.path}#{pg_read_replica.path}/settings"
         PostgresResource[name: "my-read-replica"].update(parent_id: nil)
         find(".promote-btn").click
         expect(page.status_code).to eq(400)
@@ -426,7 +534,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can reset superuser password of PostgreSQL database" do
-        visit "#{project.path}#{pg.path}"
+        visit "#{project.path}#{pg.path}/settings"
         expect(page.title).to eq "Ubicloud - pg-with-permission"
         expect(page).to have_content "Reset superuser password"
         password = pg.superuser_password
@@ -449,51 +557,34 @@ RSpec.describe Clover, "postgres" do
         expect(page.status_code).to eq(200)
       end
 
-      it "does not show reset superuser password for restoring database" do
-        pg.representative_server.update(timeline_access: "fetch")
-
-        visit "#{project.path}#{pg.path}"
-        expect(page).to have_no_content "Reset superuser password"
-        expect(page.status_code).to eq(200)
-      end
-
-      it "cannot reset superuser password of restoring database" do
-        visit "#{project.path}#{pg.path}"
-        expect(page).to have_content "Reset superuser password"
-
-        pg.representative_server.update(timeline_access: "fetch")
-        find(".reset-superuser-password-new-password").set("DummyPassword123")
-        find(".reset-superuser-password-new-password-repeat").set("DummyPassword123")
-        click_button "Reset"
-
-        expect(page.status_code).to eq(400)
-        expect(page).to have_flash_error("Superuser password cannot be updated during restore!")
-      end
-
       it "can restart PostgreSQL database" do
-        visit "#{project.path}#{pg.path}"
+        visit "#{project.path}#{pg.path}/settings"
         expect(page).to have_content "Restart"
         click_button "Restart"
 
         expect(page.status_code).to eq(200)
       end
 
-      it "does not show metrics if feature flag is disabled" do
-        visit "#{project.path}#{pg.path}"
-        expect(page).to have_no_content "CPU Usage"
+      it "doesn't show reset button when does not have permissions" do
+        # Give permission to view, so we can see the detail page
+        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:delete"])
+
+        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/settings"
+        expect(page.title).to eq "Ubicloud - pg-without-permission"
+
+        expect { find ".restart-btn" }.to raise_error Capybara::ElementNotFound
       end
 
-      it "shows metrics if feature flag is enabled and the resource is running" do
-        project.set_ff_postgres_metrics(true)
+      it "shows metrics if the resource is not creating" do
         pg.strand.update(label: "wait")
-        visit "#{project.path}#{pg.path}"
+        visit "#{project.path}#{pg.path}/charts"
         expect(page).to have_content "CPU Usage"
       end
 
-      it "does not show metrics if feature flag is enabled but the resource is not running" do
-        project.set_ff_postgres_metrics(true)
+      it "does not show metrics the resource is creating" do
         pg.strand.update(label: "wait_servers")
-        visit "#{project.path}#{pg.path}"
+        visit "#{project.path}#{pg.path}/charts"
         expect(page).to have_no_content "CPU Usage"
       end
     end
@@ -501,7 +592,7 @@ RSpec.describe Clover, "postgres" do
     describe "firewall" do
       it "can show default firewall rules" do
         pg
-        visit "#{project.path}#{pg.path}"
+        visit "#{project.path}#{pg.path}/networking"
 
         expect(page).to have_content "Firewall Rules"
         expect(page).to have_content "0.0.0.0/0"
@@ -510,9 +601,9 @@ RSpec.describe Clover, "postgres" do
 
       it "can delete firewall rules" do
         pg
-        visit "#{project.path}#{pg.path}"
+        visit "#{project.path}#{pg.path}/networking"
 
-        btn = find "#fwr-delete-#{pg.firewall_rules.first.ubid} .delete-btn"
+        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
         expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
@@ -521,16 +612,16 @@ RSpec.describe Clover, "postgres" do
       it "can not delete firewall rules when does not have permissions" do
         AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
 
-        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
+        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/networking"
         expect(page.title).to eq "Ubicloud - pg-without-permission"
 
-        expect { find "#fwr-delete-#{pg.firewall_rules.first.ubid} .delete-btn" }.to raise_error Capybara::ElementNotFound
+        expect { find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .delete-btn" }.to raise_error Capybara::ElementNotFound
       end
 
       it "does not show create firewall rule when does not have permissions" do
         AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
 
-        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
+        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/networking"
         expect(page.title).to eq "Ubicloud - pg-without-permission"
 
         expect { find_by_id "fwr-create" }.to raise_error Capybara::ElementNotFound
@@ -538,32 +629,86 @@ RSpec.describe Clover, "postgres" do
 
       it "can create firewall rule" do
         pg
-        visit "#{project.path}#{pg.path}"
+        visit "#{project.path}#{pg.path}/networking"
 
-        fill_in "cidr", with: "1.1.1.2"
+        find('input[name="cidr"][form="form-pg-fwr-create"]').set("1.1.1.2")
         find(".firewall-rule-create-button").click
         expect(page).to have_content "Firewall rule is created"
         expect(page).to have_content "1.1.1.2/32"
         expect(page).to have_content "5432"
 
-        fill_in "cidr", with: "12.12.12.0/26"
+        find('input[name="cidr"][form="form-pg-fwr-create"]').set("12.12.12.0/26")
         find(".firewall-rule-create-button").click
         expect(page).to have_content "Firewall rule is created"
 
-        fill_in "cidr", with: "fd00::/64"
+        find('input[name="cidr"][form="form-pg-fwr-create"]').set("fd00::/64")
+        find('input[name="description"][form="form-pg-fwr-create"]').set("test description - new firewall rule")
         find(".firewall-rule-create-button").click
         expect(page).to have_content "Firewall rule is created"
         expect(page.status_code).to eq(200)
         expect(page).to have_content "fd00::/64"
+        expect(page).to have_content "test description - new firewall rule"
 
         expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
+      end
+
+      it "can update firewall rule" do
+        pg
+        visit "#{project.path}#{pg.path}/networking"
+
+        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
+        url = btn["data-url"]
+        _csrf = btn["data-csrf"]
+        page.driver.submit :patch, url, {cidr: "0.0.0.0/1", description: "dummy-description", _csrf:}
+
+        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
+      end
+
+      it "can set nil description for firewall rule" do
+        pg
+        visit "#{project.path}#{pg.path}/networking"
+
+        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
+        url = btn["data-url"]
+        _csrf = btn["data-csrf"]
+        page.driver.submit :patch, url, {cidr: "0.0.0.0/1", description: nil, _csrf:}
+
+        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
+      end
+
+      it "doesn't increment update_firewall_rules semaphore if cidr is same" do
+        pg
+        visit "#{project.path}#{pg.path}/networking"
+
+        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
+        url = btn["data-url"]
+        _csrf = btn["data-csrf"]
+        page.driver.submit :patch, url, {cidr: "0.0.0.0/0", description: "test", _csrf:}
+
+        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be false
+      end
+
+      it "cannot delete firewall rule if it doesn't exist" do
+        pg
+        visit "#{project.path}#{pg.path}/networking"
+
+        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
+        url = btn["data-url"]
+        _csrf = btn["data-csrf"]
+
+        fwr = pg.firewall_rules.first
+        fwr.update(cidr: "0.0.0.0/1", postgres_resource_id: pg_wo_permission.id)
+
+        page.driver.submit :patch, url, {cidr: "0.0.0.0/2", description: "dummy-description", _csrf:}
+
+        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).not_to be true
       end
     end
 
     describe "metric-destination" do
       it "can create metric destination" do
         pg
-        visit "#{project.path}#{pg.path}"
+        visit "#{project.path}#{pg.path}/charts"
 
         fill_in "url", with: "https://example.com"
         fill_in "username", with: "username"
@@ -580,7 +725,7 @@ RSpec.describe Clover, "postgres" do
           username: "username",
           password: "password"
         )
-        visit "#{project.path}#{pg.path}"
+        visit "#{project.path}#{pg.path}/charts"
 
         btn = find "#md-delete-#{md.ubid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
@@ -596,7 +741,7 @@ RSpec.describe Clover, "postgres" do
           password: "password"
         )
 
-        visit "#{project.path}#{pg.path}"
+        visit "#{project.path}#{pg.path}/charts"
         md.this.update(id: PostgresMetricDestination.generate_uuid)
 
         btn = find "#md-delete-#{md.ubid} .delete-btn"
@@ -609,17 +754,26 @@ RSpec.describe Clover, "postgres" do
     describe "set-maintenance-window" do
       it "sets maintenance window to nil when empty string is passed" do
         pg.update(maintenance_window_start_at: 9)
-        visit "#{project.path}#{pg.path}"
+        visit "#{project.path}#{pg.path}/settings"
 
         select "No Maintenance Window", from: "maintenance_window_start_at"
         click_button "Set"
         expect(pg.reload.maintenance_window_start_at).to be_nil
       end
+
+      it "sets maintenance window to 0 when 0 is passed" do
+        pg.update(maintenance_window_start_at: 9)
+        visit "#{project.path}#{pg.path}/settings"
+
+        select "00:00 - 02:00 (UTC)", from: "maintenance_window_start_at"
+        click_button "Set"
+        expect(pg.reload.maintenance_window_start_at).to eq(0)
+      end
     end
 
     describe "delete" do
       it "can delete PostgreSQL database" do
-        visit "#{project.path}#{pg.path}"
+        visit "#{project.path}#{pg.path}/settings"
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
@@ -632,8 +786,9 @@ RSpec.describe Clover, "postgres" do
       it "can not delete PostgreSQL database when does not have permissions" do
         # Give permission to view, so we can see the detail page
         AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:edit"])
 
-        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
+        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/settings"
         expect(page.title).to eq "Ubicloud - pg-without-permission"
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound

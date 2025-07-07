@@ -22,6 +22,17 @@ RSpec.describe MetricsTargetResource do
       expect(resource.instance_variable_get(:@resource)).to eq(postgres_server)
       expect(resource.instance_variable_get(:@tsdb_client)).to eq("tsdb_client")
     end
+
+    it "initializes with a resource and a tsdb client when VictoriaMetrics is not found in development" do
+      expect(Config).to receive(:development?).and_return(true)
+      expect(Config).to receive(:postgres_service_project_id).at_least(:once).and_return("4d8f9896-26a3-4784-8f52-2ed5d5e55c0e")
+      prj = Project.create_with_id(name: "pg-project") { it.id = Config.postgres_service_project_id }
+      expect(VictoriaMetricsResource).to receive(:first).with(project_id: prj.id).and_return(nil)
+      expect(VictoriaMetrics::Client).to receive(:new).with(endpoint: "http://localhost:8428").and_return("tsdb_client")
+      expect(resource.instance_variable_get(:@resource)).to eq(postgres_server)
+      expect(resource.instance_variable_get(:@tsdb_client)).to eq("tsdb_client")
+      expect(resource.instance_variable_get(:@deleted)).to be(false)
+    end
   end
 
   describe "#open_resource_session" do
@@ -77,7 +88,7 @@ RSpec.describe MetricsTargetResource do
 
     it "swallows exceptions and logs them" do
       expect(postgres_server).to receive(:export_metrics).and_raise(StandardError.new("Export failed"))
-      expect(Clog).to receive(:emit)
+      expect(Clog).to receive(:emit).and_call_original
       expect { resource.export_metrics }.not_to raise_error
     end
   end
@@ -114,7 +125,7 @@ RSpec.describe MetricsTargetResource do
     it "triggers Kernel.exit if pulse check is stuck" do
       resource.instance_variable_get(:@mutex).lock
       resource.instance_variable_set(:@export_started_at, Time.now - 200)
-      expect(Clog).to receive(:emit).at_least(:once)
+      expect(Clog).to receive(:emit).at_least(:once).and_call_original
       resource.force_stop_if_stuck
       resource.instance_variable_get(:@mutex).unlock
     end

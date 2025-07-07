@@ -4,11 +4,11 @@ require_relative "spec_helper"
 
 RSpec.describe LoadBalancer do
   subject(:lb) {
-    prj = Project.create_with_id(name: "test-prj")
-    ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps")
-    Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080).subject
+    Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080, health_check_protocol: "https").subject
   }
 
+  let(:project) { Project.create(name: "test-prj") }
+  let(:ps) { Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps") }
   let(:vm1) {
     prj = lb.private_subnet.project
     Prog::Vm::Nexus.assemble("pub key", prj.id, name: "test-vm1", private_subnet_id: lb.private_subnet.id).subject
@@ -108,6 +108,40 @@ RSpec.describe LoadBalancer do
     end
   end
 
+  describe "detach_vm" do
+    let(:ce) {
+      dz = DnsZone.create(name: "test-dns-zone", project_id: lb.project_id)
+      Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
+    }
+
+    before do
+      lb.add_cert(ce)
+      lb.add_vm(vm1)
+    end
+
+    it "increments update_load_balancer and tries to remove_cert_server" do
+      expect(lb).to receive(:incr_update_load_balancer)
+      expect(Strand).to receive(:create) do |args|
+        expect(args[:prog]).to eq("Vnet::CertServer")
+        expect(args[:label]).to eq("remove_cert_server")
+      end
+      lb.detach_vm(vm1)
+      expect(lb.vm_ports.first[:state]).to eq("detaching")
+    end
+
+    it "increments update_load_balancer and does not create a strand for removing cert server" do
+      expect(lb).to receive(:incr_update_load_balancer)
+      expect(lb).to receive(:cert_enabled_lb?).and_return(false)
+      expect(Strand).not_to receive(:create) do |args|
+        expect(args[:prog]).to eq("Vnet::CertServer")
+        expect(args[:label]).to eq("remove_cert_server")
+      end
+
+      lb.detach_vm(vm1)
+      expect(lb.vm_ports.first[:state]).to eq("detaching")
+    end
+  end
+
   describe "remove_vm" do
     let(:ce) {
       dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.project_id)
@@ -155,6 +189,13 @@ RSpec.describe LoadBalancer do
     end
   end
 
+  describe "cert_enabled_lb?" do
+    it "returns false when healthcheck protocol is not https" do
+      lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080, health_check_protocol: "http").subject
+      expect(lb.cert_enabled_lb?).to equal(false)
+    end
+  end
+
   describe "need_certificates?" do
     let(:dns_zone) {
       DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.private_subnet.project_id)
@@ -183,6 +224,13 @@ RSpec.describe LoadBalancer do
       cert = Prog::Vnet::CertNexus.assemble(lb.hostname, dns_zone.id).subject
       lb.add_cert(cert)
       expect(lb.need_certificates?).to be(true)
+    end
+
+    it "returns false if health_check_protocol is not https" do
+      lb.update(health_check_protocol: "http")
+      expect(lb.need_certificates?).to be(false)
+      lb.update(health_check_protocol: "tcp")
+      expect(lb.need_certificates?).to be(false)
     end
   end
 

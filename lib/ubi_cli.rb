@@ -9,6 +9,7 @@ class UbiCli
   SDK_METHODS = {
     "fw" => "firewall",
     "ak" => "inference_api_key",
+    "kc" => "kubernetes_cluster",
     "lb" => "load_balancer",
     "pg" => "postgres",
     "ps" => "private_subnet",
@@ -18,6 +19,7 @@ class UbiCli
   CAPITALIZED_LABELS = {
     "fw" => "Firewall",
     "ak" => "Inference API key",
+    "kc" => "Kubernetes cluster",
     "lb" => "Load balancer",
     "pg" => "PostgreSQL database",
     "ps" => "Private subnet",
@@ -103,7 +105,7 @@ class UbiCli
 
         if !@name && OBJECT_INFO_REGEXP.match?(@location)
           unless (object = sdk[@location])
-            raise Rodish::CommandFailure, "no #{label} with id #{@location} exists"
+            raise Rodish::CommandFailure.new("no #{label} with id #{@location} exists", command)
           end
 
           @name = @location
@@ -111,7 +113,7 @@ class UbiCli
         end
 
         if extra || !@name
-          raise Rodish::CommandFailure, "invalid #{cmd} reference, should be in location/#{cmd}-name or #{cmd}-id format"
+          raise Rodish::CommandFailure.new("invalid #{cmd} reference, should be in location/#{cmd}-name or #{cmd}-id format", command)
         end
 
         command.run(self, opts, argv)
@@ -134,16 +136,16 @@ class UbiCli
       end
       help_option_values("Fields:", fields)
 
-      run do |opts|
+      run do |opts, command|
         opts = opts[key]
         if (location = opts[:location])
           unless location.match(Validation::ALLOWED_NAME_PATTERN)
-            raise Rodish::CommandFailure, "invalid location provided in #{cmd} list -l option"
+            raise Rodish::CommandFailure.new("invalid location provided in #{cmd} list -l option", command)
           end
         end
 
         items = sdk.send(sdk_method).list(location:)
-        keys = underscore_keys(check_fields(opts[:fields], fields, "#{cmd} list -f option"))
+        keys = underscore_keys(check_fields(opts[:fields], fields, "#{cmd} list -f option", command))
         response(format_rows(keys, items, headers: opts[:"no-headers"] != false))
       end
     end
@@ -239,25 +241,30 @@ class UbiCli
     end
   end
 
+  def need_integer_arg(v, arg_name, cmd)
+    raise Rodish::CommandFailure.new("invalid #{arg_name} argument: #{v.inspect}", cmd) unless (i = Integer(v, exception: false))
+    i
+  end
+
   def execute_argv(argv)
     cmd = argv.shift
     response(argv.join("\0"), headers: {"ubi-command-execute" => cmd})
   end
 
-  def check_fields(given_fields, allowed_fields, option_name)
+  def check_fields(given_fields, allowed_fields, option_name, cmd)
     if given_fields
       keys = given_fields.split(",")
 
       if keys.empty?
-        raise Rodish::CommandFailure, "no fields given in #{option_name}"
+        raise Rodish::CommandFailure.new("no fields given in #{option_name}", cmd)
       end
       unless keys.size == keys.uniq.size
-        raise Rodish::CommandFailure, "duplicate field(s) in #{option_name}"
+        raise Rodish::CommandFailure.new("duplicate field(s) in #{option_name}", cmd)
       end
 
       invalid_keys = keys - allowed_fields
       unless invalid_keys.empty?
-        raise Rodish::CommandFailure, "invalid field(s) given in #{option_name}: #{invalid_keys.join(",")}"
+        raise Rodish::CommandFailure.new("invalid field(s) given in #{option_name}: #{invalid_keys.join(",")}", cmd)
       end
 
       keys
@@ -366,8 +373,8 @@ class UbiCli
     res
   end
 
-  def check_no_slash(string, error_message)
-    raise Rodish::CommandFailure, error_message if string.include?("/")
+  def check_no_slash(string, error_message, cmd)
+    raise Rodish::CommandFailure.new(error_message, cmd) if string.include?("/")
   end
 
   # :nocov:

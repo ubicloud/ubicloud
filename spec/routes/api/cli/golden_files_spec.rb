@@ -35,7 +35,7 @@ RSpec.describe Clover, "cli" do
     expect(Firewall).to receive(:generate_uuid).and_return("30a3eec9-afb5-81fc-bbb5-8691d252ef03")
     expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("nc2kyevjaqey6h0et8qj89zvm1"))
 
-    cli(%w[pg eu-central-h1/test-pg create])
+    cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
     cli(%w[pg eu-central-h1/test-pg reset-superuser-password bar456FOO123])
     cli(%w[pg eu-central-h1/test-pg add-metric-destination foo bar https://baz.example.com])
 
@@ -72,8 +72,14 @@ RSpec.describe Clover, "cli" do
       cli_commands.concat File.readlines(f).map { [it, {command_execute: cmd}] }
     end
 
+    cli_commands_hash = {}
     cli_commands.each do |cmd, kws|
       cmd.chomp!
+      lowercase_cmd = cmd.downcase
+      if (other_cmd = cli_commands_hash[lowercase_cmd])
+        raise "Golden file commands differ only in case and would break on case insensitive file systems:\n#{cmd}\n#{other_cmd}"
+      end
+      cli_commands_hash[lowercase_cmd] = cmd
       body = DB.transaction(savepoint: true, rollback: :always) do
         cli(cmd.shellsplit, **kws)
       end

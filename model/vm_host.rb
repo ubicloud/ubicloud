@@ -13,6 +13,7 @@ class VmHost < Sequel::Model
   one_to_one :provider, key: :id, class: :HostProvider
   one_to_many :assigned_host_addresses, key: :host_id, class: :AssignedHostAddress
   one_to_many :spdk_installations, key: :vm_host_id
+  one_to_many :vhost_block_backends
   one_to_many :storage_devices, key: :vm_host_id
   one_to_many :pci_devices, key: :vm_host_id
   one_to_many :boot_images, key: :vm_host_id
@@ -20,19 +21,18 @@ class VmHost < Sequel::Model
   one_to_many :cpus, class: :VmHostCpu, key: :vm_host_id
   many_to_one :location, key: :location_id, class: :Location
 
-  plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, provider: :destroy, spdk_installations: :destroy, storage_devices: :destroy, pci_devices: :destroy, boot_images: :destroy, slices: :destroy, cpus: :destroy
+  many_to_many :assigned_vm_addresses, join_table: :address, left_key: :routed_to_host_id, right_key: :id, right_primary_key: :address_id, read_only: true
 
-  include ResourceMethods
+  plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, provider: :destroy, spdk_installations: :destroy, storage_devices: :destroy, pci_devices: :destroy, boot_images: :destroy, slices: :destroy, cpus: :destroy, vhost_block_backends: :destroy
+
+  plugin ResourceMethods
   include SemaphoreMethods
   include HealthMonitorMethods
-  semaphore :checkup, :reboot, :hardware_reset, :destroy, :graceful_reboot
+  include MetricsTargetMethods
+  semaphore :checkup, :reboot, :hardware_reset, :destroy, :graceful_reboot, :configure_metrics
 
   def host_prefix
     net6.netmask.prefix_len
-  end
-
-  def vm_addresses
-    vms.filter_map(&:assigned_vm_address)
   end
 
   def provider_name
@@ -126,46 +126,43 @@ class VmHost < Sequel::Model
   end
 
   def ip4_random_vm_network
-    # we get the available subnets and if the subnet is /32, we eliminate it
-    available_subnets = assigned_subnets.select { |a| a.cidr.version == 4 && a.cidr.network.to_s != sshable.host }
-    # we eliminate the subnets that are full
-    used_subnet = available_subnets.select { |as| as.assigned_vm_addresses.count != 2**(32 - as.cidr.netmask.prefix_len) }.sample
+    res = DB[:ipv4_address]
+      .join(:address, [:cidr])
+      .where(cidr: assigned_subnets_dataset.select(:cidr))
+      .exclude(assigned_vm_addresses_dataset.where(ip: Sequel[:ipv4_address][:ip]).select(1).exists)
+      .order { random.function }
+      .first
 
-    # not available subnet
-    return [nil, nil] unless used_subnet
-
-    # we pick a random /31 subnet from the available subnet
-    rand = SecureRandom.random_number(2**(32 - used_subnet.cidr.netmask.prefix_len)).to_i
-    picked_subnet = used_subnet.cidr.nth(rand)
-    # we check if the picked subnet is used by one of the vms
-    return ip4_random_vm_network if vm_addresses.map { it.ip.to_s }.include?("#{picked_subnet}/32")
-
-    # For Leaseweb, avoid using the very first and the last ips
-    if provider == "leaseweb"
-      subnet_size = 2**(32 - used_subnet.cidr.netmask.prefix_len)
-      last_ip = used_subnet.cidr.nth(subnet_size - 1).to_s
-      first_ip = used_subnet.cidr.network.to_s
-      if picked_subnet.to_s == first_ip.to_s || picked_subnet.to_s == last_ip.to_s
-        return ip4_random_vm_network
-      end
-    end
-    [picked_subnet, used_subnet]
+    res ? [res.delete(:ip), Address.call(res)] : [nil, nil]
   end
 
-  def veth_pair_random_ip4_addr
-    addr = NetAddr::IPv4Net.parse("169.254.0.0/16")
-    # we get 1 address here and use the next address to assign
-    # route for vetho* and vethi* devices. So, we are splitting the local address
-    # space to two but only store 1 of them for the existence check.
-    # that's why the range is 2 * ((addr.len - 2) / 2)
-    selected_addr = NetAddr::IPv4Net.new(addr.nth(2 * SecureRandom.random_number((addr.len - 2) / 2)), NetAddr::Mask32.new(32))
+  # IPv4 range to use for setting local_vetho_ip for VM in hosts.
+  APIPA_RANGE = NetAddr::IPv4Net.parse("169.254.0.0/16").freeze
 
-    return veth_pair_random_ip4_addr if selected_addr.network.to_s.nil? || vms.any? { |vm| vm.local_vetho_ip == selected_addr.network.to_s }
-    selected_addr
+  # Calculate number of usable addresses in above range.  However, substract 1024.
+  # If the random assignment conflict with an already used address, we increment
+  # instead of looking for a different random assignment. Doing so can have problems
+  # when you are near the top of the range, so carve out 1024 spots at the top of
+  # the range. This should work correctly as long as a host does not run more than
+  # 1024 VMs.
+  #
+  # we get 1 address here and use the next address to assign
+  # route for vetho* and vethi* devices. So, we are splitting the local address
+  # space to two but only store 1 of them for the existence check.
+  # that's why the range is 2 * ((addr.len - 2) / 2)
+  APIPA_LEN = ((APIPA_RANGE.len - 2) / 2) - 1024
+
+  APIPA_MASK = NetAddr::Mask32.new(32).freeze
+
+  def veth_pair_random_ip4_addr
+    ips = vms_dataset.select_map(:local_vetho_ip)
+    ip = APIPA_RANGE.nth(2 * SecureRandom.random_number(APIPA_LEN))
+    ip = ip.next.next while ips.include?(ip.to_s)
+    NetAddr::IPv4Net.new(ip, APIPA_MASK)
   end
 
   def sshable_address
-    assigned_host_addresses.find { |a| a.ip.version == 4 }
+    assigned_host_addresses_dataset.first { {family(ip) => 4} }
   end
 
   def spdk_cpu_count
@@ -354,6 +351,12 @@ class VmHost < Sequel::Model
     }
   end
 
+  def init_metrics_export_session
+    {
+      ssh_session: sshable.start_fresh_session
+    }
+  end
+
   def disk_device_ids
     # we use this next line to migrate data from the old formatting (storing device names) to the new (storing id) so we trigger the convert
     # whenever an element inside unix_device_list is not a SSD or NVMe id.
@@ -391,11 +394,11 @@ class VmHost < Sequel::Model
   end
 
   def available_storage_gib
-    storage_devices.sum { it.available_storage_gib }
+    storage_devices.sum(&:available_storage_gib)
   end
 
   def total_storage_gib
-    storage_devices.sum { it.total_storage_gib }
+    storage_devices.sum(&:total_storage_gib)
   end
 
   def render_arch(arm64:, x64:)
@@ -407,6 +410,19 @@ class VmHost < Sequel::Model
     else
       fail "BUG: inexhaustive render code"
     end
+  end
+
+  def metrics_config
+    {
+      endpoints: [
+        "http://localhost:9100/metrics"
+      ],
+      max_file_retention: 120,
+      interval: "15s",
+      additional_labels: {ubicloud_resource_id: ubid},
+      metrics_dir: "/home/rhizome/host/metrics",
+      project_id: Config.monitoring_service_project_id
+    }
   end
 end
 
@@ -445,13 +461,14 @@ end
 #  vm_host_id_fkey          | (id) REFERENCES sshable(id)
 #  vm_host_location_id_fkey | (location_id) REFERENCES location(id)
 # Referenced By:
-#  address               | address_routed_to_host_id_fkey     | (routed_to_host_id) REFERENCES vm_host(id)
-#  assigned_host_address | assigned_host_address_host_id_fkey | (host_id) REFERENCES vm_host(id)
-#  boot_image            | boot_image_vm_host_id_fkey         | (vm_host_id) REFERENCES vm_host(id)
-#  host_provider         | host_provider_id_fkey              | (id) REFERENCES vm_host(id)
-#  pci_device            | pci_device_vm_host_id_fkey         | (vm_host_id) REFERENCES vm_host(id)
-#  spdk_installation     | spdk_installation_vm_host_id_fkey  | (vm_host_id) REFERENCES vm_host(id)
-#  storage_device        | storage_device_vm_host_id_fkey     | (vm_host_id) REFERENCES vm_host(id)
-#  vm                    | vm_vm_host_id_fkey                 | (vm_host_id) REFERENCES vm_host(id)
-#  vm_host_cpu           | vm_host_cpu_vm_host_id_fkey        | (vm_host_id) REFERENCES vm_host(id)
-#  vm_host_slice         | vm_host_slice_vm_host_id_fkey      | (vm_host_id) REFERENCES vm_host(id)
+#  address               | address_routed_to_host_id_fkey      | (routed_to_host_id) REFERENCES vm_host(id)
+#  assigned_host_address | assigned_host_address_host_id_fkey  | (host_id) REFERENCES vm_host(id)
+#  boot_image            | boot_image_vm_host_id_fkey          | (vm_host_id) REFERENCES vm_host(id)
+#  host_provider         | host_provider_id_fkey               | (id) REFERENCES vm_host(id)
+#  pci_device            | pci_device_vm_host_id_fkey          | (vm_host_id) REFERENCES vm_host(id)
+#  spdk_installation     | spdk_installation_vm_host_id_fkey   | (vm_host_id) REFERENCES vm_host(id)
+#  storage_device        | storage_device_vm_host_id_fkey      | (vm_host_id) REFERENCES vm_host(id)
+#  vhost_block_backend   | vhost_block_backend_vm_host_id_fkey | (vm_host_id) REFERENCES vm_host(id)
+#  vm                    | vm_vm_host_id_fkey                  | (vm_host_id) REFERENCES vm_host(id)
+#  vm_host_cpu           | vm_host_cpu_vm_host_id_fkey         | (vm_host_id) REFERENCES vm_host(id)
+#  vm_host_slice         | vm_host_slice_vm_host_id_fkey       | (vm_host_id) REFERENCES vm_host(id)

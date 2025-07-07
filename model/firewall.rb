@@ -9,7 +9,7 @@ class Firewall < Sequel::Model
   many_to_one :location
   plugin :association_dependencies, firewall_rules: :destroy
 
-  include ResourceMethods
+  plugin ResourceMethods
   include ObjectTag::Cleanup
 
   dataset_module Pagination
@@ -23,37 +23,28 @@ class Firewall < Sequel::Model
   end
 
   def remove_firewall_rule(firewall_rule)
-    firewall_rule.destroy
-    private_subnets.map(&:incr_update_firewall_rules)
+    firewall_rules_dataset.where(id: firewall_rule.id).destroy
+    update_private_subnet_firewall_rules
   end
 
   def insert_firewall_rule(cidr, port_range)
-    fwr = FirewallRule.create_with_id(
-      firewall_id: id,
-      cidr: cidr,
-      port_range: port_range
-    )
-
-    private_subnets.each(&:incr_update_firewall_rules)
+    fwr = add_firewall_rule(cidr:, port_range:)
+    update_private_subnet_firewall_rules
     fwr
   end
 
   def replace_firewall_rules(new_firewall_rules)
     firewall_rules.each(&:destroy)
-    new_firewall_rules.each do |fwr|
-      FirewallRule.create_with_id(
-        firewall_id: id,
-        cidr: fwr[:cidr],
-        port_range: fwr[:port_range]
-      )
+    new_firewall_rules.each do
+      add_firewall_rule(it)
     end
 
-    private_subnets.each(&:incr_update_firewall_rules)
+    update_private_subnet_firewall_rules
   end
 
   def before_destroy
-    private_subnets.each(&:incr_update_firewall_rules)
-    FirewallsPrivateSubnets.where(firewall_id: id).destroy
+    update_private_subnet_firewall_rules
+    remove_all_private_subnets
     super
   end
 
@@ -63,12 +54,14 @@ class Firewall < Sequel::Model
   end
 
   def disassociate_from_private_subnet(private_subnet, apply_firewalls: true)
-    FirewallsPrivateSubnets.where(
-      private_subnet_id: private_subnet.id,
-      firewall_id: id
-    ).destroy
-
+    remove_private_subnet(private_subnet)
     private_subnet.incr_update_firewall_rules if apply_firewalls
+  end
+
+  private
+
+  def update_private_subnet_firewall_rules
+    private_subnets.each(&:incr_update_firewall_rules)
   end
 end
 

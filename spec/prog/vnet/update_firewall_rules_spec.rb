@@ -33,12 +33,12 @@ RSpec.describe Prog::Vnet::UpdateFirewallRules do
   describe "update_firewall_rules" do
     it "hops to update_aws_firewall_rules if vm is aws" do
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
-      expect(vm).to receive(:location).and_return(instance_double(Location, provider: "aws"))
+      expect(vm).to receive(:location).and_return(instance_double(Location, aws?: true))
       expect { nx.update_firewall_rules }.to hop("update_aws_firewall_rules")
     end
 
     it "populates elements if there are fw rules" do
-      GloballyBlockedDnsname.create_with_id(dns_name: "blockedhost.com", ip_list: Sequel.lit("ARRAY['123.123.123.123'::inet, '2a00:1450:400e:811::200e'::inet]"))
+      GloballyBlockedDnsname.create_with_id(dns_name: "blockedhost.com", ip_list: ["123.123.123.123", "2a00:1450:400e:811::200e"])
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
       expect(vm).to receive(:firewalls).and_return([instance_double(Firewall, name: "fw_table", firewall_rules: [
         instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: nil),
@@ -178,7 +178,7 @@ ADD_RULES
     end
 
     it "populates load balancer destination sets and adds related rules" do
-      GloballyBlockedDnsname.create_with_id(dns_name: "blockedhost.com", ip_list: Sequel.lit("ARRAY['123.123.123.123'::inet, '2a00:1450:400e:811::200e'::inet]"))
+      GloballyBlockedDnsname.create_with_id(dns_name: "blockedhost.com", ip_list: ["123.123.123.123", "2a00:1450:400e:811::200e"])
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
       expect(vm).to receive(:firewalls).and_return([instance_double(Firewall, name: "fw_table", firewall_rules: [
         instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: nil),
@@ -331,7 +331,7 @@ ADD_RULES
     end
 
     it "populates load balancer destination sets and adds related rules when there is a single load balancer vm" do
-      GloballyBlockedDnsname.create_with_id(dns_name: "blockedhost.com", ip_list: Sequel.lit("ARRAY['123.123.123.123'::inet, '2a00:1450:400e:811::200e'::inet]"))
+      GloballyBlockedDnsname.create_with_id(dns_name: "blockedhost.com", ip_list: ["123.123.123.123", "2a00:1450:400e:811::200e"])
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
       expect(vm).to receive(:firewalls).and_return([instance_double(Firewall, name: "fw_table", firewall_rules: [
         instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: nil),

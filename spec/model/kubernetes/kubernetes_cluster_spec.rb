@@ -95,7 +95,7 @@ RSpec.describe KubernetesCluster do
     it "validates cp_node_count" do
       kc.cp_node_count = 0
       expect(kc.valid?).to be false
-      expect(kc.errors[:cp_node_count]).to eq(["must be greater than 0"])
+      expect(kc.errors[:cp_node_count]).to eq(["must be a positive integer"])
 
       kc.cp_node_count = 2
       expect(kc.valid?).to be true
@@ -108,6 +108,18 @@ RSpec.describe KubernetesCluster do
 
       kc.version = "v1.32"
       expect(kc.valid?).to be true
+    end
+
+    it "adds error if cp_node_count is nil" do
+      kc.cp_node_count = nil
+      expect(kc.valid?).to be false
+      expect(kc.errors[:cp_node_count]).to include("must be a positive integer")
+    end
+
+    it "adds error if cp_node_count is not an integer" do
+      kc.cp_node_count = "three"
+      expect(kc.valid?).to be false
+      expect(kc.errors[:cp_node_count]).to include("must be a positive integer")
     end
   end
 
@@ -162,6 +174,21 @@ RSpec.describe KubernetesCluster do
       expect(extra_ports[0].src_port).to eq(80)
       expect(missing_ports.count).to eq(1)
       expect(missing_ports[0][0]).to eq(443)
+    end
+  end
+
+  describe "#all_vms" do
+    it "returns all VMs in the cluster, including CP and worker nodes" do
+      expect(kc).to receive(:cp_vms).and_return([1, 2])
+      expect(kc).to receive(:nodepools).and_return([instance_double(KubernetesNodepool, vms: [3, 4]), instance_double(KubernetesNodepool, vms: [5, 6])])
+      expect(kc.all_vms).to eq([1, 2, 3, 4, 5, 6])
+    end
+  end
+
+  describe "#worker_vms" do
+    it "returns all worker VMs in the cluster" do
+      expect(kc).to receive(:nodepools).and_return([instance_double(KubernetesNodepool, vms: [3, 4]), instance_double(KubernetesNodepool, vms: [5, 6])])
+      expect(kc.worker_vms).to eq([3, 4, 5, 6])
     end
   end
 end

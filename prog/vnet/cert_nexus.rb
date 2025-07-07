@@ -60,20 +60,21 @@ class Prog::Vnet::CertNexus < Prog::Base
 
   label def wait_dns_validation
     case dns_challenge.status
-    when "pending"
+    when "pending", "processing"
       nap 10
     when "valid"
-      csr_key = OpenSSL::PKey::EC.generate("prime256v1")
-      csr = Acme::Client::CertificateRequest.new(private_key: csr_key, common_name: cert.hostname)
-      acme_order.finalize(csr: csr)
-      cert.update(csr_key: csr_key.to_der)
-
-      hop_wait_cert_finalization
+      cert.update(csr_key: OpenSSL::PKey::EC.generate("prime256v1").to_der)
+      hop_cert_finalization
     else
       Clog.emit("DNS validation failed") { {order_status: dns_challenge.status} }
       dns_zone.delete_record(record_name: dns_record_name)
       hop_restart
     end
+  end
+
+  label def cert_finalization
+    acme_order.finalize(csr: Acme::Client::CertificateRequest.new(private_key: OpenSSL::PKey::EC.new(cert.csr_key), common_name: cert.hostname))
+    hop_wait_cert_finalization
   end
 
   label def wait_cert_finalization
@@ -157,7 +158,7 @@ class Prog::Vnet::CertNexus < Prog::Base
   end
 
   def dns_challenge
-    acme_order.authorizations.first.dns
+    acme_order&.authorizations&.first&.dns
   end
 
   def dns_record_name

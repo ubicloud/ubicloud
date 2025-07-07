@@ -11,14 +11,6 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     @kubernetes_nodepool ||= KubernetesNodepool[frame["nodepool_id"]]
   end
 
-  def write_hosts_file_if_needed(ip = nil)
-    return unless Config.development?
-    return if vm.sshable.cmd("cat /etc/hosts").include?(kubernetes_cluster.endpoint.to_s)
-    ip ||= kubernetes_cluster.sshable.host
-
-    vm.sshable.cmd("sudo tee -a /etc/hosts", stdin: "#{ip} #{kubernetes_cluster.endpoint}\n")
-  end
-
   # We need to create a random ula cidr for the cluster services subnet with
   # a NetMask of /108
   # For reference read here:
@@ -116,14 +108,10 @@ TEMPLATE
   end
 
   label def wait_bootstrap_rhizome
-    reap
-    hop_assign_role if leaf?
-    donate
+    reap(:assign_role)
   end
 
   label def assign_role
-    write_hosts_file_if_needed
-
     hop_join_worker if kubernetes_nodepool
 
     hop_init_cluster if kubernetes_cluster.cp_vms.count == 1

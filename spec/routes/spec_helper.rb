@@ -21,8 +21,18 @@ RSpec.configure do |config|
       match do |response|
         return false if response.body.empty?
         parsed_body = JSON.parse(response.body)
+
+        message_match = case expected_message
+        when nil
+          true
+        when String
+          parsed_body.dig(*message_path) == expected_message
+        when Regexp
+          expected_message.match?(parsed_body.dig(*message_path))
+        end
+
         response.status == expected_state &&
-          (expected_message.nil? || parsed_body.dig(*message_path) == expected_message) &&
+          message_match &&
           (expected_details.nil? || parsed_body.dig(*details_path) == expected_details)
       end
 
@@ -86,9 +96,9 @@ RSpec.configure do |config|
 
     def create_private_location(project:)
       loc = Location.create(
-        name: "us-east-1",
-        display_name: "aws-us-east-1",
-        ui_name: "aws-us-east-1",
+        name: "us-west-2",
+        display_name: "aws-us-west-2",
+        ui_name: "aws-us-west-2",
         visible: true,
         provider: "aws",
         project_id: project.id

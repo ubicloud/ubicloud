@@ -12,6 +12,6 @@ RSpec.describe Semaphore do
   end
 
   it ".incr raises if invalid name is given" do
-    expect { described_class.incr(st.id, nil) }.to raise_error(Sequel::ValidationFailed)
+    expect { described_class.incr(st.id, nil) }.to raise_error(RuntimeError)
   end
 end

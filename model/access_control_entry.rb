@@ -5,7 +5,7 @@ require_relative "../model"
 class AccessControlEntry < Sequel::Model
   many_to_one :project
 
-  include ResourceMethods
+  plugin ResourceMethods
 
   # use __id__ if you want the internal object id
   def_column_alias :object_id, :object_id

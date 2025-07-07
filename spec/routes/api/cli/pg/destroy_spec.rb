@@ -9,7 +9,7 @@ RSpec.describe Clover, "cli pg destroy" do
 
   it "destroys PostgreSQL database" do
     expect(PostgresResource.count).to eq 0
-    cli(%w[pg eu-central-h1/test-pg create])
+    cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
     expect(PostgresResource.count).to eq 1
     pg = PostgresResource.first
     expect(pg).to be_a PostgresResource
