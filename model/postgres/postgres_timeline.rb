@@ -129,34 +129,48 @@ PGHOST=/var/run/postgresql
   end
 
   def create_bucket
-    aws? ?
-      blob_storage_client.create_bucket({
-        bucket: ubid,
-        create_bucket_configuration: {
-          location_constraint: location.name
-        }
-      })
-    : blob_storage_client.create_bucket(ubid)
+    if aws?
+      begin
+        blob_storage_client.create_bucket({
+          bucket: ubid,
+          create_bucket_configuration: {
+            location_constraint: location.name
+          }
+        })
+      rescue Aws::S3::Errors::BucketAlreadyOwnedByYou
+      end
+    else
+      blob_storage_client.create_bucket(ubid)
+    end
   end
 
   def set_lifecycle_policy
-    aws? ?
-      blob_storage_client.put_bucket_lifecycle_configuration({
-        bucket: ubid,
-        lifecycle_configuration: {
-          rules: [
-            {
-              id: "DeleteOldBackups",
-              prefix: "basebackups_005/",
-              status: "Enabled",
-              expiration: {
-                days: BACKUP_BUCKET_EXPIRATION_DAYS
+    if aws?
+      begin
+        blob_storage_client.put_bucket_lifecycle_configuration({
+          bucket: ubid,
+          lifecycle_configuration: {
+            rules: [
+              {
+                id: "DeleteOldBackups",
+                prefix: "basebackups_005/",
+                status: "Enabled",
+                expiration: {
+                  days: BACKUP_BUCKET_EXPIRATION_DAYS
+                }
               }
-            }
-          ]
-        }
-      })
-    : blob_storage_client.set_lifecycle_policy(ubid, ubid, BACKUP_BUCKET_EXPIRATION_DAYS)
+            ]
+          }
+        })
+      rescue Aws::S3::Errors::NoSuchBucket
+        raise
+      rescue => ex
+        # Lifecycle policy may already exist, ignore other errors
+        Clog.emit("Lifecycle policy setup warning") { Util.exception_to_hash(ex) }
+      end
+    else
+      blob_storage_client.set_lifecycle_policy(ubid, ubid, BACKUP_BUCKET_EXPIRATION_DAYS)
+    end
   end
 end
 

@@ -132,9 +132,19 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   def setup_aws_s3
-    iam_client.create_user(user_name: postgres_timeline.ubid)
-    policy = iam_client.create_policy(policy_name: postgres_timeline.ubid, policy_document: postgres_timeline.blob_storage_policy.to_json)
+    begin
+      iam_client.create_user(user_name: postgres_timeline.ubid)
+    rescue Aws::IAM::Errors::EntityAlreadyExists
+    end
+
+    policy = begin
+      iam_client.create_policy(policy_name: postgres_timeline.ubid, policy_document: postgres_timeline.blob_storage_policy.to_json)
+    rescue Aws::IAM::Errors::EntityAlreadyExists
+      iam_client.get_policy(policy_arn: "arn:aws:iam::#{iam_client.get_user(user_name: postgres_timeline.ubid).user.arn.split(":")[4]}:policy/#{postgres_timeline.ubid}")
+    end
+
     iam_client.attach_user_policy(user_name: postgres_timeline.ubid, policy_arn: policy.policy.arn)
+
     response = iam_client.create_access_key(user_name: postgres_timeline.ubid)
     postgres_timeline.update(access_key: response.access_key.access_key_id, secret_key: response.access_key.secret_access_key)
     postgres_timeline.leader.incr_refresh_walg_credentials
