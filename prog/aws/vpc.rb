@@ -156,17 +156,11 @@ class Prog::Aws::Vpc < Prog::Base
   def ignore_invalid_id
     yield
   rescue Aws::EC2::Errors::InvalidSubnetIDNotFound,
-    Aws::EC2::Errors::InvalidSubnetIdNotFound,
-    Aws::EC2::Errors::InvalidSubnetIDMalformed,
     Aws::EC2::Errors::InvalidGroupNotFound,
-    Aws::EC2::Errors::InvalidGroupIDMalformed,
     Aws::EC2::Errors::InvalidNetworkInterfaceIDNotFound,
-    Aws::EC2::Errors::InvalidNetworkInterfaceIdMalformed,
     Aws::EC2::Errors::InvalidInternetGatewayIDNotFound,
-    Aws::EC2::Errors::InvalidInternetGatewayIdMalformed,
-    Aws::EC2::Errors::InvalidVpcIDNotFound,
-    Aws::EC2::Errors::InvalidVpcIDMalformed => e
-    Clog.emit("ID not found or malformed") { {exception: {error_code: e.code, error_message: e.message}} }
+    Aws::EC2::Errors::InvalidVpcIDNotFound => e
+    Clog.emit("ID not found") { {exception: {error_code: e.code, error_message: e.message}} }
   end
 
   def location

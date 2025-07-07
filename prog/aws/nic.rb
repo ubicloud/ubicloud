@@ -85,11 +85,8 @@ class Prog::Aws::Nic < Prog::Base
   def ignore_invalid_nic
     yield
   rescue Aws::EC2::Errors::InvalidNetworkInterfaceIDNotFound,
-    Aws::EC2::Errors::InvalidNetworkInterfaceIdMalformed,
-    Aws::EC2::Errors::InvalidNetworkInterfaceIDMalformed,
     Aws::EC2::Errors::InvalidAllocationIDNotFound,
-    Aws::EC2::Errors::InvalidAddressIDNotFound,
-    Aws::EC2::Errors::InvalidAllocationIDMalformed => e
-    Clog.emit("ID not found or malformed") { {exception: {error_code: e.code, error_message: e.message}} }
+    Aws::EC2::Errors::InvalidAddressIDNotFound => e
+    Clog.emit("ID not found") { {exception: {error_code: e.code, error_message: e.message}} }
   end
 end
