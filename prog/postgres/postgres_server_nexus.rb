@@ -63,7 +63,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   def before_run
     when_destroy_set? do
       is_destroying = ["destroy", nil].include?(postgres_server.resource&.strand&.label)
-      protected_labels = ["prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over"]
+      protected_labels = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over"]
       is_taking_over = @snap.set?(:take_over) || protected_labels.include?(strand.label)
 
       if is_destroying || !is_taking_over
@@ -418,6 +418,10 @@ SQL
       hop_fence
     end
 
+    when_unplanned_take_over_set? do
+      hop_prepare_for_unplanned_take_over
+    end
+
     when_planned_take_over_set? do
       hop_prepare_for_planned_take_over
     end
@@ -492,7 +496,7 @@ SQL
   label def unavailable
     register_deadline("wait", 10 * 60)
 
-    nap 0 if postgres_server.trigger_failover
+    nap 0 if postgres_server.trigger_failover(mode: "unplanned")
 
     reap(fallthrough: true)
     nap 5 unless strand.children_dataset.where(prog: "Postgres::PostgresServerNexus", label: "restart").empty?
@@ -513,6 +517,21 @@ SQL
     postgres_server.vm.sshable.cmd("sudo postgres/bin/lockout #{postgres_server.resource.version}")
 
     nap 6 * 60 * 60
+  end
+
+  label def prepare_for_unplanned_take_over
+    decr_unplanned_take_over
+
+    representative_server = postgres_server.resource.representative_server
+
+    begin
+      representative_server.vm.sshable.cmd("sudo pg_ctlcluster #{postgres_server.resource.version} main stop -m immediate")
+    rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
+    end
+
+    representative_server.incr_destroy
+
+    hop_taking_over
   end
 
   label def prepare_for_planned_take_over
