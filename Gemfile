@@ -44,7 +44,7 @@ gem "sequel", ">= 5.94"
 gem "sequel_pg", ">= 1.8", require: "sequel"
 gem "shellwords"
 gem "stripe"
-gem "tilt", ">= 2.6"
+gem "tilt", ">= 2.6.1"
 gem "warning"
 gem "webauthn"
 
