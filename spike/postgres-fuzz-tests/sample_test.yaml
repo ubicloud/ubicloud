@@ -1,0 +1,41 @@
+# Sample PostgreSQL Fuzz Test Scenario
+# This is a simple test scenario to validate the framework with the provided credentials
+
+scenarios:
+  # Simple validation test
+  - name: "basic_validation_test"
+    description: "Basic test to validate framework functionality and API connectivity"
+    steps:
+      - action: "create_database"
+        params:
+          size: "standard-2"
+          storage_size: 64
+          ha_type: "none"
+          version: "17"
+          flavor: "standard"
+      - action: "validate_connection"
+      - action: "write_data"
+        params:
+          table_count: 2
+          rows_per_table: 50
+      - action: "collect_metrics"
+      - action: "cleanup"
+
+  # High availability test
+  - name: "simple_ha_test"
+    description: "Test basic high availability functionality"
+    steps:
+      - action: "create_database"
+        params:
+          size: "standard-2"
+          storage_size: 128
+          ha_type: "async"
+          version: "17"
+          flavor: "standard"
+      - action: "validate_connection"
+      - action: "write_data"
+        params:
+          table_count: 1
+          rows_per_table: 100
+      - action: "validate_replication"
+      - action: "cleanup"

@@ -42,3 +42,6 @@
 
 # mise "local" dependency specification that shouldn't be committed
 mise.local.toml
+spike/postgres-fuzz-tests/.local-api-credentials
+spike/postgres-fuzz-tests/.prod-api-credentials
+spike/postgres-fuzz-tests/postgres_fuzz_test.log

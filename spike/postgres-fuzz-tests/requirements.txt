@@ -1,0 +1,16 @@
+# PostgreSQL Fuzz Testing Framework Dependencies
+
+# HTTP requests
+requests>=2.31.0
+
+# PostgreSQL database connectivity
+psycopg2-binary>=2.9.7
+
+# YAML parsing
+PyYAML>=6.0.1
+
+# SSL/TLS handling
+urllib3>=2.0.4
+
+# Data handling and utilities
+python-dateutil>=2.8.2

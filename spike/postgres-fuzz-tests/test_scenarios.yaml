@@ -1,0 +1,325 @@
+# Comprehensive PostgreSQL Fuzz Test Scenarios for Ubicloud
+# This file contains various test scenarios for PostgreSQL database operations including
+# scaling, HA type changes, maintenance windows, and other advanced features
+
+scenarios:
+  # Basic functionality test
+  - name: "basic_database_operations"
+    description: "Test basic database creation, connection, and data operations"
+    steps:
+      - action: "create_database"
+        params:
+          size: "standard-2"
+          storage_size: 64
+          ha_type: "none"
+          version: "17"
+          flavor: "standard"
+      - action: "validate_connection"
+      - action: "write_data"
+        params:
+          table_count: 3
+          rows_per_table: 100
+      - action: "collect_metrics"
+      - action: "cleanup"
+
+  # Scaling operations test
+  - name: "database_scaling_test"
+    description: "Test database scaling up and down operations"
+    steps:
+      - action: "create_database"
+        params:
+          size: "standard-2"
+          storage_size: 64
+          ha_type: "none"
+          version: "17"
+          flavor: "standard"
+      - action: "validate_connection"
+      - action: "write_data"
+        params:
+          table_count: 2
+          rows_per_table: 50
+      - action: "scale_up"
+        params:
+          new_size: "standard-4"
+          new_storage_size: 128
+      - action: "validate_connection"
+      - action: "write_data"
+        params:
+          table_count: 1
+          rows_per_table: 25
+      - action: "scale_down"
+        params:
+          new_size: "standard-2"
+      - action: "validate_connection"
+      - action: "cleanup"
+
+  # HA type change test
+  - name: "ha_type_change_test"
+    description: "Test changing high availability types"
+    steps:
+      - action: "create_database"
+        params:
+          size: "standard-2"
+          storage_size: 64
+          ha_type: "none"
+          version: "17"
+          flavor: "standard"
+      - action: "validate_connection"
+      - action: "write_data"
+        params:
+          table_count: 2
+          rows_per_table: 75
+      - action: "change_ha_type"
+        params:
+          new_ha_type: "async"
+      - action: "validate_replication"
+      - action: "change_ha_type"
+        params:
+          new_ha_type: "sync"
+      - action: "validate_replication"
+      - action: "cleanup"
+
+  # Maintenance and configuration test
+  - name: "maintenance_config_test"
+    description: "Test maintenance windows and configuration updates"
+    steps:
+      - action: "create_database"
+        params:
+          size: "standard-2"
+          storage_size: 64
+          ha_type: "none"
+          version: "17"
+          flavor: "standard"
+      - action: "validate_connection"
+      - action: "set_maintenance_window"
+        params:
+          maintenance_hour: 3
+      - action: "update_config"
+      - action: "restart_database"
+      - action: "validate_connection"
+      - action: "cleanup"
+
+  # Security and firewall test
+  - name: "security_firewall_test"
+    description: "Test security features including password reset and firewall rules"
+    steps:
+      - action: "create_database"
+        params:
+          size: "standard-2"
+          storage_size: 64
+          ha_type: "none"
+          version: "17"
+          flavor: "standard"
+      - action: "validate_connection"
+      - action: "reset_password"
+      - action: "test_firewall_rules"
+      - action: "validate_connection"
+      - action: "cleanup"
+
+  # Backup and restore test
+  - name: "backup_restore_test"
+    description: "Test backup and restore functionality"
+    steps:
+      - action: "create_database"
+        params:
+          size: "standard-2"
+          storage_size: 64
+          ha_type: "none"
+          version: "17"
+          flavor: "standard"
+      - action: "validate_connection"
+      - action: "write_data"
+        params:
+          table_count: 3
+          rows_per_table: 100
+      - action: "test_backup_restore"
+      - action: "cleanup"
+
+  # High availability comprehensive test
+  - name: "comprehensive_ha_test"
+    description: "Comprehensive high availability testing with replicas and failover"
+    steps:
+      - action: "create_database"
+        params:
+          size: "standard-2"
+          storage_size: 128
+          ha_type: "async"
+          version: "17"
+          flavor: "standard"
+      - action: "validate_connection"
+      - action: "write_data"
+        params:
+          table_count: 2
+          rows_per_table: 150
+      - action: "validate_replication"
+      - action: "create_read_replica"
+      - action: "test_failover"
+      - action: "cleanup"
+
+  # Performance stress test
+  - name: "performance_stress_test"
+    description: "Test database performance under stress conditions"
+    steps:
+      - action: "create_database"
+        params:
+          size: "standard-4"
+          storage_size: 128
+          ha_type: "none"
+          version: "17"
+          flavor: "standard"
+      - action: "validate_connection"
+      - action: "write_data"
+        params:
+          table_count: 5
+          rows_per_table: 200
+      - action: "stress_test"
+        params:
+          duration_minutes: 3
+      - action: "collect_metrics"
+      - action: "cleanup"
+
+  # Complete lifecycle test
+  - name: "complete_lifecycle_test"
+    description: "Test complete database lifecycle with all operations"
+    steps:
+      - action: "create_database"
+        params:
+          size: "standard-2"
+          storage_size: 64
+          ha_type: "none"
+          version: "17"
+          flavor: "standard"
+      - action: "validate_connection"
+      - action: "write_data"
+        params:
+          table_count: 2
+          rows_per_table: 50
+      - action: "set_maintenance_window"
+        params:
+          maintenance_hour: 4
+      - action: "scale_up"
+        params:
+          new_size: "standard-4"
+          new_storage_size: 128
+      - action: "change_ha_type"
+        params:
+          new_ha_type: "async"
+      - action: "validate_replication"
+      - action: "update_config"
+      - action: "test_firewall_rules"
+      - action: "restart_database"
+      - action: "validate_connection"
+      - action: "collect_metrics"
+      - action: "cleanup"
+
+  # Multi-database operations test
+  - name: "multi_database_test"
+    description: "Test operations across multiple databases"
+    steps:
+      - action: "create_database"
+        params:
+          size: "standard-2"
+          storage_size: 64
+          ha_type: "none"
+          version: "17"
+          flavor: "standard"
+      - action: "validate_connection"
+      - action: "write_data"
+        params:
+          table_count: 2
+          rows_per_table: 75
+      - action: "test_backup_restore"
+      - action: "create_read_replica"
+      - action: "validate_replication"
+      - action: "cleanup"
+
+  # ParadeDB flavor test
+  - name: "paradedb_flavor_test"
+    description: "Test ParadeDB flavor with advanced operations"
+    steps:
+      - action: "create_database"
+        params:
+          size: "standard-2"
+          storage_size: 64
+          ha_type: "none"
+          version: "17"
+          flavor: "paradedb"
+      - action: "validate_connection"
+      - action: "write_data"
+        params:
+          table_count: 2
+          rows_per_table: 100
+      - action: "scale_up"
+        params:
+          new_size: "standard-4"
+          new_storage_size: 128
+      - action: "collect_metrics"
+      - action: "cleanup"
+
+  # Lantern flavor test
+  - name: "lantern_flavor_test"
+    description: "Test Lantern flavor with vector operations"
+    steps:
+      - action: "create_database"
+        params:
+          size: "standard-2"
+          storage_size: 64
+          ha_type: "none"
+          version: "17"
+          flavor: "lantern"
+      - action: "validate_connection"
+      - action: "write_data"
+        params:
+          table_count: 2
+          rows_per_table: 100
+      - action: "update_config"
+      - action: "collect_metrics"
+      - action: "cleanup"
+
+  # Version compatibility test
+  - name: "version_compatibility_test"
+    description: "Test different PostgreSQL versions"
+    steps:
+      - action: "create_database"
+        params:
+          size: "standard-2"
+          storage_size: 64
+          ha_type: "none"
+          version: "16"
+          flavor: "standard"
+      - action: "validate_connection"
+      - action: "write_data"
+        params:
+          table_count: 2
+          rows_per_table: 100
+      - action: "scale_up"
+        params:
+          new_size: "standard-4"
+          new_storage_size: 128
+      - action: "collect_metrics"
+      - action: "cleanup"
+
+  # Edge case testing
+  - name: "edge_case_test"
+    description: "Test edge cases and error conditions"
+    steps:
+      - action: "create_database"
+        params:
+          size: "standard-2"
+          storage_size: 64
+          ha_type: "none"
+          version: "17"
+          flavor: "standard"
+      - action: "validate_connection"
+      - action: "write_data"
+        params:
+          table_count: 1
+          rows_per_table: 10
+      - action: "restart_database"
+      - action: "validate_connection"
+      - action: "stress_test"
+        params:
+          duration_minutes: 2
+      - action: "reset_password"
+      - action: "validate_connection"
+      - action: "cleanup"

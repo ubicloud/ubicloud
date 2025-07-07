@@ -1,0 +1,109 @@
+{
+  "test_run_summary": {
+    "timestamp": "2025-07-07T23:14:07.585981",
+    "total_scenarios": 2,
+    "successful_scenarios": 2,
+    "failed_scenarios": 0,
+    "total_duration": 304.324848
+  },
+  "scenarios": [
+    {
+      "name": "basic_validation_test",
+      "success": true,
+      "duration": 156.78629,
+      "summary": {
+        "total_steps": 5,
+        "successful_steps": 5,
+        "failed_steps": 0,
+        "average_step_duration": 30.35513515472412,
+        "databases_created": 0
+      },
+      "steps": [
+        {
+          "name": "create_database_fuzz-test-xe2zw88i",
+          "success": true,
+          "duration": 130.360520362854,
+          "message": "Database fuzz-test-xe2zw88i created successfully",
+          "error": null
+        },
+        {
+          "name": "validate_connection",
+          "success": true,
+          "duration": 1.3563966751098633,
+          "message": "Database connection successful",
+          "error": null
+        },
+        {
+          "name": "write_data",
+          "success": true,
+          "duration": 19.99938988685608,
+          "message": "Data operations completed successfully",
+          "error": null
+        },
+        {
+          "name": "collect_metrics",
+          "success": true,
+          "duration": 0.05932474136352539,
+          "message": "Performance metrics collected",
+          "error": null
+        },
+        {
+          "name": "cleanup",
+          "success": true,
+          "duration": 4.410743713378906e-05,
+          "message": "Cleanup initiated",
+          "error": null
+        }
+      ]
+    },
+    {
+      "name": "simple_ha_test",
+      "success": true,
+      "duration": 147.538558,
+      "summary": {
+        "total_steps": 5,
+        "successful_steps": 5,
+        "failed_steps": 0,
+        "average_step_duration": 28.502228689193725,
+        "databases_created": 0
+      },
+      "steps": [
+        {
+          "name": "create_database_fuzz-test-5fux4aja",
+          "success": true,
+          "duration": 120.38107109069824,
+          "message": "Database fuzz-test-5fux4aja created successfully",
+          "error": null
+        },
+        {
+          "name": "validate_connection",
+          "success": true,
+          "duration": 1.3471107482910156,
+          "message": "Database connection successful",
+          "error": null
+        },
+        {
+          "name": "write_data",
+          "success": true,
+          "duration": 19.238770723342896,
+          "message": "Data operations completed successfully",
+          "error": null
+        },
+        {
+          "name": "validate_replication",
+          "success": true,
+          "duration": 1.5441021919250488,
+          "message": "Replication validation completed",
+          "error": null
+        },
+        {
+          "name": "cleanup",
+          "success": true,
+          "duration": 8.869171142578125e-05,
+          "message": "Cleanup initiated",
+          "error": null
+        }
+      ]
+    }
+  ]
+}
