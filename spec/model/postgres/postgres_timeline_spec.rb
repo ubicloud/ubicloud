@@ -110,7 +110,7 @@ PGHOST=/var/run/postgresql
   it "returns empty array if user is not created yet" do
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs")).at_least(:once)
     minio_client = instance_double(Minio::Client)
-    expect(minio_client).to receive(:list_objects).and_raise(RuntimeError.new("The Access Key Id you provided does not exist in our records."))
+    expect(minio_client).to receive(:list_objects).and_raise(RuntimeError.new("The AWS Access Key Id you provided does not exist in our records."))
     expect(Minio::Client).to receive(:new).and_return(minio_client)
     expect(postgres_timeline.backups).to eq([])
   end
