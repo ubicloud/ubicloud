@@ -168,7 +168,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "cancels the destroy if the server is picked up for take over" do
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect(resource).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
-      expect(nx.strand).to receive(:label).and_return("prepare_for_planned_take_over").at_least(:once)
+      expect(postgres_server).to receive(:taking_over?).and_return(true)
       expect(nx).to receive(:decr_destroy)
       expect { nx.before_run }.not_to hop("destroy")
     end
@@ -801,12 +801,16 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#unavailable" do
     it "hops to wait if the server is available" do
+      postgres_resource = instance_double(PostgresResource, ongoing_failover?: false)
+      expect(postgres_server).to receive(:resource).and_return(postgres_resource)
       expect(postgres_server).to receive(:trigger_failover).and_return(false)
       expect(nx).to receive(:available?).and_return(true)
       expect { nx.unavailable }.to hop("wait")
     end
 
     it "buds restart if the server is not available" do
+      postgres_resource = instance_double(PostgresResource, ongoing_failover?: false)
+      expect(postgres_server).to receive(:resource).and_return(postgres_resource)
       expect(postgres_server).to receive(:trigger_failover).and_return(false)
       expect(nx).to receive(:available?).and_return(false)
       expect(nx).to receive(:bud).with(described_class, {}, :restart)
@@ -815,12 +819,16 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "does not bud restart if there is already one restart going on" do
       Strand.create(parent_id: st.id, prog: "Postgres::PostgresServerNexus", label: "restart", stack: [{}], lease: Time.now + 10)
+      postgres_resource = instance_double(PostgresResource, ongoing_failover?: false)
+      expect(postgres_server).to receive(:resource).and_return(postgres_resource)
       expect(postgres_server).to receive(:trigger_failover).and_return(false)
       expect { nx.unavailable }.to nap(5)
       expect(Strand.where(prog: "Postgres::PostgresServerNexus", label: "restart").count).to eq 1
     end
 
     it "trigger_failover succeeds, naps 0" do
+      postgres_resource = instance_double(PostgresResource, ongoing_failover?: false)
+      expect(postgres_server).to receive(:resource).and_return(postgres_resource)
       expect(postgres_server).to receive(:trigger_failover).and_return(true)
       expect { nx.unavailable }.to nap(0)
     end

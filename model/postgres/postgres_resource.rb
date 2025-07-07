@@ -133,6 +133,10 @@ class PostgresResource < Sequel::Model
     parent_id && restore_target.nil?
   end
 
+  def ongoing_failover?
+    servers.any? { it.taking_over? }
+  end
+
   module HaType
     NONE = "none"
     ASYNC = "async"

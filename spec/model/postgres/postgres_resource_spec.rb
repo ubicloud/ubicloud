@@ -124,4 +124,16 @@ RSpec.describe PostgresResource do
     ])
     postgres_resource.set_firewall_rules
   end
+
+  describe "#ongoing_failover?" do
+    it "returns false if there is no ongoing failover" do
+      expect(postgres_resource).to receive(:servers).and_return([instance_double(PostgresServer, taking_over?: false), instance_double(PostgresServer, taking_over?: false)])
+      expect(postgres_resource.ongoing_failover?).to be false
+    end
+
+    it "returns true if there is an ongoing failover" do
+      expect(postgres_resource).to receive(:servers).and_return([instance_double(PostgresServer, taking_over?: true), instance_double(PostgresServer, taking_over?: false)])
+      expect(postgres_resource.ongoing_failover?).to be true
+    end
+  end
 end
