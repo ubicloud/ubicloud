@@ -361,7 +361,7 @@ class Clover
 
       r.post "set-maintenance-window" do
         authorize("Postgres:edit", pg.id)
-        maintenance_window_start_at = typecast_params.pos_int("maintenance_window_start_at")
+        maintenance_window_start_at = typecast_params.int("maintenance_window_start_at")
 
         DB.transaction do
           pg.update(maintenance_window_start_at:)

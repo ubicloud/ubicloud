@@ -760,6 +760,15 @@ RSpec.describe Clover, "postgres" do
         click_button "Set"
         expect(pg.reload.maintenance_window_start_at).to be_nil
       end
+
+      it "sets maintenance window to 0 when 0 is passed" do
+        pg.update(maintenance_window_start_at: 9)
+        visit "#{project.path}#{pg.path}/settings"
+
+        select "00:00 - 02:00 (UTC)", from: "maintenance_window_start_at"
+        click_button "Set"
+        expect(pg.reload.maintenance_window_start_at).to eq(0)
+      end
     end
 
     describe "delete" do

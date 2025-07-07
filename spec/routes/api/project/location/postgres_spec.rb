@@ -405,6 +405,13 @@ RSpec.describe Clover, "postgres" do
 
         expect(last_response.status).to eq(400)
         expect(pg.reload.maintenance_window_start_at).to be_nil
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
+          maintenance_window_start_at: -2
+        }.to_json
+
+        expect(last_response.status).to eq(400)
+        expect(pg.reload.maintenance_window_start_at).to be_nil
       end
 
       it "invalid payment" do
