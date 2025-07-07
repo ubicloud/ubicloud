@@ -243,7 +243,7 @@ class Prog::Vm::Nexus < Prog::Base
             prefs["location_filter"] || runner_location_filter,
             prefs["location_preference"] || runner_location_preference,
             [],
-            prefs["family_filter"] || runner_family_filter
+            (vm.family == "premium" && [vm.family]) || prefs["family_filter"] || runner_family_filter
           ]
         else
           [["accepting"], [vm.location_id], [], [], [vm.family]]
