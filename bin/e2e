@@ -36,7 +36,7 @@ def main(options)
     tests_to_wait << unencrypted_vms_st
   end
 
-  if (gh_test_cases = all_test_cases.values_at(*options[:test_cases].select { it.include?("github_runner") }))
+  if (gh_test_cases = all_test_cases.values_at(*options[:test_cases].select { it.include?("github_runner") })).any?
     tests_to_wait << Prog::Test::GithubRunner.assemble(gh_test_cases)
   end
 
