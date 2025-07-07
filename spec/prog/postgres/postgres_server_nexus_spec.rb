@@ -839,6 +839,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:decr_fence)
       expect(postgres_server).to receive(:run_query).with("CHECKPOINT; CHECKPOINT; CHECKPOINT;")
       expect(sshable).to receive(:cmd).with("sudo postgres/bin/lockout 16")
+      expect(sshable).to receive(:cmd).with("sudo pg_ctlcluster 16 main stop -m smart")
       expect { nx.fence }.to nap(6 * 60 * 60)
     end
   end
@@ -885,19 +886,10 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.wait_fencing_of_old_primary }.to nap(0)
     end
 
-    it "naps immediately if LSN is not caught up" do
-      representative_server = instance_double(PostgresServer)
-      expect(postgres_server.resource).to receive(:representative_server).and_return(representative_server)
-      expect(representative_server).to receive(:fence_set?).and_return(false)
-      expect(postgres_server).to receive(:lsn_caught_up).and_return(false)
-      expect { nx.wait_fencing_of_old_primary }.to nap(0)
-    end
-
-    it "destroys old primary and hops to taking_over when fence is not set and LSN is caught up" do
+    it "destroys old primary and hops to taking_over when fence is not set" do
       representative_server = instance_double(PostgresServer)
       expect(postgres_server.resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
       expect(representative_server).to receive(:fence_set?).and_return(false)
-      expect(postgres_server).to receive(:lsn_caught_up).and_return(true)
       expect(representative_server).to receive(:incr_destroy)
       expect { nx.wait_fencing_of_old_primary }.to hop("taking_over")
     end

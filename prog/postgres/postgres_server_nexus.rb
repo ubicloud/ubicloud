@@ -513,6 +513,7 @@ SQL
 
     postgres_server.run_query("CHECKPOINT; CHECKPOINT; CHECKPOINT;")
     postgres_server.vm.sshable.cmd("sudo postgres/bin/lockout #{postgres_server.resource.version}")
+    postgres_server.vm.sshable.cmd("sudo pg_ctlcluster #{postgres_server.resource.version} main stop -m smart")
 
     nap 6 * 60 * 60
   end
@@ -540,7 +541,7 @@ SQL
   end
 
   label def wait_fencing_of_old_primary
-    nap 0 if postgres_server.resource.representative_server.fence_set? || !postgres_server.lsn_caught_up
+    nap 0 if postgres_server.resource.representative_server.fence_set?
 
     postgres_server.resource.representative_server.incr_destroy
     hop_taking_over
