@@ -405,4 +405,16 @@ RSpec.describe PostgresServer do
     expect(postgres_server.vm).to receive(:vm_storage_volumes).and_return([instance_double(VmStorageVolume, boot: false, device_path: "/dev/vdb")])
     expect(postgres_server.storage_device_paths).to eq(["/dev/vdb"])
   end
+
+  describe "#taking_over?" do
+    it "returns true if the strand label is 'taking_over'" do
+      expect(postgres_server).to receive(:strand).and_return(instance_double(Strand, label: "taking_over"))
+      expect(postgres_server.taking_over?).to be true
+    end
+
+    it "returns false if the strand label is not 'wait'" do
+      expect(postgres_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      expect(postgres_server.taking_over?).to be false
+    end
+  end
 end

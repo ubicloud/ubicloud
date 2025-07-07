@@ -63,10 +63,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   def before_run
     when_destroy_set? do
       is_destroying = ["destroy", nil].include?(postgres_server.resource&.strand&.label)
-      protected_labels = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over"]
-      is_taking_over = @snap.set?(:take_over) || protected_labels.include?(strand.label)
 
-      if is_destroying || !is_taking_over
+      if is_destroying || !postgres_server.taking_over?
         if strand.label != "destroy"
           hop_destroy
         elsif strand.stack.count > 1
@@ -496,7 +494,7 @@ SQL
   label def unavailable
     register_deadline("wait", 10 * 60)
 
-    nap 0 if postgres_server.trigger_failover(mode: "unplanned")
+    nap 0 if postgres_server.resource.ongoing_failover? || postgres_server.trigger_failover(mode: "unplanned")
 
     reap(fallthrough: true)
     nap 5 unless strand.children_dataset.where(prog: "Postgres::PostgresServerNexus", label: "restart").empty?

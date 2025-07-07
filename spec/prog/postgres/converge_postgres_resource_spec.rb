@@ -91,11 +91,13 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     it "hops to prune_servers if the representative server does not need recycling" do
       expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, needs_recycling?: false)).at_least(:once)
+      expect(postgres_resource).to receive(:ongoing_failover?).and_return(false)
       expect { nx.recycle_representative_server }.to hop("prune_servers")
     end
 
     it "waits if it is not the maintenance window" do
       expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, needs_recycling?: true)).at_least(:once)
+      expect(postgres_resource).to receive(:ongoing_failover?).and_return(false)
       expect(postgres_resource).to receive(:in_maintenance_window?).and_return(false)
       expect(postgres_resource.representative_server).not_to receive(:trigger_failover)
       expect { nx.recycle_representative_server }.to nap(10 * 60)
@@ -103,6 +105,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     it "triggers failover if maintenance window is not set or if it is the maintenance window" do
       expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, needs_recycling?: true)).at_least(:once)
+      expect(postgres_resource).to receive(:ongoing_failover?).and_return(false)
       expect(postgres_resource).to receive(:in_maintenance_window?).and_return(true)
       expect(postgres_resource.representative_server).to receive(:trigger_failover)
       expect { nx.recycle_representative_server }.to nap(60)

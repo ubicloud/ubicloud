@@ -34,7 +34,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   end
 
   label def recycle_representative_server
-    if (rs = postgres_resource.representative_server)
+    if (rs = postgres_resource.representative_server) && !postgres_resource.ongoing_failover?
       hop_prune_servers unless rs.needs_recycling?
 
       nap 10 * 60 unless postgres_resource.in_maintenance_window?
