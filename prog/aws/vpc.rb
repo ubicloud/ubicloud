@@ -176,12 +176,13 @@ class Prog::Aws::Vpc < Prog::Base
 
   def ignore_invalid_id
     yield
-  rescue Aws::EC2::Errors::InvalidSubnetIDNotFound,
+  rescue ArgumentError,
+    Aws::EC2::Errors::InvalidSubnetIDNotFound,
     Aws::EC2::Errors::InvalidGroupNotFound,
     Aws::EC2::Errors::InvalidNetworkInterfaceIDNotFound,
     Aws::EC2::Errors::InvalidInternetGatewayIDNotFound,
     Aws::EC2::Errors::InvalidVpcIDNotFound => e
-    Clog.emit("ID not found") { {exception: {error_code: e.code, error_message: e.message}} }
+    Clog.emit("ID not found") { Util.exception_to_hash(e) }
   end
 
   def location
