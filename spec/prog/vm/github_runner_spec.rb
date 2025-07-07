@@ -435,7 +435,7 @@ RSpec.describe Prog::Vm::GithubRunner do
         stdin: "AABBCC$$").and_raise Sshable::SshError.new("command", "", "Job for runner-script.service failed.\n Check logs", 123, nil)
       expect(Clog).to receive(:emit).with("Failed to start runner script").and_call_original
       expect(vm.sshable).to receive(:cmd).with(<<~COMMAND)
-        journalctl -xeu runner-script.service
+        sudo journalctl -xeu runner-script.service
         cat /run/systemd/transient/runner-script.service || true
       COMMAND
       expect { nx.register_runner }.to raise_error Sshable::SshError
