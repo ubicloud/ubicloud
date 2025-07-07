@@ -83,6 +83,7 @@ RSpec.configure do |config|
     def login(email = TEST_USER_EMAIL, password = TEST_USER_PASSWORD)
       visit "/login"
       fill_in "Email Address", with: email
+      click_button "Sign in"
       fill_in "Password", with: password
       click_button "Sign in"
 

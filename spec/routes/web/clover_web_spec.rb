@@ -18,6 +18,7 @@ RSpec.describe Clover do
     expect(page.status_code).to eq(200)
     expect(page).to have_current_path("/login", ignore_query: true)
     fill_in "Email Address", with: TEST_USER_EMAIL
+    click_button "Sign in"
     fill_in "Password", with: TEST_USER_PASSWORD
     click_button "Sign in"
     expect(page.title).to end_with("Dashboard")

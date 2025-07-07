@@ -23,9 +23,8 @@ RSpec.describe Clover, "auth" do
 
     visit "/login"
     fill_in "Email Address", with: TEST_USER_EMAIL
-    fill_in "Password", with: TEST_USER_PASSWORD
     click_button "Sign in"
-
+    expect(page).to have_flash_error("The account you tried to login with is currently awaiting verification")
     expect(page.title).to eq("Ubicloud - Resend Verification")
   end
 
@@ -54,18 +53,16 @@ RSpec.describe Clover, "auth" do
     expect(Mail::TestMailer.deliveries.length).to eq 1
 
     fill_in "Email Address", with: TEST_USER_EMAIL
-    fill_in "Password", with: TEST_USER_PASSWORD
     click_button "Sign in"
 
+    expect(page).to have_flash_error("The account you tried to login with is currently awaiting verification")
     expect(page).to have_content("You need to wait at least 5 minutes before sending another verification email. If you did not receive the email, please check your spam folder.")
 
     DB[:account_verification_keys].update(email_last_sent: Time.now - 310)
 
     visit "/login"
     fill_in "Email Address", with: TEST_USER_EMAIL
-    fill_in "Password", with: TEST_USER_PASSWORD
     click_button "Sign in"
-
     expect(page).to have_flash_error("The account you tried to login with is currently awaiting verification")
 
     DB.transaction(rollback: :always) do
@@ -160,6 +157,7 @@ RSpec.describe Clover, "auth" do
 
     visit "/login"
     fill_in "Email Address", with: TEST_USER_EMAIL
+    click_button "Sign in"
     fill_in "Password", with: TEST_USER_PASSWORD
     check "Remember me"
     click_button "Sign in"
@@ -173,6 +171,7 @@ RSpec.describe Clover, "auth" do
 
     visit "/login"
     fill_in "Email Address", with: TEST_USER_EMAIL
+    click_button "Sign in"
     fill_in "Password", with: TEST_USER_PASSWORD
     check "Remember me"
     click_button "Sign in"
@@ -187,9 +186,9 @@ RSpec.describe Clover, "auth" do
     create_account
 
     visit "/login"
-    click_link "Forgot your password?"
-
     fill_in "Email Address", with: TEST_USER_EMAIL
+    click_button "Sign in"
+    click_link "Forgot your password?"
 
     click_button "Request Password Reset"
 
@@ -208,6 +207,7 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - Login")
 
     fill_in "Email Address", with: TEST_USER_EMAIL
+    click_button "Sign in"
     fill_in "Password", with: "#{TEST_USER_PASSWORD}_new"
 
     click_button "Sign in"
@@ -218,8 +218,11 @@ RSpec.describe Clover, "auth" do
     DB[:account_password_hashes].where(id: account.id).delete
 
     visit "/login"
-    click_link "Forgot your password?"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    click_button "Sign in"
+    expect(page).to have_no_content("Forget your password?")
 
+    visit "/reset-password-request"
     fill_in "Email Address", with: TEST_USER_EMAIL
     click_button "Request Password Reset"
 
@@ -234,6 +237,7 @@ RSpec.describe Clover, "auth" do
 
     visit "/login"
     fill_in "Email Address", with: TEST_USER_EMAIL
+    click_button "Sign in"
     fill_in "Password", with: TEST_USER_PASSWORD
     click_button "Sign in"
 
@@ -245,6 +249,7 @@ RSpec.describe Clover, "auth" do
 
     visit "/login"
     fill_in "Email Address", with: TEST_USER_EMAIL
+    click_button "Sign in"
     fill_in "Password", with: TEST_USER_PASSWORD
     click_button "Sign in"
 
@@ -256,6 +261,7 @@ RSpec.describe Clover, "auth" do
 
     visit "/login"
     fill_in "Email Address", with: TEST_USER_EMAIL
+    click_button "Sign in"
     fill_in "Password", with: TEST_USER_PASSWORD
     click_button "Sign in"
     expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
@@ -264,6 +270,7 @@ RSpec.describe Clover, "auth" do
 
     visit "/login"
     fill_in "Email Address", with: TEST_USER_EMAIL
+    click_button "Sign in"
     fill_in "Password", with: TEST_USER_PASSWORD
     click_button "Sign in"
 
@@ -276,6 +283,7 @@ RSpec.describe Clover, "auth" do
 
     visit "/login"
     fill_in "Email Address", with: TEST_USER_EMAIL
+    click_button "Sign in"
     fill_in "Password", with: TEST_USER_PASSWORD
     check "Remember me"
     click_button "Sign in"
@@ -292,6 +300,7 @@ RSpec.describe Clover, "auth" do
 
     visit "/login"
     fill_in "Email Address", with: TEST_USER_EMAIL
+    click_button "Sign in"
     fill_in "Password", with: TEST_USER_PASSWORD
     click_button "Sign in"
 
@@ -303,6 +312,7 @@ RSpec.describe Clover, "auth" do
 
     visit "/login"
     fill_in "Email Address", with: TEST_USER_EMAIL
+    click_button "Sign in"
     fill_in "Password", with: TEST_USER_PASSWORD
     click_button "Sign in"
 
@@ -314,6 +324,7 @@ RSpec.describe Clover, "auth" do
 
     visit "/login"
     fill_in "Email Address", with: TEST_USER_EMAIL
+    click_button "Sign in"
     fill_in "Password", with: TEST_USER_PASSWORD
     click_button "Sign in"
 
@@ -325,6 +336,7 @@ RSpec.describe Clover, "auth" do
 
     visit "/login"
     fill_in "Email Address", with: TEST_USER_EMAIL
+    click_button "Sign in"
     fill_in "Password", with: TEST_USER_PASSWORD
     click_button "Sign in"
 
@@ -384,6 +396,7 @@ RSpec.describe Clover, "auth" do
         expect(page.title).to eq("Ubicloud - Login")
 
         fill_in "Email Address", with: new_email
+        click_button "Sign in"
         fill_in "Password", with: TEST_USER_PASSWORD
 
         click_button "Sign in"
@@ -408,6 +421,7 @@ RSpec.describe Clover, "auth" do
       expect(page.title).to eq("Ubicloud - Login")
 
       fill_in "Email Address", with: TEST_USER_EMAIL
+      click_button "Sign in"
       fill_in "Password", with: "#{TEST_USER_PASSWORD}_new"
 
       click_button "Sign in"
@@ -431,6 +445,7 @@ RSpec.describe Clover, "auth" do
         expect(page.title).to eq("Ubicloud - Login")
 
         fill_in "Email Address", with: TEST_USER_EMAIL
+        click_button "Sign in"
         fill_in "Password", with: "#{TEST_USER_PASSWORD}_new"
 
         click_button "Sign in"
@@ -499,7 +514,7 @@ RSpec.describe Clover, "auth" do
       OmniAuth.config.test_mode = true
     end
 
-    it "can login via OIDC flow" do
+    it "can login via OIDC flow using separate login page" do
       visit "/auth/#{OidcProvider.generate_ubid}"
       expect(page.status_code).to eq 404
 
@@ -639,6 +654,45 @@ RSpec.describe Clover, "auth" do
         expect(page).to have_flash_notice("Your account has been disconnected from TestOIDC")
       ensure
         OmniAuth.config.mock_auth[omniauth_key] = nil
+      end
+
+      it "can login via OIDC flow with already connected account using normal login page" do
+        omniauth_key = oidc_provider.ubid.to_sym
+        AccountIdentity.create(account_id: Account.first.id, provider: oidc_provider.ubid, uid: "789")
+        OmniAuth.config.add_mock(omniauth_key, provider: oidc_provider.ubid, uid: "789",
+          info: {email: "user@example.com"})
+        click_button "Log out"
+
+        fill_in "Email Address", with: TEST_USER_EMAIL
+        click_button "Sign in"
+        expect(page).to have_content("Password")
+        expect(page).to have_content("Or login with:")
+        click_button "TestOIDC"
+
+        expect(page.title).to eq("Ubicloud - Default Dashboard")
+        expect(page).to have_flash_notice("You have been logged in")
+      end
+
+      it "can login via OIDC flow with already connected account using normal login page when account does not have password" do
+        omniauth_key = oidc_provider.ubid.to_sym
+        account_id = Account.first.id
+        AccountIdentity.create(account_id:, provider: oidc_provider.ubid, uid: "789")
+        AccountIdentity.create(account_id:, provider: "google", uid: "123")
+        mock_provider(:google, "uSer@example.com")
+        OmniAuth.config.add_mock(omniauth_key, provider: oidc_provider.ubid, uid: "789",
+          info: {email: "user@example.com"})
+        DB[:account_password_hashes].delete
+        click_button "Log out"
+
+        fill_in "Email Address", with: TEST_USER_EMAIL
+        click_button "Sign in"
+        expect(page).to have_no_content("Password")
+        expect(page).to have_content("Login with:")
+        expect(page).to have_content("Google")
+        click_button "TestOIDC"
+
+        expect(page.title).to eq("Ubicloud - Default Dashboard")
+        expect(page).to have_flash_notice("You have been logged in")
       end
 
       it "can connect to existing account" do

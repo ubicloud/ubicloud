@@ -383,6 +383,10 @@ class Clover < Roda
       scope.after_rodauth_create_account(account_id)
     end
 
+    use_multi_phase_login? true
+    need_password_notice_flash "Login recognized"
+    multi_phase_login_view { login_view }
+
     # :nocov:
     if Config.omniauth_github_id
       require "omniauth-github"
