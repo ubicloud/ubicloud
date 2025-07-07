@@ -397,7 +397,7 @@ GEM
       lint_roller (~> 1.1)
       rubocop-performance (~> 1.25.0)
     stripe (12.6.0)
-    tilt (2.6.0)
+    tilt (2.6.1)
     timeout (0.4.3)
     tpm-key_attestation (0.12.1)
       bindata (~> 2.4)
@@ -509,7 +509,7 @@ DEPENDENCIES
   simplecov
   standard (>= 1.24.3)
   stripe
-  tilt (>= 2.6)
+  tilt (>= 2.6.1)
   turbo_tests
   warning
   webauthn
