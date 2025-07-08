@@ -177,6 +177,7 @@ class Prog::Aws::Vpc < Prog::Base
   def ignore_invalid_id
     yield
   rescue ArgumentError,
+    Aws::EC2::Errors::GatewayNotAttached,
     Aws::EC2::Errors::InvalidSubnetIDNotFound,
     Aws::EC2::Errors::InvalidGroupNotFound,
     Aws::EC2::Errors::InvalidNetworkInterfaceIDNotFound,

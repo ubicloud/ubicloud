@@ -32,16 +32,24 @@ RSpec.describe Prog::Aws::Nic do
   describe "#create_network_interface" do
     it "creates a network interface" do
       client.stub_responses(:create_network_interface, network_interface: {network_interface_id: "eni-0123456789abcdefg", ipv_6_addresses: []})
-      client.stub_responses(:assign_ipv_6_addresses)
       expect(client).to receive(:create_network_interface).with({subnet_id: "subnet-0123456789abcdefg", private_ip_address: nic.private_ipv4.network.to_s, ipv_6_prefix_count: 1, groups: ["sg-0123456789abcdefg"], tag_specifications: Util.aws_tag_specifications("network-interface", nic.name), client_token: nic.id}).and_call_original
+      expect { nx.create_network_interface }.to hop("assign_ipv6_address")
+    end
+  end
+
+  describe "#assign_ipv6_address" do
+    it "assigns an IPv6 address" do
+      client.stub_responses(:describe_network_interfaces, network_interfaces: [{ipv_6_addresses: []}])
+      expect(nic.nic_aws_resource).to receive(:network_interface_id).and_return("eni-0123456789abcdefg").at_least(:once)
+      client.stub_responses(:assign_ipv_6_addresses)
       expect(client).to receive(:assign_ipv_6_addresses).with({network_interface_id: "eni-0123456789abcdefg", ipv_6_address_count: 1}).and_call_original
-      expect { nx.create_network_interface }.to hop("wait_network_interface_created")
+      expect { nx.assign_ipv6_address }.to hop("wait_network_interface_created")
     end
 
     it "skips assigning IPv6 addresses if already assigned" do
-      client.stub_responses(:create_network_interface, network_interface: {network_interface_id: "eni-0123456789abcdefg", ipv_6_addresses: [{ipv_6_address: "2a01:4f8:173:1ed3::1"}]})
+      client.stub_responses(:describe_network_interfaces, network_interfaces: [{ipv_6_addresses: [{ipv_6_address: "2a01:4f8:173:1ed3::1"}]}])
       expect(client).not_to receive(:assign_ipv_6_addresses)
-      expect { nx.create_network_interface }.to hop("wait_network_interface_created")
+      expect { nx.assign_ipv6_address }.to hop("wait_network_interface_created")
     end
   end
 
