@@ -342,6 +342,23 @@ class Clover < Roda
     login_label "Email Address"
     two_factor_auth_return_to_requested_location? true
     already_logged_in { redirect login_redirect }
+
+    before_login do
+      email = account[:email]
+      if (locked_domain = locked_domain_for(email))
+        error = if !omniauth_provider
+          "Login via username and password"
+        elsif omniauth_provider != locked_domain.oidc_provider.ubid
+          "Login via #{scope.omniauth_provider_name(omniauth_provider)}"
+        end
+
+        if error
+          flash["error"] = "#{error} is not supported for the #{domain_for_email(email)} domain. You must authenticate using #{locked_domain.oidc_provider.display_name}."
+          redirect "/login"
+        end
+      end
+    end
+
     after_login do
       remember_login if scope.typecast_params.str("remember-me") == "on"
       if omniauth_identity && omniauth_params["redirect_url"]
@@ -415,6 +432,14 @@ class Clover < Roda
         nil
       end
 
+      def domain_for_email(email)
+        email.split("@", 2)[1]
+      end
+
+      def locked_domain_for(email)
+        LockedDomain.with_pk(domain_for_email(email))
+      end
+
       omniauth_apps = {}
       omniauth_app_mutex = Mutex.new
       builder_app = ->(env) { [404, {}, []] }
@@ -472,10 +497,16 @@ class Clover < Roda
     end
 
     before_omniauth_create_account do
-      unless account[:email]
+      unless (email = account[:email])
         flash["error"] = "Social login is only allowed if social login provider provides email"
         redirect "/login"
       end
+
+      if (locked_domain = locked_domain_for(email)) && omniauth_provider != locked_domain.oidc_provider.ubid
+        flash["error"] = "Creating an account via authentication through #{scope.omniauth_provider_name(omniauth_provider)} is not supported for the #{domain_for_email(email)} domain. You must authenticate using #{locked_domain.oidc_provider.display_name}."
+        redirect "/login"
+      end
+
       scope.before_rodauth_create_account(account, omniauth_name || account[:email].split("@", 2)[0].gsub(/[^A-Za-z]+/, " ").capitalize)
     end
 
