@@ -64,7 +64,12 @@ if location.provider != HostProvider::HETZNER_PROVIDER_NAME
   exit 1
 end
 
-strand = if (vmh = VmHost.all.find { it.sshable.host == hostname && it.location == location && it.provider.server_identifier == host_id })
+vm_host_ds = VmHost
+  .where(id: Sshable.where(host: hostname).select(:id))
+  .where(id: HostProvider.where(server_identifier: host_id).select(:id))
+  .where(location_id: location.id)
+
+strand = if (vmh = vm_host_ds.first)
   puts "Found existing cloudified server for '#{hostname}' with ID: #{vmh.id}"
   vmh.strand
 else
