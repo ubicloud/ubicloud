@@ -514,33 +514,103 @@ RSpec.describe Clover, "auth" do
       OmniAuth.config.test_mode = true
     end
 
-    it "can login via OIDC flow using separate login page" do
-      visit "/auth/#{OidcProvider.generate_ubid}"
-      expect(page.status_code).to eq 404
+    [true, false].each do |locked_domain|
+      it "can login via OIDC flow using separate login page#{" when domain is locked" if locked_domain}" do
+        visit "/auth/#{OidcProvider.generate_ubid}"
+        expect(page.status_code).to eq 404
 
-      provider = oidc_provider
-      omniauth_key = provider.ubid.to_sym
+        provider = oidc_provider
+        provider.add_locked_domain(domain: "example.com") if locked_domain
+        omniauth_key = provider.ubid.to_sym
 
-      visit "/auth/#{provider.ubid}"
-      expect(page.status_code).to eq 200
-      expect(page.title).to eq "Ubicloud - Login to TestOIDC via OIDC"
+        visit "/auth/#{provider.ubid}"
+        expect(page.status_code).to eq 200
+        expect(page.title).to eq "Ubicloud - Login to TestOIDC via OIDC"
 
-      OmniAuth.config.mock_auth[omniauth_key] = :invalid_credentials
-      click_button "Login"
+        OmniAuth.config.mock_auth[omniauth_key] = :invalid_credentials
+        click_button "Login"
+
+        expect(page.title).to eq("Ubicloud - Login")
+        expect(page).to have_flash_error("There was an error logging in with the external provider")
+
+        visit "/auth/#{provider.ubid}"
+        OmniAuth.config.add_mock(omniauth_key, provider: provider.ubid, uid: "789",
+          info: {email: "user@example.com"})
+        click_button "Login"
+
+        account = Account.first
+        expect(account.email).to eq "user@example.com"
+        expect(AccountIdentity.select_hash(:account_id, :provider)).to eq(account.id => provider.ubid)
+        expect(page.title).to eq("Ubicloud - Default Dashboard")
+        expect(page).to have_flash_notice("You have been logged in")
+      end
+    end
+
+    it "cannot login to an account via password when domain is locked" do
+      oidc_provider.add_locked_domain(domain: "example.com")
+      account = create_account
+      visit "/login"
+      fill_in "Email Address", with: account.email
+      click_button "Sign in"
+      fill_in "Password", with: TEST_USER_PASSWORD
+      click_button "Sign in"
 
       expect(page.title).to eq("Ubicloud - Login")
-      expect(page).to have_flash_error("There was an error logging in with the external provider")
+      expect(page).to have_flash_error("Login via username and password is not supported for the example.com domain. You must authenticate using TestOIDC.")
+    end
+
+    it "cannot login to an account via an omniauth provider when domain is locked to a different provider" do
+      provider = OidcProvider.create(
+        display_name: "TestOIDC2",
+        client_id: "123",
+        client_secret: "456",
+        url: "http://example.com",
+        authorization_endpoint: "/auth",
+        token_endpoint: "/tok",
+        userinfo_endpoint: "/ui",
+        jwks_uri: "https://host/jw"
+      )
 
       visit "/auth/#{provider.ubid}"
-      OmniAuth.config.add_mock(omniauth_key, provider: provider.ubid, uid: "789",
+      OmniAuth.config.add_mock(provider.ubid.to_sym, provider: provider.ubid, uid: "789",
         info: {email: "user@example.com"})
       click_button "Login"
 
       account = Account.first
       expect(account.email).to eq "user@example.com"
       expect(AccountIdentity.select_hash(:account_id, :provider)).to eq(account.id => provider.ubid)
-      expect(page.title).to eq("Ubicloud - Default Dashboard")
-      expect(page).to have_flash_notice("You have been logged in")
+
+      click_button "Log out"
+      oidc_provider.add_locked_domain(domain: "example.com")
+
+      visit "/auth/#{provider.ubid}"
+      click_button "Login"
+      expect(page.title).to eq("Ubicloud - Login")
+      expect(page).to have_flash_error("Login via TestOIDC2 is not supported for the example.com domain. You must authenticate using TestOIDC.")
+    end
+
+    it "cannot create account via an omniauth provider when domain is locked to a different provider" do
+      oidc_provider.add_locked_domain(domain: "example.com")
+      provider = OidcProvider.create(
+        display_name: "TestOIDC2",
+        client_id: "123",
+        client_secret: "456",
+        url: "http://example.com",
+        authorization_endpoint: "/auth",
+        token_endpoint: "/tok",
+        userinfo_endpoint: "/ui",
+        jwks_uri: "https://host/jw"
+      )
+
+      visit "/auth/#{provider.ubid}"
+      OmniAuth.config.add_mock(provider.ubid.to_sym, provider: provider.ubid, uid: "789",
+        info: {email: "user@example.com"})
+      click_button "Login"
+
+      expect(page.title).to eq("Ubicloud - Login")
+      expect(page).to have_flash_error("Creating an account via authentication through TestOIDC2 is not supported for the example.com domain. You must authenticate using TestOIDC.")
+      expect(Account.all).to eq []
+      expect(AccountIdentity.all).to eq []
     end
 
     it "shows error message if attempting to create an account where social login has no email" do
@@ -656,43 +726,47 @@ RSpec.describe Clover, "auth" do
         OmniAuth.config.mock_auth[omniauth_key] = nil
       end
 
-      it "can login via OIDC flow with already connected account using normal login page" do
-        omniauth_key = oidc_provider.ubid.to_sym
-        AccountIdentity.create(account_id: Account.first.id, provider: oidc_provider.ubid, uid: "789")
-        OmniAuth.config.add_mock(omniauth_key, provider: oidc_provider.ubid, uid: "789",
-          info: {email: "user@example.com"})
-        click_button "Log out"
+      [true, false].each do |locked_domain|
+        it "can login via OIDC flow with already connected account using normal login page#{" when domain is locked" if locked_domain}" do
+          omniauth_key = oidc_provider.ubid.to_sym
+          oidc_provider.add_locked_domain(domain: "example.com") if locked_domain
+          AccountIdentity.create(account_id: Account.first.id, provider: oidc_provider.ubid, uid: "789")
+          OmniAuth.config.add_mock(omniauth_key, provider: oidc_provider.ubid, uid: "789",
+            info: {email: "user@example.com"})
+          click_button "Log out"
 
-        fill_in "Email Address", with: TEST_USER_EMAIL
-        click_button "Sign in"
-        expect(page).to have_content("Password")
-        expect(page).to have_content("Or login with:")
-        click_button "TestOIDC"
+          fill_in "Email Address", with: TEST_USER_EMAIL
+          click_button "Sign in"
+          expect(page).to have_content("Password")
+          expect(page).to have_content("Or login with:")
+          click_button "TestOIDC"
 
-        expect(page.title).to eq("Ubicloud - Default Dashboard")
-        expect(page).to have_flash_notice("You have been logged in")
-      end
+          expect(page.title).to eq("Ubicloud - Default Dashboard")
+          expect(page).to have_flash_notice("You have been logged in")
+        end
 
-      it "can login via OIDC flow with already connected account using normal login page when account does not have password" do
-        omniauth_key = oidc_provider.ubid.to_sym
-        account_id = Account.first.id
-        AccountIdentity.create(account_id:, provider: oidc_provider.ubid, uid: "789")
-        AccountIdentity.create(account_id:, provider: "google", uid: "123")
-        mock_provider(:github, "uSer@example.com")
-        OmniAuth.config.add_mock(omniauth_key, provider: oidc_provider.ubid, uid: "789",
-          info: {email: "user@example.com"})
-        DB[:account_password_hashes].delete
-        click_button "Log out"
+        it "can login via OIDC flow with already connected account using normal login page when account does not have password#{" when domain is locked" if locked_domain}" do
+          omniauth_key = oidc_provider.ubid.to_sym
+          oidc_provider.add_locked_domain(domain: "example.com") if locked_domain
+          account_id = Account.first.id
+          AccountIdentity.create(account_id:, provider: oidc_provider.ubid, uid: "789")
+          AccountIdentity.create(account_id:, provider: "google", uid: "123")
+          mock_provider(:google, "uSer@example.com")
+          OmniAuth.config.add_mock(omniauth_key, provider: oidc_provider.ubid, uid: "789",
+            info: {email: "user@example.com"})
+          DB[:account_password_hashes].delete
+          click_button "Log out"
 
-        fill_in "Email Address", with: TEST_USER_EMAIL
-        click_button "Sign in"
-        expect(page).to have_no_content("Password")
-        expect(page).to have_content("Login with:")
-        expect(page).to have_content("GitHub")
-        click_button "TestOIDC"
+          fill_in "Email Address", with: TEST_USER_EMAIL
+          click_button "Sign in"
+          expect(page).to have_no_content("Password")
+          expect(page).to have_content("Login with:")
+          expect(page).to have_content("Google")
+          click_button "TestOIDC"
 
-        expect(page.title).to eq("Ubicloud - Default Dashboard")
-        expect(page).to have_flash_notice("You have been logged in")
+          expect(page.title).to eq("Ubicloud - Default Dashboard")
+          expect(page).to have_flash_notice("You have been logged in")
+        end
       end
 
       it "can connect to existing account" do
