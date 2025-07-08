@@ -36,6 +36,8 @@ RSpec.describe Clover, "cli" do
     expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("nc2kyevjaqey6h0et8qj89zvm1"))
 
     cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
+    pg = PostgresResource.first(name: "test-pg")
+    pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 64, disk_index: 0)
     cli(%w[pg eu-central-h1/test-pg reset-superuser-password bar456FOO123])
     cli(%w[pg eu-central-h1/test-pg add-metric-destination foo bar https://baz.example.com])
 

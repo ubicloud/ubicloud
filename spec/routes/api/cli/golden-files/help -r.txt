@@ -460,9 +460,10 @@ Options:
     -f, --fields=fields              show specific fields (comma separated)
 
 Allowed Option Values:
-    Fields: id name state location vm-size storage-size-gib version ha-type
-            flavor connection-string primary earliest-restore-time
-            firewall-rules metric-destinations ca-certificates
+    Fields: id name state location vm-size target-vm-size storage-size-gib
+            target-storage-size-gib version ha-type flavor connection-string
+            primary earliest-restore-time firewall-rules metric-destinations
+            ca-certificates
 
 
 Manage private subnets

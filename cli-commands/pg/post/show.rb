@@ -3,7 +3,7 @@
 UbiCli.on("pg").run_on("show") do
   desc "Show details for a PostgreSQL database"
 
-  fields = %w[id name state location vm-size storage-size-gib version ha-type flavor connection-string primary earliest-restore-time firewall-rules metric-destinations ca-certificates].freeze.each(&:freeze)
+  fields = %w[id name state location vm-size target-vm-size storage-size-gib target-storage-size-gib version ha-type flavor connection-string primary earliest-restore-time firewall-rules metric-destinations ca-certificates].freeze.each(&:freeze)
 
   options("ubi pg (location/pg-name | pg-id) show [options]", key: :pg_show) do
     on("-f", "--fields=fields", "show specific fields (comma separated)")

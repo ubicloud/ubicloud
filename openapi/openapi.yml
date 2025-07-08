@@ -2087,11 +2087,17 @@ components:
         storage_size_gib:
           description: Storage size in GiB
           type: integer
+        target_storage_size_gib:
+          description: Desired storage size in GiB
+          type: integer
         version:
           description: Postgres version
           type: string
         vm_size:
           description: Size of the underlying VM
+          type: string
+        target_vm_size:
+          description: Desired VM size
           type: string
         ca_certificates:
           description: CA certificates of the root CA used to issue postgres server certificates
