@@ -678,7 +678,7 @@ RSpec.describe Clover, "auth" do
         account_id = Account.first.id
         AccountIdentity.create(account_id:, provider: oidc_provider.ubid, uid: "789")
         AccountIdentity.create(account_id:, provider: "google", uid: "123")
-        mock_provider(:google, "uSer@example.com")
+        mock_provider(:github, "uSer@example.com")
         OmniAuth.config.add_mock(omniauth_key, provider: oidc_provider.ubid, uid: "789",
           info: {email: "user@example.com"})
         DB[:account_password_hashes].delete
@@ -688,7 +688,7 @@ RSpec.describe Clover, "auth" do
         click_button "Sign in"
         expect(page).to have_no_content("Password")
         expect(page).to have_content("Login with:")
-        expect(page).to have_content("Google")
+        expect(page).to have_content("GitHub")
         click_button "TestOIDC"
 
         expect(page.title).to eq("Ubicloud - Default Dashboard")
@@ -704,7 +704,7 @@ RSpec.describe Clover, "auth" do
         end
 
         expect(page.title).to eq("Ubicloud - Login Methods")
-        expect(page).to have_flash_notice("You have successfully connected your account with Github.")
+        expect(page).to have_flash_notice("You have successfully connected your account with GitHub.")
       end
 
       it "can disconnect from existing account" do
@@ -717,7 +717,7 @@ RSpec.describe Clover, "auth" do
         end
 
         expect(page.title).to eq("Ubicloud - Login Methods")
-        expect(page).to have_flash_notice("Your account has been disconnected from Github")
+        expect(page).to have_flash_notice("Your account has been disconnected from GitHub")
       end
 
       it "can delete password if another login method is available" do
@@ -756,7 +756,7 @@ RSpec.describe Clover, "auth" do
         end
 
         expect(page.title).to eq("Ubicloud - Login Methods")
-        expect(page).to have_flash_error("Your account already has been disconnected from Github")
+        expect(page).to have_flash_error("Your account already has been disconnected from GitHub")
       end
 
       it "can not connect an account with different email" do
@@ -768,7 +768,7 @@ RSpec.describe Clover, "auth" do
         end
 
         expect(page.title).to eq("Ubicloud - Login Methods")
-        expect(page).to have_flash_error("Your account's email address is different from the email address associated with the Github account.")
+        expect(page).to have_flash_error("Your account's email address is different from the email address associated with the GitHub account.")
       end
 
       it "can not connect a social account with multiple accounts" do
@@ -781,7 +781,7 @@ RSpec.describe Clover, "auth" do
         end
 
         expect(page.title).to eq("Ubicloud - Login Methods")
-        expect(page).to have_flash_error("Your account's email address is different from the email address associated with the Github account.")
+        expect(page).to have_flash_error("Your account's email address is different from the email address associated with the GitHub account.")
       end
     end
   end
