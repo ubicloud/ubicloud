@@ -12,12 +12,8 @@ class GithubRepository < Sequel::Model
 
   plugin :association_dependencies, cache_entries: :destroy
 
-  plugin ResourceMethods
+  plugin ResourceMethods, encrypted_columns: :secret_key
   plugin SemaphoreMethods, :destroy
-
-  plugin :column_encryption do |enc|
-    enc.column :secret_key
-  end
 
   CACHE_SIZE_LIMIT = 10 * 1024 * 1024 * 1024 # 10GB
 

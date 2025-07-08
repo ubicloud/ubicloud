@@ -5,11 +5,7 @@ require_relative "../../model"
 class PostgresMetricDestination < Sequel::Model
   many_to_one :postgres_resource, key: :postgres_resource_id
 
-  plugin ResourceMethods
-
-  plugin :column_encryption do |enc|
-    enc.column :password
-  end
+  plugin ResourceMethods, encrypted_columns: :password
 end
 
 # Table: postgres_metric_destination

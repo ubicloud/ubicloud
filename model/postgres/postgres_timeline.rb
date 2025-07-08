@@ -9,12 +9,8 @@ class PostgresTimeline < Sequel::Model
   one_to_one :leader, class: :PostgresServer, key: :timeline_id, conditions: {timeline_access: "push"}
   many_to_one :location
 
-  plugin ResourceMethods
+  plugin ResourceMethods, encrypted_columns: :secret_key
   plugin SemaphoreMethods, :destroy
-
-  plugin :column_encryption do |enc|
-    enc.column :secret_key
-  end
 
   BACKUP_BUCKET_EXPIRATION_DAYS = 8
 

@@ -59,12 +59,7 @@ class OidcProvider < Sequel::Model
     )
   end
 
-  plugin ResourceMethods
-
-  plugin :column_encryption do |enc|
-    enc.column :client_secret
-    enc.column :registration_access_token
-  end
+  plugin ResourceMethods, encrypted_columns: [:client_secret, :registration_access_token]
 
   def callback_url
     "#{Config.base_url}/auth/#{ubid}/callback"
