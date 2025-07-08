@@ -231,17 +231,17 @@ class Prog::Vm::GithubRunner < Prog::Base
       # The `imagedata.json` file contains information about the generated image.
       # I enrich it with details about the Ubicloud environment and placed it in the runner's home directory.
       # GitHub-hosted runners also use this file as setup_info to show on the GitHub UI.
-      jq '. += [#{setup_info.to_json}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
+      jq '. += [#{setup_info.to_json}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
 
       # We use a JWT token to authenticate the virtual machines with our runtime API. This token is valid as long as the vm is running.
       # ubicloud/cache package which forked from the official actions/cache package, sends requests to UBICLOUD_CACHE_URL using this token.
       echo "UBICLOUD_RUNTIME_TOKEN=#{vm.runtime_token}
-      UBICLOUD_CACHE_URL=#{Config.base_url}/runtime/github/" | sudo tee -a /etc/environment
+      UBICLOUD_CACHE_URL=#{Config.base_url}/runtime/github/" | sudo tee -a /etc/environment > /dev/null
     COMMAND
 
     if github_runner.installation.cache_enabled
       command += <<~COMMAND
-        echo "CUSTOM_ACTIONS_CACHE_URL=http://#{vm.private_ipv4}:51123/random_token/" | sudo tee -a /etc/environment
+        echo "CUSTOM_ACTIONS_CACHE_URL=http://#{vm.private_ipv4}:51123/random_token/" | sudo tee -a /etc/environment > /dev/null
       COMMAND
     end
 

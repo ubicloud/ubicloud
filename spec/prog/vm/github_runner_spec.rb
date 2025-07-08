@@ -351,9 +351,9 @@ RSpec.describe Prog::Vm::GithubRunner do
         set -ueo pipefail
         echo "image version: $ImageVersion"
         sudo usermod -a -G sudo,adm runneradmin
-        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{runner.ubid}\\nLabel: ubicloud-standard-4\\nVM Family: standard\\nArch: x64\\nImage: github-ubuntu-2204\\nVM Host: #{vm.vm_host.ubid}\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: #{project.ubid}\\nConsole URL: http://localhost:9292/project/#{project.ubid}/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
+        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{runner.ubid}\\nLabel: ubicloud-standard-4\\nVM Family: standard\\nArch: x64\\nImage: github-ubuntu-2204\\nVM Host: #{vm.vm_host.ubid}\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: #{project.ubid}\\nConsole URL: http://localhost:9292/project/#{project.ubid}/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
         echo "UBICLOUD_RUNTIME_TOKEN=my_token
-        UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment
+        UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment > /dev/null
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
@@ -367,9 +367,9 @@ RSpec.describe Prog::Vm::GithubRunner do
         set -ueo pipefail
         echo "image version: $ImageVersion"
         sudo usermod -a -G sudo,adm runneradmin
-        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{runner.ubid}\\nLabel: ubicloud-standard-4\\nVM Family: standard\\nArch: x64\\nImage: github-ubuntu-2204\\nVM Host: #{vm.vm_host.ubid}\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: #{project.ubid}\\nConsole URL: http://localhost:9292/project/#{project.ubid}/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
+        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{runner.ubid}\\nLabel: ubicloud-standard-4\\nVM Family: standard\\nArch: x64\\nImage: github-ubuntu-2204\\nVM Host: #{vm.vm_host.ubid}\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: #{project.ubid}\\nConsole URL: http://localhost:9292/project/#{project.ubid}/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
         echo "UBICLOUD_RUNTIME_TOKEN=my_token
-        UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment
+        UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment > /dev/null
         sudo tee /etc/systemd/system/runner-script.service > /dev/null > /dev/null <<'EOT'
         [Unit]
         Description=runner-script
@@ -400,10 +400,10 @@ RSpec.describe Prog::Vm::GithubRunner do
         set -ueo pipefail
         echo "image version: $ImageVersion"
         sudo usermod -a -G sudo,adm runneradmin
-        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{runner.ubid}\\nLabel: ubicloud-standard-4\\nVM Family: standard\\nArch: x64\\nImage: github-ubuntu-2204\\nVM Host: #{vm.vm_host.ubid}\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: #{project.ubid}\\nConsole URL: http://localhost:9292/project/#{project.ubid}/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
+        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{runner.ubid}\\nLabel: ubicloud-standard-4\\nVM Family: standard\\nArch: x64\\nImage: github-ubuntu-2204\\nVM Host: #{vm.vm_host.ubid}\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: #{project.ubid}\\nConsole URL: http://localhost:9292/project/#{project.ubid}/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
         echo "UBICLOUD_RUNTIME_TOKEN=my_token
-        UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment
-        echo "CUSTOM_ACTIONS_CACHE_URL=http://10.0.0.1:51123/random_token/" | sudo tee -a /etc/environment
+        UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment > /dev/null
+        echo "CUSTOM_ACTIONS_CACHE_URL=http://10.0.0.1:51123/random_token/" | sudo tee -a /etc/environment > /dev/null
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
