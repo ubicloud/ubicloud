@@ -9,13 +9,8 @@ class Cert < Sequel::Model
 
   plugin :association_dependencies, certs_load_balancers: :destroy
 
-  plugin ResourceMethods, redacted_columns: :cert
+  plugin ResourceMethods, redacted_columns: :cert, encrypted_columns: [:account_key, :csr_key]
   plugin SemaphoreMethods, :destroy, :restarted
-
-  plugin :column_encryption do |enc|
-    enc.column :account_key
-    enc.column :csr_key
-  end
 
   dataset_module do
     exclude :with_cert, cert: nil

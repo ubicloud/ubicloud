@@ -7,12 +7,8 @@ class InferenceRouterTarget < Sequel::Model
   many_to_one :inference_router
   many_to_one :inference_router_model
 
-  plugin ResourceMethods
+  plugin ResourceMethods, encrypted_columns: :api_key
   plugin SemaphoreMethods, :destroy
-
-  plugin :column_encryption do |enc|
-    enc.column :api_key
-  end
 end
 
 # Table: inference_router_target

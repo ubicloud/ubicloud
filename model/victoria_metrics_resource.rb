@@ -9,14 +9,9 @@ class VictoriaMetricsResource < Sequel::Model
   one_to_many :servers, class: :VictoriaMetricsServer, key: :victoria_metrics_resource_id
   many_to_one :private_subnet
 
-  plugin ResourceMethods, redacted_columns: [:admin_password, :root_cert_1, :root_cert_2]
+  plugin ResourceMethods, redacted_columns: [:admin_password, :root_cert_1, :root_cert_2],
+    encrypted_columns: [:admin_password, :root_cert_key_1, :root_cert_key_2]
   plugin SemaphoreMethods, :destroy, :reconfigure
-
-  plugin :column_encryption do |enc|
-    enc.column :admin_password
-    enc.column :root_cert_key_1
-    enc.column :root_cert_key_2
-  end
 
   def hostname
     "#{name}.#{Config.victoria_metrics_host_name}"

@@ -1,11 +1,20 @@
 # frozen_string_literal: true
 
 module ResourceMethods
-  def self.configure(model, etc_type: false, redacted_columns: nil)
+  def self.configure(model, etc_type: false, redacted_columns: nil, encrypted_columns: nil)
     model.instance_exec do
       extend UbidTypeEtcMethods if etc_type
       @ubid_format = /\A#{ubid_type}[a-z0-9]{24}\z/
-      @redacted_columns = Array(redacted_columns).freeze
+      @encrypted_columns = Array(encrypted_columns).freeze
+      @redacted_columns = (Array(redacted_columns) + @encrypted_columns).freeze
+
+      unless @encrypted_columns.empty?
+        plugin :column_encryption do |enc|
+          @encrypted_columns.each do |col|
+            enc.column col
+          end
+        end
+      end
     end
   end
 
@@ -76,20 +85,17 @@ module ResourceMethods
       inspect_values.inspect
     end
 
-    NON_ARCHIVED_MODELS = ["ArchivedRecord", "Semaphore"]
+    NON_ARCHIVED_MODELS = ["ArchivedRecord", "Semaphore"].freeze
     def before_destroy
       model_name = self.class.name
       unless NON_ARCHIVED_MODELS.include?(model_name)
-        model_values = values.merge(model_name: model_name)
+        model_values = values.merge(model_name:)
 
-        encryption_metadata = self.class.instance_variable_get(:@column_encryption_metadata)
-        unless encryption_metadata.empty?
-          encryption_metadata.keys.each do |key|
-            model_values.delete(key)
-          end
+        self.class.encrypted_columns.each do |key|
+          model_values.delete(key)
         end
 
-        ArchivedRecord.create(model_name: model_name, model_values: model_values)
+        ArchivedRecord.create(model_name:, model_values:)
       end
 
       super
@@ -98,6 +104,10 @@ module ResourceMethods
 
   module ClassMethods
     attr_reader :ubid_format
+
+    attr_reader :encrypted_columns
+
+    attr_reader :redacted_columns
 
     # Adapted from sequel/model/inflections.rb's underscore, to convert
     # class names into symbols
@@ -139,10 +149,6 @@ module ResourceMethods
 
     def create_with_id(...)
       create(...)
-    end
-
-    def redacted_columns
-      (column_encryption_metadata.keys || []) + @redacted_columns
     end
   end
 end

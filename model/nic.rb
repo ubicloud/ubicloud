@@ -11,13 +11,9 @@ class Nic < Sequel::Model
   one_to_one :nic_aws_resource, key: :id
   plugin :association_dependencies, src_ipsec_tunnels: :destroy, dst_ipsec_tunnels: :destroy, nic_aws_resource: :destroy
 
-  plugin ResourceMethods
+  plugin ResourceMethods, encrypted_columns: :encryption_key
   plugin SemaphoreMethods, :destroy, :start_rekey, :trigger_outbound_update,
     :old_state_drop_trigger, :setup_nic, :repopulate, :lock, :vm_allocated
-
-  plugin :column_encryption do |enc|
-    enc.column :encryption_key
-  end
 
   def self.ubid_to_name(ubid)
     ubid.to_s[0..7]

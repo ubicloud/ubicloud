@@ -5,13 +5,9 @@ require_relative "../model"
 class ApiKey < Sequel::Model
   many_to_one :project
 
-  plugin ResourceMethods
+  plugin ResourceMethods, encrypted_columns: :key
   include SubjectTag::Cleanup # personal access tokens
   include ObjectTag::Cleanup # inference tokens
-
-  plugin :column_encryption do |enc|
-    enc.column :key
-  end
 
   def self.random_key
     SecureRandom.alphanumeric(32)
