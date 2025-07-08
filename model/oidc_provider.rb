@@ -4,6 +4,8 @@ require_relative "../model"
 require "excon"
 
 class OidcProvider < Sequel::Model
+  one_to_many :locked_domains
+
   def self.name_for_ubid(ubid)
     OidcProvider[UBID.to_uuid(ubid)]&.display_name
   end
@@ -81,3 +83,5 @@ end
 #  registration_access_token | text |
 # Indexes:
 #  oidc_provider_pkey | PRIMARY KEY btree (id)
+# Referenced By:
+#  locked_domain | locked_domain_oidc_provider_id_fkey | (oidc_provider_id) REFERENCES oidc_provider(id)
