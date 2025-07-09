@@ -574,6 +574,45 @@ RSpec.describe Clover, "auth" do
       expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
     end
 
+    it "attempting to reset the password for an account in a locked domain redirects to required OIDC login page" do
+      create_account
+
+      visit "/login"
+      fill_in "Email Address", with: TEST_USER_EMAIL
+      click_button "Sign in"
+      click_link "Forgot your password?"
+      click_button "Request Password Reset"
+
+      expect(page).to have_flash_notice("An email has been sent to you with a link to reset the password for your account")
+      expect(Mail::TestMailer.deliveries.length).to eq 1
+      reset_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/reset-password.+?)"/)[1]
+
+      oidc_provider.add_locked_domain(domain: "example.com")
+      visit reset_link
+      fill_in "Password", with: "#{TEST_USER_PASSWORD}_new"
+      fill_in "Password Confirmation", with: "#{TEST_USER_PASSWORD}_new"
+
+      click_button "Reset Password"
+
+      expect(page).to have_flash_error("Resetting passwords is not supported for the example.com domain. You must authenticate using TestOIDC.")
+      expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
+    end
+
+    it "requesting a password reset for an account in a locked domain redirects to required OIDC login page" do
+      oidc_provider.add_locked_domain(domain: "example.com")
+
+      create_account
+
+      visit "/login"
+      click_link "Forgot your password?"
+      fill_in "Email Address", with: TEST_USER_EMAIL
+      click_button "Request Password Reset"
+
+      expect(Mail::TestMailer.deliveries.length).to eq 0
+      expect(page).to have_flash_error("Resetting passwords is not supported for the example.com domain. You must authenticate using TestOIDC.")
+      expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
+    end
+
     it "cannot login to an account via an omniauth provider when domain is locked to a different provider" do
       provider = OidcProvider.create(
         display_name: "TestOIDC2",
