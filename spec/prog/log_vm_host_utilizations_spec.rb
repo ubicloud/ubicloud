@@ -19,10 +19,10 @@ RSpec.describe Prog::LogVmHostUtilizations do
 
       expect(Clog).to receive(:emit).with("location utilization") do |&blk|
         dat = blk.call[:location_utilization]
-        if dat[:location] == "hetzner-fsn1" && dat[:arch] == "x64" && dat[:allocation_state] == "accepting"
+        if dat[:location_id] == Location::HETZNER_FSN1_ID && dat[:arch] == "x64" && dat[:allocation_state] == "accepting"
           expect(dat[:core_utilization]).to eq(30.0)
           expect(dat[:hugepage_utilization]).to eq(25.0)
-        elsif dat[:location] == "hetzner-fsn1" && dat[:arch] == "x64" && dat[:allocation_state] == "draining"
+        elsif dat[:location_id] == Location::HETZNER_FSN1_ID && dat[:arch] == "x64" && dat[:allocation_state] == "draining"
           expect(dat[:core_utilization]).to eq(25.0)
           expect(dat[:hugepage_utilization]).to eq(33.33)
         end
