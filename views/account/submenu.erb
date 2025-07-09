@@ -1,13 +1,15 @@
 <aside class="py-6 lg:col-span-4 xl:col-span-3 2xl:col-span-2">
   <nav class="space-y-1">
-    <% [
-        ["Multifactor Auth", "/account/multifactor-manage", "hero-lock-closed", request.path.start_with?("/account/multifactor")],
-        ["Login Methods", "/account/login-method", "hero-finger-print"],
-        ["#{rodauth.has_password? ? "Change" : "Create"} Password", "/account/change-password", "hero-key"],
-        ["Change Email", "/account/change-login", "hero-envelope"],
+    <% disallow_login_methods = rodauth.locked_domain_for(current_account.email)
+      [
+        ["Multifactor Auth", "/account/multifactor-manage", "hero-lock-closed"],
+        ["Login Methods", "/account/login-method", "hero-finger-print", disallow_login_methods],
+        ["#{rodauth.has_password? ? "Change" : "Create"} Password", "/account/change-password", "hero-key", disallow_login_methods],
+        ["Change Email", "/account/change-login", "hero-envelope", disallow_login_methods],
         ["Close Account", "/account/close-account", "hero-x-circle"]
-      ].each do |label, url, icon, is_active| %>
-      <% if is_active || request.path == url %>
+      ].each do |label, url, icon, disallowed| %>
+      <% next if disallowed %>
+      <% if request.path == url %>
         <a
           href="<%= url %>"
           class="border-orange-600 bg-orange-50 text-orange-600 hover:bg-orange-50 hover:text-orange-700 group flex items-center border-l-4 px-3 py-2 text-sm font-medium"
