@@ -559,6 +559,21 @@ RSpec.describe Clover, "auth" do
       expect(page).to have_flash_error("Login via username and password is not supported for the example.com domain. You must authenticate using TestOIDC.")
     end
 
+    it "attempting to create an account in a locked domain redirects to required OIDC login page" do
+      oidc_provider.add_locked_domain(domain: "example.com")
+
+      visit "/create-account"
+      fill_in "Email Address", with: TEST_USER_EMAIL
+      fill_in "Full Name", with: "John Doe"
+      fill_in "Password", with: TEST_USER_PASSWORD
+      fill_in "Password Confirmation", with: TEST_USER_PASSWORD
+      click_button "Create Account"
+
+      expect(Mail::TestMailer.deliveries.length).to eq 0
+      expect(page).to have_flash_error("Creating accounts with a password is not supported for the example.com domain. You must authenticate using TestOIDC.")
+      expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
+    end
+
     it "cannot login to an account via an omniauth provider when domain is locked to a different provider" do
       provider = OidcProvider.create(
         display_name: "TestOIDC2",
