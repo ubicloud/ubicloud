@@ -385,6 +385,8 @@ class Clover < Roda
     create_account_set_password? true
     password_confirm_label "Password Confirmation"
     before_create_account do
+      check_locked_domain(account[:email], "Creating accounts with a password")
+
       cf_response = scope.typecast_params.str("cf-turnstile-response").to_s if Config.cloudflare_turnstile_site_key
 
       if cf_response&.empty?
@@ -416,6 +418,13 @@ class Clover < Roda
     # :nocov:
 
     auth_class_eval do
+      def check_locked_domain(email, error_prefix)
+        if (locked_domain = locked_domain_for(email))
+          flash["error"] = "#{error_prefix} is not supported for the #{domain_for_email(email)} domain. You must authenticate using #{locked_domain.oidc_provider.display_name}."
+          redirect("/auth/#{locked_domain.oidc_provider.ubid}")
+        end
+      end
+
       # If the route isn't already handled and matches a known provider,
       # get the app specific to that provider, and then run it.
       def route_omniauth!
