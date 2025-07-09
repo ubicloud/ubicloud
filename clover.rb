@@ -596,10 +596,12 @@ class Clover < Roda
           "If you did not initiate this request or for any questions, reach out to our team at support@ubicloud.com."])
     end
 
+    before_change_login { check_locked_domain(account[:email], "Changing email addresses", redirect: "/") }
     change_login_redirect "/account/change-login"
     change_login_route "account/change-login"
     change_login_view { view "account/change_login", "My Account" }
 
+    before_verify_login_change { check_locked_domain(account[:email], "Changing email addresses", redirect: "/") }
     verify_login_change_view { view "auth/verify_login_change", "Verify Email Change" }
     send_verify_login_change_email do |new_login|
       user = Account[account_id]
