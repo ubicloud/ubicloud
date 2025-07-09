@@ -418,10 +418,10 @@ class Clover < Roda
     # :nocov:
 
     auth_class_eval do
-      def check_locked_domain(email, error_prefix)
+      def check_locked_domain(email, error_prefix, redirect: nil)
         if (locked_domain = locked_domain_for(email))
-          flash["error"] = "#{error_prefix} is not supported for the #{domain_for_email(email)} domain. You must authenticate using #{locked_domain.oidc_provider.display_name}."
-          redirect("/auth/#{locked_domain.oidc_provider.ubid}")
+          flash["error"] = "#{error_prefix} is not supported for the #{domain_for_email(email)} domain.#{" You must authenticate using #{locked_domain.oidc_provider.display_name}." unless redirect}"
+          redirect(redirect || "/auth/#{locked_domain.oidc_provider.ubid}")
         end
       end
 
@@ -580,6 +580,7 @@ class Clover < Roda
       remove_all_active_sessions_except_current
     end
 
+    before_change_password { check_locked_domain(account[:email], "Changing passwords", redirect: "/") }
     change_password_redirect "/account/change-password"
     change_password_route "account/change-password"
     change_password_view { view "account/change_password", "My Account" }

@@ -948,6 +948,19 @@ RSpec.describe Clover, "auth" do
         expect(page.title).to eq("Ubicloud - Login Methods")
         expect(page).to have_flash_error("Your account's email address is different from the email address associated with the GitHub account.")
       end
+
+      it "disallows changing password for an account in a locked domain" do
+        oidc_provider.add_locked_domain(domain: "example.com")
+
+        visit "/account/change-password"
+        fill_in "New Password", with: "#{TEST_USER_PASSWORD}_new"
+        fill_in "New Password Confirmation", with: "#{TEST_USER_PASSWORD}_new"
+        click_button "Change Password"
+
+        expect(Mail::TestMailer.deliveries.length).to eq 0
+        expect(page).to have_flash_error("Changing passwords is not supported for the example.com domain.")
+        expect(page.title).to eq("Ubicloud - Default Dashboard")
+      end
     end
   end
 end
