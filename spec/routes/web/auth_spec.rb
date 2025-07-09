@@ -613,6 +613,43 @@ RSpec.describe Clover, "auth" do
       expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
     end
 
+    it "attempting to unlock an account in a locked domain redirects to required OIDC login page" do
+      account = create_account
+      DB[:account_lockouts].insert(id: account.id, key: SecureRandom.urlsafe_base64(32))
+
+      visit "/login"
+      fill_in "Email Address", with: TEST_USER_EMAIL
+      click_button "Sign in"
+      click_button "Request Account Unlock"
+
+      expect(page).to have_flash_notice("An email has been sent to you with a link to unlock your account")
+      expect(Mail::TestMailer.deliveries.length).to eq 1
+      unlock_link = Mail::TestMailer.deliveries.first.body.match(/(\/unlock-account[^ ]+)/)[1]
+
+      oidc_provider.add_locked_domain(domain: "example.com")
+      visit unlock_link
+      click_button "Unlock Account"
+
+      expect(page).to have_flash_error("Unlocking accounts is not supported for the example.com domain. You must authenticate using TestOIDC.")
+      expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
+    end
+
+    it "requesting an account unlock for an account in a locked domain redirects to required OIDC login page" do
+      oidc_provider.add_locked_domain(domain: "example.com")
+
+      account = create_account
+      DB[:account_lockouts].insert(id: account.id, key: SecureRandom.urlsafe_base64(32))
+
+      visit "/login"
+      fill_in "Email Address", with: TEST_USER_EMAIL
+      click_button "Sign in"
+      click_button "Request Account Unlock"
+
+      expect(Mail::TestMailer.deliveries.length).to eq 0
+      expect(page).to have_flash_error("Unlocking accounts is not supported for the example.com domain. You must authenticate using TestOIDC.")
+      expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
+    end
+
     it "cannot login to an account via an omniauth provider when domain is locked to a different provider" do
       provider = OidcProvider.create(
         display_name: "TestOIDC2",
