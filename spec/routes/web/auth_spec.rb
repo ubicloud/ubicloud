@@ -961,6 +961,36 @@ RSpec.describe Clover, "auth" do
         expect(page).to have_flash_error("Changing passwords is not supported for the example.com domain.")
         expect(page.title).to eq("Ubicloud - Default Dashboard")
       end
+
+      it "disallows requesting a login change for an account in a locked domain" do
+        oidc_provider.add_locked_domain(domain: "example.com")
+
+        visit "/account/change-login"
+        fill_in "New Email Address", with: "user@other-example.com"
+        click_button "Change Email"
+
+        expect(Mail::TestMailer.deliveries.length).to eq 0
+        expect(page).to have_flash_error("Changing email addresses is not supported for the example.com domain.")
+        expect(page.title).to eq("Ubicloud - Default Dashboard")
+      end
+
+      it "disallows changing login for an account in a locked domain" do
+        visit "/account/change-login"
+        fill_in "New Email Address", with: "user@other-example.com"
+        click_button "Change Email"
+
+        expect(page).to have_flash_notice("An email has been sent to you with a link to verify your login change")
+        expect(Mail::TestMailer.deliveries.length).to eq 1
+        verify_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/verify-login-change.+?)"/)[1]
+
+        oidc_provider.add_locked_domain(domain: "example.com")
+
+        visit verify_link
+        click_button "Click to Verify New Email"
+
+        expect(page).to have_flash_error("Changing email addresses is not supported for the example.com domain.")
+        expect(page.title).to eq("Ubicloud - Default Dashboard")
+      end
     end
   end
 end
