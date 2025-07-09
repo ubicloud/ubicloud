@@ -546,6 +546,9 @@ class Clover < Roda
 
     omniauth_create_account? { !authenticated? }
 
+    before_unlock_account { check_locked_domain(account[:email], "Unlocking accounts") }
+    before_unlock_account_request { check_locked_domain(account[:email], "Unlocking accounts") }
+
     before_reset_password { check_locked_domain(account[:email], "Resetting passwords") }
     reset_password_view { view "auth/reset_password", "Request Password" }
     reset_password_request_view { view "auth/reset_password_request", "Request Password Reset" }
