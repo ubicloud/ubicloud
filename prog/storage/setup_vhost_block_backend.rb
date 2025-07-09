@@ -4,8 +4,8 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
   subject_is :sshable, :vm_host
 
   SUPPORTED_VHOST_BLOCK_BACKEND_VERSIONS = [
-    ["v0.1-6", "x64"],
-    ["v0.1-6", "arm64"]
+    ["v0.1-7", "x64"],
+    ["v0.1-7", "arm64"]
   ].freeze.each(&:freeze)
 
   def self.assemble(vm_host_id, version, allocation_weight: 0)
