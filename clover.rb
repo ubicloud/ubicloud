@@ -546,6 +546,7 @@ class Clover < Roda
 
     omniauth_create_account? { !authenticated? }
 
+    before_reset_password { check_locked_domain(account[:email], "Resetting passwords") }
     reset_password_view { view "auth/reset_password", "Request Password" }
     reset_password_request_view { view "auth/reset_password_request", "Request Password Reset" }
     reset_password_redirect { login_route }
@@ -564,6 +565,7 @@ class Clover < Roda
     end
 
     before_reset_password_request do
+      check_locked_domain(account[:email], "Resetting passwords")
       unless has_password?
         flash["error"] = "Login with password is not enabled for this account. Please use other login methods. For any questions or assistance, reach out to our team at support@ubicloud.com"
         redirect login_route
