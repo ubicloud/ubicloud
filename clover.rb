@@ -304,6 +304,18 @@ class Clover < Roda
 
       email_from Config.mail_from
 
+      before_verify_account do
+        if locked_domain_for(account[:email])
+          transaction do
+            DB[:account_verification_keys].where(id: account[:id]).delete
+            before_close_account
+            close_account
+            after_close_account
+            delete_account
+          end
+          check_locked_domain(account[:email], "Verifying accounts")
+        end
+      end
       verify_account_view { view "auth/verify_account", "Verify Account" }
       resend_verify_account_view { view "auth/verify_account_resend", "Resend Verification" }
       verify_account_email_sent_redirect { login_route }
@@ -342,6 +354,23 @@ class Clover < Roda
     login_label "Email Address"
     two_factor_auth_return_to_requested_location? true
     already_logged_in { redirect login_redirect }
+
+    before_login do
+      email = account[:email]
+      if (locked_domain = locked_domain_for(email))
+        error = if !omniauth_provider
+          "Login via username and password"
+        elsif omniauth_provider != locked_domain.oidc_provider.ubid
+          "Login via #{scope.omniauth_provider_name(omniauth_provider)}"
+        end
+
+        if error
+          flash["error"] = "#{error} is not supported for the #{domain_for_email(email)} domain. You must authenticate using #{locked_domain.oidc_provider.display_name}."
+          redirect "/login"
+        end
+      end
+    end
+
     after_login do
       remember_login if scope.typecast_params.str("remember-me") == "on"
       if omniauth_identity && omniauth_params["redirect_url"]
@@ -368,6 +397,8 @@ class Clover < Roda
     create_account_set_password? true
     password_confirm_label "Password Confirmation"
     before_create_account do
+      check_locked_domain(account[:email], "Creating accounts with a password")
+
       cf_response = scope.typecast_params.str("cf-turnstile-response").to_s if Config.cloudflare_turnstile_site_key
 
       if cf_response&.empty?
@@ -399,6 +430,13 @@ class Clover < Roda
     # :nocov:
 
     auth_class_eval do
+      def check_locked_domain(email, error_prefix, redirect: nil)
+        if (locked_domain = locked_domain_for(email))
+          flash["error"] = "#{error_prefix} is not supported for the #{domain_for_email(email)} domain.#{" You must authenticate using #{locked_domain.oidc_provider.display_name}." unless redirect}"
+          redirect(redirect || "/auth/#{locked_domain.oidc_provider.ubid}")
+        end
+      end
+
       # If the route isn't already handled and matches a known provider,
       # get the app specific to that provider, and then run it.
       def route_omniauth!
@@ -413,6 +451,14 @@ class Clover < Roda
           # :nocov:
         end
         nil
+      end
+
+      def domain_for_email(email)
+        email.split("@", 2)[1]
+      end
+
+      def locked_domain_for(email)
+        LockedDomain.with_pk(domain_for_email(email))
       end
 
       omniauth_apps = {}
@@ -472,10 +518,16 @@ class Clover < Roda
     end
 
     before_omniauth_create_account do
-      unless account[:email]
+      unless (email = account[:email])
         flash["error"] = "Social login is only allowed if social login provider provides email"
         redirect "/login"
       end
+
+      if (locked_domain = locked_domain_for(email)) && omniauth_provider != locked_domain.oidc_provider.ubid
+        flash["error"] = "Creating an account via authentication through #{scope.omniauth_provider_name(omniauth_provider)} is not supported for the #{domain_for_email(email)} domain. You must authenticate using #{locked_domain.oidc_provider.display_name}."
+        redirect "/login"
+      end
+
       scope.before_rodauth_create_account(account, omniauth_name || account[:email].split("@", 2)[0].gsub(/[^A-Za-z]+/, " ").capitalize)
     end
 
@@ -506,6 +558,10 @@ class Clover < Roda
 
     omniauth_create_account? { !authenticated? }
 
+    before_unlock_account { check_locked_domain(account[:email], "Unlocking accounts") }
+    before_unlock_account_request { check_locked_domain(account[:email], "Unlocking accounts") }
+
+    before_reset_password { check_locked_domain(account[:email], "Resetting passwords") }
     reset_password_view { view "auth/reset_password", "Request Password" }
     reset_password_request_view { view "auth/reset_password_request", "Request Password Reset" }
     reset_password_redirect { login_route }
@@ -524,6 +580,7 @@ class Clover < Roda
     end
 
     before_reset_password_request do
+      check_locked_domain(account[:email], "Resetting passwords")
       unless has_password?
         flash["error"] = "Login with password is not enabled for this account. Please use other login methods. For any questions or assistance, reach out to our team at support@ubicloud.com"
         redirect login_route
@@ -535,6 +592,7 @@ class Clover < Roda
       remove_all_active_sessions_except_current
     end
 
+    before_change_password { check_locked_domain(account[:email], "Changing passwords", redirect: "/") }
     change_password_redirect "/account/change-password"
     change_password_route "account/change-password"
     change_password_view { view "account/change_password", "My Account" }
@@ -550,10 +608,12 @@ class Clover < Roda
           "If you did not initiate this request or for any questions, reach out to our team at support@ubicloud.com."])
     end
 
+    before_change_login { check_locked_domain(account[:email], "Changing email addresses", redirect: "/") }
     change_login_redirect "/account/change-login"
     change_login_route "account/change-login"
     change_login_view { view "account/change_login", "My Account" }
 
+    before_verify_login_change { check_locked_domain(account[:email], "Changing email addresses", redirect: "/") }
     verify_login_change_view { view "auth/verify_login_change", "Verify Email Change" }
     send_verify_login_change_email do |new_login|
       user = Account[account_id]

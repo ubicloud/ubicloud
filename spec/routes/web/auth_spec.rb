@@ -514,33 +514,215 @@ RSpec.describe Clover, "auth" do
       OmniAuth.config.test_mode = true
     end
 
-    it "can login via OIDC flow using separate login page" do
-      visit "/auth/#{OidcProvider.generate_ubid}"
-      expect(page.status_code).to eq 404
+    [true, false].each do |locked_domain|
+      it "can login via OIDC flow using separate login page#{" when domain is locked" if locked_domain}" do
+        visit "/auth/#{OidcProvider.generate_ubid}"
+        expect(page.status_code).to eq 404
 
-      provider = oidc_provider
-      omniauth_key = provider.ubid.to_sym
+        provider = oidc_provider
+        provider.add_locked_domain(domain: "example.com") if locked_domain
+        omniauth_key = provider.ubid.to_sym
 
-      visit "/auth/#{provider.ubid}"
-      expect(page.status_code).to eq 200
-      expect(page.title).to eq "Ubicloud - Login to TestOIDC via OIDC"
+        visit "/auth/#{provider.ubid}"
+        expect(page.status_code).to eq 200
+        expect(page.title).to eq "Ubicloud - Login to TestOIDC via OIDC"
 
-      OmniAuth.config.mock_auth[omniauth_key] = :invalid_credentials
-      click_button "Login"
+        OmniAuth.config.mock_auth[omniauth_key] = :invalid_credentials
+        click_button "Login"
+
+        expect(page.title).to eq("Ubicloud - Login")
+        expect(page).to have_flash_error("There was an error logging in with the external provider")
+
+        visit "/auth/#{provider.ubid}"
+        OmniAuth.config.add_mock(omniauth_key, provider: provider.ubid, uid: "789",
+          info: {email: "user@example.com"})
+        click_button "Login"
+
+        account = Account.first
+        expect(account.email).to eq "user@example.com"
+        expect(AccountIdentity.select_hash(:account_id, :provider)).to eq(account.id => provider.ubid)
+        expect(page.title).to eq("Ubicloud - Default Dashboard")
+        expect(page).to have_flash_notice("You have been logged in")
+      end
+    end
+
+    it "cannot login to an account via password when domain is locked" do
+      oidc_provider.add_locked_domain(domain: "example.com")
+      account = create_account
+      visit "/login"
+      fill_in "Email Address", with: account.email
+      click_button "Sign in"
+      fill_in "Password", with: TEST_USER_PASSWORD
+      click_button "Sign in"
 
       expect(page.title).to eq("Ubicloud - Login")
-      expect(page).to have_flash_error("There was an error logging in with the external provider")
+      expect(page).to have_flash_error("Login via username and password is not supported for the example.com domain. You must authenticate using TestOIDC.")
+    end
+
+    it "disallow attempting to verify an account in a locked domain" do
+      visit "/create-account"
+      fill_in "Full Name", with: "John Doe"
+      fill_in "Email Address", with: TEST_USER_EMAIL
+      fill_in "Password", with: TEST_USER_PASSWORD
+      fill_in "Password Confirmation", with: TEST_USER_PASSWORD
+      expect(page).to have_no_content "By using Ubicloud console you agree to our"
+      click_button "Create Account"
+
+      expect(page).to have_flash_notice("An email has been sent to you with a link to verify your account")
+      expect(Mail::TestMailer.deliveries.length).to eq 1
+      verify_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/verify-account.+?)"/)[1]
+
+      oidc_provider.add_locked_domain(domain: "example.com")
+      visit verify_link
+      click_button "Verify Account"
+      expect(page).to have_flash_error("Verifying accounts is not supported for the example.com domain. You must authenticate using TestOIDC.")
+      expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
+      expect(Account.all).to eq []
+    end
+
+    it "attempting to create an account in a locked domain redirects to required OIDC login page" do
+      oidc_provider.add_locked_domain(domain: "example.com")
+
+      visit "/create-account"
+      fill_in "Email Address", with: TEST_USER_EMAIL
+      fill_in "Full Name", with: "John Doe"
+      fill_in "Password", with: TEST_USER_PASSWORD
+      fill_in "Password Confirmation", with: TEST_USER_PASSWORD
+      click_button "Create Account"
+
+      expect(Mail::TestMailer.deliveries.length).to eq 0
+      expect(page).to have_flash_error("Creating accounts with a password is not supported for the example.com domain. You must authenticate using TestOIDC.")
+      expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
+    end
+
+    it "attempting to reset the password for an account in a locked domain redirects to required OIDC login page" do
+      create_account
+
+      visit "/login"
+      fill_in "Email Address", with: TEST_USER_EMAIL
+      click_button "Sign in"
+      click_link "Forgot your password?"
+      click_button "Request Password Reset"
+
+      expect(page).to have_flash_notice("An email has been sent to you with a link to reset the password for your account")
+      expect(Mail::TestMailer.deliveries.length).to eq 1
+      reset_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/reset-password.+?)"/)[1]
+
+      oidc_provider.add_locked_domain(domain: "example.com")
+      visit reset_link
+      fill_in "Password", with: "#{TEST_USER_PASSWORD}_new"
+      fill_in "Password Confirmation", with: "#{TEST_USER_PASSWORD}_new"
+
+      click_button "Reset Password"
+
+      expect(page).to have_flash_error("Resetting passwords is not supported for the example.com domain. You must authenticate using TestOIDC.")
+      expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
+    end
+
+    it "requesting a password reset for an account in a locked domain redirects to required OIDC login page" do
+      oidc_provider.add_locked_domain(domain: "example.com")
+
+      create_account
+
+      visit "/login"
+      click_link "Forgot your password?"
+      fill_in "Email Address", with: TEST_USER_EMAIL
+      click_button "Request Password Reset"
+
+      expect(Mail::TestMailer.deliveries.length).to eq 0
+      expect(page).to have_flash_error("Resetting passwords is not supported for the example.com domain. You must authenticate using TestOIDC.")
+      expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
+    end
+
+    it "attempting to unlock an account in a locked domain redirects to required OIDC login page" do
+      account = create_account
+      DB[:account_lockouts].insert(id: account.id, key: SecureRandom.urlsafe_base64(32))
+
+      visit "/login"
+      fill_in "Email Address", with: TEST_USER_EMAIL
+      click_button "Sign in"
+      click_button "Request Account Unlock"
+
+      expect(page).to have_flash_notice("An email has been sent to you with a link to unlock your account")
+      expect(Mail::TestMailer.deliveries.length).to eq 1
+      unlock_link = Mail::TestMailer.deliveries.first.body.match(/(\/unlock-account[^ ]+)/)[1]
+
+      oidc_provider.add_locked_domain(domain: "example.com")
+      visit unlock_link
+      click_button "Unlock Account"
+
+      expect(page).to have_flash_error("Unlocking accounts is not supported for the example.com domain. You must authenticate using TestOIDC.")
+      expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
+    end
+
+    it "requesting an account unlock for an account in a locked domain redirects to required OIDC login page" do
+      oidc_provider.add_locked_domain(domain: "example.com")
+
+      account = create_account
+      DB[:account_lockouts].insert(id: account.id, key: SecureRandom.urlsafe_base64(32))
+
+      visit "/login"
+      fill_in "Email Address", with: TEST_USER_EMAIL
+      click_button "Sign in"
+      click_button "Request Account Unlock"
+
+      expect(Mail::TestMailer.deliveries.length).to eq 0
+      expect(page).to have_flash_error("Unlocking accounts is not supported for the example.com domain. You must authenticate using TestOIDC.")
+      expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
+    end
+
+    it "cannot login to an account via an omniauth provider when domain is locked to a different provider" do
+      provider = OidcProvider.create(
+        display_name: "TestOIDC2",
+        client_id: "123",
+        client_secret: "456",
+        url: "http://example.com",
+        authorization_endpoint: "/auth",
+        token_endpoint: "/tok",
+        userinfo_endpoint: "/ui",
+        jwks_uri: "https://host/jw"
+      )
 
       visit "/auth/#{provider.ubid}"
-      OmniAuth.config.add_mock(omniauth_key, provider: provider.ubid, uid: "789",
+      OmniAuth.config.add_mock(provider.ubid.to_sym, provider: provider.ubid, uid: "789",
         info: {email: "user@example.com"})
       click_button "Login"
 
       account = Account.first
       expect(account.email).to eq "user@example.com"
       expect(AccountIdentity.select_hash(:account_id, :provider)).to eq(account.id => provider.ubid)
-      expect(page.title).to eq("Ubicloud - Default Dashboard")
-      expect(page).to have_flash_notice("You have been logged in")
+
+      click_button "Log out"
+      oidc_provider.add_locked_domain(domain: "example.com")
+
+      visit "/auth/#{provider.ubid}"
+      click_button "Login"
+      expect(page.title).to eq("Ubicloud - Login")
+      expect(page).to have_flash_error("Login via TestOIDC2 is not supported for the example.com domain. You must authenticate using TestOIDC.")
+    end
+
+    it "cannot create account via an omniauth provider when domain is locked to a different provider" do
+      oidc_provider.add_locked_domain(domain: "example.com")
+      provider = OidcProvider.create(
+        display_name: "TestOIDC2",
+        client_id: "123",
+        client_secret: "456",
+        url: "http://example.com",
+        authorization_endpoint: "/auth",
+        token_endpoint: "/tok",
+        userinfo_endpoint: "/ui",
+        jwks_uri: "https://host/jw"
+      )
+
+      visit "/auth/#{provider.ubid}"
+      OmniAuth.config.add_mock(provider.ubid.to_sym, provider: provider.ubid, uid: "789",
+        info: {email: "user@example.com"})
+      click_button "Login"
+
+      expect(page.title).to eq("Ubicloud - Login")
+      expect(page).to have_flash_error("Creating an account via authentication through TestOIDC2 is not supported for the example.com domain. You must authenticate using TestOIDC.")
+      expect(Account.all).to eq []
+      expect(AccountIdentity.all).to eq []
     end
 
     it "shows error message if attempting to create an account where social login has no email" do
@@ -656,43 +838,47 @@ RSpec.describe Clover, "auth" do
         OmniAuth.config.mock_auth[omniauth_key] = nil
       end
 
-      it "can login via OIDC flow with already connected account using normal login page" do
-        omniauth_key = oidc_provider.ubid.to_sym
-        AccountIdentity.create(account_id: Account.first.id, provider: oidc_provider.ubid, uid: "789")
-        OmniAuth.config.add_mock(omniauth_key, provider: oidc_provider.ubid, uid: "789",
-          info: {email: "user@example.com"})
-        click_button "Log out"
+      [true, false].each do |locked_domain|
+        it "can login via OIDC flow with already connected account using normal login page#{" when domain is locked" if locked_domain}" do
+          omniauth_key = oidc_provider.ubid.to_sym
+          oidc_provider.add_locked_domain(domain: "example.com") if locked_domain
+          AccountIdentity.create(account_id: Account.first.id, provider: oidc_provider.ubid, uid: "789")
+          OmniAuth.config.add_mock(omniauth_key, provider: oidc_provider.ubid, uid: "789",
+            info: {email: "user@example.com"})
+          click_button "Log out"
 
-        fill_in "Email Address", with: TEST_USER_EMAIL
-        click_button "Sign in"
-        expect(page).to have_content("Password")
-        expect(page).to have_content("Or login with:")
-        click_button "TestOIDC"
+          fill_in "Email Address", with: TEST_USER_EMAIL
+          click_button "Sign in"
+          expect(page).to have_content("Password")
+          expect(page).to have_content("Or login with:")
+          click_button "TestOIDC"
 
-        expect(page.title).to eq("Ubicloud - Default Dashboard")
-        expect(page).to have_flash_notice("You have been logged in")
-      end
+          expect(page.title).to eq("Ubicloud - Default Dashboard")
+          expect(page).to have_flash_notice("You have been logged in")
+        end
 
-      it "can login via OIDC flow with already connected account using normal login page when account does not have password" do
-        omniauth_key = oidc_provider.ubid.to_sym
-        account_id = Account.first.id
-        AccountIdentity.create(account_id:, provider: oidc_provider.ubid, uid: "789")
-        AccountIdentity.create(account_id:, provider: "google", uid: "123")
-        mock_provider(:google, "uSer@example.com")
-        OmniAuth.config.add_mock(omniauth_key, provider: oidc_provider.ubid, uid: "789",
-          info: {email: "user@example.com"})
-        DB[:account_password_hashes].delete
-        click_button "Log out"
+        it "can login via OIDC flow with already connected account using normal login page when account does not have password#{" when domain is locked" if locked_domain}" do
+          omniauth_key = oidc_provider.ubid.to_sym
+          oidc_provider.add_locked_domain(domain: "example.com") if locked_domain
+          account_id = Account.first.id
+          AccountIdentity.create(account_id:, provider: oidc_provider.ubid, uid: "789")
+          AccountIdentity.create(account_id:, provider: "google", uid: "123")
+          mock_provider(:google, "uSer@example.com")
+          OmniAuth.config.add_mock(omniauth_key, provider: oidc_provider.ubid, uid: "789",
+            info: {email: "user@example.com"})
+          DB[:account_password_hashes].delete
+          click_button "Log out"
 
-        fill_in "Email Address", with: TEST_USER_EMAIL
-        click_button "Sign in"
-        expect(page).to have_no_content("Password")
-        expect(page).to have_content("Login with:")
-        expect(page).to have_content("Google")
-        click_button "TestOIDC"
+          fill_in "Email Address", with: TEST_USER_EMAIL
+          click_button "Sign in"
+          expect(page).to have_no_content("Password")
+          expect(page).to have_content("Login with:")
+          expect(page).to have_content("Google")
+          click_button "TestOIDC"
 
-        expect(page.title).to eq("Ubicloud - Default Dashboard")
-        expect(page).to have_flash_notice("You have been logged in")
+          expect(page.title).to eq("Ubicloud - Default Dashboard")
+          expect(page).to have_flash_notice("You have been logged in")
+        end
       end
 
       it "can connect to existing account" do
@@ -782,6 +968,57 @@ RSpec.describe Clover, "auth" do
 
         expect(page.title).to eq("Ubicloud - Login Methods")
         expect(page).to have_flash_error("Your account's email address is different from the email address associated with the Github account.")
+      end
+
+      it "disallows changing password for an account in a locked domain" do
+        oidc_provider.add_locked_domain(domain: "example.com")
+
+        visit "/account/change-password"
+        fill_in "New Password", with: "#{TEST_USER_PASSWORD}_new"
+        fill_in "New Password Confirmation", with: "#{TEST_USER_PASSWORD}_new"
+        click_button "Change Password"
+
+        expect(Mail::TestMailer.deliveries.length).to eq 0
+        expect(page).to have_flash_error("Changing passwords is not supported for the example.com domain.")
+        expect(page.title).to eq("Ubicloud - Default Dashboard")
+      end
+
+      it "disallows requesting a login change for an account in a locked domain" do
+        oidc_provider.add_locked_domain(domain: "example.com")
+
+        visit "/account/change-login"
+        fill_in "New Email Address", with: "user@other-example.com"
+        click_button "Change Email"
+
+        expect(Mail::TestMailer.deliveries.length).to eq 0
+        expect(page).to have_flash_error("Changing email addresses is not supported for the example.com domain.")
+        expect(page.title).to eq("Ubicloud - Default Dashboard")
+      end
+
+      it "disallows changing login for an account in a locked domain" do
+        visit "/account/change-login"
+        fill_in "New Email Address", with: "user@other-example.com"
+        click_button "Change Email"
+
+        expect(page).to have_flash_notice("An email has been sent to you with a link to verify your login change")
+        expect(Mail::TestMailer.deliveries.length).to eq 1
+        verify_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/verify-login-change.+?)"/)[1]
+
+        oidc_provider.add_locked_domain(domain: "example.com")
+
+        visit verify_link
+        click_button "Click to Verify New Email"
+
+        expect(page).to have_flash_error("Changing email addresses is not supported for the example.com domain.")
+        expect(page.title).to eq("Ubicloud - Default Dashboard")
+      end
+
+      it "hides login methods, change password, and change emails options on My Account page" do
+        oidc_provider.add_locked_domain(domain: "example.com")
+        visit "/account"
+        expect(page).to have_no_content("Login Methods")
+        expect(page).to have_no_content("Change Password")
+        expect(page).to have_no_content("Change Email")
       end
     end
   end
