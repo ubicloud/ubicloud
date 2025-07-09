@@ -61,6 +61,15 @@ module Csi
         status == 0
       end
 
+      def find_loop_device(backing_file)
+        output, ok = run_cmd("losetup", "-j", backing_file)
+        if ok && !output.empty?
+          loop_device = output.split(":")[0].strip
+          return loop_device if loop_device.start_with?("/dev/loop")
+        end
+        nil
+      end
+
       def node_stage_volume(req, _call)
         req_id = SecureRandom.uuid
         log_with_id(req_id, "node_stage_volume request: #{req.inspect}")
@@ -84,19 +93,28 @@ module Csi
             end
           end
 
-          loop_device, ok = run_cmd("losetup", "--find", "--show", backing_file)
-          loop_device = loop_device.strip
-          unless ok && !loop_device.empty?
-            raise GRPC::Internal, "Failed to setup loop device: #{loop_device}"
+          loop_device = find_loop_device(backing_file)
+          is_new_loop_device = loop_device.nil?
+          if is_new_loop_device
+            log_with_id(req_id, "Setting up new loop device for: #{backing_file}")
+            output, ok = run_cmd("losetup", "--find", "--show", backing_file)
+            loop_device = output.strip
+            unless ok && !loop_device.empty?
+              raise GRPC::Internal, "Failed to setup loop device: #{output}"
+            end
+          else
+            log_with_id(req_id, "Loop device already exists: #{loop_device}")
           end
 
-          if req.volume_capability&.mount
+          if req.volume_capability&.mount && is_new_loop_device
             fs_type = req.volume_capability.mount.fs_type || "ext4"
             output, ok = run_cmd("mkfs.#{fs_type}", loop_device)
             unless ok
               log_with_id(req_id, "[CSI NodeService] gRPC error in node_stage_volume: failed to format device: #{output}")
               raise GRPC::Internal, "Failed to format device #{loop_device} with #{fs_type}: #{output}"
             end
+          end
+          unless is_mounted?(staging_path)
             FileUtils.mkdir_p(staging_path)
             output, ok = run_cmd("mount", loop_device, staging_path)
             unless ok
