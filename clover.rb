@@ -304,6 +304,18 @@ class Clover < Roda
 
       email_from Config.mail_from
 
+      before_verify_account do
+        if locked_domain_for(account[:email])
+          transaction do
+            DB[:account_verification_keys].where(id: account[:id]).delete
+            before_close_account
+            close_account
+            after_close_account
+            delete_account
+          end
+          check_locked_domain(account[:email], "Verifying accounts")
+        end
+      end
       verify_account_view { view "auth/verify_account", "Verify Account" }
       resend_verify_account_view { view "auth/verify_account_resend", "Resend Verification" }
       verify_account_email_sent_redirect { login_route }

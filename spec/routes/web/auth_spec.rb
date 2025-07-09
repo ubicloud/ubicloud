@@ -559,6 +559,27 @@ RSpec.describe Clover, "auth" do
       expect(page).to have_flash_error("Login via username and password is not supported for the example.com domain. You must authenticate using TestOIDC.")
     end
 
+    it "disallow attempting to verify an account in a locked domain" do
+      visit "/create-account"
+      fill_in "Full Name", with: "John Doe"
+      fill_in "Email Address", with: TEST_USER_EMAIL
+      fill_in "Password", with: TEST_USER_PASSWORD
+      fill_in "Password Confirmation", with: TEST_USER_PASSWORD
+      expect(page).to have_no_content "By using Ubicloud console you agree to our"
+      click_button "Create Account"
+
+      expect(page).to have_flash_notice("An email has been sent to you with a link to verify your account")
+      expect(Mail::TestMailer.deliveries.length).to eq 1
+      verify_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/verify-account.+?)"/)[1]
+
+      oidc_provider.add_locked_domain(domain: "example.com")
+      visit verify_link
+      click_button "Verify Account"
+      expect(page).to have_flash_error("Verifying accounts is not supported for the example.com domain. You must authenticate using TestOIDC.")
+      expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
+      expect(Account.all).to eq []
+    end
+
     it "attempting to create an account in a locked domain redirects to required OIDC login page" do
       oidc_provider.add_locked_domain(domain: "example.com")
 
