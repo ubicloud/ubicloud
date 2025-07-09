@@ -1012,6 +1012,14 @@ RSpec.describe Clover, "auth" do
         expect(page).to have_flash_error("Changing email addresses is not supported for the example.com domain.")
         expect(page.title).to eq("Ubicloud - Default Dashboard")
       end
+
+      it "hides login methods, change password, and change emails options on My Account page" do
+        oidc_provider.add_locked_domain(domain: "example.com")
+        visit "/account"
+        expect(page).to have_no_content("Login Methods")
+        expect(page).to have_no_content("Change Password")
+        expect(page).to have_no_content("Change Email")
+      end
     end
   end
 end
