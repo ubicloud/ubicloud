@@ -15,7 +15,7 @@ RSpec.describe Al do
 
   # Creates a Request object with the given parameters
   #
-  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: true, require_shared_slice: false, diagnostics: false, family_filter: [])
+  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: true, require_shared_slice: false, diagnostics: false, family_filter: [], os_filter: nil)
     Al::Request.new(
       vm.id,
       vm.vcpus,
@@ -39,7 +39,8 @@ RSpec.describe Al do
       use_slices,
       require_shared_slice,
       diagnostics,
-      family_filter
+      family_filter,
+      os_filter
     )
   end
 
@@ -266,6 +267,23 @@ RSpec.describe Al do
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
       req.family_filter = ["premium"]
+      cand = Al::Allocation.candidate_hosts(req)
+
+      expect(cand.size).to eq(1)
+      expect(cand.first[:vm_host_id]).to eq(vmh1.id)
+    end
+
+    it "applies os filter" do
+      vmh1 = create_vm_host(family: "standard", os_version: "ubuntu-24.04", total_cpus: 10, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      vmh2 = create_vm_host(family: "standard", os_version: "ubuntu-22.04", total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      StorageDevice.create(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
+      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id)
+      BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
+      BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
+
+      req.os_filter = "ubuntu-24.04"
       cand = Al::Allocation.candidate_hosts(req)
 
       expect(cand.size).to eq(1)
