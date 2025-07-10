@@ -325,10 +325,16 @@ class StorageVolume
     end
   end
 
+  def stop_service_if_loaded(name)
+    r "systemctl stop #{name.shellescape}"
+  rescue CommandFail => e
+    raise unless e.stderr.include?("not loaded")
+  end
+
   def purge_spdk_artifacts
     if @vhost_backend_version
       service_file_path = "/etc/systemd/system/#{vhost_user_block_service}"
-      r "systemctl stop #{q_vhost_user_block_service}"
+      stop_service_if_loaded(vhost_user_block_service)
       rm_if_exists(service_file_path)
       rm_if_exists(vhost_sock)
       return
