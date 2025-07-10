@@ -13,9 +13,14 @@ module Csi
       MAX_VOLUMES_PER_NODE = 8
       VOLUME_BASE_PATH = "/var/lib/ubicsi"
       LOGGER = Logger.new($stdout)
+      PV_MIGRATION_ANNOTATION_KEY = "csi.ubicloud.com/old-pv-name"
 
       def log_with_id(id, message)
         LOGGER.info("[req_id=#{id}] [CSI NodeService] #{message}")
+      end
+
+      def node_name
+        ENV["NODE_ID"]
       end
 
       def node_get_capabilities(req, _call)
@@ -80,6 +85,18 @@ module Csi
       def node_stage_volume(req, _call)
         req_id = SecureRandom.uuid
         log_with_id(req_id, "node_stage_volume request: #{req.inspect}")
+
+        client = KubernetesClient.new
+        pvc = client.get_pvc(req.parameters["csi.storage.k8s.io/pvc/namespace"],
+          req.parameters["csi.storage.k8s.io/pvc/name"])
+        if pvc_needs_migration?(pvc)
+          migrate_pvc_data(client, pvc, req)
+        end
+
+        perform_node_stage_volume(req_id, req, _call)
+      end
+
+      def perform_node_stage_volume(req_id, req, _call)
         volume_id = req.volume_id
         staging_path = req.staging_target_path
         size_bytes = req.volume_context["size_bytes"].to_i
@@ -143,9 +160,31 @@ module Csi
         resp
       end
 
+      def pvc_needs_migration?(pvc)
+        old_pv_name = pvc.dig("metadata", "annotations", PV_MIGRATION_ANNOTATION_KEY)
+        !old_pv_name.nil?
+      end
+
+      def migrate_pvc_data(client, pvc, req)
+        old_pv_name = pvc.dig("metadata", "annotations", PV_MIGRATION_ANNOTATION_KEY)
+        pv = client.get_pv(old_pv_name)
+        pv_node = pv.dig("spec", "nodeAffinity", "required", "nodeSelectorTerms", 0, "matchExpressions", 0, "values", 0)
+        old_data_path = backing_file_path(pv["spec"]["csi"]["volumeHandle"])
+        current_data_path = backing_file_path(req.volume_id)
+        # copy from pv_node:old_path_data to current_data_path
+      end
+
       def node_unstage_volume(req, _call)
         req_id = SecureRandom.uuid
         log_with_id(req_id, "node_unstage_volume request: #{req.inspect}")
+        client = KubernetesClient.new
+        if !client.node_schedulable?(node_name)
+          start_data_migration(client, req_id, req, _call)
+        end
+        perform_node_unstage_volume(req_id, req, _call)
+      end
+
+      def perform_node_unstage_volume(req_id, req, _call)
         staging_path = req.staging_target_path
         begin
           if is_mounted?(staging_path)
@@ -167,6 +206,37 @@ module Csi
         resp = NodeUnstageVolumeResponse.new
         log_with_id(req_id, "node_unstage_volume response: #{resp.inspect}")
         resp
+      end
+
+      def start_data_migration(client, req_id, req, _call)
+        log_with_id(req_id, "Retaining pv with volume_id #{volume_id}")
+        retain_pv(client, req.volume_id)
+        log_with_id(req_id, "Recreating pvc with volume_id #{volume_id}")
+        recreate_pvc(client, req.volume_id)
+      end
+
+      def retain_pv(client, volume_id)
+        pv = client.find_pv_by_volume_id(volume_id)
+        pv["spec"]["persistentVolumeReclaimPolicy"] = "Retain"
+        client.update_pv(pv)
+      end
+
+      def recreate_pvc(client, volume_id)
+        pv = client.find_pv_by_volume_id(volume_id)
+        pvc_namespace = pv["spec"]["claimRef"]["namespace"]
+        pvc_name = pv["spec"]["claimRef"]["name"]
+
+        pvc = client.get_pvc(pvc_namespace, pvc_name)
+
+        pvc["metadata"]["annotations"] = {PV_MIGRATION_ANNOTATION_KEY: pv["metadata"]["name"]}
+        %w[resourceVersion uid creationTimestamp].each do |key|
+          pvc["metadata"].delete(key)
+        end
+        pvc["spec"].delete("volumeName")
+        pvc.delete("status")
+
+        client.delete_pvc(pvc_namespace, pvc_name)
+        client.create_pvc(pvc)
       end
 
       def node_publish_volume(req, _call)
