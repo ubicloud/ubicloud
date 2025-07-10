@@ -66,7 +66,7 @@ class Prog::Aws::Vpc < Prog::Base
         vpc_id: vpc_response.vpc_id,
         cidr_block: private_subnet.net4.to_s,
         ipv_6_cidr_block: "#{ipv_6_cidr_block}/64",
-        availability_zone: location.name + "a", # YYY: This is a hack since we don't support multiple AZs yet
+        availability_zone: location.name + ["a", "b", "c"].sample,
         tag_specifications: Util.aws_tag_specifications("subnet", private_subnet.name)
       }).subnet.subnet_id
     else
