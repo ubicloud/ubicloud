@@ -42,6 +42,13 @@ class Prog::Vm::VmPool < Prog::Base
       allow_only_ssh: true
     ).subject
 
+    if rand * 100 < Config.github_actions_ch_46_percent
+      hugepages = false
+      ch_version = "46.0"
+    else
+      hugepages = true
+    end
+
     Prog::Vm::Nexus.assemble_with_sshable(
       Config.vm_pool_project_id,
       unix_user: "runneradmin",
@@ -54,7 +61,9 @@ class Prog::Vm::VmPool < Prog::Base
       pool_id: vm_pool.id,
       arch: vm_pool.arch,
       swap_size_bytes: 4294963200,
-      private_subnet_id: ps.id
+      private_subnet_id: ps.id,
+      hugepages:,
+      ch_version:
     )
 
     hop_wait
