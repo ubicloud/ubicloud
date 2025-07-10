@@ -23,9 +23,9 @@ module Csi
       yield
     end
 
-    def run_cmd(*cmd, req_id:)
+    def run_cmd(*cmd, req_id:, **kwargs)
       log_run_cmd(req_id, cmd) do
-        Open3.capture2e(*cmd)
+        Open3.capture2e(*cmd, **kwargs)
       end
     end
   end
