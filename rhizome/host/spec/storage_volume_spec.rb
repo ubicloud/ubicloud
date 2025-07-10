@@ -525,4 +525,21 @@ RSpec.describe StorageVolume do
       expect { encrypted_sv.persistent_device_id("storage_path") }.to raise_error RuntimeError, "No persistent device ID found for storage path: storage_path"
     end
   end
+
+  describe "#stop_service_if_loaded" do
+    it "stops the service if it is loaded" do
+      expect(encrypted_vhost_sv).to receive(:r).with("systemctl stop test-2-storage.service")
+      encrypted_vhost_sv.stop_service_if_loaded("test-2-storage.service")
+    end
+
+    it "does nothing if the service is not loaded" do
+      allow(encrypted_vhost_sv).to receive(:r).and_raise(CommandFail.new("error", "", "Unit test-2-storage.service not loaded."))
+      expect { encrypted_vhost_sv.stop_service_if_loaded("test-2-storage.service") }.not_to raise_error
+    end
+
+    it "raises an error for unexpected command failures" do
+      allow(encrypted_vhost_sv).to receive(:r).and_raise(CommandFail.new("unexpected error", "some output", "Some error"))
+      expect { encrypted_vhost_sv.stop_service_if_loaded("test-2-storage.service") }.to raise_error(CommandFail, /unexpected error/)
+    end
+  end
 end
