@@ -73,13 +73,17 @@ module Csi
         nil
       end
 
+      def backing_file_path(volume_id)
+        File.join(VOLUME_BASE_PATH, "#{volume_id}.img")
+      end
+
       def node_stage_volume(req, _call)
         req_id = SecureRandom.uuid
         log_with_id(req_id, "node_stage_volume request: #{req.inspect}")
         volume_id = req.volume_id
         staging_path = req.staging_target_path
         size_bytes = req.volume_context["size_bytes"].to_i
-        backing_file = File.join(VOLUME_BASE_PATH, "#{volume_id}.img")
+        backing_file = backing_file_path(volume_id)
         log_with_id(req_id, "Creating backing file's directory #{File.dirname(backing_file)}")
         FileUtils.mkdir_p(File.dirname(backing_file))
 
