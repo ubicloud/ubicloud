@@ -8,6 +8,7 @@ require "base64"
 
 class Prog::Vm::Nexus < Prog::Base
   DEFAULT_SIZE = "standard-2"
+  CH_VERSION_OS_VERSIONS = {"46.0" => "ubuntu-24.04"}.freeze
 
   subject_is :vm
 
@@ -249,6 +250,7 @@ class Prog::Vm::Nexus < Prog::Base
           [["accepting"], [vm.location_id], [], [], [vm.family]]
         end
       family_filter = ["standard"] if vm.family == "burstable"
+      os_filter = CH_VERSION_OS_VERSIONS[frame["ch_version"]] if frame["ch_version"]
 
       Scheduling::Allocator.allocate(
         vm, frame["storage_volumes"],
@@ -260,7 +262,8 @@ class Prog::Vm::Nexus < Prog::Base
         host_exclusion_filter: host_exclusion_filter,
         gpu_count: gpu_count,
         gpu_device: gpu_device,
-        family_filter: family_filter
+        family_filter: family_filter,
+        os_filter:
       )
     rescue RuntimeError => ex
       raise unless ex.message.include?("no space left on any eligible host")
