@@ -34,7 +34,7 @@ RSpec.describe Prog::Vm::VmPool do
       Project.create_with_id(name: "default")
     }
 
-    it "creates a new vm and hops to wait" do
+    def pool
       expect(Config).to receive(:vm_pool_project_id).and_return(prj.id).at_least(:once)
       st = described_class.assemble(
         size: 3, vm_size: "standard-2", boot_image: "img", location_id: Location::HETZNER_FSN1_ID,
@@ -45,11 +45,29 @@ RSpec.describe Prog::Vm::VmPool do
       expect(SshKey).to receive(:generate).and_call_original
       expect(nx).to receive(:vm_pool).and_return(VmPool[st.id]).at_least(:once)
       expect { nx.create_new_vm }.to hop("wait")
-      pool = VmPool[st.id]
+      VmPool[st.id]
+    end
+
+    it "creates a new vm and hops to wait" do
+      pool = self.pool
       expect(pool.vms.count).to eq(1)
       vm = pool.vms.first
       expect(vm.unix_user).to eq("runneradmin")
       expect(vm.sshable.unix_user).to eq("runneradmin")
+    end
+
+    it "uses ch_version 46.0 without hugepages if randomly selected" do
+      allow(Config).to receive(:github_actions_ch_46_percent).and_return(100)
+      vm = pool.vms.first
+      expect(vm.strand.stack[0]["hugepages"]).to be false
+      expect(vm.strand.stack[0]["ch_version"]).to eq "46.0"
+    end
+
+    it "does not specify ch_version or hugepages if not randomly selected" do
+      allow(Config).to receive(:github_actions_ch_46_percent).and_return(0)
+      vm = pool.vms.first
+      expect(vm.strand.stack[0]["hugepages"]).to be true
+      expect(vm.strand.stack[0]["ch_version"]).to be_nil
     end
   end
 
