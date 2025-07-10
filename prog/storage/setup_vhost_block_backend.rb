@@ -40,6 +40,7 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
     q_name = "setup-vhost-block-backend-#{q_version}".shellescape
     case sshable.cmd("common/bin/daemonizer --check #{q_name}")
     when "Succeeded"
+      sshable.cmd("common/bin/daemonizer --clean #{q_name}")
       VhostBlockBackend.first(
         vm_host_id: vm_host.id, version: frame["version"]
       ).update(allocation_weight: frame["allocation_weight"])

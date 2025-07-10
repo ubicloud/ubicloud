@@ -48,6 +48,7 @@ RSpec.describe Prog::Storage::SetupVhostBlockBackend do
     it "updates and pops if succeeded" do
       VhostBlockBackend.create(version: version.to_s, allocation_weight: 0, vm_host_id: vm_host.id)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup-vhost-block-backend-#{version}").and_return("Succeeded")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean setup-vhost-block-backend-#{version}")
       expect { setup_vhost_block_backend.install_vhost_backend }.to exit({"msg" => "VhostBlockBackend was setup"})
       expect(VhostBlockBackend.first.allocation_weight).to eq(50)
     end
