@@ -29,7 +29,7 @@ runs:
 
     - name: Create .env.rb file
       shell: bash
-      run: bundle exec rake overwrite_envrb
+      run: "bundle exec rake overwrite_envrb && echo '$stdout.sync = true' >> .env.rb"
 
     - name: Setup clover database
       shell: bash
