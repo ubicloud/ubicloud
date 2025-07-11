@@ -134,6 +134,7 @@ class RegenScreenshots
 
     resize(1400)
     click_link "Create PostgreSQL Database"
+    screenshot "managed-postgresql/create-screenshot.png"
     screenshot "quick-start/using-kamal-with-ubicloud-3-screenshot.png"
 
     pg_resource = PostgresResource.create(
@@ -152,15 +153,148 @@ class RegenScreenshots
         define_method(:first) { |*| pg_resource }
       end
     end
+
+    pg_vm = Vm.create(
+      name: "postgresql-demo-vm",
+      memory_gib: 8,
+      vcpus: 2,
+      cores: 2,
+      location_id: Location::HETZNER_FSN1_ID,
+      project_id: project.id,
+      unix_user: "postgres",
+      public_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7b8ZxEjGHV54sF4z/7H5z9hGJtYI5RvV2kz8KjQhYJvQG8W1vZK8dG9vLWJyZWFrZXItdGVzdEBleGFtcGxlLmNvbYIxP634e6Y0p2FQI+CvLVgNxYqaQZxjx84+SN/XY4FOR4",
+      boot_image: "ubuntu-jammy",
+      family: "standard"
+    )
+    pg_timeline = PostgresTimeline.create(
+      location_id: Location::HETZNER_FSN1_ID
+    ) do |timeline|
+      timeline.id = UBID.parse("ptmjy3v4ef1y7gdpzv6b3fchef").to_uuid
+    end
+    pg_server = PostgresServer.create(
+      resource_id: pg_resource.id,
+      vm_id: pg_vm.id,
+      timeline_id: pg_timeline.id
+    ) do |server|
+      server.id = UBID.parse("pvmjy3v4ef1y7gdpzv6b3fchef").to_uuid
+    end
     PostgresResource.define_method(:display_state) { "running" }
+    # Add default firewall rule to the postgres instance
+    PostgresFirewallRule.create_with_id(postgres_resource_id: pg_resource.id, cidr: "0.0.0.0/0")
+
     PostgresResource.define_method(:connection_string) { "sample-connection-string" }
     PostgresResource.define_method(:ca_certificates) { "certs" }
+    PostgresResource.define_method(:representative_server) { pg_server }
+    PostgresResource.define_method(:user_config) { {"max_connections" => 1000, "work_mem" => "64MB"} }
+    PostgresResource.define_method(:pgbouncer_user_config) { {"default_pool_size" => 50} }
     Authorization.define_singleton_method(:authorize) { |*| }
+    PostgresServer.define_method(:storage_size_gib) { 128 }
 
-    resize(800)
+    # Create VictoriaMetrics resources for metrics display
+    vmr = VictoriaMetricsResource.create(
+      name: "victoria-metrics-demo",
+      admin_user: "admin",
+      admin_password: "password",
+      target_vm_size: "standard-2",
+      target_storage_size_gib: 100,
+      project_id: project.id,
+      location_id: Location::HETZNER_FSN1_ID
+    )
+
+    vm_metrics = Vm.create(
+      name: "victoria-metrics-vm",
+      memory_gib: 8,
+      vcpus: 2,
+      cores: 2,
+      location_id: Location::HETZNER_FSN1_ID,
+      project_id: project.id,
+      unix_user: "ubi",
+      public_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7b8ZxEjGHV54sF4z/7H5z9hGJtYI5RvV2kz8KjQhYJvQG8W1vZK8dG9vLWJyZWFrZXItdGVzdEBleGFtcGxlLmNvbYIxP634e6Y0p2FQI+CvLVgNxYqaQZxjx84+SN/XY4FOR4",
+      boot_image: "ubuntu-jammy",
+      family: "standard"
+    )
+
+    VictoriaMetricsServer.create(
+      victoria_metrics_resource_id: vmr.id,
+      vm_id: vm_metrics.id,
+      cert: "cert-data",
+      cert_key: "cert-key-data"
+    )
+
+    # Mock the VictoriaMetrics client to return sample data
+    mock_client = Object.new
+    def mock_client.query_range(query:, start_ts:, end_ts:)
+      # Use a separate RNG for VictoriaMetrics metrics to ensure consistent results
+      metrics_rng = Random.new(1234)
+
+      step = 60 # 1 minute intervals
+      timestamps = (start_ts..end_ts).step(step).to_a
+
+      case query
+      when /node_filesystem_avail_bytes/
+        # Return disk usage around 45%
+        values = timestamps.map { |ts| [ts, metrics_rng.rand(40..49).to_s] }
+        [{
+          "labels" => {},
+          "values" => values
+        }]
+      when /node_cpu_seconds_total/
+        [{
+          "labels" => {"mode" => "user"},
+          "values" => timestamps.map { |ts| [ts, metrics_rng.rand(15..64).to_s] }
+        },
+          {
+            "labels" => {"mode" => "system"},
+            "values" => timestamps.map { |ts| [ts, metrics_rng.rand(8..12).to_s] }
+          },
+          {
+            "labels" => {"mode" => "iowait"},
+            "values" => timestamps.map { |ts| [ts, metrics_rng.rand(2..4).to_s] }
+          }]
+      else
+        # Default sample data
+        values = timestamps.map { |ts| [ts, metrics_rng.rand(20..39).to_s] }
+        [{
+          "labels" => {},
+          "values" => values
+        }]
+      end
+    end
+
+    VictoriaMetricsServer.define_method(:client) { |*| mock_client }
+
+    # Mock the metrics_config method on PostgresServer to return the correct project_id
+    PostgresServer.define_method(:metrics_config) { {project_id: project.id} }
+
+    resize(900, width: 1600)
     click_link "PostgreSQL"
     click_link "postgresql-demo"
+    sleep 1 # Wait for metrics charts to load.
     screenshot "managed-postgresql/overview-2-screenshot.png"
+
+    resize(800, width: 1600)
+    click_link "Connection"
+    screenshot "managed-postgresql/connection-screenshot.png"
+
+    resize(800, width: 1600)
+    within("aside nav") do
+      click_link "Networking"
+    end
+    screenshot "managed-postgresql/networking-screenshot.png"
+
+    resize(1200, width: 1600)
+    click_link "Resize"
+    screenshot "managed-postgresql/resizing-screenshot.png"
+
+    resize(850, width: 1600)
+    click_link "Configuration"
+    screenshot "managed-postgresql/configuration-screenshot.png"
+
+    resize(1000, width: 1600)
+    within("aside nav") do
+      click_link "Settings"
+    end
+    screenshot "managed-postgresql/settings-screenshot.png"
 
     click_link "Kubernetes"
     click_link "Create Kubernetes Cluster"
