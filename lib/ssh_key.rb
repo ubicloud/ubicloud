@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
+require "base64"
 require "stringio"
+
+require "ed25519"
+require "net/ssh"
 
 class SshKey
   def self.generate
