@@ -200,7 +200,7 @@ class RegenScreenshots
       kn.id = UBID.parse(kn_ubid).to_uuid
     end
 
-    Prog::Vnet::LoadBalancerNexus.assemble(
+    services_lb = Prog::Vnet::LoadBalancerNexus.assemble(
       k8s_cluster.private_subnet_id,
       name: k8s_cluster.services_load_balancer_name,
       algorithm: "hash_based",
@@ -209,7 +209,10 @@ class RegenScreenshots
       health_check_endpoint: "/",
       health_check_protocol: "tcp",
       stack: LoadBalancer::Stack::IPV4
-    )
+    ).subject
+
+    # Associate the load balancer with the Kubernetes cluster
+    k8s_cluster.update(services_lb_id: services_lb.id)
 
     ["le9ec", "e12en", "zd3ka"].each do |suffix|
       k8s_cluster.add_cp_vm Prog::Vm::Nexus.assemble_with_sshable(
