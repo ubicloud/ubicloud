@@ -279,6 +279,11 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.wait }.to hop("install_metrics_server")
     end
 
+    it "hops to sync_worker_mesh when semaphore is set" do
+      expect(nx).to receive(:when_sync_worker_mesh_set?).and_yield
+      expect { nx.wait }.to hop("sync_worker_mesh")
+    end
+
     it "naps until sync_kubernetes_service or upgrade is set" do
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
@@ -391,6 +396,28 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     it "naps forever when daemonizer2 returns something unknown" do
       expect(sshable).to receive(:d_check).with("install_metrics_server").and_return("SomethingElse")
       expect { nx.install_metrics_server }.to nap(65536)
+    end
+  end
+
+  describe "#sync_worker_mesh" do
+    let(:first_vm) { Prog::Vm::Nexus.assemble_with_sshable(customer_project.id).subject }
+    let(:first_ssh_key) { SshKey.generate }
+    let(:second_vm) { Prog::Vm::Nexus.assemble_with_sshable(customer_project.id).subject }
+    let(:second_ssh_key) { SshKey.generate }
+
+    before do
+      expect(kubernetes_cluster).to receive(:worker_vms).and_return([first_vm, second_vm])
+      expect(SshKey).to receive(:generate).and_return(first_ssh_key, second_ssh_key)
+    end
+
+    it "creates full mesh connectivity on cluster worker nodes" do
+      expect(first_vm.sshable).to receive(:cmd).with("tee ~/.ssh/id_ed25519 > /dev/null", stdin: first_ssh_key.private_key)
+      expect(first_vm.sshable).to receive(:cmd).with("tee ~/.ssh/authorized_keys > /dev/null", stdin: [first_vm.sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n"))
+
+      expect(second_vm.sshable).to receive(:cmd).with("tee ~/.ssh/id_ed25519 > /dev/null", stdin: second_ssh_key.private_key)
+      expect(second_vm.sshable).to receive(:cmd).with("tee ~/.ssh/authorized_keys > /dev/null", stdin: [second_vm.sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n"))
+
+      expect { nx.sync_worker_mesh }.to hop("wait")
     end
   end
 
