@@ -160,6 +160,9 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       hop_install_metrics_server
     end
 
+    when_sync_worker_mesh_set? do
+      hop_sync_worker_mesh
+    end
     nap 6 * 60 * 60
   end
 
@@ -211,6 +214,24 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     end
 
     nap 65536
+  end
+
+  label def sync_worker_mesh
+    decr_sync_worker_mesh
+
+    key_pairs = kubernetes_cluster.worker_vms.map do |vm|
+      {vm: vm, ssh_key: SshKey.generate}
+    end
+
+    public_keys = key_pairs.map { |kp| kp[:ssh_key].public_key }
+    key_pairs.each do |kp|
+      vm = kp[:vm]
+      vm.sshable.cmd("tee ~/.ssh/id_ed25519 > /dev/null", stdin: kp[:ssh_key].private_key)
+      all_keys_str = ([vm.sshable.keys.first.public_key] + public_keys).join("\n")
+      vm.sshable.cmd("tee ~/.ssh/authorized_keys > /dev/null", stdin: all_keys_str)
+    end
+
+    hop_wait
   end
 
   label def destroy
