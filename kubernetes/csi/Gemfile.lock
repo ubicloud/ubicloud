@@ -1,0 +1,32 @@
+PATH
+  remote: .
+  specs:
+    ubi-csi (0.1.0)
+      grpc (~> 1.73)
+      grpc-tools (~> 1.73)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    bigdecimal (3.1.9)
+    google-protobuf (4.31.1-arm64-darwin)
+      bigdecimal
+      rake (>= 13)
+    googleapis-common-protos-types (1.20.0)
+      google-protobuf (>= 3.18, < 5.a)
+    grpc (1.73.0-arm64-darwin)
+      google-protobuf (>= 3.25, < 5.0)
+      googleapis-common-protos-types (~> 1.0)
+    grpc-tools (1.73.0)
+    rake (13.2.1)
+
+PLATFORMS
+  arm64-darwin
+
+DEPENDENCIES
+  grpc (~> 1.73)
+  grpc-tools (~> 1.73)
+  ubi-csi!
+
+BUNDLED WITH
+   2.6.9
