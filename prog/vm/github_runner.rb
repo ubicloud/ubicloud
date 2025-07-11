@@ -53,10 +53,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     ).subject
 
     if rand * 100 < Config.github_actions_ch_46_percent
-      hugepages = false
       ch_version = "46.0"
-    else
-      hugepages = true
     end
 
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
@@ -72,7 +69,6 @@ class Prog::Vm::GithubRunner < Prog::Base
       arch: label_data["arch"],
       swap_size_bytes: 4294963200, # ~4096MB, the same value with GitHub hosted runners
       private_subnet_id: ps.id,
-      hugepages:,
       ch_version:
     )
 

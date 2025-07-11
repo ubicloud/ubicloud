@@ -66,7 +66,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm.project_id).to eq(Config.github_runner_service_project_id)
     end
 
-    it "uses ch_version 46.0 without hugepages if randomly selected" do
+    it "uses ch_version 46.0 if randomly selected" do
       allow(Config).to receive(:github_actions_ch_46_percent).and_return(100)
       vm = nx.pick_vm
       expect(vm.pool_id).to be_nil
@@ -75,14 +75,12 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm.family).to eq("standard")
       expect(vm.vcpus).to eq(4)
       expect(vm.project_id).to eq(Config.github_runner_service_project_id)
-      expect(vm.strand.stack[0]["hugepages"]).to be false
       expect(vm.strand.stack[0]["ch_version"]).to eq "46.0"
     end
 
-    it "does not specify ch_version or hugepages if not randomly selected" do
+    it "does not specify ch_version if not randomly selected" do
       allow(Config).to receive(:github_actions_ch_46_percent).and_return(0)
       vm = nx.pick_vm
-      expect(vm.strand.stack[0]["hugepages"]).to be true
       expect(vm.strand.stack[0]["ch_version"]).to be_nil
     end
 
