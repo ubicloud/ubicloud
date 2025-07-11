@@ -135,6 +135,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   describe "#start" do
     it "registers deadline and hops" do
       expect(nx).to receive(:register_deadline)
+      expect(nx).to receive(:incr_install_metrics_server)
       expect { nx.start }.to hop("create_load_balancers")
     end
   end
@@ -273,6 +274,11 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.wait }.to hop("upgrade")
     end
 
+    it "hops to install_metrics_server when semaphore is set" do
+      expect(nx).to receive(:when_install_metrics_server_set?).and_yield
+      expect { nx.wait }.to hop("install_metrics_server")
+    end
+
     it "naps until sync_kubernetes_service or upgrade is set" do
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
@@ -349,6 +355,42 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
       Strand.create(parent_id: st.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_upgrade }.to nap(120)
+    end
+  end
+
+  describe "#install_metrics_server" do
+    let(:sshable) { instance_double(Sshable) }
+    let(:vm) { create_vm }
+
+    before do
+      allow(vm).to receive(:sshable).and_return(sshable)
+      allow(kubernetes_cluster).to receive(:cp_vms).and_return([vm])
+    end
+
+    it "runs install_metrics_server and naps when not started" do
+      expect(sshable).to receive(:d_check).with("install_metrics_server").and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with("install_metrics_server", "kubernetes/bin/install-metrics-server")
+      expect { nx.install_metrics_server }.to nap(30)
+    end
+
+    it "hops when metrics server install succeeds" do
+      expect(sshable).to receive(:d_check).with("install_metrics_server").and_return("Succeeded")
+      expect { nx.install_metrics_server }.to hop("wait")
+    end
+
+    it "naps when install_metrics_server is in progress" do
+      expect(sshable).to receive(:d_check).with("install_metrics_server").and_return("InProgress")
+      expect { nx.install_metrics_server }.to nap(10)
+    end
+
+    it "naps forever when install_metrics_server fails" do
+      expect(sshable).to receive(:d_check).with("install_metrics_server").and_return("Failed")
+      expect { nx.install_metrics_server }.to nap(65536)
+    end
+
+    it "naps forever when daemonizer2 returns something unknown" do
+      expect(sshable).to receive(:d_check).with("install_metrics_server").and_return("SomethingElse")
+      expect { nx.install_metrics_server }.to nap(65536)
     end
   end
 

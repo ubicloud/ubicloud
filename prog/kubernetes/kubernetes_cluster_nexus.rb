@@ -48,6 +48,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
   label def start
     register_deadline("wait", 120 * 60)
+    incr_install_metrics_server
     hop_create_load_balancers
   end
 
@@ -150,9 +151,15 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     when_sync_kubernetes_services_set? do
       hop_sync_kubernetes_services
     end
+
     when_upgrade_set? do
       hop_upgrade
     end
+
+    when_install_metrics_server_set? do
+      hop_install_metrics_server
+    end
+
     nap 6 * 60 * 60
   end
 
@@ -183,6 +190,27 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
   label def wait_upgrade
     reap(:upgrade)
+  end
+
+  label def install_metrics_server
+    decr_install_metrics_server
+
+    vm = kubernetes_cluster.cp_vms.first
+    case vm.sshable.d_check("install_metrics_server")
+    when "Succeeded"
+      Clog.emit("Metrics server is installed")
+      hop_wait
+    when "NotStarted"
+      vm.sshable.d_run("install_metrics_server", "kubernetes/bin/install-metrics-server")
+      nap 30
+    when "InProgress"
+      nap 10
+    when "Failed"
+      Clog.emit("METRICS SERVER INSTALLATION FAILED")
+      nap 65536
+    end
+
+    nap 65536
   end
 
   label def destroy
