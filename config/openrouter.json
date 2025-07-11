@@ -1,33 +1,3 @@
 {
-  "data": [
-    {
-      "id": "mistral-small-3",
-      "name": "mistralai/Mistral-Small-24B-Instruct-2501",
-      "base_url": "https://mistral-small-3.ai.ubicloud.com/v1",
-      "created": 1739816399,
-      "context_length": 32768,
-      "quantization": "bf16",
-      "pricing": {
-        "prompt": "0.0000003",
-        "completion": "0.0000003",
-        "image": "0",
-        "request": "0"
-      },
-      "supported_sampling_parameters": [
-        "frequency_penalty",
-        "max_tokens",
-        "min_p",
-        "presence_penalty",
-        "repetition_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_p"
-      ]
-    }
-  ]
+  "data": []
 }
