@@ -90,6 +90,7 @@ jobs:
         UBICLOUD_IMAGES_BLOB_STORAGE_ACCESS_KEY: ${{ secrets.UBICLOUD_IMAGES_BLOB_STORAGE_ACCESS_KEY }}
         UBICLOUD_IMAGES_BLOB_STORAGE_SECRET_KEY: ${{ secrets.UBICLOUD_IMAGES_BLOB_STORAGE_SECRET_KEY }}
         UBICLOUD_IMAGES_BLOB_STORAGE_CERTS: ${{ secrets.UBICLOUD_IMAGES_BLOB_STORAGE_CERTS }}
+        GITHUB_ACTIONS_CH_46_PERCENT: 100
         GITHUB_APP_NAME: ${{ secrets.GH_APP_NAME }}
         GITHUB_APP_ID: ${{ secrets.GH_APP_ID }}
         GITHUB_APP_CLIENT_ID: ${{ secrets.GH_APP_CLIENT_ID }}
@@ -116,7 +117,7 @@ jobs:
         STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
       run: |
         set -o pipefail
-        timeout 55m foreman start -m all=1,respirate=2 | tee foreman.log | grep "e2e.1"
+        timeout 55m foreman start -m all=1,respirate=2 | tee foreman.log | grep --line-buffered -F "e2e.1"
 
     - name: Print logs
       if: always()

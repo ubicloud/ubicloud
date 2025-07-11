@@ -12,7 +12,7 @@ module Scheduling::Allocator
     @target_host_utilization ||= Config.allocator_target_host_utilization
   end
 
-  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [])
+  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], os_filter: nil)
     request = Request.new(
       vm.id,
       vm.vcpus,
@@ -68,7 +68,8 @@ module Scheduling::Allocator
     :use_slices,
     :require_shared_slice,
     :diagnostics,
-    :family_filter
+    :family_filter,
+    :os_filter
   ) do
     def initialize(*args)
       super
@@ -234,6 +235,9 @@ module Scheduling::Allocator
       ds = ds.where(allocation_state: request.allocation_state_filter) unless request.allocation_state_filter.empty?
       ds = ds.where(Sequel[:vm_host][:family] => request.family_filter) unless request.family_filter.empty?
       ds = ds.exclude { Sequel.function(:coalesce, num_gpus, 0) > 0 } unless request.gpu_count > 0 || request.host_filter.any?
+
+      # Temporary while testing CloudHypervisor 46 rollout
+      ds = ds.where(Sequel[:vm_host][:os_version] => request.os_filter) if request.os_filter
 
       # If we dont's want to use slices, place those only on hosts that do not accept them
       # If we require a shared slice (for burstable vm), allocate those only on hosts that accept slices
