@@ -190,6 +190,13 @@ PGHOST=/var/run/postgresql
       expect(postgres_timeline.create_bucket).to be(true)
     end
 
+    it "creates bucket in us-east-1" do
+      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-1")).at_least(:once)
+      s3_client.stub_responses(:create_bucket)
+      expect(s3_client).to receive(:create_bucket).with({bucket: postgres_timeline.ubid, create_bucket_configuration: nil}).and_return(true)
+      expect(postgres_timeline.create_bucket).to be(true)
+    end
+
     it "sets lifecycle policy" do
       s3_client.stub_responses(:put_bucket_lifecycle_configuration)
       expect(s3_client).to receive(:put_bucket_lifecycle_configuration).with({bucket: postgres_timeline.ubid, lifecycle_configuration: {rules: [{id: "DeleteOldBackups", status: "Enabled", prefix: "basebackups_005/", expiration: {days: 8}}]}}).and_return(true)

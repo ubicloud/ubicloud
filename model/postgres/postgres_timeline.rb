@@ -123,14 +123,12 @@ PGHOST=/var/run/postgresql
   end
 
   def create_bucket
-    aws? ?
-      blob_storage_client.create_bucket({
-        bucket: ubid,
-        create_bucket_configuration: {
-          location_constraint: location.name
-        }
-      })
-    : blob_storage_client.create_bucket(ubid)
+    aws? ? aws_create_bucket : blob_storage_client.create_bucket(ubid)
+  end
+
+  def aws_create_bucket
+    location_constraint = (location.name == "us-east-1") ? nil : {location_constraint: location.name}
+    blob_storage_client.create_bucket(bucket: ubid, create_bucket_configuration: location_constraint)
   end
 
   def set_lifecycle_policy
