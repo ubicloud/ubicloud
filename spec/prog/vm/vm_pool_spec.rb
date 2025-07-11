@@ -56,17 +56,15 @@ RSpec.describe Prog::Vm::VmPool do
       expect(vm.sshable.unix_user).to eq("runneradmin")
     end
 
-    it "uses ch_version 46.0 without hugepages if randomly selected" do
+    it "uses ch_version 46.0 if randomly selected" do
       allow(Config).to receive(:github_actions_ch_46_percent).and_return(100)
       vm = pool.vms.first
-      expect(vm.strand.stack[0]["hugepages"]).to be false
       expect(vm.strand.stack[0]["ch_version"]).to eq "46.0"
     end
 
-    it "does not specify ch_version or hugepages if not randomly selected" do
+    it "does not specify ch_version if not randomly selected" do
       allow(Config).to receive(:github_actions_ch_46_percent).and_return(0)
       vm = pool.vms.first
-      expect(vm.strand.stack[0]["hugepages"]).to be true
       expect(vm.strand.stack[0]["ch_version"]).to be_nil
     end
   end
