@@ -153,6 +153,9 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     when_upgrade_set? do
       hop_upgrade
     end
+    when_sync_worker_mesh_set? do
+      hop_sync_worker_mesh
+    end
     nap 6 * 60 * 60
   end
 
@@ -183,6 +186,25 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
   label def wait_upgrade
     reap(:upgrade)
+  end
+
+  label def sync_worker_mesh
+    decr_sync_worker_mesh
+
+    key_pairs = kubernetes_cluster.worker_vms.map do |vm|
+      {vm: vm, ssh_key: SshKey.generate}
+    end
+
+    public_keys = key_pairs.map { |kp| kp[:ssh_key].public_key }
+    key_pairs.each do |kp|
+      vm = kp[:vm]
+      private_key = kp[:ssh_key].private_key
+      vm.sshable.cmd("echo '#{private_key}' > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519", log: false)
+      all_keys_str = ([vm.sshable.keys.first.public_key] + public_keys).join("\\n")
+      vm.sshable.cmd("echo -e '#{all_keys_str}' > ~/.ssh/authorized_keys")
+    end
+
+    hop_wait
   end
 
   label def destroy

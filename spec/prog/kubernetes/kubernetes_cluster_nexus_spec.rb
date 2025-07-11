@@ -273,6 +273,11 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.wait }.to hop("upgrade")
     end
 
+    it "hops to sync_worker_mesh when semaphore is set" do
+      expect(nx).to receive(:when_sync_worker_mesh_set?).and_yield
+      expect { nx.wait }.to hop("sync_worker_mesh")
+    end
+
     it "naps until sync_kubernetes_service or upgrade is set" do
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
@@ -349,6 +354,28 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
       Strand.create(parent_id: st.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_upgrade }.to nap(120)
+    end
+  end
+
+  describe "#sync_worker_mesh" do
+    let(:first_vm) { Prog::Vm::Nexus.assemble_with_sshable(customer_project.id).subject }
+    let(:first_ssh_key) { SshKey.generate }
+    let(:second_vm) { Prog::Vm::Nexus.assemble_with_sshable(customer_project.id).subject }
+    let(:second_ssh_key) { SshKey.generate }
+
+    before do
+      expect(kubernetes_cluster).to receive(:worker_vms).and_return([first_vm, second_vm])
+      expect(SshKey).to receive(:generate).and_return(first_ssh_key, second_ssh_key)
+    end
+
+    it "creates full mesh connectivity on cluster worker nodes" do
+      expect(first_vm.sshable).to receive(:cmd).with("echo '#{first_ssh_key.private_key}' > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519", log: false)
+      expect(first_vm.sshable).to receive(:cmd).with("echo -e '#{[first_vm.sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\\n")}' > ~/.ssh/authorized_keys")
+
+      expect(second_vm.sshable).to receive(:cmd).with("echo '#{second_ssh_key.private_key}' > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519", log: false)
+      expect(second_vm.sshable).to receive(:cmd).with("echo -e '#{[second_vm.sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\\n")}' > ~/.ssh/authorized_keys")
+
+      expect { nx.sync_worker_mesh }.to hop("wait")
     end
   end
 
