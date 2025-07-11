@@ -559,7 +559,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       vm.update(vm_host_id: create_vm_host(data_center: "FSN1-DC8").id)
     end
 
-    it "Logs journalctl and docker limits if workflow_job is not successful" do
+    it "Logs journalctl, docker limits, and cache proxy log if workflow_job is not successful" do
       runner.update(workflow_job: {"conclusion" => "failure"})
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ln /vm/#{vm.inhost_name}/serial.log /var/log/ubicloud/serials/#{runner.ubid}_serial.log")
       expect(vm.sshable).to receive(:cmd).with("journalctl -u runner-script -t 'run-withenv.sh' -t 'systemd' --no-pager | grep -Fv Started")
@@ -567,11 +567,17 @@ RSpec.describe Prog::Vm::GithubRunner do
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
+      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND, log: false).and_return("Cache Proxy Log Output\n")
+        sudo cat /var/log/cacheproxy.log
+      COMMAND
+      expect(Clog).to receive(:emit).with("Cache proxy log") do |&blk|
+        expect(blk.call).to eq(cache_proxy_log: "Cache Proxy Log Output\n")
+      end
 
       nx.collect_final_telemetry
     end
 
-    it "Logs journalctl and docker limits if workflow_job is nil" do
+    it "Logs journalctl, docker limits, and cache proxy log if workflow_job is nil" do
       runner.update(workflow_job: nil)
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ln /vm/#{vm.inhost_name}/serial.log /var/log/ubicloud/serials/#{runner.ubid}_serial.log")
       expect(vm.sshable).to receive(:cmd).with("journalctl -u runner-script -t 'run-withenv.sh' -t 'systemd' --no-pager | grep -Fv Started")
@@ -579,11 +585,17 @@ RSpec.describe Prog::Vm::GithubRunner do
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
+      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND, log: false).and_return("Cache Proxy Log Output\n")
+        sudo cat /var/log/cacheproxy.log
+      COMMAND
+      expect(Clog).to receive(:emit).with("Cache proxy log") do |&blk|
+        expect(blk.call).to eq(cache_proxy_log: "Cache Proxy Log Output\n")
+      end
 
       nx.collect_final_telemetry
     end
 
-    it "Logs only docker limits if workflow_job is successful" do
+    it "Logs docker limits and cache proxy log if workflow_job is successful" do
       runner.update(workflow_job: {"conclusion" => "success"})
       expect(vm.sshable).to receive(:cmd).with(<<~COMMAND, log: false).and_return("ratelimit-limit: 100;w=21600\nratelimit-remaining: 98;w=21600\ndocker-ratelimit-source: 192.168.1.1\n")
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
@@ -591,6 +603,13 @@ RSpec.describe Prog::Vm::GithubRunner do
       COMMAND
       expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits") do |&blk|
         expect(blk.call).to eq(dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 98, remaining_window: 21600, source: "192.168.1.1"})
+      end
+
+      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND, log: false).and_return("Cache Proxy Log Output\n")
+        sudo cat /var/log/cacheproxy.log
+      COMMAND
+      expect(Clog).to receive(:emit).with("Cache proxy log") do |&blk|
+        expect(blk.call).to eq(cache_proxy_log: "Cache Proxy Log Output\n")
       end
 
       nx.collect_final_telemetry
