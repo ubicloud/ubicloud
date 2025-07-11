@@ -137,10 +137,21 @@ PGHOST=/var/run/postgresql
     expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, name: "us-west-2")).at_least(:once)
 
     s3_client = Aws::S3::Client.new(stub_responses: true)
-    s3_client.stub_responses(:list_objects_v2, {contents: [{key: "backup_stop_sentinel.json"}, {key: "unrelated_file.txt"}]})
+    s3_client.stub_responses(:list_objects_v2, {contents: [{key: "backup_stop_sentinel.json"}, {key: "unrelated_file.txt"}], is_truncated: false})
     expect(s3_client).to receive(:list_objects_v2).with(bucket: postgres_timeline.ubid, prefix: "basebackups_005/").and_call_original
     expect(Aws::S3::Client).to receive(:new).and_return(s3_client)
     expect(postgres_timeline.backups.map(&:key)).to eq(["backup_stop_sentinel.json"])
+  end
+
+  it "returns list of backups with enumeration for AWS regions" do
+    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, name: "us-west-2")).at_least(:once)
+
+    s3_client = Aws::S3::Client.new(stub_responses: true)
+    s3_client.stub_responses(:list_objects_v2, {contents: [{key: "backup_stop_sentinel.json"}, {key: "unrelated_file.txt"}], is_truncated: true, next_continuation_token: "token"}, {contents: [{key: "backup_stop_sentinel.json"}, {key: "unrelated_file.txt"}], is_truncated: false})
+    expect(s3_client).to receive(:list_objects_v2).with(bucket: postgres_timeline.ubid, prefix: "basebackups_005/").and_call_original
+    expect(s3_client).to receive(:list_objects_v2).with(bucket: postgres_timeline.ubid, prefix: "basebackups_005/", continuation_token: "token").and_call_original
+    expect(Aws::S3::Client).to receive(:new).and_return(s3_client)
+    expect(postgres_timeline.backups.map(&:key)).to eq(["backup_stop_sentinel.json", "backup_stop_sentinel.json"])
   end
 
   it "returns blob storage endpoint" do

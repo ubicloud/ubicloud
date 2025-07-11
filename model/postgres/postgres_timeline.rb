@@ -118,8 +118,18 @@ PGHOST=/var/run/postgresql
 
   def list_objects(prefix)
     aws? ?
-      blob_storage_client.list_objects_v2(bucket: ubid, prefix: prefix).contents
+    aws_list_objects(prefix)
     : blob_storage_client.list_objects(ubid, prefix)
+  end
+
+  def aws_list_objects(prefix)
+    response = blob_storage_client.list_objects_v2(bucket: ubid, prefix: prefix)
+    objects = response.contents
+    while response.is_truncated
+      response = blob_storage_client.list_objects_v2(bucket: ubid, prefix: prefix, continuation_token: response.next_continuation_token)
+      objects.concat(response.contents)
+    end
+    objects
   end
 
   def create_bucket
