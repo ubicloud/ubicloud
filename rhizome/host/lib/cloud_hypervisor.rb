@@ -112,15 +112,16 @@ module CloudHypervisor
       x64: new("35.1", "e8426b0733248ed559bea64eb04d732ce8a471edc94807b5e2ecfdfc57136ab4", "337bd88183f6886f1c7b533499826587360f23168eac5aabf38e6d6b977c93b0"),
       arm64: new("35.1", "071a0b4918565ce81671ecd36d65b87351c85ea9ca0fbf73d4a67ec810efe606", "355cdb1e2af7653a15912c66f7c76c922ca788fd33d77f6f75846ff41278e249")
     )}
+    default = SUPPORTED["35.1"]
 
     if ubuntu_version >= 24
       SUPPORTED["46.0"] = Arch.render(
         x64: new("46.0", "00b5cf2976847d2f21d2b7266038c8fc40bd14f2a542115055e9e214867edc9e", "526c91cf6b2d30b24af6eb39511f4f562f7bbc50a4dfb17d486274057a162445"),
         arm64: new("46.0", "a5a19c7e7326a5ca5dcf83a7b895a03e81cdac8c7d0690d4e94133cc89d38561", "6395a86db76f1f50d8b8c0ae1debbbb6a08e572b6f8c57cfbd9511e9beb4126a")
       )
+      default = SUPPORTED["46.0"]
     end
 
-    default = SUPPORTED["35.1"]
     SUPPORTED.freeze
 
     INSTALLED = SUPPORTED.select { _2.downloaded? }
