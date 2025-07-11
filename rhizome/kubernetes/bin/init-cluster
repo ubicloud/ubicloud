@@ -75,11 +75,19 @@ cluster_config = {
   }
 }
 
+kubelet_config = {
+  "apiVersion" => "kubelet.config.k8s.io/v1beta1",
+  "kind" => "KubeletConfiguration",
+  "serverTLSBootstrap" => true
+}
+
 config_path = "/tmp/kubeadm-config.yaml"
 File.open(config_path, "w") do |file|
   file.write(init_config.to_yaml)
   file.write("---\n")
   file.write(cluster_config.to_yaml)
+  file.write("---\n")
+  file.write(kubelet_config.to_yaml)
 end
 
 r("sudo kubeadm init --config #{config_path} --node-name #{node_name}")
@@ -94,6 +102,7 @@ rescue CommandFail
   puts "API server is not up yet, retrying in 5 seconds..."
   sleep 5
 end
+
 unless api_server_up
   puts "API server is not healthy. Could not create customer credentials."
   exit 1
