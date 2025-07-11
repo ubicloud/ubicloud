@@ -1,0 +1,15 @@
+<% 
+  pg_config = @pg.user_config || {}
+  pgbouncer_config = @pg.pgbouncer_user_config || {}
+%>
+
+<div role="form" class="min-w-2/3 pg-config">
+    <%== csrf_tag(path: "#{@project_data[:path]}#{@pg.path}/config", method: "PATCH") %>
+    <%== part("components/config_card", title: "PostgreSQL Configuration", config: pg_config, name: "pg-config") %>
+    <%== part("components/config_card", title: "PgBouncer Configuration", config: pgbouncer_config, name: "pgbouncer-config") %>
+    <%== part("components/form/section", label: "", content: "
+    All changes made here are typically persisted to the database configuration within one
+    minute. If modifying a setting requires a restart, it will be applied after the
+    next restart. You can trigger a restart manually from the Settings
+    tab.") %>
+</div>
