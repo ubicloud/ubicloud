@@ -87,12 +87,13 @@ class SshKey
       # 'encrypted' private keys
       :string, "ssh-ed25519",
       :string, verify_key_bytes,
-      :string, @signer.keypair
+      :string, @signer.keypair,
+      :string, "" # empty "comment" field
     )
 
     # Negative modulus is a handy trick to fill out pads like this.
     padding = (nested_private_key.length % -8).abs
-    nested_private_key.write("12345678".slice(0, padding))
+    nested_private_key.write("\x01\x02\x03\x04\x05\x06\x07\x08".slice(0, padding))
     # :nocov:
     fail "BUG: padding broken" unless nested_private_key.length % 8 == 0
     # :nocov:
@@ -105,8 +106,11 @@ class SshKey
         :string, "none", # kdf
         :string, "", # kdfoptions
         :long, 1, # number of keys N
-        :string, verify_key_bytes, # publickey1,
-        :string, nested_private_key.content
+        :string, Net::SSH::Buffer.from(
+          :string, "ssh-ed25519",
+          :string, verify_key_bytes
+        ).content, # publickey1
+        :string, nested_private_key.content # privatekey1
       ).content)
       s.puts "-----END OPENSSH PRIVATE KEY-----"
       s.string
