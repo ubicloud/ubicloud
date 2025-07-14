@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require "open3"
+require "tmpdir"
+
 require "net/ssh"
 
 RSpec.describe SshKey do
@@ -20,6 +23,34 @@ RSpec.describe SshKey do
       sk.public_key
       sk.public_key
     }.not_to raise_error
+  end
+
+  it "generates private keys that are compatible with openssh" do
+    ssh_key = described_class.generate
+    Dir.mktmpdir do |d|
+      File.write("#{d}/key", ssh_key.private_key, perm: 0o600)
+      File.write("#{d}/key.pub", ssh_key.public_key)
+      test_data = "test\n"
+      File.write("#{d}/data", test_data)
+
+      # Sign the data
+      stdout, stderr, status = Open3.capture3("ssh-keygen -Y sign -f #{d}/key -n test@ubicloud.com #{d}/data")
+      expect(status).to(
+        be_success,
+        "Expected ssh-keygen sign to succeed, but it failed.\nStatus: #{status}\nSTDOUT: #{stdout}\nSTDERR: #{stderr}"
+      )
+
+      File.write("#{d}/signers", "test #{ssh_key.public_key}")
+
+      # Verify the signature
+      stdout, stderr, status = Open3.capture3(
+        "ssh-keygen -Y verify -f #{d}/signers -I test -n test@ubicloud.com -s #{d}/data.sig",
+        stdin_data: test_data
+      )
+      expect(stderr).to be_empty
+      expect(stdout).to match(/\AGood "test@ubicloud.com" signature for test with ED25519 key .*\n\z/)
+      expect(status).to be_success
+    end
   end
 
   context "when render common public keys types often returned by ssh-agent" do
