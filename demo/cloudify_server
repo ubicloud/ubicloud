@@ -79,7 +79,7 @@ else
     provider_name: location.provider,
     server_identifier: host_id,
     location_id: location.id,
-    default_boot_images: ["ubuntu-jammy"]
+    default_boot_images: ["ubuntu-noble"]
   )
 end
 
