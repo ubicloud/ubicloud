@@ -2,3 +2,6 @@
 
 class ObjectNotFoundError < StandardError
 end
+
+class CopyNotFinishedError < StandardError
+end
