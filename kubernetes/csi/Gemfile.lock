@@ -8,6 +8,7 @@ PATH
 GEM
   remote: https://rubygems.org/
   specs:
+    base64 (0.3.0)
     bigdecimal (3.1.9)
     google-protobuf (4.31.1-arm64-darwin)
       bigdecimal
@@ -24,6 +25,7 @@ PLATFORMS
   arm64-darwin
 
 DEPENDENCIES
+  base64
   grpc (~> 1.73)
   grpc-tools (~> 1.73)
   ubi-csi!
