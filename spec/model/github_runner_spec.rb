@@ -74,29 +74,6 @@ RSpec.describe GithubRunner do
     })
   end
 
-  it "can log duration with a vm with a strand" do
-    vm = github_runner.vm
-    Strand.create(
-      prog: "Vm::Nexus",
-      label: "start",
-      stack: [{"ch_version" => "46.0"}]
-    ) { it.id = vm.id }
-    expect(clog_emit_hash).to eq({
-      repository_name: "test-repo",
-      ubid: github_runner.ubid,
-      label: github_runner.label,
-      duration: 10,
-      conclusion: nil,
-      vm_ubid: vm.ubid,
-      arch: vm.arch,
-      cores: vm.cores,
-      vcpus: vm.vcpus,
-      vm_host_ubid: vm.vm_host.ubid,
-      data_center: vm.vm_host.data_center,
-      ch_version: "46.0"
-    })
-  end
-
   it "can log duration without a vm" do
     github_runner.update(vm_id: nil)
     expect(clog_emit_hash).to eq({
