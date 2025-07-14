@@ -52,10 +52,6 @@ class Prog::Vm::GithubRunner < Prog::Base
       allow_only_ssh: true
     ).subject
 
-    if rand * 100 < Config.github_actions_ch_46_percent
-      ch_version = "46.0"
-    end
-
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
       Config.github_runner_service_project_id,
       unix_user: "runneradmin",
@@ -68,8 +64,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       enable_ip4: true,
       arch: label_data["arch"],
       swap_size_bytes: 4294963200, # ~4096MB, the same value with GitHub hosted runners
-      private_subnet_id: ps.id,
-      ch_version:
+      private_subnet_id: ps.id
     )
 
     vm_st.subject

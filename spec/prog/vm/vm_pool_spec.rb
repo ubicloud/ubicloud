@@ -34,7 +34,7 @@ RSpec.describe Prog::Vm::VmPool do
       Project.create_with_id(name: "default")
     }
 
-    def pool
+    it "creates a new vm and hops to wait" do
       expect(Config).to receive(:vm_pool_project_id).and_return(prj.id).at_least(:once)
       st = described_class.assemble(
         size: 3, vm_size: "standard-2", boot_image: "img", location_id: Location::HETZNER_FSN1_ID,
@@ -45,27 +45,11 @@ RSpec.describe Prog::Vm::VmPool do
       expect(SshKey).to receive(:generate).and_call_original
       expect(nx).to receive(:vm_pool).and_return(VmPool[st.id]).at_least(:once)
       expect { nx.create_new_vm }.to hop("wait")
-      VmPool[st.id]
-    end
-
-    it "creates a new vm and hops to wait" do
-      pool = self.pool
+      pool = VmPool[st.id]
       expect(pool.vms.count).to eq(1)
       vm = pool.vms.first
       expect(vm.unix_user).to eq("runneradmin")
       expect(vm.sshable.unix_user).to eq("runneradmin")
-    end
-
-    it "uses ch_version 46.0 if randomly selected" do
-      allow(Config).to receive(:github_actions_ch_46_percent).and_return(100)
-      vm = pool.vms.first
-      expect(vm.strand.stack[0]["ch_version"]).to eq "46.0"
-    end
-
-    it "does not specify ch_version if not randomly selected" do
-      allow(Config).to receive(:github_actions_ch_46_percent).and_return(0)
-      vm = pool.vms.first
-      expect(vm.strand.stack[0]["ch_version"]).to be_nil
     end
   end
 
