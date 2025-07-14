@@ -79,6 +79,8 @@ class Prog::DownloadBootImage < Prog::Base
       ["debian-12", "x64", "20241004-1890"] => "5af3d0e134eb3560ab035021763401d1ec72a25c761fe0ce964351e1409c523d",
       ["almalinux-9", "x64", "9.5-20241120"] => "abddf01589d46c841f718cec239392924a03b34c4fe84929af5d543c50e37e37",
       ["almalinux-9", "arm64", "9.5-20241120"] => "5ede4affaad0a997a2b642f1628b6268bd8eba775f281346b75be3ed20ec369e",
+      ["almalinux-9", "x64", "9.6-20250522"] => "b08cd5db79bf32860412f5837e8c7b8df9447e032376e3c622840b31aaf26bc6",
+      ["almalinux-9", "arm64", "9.6-20250522"] => "47e6801d066c311c44a5ce8100bed16b5976bde610e599dd384d1dca73b31ac5",
       ["github-ubuntu-2404", "x64", "20250511.1.1"] => "ed96b6546741914b5f57e9d4b41438ab2cd18f32e3060fd27139bc53ece8936f",
       ["github-ubuntu-2404", "x64", "20250622.1.0"] => "5889046ddc20823708806a29c85cbb214b27a6533f2a9004bba4092c8095cade",
       ["github-ubuntu-2404", "arm64", "20250511.1.1"] => "fb168b2283646b93a8a1373de3dea8d0eb3a652261f54fd3d3766b576c43c8a9",
