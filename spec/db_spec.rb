@@ -11,6 +11,24 @@ RSpec.describe "Database" do
     expect(collated_columns).to eq []
   end
 
+  it "has no encrypted columns that are not redacted" do
+    Sequel::Model.subclasses.each do |mod|
+      next unless (md = mod.instance_variable_get(:@column_encryption_metadata))
+      keys = md.keys
+      next if keys.empty?
+      expect(mod.redacted_columns & keys).to eq keys
+    end
+  end
+
+  it "has unique redacted columns" do
+    Sequel::Model.subclasses.each do |mod|
+      next unless (md = mod.instance_variable_get(:@column_encryption_metadata))
+      keys = md.keys
+      next if keys.empty?
+      expect(mod.redacted_columns.uniq).to eq mod.redacted_columns
+    end
+  end
+
   describe "audit_log table" do
     def insert_row(at)
       DB[:audit_log].returning(:ubid_type).insert(at:, ubid_type: "vm", action: "create", project_id: Project.generate_uuid, subject_id: Account.generate_uuid, object_ids: Sequel.pg_array([], :uuid))
