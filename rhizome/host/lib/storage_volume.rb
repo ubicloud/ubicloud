@@ -221,7 +221,7 @@ class StorageVolume
       #  - NVMe: Use identifiers starting with 'nvme-eui', also globally unique.
       #  - MD devices: Use uuid identifiers.
       dev = File.basename(dev_path)
-      return id if (dev.start_with?("nvme") && id.include?("nvme-eui-")) ||
+      return id if (dev.start_with?("nvme") && id.include?("nvme-eui.")) ||
         (dev.start_with?("sd") && id.include?("wwn-")) ||
         (dev.start_with?("md") && id.include?("md-uuid-"))
     rescue SystemCallError
