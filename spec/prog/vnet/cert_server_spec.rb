@@ -47,6 +47,11 @@ RSpec.describe Prog::Vnet::CertServer do
   end
 
   describe "#reshare_certificate" do
+    it "doesn't try to put the certificate when Vm is not scheduled to a VmHost" do
+      expect(vm).to receive(:vm_host).and_return(nil)
+      expect { nx.reshare_certificate }.to exit({"msg" => "certificate is reshared"})
+    end
+
     it "puts the certificate and pops" do
       expect(nx).to receive(:put_cert_to_vm)
       expect { nx.reshare_certificate }.to exit({"msg" => "certificate is reshared"})
@@ -63,6 +68,11 @@ RSpec.describe Prog::Vnet::CertServer do
       expect(nx.load_balancer).to receive(:active_cert).and_return(nil)
       expect { nx.put_certificate }.to nap(5)
     end
+
+    it "naps if the vm is not scheduled" do
+      expect(vm).to receive(:vm_host).and_return(nil)
+      expect { nx.put_certificate }.to nap(5)
+    end
   end
 
   describe "#start_certificate_server" do
@@ -76,6 +86,11 @@ RSpec.describe Prog::Vnet::CertServer do
     it "removes the certificate files, server and hops to remove_load_balancer" do
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo host/bin/setup-cert-server stop_and_remove test-vm")
 
+      expect { nx.remove_cert_server }.to exit({"msg" => "certificate resources and server are removed"})
+    end
+
+    it "does nothing if the vm is not scheduled anywhere" do
+      expect(vm).to receive(:vm_host).and_return(nil)
       expect { nx.remove_cert_server }.to exit({"msg" => "certificate resources and server are removed"})
     end
   end
