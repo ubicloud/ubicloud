@@ -1,0 +1,4 @@
+<% form(id: "ubid_form") do |f| %>
+  <%== f.input("text", key: "ubid", label: "UBID", attr: {pattern: "[a-tv-z0-9]{26}", title: "UBID format: [a-tv-z0-9]{26}"}) %>
+  <%== f.button("Show Object") %>
+<% end %>
