@@ -9,8 +9,8 @@ end
 
 # Table: locked_domain
 # Columns:
-#  domain           | text | PRIMARY KEY
-#  oidc_provider_id | uuid | NOT NULL
+#  domain           | citext | PRIMARY KEY
+#  oidc_provider_id | uuid   | NOT NULL
 # Indexes:
 #  locked_domain_pkey | PRIMARY KEY btree (domain)
 # Foreign key constraints:

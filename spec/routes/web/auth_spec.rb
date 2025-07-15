@@ -520,7 +520,7 @@ RSpec.describe Clover, "auth" do
         expect(page.status_code).to eq 404
 
         provider = oidc_provider
-        provider.add_locked_domain(domain: "example.com") if locked_domain
+        provider.add_locked_domain(domain: "Example.com") if locked_domain
         omniauth_key = provider.ubid.to_sym
 
         visit "/auth/#{provider.ubid}"
@@ -547,7 +547,7 @@ RSpec.describe Clover, "auth" do
     end
 
     it "cannot login to an account via password when domain is locked" do
-      oidc_provider.add_locked_domain(domain: "example.com")
+      oidc_provider.add_locked_domain(domain: "Example.com")
       account = create_account
       visit "/login"
       fill_in "Email Address", with: account.email
@@ -572,7 +572,7 @@ RSpec.describe Clover, "auth" do
       expect(Mail::TestMailer.deliveries.length).to eq 1
       verify_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/verify-account.+?)"/)[1]
 
-      oidc_provider.add_locked_domain(domain: "example.com")
+      oidc_provider.add_locked_domain(domain: "Example.com")
       visit verify_link
       click_button "Verify Account"
       expect(page).to have_flash_error("Verifying accounts is not supported for the example.com domain. You must authenticate using TestOIDC.")
@@ -581,7 +581,7 @@ RSpec.describe Clover, "auth" do
     end
 
     it "attempting to create an account in a locked domain redirects to required OIDC login page" do
-      oidc_provider.add_locked_domain(domain: "example.com")
+      oidc_provider.add_locked_domain(domain: "Example.com")
 
       visit "/create-account"
       fill_in "Email Address", with: TEST_USER_EMAIL
@@ -608,7 +608,7 @@ RSpec.describe Clover, "auth" do
       expect(Mail::TestMailer.deliveries.length).to eq 1
       reset_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/reset-password.+?)"/)[1]
 
-      oidc_provider.add_locked_domain(domain: "example.com")
+      oidc_provider.add_locked_domain(domain: "Example.com")
       visit reset_link
       fill_in "Password", with: "#{TEST_USER_PASSWORD}_new"
       fill_in "Password Confirmation", with: "#{TEST_USER_PASSWORD}_new"
@@ -620,7 +620,7 @@ RSpec.describe Clover, "auth" do
     end
 
     it "requesting a password reset for an account in a locked domain redirects to required OIDC login page" do
-      oidc_provider.add_locked_domain(domain: "example.com")
+      oidc_provider.add_locked_domain(domain: "Example.com")
 
       create_account
 
@@ -647,7 +647,7 @@ RSpec.describe Clover, "auth" do
       expect(Mail::TestMailer.deliveries.length).to eq 1
       unlock_link = Mail::TestMailer.deliveries.first.body.match(/(\/unlock-account[^ ]+)/)[1]
 
-      oidc_provider.add_locked_domain(domain: "example.com")
+      oidc_provider.add_locked_domain(domain: "Example.com")
       visit unlock_link
       click_button "Unlock Account"
 
@@ -656,7 +656,7 @@ RSpec.describe Clover, "auth" do
     end
 
     it "requesting an account unlock for an account in a locked domain redirects to required OIDC login page" do
-      oidc_provider.add_locked_domain(domain: "example.com")
+      oidc_provider.add_locked_domain(domain: "Example.com")
 
       account = create_account
       DB[:account_lockouts].insert(id: account.id, key: SecureRandom.urlsafe_base64(32))
@@ -693,7 +693,7 @@ RSpec.describe Clover, "auth" do
       expect(AccountIdentity.select_hash(:account_id, :provider)).to eq(account.id => provider.ubid)
 
       click_button "Log out"
-      oidc_provider.add_locked_domain(domain: "example.com")
+      oidc_provider.add_locked_domain(domain: "Example.com")
 
       visit "/auth/#{provider.ubid}"
       click_button "Login"
@@ -702,7 +702,7 @@ RSpec.describe Clover, "auth" do
     end
 
     it "cannot create account via an omniauth provider when domain is locked to a different provider" do
-      oidc_provider.add_locked_domain(domain: "example.com")
+      oidc_provider.add_locked_domain(domain: "Example.com")
       provider = OidcProvider.create(
         display_name: "TestOIDC2",
         client_id: "123",
@@ -841,7 +841,7 @@ RSpec.describe Clover, "auth" do
       [true, false].each do |locked_domain|
         it "can login via OIDC flow with already connected account using normal login page#{" when domain is locked" if locked_domain}" do
           omniauth_key = oidc_provider.ubid.to_sym
-          oidc_provider.add_locked_domain(domain: "example.com") if locked_domain
+          oidc_provider.add_locked_domain(domain: "Example.com") if locked_domain
           AccountIdentity.create(account_id: Account.first.id, provider: oidc_provider.ubid, uid: "789")
           OmniAuth.config.add_mock(omniauth_key, provider: oidc_provider.ubid, uid: "789",
             info: {email: "user@example.com"})
@@ -859,7 +859,7 @@ RSpec.describe Clover, "auth" do
 
         it "can login via OIDC flow with already connected account using normal login page when account does not have password#{" when domain is locked" if locked_domain}" do
           omniauth_key = oidc_provider.ubid.to_sym
-          oidc_provider.add_locked_domain(domain: "example.com") if locked_domain
+          oidc_provider.add_locked_domain(domain: "Example.com") if locked_domain
           account_id = Account.first.id
           AccountIdentity.create(account_id:, provider: oidc_provider.ubid, uid: "789")
           AccountIdentity.create(account_id:, provider: "google", uid: "123")
@@ -971,7 +971,7 @@ RSpec.describe Clover, "auth" do
       end
 
       it "disallows changing password for an account in a locked domain" do
-        oidc_provider.add_locked_domain(domain: "example.com")
+        oidc_provider.add_locked_domain(domain: "Example.com")
 
         visit "/account/change-password"
         fill_in "New Password", with: "#{TEST_USER_PASSWORD}_new"
@@ -984,7 +984,7 @@ RSpec.describe Clover, "auth" do
       end
 
       it "disallows requesting a login change for an account in a locked domain" do
-        oidc_provider.add_locked_domain(domain: "example.com")
+        oidc_provider.add_locked_domain(domain: "Example.com")
 
         visit "/account/change-login"
         fill_in "New Email Address", with: "user@other-example.com"
@@ -1004,7 +1004,7 @@ RSpec.describe Clover, "auth" do
         expect(Mail::TestMailer.deliveries.length).to eq 1
         verify_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/verify-login-change.+?)"/)[1]
 
-        oidc_provider.add_locked_domain(domain: "example.com")
+        oidc_provider.add_locked_domain(domain: "Example.com")
 
         visit verify_link
         click_button "Click to Verify New Email"
@@ -1044,7 +1044,7 @@ RSpec.describe Clover, "auth" do
       end
 
       it "hides login methods, change password, and change emails options on My Account page" do
-        oidc_provider.add_locked_domain(domain: "example.com")
+        oidc_provider.add_locked_domain(domain: "Example.com")
         visit "/account"
         expect(page).to have_no_content("Login Methods")
         expect(page).to have_no_content("Change Password")
