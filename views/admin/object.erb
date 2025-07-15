@@ -1,0 +1,41 @@
+<% @page_title = "#{@klass.name} #{@obj.ubid}" %>
+
+<table class="object-table">
+<caption>Data</caption>
+<thead>
+  <tr>
+    <th>Column</th>
+    <th>Value</th>
+  </tr>
+</thead>
+<tbody>
+  <% @obj.inspect_values_hash.each do |k, v| %>
+    <tr>
+      <td><%= k %></td>
+      <td>
+        <% if v.is_a?(String) && v.bytesize == 26 && (column_class = UBID.class_for_ubid(v)) %>
+          <a href="/model/<%= column_class %>/<%= v %>"><%= v %></a>
+        <% else %>
+          <%= v %>
+        <% end %>
+      </td>
+    </tr>
+  <% end %>
+</tbody>
+</table>
+
+<h2>Associations</h2>
+<% @klass.associations.each do |assoc| %>
+  <%
+  assoc_objs = Array(@obj.send(assoc)).select { defined?(it.ubid) && it.ubid }
+  next if assoc_objs.empty?
+  associated_class = @klass.association_reflection(assoc).associated_class
+  %>
+
+  <h3><%= assoc %></h3>
+  <ul>
+  <% assoc_objs.each do %>
+    <li><a href="/model/<%= associated_class %>/<%= it.ubid %>"><%= it.ubid %></a></li>
+  <% end %>
+  </ul>
+<% end %>
