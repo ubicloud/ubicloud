@@ -105,7 +105,6 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
     it "hops to wait" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_standard").and_return("Succeeded")
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean prep_standard")
-      expect(vm_host_slice).to receive(:update).with(enabled: true)
 
       expect { nx.prep }.to hop("wait")
     end

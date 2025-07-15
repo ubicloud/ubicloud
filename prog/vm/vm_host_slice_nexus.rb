@@ -38,7 +38,6 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
     case host.sshable.cmd("common/bin/daemonizer --check prep_#{vm_host_slice.name}")
     when "Succeeded"
       host.sshable.cmd("common/bin/daemonizer --clean prep_#{vm_host_slice.name}")
-      vm_host_slice.update(enabled: true)
       hop_wait
     when "NotStarted", "Failed"
       host.sshable.cmd("common/bin/daemonizer 'sudo host/bin/setup-slice prep #{vm_host_slice.inhost_name} \"#{vm_host_slice.allowed_cpus_cgroup}\"' prep_#{vm_host_slice.name}")

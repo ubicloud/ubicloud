@@ -466,11 +466,12 @@ module Scheduling::Allocator
           # update the VM
           vm.update(vm_host_slice_id: st.subject.id)
 
-          # update the allocation on the VM
-          # we are updating a newly created slice, so not checking for 'enabled' flag
+          # Update the allocation on the VM. We also set enabled to true
+          # to mark it as allocatable and not scheduled for destruction.
           VmHostSlice.dataset.where(id: vm.vm_host_slice_id).update(
             used_cpu_percent: Sequel[:used_cpu_percent] + vm.cpu_percent_limit,
-            used_memory_gib: Sequel[:used_memory_gib] + vm.memory_gib
+            used_memory_gib: Sequel[:used_memory_gib] + vm.memory_gib,
+            enabled: true
           )
 
           # Update the host utilization
