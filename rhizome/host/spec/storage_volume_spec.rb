@@ -508,6 +508,20 @@ RSpec.describe StorageVolume do
       expect(encrypted_sv.persistent_device_id("storage_path")).to eq(paths.last)
     end
 
+    it "returns the persistent device id for a path with NVMe device" do
+      paths = ["nvme-SAMSUNG_MZQL21T9HCJR-00A07_S64GNN0WC00472", "nvme-SAMSUNG_MZQL21T9HCJR-00A07_S64GNN0WC00475",
+        "nvme-eui.3634473057c004720025384e00000001", "nvme-eui.3634473057c004750025384e00000001"]
+      expect(Dir).to receive(:[]).with("/dev/disk/by-id/*").and_return(paths)
+      expect(File).to receive(:realpath).with(paths[0]).and_return("/dev/nvme0n1")
+      expect(File).to receive(:realpath).with(paths[1]).and_return("/dev/nvme0n2")
+      expect(File).to receive(:realpath).with(paths[2]).and_return("/dev/nvme0n1")
+      expect(File).to receive(:realpath).with(paths[3]).and_return("/dev/nvme0n2")
+      expect(File).to receive(:stat).with("/dev/nvme0n1").and_return(instance_double(File::Stat, rdev_major: 259, rdev_minor: 0)).twice
+      expect(File).to receive(:stat).with("/dev/nvme0n2").and_return(instance_double(File::Stat, rdev_major: 259, rdev_minor: 1)).twice
+      expect(File).to receive(:stat).with("storage_path").and_return(instance_double(File::Stat, dev_major: 259, dev_minor: 1))
+      expect(encrypted_sv.persistent_device_id("storage_path")).to eq(paths.last)
+    end
+
     it "handles system call errors gracefully" do
       paths = ["/dev/disk/by-id/md-name-rescue:0", "/dev/disk/by-id/md-uuid-8e4083eb:4c4a19fb:f1c64530:5faaca1b"]
       expect(Dir).to receive(:[]).with("/dev/disk/by-id/*").and_return(paths)
