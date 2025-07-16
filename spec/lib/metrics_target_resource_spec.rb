@@ -91,6 +91,12 @@ RSpec.describe MetricsTargetResource do
       expect(Clog).to receive(:emit).and_call_original
       expect { resource.export_metrics }.not_to raise_error
     end
+
+    it "skips export if resource is deleted" do
+      resource.instance_variable_set(:@deleted, true)
+      expect(postgres_server).not_to receive(:export_metrics)
+      expect { resource.export_metrics }.not_to raise_error
+    end
   end
 
   describe "#close_resource_session" do

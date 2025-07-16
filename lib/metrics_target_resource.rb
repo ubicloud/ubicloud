@@ -31,6 +31,8 @@ class MetricsTargetResource
   end
 
   def export_metrics
+    return if @deleted
+
     @export_started_at = Time.now
     begin
       count = @resource.export_metrics(session: @session, tsdb_client: @tsdb_client)
