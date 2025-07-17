@@ -29,6 +29,16 @@ class CloverAdmin < Roda
   plugin :public
   plugin :flash
 
+  plugin :content_security_policy do |csp|
+    csp.default_src :none
+    csp.style_src :self
+    csp.img_src :self    # /favicon.ico
+    csp.script_src :self # webauthn
+    csp.form_action :self
+    csp.base_uri :none
+    csp.frame_ancestors :none
+  end
+
   plugin :sessions,
     key: "_CloverAdmin.session",
     cookie_options: {secure: !(Config.development? || Config.test?)},
