@@ -3,5 +3,35 @@
   <%== f.button("Show Object") %>
 <% end %>
 
+<% unless @pages.empty? %>
+  <table class="page-table">
+    <caption>Active Pages</caption>
+    <thead>
+      <tr>
+	<th>UBID</th>
+	<th>Created At</th>
+	<th>Summary</th>
+	<th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @pages.each do |page| %>
+	<tr>
+	  <td><a href="/model/Page/<%= page.ubid %>"><%= page.ubid %></a></td>
+	  <td><%= page.created_at.strftime("%F %T") %></td>
+	  <td><%= page.summary %></td>
+	  <td><%== h(page.details).gsub(/\b[a-tv-z0-9]{26}\b/) do
+            if (klass = UBID.class_for_ubid(it))
+              "<a href=\"/model/#{klass}/#{it}\">#{it}</a>"
+            else
+              it
+            end
+          end %></td>
+	</tr>
+       <% end %>
+    </tbody>
+  </table>
+<% end %>
+
 <p><a href="/change-password">Change Password</a></p>
 <p><a href="/multifactor-manage">Manage Multifactor Authentication</a></p>
