@@ -116,11 +116,29 @@ module Csi
         log_request_response(req, "delete_volume") do |req_id|
           raise GRPC::InvalidArgument.new("Volume ID is required", GRPC::Core::StatusCodes::INVALID_ARGUMENT) if req.volume_id.nil? || req.volume_id.empty?
 
-          @mutex.synchronize do
-            @volume_store.delete_if { |_, details| details[:volume_id] == req.volume_id }
+          client = KubernetesClient.new(req_id:, logger: @logger)
+          # Since we would have at most 8 PVCs per node, searching by value will not cause overhead
+          pv_name = @mutex.synchronize { @volume_store.find { |_, d| d[:volume_id] == req.volume_id }&.first }
+          pv = pv_name.nil? ? client.find_pv_by_volume_id(req.volume_id) : client.get_pv(pv_name)
+          pv_node = client.extract_node_from_pv(pv)
+          pv_node_ip = client.get_node_ip(pv_node)
+          file_path = NodeService.backing_file_path(req.volume_id)
+          delete_cmd = ["ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-i", "/ssh/id_ed25519", "ubi@#{pv_node_ip}",
+            "sudo", "rm", "-f", file_path]
+          output, status = run_cmd(*delete_cmd, req_id:)
+          if !status.success?
+            log_with_id(req_id, "Could not delete the PV's backing file: #{output}")
+            raise GRPC::Internal, "Could not delete the PV's backing file"
           end
+          @mutex.synchronize { @volume_store.delete(pv_name) }
 
           DeleteVolumeResponse.new
+        rescue GRPC::InvalidArgument => e
+          log_with_id(req_id, "Handled gRPC validation error in delete_volume: #{e.class} - #{e.message}")
+          raise
+        rescue => e
+          log_with_id(req_id, "Internal error in delete_volume: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}")
+          raise GRPC::Internal, "DeleteVolume error: #{e.message}"
         end
       end
     end
