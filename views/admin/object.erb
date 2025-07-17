@@ -1,5 +1,9 @@
 <% @page_title = "#{@klass.name} #{@obj.ubid}" %>
 
+<% if @klass.associations.include?(:sshable) && (sshable = @obj.sshable) %>
+  <p>SSH Command: <code>ssh -i &lt;PRIVATE_KEY_PATH&gt; <%= sshable.unix_user %>@<%= sshable.host %></code></p>
+<% end %>
+
 <% if @klass.associations.include?(:strand) && (strand = @obj.strand) %>
   <p>
     <a href="/model/Strand/<%= strand.ubid %>">Strand</a>: <%= strand.prog %>#<%= strand.label %>

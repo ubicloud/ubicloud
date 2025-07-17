@@ -78,6 +78,19 @@ RSpec.describe CloverAdmin do
     expect(page).to have_no_content "Strand"
   end
 
+  it "shows sshable information for object, if any" do
+    vm_host = Prog::Vm::HostNexus.assemble("1.2.3.4").subject
+    fill_in "UBID", with: vm_host.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - VmHost #{vm_host.ubid}"
+    expect(page).to have_content "SSH Command: ssh -i <PRIVATE_KEY_PATH> rhizome@1.2.3.4"
+
+    visit "/"
+    fill_in "UBID", with: vm_pool.ubid
+    click_button "Show Object"
+    expect(page).to have_no_content "SSH Command"
+  end
+
   it "handles request for invalid ubid" do
     fill_in "UBID", with: "foo"
     click_button "Show Object"
