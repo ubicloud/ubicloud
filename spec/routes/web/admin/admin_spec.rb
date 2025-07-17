@@ -7,12 +7,14 @@ RSpec.describe CloverAdmin do
     page.all(".object-table tbody tr").map { it.all("td").map(&:text) }.to_h.transform_keys(&:to_sym).except(:created_at)
   end
 
-  it "allows searching by ubid and navigating to related objects" do
-    account = create_account
+  before do
+    admin_account_setup_and_login
+  end
 
-    visit "/"
+  it "allows searching by ubid and navigating to related objects" do
     expect(page.title).to eq "Ubicloud Admin"
 
+    account = create_account
     fill_in "UBID", with: account.ubid
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
@@ -34,7 +36,6 @@ RSpec.describe CloverAdmin do
   end
 
   it "handles request for invalid ubid" do
-    visit "/"
     fill_in "UBID", with: "foo"
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin"
