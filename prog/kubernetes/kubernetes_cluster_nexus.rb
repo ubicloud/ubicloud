@@ -49,6 +49,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def start
     register_deadline("wait", 120 * 60)
     incr_install_metrics_server
+    incr_sync_worker_mesh
     hop_create_load_balancers
   end
 
