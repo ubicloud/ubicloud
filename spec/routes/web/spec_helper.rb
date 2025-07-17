@@ -47,6 +47,7 @@ RSpec.configure do |config|
   config.after do
     Capybara.reset_sessions!
     Capybara.use_default_driver
+    Capybara.default_host = "http://www.example.com"
   end
 
   class RSpec::Matchers::DSL::Matcher
