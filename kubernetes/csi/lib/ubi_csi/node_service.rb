@@ -91,6 +91,7 @@ module Csi
           client = KubernetesClient.new(req_id:, logger: @logger)
           pvc = fetch_and_migrate_pvc(req_id, client, req)
           perform_node_stage_volume(req_id, pvc, req, _call)
+          roll_back_reclaim_policy(req_id, client, req, pvc)
           remove_old_pv_annotation(client, pvc)
           NodeStageVolumeResponse.new
         end
@@ -182,6 +183,21 @@ module Csi
           pvc["metadata"]["annotations"].delete(OLD_PV_NAME_ANNOTATION_KEY)
           client.update_pvc(pvc)
         end
+      end
+
+      def roll_back_reclaim_policy(req_id, client, req, pvc)
+        old_pv_name = pvc.dig("metadata", "annotations", OLD_PV_NAME_ANNOTATION_KEY)
+        if old_pv_name.nil?
+          return
+        end
+        pv = client.get_pv(old_pv_name)
+        if pv.dig("spec", "persistentVolumeReclaimPolicy") == "Retain"
+          pv["spec"]["persistentVolumeReclaimPolicy"] = "Delete"
+          client.update_pv(pv)
+        end
+      rescue => e
+        log_with_id(req_id, "Internal error in node_stage_volume: #{e.class} - #{e.message} - #{e.backtrace}")
+        raise GRPC::Internal, "Unexpected error: #{e.class} - #{e.message}"
       end
 
       def migrate_pvc_data(req_id, client, pvc, req)
