@@ -166,16 +166,26 @@ class Prog::Vm::GithubRunner < Prog::Base
   label def wait_concurrency_limit
     unless quota_available?
       # check utilization, if it's high, wait for it to go down
-      utilization = VmHost.where(allocation_state: "accepting", arch: github_runner.label_data["arch"]).select_map {
-        sum(:used_cores) * 100.0 / sum(:total_cores)
-      }.first.to_f
+      family_utilization = VmHost.where(allocation_state: "accepting", arch: github_runner.label_data["arch"])
+        .select_group(:family)
+        .select_append { round(sum(:used_cores) * 100.0 / sum(:total_cores), 2).cast(:float).as(:utilization) }
+        .to_hash(:family, :utilization)
 
-      unless utilization < 75
-        Clog.emit("Waiting for customer concurrency limit, utilization is high") { [github_runner, {utilization: utilization}] }
+      not_allow = if github_runner.label_data["arch"] == "x64" && github_runner.label_data["family"] == "standard" && github_runner.installation.premium_runner_enabled?
+        family_utilization["premium"] > 75 && family_utilization["standard"] > 75
+      else
+        family_utilization.fetch(github_runner.label_data["family"], 0) > 75
+      end
+
+      if not_allow
+        Clog.emit("not allowed because of high utilization") { {reached_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
         nap rand(5..15)
       end
 
-      Clog.emit("Concurrency limit reached but allocation is allowed because of low utilization") { [github_runner, {utilization: utilization}] }
+      if github_runner.label_data["arch"] == "x64" && ((family_utilization["premium"] > 75) || (github_runner.installation.free_runner_upgrade? && family_utilization["premium"] > 50))
+        github_runner.incr_not_upgrade_premium
+      end
+      Clog.emit("allowed because of low utilization") { {exceeded_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
     end
     github_runner.log_duration("runner_capacity_waited", Time.now - github_runner.created_at)
     hop_allocate_vm

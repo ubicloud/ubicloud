@@ -586,6 +586,26 @@ RSpec.describe Prog::Vm::Nexus do
       expect { nx.start }.to hop("create_unix_user")
     end
 
+    it "do not upgrade to the premium runner if not allowed" do
+      vm.location_id = Location::GITHUB_RUNNERS_ID
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, allocator_preferences: {"family_filter" => ["standard", "premium"]})
+      runner = Prog::Vm::GithubRunner.assemble(installation, repository_name: "ubicloud/test", label: "ubicloud-standard-2").subject.update(vm_id: vm.id)
+      runner.incr_not_upgrade_premium
+      expect(Scheduling::Allocator).to receive(:allocate).with(
+        vm, :storage_volumes,
+        allocation_state_filter: ["accepting"],
+        distinct_storage_devices: false,
+        host_filter: [],
+        host_exclusion_filter: [],
+        location_filter: [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID],
+        location_preference: [Location::GITHUB_RUNNERS_ID],
+        gpu_count: 0,
+        gpu_device: nil,
+        family_filter: ["standard"]
+      )
+      expect { nx.start }.to hop("create_unix_user")
+    end
+
     it "can force allocating a host" do
       allow(nx).to receive(:frame).and_return({
         "force_host_id" => :vm_host_id,
