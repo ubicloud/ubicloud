@@ -46,6 +46,8 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
+            - name: ssh-creds
+              mountPath: /ssh
         - name: csi-provisioner
           image: registry.k8s.io/sig-storage/csi-provisioner:v5.3.0
           imagePullPolicy: IfNotPresent
@@ -72,3 +74,7 @@ spec:
           emptyDir: {
             medium: "Memory"
           }
+        - name: ssh-creds
+          hostPath:
+            path: /home/ubi/.ssh
+            type: Directory
