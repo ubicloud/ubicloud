@@ -136,6 +136,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     it "registers deadline and hops" do
       expect(nx).to receive(:register_deadline)
       expect(nx).to receive(:incr_install_metrics_server)
+      expect(nx).to receive(:incr_sync_worker_mesh)
       expect { nx.start }.to hop("create_load_balancers")
     end
   end
