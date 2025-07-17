@@ -13,6 +13,11 @@
     <nav class="navbar" role="navigation">
       <div class="container">
         <a class="navbar-brand" href="/">Ubicloud Admin</a>
+        <% if rodauth.logged_in? %>
+          <% form(action: "/logout", method: :post, id: :logout_form) do |f| %>
+            <%== f.button("Logout") %>
+          <% end %>
+        <% end %>
       </div>
     </nav>
 

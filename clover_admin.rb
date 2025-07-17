@@ -50,20 +50,46 @@ class CloverAdmin < Roda
   end
 
   plugin :route_csrf do |token|
-    # :nocov:
-    # Cover after we have a form submitting a POST request
     flash.now["error"] = "An invalid security token submitted with this request, please try again"
     @page_title = "Invalid Security Token"
     view(content: "")
-    # :nocov:
   end
 
   plugin :forme_route_csrf
   Forme.register_config(:clover_admin, base: :default, labeler: :explicit)
   Forme.default_config = :clover_admin
 
+  def self.create_admin_account(login, password = SecureRandom.urlsafe_base64(16))
+    password_hash = rodauth.new(nil).password_hash(password)
+    DB.transaction do
+      id = DB[:admin_account].insert(login:)
+      DB[:admin_password_hash].insert(id:, password_hash:)
+    end
+    password
+  end
+
+  plugin :rodauth, route_csrf: true do
+    enable :argon2, :login, :logout, :webauthn, :change_password
+    accounts_table :admin_account
+    password_hash_table :admin_password_hash
+    webauthn_keys_table :admin_webauthn_key
+    webauthn_user_ids_table :admin_webauthn_user_id
+    login_column :login
+    require_bcrypt? false
+    title_instance_variable :@page_title
+    argon2_secret OpenSSL::HMAC.digest("SHA256", Config.clover_session_secret, "admin-argon2-secret")
+    hmac_secret OpenSSL::HMAC.digest("SHA512", Config.clover_session_secret, "admin-rodauth-hmac-secret")
+    function_name(&{
+      rodauth_get_salt: :rodauth_admin_get_salt,
+      rodauth_valid_password_hash: :rodauth_admin_valid_password_hash
+    }.to_proc)
+  end
+
   route do |r|
     r.public
+    r.rodauth
+    rodauth.require_authentication
+    rodauth.require_two_factor_setup
 
     # :nocov:
     r.exception_page_assets if Config.development?
