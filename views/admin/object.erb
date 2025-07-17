@@ -1,5 +1,15 @@
 <% @page_title = "#{@klass.name} #{@obj.ubid}" %>
 
+<% if @klass.associations.include?(:strand) && (strand = @obj.strand) %>
+  <p>
+    <a href="/model/Strand/<%= strand.ubid %>">Strand</a>: <%= strand.prog %>#<%= strand.label %>
+    | schedule: <%= strand.schedule.strftime("%F %T") %>
+    <% if strand.try > 0 %>
+      | try: <%= strand.try %>
+    <% end %>
+  </p>
+<% end %>
+
 <% if @klass.associations.include?(:semaphores) && !(semaphores = @obj.semaphores_dataset.select_order_map(:name)).empty? %>
   <p>Semaphores Set: <%= semaphores.join(", ") %></p>
 <% end %>
