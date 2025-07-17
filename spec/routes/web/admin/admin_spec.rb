@@ -58,6 +58,26 @@ RSpec.describe CloverAdmin do
     expect(page).to have_content "Semaphores Set: destroy"
   end
 
+  it "shows object's strand, if any" do
+    fill_in "UBID", with: vm_pool.ubid
+    click_button "Show Object"
+    path = page.current_path
+    expect(page.title).to eq "Ubicloud Admin - VmPool #{vm_pool.ubid}"
+    expect(page).to have_content "Strand: Vm::VmPool#create_new_vm | schedule: 2"
+    expect(page).to have_no_content "| try"
+
+    vm_pool.strand.update(try: 3)
+    visit path
+    expect(page).to have_content "| try: 3"
+
+    click_link "Strand"
+    expect(page.title).to eq "Ubicloud Admin - Strand #{vm_pool.ubid}"
+
+    vm_pool.strand.destroy
+    visit path
+    expect(page).to have_no_content "Strand"
+  end
+
   it "handles request for invalid ubid" do
     fill_in "UBID", with: "foo"
     click_button "Show Object"
