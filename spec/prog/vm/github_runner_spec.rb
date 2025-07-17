@@ -275,28 +275,106 @@ RSpec.describe Prog::Vm::GithubRunner do
 
   describe "#wait_concurrency_limit" do
     before do
-      [[Location::HETZNER_FSN1_ID, "x64"], [Location::GITHUB_RUNNERS_ID, "x64"], [Location::GITHUB_RUNNERS_ID, "arm64"]].each do |location_id, arch|
-        create_vm_host(location_id:, arch:, total_cores: 16, used_cores: 16)
+      [
+        [Location::HETZNER_FSN1_ID, "x64", "standard"],
+        [Location::GITHUB_RUNNERS_ID, "x64", "standard"],
+        [Location::GITHUB_RUNNERS_ID, "x64", "premium"],
+        [Location::GITHUB_RUNNERS_ID, "arm64", "standard"]
+      ].each do |location_id, arch, family|
+        create_vm_host(location_id:, arch:, family:, total_cores: 16, used_cores: 16)
       end
-    end
-
-    it "waits until customer concurrency limit frees up" do
-      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
-
-      expect { nx.wait_concurrency_limit }.to nap
     end
 
     it "hops to allocate_vm when customer concurrency limit frees up" do
       expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
-
       expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
     end
 
-    it "hops to allocate_vm when customer concurrency limit is full but the overall utilization is low" do
-      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+    context "when standard runner" do
+      it "waits if standard utilization is high" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        expect { nx.wait_concurrency_limit }.to nap
+      end
 
-      VmHost[arch: "x64"].update(used_cores: 1)
-      expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+      it "allocates if standard utilization is low" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
+        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+      end
+    end
+
+    context "when transparent premium runner" do
+      before { installation.update(allocator_preferences: {"family_filter" => ["premium", "standard"]}) }
+
+      it "waits if premium and standard utilizations are high" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        expect { nx.wait_concurrency_limit }.to nap
+      end
+
+      it "allocates if standard utilization is high but premium utilization is low" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        VmHost[arch: "x64", family: "premium"].update(used_cores: 8)
+        expect(runner).not_to receive(:incr_not_upgrade_premium)
+        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+      end
+
+      it "allocates without upgrade if premium utilization is high but standard utilization is low" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
+        expect(runner).to receive(:incr_not_upgrade_premium)
+        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+      end
+
+      it "allocates arm64 runners without checking premium utilization" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        runner.update(label: "ubicloud-standard-4-arm")
+        VmHost[arch: "arm64"].update(used_cores: 8)
+        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+      end
+    end
+
+    context "when explicit premium runner" do
+      before { runner.update(label: "ubicloud-premium-4") }
+
+      it "waits if premium and standard utilizations are high" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        expect { nx.wait_concurrency_limit }.to nap
+      end
+
+      it "allocates if premium utilization is low" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        VmHost[arch: "x64", family: "premium"].update(used_cores: 8)
+        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+      end
+
+      it "waits if premium utilization is high but standard utilization is low" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
+        expect { nx.wait_concurrency_limit }.to nap
+      end
+    end
+
+    context "when free premium runner" do
+      before { project.set_ff_free_runner_upgrade_until(Time.now + 100).reload }
+
+      it "waits if premium and standard utilizations are high" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        expect { nx.wait_concurrency_limit }.to nap
+      end
+
+      it "allocates if premium utilization is low than 50" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        VmHost.where(arch: "x64").update(used_cores: 4)
+        expect(runner).not_to receive(:incr_not_upgrade_premium)
+        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+      end
+
+      it "allocates without upgrade if premium utilization is higher than 50" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        VmHost.where(arch: "x64").update(used_cores: 10)
+        expect(runner).to receive(:incr_not_upgrade_premium)
+        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+      end
     end
   end
 
