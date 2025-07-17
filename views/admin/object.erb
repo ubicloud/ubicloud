@@ -1,5 +1,9 @@
 <% @page_title = "#{@klass.name} #{@obj.ubid}" %>
 
+<% if @klass.associations.include?(:semaphores) && !(semaphores = @obj.semaphores_dataset.select_order_map(:name)).empty? %>
+  <p>Semaphores Set: <%= semaphores.join(", ") %></p>
+<% end %>
+
 <table class="object-table">
 <caption>Data</caption>
 <thead>
