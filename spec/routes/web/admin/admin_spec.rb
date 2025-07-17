@@ -91,6 +91,30 @@ RSpec.describe CloverAdmin do
     expect(page).to have_no_content "SSH Command"
   end
 
+  it "shows active pages on index page" do
+    expect(page).to have_no_content "Active Pages"
+
+    page1 = Page.create(summary: "some problem", tag: "a")
+    page.refresh
+    expect(page).to have_content "Active Pages"
+    tds = page.all(".page-table tbody tr").map { it.all("td").values_at(0, 2, 3).map(&:text) }
+    expect(tds).to eq [
+      [page1.ubid, "some problem", "{}"]
+    ]
+    click_link page1.ubid
+    expect(page.title).to eq "Ubicloud Admin - Page #{page1.ubid}"
+
+    page2 = Page.create(summary: "another problem", tag: "b", details: {"related_resources" => [vm_pool.ubid]})
+    visit "/"
+    tds = page.all(".page-table tbody tr").map { it.all("td").values_at(0, 2, 3).map(&:text) }
+    expect(tds).to eq [
+      [page1.ubid, "some problem", "{}"],
+      [page2.ubid, "another problem", "{\"related_resources\" => [\"#{vm_pool.ubid}\"]}"]
+    ]
+    click_link vm_pool.ubid
+    expect(page.title).to eq "Ubicloud Admin - VmPool #{vm_pool.ubid}"
+  end
+
   it "handles request for invalid ubid" do
     fill_in "UBID", with: "foo"
     click_button "Show Object"

@@ -28,6 +28,7 @@ class CloverAdmin < Roda
 
   plugin :public
   plugin :flash
+  plugin :h
 
   plugin :content_security_policy do |csp|
     csp.default_src :none
@@ -124,6 +125,8 @@ class CloverAdmin < Roda
       elsif typecast_params.nonempty_str("ubid")
         flash.now["error"] = "Invalid ubid provided"
       end
+
+      @pages = Page.active.reverse(:created_at, :summary).all
 
       view("index")
     end
