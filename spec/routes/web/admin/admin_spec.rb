@@ -11,6 +11,18 @@ RSpec.describe CloverAdmin do
     admin_account_setup_and_login
   end
 
+  let(:vm_pool) do
+    vp = VmPool.create(
+      size: 3,
+      vm_size: "standard-2",
+      boot_image: "img",
+      location_id: Location::HETZNER_FSN1_ID,
+      storage_size_gib: 86
+    )
+    Strand.create(prog: "Vm::VmPool", label: "create_new_vm") { it.id = vp.id }
+    vp
+  end
+
   it "allows searching by ubid and navigating to related objects" do
     expect(page.title).to eq "Ubicloud Admin"
 
@@ -33,6 +45,17 @@ RSpec.describe CloverAdmin do
     # Column Link
     click_link project.ubid
     expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
+  end
+
+  it "shows semaphores set on the object, if any" do
+    fill_in "UBID", with: vm_pool.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - VmPool #{vm_pool.ubid}"
+    expect(page).to have_no_content "Semaphores Set:"
+
+    vm_pool.incr_destroy
+    page.refresh
+    expect(page).to have_content "Semaphores Set: destroy"
   end
 
   it "handles request for invalid ubid" do
