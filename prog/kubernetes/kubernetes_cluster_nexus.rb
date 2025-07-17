@@ -227,9 +227,9 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     public_keys = key_pairs.map { |kp| kp[:ssh_key].public_key }
     key_pairs.each do |kp|
       vm = kp[:vm]
-      vm.sshable.cmd("tee ~/.ssh/id_ed25519 > /dev/null", stdin: kp[:ssh_key].private_key)
+      vm.sshable.cmd("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: kp[:ssh_key].private_key)
       all_keys_str = ([vm.sshable.keys.first.public_key] + public_keys).join("\n")
-      vm.sshable.cmd("tee ~/.ssh/authorized_keys > /dev/null", stdin: all_keys_str)
+      vm.sshable.cmd("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: all_keys_str)
     end
 
     hop_wait
