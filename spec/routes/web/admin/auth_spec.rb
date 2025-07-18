@@ -35,7 +35,7 @@ RSpec.describe CloverAdmin do
     fill_in "Login", with: "admin"
     fill_in "Password", with: TEST_USER_PASSWORD
     click_button "Login"
-    expect(page).to have_flash_error("This account has not been setup for multifactor authentication")
+    expect(page).to have_flash_notice("You have been logged in")
     expect(page.title).to eq "Ubicloud Admin - Setup WebAuthn Authentication"
 
     admin_webauthn_auth_setup
@@ -49,7 +49,7 @@ RSpec.describe CloverAdmin do
     fill_in "Login", with: "admin"
     fill_in "Password", with: TEST_USER_PASSWORD
     click_button "Login"
-    expect(page).to have_flash_error("You need to authenticate via an additional factor before continuing")
+    expect(page).to have_flash_notice("You have been logged in")
     expect(page.title).to eq "Ubicloud Admin - Authenticate Using WebAuthn"
 
     admin_webauthn_auth
