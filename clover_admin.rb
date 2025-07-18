@@ -126,7 +126,7 @@ class CloverAdmin < Roda
         flash.now["error"] = "Invalid ubid provided"
       end
 
-      @pages = Page.active.reverse(:created_at, :summary).all
+      @grouped_pages = Page.active.reverse(:created_at, :summary).group_by_vm_host
 
       view("index")
     end
