@@ -8,9 +8,11 @@ PATH
 GEM
   remote: https://rubygems.org/
   specs:
+    ansi (1.5.0)
     base64 (0.3.0)
     bigdecimal (3.1.9)
     diff-lcs (1.6.2)
+    docile (1.4.1)
     google-protobuf (4.31.1-arm64-darwin)
       bigdecimal
       rake (>= 13)
@@ -40,6 +42,21 @@ GEM
       diff-lcs (>= 1.2.0, < 2.0)
       rspec-support (~> 3.13.0)
     rspec-support (3.13.4)
+    simplecov (0.22.0)
+      docile (~> 1.1)
+      simplecov-html (~> 0.11)
+      simplecov_json_formatter (~> 0.1)
+    simplecov-console (0.9.3)
+      ansi
+      simplecov
+      terminal-table
+    simplecov-html (0.13.2)
+    simplecov_json_formatter (0.1.4)
+    terminal-table (4.0.0)
+      unicode-display_width (>= 1.1.1, < 4)
+    unicode-display_width (3.1.4)
+      unicode-emoji (~> 4.0, >= 4.0.4)
+    unicode-emoji (4.0.4)
 
 PLATFORMS
   arm64-darwin
@@ -50,6 +67,8 @@ DEPENDENCIES
   grpc (~> 1.73)
   grpc-tools (~> 1.73)
   rspec (~> 3.12)
+  simplecov (~> 0.22)
+  simplecov-console (~> 0.9)
   ubi-csi!
 
 BUNDLED WITH

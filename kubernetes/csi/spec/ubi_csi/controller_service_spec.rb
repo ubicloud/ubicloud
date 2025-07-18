@@ -35,18 +35,18 @@ RSpec.describe Csi::V1::ControllerService do
     let(:cmd) { ["echo", "test"] }
 
     it "runs command without request ID" do
-      allow(Open3).to receive(:capture2e).with(*cmd).and_return(["output", double("status")])
+      allow(Open3).to receive(:capture2e).with(*cmd).and_return(["output", instance_double("Process::Status")])
       expect { service.run_cmd(*cmd) }.not_to raise_error
     end
 
     it "runs command with request ID" do
-      allow(Open3).to receive(:capture2e).with(*cmd).and_return(["output", double("status")])
+      allow(Open3).to receive(:capture2e).with(*cmd).and_return(["output", instance_double("Process::Status")])
       expect { service.run_cmd(*cmd, req_id: "test-id") }.not_to raise_error
     end
   end
 
   describe "#controller_get_capabilities" do
-    let(:request) { instance_double("ControllerGetCapabilitiesRequest") }
+    let(:request) { Csi::V1::ControllerGetCapabilitiesRequest.new }
     let(:call) { instance_double("GRPC::ActiveCall") }
 
     before do

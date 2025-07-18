@@ -60,5 +60,129 @@ RSpec.describe Csi::V1::NodeService do
       expect(described_class.superclass).to eq(Csi::V1::Node::Service)
     end
   end
+
+  describe "gRPC object creation and validation" do
+    # Shared fixtures using let() for DRY
+    let(:volume_capability) do
+      {
+        mount: { fs_type: "ext4", mount_flags: [], volume_mount_group: "" },
+        access_mode: { mode: :SINGLE_NODE_WRITER }
+      }
+    end
+
+    let(:base_volume_context) { { "storage.kubernetes.io/csiProvisionerIdentity" => "test" } }
+    let(:base_publish_context) { { "devicePath" => "/dev/xvdf" } }
+
+    describe "NodeStageVolumeRequest" do
+      let(:stage_request) do
+        Csi::V1::NodeStageVolumeRequest.new(
+          volume_id: "test-vol-123",
+          staging_target_path: "/var/lib/kubelet/staging/test-vol-123",
+          volume_capability: volume_capability,
+          publish_context: base_publish_context,
+          volume_context: base_volume_context
+        )
+      end
+
+      it "creates valid request with nested objects" do
+        expect(stage_request.volume_id).to eq("test-vol-123")
+        expect(stage_request.staging_target_path).to eq("/var/lib/kubelet/staging/test-vol-123")
+        expect(stage_request.volume_capability.mount.fs_type).to eq("ext4")
+        expect(stage_request.volume_capability.access_mode.mode).to eq(:SINGLE_NODE_WRITER)
+      end
+
+      it "handles custom filesystem types" do
+        custom_request = Csi::V1::NodeStageVolumeRequest.new(
+          volume_id: "xfs-vol",
+          staging_target_path: "/mnt/test",
+          volume_capability: {
+            mount: { fs_type: "xfs", mount_flags: ["noatime", "nodiratime"] },
+            access_mode: { mode: :SINGLE_NODE_WRITER }
+          }
+        )
+
+        expect(custom_request.volume_capability.mount.fs_type).to eq("xfs")
+        expect(custom_request.volume_capability.mount.mount_flags).to eq(["noatime", "nodiratime"])
+      end
+    end
+
+    describe "NodePublishVolumeRequest" do
+      let(:publish_request) do
+        Csi::V1::NodePublishVolumeRequest.new(
+          volume_id: "test-vol-456",
+          staging_target_path: "/var/lib/kubelet/staging/test-vol-456",
+          target_path: "/var/lib/kubelet/pods/test-pod/volumes/test-vol-456",
+          volume_capability: volume_capability,
+          readonly: false,
+          publish_context: base_publish_context,
+          volume_context: base_volume_context
+        )
+      end
+
+      it "creates valid publish request" do
+        expect(publish_request.volume_id).to eq("test-vol-456")
+        expect(publish_request.readonly).to be false
+        expect(publish_request.volume_capability.access_mode.mode).to eq(:SINGLE_NODE_WRITER)
+      end
+
+      context "with readonly mount" do
+        let(:readonly_request) do
+          Csi::V1::NodePublishVolumeRequest.new(
+            volume_id: "readonly-vol",
+            target_path: "/mnt/readonly",
+            volume_capability: volume_capability,
+            readonly: true
+          )
+        end
+
+        it "handles readonly flag" do
+          expect(readonly_request.readonly).to be true
+          expect(readonly_request.volume_id).to eq("readonly-vol")
+        end
+      end
+    end
+
+    describe "complex nested structures" do
+      it "creates requests with multiple volume capabilities" do
+        multi_cap_request = Csi::V1::CreateVolumeRequest.new(
+          name: "multi-capability-volume",
+          volume_capabilities: [
+            {
+              mount: { fs_type: "ext4" },
+              access_mode: { mode: :SINGLE_NODE_WRITER }
+            },
+            {
+              block: {},
+              access_mode: { mode: :MULTI_NODE_READER_ONLY }
+            }
+          ],
+          capacity_range: { required_bytes: 1073741824, limit_bytes: 2147483648 }
+        )
+
+        expect(multi_cap_request.volume_capabilities.length).to eq(2)
+        expect(multi_cap_request.volume_capabilities[0].mount.fs_type).to eq("ext4")
+        expect(multi_cap_request.volume_capabilities[1].access_mode.mode).to eq(:MULTI_NODE_READER_ONLY)
+      end
+
+      it "creates topology requirements" do
+        topo_request = Csi::V1::CreateVolumeRequest.new(
+          name: "topology-volume",
+          accessibility_requirements: {
+            requisite: [
+              { segments: { "zone" => "us-west-1a", "instance-type" => "m5.large" } },
+              { segments: { "zone" => "us-west-1b", "instance-type" => "m5.large" } }
+            ],
+            preferred: [
+              { segments: { "zone" => "us-west-1a" } }
+            ]
+          }
+        )
+
+        expect(topo_request.accessibility_requirements.requisite.length).to eq(2)
+        expect(topo_request.accessibility_requirements.requisite[0].segments["zone"]).to eq("us-west-1a")
+        expect(topo_request.accessibility_requirements.preferred[0].segments["zone"]).to eq("us-west-1a")
+      end
+    end
+  end
 end
 
