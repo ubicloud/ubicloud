@@ -47,6 +47,10 @@ def main(options)
     tests_to_wait << Prog::Test::HaPostgresResource.assemble
   end
 
+  if options[:test_cases].include?("kubernetes")
+    tests_to_wait << Prog::Test::Kubernetes.assemble
+  end
+
   # Although wait_until will be blocked while checking the first one
   # it won't affect the total time as other strands will continue in parallel.
   # No need to make it parallel.
