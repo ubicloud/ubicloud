@@ -360,7 +360,7 @@ class Clover < Roda
       if (locked_domain = locked_domain_for(email))
         error = if !omniauth_provider
           "Login via username and password"
-        elsif omniauth_provider != locked_domain.oidc_provider.ubid
+        elsif omniauth_provider.to_s != locked_domain.oidc_provider.ubid
           "Login via #{scope.omniauth_provider_name(omniauth_provider)}"
         end
 
@@ -523,7 +523,7 @@ class Clover < Roda
         redirect "/login"
       end
 
-      if (locked_domain = locked_domain_for(email)) && omniauth_provider != locked_domain.oidc_provider.ubid
+      if (locked_domain = locked_domain_for(email)) && omniauth_provider.to_s != locked_domain.oidc_provider.ubid
         flash["error"] = "Creating an account via authentication through #{scope.omniauth_provider_name(omniauth_provider)} is not supported for the #{domain_for_email(email)} domain. You must authenticate using #{locked_domain.oidc_provider.display_name}."
         redirect "/login"
       end
