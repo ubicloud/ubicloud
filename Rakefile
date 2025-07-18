@@ -266,6 +266,11 @@ task "rhizome_spec" do
   sh "COVERAGE=rhizome bundle exec rspec -O /dev/null rhizome"
 end
 
+desc "Run CSI tests"
+task "csi_spec" do
+  sh "cd kubernetes/csi && bundle exec rspec"
+end
+
 desc "Update cli spec golden files"
 task "update_golden_files" do
   sh "mv spec/routes/api/cli/spec-output-files/*.txt spec/routes/api/cli/spec-output-files/.txt spec/routes/api/cli/golden-files/"
