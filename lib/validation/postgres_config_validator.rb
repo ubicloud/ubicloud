@@ -16,6 +16,14 @@ module Validation
     end
 
     def validate(config)
+      errors = validation_errors(config)
+
+      if errors.any?
+        raise Validation::ValidationFailed.new(errors)
+      end
+    end
+
+    def validation_errors(config)
       errors = {}
       config.each do |key, value|
         errors[key] = if valid_config?(key)
@@ -29,10 +37,7 @@ module Validation
         end
       end
       errors.compact!
-
-      if errors.any?
-        raise Validation::ValidationFailed.new(errors)
-      end
+      errors
     end
 
     private
