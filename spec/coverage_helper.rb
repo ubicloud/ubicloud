@@ -21,6 +21,7 @@ if (suite = ENV.delete("COVERAGE"))
       end
     else
       add_filter "/rhizome"
+      add_filter "/kubernetes"
       # No need to check coverage for them
       add_filter "/migrate/"
       add_filter "/spec/"
