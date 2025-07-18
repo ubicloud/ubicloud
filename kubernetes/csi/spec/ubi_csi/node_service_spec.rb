@@ -797,5 +797,244 @@ RSpec.describe Csi::V1::NodeService do
       expect(result).to eq(pv)
     end
   end
+
+  describe "#node_unpublish_volume" do
+    let(:target_path) { "/var/lib/kubelet/pods/pod-123/volumes/kubernetes.io~csi/vol-test-123/mount" }
+    let(:req) do
+      Csi::V1::NodeUnpublishVolumeRequest.new(
+        volume_id: "vol-test-123",
+        target_path: target_path
+      )
+    end
+
+    before do
+      allow(service).to receive(:log_with_id)
+      allow(SecureRandom).to receive(:uuid).and_return("test-req-id")
+    end
+
+    it "unpublishes a mounted volume successfully" do
+      allow(service).to receive(:is_mounted?).with(target_path).and_return(true)
+      allow(service).to receive(:run_cmd).with("umount", "-q", target_path, req_id: "test-req-id").and_return(["", true])
+      
+      result = service.node_unpublish_volume(req, nil)
+      
+      expect(result).to be_a(Csi::V1::NodeUnpublishVolumeResponse)
+    end
+
+    it "skips umount when target path is not mounted" do
+      allow(service).to receive(:is_mounted?).with(target_path).and_return(false)
+      expect(service).to receive(:log_with_id).with("test-req-id", /is not mounted, skipping umount/)
+      
+      result = service.node_unpublish_volume(req, nil)
+      
+      expect(result).to be_a(Csi::V1::NodeUnpublishVolumeResponse)
+    end
+
+    it "handles umount failure" do
+      allow(service).to receive(:is_mounted?).with(target_path).and_return(true)
+      allow(service).to receive(:run_cmd).with("umount", "-q", target_path, req_id: "test-req-id").and_return(["umount error", false])
+      
+      expect(service).to receive(:log_with_id).with("test-req-id", /failed to umount device/)
+      expect { service.node_unpublish_volume(req, nil) }.to raise_error(GRPC::Internal, /Failed to unmount/)
+    end
+
+    it "handles GRPC::BadStatus exceptions" do
+      allow(service).to receive(:is_mounted?).with(target_path).and_raise(GRPC::InvalidArgument, "Invalid argument")
+      
+      expect(service).to receive(:log_with_id).with("test-req-id", /gRPC error in node_unpublish_volume/)
+      expect { service.node_unpublish_volume(req, nil) }.to raise_error(GRPC::InvalidArgument, "3:Invalid argument")
+    end
+
+    it "handles general exceptions and converts to GRPC::Internal" do
+      allow(service).to receive(:is_mounted?).with(target_path).and_raise(StandardError, "Unexpected error")
+      
+      expect(service).to receive(:log_with_id).with("test-req-id", /Internal error in node_unpublish_volume/)
+      expect { service.node_unpublish_volume(req, nil) }.to raise_error(GRPC::Internal, /NodeUnpublishVolume error/)
+    end
+  end
+
+  describe "#node_publish_volume" do
+    let(:staging_path) { "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/vol-test-123/globalmount" }
+    let(:target_path) { "/var/lib/kubelet/pods/pod-123/volumes/kubernetes.io~csi/vol-test-123/mount" }
+    let(:req) do
+      Csi::V1::NodePublishVolumeRequest.new(
+        volume_id: "vol-test-123",
+        staging_target_path: staging_path,
+        target_path: target_path,
+        volume_capability: Csi::V1::VolumeCapability.new(
+          mount: Csi::V1::VolumeCapability::MountVolume.new(fs_type: "ext4")
+        )
+      )
+    end
+
+    before do
+      allow(service).to receive(:log_with_id)
+      allow(SecureRandom).to receive(:uuid).and_return("test-req-id")
+    end
+
+    it "publishes a volume successfully" do
+      allow(FileUtils).to receive(:mkdir_p).with(target_path)
+      allow(service).to receive(:run_cmd).with("mount", "--bind", staging_path, target_path, req_id: "test-req-id").and_return(["", true])
+      
+      result = service.node_publish_volume(req, nil)
+      
+      expect(result).to be_a(Csi::V1::NodePublishVolumeResponse)
+    end
+
+    it "handles bind mount failure" do
+      allow(FileUtils).to receive(:mkdir_p).with(target_path)
+      allow(service).to receive(:run_cmd).with("mount", "--bind", staging_path, target_path, req_id: "test-req-id").and_return(["mount error", false])
+      
+      expect(service).to receive(:log_with_id).with("test-req-id", /failed to bind mount device/)
+      expect { service.node_publish_volume(req, nil) }.to raise_error(GRPC::Internal, /Failed to bind mount/)
+    end
+
+    it "handles GRPC::BadStatus exceptions" do
+      allow(FileUtils).to receive(:mkdir_p).with(target_path).and_raise(GRPC::InvalidArgument, "Invalid argument")
+      
+      expect(service).to receive(:log_with_id).with("test-req-id", /gRPC error in node_publish_volume/)
+      expect { service.node_publish_volume(req, nil) }.to raise_error(GRPC::InvalidArgument, "3:Invalid argument")
+    end
+
+    it "handles general exceptions and converts to GRPC::Internal" do
+      allow(FileUtils).to receive(:mkdir_p).with(target_path).and_raise(StandardError, "Unexpected error")
+      
+      expect(service).to receive(:log_with_id).with("test-req-id", /Internal error in node_publish_volume/)
+      expect { service.node_publish_volume(req, nil) }.to raise_error(GRPC::Internal, /NodePublishVolume error/)
+    end
+  end
+
+  describe "#recreate_pvc" do
+    let(:req_id) { "test-req-id" }
+    let(:client) { instance_double("KubernetesClient") }
+    let(:pv) do
+      {
+        "metadata" => {
+          "name" => "pv-123",
+          "annotations" => {}
+        },
+        "spec" => {
+          "claimRef" => {
+            "namespace" => "default",
+            "name" => "pvc-123"
+          }
+        }
+      }
+    end
+    let(:pvc) do
+      {
+        "metadata" => {
+          "name" => "pvc-123",
+          "namespace" => "default",
+          "resourceVersion" => "12345",
+          "uid" => "uid-123",
+          "creationTimestamp" => "2023-01-01T00:00:00Z"
+        },
+        "spec" => {
+          "volumeName" => "pv-123"
+        },
+        "status" => {}
+      }
+    end
+
+    before do
+      allow(service).to receive(:log_with_id)
+      allow(service).to receive(:trim_pvc).and_return(pvc)
+      allow(YAML).to receive(:dump).and_return("yaml_content")
+      allow(Base64).to receive(:strict_encode64).and_return("base64_content")
+    end
+
+    it "recreates PVC when PVC exists" do
+      allow(client).to receive(:get_pvc).with("default", "pvc-123").and_return(pvc)
+      expect(client).to receive(:update_pv).with(pv)
+      expect(client).to receive(:delete_pvc).with("default", "pvc-123")
+      expect(client).to receive(:create_pvc).with("yaml_content")
+      
+      service.recreate_pvc(req_id, client, pv)
+      
+      expect(pv["metadata"]["annotations"]["csi.ubicloud.com/old-pvc-object"]).to eq("base64_content")
+    end
+
+    it "recreates PVC from annotation when PVC not found" do
+      old_pvc_data = "different_base64_content"  # Different from "base64_content"
+      pv["metadata"]["annotations"]["csi.ubicloud.com/old-pvc-object"] = old_pvc_data
+      
+      allow(client).to receive(:get_pvc).with("default", "pvc-123").and_raise(ObjectNotFoundError.new("PVC not found"))
+      allow(Base64).to receive(:decode64).with(old_pvc_data).and_return("decoded_yaml")
+      allow(YAML).to receive(:load).with("decoded_yaml").and_return(pvc)
+      
+      # Since the annotation content is different from base64_content, it should update
+      expect(client).to receive(:update_pv).with(pv)
+      expect(client).to receive(:delete_pvc).with("default", "pvc-123")
+      expect(client).to receive(:create_pvc).with("yaml_content")
+      
+      service.recreate_pvc(req_id, client, pv)
+    end
+
+    it "raises error when PVC not found and no annotation" do
+      pv["metadata"]["annotations"]["csi.ubicloud.com/old-pvc-object"] = ""
+      
+      error = ObjectNotFoundError.new("PVC not found")
+      allow(client).to receive(:get_pvc).with("default", "pvc-123").and_raise(error)
+      
+      expect { service.recreate_pvc(req_id, client, pv) }.to raise_error(ObjectNotFoundError)
+    end
+
+    it "skips PV update when annotation already matches" do
+      pv["metadata"]["annotations"]["csi.ubicloud.com/old-pvc-object"] = "base64_content"
+      
+      allow(client).to receive(:get_pvc).with("default", "pvc-123").and_return(pvc)
+      expect(client).not_to receive(:update_pv)
+      expect(client).to receive(:delete_pvc).with("default", "pvc-123")
+      expect(client).to receive(:create_pvc).with("yaml_content")
+      
+      service.recreate_pvc(req_id, client, pv)
+    end
+  end
+
+  describe "#trim_pvc" do
+    let(:pv_name) { "pv-123" }
+    let(:pvc) do
+      {
+        "metadata" => {
+          "name" => "pvc-123",
+          "namespace" => "default",
+          "annotations" => {
+            "existing-annotation" => "value"
+          },
+          "resourceVersion" => "12345",
+          "uid" => "uid-123",
+          "creationTimestamp" => "2023-01-01T00:00:00Z"
+        },
+        "spec" => {
+          "volumeName" => "old-pv-name"
+        },
+        "status" => {
+          "phase" => "Bound"
+        }
+      }
+    end
+
+    it "trims PVC metadata and spec for recreation" do
+      result = service.trim_pvc(pvc, pv_name)
+      
+      # Should set the old PV name annotation
+      expect(result["metadata"]["annotations"]).to eq({"csi.ubicloud.com/old-pv-name" => pv_name})
+      
+      # Should remove metadata fields
+      expect(result["metadata"]).not_to have_key("resourceVersion")
+      expect(result["metadata"]).not_to have_key("uid")
+      expect(result["metadata"]).not_to have_key("creationTimestamp")
+      
+      # Should remove volumeName from spec
+      expect(result["spec"]).not_to have_key("volumeName")
+      
+      # Should remove status
+      expect(result).not_to have_key("status")
+      
+      # Should return the same object
+      expect(result).to eq(pvc)
+    end
+  end
 end
 
