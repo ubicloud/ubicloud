@@ -42,18 +42,22 @@
 </tbody>
 </table>
 
-<h2>Associations</h2>
-<% @klass.associations.each do |assoc| %>
-  <%
-  assoc_objs = Array(@obj.send(assoc)).select { defined?(it.ubid) && it.ubid }
-  next if assoc_objs.empty?
-  associated_class = @klass.association_reflection(assoc).associated_class
-  %>
+<h2 id="associations-header">Associations</h2>
+<div class="associations">
+  <% @klass.associations.sort.each do |assoc| %>
+    <%
+    assoc_objs = Array(@obj.send(assoc)).select { defined?(it.ubid) && it.ubid }
+    next if assoc_objs.empty?
+    associated_class = @klass.association_reflection(assoc).associated_class
+    %>
 
-  <h3><%= assoc %></h3>
-  <ul>
-  <% assoc_objs.each do %>
-    <li><a href="/model/<%= associated_class %>/<%= it.ubid %>"><%= it.ubid %></a></li>
+    <div class="association">
+      <h3><%= assoc %></h3>
+      <ul>
+      <% assoc_objs.each do %>
+	<li><a href="/model/<%= associated_class %>/<%= it.ubid %>"><%= it.ubid %></a></li>
+      <% end %>
+      </ul>
+    </div>
   <% end %>
-  </ul>
-<% end %>
+</div>

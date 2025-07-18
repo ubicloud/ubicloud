@@ -1,7 +1,11 @@
-<% form(id: "ubid_form") do |f| %>
-  <%== f.input("text", key: "ubid", label: "UBID", attr: {pattern: "[a-tv-z0-9]{26}", title: "UBID format: [a-tv-z0-9]{26}"}) %>
-  <%== f.button("Show Object") %>
-<% end %>
+<% @content_class = "" %>
+
+<div class="container">
+  <% form(id: "ubid_form") do |f| %>
+    <%== f.input("text", key: "ubid", label: "UBID", attr: {pattern: "[a-tv-z0-9]{26}", title: "UBID format: [a-tv-z0-9]{26}"}) %>
+    <%== f.button("Show Object") %>
+  <% end %>
+</div>
 
 <% unless @grouped_pages.empty? %>
   <table class="page-table">
@@ -44,5 +48,7 @@
   </table>
 <% end %>
 
-<p><a href="/change-password">Change Password</a></p>
-<p><a href="/multifactor-manage">Manage Multifactor Authentication</a></p>
+<div class="container">
+  <p><a href="/change-password">Change Password</a></p>
+  <p><a href="/multifactor-manage">Manage Multifactor Authentication</a></p>
+</div>

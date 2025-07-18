@@ -21,7 +21,7 @@
       </div>
     </nav>
 
-    <div class="container" id="content">
+    <div class="<%= @content_class || "container" %>" id="content">
       <% if flash["notice"] %>
         <div class="alert alert-success" role="alert" id="flash-notice"><%= flash["notice"] %></div>
       <% end %>
