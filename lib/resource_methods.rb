@@ -66,7 +66,7 @@ module ResourceMethods
       "inet" => :to_s.to_proc,
       "timestamp with time zone" => lambda { |v| v.strftime("%F %T") }
     }.freeze
-    def inspect_values
+    def inspect_values_hash
       inspect_values = {}
       sch = db_schema
       @values.except(*self.class.redacted_columns).each do |k, v|
@@ -82,7 +82,12 @@ module ResourceMethods
           v
         end
       end
-      inspect_values.inspect
+
+      inspect_values
+    end
+
+    def inspect_values
+      inspect_values_hash.inspect
     end
 
     NON_ARCHIVED_MODELS = ["ArchivedRecord", "Semaphore"].freeze
