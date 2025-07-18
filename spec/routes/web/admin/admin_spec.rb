@@ -166,4 +166,17 @@ RSpec.describe CloverAdmin do
     visit "/invalid-page"
     expect(page.title).to eq "Ubicloud Admin - File Not Found"
   end
+
+  it "raises errors if SHOW_ERRORS environment variable is set" do
+    show_errors, ENV["SHOW_ERRORS"] = ENV["SHOW_ERRORS"], "1"
+    expect { visit "/error" }.to raise_error(RuntimeError)
+  ensure
+    ENV.delete("SHOW_ERRORS") unless show_errors
+  end
+
+  it "shows error page for errors if SHOW_ERRORS environment variable is not set" do
+    expect(Clog).to receive(:emit).with("admin route exception").and_call_original
+    visit "/error"
+    expect(page.title).to eq "Ubicloud Admin - Internal Server Error"
+  end
 end
