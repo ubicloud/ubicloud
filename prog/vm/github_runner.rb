@@ -405,6 +405,14 @@ class Prog::Vm::GithubRunner < Prog::Base
       }
       Clog.emit("Remaining DockerHub rate limits") { {dockerhub_rate_limits:} }
     end
+
+    proxy_log_command = <<~COMMAND
+      sudo cat /var/log/cacheproxy.log
+    COMMAND
+    if (cache_proxy_log = vm.sshable.cmd(proxy_log_command, log: false))
+      cache_proxy_log_line_counts = cache_proxy_log.lines.each(&:strip!).reject(&:empty?).tally
+      Clog.emit("Cache proxy log line counts") { {cache_proxy_log_line_counts:} }
+    end
   rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
     Clog.emit("Failed to collect final telemetry") { github_runner }
   end
