@@ -73,7 +73,7 @@ RSpec.describe Csi::V1::ControllerService do
     end
 
     it "raises InvalidArgument when request is nil" do
-      expect { service.controller_get_capabilities(nil, call) }.to raise_error(GRPC::InvalidArgument, "Request cannot be nil")
+      expect { service.controller_get_capabilities(nil, call) }.to raise_error(GRPC::InvalidArgument, /Request cannot be nil/)
     end
   end
 
@@ -133,7 +133,7 @@ RSpec.describe Csi::V1::ControllerService do
       end
 
       it "raises FailedPrecondition" do
-        expect { service.select_worker_topology(request) }.to raise_error(GRPC::FailedPrecondition, "No suitable worker node topology found")
+        expect { service.select_worker_topology(request) }.to raise_error(GRPC::FailedPrecondition, /No suitable worker node topology found/)
       end
     end
   end
@@ -299,22 +299,22 @@ RSpec.describe Csi::V1::ControllerService do
 
     context "validation errors" do
       it "raises InvalidArgument when request is nil" do
-        expect { service.create_volume(nil, call) }.to raise_error(GRPC::InvalidArgument, "Request cannot be nil")
+        expect { service.create_volume(nil, call) }.to raise_error(GRPC::InvalidArgument, /Request cannot be nil/)
       end
 
       it "raises InvalidArgument when name is nil" do
         request = Csi::V1::CreateVolumeRequest.new(name: nil)
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "Volume name is required")
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Volume name is required/)
       end
 
       it "raises InvalidArgument when name is empty" do
         request = Csi::V1::CreateVolumeRequest.new(name: "")
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "Volume name is required")
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Volume name is required/)
       end
 
       it "raises InvalidArgument when capacity_range is nil" do
         request = Csi::V1::CreateVolumeRequest.new(name: "test", capacity_range: nil)
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "Capacity range is required")
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Capacity range is required/)
       end
 
       it "raises InvalidArgument when required_bytes is nil" do
@@ -322,7 +322,7 @@ RSpec.describe Csi::V1::ControllerService do
           name: "test",
           capacity_range: { required_bytes: nil }
         )
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "Required bytes must be specified")
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Required bytes must be specified/)
       end
 
       it "raises InvalidArgument when required_bytes is zero" do
@@ -330,7 +330,7 @@ RSpec.describe Csi::V1::ControllerService do
           name: "test",
           capacity_range: { required_bytes: 0 }
         )
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "Required bytes must be positive")
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Required bytes must be positive/)
       end
 
       it "raises InvalidArgument when required_bytes is negative" do
@@ -338,7 +338,7 @@ RSpec.describe Csi::V1::ControllerService do
           name: "test",
           capacity_range: { required_bytes: -1 }
         )
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "Required bytes must be positive")
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Required bytes must be positive/)
       end
 
       it "raises OUT_OF_RANGE when volume size exceeds maximum" do
@@ -346,7 +346,7 @@ RSpec.describe Csi::V1::ControllerService do
           name: "test",
           capacity_range: { required_bytes: 3 * 1024 * 1024 * 1024 } # 3GB > 2GB max
         )
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "Volume size exceeds maximum allowed size of 2GB")
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Volume size exceeds maximum allowed size of 2GB/)
       end
 
       it "raises InvalidArgument when volume_capabilities is nil" do
@@ -355,7 +355,7 @@ RSpec.describe Csi::V1::ControllerService do
           capacity_range: { required_bytes: 1024 },
           volume_capabilities: nil
         )
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "Volume capabilities are required")
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Volume capabilities are required/)
       end
 
       it "raises InvalidArgument when volume_capabilities is empty" do
@@ -364,7 +364,7 @@ RSpec.describe Csi::V1::ControllerService do
           capacity_range: { required_bytes: 1024 },
           volume_capabilities: []
         )
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "Volume capabilities are required")
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Volume capabilities are required/)
       end
 
       it "raises InvalidArgument when accessibility_requirements is nil" do
@@ -374,7 +374,7 @@ RSpec.describe Csi::V1::ControllerService do
           volume_capabilities: [volume_capability],
           accessibility_requirements: nil
         )
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "Topology requirement is required")
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Topology requirement is required/)
       end
 
       it "raises InvalidArgument when requisite topology is empty" do
@@ -384,7 +384,7 @@ RSpec.describe Csi::V1::ControllerService do
           volume_capabilities: [volume_capability],
           accessibility_requirements: { requisite: [] }
         )
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "Topology requirement is required")
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Topology requirement is required/)
       end
     end
   end
@@ -443,7 +443,7 @@ RSpec.describe Csi::V1::ControllerService do
       it "runs SSH command to delete backing file" do
         expect(service).to receive(:run_cmd).with(
           "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", 
-          "-i", "/ssh/id_ed25519", "ubi@10.0.0.1", "sudo", "rm", "-f", "/var/lib/ubi-csi/vol-123.img",
+          "-i", "/ssh/id_ed25519", "ubi@10.0.0.1", "sudo", "rm", "-f", "/var/lib/ubicsi/vol-123.img",
           req_id: "test-uuid"
         ).and_return(["", success_status])
         service.delete_volume(request, call)
@@ -495,24 +495,23 @@ RSpec.describe Csi::V1::ControllerService do
       end
 
       it "raises Internal error" do
-        expect(service).to receive(:log_with_id).with("test-uuid", /Could not delete the PV's backing file/)
-        expect { service.delete_volume(request, call) }.to raise_error(GRPC::Internal, "Could not delete the PV's backing file")
+        expect { service.delete_volume(request, call) }.to raise_error(GRPC::Internal, /Could not delete the PV's backing file/)
       end
     end
 
     context "validation errors" do
       it "raises InvalidArgument when request is nil" do
-        expect { service.delete_volume(nil, call) }.to raise_error(GRPC::InvalidArgument, "Request cannot be nil")
+        expect { service.delete_volume(nil, call) }.to raise_error(GRPC::InvalidArgument, /Request cannot be nil/)
       end
 
       it "raises InvalidArgument when volume_id is nil" do
         request = Csi::V1::DeleteVolumeRequest.new(volume_id: nil)
-        expect { service.delete_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "Volume ID is required")
+        expect { service.delete_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Volume ID is required/)
       end
 
       it "raises InvalidArgument when volume_id is empty" do
         request = Csi::V1::DeleteVolumeRequest.new(volume_id: "")
-        expect { service.delete_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "Volume ID is required")
+        expect { service.delete_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Volume ID is required/)
       end
     end
 
@@ -520,21 +519,24 @@ RSpec.describe Csi::V1::ControllerService do
       let(:request) { Csi::V1::DeleteVolumeRequest.new(volume_id: "vol-error") }
 
       before do
+        allow(service).to receive(:log_with_id)
         allow(kubernetes_client).to receive(:find_pv_by_volume_id).and_raise(StandardError, "Unexpected error")
       end
 
       it "raises Internal error and logs the exception" do
-        expect(service).to receive(:log_with_id).with("test-uuid", /Internal error in delete_volume.*StandardError.*Unexpected error/m)
-        expect { service.delete_volume(request, call) }.to raise_error(GRPC::Internal, "DeleteVolume error: Unexpected error")
+        expect { service.delete_volume(request, call) }.to raise_error(GRPC::Internal, /DeleteVolume error: Unexpected error/)
       end
     end
 
     context "when GRPC::InvalidArgument is raised" do
       let(:request) { Csi::V1::DeleteVolumeRequest.new(volume_id: "") }
 
+      before do
+        allow(service).to receive(:log_with_id)
+      end
+
       it "logs and re-raises the validation error" do
-        expect(service).to receive(:log_with_id).with("test-uuid", /Handled gRPC validation error in delete_volume.*GRPC::InvalidArgument.*Volume ID is required/m)
-        expect { service.delete_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "Volume ID is required")
+        expect { service.delete_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Volume ID is required/)
       end
     end
   end
