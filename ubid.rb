@@ -190,11 +190,11 @@ class UBID
     # :nocov:
   end
 
-  def self.resolve_map(uuids)
+  def self.resolve_map(uuids, assume_et_is_api_key: true)
     uuids.keys.group_by do
       ubid = from_uuidish(it).to_s
       # Bad hack, needed because ApiKey does not use a fixed ubid type
-      ubid.start_with?("et") ? ApiKey : class_for_ubid(ubid)
+      (ubid.start_with?("et") && assume_et_is_api_key) ? ApiKey : class_for_ubid(ubid)
     end.each do |model, model_uuids|
       next unless model
       model.where(id: model_uuids).each do

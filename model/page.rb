@@ -8,6 +8,50 @@ require "openssl"
 class Page < Sequel::Model
   dataset_module do
     where :active, resolved_at: nil
+
+    def group_by_vm_host
+      pages = all
+      related_resources = pages.flat_map { it.details["related_resources"] }.compact.to_h { [UBID.to_uuid(it), nil] }
+      related_resources = UBID.resolve_map(related_resources, assume_et_is_api_key: false)
+      related_resources.compact!
+      # ubid => VmHost ubid
+      host_map = {}
+      # Vm id => ubid
+      vm_id_map = {}
+
+      related_resources.transform_values do
+        case it
+        when VmHost
+          host_map[it.ubid] = it.ubid
+        when Vm, VmHostSlice, VhostBlockBackend, StorageDevice, SpdkInstallation, PciDevice
+          host_map[it.ubid] = UBID.from_uuidish(it.vm_host_id).to_s if it.vm_host_id
+        when VmStorageVolume, VictoriaMetricsServer, Nic, MinioServer, GithubRunner, PostgresServer, InferenceEndpointReplica, InferenceRouterReplica
+          (vm_id_map[it.vm_id] ||= []) << it.ubid if it.vm_id
+        end
+      end
+
+      # Vm id => VmHost ubid
+      vm_to_vm_host_map = Vm
+        .where(id: vm_id_map.keys)
+        .to_hash(:id, :vm_host_id)
+        .compact
+        .transform_values! { UBID.from_uuidish(it).to_s }
+
+      vm_id_map.each do |vm_id, ubids|
+        ubids.each do |ubid|
+          host_map[ubid] = vm_to_vm_host_map[vm_id]
+        end
+      end
+
+      grouped_pages = {}
+      pages.each do |page|
+        vm_host_ubid = nil
+        page.details["related_resources"]&.find { vm_host_ubid = host_map[it] }
+        (grouped_pages[vm_host_ubid] ||= []) << page
+      end
+
+      grouped_pages
+    end
   end
 
   # This cannot be covered, as the current coverage tests run without freezing models.
