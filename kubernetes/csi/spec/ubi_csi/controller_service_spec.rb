@@ -169,7 +169,7 @@ RSpec.describe Csi::V1::ControllerService do
     context "with valid request" do
       it "creates a new volume" do
         response = service.create_volume(valid_request, call)
-        expect(response.volume.volume_id).to eq("vol-test-uuid")
+        expect(response.volume.volume_id).to eq("vol-vol-test-uuid")
         expect(response.volume.capacity_bytes).to eq(1024 * 1024 * 1024)
         expect(response.volume.volume_context["size_bytes"]).to eq("1073741824")
         expect(response.volume.accessible_topology.first.segments["kubernetes.io/hostname"]).to eq("worker-1")
@@ -179,7 +179,7 @@ RSpec.describe Csi::V1::ControllerService do
         service.create_volume(valid_request, call)
         volume_store = service.instance_variable_get(:@volume_store)
         expect(volume_store["test-volume"]).to include(
-          volume_id: "vol-test-uuid",
+          volume_id: "vol-vol-test-uuid",
           name: "test-volume",
           capacity_bytes: 1024 * 1024 * 1024
         )
@@ -200,11 +200,12 @@ RSpec.describe Csi::V1::ControllerService do
 
       it "returns existing volume" do
         response = service.create_volume(valid_request, call)
-        expect(response.volume.volume_id).to eq("vol-test-uuid")
+        expect(response.volume.volume_id).to eq("vol-vol-test-uuid")
       end
 
       it "logs existing volume response" do
-        expect(service).to receive(:log_with_id).with("test-uuid-2", /create_volume response \(existing\)/)
+        expect(service).to receive(:log_with_id).with("test-uuid-2", /create_volume request/).ordered
+        expect(service).to receive(:log_with_id).with("test-uuid-2", /create_volume response/).ordered
         service.create_volume(valid_request, call)
       end
     end
@@ -217,7 +218,8 @@ RSpec.describe Csi::V1::ControllerService do
           volume_capabilities: [volume_capability],
           accessibility_requirements: {
             requisite: [{ segments: { "kubernetes.io/hostname" => "worker-2" } }]
-          }
+          },
+          parameters: { "type" => "ssd" }
         )
       end
 
@@ -226,7 +228,7 @@ RSpec.describe Csi::V1::ControllerService do
       end
 
       it "raises FailedPrecondition" do
-        expect { service.create_volume(different_topology_request, call) }.to raise_error(GRPC::FailedPrecondition, "Existing volume has incompatible topology")
+        expect { service.create_volume(different_topology_request, call) }.to raise_error(GRPC::FailedPrecondition, "9:Existing volume has incompatible topology")
       end
     end
 
@@ -238,7 +240,8 @@ RSpec.describe Csi::V1::ControllerService do
           volume_capabilities: [volume_capability],
           accessibility_requirements: {
             requisite: [topology]
-          }
+          },
+          parameters: { "type" => "ssd" }
         )
       end
 
@@ -247,7 +250,7 @@ RSpec.describe Csi::V1::ControllerService do
       end
 
       it "raises FailedPrecondition" do
-        expect { service.create_volume(different_size_request, call) }.to raise_error(GRPC::FailedPrecondition, "Volume with same name but different size exists")
+        expect { service.create_volume(different_size_request, call) }.to raise_error(GRPC::FailedPrecondition, "9:Volume with same name but different size exists")
       end
     end
 
@@ -269,7 +272,7 @@ RSpec.describe Csi::V1::ControllerService do
       end
 
       it "raises FailedPrecondition" do
-        expect { service.create_volume(different_params_request, call) }.to raise_error(GRPC::FailedPrecondition, "Volume with same name but different parameters exists")
+        expect { service.create_volume(different_params_request, call) }.to raise_error(GRPC::FailedPrecondition, "9:Volume with same name but different parameters exists")
       end
     end
 
@@ -284,7 +287,8 @@ RSpec.describe Csi::V1::ControllerService do
           }],
           accessibility_requirements: {
             requisite: [topology]
-          }
+          },
+          parameters: { "type" => "ssd" }
         )
       end
 
@@ -293,28 +297,28 @@ RSpec.describe Csi::V1::ControllerService do
       end
 
       it "raises FailedPrecondition" do
-        expect { service.create_volume(different_capabilities_request, call) }.to raise_error(GRPC::FailedPrecondition, "Volume with same name but different capabilities exists")
+        expect { service.create_volume(different_capabilities_request, call) }.to raise_error(GRPC::FailedPrecondition, "9:Volume with same name but different capabilities exists")
       end
     end
 
     context "validation errors" do
       it "raises InvalidArgument when request is nil" do
-        expect { service.create_volume(nil, call) }.to raise_error(GRPC::InvalidArgument, /Request cannot be nil/)
+        expect { service.create_volume(nil, call) }.to raise_error(GRPC::InvalidArgument, "3:Request cannot be nil")
       end
 
       it "raises InvalidArgument when name is nil" do
         request = Csi::V1::CreateVolumeRequest.new(name: nil)
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Volume name is required/)
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume name is required")
       end
 
       it "raises InvalidArgument when name is empty" do
         request = Csi::V1::CreateVolumeRequest.new(name: "")
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Volume name is required/)
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume name is required")
       end
 
       it "raises InvalidArgument when capacity_range is nil" do
         request = Csi::V1::CreateVolumeRequest.new(name: "test", capacity_range: nil)
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Capacity range is required/)
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Capacity range is required")
       end
 
       it "raises InvalidArgument when required_bytes is nil" do
@@ -322,7 +326,7 @@ RSpec.describe Csi::V1::ControllerService do
           name: "test",
           capacity_range: { required_bytes: nil }
         )
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Required bytes must be specified/)
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Required bytes must be positive")
       end
 
       it "raises InvalidArgument when required_bytes is zero" do
@@ -330,7 +334,7 @@ RSpec.describe Csi::V1::ControllerService do
           name: "test",
           capacity_range: { required_bytes: 0 }
         )
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Required bytes must be positive/)
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Required bytes must be positive")
       end
 
       it "raises InvalidArgument when required_bytes is negative" do
@@ -338,7 +342,7 @@ RSpec.describe Csi::V1::ControllerService do
           name: "test",
           capacity_range: { required_bytes: -1 }
         )
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Required bytes must be positive/)
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Required bytes must be positive")
       end
 
       it "raises OUT_OF_RANGE when volume size exceeds maximum" do
@@ -346,7 +350,7 @@ RSpec.describe Csi::V1::ControllerService do
           name: "test",
           capacity_range: { required_bytes: 3 * 1024 * 1024 * 1024 } # 3GB > 2GB max
         )
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Volume size exceeds maximum allowed size of 2GB/)
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume size exceeds maximum allowed size of 2GB")
       end
 
       it "raises InvalidArgument when volume_capabilities is nil" do
@@ -355,7 +359,7 @@ RSpec.describe Csi::V1::ControllerService do
           capacity_range: { required_bytes: 1024 },
           volume_capabilities: nil
         )
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Volume capabilities are required/)
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume capabilities are required")
       end
 
       it "raises InvalidArgument when volume_capabilities is empty" do
@@ -364,7 +368,7 @@ RSpec.describe Csi::V1::ControllerService do
           capacity_range: { required_bytes: 1024 },
           volume_capabilities: []
         )
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Volume capabilities are required/)
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume capabilities are required")
       end
 
       it "raises InvalidArgument when accessibility_requirements is nil" do
@@ -374,7 +378,7 @@ RSpec.describe Csi::V1::ControllerService do
           volume_capabilities: [volume_capability],
           accessibility_requirements: nil
         )
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Topology requirement is required/)
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Topology requirement is required")
       end
 
       it "raises InvalidArgument when requisite topology is empty" do
@@ -384,7 +388,7 @@ RSpec.describe Csi::V1::ControllerService do
           volume_capabilities: [volume_capability],
           accessibility_requirements: { requisite: [] }
         )
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Topology requirement is required/)
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Topology requirement is required")
       end
     end
   end
@@ -495,23 +499,23 @@ RSpec.describe Csi::V1::ControllerService do
       end
 
       it "raises Internal error" do
-        expect { service.delete_volume(request, call) }.to raise_error(GRPC::Internal, /Could not delete the PV's backing file/)
+        expect { service.delete_volume(request, call) }.to raise_error(GRPC::Internal, "13:DeleteVolume error: 13:Could not delete the PV's backing file")
       end
     end
 
     context "validation errors" do
       it "raises InvalidArgument when request is nil" do
-        expect { service.delete_volume(nil, call) }.to raise_error(GRPC::InvalidArgument, /Request cannot be nil/)
+        expect { service.delete_volume(nil, call) }.to raise_error(GRPC::InvalidArgument, "3:Request cannot be nil")
       end
 
       it "raises InvalidArgument when volume_id is nil" do
         request = Csi::V1::DeleteVolumeRequest.new(volume_id: nil)
-        expect { service.delete_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Volume ID is required/)
+        expect { service.delete_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume ID is required")
       end
 
       it "raises InvalidArgument when volume_id is empty" do
         request = Csi::V1::DeleteVolumeRequest.new(volume_id: "")
-        expect { service.delete_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Volume ID is required/)
+        expect { service.delete_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume ID is required")
       end
     end
 
@@ -524,7 +528,7 @@ RSpec.describe Csi::V1::ControllerService do
       end
 
       it "raises Internal error and logs the exception" do
-        expect { service.delete_volume(request, call) }.to raise_error(GRPC::Internal, /DeleteVolume error: Unexpected error/)
+        expect { service.delete_volume(request, call) }.to raise_error(GRPC::Internal, "13:DeleteVolume error: Unexpected error")
       end
     end
 
@@ -536,7 +540,7 @@ RSpec.describe Csi::V1::ControllerService do
       end
 
       it "logs and re-raises the validation error" do
-        expect { service.delete_volume(request, call) }.to raise_error(GRPC::InvalidArgument, /Volume ID is required/)
+        expect { service.delete_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume ID is required")
       end
     end
   end
