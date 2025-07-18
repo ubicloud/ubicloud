@@ -19,4 +19,6 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "grpc", "~> 1.73"
   spec.add_dependency "grpc-tools", "~> 1.73"
+
+  spec.add_development_dependency "rspec", "~> 3.12"
 end
