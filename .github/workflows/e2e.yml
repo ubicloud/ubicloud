@@ -9,7 +9,7 @@ on:
       test_cases:
         description: 'Comma-separated list of test cases (vm)'
         required: true
-        default: 'vm,github_runner_ubuntu_2404,github_runner_ubuntu_2204,postgres_standard,postgres_ha'
+        default: 'vm,github_runner_ubuntu_2404,github_runner_ubuntu_2204,postgres_standard,postgres_ha,kubernetes'
         type: string
 
   schedule:
@@ -108,6 +108,7 @@ jobs:
         GITHUB_CACHE_BLOB_STORAGE_ACCOUNT_ID: ${{ secrets.GH_CACHE_BLOB_STORAGE_ACCOUNT_ID }}
         GITHUB_CACHE_BLOB_STORAGE_API_KEY: ${{ secrets.GH_CACHE_BLOB_STORAGE_API_KEY }}
         POSTGRES_SERVICE_PROJECT_ID: "546a1ed8-53e5-86d2-966c-fb782d2ae5ab"
+        KUBERNETES_SERVICE_PROJECT_ID: "4e762e09-2a22-82d2-93c2-cfbefbda8c69"
         MINIO_SERVICE_PROJECT_ID: "37ad2a8d-0220-4e8b-a67f-38db95d6c657"
         VM_POOL_PROJECT_ID: "e4b93fb7-5125-8ad2-9d29-730ff4506bc3"
         MAIL_FROM: test@example.com
