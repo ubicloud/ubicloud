@@ -3,11 +3,12 @@
   <%== f.button("Show Object") %>
 <% end %>
 
-<% unless @pages.empty? %>
+<% unless @grouped_pages.empty? %>
   <table class="page-table">
     <caption>Active Pages</caption>
     <thead>
       <tr>
+	<th>VmHost</th>
 	<th>UBID</th>
 	<th>Created At</th>
 	<th>Summary</th>
@@ -15,19 +16,29 @@
       </tr>
     </thead>
     <tbody>
-      <% @pages.each do |page| %>
-	<tr>
-	  <td><a href="/model/Page/<%= page.ubid %>"><%= page.ubid %></a></td>
-	  <td><%= page.created_at.strftime("%F %T") %></td>
-	  <td><%= page.summary %></td>
-	  <td><%== h(page.details).gsub(/\b[a-tv-z0-9]{26}\b/) do
-            if (klass = UBID.class_for_ubid(it))
-              "<a href=\"/model/#{klass}/#{it}\">#{it}</a>"
-            else
-              it
-            end
-          end %></td>
-	</tr>
+      <% @grouped_pages.sort_by { |k,| k || "z" }.each do |vmh_ubid, pages| %>
+        <% pages.each_with_index do |page, index| %>
+          <tr>
+            <% if index == 0 %>
+              <td rowspan="<%= pages.size %>">
+                <% if vmh_ubid %>
+                  <a href="/model/VmHost/<%= vmh_ubid %>"><%= vmh_ubid %></a>
+                <% end%>
+              </td>
+            <% end %>
+
+            <td><a href="/model/Page/<%= page.ubid %>"><%= page.ubid %></a></td>
+            <td><%= page.created_at.strftime("%F %T") %></td>
+            <td><%= page.summary %></td>
+            <td><%== h(page.details).gsub(/\b[a-tv-z0-9]{26}\b/) do
+              if (klass = UBID.class_for_ubid(it))
+                "<a href=\"/model/#{klass}/#{it}\">#{it}</a>"
+              else
+                it
+              end
+            end %></td>
+          </tr>
+         <% end %>
        <% end %>
     </tbody>
   </table>

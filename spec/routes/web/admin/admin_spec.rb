@@ -7,6 +7,14 @@ RSpec.describe CloverAdmin do
     page.all(".object-table tbody tr").map { it.all("td").map(&:text) }.to_h.transform_keys(&:to_sym).except(:created_at)
   end
 
+  def page_data
+    page.all(".page-table tbody tr").map do
+      tds = it.all("td").map(&:text)
+      tds.delete_at(-3)
+      tds
+    end
+  end
+
   before do
     admin_account_setup_and_login
   end
@@ -91,28 +99,45 @@ RSpec.describe CloverAdmin do
     expect(page).to have_no_content "SSH Command"
   end
 
-  it "shows active pages on index page" do
+  it "shows active pages on index page, grouped by related host" do
     expect(page).to have_no_content "Active Pages"
 
     page1 = Page.create(summary: "some problem", tag: "a")
     page.refresh
     expect(page).to have_content "Active Pages"
-    tds = page.all(".page-table tbody tr").map { it.all("td").values_at(0, 2, 3).map(&:text) }
-    expect(tds).to eq [
-      [page1.ubid, "some problem", "{}"]
+    expect(page_data).to eq [
+      ["", page1.ubid, "some problem", "{}"]
     ]
     click_link page1.ubid
     expect(page.title).to eq "Ubicloud Admin - Page #{page1.ubid}"
 
     page2 = Page.create(summary: "another problem", tag: "b", details: {"related_resources" => [vm_pool.ubid]})
     visit "/"
-    tds = page.all(".page-table tbody tr").map { it.all("td").values_at(0, 2, 3).map(&:text) }
-    expect(tds).to eq [
-      [page1.ubid, "some problem", "{}"],
+    expect(page_data).to eq [
+      ["", page1.ubid, "some problem", "{}"],
       [page2.ubid, "another problem", "{\"related_resources\" => [\"#{vm_pool.ubid}\"]}"]
     ]
     click_link vm_pool.ubid
     expect(page.title).to eq "Ubicloud Admin - VmPool #{vm_pool.ubid}"
+
+    vmh = Prog::Vm::HostNexus.assemble("1.2.3.4").subject
+    pj = Project.create(name: "test")
+    vm = Prog::Vm::Nexus.assemble("a a", pj.id).subject
+    vm.update(vm_host_id: vmh.id)
+    page3 = Page.create(summary: "third problem", tag: "c", details: {"related_resources" => [vm.ubid]})
+    visit "/"
+    expect(page_data).to eq [
+      [vmh.ubid, page3.ubid, "third problem", "{\"related_resources\" => [\"#{vm.ubid}\"]}"],
+      ["", page1.ubid, "some problem", "{}"],
+      [page2.ubid, "another problem", "{\"related_resources\" => [\"#{vm_pool.ubid}\"]}"]
+    ]
+
+    click_link vmh.ubid
+    expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
+
+    visit "/"
+    click_link vm.ubid
+    expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
   end
 
   it "handles request for invalid ubid" do
