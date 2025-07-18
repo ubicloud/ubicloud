@@ -66,6 +66,13 @@ class CloverAdmin < Roda
     view(content: "")
   end
 
+  plugin :error_handler do |e|
+    raise e if Config.test? && ENV["SHOW_ERRORS"]
+    Clog.emit("admin route exception") { Util.exception_to_hash(e) }
+    @page_title = "Internal Server Error"
+    view(content: "")
+  end
+
   plugin :forme_route_csrf
   Forme.register_config(:clover_admin, base: :default, labeler: :explicit)
   Forme.default_config = :clover_admin
@@ -132,6 +139,12 @@ class CloverAdmin < Roda
       @grouped_pages = Page.active.reverse(:created_at, :summary).group_by_vm_host
 
       view("index")
+    end
+
+    # :nocov:
+    if Config.test?
+      # :nocov:
+      r.get("error") { raise }
     end
   end
 end
