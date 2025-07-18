@@ -7,6 +7,44 @@ require "json"
 RSpec.describe Page do
   subject(:p) { described_class.create(tag: "dummy-tag") }
 
+  describe ".group_by_vm_host" do
+    it "groups pages by the VmHost they are related to" do
+      expect(described_class.group_by_vm_host).to eq({})
+
+      p1 = described_class.create(tag: "a")
+      expect(described_class.group_by_vm_host).to eq({nil => [p1]})
+
+      p2 = described_class.create(tag: "b", details: {"related_resources" => []})
+      expect(described_class.order(:tag).group_by_vm_host).to eq({nil => [p1, p2]})
+
+      p3 = described_class.create(tag: "c", details: {"related_resources" => [p2.ubid]})
+      expect(described_class.order(:tag).group_by_vm_host).to eq({nil => [p1, p2, p3]})
+
+      vmh = Prog::Vm::HostNexus.assemble("1.2.3.4").subject
+      p4 = described_class.create(tag: "d", details: {"related_resources" => [vmh.ubid]})
+      expect(described_class.order(:tag).group_by_vm_host).to eq({nil => [p1, p2, p3], vmh.ubid => [p4]})
+
+      pj = Project.create(name: "test")
+      vm = Prog::Vm::Nexus.assemble("a a", pj.id).subject
+      p5 = described_class.create(tag: "e", details: {"related_resources" => [p3.ubid, vm.ubid]})
+      expect(described_class.order(:tag).group_by_vm_host).to eq({nil => [p1, p2, p3, p5], vmh.ubid => [p4]})
+
+      vm.update(vm_host_id: vmh.id)
+      expect(described_class.order(:tag).group_by_vm_host).to eq({nil => [p1, p2, p3], vmh.ubid => [p4, p5]})
+
+      p6 = described_class.create(tag: "f", details: {"related_resources" => [vm.nic.ubid]})
+      expect(described_class.order(:tag).group_by_vm_host).to eq({nil => [p1, p2, p3], vmh.ubid => [p4, p5, p6]})
+
+      gi = GithubInstallation.create(installation_id: 1, name: "t", type: "t")
+      gr = Prog::Vm::GithubRunner.assemble(gi, repository_name: "a", label: "ubicloud").subject
+      p7 = described_class.create(tag: "g", details: {"related_resources" => [gr.ubid]})
+      expect(described_class.order(:tag).group_by_vm_host).to eq({nil => [p1, p2, p3, p7], vmh.ubid => [p4, p5, p6]})
+
+      gr.update(vm_id: vm.id)
+      expect(described_class.order(:tag).group_by_vm_host).to eq({nil => [p1, p2, p3], vmh.ubid => [p4, p5, p6, p7]})
+    end
+  end
+
   describe "#trigger" do
     before do
       expect(Config).to receive(:pagerduty_key).and_return("dummy-key").at_least(:once)
