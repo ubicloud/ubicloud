@@ -86,6 +86,9 @@ class CloverAdmin < Roda
     webauthn_keys_table :admin_webauthn_key
     webauthn_user_ids_table :admin_webauthn_user_id
     login_column :login
+    login_redirect do
+      uses_two_factor_authentication? ? "/webauthn-auth" : "/webauthn-setup"
+    end
     require_bcrypt? false
     title_instance_variable :@page_title
     argon2_secret OpenSSL::HMAC.digest("SHA256", Config.clover_session_secret, "admin-argon2-secret")
