@@ -20,7 +20,7 @@ module Csi
         "kubectl",
         *args
       ]
-      @logger.info("[req_id=#{id}] [Kubernetes Client] #{cmd.join(" ")}") unless @req_id.nil?
+      @logger&.info("[req_id=#{@req_id}] [Kubernetes Client] #{cmd.join(" ")}")
       output, status = run_cmd(*cmd, stdin_data:)
       unless status.success?
         if output.strip.end_with?("not found")
