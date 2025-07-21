@@ -37,6 +37,7 @@ class Clover
         if api?
           Serializers::Project.serialize(@project)
         else
+          flash["notice"] = "Project created"
           r.redirect @project.path
         end
       end
