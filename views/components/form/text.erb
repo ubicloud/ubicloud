@@ -1,5 +1,5 @@
 <%# locals: (name: nil, label: nil, type: "text", value: nil, attributes: {}, extra_class: nil, button_title: nil) %>
-<% value = flash.dig("old", name) || value
+<% value = flash.dig("old", name) || request.POST[name] || value
 error = rodauth.field_error(name) || flash.dig("errors", name) %>
 
 <div class="space-y-2 text-gray-900">
