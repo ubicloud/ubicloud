@@ -38,9 +38,17 @@ RSpec.describe Prog::Storage::RemoveSpdk do
       expect { remove_spdk.start }.to hop("wait_volumes")
     end
 
-    it "fails if already contains 1 installations" do
+    it "fails if this is the last storage backend" do
       expect(vm_host).to receive(:spdk_installations).and_return(["spdk_1"])
-      expect { remove_spdk.start }.to raise_error RuntimeError, "Can't remove SPDK from hosts with less than 2 SPDK installations"
+      expect(vm_host).to receive(:vhost_block_backends).and_return([])
+      expect { remove_spdk.start }.to raise_error RuntimeError, "Can't remove the last storage backend from the host"
+    end
+
+    it "does not fail if there are other storage backends" do
+      expect(vm_host).to receive(:spdk_installations).and_return(["spdk_1"])
+      expect(vm_host).to receive(:vhost_block_backends).and_return(["vhost_backend"])
+      expect(spdk_installation).to receive(:update).with(allocation_weight: 0)
+      expect { remove_spdk.start }.to hop("wait_volumes")
     end
   end
 

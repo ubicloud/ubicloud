@@ -16,7 +16,7 @@ class Prog::Storage::RemoveSpdk < Prog::Base
   label def start
     vm_host = spdk_installation.vm_host
 
-    fail "Can't remove SPDK from hosts with less than 2 SPDK installations" if vm_host.spdk_installations.length < 2
+    fail "Can't remove the last storage backend from the host" if vm_host.spdk_installations.one? && vm_host.vhost_block_backends.empty?
 
     spdk_installation.update(allocation_weight: 0)
 
