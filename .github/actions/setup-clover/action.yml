@@ -37,3 +37,7 @@ runs:
         createuser -U postgres clover
         createuser -U postgres clover_password
         bundle exec rake setup_database\[test,true\]
+
+    - name: Install CSI gems
+      shell: bash
+      run: "cd kubernetes/csi && bundle install"

@@ -73,6 +73,9 @@ jobs:
     - name: Run dataplane tests
       run: bundle exec rake rhizome_spec
 
+    - name: Run CSI tests
+      run: rake csi_spec
+
     - name: Archive code coverage results
       if: failure()
       uses: actions/upload-artifact@v4
