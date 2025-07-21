@@ -13,6 +13,9 @@ GEM
     bigdecimal (3.1.9)
     diff-lcs (1.6.2)
     docile (1.4.1)
+    google-protobuf (4.31.1-aarch64-linux-gnu)
+      bigdecimal
+      rake (>= 13)
     google-protobuf (4.31.1-arm64-darwin)
       bigdecimal
       rake (>= 13)
@@ -21,6 +24,9 @@ GEM
       rake (>= 13)
     googleapis-common-protos-types (1.20.0)
       google-protobuf (>= 3.18, < 5.a)
+    grpc (1.73.0-aarch64-linux)
+      google-protobuf (>= 3.25, < 5.0)
+      googleapis-common-protos-types (~> 1.0)
     grpc (1.73.0-arm64-darwin)
       google-protobuf (>= 3.25, < 5.0)
       googleapis-common-protos-types (~> 1.0)
@@ -59,6 +65,7 @@ GEM
     unicode-emoji (4.0.4)
 
 PLATFORMS
+  aarch64-linux
   arm64-darwin
   x86_64-linux
 
