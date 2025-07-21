@@ -7,7 +7,7 @@ RSpec.describe Project do
   subject(:project) { described_class.create(name: "test") }
 
   describe "#validate" do
-    invalid_name = "must only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number"
+    invalid_name = "must be less than 64 characters and only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number"
 
     it "validates that name for new object is not empty and has correct format" do
       project = described_class.new
