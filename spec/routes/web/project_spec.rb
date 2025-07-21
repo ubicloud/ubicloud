@@ -79,6 +79,7 @@ RSpec.describe Clover, "project" do
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_flash_notice("Project created")
         expect(page).to have_content name
 
         project = Project[name: name]
