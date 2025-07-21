@@ -62,14 +62,6 @@ class Clover
           if api?
             Serializers::Project.serialize(@project)
           else
-            @quotas = ["VmVCpu", "PostgresVCpu"].map {
-              {
-                resource_type: it,
-                current_resource_usage: @project.current_resource_usage(it),
-                quota: @project.effective_quota_value(it)
-              }
-            }
-
             view "project/show"
           end
         end
@@ -91,8 +83,13 @@ class Clover
 
         r.post web? do
           authorize("Project:edit", @project.id)
-          @project.update(name: typecast_params.nonempty_str!("name"))
-          audit_log(@project, "update")
+
+          handle_validation_failure("project/show")
+
+          DB.transaction do
+            @project.update(name: typecast_params.nonempty_str!("name"))
+            audit_log(@project, "update")
+          end
 
           flash["notice"] = "The project name is updated to '#{@project.name}'."
 
