@@ -45,7 +45,17 @@ class Clover < Roda
     part("components/form/hidden", name: csrf_field, value: csrf_token(*))
   end
 
+  def handle_validation_failure(template)
+    return unless web?
+    @validation_failure_template = template
+  end
+
   def redirect_back_with_inputs
+    if (template = @validation_failure_template)
+      flash.sweep
+      request.on { view(template) }
+    end
+
     referrer = flash["referrer"] || env["HTTP_REFERER"]
     uri = begin
       Kernel.URI(referrer)
