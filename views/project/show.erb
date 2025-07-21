@@ -1,4 +1,11 @@
-<% @page_title = @project_data[:name] %>
+<% @page_title = @project_data[:name]
+@quotas = ["VmVCpu", "PostgresVCpu"].map {
+  {
+    resource_type: it,
+    current_resource_usage: @project.current_resource_usage(it),
+    quota: @project.effective_quota_value(it)
+  }
+} %>
 
 <%== part(
   "components/page_header",
