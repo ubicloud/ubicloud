@@ -63,6 +63,10 @@ class Clover < Roda
       nil
     end
 
+    # :nocov:
+    raise "Request failure without handle_validation_failure: #{request.path_info}" if ENV["DISALLOW_INTERNAL_REQUEST_FALLBACK"]
+    # :nocov:
+
     request.redirect "/" unless uri
 
     flash["old"] = redirect_back_with_inputs_params
