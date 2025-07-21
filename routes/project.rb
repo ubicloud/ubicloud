@@ -27,6 +27,8 @@ class Clover
           end
         end
 
+        handle_validation_failure("project/create")
+
         DB.transaction do
           @project = current_account.create_project_with_default_policy(typecast_params.nonempty_str!("name"))
           audit_log(@project, "create")
