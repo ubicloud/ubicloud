@@ -1,6 +1,8 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+ENV["MONITOR_PROCESS"] = "1"
+
 require_relative "../loader"
 clover_freeze
 
