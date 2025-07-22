@@ -92,4 +92,8 @@ module Util
     tags = [{key: "Ubicloud", value: "true"}, {key: "Name", value: name}].concat(additional_tags.map { |k, v| {key: k.to_s, value: v.to_s} })
     [{resource_type:, tags:}].compact
   end
+
+  def self.monitor_process?
+    ENV["MONITOR_PROCESS"] == "1"
+  end
 end
