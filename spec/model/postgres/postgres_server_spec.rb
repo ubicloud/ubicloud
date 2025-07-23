@@ -47,7 +47,7 @@ RSpec.describe PostgresServer do
 
   describe "#configure" do
     before do
-      allow(postgres_server).to receive_messages(timeline: instance_double(PostgresTimeline, blob_storage: "dummy-blob-storage"), read_replica?: false)
+      allow(postgres_server).to receive_messages(timeline: instance_double(PostgresTimeline, blob_storage: "dummy-blob-storage", aws?: false), read_replica?: false)
       allow(resource).to receive(:flavor).and_return(PostgresResource::Flavor::STANDARD)
     end
 
@@ -108,6 +108,12 @@ RSpec.describe PostgresServer do
       postgres_server.timeline_access = "push"
       expect(resource).to receive(:flavor).and_return(PostgresResource::Flavor::LANTERN).at_least(:once)
       expect(postgres_server.configure_hash[:configs]).to include("shared_preload_libraries" => "'pg_cron,pg_stat_statements,lantern_extras'")
+    end
+
+    it "puts extra logging options for AWS" do
+      expect(postgres_server.timeline).to receive(:aws?).and_return(true)
+      postgres_server.timeline_access = "push"
+      expect(postgres_server.configure_hash[:configs]).to include(:log_line_prefix, :log_connections, :log_disconnections)
     end
   end
 
