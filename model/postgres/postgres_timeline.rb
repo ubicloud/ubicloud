@@ -149,11 +149,11 @@ PGHOST=/var/run/postgresql
           rules: [
             {
               id: "DeleteOldBackups",
-              prefix: "basebackups_005/",
               status: "Enabled",
               expiration: {
                 days: BACKUP_BUCKET_EXPIRATION_DAYS
-              }
+              },
+              filter: {}
             }
           ]
         }
