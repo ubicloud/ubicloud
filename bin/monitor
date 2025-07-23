@@ -3,99 +3,303 @@
 
 ENV["MONITOR_PROCESS"] = "1"
 
+partition_number = ARGV[0]
+partition_number ||= if (match = /monitor\.(\d+)\z/.match(ENV["DYNO"] || ENV["PS"]))
+  match[1] # Heroku/Foreman
+end
+
+# For simplicity, monitor always runs partitioned. Even if only running a single
+# process, in which case, the partition is the entire id space.
+partition_number ||= "1"
+
+if partition_number
+  partition_number = Integer(partition_number)
+  raise "invalid partition_number: #{partition_number}" if partition_number < 1
+end
+
+# Used for NOTIFY, since NOTIFY payload must be a string
+partition_number_string = partition_number.to_s
+
+# Assume when starting that we are the final partition. For cases where we aren't,
+# this will quickly be updated after startup.
+num_partitions = partition_number
+
+# Flag set when we have repartitioned, to ensure we do a scan using the new partition
+# before enqueuing additional resources.
+repartitioned = true
+
+# Flag set when shutting down. All threads check this in their loops, and exit within
+# 1 second after it is set.
+shutdown = false
+
+# Time after which to run the scan query to check for new resources. This is updated
+# every time we run the scan query.
+scan_after = Time.now
+
+# The number of seconds until we should run the next scan query. This runs a scan
+# every minute.
+scan_every = 60
+
+# The number of seconds between enqueuing resources for pulse checking.
+enqueue_every = 5
+
+# Used solely to allow for immediately main/scan/enqueue thread exiting early during
+# shutdown.
+wakeup_queue = Queue.new
+
+# All queues that should be closed during shutdown. The queues for each of the thread
+# pool will be added to this array later.
+queues = [wakeup_queue]
+
+do_shutdown = proc do
+  shutdown = true
+  queues.each(&:close)
+end
+
+Signal.trap("INT", &do_shutdown)
+Signal.trap("TERM", &do_shutdown)
+
 require_relative "../loader"
+
+# Class that abstracts both monitored resources and metric export resources, to avoid
+# duplication for the two types. Each type monitors a certain number of types,
+# has a dedicated group of worker threads, and a queue for feeding the worker threads.
+MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :queue, :threads) do
+  # Helper method for creating the instance with the correct thread pool and queue
+  def self.create(klass, num_threads, *types)
+    pool_size = (num_threads - 2).clamp(1, nil)
+
+    # This does not get updated during runtime, which means that if many resources are
+    # added after startup, it may not be sized appropriately.  However, this seems
+    # unlikely to matter in practice.
+    queue_size = pool_size + (types.sum(&:count) * 1.5).round
+
+    queue = SizedQueue.new(queue_size)
+
+    threads = Array.new(pool_size) do
+      Thread.new do
+        while (r = queue.pop)
+          r.lock_no_wait do
+            r.open_resource_session
+
+            # Yield so that monitored resources and metric export resources can be
+            # handled differently.
+            yield r
+          end
+        end
+      end
+    end
+
+    new(klass, {}, types, queue, threads)
+  end
+
+  # Update the resources the instance will monitor/metric export. If the resource
+  # to be monitored was previously monitored, keep the previous version, as it will
+  # likely have an ssh session already setup.
+  def scan(id_range)
+    new_resources = {}
+    types.each do |type|
+      type.where_each(id: id_range) do
+        new_resources[it.id] = resources[it.id] || wrapper_class.new(it)
+      end
+    end
+    self.resources = new_resources
+  end
+
+  # Enqueue each resource. Enqueued resources will be processed by the worker
+  # thread pool.
+  def enqueue
+    resources.each_value do
+      # This method name is misleading, it only logs, it doesn't force stop
+      it.force_stop_if_stuck
+
+      # Even if the resource is locked, we still enqueue it, which seems
+      # questionable. Maybe it will be unlocked by the time a worker thread
+      # picks it up, but we should probably consider not enqueuing a locked
+      # resource.
+      queue.push(it)
+    end
+  end
+end
+
+# Need to define the MonitorResourceType constant before freezing
 clover_freeze
 
-health_monitor_resources = {}
-health_monitor_mutex = Mutex.new
-health_monitor_thread_pool_size = (Config.max_health_monitor_threads - 2).clamp(1, nil)
-monitorable_resource_types = [VmHost, PostgresServer, Vm.where(~Sshable.where(id: Sequel[:vm][:id]).exists), MinioServer, GithubRunner, VmHostSlice, LoadBalancerVmPort, KubernetesCluster, VictoriaMetricsServer]
-health_monitor_queue_size = health_monitor_thread_pool_size + (monitorable_resource_types.sum(&:count) * 1.5).round
-health_monitor_queue = SizedQueue.new(health_monitor_queue_size)
-
-metrics_target_resources = {}
-metrics_export_mutex = Mutex.new
-metrics_export_thread_pool_size = (Config.max_metrics_export_threads - 2).clamp(1, nil)
-metrics_target_resource_types = [PostgresServer, VmHost]
-metrics_export_queue_size = metrics_export_thread_pool_size + (metrics_target_resource_types.sum(&:count) * 1.5).round
-metrics_export_queue = SizedQueue.new(metrics_export_queue_size)
-
-resource_scanner = Thread.new do
-  loop do
-    monitorable_resources = monitorable_resource_types.flat_map(&:all)
-    health_monitor_mutex.synchronize do
-      monitorable_resources.each do |r|
-        health_monitor_resources[r.id] ||= MonitorableResource.new(r)
-      end
-    end
-    metrics_resources = metrics_target_resource_types.flat_map(&:all)
-    metrics_export_mutex.synchronize do
-      metrics_resources.each do |r|
-        metrics_target_resources[r.id] ||= MetricsTargetResource.new(r)
-      end
-    end
-
-    sleep 60
-  end
-rescue => ex
-  Clog.emit("Resource scanning has failed.") { {resource_scanning_failure: {exception: Util.exception_to_hash(ex)}} }
-  ThreadPrinter.run
-  Kernel.exit!
+partition_boundary = lambda do |partition_num, partition_size|
+  "%08x-0000-0000-0000-000000000000" % (partition_num * partition_size).to_i
 end
 
-health_monitor_thread_pool = Array.new(health_monitor_thread_pool_size) do
-  Thread.new do
-    while (r = health_monitor_queue.pop)
-      r.lock_no_wait do
-        r.open_resource_session
-        r.process_event_loop
-        r.check_pulse
-      end
-    end
+# This calculates the partition of the id space that this process will monitor.
+strand_id_range = lambda do
+  partition_size = (16**8) / num_partitions.to_r
+  start_id = partition_boundary.call(partition_number - 1, partition_size)
+
+  if num_partitions == partition_number
+    start_id.."ffffffff-ffff-ffff-ffff-ffffffffffff"
+  else
+    start_id...partition_boundary.call(partition_number, partition_size)
   end
 end
 
-metrics_export_thread_pool = Array.new(metrics_export_thread_pool_size) do
-  Thread.new do
-    while (r = metrics_export_queue.pop)
-      r.lock_no_wait do
-        r.open_resource_session
-        r.export_metrics
-      end
+# Notify the monitor channel that we exist, so that other monitor processes
+# can repartition appropriately if needed.
+notify_partition = proc do
+  DB.notify(:monitor, payload: partition_number_string)
+end
+
+# Listens on the monitor channel to determine what other monitor processes are
+# running, and updates the num_partitions information, so that the current process
+# scan thread will use the appropriate partition.
+repartition_thread = Thread.new do
+  # Check for shutdown every second
+  listen_timeout = 1
+
+  # Check for stale partitions and notify that the current process is still running
+  # every 18 seconds.
+  recheck_seconds = 18
+
+  # Remove a partition if we have not been notified about it in the last 40 seconds.
+  # Combined with the above two settings, this means that if the final monitor partition
+  # process exits, other monitor processes will repartition in 40-59 seconds.
+  stale_seconds = 40
+
+  # The next deadline after which to check for stale partitions and notify.
+  partition_recheck_time = Time.now + recheck_seconds - rand
+
+  # This starts out empty, but will be filled in by notifications from the current
+  # monitor process and other monitor processes.
+  partition_times = {}
+
+  # Updates the total number of partitions, and sets the repartition flag, so the
+  # next main loop iteration will run a scan query.
+  repartition = lambda do |np|
+    num_partitions = np
+    repartitioned = true
+    Clog.emit("monitor repartitioning") { {partition_number:, num_partitions:, range: strand_id_range.call} }
+  end
+
+  # Ensure we log partition information on startup
+  repartition.call(partition_number)
+
+  # Called every second. Used to exit the listen loop on shutdown, and to NOTIFY
+  # about the current process and remove stale processes when rechecking.
+  repartition_check = lambda do |partition_times|
+    throw :stop if shutdown
+
+    t = Time.now
+    if t > partition_recheck_time
+      partition_recheck_time = t + recheck_seconds
+      notify_partition.call
+      stale = t - stale_seconds
+      partition_times.reject! { |_, time| time < stale }
+      partition_times.keys.max
     end
   end
+
+  # If the maximum partition number after rechecking is lower than the currently
+  # expected partitioning, repartition the current process to expand the
+  # partition size.
+  loop = proc do
+    if (max_partition = repartition_check.call(partition_times))&.<(num_partitions)
+      repartition.call(max_partition)
+    end
+  end
+
+  # Continuouly LISTENs for notifications on the monitor channel until shutdown.
+  # If notified about a higher partition number than the currently expected
+  # partitioning, repartition the current process to decrease the partition size.
+  DB.listen(:monitor, loop:, after_listen: notify_partition, timeout: listen_timeout) do |_, _, payload|
+    throw :stop if shutdown
+
+    unless (partition_num = Integer(payload, exception: false)) && (partition_num <= 8)
+      Clog.emit("invalid monitor repartition notification") { {monitor_notify_payload: payload} }
+      next
+    end
+
+    repartition.call(partition_num) if partition_num > num_partitions
+    partition_times[partition_num] = Time.now
+  end
 end
+
+# Only NOTIFY for the first 3-5 seconds, so that by the time we actually start monitoring,
+# all monitor processes know the expected partitioning. The rand is to avoid thundering herd issues.
+sleep 1
+sleep rand
+3.times do
+  notify_partition.call
+  sleep 1
+end
+
+# Handle both monitored resources and metric export resources.
+resource_types = [
+  MonitorResourceType.create(MonitorableResource, Config.max_health_monitor_threads,
+    VmHost,
+    PostgresServer,
+    Vm.where(~Sshable.where(id: Sequel[:vm][:id]).exists),
+    MinioServer,
+    GithubRunner,
+    VmHostSlice,
+    LoadBalancerVmPort,
+    KubernetesCluster,
+    VictoriaMetricsServer) do
+    it.process_event_loop
+    it.check_pulse
+  end,
+  MonitorResourceType.create(MetricsTargetResource, Config.max_metrics_export_threads,
+    PostgresServer,
+    VmHost,
+    &:export_metrics)
+]
+
+# Shutdown the worker thread queues on shutdown.
+queues.concat(resource_types.map(&:queue))
+queues.freeze
+
+# The 2 additional threads are the main thread and the repartition thread
+monitor_internal_threads = resource_types.sum { it.threads.size } + 2
 
 begin
-  loop do
-    # Since the switch to use a thread pool for monitored resources,
-    # this emits the number of pulse threads + export threads, not the number of monitor threads + pulse threads
-    Clog.emit("Active threads count.") { {active_threads_count: Thread.list.count - health_monitor_thread_pool_size - metrics_export_thread_pool_size - 2} }
+  until shutdown
+    Clog.emit("Active threads count.") { {active_threads_count: Thread.list.count - monitor_internal_threads} }
 
-    health_monitor_rs = health_monitor_mutex.synchronize { health_monitor_resources.values }
-    health_monitor_rs.each do |r|
-      r.force_stop_if_stuck
-      health_monitor_queue.push(r)
+    t = Time.now
+    # If the time since last scan has exceeded the deadline, or we
+    # have repartitioned since the last iteration, scan again to get the
+    # current set of resources for both resource types.
+    if t > scan_after || repartitioned
+      scan_after = t + scan_every
+      repartitioned = false
+      id_range = strand_id_range.call
+      resource_types.each { it.scan(id_range) }
     end
-    health_monitor_mutex.synchronize { health_monitor_resources.delete_if { |_, r| r.deleted } }
 
-    metrics_export_rs = metrics_export_mutex.synchronize { metrics_target_resources.values }
-    metrics_export_rs.each do |r|
-      r.force_stop_if_stuck
-      metrics_export_queue.push(r)
-    end
-    metrics_export_mutex.synchronize { metrics_target_resources.delete_if { |_, r| r.deleted } }
+    # Enqueue every resource for both resource types
+    resource_types.each(&:enqueue)
 
-    sleep 5
+    # Sleep for the given number of seconds. This uses a timed pop on
+    # a queue so that it will exit immediately on shutdown
+    wakeup_queue.pop(timeout: enqueue_every)
   end
+rescue ClosedQueueError
+  # Shouldn't hit this block unless we are already shutting down,
+  # but better to be safe and handle case where we aren't already
+  # shutting down, otherwise joining the threads will block.
+  do_shutdown unless shutdown
 rescue => ex
-  Clog.emit("Pulse checking has failed.") { {pulse_checking_failure: {exception: Util.exception_to_hash(ex)}} }
+  Clog.emit("Pulse checking or resource scanning has failed.") { {pulse_checking_or_resource_scanning_failure: {exception: Util.exception_to_hash(ex)}} }
   ThreadPrinter.run
-  Kernel.exit!
+  Kernel.exit! 2
 end
 
-resource_scanner.join
-health_monitor_thread_pool.each { health_monitor_queue.push(nil) }
-health_monitor_thread_pool.each(&:join)
-metrics_export_thread_pool.each { metrics_export_queue.push(nil) }
-metrics_export_thread_pool.each(&:join)
+# If not all threads exit within two seconds, exit 1 to indicate
+# unclean shutdown.
+exit_status = 1
+
+Thread.new do
+  repartition_thread.join
+  resource_types.each { it.threads.each(&:join) }
+  # If all threads exit within two seconds, exit 0 to indicate clean shutdown.
+  exit_status = 0
+end.join(2)
+
+exit exit_status
