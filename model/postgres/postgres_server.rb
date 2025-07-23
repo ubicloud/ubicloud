@@ -93,6 +93,12 @@ class PostgresServer < Sequel::Model
       if standby? || doing_pitr?
         configs[:restore_command] = "'/usr/bin/wal-g wal-fetch %f %p --config /etc/postgresql/wal-g.env'"
       end
+
+      if timeline.aws?
+        configs[:log_line_prefix] = "'%m [%p:%l] (%x,%v): host=%r,db=%d,user=%u,app=%a,client=%h '"
+        configs[:log_connections] = "on"
+        configs[:log_disconnections] = "on"
+      end
     end
 
     {
