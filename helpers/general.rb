@@ -63,7 +63,7 @@ class Clover < Roda
     update_billing
     update_invitation
   ACTIONS
-  LOGGED_ACTIONS = Set.new(%w[create create_replica destroy]).freeze
+  LOGGED_ACTIONS = Set.new(%w[create create_replica destroy promote reset_superuser_password restart restore update]).freeze
 
   def audit_log(object, action, objects = [])
     raise "unsupported audit_log action: #{action}" unless SUPPORTED_ACTIONS.include?(action)
