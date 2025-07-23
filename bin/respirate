@@ -14,6 +14,7 @@ end
 require_relative "../loader"
 
 d = Scheduling::Dispatcher.new(partition_number:)
+Signal.trap("INT") { d.shutdown }
 Signal.trap("TERM") { d.shutdown }
 
 if Config.heartbeat_url
@@ -78,11 +79,14 @@ end
 
 Clog.emit("Shutting down.") { {unfinished_strand_count: d.num_current_strands} }
 
+exit_status = 1
+
 # Wait up to 2 seconds for all strand threads to exit.
 # We cannot wait very long, as every second we wait is potentially an
 # additional second that no respirate process is processing new strands.
 Thread.new do
   d.shutdown_and_cleanup_threads
-  exit 0
+  exit_status = 0
 end.join(2)
-exit 1
+
+exit exit_status

@@ -476,7 +476,7 @@ class Scheduling::Dispatcher
     # Don't thread print concurrently.
     APOPTOSIS_MUTEX.synchronize do
       ThreadPrinter.run
-      Kernel.exit!
+      Kernel.exit! 2
     end
   end
 
