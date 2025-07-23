@@ -863,6 +863,7 @@ function queryAndUpdateChart(chartInstance, start_time, end_time) {
 
       chartInstance.chart.hideLoading();
       chartInstance.chart.setOption({
+        ...chartInstance.chart.getOption(),
         legend: {
           data: chartSeries.map(series => series.name),
           right: '2%',
@@ -872,8 +873,9 @@ function queryAndUpdateChart(chartInstance, start_time, end_time) {
           min: start_time.getTime(),
           max: end_time.getTime()
         },
-        series: chartSeries
-      });
+        series: chartSeries,
+        graphic: [],
+      }, true);
       chartInstance.chart.resize();
     })
     .catch(error => {
