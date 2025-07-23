@@ -210,7 +210,7 @@ PGHOST=/var/run/postgresql
 
     it "sets lifecycle policy" do
       s3_client.stub_responses(:put_bucket_lifecycle_configuration)
-      expect(s3_client).to receive(:put_bucket_lifecycle_configuration).with({bucket: postgres_timeline.ubid, lifecycle_configuration: {rules: [{id: "DeleteOldBackups", status: "Enabled", prefix: "basebackups_005/", expiration: {days: 8}}]}}).and_return(true)
+      expect(s3_client).to receive(:put_bucket_lifecycle_configuration).with({bucket: postgres_timeline.ubid, lifecycle_configuration: {rules: [{id: "DeleteOldBackups", status: "Enabled", expiration: {days: 8}, filter: {}}]}}).and_return(true)
       expect(postgres_timeline.set_lifecycle_policy).to be(true)
     end
   end
