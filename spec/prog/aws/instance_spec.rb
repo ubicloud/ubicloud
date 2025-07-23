@@ -24,6 +24,10 @@ RSpec.describe Prog::Aws::Instance do
     Aws::EC2::Client.new(stub_responses: true)
   }
 
+  let(:iam_client) {
+    Aws::IAM::Client.new(stub_responses: true)
+  }
+
   let(:user_data) {
     <<~USER_DATA
 #!/bin/bash
@@ -48,9 +52,164 @@ usermod -L ubuntu
   before do
     allow(nx).to receive(:vm).and_return(vm)
     allow(Aws::EC2::Client).to receive(:new).with(access_key_id: "test-access-key", secret_access_key: "test-secret-key", region: "us-west-2").and_return(client)
+    allow(Aws::IAM::Client).to receive(:new).with(access_key_id: "test-access-key", secret_access_key: "test-secret-key", region: "us-west-2").and_return(iam_client)
   end
 
   describe "#start" do
+    it "creates a role for instance" do
+      iam_client.stub_responses(:create_role, {})
+      allow(nx).to receive(:iam_client).and_return(iam_client)
+      iam_client.stub_responses(:create_role, {})
+      expect(iam_client).to receive(:create_role).with({
+        role_name: vm.name,
+        assume_role_policy_document: {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Principal: {Service: "ec2.amazonaws.com"},
+              Action: "sts:AssumeRole"
+            }
+          ]
+        }.to_json
+      })
+
+      expect { nx.start }.to hop("create_role_policy")
+    end
+
+    it "hops to create_role_policy if role already exists" do
+      allow(nx).to receive(:iam_client).and_return(iam_client)
+      expect(iam_client).to receive(:create_role).with({role_name: vm.name, assume_role_policy_document: {
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Effect: "Allow",
+            Principal: {Service: "ec2.amazonaws.com"},
+            Action: "sts:AssumeRole"
+          }
+        ]
+      }.to_json}).and_raise(Aws::IAM::Errors::EntityAlreadyExists.new(nil, "EntityAlreadyExists"))
+      expect { nx.start }.to hop("create_role_policy")
+    end
+  end
+
+  describe "#create_role_policy" do
+    it "creates a role policy" do
+      iam_client.stub_responses(:create_policy, {})
+      expect(iam_client).to receive(:create_policy).with({
+        policy_name: "#{vm.name}-cw-agent-policy",
+        policy_document: {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Action: [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+                "logs:CreateLogGroup"
+              ],
+              Resource: [
+                "arn:aws:logs:*:*:log-group:/#{vm.name}/auth:log-stream:*",
+                "arn:aws:logs:*:*:log-group:/#{vm.name}/postgresql:log-stream:*"
+              ]
+            },
+            {
+              Effect: "Allow",
+              Action: "logs:DescribeLogStreams",
+              Resource: [
+                "arn:aws:logs:*:*:log-group:/#{vm.name}/auth:*",
+                "arn:aws:logs:*:*:log-group:/#{vm.name}/postgresql:*"
+              ]
+            }
+          ]
+        }.to_json
+      })
+
+      expect { nx.create_role_policy }.to hop("attach_role_policy")
+    end
+
+    it "hops to attach_role_policy if policy already exists" do
+      allow(nx).to receive(:iam_client).and_return(iam_client)
+      expect(iam_client).to receive(:create_policy).and_raise(Aws::IAM::Errors::EntityAlreadyExists.new(nil, "EntityAlreadyExists"))
+      expect { nx.create_role_policy }.to hop("attach_role_policy")
+    end
+  end
+
+  describe "#attach_role_policy" do
+    it "attaches role policy" do
+      allow(nx).to receive(:iam_client).and_return(iam_client)
+      iam_client.stub_responses(:attach_role_policy, {})
+      iam_client.stub_responses(:list_policies, policies: [{policy_name: "#{vm.name}-cw-agent-policy", arn: "arn:aws:iam::aws:policy/#{vm.name}-cw-agent-policy"}])
+      expect(iam_client).to receive(:attach_role_policy).with({
+        role_name: vm.name,
+        policy_arn: "arn:aws:iam::aws:policy/#{vm.name}-cw-agent-policy"
+      })
+
+      expect { nx.attach_role_policy }.to hop("create_instance_profile")
+    end
+
+    it "hops to create_instance_profile if policy already exists" do
+      allow(nx).to receive(:iam_client).and_return(iam_client)
+      iam_client.stub_responses(:list_policies, policies: [{policy_name: "#{vm.name}-cw-agent-policy", arn: "arn:aws:iam::aws:policy/#{vm.name}-cw-agent-policy"}])
+      expect(iam_client).to receive(:attach_role_policy).and_raise(Aws::IAM::Errors::EntityAlreadyExists.new(nil, "EntityAlreadyExists"))
+      expect { nx.attach_role_policy }.to hop("create_instance_profile")
+    end
+  end
+
+  describe "#create_instance_profile" do
+    it "creates an instance profile" do
+      allow(nx).to receive(:iam_client).and_return(iam_client)
+      iam_client.stub_responses(:create_instance_profile, {})
+      expect(iam_client).to receive(:create_instance_profile).with({
+        instance_profile_name: "#{vm.name}-instance-profile"
+      })
+
+      expect { nx.create_instance_profile }.to hop("add_role_to_instance_profile")
+    end
+
+    it "hops to add_role_to_instance_profile if instance profile already exists" do
+      allow(nx).to receive(:iam_client).and_return(iam_client)
+      expect(iam_client).to receive(:create_instance_profile).and_raise(Aws::IAM::Errors::EntityAlreadyExists.new(nil, "EntityAlreadyExists"))
+      expect { nx.create_instance_profile }.to hop("add_role_to_instance_profile")
+    end
+  end
+
+  describe "#add_role_to_instance_profile" do
+    it "adds role to instance profile" do
+      allow(nx).to receive(:iam_client).and_return(iam_client)
+      iam_client.stub_responses(:add_role_to_instance_profile, {})
+      expect(iam_client).to receive(:add_role_to_instance_profile).with({
+        instance_profile_name: "#{vm.name}-instance-profile",
+        role_name: vm.name
+      })
+
+      expect { nx.add_role_to_instance_profile }.to hop("wait_instance_profile_created")
+    end
+
+    it "hops to wait_instance_profile_created if role is already added to instance profile" do
+      allow(nx).to receive(:iam_client).and_return(iam_client)
+      expect(iam_client).to receive(:add_role_to_instance_profile).and_raise(Aws::IAM::Errors::EntityAlreadyExists.new(nil, "LimitExceeded"))
+      expect { nx.add_role_to_instance_profile }.to hop("wait_instance_profile_created")
+    end
+  end
+
+  describe "#wait_instance_profile_created" do
+    it "waits for instance profile to be created" do
+      expect(nx).to receive(:iam_client).and_return(iam_client)
+
+      iam_client.stub_responses(:get_instance_profile, instance_profile: {instance_profile_name: "#{vm.name}-instance-profile", instance_profile_id: "#{vm.name}-instance-profile-id", path: "/", roles: [], arn: "arn:aws:iam::#{vm.project.id}:instance-profile/#{vm.name}-instance-profile", create_date: Time.now})
+      expect { nx.wait_instance_profile_created }.to hop("create_instance")
+    end
+
+    it "naps if instance profile is not created" do
+      expect(nx).to receive(:iam_client).and_return(iam_client)
+      expect(iam_client).to receive(:get_instance_profile).and_raise(Aws::IAM::Errors::NoSuchEntity.new(nil, "NoSuchEntity"))
+
+      expect { nx.wait_instance_profile_created }.to nap(1)
+    end
+  end
+
+  describe "#create_instance" do
     it "creates an instance" do
       client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}]}])
       client.stub_responses(:describe_subnets, subnets: [{availability_zone_id: "use1-az1"}])
@@ -89,10 +248,13 @@ usermod -L ubuntu
         max_count: 1,
         user_data: Base64.encode64(user_data),
         tag_specifications: Util.aws_tag_specifications("instance", vm.name),
+        iam_instance_profile: {
+          name: "#{vm.name}-instance-profile"
+        },
         client_token: vm.id
       }).and_call_original
       expect(AwsInstance).to receive(:create).with(instance_id: "i-0123456789abcdefg", az_id: "use1-az1")
-      expect { nx.start }.to hop("wait_instance_created")
+      expect { nx.create_instance }.to hop("wait_instance_created")
     end
   end
 
@@ -134,12 +296,25 @@ usermod -L ubuntu
       expect(aws_instance).to receive(:destroy)
       expect(vm).to receive(:aws_instance).and_return(aws_instance).at_least(:once)
       expect(client).to receive(:terminate_instances).with({instance_ids: ["i-0123456789abcdefg"]})
-      expect { nx.destroy }.to exit({"msg" => "vm destroyed"})
+      expect { nx.destroy }.to hop("cleanup_roles")
     end
 
     it "pops directly if there is no aws_instance" do
       expect(vm).to receive(:aws_instance).and_return(nil)
-      expect { nx.destroy }.to exit({"msg" => "vm destroyed"})
+      expect { nx.destroy }.to hop("cleanup_roles")
+    end
+  end
+
+  describe "#cleanup_roles" do
+    it "cleans up roles" do
+      iam_client.stub_responses(:list_policies, policies: [{policy_name: "#{vm.name}-cw-agent-policy", arn: "arn:aws:iam::aws:policy/#{vm.name}-cw-agent-policy"}])
+      iam_client.stub_responses(:remove_role_from_instance_profile, {})
+      iam_client.stub_responses(:delete_instance_profile, {})
+      iam_client.stub_responses(:detach_role_policy, {})
+      iam_client.stub_responses(:delete_policy, {})
+      iam_client.stub_responses(:delete_role, {})
+
+      expect { nx.cleanup_roles }.to exit({"msg" => "vm destroyed"})
     end
   end
 end
