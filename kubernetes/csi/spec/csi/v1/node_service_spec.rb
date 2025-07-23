@@ -4,13 +4,12 @@ require "logger"
 require "spec_helper"
 
 RSpec.describe Csi::V1::NodeService do
-  let(:service) {
-    @service
-  }
+  let(:req_id) { "test-req-id" }
+  let(:client) { Csi::KubernetesClient.new(logger: Logger.new($stdout), req_id:) }
+  let(:service) { described_class.new(logger: Logger.new($stdout), node_id: "test-node") }
 
   before do
-    expect(Dir).to receive(:exist?).and_return(true)
-    @service = described_class.new(logger: Logger.new($stdout), node_id: "test-node")
+    allow(Dir).to receive(:exist?).and_return(true)
   end
 
   describe "directory creation logic" do
@@ -388,8 +387,6 @@ RSpec.describe Csi::V1::NodeService do
   end
 
   describe "#remove_old_pv_annotation" do
-    let(:client) { Csi::KubernetesClient }
-
     it "removes old PV annotation when present" do
       pvc = {
         "metadata" => {
@@ -418,8 +415,6 @@ RSpec.describe Csi::V1::NodeService do
   end
 
   describe "#roll_back_reclaim_policy" do
-    let(:req_id) { "test-req-id" }
-    let(:client) { Csi::KubernetesClient }
     let(:req) { instance_double(Csi::V1::NodeStageVolumeRequest) }
 
     it "returns early when old PV name annotation is not present" do
@@ -515,8 +510,6 @@ RSpec.describe Csi::V1::NodeService do
   end
 
   describe "#migrate_pvc_data" do
-    let(:req_id) { "test-req-id" }
-    let(:client) { Csi::KubernetesClient }
     let(:req) { Csi::V1::NodeStageVolumeRequest.new(volume_id: "vol-new-123") }
     let(:pvc) do
       {
@@ -553,8 +546,8 @@ RSpec.describe Csi::V1::NodeService do
       allow(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
 
       # First call is the check, second call is the run
-      expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "check", "copy_old-pv-123", req_id: req_id).and_return("NotStarted")
-      allow(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "run", any_args)
+      expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "check", "copy_old-pv-123", req_id:).and_return("NotStarted")
+      allow(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "run", any_args, req_id:)
 
       expect { service.migrate_pvc_data(req_id, client, pvc, req) }.to raise_error(CopyNotFinishedError, "Old PV data is not copied yet")
     end
@@ -592,8 +585,6 @@ RSpec.describe Csi::V1::NodeService do
 
   describe "#node_unstage_volume" do
     let(:req) { Csi::V1::NodeUnstageVolumeRequest.new(volume_id: "vol-test-123", staging_target_path: "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/vol-test-123/globalmount") }
-    let(:req_id) { "test-req-id" }
-    let(:client) { Csi::KubernetesClient.new(logger: Logger.new($stdout), req_id:) }
     let(:response) { Csi::V1::NodeUnstageVolumeResponse.new }
 
     before do
@@ -656,9 +647,7 @@ RSpec.describe Csi::V1::NodeService do
   end
 
   describe "#prepare_data_migration" do
-    let(:req_id) { "test-req-id" }
     let(:volume_id) { "vol-test-123" }
-    let(:client) { Csi::KubernetesClient }
     let(:pv) { {"metadata" => {"name" => "pv-123"}} }
 
     it "retains PV and recreates PVC" do
@@ -672,9 +661,7 @@ RSpec.describe Csi::V1::NodeService do
   end
 
   describe "#retain_pv" do
-    let(:req_id) { "test-req-id" }
     let(:volume_id) { "vol-test-123" }
-    let(:client) { Csi::KubernetesClient }
 
     it "updates PV reclaim policy when it's not Retain" do
       pv = {
@@ -818,8 +805,6 @@ RSpec.describe Csi::V1::NodeService do
   end
 
   describe "#recreate_pvc" do
-    let(:req_id) { "test-req-id" }
-    let(:client) { Csi::KubernetesClient }
     let(:pv) do
       {
         "metadata" => {
