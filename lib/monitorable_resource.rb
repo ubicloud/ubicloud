@@ -1,14 +1,12 @@
 # frozen_string_literal: true
 
 class MonitorableResource
-  attr_reader :deleted, :run_event_loop
-
-  PULSE_TIMEOUT = 120
+  attr_reader :deleted, :run_event_loop, :resource
+  attr_accessor :monitor_job_started_at, :monitor_job_finished_at
 
   def initialize(resource)
     @resource = resource
     @session = nil
-    @mutex = Mutex.new
     @pulse = {}
     @pulse_check_started_at = Time.now
     @pulse_thread = nil
@@ -64,24 +62,5 @@ class MonitorableResource
     rescue
     end
     @session = nil
-  end
-
-  def force_stop_if_stuck
-    if @mutex.locked?
-      Clog.emit("Resource is locked.") { {resource_locked: {ubid: @resource.ubid}} }
-      if @pulse_check_started_at + PULSE_TIMEOUT < Time.now
-        Clog.emit("Pulse check has stuck.") { {pulse_check_stuck: {ubid: @resource.ubid}} }
-      end
-    end
-  end
-
-  def lock_no_wait
-    return unless @mutex.try_lock
-
-    begin
-      yield
-    ensure
-      @mutex.unlock
-    end
   end
 end

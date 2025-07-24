@@ -1,14 +1,12 @@
 # frozen_string_literal: true
 
 class MetricsTargetResource
-  EXPORT_TIMEOUT = 100
-
-  attr_reader :deleted
+  attr_reader :deleted, :resource
+  attr_accessor :monitor_job_started_at, :monitor_job_finished_at
 
   def initialize(resource)
     @resource = resource
     @session = nil
-    @mutex = Mutex.new
     @last_export_success = false
     @export_started_at = Time.now
     @deleted = false
@@ -54,24 +52,5 @@ class MetricsTargetResource
     rescue
     end
     @session = nil
-  end
-
-  def force_stop_if_stuck
-    if @mutex.locked?
-      Clog.emit("Resource is locked.") { {resource_locked: {ubid: @resource.ubid}} }
-      if @export_started_at + EXPORT_TIMEOUT < Time.now
-        Clog.emit("Metrics export has stuck.") { {metrics_export_stuck: {ubid: @resource.ubid}} }
-      end
-    end
-  end
-
-  def lock_no_wait
-    return unless @mutex.try_lock
-
-    begin
-      yield
-    ensure
-      @mutex.unlock
-    end
   end
 end
