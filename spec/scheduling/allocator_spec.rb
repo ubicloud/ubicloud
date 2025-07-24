@@ -94,6 +94,21 @@ RSpec.describe Al do
       vm.family = "non-existing-family"
       expect { described_class.allocate(vm, storage_volumes) }.to raise_error RuntimeError, /no space left on any eligible host/
     end
+
+    it "uses premium host target utilization if it's enabled" do
+      al = instance_double(Al::Allocation)
+      expect(Al::Allocation).to receive(:best_allocation)
+        .with(Al::Request.new(
+          "2464de61-7501-8374-9ab0-416caebe31da", 2, 8, 33,
+          [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
+            [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
+          "ubuntu-jammy", false, 0, nil, true, Config.allocator_target_premium_host_utilization, "x64", ["accepting"], [], [], [], [],
+          "standard", 200, true, false, false, ["premium", "standard"]
+        )).and_return(al)
+      expect(al).to receive(:update)
+
+      described_class.allocate(vm, storage_volumes, family_filter: ["premium", "standard"])
+    end
   end
 
   describe "candidate_selection" do
