@@ -13,7 +13,7 @@ module Scheduling::Allocator
       gpu_count,
       gpu_device,
       vm.ip4_enabled,
-      Config.allocator_target_host_utilization,
+      family_filter.include?("premium") ? Config.allocator_target_premium_host_utilization : Config.allocator_target_host_utilization,
       vm.arch,
       allocation_state_filter,
       host_filter,

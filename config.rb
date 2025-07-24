@@ -181,7 +181,8 @@ module Config
   override :aws_based_postgres_17_ubuntu_2204_ami_version, "ami-0c8f8ddefeb7bd695", string
 
   # Allocator
-  override :allocator_target_host_utilization, 0.55, float
+  override :allocator_target_host_utilization, 0.72, float
+  override :allocator_target_premium_host_utilization, 0.85, float
   override :allocator_max_random_score, 0.1, float
 
   # e2e
