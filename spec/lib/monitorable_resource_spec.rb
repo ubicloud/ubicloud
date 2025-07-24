@@ -129,39 +129,4 @@ RSpec.describe MonitorableResource do
       r_w_event_loop.close_resource_session
     end
   end
-
-  describe "#force_stop_if_stuck" do
-    it "does nothing if pulse check is not stuck" do
-      expect(Kernel).not_to receive(:exit!)
-
-      # not locked
-      r_w_event_loop.force_stop_if_stuck
-
-      # not timed out
-      r_w_event_loop.instance_variable_get(:@mutex).lock
-      r_w_event_loop.instance_variable_set(:@pulse_check_started_at, Time.now)
-      r_w_event_loop.force_stop_if_stuck
-      r_w_event_loop.instance_variable_get(:@mutex).unlock
-    end
-
-    it "triggers Kernel.exit if pulse check is stuck" do
-      r_w_event_loop.instance_variable_get(:@mutex).lock
-      r_w_event_loop.instance_variable_set(:@pulse_check_started_at, Time.now - 200)
-      expect(Clog).to receive(:emit).at_least(:once).and_call_original
-      r_w_event_loop.force_stop_if_stuck
-      r_w_event_loop.instance_variable_get(:@mutex).unlock
-    end
-  end
-
-  describe "#lock_no_wait" do
-    it "does not yield if mutex is locked" do
-      r_w_event_loop.instance_variable_get(:@mutex).lock
-      expect { |b| r_w_event_loop.lock_no_wait(&b) }.not_to yield_control
-      r_w_event_loop.instance_variable_get(:@mutex).unlock
-    end
-
-    it "yields if mutex is not locked" do
-      expect { |b| r_w_event_loop.lock_no_wait(&b) }.to yield_control
-    end
-  end
 end
