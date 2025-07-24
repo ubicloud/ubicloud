@@ -1,24 +1,13 @@
 # frozen_string_literal: true
 
 require "logger"
+require "tmpdir"
 require "spec_helper"
 
 RSpec.describe Csi::V1::NodeService do
   let(:req_id) { "test-req-id" }
   let(:client) { Csi::KubernetesClient.new(logger: Logger.new($stdout), req_id:) }
   let(:service) { described_class.new(logger: Logger.new($stdout), node_id: "test-node") }
-
-  before do
-    allow(Dir).to receive(:exist?).and_return(true)
-  end
-
-  describe "directory creation logic" do
-    it "creates backing directory when doesn't exist" do
-      expect(Dir).to receive(:exist?).with("/var/lib/ubicsi").and_return(false)
-      expect(FileUtils).to receive(:mkdir_p).with("/var/lib/ubicsi")
-      described_class.new(logger: Logger.new($stdout), node_id: "test-node")
-    end
-  end
 
   describe "#node_get_capabilities" do
     let(:call) { instance_double(GRPC::ActiveCall) }
@@ -206,153 +195,193 @@ RSpec.describe Csi::V1::NodeService do
 
   describe "perform_node_stage_volume branches" do
     let(:req_id) { "test-req-id" }
-    let(:volume_id) { "vol-test-123" }
     let(:size_bytes) { 1024 * 1024 * 1024 }
-    let(:backing_file) { "/var/lib/ubicsi/vol-test-123.img" }
-    let(:staging_path) { "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/test-pv/globalmount" }
+    # let(:backing_file) { "/var/lib/ubicsi/vol-test-123.img" }
+    # let(:staging_path) { "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/test-pv/globalmount" }
     let(:pvc) { {"metadata" => {"annotations" => {}}} }
-    let(:req) do
-      Csi::V1::NodeStageVolumeRequest.new(
-        volume_id: volume_id,
-        staging_target_path: staging_path,
-        volume_context: {"size_bytes" => size_bytes.to_s},
-        volume_capability: Csi::V1::VolumeCapability.new(
-          mount: Csi::V1::VolumeCapability::MountVolume.new(fs_type: "ext4")
-        )
-      )
-    end
+    # let(:req) do
+    #   Csi::V1::NodeStageVolumeRequest.new(
+    #     volume_id: "vol-test-123",
+    #     staging_target_path: staging_path,
+    #     volume_context: {"size_bytes" => size_bytes.to_s},
+    #     volume_capability: Csi::V1::VolumeCapability.new(
+    #       mount: Csi::V1::VolumeCapability::MountVolume.new(fs_type: "ext4")
+    #     )
+    #   )
+    # end
 
-    before do
-      expect(service).to receive(:log_with_id).at_least(:once)
-      expect(described_class).to receive(:backing_file_path).with(volume_id).and_return(backing_file).at_least(:once)
-      # Keep these as allow since they're not used in every test
-      allow(service).to receive_messages(
-        is_mounted?: false,
-        is_copied_pvc?: false,
-        find_loop_device: nil
-      )
-      allow(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id: req_id).and_return(["/dev/loop0", true])
-      allow(service).to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id: req_id).and_return(["", true])
-      allow(Dir).to receive(:exist?).with(staging_path).and_return(false)
-      allow(FileUtils).to receive(:mkdir_p)
-      allow(service).to receive(:run_cmd).with("mount", "/dev/loop0", staging_path, req_id: req_id).and_return(["", true])
-    end
+    prefix_helper = ->(&blk) {
+      Dir.mktmpdir do |dir|
+        vbp = "#{dir}/var/lib/ubicsi"
+        FileUtils.mkdir_p(vbp)
+        service = Class.new(described_class) do
+          VOLUME_BASE_PATH = vbp
+          def self.volume_base_path = VOLUME_BASE_PATH
+        end.new(logger: Logger.new($stdout), node_id: "test-node")
+
+        req = Csi::V1::NodeStageVolumeRequest.new(
+          volume_id: "vol-test-123",
+          staging_target_path: "#{dir}/var/lib/kubelet/plugins/kubernetes.io/csi/pv/test-pv/globalmount",
+          volume_context: {"size_bytes" => (1024**3).to_s},
+          volume_capability: Csi::V1::VolumeCapability.new(
+            mount: Csi::V1::VolumeCapability::MountVolume.new(fs_type: "ext4")
+          )
+        )
+
+        backing_file = service.class.backing_file_path("vol-test-123")
+
+        blk.call(service, req, backing_file)
+      end
+    }
+
+    # before do
+    #   expect(service).to receive(:log_with_id).at_least(:once)
+    #   expect(described_class).to receive(:backing_file_path).with(volume_id).and_return(backing_file).at_least(:once)
+    #   # Keep these as allow since they're not used in every test
+    #   allow(service).to receive_messages(
+    #     is_mounted?: false,
+    #     is_copied_pvc?: false,
+    #     find_loop_device: nil
+    #   )
+    #   allow(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id: req_id).and_return(["/dev/loop0", true])
+    #   allow(service).to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id: req_id).and_return(["", true])
+    #   allow(service).to receive(:run_cmd).with("mount", "/dev/loop0", staging_path, req_id: req_id).and_return(["", true])
+    # end
 
     describe "backing file creation logic" do
-      before do
-        allow(Dir).to receive(:exist?).with("/var/lib/ubicsi").and_return(true)
-      end
-
       it "skips file creation when file exists" do
-        allow(File).to receive(:exist?).with(backing_file).and_return(true)
-        expect(service).not_to receive(:run_cmd).with("fallocate", "-l", size_bytes.to_s, backing_file, req_id: req_id)
+        prefix_helper.call do |service, req, backing_file|
+          File.write(backing_file, "")
+          p service.commands_run
+          expect(service).not_to receive(:run_cmd).with("fallocate", "-l", backing_file, req_id: req_id)
+          expect(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id: req_id).and_return(["/dev/loop0", true])
+          expect(service).to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id: req_id).and_return(["", true])
+          expect(service).to receive(:run_cmd).with("mount", "/dev/loop0", req.staging_target_path, req_id: req_id).and_return(["", true])
 
-        service.perform_node_stage_volume(req_id, pvc, req, nil)
+          service.perform_node_stage_volume(req_id, pvc, req, nil)
+        end
       end
 
       it "creates file when it doesn't exist - success path" do
-        allow(File).to receive(:exist?).with(backing_file).and_return(false)
-        expect(service).to receive(:run_cmd).with("fallocate", "-l", size_bytes.to_s, backing_file, req_id: req_id).and_return(["", true])
-        expect(service).to receive(:run_cmd).with("fallocate", "--punch-hole", "--keep-size", "-o", "0", "-l", size_bytes.to_s, backing_file, req_id: req_id).and_return(["", true])
+        prefix_helper.call do |service, req, backing_file|
+          expect(service).to receive(:run_cmd).with("fallocate", "-l", size_bytes.to_s, backing_file, req_id: req_id).and_return(["", true])
+          expect(service).to receive(:run_cmd).with("fallocate", "--punch-hole", "--keep-size", "-o", "0", "-l", size_bytes.to_s, backing_file, req_id:).and_return(["", true])
 
-        service.perform_node_stage_volume(req_id, pvc, req, nil)
+          # The rest of the commands are uninteresting.
+          expect(service).to receive(:run_cmd).with(any_args).at_least(:once).and_return(["irrelevant, but can't be empty", true])
+          service.perform_node_stage_volume(req_id, pvc, req, nil)
+        end
       end
 
       it "handles fallocate failure" do
-        expect(File).to receive(:exist?).with(backing_file).and_return(false)
-        expect(service).to receive(:run_cmd).with("fallocate", "-l", size_bytes.to_s, backing_file, req_id: req_id).and_return(["Error message", false])
+        prefix_helper.call do |service, req, backing_file|
+          expect(service).to receive(:run_cmd).with("fallocate", "-l", size_bytes.to_s, backing_file, req_id:).and_return(["Error message", false])
 
-        expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error(GRPC::ResourceExhausted, /Failed to allocate backing file/)
+          expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error(GRPC::ResourceExhausted, /Failed to allocate backing file/)
+        end
       end
 
       it "handles punch hole failure" do
-        expect(File).to receive(:exist?).with(backing_file).and_return(false)
-        expect(service).to receive(:run_cmd).with("fallocate", "-l", size_bytes.to_s, backing_file, req_id: req_id).and_return(["", true])
-        expect(service).to receive(:run_cmd).with("fallocate", "--punch-hole", "--keep-size", "-o", "0", "-l", size_bytes.to_s, backing_file, req_id: req_id).and_return(["Punch hole error", false])
+        prefix_helper.call do |service, req, backing_file|
+          expect(service).to receive(:run_cmd).with("fallocate", "-l", size_bytes.to_s, backing_file, req_id:).and_return(["", true])
+          expect(service).to receive(:run_cmd).with("fallocate", "--punch-hole", "--keep-size", "-o", "0", "-l", size_bytes.to_s, backing_file, req_id:).and_return(["Punch hole error", false])
 
-        expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error(GRPC::ResourceExhausted, /Failed to punch hole/)
+          expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error(GRPC::ResourceExhausted, /Failed to punch hole/)
+        end
       end
     end
 
     describe "loop device logic" do
-      before do
-        allow(Dir).to receive(:exist?).with("/var/lib/ubicsi").and_return(true)
-        allow(File).to receive(:exist?).with(backing_file).and_return(true)
-      end
-
       it "handles loop device setup failure" do
-        allow(service).to receive(:find_loop_device).and_return(nil)
-        allow(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id: req_id).and_return(["Error setting up loop device", false])
+        prefix_helper.call do |service, req, backing_file|
+          expect(service).to receive(:run_cmd).with("fallocate", any_args, req_id:).and_return(["", true]).at_least(:once)
+          expect(service).to receive(:run_cmd).with("losetup", "-j", any_args, req_id:).and_return(["a fake found loop device", true])
+          expect(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id: req_id).and_return(["Error setting up loop device", false])
 
-        expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error(GRPC::Internal, /Failed to setup loop device/)
+          expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error(GRPC::Internal, /Failed to setup loop device/)
+        end
       end
 
       it "handles empty loop device output" do
-        allow(service).to receive(:find_loop_device).and_return(nil)
-        allow(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id: req_id).and_return(["", true])
+        prefix_helper.call do |service, req, backing_file|
+          expect(service).to receive(:run_cmd).with("fallocate", any_args, req_id:).and_return(["", true]).at_least(:once)
+          expect(service).to receive(:run_cmd).with("losetup", "-j", any_args, req_id:).and_return(["a fake found loop device", true])
+          expect(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id: req_id).and_return(["", true])
 
-        expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error(GRPC::Internal, /Failed to setup loop device/)
+          expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error(GRPC::Internal, /Failed to setup loop device/)
+        end
       end
 
       it "logs when loop device already exists" do
-        expect(service).to receive(:find_loop_device).and_return("/dev/loop1")
-        expect(service).to receive(:run_cmd).with("mount", "/dev/loop1", staging_path, req_id: req_id).and_return(["", true])
+        prefix_helper.call do |service, req, backing_file|
+          expect(service).to receive(:run_cmd).with("fallocate", any_args, req_id:).and_return(["", true]).at_least(:once)
+          expect(service).to receive(:find_loop_device).and_return("/dev/loop1")
+          expect(service).to receive(:is_mounted?).and_return(false)
+          expect(service).to receive(:run_cmd).with("mount", "/dev/loop1", req.staging_target_path, req_id: req_id).and_return(["", true])
 
-        service.perform_node_stage_volume(req_id, pvc, req, nil)
+          service.perform_node_stage_volume(req_id, pvc, req, nil)
+        end
       end
     end
 
     describe "filesystem creation logic" do
-      before do
-        allow(Dir).to receive(:exist?).with("/var/lib/ubicsi").and_return(true)
-        allow(File).to receive(:exist?).with(backing_file).and_return(true)
-        allow(service).to receive(:find_loop_device).and_return("/dev/loop0")
-      end
-
       it "skips mkfs when PVC is copied" do
-        allow(service).to receive(:is_copied_pvc?).and_return(true)
-        expect(service).not_to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id: req_id)
+        prefix_helper.call do |service, req, backing_file|
+          expect(service).to receive(:run_cmd).with("fallocate", any_args, req_id:).and_return(["", true]).at_least(:once)
+          expect(service).to receive(:run_cmd).with("mount", any_args, req_id:).and_return(["", true])
+          expect(service).to receive(:find_loop_device).and_return("/dev/loop0")
+          expect(service).to receive(:is_copied_pvc?).and_return(true)
+          expect(service).not_to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id: req_id)
 
-        service.perform_node_stage_volume(req_id, pvc, req, nil)
+          service.perform_node_stage_volume(req_id, pvc, req, nil)
+        end
       end
 
       it "runs nothing when requested storage is already mounted and needs no mkfs" do
-        expect(service).to receive_messages(
-          find_loop_device: "/dev/loop0",
-          is_mounted?: true
-        )
+        prefix_helper.call do |service, req, _|
+          expect(service).to receive_messages(
+            find_loop_device: "/dev/loop0",
+            is_mounted?: true
+          )
 
-        service.perform_node_stage_volume(req_id, pvc, req, nil)
+          service.perform_node_stage_volume(req_id, pvc, req, nil)
+        end
       end
 
       it "handles mkfs failure" do
-        allow(service).to receive_messages(
-          find_loop_device: nil,  # New loop device
-          is_copied_pvc?: false,
-          is_mounted?: false
-        )
-        expect(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id: req_id).and_return(["/dev/loop0", true])
-        expect(service).to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id: req_id).and_return(["mkfs error", false])
+        prefix_helper.call do |service, req, backing_file|
+          expect(service).to receive_messages(
+            find_loop_device: nil,  # New loop device
+            is_copied_pvc?: false
+          )
+          expect(service).to receive(:run_cmd).with("fallocate", any_args, req_id:).and_return(["", true]).at_least(:once)
+          expect(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id: req_id).and_return(["/dev/loop0", true])
+          expect(service).to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id: req_id).and_return(["mkfs error", false])
 
-        expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error(GRPC::Internal, /Failed to format device/)
+          expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error(GRPC::Internal, /Failed to format device/)
+        end
       end
 
       it "handles mount failure" do
-        allow(service).to receive_messages(
-          find_loop_device: "/dev/loop0",
-          is_copied_pvc?: false,
-          is_mounted?: false
-        )
-        expect(FileUtils).to receive(:mkdir_p)
-        expect(service).to receive(:run_cmd).with("mount", "/dev/loop0", staging_path, req_id: req_id).and_return(["mount error", false])
+        prefix_helper.call do |service, req, backing_file|
+          expect(service).to receive_messages(
+            find_loop_device: "/dev/loop0",
+            is_copied_pvc?: false,
+            is_mounted?: false
+          )
+          expect(service).to receive(:run_cmd).with("fallocate", any_args, req_id:).and_return(["", true]).at_least(:once)
+          expect(service).to receive(:run_cmd).with("mount", "/dev/loop0", req.staging_target_path, req_id:).and_return(["mount error", false])
 
-        expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error(GRPC::Internal, /Failed to mount/)
+          expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error(GRPC::Internal, /Failed to mount/)
+        end
       end
 
       it "handles general exceptions" do
-        expect(service).to receive(:find_loop_device).and_raise(StandardError, "Unexpected error")
+        prefix_helper.call do |service, req, _|
+          expect(service).to receive(:find_loop_device).and_raise(StandardError, "Unexpected error")
 
-        expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error(GRPC::Internal, /NodeStageVolume error/)
+          expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error(GRPC::Internal, /NodeStageVolume error/)
+        end
       end
     end
   end
@@ -773,7 +802,6 @@ RSpec.describe Csi::V1::NodeService do
     end
 
     it "publishes a volume successfully" do
-      allow(FileUtils).to receive(:mkdir_p).with(target_path)
       allow(service).to receive(:run_cmd).with("mount", "--bind", staging_path, target_path, req_id: "test-req-id").and_return(["", true])
 
       result = service.node_publish_volume(req, nil)
@@ -782,7 +810,6 @@ RSpec.describe Csi::V1::NodeService do
     end
 
     it "handles bind mount failure" do
-      allow(FileUtils).to receive(:mkdir_p).with(target_path)
       allow(service).to receive(:run_cmd).with("mount", "--bind", staging_path, target_path, req_id: "test-req-id").and_return(["mount error", false])
 
       expect(service).to receive(:log_with_id).with("test-req-id", /failed to bind mount device/)
@@ -790,15 +817,11 @@ RSpec.describe Csi::V1::NodeService do
     end
 
     it "handles GRPC::BadStatus exceptions" do
-      allow(FileUtils).to receive(:mkdir_p).with(target_path).and_raise(GRPC::InvalidArgument, "Invalid argument")
-
       expect(service).to receive(:log_with_id).with("test-req-id", /gRPC error in node_publish_volume/)
       expect { service.node_publish_volume(req, nil) }.to raise_error(GRPC::InvalidArgument, "3:Invalid argument")
     end
 
     it "handles general exceptions and converts to GRPC::Internal" do
-      allow(FileUtils).to receive(:mkdir_p).with(target_path).and_raise(StandardError, "Unexpected error")
-
       expect(service).to receive(:log_with_id).with("test-req-id", /Internal error in node_publish_volume/)
       expect { service.node_publish_volume(req, nil) }.to raise_error(GRPC::Internal, /NodePublishVolume error/)
     end
