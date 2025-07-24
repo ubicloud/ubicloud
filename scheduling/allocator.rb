@@ -1,17 +1,6 @@
 # frozen_string_literal: true
 
 module Scheduling::Allocator
-  # :nocov:
-  def self.freeze
-    target_host_utilization
-    super
-  end
-  # :nocov:
-
-  def self.target_host_utilization
-    @target_host_utilization ||= Config.allocator_target_host_utilization
-  end
-
   def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], os_filter: nil)
     request = Request.new(
       vm.id,
@@ -24,7 +13,7 @@ module Scheduling::Allocator
       gpu_count,
       gpu_device,
       vm.ip4_enabled,
-      target_host_utilization,
+      Config.allocator_target_host_utilization,
       vm.arch,
       allocation_state_filter,
       host_filter,
