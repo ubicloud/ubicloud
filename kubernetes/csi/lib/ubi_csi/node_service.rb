@@ -20,8 +20,11 @@ module Csi
       OLD_PV_NAME_ANNOTATION_KEY = "csi.ubicloud.com/old-pv-name"
       OLD_PVC_OBJECT_ANNOTATION_KEY = "csi.ubicloud.com/old-pvc-object"
 
+      def self.mkdir_p
+        FileUtils.mkdir_p(VOLUME_BASE_PATH)
+      end
+
       def initialize(logger:, node_id:)
-        FileUtils.mkdir_p(VOLUME_BASE_PATH) unless Dir.exist?(VOLUME_BASE_PATH)
         @logger = logger
         @node_id = node_id
       end

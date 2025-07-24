@@ -8,15 +8,10 @@ RSpec.describe Csi::V1::NodeService do
   let(:client) { Csi::KubernetesClient.new(logger: Logger.new($stdout), req_id:) }
   let(:service) { described_class.new(logger: Logger.new($stdout), node_id: "test-node") }
 
-  before do
-    allow(Dir).to receive(:exist?).and_return(true)
-  end
-
-  describe "directory creation logic" do
+  describe ".mkdir_p" do
     it "creates backing directory when doesn't exist" do
-      expect(Dir).to receive(:exist?).with("/var/lib/ubicsi").and_return(false)
       expect(FileUtils).to receive(:mkdir_p).with("/var/lib/ubicsi")
-      described_class.new(logger: Logger.new($stdout), node_id: "test-node")
+      described_class.mkdir_p
     end
   end
 
@@ -239,10 +234,6 @@ RSpec.describe Csi::V1::NodeService do
     end
 
     describe "backing file creation logic" do
-      before do
-        allow(Dir).to receive(:exist?).with("/var/lib/ubicsi").and_return(true)
-      end
-
       it "skips file creation when file exists" do
         allow(File).to receive(:exist?).with(backing_file).and_return(true)
         expect(service).not_to receive(:run_cmd).with("fallocate", "-l", size_bytes.to_s, backing_file, req_id: req_id)
@@ -276,7 +267,6 @@ RSpec.describe Csi::V1::NodeService do
 
     describe "loop device logic" do
       before do
-        allow(Dir).to receive(:exist?).with("/var/lib/ubicsi").and_return(true)
         allow(File).to receive(:exist?).with(backing_file).and_return(true)
       end
 
