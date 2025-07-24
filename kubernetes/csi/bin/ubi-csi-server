@@ -30,6 +30,8 @@ logger.debug("Socket path: #{socket_path}")
 File.delete(socket_path) if File.exist?(socket_path)
 server.add_http2_port("unix:#{socket_path}", :this_port_is_insecure)
 
+Csi::V1::NodeService.mkdir_p
+
 logger.debug("Registering services")
 server.handle(Csi::V1::IdentityService.new(logger:))
 server.handle(Csi::V1::ControllerService.new(logger:))
