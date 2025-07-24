@@ -260,7 +260,7 @@ monitor_internal_threads = resource_types.sum { it.threads.size } + 2
 
 begin
   until shutdown
-    Clog.emit("Active threads count.") { {active_threads_count: Thread.list.count - monitor_internal_threads} }
+    Clog.emit("Active threads count.") { {active_threads_count: Thread.list.count - monitor_internal_threads, threads_waiting_for_db_connection: DB.pool.num_waiting} }
 
     t = Time.now
     # If the time since last scan has exceeded the deadline, or we
