@@ -235,7 +235,7 @@ RSpec.describe Csi::V1::NodeService do
     describe "backing file creation logic" do
       it "skips file creation when file exists" do
         expect(FileUtils).to receive(:mkdir_p).with(staging_path)
-        allow(File).to receive(:exist?).with(backing_file).and_return(true)
+        expect(File).to receive(:exist?).with(backing_file).and_return(true)
         expect(service).not_to receive(:run_cmd).with("fallocate", "-l", size_bytes.to_s, backing_file, req_id: req_id)
 
         service.perform_node_stage_volume(req_id, pvc, req, nil)
@@ -243,7 +243,7 @@ RSpec.describe Csi::V1::NodeService do
 
       it "creates file when it doesn't exist - success path" do
         expect(FileUtils).to receive(:mkdir_p).with(staging_path)
-        allow(File).to receive(:exist?).with(backing_file).and_return(false)
+        expect(File).to receive(:exist?).with(backing_file).and_return(false)
         expect(service).to receive(:run_cmd).with("fallocate", "-l", size_bytes.to_s, backing_file, req_id: req_id).and_return(["", true])
         expect(service).to receive(:run_cmd).with("fallocate", "--punch-hole", "--keep-size", "-o", "0", "-l", size_bytes.to_s, backing_file, req_id: req_id).and_return(["", true])
 
@@ -268,19 +268,19 @@ RSpec.describe Csi::V1::NodeService do
 
     describe "loop device logic" do
       before do
-        allow(File).to receive(:exist?).with(backing_file).and_return(true)
+        expect(File).to receive(:exist?).with(backing_file).and_return(true)
       end
 
       it "handles loop device setup failure" do
-        allow(service).to receive(:find_loop_device).and_return(nil)
-        allow(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id: req_id).and_return(["Error setting up loop device", false])
+        expect(service).to receive(:find_loop_device).and_return(nil)
+        expect(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id: req_id).and_return(["Error setting up loop device", false])
 
         expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error(GRPC::Internal, /Failed to setup loop device/)
       end
 
       it "handles empty loop device output" do
-        allow(service).to receive(:find_loop_device).and_return(nil)
-        allow(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id: req_id).and_return(["", true])
+        expect(service).to receive(:find_loop_device).and_return(nil)
+        expect(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id: req_id).and_return(["", true])
 
         expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error(GRPC::Internal, /Failed to setup loop device/)
       end
@@ -303,7 +303,7 @@ RSpec.describe Csi::V1::NodeService do
 
       it "skips mkfs when PVC is copied" do
         expect(FileUtils).to receive(:mkdir_p).with(staging_path)
-        allow(service).to receive(:is_copied_pvc?).and_return(true)
+        expect(service).to receive(:is_copied_pvc?).and_return(true)
         expect(service).not_to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id: req_id)
 
         service.perform_node_stage_volume(req_id, pvc, req, nil)
@@ -319,10 +319,9 @@ RSpec.describe Csi::V1::NodeService do
       end
 
       it "handles mkfs failure" do
-        allow(service).to receive_messages(
+        expect(service).to receive_messages(
           find_loop_device: nil,  # New loop device
-          is_copied_pvc?: false,
-          is_mounted?: false
+          is_copied_pvc?: false
         )
         expect(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id: req_id).and_return(["/dev/loop0", true])
         expect(service).to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id: req_id).and_return(["mkfs error", false])
@@ -331,7 +330,7 @@ RSpec.describe Csi::V1::NodeService do
       end
 
       it "handles mount failure" do
-        allow(service).to receive_messages(
+        expect(service).to receive_messages(
           find_loop_device: "/dev/loop0",
           is_copied_pvc?: false,
           is_mounted?: false
@@ -365,9 +364,9 @@ RSpec.describe Csi::V1::NodeService do
     let(:response) { Csi::V1::NodeStageVolumeResponse.new }
 
     it "stages a volume successfully" do
-      allow(service).to receive(:log_with_id)
-      allow(Csi::KubernetesClient).to receive(:new).and_return(Csi::KubernetesClient)
-      allow(service).to receive_messages(
+      expect(service).to receive(:log_with_id).at_least(:once)
+      expect(Csi::KubernetesClient).to receive(:new).and_return(Csi::KubernetesClient)
+      expect(service).to receive_messages(
         fetch_and_migrate_pvc: pvc,
         perform_node_stage_volume: response,
         roll_back_reclaim_policy: nil,
@@ -435,7 +434,7 @@ RSpec.describe Csi::V1::NodeService do
         }
       }
 
-      allow(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
+      expect(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
       expect(client).to receive(:update_pv).with(pv)
 
       service.roll_back_reclaim_policy(req_id, client, req, pvc)
@@ -456,7 +455,7 @@ RSpec.describe Csi::V1::NodeService do
         }
       }
 
-      allow(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
+      expect(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
       expect(client).not_to receive(:update_pv)
 
       service.roll_back_reclaim_policy(req_id, client, req, pvc)
@@ -471,7 +470,7 @@ RSpec.describe Csi::V1::NodeService do
         }
       }
 
-      allow(client).to receive(:get_pv).with("old-pv-123").and_raise(StandardError, "Kubernetes API error")
+      expect(client).to receive(:get_pv).with("old-pv-123").and_raise(StandardError, "Kubernetes API error")
       expect(service).to receive(:log_with_id).with(req_id, /Internal error in node_stage_volume/)
 
       expect { service.roll_back_reclaim_policy(req_id, client, req, pvc) }.to raise_error(GRPC::Internal, /Unexpected error/)
@@ -524,31 +523,31 @@ RSpec.describe Csi::V1::NodeService do
     end
 
     it "handles migration when daemonizer check returns Succeeded" do
-      allow(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
-      allow(client).to receive(:extract_node_from_pv).with(pv).and_return("worker-1")
-      allow(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
-      allow(service).to receive(:run_cmd_output).and_return("Succeeded")
+      expect(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
+      expect(client).to receive(:extract_node_from_pv).with(pv).and_return("worker-1")
+      expect(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
+      expect(service).to receive(:run_cmd_output).and_return("Succeeded")
       expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "clean", "copy_old-pv-123", req_id: req_id)
 
       service.migrate_pvc_data(req_id, client, pvc, req)
     end
 
     it "handles migration when daemonizer check returns NotStarted" do
-      allow(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
-      allow(client).to receive(:extract_node_from_pv).with(pv).and_return("worker-1")
-      allow(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
+      expect(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
+      expect(client).to receive(:extract_node_from_pv).with(pv).and_return("worker-1")
+      expect(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
 
       # First call is the check, second call is the run
       expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "check", "copy_old-pv-123", req_id:).and_return("NotStarted")
-      allow(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "run", any_args, req_id:)
+      expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "run", any_args, req_id:)
 
       expect { service.migrate_pvc_data(req_id, client, pvc, req) }.to raise_error(CopyNotFinishedError, "Old PV data is not copied yet")
     end
 
     it "handles migration when daemonizer check returns InProgress" do
-      allow(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
-      allow(client).to receive(:extract_node_from_pv).with(pv).and_return("worker-1")
-      allow(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
+      expect(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
+      expect(client).to receive(:extract_node_from_pv).with(pv).and_return("worker-1")
+      expect(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
 
       expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "check", "copy_old-pv-123", req_id: req_id).and_return("InProgress")
 
@@ -556,9 +555,9 @@ RSpec.describe Csi::V1::NodeService do
     end
 
     it "handles migration when daemonizer check returns Failed" do
-      allow(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
-      allow(client).to receive(:extract_node_from_pv).with(pv).and_return("worker-1")
-      allow(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
+      expect(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
+      expect(client).to receive(:extract_node_from_pv).with(pv).and_return("worker-1")
+      expect(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
 
       expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "check", "copy_old-pv-123", req_id: req_id).and_return("Failed")
 
@@ -566,9 +565,9 @@ RSpec.describe Csi::V1::NodeService do
     end
 
     it "handles migration when daemonizer check returns unknown status" do
-      allow(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
-      allow(client).to receive(:extract_node_from_pv).with(pv).and_return("worker-1")
-      allow(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
+      expect(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
+      expect(client).to receive(:extract_node_from_pv).with(pv).and_return("worker-1")
+      expect(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
 
       expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "check", "copy_old-pv-123", req_id: req_id).and_return("UnknownStatus")
 
@@ -587,24 +586,24 @@ RSpec.describe Csi::V1::NodeService do
     end
 
     it "unstages a volume successfully when node is schedulable" do
-      allow(client).to receive(:node_schedulable?).with(service.node_id).and_return(true)
-      allow(service).to receive(:is_mounted?).with(req.staging_target_path, req_id: "test-req-id").and_return(true)
+      expect(client).to receive(:node_schedulable?).with(service.node_id).and_return(true)
+      expect(service).to receive(:is_mounted?).with(req.staging_target_path, req_id: "test-req-id").and_return(true)
 
       result = service.node_unstage_volume(req, nil)
       expect(result).to eq(response)
     end
 
     it "prepares data migration when node is not schedulable" do
-      allow(client).to receive(:node_schedulable?).with(service.node_id).and_return(false)
+      expect(client).to receive(:node_schedulable?).with(service.node_id).and_return(false)
       expect(service).to receive(:prepare_data_migration).with(client, "test-req-id", "vol-test-123")
-      allow(service).to receive(:is_mounted?).with(req.staging_target_path, req_id:).and_return(true)
+      expect(service).to receive(:is_mounted?).with(req.staging_target_path, req_id:).and_return(true)
 
       result = service.node_unstage_volume(req, nil)
       expect(result).to eq(response)
     end
 
     it "handles errors and raises GRPC::Internal" do
-      allow(client).to receive(:node_schedulable?).with(service.node_id).and_raise(StandardError, "Test error")
+      expect(client).to receive(:node_schedulable?).with(service.node_id).and_raise(StandardError, "Test error")
 
       expect { service.node_unstage_volume(req, nil) }.to raise_error(GRPC::Internal, "13:NodeUnstageVolume error: StandardError - Test error")
     end
@@ -619,7 +618,7 @@ RSpec.describe Csi::V1::NodeService do
 
     it "skips umount when staging path is not mounted" do
       expect(client).to receive(:node_schedulable?).with(service.node_id).and_return(true)
-      allow(service).to receive(:is_mounted?).with("/var/lib/kubelet/plugins/kubernetes.io/csi/pv/vol-test-123/globalmount", req_id:).and_return(false)
+      expect(service).to receive(:is_mounted?).with("/var/lib/kubelet/plugins/kubernetes.io/csi/pv/vol-test-123/globalmount", req_id:).and_return(false)
 
       result = service.node_unstage_volume(req, nil)
       expect(result).to eq(response)
@@ -627,14 +626,14 @@ RSpec.describe Csi::V1::NodeService do
 
     it "handles GRPC::BadStatus exceptions" do
       expect(client).to receive(:node_schedulable?).with(service.node_id).and_return(true)
-      allow(service).to receive(:is_mounted?).with("/var/lib/kubelet/plugins/kubernetes.io/csi/pv/vol-test-123/globalmount", req_id:).and_raise(GRPC::InvalidArgument, "Invalid argument")
+      expect(service).to receive(:is_mounted?).with("/var/lib/kubelet/plugins/kubernetes.io/csi/pv/vol-test-123/globalmount", req_id:).and_raise(GRPC::InvalidArgument, "Invalid argument")
 
       expect { service.node_unstage_volume(req, nil) }.to raise_error(GRPC::InvalidArgument, "3:Invalid argument")
     end
 
     it "handles general exceptions and converts to GRPC::Internal" do
       expect(client).to receive(:node_schedulable?).with(service.node_id).and_return(true)
-      allow(service).to receive(:is_mounted?).with("/var/lib/kubelet/plugins/kubernetes.io/csi/pv/vol-test-123/globalmount", req_id:).and_raise(StandardError, "Unexpected error")
+      expect(service).to receive(:is_mounted?).with("/var/lib/kubelet/plugins/kubernetes.io/csi/pv/vol-test-123/globalmount", req_id:).and_raise(StandardError, "Unexpected error")
       expect { service.node_unstage_volume(req, nil) }.to raise_error(GRPC::Internal, "13:NodeUnstageVolume error: StandardError - Unexpected error")
     end
   end
@@ -663,7 +662,7 @@ RSpec.describe Csi::V1::NodeService do
         }
       }
 
-      allow(client).to receive(:find_pv_by_volume_id).with(volume_id).and_return(pv)
+      expect(client).to receive(:find_pv_by_volume_id).with(volume_id).and_return(pv)
       expect(service).to receive(:log_with_id).with(req_id, /Found PV with volume_id/)
       expect(client).to receive(:update_pv).with(pv)
       expect(service).to receive(:log_with_id).with(req_id, /Updated PV to retain/)
@@ -680,7 +679,7 @@ RSpec.describe Csi::V1::NodeService do
         }
       }
 
-      allow(client).to receive(:find_pv_by_volume_id).with(volume_id).and_return(pv)
+      expect(client).to receive(:find_pv_by_volume_id).with(volume_id).and_return(pv)
       expect(service).to receive(:log_with_id).with(req_id, /Found PV with volume_id/)
       expect(client).not_to receive(:update_pv)
       expect(service).not_to receive(:log_with_id).with(req_id, /Updated PV to retain/)
@@ -706,8 +705,8 @@ RSpec.describe Csi::V1::NodeService do
     end
 
     it "unpublishes a mounted volume successfully" do
-      allow(service).to receive(:is_mounted?).with(target_path, req_id:).and_return(true)
-      allow(service).to receive(:run_cmd).with("umount", "-q", target_path, req_id:).and_return(["", true])
+      expect(service).to receive(:is_mounted?).with(target_path, req_id:).and_return(true)
+      expect(service).to receive(:run_cmd).with("umount", "-q", target_path, req_id:).and_return(["", true])
 
       result = service.node_unpublish_volume(req, nil)
 
@@ -715,7 +714,7 @@ RSpec.describe Csi::V1::NodeService do
     end
 
     it "skips umount when target path is not mounted" do
-      allow(service).to receive(:is_mounted?).with(target_path, req_id:).and_return(false)
+      expect(service).to receive(:is_mounted?).with(target_path, req_id:).and_return(false)
       expect(service).to receive(:log_with_id).with(req_id, /is not mounted, skipping umount/)
 
       result = service.node_unpublish_volume(req, nil)
@@ -724,22 +723,22 @@ RSpec.describe Csi::V1::NodeService do
     end
 
     it "handles umount failure" do
-      allow(service).to receive(:is_mounted?).with(target_path, req_id:).and_return(true)
-      allow(service).to receive(:run_cmd).with("umount", "-q", target_path, req_id:).and_return(["umount error", false])
+      expect(service).to receive(:is_mounted?).with(target_path, req_id:).and_return(true)
+      expect(service).to receive(:run_cmd).with("umount", "-q", target_path, req_id:).and_return(["umount error", false])
 
       expect(service).to receive(:log_with_id).with(req_id, /failed to umount device/)
       expect { service.node_unpublish_volume(req, nil) }.to raise_error(GRPC::Internal, /Failed to unmount/)
     end
 
     it "handles GRPC::BadStatus exceptions" do
-      allow(service).to receive(:is_mounted?).with(target_path, req_id:).and_raise(GRPC::InvalidArgument, "Invalid argument")
+      expect(service).to receive(:is_mounted?).with(target_path, req_id:).and_raise(GRPC::InvalidArgument, "Invalid argument")
 
       expect(service).to receive(:log_with_id).with(req_id, /gRPC error in node_unpublish_volume/)
       expect { service.node_unpublish_volume(req, nil) }.to raise_error(GRPC::InvalidArgument, "3:Invalid argument")
     end
 
     it "handles general exceptions and converts to GRPC::Internal" do
-      allow(service).to receive(:is_mounted?).with(target_path, req_id:).and_raise(StandardError, "Unexpected error")
+      expect(service).to receive(:is_mounted?).with(target_path, req_id:).and_raise(StandardError, "Unexpected error")
 
       expect(service).to receive(:log_with_id).with(req_id, /Internal error in node_unpublish_volume/)
       expect { service.node_unpublish_volume(req, nil) }.to raise_error(GRPC::Internal, /NodeUnpublishVolume error/)
@@ -766,8 +765,8 @@ RSpec.describe Csi::V1::NodeService do
     end
 
     it "publishes a volume successfully" do
-      allow(FileUtils).to receive(:mkdir_p).with(target_path)
-      allow(service).to receive(:run_cmd).with("mount", "--bind", staging_path, target_path, req_id: "test-req-id").and_return(["", true])
+      expect(FileUtils).to receive(:mkdir_p).with(target_path)
+      expect(service).to receive(:run_cmd).with("mount", "--bind", staging_path, target_path, req_id: "test-req-id").and_return(["", true])
 
       result = service.node_publish_volume(req, nil)
 
@@ -775,22 +774,22 @@ RSpec.describe Csi::V1::NodeService do
     end
 
     it "handles bind mount failure" do
-      allow(FileUtils).to receive(:mkdir_p).with(target_path)
-      allow(service).to receive(:run_cmd).with("mount", "--bind", staging_path, target_path, req_id: "test-req-id").and_return(["mount error", false])
+      expect(FileUtils).to receive(:mkdir_p).with(target_path)
+      expect(service).to receive(:run_cmd).with("mount", "--bind", staging_path, target_path, req_id: "test-req-id").and_return(["mount error", false])
 
       expect(service).to receive(:log_with_id).with("test-req-id", /failed to bind mount device/)
       expect { service.node_publish_volume(req, nil) }.to raise_error(GRPC::Internal, /Failed to bind mount/)
     end
 
     it "handles GRPC::BadStatus exceptions" do
-      allow(FileUtils).to receive(:mkdir_p).with(target_path).and_raise(GRPC::InvalidArgument, "Invalid argument")
+      expect(FileUtils).to receive(:mkdir_p).with(target_path).and_raise(GRPC::InvalidArgument, "Invalid argument")
 
       expect(service).to receive(:log_with_id).with("test-req-id", /gRPC error in node_publish_volume/)
       expect { service.node_publish_volume(req, nil) }.to raise_error(GRPC::InvalidArgument, "3:Invalid argument")
     end
 
     it "handles general exceptions and converts to GRPC::Internal" do
-      allow(FileUtils).to receive(:mkdir_p).with(target_path).and_raise(StandardError, "Unexpected error")
+      expect(FileUtils).to receive(:mkdir_p).with(target_path).and_raise(StandardError, "Unexpected error")
 
       expect(service).to receive(:log_with_id).with("test-req-id", /Internal error in node_publish_volume/)
       expect { service.node_publish_volume(req, nil) }.to raise_error(GRPC::Internal, /NodePublishVolume error/)
@@ -835,7 +834,7 @@ RSpec.describe Csi::V1::NodeService do
     end
 
     it "recreates PVC when PVC exists" do
-      allow(client).to receive(:get_pvc).with("default", "pvc-123").and_return(pvc)
+      expect(client).to receive(:get_pvc).with("default", "pvc-123").and_return(pvc)
       expect(client).to receive(:update_pv).with(pv)
       expect(client).to receive(:delete_pvc).with("default", "pvc-123")
       expect(client).to receive(:create_pvc).with(pvc)
@@ -849,9 +848,9 @@ RSpec.describe Csi::V1::NodeService do
       old_pvc_data = "different_base64_content"  # Different from "base64_content"
       pv["metadata"]["annotations"]["csi.ubicloud.com/old-pvc-object"] = old_pvc_data
 
-      allow(client).to receive(:get_pvc).with("default", "pvc-123").and_raise(ObjectNotFoundError.new("PVC not found"))
-      allow(Base64).to receive(:decode64).with(old_pvc_data).and_return("decoded_yaml")
-      allow(YAML).to receive(:load).with("decoded_yaml").and_return(pvc)
+      expect(client).to receive(:get_pvc).with("default", "pvc-123").and_raise(ObjectNotFoundError.new("PVC not found"))
+      expect(Base64).to receive(:decode64).with(old_pvc_data).and_return("decoded_yaml")
+      expect(YAML).to receive(:load).with("decoded_yaml").and_return(pvc)
 
       # Since the annotation content is different from base64_content, it should update
       expect(client).to receive(:update_pv).with(pv)
@@ -865,7 +864,7 @@ RSpec.describe Csi::V1::NodeService do
       pv["metadata"]["annotations"]["csi.ubicloud.com/old-pvc-object"] = ""
 
       error = ObjectNotFoundError.new("PVC not found")
-      allow(client).to receive(:get_pvc).with("default", "pvc-123").and_raise(error)
+      expect(client).to receive(:get_pvc).with("default", "pvc-123").and_raise(error)
 
       expect { service.recreate_pvc(req_id, client, pv) }.to raise_error(ObjectNotFoundError)
     end
@@ -873,7 +872,7 @@ RSpec.describe Csi::V1::NodeService do
     it "skips PV update when annotation already matches" do
       pv["metadata"]["annotations"]["csi.ubicloud.com/old-pvc-object"] = "base64_content"
 
-      allow(client).to receive(:get_pvc).with("default", "pvc-123").and_return(pvc)
+      expect(client).to receive(:get_pvc).with("default", "pvc-123").and_return(pvc)
       expect(client).not_to receive(:update_pv)
       expect(client).to receive(:delete_pvc).with("default", "pvc-123")
       expect(client).to receive(:create_pvc).with(pvc)
