@@ -229,12 +229,12 @@ RSpec.describe Csi::V1::NodeService do
       allow(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id: req_id).and_return(["/dev/loop0", true])
       allow(service).to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id: req_id).and_return(["", true])
       allow(Dir).to receive(:exist?).with(staging_path).and_return(false)
-      allow(FileUtils).to receive(:mkdir_p)
       allow(service).to receive(:run_cmd).with("mount", "/dev/loop0", staging_path, req_id: req_id).and_return(["", true])
     end
 
     describe "backing file creation logic" do
       it "skips file creation when file exists" do
+        expect(FileUtils).to receive(:mkdir_p).with(staging_path)
         allow(File).to receive(:exist?).with(backing_file).and_return(true)
         expect(service).not_to receive(:run_cmd).with("fallocate", "-l", size_bytes.to_s, backing_file, req_id: req_id)
 
@@ -242,6 +242,7 @@ RSpec.describe Csi::V1::NodeService do
       end
 
       it "creates file when it doesn't exist - success path" do
+        expect(FileUtils).to receive(:mkdir_p).with(staging_path)
         allow(File).to receive(:exist?).with(backing_file).and_return(false)
         expect(service).to receive(:run_cmd).with("fallocate", "-l", size_bytes.to_s, backing_file, req_id: req_id).and_return(["", true])
         expect(service).to receive(:run_cmd).with("fallocate", "--punch-hole", "--keep-size", "-o", "0", "-l", size_bytes.to_s, backing_file, req_id: req_id).and_return(["", true])
@@ -285,6 +286,7 @@ RSpec.describe Csi::V1::NodeService do
       end
 
       it "logs when loop device already exists" do
+        expect(FileUtils).to receive(:mkdir_p).with(staging_path)
         expect(service).to receive(:find_loop_device).and_return("/dev/loop1")
         expect(service).to receive(:run_cmd).with("mount", "/dev/loop1", staging_path, req_id: req_id).and_return(["", true])
 
@@ -300,6 +302,7 @@ RSpec.describe Csi::V1::NodeService do
       end
 
       it "skips mkfs when PVC is copied" do
+        expect(FileUtils).to receive(:mkdir_p).with(staging_path)
         allow(service).to receive(:is_copied_pvc?).and_return(true)
         expect(service).not_to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id: req_id)
 
@@ -333,7 +336,7 @@ RSpec.describe Csi::V1::NodeService do
           is_copied_pvc?: false,
           is_mounted?: false
         )
-        expect(FileUtils).to receive(:mkdir_p)
+        expect(FileUtils).to receive(:mkdir_p).with(staging_path)
         expect(service).to receive(:run_cmd).with("mount", "/dev/loop0", staging_path, req_id: req_id).and_return(["mount error", false])
 
         expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error(GRPC::Internal, /Failed to mount/)
