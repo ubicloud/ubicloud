@@ -174,6 +174,6 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   end
 
   def client
-    @client ||= Github.installation_client(Config.e2e_github_installation_id)
+    @client ||= Github.installation_client(Config.e2e_github_installation_id, auto_paginate: true)
   end
 end
