@@ -102,3 +102,6 @@ Lint/UselessTimes:
 
 Lint/ConstantDefinitionInBlock:
   Enabled: false
+
+RSpec/IndexedLet:
+  Enabled: false

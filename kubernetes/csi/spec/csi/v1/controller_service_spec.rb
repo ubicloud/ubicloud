@@ -28,19 +28,15 @@ RSpec.describe Csi::V1::ControllerService do
   end
 
   describe "#select_worker_topology" do
-    let(:topologies) do
-      {
-        kc: Csi::V1::Topology.new(segments: {"kubernetes.io/hostname" => "kc-worker-1"}),
-        worker1: Csi::V1::Topology.new(segments: {"kubernetes.io/hostname" => "worker-1"}),
-        worker2: Csi::V1::Topology.new(segments: {"kubernetes.io/hostname" => "worker-2"})
-      }
-    end
+    let(:kc) { Csi::V1::Topology.new(segments: {"kubernetes.io/hostname" => "kc-worker-1"}) }
+    let(:worker1) { Csi::V1::Topology.new(segments: {"kubernetes.io/hostname" => "worker-1"}) }
+    let(:worker2) { Csi::V1::Topology.new(segments: {"kubernetes.io/hostname" => "worker-2"}) }
 
     it "selects from preferred topology when suitable worker exists" do
       request = Csi::V1::CreateVolumeRequest.new(
         accessibility_requirements: {
-          preferred: [topologies[:worker1], topologies[:kc]],
-          requisite: [topologies[:kc]]
+          preferred: [worker1, kc],
+          requisite: [kc]
         }
       )
       expect(service.select_worker_topology(request).segments["kubernetes.io/hostname"]).to eq("worker-1")
@@ -49,8 +45,8 @@ RSpec.describe Csi::V1::ControllerService do
     it "selects from requisite topology when preferred has no suitable worker" do
       request = Csi::V1::CreateVolumeRequest.new(
         accessibility_requirements: {
-          preferred: [topologies[:kc]],
-          requisite: [topologies[:worker2], topologies[:kc]]
+          preferred: [kc],
+          requisite: [worker2, kc]
         }
       )
       expect(service.select_worker_topology(request).segments["kubernetes.io/hostname"]).to eq("worker-2")
@@ -59,8 +55,8 @@ RSpec.describe Csi::V1::ControllerService do
     it "raises FailedPrecondition when no suitable worker found" do
       request = Csi::V1::CreateVolumeRequest.new(
         accessibility_requirements: {
-          preferred: [topologies[:kc]],
-          requisite: [topologies[:kc]]
+          preferred: [kc],
+          requisite: [kc]
         }
       )
       expect { service.select_worker_topology(request) }.to raise_error(GRPC::FailedPrecondition, /No suitable worker node topology found/)
