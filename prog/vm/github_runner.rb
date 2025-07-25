@@ -275,15 +275,6 @@ class Prog::Vm::GithubRunner < Prog::Base
     github_runner.log_duration("runner_registered", github_runner.ready_at - github_runner.allocated_at)
 
     hop_wait
-  rescue Sshable::SshError => e
-    if e.stderr.include?("Job for runner-script.service failed")
-      Clog.emit("Failed to start runner script") { {failed_to_start_runner: response.to_h} }
-      vm.sshable.cmd(<<~COMMAND)
-        sudo journalctl -xeu runner-script.service
-        cat /run/systemd/transient/runner-script.service || true
-      COMMAND
-    end
-    raise
   rescue Octokit::Conflict => e
     raise unless e.message.include?("Already exists")
 
