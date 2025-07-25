@@ -255,30 +255,6 @@ class Prog::Vm::GithubRunner < Prog::Base
       COMMAND
     end
 
-    command += <<~COMMAND
-      if [ ! -f /etc/systemd/system/runner-script.service ]; then
-        sudo tee /etc/systemd/system/runner-script.service > /dev/null <<'EOT'
-      [Unit]
-      Description=runner-script
-
-      [Service]
-      RemainAfterExit=yes
-      User=runner
-      Group=runner
-      WorkingDirectory=/home/runner
-      ExecStart=/home/runner/actions-runner/run-withenv.sh
-      EOT
-
-        sudo -u runner tee /home/runner/actions-runner/run-withenv.sh > /dev/null <<'EOT'
-      #!/bin/bash
-      mapfile -t env </etc/environment
-      JIT_CONFIG="$(cat ./actions-runner/.jit_token)"
-      exec env -- "${env[@]}" ./actions-runner/run.sh --jitconfig "$JIT_CONFIG"
-      EOT
-        sudo systemctl daemon-reload
-      fi
-    COMMAND
-
     # Remove comments and empty lines before sending them to the machine
     vm.sshable.cmd(command.gsub(/^(\s*# .*)?\n/, ""))
 
