@@ -43,7 +43,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       representative_server: postgres_server,
       metric_destinations: [instance_double(PostgresMetricDestination, ubid: "pgmetricubid", url: "url", username: "username", password: "password")],
       ca_certificates: "root_cert_1\nroot_cert_2",
-      location_id: Location::HETZNER_FSN1_ID
+      location_id: Location::HETZNER_FSN1_ID,
+      project: instance_double(Project, get_ff_aws_cloudwatch_logs: true)
     )
   }
 
@@ -404,6 +405,27 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.configure_metrics }.to hop("setup_hugepages")
     end
 
+    it "configures prometheus and metrics during initial provisioning and hops to setup_cloudwatch if timeline is AWS" do
+      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now postgres_exporter")
+      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now node_exporter")
+      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now prometheus")
+
+      # Configure metrics expectations
+      expect(postgres_server).to receive(:metrics_config).and_return(metrics_config)
+      expect(sshable).to receive(:cmd).with("mkdir -p /home/ubi/postgres/metrics")
+      expect(sshable).to receive(:cmd).with("tee /home/ubi/postgres/metrics/config.json > /dev/null", stdin: metrics_config.to_json)
+      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo systemctl daemon-reload")
+      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now postgres-metrics.timer")
+
+      expect(postgres_server.timeline).to receive(:aws?).and_return(true)
+      expect { nx.configure_metrics }.to hop("setup_cloudwatch")
+    end
+
     it "configures prometheus and metrics and hops to wait at times other than initial provisioning" do
       # Prometheus expectations
       expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
@@ -444,6 +466,15 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
       expect(resource).to receive(:representative_server).and_return(instance_double(PostgresServer, id: "random-id"))
       expect { nx.configure_metrics }.to hop("wait")
+    end
+  end
+
+  describe "#setup_cloudwatch" do
+    it "hops to setup_hugepages after setting up cloudwatch" do
+      expect(sshable).to receive(:cmd).with("sudo mkdir -p /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d")
+      expect(sshable).to receive(:cmd).with("sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/001-ubicloud-config.json > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/001-ubicloud-config.json -s")
+      expect { nx.setup_cloudwatch }.to hop("setup_hugepages")
     end
   end
 

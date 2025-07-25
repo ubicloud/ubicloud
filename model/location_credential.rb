@@ -2,6 +2,7 @@
 
 require_relative "../model"
 require "aws-sdk-ec2"
+require "aws-sdk-iam"
 
 class LocationCredential < Sequel::Model
   plugin ResourceMethods, encrypted_columns: [:access_key, :secret_key]
@@ -10,6 +11,10 @@ class LocationCredential < Sequel::Model
 
   def client
     Aws::EC2::Client.new(access_key_id: access_key, secret_access_key: secret_key, region: location.name)
+  end
+
+  def iam_client
+    Aws::IAM::Client.new(access_key_id: access_key, secret_access_key: secret_key, region: location.name)
   end
 end
 

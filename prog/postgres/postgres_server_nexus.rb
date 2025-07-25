@@ -271,6 +271,7 @@ TIMER
       vm.sshable.cmd("sudo systemctl enable --now prometheus")
       vm.sshable.cmd("sudo systemctl enable --now postgres-metrics.timer")
 
+      hop_setup_cloudwatch if postgres_server.timeline.aws? && postgres_server.resource.project.get_ff_aws_cloudwatch_logs
       hop_setup_hugepages
     end
 
@@ -279,6 +280,39 @@ TIMER
     vm.sshable.cmd("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
 
     hop_wait
+  end
+
+  label def setup_cloudwatch
+    filepath = "/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d"
+    filename = "001-ubicloud-config.json"
+    config = <<CONFIG
+{
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/dat/#{postgres_server.resource.version}/data/pg_log/postgresql.log",
+            "log_group_name": "/#{postgres_server.ubid}/postgresql",
+            "log_stream_name": "#{postgres_server.ubid}/postgresql",
+            "timestamp_format": "%Y-%m-%d %H:%M:%S"
+          },
+          {
+            "file_path": "/var/log/auth.log",
+            "log_group_name": "/#{postgres_server.ubid}/auth",
+            "log_stream_name": "#{postgres_server.ubid}/auth",
+            "timestamp_format": "%Y-%m-%d %H:%M:%S"
+          }
+        ]
+      }
+    }
+  }
+}
+CONFIG
+    vm.sshable.cmd("sudo mkdir -p #{filepath}")
+    vm.sshable.cmd("sudo tee #{filepath}/#{filename} > /dev/null", stdin: config)
+    vm.sshable.cmd("sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:#{filepath}/#{filename} -s")
+    hop_setup_hugepages
   end
 
   label def setup_hugepages
