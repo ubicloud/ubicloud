@@ -69,7 +69,7 @@ MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :submit_que
     before = Time.now - timeout
     resources.each_value do |r|
       if r.monitor_job_started_at&.<(before)
-        Clog.emit(msg) { {key => {ubid: r.ubid}} }
+        Clog.emit(msg) { {key => {ubid: r.resource.ubid}} }
       end
     end
   end
