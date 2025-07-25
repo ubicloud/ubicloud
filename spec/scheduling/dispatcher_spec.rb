@@ -208,7 +208,7 @@ RSpec.describe Scheduling::Dispatcher do
     it "triggers thread dumps and exit if the Prog takes too long" do
       exited = false
       expect(ThreadPrinter).to receive(:run)
-      expect(Kernel).to receive(:exit!).and_invoke(-> { exited = true })
+      expect(Kernel).to receive(:exit!).with(2).and_invoke(->(_) { exited = true })
       di = @di = described_class.new(apoptosis_timeout: 0.05, pool_size: 1)
       start_queue = di.instance_variable_get(:@thread_data).dig(0, :start_queue)
       start_queue.push(true)
@@ -223,7 +223,7 @@ RSpec.describe Scheduling::Dispatcher do
     it "triggers thread dumps and exit if the there is an exception raised" do
       exited = false
       expect(ThreadPrinter).to receive(:run)
-      expect(Kernel).to receive(:exit!).and_invoke(-> { exited = true })
+      expect(Kernel).to receive(:exit!).with(2).and_invoke(->(_) { exited = true })
       di = @di = described_class.new(apoptosis_timeout: 0.05, pool_size: 1)
       thread_data = di.instance_variable_get(:@thread_data)
       start_queue = thread_data.dig(0, :start_queue)
