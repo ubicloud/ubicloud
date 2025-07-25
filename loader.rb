@@ -95,12 +95,13 @@ module Serializers; end
 module VictoriaMetrics; end
 
 autoload_normal.call("model", flat: true)
-%w[lib clover.rb].each { autoload_normal.call(it) }
+%w[lib clover.rb clover_admin.rb].each { autoload_normal.call(it) }
 %w[scheduling prog serializers].each { autoload_normal.call(it, include_first: true) }
 
 if ENV["LOAD_FILES_SEPARATELY_CHECK"] == "1"
   files = %w[model lib scheduling prog serializers].flat_map { Dir["#{it}/**/*.rb"] }
   files << "clover.rb"
+  files << "clover_admin.rb"
 
   Sequel::DATABASES.each(&:disconnect)
   files.each do |file|
