@@ -40,7 +40,8 @@ class LoadBalancerVmPort < Sequel::Model
 
     begin
       (session[:ssh_session].exec!(health_check_cmd(type)).strip == "200") ? "up" : "down"
-    rescue
+    rescue => e
+      Clog.emit("Exception in LoadBalancerVmPort #{ubid} monitor: #{e.class} - #{e.message} - #{e.backtrace.join(" | ")}")
       "down"
     end
   end
