@@ -40,7 +40,7 @@ gem "rodauth-omniauth", github: "janko/rodauth-omniauth", ref: "477810179ba0cab8
 gem "rodish", ">= 2.0.1"
 gem "rotp"
 gem "rqrcode"
-gem "sequel", ">= 5.94"
+gem "sequel", github: "jeremyevans/sequel", ref: "2b17b99b81a38da94c3ff73bc3f15e5adcda0e89"
 gem "sequel_pg", ">= 1.8", require: "sequel"
 gem "shellwords"
 gem "stripe"

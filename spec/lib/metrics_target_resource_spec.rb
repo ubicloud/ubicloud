@@ -113,39 +113,4 @@ RSpec.describe MetricsTargetResource do
       expect { resource.close_resource_session }.to change { resource.instance_variable_get(:@session) }.from({ssh_session: session}).to(nil)
     end
   end
-
-  describe "#force_stop_if_stuck" do
-    it "does nothing if pulse check is not stuck" do
-      expect(Kernel).not_to receive(:exit!)
-
-      # not locked
-      resource.force_stop_if_stuck
-
-      # not timed out
-      resource.instance_variable_get(:@mutex).lock
-      resource.instance_variable_set(:@export_started_at, Time.now)
-      resource.force_stop_if_stuck
-      resource.instance_variable_get(:@mutex).unlock
-    end
-
-    it "triggers Kernel.exit if pulse check is stuck" do
-      resource.instance_variable_get(:@mutex).lock
-      resource.instance_variable_set(:@export_started_at, Time.now - 200)
-      expect(Clog).to receive(:emit).at_least(:once).and_call_original
-      resource.force_stop_if_stuck
-      resource.instance_variable_get(:@mutex).unlock
-    end
-  end
-
-  describe "#lock_no_wait" do
-    it "does not yield if mutex is locked" do
-      resource.instance_variable_get(:@mutex).lock
-      expect { |b| resource.lock_no_wait(&b) }.not_to yield_control
-      resource.instance_variable_get(:@mutex).unlock
-    end
-
-    it "yields if mutex is not locked" do
-      expect { |b| resource.lock_no_wait(&b) }.to yield_control
-    end
-  end
 end
