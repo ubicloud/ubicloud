@@ -159,7 +159,8 @@ GEM
       ffi (>= 1.15.5)
       rake
     fiddle (1.1.8)
-    foreman (0.88.1)
+    foreman (0.90.0)
+      thor (~> 1.4)
     hashdiff (1.2.0)
     hashery (2.1.2)
     hashie (5.0.0)
@@ -397,6 +398,7 @@ GEM
       lint_roller (~> 1.1)
       rubocop-performance (~> 1.25.0)
     stripe (12.6.0)
+    thor (1.4.0)
     tilt (2.6.1)
     timeout (0.4.3)
     tpm-key_attestation (0.12.1)
