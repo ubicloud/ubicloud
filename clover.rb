@@ -293,7 +293,7 @@ class Clover < Roda
       :lockout, :login, :logout, :remember, :reset_password,
       :disallow_password_reuse, :password_grace_period, :active_sessions,
       :verify_login_change, :change_password_notify, :confirm_password,
-      :otp, :webauthn, :recovery_codes, :omniauth, :otp_unlock
+      :otp, :webauthn, :recovery_codes, :omniauth, :otp_unlock, :otp_lockout_email
 
     title_instance_variable :@page_title
     check_csrf? false
@@ -720,6 +720,22 @@ class Clover < Roda
     otp_unlock_auth_failure_error_flash "One-Time Password invalid authentication"
     otp_unlock_auth_deadline_passed_error_flash "Deadline past for unlocking One-Time Password authentication"
     otp_unlock_auth_not_yet_available_error_flash "One-Time Password unlock attempt not yet available"
+
+    # OTP Unlock Email
+    send_otp_locked_out_email do
+      user = Account[account_id]
+      Util.send_email(user.email, "Ubicloud Account One-Time Password Authentication Locked Out",
+        greeting: "Hello #{user.name},",
+        body: ["Due to repeated authentication failures, for the safety of your Ubicloud account, One-Time Password Authentication has been locked out. You can unlock it with three successful consecutive One-Time Password Authentications.",
+          "For any questions or assistance, reach out to our team at support@ubicloud.com."])
+    end
+    send_otp_unlocked_email do
+      user = Account[account_id]
+      Util.send_email(user.email, "Ubicloud Account One-Time Password Authentication Unlocked",
+        greeting: "Hello #{user.name},",
+        body: ["Since your Ubicloud account had three successful consecutive One-Time Password Authentications,  One-Time Password Authentication is now unlocked for your account.",
+          "For any questions or assistance, reach out to our team at support@ubicloud.com."])
+    end
 
     # Webauthn Setup
     webauthn_setup_route "account/multifactor/webauthn-setup"
