@@ -66,6 +66,7 @@ end
 #  account_login_change_keys         | account_login_change_keys_id_fkey                 | (id) REFERENCES accounts(id)
 #  account_login_failures            | account_login_failures_id_fkey                    | (id) REFERENCES accounts(id)
 #  account_otp_keys                  | account_otp_keys_id_fkey                          | (id) REFERENCES accounts(id)
+#  account_otp_unlocks               | account_otp_unlocks_id_fkey                       | (id) REFERENCES accounts(id)
 #  account_password_change_times     | account_password_change_times_id_fkey             | (id) REFERENCES accounts(id)
 #  account_password_hashes           | account_password_hashes_id_fkey                   | (id) REFERENCES accounts(id)
 #  account_password_reset_keys       | account_password_reset_keys_id_fkey               | (id) REFERENCES accounts(id)
