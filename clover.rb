@@ -293,7 +293,7 @@ class Clover < Roda
       :lockout, :login, :logout, :remember, :reset_password,
       :disallow_password_reuse, :password_grace_period, :active_sessions,
       :verify_login_change, :change_password_notify, :confirm_password,
-      :otp, :webauthn, :recovery_codes, :omniauth
+      :otp, :webauthn, :recovery_codes, :omniauth, :otp_unlock
 
     title_instance_variable :@page_title
     check_csrf? false
@@ -708,6 +708,18 @@ class Clover < Roda
     otp_auth_view { view "auth/otp_auth", "One-Time" }
     otp_auth_button "Authenticate Using One-Time Password"
     otp_auth_link_text "One-Time Password Generator"
+
+    # OTP Unlock
+    otp_unlock_view { view "auth/otp_unlock", "One-Time Password Unlock" }
+    otp_unlock_not_available_view { view "auth/otp_unlock_not_available", "One-Time Password Unlock Not Available" }
+    otp_unlock_button "Authenticate Using One-Time Password to Unlock"
+    otp_unlocked_redirect "/otp-auth"
+    otp_unlocked_notice_flash "One-Time Password authentication unlocked"
+    otp_unlock_auth_success_notice_flash "One-Time Password successful authentication, more successful authentication needed to unlock"
+    otp_unlock_not_locked_out_error_flash "One-Time Password authentication is not currently locked out"
+    otp_unlock_auth_failure_error_flash "One-Time Password invalid authentication"
+    otp_unlock_auth_deadline_passed_error_flash "Deadline past for unlocking One-Time Password authentication"
+    otp_unlock_auth_not_yet_available_error_flash "One-Time Password unlock attempt not yet available"
 
     # Webauthn Setup
     webauthn_setup_route "account/multifactor/webauthn-setup"

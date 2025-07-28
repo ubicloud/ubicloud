@@ -1,0 +1,25 @@
+<% @page_message = "Your one-time password authentication has been locked out, and must be unlocked to be used." %>
+
+<form class="rodauth space-y-6" role="form" method="POST">
+  <%== rodauth.otp_unlock_additional_form_tags %>
+  <%== rodauth.csrf_tag %>
+
+  <p><%= rodauth.otp_unlock_consecutive_successes_label %>: <%= rodauth.otp_unlock_num_successes %></p>
+  <p><%= rodauth.otp_unlock_required_consecutive_successes_label %>: <%= rodauth.otp_unlock_auths_required %></p>
+  <p><%= rodauth.otp_unlock_next_auth_deadline_label %>: <%= rodauth.otp_unlock_deadline.strftime(rodauth.strftime_format) %></p>
+
+  <%== render("components/rodauth/otp_auth_code_field") %>
+
+  <div class="flex flex-col text-center">
+    <%== part("components/form/submit_button", text: rodauth.otp_unlock_button) %>
+    <p class="mt-10 text-center text-sm text-gray-400">
+      Can't access your authentication app?
+      <br>
+      <a href="/<%= rodauth.recovery_auth_route %>" class="font-semibold leading-6 text-orange-500 hover:text-orange-700">Enter a recovery code</a>
+      or
+      <a href="mailto:support@ubicloud.com" class="font-semibold leading-6 text-orange-500 hover:text-orange-700">contact support</a>
+    </p>
+  </div>
+</form>
+
+<%== rodauth.otp_unlock_form_footer %>

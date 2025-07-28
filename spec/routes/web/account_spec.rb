@@ -24,7 +24,7 @@ RSpec.describe Clover, "account" do
     end
 
     [true, false].each do |clear_last_password_entry|
-      it "allows setting up and removing OTP authentication when password entry is #{"not " unless clear_last_password_entry}required" do
+      it "allows setting up#{", authenticating with, unlocking," if clear_last_password_entry} and removing OTP authentication when password entry is #{"not " unless clear_last_password_entry}required" do
         visit "/clear-last-password-entry" if clear_last_password_entry
 
         visit "/account/multifactor-manage"
@@ -39,7 +39,57 @@ RSpec.describe Clover, "account" do
         expect(page).to have_flash_notice "One-time password authentication is now setup, please make note of your recovery codes"
         expect(page.title).to eq("Ubicloud - Recovery Codes")
 
-        visit "/clear-last-password-entry" if clear_last_password_entry
+        if clear_last_password_entry
+          DB[:account_otp_keys].update(last_use: Sequel.date_sub(Sequel::CURRENT_TIMESTAMP, seconds: 4600))
+          click_button "Log out"
+          visit "/login"
+          fill_in "Email Address", with: TEST_USER_EMAIL
+          click_button "Sign in"
+          fill_in "Password", with: TEST_USER_PASSWORD
+          click_button "Sign in"
+          expect(page.title).to eq("Ubicloud - 2FA - One-Time Password")
+          fill_in "Authentication Code", with: totp.now
+          click_button "Authenticate Using One-Time Password"
+          expect(page).to have_flash_notice("You have been logged in")
+
+          DB[:account_otp_keys].update(last_use: Sequel.date_sub(Sequel::CURRENT_TIMESTAMP, seconds: 4600))
+          click_button "Log out"
+          visit "/login"
+          fill_in "Email Address", with: TEST_USER_EMAIL
+          click_button "Sign in"
+          fill_in "Password", with: TEST_USER_PASSWORD
+          click_button "Sign in"
+          6.times do
+            expect(page.title).to eq("Ubicloud - 2FA - One-Time Password")
+            fill_in "Authentication Code", with: totp.now + "1"
+            click_button "Authenticate Using One-Time Password"
+          end
+          expect(page).to have_flash_error("TOTP authentication code use locked out due to numerous failures")
+
+          2.times do
+            expect(page.title).to eq("Ubicloud - One-Time Password Unlock")
+            fill_in "Authentication Code", with: totp.now
+            click_button "Authenticate Using One-Time Password to Unlock"
+            expect(page).to have_flash_notice("One-Time Password successful authentication, more successful authentication needed to unlock")
+            expect(page.title).to eq("Ubicloud - One-Time Password Unlock Not Available")
+            DB[:account_otp_unlocks].update(next_auth_attempt_after: Sequel.date_sub(Sequel::CURRENT_TIMESTAMP, seconds: 200))
+            visit page.current_path
+          end
+
+          expect(page.title).to eq("Ubicloud - One-Time Password Unlock")
+          fill_in "Authentication Code", with: totp.now
+          click_button "Authenticate Using One-Time Password to Unlock"
+          expect(page).to have_flash_notice("One-Time Password authentication unlocked")
+
+          DB[:account_otp_keys].update(last_use: Sequel.date_sub(Sequel::CURRENT_TIMESTAMP, seconds: 4600))
+          expect(page.title).to eq("Ubicloud - 2FA - One-Time Password")
+          fill_in "Authentication Code", with: totp.now
+          click_button "Authenticate Using One-Time Password"
+          expect(page).to have_flash_notice("You have been logged in")
+
+          visit "/clear-last-password-entry"
+        end
+
         visit "/account/multifactor-manage"
         click_link "Disable"
         expect(page.title).to eq("Ubicloud - Disable One-Time Password")
