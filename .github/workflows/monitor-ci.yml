@@ -1,0 +1,53 @@
+name: monitor CI
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'bin/monitor'
+      - 'lib/monitor_runner.rb'
+      - 'lib/monitor_repartitioner.rb'
+      - 'lib/monitor_resource_type.rb'
+      - 'lib/monitorable_resource.rb'
+      - 'lib/monitor_resource_stub.rb'
+      - 'lib/metrics_target_resource.rb'
+      - 'spec/monitor_smoke_test.rb'
+      - '.github/workflows/monitor-ci.yml'
+      - '.github/actions/setup-clover/action.yml'
+  pull_request:
+    paths:
+      - 'bin/monitor'
+      - 'lib/monitor_runner.rb'
+      - 'lib/monitor_repartitioner.rb'
+      - 'lib/monitor_resource_type.rb'
+      - 'lib/monitorable_resource.rb'
+      - 'lib/monitor_resource_stub.rb'
+      - 'lib/metrics_target_resource.rb'
+      - 'spec/monitor_smoke_test.rb'
+      - '.github/workflows/monitor-ci.yml'
+      - '.github/actions/setup-clover/action.yml'
+
+jobs:
+  cli-ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on: [ubicloud, ubicloud-arm]
+    name: monitor CI - ${{matrix.runs-on}}
+    runs-on: ${{matrix.runs-on}}
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Clover
+      uses: ./.github/actions/setup-clover
+
+    - name: Run monitor smoke test
+      run: bundle exec rake monitor_smoke_test
+
