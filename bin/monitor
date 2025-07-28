@@ -26,22 +26,37 @@ monitor_pulse_info = [120, "Pulse check has stuck.", :pulse_check_stuck].freeze
 # Information (seconds, log message, log key) for stuck pulses for metric export jobs.
 metric_export_pulse_info = [100, "Pulse check has stuck.", :pulse_check_stuck].freeze
 
-monitor_models = [
-  VmHost,
-  PostgresServer,
-  Vm.where(~Sshable.where(id: Sequel[:vm][:id]).exists),
-  MinioServer,
-  GithubRunner,
-  VmHostSlice,
-  LoadBalancerVmPort,
-  KubernetesCluster,
-  VictoriaMetricsServer
-]
+if Config.test?
+  # Run during monitor smoke tests
+  $stdout.sync = $stderr.sync = true
+  # Ensure clog output during smoke test
+  Clog::Config = Struct.new(:test?).new(false)
+  MonitorResourceStub.add(UBID.generate_vanity("et", "mr", "vp"))
+  MonitorResourceStub.add(UBID.generate_vanity("et", "mr", "down"), pulse: "down")
+  MonitorResourceStub.add(UBID.generate_vanity("et", "mr", "evloop"), need_event_loop: true)
+  MonitorResourceStub.add(UBID.generate_vanity("et", "mr", "mc2"), metrics_count: 2)
+  monitor_models = [MonitorResourceStub]
+  metric_export_models = [MonitorResourceStub]
+  runner_args = {scan_every: 1, report_every: 1, enqueue_every: 1, check_stuck_pulses_every: 1}
+else
+  runner_args = {ignore_threads: 2}
+  monitor_models = [
+    VmHost,
+    PostgresServer,
+    Vm.where(~Sshable.where(id: Sequel[:vm][:id]).exists),
+    MinioServer,
+    GithubRunner,
+    VmHostSlice,
+    LoadBalancerVmPort,
+    KubernetesCluster,
+    VictoriaMetricsServer
+  ]
 
-metric_export_models = [
-  PostgresServer,
-  VmHost
-]
+  metric_export_models = [
+    PostgresServer,
+    VmHost
+  ]
+end
 
 # Handle both monitored resources and metric export resources.
 monitor_resources = MonitorResourceType.create(
@@ -64,7 +79,7 @@ metric_export_resources = MonitorResourceType.create(
 
 repartitioner = MonitorRepartitioner.new(partition_number)
 
-runner = MonitorRunner.new(monitor_resources:, metric_export_resources:, repartitioner:, ignore_threads: 2)
+runner = MonitorRunner.new(monitor_resources:, metric_export_resources:, repartitioner:, **runner_args)
 
 repartition_thread = Thread.new { repartitioner.listen }
 

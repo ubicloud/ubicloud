@@ -291,6 +291,11 @@ task "check_separate_requires" do
   system({"RACK_ENV" => "test", "LOAD_FILES_SEPARATELY_CHECK" => "1"}, RbConfig.ruby, "-r", "./loader", "-e", "")
 end
 
+desc "Run monitor smoke test"
+task :monitor_smoke_test do
+  system(RbConfig.ruby, "spec/monitor_smoke_test.rb")
+end
+
 desc "Run respirate smoke tests"
 task :respirate_smoke_test do
   # not partitioned, 1 process
