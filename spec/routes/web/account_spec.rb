@@ -65,6 +65,8 @@ RSpec.describe Clover, "account" do
             click_button "Authenticate Using One-Time Password"
           end
           expect(page).to have_flash_error("TOTP authentication code use locked out due to numerous failures")
+          expect(Mail::TestMailer.deliveries.length).to eq 1
+          expect(Mail::TestMailer.deliveries.first.subject).to eq "Ubicloud Account One-Time Password Authentication Locked Out"
 
           2.times do
             expect(page.title).to eq("Ubicloud - One-Time Password Unlock")
@@ -80,6 +82,8 @@ RSpec.describe Clover, "account" do
           fill_in "Authentication Code", with: totp.now
           click_button "Authenticate Using One-Time Password to Unlock"
           expect(page).to have_flash_notice("One-Time Password authentication unlocked")
+          expect(Mail::TestMailer.deliveries.length).to eq 2
+          expect(Mail::TestMailer.deliveries.last.subject).to eq "Ubicloud Account One-Time Password Authentication Unlocked"
 
           DB[:account_otp_keys].update(last_use: Sequel.date_sub(Sequel::CURRENT_TIMESTAMP, seconds: 4600))
           expect(page.title).to eq("Ubicloud - 2FA - One-Time Password")
