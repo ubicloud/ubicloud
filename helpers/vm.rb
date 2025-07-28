@@ -112,6 +112,7 @@ class Clover
         .from_self
         .select_group { [name.as(:location_name), device] }
         .select_append { max(:count).as(:max_count) }
+        .all.filter { !!BillingRate.from_resource_properties("Gpu", it[:device], it[:location_name]) }
 
       gpu_counts = [1, 2, 4, 8]
       gpu_options = available_gpus.map { it[:device] }.uniq.flat_map { |x| gpu_counts.map { |i| "#{i}:#{x}" } }
