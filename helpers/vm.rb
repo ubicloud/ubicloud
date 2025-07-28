@@ -107,7 +107,7 @@ class Clover
       available_gpus = DB[:pci_device]
         .join(:vm_host, id: :vm_host_id)
         .join(:location, id: :location_id)
-        .where(device_class: ["0300", "0302"], vm_id: nil)
+        .where(device_class: ["0300", "0302"], vm_id: nil, visible: true)
         .group_and_count(:vm_host_id, :name, :device)
         .from_self
         .select_group { [name.as(:location_name), device] }
