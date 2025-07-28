@@ -98,14 +98,14 @@ RSpec.describe Clover, "account" do
         expect(page).to have_flash_notice "One-time password authentication has been disabled"
       end
 
-      it "allows setting up and removing Webauthn authentication when password entry is #{"not " unless clear_last_password_entry}required" do
+      it "allows setting up#{", authenticating," if clear_last_password_entry} and removing Webauthn authentication when password entry is #{"not " unless clear_last_password_entry}required" do
+        webauthn_client = WebAuthn::FakeClient.new("http://www.example.com")
         2.times do |i|
           visit "/clear-last-password-entry" if clear_last_password_entry
           visit "/account/multifactor-manage"
           expect(page.title).to eq("Ubicloud - Multifactor Authentication")
           click_link "Add"
           expect(page.title).to eq("Ubicloud - Setup Security Key")
-          webauthn_client = WebAuthn::FakeClient.new("http://www.example.com")
           challenge = JSON.parse(page.find_by_id("webauthn-setup-form")["data-credential-options"])["challenge"]
           fill_in "Key Name", with: "My Key #{i}"
           fill_in "Password", with: TEST_USER_PASSWORD if clear_last_password_entry
@@ -113,6 +113,20 @@ RSpec.describe Clover, "account" do
           click_button "Setup Security Key"
           expect(page).to have_flash_notice "Security key is now setup, please make note of your recovery codes"
           expect(page.title).to eq("Ubicloud - Recovery Codes")
+        end
+
+        if clear_last_password_entry
+          click_button "Log out"
+          visit "/login"
+          fill_in "Email Address", with: TEST_USER_EMAIL
+          click_button "Sign in"
+          fill_in "Password", with: TEST_USER_PASSWORD
+          click_button "Sign in"
+          expect(page.title).to eq("Ubicloud - 2FA - Security Keys")
+          challenge = JSON.parse(page.find_by_id("webauthn-auth-form")["data-credential-options"])["challenge"]
+          fill_in "webauthn_auth", with: webauthn_client.get(challenge: challenge).to_json, visible: false
+          click_button "Authenticate Using Security Keys"
+          expect(page).to have_flash_notice "You have been logged in"
         end
 
         DB.transaction(rollback: :always) do
