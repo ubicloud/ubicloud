@@ -391,9 +391,9 @@ RSpec.describe Prog::Vm::GithubRunner do
   end
 
   describe "#wait_vm" do
-    it "naps 13 seconds if vm is not allocated yet" do
+    it "naps 11 seconds if vm is not allocated yet" do
       vm.update(allocated_at: nil)
-      expect { nx.wait_vm }.to nap(13)
+      expect { nx.wait_vm }.to nap(11)
     end
 
     it "naps a second if vm is allocated but not provisioned yet" do
