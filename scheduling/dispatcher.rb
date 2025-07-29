@@ -10,6 +10,19 @@ class Scheduling::Dispatcher
   STRAND_RUNTIME = Strand::LEASE_EXPIRATION / 4
   APOPTOSIS_MUTEX = Mutex.new
 
+  class Repartitioner < MonitorRepartitioner
+    def initialize(*, dispatcher:, **)
+      @dispatcher = dispatcher
+      super(*, **)
+    end
+
+    # Update the dispatcher prepared statement when repartitioning.
+    def repartition(num_partitions)
+      super
+      @dispatcher.setup_prepared_statements(strand_id_range:)
+    end
+  end
+
   # Arguments:
   # apoptosis_timeout :: The number of seconds a strand is allowed to
   #                      run before causing apoptosis.
@@ -96,17 +109,21 @@ class Scheduling::Dispatcher
     # based on metrics. Used for calculating the sleep duration.
     @strands_per_second = 1
 
-    # Ensure initial unpartitioned prepared statement setup before listening
-    # for partition changes.  In a partitioned environment, this should
-    # quickly be called be the repartition thread once it determines
-    # the number of partitions.  Assume by default that this is the highest
-    # partition.
-    setup_prepared_statements(num_partitions: partition_number)
-
     if partition_number
+      # Handles repartitioning when new partitions show up or old partitions
+      # go stale.
+      @repartitioner = Repartitioner.new(partition_number, channel: :respirate,
+        max_partition: 256, dispatcher: self, listen_timeout:,
+        recheck_seconds: listen_timeout * 2, stale_seconds: listen_timeout * 4)
+
       # The thread that listens for changes in the number of respirate processes
       # and adjusts the partition range accordingly.
-      @repartition_thread = Thread.new { repartition_thread }
+      @repartition_thread = Thread.new { @repartitioner.listen }
+    else
+      # Setup an unpartitioned prepared statement.
+      # This method is called implicitly with the appropriate partition when
+      # initializing the repartitioner in the if branch.
+      setup_prepared_statements(strand_id_range: nil)
     end
   end
 
@@ -151,54 +168,10 @@ class Scheduling::Dispatcher
   # strand thread signals them to exit.
   def shutdown
     @shutting_down = true
+    @repartitioner&.shutdown!
   end
 
-  def notify_partition
-    DB.notify(:respirate, payload: @partition_number_string)
-  end
-
-  def repartition_check(partition_times)
-    throw :stop if @shutting_down
-
-    t = Time.now
-    if t > @partition_recheck_time
-      @partition_recheck_time = t + (@listen_timeout * 2)
-      notify_partition
-      stale = t - (@listen_timeout * 4)
-      partition_times.reject! { |_, time| time < stale }
-      partition_times.keys.max
-    end
-  end
-
-  def repartition_thread
-    partition_times = {}
-    num_partitions = @partition_number
-
-    loop = proc do
-      if (max_partition = repartition_check(partition_times))&.<(num_partitions)
-        num_partitions = max_partition
-        setup_prepared_statements(num_partitions:)
-      end
-    end
-
-    # Set the initial recheck time.  Use rand to prevent the thundering herd.
-    @partition_recheck_time = Time.now + (@listen_timeout * rand * 2)
-
-    DB.listen(:respirate, loop:, after_listen: proc { notify_partition }, timeout: @listen_timeout) do |_, _, payload|
-      unless (partition_num = Integer(payload, exception: false)) && (partition_num <= 256)
-        Clog.emit("invalid respirate repartition notification") { {payload:} }
-        next
-      end
-
-      if partition_num > num_partitions
-        num_partitions = partition_num
-        setup_prepared_statements(num_partitions:)
-      end
-      partition_times[partition_num] = Time.now
-    end
-  end
-
-  def setup_prepared_statements(num_partitions: nil)
+  def setup_prepared_statements(strand_id_range:)
     # A prepared statement to get the strands to run.  A prepared statement
     # is used to reduce parsing/planning work in the database.
     ds = Strand
@@ -214,16 +187,15 @@ class Scheduling::Dispatcher
     # If a partition is given, limit the strands to the partition.
     # Create a separate prepared statement for older strands, not tied to
     # the current partition, to allow for graceful degradation.
-    if @partition_number && num_partitions
+    if strand_id_range
       # The old strand prepared statement does not change based on the
       # number of partitions, so no reason to reprepare it.
       @old_strand_ps ||= ds
         .where(Sequel[:schedule] < Sequel::CURRENT_TIMESTAMP - Sequel.cast(Sequel.cast(:$old_strand_delay, String) + " seconds", :interval))
         .prepare(:select, :get_old_strand_cohort)
 
-      partition = strand_id_range(num_partitions)
-      ds = ds.where(id: partition)
-      Clog.emit("respirate repartitioning") { {partition:} }
+      ds = ds.where(id: strand_id_range)
+      Clog.emit("respirate repartitioning") { {partition: strand_id_range} }
     else
       @old_strand_ps = nil
     end
@@ -231,21 +203,6 @@ class Scheduling::Dispatcher
     @strand_ps = ds
       .where(Sequel[:schedule] < Sequel::CURRENT_TIMESTAMP)
       .prepare(:select, :get_strand_cohort)
-  end
-
-  def partition_boundary(partition_num, partition_size)
-    "%08x-0000-0000-0000-000000000000" % (partition_num * partition_size).to_i
-  end
-
-  def strand_id_range(num_partitions)
-    partition_size = (16**8) / num_partitions.to_r
-    start_id = partition_boundary(@partition_number - 1, partition_size)
-
-    if num_partitions == @partition_number
-      start_id.."ffffffff-ffff-ffff-ffff-ffffffffffff"
-    else
-      start_id...partition_boundary(@partition_number, partition_size)
-    end
   end
 
   # Thread responsible for collecting and emitting metrics. This emits after every
