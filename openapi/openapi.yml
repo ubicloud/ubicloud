@@ -881,6 +881,11 @@ paths:
                 version:
                   description: PostgreSQL version
                   type: string
+                tags:
+                  description: Tags for the Postgres Database
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PostgresTag'
               additionalProperties: false
               required:
                 - size
@@ -911,6 +916,11 @@ paths:
                 storage_size:
                   description: Requested storage size in GiB
                   type: integer
+                tags:
+                  description: Tags for the Postgres Database
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PostgresTag'
               additionalProperties: false
       responses:
         '200':
@@ -1902,6 +1912,19 @@ components:
       required:
         - pg_config
         - pgbouncer_config
+    PostgresTag:
+      type: object
+      properties:
+        key:
+          description: Key of the Postgres tag
+          type: string
+        value:
+          description: Value of the Postgres tag
+          type: string
+      additionalProperties: false
+      required:
+        - key
+        - value
     PrivateLocation:
       type: object
       properties:
@@ -2116,6 +2139,11 @@ components:
           description: Parent Postgres database
           type: string
           nullable: true
+        tags:
+          description: Tags of the Postgres database
+          type: array
+          items:
+            $ref: '#/components/schemas/PostgresTag'
       additionalProperties: false
       required:
         - flavor
@@ -2129,6 +2157,7 @@ components:
         - vm_size
         - maintenance_window_start_at
         - read_replica
+        - tags
     PostgresDatabaseMetrics:
       type: object
       properties:
@@ -2610,6 +2639,11 @@ components:
                   maintenance_window_start_at:
                     description: Maintenance window start time
                     type: integer
+                  tags:
+                    description: Tags of the Postgres database
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PostgresTag'
                 required:
                   - connection_string
                   - earliest_restore_time
@@ -2617,6 +2651,7 @@ components:
                   - latest_restore_time
                   - primary
                   - maintenance_window_start_at
+                  - tags
     PostgresDatabases:
       description: A list of Postgres Databases
       content:
