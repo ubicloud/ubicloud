@@ -72,13 +72,13 @@ class MonitorRepartitioner
     DB.listen(:monitor, loop:, after_listen: proc { notify }, timeout: @listen_timeout) do |_, _, payload|
       throw :stop if @shutdown
 
-      unless (partition_num = Integer(payload, exception: false)) && (partition_num <= 8)
+      unless (notify_partition_num = Integer(payload, exception: false)) && (notify_partition_num <= 8)
         Clog.emit("invalid monitor repartition notification") { {monitor_notify_payload: payload} }
         next
       end
 
-      repartition(partition_num) if partition_num > @num_partitions
-      @partition_times[partition_num] = Time.now
+      repartition(notify_partition_num) if notify_partition_num > @num_partitions
+      @partition_times[notify_partition_num] = Time.now
     end
   end
 
