@@ -5,7 +5,7 @@ class MonitorRepartitioner
 
   attr_accessor :repartitioned
 
-  def initialize(partition_number, listen_timeout: 1, recheck_seconds: 18, stale_seconds: 40)
+  def initialize(partition_number, listen_timeout: 1, recheck_seconds: 18, stale_seconds: 40, max_partition: 8, channel: :monitor)
     @partition_number = partition_number
 
     # Assume when starting that we are the final partition. For cases where we aren't,
@@ -38,6 +38,12 @@ class MonitorRepartitioner
     # The next deadline after which to check for stale partitions and notify.
     @partition_recheck_time = Time.now + recheck_seconds - rand
 
+    # The channel to LISTEN and NOTIFY on.
+    @channel = channel
+
+    # The maximum partition we will consider valid.
+    @max_partition = max_partition
+
     @shutdown = false
 
     repartition(partition_number)
@@ -50,7 +56,7 @@ class MonitorRepartitioner
   # Notify the monitor channel that we exist, so that other monitor processes
   # can repartition appropriately if needed.
   def notify
-    DB.notify(:monitor, payload: @partition_number_string)
+    DB.notify(@channel, payload: @partition_number_string)
   end
 
   # Listens on the monitor channel to determine what other monitor processes are
@@ -66,14 +72,18 @@ class MonitorRepartitioner
       end
     end
 
+    allowed_partition_range = 1..@max_partition
+    emit_str = "invalid #{@channel} repartition notification"
+    emit_key = :"#{@channel}_notify_payload"
+
     # Continuouly LISTENs for notifications on the monitor channel until shutdown.
     # If notified about a higher partition number than the currently expected
     # partitioning, repartition the current process to decrease the partition size.
-    DB.listen(:monitor, loop:, after_listen: proc { notify }, timeout: @listen_timeout) do |_, _, payload|
+    DB.listen(@channel, loop:, after_listen: proc { notify }, timeout: @listen_timeout) do |_, _, payload|
       throw :stop if @shutdown
 
-      unless (notify_partition_num = Integer(payload, exception: false)) && (notify_partition_num <= 8)
-        Clog.emit("invalid monitor repartition notification") { {monitor_notify_payload: payload} }
+      unless (notify_partition_num = Integer(payload, exception: false)) && allowed_partition_range.cover?(notify_partition_num)
+        Clog.emit(emit_str) { {emit_key => payload} }
         next
       end
 
