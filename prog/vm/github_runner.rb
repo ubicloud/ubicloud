@@ -46,9 +46,19 @@ class Prog::Vm::GithubRunner < Prog::Base
       return picked_vm
     end
 
+    boot_image = label_data["boot_image"]
+    location_id = Location::GITHUB_RUNNERS_ID
+    size = label_data["vm_size"]
+    alien_ratio = github_runner.installation.project.get_ff_aws_alien_runners_ratio || 0
+    if label_data["arch"] == "x64" && boot_image == "github-ubuntu-2204" && rand < alien_ratio
+      boot_image = Config.send(:"#{boot_image.tr("-", "_")}_aws_ami_version")
+      location_id = Config.github_runner_aws_location_id
+      size = Option.aws_instance_type_name("m7a", label_data["vcpus"])
+    end
+
     ps = Prog::Vnet::SubnetNexus.assemble(
       Config.github_runner_service_project_id,
-      location_id: Location::GITHUB_RUNNERS_ID,
+      location_id:,
       allow_only_ssh: true
     ).subject
 
@@ -57,9 +67,9 @@ class Prog::Vm::GithubRunner < Prog::Base
       unix_user: "runneradmin",
       sshable_unix_user: "runneradmin",
       name: github_runner.ubid.to_s,
-      size: label_data["vm_size"],
-      location_id: Location::GITHUB_RUNNERS_ID,
-      boot_image: label_data["boot_image"],
+      size:,
+      location_id:,
+      boot_image:,
       storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: true, skip_sync: true}],
       enable_ip4: true,
       arch: label_data["arch"],
@@ -81,6 +91,8 @@ class Prog::Vm::GithubRunner < Prog::Base
       # If we enable free upgrades for the project, we should charge
       # the customer for the label's VM size instead of the effective VM size.
       label_data["vm_size"]
+    elsif github_runner.vm.location.aws?
+      "standard-#{vm.vcpus}"
     else
       "#{vm.family}-#{vm.vcpus}"
     end
@@ -210,6 +222,8 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   def setup_info
+    vmh = vm.vm_host
+    project = github_runner.installation.project
     {
       group: "Ubicloud Managed Runner",
       detail: {
@@ -218,12 +232,12 @@ class Prog::Vm::GithubRunner < Prog::Base
         "VM Family" => vm.family,
         "Arch" => vm.arch,
         "Image" => vm.boot_image,
-        "VM Host" => vm.vm_host.ubid,
+        "VM Host" => vmh&.ubid,
         "VM Pool" => vm.pool_id ? UBID.from_uuidish(vm.pool_id).to_s : nil,
-        "Location" => Location[vm.vm_host.location_id].name,
-        "Datacenter" => vm.vm_host.data_center,
-        "Project" => github_runner.installation.project.ubid,
-        "Console URL" => "#{Config.base_url}#{github_runner.installation.project.path}/github"
+        "Location" => vmh&.location&.name,
+        "Datacenter" => vmh&.data_center,
+        "Project" => project.ubid,
+        "Console URL" => "#{Config.base_url}#{project.path}/github"
       }.map { "#{_1}: #{_2}" }.join("\n")
     }
   end
