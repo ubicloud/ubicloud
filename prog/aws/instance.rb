@@ -135,7 +135,7 @@ usermod -L ubuntu
             encrypted: true,
             delete_on_termination: true,
             iops: 3000,
-            volume_size: 40,
+            volume_size: vm.vm_storage_volumes_dataset.where(:boot).get(:size_gib),
             volume_type: "gp3",
             throughput: 125
           }
