@@ -6,7 +6,7 @@
 
   <p><%= rodauth.otp_unlock_consecutive_successes_label %>: <%= rodauth.otp_unlock_num_successes %></p>
   <p><%= rodauth.otp_unlock_required_consecutive_successes_label %>: <%= rodauth.otp_unlock_auths_required %></p>
-  <p><%= rodauth.otp_unlock_next_auth_deadline_label %>: <%= rodauth.otp_unlock_deadline.strftime(rodauth.strftime_format) %></p>
+  <p><%= rodauth.otp_unlock_next_auth_deadline_label %>: <%= (rodauth.otp_unlock_deadline - Time.now).to_i %> seconds</p>
 
   <%== render("components/rodauth/otp_auth_code_field") %>
 
