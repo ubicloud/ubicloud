@@ -227,7 +227,7 @@ usermod -L ubuntu
               encrypted: true,
               delete_on_termination: true,
               iops: 3000,
-              volume_size: 40,
+              volume_size: 30,
               volume_type: "gp3",
               throughput: 125
             }
