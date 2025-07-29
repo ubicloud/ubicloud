@@ -66,10 +66,19 @@ MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :submit_que
   # Check each resource for stuck pulses/metric exports, and log if any are found.
   def check_stuck_pulses
     timeout, msg, key = stuck_pulse_info
-    before = Time.now - timeout
+    t = Time.now
+    before = t - timeout
     resources.each_value do |r|
       if r.monitor_job_started_at&.<(before)
-        Clog.emit(msg) { {key => {ubid: r.resource.ubid}} }
+        Clog.emit(msg) do
+          {
+            key => {
+              ubid: r.resource.ubid,
+              job_started_at: r.monitor_job_started_at,
+              time_elapsed: t - r.monitor_job_started_at
+            }
+          }
+        end
       end
     end
   end
