@@ -131,6 +131,18 @@ RSpec.describe MonitorResourceType do
       expect(@mrt.finish_queue.pop(timeout: 0)).to be_nil
     end
 
+    it "drops finished jobs if resource was deleted" do
+      mr.monitor_job_finished_at = Time.now
+      mr.instance_variable_set(:@deleted, true)
+      @mrt.resources[nil] = mr
+      @mrt.finish_queue.push(mr)
+      expect(@mrt.run_queue).to eq []
+      @mrt.enqueue(Time.now - 5)
+      expect(@mrt.run_queue).to eq []
+      expect(@mrt.resources).to eq({})
+      expect(@mrt.finish_queue.pop(timeout: 0)).to be_nil
+    end
+
     it "does not submit jobs if run queue is empty" do
       @mrt.submit_queue.close
       @mrt.enqueue(Time.now)

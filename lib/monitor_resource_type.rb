@@ -104,7 +104,11 @@ MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :submit_que
     # run queue. This can result in jobs that a very slightly out of order,
     # due to thread scheduling, but the differences are not likely to be material.
     while (r = finish_queue.pop(timeout: 0))
-      run_queue << r
+      if r.deleted
+        resources.delete(r.resource.id)
+      else
+        run_queue << r
+      end
     end
 
     unless run_queue.empty?
