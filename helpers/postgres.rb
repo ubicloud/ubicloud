@@ -10,6 +10,7 @@ class Clover
     storage_size = typecast_params.pos_int("storage_size")
     ha_type = typecast_params.nonempty_str("ha_type", PostgresResource::HaType::NONE)
     version = typecast_params.nonempty_str("version", PostgresResource::DEFAULT_VERSION)
+    tags = typecast_params.array(:Hash, "tags", [])
 
     postgres_params = {
       "flavor" => flavor,
@@ -40,6 +41,7 @@ class Clover
         version:,
         flavor:
       ).subject
+      pg.update(tags:)
       audit_log(pg, "create")
     end
     send_notification_mail_to_partners(pg, current_account.email)

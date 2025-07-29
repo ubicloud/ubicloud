@@ -167,6 +167,25 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "Invalid size."})
       end
 
+      it "can set and update tags" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
+          size: "standard-2",
+          storage_size: "64",
+          ha_type: "sync",
+          tags: [{key: "env", value: "test"}, {key: "team", value: "devops"}]
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["tags"]).to eq([{"key" => "env", "value" => "test"}, {"key" => "team", "value" => "devops"}])
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
+          tags: [{key: "env", value: "prod"}, {key: "team", value: "devops"}]
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["tags"]).to eq([{"key" => "env", "value" => "prod"}, {"key" => "team", "value" => "devops"}])
+      end
+
       it "can update database properties" do
         pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 

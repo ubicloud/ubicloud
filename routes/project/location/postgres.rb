@@ -49,6 +49,7 @@ class Clover
           size = typecast_params.nonempty_str("size", pg.target_vm_size)
           target_storage_size_gib = typecast_params.pos_int("storage_size", pg.target_storage_size_gib)
           ha_type = typecast_params.nonempty_str("ha_type", pg.ha_type)
+          tags = typecast_params.array(:Hash, "tags", pg.tags)
 
           postgres_params = {
             "flavor" => pg.flavor,
@@ -84,7 +85,7 @@ class Clover
           Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count - current_postgres_vcpu_count)
 
           DB.transaction do
-            pg.update(target_vm_size: requested_parsed_size.name, target_storage_size_gib:, ha_type:)
+            pg.update(target_vm_size: requested_parsed_size.name, target_storage_size_gib:, ha_type:, tags:)
             pg.read_replicas_dataset.update(target_vm_size: requested_parsed_size.name, target_storage_size_gib:)
             audit_log(pg, "update")
           end

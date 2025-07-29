@@ -17,7 +17,8 @@ class Serializers::Postgres < Serializers::Base
       ca_certificates: pg.ca_certificates,
       maintenance_window_start_at: pg.maintenance_window_start_at,
       read_replica: !!pg.read_replica?,
-      parent: pg.parent&.path
+      parent: pg.parent&.path,
+      tags: pg.tags || []
     }
 
     if options[:include_path]
