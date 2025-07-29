@@ -23,7 +23,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   let(:installation) { runner.installation }
   let(:project) { installation.project }
   let(:client) { instance_double(Octokit::Client) }
-  let(:now) { Time.utc(2025, 5, 19, 19, 0) }
+  let(:now) { Time.utc(2025, 8, 1, 19, 0) }
 
   before do
     allow(Config).to receive(:github_runner_service_project_id).and_return(vm.project_id)
@@ -100,6 +100,17 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm.id).to eq(picked_vm.id)
       expect(picked_vm.family).to eq("premium")
     end
+
+    it "uses alien vms if enabled" do
+      project.set_ff_aws_alien_runners_ratio(0.5)
+      expect(nx).to receive(:rand).and_return(0.4)
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      picked_vm = nx.pick_vm
+      expect(picked_vm.family).to eq("m7a")
+      expect(picked_vm.location.aws?).to be(true)
+      expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2204_aws_ami_version)
+    end
   end
 
   describe ".update_billing_record" do
@@ -170,6 +181,21 @@ RSpec.describe Prog::Vm::GithubRunner do
       runner.update(label: "ubicloud-standard-2", ready_at: now - 5 * 60, created_at: now - 100)
 
       expect(installation).to receive(:free_runner_upgrade_expires_at).and_return(now - 50)
+      expect(BillingRecord).to receive(:create).and_call_original
+      nx.update_billing_record
+
+      br = BillingRecord[resource_id: project.id]
+      expect(br.amount).to eq(5)
+      expect(br.duration(now, now)).to eq(1)
+      expect(br.billing_rate["resource_family"]).to eq("standard-2")
+      expect(runner.billed_vm_size).to eq("standard-2")
+    end
+
+    it "uses standard billing rate for alien runners" do
+      runner.update(label: "ubicloud-standard-2", ready_at: now - 5 * 60)
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      vm.update(location_id: location.id, family: "m7a")
+      expect(vm.location.aws?).to be(true)
       expect(BillingRecord).to receive(:create).and_call_original
       nx.update_billing_record
 
@@ -414,6 +440,12 @@ RSpec.describe Prog::Vm::GithubRunner do
       vm.update(pool_id: pool.id, vm_host_id: vm_host.id)
 
       expect(nx.setup_info[:detail]).to eq("Name: #{runner.ubid}\nLabel: ubicloud-standard-4\nVM Family: standard\nArch: x64\nImage: github-ubuntu-2204\nVM Host: #{vm_host.ubid}\nVM Pool: #{pool.ubid}\nLocation: hetzner-fsn1\nDatacenter: FSN1-DC8\nProject: #{project.ubid}\nConsole URL: http://localhost:9292/project/#{project.ubid}/github")
+    end
+
+    it "returns setup info without vm host" do
+      vm.update(vm_host_id: nil)
+
+      expect(nx.setup_info[:detail]).to eq("Name: #{runner.ubid}\nLabel: ubicloud-standard-4\nVM Family: standard\nArch: x64\nImage: github-ubuntu-2204\nVM Host: \nVM Pool: \nLocation: \nDatacenter: \nProject: #{project.ubid}\nConsole URL: http://localhost:9292/project/#{project.ubid}/github")
     end
   end
 

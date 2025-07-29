@@ -109,6 +109,7 @@ module Config
   optional :vm_pool_project_id, string
   optional :github_runner_service_project_id, string
   override :enable_github_workflow_poller, true, bool
+  optional :github_runner_aws_location_id, string
 
   # GitHub Cache
   optional :github_cache_blob_storage_endpoint, string
@@ -167,6 +168,7 @@ module Config
   override :github_ubuntu_2404_version, "20250821.1.0", string
   override :github_ubuntu_2204_version, "20250821.1.0", string
   override :github_gpu_ubuntu_2204_version, "20250821.1.0", string
+  override :github_ubuntu_2204_aws_ami_version, "ami-08b71dd98be505433", string
   override :postgres16_ubuntu_2204_version, "20250425.1.1", string
   override :postgres17_ubuntu_2204_version, "20250425.1.1", string
   override :postgres16_paradedb_ubuntu_2204_version, "20250425.1.1", string
