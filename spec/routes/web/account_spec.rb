@@ -74,6 +74,9 @@ RSpec.describe Clover, "account" do
             click_button "Authenticate Using One-Time Password to Unlock"
             expect(page).to have_flash_notice("One-Time Password successful authentication, more successful authentication needed to unlock")
             expect(page.title).to eq("Ubicloud - One-Time Password Unlock Not Available")
+            expect(page.response_headers["refresh"]).to match(/\A1[012]\d\z/)
+            expect(page).to have_content(/Deadline for next authentication: \d+ seconds/)
+            expect(page).to have_content(/Page will automatically refresh when authentication is possible \(in \d+ seconds\)\./)
             DB[:account_otp_unlocks].update(next_auth_attempt_after: Sequel.date_sub(Sequel::CURRENT_TIMESTAMP, seconds: 200))
             visit page.current_path
           end

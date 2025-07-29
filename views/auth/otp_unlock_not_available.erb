@@ -3,8 +3,7 @@
 <div class="space-y-6">
   <p><%= rodauth.otp_unlock_consecutive_successes_label %>: <%= rodauth.otp_unlock_num_successes %></p>
   <p><%= rodauth.otp_unlock_required_consecutive_successes_label %>: <%= rodauth.otp_unlock_auths_required %></p>
-  <p><%= rodauth.otp_unlock_next_auth_deadline_label %>: <%= rodauth.otp_unlock_deadline.strftime(rodauth.strftime_format) %></p>
+  <p><%= rodauth.otp_unlock_next_auth_deadline_label %>: <%= (rodauth.otp_unlock_deadline - Time.now).to_i %> seconds</p>
 
-  <p><%= rodauth.otp_unlock_next_auth_attempt_refresh_label %></p>
-  <%== rodauth.otp_unlock_refresh_tag %>
+  <p>Page will automatically refresh when authentication is possible (in <%= (rodauth.otp_unlock_next_auth_attempt_after - Time.now).to_i + 1 %> seconds).</p>
 </div>
