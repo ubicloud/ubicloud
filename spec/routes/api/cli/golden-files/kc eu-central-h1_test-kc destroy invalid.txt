@@ -1,6 +1,6 @@
 ! Invalid number of arguments for kc destroy subcommand (requires: 0, given: 1)
 
-Destroy a kubernetes cluster
+Destroy a Kubernetes cluster
 
 Usage:
     ubi kc (location/kc-name | kc-id) destroy [options]
