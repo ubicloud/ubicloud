@@ -1,4 +1,7 @@
-<% @page_title = @lb[:name] %>
+<% @page_title = @lb.name
+attachable_vms = dataset_authorize(@lb.private_subnet.vms_dataset.eager(:location), "Vm:view")
+  .exclude(Sequel[:vm][:id] => @lb.vms_dataset.select(Sequel[:vm][:id]))
+  .all %>
 
 <%== part(
   "components/page_header",
@@ -6,7 +9,7 @@
     %w[Projects /project],
     [@project_data[:name], @project_data[:path]],
     ["Load Balancer", "#{@project_data[:path]}/load-balancer"],
-    [@lb[:name], "#"]
+    [@lb.name, "#"]
   ]
 ) %>
 
@@ -15,19 +18,19 @@
   <%== part(
     "components/kv_data_card",
     data: [
-      ["ID", @lb[:id]],
-      ["Name", @lb[:name]],
-      ["Connection String", @lb[:hostname], { copyable: true }],
+      ["ID", @lb.ubid],
+      ["Name", @lb.name],
+      ["Connection String", @lb.hostname, { copyable: true }],
       [
         "Private Subnet",
-        "<a href='#{@project_data[:path]}/location/#{@lb[:location]}/private-subnet/#{@lb[:subnet]}' class='text-rose-500 hover:underline'>#{@lb[:subnet]}</a>",
+        "<a href='#{@project_data[:path]}/location/#{@lb.display_location}/private-subnet/#{@lb.private_subnet.name}' class='text-rose-500 hover:underline'>#{@lb.private_subnet.name}</a>",
         { escape: false }
       ],
-      ["Algorithm", (@lb[:algorithm] == "round_robin") ? "Round Robin" : "Hash Based"],
-      ["Stack", @lb[:stack].gsub("ip", "IP")],
-      ["Load Balancer Port", @lb[:src_port]],
-      ["Application Port", @lb[:dst_port]],
-      ["HTTP Health Check Endpoint", @lb[:health_check_endpoint]]
+      ["Algorithm", (@lb.algorithm == "round_robin") ? "Round Robin" : "Hash Based"],
+      ["Stack", @lb.stack.gsub("ip", "IP")],
+      ["Load Balancer Port", @lb.src_port],
+      ["Application Port", @lb.dst_port],
+      ["HTTP Health Check Endpoint", @lb.health_check_endpoint]
     ]
   ) %>
   <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
@@ -43,50 +46,50 @@
         <tr>
           <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">VM</th>
           <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Application State</th>
-          <% if has_permission?("LoadBalancer:edit", @lb[:id]) %>
+          <% if has_permission?("LoadBalancer:edit", @lb.ubid) %>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
           <% end %>
         </tr>
       </thead>
-      <tbody class="divide-y divide-gray-200 bg-white">
-        <% @lb[:vms].each do |vm| %>
+      <tbody class="divide-y divide-gray-200 bg-white" id="lb-vms">
+        <% @lb.vms(eager: :load_balancer_vm_ports).each do |vm| %>
           <tr>
             <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
               <a
-                href="<%= "#{@project_data[:path]}/location/#{vm[:location]}/vm/#{vm[:name]}" %>"
+                href="<%= "#{@project_data[:path]}/location/#{vm.display_location}/vm/#{vm.name}" %>"
                 class="text-orange-600 hover:text-orange-700"
-              ><%= vm[:name] %></a>
+              ><%= vm.name %></a>
             </td>
             <td class="px-3 py-3.5 whitespace-nowrap text-sm text-gray-900">
-              <%= vm[:load_balancer_state] %>
+              <%= vm.load_balancer_state %>
             </td>
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
               <form action="<%= "#{request.path}/detach-vm" %>" role="form" method="POST">
                 <%== csrf_tag("#{request.path}/detach-vm") %>
-                <input type="hidden" name="vm_id" value="<%= vm[:id] %>">
+                <input type="hidden" name="vm_id" value="<%= vm.ubid %>">
                 <%== part("components/form/submit_button", text: "Detach") %>
               </form>
             </td>
           </tr>
         <% end %>
-        <% if has_permission?("LoadBalancer:edit", @lb[:id]) %>
+        <% if has_permission?("LoadBalancer:edit", @lb.ubid) %>
           <tr>
             <td class="whitespace-nowrap py-4 pl-2 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
               <%== part(
                 "components/form/select",
                 name: "vm_id",
                 placeholder: "Select a VM",
-                options: @attachable_vms.map { |s| [s[:id], s[:name]] },
+                options: attachable_vms.map { [it.ubid, it.name] },
                 attributes: {
                   required: true,
-                  form: "form-lb-#{@lb[:id]}"
+                  form: "form-lb-#{@lb.ubid}"
                 }
               ) %>
             </td>
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
             </td>
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-              <form action="<%= "#{request.path}/attach-vm" %>" role="form" method="POST" id="form-lb-<%= @lb[:id] %>">
+              <form action="<%= "#{request.path}/attach-vm" %>" role="form" method="POST" id="form-lb-<%= @lb.ubid %>">
                 <%== csrf_tag("#{request.path}/attach-vm") %>
                 <%== part("components/form/submit_button", text: "Attach") %>
               </form>
@@ -97,7 +100,7 @@
     </table>
   </div>
   <!-- Delete Card -->
-  <% if has_permission?("LoadBalancer:delete", @lb[:id]) %>
+  <% if has_permission?("LoadBalancer:delete", @lb.ubid) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
         <div class="sm:flex sm:items-center sm:justify-between">
@@ -109,7 +112,7 @@
             </div>
           </div>
           <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-            <%== part("components/delete_button", confirmation: @lb[:name], redirect: "#{@project_data[:path]}/load-balancer") %>
+            <%== part("components/delete_button", confirmation: @lb.name, redirect: "#{@project_data[:path]}/load-balancer") %>
           </div>
         </div>
       </div>

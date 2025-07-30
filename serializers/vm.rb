@@ -32,10 +32,6 @@ class Serializers::Vm < Serializers::Base
       )
     end
 
-    if options[:load_balancer]
-      base[:load_balancer_state] = vm.load_balancer_vm_ports.first&.state
-    end
-
     base
   end
 end
