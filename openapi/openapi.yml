@@ -1762,7 +1762,7 @@ components:
       schema:
         type: string
         example: fwkkmx0f2vke4h36nk9cm8v8q0
-        pattern: '^(fw|1b|pg|ps|vm)[0-9a-hj-km-np-tv-z]{24}$'
+        pattern: '^(fw|kc|1b|pg|ps|vm)[0-9a-hj-km-np-tv-z]{24}$'
     order_column:
       description: Pagination - Order column
       in: query

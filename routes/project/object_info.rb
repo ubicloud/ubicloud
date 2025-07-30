@@ -3,6 +3,7 @@
 class Clover
   type_ds_perm_map = {
     "fw" => [:firewalls_dataset, "Firewall:view"],
+    "kc" => [:kubernetes_clusters_dataset, "KubernetesCluster:view"],
     "1b" => [:load_balancers_dataset, "LoadBalancer:view"],
     "pg" => [:postgres_resources_dataset, "Postgres:view"],
     "ps" => [:private_subnets_dataset, "PrivateSubnet:view"],
