@@ -19,7 +19,7 @@ class Clover
       end
 
       filter[:private_subnet_id] = @project.private_subnets_dataset.where(location_id: @location.id).select(Sequel[:private_subnet][:id])
-      lb = LoadBalancer.first(filter)
+      @lb = lb = LoadBalancer.first(filter)
 
       check_found_object(lb)
 
@@ -58,13 +58,9 @@ class Clover
       r.is do
         r.get do
           authorize("LoadBalancer:view", lb.id)
-          @lb = Serializers::LoadBalancer.serialize(lb, {detailed: true, vms_serialized: !api?})
           if api?
-            @lb
+            Serializers::LoadBalancer.serialize(lb, {detailed: true})
           else
-            vms = dataset_authorize(lb.private_subnet.vms_dataset.eager(:location), "Vm:view").exclude(Sequel[:vm][:id] => lb.vms_dataset.select(Sequel[:vm][:id])).all
-            @attachable_vms = Serializers::Vm.serialize(vms)
-
             view "networking/load_balancer/show"
           end
         end

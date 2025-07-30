@@ -37,6 +37,12 @@ RSpec.describe Vm do
     end
   end
 
+  describe "#load_balancer_state" do
+    it "returns nil if there is related object" do
+      expect(vm.load_balancer_state).to be_nil
+    end
+  end
+
   describe "#cloud_hypervisor_cpu_topology" do
     it "scales a single-socket hyperthreaded system" do
       vm.family = "standard"
