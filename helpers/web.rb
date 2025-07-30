@@ -58,16 +58,17 @@ class Clover < Roda
       request.on { view(template) }
     end
 
+    # :nocov:
+    # This code path is deprecated and will be removed after all routes have been updated
+    # to use handle_validation_failure.
+    raise "Request failure without handle_validation_failure: #{request.path_info}" if ENV["DISALLOW_INTERNAL_REQUEST_FALLBACK"]
+
     referrer = flash["referrer"] || env["HTTP_REFERER"]
     uri = begin
       Kernel.URI(referrer)
     rescue URI::InvalidURIError, ArgumentError
       nil
     end
-
-    # :nocov:
-    raise "Request failure without handle_validation_failure: #{request.path_info}" if ENV["DISALLOW_INTERNAL_REQUEST_FALLBACK"]
-    # :nocov:
 
     request.redirect "/" unless uri
 
@@ -86,6 +87,7 @@ class Clover < Roda
     else
       request.redirect referrer
     end
+    # :nocov:
   end
 
   def redirect_back_with_inputs_params
