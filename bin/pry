@@ -52,4 +52,39 @@ if Config.development?
   Pry.prepend(PryReloader)
 end
 
+PRY_LOGGER = LogDnaBatcher.new(ENV["INGEST_KEY"])
+
+module PryLogger
+  def evaluate_ruby(code)
+    PRY_LOGGER.log("INPUT: #{code.strip}",
+      level: "info",
+      type: "pry_input")
+
+    # Evaluate and capture result
+    begin
+      result = super
+
+      # Log output
+      output = result.inspect
+      output = "#{output[0..500]}..." if output.length > 500
+      PRY_LOGGER.log("OUTPUT: #{output}",
+        level: "info",
+        type: "pry_output")
+
+      result
+    rescue => e
+      PRY_LOGGER.log("EVAL_ERROR: #{e.class}: #{e.message}",
+        level: "error",
+        type: "eval_error")
+      raise
+    end
+  end
+end
+
+at_exit do
+  PRY_LOGGER.stop
+end
+
+Pry.prepend(PryLogger)
+
 Pry::CLI.start(opts)
