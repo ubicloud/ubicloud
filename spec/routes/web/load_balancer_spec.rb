@@ -223,13 +223,26 @@ RSpec.describe Clover, "load balancer" do
         expect(page).to have_flash_notice("VM is attached to the load balancer")
         expect(lb.vms.count).to eq(1)
 
+        expect(Config).to receive(:load_balancer_service_hostname).and_return("lb.ubicloud.com")
         visit "#{project.path}#{lb.path}"
-        expect(page).to have_content lb.name
-        expect(page).to have_content vm.name
-        expect(page).to have_content 80
-        expect(page).to have_content 8000
-        expect(page).to have_content "down"
-        expect(page).to have_content "Hash Based"
+        expect(page.all("dt,dd").map(&:text)).to eq [
+          "ID", lb.ubid,
+          "Name", "dummy-lb-3",
+          "Connection String", "dummy-lb-3.#{ps.ubid[-5...]}.lb.ubicloud.com",
+          "Private Subnet", "dummy-ps-1",
+          "Algorithm", "Hash Based",
+          "Stack", "dual",
+          "Load Balancer Port", "80",
+          "Application Port", "8000",
+          "HTTP Health Check Endpoint", "/up"
+        ]
+        expect(page.all("#lb-vms td").map(&:text)).to eq [
+          "dummy-vm-1", "down", "Detach",
+          "Select a VM", "", "Attach"
+        ]
+
+        click_link "dummy-ps-1"
+        expect(page.title).to eq("Ubicloud - #{ps.name}")
       end
 
       it "can not attach vm when it is already attached to another load balancer" do

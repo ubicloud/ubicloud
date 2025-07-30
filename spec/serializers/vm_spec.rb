@@ -6,7 +6,6 @@ RSpec.describe Serializers::Vm do
   describe ".serialize_internal" do
     it "serializes a VM with no loadbalancer_vm_port correctly" do
       vm = instance_double(Vm, name: "test-vm", unix_user: "ubi", storage_size_gib: 100, ip4_enabled: true)
-      expect(vm).to receive(:load_balancer_vm_ports).and_return([])
       expect(vm).to receive(:ip4_enabled).and_return(true)
       expect(vm).to receive(:display_state).and_return("running")
       expect(vm).to receive(:display_size).and_return("standard-2")
@@ -25,11 +24,10 @@ RSpec.describe Serializers::Vm do
         storage_size_gib: 100,
         ip6: nil,
         ip4_enabled: true,
-        ip4: "192.168.1.0/24",
-        load_balancer_state: nil
+        ip4: "192.168.1.0/24"
       }
 
-      expect(described_class.serialize_internal(vm, {load_balancer: true})).to eq(expected_result)
+      expect(described_class.serialize_internal(vm)).to eq(expected_result)
     end
 
     it "serializes a VM with GPU correctly" do
