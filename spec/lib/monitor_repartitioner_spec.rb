@@ -80,8 +80,15 @@ RSpec.describe MonitorRepartitioner do
       q.pop(timeout: 1)
       expect(mp).to receive(:repartition).with(3).and_call_original
       expect(mp.strand_id_range).to eq("00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff")
-      Thread.new { described_class.new(3).notify }.join(1)
-      Thread.new { described_class.new(2).notify }.join(1)
+      q2 = Queue.new
+      Thread.new do
+        described_class.new(3).notify
+        q2.push nil
+      end.join(1)
+      Thread.new do
+        q2.pop
+        described_class.new(2).notify
+      end.join(1)
 
       q.pop(timeout: 1)
       expect(mp.strand_id_range).to eq("00000000-0000-0000-0000-000000000000"..."55555555-0000-0000-0000-000000000000")
