@@ -1,5 +1,5 @@
 <%# locals: (name: nil, id: name, classes: nil, label: nil, options: {}, selected: nil, placeholder: nil, error: nil, description_html: nil, attributes: {}) %>
-<% selected = flash.dig("old", name) || selected
+<% selected = flash.dig("old", name) || request.POST[name] || selected
 error ||= flash.dig("errors", name) %>
 
 <div class="space-y-2 text-gray-900">

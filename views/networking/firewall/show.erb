@@ -1,5 +1,15 @@
-<% @page_title = @firewall[:name] %>
-<% edit_perm = has_permission?("Firewall:edit", @firewall[:id]) %>
+<% @page_title = @firewall.name
+
+attachable_subnets = dataset_authorize(@project
+    .private_subnets_dataset
+    .eager(:location)
+    .where(location_id: @location.id),
+  "PrivateSubnet:view")
+  .exclude(id: @firewall.private_subnets_dataset.select(:id))
+  .all
+
+firewall_path = "#{@project_data[:path]}#{@firewall.path}"
+edit_perm = has_permission?("Firewall:edit", @firewall.ubid) %>
 
 <%== part(
   "components/page_header",
@@ -7,7 +17,7 @@
     %w[Projects /project],
     [@project_data[:name], @project_data[:path]],
     ["Firewall", "#{@project_data[:path]}/firewall"],
-    [@firewall[:name], "#"]
+    [@firewall.name, "#"]
   ]
 ) %>
 
@@ -16,10 +26,10 @@
   <%== part(
     "components/kv_data_card",
     data: [
-      ["ID", @firewall[:id]],
-      ["Name", @firewall[:name]],
-      ["Location", @firewall[:location]],
-      ["Description", @firewall[:description]]
+      ["ID", @firewall.ubid],
+      ["Name", @firewall.name],
+      ["Location", @firewall.display_location],
+      ["Description", @firewall.description]
     ]
   ) %>
   <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
@@ -41,16 +51,16 @@
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-200 bg-white">
-        <% @firewall[:firewall_rules].each do |fwr| %>
+        <% @firewall.firewall_rules.sort_by { [it.cidr.version, it.cidr.to_s] }.each do |fwr| %>
           <tr>
-            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:cidr] %></td>
-            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:port_range] %></td>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr.cidr %></td>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr.display_port_range %></td>
             <% if edit_perm %>
               <td
-                id="fwr-delete-<%=fwr[:id]%>"
+                id="fwr-delete-<%= fwr.ubid %>"
                 class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
               >
-                <%== part("components/delete_button", url: "#{request.path}/firewall-rule/#{fwr[:id]}", text: "") %>
+                <%== part("components/delete_button", url: "#{firewall_path}/firewall-rule/#{fwr.ubid}", text: "") %>
               </td>
             <% end %>
           </tr>
@@ -64,7 +74,7 @@
                 attributes: {
                   placeholder: "0.0.0.0/0",
                   required: true,
-                  form: "form-fw-create-rule-#{@firewall[:id]}"
+                  form: "form-fw-create-rule-#{@firewall.ubid}"
                 }
               ) %>
             </td>
@@ -74,18 +84,18 @@
                 name: "port_range",
                 attributes: {
                   placeholder: "0..65536",
-                  form: "form-fw-create-rule-#{@firewall[:id]}"
+                  form: "form-fw-create-rule-#{@firewall.ubid}"
                 }
               ) %>
             </td>
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
               <form
-                action="<%= "#{request.path}/firewall-rule" %>"
+                action="<%= "#{firewall_path}/firewall-rule" %>"
                 role="form"
                 method="POST"
-                id="form-fw-create-rule-<%= @firewall[:id] %>"
+                id="form-fw-create-rule-<%= @firewall.ubid %>"
               >
-                <%== csrf_tag("#{request.path}/firewall-rule") %>
+                <%== csrf_tag("#{firewall_path}/firewall-rule") %>
                 <%== part("components/form/submit_button", text: "Create") %>
               </form>
             </td>
@@ -112,19 +122,19 @@
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-200 bg-white">
-        <% @firewall[:private_subnets].each do |ps| %>
+        <% @firewall.private_subnets.each do |ps| %>
           <tr>
             <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
               <a
-                href="<%= "#{@project_data[:path]}/location/#{ps[:location]}/private-subnet/#{ps[:name]}" %>"
+                href="<%= "#{@project_data[:path]}/location/#{ps.display_location}/private-subnet/#{ps.name}" %>"
                 class="text-orange-600 hover:text-orange-700"
-              ><%= ps[:name] %></a>
+              ><%= ps.name %></a>
             </td>
             <% if edit_perm %>
               <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                <form action="<%= "#{request.path}/detach-subnet" %>" role="form" method="POST">
-                  <%== csrf_tag("#{request.path}/detach-subnet") %>
-                  <input type="hidden" name="private_subnet_id" value="<%= ps[:id] %>">
+                <form action="<%= "#{firewall_path}/detach-subnet" %>" role="form" method="POST">
+                  <%== csrf_tag("#{firewall_path}/detach-subnet") %>
+                  <input type="hidden" name="private_subnet_id" value="<%= ps.ubid %>">
                   <%== part("components/form/submit_button", text: "Detach") %>
                 </form>
               </td>
@@ -138,21 +148,21 @@
                 "components/form/select",
                 name: "private_subnet_id",
                 placeholder: "Select a subnet",
-                options: @attachable_subnets.map { |s| [s[:id], s[:name]] },
+                options: attachable_subnets.map { [it.ubid, it.name] },
                 attributes: {
                   required: true,
-                  form: "form-fw-attach-#{@firewall[:id]}"
+                  form: "form-fw-attach-#{@firewall.ubid}"
                 }
               ) %>
             </td>
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
               <form
-                action="<%= "#{request.path}/attach-subnet" %>"
+                action="<%= "#{firewall_path}/attach-subnet" %>"
                 role="form"
                 method="POST"
-                id="form-fw-attach-<%= @firewall[:id] %>"
+                id="form-fw-attach-<%= @firewall.ubid %>"
               >
-                <%== csrf_tag("#{request.path}/attach-subnet") %>
+                <%== csrf_tag("#{firewall_path}/attach-subnet") %>
                 <%== part("components/form/submit_button", text: "Attach") %>
               </form>
             </td>
@@ -162,7 +172,7 @@
     </table>
   </div>
   <!-- Delete Card -->
-  <% if has_permission?("Firewall:delete", @firewall[:id]) %>
+  <% if has_permission?("Firewall:delete", @firewall.ubid) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
         <div class="sm:flex sm:items-center sm:justify-between">
@@ -174,7 +184,7 @@
             </div>
           </div>
           <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-            <%== part("components/delete_button", confirmation: @firewall[:name], redirect: "#{@project_data[:path]}/firewall") %>
+            <%== part("components/delete_button", confirmation: @firewall.name, redirect: "#{@project_data[:path]}/firewall") %>
           </div>
         </div>
       </div>
