@@ -192,6 +192,7 @@ Commands:
 Post Commands:
     create     Create a Kubernetes cluster
     destroy    Destroy a Kubernetes cluster
+    show       Show details for a Kubernetes cluster
 
 
 List Kubernetes clusters
@@ -231,6 +232,24 @@ Usage:
 
 Options:
     -f, --force                      do not require confirmation
+
+
+Show details for a Kubernetes cluster
+
+Usage:
+    ubi kc (location/kc-name | kc-id) show [options]
+
+Options:
+    -f, --fields=fields              show specific fields (comma separated)
+    -n, --nodepool-fields=fields     show specific nodepool fields (comma separated)
+    -v, --vm-fields=fields           show specific virtual machine fields (comma separated)
+
+Allowed Option Values:
+    Fields: id name location display-state cp-node-count node-size version
+            nodepools cp-vms
+    Nodepool Fields: id name node-count node-size vms
+    Virtual Machine Fields: id name state location size unix-user
+                            storage-size-gib ip6 ip4-enabled ip4
 
 
 Manage load balancers

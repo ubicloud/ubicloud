@@ -1,0 +1,5 @@
+id: kcnzrctjjg4j4g6eqvdsvzthwp
+name: test-kc
+location: eu-central-h1
+display_state: creating
+cp_node_count: 1
