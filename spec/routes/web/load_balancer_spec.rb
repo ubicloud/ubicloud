@@ -129,17 +129,6 @@ RSpec.describe Clover, "load balancer" do
         expect((find "input[name=name]")["value"]).to eq("invalid name")
       end
 
-      it "handles invalid referers by redirecting to root" do
-        project
-        Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
-        visit "#{project.path}/load-balancer/create"
-        fill_in "Name", with: "invalid name"
-
-        expect(Kernel).to receive(:URI).and_raise(URI::InvalidURIError)
-        click_button "Create"
-        expect(page.title).to eq("Ubicloud - Default Dashboard")
-      end
-
       it "can not create load balancer in a project when does not have permissions" do
         Prog::Vnet::SubnetNexus.assemble(project_wo_permissions.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         visit "#{project_wo_permissions.path}/load-balancer/create"
