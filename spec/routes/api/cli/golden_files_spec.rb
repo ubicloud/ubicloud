@@ -58,6 +58,29 @@ RSpec.describe Clover, "cli" do
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("ps788q81w5w26h900k13ad8bkx"))
     cli(%W[kc eu-central-h1/test-kc create -c 1 -z standard-2 -w 1 -v v1.32])
 
+    expect(Vm).to receive(:generate_ubid).and_return(UBID.parse("vmgbbazmznfa0mp49nzh5v0z25"), UBID.parse("vmnwfmjk5k462kkzsfa4n1h4xm"))
+    expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("ncnqx1bbxgra7k8r9k9qwvspwd"), UBID.parse("nc1c3bggqpxt5kqqrdtkym1g03"))
+    kubernetes_cluster = KubernetesCluster.first
+    vms = ["kc-cp-vm", "kc-np-vm"].map do |vm_name|
+      Prog::Vm::Nexus.assemble_with_sshable(
+        Config.kubernetes_service_project_id,
+        sshable_unix_user: "ubi",
+        name: vm_name,
+        location_id: kubernetes_cluster.location.id,
+        size: kubernetes_cluster.target_node_size,
+        storage_volumes: [{encrypted: true, size_gib: kubernetes_cluster.target_node_storage_size_gib}],
+        boot_image: "kubernetes-#{kubernetes_cluster.version.tr(".", "_")}",
+        private_subnet_id: kubernetes_cluster.private_subnet_id,
+        enable_ip4: true
+      ).subject
+    end
+    vms[0].update(ephemeral_net6: "ccab:de77:9a94:fa69::/64")
+    vms[1].update(ephemeral_net6: "bbab:de77:9a94:fa69::/64")
+    add_ipv4_to_vm(vms[0], "129.0.0.2")
+    add_ipv4_to_vm(vms[1], "130.0.0.3")
+    kubernetes_cluster.add_cp_vm(vms[0])
+    KubernetesNodepool.first.add_vm(vms[1])
+
     expect(Vm).to receive(:generate_ubid).and_return(UBID.parse("vmz7b0dxt40t4g7rnmag9hct7c")).at_least(:once)
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("ps9a8v5tm1020qn73f0c7db0x7")).at_least(:once)
     fw_uuids = %w[2b4ae5cf-1aac-8dfc-bc80-c87e3e381e10 f5e6cb31-e580-81fc-88d6-a379f13494bf].cycle

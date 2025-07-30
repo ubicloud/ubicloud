@@ -45,6 +45,14 @@ help -u vm
 help vm
 help vm list
 kc eu-central-h1/test-kc destroy -f
+kc eu-central-h1/test-kc show
+kc eu-central-h1/test-kc show -f id,name,location,display-state,cp-node-count
+kc eu-central-h1/test-kc show -f node-size,version,nodepools,cp-vms
+kc eu-central-h1/test-kc show -n id,name,node-count
+kc eu-central-h1/test-kc show -n node-size,vms
+kc eu-central-h1/test-kc show -v id,name,state,location,size,unix-user,storage-size-gib
+kc eu-central-h1/test-kc show -v ip6,ip4-enabled,ip4
+kc kcnzrctjjg4j4g6eqvdsvzthwp show
 kc list
 kc list -f location
 kc list -l eu-central-h1
