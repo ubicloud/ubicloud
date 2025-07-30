@@ -1,4 +1,6 @@
-<% @page_title = "Create Kubernetes Cluster" %>
+<% @page_title = "Create Kubernetes Cluster"
+@has_valid_payment_method = @project.has_valid_payment_method?
+@option_tree, @option_parents = generate_kubernetes_cluster_options %>
 
 <%== render("components/billing_warning") %>
 
