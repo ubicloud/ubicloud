@@ -32,7 +32,7 @@ class UbiCli
   LOWERCASE_LABELS["ak"] = "inference API key"
   LOWERCASE_LABELS.freeze
 
-  OBJECT_INFO_REGEXP = /((fw|1b|pg|ps|vm|ak)[a-z0-9]{24})/
+  OBJECT_INFO_REGEXP = /((fw|kc|1b|pg|ps|vm)[a-z0-9]{24})/
   UBI_VERSION_REGEXP = /\A\d{1,4}\.\d{1,4}\.\d{1,4}\z/
 
   Rodish.processor(self)
