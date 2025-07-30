@@ -133,7 +133,7 @@ class Sshable < Sequel::Model
   COMMON_SSH_ARGS = {non_interactive: true, timeout: 10,
                      user_known_hosts_file: [], global_known_hosts_file: [],
                      verify_host_key: :accept_new, keys: [], key_data: [], use_agent: false,
-                     keepalive: true, keepalive_interval: 3, keepalive_maxcount: 5}.freeze
+                     keepalive: true, keepalive_interval: 60, keepalive_maxcount: 5}.freeze
 
   def connect
     Thread.current[:clover_ssh_cache] ||= {}
