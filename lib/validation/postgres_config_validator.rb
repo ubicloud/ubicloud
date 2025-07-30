@@ -26,7 +26,7 @@ module Validation
     def validation_errors(config)
       errors = {}
       config.each do |key, value|
-        errors[key] = if value.empty?
+        errors[key] = if value.to_s.empty?
           "Value cannot be empty"
         elsif valid_config?(key)
           validate_config(key, value)

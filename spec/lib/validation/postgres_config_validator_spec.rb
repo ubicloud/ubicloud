@@ -54,6 +54,11 @@ RSpec.describe Validation::PostgresConfigValidator do
         config = {"citus.shard_count" => "32"}
         expect { validator.validate(config) }.not_to raise_error
       end
+
+      it "returns no errors for non-string value" do
+        config = {"max_connections" => 100}
+        expect { validator.validate(config) }.not_to raise_error
+      end
     end
 
     context "with invalid configurations" do
