@@ -382,6 +382,7 @@ class Clover < Roda
     create_account_set_password? true
     password_confirm_label "Password Confirmation"
     before_create_account do
+      scope.handle_validation_failure("auth/create_account")
       check_locked_domain(account[:email], "Creating accounts with a password")
 
       cf_response = scope.typecast_params.str("cf-turnstile-response").to_s if Config.cloudflare_turnstile_site_key
@@ -625,6 +626,11 @@ class Clover < Roda
     close_account_view { view "account/close_account", "My Account" }
 
     before_close_account do
+      scope.handle_validation_failure(true) do
+        request.on do
+          close_account_view
+        end
+      end
       account = Account[account_id]
       # Do not allow to close account if the project has resources and
       # the account is the only user
