@@ -36,7 +36,9 @@ class Clover
   end
 
   def kubernetes_cluster_list
-    dataset = dataset_authorize(@project.kubernetes_clusters_dataset, "KubernetesCluster:view")
+    dataset = @project.kubernetes_clusters_dataset
+    dataset = dataset.where(location_id: @location.id) if @location
+    dataset = dataset_authorize(dataset, "KubernetesCluster:view")
     if api?
       paginated_result(dataset, Serializers::KubernetesCluster)
     else
