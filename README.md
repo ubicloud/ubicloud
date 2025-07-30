@@ -138,9 +138,10 @@ tests, we use [RSpec](https://rspec.info/).
 design, we use [Tailwind CSS](https://tailwindcss.com) with components from
 [Tailwind UI](https://tailwindui.com). We also use jQuery for interactivity.
 
-If you’d like to start hacking with Ubicloud, any method of obtaining Ruby and Postgres 
-versions is acceptable. If you have no opinion on this, our development team uses `asdf-vm` 
-as [documented here in detail](DEVELOPERS.md).
+If you’d like to start hacking with Ubicloud, any method of obtaining
+Ruby and Postgres versions is acceptable. If you have no opinion on
+this, our development team uses `mise` as [documented here in
+detail](DEVELOPERS.md).
 
 [Greptile](https://greptile.com/) provides an AI/LLM that indexes
 Ubicloud's source code [can answer questions about
