@@ -268,12 +268,12 @@ class Clover
           r.is do
             r.get do
               authorize("Project:viewaccess", @project.id)
-              @tags = dataset_authorize(@tag_model.where(project_id: @project.id).order(:name), "#{@tag_model}:view").all
               view "project/tag-list"
             end
 
             r.post do
               authorize(tag_perm_map[tag_type], @project.id)
+              handle_validation_failure("project/tag-list")
               DB.transaction do
                 tag = @tag_model.create_with_id(project_id: @project.id, name: typecast_params.nonempty_str("name"))
                 audit_log(tag, "create")
@@ -293,13 +293,6 @@ class Clover
             r.is do
               r.get do
                 authorize("#{@tag.class}:view", @authorize_id)
-
-                members = @current_members = {}
-                @tag.member_ids.each do
-                  next if @tag_type == "subject" && UBID.uuid_class_match?(it, ApiKey)
-                  members[it] = nil
-                end
-                UBID.resolve_map(members)
                 view "project/tag"
               end
 
@@ -311,6 +304,7 @@ class Clover
               end
 
               r.post do
+                handle_validation_failure("project/tag")
                 @tag.update(name: typecast_params.nonempty_str("name"))
                 audit_log(@tag, "update")
                 flash["notice"] = "#{@display_tag_type} tag name updated successfully"
@@ -327,6 +321,7 @@ class Clover
 
             r.post "associate" do
               authorize("#{@tag.class}:add", @authorize_id)
+              handle_validation_failure("project/tag")
 
               # Use serializable isolation to try to prevent concurrent changes
               # from introducing loops
@@ -355,6 +350,7 @@ class Clover
 
             r.post "disassociate" do
               authorize("#{@tag.class}:remove", @authorize_id)
+              handle_validation_failure("project/tag")
 
               to_remove = typecast_params.array(:nonempty_str, "remove") || []
               to_remove.reject! { UBID.class_match?(it, ApiKey) } if @tag_type == "subject"
