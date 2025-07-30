@@ -316,5 +316,13 @@ usermod -L ubuntu
 
       expect { nx.cleanup_roles }.to exit({"msg" => "vm destroyed"})
     end
+
+    it "skips policy cleanup if the cloudwatch policy doesn't exist" do
+      iam_client.stub_responses(:list_policies, policies: [])
+      iam_client.stub_responses(:remove_role_from_instance_profile, {})
+      iam_client.stub_responses(:delete_instance_profile, {})
+      iam_client.stub_responses(:delete_role, {})
+      expect { nx.cleanup_roles }.to exit({"msg" => "vm destroyed"})
+    end
   end
 end

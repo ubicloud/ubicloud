@@ -208,12 +208,14 @@ usermod -L ubuntu
       iam_client.delete_instance_profile({instance_profile_name: "#{vm.name}-instance-profile"})
     end
 
-    ignore_invalid_entity do
-      iam_client.detach_role_policy({role_name: vm.name, policy_arn: cloudwatch_policy.arn})
-    end
+    if cloudwatch_policy
+      ignore_invalid_entity do
+        iam_client.detach_role_policy({role_name: vm.name, policy_arn: cloudwatch_policy.arn})
+      end
 
-    ignore_invalid_entity do
-      iam_client.delete_policy({policy_arn: cloudwatch_policy.arn})
+      ignore_invalid_entity do
+        iam_client.delete_policy({policy_arn: cloudwatch_policy.arn})
+      end
     end
 
     ignore_invalid_entity do
