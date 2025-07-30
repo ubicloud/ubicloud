@@ -1,2 +1,2 @@
-Destroying this kubernetes cluster is not recoverable.
-Enter the following to confirm destruction of the kubernetes cluster: test-kc
+Destroying this Kubernetes cluster is not recoverable.
+Enter the following to confirm destruction of the Kubernetes cluster: test-kc

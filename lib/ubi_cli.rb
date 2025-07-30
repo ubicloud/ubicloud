@@ -28,6 +28,7 @@ class UbiCli
 
   LOWERCASE_LABELS = CAPITALIZED_LABELS.transform_values(&:downcase)
   LOWERCASE_LABELS["pg"] = CAPITALIZED_LABELS["pg"]
+  LOWERCASE_LABELS["kc"] = CAPITALIZED_LABELS["kc"]
   LOWERCASE_LABELS["ak"] = "inference API key"
   LOWERCASE_LABELS.freeze
 

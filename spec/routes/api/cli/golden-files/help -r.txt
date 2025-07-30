@@ -11,7 +11,7 @@ Commands:
     ai         Manage AI features
     fw         Manage firewalls
     help       Get command help
-    kc         Manage kubernetes clusters
+    kc         Manage Kubernetes clusters
     lb         Manage load balancers
     pg         Manage PostgreSQL databases
     ps         Manage private subnets
@@ -180,28 +180,28 @@ Options:
     -u, --usage                      only show usage
 
 
-Manage kubernetes clusters
+Manage Kubernetes clusters
 
 Usage:
     ubi kc command [...]
     ubi kc (location/kc-name | kc-id) post-command [...]
 
 Commands:
-    list       List kubernetes clusters
+    list       List Kubernetes clusters
 
 Post Commands:
     create     Create a Kubernetes cluster
-    destroy    Destroy a kubernetes cluster
+    destroy    Destroy a Kubernetes cluster
 
 
-List kubernetes clusters
+List Kubernetes clusters
 
 Usage:
     ubi kc list [options]
 
 Options:
     -f, --fields=fields              show specific fields (comma separated)
-    -l, --location=location          only show kubernetes clusters in given location
+    -l, --location=location          only show Kubernetes clusters in given location
     -N, --no-headers                 do not show headers
 
 Allowed Option Values:
@@ -224,7 +224,7 @@ Allowed Option Values:
     Control Plane Node Count: 1 3
 
 
-Destroy a kubernetes cluster
+Destroy a Kubernetes cluster
 
 Usage:
     ubi kc (location/kc-name | kc-id) destroy [options]
