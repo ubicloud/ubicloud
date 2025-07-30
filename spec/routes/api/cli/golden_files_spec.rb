@@ -80,6 +80,7 @@ RSpec.describe Clover, "cli" do
     add_ipv4_to_vm(vms[1], "130.0.0.3")
     kubernetes_cluster.add_cp_vm(vms[0])
     KubernetesNodepool.first.add_vm(vms[1])
+    expect(KubernetesCluster).to receive(:kubeconfig).and_return("example-kubeconfig").at_least(:once)
 
     expect(Vm).to receive(:generate_ubid).and_return(UBID.parse("vmz7b0dxt40t4g7rnmag9hct7c")).at_least(:once)
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("ps9a8v5tm1020qn73f0c7db0x7")).at_least(:once)

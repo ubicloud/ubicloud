@@ -21,6 +21,7 @@ fw list invalid
 help invalid
 invalid
 kc eu-central-h1/test-kc destroy invalid
+kc eu-central-h1/test-kc kubeconfig bad
 kc eu-central-h1/test-kc show -f bad
 kc list -f invalid
 kc list invalid
