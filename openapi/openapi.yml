@@ -627,6 +627,21 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Kubernetes Cluster
+  '/project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_reference}/kubeconfig':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/kubernetes_cluster_reference'
+    get:
+      operationId: getKubernetesKubeconfigFile
+      summary: Get kubeconfig.yaml of a specific KubernetesCluster in a location
+      responses:
+        '200':
+          $ref: '#/components/responses/Kubeconfig'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Kubernetes Cluster
   '/project/{project_id}/location/{location}/load-balancer':
     get:
       operationId: listLocationLoadBalancers
@@ -2765,6 +2780,11 @@ components:
             required:
               - count
               - items
+    Kubeconfig:
+      description: A Kubernetes Cluster configuration file
+      content:
+        text/plain:
+          schema: {}
     KubernetesCluster:
       description: A KubernetesCluster
       content:

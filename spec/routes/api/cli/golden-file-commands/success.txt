@@ -45,6 +45,7 @@ help -u vm
 help vm
 help vm list
 kc eu-central-h1/test-kc destroy -f
+kc eu-central-h1/test-kc kubeconfig
 kc eu-central-h1/test-kc show
 kc eu-central-h1/test-kc show -f id,name,location,display-state,cp-node-count
 kc eu-central-h1/test-kc show -f node-size,version,nodepools,cp-vms
