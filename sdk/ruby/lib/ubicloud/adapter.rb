@@ -47,12 +47,16 @@ module Ubicloud
 
     # Handle responses to the requests made the library.  Non-200/204
     # are treated as errors and result in an Ubicloud::Error being raised.
-    def handle_response(code, body, missing: :raise)
+    def handle_response(code, headers, body, missing: :raise)
       case code
       when 204
         nil
       when 200
-        JSON.parse(body, symbolize_names: true)
+        if headers["content-type"].include?("json")
+          JSON.parse(body, symbolize_names: true)
+        else
+          body
+        end
       else
         return if code == 404 && missing.nil?
         raise Error.new("unsuccessful response", code:, body:)
