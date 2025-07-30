@@ -9,7 +9,8 @@ RSpec.describe Clover do
     click_button "Sign in"
 
     expect(page.status_code).to eq(400)
-    expect(page).to have_flash_error("An invalid security token submitted with this request, please try again")
+    expect(page.title).to eq "Ubicloud - Invalid Security Token"
+    expect(page).to have_content("An invalid security token was submitted, please click back, refresh, and try again.")
   end
 
   it "does not redirect to requested path if path is too long" do

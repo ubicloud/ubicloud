@@ -98,9 +98,9 @@ class Clover < Roda
   end
 
   plugin :route_csrf do |token|
-    flash["error"] = "An invalid security token submitted with this request, please try again"
     response.status = 400
-    redirect_back_with_inputs
+    @page_title = "Invalid Security Token"
+    view(content: "An invalid security token was submitted, please click back, refresh, and try again.")
   end
 
   plugin :content_security_policy do |csp|
