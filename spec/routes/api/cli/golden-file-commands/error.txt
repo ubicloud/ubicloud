@@ -1,6 +1,7 @@
 
 --confirm foo ai api-key ak2c0j48r8kj4nharh6yagf3eb destroy
 --confirm foo fw eu-central-h1/test-ps-default destroy
+--confirm foo kc eu-central-h1/test-kc destroy
 --confirm foo lb eu-central-h1/test-lb destroy
 --confirm foo pg eu-central-h1/test-pg destroy
 --confirm foo ps eu-central-h1/test-ps destroy
@@ -19,6 +20,7 @@ fw list -f invalid
 fw list invalid
 help invalid
 invalid
+kc eu-central-h1/test-kc destroy invalid
 lb list -f invalid
 lb list -N=1 invalid
 lb list invalid

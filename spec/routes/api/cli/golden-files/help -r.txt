@@ -187,10 +187,11 @@ Usage:
     ubi kc (location/kc-name | kc-id) post-command [...]
 
 Commands:
-    list      List kubernetes clusters
+    list       List kubernetes clusters
 
 Post Commands:
-    create    Create a Kubernetes cluster
+    create     Create a Kubernetes cluster
+    destroy    Destroy a kubernetes cluster
 
 
 List kubernetes clusters
@@ -221,6 +222,15 @@ Options:
 Allowed Option Values:
     Version: v1.33 v1.32
     Control Plane Node Count: 1 3
+
+
+Destroy a kubernetes cluster
+
+Usage:
+    ubi kc (location/kc-name | kc-id) destroy [options]
+
+Options:
+    -f, --force                      do not require confirmation
 
 
 Manage load balancers
