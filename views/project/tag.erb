@@ -1,4 +1,12 @@
 <% @page_title = "#{@project_data[:name]} - #{@tag.name}"
+
+members = @current_members = {}
+@tag.member_ids.each do
+  next if @tag_type == "subject" && UBID.uuid_class_match?(it, ApiKey)
+  members[it] = nil
+end
+UBID.resolve_map(members)
+
 editable =
   !(@tag_type == "subject" && @tag.name == "Admin") &&
     has_project_permission("Project:#{@tag_type.sub(/(ect|ion)\z/, "").downcase}tag")
@@ -17,8 +25,8 @@ add_groups.transform_values! do |v|
 end
 add_groups.reject! { _2.empty? }
 
-add_checked = flash.dig("old", "add")
-remove_checked = flash.dig("old", "remove")
+add_checked = flash.dig("old", "add") || request.POST["add"]
+remove_checked = flash.dig("old", "remove") || request.POST["remove"]
 
 base_path = "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
 associate_path = "#{base_path}/associate"
