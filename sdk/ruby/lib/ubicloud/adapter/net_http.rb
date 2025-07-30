@@ -48,7 +48,8 @@ module Ubicloud
           http.send(METHOD_MAP.fetch(method), path, params&.to_json, @headers)
         end
 
-        handle_response(response.code.to_i, response.body, missing:)
+        headers = response.to_hash.transform_values { (it.length == 1) ? it[0] : it }
+        handle_response(response.code.to_i, headers, response.body, missing:)
       end
     end
   end

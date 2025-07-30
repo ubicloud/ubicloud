@@ -31,7 +31,7 @@ RSpec.describe Ubicloud do
     o = ["{\"items\": []}"]
     closed = false
     o.define_singleton_method(:close) { closed = true }
-    expect(Clover).to receive(:call).and_return([200, {}, o])
+    expect(Clover).to receive(:call).and_return([200, {"content-type" => "application/json"}, o])
     expect(ubi.vm.list).to eq([])
     expect(closed).to be true
   end
@@ -100,7 +100,7 @@ RSpec.describe Ubicloud do
     expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
       path = env["PATH_INFO"]
       params = JSON.parse(env["rack.input"].read, symbolize_names: true)
-      [200, {}, ["{\"id\": \"ps345678901234567890123456\"}"]]
+      [200, {"content-type" => "application/json"}, ["{\"id\": \"ps345678901234567890123456\"}"]]
     end)
 
     fw.attach_subnet(ps)
@@ -116,7 +116,7 @@ RSpec.describe Ubicloud do
     public_key = nil
     expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
       public_key = JSON.parse(env["rack.input"].read, symbolize_names: true)[:public_key]
-      [200, {}, ["{\"id\": \"vm345678901234567890123456\"}"]]
+      [200, {"content-type" => "application/json"}, ["{\"id\": \"vm345678901234567890123456\"}"]]
     end)
 
     expect(ubi.vm.create(location: "eu-central-h1", name: "test-vm", public_key: "foo\nbar\r\nbaz")).to be_a(Ubicloud::Vm)
@@ -128,7 +128,7 @@ RSpec.describe Ubicloud do
 
   it "Firewall#add_rule and #delete_rule work without firewall rules loaded" do
     expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
-      [200, {}, ["{}"]]
+      [200, {"content-type" => "application/json"}, ["{}"]]
     end)
 
     fw = ubi.firewall.new("foo/bar")
@@ -141,7 +141,7 @@ RSpec.describe Ubicloud do
 
   it "Postgres#add_firewall_rule and #delete_firewall_rule work without firewall rules loaded" do
     expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
-      [200, {}, ["{}"]]
+      [200, {"content-type" => "application/json"}, ["{}"]]
     end)
 
     pg = ubi.postgres.new("foo/bar")
@@ -154,7 +154,7 @@ RSpec.describe Ubicloud do
 
   it "Postgres#add_metric_destination and #delete_metric_destination work without firewall rules loaded" do
     expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
-      [200, {}, ["{}"]]
+      [200, {"content-type" => "application/json"}, ["{}"]]
     end)
 
     pg = ubi.postgres.new("foo/bar")
@@ -167,7 +167,7 @@ RSpec.describe Ubicloud do
 
   it "Firewall#add_rule and #delete_rule modify firewall rules if loaded" do
     expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
-      [200, {}, ["{\"id\": \"fr345678901234567890123456\"}"]]
+      [200, {"content-type" => "application/json"}, ["{\"id\": \"fr345678901234567890123456\"}"]]
     end)
 
     fw = ubi.firewall.new(location: "foo", name: "bar", firewall_rules: [])
@@ -180,7 +180,7 @@ RSpec.describe Ubicloud do
 
   it "Postgres#add_firewall_rule and #delete_firewall_rule modify firewall rules if loaded" do
     expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
-      [200, {}, ["{\"id\": \"fr345678901234567890123456\"}"]]
+      [200, {"content-type" => "application/json"}, ["{\"id\": \"fr345678901234567890123456\"}"]]
     end)
 
     pg = ubi.postgres.new(location: "foo", name: "bar", firewall_rules: [])
@@ -193,7 +193,7 @@ RSpec.describe Ubicloud do
 
   it "Postgres#add_metric_destination and #delete_metric_destination modify metric destinations if loaded" do
     expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
-      [200, {}, ["{\"id\": \"md345678901234567890123456\"}"]]
+      [200, {"content-type" => "application/json"}, ["{\"id\": \"md345678901234567890123456\"}"]]
     end)
 
     pg = ubi.postgres.new(location: "foo", name: "bar", metric_destinations: [])
@@ -218,7 +218,7 @@ RSpec.describe Ubicloud do
             "User-Agent" => "Ruby"
           }
         )
-        .to_return(status: 200, body: "{}", headers: {})
+        .to_return(status: 200, body: "{}", headers: {"content-type" => "application/json"})
       expect(adapter.get("headers")).to eq({})
     end
 
@@ -235,7 +235,7 @@ RSpec.describe Ubicloud do
             "User-Agent" => "Ruby"
           }
         )
-        .to_return(status: 200, body: "{}", headers: {})
+        .to_return(status: 200, body: "{}", headers: {"content-type" => "application/json", "test-array" => ["a", "b"]})
       expect(adapter.post("headers", foo: "bar")).to eq({})
     end
 
@@ -251,7 +251,7 @@ RSpec.describe Ubicloud do
             "User-Agent" => "Ruby"
           }
         )
-        .to_return(status: 200, body: "{}", headers: {})
+        .to_return(status: 200, body: "{}", headers: {"content-type" => "application/json"})
       expect(adapter.post("headers")).to eq({})
     end
 
@@ -267,7 +267,7 @@ RSpec.describe Ubicloud do
             "User-Agent" => "Ruby"
           }
         )
-        .to_return(status: 200, body: "{}", headers: {})
+        .to_return(status: 200, body: "{}", headers: {"content-type" => "application/json"})
       expect(adapter.delete("headers")).to eq({})
     end
   end

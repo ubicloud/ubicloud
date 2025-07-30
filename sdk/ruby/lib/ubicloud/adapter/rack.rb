@@ -30,12 +30,12 @@ module Ubicloud
       env["rack.input"] = StringIO.new(params || "".b)
       env.delete("roda.json_params")
 
-      status, _, rack_body = @app.call(env)
+      status, headers, rack_body = @app.call(env)
       body = +""
       rack_body.each { body << it }
       rack_body.close if rack_body.respond_to?(:close)
 
-      handle_response(status, body, missing:)
+      handle_response(status, headers, body, missing:)
     end
   end
 end
