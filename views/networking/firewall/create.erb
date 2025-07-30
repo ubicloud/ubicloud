@@ -1,4 +1,7 @@
-<% @page_title = "Create Firewall" %>
+<% @page_title = "Create Firewall"
+@option_tree, @option_parents = generate_firewall_options
+@default_location = @project.default_location
+%>
 
 <%== part(
   "components/page_header",
