@@ -12,6 +12,7 @@ RSpec.describe Clover, "cli" do
 
     postgres_project = Project.create(name: "postgres")
     expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
+    expect(Config).to receive(:kubernetes_service_project_id).and_return(postgres_project.id).at_least(:once)
     expect(Vm).to receive(:generate_ubid).and_return(UBID.parse("vmdzyppz6j166jh5e9t2dwrfas"))
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("psfzm9e26xky5m9ggetw4dpqe2"))
     expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("nc69z0cda8jt0g5b120hamn4vf"))
@@ -49,6 +50,13 @@ RSpec.describe Clover, "cli" do
     expect(LoadBalancer).to receive(:generate_uuid).and_return("dd91e986-6ac4-882b-ac39-1d430f899d96")
     lb = Prog::Vnet::LoadBalancerNexus.assemble(@ps.id, name: "test-lb", src_port: 12345, dst_port: 54321).subject
     lb.add_vm(@vm)
+
+    expect(KubernetesCluster).to receive(:generate_ubid).and_return(UBID.parse("kcnzrctjjg4j4g6eqvdsvzthwp"))
+    expect(KubernetesNodepool).to receive(:generate_uuid).and_return("2432784b-3c9e-8a75-900d-df23880643ec")
+    expect(Firewall).to receive(:generate_uuid).and_return("850f5687-1a76-8dfc-8949-a115826d20e7")
+    expect(FirewallRule).to receive(:generate_uuid).and_return("d5889073-4aed-89f8-8894-1c376ebea8f6", "0803b040-d565-81f8-b2ed-f4d28df19f7c")
+    expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("ps788q81w5w26h900k13ad8bkx"))
+    cli(%W[kc eu-central-h1/test-kc create -c 1 -z standard-2 -w 1 -v v1.32])
 
     expect(Vm).to receive(:generate_ubid).and_return(UBID.parse("vmz7b0dxt40t4g7rnmag9hct7c")).at_least(:once)
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("ps9a8v5tm1020qn73f0c7db0x7")).at_least(:once)

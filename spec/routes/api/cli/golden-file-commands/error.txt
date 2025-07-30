@@ -21,6 +21,8 @@ fw list invalid
 help invalid
 invalid
 kc eu-central-h1/test-kc destroy invalid
+kc list -f invalid
+kc list invalid
 lb list -f invalid
 lb list -N=1 invalid
 lb list invalid
