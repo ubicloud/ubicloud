@@ -1,7 +1,8 @@
 <% @page_title = @lb.name
 attachable_vms = dataset_authorize(@lb.private_subnet.vms_dataset.eager(:location), "Vm:view")
   .exclude(Sequel[:vm][:id] => @lb.vms_dataset.select(Sequel[:vm][:id]))
-  .all %>
+  .all
+load_balancer_path = "#{@project_data[:path]}#{@lb.path}" %>
 
 <%== part(
   "components/page_header",
@@ -64,8 +65,8 @@ attachable_vms = dataset_authorize(@lb.private_subnet.vms_dataset.eager(:locatio
               <%= vm.load_balancer_state %>
             </td>
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-              <form action="<%= "#{request.path}/detach-vm" %>" role="form" method="POST">
-                <%== csrf_tag("#{request.path}/detach-vm") %>
+              <form action="<%= "#{load_balancer_path}/detach-vm" %>" role="form" method="POST">
+                <%== csrf_tag("#{load_balancer_path}/detach-vm") %>
                 <input type="hidden" name="vm_id" value="<%= vm.ubid %>">
                 <%== part("components/form/submit_button", text: "Detach") %>
               </form>
@@ -89,8 +90,8 @@ attachable_vms = dataset_authorize(@lb.private_subnet.vms_dataset.eager(:locatio
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
             </td>
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-              <form action="<%= "#{request.path}/attach-vm" %>" role="form" method="POST" id="form-lb-<%= @lb.ubid %>">
-                <%== csrf_tag("#{request.path}/attach-vm") %>
+              <form action="<%= "#{load_balancer_path}/attach-vm" %>" role="form" method="POST" id="form-lb-<%= @lb.ubid %>">
+                <%== csrf_tag("#{load_balancer_path}/attach-vm") %>
                 <%== part("components/form/submit_button", text: "Attach") %>
               </form>
             </td>
