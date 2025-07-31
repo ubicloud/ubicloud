@@ -26,7 +26,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         else raise "Unknown PostgreSQL flavor: #{postgres_resource.flavor}"
         end
 
-        "postgres#{postgres_resource.version}#{flavor_suffix}-ubuntu-2204"
+        "postgres#{flavor_suffix}-ubuntu-2204"
       end
 
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
