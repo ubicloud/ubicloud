@@ -47,9 +47,9 @@ class LogDnaBatcher
 
         if item.nil?
           if @input_queue.closed? && @input_queue.empty?
-            send_batch(batch) unless batch.empty?
+            send_batch(batch)
             break
-          elsif !batch.empty? && (Time.now - last_flush_time) >= @flush_interval
+          elsif (Time.now - last_flush_time) >= @flush_interval
             send_batch(batch)
             batch.clear
             last_flush_time = Time.now
