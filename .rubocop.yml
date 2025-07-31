@@ -105,3 +105,6 @@ Lint/ConstantDefinitionInBlock:
 
 RSpec/IndexedLet:
   Enabled: false
+
+RSpec/NestedGroups:
+  Enabled: false
