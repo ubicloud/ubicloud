@@ -6,7 +6,7 @@ require "json"
 require "socket"
 
 class LogDnaBatcher
-  def initialize(api_key, base_url: "https://logs.logdna.com/logs/ingest", default_metadata: {}, flush_interval: 0.5, max_batch_size: 5)
+  def initialize(api_key, base_url: "https://logs.logdna.com/logs/ingest", default_metadata: {"pid" => Process.pid}, flush_interval: 0.5, max_batch_size: 5)
     @api_key = api_key
     @flush_interval = flush_interval
     @max_batch_size = max_batch_size
