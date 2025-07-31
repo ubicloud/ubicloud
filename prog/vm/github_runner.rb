@@ -27,15 +27,24 @@ class Prog::Vm::GithubRunner < Prog::Base
     label_data = github_runner.label_data
     installation = github_runner.installation
 
-    vm_size = if installation.premium_runner_enabled? || installation.free_runner_upgrade?
-      "premium-#{label_data["vcpus"]}"
-    else
-      label_data["vm_size"]
+    boot_image = label_data["boot_image"]
+    location_id = Location::GITHUB_RUNNERS_ID
+    vm_size = pool_vm_size = label_data["vm_size"]
+    pool_vm_size = "premium-#{label_data["vcpus"]}" if installation.premium_runner_enabled? || installation.free_runner_upgrade?
+    exclude_availability_zones = []
+
+    alien_ratio = github_runner.installation.project.get_ff_aws_alien_runners_ratio || 0
+    if label_data["arch"] == "x64" && rand < alien_ratio
+      boot_image = Config.send(:"#{boot_image.tr("-", "_")}_aws_ami_version")
+      location_id = Config.github_runner_aws_location_id
+      vm_size = pool_vm_size = Option.aws_instance_type_name("m7a", label_data["vcpus"])
+      exclude_availability_zones << "a" # eu-central-1a is usually give capacity errors
     end
+
     pool = installation.project.get_ff_skip_runner_pool ? nil : VmPool.where(
-      vm_size:,
-      boot_image: label_data["boot_image"],
-      location_id: Location::GITHUB_RUNNERS_ID,
+      vm_size: pool_vm_size,
+      boot_image:,
+      location_id:,
       storage_size_gib: label_data["storage_size_gib"],
       storage_encrypted: true,
       storage_skip_sync: true,
@@ -43,19 +52,8 @@ class Prog::Vm::GithubRunner < Prog::Base
     ).first
 
     if (picked_vm = pool&.pick_vm)
+      bud Prog::Aws::Instance, {"subject_id" => picked_vm.id}, :start_instance if picked_vm.location.aws?
       return picked_vm
-    end
-
-    boot_image = label_data["boot_image"]
-    location_id = Location::GITHUB_RUNNERS_ID
-    size = label_data["vm_size"]
-    exclude_availability_zones = []
-    alien_ratio = github_runner.installation.project.get_ff_aws_alien_runners_ratio || 0
-    if label_data["arch"] == "x64" && rand < alien_ratio
-      boot_image = Config.send(:"#{boot_image.tr("-", "_")}_aws_ami_version")
-      location_id = Config.github_runner_aws_location_id
-      size = Option.aws_instance_type_name("m7a", label_data["vcpus"])
-      exclude_availability_zones << "a" # eu-central-1a is usually give capacity errors
     end
 
     ps = Prog::Vnet::SubnetNexus.assemble(
@@ -69,7 +67,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       unix_user: "runneradmin",
       sshable_unix_user: "runneradmin",
       name: github_runner.ubid.to_s,
-      size:,
+      size: vm_size,
       location_id:,
       boot_image:,
       storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: true, skip_sync: true}],
@@ -221,7 +219,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     nap 10 unless vm.allocated_at
     nap 1 unless vm.provisioned_at
     register_deadline("wait", 10 * 60)
-    hop_setup_environment
+    reap(:setup_environment)
   end
 
   def setup_info

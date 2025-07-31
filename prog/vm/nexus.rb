@@ -360,7 +360,19 @@ class Prog::Vm::Nexus < Prog::Base
       nap 1
     end
 
+    if vm.location.aws? && vm.pool_id && vm.sshable.cmd("sudo touch /etc/cloud/cloud-init.disabled")
+      # if vm.location.aws? && vm.pool_id
+      bud Prog::Aws::Instance, {"subject_id" => vm.id}, :stop_instance
+      hop_wait_aws_vm_stopped
+      # rescue Net::SSH::AuthenticationFailed
+      #   nap 2
+    end
+
     hop_create_billing_record
+  end
+
+  label def wait_aws_vm_stopped
+    reap(:create_billing_record)
   end
 
   label def create_billing_record

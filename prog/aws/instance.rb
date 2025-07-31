@@ -121,10 +121,17 @@ class Prog::Aws::Instance < Prog::Base
       # Normally we use dnsmasq to resolve our transparent cache domain to local IP, but we use /etc/hosts for AWS runners
       user_data += "\necho \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
       instance_market_options = if Config.github_runner_aws_spot_instance_enabled
-        spot_options = {
-          spot_instance_type: "one-time",
-          instance_interruption_behavior: "terminate"
-        }
+        spot_options = if vm.pool_id
+          {
+            spot_instance_type: "persistent",
+            instance_interruption_behavior: "stop"
+          }
+        else
+          {
+            spot_instance_type: "one-time",
+            instance_interruption_behavior: "terminate"
+          }
+        end
         if Config.github_runner_aws_spot_instance_max_price_per_vcpu > 0
           # Not setting max_price means you'll pay up to the on-demand price,
           spot_options[:max_price] = (vm.vcpus * Config.github_runner_aws_spot_instance_max_price_per_vcpu * 60).to_s
@@ -205,6 +212,28 @@ class Prog::Aws::Instance < Prog::Base
     vm.update(cores: vm.vcpus / 2, allocated_at: Time.now, ephemeral_net6: public_ipv6)
 
     pop "vm created"
+  end
+
+  label def stop_instance
+    client.stop_instances(instance_ids: [vm.aws_instance.instance_id]) if vm.aws_instance
+    hop_wait_instance_stopped
+  end
+
+  label def wait_instance_stopped
+    instance_response = client.describe_instances({filters: [{name: "instance-id", values: [vm.aws_instance.instance_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).reservations[0].instances[0]
+    pop "instance stopped" if instance_response.dig(:state, :name) == "stopped"
+    nap 2
+  end
+
+  label def start_instance
+    client.start_instances(instance_ids: [vm.aws_instance.instance_id]) if vm.aws_instance
+    hop_wait_instance_started
+  end
+
+  label def wait_instance_started
+    instance_response = client.describe_instances({filters: [{name: "instance-id", values: [vm.aws_instance.instance_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).reservations[0].instances[0]
+    pop "instance started" if instance_response.dig(:state, :name) == "running"
+    nap 1
   end
 
   label def destroy
