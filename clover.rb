@@ -227,9 +227,9 @@ class Clover < Roda
       elsif e.is_a?(Sequel::SerializationFailure)
         flash["error"] = "There was a temporary error attempting to make this change, please try again."
         redirect_back_with_inputs
-      elsif e.is_a?(Validation::ValidationFailed) || (request.patch? && e.is_a?(CloverError))
+      elsif e.is_a?(CloverError) && !e.is_a?(Authorization::Unauthorized)
         flash["error"] = message
-        flash["errors"] = (flash["errors"] || {}).merge(details).transform_keys(&:to_s)
+        flash["errors"] = (flash["errors"] || {}).merge(details || {}).transform_keys(&:to_s)
 
         if request.patch?
           response["location"] = env["HTTP_REFERER"]
