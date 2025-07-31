@@ -22,9 +22,12 @@ class OidcProvider < Sequel::Model
     oidc_provider = new_with_id(display_name:)
 
     uri = URI(url)
-    uri.path = "/.well-known/openid-configuration"
+    unless url.end_with?("/.well-known/openid-configuration")
+      uri.path += "/.well-known/openid-configuration"
+    end
     response = Excon.get(uri.to_s, headers: {"Accept" => "application/json"}, expects: 200)
     config_info = JSON.parse(response.body)
+    url = config_info.fetch("issuer")
     authorization_endpoint = URI(config_info.fetch("authorization_endpoint")).path
     token_endpoint = URI(config_info.fetch("token_endpoint")).path
     userinfo_endpoint = URI(config_info.fetch("userinfo_endpoint")).path
@@ -47,9 +50,8 @@ class OidcProvider < Sequel::Model
       registration_access_token = registration_info["registration_access_token"]
     end
 
-    uri.path = ""
     oidc_provider.update(
-      url: uri.to_s,
+      url:,
       client_id:,
       client_secret:,
       authorization_endpoint:,
