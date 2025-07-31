@@ -335,6 +335,7 @@ class Clover
 
       r.post "reset-superuser-password" do
         authorize("Postgres:view", pg.id)
+        handle_validation_failure("postgres/show") { @page = "settings" }
 
         if pg.read_replica?
           raise CloverError.new(400, "InvalidRequest", "Superuser password cannot be updated for read replicas!")
