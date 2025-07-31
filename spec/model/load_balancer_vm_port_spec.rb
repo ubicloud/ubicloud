@@ -98,6 +98,38 @@ RSpec.describe LoadBalancerVmPort do
         expect(session[:ssh_session]).to receive(:exec!).with("healthcheck command").and_raise("error").at_least(:once)
         expect(lb_vm_port.health_check(session:)).to eq(["down", "down"])
       end
+
+      context "when exercising stale-connection retry" do
+        it "is down if :last_pulse is not set, even with a qualifying exception" do
+          expect(session[:ssh_session]).to receive(:exec!).and_raise(IOError.new("closed stream"))
+          expect(lb_vm_port.check_probe(session, :ipv6)).to eq("down")
+        end
+
+        it "does not retry if the connection is fresh" do
+          session[:last_pulse] = Time.now - 1
+          expect(session[:ssh_session]).to receive(:exec!).and_raise(IOError.new("closed stream"))
+          expect(lb_vm_port.check_probe(session, :ipv6)).to eq("down")
+        end
+
+        it "is up on a retry on a stale connection that works the second time" do
+          session[:last_pulse] = Time.now - 10
+          expect(session[:ssh_session]).to receive(:exec!).and_raise(IOError.new("closed stream"))
+          expect(session[:ssh_session]).to receive(:exec!).and_return("200")
+          expect(lb_vm_port.check_probe(session, :ipv6)).to eq("up")
+        end
+
+        it "is down if consecutive IOErrors are raised even on a stale connection" do
+          session[:last_pulse] = Time.now - 10
+          expect(session[:ssh_session]).to receive(:exec!).and_raise(IOError.new("closed stream")).twice
+          expect(lb_vm_port.check_probe(session, :ipv6)).to eq("down")
+        end
+
+        it "is down for an IOError of any other kind of of message" do
+          session[:last_pulse] = Time.now - 10
+          expect(session[:ssh_session]).to receive(:exec!).and_raise(IOError.new("something else"))
+          expect(lb_vm_port.check_probe(session, :ipv6)).to eq("down")
+        end
+      end
     end
 
     describe "#check_probe" do

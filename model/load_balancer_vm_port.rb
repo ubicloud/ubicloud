@@ -38,9 +38,20 @@ class LoadBalancerVmPort < Sequel::Model
       raise "Invalid type: #{type}"
     end
 
+    stale_retry = false
     begin
-      (session[:ssh_session].exec!(health_check_cmd(type)).strip == "200") ? "up" : "down"
+      ((session[:ssh_session].exec!(health_check_cmd(type)).strip == "200") ? "up" : "down").tap { session[:last_pulse] = Time.now }
     rescue => e
+      # "Staleness" of last_pulse should be somewhat less than
+      # sshd_config ClientAlive setting.
+      if !stale_retry &&
+          e.is_a?(IOError) &&
+          e.message == "closed stream" &&
+          session[:last_pulse]&.<(Time.now - 8)
+        stale_retry = true
+        retry
+      end
+
       Clog.emit("Exception in LoadBalancerVmPort #{ubid}") { Util.exception_to_hash(e) }
       "down"
     end
