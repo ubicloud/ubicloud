@@ -15,12 +15,6 @@ class Clover
       authorize("Project:billing", @project.id)
 
       r.get true do
-        if @project.billing_info
-          @invoices = Serializers::Invoice.serialize(@project.invoices.prepend(@project.current_invoice))
-        end
-
-        @usage_alerts = Serializers::UsageAlert.serialize(@project.usage_alerts_dataset.eager(:user))
-
         view "project/billing"
       end
 
