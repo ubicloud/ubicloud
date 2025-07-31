@@ -22,11 +22,11 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         flavor_suffix = case postgres_resource.flavor
         when PostgresResource::Flavor::STANDARD then ""
         when PostgresResource::Flavor::PARADEDB then "-paradedb"
-        when PostgresResource::Flavor::LANTERN then "-lantern"
+        when PostgresResource::Flavor::LANTERN then "#{postgres_resource.version}-lantern"
         else raise "Unknown PostgreSQL flavor: #{postgres_resource.flavor}"
         end
 
-        "postgres#{postgres_resource.version}#{flavor_suffix}-ubuntu-2204"
+        "postgres#{flavor_suffix}-ubuntu-2204"
       end
 
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
@@ -661,6 +661,9 @@ SQL
   end
 
   def available?
+    # Don't declare unavailability if we are upgrading.
+    return true if postgres_server.resource.version != postgres_server.resource.target_version && postgres_server == postgres_server.resource.upgrade_candidate_server
+
     vm.sshable.invalidate_cache_entry
 
     begin
