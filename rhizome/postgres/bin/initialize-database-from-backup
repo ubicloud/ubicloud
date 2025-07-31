@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require_relative "../../common/lib/util"
+require_relative "../lib/postgres_setup"
 
 if ARGV.count != 2
   fail "Wrong number of arguments. Expected 2, Given #{ARGV.count}"
@@ -9,6 +10,8 @@ end
 
 v = ARGV[0]
 backup_label = ARGV[1]
+
+PostgresSetup.new(v, Logger.new($stdout)).setup
 
 r "chown postgres /dat"
 
