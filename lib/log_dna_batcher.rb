@@ -43,21 +43,20 @@ class LogDnaBatcher
       last_flush_time = Time.now
 
       loop do
-        item = @input_queue.pop(timeout: @flush_interval)
-
-        if item.nil?
-          if @input_queue.closed? && @input_queue.empty?
-            send_batch(batch)
-            break
-          elsif (Time.now - last_flush_time) >= @flush_interval
-            send_batch(batch)
-            last_flush_time = Time.now
-          end
-        else
+        if (item = @input_queue.pop(timeout: @flush_interval))
           batch << item
-          if batch.size >= @max_batch_size
-            send_batch(batch)
+        end
+
+        input_queue_is_closed = @input_queue.closed? && @input_queue.empty?
+        flush_interval_is_exceeded = (Time.now - last_flush_time) >= @flush_interval
+        max_batch_size_is_exceeded = batch.size >= @max_batch_size
+
+        if input_queue_is_closed || flush_interval_is_exceeded || max_batch_size_is_exceeded
+          send_batch(batch)
+
+          if batch.empty?
             last_flush_time = Time.now
+            break if input_queue_is_closed
           end
         end
       rescue => e
