@@ -128,6 +128,16 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(200)
       end
 
+      it "fails if invalid flavor is used" do
+        project.set_ff_postgres_lantern(false)
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-invalid", {
+          size: "standard-2",
+          storage_size: "64",
+          flavor: "invalid"
+        }.to_json
+        expect(last_response.status).to eq(400)
+      end
+
       it "fails if lantern feature flag is not enabled" do
         project.set_ff_postgres_lantern(false)
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-lantern", {
