@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require_relative "../../common/lib/util"
+require_relative "../lib/postgres_setup"
 
 if ARGV.count != 1
   fail "Wrong number of arguments. Expected 1, Given #{ARGV.count}"
@@ -9,13 +10,10 @@ end
 
 v = ARGV[0]
 
-r "chown postgres /dat"
-
-# Below commands are required for idempotency
-r "rm -rf /dat/#{v}"
-r "rm -rf /etc/postgresql/#{v}"
-
-r "pg_createcluster #{v} main --start --locale=C.UTF8"
+pg_setup = PostgresSetup.new(v)
+pg_setup.install_packages
+pg_setup.setup_data_directory
+pg_setup.create_cluster
 
 role_creation_queries = <<~ROLE_CREATION
   /**
