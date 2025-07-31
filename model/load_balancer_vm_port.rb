@@ -45,8 +45,12 @@ class LoadBalancerVmPort < Sequel::Model
       # "Staleness" of last_pulse should be somewhat less than
       # sshd_config ClientAlive setting.
       if !stale_retry &&
-          e.is_a?(IOError) &&
-          e.message == "closed stream" &&
+          (
+            # Seen when sending on a broken connection.
+            e.is_a?(IOError) && e.message == "closed stream" ||
+            # Seen when receiving on a broken connection.
+            e.is_a?(Errno::ECONNRESET) && e.message.start_with?("Connection reset by peer")
+          ) &&
           session[:last_pulse]&.<(Time.now - 8)
         stale_retry = true
         session.merge!(init_health_monitor_session)
