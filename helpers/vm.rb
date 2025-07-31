@@ -87,16 +87,7 @@ class Clover
   def generate_vm_options
     options = OptionTreeGenerator.new
 
-    @show_gpu = if flash["old"]
-      case flash["old"]["show_gpu"]
-      when "true"
-        true
-      when "false"
-        false
-      end
-    else
-      typecast_params.bool("show_gpu")
-    end
+    @show_gpu = typecast_params.bool("show_gpu")
     @show_gpu = false unless @project.get_ff_gpu_vm
     # @show_gpu:
     # true: Only show options valid for GPU configurations
