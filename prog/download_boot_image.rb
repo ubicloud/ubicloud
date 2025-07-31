@@ -30,6 +30,7 @@ class Prog::DownloadBootImage < Prog::Base
       elsif download_from_blob_storage?
         suffixes = {
           "github" => "raw",
+          "postgres" => "raw",
           "postgres16" => "raw",
           "postgres17" => "raw",
           "ubuntu" => "img",
@@ -90,6 +91,7 @@ class Prog::DownloadBootImage < Prog::Base
     ["github-ubuntu-2204", "arm64", "20250724.1.0"] => "7c46f1738392eb928b78fbb56b3daa85a711681d3098544d3f993f6ce704cf08",
     ["github-gpu-ubuntu-2204", "x64", "20250622.1.0"] => "73fa4578ff1b907a16e464465f43f2646680774b40a2d52c1e7226dd7fc4ae92",
     ["github-gpu-ubuntu-2204", "x64", "20250724.1.0"] => "b091b99107682d3f8143dc2d75a50fe9e6e74140107dfdd552e29d2f73105db8",
+    ["postgres-ubuntu-2204", "x64", "20250731.1.0"] => "95ff9ef18f818941747b8e239ea4c2fa35aee4ed54cd19057dd224d0ad55ba78",
     ["postgres16-ubuntu-2204", "x64", "20250425.1.1"] => "f59622da276d646ed2a1c03de546b0a7ec3fd48aeb27c0bfe2b8b8be98c062d2",
     ["postgres17-ubuntu-2204", "x64", "20250425.1.1"] => "ccb4bcd8197c2e230be3f485dd33f24a51041a4dc0408257e42b3fe9f1c0bfb3",
     ["postgres16-paradedb-ubuntu-2204", "x64", "20250425.1.1"] => "598ab8070959c5d8836000b574a5ec5d3a9926ab2abb6e651bd231b4044c55be",
