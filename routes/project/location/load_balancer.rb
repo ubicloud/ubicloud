@@ -25,6 +25,7 @@ class Clover
 
       r.post %w[attach-vm detach-vm] do |action|
         authorize("LoadBalancer:edit", lb.id)
+        handle_validation_failure("networking/load_balancer/show")
 
         unless (vm = authorized_vm)
           fail Validation::ValidationFailed.new("vm_id" => "VM not found")
