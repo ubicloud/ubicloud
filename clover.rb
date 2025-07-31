@@ -995,16 +995,6 @@ class Clover < Roda
         request.body.rewind unless request.get?
       end
 
-      def redirect_back_with_inputs_params
-        # This currently needs all parameters. We could change the related views to
-        # use typecast_params with the flash["old"] value, but in the long term,
-        # should avoid the redirect_back_with_inputs approach completely.
-        # Use super for coverage, even though it will raise an exception.
-        super
-      rescue
-        request.instance_variable_get(:@params)
-      end
-
       def audit_log(...)
         @still_need_audit_logging = false
         super
