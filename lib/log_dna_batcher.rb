@@ -51,14 +51,12 @@ class LogDnaBatcher
             break
           elsif (Time.now - last_flush_time) >= @flush_interval
             send_batch(batch)
-            batch.clear
             last_flush_time = Time.now
           end
         else
           batch << item
           if batch.size >= @max_batch_size
             send_batch(batch)
-            batch.clear
             last_flush_time = Time.now
           end
         end
@@ -82,7 +80,9 @@ class LogDnaBatcher
 
       response = http.request(request)
 
-      unless response.is_a?(Net::HTTPSuccess)
+      if response.is_a?(Net::HTTPSuccess)
+        batch.clear
+      else
         puts "Failed to send logs: #{response.code} #{response.message}"
       end
     rescue => e
