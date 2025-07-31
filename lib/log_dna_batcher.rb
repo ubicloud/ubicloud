@@ -104,7 +104,7 @@ class LogDnaBatcher
   end
 
   def close_connection
-    @http&.finish if @http&.started?
+    @http.finish if @http&.started?
     @http = nil
   end
 end
