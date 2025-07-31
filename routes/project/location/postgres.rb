@@ -19,7 +19,7 @@ class Clover
       end
 
       filter[:location_id] = @location.id
-      pg = @project.postgres_resources_dataset.first(filter)
+      @pg = pg = @project.postgres_resources_dataset.first(filter)
       check_found_object(pg)
 
       r.is do
@@ -107,8 +107,6 @@ class Clover
 
         response.headers["cache-control"] = "no-store"
 
-        @pg = pg
-        @option_tree, @option_parents = generate_postgres_options(flavor: @pg.flavor, location: @location)
         @page = page
 
         view "postgres/show"
