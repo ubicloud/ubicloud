@@ -98,22 +98,26 @@ RSpec.describe LoadBalancerVmPort do
         expect(session[:ssh_session]).to receive(:exec!).with("healthcheck command").and_raise("error").at_least(:once)
         expect(lb_vm_port.health_check(session:)).to eq(["down", "down"])
       end
+    end
 
-      context "when exercising stale-connection retry" do
+    [IOError.new("closed stream"), Errno::ECONNRESET.new("Connection reset by peer - recvfrom(2)")].each do |ex|
+      describe "#check_probe", "stale connection retry behavior with #{ex.class}" do
+        let(:session) { {ssh_session: instance_double(Net::SSH::Connection::Session)} }
+
         it "is down if :last_pulse is not set, even with a qualifying exception" do
-          expect(session[:ssh_session]).to receive(:exec!).and_raise(IOError.new("closed stream"))
+          expect(session[:ssh_session]).to receive(:exec!).and_raise(ex)
           expect(lb_vm_port.check_probe(session, :ipv6)).to eq("down")
         end
 
         it "does not retry if the connection is fresh" do
           session[:last_pulse] = Time.now - 1
-          expect(session[:ssh_session]).to receive(:exec!).and_raise(IOError.new("closed stream"))
+          expect(session[:ssh_session]).to receive(:exec!).and_raise(ex)
           expect(lb_vm_port.check_probe(session, :ipv6)).to eq("down")
         end
 
         it "is up on a retry on a stale connection that works the second time" do
           session[:last_pulse] = Time.now - 10
-          expect(session[:ssh_session]).to receive(:exec!).and_raise(IOError.new("closed stream"))
+          expect(session[:ssh_session]).to receive(:exec!).and_raise(ex)
           second_ssh = instance_double(Net::SSH::Connection::Session)
           expect(second_ssh).to receive(:exec!).and_return("200")
           expect(lb_vm_port).to receive(:init_health_monitor_session).and_return(ssh_session: second_ssh)
@@ -123,21 +127,21 @@ RSpec.describe LoadBalancerVmPort do
           expect(session[:ssh_session]).to eq(second_ssh)
         end
 
-        it "is down if consecutive IOErrors are raised even on a stale connection" do
+        it "is down if consecutive errors are raised even on a stale connection" do
           session[:last_pulse] = Time.now - 10
 
-          expect(session[:ssh_session]).to receive(:exec!).and_raise(IOError.new("closed stream"))
+          expect(session[:ssh_session]).to receive(:exec!).and_raise(ex)
 
           second_ssh = instance_double(Net::SSH::Connection::Session)
-          expect(second_ssh).to receive(:exec!).and_raise(IOError.new("closed stream"))
+          expect(second_ssh).to receive(:exec!).and_raise(ex)
           expect(lb_vm_port).to receive(:init_health_monitor_session).and_return(ssh_session: second_ssh)
 
           expect(lb_vm_port.check_probe(session, :ipv6)).to eq("down")
         end
 
-        it "is down for an IOError of any other kind of of message" do
+        it "is down for a matching exception without a matching message" do
           session[:last_pulse] = Time.now - 10
-          expect(session[:ssh_session]).to receive(:exec!).and_raise(IOError.new("something else"))
+          expect(session[:ssh_session]).to receive(:exec!).and_raise(ex.class.new("something else"))
           expect(lb_vm_port.check_probe(session, :ipv6)).to eq("down")
         end
       end
