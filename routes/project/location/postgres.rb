@@ -493,6 +493,7 @@ class Clover
 
         r.on method: [:post, :patch] do
           authorize("Postgres:edit", pg.id)
+          handle_validation_failure("postgres/show") { @page = "config" }
 
           if web?
             pg_keys = typecast_params.array(:str, "pg_config_keys") || []
