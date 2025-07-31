@@ -278,15 +278,11 @@ class Clover
 
       r.post "promote" do
         authorize("Postgres:edit", pg.id)
+        handle_validation_failure("postgres/show") { @page = "settings" }
 
         unless pg.read_replica?
           error_msg = "Non read replica servers cannot be promoted."
-          if api?
-            fail CloverError.new(400, "InvalidRequest", error_msg)
-          else
-            flash["error"] = error_msg
-            redirect_back_with_inputs
-          end
+          fail CloverError.new(400, "InvalidRequest", error_msg)
         end
 
         DB.transaction do
