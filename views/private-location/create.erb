@@ -1,4 +1,12 @@
-<% @page_title = "Create AWS Region" %>
+<% @page_title = "Create AWS Region"
+
+options = OptionTreeGenerator.new
+options.add_option(name: "name")
+options.add_option(name: "provider_location_name", values: Option::AWS_LOCATIONS.map { |l| {value: l, display_name: l} })
+options.add_option(name: "access_key")
+options.add_option(name: "secret_key")
+@option_tree, @option_parents = options.serialize %>
+
 
 <%== part(
   "components/page_header",
