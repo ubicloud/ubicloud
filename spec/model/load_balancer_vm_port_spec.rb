@@ -114,13 +114,24 @@ RSpec.describe LoadBalancerVmPort do
         it "is up on a retry on a stale connection that works the second time" do
           session[:last_pulse] = Time.now - 10
           expect(session[:ssh_session]).to receive(:exec!).and_raise(IOError.new("closed stream"))
-          expect(session[:ssh_session]).to receive(:exec!).and_return("200")
+          second_ssh = instance_double(Net::SSH::Connection::Session)
+          expect(second_ssh).to receive(:exec!).and_return("200")
+          expect(lb_vm_port).to receive(:init_health_monitor_session).and_return(ssh_session: second_ssh)
+
           expect(lb_vm_port.check_probe(session, :ipv6)).to eq("up")
+
+          expect(session[:ssh_session]).to eq(second_ssh)
         end
 
         it "is down if consecutive IOErrors are raised even on a stale connection" do
           session[:last_pulse] = Time.now - 10
-          expect(session[:ssh_session]).to receive(:exec!).and_raise(IOError.new("closed stream")).twice
+
+          expect(session[:ssh_session]).to receive(:exec!).and_raise(IOError.new("closed stream"))
+
+          second_ssh = instance_double(Net::SSH::Connection::Session)
+          expect(second_ssh).to receive(:exec!).and_raise(IOError.new("closed stream"))
+          expect(lb_vm_port).to receive(:init_health_monitor_session).and_return(ssh_session: second_ssh)
+
           expect(lb_vm_port.check_probe(session, :ipv6)).to eq("down")
         end
 

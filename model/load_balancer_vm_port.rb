@@ -49,6 +49,7 @@ class LoadBalancerVmPort < Sequel::Model
           e.message == "closed stream" &&
           session[:last_pulse]&.<(Time.now - 8)
         stale_retry = true
+        session.merge!(init_health_monitor_session)
         retry
       end
 
