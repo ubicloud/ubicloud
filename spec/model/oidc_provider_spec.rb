@@ -7,6 +7,7 @@ RSpec.describe OidcProvider do
   let(:registration_body) do
     {
       registration_endpoint: "https://example.com/register",
+      issuer: "https://host/issuer",
       authorization_endpoint: "https://host/auth",
       token_endpoint: "https://host/tok",
       userinfo_endpoint: "https://host/ui",
@@ -48,7 +49,7 @@ RSpec.describe OidcProvider do
     expect(described_class).to receive(:generate_uuid).and_return("9a2d00a7-7d70-8816-82db-4c9e34e1d008")
     oidc_provider = described_class.register("Test", "https://example.com")
     expect(described_class.all).to eq [oidc_provider]
-    expect(oidc_provider.url).to eq "https://example.com"
+    expect(oidc_provider.url).to eq "https://host/issuer"
     expect(oidc_provider.client_id).to eq "123"
     expect(oidc_provider.client_secret).to eq "456"
     expect(oidc_provider.authorization_endpoint).to eq "/auth"
@@ -62,9 +63,9 @@ RSpec.describe OidcProvider do
   it ".register registers a new provider with given client_id and client_secret" do
     Excon.stub({path: "/.well-known/openid-configuration", method: :get}, {status: 200, body: registration_body})
     expect(described_class).to receive(:generate_uuid).and_return("9a2d00a7-7d70-8816-82db-4c9e34e1d008")
-    oidc_provider = described_class.register("Test", "https://example.com", client_id: "123", client_secret: "456")
+    oidc_provider = described_class.register("Test", "https://example.com/.well-known/openid-configuration", client_id: "123", client_secret: "456")
     expect(described_class.all).to eq [oidc_provider]
-    expect(oidc_provider.url).to eq "https://example.com"
+    expect(oidc_provider.url).to eq "https://host/issuer"
     expect(oidc_provider.client_id).to eq "123"
     expect(oidc_provider.client_secret).to eq "456"
     expect(oidc_provider.authorization_endpoint).to eq "/auth"

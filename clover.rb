@@ -900,7 +900,9 @@ class Clover < Roda
         next unless (@oidc_provider = OidcProvider[id])
 
         r.get do
-          content_security_policy.add_form_action(@oidc_provider.url)
+          uri = URI(@oidc_provider.url)
+          uri.path = ""
+          content_security_policy.add_form_action(uri.to_s)
           view "auth/oidc_login"
         end
       end
