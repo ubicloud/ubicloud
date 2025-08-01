@@ -1,8 +1,12 @@
-<% @page_title = @ps[:name]
+<% @page_title = @ps.name
+
+@nics = @ps.nics
+@connected_subnets = @ps.connected_subnets
+@connectable_subnets = @ps.project.private_subnets_dataset.exclude(id: @ps.connected_subnets.map(&:id)).all
 
 perm_checks = {
-  "Firewall:view" => Firewall.where(id: @ps[:firewalls].map { UBID.to_uuid(it[:id]) }),
-  "PrivateSubnet:view" => PrivateSubnet.where(id: @connected_subnets.map { UBID.to_uuid(it[:id]) })
+  "Firewall:view" => Firewall.where(id: @ps.firewalls.map(&:id)),
+  "PrivateSubnet:view" => PrivateSubnet.where(id: @connected_subnets.map(&:id))
 }
 
 viewable_fws, viewable_subnets =
@@ -16,9 +20,9 @@ viewable_fws, viewable_subnets =
     %w[Projects /project],
     [@project_data[:name], @project_data[:path]],
     ["Private Subnet", "#{@project_data[:path]}/private-subnet"],
-    [@ps[:name], "#"]
+    [@ps.name, "#"]
   ],
-  right_items: [part("components/ps_state_label", state: @ps[:state], extra_class: "text-md")]
+  right_items: [part("components/ps_state_label", state: @ps.display_state, extra_class: "text-md")]
 ) %>
 
 <div class="grid gap-6">
@@ -26,11 +30,11 @@ viewable_fws, viewable_subnets =
   <%== part(
     "components/kv_data_card",
     data: [
-      ["ID", @ps[:id]],
-      ["Name", @ps[:name]],
-      ["Location", @ps[:location]],
-      ["IPv6 block", @ps[:net6]],
-      ["IPv4 block", @ps[:net4]]
+      ["ID", @ps.ubid],
+      ["Name", @ps.name],
+      ["Location", @ps.display_location],
+      ["IPv6 block", @ps.net6.to_s],
+      ["IPv4 block", @ps.net4.to_s]
     ]
   ) %>
   <!-- Nic List -->
@@ -44,16 +48,16 @@ viewable_fws, viewable_subnets =
         [
           [
             (
-              if nic[:vm_name]
-                [nic[:vm_name], { link: "#{@project_data[:path]}/location/#{@ps[:location]}/vm/#{nic[:vm_name]}" }]
+              if nic.vm
+                [nic.vm.name, { link: "#{@project_data[:path]}#{nic.vm.path}" }]
               else
                 "-"
               end
             ),
-            [nic[:private_ipv4], { copyable: true }],
-            [nic[:private_ipv6], { copyable: true }]
+            [nic.private_ipv4_address, { copyable: true }],
+            [nic.private_ipv6_address, { copyable: true }]
           ],
-          { id: "nic-#{nic[:id]}" }
+          { id: "nic-#{nic.ubid}" }
         ]
       end
   ) %>
@@ -64,19 +68,19 @@ viewable_fws, viewable_subnets =
     headers: %w[Name Description],
     empty_state: "No firewall attached",
     rows:
-      @ps[:firewalls].map do |fw|
+      @ps.firewalls.map do |fw|
         [
           [
             (
-              if viewable_fws[fw[:id]]
-                [fw[:name], { link: "#{@project_data[:path]}/location/#{fw[:location]}/firewall/#{fw[:name]}" }]
+              if viewable_fws[fw.ubid]
+                [fw.name, { link: "#{@project_data[:path]}#{fw.path}" }]
               else
-                fw[:name]
+                fw.name
               end
             ),
-            fw[:description]
+            fw.description
           ],
-          { id: "fw-#{fw[:id]}" }
+          { id: "fw-#{fw.ubid}" }
         ]
       end
   ) %>
@@ -100,22 +104,19 @@ viewable_fws, viewable_subnets =
         <% @connected_subnets.each do |subnet| %>
           <tr>
             <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <% if viewable_subnets[subnet[:id]] %>
-                <a
-                  href="<%= "#{@project_data[:path]}/location/#{subnet[:location]}/private-subnet/#{subnet[:name]}" %>"
-                  class="text-orange-600 hover:text-orange-700"
-                ><%= subnet[:name] %></a>
+              <% if viewable_subnets[subnet.ubid] %>
+                <a href="<%= "#{@project_data[:path]}#{subnet.path}" %>" class="text-orange-600 hover:text-orange-700"><%= subnet.name %></a>
               <% else %>
-                <%= subnet[:name] %>
+                <%= subnet.name %>
               <% end %>
             </td>
             <td
-              id="cps-delete-<%=subnet[:id]%>"
+              id="cps-delete-<%= subnet.ubid %>"
               class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
             >
               <%== part(
                 "components/delete_button",
-                url: "#{request.path}/disconnect/#{subnet[:id]}",
+                url: "#{request.path}/disconnect/#{subnet.ubid}",
                 confirmation_message: "Are you sure to disconnect?",
                 redirect: request.path,
                 method: "POST",
@@ -131,7 +132,7 @@ viewable_fws, viewable_subnets =
               name: "connected-subnet-id",
               label: "",
               placeholder: "Pick a subnet to connect",
-              options: @connectable_subnets.map { |s| [s[:id], s[:name]] },
+              options: @connectable_subnets.map { |s| [s.ubid, s.name] },
               attributes: {
                 form: "form-connect-subnet"
               }
@@ -148,7 +149,7 @@ viewable_fws, viewable_subnets =
     </table>
   </div>
   <!-- Delete Card -->
-  <% if has_permission?("PrivateSubnet:delete", @ps[:id]) %>
+  <% if has_permission?("PrivateSubnet:delete", @ps.ubid) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
         <div class="sm:flex sm:items-center sm:justify-between">
@@ -160,7 +161,7 @@ viewable_fws, viewable_subnets =
             </div>
           </div>
           <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-            <%== part("components/delete_button", confirmation: @ps[:name], redirect: "#{@project_data[:path]}/private-subnet") %>
+            <%== part("components/delete_button", confirmation: @ps.name, redirect: "#{@project_data[:path]}/private-subnet") %>
           </div>
         </div>
       </div>
