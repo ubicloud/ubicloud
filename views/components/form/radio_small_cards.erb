@@ -1,5 +1,5 @@
 <%# locals: (name:, label:, options:, attributes:) %>
-<% selected = flash.dig("old", name) || selected
+<% selected = flash.dig("old", name) || request.POST[name] || selected
 error = flash.dig("errors", name)
 is_content_array = options[0][1].is_a?(Array) %>
 
