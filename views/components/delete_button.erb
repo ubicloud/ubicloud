@@ -1,6 +1,6 @@
 <%# locals: (url: request.path, csrf_url: url, text: "Delete", confirmation: nil, confirmation_message: nil, redirect: request.path, method: "DELETE") %>
 
-<%== part(
+<% button = part(
   "components/button",
   text: text,
   icon: "hero-trash",
@@ -15,3 +15,12 @@
     "data-method" => method
   }
 ) %>
+
+<% if method == "POST" %>
+  <form method="POST" action="<%= url %>">
+    <%== csrf_tag(url) %>
+    <%== button %>
+  </form>
+<% else %>
+  <%== button %>
+<% end %>
