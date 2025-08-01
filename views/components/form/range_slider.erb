@@ -1,7 +1,7 @@
 <% name ||= nil
 label ||= nil
 range_labels ||= {}
-value = flash.dig("old", name) || value || 0
+value = flash.dig("old", name) || request.POST[name] || value || 0
 error ||= rodauth.field_error(name) || flash.dig("errors", name)
 description ||= nil
 attributes ||= {}
