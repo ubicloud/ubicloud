@@ -1,4 +1,8 @@
-<% @page_title = "Login Methods" %>
+<% @page_title = "Login Methods"
+@identities = current_account.identities_dataset.select_hash(:provider, :uid)
+social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
+@oidc_identities = @identities.reject { |provider,| social_login_providers.include?(provider) }
+@oidc_identity_names = OidcProvider.where(id: @oidc_identities.keys.map! { UBID.to_uuid(it) }).select_hash(:id, :display_name) %>
 
 <%== part("components/page_header", title: "My Account") %>
 
