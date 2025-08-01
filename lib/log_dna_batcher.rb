@@ -62,6 +62,8 @@ class LogDnaBatcher
         end
       rescue => e
         puts "Error in processor: #{e.message}"
+        puts e.backtrace
+        exit(1)
       end
     end
   end
