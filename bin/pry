@@ -5,6 +5,11 @@ REPL = true
 
 require_relative "../loader"
 
+if Config.production? && ENV["INGEST_KEY"].nil?
+  puts "INGEST_KEY is not set in production environment. This is not allowed for auditing purposes."
+  exit(1)
+end
+
 require "pry"
 
 if Config.development?
@@ -52,7 +57,7 @@ if Config.development?
   Pry.prepend(PryReloader)
 end
 
-if Config.production? || ENV["INGEST_KEY"]
+if ENV["INGEST_KEY"]
   PRY_LOGGER = LogDnaBatcher.new(ENV["INGEST_KEY"])
 
   module PryLogger
