@@ -71,23 +71,29 @@ RSpec.describe Clover, "vm" do
         choose option: Location::HETZNER_FSN1_UBID
         uncheck "enable_ip4"
         choose option: "ubuntu-jammy"
-        choose option: "standard-2"
+        choose option: "standard-4"
 
+        click_button "Create"
+        expect(page).to have_flash_error("Validation failed for following fields: storage_size")
+
+        choose option: "standard-2"
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - #{name}")
         expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
         expect(Vm.count).to eq(1)
-        expect(Vm.first.project_id).to eq(project.id)
-        expect(Vm.first.private_subnets.first.id).not_to be_nil
-        expect(Vm.first.ip4_enabled).to be_falsey
+        vm = Vm.first
+        expect(vm.boot_image).to eq("ubuntu-jammy")
+        expect(vm.project_id).to eq(project.id)
+        expect(vm.private_subnets.first.id).not_to be_nil
+        expect(vm.ip4_enabled).to be_falsey
 
         visit project.path
         expect(page).to have_content("2/32 (6%)")
-        Vm.first.update(vcpus: 25)
+        vm.update(vcpus: 25)
         page.refresh
         expect(page).to have_content("25/32 (78%)")
-        Vm.first.update(vcpus: 31)
+        vm.update(vcpus: 31)
         page.refresh
         expect(page).to have_content("31/32 (96%)")
       end
