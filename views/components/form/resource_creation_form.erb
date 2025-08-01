@@ -60,13 +60,6 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
       [opt_val, opt_text, opt_classes, opt_attrs]
     end if has_option
 
-    if has_option && selected_options[name].nil?
-      options.find{ |_, _, _, opt_attrs| opt_attrs[:disabled].nil? }&.tap do |opt_val, _, _, opt_attrs|
-        opt_attrs[:checked] = true
-        selected_options[name] = opt_val
-      end
-    end
-
     attributes = {required:}
 
     case type
