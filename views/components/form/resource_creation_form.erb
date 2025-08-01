@@ -5,7 +5,7 @@ content_security_policy.add_script_src [:nonce, nonce] %>
 <script nonce="<%==nonce%>">
 let option_tree = <%==JSON.generate(option_tree)%>
 let option_children = <%==JSON.generate(option_parents.each_with_object(Hash.new { |h, k| h[k] = [] }) { |(child, parents), h| h[parents.last] << child if parents.any? })%>
-let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_object(Hash.new { |h, k| h[k] = [] }) { |option, h| h[option] = flash.dig("old", option) || request.POST[option] || pre_selected_values[option] })%>
+let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_object(Hash.new { |h, k| h[k] = [] }) { |option, h| h[option] = flash.dig("old", option) || typecast_body_params.str(option) || pre_selected_values[option] })%>
 </script>
 
 <div>
@@ -42,7 +42,7 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
       parents = option.reject { |k, v| k == name }.transform_values { |v| v.is_a?(Sequel::Model) ? v.ubid : v }
 
       parents_selected = parents.all? { |k, v| selected_options[k] == v }
-      submitted_value = flash.dig("old", name) || request.POST[name]
+      submitted_value = flash.dig("old", name) || typecast_body_params.str(name)
       selected_in_form_submission = submitted_value == opt_val
       selected_in_pre_selection = submitted_value.nil? && selected_options[name] == opt_val
       first_of_its_kind = submitted_value.nil? && selected_options[name].nil? unless type == "checkbox" && !request.get?
