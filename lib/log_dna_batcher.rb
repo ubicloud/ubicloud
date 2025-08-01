@@ -32,38 +32,6 @@ class LogDnaBatcher
     close_connection
   end
 
-  private
-
-  def start_processor
-    @processor_thread = Thread.new do
-      batch = []
-      last_flush_time = Time.now
-
-      loop do
-        if (item = @input_queue.pop(timeout: @flush_interval))
-          batch << item
-        end
-
-        input_queue_is_closed = @input_queue.closed? && @input_queue.empty?
-        flush_interval_is_exceeded = (Time.now - last_flush_time) >= @flush_interval
-        max_batch_size_is_exceeded = batch.size >= @max_batch_size
-
-        if input_queue_is_closed || flush_interval_is_exceeded || max_batch_size_is_exceeded
-          send_batch(batch)
-
-          if batch.empty?
-            last_flush_time = Time.now
-            break if input_queue_is_closed
-          end
-        end
-      rescue => e
-        puts "Error in processor: #{e.message}"
-        puts e.backtrace
-        exit(1)
-      end
-    end
-  end
-
   def send_batch(batch)
     return if batch.empty?
 
@@ -112,5 +80,37 @@ class LogDnaBatcher
   def close_connection
     @http.finish if @http&.started?
     @http = nil
+  end
+
+  private
+
+  def start_processor
+    @processor_thread = Thread.new do
+      batch = []
+      last_flush_time = Time.now
+
+      loop do
+        if (item = @input_queue.pop(timeout: @flush_interval))
+          batch << item
+        end
+
+        input_queue_is_closed = @input_queue.closed? && @input_queue.empty?
+        flush_interval_is_exceeded = (Time.now - last_flush_time) >= @flush_interval
+        max_batch_size_is_exceeded = batch.size >= @max_batch_size
+
+        if input_queue_is_closed || flush_interval_is_exceeded || max_batch_size_is_exceeded
+          send_batch(batch)
+
+          if batch.empty?
+            last_flush_time = Time.now
+            break if input_queue_is_closed
+          end
+        end
+      rescue => e
+        puts "Error in processor: #{e.message}"
+        puts e.backtrace
+        exit(1)
+      end
+    end
   end
 end
