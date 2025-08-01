@@ -1,4 +1,4 @@
-<%# locals: (name: nil, value: nil, label: nil, description: nil, attributes: {}) %>
+<%# locals: (name:, value: nil, label:, description: nil, attributes: {}) %>
 <% value = flash.dig("old", name) || typecast_body_params.str(name) || value %>
 
 <div class="space-y-2">
