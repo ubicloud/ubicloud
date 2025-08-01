@@ -62,9 +62,7 @@ if ENV["INGEST_KEY"]
 
   module PryLogger
     def evaluate_ruby(code)
-      PRY_LOGGER.log("INPUT: #{code.strip}",
-        level: "info",
-        type: "pry_input")
+      PRY_LOGGER.log("INPUT: #{code.strip}", app: "pry", level: "info", type: "pry_input")
 
       # Evaluate and capture result
       begin
@@ -73,15 +71,11 @@ if ENV["INGEST_KEY"]
         # Log output
         output = result.inspect
         output = "#{output[0..500]}..." if output.length > 500
-        PRY_LOGGER.log("OUTPUT: #{output}",
-          level: "info",
-          type: "pry_output")
+        PRY_LOGGER.log("OUTPUT: #{output}", app: "pry", level: "info", type: "pry_output")
 
         result
       rescue => e
-        PRY_LOGGER.log("EVAL_ERROR: #{e.class}: #{e.message}",
-          level: "error",
-          type: "eval_error")
+        PRY_LOGGER.log("EVAL_ERROR: #{e.class}: #{e.message}", app: "pry", level: "error", type: "eval_error")
         raise
       end
     end

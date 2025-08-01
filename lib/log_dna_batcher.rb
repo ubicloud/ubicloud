@@ -6,10 +6,7 @@ require "json"
 require "socket"
 
 class LogDnaBatcher
-  def initialize(api_key, base_url: "https://logs.logdna.com/logs/ingest",
-    default_metadata: {"app" => $0},
-    flush_interval: 0.5,
-    max_batch_size: 5)
+  def initialize(api_key, base_url: "https://logs.logdna.com/logs/ingest", default_metadata: {}, flush_interval: 0.5, max_batch_size: 5)
     @api_key = api_key
     @flush_interval = flush_interval
     @max_batch_size = max_batch_size
@@ -20,19 +17,16 @@ class LogDnaBatcher
 
     params = @base_url.query ? URI.decode_www_form(@base_url.query).to_h : {}
     params["hostname"] = Socket.gethostname
-    params["app"] = $0
     @request_path = "#{@base_url.path}?#{URI.encode_www_form(params)}"
 
     start_processor
   end
 
-  def log(line, timestamp: (Time.now.to_f * 1000).to_i, **metadata)
-    data = @default_metadata.dup
-    data.merge!(metadata)
-    data[:line] = line
-    data[:timestamp] = timestamp
+  def log(line, timestamp: (Time.now.to_f * 1000).to_i, app: nil, level: "info", **meta)
+    meta = @default_metadata.dup.merge!(meta)
+
+    data = {line:, timestamp:, app:, level:, meta:}.compact
     @input_queue.push(data)
-    nil
   end
 
   def stop
