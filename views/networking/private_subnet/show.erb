@@ -9,6 +9,8 @@ perm_checks = {
   "PrivateSubnet:view" => PrivateSubnet.where(id: @connected_subnets.map(&:id))
 }
 
+ps_path = "#{@project_data[:path]}#{@ps.path}"
+
 viewable_fws, viewable_subnets =
   perm_checks.map do |perm, ds|
     dataset_authorize(ds, perm).select_hash(:id, Sequel.as(true, :v)).transform_keys! { UBID.from_uuidish(it).to_s }
@@ -116,9 +118,9 @@ viewable_fws, viewable_subnets =
             >
               <%== part(
                 "components/delete_button",
-                url: "#{request.path}/disconnect/#{subnet.ubid}",
+                url: "#{ps_path}/disconnect/#{subnet.ubid}",
                 confirmation_message: "Are you sure to disconnect?",
-                redirect: request.path,
+                redirect: ps_path,
                 method: "POST",
                 text: ""
               ) %>
@@ -139,8 +141,8 @@ viewable_fws, viewable_subnets =
             ) %>
           </td>
           <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-            <form action="<%= "#{request.path}/connect" %>" role="form" method="POST" id="form-connect-subnet">
-              <%== csrf_tag("#{request.path}/connect") %>
+            <form action="<%= "#{ps_path}/connect" %>" role="form" method="POST" id="form-connect-subnet">
+              <%== csrf_tag("#{ps_path}/connect") %>
               <%== part("components/form/submit_button", text: "Connect") %>
             </form>
           </td>
