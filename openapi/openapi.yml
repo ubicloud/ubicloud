@@ -1598,6 +1598,7 @@ paths:
                     - us-west-2
                     - us-east-1
                     - us-east-2
+                    - ap-southeast-2
                 access_key:
                   description: Access key for the private location
                   type: string
