@@ -237,9 +237,7 @@ RSpec.describe Clover, "private subnet" do
 
         expect(page).to have_content ps2.name
 
-        btn = find "#cps-delete-#{ps2.ubid} .delete-btn"
-        page.driver.post btn["data-url"], {_csrf: btn["data-csrf"]}
-
+        click_button "Disconnect"
         expect(private_subnet.reload.connected_subnets.count).to eq(0)
       end
 
@@ -278,11 +276,10 @@ RSpec.describe Clover, "private subnet" do
         ps2.strand.destroy
         ps2.destroy
 
-        btn = find "#cps-delete-#{ps2.ubid} .delete-btn"
-        page.driver.post btn["data-url"], {_csrf: btn["data-csrf"]}
-
+        click_button "Disconnect"
         expect(page.status_code).to eq(400)
-        expect(page.body).to eq({error: {code: 400, type: "InvalidRequest", message: "Subnet to be disconnected not found"}}.to_json)
+        expect(page).to have_flash_error("Subnet to be disconnected not found")
+        expect(page.title).to eq("Ubicloud - dummy-ps-1")
       end
     end
 
