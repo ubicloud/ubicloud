@@ -31,7 +31,7 @@ class LogDnaBatcher
 
   def stop
     @input_queue.close
-    @processor_thread&.join
+    @processor_thread.join
     close_connection
   end
 
