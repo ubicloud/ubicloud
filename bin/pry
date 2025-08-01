@@ -65,7 +65,7 @@ if ENV["INGEST_KEY"]
       @counter ||= 0
       @counter += 1
 
-      PRY_LOGGER.log("INPUT: #{code.strip}", app: "pry", level: "info", type: "pry_input", counter: @counter)
+      PRY_LOGGER.log("$> #{code.strip}", app: "pry", level: "info", type: "pry_input", counter: @counter)
 
       # Evaluate and capture result
       begin
@@ -74,11 +74,11 @@ if ENV["INGEST_KEY"]
         # Log output
         output = result.inspect
         output = "#{output[0..500]}..." if output.length > 500
-        PRY_LOGGER.log("OUTPUT: #{output}", app: "pry", level: "info", type: "pry_output", counter: @counter)
+        PRY_LOGGER.log(output, app: "pry", level: "info", type: "pry_output", counter: @counter)
 
         result
       rescue => e
-        PRY_LOGGER.log("EVAL_ERROR: #{e.class}: #{e.message}\n#{e.backtrace.join("\n")}", app: "pry", level: "error", type: "eval_error", counter: @counter)
+        PRY_LOGGER.log("#{e.class}: #{e.message}\n#{e.backtrace.join("\n")}", app: "pry", level: "error", type: "eval_error", counter: @counter)
         raise
       end
     end
