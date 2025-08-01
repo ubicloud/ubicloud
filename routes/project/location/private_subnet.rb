@@ -44,9 +44,9 @@ class Clover
 
       r.post "disconnect", :ubid_uuid do |id|
         authorize("PrivateSubnet:disconnect", ps.id)
+        handle_validation_failure("networking/private_subnet/show")
         unless (subnet = authorized_private_subnet(id:, perm: "PrivateSubnet:disconnect"))
-          response.status = 400
-          next {error: {code: 400, type: "InvalidRequest", message: "Subnet to be disconnected not found"}}
+          raise CloverError.new(400, "InvalidRequest", "Subnet to be disconnected not found")
         end
 
         DB.transaction do
@@ -58,7 +58,7 @@ class Clover
           Serializers::PrivateSubnet.serialize(ps)
         else
           flash["notice"] = "#{subnet.name} will be disconnected in a few seconds"
-          204
+          r.redirect "#{@project.path}#{ps.path}"
         end
       end
 

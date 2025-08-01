@@ -69,7 +69,6 @@ $("#new-ace-btn").on("click", function (event) {
 });
 
 $(".delete-btn").on("click", function (event) {
-  event.preventDefault();
   let url = $(this).data("url");
   let csrf = $(this).data("csrf");
   let confirmation = $(this).data("confirmation");
@@ -80,11 +79,20 @@ $(".delete-btn").on("click", function (event) {
   if (confirmation) {
     if (prompt(`Please type "${confirmation}" to confirm deletion`, "") != confirmation) {
       alert("Could not confirm resource name");
+      event.preventDefault();
       return;
     }
   } else if (!confirm(confirmationMessage || "Are you sure to delete?")) {
+    event.preventDefault();
     return;
   }
+
+  if (method === "POST") {
+    // Use normal form submission for POST requests
+    return true;
+  }
+
+  event.preventDefault();
 
   $.ajax({
     url: url,
