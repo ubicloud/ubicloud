@@ -63,6 +63,13 @@ RSpec.describe Clover do
     expect { post "/webhook/test-no-audit-logging/bad" }.to raise_error(RuntimeError, "unsupported audit_log action: bad_action")
   end
 
+  it "handles typecast errors when rendering validation failure template errors" do
+    visit "/webhook/test-typecast-error-during-validation-failure"
+
+    expect(page.title).to eq("Ubicloud - Invalid Parameter Type")
+    expect(page.status_code).to eq(400)
+  end
+
   it "handles expected errors" do
     expect(Clog).to receive(:emit).with("route exception").and_call_original
 

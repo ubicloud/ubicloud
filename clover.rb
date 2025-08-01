@@ -784,6 +784,12 @@ class Clover < Roda
       raise(typecast_params.str("message") || "test error")
     end
 
+    hash_branch(:webhook_prefix, "test-typecast-error-during-validation-failure") do |r|
+      r.POST["a"] = {}
+      handle_validation_failure(inline: "<%= typecast_body_params.str('a') %>")
+      typecast_body_params.str("a")
+    end
+
     hash_branch(:webhook_prefix, "test-no-audit-logging") do |r|
       r.post "test" do
         @still_need_audit_logging = true

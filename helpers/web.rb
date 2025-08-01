@@ -57,7 +57,13 @@ class Clover < Roda
       # :nocov:
       flash.sweep
       @validation_failure_block&.call
-      request.on { view(template) }
+
+      request.on do
+        view(template)
+      rescue Roda::RodaPlugins::TypecastParams::Error
+        @page_title = "Invalid Parameter Type"
+        view(content: "<p>An invalid parameter type was submitted.</p>")
+      end
     end
 
     # :nocov:
