@@ -14,6 +14,7 @@ class LogDnaBatcher
     @http = nil
     @base_url = URI.parse(base_url)
     @default_metadata = default_metadata.dup.freeze
+    @batch_send_failure_count = 0
 
     params = @base_url.query ? URI.decode_www_form(@base_url.query).to_h : {}
     params["hostname"] = Socket.gethostname
@@ -81,12 +82,20 @@ class LogDnaBatcher
 
       if response.is_a?(Net::HTTPSuccess)
         batch.clear
+        @batch_send_failure_count = 0
       else
+        @batch_send_failure_count += 1
         puts "Failed to send logs: #{response.code} #{response.message}"
       end
     rescue => e
+      @batch_send_failure_count += 1
       puts "Error sending batch: #{e.message}"
       close_connection
+    end
+
+    if @batch_send_failure_count >= 5
+      puts "Too many failures sending logs, stopping the batcher."
+      exit(1)
     end
   end
 
