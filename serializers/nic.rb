@@ -5,8 +5,8 @@ class Serializers::Nic < Serializers::Base
     {
       id: nic.ubid,
       name: nic.name,
-      private_ipv4: (nic.private_ipv4.netmask.prefix_len == 32) ? nic.private_ipv4.network.to_s : nic.private_ipv4.nth(1).to_s,
-      private_ipv6: nic.private_ipv6.nth(2).to_s,
+      private_ipv4: nic.private_ipv4_address,
+      private_ipv6: nic.private_ipv6_address,
       vm_name: nic.vm&.name
     }
   end
