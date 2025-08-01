@@ -20,6 +20,7 @@ class Clover
 
       r.post true do
         if (billing_info = @project.billing_info)
+          handle_validation_failure("project/billing")
           current_tax_id = billing_info.stripe_data["tax_id"]
           tp = typecast_params
           new_tax_id = tp.str!("tax_id").gsub(/[^a-zA-Z0-9]/, "")
@@ -51,9 +52,10 @@ class Clover
             end
             audit_log(@project, "update_billing")
           rescue Stripe::InvalidRequestError => e
-            flash["error"] = e.message
+            raise CloverError.new(400, nil, e.message)
           end
 
+          flash["notice"] = "Billing info updated"
           r.redirect @project.path + "/billing"
         else
           no_audit_log
@@ -72,6 +74,7 @@ class Clover
       end
 
       r.get "success" do
+        handle_validation_failure("project/billing")
         checkout_session = Stripe::Checkout::Session.retrieve(typecast_params.str!("session_id"))
         setup_intent = Stripe::SetupIntent.retrieve(checkout_session["setup_intent"])
 
@@ -79,8 +82,7 @@ class Clover
         stripe_payment_method = Stripe::PaymentMethod.retrieve(stripe_id)
         card_fingerprint = stripe_payment_method["card"]["fingerprint"]
         unless PaymentMethod.where(fraud: true, card_fingerprint:).empty?
-          flash["error"] = "Payment method you added is labeled as fraud. Please contact support."
-          r.redirect @project.path + "/billing"
+          raise CloverError.new(400, nil, "Payment method you added is labeled as fraud. Please contact support.")
         end
 
         # Pre-authorize card to check if it is valid, if so
@@ -110,8 +112,7 @@ class Clover
         rescue
           # Log and redirect if Stripe card error or our manual raise
           Clog.emit("Couldn't pre-authorize card") { {card_authorization: {project_id: @project.id, customer_stripe_id: customer_stripe_id}} }
-          flash["error"] = "We couldn't pre-authorize your card for verification. Please make sure it can be pre-authorized up to $5 or contact our support team at support@ubicloud.com."
-          r.redirect @project.path + "/billing"
+          raise CloverError.new(400, nil, "We couldn't pre-authorize your card for verification. Please make sure it can be pre-authorized up to $5 or contact our support team at support@ubicloud.com.")
         end
 
         DB.transaction do
@@ -129,6 +130,7 @@ class Clover
           })
         end
 
+        flash["notice"] = "Billing info updated"
         r.redirect @project.path + "/billing"
       end
 

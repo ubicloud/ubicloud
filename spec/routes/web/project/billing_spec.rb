@@ -78,6 +78,9 @@ RSpec.describe Clover, "billing" do
       expect(page.title).to eq("Ubicloud - Project Billing")
       click_button "Add new billing information"
 
+      expect(page.title).to eq("Ubicloud - Project Billing")
+      expect(page).to have_flash_notice("Billing info updated")
+
       billing_info = project.reload.billing_info
       expect(page.status_code).to eq(200)
       expect(billing_info.stripe_id).to eq("cs_1234567890")
@@ -111,7 +114,7 @@ RSpec.describe Clover, "billing" do
       expect(page.title).to eq("Ubicloud - Project Billing")
       click_button "Add new billing information"
 
-      expect(page.status_code).to eq(200)
+      expect(page.status_code).to eq(400)
       expect(page).to have_flash_error("We couldn't pre-authorize your card for verification. Please make sure it can be pre-authorized up to $5 or contact our support team at support@ubicloud.com.")
     end
 
@@ -128,6 +131,7 @@ RSpec.describe Clover, "billing" do
 
       click_button "Update"
 
+      expect(page).to have_flash_notice("Billing info updated")
       expect(page.status_code).to eq(200)
       expect(page).to have_field("Billing Name", with: "New Inc.")
       expect(page).to have_field("Country", with: "DE")
@@ -191,7 +195,7 @@ RSpec.describe Clover, "billing" do
 
       click_button "Update"
 
-      expect(page.status_code).to eq(200)
+      expect(page.status_code).to eq(400)
       expect(page).to have_flash_error("Invalid email address: test@test.com")
     end
 
@@ -265,7 +269,7 @@ RSpec.describe Clover, "billing" do
 
       click_link "Add Payment Method"
 
-      expect(page.status_code).to eq(200)
+      expect(page.status_code).to eq(400)
       expect(page.title).to eq("Ubicloud - Project Billing")
       expect(billing_info.payment_methods.count).to eq(1)
       expect(page).to have_content "Visa"
