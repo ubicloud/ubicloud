@@ -24,14 +24,9 @@ class Clover
 
       r.post "connect" do
         authorize("PrivateSubnet:connect", ps.id)
+        handle_validation_failure("networking/private_subnet/show")
         unless (subnet = authorized_private_subnet(key: "connected-subnet-id", perm: "PrivateSubnet:connect"))
-          if api?
-            response.status = 400
-            next {error: {code: 400, type: "InvalidRequest", message: "Subnet to be connected not found"}}
-          else
-            flash["error"] = "Subnet to be connected not found"
-            r.redirect "#{@project.path}#{ps.path}"
-          end
+          raise CloverError.new(400, "InvalidRequest", "Subnet to be connected not found")
         end
 
         DB.transaction do
