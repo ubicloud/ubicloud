@@ -16,10 +16,6 @@ class LogDnaBatcher
     @default_metadata = default_metadata.dup.freeze
     @batch_send_failure_count = 0
 
-    params = @base_url.query ? URI.decode_www_form(@base_url.query).to_h : {}
-    params["hostname"] = Socket.gethostname
-    @request_path = "#{@base_url.path}?#{URI.encode_www_form(params)}"
-
     start_processor
   end
 
@@ -74,7 +70,7 @@ class LogDnaBatcher
     begin
       http = ensure_connection
 
-      request = Net::HTTP::Post.new(@request_path)
+      request = Net::HTTP::Post.new(@base_url.to_s + "?hostname=#{Socket.gethostname}")
       request.basic_auth(@api_key, "")
       request["Content-Type"] = "application/json; charset=UTF-8"
       request["Connection"] = "keep-alive"
@@ -106,9 +102,8 @@ class LogDnaBatcher
 
     close_connection if @http
 
-    base_uri = URI.parse(@base_url)
-    @http = Net::HTTP.new(base_uri.host, base_uri.port)
-    @http.use_ssl = base_uri.scheme == "https"
+    @http = Net::HTTP.new(@base_url.host, @base_url.port)
+    @http.use_ssl = @base_url.scheme == "https"
     @http.keep_alive_timeout = 30
     @http.start
     @http
