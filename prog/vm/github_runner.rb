@@ -255,30 +255,6 @@ class Prog::Vm::GithubRunner < Prog::Base
       COMMAND
     end
 
-    command += <<~COMMAND
-      if [ ! -f /etc/systemd/system/runner-script.service ]; then
-        sudo tee /etc/systemd/system/runner-script.service > /dev/null <<'EOT'
-      [Unit]
-      Description=runner-script
-
-      [Service]
-      RemainAfterExit=yes
-      User=runner
-      Group=runner
-      WorkingDirectory=/home/runner
-      ExecStart=/home/runner/actions-runner/run-withenv.sh
-      EOT
-
-        sudo -u runner tee /home/runner/actions-runner/run-withenv.sh > /dev/null <<'EOT'
-      #!/bin/bash
-      mapfile -t env </etc/environment
-      JIT_CONFIG="$(cat ./actions-runner/.jit_token)"
-      exec env -- "${env[@]}" ./actions-runner/run.sh --jitconfig "$JIT_CONFIG"
-      EOT
-        sudo systemctl daemon-reload
-      fi
-    COMMAND
-
     # Remove comments and empty lines before sending them to the machine
     vm.sshable.cmd(command.gsub(/^(\s*# .*)?\n/, ""))
 
@@ -299,15 +275,6 @@ class Prog::Vm::GithubRunner < Prog::Base
     github_runner.log_duration("runner_registered", github_runner.ready_at - github_runner.allocated_at)
 
     hop_wait
-  rescue Sshable::SshError => e
-    if e.stderr.include?("Job for runner-script.service failed")
-      Clog.emit("Failed to start runner script") { {failed_to_start_runner: response.to_h} }
-      vm.sshable.cmd(<<~COMMAND)
-        sudo journalctl -xeu runner-script.service
-        cat /run/systemd/transient/runner-script.service || true
-      COMMAND
-    end
-    raise
   rescue Octokit::Conflict => e
     raise unless e.message.include?("Already exists")
 
