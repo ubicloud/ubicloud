@@ -66,10 +66,19 @@ MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :submit_que
   # Check each resource for stuck pulses/metric exports, and log if any are found.
   def check_stuck_pulses
     timeout, msg, key = stuck_pulse_info
-    before = Time.now - timeout
+    t = Time.now
+    before = t - timeout
     resources.each_value do |r|
       if r.monitor_job_started_at&.<(before)
-        Clog.emit(msg) { {key => {ubid: r.resource.ubid}} }
+        Clog.emit(msg) do
+          {
+            key => {
+              ubid: r.resource.ubid,
+              job_started_at: r.monitor_job_started_at,
+              time_elapsed: t - r.monitor_job_started_at
+            }
+          }
+        end
       end
     end
   end
@@ -104,7 +113,11 @@ MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :submit_que
     # run queue. This can result in jobs that a very slightly out of order,
     # due to thread scheduling, but the differences are not likely to be material.
     while (r = finish_queue.pop(timeout: 0))
-      run_queue << r
+      if r.deleted
+        resources.delete(r.resource.id)
+      else
+        run_queue << r
+      end
     end
 
     unless run_queue.empty?

@@ -8,7 +8,7 @@ end
 
 if partition_number
   partition_number = Integer(partition_number)
-  raise "invalid partition_number: #{partition_number}" if partition_number < 1
+  raise "invalid partition_number: #{partition_number}" if partition_number < 1 || partition_number > 256
 end
 
 require_relative "../loader"
