@@ -129,17 +129,6 @@ RSpec.describe Clover, "load balancer" do
         expect((find "input[name=name]")["value"]).to eq("invalid name")
       end
 
-      it "handles invalid referers by redirecting to root" do
-        project
-        Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
-        visit "#{project.path}/load-balancer/create"
-        fill_in "Name", with: "invalid name"
-
-        expect(Kernel).to receive(:URI).and_raise(URI::InvalidURIError)
-        click_button "Create"
-        expect(page.title).to eq("Ubicloud - Default Dashboard")
-      end
-
       it "can not create load balancer in a project when does not have permissions" do
         Prog::Vnet::SubnetNexus.assemble(project_wo_permissions.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         visit "#{project_wo_permissions.path}/load-balancer/create"
@@ -234,13 +223,26 @@ RSpec.describe Clover, "load balancer" do
         expect(page).to have_flash_notice("VM is attached to the load balancer")
         expect(lb.vms.count).to eq(1)
 
+        expect(Config).to receive(:load_balancer_service_hostname).and_return("lb.ubicloud.com")
         visit "#{project.path}#{lb.path}"
-        expect(page).to have_content lb.name
-        expect(page).to have_content vm.name
-        expect(page).to have_content 80
-        expect(page).to have_content 8000
-        expect(page).to have_content "down"
-        expect(page).to have_content "Hash Based"
+        expect(page.all("dt,dd").map(&:text)).to eq [
+          "ID", lb.ubid,
+          "Name", "dummy-lb-3",
+          "Connection String", "dummy-lb-3.#{ps.ubid[-5...]}.lb.ubicloud.com",
+          "Private Subnet", "dummy-ps-1",
+          "Algorithm", "Hash Based",
+          "Stack", "dual",
+          "Load Balancer Port", "80",
+          "Application Port", "8000",
+          "HTTP Health Check Endpoint", "/up"
+        ]
+        expect(page.all("#lb-vms td").map(&:text)).to eq [
+          "dummy-vm-1", "down", "Detach",
+          "Select a VM", "", "Attach"
+        ]
+
+        click_link "dummy-ps-1"
+        expect(page.title).to eq("Ubicloud - #{ps.name}")
       end
 
       it "can not attach vm when it is already attached to another load balancer" do

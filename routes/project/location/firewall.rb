@@ -19,7 +19,7 @@ class Clover
       end
 
       filter[:location_id] = @location.id
-      firewall = @project.firewalls_dataset.first(filter)
+      @firewall = firewall = @project.firewalls_dataset.first(filter)
       check_found_object(firewall)
 
       r.is do
@@ -39,19 +39,10 @@ class Clover
 
         r.get do
           authorize("Firewall:view", firewall.id)
-          @firewall = Serializers::Firewall.serialize(firewall, {detailed: true})
 
           if api?
-            @firewall
+            Serializers::Firewall.serialize(firewall, {detailed: true})
           else
-            attachable_subnets_dataset = dataset_authorize(@project
-                .private_subnets_dataset
-                .eager(:location)
-                .where(location_id: @location.id),
-              "PrivateSubnet:view")
-              .exclude(id: firewall.private_subnets_dataset.select(:id))
-            @attachable_subnets = Serializers::PrivateSubnet.serialize(attachable_subnets_dataset.all)
-
             view "networking/firewall/show"
           end
         end
@@ -92,13 +83,13 @@ class Clover
       end
 
       r.api do
-        @firewall = firewall
         r.hash_branches(:project_location_firewall_prefix)
       end
 
       r.on "firewall-rule" do
         r.post true do
           authorize("Firewall:edit", firewall.id)
+          handle_validation_failure("networking/firewall/show")
 
           parsed_cidr = Validation.validate_cidr(typecast_params.str!("cidr"))
           port_range = Validation.validate_port_range(typecast_params.str("port_range"))

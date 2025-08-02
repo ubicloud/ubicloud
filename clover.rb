@@ -113,9 +113,9 @@ class Clover < Roda
   end
 
   plugin :route_csrf do |token|
-    flash["error"] = "An invalid security token submitted with this request, please try again"
     response.status = 400
-    redirect_back_with_inputs
+    @page_title = "Invalid Security Token"
+    view(content: "An invalid security token was submitted, please click back, refresh, and try again.")
   end
 
   plugin :content_security_policy do |csp|
@@ -242,9 +242,9 @@ class Clover < Roda
       elsif e.is_a?(Sequel::SerializationFailure)
         flash["error"] = "There was a temporary error attempting to make this change, please try again."
         redirect_back_with_inputs
-      elsif e.is_a?(Validation::ValidationFailed) || (request.patch? && e.is_a?(CloverError))
+      elsif e.is_a?(CloverError) && !e.is_a?(Authorization::Unauthorized)
         flash["error"] = message
-        flash["errors"] = (flash["errors"] || {}).merge(details).transform_keys(&:to_s)
+        flash["errors"] = (flash["errors"] || {}).merge(details || {}).transform_keys(&:to_s)
 
         if request.patch?
           response["location"] = env["HTTP_REFERER"]
@@ -397,6 +397,7 @@ class Clover < Roda
     create_account_set_password? true
     password_confirm_label "Password Confirmation"
     before_create_account do
+      scope.handle_validation_failure("auth/create_account")
       check_locked_domain(account[:email], "Creating accounts with a password")
 
       cf_response = scope.typecast_params.str("cf-turnstile-response").to_s if Config.cloudflare_turnstile_site_key
@@ -640,6 +641,11 @@ class Clover < Roda
     close_account_view { view "account/close_account", "My Account" }
 
     before_close_account do
+      scope.handle_validation_failure(true) do
+        request.on do
+          close_account_view
+        end
+      end
       account = Account[account_id]
       # Do not allow to close account if the project has resources and
       # the account is the only user
@@ -791,6 +797,12 @@ class Clover < Roda
     # :nocov:
     hash_branch(:webhook_prefix, "test-error") do |r|
       raise(typecast_params.str("message") || "test error")
+    end
+
+    hash_branch(:webhook_prefix, "test-typecast-error-during-validation-failure") do |r|
+      r.POST["a"] = {}
+      handle_validation_failure(inline: "<%= typecast_body_params.str('a') %>")
+      typecast_body_params.str("a")
     end
 
     hash_branch(:webhook_prefix, "test-no-audit-logging") do |r|
@@ -1002,16 +1014,6 @@ class Clover < Roda
 
         # Need to rewind body so webhook github requests work
         request.body.rewind unless request.get?
-      end
-
-      def redirect_back_with_inputs_params
-        # This currently needs all parameters. We could change the related views to
-        # use typecast_params with the flash["old"] value, but in the long term,
-        # should avoid the redirect_back_with_inputs approach completely.
-        # Use super for coverage, even though it will raise an exception.
-        super
-      rescue
-        request.instance_variable_get(:@params)
       end
 
       def audit_log(...)

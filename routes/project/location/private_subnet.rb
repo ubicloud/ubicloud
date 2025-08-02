@@ -19,7 +19,7 @@ class Clover
       end
 
       filter[:location_id] = @location.id
-      ps = @project.private_subnets_dataset.first(filter)
+      ps = @ps = @project.private_subnets_dataset.first(filter)
       check_found_object(ps)
 
       r.post "connect" do
@@ -70,14 +70,9 @@ class Clover
       r.is do
         r.get do
           authorize("PrivateSubnet:view", ps.id)
-          @ps = Serializers::PrivateSubnet.serialize(ps)
           if api?
-            @ps
+            Serializers::PrivateSubnet.serialize(ps)
           else
-            @nics = Serializers::Nic.serialize(ps.nics)
-            @connected_subnets = Serializers::PrivateSubnet.serialize(ps.connected_subnets)
-            connectable_subnets_dataset = ps.project.private_subnets_dataset.exclude(id: ps.connected_subnets.map(&:id))
-            @connectable_subnets = Serializers::PrivateSubnet.serialize(connectable_subnets_dataset.all)
             view "networking/private_subnet/show"
           end
         end

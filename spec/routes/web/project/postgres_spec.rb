@@ -216,13 +216,14 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_no_content private_location.name
       end
 
-      it "can not open create page with invalid flavor" do
+      it "treats invalid flavor as standard flavor when creating" do
         default_project = Project[name: "Default"]
         url = "#{default_project.path}/dashboard"
         Capybara.current_session.driver.header "Referer", url
         visit "#{project.path}/postgres/create?flavor=invalid"
 
-        expect(page.title).to eq("Ubicloud - Default Dashboard")
+        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
+        expect(find("input[name=flavor]", visible: false)[:value]).to eq "standard"
       end
 
       it "can not create PostgreSQL database with same name" do

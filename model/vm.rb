@@ -43,6 +43,10 @@ class Vm < Sequel::Model
     location.display_name
   end
 
+  def load_balancer_state
+    load_balancer_vm_ports.first&.state
+  end
+
   def path
     "/location/#{display_location}/vm/#{name}"
   end

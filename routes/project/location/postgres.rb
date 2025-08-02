@@ -19,7 +19,7 @@ class Clover
       end
 
       filter[:location_id] = @location.id
-      pg = @project.postgres_resources_dataset.first(filter)
+      @pg = pg = @project.postgres_resources_dataset.first(filter)
       check_found_object(pg)
 
       r.is do
@@ -106,8 +106,6 @@ class Clover
 
         response.headers["cache-control"] = "no-store"
 
-        @pg = pg
-        @option_tree, @option_parents = generate_postgres_options(flavor: @pg.flavor, location: @location)
         @page = page
 
         view "postgres/show"
@@ -240,6 +238,7 @@ class Clover
 
       r.post "read-replica" do
         authorize("Postgres:edit", pg.id)
+        handle_validation_failure("postgres/show") { @page = "read-replica" }
 
         name = typecast_params.nonempty_str!("name")
 
@@ -248,12 +247,7 @@ class Clover
         Validation.validate_vcpu_quota(@project, "PostgresVCpu", Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size].vcpu_count)
         if pg.timeline.earliest_restore_time.nil?
           error_msg = "Parent server is not ready for read replicas. There are no backups, yet."
-          if api?
-            fail CloverError.new(400, "InvalidRequest", error_msg)
-          else
-            flash["error"] = error_msg
-            redirect_back_with_inputs
-          end
+          fail CloverError.new(400, "InvalidRequest", error_msg)
         end
 
         st = nil
@@ -284,15 +278,11 @@ class Clover
 
       r.post "promote" do
         authorize("Postgres:edit", pg.id)
+        handle_validation_failure("postgres/show") { @page = "settings" }
 
         unless pg.read_replica?
           error_msg = "Non read replica servers cannot be promoted."
-          if api?
-            fail CloverError.new(400, "InvalidRequest", error_msg)
-          else
-            flash["error"] = error_msg
-            redirect_back_with_inputs
-          end
+          fail CloverError.new(400, "InvalidRequest", error_msg)
         end
 
         DB.transaction do
@@ -345,6 +335,7 @@ class Clover
 
       r.post "reset-superuser-password" do
         authorize("Postgres:view", pg.id)
+        handle_validation_failure("postgres/show") { @page = "settings" }
 
         if pg.read_replica?
           raise CloverError.new(400, "InvalidRequest", "Superuser password cannot be updated for read replicas!")
@@ -495,6 +486,7 @@ class Clover
 
         r.on method: [:post, :patch] do
           authorize("Postgres:edit", pg.id)
+          handle_validation_failure("postgres/show") { @page = "config" }
 
           if web?
             pg_keys = typecast_params.array(:str, "pg_config_keys") || []

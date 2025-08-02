@@ -23,6 +23,14 @@ class Nic < Sequel::Model
     ubid.to_s[0..9]
   end
 
+  def private_ipv4_address
+    (private_ipv4.netmask.prefix_len == 32) ? private_ipv4.network.to_s : private_ipv4.nth(1).to_s
+  end
+
+  def private_ipv6_address
+    private_ipv6.nth(2).to_s
+  end
+
   def private_ipv4_gateway
     private_subnet.net4.nth(1).to_s + private_subnet.net4.netmask.to_s
   end

@@ -2,8 +2,8 @@
   pg_config = @pg.user_config || {}
   pgbouncer_config = @pg.pgbouncer_user_config || {}
 
-  errors = flash["errors"] || {}
-  old = flash["old"] || {}
+  errors = flash.now["errors"] || {}
+  old = request.POST || {}
 
   unless old.empty?
     pg_keys = old["pg_config_keys"] || []

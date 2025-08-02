@@ -5,6 +5,8 @@
   {name: "failover_time_notice", type: "section", content: "If a maintenance window is configured, failover to the new server with the desired configuration will occur during the first available maintenance window after the new server is ready. Otherwise, failover will take place as soon as the new server becomes ready. Depending on the size of the data, it may take several hours for the new server to become ready.", separator: false}
 ]
 
+@option_tree, @option_parents = generate_postgres_options(flavor: @pg.flavor, location: @location)
+
 pre_selected_values = {
   "flavor" => @pg.flavor,
   "location" => @location.ubid,

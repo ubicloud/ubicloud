@@ -10,6 +10,10 @@ class FirewallRule < Sequel::Model
   def ip6?
     cidr.to_s.include?(":")
   end
+
+  def display_port_range
+    port_range&.begin ? "#{port_range.begin}..#{port_range.end - 1}" : "0..65535"
+  end
 end
 
 # Table: firewall_rule

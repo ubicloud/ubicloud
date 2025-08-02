@@ -64,11 +64,22 @@ RSpec.describe Clover, "project" do
         expect(project.accounts_dataset.count).to eq 1
         expect(page.title).to eq("Ubicloud - Create Project")
 
-        fill_in "Name", with: name
+        click_button "Create"
+        expect(page).to have_flash_error("empty string provided for parameter name")
 
+        fill_in "Name", with: "a" * 65
+        click_button "Create"
+        expect(page).to have_flash_error("name must be less than 64 characters and only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number")
+
+        # Check retains parameter value
+        click_button "Create"
+        expect(page).to have_flash_error("name must be less than 64 characters and only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number")
+
+        fill_in "Name", with: name
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_flash_notice("Project created")
         expect(page).to have_content name
 
         project = Project[name: name]
@@ -221,6 +232,18 @@ RSpec.describe Clover, "project" do
       it "can update the project name" do
         new_name = "New-Project-Name"
         visit project.path
+
+        fill_in "name", with: ""
+        click_button "Save"
+        expect(page).to have_flash_error("empty string provided for parameter name")
+
+        fill_in "name", with: "a" * 65
+        click_button "Save"
+        expect(page).to have_flash_error("name must be less than 64 characters and only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number")
+
+        # Check retains parameter value
+        click_button "Save"
+        expect(page).to have_flash_error("name must be less than 64 characters and only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number")
 
         fill_in "name", with: new_name
         click_button "Save"

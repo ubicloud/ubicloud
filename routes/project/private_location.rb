@@ -18,6 +18,7 @@ class Clover
 
       r.post do
         authorize("Location:create", @project.id)
+        handle_validation_failure("private-location/create")
         name, provider_location_name, access_key, secret_key = typecast_params.nonempty_str!(["name", "provider_location_name", "access_key", "secret_key"])
 
         Validation.validate_name(name)
@@ -47,14 +48,6 @@ class Clover
 
     r.get(web?, "create") do
       authorize("Location:create", @project.id)
-
-      options = OptionTreeGenerator.new
-      options.add_option(name: "name")
-      options.add_option(name: "provider_location_name", values: Option::AWS_LOCATIONS.map { |l| {value: l, display_name: l} })
-      options.add_option(name: "access_key")
-      options.add_option(name: "secret_key")
-      @option_tree, @option_parents = options.serialize
-
       view "private-location/create"
     end
 

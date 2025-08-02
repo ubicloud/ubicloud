@@ -8,12 +8,12 @@ class Clover
 
     r.web do
       r.post true do
+        handle_validation_failure("networking/load_balancer/create")
         load_balancer_post(typecast_params.nonempty_str("name"))
       end
 
       r.get "create" do
         authorize("LoadBalancer:create", @project.id)
-        @option_tree, @option_parents = generate_load_balancer_options
         view "networking/load_balancer/create"
       end
     end

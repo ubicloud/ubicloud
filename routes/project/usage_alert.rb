@@ -6,6 +6,7 @@ class Clover
       authorize("Project:billing", @project.id)
 
       r.post true do
+        handle_validation_failure("project/billing")
         name = typecast_params.nonempty_str("alert_name")
         Validation.validate_short_text(name, "name")
         limit = typecast_params.pos_int!("limit")

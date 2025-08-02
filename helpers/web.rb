@@ -45,7 +45,50 @@ class Clover < Roda
     part("components/form/hidden", name: csrf_field, value: csrf_token(*))
   end
 
+  def handle_validation_failure(template, &block)
+    return unless web?
+    @validation_failure_template = template
+    @validation_failure_block = block
+  end
+
   def redirect_back_with_inputs
+    # :nocov:
+    if (template = @validation_failure_template)
+      # :nocov:
+      flash.sweep
+      @validation_failure_block&.call
+
+      request.on do
+        view(template)
+      rescue Roda::RodaPlugins::TypecastParams::Error
+        @page_title = "Invalid Parameter Type"
+        view(content: "<p>An invalid parameter type was submitted.</p>")
+      end
+    end
+
+    # :nocov:
+    # This code path is deprecated and will be removed after all routes have been updated
+    # to use handle_validation_failure.
+
+    if Config.test?
+      # Raise error in the tests if we get here. If this error is raised, the route
+      # should be fixed to call handle_validation_failure.
+      raise "Request failure without handle_validation_failure: #{request.request_method} #{request.path_info}"
+    else
+      # Emit error messages in other environments. This will allow detection of errors in production
+      # for cases where we don't have specs that cover the error. These errors will be
+      # monitored and specs will be added for them.
+      Clog.emit("web error without handle_validation_failure") do
+        {
+          missing_handle_validation_failure: {
+            request_method: request.request_method,
+            path_info: request.path_info,
+            referrer: env["HTTP_REFERER"]
+          }
+        }
+      end
+    end
+
     referrer = flash["referrer"] || env["HTTP_REFERER"]
     uri = begin
       Kernel.URI(referrer)
@@ -75,6 +118,7 @@ class Clover < Roda
   def redirect_back_with_inputs_params
     request.params
   end
+  # :nocov:
 
   def redirect_default_project_dashboard
     if (project = current_account.projects_dataset.order(:created_at, :name).first)

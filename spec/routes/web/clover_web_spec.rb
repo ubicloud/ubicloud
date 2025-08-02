@@ -9,7 +9,8 @@ RSpec.describe Clover do
     click_button "Sign in"
 
     expect(page.status_code).to eq(400)
-    expect(page).to have_flash_error("An invalid security token submitted with this request, please try again")
+    expect(page.title).to eq "Ubicloud - Invalid Security Token"
+    expect(page).to have_content("An invalid security token was submitted, please click back, refresh, and try again.")
   end
 
   it "does not redirect to requested path if path is too long" do
@@ -60,6 +61,13 @@ RSpec.describe Clover do
 
   it "raises error for unsupported audit log action" do
     expect { post "/webhook/test-no-audit-logging/bad" }.to raise_error(RuntimeError, "unsupported audit_log action: bad_action")
+  end
+
+  it "handles typecast errors when rendering validation failure template errors" do
+    visit "/webhook/test-typecast-error-during-validation-failure"
+
+    expect(page.title).to eq("Ubicloud - Invalid Parameter Type")
+    expect(page.status_code).to eq(400)
   end
 
   it "handles expected errors" do

@@ -2,6 +2,8 @@
   {name: "ha_type", type: "radio_small_cards", label: "Standby Count", required: "required", content_generator: ContentGenerator::Postgres.method(:ha_type)}
 ]
 
+@option_tree, @option_parents = generate_postgres_options(flavor: @pg.flavor, location: @location)
+
 pre_selected_values = {
   "flavor" => @pg.flavor,
   "location" => @location.ubid,

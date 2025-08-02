@@ -1,4 +1,11 @@
 <%
+  @flavor = typecast_params.nonempty_str("flavor", PostgresResource::Flavor::STANDARD)
+  @flavor = PostgresResource::Flavor::STANDARD unless Option::POSTGRES_FLAVOR_OPTIONS.any? { |k,| k == @flavor }
+  @prices = fetch_location_based_prices("PostgresVCpu", "PostgresStorage")
+  @has_valid_payment_method = @project.has_valid_payment_method?
+  @enabled_postgres_sizes = Option::VmSizes.select { @project.quota_available?("PostgresVCpu", it.vcpus) }.map(&:name)
+  @option_tree, @option_parents = generate_postgres_options(flavor: @flavor)
+
   @page_title, logo = postgres_flavors[@flavor].yield_self { ["Create #{it.title}", "logo-#{it.brand}.png"] }
   logo = nil if @flavor == PostgresResource::Flavor::STANDARD
 %>

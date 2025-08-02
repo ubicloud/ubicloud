@@ -8,16 +8,13 @@ class Clover
 
     r.web do
       r.post true do
+        handle_validation_failure("kubernetes-cluster/create")
         check_visible_location
         kubernetes_cluster_post(typecast_params.nonempty_str("name"))
       end
 
       r.get "create" do
         authorize("KubernetesCluster:create", @project.id)
-
-        @has_valid_payment_method = @project.has_valid_payment_method?
-        @option_tree, @option_parents = generate_kubernetes_cluster_options
-
         view "kubernetes-cluster/create"
       end
     end

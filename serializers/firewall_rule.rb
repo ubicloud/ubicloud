@@ -5,7 +5,7 @@ class Serializers::FirewallRule < Serializers::Base
     {
       id: firewall_rule.ubid,
       cidr: firewall_rule.cidr,
-      port_range: firewall_rule.port_range&.begin ? "#{firewall_rule.port_range.begin}..#{firewall_rule.port_range.end - 1}" : "0..65535"
+      port_range: firewall_rule.display_port_range
     }
   end
 end
