@@ -80,6 +80,7 @@ class Clover
 
       r.post "policy/managed" do
         authorize("Project:user", @project.id)
+        handle_validation_failure("project/user")
         user_policies = typecast_params.Hash("user_policies") || {}
         invitation_policies = typecast_params.Hash("invitation_policies") || {}
         user_policies.transform_keys! { UBID.to_uuid(it) }
@@ -137,9 +138,7 @@ class Clover
           removals.transform_keys!(&:name)
 
           if @project.subject_tags_dataset.first(name: "Admin").member_ids.empty?
-            flash["error"] = "The project must have at least one admin."
-            DB.rollback_on_exit
-            r.redirect "#{@project.path}/user"
+            raise CloverError.new(400, nil, "The project must have at least one admin.")
           end
 
           invitatation_map = @project
