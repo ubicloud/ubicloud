@@ -725,13 +725,16 @@ RSpec.describe Clover, "postgres" do
 
     describe "metric-destination" do
       it "can create metric destination" do
-        pg
         visit "#{project.path}#{pg.path}/charts"
+        find(".metric-destination-create-button").click
+        fill_in "username", with: "username"
+        expect(page).to have_flash_error "empty string provided for parameter url"
 
         fill_in "url", with: "https://example.com"
-        fill_in "username", with: "username"
         find(".metric-destination-password").set("password")
         find(".metric-destination-create-button").click
+        expect(page.title).to eq "Ubicloud - pg-with-permission"
+        expect(page).to have_flash_notice "Metric destination is created"
         expect(page).to have_content "https://example.com"
         expect(pg.reload.metric_destinations.count).to eq(1)
       end
