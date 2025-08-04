@@ -102,6 +102,13 @@ class UbiCli
 
       run do |(ref, *argv), opts, command|
         @sdk_method = SDK_METHODS[cmd]
+
+        if command.post_subcommand(ref)
+          # support swapped reference and post command arguments
+          argv.insert(1, ref)
+          ref = argv.shift
+        end
+
         @location, @name, extra = ref.split("/", 3)
 
         if !@name && OBJECT_INFO_REGEXP.match?(@location)

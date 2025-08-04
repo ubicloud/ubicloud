@@ -19,6 +19,10 @@ RSpec.describe Clover, "cli vm ssh" do
     expect(cli_exec(["vm", @ref, "ssh"])).to eq %w[ssh -- ubi@128:1234::2]
   end
 
+  it "supports swapped arguments" do
+    expect(cli_exec(["vm", "ssh", @ref])).to eq %w[ssh -- ubi@128:1234::2]
+  end
+
   it "IPv4 address is used by default if available" do
     add_ipv4_to_vm(@vm, "128.0.0.1")
     expect(cli_exec(["vm", @ref, "ssh"])).to eq %w[ssh -- ubi@128.0.0.1]

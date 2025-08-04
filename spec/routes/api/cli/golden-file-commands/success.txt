@@ -11,6 +11,7 @@ ai api-key ak2c0j48r8kj4nharh6yagf3eb show
 ai api-key ak2c0j48r8kj4nharh6yagf3eb destroy -f
 fw eu-central-h1/default-eu-central-h1-default delete-rule fr7cv7h5bz324maazy93ykn8s4
 fw eu-central-h1/default-eu-central-h1-default detach-subnet psfzm9e26xky5m9ggetw4dpqe2
+fw show eu-central-h1/default-eu-central-h1-default
 fw eu-central-h1/default-eu-central-h1-default show
 fw eu-central-h1/default-eu-central-h1-default show -f firewall-rules -r id,cidr
 fw eu-central-h1/default-eu-central-h1-default show -f firewall-rules -r port-range
