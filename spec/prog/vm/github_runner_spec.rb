@@ -577,6 +577,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       runner.update(ready_at: now - 6 * 60, workflow_job: nil)
       expect(client).to receive(:get).and_return({busy: true})
       expect(vm.sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
+      expect(nx).not_to receive(:register_deadline).with(nil, 7200)
       expect(runner).not_to receive(:incr_destroy)
 
       expect { nx.wait }.to nap(60)
@@ -587,7 +588,8 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(client).to receive(:get).and_return({busy: false})
       expect(vm.sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(runner).to receive(:incr_destroy)
-      expect(Clog).to receive(:emit).with("The runner does not pick a job").and_call_original
+      expect(nx).to receive(:register_deadline).twice
+      expect(Clog).to receive(:emit).with("The runner did not pick a job").and_call_original
 
       expect { nx.wait }.to nap(0)
     end
@@ -597,7 +599,8 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(client).to receive(:get).and_raise(Octokit::NotFound)
       expect(vm.sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(runner).to receive(:incr_destroy)
-      expect(Clog).to receive(:emit).with("The runner does not pick a job").and_call_original
+      expect(nx).to receive(:register_deadline).twice
+      expect(Clog).to receive(:emit).with("The runner did not pick a job").and_call_original
 
       expect { nx.wait }.to nap(0)
     end
