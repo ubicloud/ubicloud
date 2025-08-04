@@ -59,12 +59,12 @@ RSpec.describe Clover, "github" do
     end
 
     it "can not connect GitHub account if project has no valid payment method" do
-      expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project).twice
+      expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
 
       visit "#{project.path}/github/create"
 
-      expect(page.status_code).to eq(200)
+      expect(page.status_code).to eq(400)
       expect(page.title).to eq("Ubicloud - GitHub Runners Integration")
       expect(page).to have_flash_error("Project doesn't have valid billing information")
     end

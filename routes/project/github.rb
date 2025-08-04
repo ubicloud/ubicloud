@@ -19,9 +19,9 @@ class Clover
       end
 
       r.get "create" do
+        handle_validation_failure("github/index")
         unless @project.has_valid_payment_method?
-          flash["error"] = "Project doesn't have valid billing information"
-          r.redirect "#{@project.path}/github"
+          raise CloverError.new(400, nil, "Project doesn't have valid billing information")
         end
         session[:github_installation_project_id] = @project.id
 
