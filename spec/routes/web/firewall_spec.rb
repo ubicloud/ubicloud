@@ -253,7 +253,8 @@ RSpec.describe Clover, "firewall" do
         click_button "Attach"
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
-        expect(page).to have_flash_error("Private subnet not found")
+        expect(page).to have_flash_error("Validation failed for following fields: private_subnet_id")
+        expect(page).to have_content("Private subnet with the given id \"#{ps.ubid}\" and the location \"eu-central-h1\" is not found")
         expect(firewall.private_subnets_dataset.count).to eq(0)
       end
 
@@ -282,12 +283,13 @@ RSpec.describe Clover, "firewall" do
         visit "#{project.path}#{firewall.path}"
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
-        expect(firewall.private_subnets_dataset.count).to eq(1)
         ps.destroy
+        expect(firewall.private_subnets_dataset.count).to eq(0)
         click_button "Detach"
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
-        expect(page).to have_flash_error("Private subnet not found")
+        expect(page).to have_flash_error("Validation failed for following fields: private_subnet_id")
+        expect(page).to have_content("Private subnet with the given id \"#{ps.ubid}\" and the location \"eu-central-h1\" is not found")
         expect(firewall.private_subnets_dataset.count).to eq(0)
       end
     end
