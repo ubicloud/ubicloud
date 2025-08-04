@@ -44,6 +44,9 @@ c = Class.new(Roda) do
         case argv[2]
         when "as-is"
           # nothing
+        when "psql"
+          response["ubi-pgpassword"] = "test-pg-pass"
+          rest << "--" << "new"
         when "prog-switch"
           response["ubi-command-execute"] = "new"
           rest << "--"

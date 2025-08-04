@@ -100,7 +100,7 @@ func processResponse(resp *http.Response, args []string) {
 
 func handleSuccess(resp *http.Response, args []string) {
 	if prog := resp.Header.Get("ubi-command-execute"); prog != "" {
-		executeValidatedCommand(prog, resp.Body)
+		executeValidatedCommand(prog, resp)
 	} else if prompt := resp.Header.Get("ubi-confirm"); prompt != "" {
 		handleConfirmation(prompt, resp.Body, args)
 	} else {
@@ -116,6 +116,10 @@ var allowedCommands = map[string]bool{
 	"psql": true, "pg_dump": true, "pg_dumpall": true,
 }
 
+var pgCommands = map[string]bool{
+	"psql": true, "pg_dump": true, "pg_dumpall": true,
+}
+
 func getExecutablePath(prog string) string {
 	envProg := os.Getenv("UBI_" + strings.ToUpper(prog))
 	if envProg != "" {
@@ -124,7 +128,8 @@ func getExecutablePath(prog string) string {
 	return prog
 }
 
-func executeValidatedCommand(prog string, args io.Reader) {
+func executeValidatedCommand(prog string, resp *http.Response) {
+	args := resp.Body
 	if !slices.Contains(os.Args, prog) {
 		fmt.Fprintf(os.Stderr, "! Invalid server response, not executing program not in original argv\n")
 		os.Exit(1)
@@ -132,6 +137,16 @@ func executeValidatedCommand(prog string, args io.Reader) {
 	if !allowedCommands[prog] {
 		fmt.Fprintf(os.Stderr, "! Invalid server response, unsupported program requested\n")
 		os.Exit(1)
+	}
+	if pgCommands[prog] {
+		pgpassword := resp.Header.Get("ubi-pgpassword")
+		if pgpassword != "" {
+			err := os.Setenv("PGPASSWORD", pgpassword)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "! Unable to set PGPASSWORD environment variable: %v\n", err)
+				os.Exit(1)
+			}
+		}
 	}
 
 	argsBuf := make([]byte, 1024*1024)
