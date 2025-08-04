@@ -8,7 +8,7 @@ class Prog::LearnStorage < Prog::Base
   def make_model_instances
     devices = SystemParser.extract_disk_info_from_df(sshable.cmd(SystemParser.df_command))
     rec = SystemParser.extract_disk_info_from_df(sshable.cmd(SystemParser.df_command("/var/storage"))).first
-    sds = [StorageDevice.new_with_id(
+    sds = [StorageDevice.new(
       vm_host_id: vm_host.id, name: "DEFAULT",
       # reserve 5G the host.
       available_storage_gib: [rec.avail_gib - 5, 0].max,
@@ -18,7 +18,7 @@ class Prog::LearnStorage < Prog::Base
 
     devices.each do |rec|
       next unless (name = rec.optional_name)
-      sds << StorageDevice.new_with_id(
+      sds << StorageDevice.new(
         vm_host_id: vm_host.id, name: name,
         available_storage_gib: rec.avail_gib,
         total_storage_gib: rec.size_gib,
