@@ -15,7 +15,9 @@ unless (token = ENV["UBI_TOKEN"])
 end
 
 url = ENV["UBI_URL"] || "https://api.ubicloud.com/cli"
-allowed_progs = %w[ssh scp sftp psql pg_dump pg_dumpall]
+ssh_progs = %w[ssh scp sftp].freeze.each(&:freeze)
+pg_progs = %w[psql pg_dump pg_dumpall].freeze.each(&:freeze)
+allowed_progs = (ssh_progs + pg_progs).freeze
 
 get_prog = lambda do |prog|
   return unless allowed_progs.include?(prog)
@@ -51,6 +53,10 @@ confirmation = nil
       unless (prog = get_prog[prog_type])
         warn "! Invalid server response, unsupported program requested"
         exit 1
+      end
+
+      if pg_progs.include?(prog_type) && (pgpassword = response["ubi-pgpassword"])
+        ENV["PGPASSWORD"] = pgpassword
       end
 
       argv_set = ARGV.to_set

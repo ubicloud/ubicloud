@@ -5,6 +5,7 @@ require_relative "spec_helper"
 require "puma/cli"
 require "nio"
 require "open3"
+require "rbconfig"
 
 Gem.ruby # force early loading to work in frozen specs
 
@@ -32,7 +33,8 @@ RSpec.describe "bin/ubi" do
       "UBI_URL" => "http://localhost:#{port}/cli",
       "UBI_TOKEN" => "a",
       "UBI_SSH" => "/bin/echo",
-      "UBI_PG_DUMPALL" => "/bin/echo"
+      "UBI_PG_DUMPALL" => "/bin/echo",
+      "UBI_PSQL" => RbConfig.ruby
     }.freeze
     @debug_env = @env.merge("UBI_DEBUG" => "1")
   end
@@ -141,6 +143,13 @@ RSpec.describe "bin/ubi" do
   it "executes supported program with new argument after --" do
     o, e, s = Open3.capture3(@env, @prog, "exec", "ssh", "new-after", "foo")
     expect(o).to eq "foo -- new\n"
+    expect(e).to eq ""
+    expect(s.exitstatus).to eq 0
+  end
+
+  it "includes PGPASSWORD in environment for pg-related commands if ubi-pgpassword response header is present" do
+    o, e, s = Open3.capture3(@env, @prog, "exec", "psql", "psql", "-e", "ARGV.unshift(ENV['PGPASSWORD']); puts ARGV.join(' ')")
+    expect(o).to eq "test-pg-pass new\n"
     expect(e).to eq ""
     expect(s.exitstatus).to eq 0
   end
