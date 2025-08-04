@@ -646,23 +646,24 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can create firewall rule" do
-        pg
         visit "#{project.path}#{pg.path}/networking"
+        find(".firewall-rule-create-button").click
+        expect(page).to have_flash_error "empty string provided for parameter cidr"
 
         find('input[name="cidr"][form="form-pg-fwr-create"]').set("1.1.1.2")
         find(".firewall-rule-create-button").click
-        expect(page).to have_content "Firewall rule is created"
+        expect(page).to have_flash_notice "Firewall rule is created"
         expect(page).to have_content "1.1.1.2/32"
         expect(page).to have_content "5432"
 
         find('input[name="cidr"][form="form-pg-fwr-create"]').set("12.12.12.0/26")
         find(".firewall-rule-create-button").click
-        expect(page).to have_content "Firewall rule is created"
+        expect(page).to have_flash_notice "Firewall rule is created"
 
         find('input[name="cidr"][form="form-pg-fwr-create"]').set("fd00::/64")
         find('input[name="description"][form="form-pg-fwr-create"]').set("test description - new firewall rule")
         find(".firewall-rule-create-button").click
-        expect(page).to have_content "Firewall rule is created"
+        expect(page).to have_flash_notice "Firewall rule is created"
         expect(page.status_code).to eq(200)
         expect(page).to have_content "fd00::/64"
         expect(page).to have_content "test description - new firewall rule"
