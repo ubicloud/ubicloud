@@ -196,7 +196,11 @@
             <% @invoices.each do |inv| %>
               <tr id="invoice-<%= inv[:ubid]%>">
                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <a href="<%= @project_data[:path] + "/billing" + inv[:path] %>" class="text-orange-600 hover:text-orange-700">
+                  <a
+                    href="<%= @project_data[:path] + "/billing" + inv[:path] %>"
+                    target="_blank"
+                    class="text-orange-600 hover:text-orange-700"
+                  >
                     <%= inv[:name] %>
                   </a>
                   <span class="text-xs text-gray-400 italic">
