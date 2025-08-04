@@ -24,6 +24,10 @@ require_relative "../spec_helper"
       expect(cli_exec(["pg", @ref, cmd])).to eq %W[#{cmd} -- postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require]
     end
 
+    it "puts password in ubi-pgpassword if client is 1.1.0+" do
+      expect(cli_exec(["pg", @ref, cmd], env: {"HTTP_X_UBI_VERSION" => "1.1.0"}, command_pgpassword: @pg.superuser_password)).to eq %W[#{cmd} -- postgres://postgres@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require]
+    end
+
     it "supports #{cmd} options" do
       expect(cli_exec(["pg", @ref, cmd, "-a"])).to eq %W[#{cmd} -a -- postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require]
     end
