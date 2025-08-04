@@ -289,8 +289,8 @@ class Clover
               authorize(tag_perm_map[tag_type], @project.id)
 
               if @tag_type == "subject" && @tag.name == "Admin"
-                flash["error"] = "Cannot modify Admin subject tag"
-                r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}"
+                handle_validation_failure("project/tag-list")
+                raise CloverError.new(400, nil, "Cannot modify Admin subject tag")
               end
 
               r.post do
