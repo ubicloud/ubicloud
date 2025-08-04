@@ -139,6 +139,7 @@ class Clover
 
           r.post do
             authorize("Postgres:edit", pg.id)
+            handle_validation_failure("postgres/show") { @page = "networking" }
 
             parsed_cidr = Validation.validate_cidr(typecast_params.nonempty_str!("cidr"))
 
