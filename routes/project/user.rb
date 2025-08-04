@@ -381,8 +381,7 @@ class Clover
         next unless (user = @project.accounts_dataset[id:])
 
         unless @project.accounts_dataset.count > 1
-          response.status = 400
-          next {error: {message: "You can't remove the last user from '#{@project.name}' project. Delete project instead."}}
+          raise CloverError.new(400, nil, "You can't remove the last user from '#{@project.name}' project. Delete project instead.")
         end
 
         @project.disassociate_subject(user.id)

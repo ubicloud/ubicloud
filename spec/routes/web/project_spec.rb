@@ -734,9 +734,9 @@ RSpec.describe Clover, "project" do
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
         btn = find "#user-#{user.ubid} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}, {"HTTP_ACCEPT" => "application/json"}
         expect(page.status_code).to eq(400)
-        expect(page.body).to eq({error: {message: "You can't remove the last user from '#{project.name}' project. Delete project instead."}}.to_json)
+        expect(JSON.parse(page.body)).to eq({"error" => {"message" => "You can't remove the last user from '#{project.name}' project. Delete project instead.", "code" => 400, "type" => nil, "details" => nil}})
 
         visit "#{project.path}/user"
         expect(page).to have_content user.email
