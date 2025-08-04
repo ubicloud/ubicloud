@@ -29,7 +29,7 @@ class Prog::Vm::HostNexus < Prog::Base
         vmh.set_server_name unless Config.development?
       else
         Address.create(cidr: sshable_hostname, routed_to_host_id: vmh.id) { it.id = vmh.id }
-        AssignedHostAddress.create_with_id(ip: sshable_hostname, address_id: vmh.id, host_id: vmh.id)
+        AssignedHostAddress.create(ip: sshable_hostname, address_id: vmh.id, host_id: vmh.id)
       end
 
       Strand.create(

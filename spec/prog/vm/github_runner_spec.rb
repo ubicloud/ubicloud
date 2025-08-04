@@ -117,7 +117,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "creates new billing record when no daily record" do
       runner.update(ready_at: now - 5 * 60)
-      expect(BillingRecord).to receive(:create_with_id).and_call_original
+      expect(BillingRecord).to receive(:create).and_call_original
       nx.update_billing_record
 
       br = BillingRecord[resource_id: project.id]
@@ -127,7 +127,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "uses separate billing rate for arm64 runners" do
       runner.update(label: "ubicloud-arm", ready_at: now - 5 * 60)
-      expect(BillingRecord).to receive(:create_with_id).and_call_original
+      expect(BillingRecord).to receive(:create).and_call_original
       nx.update_billing_record
 
       br = BillingRecord[resource_id: project.id]
@@ -141,7 +141,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       vm.update(family: "standard-gpu", vcpus: 6)
       runner.update(label: "ubicloud-gpu", ready_at: now - 5 * 60)
 
-      expect(BillingRecord).to receive(:create_with_id).and_call_original
+      expect(BillingRecord).to receive(:create).and_call_original
       nx.update_billing_record
 
       br = BillingRecord[resource_id: project.id]
@@ -155,7 +155,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       vm.update(family: "premium")
       runner.update(label: "ubicloud-standard-2", ready_at: now - 5 * 60)
 
-      expect(BillingRecord).to receive(:create_with_id).and_call_original
+      expect(BillingRecord).to receive(:create).and_call_original
       nx.update_billing_record
 
       br = BillingRecord[resource_id: project.id]
@@ -170,7 +170,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       runner.update(label: "ubicloud-standard-2", ready_at: now - 5 * 60, created_at: now - 100)
 
       expect(installation).to receive(:free_runner_upgrade_expires_at).and_return(now - 50)
-      expect(BillingRecord).to receive(:create_with_id).and_call_original
+      expect(BillingRecord).to receive(:create).and_call_original
       nx.update_billing_record
 
       br = BillingRecord[resource_id: project.id]
@@ -183,7 +183,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "updates the amount of existing billing record" do
       runner.update(ready_at: now - 5 * 60)
 
-      expect(BillingRecord).to receive(:create_with_id).and_call_original
+      expect(BillingRecord).to receive(:create).and_call_original
       # Create a record
       nx.update_billing_record
 
@@ -196,13 +196,13 @@ RSpec.describe Prog::Vm::GithubRunner do
       tomorrow = today + 24 * 60 * 60
       expect(Time).to receive(:now).and_return(today).exactly(6)
       expect(runner).to receive(:ready_at).and_return(today - 5 * 60).twice
-      expect(BillingRecord).to receive(:create_with_id).and_call_original
+      expect(BillingRecord).to receive(:create).and_call_original
       # Create today record
       nx.update_billing_record
 
       expect(Time).to receive(:now).and_return(tomorrow).at_least(:once)
       expect(runner).to receive(:ready_at).and_return(tomorrow - 5 * 60).at_least(:once)
-      expect(BillingRecord).to receive(:create_with_id).and_call_original
+      expect(BillingRecord).to receive(:create).and_call_original
       # Create tomorrow record
       expect { nx.update_billing_record }
         .to change { BillingRecord.where(resource_id: project.id).count }.from(1).to(2)
@@ -212,8 +212,8 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "tries 3 times and creates single billing record" do
       runner.update(ready_at: now - 5 * 60)
-      expect(BillingRecord).to receive(:create_with_id).and_raise(Sequel::Postgres::ExclusionConstraintViolation).exactly(3)
-      expect(BillingRecord).to receive(:create_with_id).and_call_original
+      expect(BillingRecord).to receive(:create).and_raise(Sequel::Postgres::ExclusionConstraintViolation).exactly(3)
+      expect(BillingRecord).to receive(:create).and_call_original
 
       expect {
         3.times { nx.update_billing_record }
@@ -222,7 +222,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "tries 4 times and fails" do
       runner.update(ready_at: now - 5 * 60)
-      expect(BillingRecord).to receive(:create_with_id).and_raise(Sequel::Postgres::ExclusionConstraintViolation).at_least(:once)
+      expect(BillingRecord).to receive(:create).and_raise(Sequel::Postgres::ExclusionConstraintViolation).at_least(:once)
 
       expect {
         4.times { nx.update_billing_record }

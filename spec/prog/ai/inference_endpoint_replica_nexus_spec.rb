@@ -58,9 +58,9 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   describe ".assemble" do
     it "creates replica and vm with sshable" do
-      user_project = Project.create_with_id(name: "default")
-      ie_project = Project.create_with_id(name: "default")
-      Firewall.create_with_id(name: "inference-endpoint-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: ie_project.id)
+      user_project = Project.create(name: "default")
+      ie_project = Project.create(name: "default")
+      Firewall.create(name: "inference-endpoint-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: ie_project.id)
 
       expect(Config).to receive(:inference_endpoint_service_project_id).and_return(ie_project.id).at_least(:once)
       st_ie = Prog::Ai::InferenceEndpointNexus.assemble_with_model(
@@ -419,7 +419,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
   end
 
   describe "#ping_gateway" do
-    let(:projects) { [Project.create_with_id(name: "p1"), Project.create_with_id(name: "p2")] }
+    let(:projects) { [Project.create(name: "p1"), Project.create(name: "p2")] }
 
     before do
       ApiKey.create_inference_api_key(projects.first)
@@ -470,7 +470,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
   end
 
   describe "#update_billing_records" do
-    let(:p1) { Project.create_with_id(name: "default") }
+    let(:p1) { Project.create(name: "default") }
 
     it "updates billing records" do
       expect(BillingRecord.count).to eq(0)
@@ -534,9 +534,9 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
     end
 
     it "failure in updating single record doesn't impact others" do
-      p2 = Project.create_with_id(name: "default")
-      expect(BillingRecord).to receive(:create_with_id).once.ordered.with(hash_including(project_id: p1.id)).and_raise(Sequel::DatabaseConnectionError)
-      expect(BillingRecord).to receive(:create_with_id).once.ordered.with(hash_including(project_id: p2.id)).and_call_original
+      p2 = Project.create(name: "default")
+      expect(BillingRecord).to receive(:create).once.ordered.with(hash_including(project_id: p1.id)).and_raise(Sequel::DatabaseConnectionError)
+      expect(BillingRecord).to receive(:create).once.ordered.with(hash_including(project_id: p2.id)).and_call_original
       expect(BillingRecord.count).to eq(0)
       nx.update_billing_records(
         [{"ubid" => p1.ubid, "request_count" => 1, "prompt_token_count" => 2, "completion_token_count" => 3}, {"ubid" => p2.ubid, "request_count" => 1, "prompt_token_count" => 2, "completion_token_count" => 3}],

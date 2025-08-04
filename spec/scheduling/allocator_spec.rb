@@ -862,7 +862,7 @@ RSpec.describe Al do
       assigned_address = AssignedVmAddress.new(ip: NetAddr::IPv4Net.parse("10.0.0.1"))
       expect(vmh).to receive(:ip4_random_vm_network).and_return(["0.0.0.0", address])
       expect(vm).to receive(:ip4_enabled).and_return(true).twice
-      expect(AssignedVmAddress).to receive(:create_with_id).and_return(assigned_address)
+      expect(AssignedVmAddress).to receive(:create).and_return(assigned_address)
       expect(vm).to receive(:assigned_vm_address).and_return(assigned_address)
       expect(vm).to receive(:sshable).and_return(instance_double(Sshable)).at_least(:once)
       expect(vm.sshable).to receive(:update).with(host: assigned_address.ip.network)

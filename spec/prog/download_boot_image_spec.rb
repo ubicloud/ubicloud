@@ -181,8 +181,8 @@ RSpec.describe Prog::DownloadBootImage do
 
   describe "#update_available_storage_space" do
     it "updates available storage space" do
-      bi = BootImage.create_with_id(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 0)
-      sd = StorageDevice.create_with_id(
+      bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 0)
+      sd = StorageDevice.create(
         vm_host_id: vm_host.id,
         name: "DEFAULT",
         total_storage_gib: 50,
@@ -196,10 +196,10 @@ RSpec.describe Prog::DownloadBootImage do
     end
 
     it "checks the correct path if version is nil" do
-      BootImage.create_with_id(vm_host_id: vm_host.id, name: "my-image", version: nil, size_gib: 0)
+      BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: nil, size_gib: 0)
       dbi = described_class.new(Strand.new(stack: [{"image_name" => "my-image", "custom_url" => "https://example.com/my-image.raw", "version" => nil}]))
       allow(dbi).to receive_messages(sshable: sshable, vm_host: vm_host)
-      sd = StorageDevice.create_with_id(
+      sd = StorageDevice.create(
         vm_host_id: vm_host.id,
         name: "DEFAULT",
         total_storage_gib: 50,

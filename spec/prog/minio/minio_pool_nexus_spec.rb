@@ -6,7 +6,7 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
   subject(:nx) { described_class.new(described_class.assemble(minio_cluster.id, 0, 1, 1, 100, "standard-2")) }
 
   let(:minio_cluster) {
-    MinioCluster.create_with_id(
+    MinioCluster.create(
       location_id: Location::HETZNER_FSN1_ID,
       name: "minio-cluster-name",
       admin_user: "minio-admin",
@@ -19,7 +19,7 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
     Prog::Vnet::SubnetNexus.assemble(minio_project.id, name: "minio-cluster-name", location_id: Location::HETZNER_FSN1_ID)
   }
 
-  let(:minio_project) { Project.create_with_id(name: "default") }
+  let(:minio_project) { Project.create(name: "default") }
 
   before do
     allow(minio_cluster).to receive(:project).and_return(minio_project)

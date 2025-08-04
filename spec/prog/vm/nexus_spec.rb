@@ -57,7 +57,7 @@ RSpec.describe Prog::Vm::Nexus do
     }
     vm
   }
-  let(:prj) { Project.create_with_id(name: "default") }
+  let(:prj) { Project.create(name: "default") }
 
   describe ".assemble" do
     let(:ps) {
@@ -200,7 +200,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "hops to start_aws if location is aws" do
-      loc = Location.create_with_id(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
+      loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
       st = described_class.assemble("some_ssh key", prj.id, location_id: loc.id)
       expect(st.label).to eq("start_aws")
     end
@@ -757,7 +757,7 @@ RSpec.describe Prog::Vm::Nexus do
       vm_addr = instance_double(AssignedVmAddress, id: "46ca6ded-b056-4723-bd91-612959f52f6f", ip: NetAddr::IPv4Net.parse("10.0.0.1"))
       expect(vm).to receive(:assigned_vm_address).and_return(vm_addr).at_least(:once)
       expect(vm).to receive(:ip4_enabled).and_return(true)
-      expect(BillingRecord).to receive(:create_with_id).exactly(4).times
+      expect(BillingRecord).to receive(:create).exactly(4).times
       expect(vm).to receive(:project).and_return(prj).at_least(:once)
       expect { nx.create_billing_record }.to hop("wait")
     end
@@ -765,14 +765,14 @@ RSpec.describe Prog::Vm::Nexus do
     it "creates billing records when gpu is present" do
       vm.location = Location[name: "latitude-ai"]
       expect(vm).to receive(:pci_devices).and_return([PciDevice.new(slot: "01:00.0", iommu_group: 23, device_class: "0302", vendor: "10de", device: "20b5")]).at_least(:once)
-      expect(BillingRecord).to receive(:create_with_id).exactly(4).times
+      expect(BillingRecord).to receive(:create).exactly(4).times
       expect(vm).to receive(:project).and_return(prj).at_least(:once)
       expect { nx.create_billing_record }.to hop("wait")
     end
 
     it "creates billing records when ip4 is not enabled" do
       expect(vm).to receive(:ip4_enabled).and_return(false)
-      expect(BillingRecord).to receive(:create_with_id).exactly(3).times
+      expect(BillingRecord).to receive(:create).exactly(3).times
       expect(vm).to receive(:project).and_return(prj).at_least(:once)
       expect { nx.create_billing_record }.to hop("wait")
     end
@@ -780,25 +780,25 @@ RSpec.describe Prog::Vm::Nexus do
     it "not create billing records when the project is not billable" do
       expect(vm).to receive(:project).and_return(prj).at_least(:once)
       expect(prj).to receive(:billable).and_return(false)
-      expect(BillingRecord).not_to receive(:create_with_id)
+      expect(BillingRecord).not_to receive(:create)
       expect { nx.create_billing_record }.to hop("wait")
     end
 
     it "doesn't create billing records for storage volumes, ip4 and pci devices if the location provider is aws" do
-      loc = Location.create_with_id(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
+      loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
       vm.location = loc
       expect(vm).to receive(:project).and_return(prj).at_least(:once)
       expect(vm).not_to receive(:ip4_enabled)
       expect(vm).not_to receive(:pci_devices)
       expect(vm).not_to receive(:storage_volumes)
-      expect(BillingRecord).to receive(:create_with_id).once
+      expect(BillingRecord).to receive(:create).once
       expect { nx.create_billing_record }.to hop("wait")
     end
 
     it "creates a billing record when host is nil, too" do
       vm.vm_host = nil
       vm.location.provider = "aws"
-      expect(BillingRecord).to receive(:create_with_id).once
+      expect(BillingRecord).to receive(:create).once
       expect(vm).to receive(:project).and_return(prj).at_least(:once)
 
       expect { nx.create_billing_record }.to hop("wait")
@@ -809,7 +809,7 @@ RSpec.describe Prog::Vm::Nexus do
       allow(nx).to receive(:host).and_return(host)
       vm.vm_host = host
       vm.location.provider = "aws"
-      expect(BillingRecord).to receive(:create_with_id).once
+      expect(BillingRecord).to receive(:create).once
       expect(vm).to receive(:project).and_return(prj).at_least(:once)
 
       expect { nx.create_billing_record }.to hop("wait")

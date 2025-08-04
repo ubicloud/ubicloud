@@ -6,7 +6,7 @@ RSpec.describe Prog::Vnet::CertServer do
   }
 
   let(:st) {
-    Strand.create_with_id(prog: "Vnet::CertServer", stack: [{"subject_id" => lb.id, "vm_id" => vm.id}], label: "update_load_balancer")
+    Strand.create(prog: "Vnet::CertServer", stack: [{"subject_id" => lb.id, "vm_id" => vm.id}], label: "update_load_balancer")
   }
 
   let(:cert) {
@@ -14,10 +14,10 @@ RSpec.describe Prog::Vnet::CertServer do
   }
 
   let(:lb) {
-    prj = Project.create_with_id(name: "test-prj")
+    prj = Project.create(name: "test-prj")
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps").subject
     lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080).subject
-    dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: prj.id)
+    dz = DnsZone.create(name: "test-dns-zone", project_id: prj.id)
     cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
     cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
     lb.add_cert(cert)

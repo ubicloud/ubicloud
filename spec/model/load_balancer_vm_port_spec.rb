@@ -4,7 +4,7 @@ require_relative "spec_helper"
 
 RSpec.describe LoadBalancerVmPort do
   subject(:lb_vm_port) {
-    dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: prj.id)
+    dz = DnsZone.create(name: "test-dns-zone", project_id: prj.id)
     cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
     lb = Prog::Vnet::LoadBalancerNexus.assemble_with_multiple_ports(private_subnet.id, name: "test-lb", ports: [[80, 8080]]).subject
     lb.add_cert(cert)
@@ -22,7 +22,7 @@ RSpec.describe LoadBalancerVmPort do
   }
 
   let(:prj) {
-    Project.create_with_id(name: "test-prj")
+    Project.create(name: "test-prj")
   }
 
   describe "#health_probe" do

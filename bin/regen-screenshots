@@ -180,7 +180,7 @@ class RegenScreenshots
     end
     PostgresResource.define_method(:display_state) { "running" }
     # Add default firewall rule to the postgres instance
-    PostgresFirewallRule.create_with_id(postgres_resource_id: pg_resource.id, cidr: "0.0.0.0/0")
+    PostgresFirewallRule.create(postgres_resource_id: pg_resource.id, cidr: "0.0.0.0/0")
 
     PostgresResource.define_method(:connection_string) { "sample-connection-string" }
     PostgresResource.define_method(:ca_certificates) { "certs" }

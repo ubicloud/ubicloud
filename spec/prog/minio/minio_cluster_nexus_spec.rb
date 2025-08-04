@@ -12,7 +12,7 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
     )
   }
 
-  let(:minio_project) { Project.create_with_id(name: "default") }
+  let(:minio_project) { Project.create(name: "default") }
 
   describe ".assemble" do
     before do

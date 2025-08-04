@@ -44,7 +44,7 @@ RSpec.describe Clover, "postgres" do
 
   describe "authenticated" do
     before do
-      postgres_project = Project.create_with_id(name: "default")
+      postgres_project = Project.create(name: "default")
       allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
       login(user.email)
 
@@ -584,8 +584,8 @@ RSpec.describe Clover, "postgres" do
 
       it "doesn't show reset button when does not have permissions" do
         # Give permission to view, so we can see the detail page
-        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
-        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:delete"])
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:delete"])
 
         visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/settings"
         expect(page.title).to eq "Ubicloud - pg-without-permission"
@@ -627,7 +627,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can not delete firewall rules when does not have permissions" do
-        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
 
         visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/networking"
         expect(page.title).to eq "Ubicloud - pg-without-permission"
@@ -636,7 +636,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "does not show create firewall rule when does not have permissions" do
-        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
 
         visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/networking"
         expect(page.title).to eq "Ubicloud - pg-without-permission"
@@ -736,7 +736,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can delete metric destinations" do
-        md = PostgresMetricDestination.create_with_id(
+        md = PostgresMetricDestination.create(
           postgres_resource_id: pg.id,
           url: "https://example.com",
           username: "username",
@@ -751,7 +751,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "cannot delete metric destination if it is not exist" do
-        md = PostgresMetricDestination.create_with_id(
+        md = PostgresMetricDestination.create(
           postgres_resource_id: pg.id,
           url: "https://example.com",
           username: "username",
@@ -802,8 +802,8 @@ RSpec.describe Clover, "postgres" do
 
       it "can not delete PostgreSQL database when does not have permissions" do
         # Give permission to view, so we can see the detail page
-        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
-        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:edit"])
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:edit"])
 
         visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/settings"
         expect(page.title).to eq "Ubicloud - pg-without-permission"
@@ -824,7 +824,7 @@ RSpec.describe Clover, "postgres" do
 
       it "does not show update button when user does not have permissions" do
         pg_wo_permission.update(user_config: {"max_connections" => "120"})
-        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
 
         visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/config"
         expect(page.title).to eq "Ubicloud - pg-without-permission"

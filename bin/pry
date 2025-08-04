@@ -26,7 +26,7 @@ end
 
 def dev_project
   return unless Config.development?
-  ac = Account[email: "dev@ubicloud.com"] || Account.create_with_id(email: "dev@ubicloud.com")
+  ac = Account[email: "dev@ubicloud.com"] || Account.create(email: "dev@ubicloud.com")
   ac.projects.first || ac.create_project_with_default_policy("default")
 end
 

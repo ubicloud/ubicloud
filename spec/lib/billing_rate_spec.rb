@@ -62,7 +62,7 @@ RSpec.describe BillingRate do
   end
 
   it "can find rate for aws locations" do
-    project = Project.create_with_id(name: "test")
+    project = Project.create(name: "test")
 
     loc = Location.create(
       name: "us-west-2",

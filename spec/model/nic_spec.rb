@@ -11,10 +11,10 @@ RSpec.describe Nic do
   end
 
   describe "ubid_to_tap_name" do
-    let(:subnet) { PrivateSubnet.create_with_id(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: Project.create(name: "test").id) }
+    let(:subnet) { PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: Project.create(name: "test").id) }
 
     it "returns tap name from ubid" do
-      nic = described_class.create_with_id(
+      nic = described_class.create(
         private_ipv6: "fd10:9b0b:6b4b:8fbb::/128",
         private_ipv4: "10.0.0.12/32",
         mac: "00:11:22:33:44:55",
@@ -29,7 +29,7 @@ RSpec.describe Nic do
 
   describe ".unlock" do
     it "destroys all semaphores with name lock" do
-      prj = Project.create_with_id(name: "prj")
+      prj = Project.create(name: "prj")
       ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps").subject
       nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "nic").subject
       nic.incr_lock

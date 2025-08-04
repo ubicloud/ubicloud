@@ -17,7 +17,7 @@ RSpec.describe Prog::Test::ConnectedSubnets do
   }
 
   let(:project) {
-    Project.create_with_id(name: "project1")
+    Project.create(name: "project1")
   }
 
   let(:sshable) {

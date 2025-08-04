@@ -4,7 +4,7 @@ require_relative "../spec_helper"
 
 RSpec.describe VictoriaMetricsResource do
   subject(:vmr) {
-    described_class.create_with_id(
+    described_class.create(
       name: "victoria-metrics-name",
       admin_user: "victoria-admin",
       admin_password: "dummy-password",
@@ -17,8 +17,8 @@ RSpec.describe VictoriaMetricsResource do
     )
   }
 
-  let(:project) { Project.create_with_id(name: "default") }
-  let(:victoria_metrics_project) { Project.create_with_id(name: "victoria-metrics") }
+  let(:project) { Project.create(name: "default") }
+  let(:victoria_metrics_project) { Project.create(name: "victoria-metrics") }
   let(:location) {
     Location.create(
       name: "us-west-2",

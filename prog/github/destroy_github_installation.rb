@@ -6,7 +6,7 @@ class Prog::Github::DestroyGithubInstallation < Prog::Base
   subject_is :github_installation
 
   def self.assemble(installation)
-    Strand.create_with_id(
+    Strand.create(
       prog: "Github::DestroyGithubInstallation",
       label: "start",
       stack: [{"subject_id" => installation.id}]

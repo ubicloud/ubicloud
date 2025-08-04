@@ -3,8 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe ObjectMetatag do
-  let(:project) { Project.create_with_id(name: "test") }
-  let(:tag) { ObjectTag.create_with_id(project_id: project.id, name: "T") }
+  let(:project) { Project.create(name: "test") }
+  let(:tag) { ObjectTag.create(project_id: project.id, name: "T") }
   let(:metatag) { tag.metatag }
 
   it "can be created via ObjectTag#metatag" do
@@ -30,7 +30,7 @@ RSpec.describe ObjectMetatag do
   end
 
   it "works correctly with UBID.resolve_map" do
-    ot = ObjectTag.create_with_id(project_id: project.id, name: "S")
+    ot = ObjectTag.create(project_id: project.id, name: "S")
     map = {metatag.id => nil, ot.metatag_uuid => nil}
     ot.destroy
     UBID.resolve_map(map)
@@ -40,35 +40,35 @@ RSpec.describe ObjectMetatag do
   end
 
   it "works with Authorization.has_permission?" do
-    account = Account.create_with_id(email: "test@example.com", status_id: 2)
+    account = Account.create(email: "test@example.com", status_id: 2)
     project = account.create_project_with_default_policy("Default", default_policy: false)
-    tag = ObjectTag.create_with_id(project_id: project.id, name: "T")
-    ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: account.id, object_id: tag.id)
+    tag = ObjectTag.create(project_id: project.id, name: "T")
+    ace = AccessControlEntry.create(project_id: project.id, subject_id: account.id, object_id: tag.id)
     expect(Authorization.has_permission?(project.id, account.id, "ObjectTag:view", tag.metatag_uuid)).to be false
     ace.update(object_id: tag.metatag_uuid)
     expect(Authorization.has_permission?(project.id, account.id, "ObjectTag:view", tag.metatag_uuid)).to be true
 
-    ot = ObjectTag.create_with_id(project_id: project.id, name: "S")
+    ot = ObjectTag.create(project_id: project.id, name: "S")
     ot.destroy
     expect(Authorization.has_permission?(project.id, account.id, "ObjectTag:view", ot.metatag_uuid)).to be false
   end
 
   it "supports only valid metatag when creating AccessControlEntry" do
-    account = Account.create_with_id(email: "test@example.com", status_id: 2)
+    account = Account.create(email: "test@example.com", status_id: 2)
     project = account.create_project_with_default_policy("Default", default_policy: false)
-    ot = ObjectTag.create_with_id(project_id: project.id, name: "S")
-    AccessControlEntry.create_with_id(project_id: project.id, subject_id: account.id, object_id: ot.metatag_uuid)
+    ot = ObjectTag.create(project_id: project.id, name: "S")
+    AccessControlEntry.create(project_id: project.id, subject_id: account.id, object_id: ot.metatag_uuid)
     ot.destroy
     expect {
-      AccessControlEntry.create_with_id(project_id: project.id, subject_id: account.id, object_id: ot.metatag_uuid)
+      AccessControlEntry.create(project_id: project.id, subject_id: account.id, object_id: ot.metatag_uuid)
     }.to raise_error Sequel::ValidationFailed
   end
 
   it "Authorization.dataset_authorize for ObjectTag only grants access for matching metatag" do
-    account = Account.create_with_id(email: "test@example.com", status_id: 2)
+    account = Account.create(email: "test@example.com", status_id: 2)
     project = account.create_project_with_default_policy("Default", default_policy: false)
-    tag = ObjectTag.create_with_id(project_id: project.id, name: "S")
-    ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: account.id, object_id: tag.id)
+    tag = ObjectTag.create(project_id: project.id, name: "S")
+    ace = AccessControlEntry.create(project_id: project.id, subject_id: account.id, object_id: tag.id)
     expect(Authorization.dataset_authorize(ObjectTag.dataset, project.id, account.id, "ObjectTag:view").all).to be_empty
     ace.update(object_id: tag.metatag_uuid)
     expect(Authorization.dataset_authorize(ObjectTag.dataset, project.id, account.id, "ObjectTag:view").all).to eq [tag]
@@ -87,11 +87,11 @@ RSpec.describe ObjectMetatag do
   end
 
   it "has references destroyed when related tag is destroyed" do
-    account = Account.create_with_id(email: "test@example.com", status_id: 2)
+    account = Account.create(email: "test@example.com", status_id: 2)
     project = account.create_project_with_default_policy("Default", default_policy: false)
-    tag = ObjectTag.create_with_id(project_id: project.id, name: "T")
-    ot = ObjectTag.create_with_id(project_id: project.id, name: "S")
-    AccessControlEntry.create_with_id(project_id: project.id, subject_id: account.id, object_id: tag.metatag_uuid)
+    tag = ObjectTag.create(project_id: project.id, name: "T")
+    ot = ObjectTag.create(project_id: project.id, name: "S")
+    AccessControlEntry.create(project_id: project.id, subject_id: account.id, object_id: tag.metatag_uuid)
     ot.add_object(tag.metatag_uuid)
     tag.destroy
     expect(DB[:applied_object_tag].all).to be_empty

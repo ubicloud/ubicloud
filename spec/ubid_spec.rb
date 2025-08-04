@@ -227,7 +227,7 @@ RSpec.describe UBID do
   end
 
   it "generates ids with proper prefix" do
-    sshable = Sshable.create_with_id
+    sshable = Sshable.create
     expect(sshable.ubid).to start_with UBID::TYPE_SSHABLE
 
     host = create_vm_host
@@ -238,36 +238,36 @@ RSpec.describe UBID do
 
     dev = StorageDevice.create(name: "x", available_storage_gib: 1, total_storage_gib: 1, vm_host_id: host.id) { it.id = host.id }
 
-    sv = VmStorageVolume.create_with_id(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false, spdk_installation_id: si.id, storage_device_id: dev.id)
+    sv = VmStorageVolume.create(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false, spdk_installation_id: si.id, storage_device_id: dev.id)
     expect(sv.ubid).to start_with UBID::TYPE_VM_STORAGE_VOLUME
 
-    kek = StorageKeyEncryptionKey.create_with_id(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")
+    kek = StorageKeyEncryptionKey.create(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")
     expect(kek.ubid).to start_with UBID::TYPE_STORAGE_KEY_ENCRYPTION_KEY
 
-    account = Account.create_with_id(email: "x@y.net")
+    account = Account.create(email: "x@y.net")
     expect(account.ubid).to start_with UBID::TYPE_ACCOUNT
 
     prj = account.create_project_with_default_policy("x")
     expect(prj.ubid).to start_with UBID::TYPE_PROJECT
 
-    st = SubjectTag.create_with_id(project_id: prj.id, name: "T")
+    st = SubjectTag.create(project_id: prj.id, name: "T")
     expect(st.ubid).to start_with UBID::TYPE_SUBJECT_TAG
 
-    at = ActionTag.create_with_id(project_id: prj.id, name: "T")
+    at = ActionTag.create(project_id: prj.id, name: "T")
     expect(at.ubid).to start_with UBID::TYPE_ACTION_TAG
 
-    ot = ObjectTag.create_with_id(project_id: prj.id, name: "T")
+    ot = ObjectTag.create(project_id: prj.id, name: "T")
     expect(ot.ubid).to start_with UBID::TYPE_OBJECT_TAG
 
-    ace = AccessControlEntry.create_with_id(project_id: prj.id, subject_id: st.id)
+    ace = AccessControlEntry.create(project_id: prj.id, subject_id: st.id)
     expect(ace.ubid).to start_with UBID::TYPE_ACCESS_CONTROL_ENTRY
 
     expect(ActionType.first.ubid).to start_with UBID::TYPE_ACTION_TYPE
 
-    subnet = PrivateSubnet.create_with_id(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: prj.id)
+    subnet = PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: prj.id)
     expect(subnet.ubid).to start_with UBID::TYPE_PRIVATE_SUBNET
 
-    nic = Nic.create_with_id(
+    nic = Nic.create(
       private_ipv6: "fd10:9b0b:6b4b:8fbb::/128",
       private_ipv4: "10.0.0.12/32",
       mac: "00:11:22:33:44:55",
@@ -276,25 +276,25 @@ RSpec.describe UBID do
       name: "def-nic"
     )
     expect(nic.ubid).to start_with UBID::TYPE_NIC
-    tun = IpsecTunnel.create_with_id(src_nic_id: nic.id, dst_nic_id: nic.id)
+    tun = IpsecTunnel.create(src_nic_id: nic.id, dst_nic_id: nic.id)
     expect(tun.ubid).to start_with UBID::TYPE_IPSEC_TUNNEL
 
-    adr = Address.create_with_id(cidr: "192.168.1.0/24", routed_to_host_id: host.id)
+    adr = Address.create(cidr: "192.168.1.0/24", routed_to_host_id: host.id)
     expect(adr.ubid).to start_with UBID::TYPE_ADDRESS
 
-    vm_adr = AssignedVmAddress.create_with_id(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
+    vm_adr = AssignedVmAddress.create(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
     expect(vm_adr.ubid).to start_with UBID::TYPE_ASSIGNED_VM_ADDRESS
 
-    host_adr = AssignedHostAddress.create_with_id(ip: "192.168.1.1", address_id: adr.id, host_id: host.id)
+    host_adr = AssignedHostAddress.create(ip: "192.168.1.1", address_id: adr.id, host_id: host.id)
     expect(host_adr.ubid).to start_with UBID::TYPE_ASSIGNED_HOST_ADDRESS
 
-    strand = Strand.create_with_id(prog: "x", label: "y")
+    strand = Strand.create(prog: "x", label: "y")
     expect(strand.ubid).to start_with UBID::TYPE_STRAND
 
-    semaphore = Semaphore.create_with_id(strand_id: strand.id, name: "z")
+    semaphore = Semaphore.create(strand_id: strand.id, name: "z")
     expect(semaphore.ubid).to start_with UBID::TYPE_SEMAPHORE
 
-    page = Page.create_with_id(summary: "x", tag: "y")
+    page = Page.create(summary: "x", tag: "y")
     expect(page.ubid).to start_with UBID::TYPE_PAGE
   end
 
@@ -304,30 +304,30 @@ RSpec.describe UBID do
   end
 
   it "can decode ids" do
-    sshable = Sshable.create_with_id
+    sshable = Sshable.create
     host = create_vm_host
     si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: host.id) { it.id = host.id }
     vm = create_vm
     dev = StorageDevice.create(name: "x", available_storage_gib: 1, total_storage_gib: 1, vm_host_id: host.id) { it.id = host.id }
-    sv = VmStorageVolume.create_with_id(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false, spdk_installation_id: si.id, storage_device_id: dev.id)
-    kek = StorageKeyEncryptionKey.create_with_id(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")
-    account = Account.create_with_id(email: "x@y.net")
+    sv = VmStorageVolume.create(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false, spdk_installation_id: si.id, storage_device_id: dev.id)
+    kek = StorageKeyEncryptionKey.create(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")
+    account = Account.create(email: "x@y.net")
     project = account.create_project_with_default_policy("x")
     project_id = project.id
-    st = SubjectTag.create_with_id(project_id:, name: "T")
-    at = ActionTag.create_with_id(project_id:, name: "T")
-    ot = ObjectTag.create_with_id(project_id:, name: "T")
-    ace = AccessControlEntry.create_with_id(project_id:, subject_id: st.id)
+    st = SubjectTag.create(project_id:, name: "T")
+    at = ActionTag.create(project_id:, name: "T")
+    ot = ObjectTag.create(project_id:, name: "T")
+    ace = AccessControlEntry.create(project_id:, subject_id: st.id)
     a_type = ActionType.first
-    subnet = PrivateSubnet.create_with_id(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id:)
-    nic = Nic.create_with_id(private_ipv6: "fd10:9b0b:6b4b:8fbb::/128", private_ipv4: "10.0.0.12/32", mac: "00:11:22:33:44:55", encryption_key: "0x30613961313636632d653765372d343434372d616232392d376561343432623562623065", private_subnet_id: subnet.id, name: "def-nic")
-    tun = IpsecTunnel.create_with_id(src_nic_id: nic.id, dst_nic_id: nic.id)
-    adr = Address.create_with_id(cidr: "192.168.1.0/24", routed_to_host_id: host.id)
-    vm_adr = AssignedVmAddress.create_with_id(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
-    host_adr = AssignedHostAddress.create_with_id(ip: "192.168.1.1", address_id: adr.id, host_id: host.id)
-    strand = Strand.create_with_id(prog: "x", label: "y")
-    semaphore = Semaphore.create_with_id(strand_id: strand.id, name: "z")
-    page = Page.create_with_id(summary: "x", tag: "y")
+    subnet = PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id:)
+    nic = Nic.create(private_ipv6: "fd10:9b0b:6b4b:8fbb::/128", private_ipv4: "10.0.0.12/32", mac: "00:11:22:33:44:55", encryption_key: "0x30613961313636632d653765372d343434372d616232392d376561343432623562623065", private_subnet_id: subnet.id, name: "def-nic")
+    tun = IpsecTunnel.create(src_nic_id: nic.id, dst_nic_id: nic.id)
+    adr = Address.create(cidr: "192.168.1.0/24", routed_to_host_id: host.id)
+    vm_adr = AssignedVmAddress.create(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
+    host_adr = AssignedHostAddress.create(ip: "192.168.1.1", address_id: adr.id, host_id: host.id)
+    strand = Strand.create(prog: "x", label: "y")
+    semaphore = Semaphore.create(strand_id: strand.id, name: "z")
+    page = Page.create(summary: "x", tag: "y")
 
     expect(described_class.decode(vm.ubid)).to eq(vm)
     expect(described_class.decode(sv.ubid)).to eq(sv)
@@ -362,13 +362,13 @@ RSpec.describe UBID do
   end
 
   it ".resolve_map populates hash with uuid keys" do
-    page = Page.create_with_id(summary: "x", tag: "y")
+    page = Page.create(summary: "x", tag: "y")
     project = Project.create(name: "test")
     a_type = ActionType.first
 
     api_key = ApiKey.create(owner_table: "project", owner_id: project.id, used_for: "inference_endpoint", key: "1", project_id: project.id)
     # Backwards compatibility for old TYPE_ETC ubid (etkjnpyp1dst3n9d2mct7s71rh in this example)
-    old_api_key = ApiKey.create_with_id(owner_table: "project", owner_id: project.id, used_for: "inference_endpoint", project_id: project.id) { |ak| ak.id = "9cab6f58-2dce-85da-aa5a-2a3347c9c388" }
+    old_api_key = ApiKey.create(owner_table: "project", owner_id: project.id, used_for: "inference_endpoint", project_id: project.id) { |ak| ak.id = "9cab6f58-2dce-85da-aa5a-2a3347c9c388" }
 
     invalid = described_class.to_uuid("han2sefsk4f61k91z77vn0y978")
     hash = {page.id => nil, a_type.id => nil, api_key.id => nil, invalid => nil, old_api_key.id => nil}

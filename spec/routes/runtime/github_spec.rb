@@ -18,15 +18,15 @@ RSpec.describe Clover, "github" do
     end
 
     it "vm has runner but no repository" do
-      GithubRunner.create_with_id(vm_id: vm.id, repository_name: "test", label: "ubicloud")
+      GithubRunner.create(vm_id: vm.id, repository_name: "test", label: "ubicloud")
       get "/runtime/github"
 
       expect(last_response).to have_runtime_error(400, "invalid JWT format or claim in Authorization header")
     end
 
     it "vm has runner and repository" do
-      repository = GithubRepository.create_with_id(name: "test", access_key: "key")
-      GithubRunner.create_with_id(vm_id: vm.id, repository_name: "test", label: "ubicloud", repository_id: repository.id)
+      repository = GithubRepository.create(name: "test", access_key: "key")
+      GithubRunner.create(vm_id: vm.id, repository_name: "test", label: "ubicloud", repository_id: repository.id)
       get "/runtime/github"
 
       expect(last_response.status).to eq(404)
@@ -61,9 +61,9 @@ RSpec.describe Clover, "github" do
   end
 
   describe "cache endpoints" do
-    let(:repository) { GithubRepository.create_with_id(name: "test", default_branch: "main", access_key: "123", installation:) }
-    let(:installation) { GithubInstallation.create_with_id(installation_id: 123, name: "test-user", type: "User", project: Project.create_with_id(name: "test")) }
-    let(:runner) { GithubRunner.create_with_id(vm_id: create_vm.id, repository_name: "test", label: "ubicloud", repository_id: repository.id, workflow_job: {head_branch: "dev"}) }
+    let(:repository) { GithubRepository.create(name: "test", default_branch: "main", access_key: "123", installation:) }
+    let(:installation) { GithubInstallation.create(installation_id: 123, name: "test-user", type: "User", project: Project.create(name: "test")) }
+    let(:runner) { GithubRunner.create(vm_id: create_vm.id, repository_name: "test", label: "ubicloud", repository_id: repository.id, workflow_job: {head_branch: "dev"}) }
     let(:url_presigner) { instance_double(Aws::S3::Presigner, presigned_request: "aa") }
     let(:blob_storage_client) { instance_double(Aws::S3::Client) }
 
@@ -100,7 +100,7 @@ RSpec.describe Clover, "github" do
       end
 
       it "fails if the cache entry already exists before upload" do
-        GithubCacheEntry.create_with_id(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+        GithubCacheEntry.create(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
 
         expect(last_response).to have_runtime_error(409, "A cache entry for dev scope already exists with k1 key and v1 version.")
@@ -218,7 +218,7 @@ RSpec.describe Clover, "github" do
       end
 
       it "fails if there is no created multipart upload at blob storage" do
-        GithubCacheEntry.create_with_id(key: "cache-key", version: "key-version", scope: "dev", repository_id: repository.id, created_by: runner.id, upload_id: "upload-id", size: 100)
+        GithubCacheEntry.create(key: "cache-key", version: "key-version", scope: "dev", repository_id: repository.id, created_by: runner.id, upload_id: "upload-id", size: 100)
         expect(blob_storage_client).to receive(:complete_multipart_upload).and_raise(Aws::S3::Errors::NoSuchUpload.new("error", "error"))
         post "/runtime/github/caches/commit", {etags: ["etag-1", "etag-2"], uploadId: "upload-id", size: 100}
 
@@ -226,7 +226,7 @@ RSpec.describe Clover, "github" do
       end
 
       it "fails if the s3 storage service is unavailable" do
-        GithubCacheEntry.create_with_id(key: "cache-key", version: "key-version", scope: "dev", repository_id: repository.id, created_by: runner.id, upload_id: "upload-id", size: 100)
+        GithubCacheEntry.create(key: "cache-key", version: "key-version", scope: "dev", repository_id: repository.id, created_by: runner.id, upload_id: "upload-id", size: 100)
         expect(blob_storage_client).to receive(:complete_multipart_upload).and_raise(Aws::S3::Errors::ServiceUnavailable.new("error", "error"))
         post "/runtime/github/caches/commit", {etags: ["etag-1", "etag-2"], uploadId: "upload-id", size: 100}
 
@@ -234,7 +234,7 @@ RSpec.describe Clover, "github" do
       end
 
       it "completes multipart upload" do
-        entry = GithubCacheEntry.create_with_id(key: "cache-key", version: "key-version", scope: "dev", repository_id: repository.id, created_by: runner.id, upload_id: "upload-id", size: 100)
+        entry = GithubCacheEntry.create(key: "cache-key", version: "key-version", scope: "dev", repository_id: repository.id, created_by: runner.id, upload_id: "upload-id", size: 100)
         expect(blob_storage_client).to receive(:complete_multipart_upload).with(
           hash_including(upload_id: "upload-id", multipart_upload: {parts: [{etag: "etag-1", part_number: 1}, {etag: "etag-2", part_number: 2}]})
         )
@@ -245,7 +245,7 @@ RSpec.describe Clover, "github" do
       end
 
       it "completes multipart upload without size" do
-        entry = GithubCacheEntry.create_with_id(key: "cache-key", version: "key-version", scope: "dev", repository_id: repository.id, created_by: runner.id, upload_id: "upload-id")
+        entry = GithubCacheEntry.create(key: "cache-key", version: "key-version", scope: "dev", repository_id: repository.id, created_by: runner.id, upload_id: "upload-id")
         expect(blob_storage_client).to receive(:complete_multipart_upload).with(
           hash_including(upload_id: "upload-id", multipart_upload: {parts: [{etag: "etag-1", part_number: 1}, {etag: "etag-2", part_number: 2}]})
         )
@@ -279,7 +279,7 @@ RSpec.describe Clover, "github" do
 
       it "fails to get head branch if runner name not matched" do
         runner.update(workflow_job: nil, installation_id: installation.id)
-        GithubCacheEntry.create_with_id(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+        GithubCacheEntry.create(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         client = instance_double(Octokit::Client)
         allow(Github).to receive(:installation_client).and_return(client)
         expect(client).to receive(:workflow_run_jobs).and_return({jobs: [{head_branch: "dev", runner_name: "dummy-runner-name"}]})
@@ -290,7 +290,7 @@ RSpec.describe Clover, "github" do
 
       it "fails to get head branch if GitHub API raises an exception" do
         runner.update(workflow_job: nil, installation_id: installation.id)
-        GithubCacheEntry.create_with_id(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+        GithubCacheEntry.create(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         client = instance_double(Octokit::Client)
         allow(Github).to receive(:installation_client).and_return(client)
         expect(client).to receive(:workflow_run_jobs).and_raise(Octokit::NotFound)
@@ -301,7 +301,7 @@ RSpec.describe Clover, "github" do
 
       it "gets branch from GitHub API if the runner doesn't have a branch info" do
         runner.update(workflow_job: nil, installation_id: installation.id)
-        entry = GithubCacheEntry.create_with_id(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+        entry = GithubCacheEntry.create(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         client = instance_double(Octokit::Client)
         allow(Github).to receive(:installation_client).and_return(client)
         expect(client).to receive(:workflow_run_jobs).and_return({jobs: [{head_branch: "dev", runner_name: runner.ubid}]})
@@ -314,7 +314,7 @@ RSpec.describe Clover, "github" do
 
       it "returns a cache from default branch when no branch info" do
         runner.update(workflow_job: nil)
-        entry = GithubCacheEntry.create_with_id(key: "k1", version: "v1", scope: "main", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+        entry = GithubCacheEntry.create(key: "k1", version: "v1", scope: "main", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         expect(url_presigner).to receive(:presigned_url).with(:get_object, hash_including(bucket: repository.bucket_name, key: entry.blob_key)).and_return("http://presigned-url")
         get "/runtime/github/cache", {keys: "k1", version: "v1"}
 
@@ -329,7 +329,7 @@ RSpec.describe Clover, "github" do
           ["k2", "v1", "main"],
           ["k2", "v1", "dev"]
         ].each do |key, version, branch|
-          GithubCacheEntry.create_with_id(key: key, version: version, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+          GithubCacheEntry.create(key: key, version: version, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         end
         expect(url_presigner).to receive(:presigned_url).with(:get_object, anything).and_return("http://presigned-url")
         get "/runtime/github/cache", {keys: "k2", version: "v1"}
@@ -340,9 +340,9 @@ RSpec.describe Clover, "github" do
       end
 
       it "partially matched key returns the cache according to the order of incoming keys" do
-        GithubCacheEntry.create_with_id(key: "mix-dev-123", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now - 2, created_by: runner.id, committed_at: Time.now)
-        GithubCacheEntry.create_with_id(key: "mix-dev-main-123", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now - 1, created_by: runner.id, committed_at: Time.now)
-        GithubCacheEntry.create_with_id(key: "mix-prod-123", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now, created_by: runner.id, committed_at: Time.now)
+        GithubCacheEntry.create(key: "mix-dev-123", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now - 2, created_by: runner.id, committed_at: Time.now)
+        GithubCacheEntry.create(key: "mix-dev-main-123", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now - 1, created_by: runner.id, committed_at: Time.now)
+        GithubCacheEntry.create(key: "mix-prod-123", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now, created_by: runner.id, committed_at: Time.now)
 
         expect(url_presigner).to receive(:presigned_url).with(:get_object, anything).and_return("http://presigned-url").at_least(:once)
         get "/runtime/github/cache", {keys: "mix-dev-main-,mix-dev-,mix-", version: "v1"}
@@ -353,9 +353,9 @@ RSpec.describe Clover, "github" do
       end
 
       it "returns cache from any scope if scope check is disabled" do
-        GithubCacheEntry.create_with_id(key: "mix-dev-123", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now - 2, created_by: runner.id, committed_at: Time.now)
-        GithubCacheEntry.create_with_id(key: "mix-dev-main-123", version: "v1", scope: "feature-b", repository_id: repository.id, created_at: Time.now - 1, created_by: runner.id, committed_at: Time.now)
-        GithubCacheEntry.create_with_id(key: "mix-prod-123", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now, created_by: runner.id, committed_at: Time.now)
+        GithubCacheEntry.create(key: "mix-dev-123", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now - 2, created_by: runner.id, committed_at: Time.now)
+        GithubCacheEntry.create(key: "mix-dev-main-123", version: "v1", scope: "feature-b", repository_id: repository.id, created_at: Time.now - 1, created_by: runner.id, committed_at: Time.now)
+        GithubCacheEntry.create(key: "mix-prod-123", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now, created_by: runner.id, committed_at: Time.now)
 
         expect(url_presigner).to receive(:presigned_url).with(:get_object, anything).and_return("http://presigned-url").at_least(:once)
         installation.project.set_ff_access_all_cache_scopes(true)
@@ -367,7 +367,7 @@ RSpec.describe Clover, "github" do
       end
 
       it "only does a prefix match on key, escapes LIKE metacharacters in submitted keys" do
-        GithubCacheEntry.create_with_id(key: "k123456", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now, created_by: runner.id, committed_at: Time.now)
+        GithubCacheEntry.create(key: "k123456", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now, created_by: runner.id, committed_at: Time.now)
         get "/runtime/github/cache", {keys: "%6", version: "v1"}
         expect(last_response.status).to eq(204)
       end
@@ -387,7 +387,7 @@ RSpec.describe Clover, "github" do
           ["k1", "v1", "feature"],
           ["k2", "v1", "dev"]
         ].each do |key, version, branch|
-          GithubCacheEntry.create_with_id(key: key, version: version, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+          GithubCacheEntry.create(key: key, version: version, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         end
 
         get "/runtime/github/caches", {key: "k1"}
@@ -405,7 +405,7 @@ RSpec.describe Clover, "github" do
           ["k1", "v1", "feature"],
           ["k2", "v1", "dev"]
         ].each do |key, version, branch|
-          GithubCacheEntry.create_with_id(key: key, version: version, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+          GithubCacheEntry.create(key: key, version: version, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         end
         get "/runtime/github/caches", {key: "k1"}
 

@@ -37,7 +37,7 @@ RSpec.describe Clover, "access control" do
         "Tag: Admin", "All", "All"
       ]
 
-      ace = AccessControlEntry.create_with_id(project_id:, subject_id: user.id)
+      ace = AccessControlEntry.create(project_id:, subject_id: user.id)
       user.update(name: "Tname")
       page.refresh
       expect(displayed_access_control_entries).to eq [
@@ -45,8 +45,8 @@ RSpec.describe Clover, "access control" do
         "Tname", "All Actions", "All Objects"
       ]
 
-      st = SubjectTag.create_with_id(project_id:, name: "STest")
-      AccessControlEntry.create_with_id(project_id:, subject_id: st.id)
+      st = SubjectTag.create(project_id:, name: "STest")
+      AccessControlEntry.create(project_id:, subject_id: st.id)
       page.refresh
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
@@ -54,8 +54,8 @@ RSpec.describe Clover, "access control" do
         "STest", "All Actions", "All Objects"
       ]
 
-      at = ActionTag.create_with_id(project_id:, name: "ATest")
-      AccessControlEntry.create_with_id(project_id:, subject_id: user.id, action_id: at.id)
+      at = ActionTag.create(project_id:, name: "ATest")
+      AccessControlEntry.create(project_id:, subject_id: user.id, action_id: at.id)
       page.refresh
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
@@ -64,7 +64,7 @@ RSpec.describe Clover, "access control" do
         "STest", "All Actions", "All Objects"
       ]
 
-      AccessControlEntry.create_with_id(project_id:, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:view"])
+      AccessControlEntry.create(project_id:, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:view"])
       page.refresh
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
@@ -74,20 +74,8 @@ RSpec.describe Clover, "access control" do
         "STest", "All Actions", "All Objects"
       ]
 
-      ot1 = ObjectTag.create_with_id(project_id:, name: "OTest1")
-      AccessControlEntry.create_with_id(project_id:, subject_id: user.id, action_id: at.id, object_id: ot1.id)
-      page.refresh
-      expect(displayed_access_control_entries).to eq [
-        "Tag: Admin", "All", "All",
-        "Tname", "All Actions", "All Objects",
-        "Tname", "Project:view", "All Objects",
-        "Tname", "ATest", "All Objects",
-        "Tname", "ATest", "OTest1",
-        "STest", "All Actions", "All Objects"
-      ]
-
-      ot2 = ObjectTag.create_with_id(project_id:, name: "OTest2")
-      AccessControlEntry.create_with_id(project_id:, subject_id: user.id, action_id: at.id, object_id: ot2.id)
+      ot1 = ObjectTag.create(project_id:, name: "OTest1")
+      AccessControlEntry.create(project_id:, subject_id: user.id, action_id: at.id, object_id: ot1.id)
       page.refresh
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
@@ -95,11 +83,11 @@ RSpec.describe Clover, "access control" do
         "Tname", "Project:view", "All Objects",
         "Tname", "ATest", "All Objects",
         "Tname", "ATest", "OTest1",
-        "Tname", "ATest", "OTest2",
         "STest", "All Actions", "All Objects"
       ]
 
-      AccessControlEntry.create_with_id(project_id:, subject_id: user.id, action_id: at.id, object_id: ot2.id)
+      ot2 = ObjectTag.create(project_id:, name: "OTest2")
+      AccessControlEntry.create(project_id:, subject_id: user.id, action_id: at.id, object_id: ot2.id)
       page.refresh
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
@@ -108,11 +96,23 @@ RSpec.describe Clover, "access control" do
         "Tname", "ATest", "All Objects",
         "Tname", "ATest", "OTest1",
         "Tname", "ATest", "OTest2",
+        "STest", "All Actions", "All Objects"
+      ]
+
+      AccessControlEntry.create(project_id:, subject_id: user.id, action_id: at.id, object_id: ot2.id)
+      page.refresh
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All",
+        "Tname", "All Actions", "All Objects",
+        "Tname", "Project:view", "All Objects",
+        "Tname", "ATest", "All Objects",
+        "Tname", "ATest", "OTest1",
+        "Tname", "ATest", "OTest2",
         "Tname", "ATest", "OTest2",
         "STest", "All Actions", "All Objects"
       ]
 
-      AccessControlEntry.create_with_id(project_id:, subject_id: user.id, action_id: ActionTag[project_id: nil, name: "Member"].id, object_id: ot2.id)
+      AccessControlEntry.create(project_id:, subject_id: user.id, action_id: ActionTag[project_id: nil, name: "Member"].id, object_id: ot2.id)
       page.refresh
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
@@ -127,7 +127,7 @@ RSpec.describe Clover, "access control" do
       ]
 
       inference_api_key = ApiKey.create_inference_api_key(project)
-      AccessControlEntry.create_with_id(project_id:, subject_id: user.id, action_id: ActionTag[project_id: nil, name: "Member"].id, object_id: inference_api_key.id)
+      AccessControlEntry.create(project_id:, subject_id: user.id, action_id: ActionTag[project_id: nil, name: "Member"].id, object_id: inference_api_key.id)
       page.refresh
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
@@ -142,7 +142,7 @@ RSpec.describe Clover, "access control" do
         "STest", "All Actions", "All Objects"
       ]
 
-      AccessControlEntry.create_with_id(project_id:, subject_id: user.id, action_id: at.id, object_id: ot1.metatag_uuid)
+      AccessControlEntry.create(project_id:, subject_id: user.id, action_id: at.id, object_id: ot1.metatag_uuid)
       page.refresh
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
@@ -160,7 +160,7 @@ RSpec.describe Clover, "access control" do
 
       project.subject_tags_dataset.where(name: "Admin").first.remove_members([user.id])
       ace.destroy
-      AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
+      AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
       page.refresh
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
@@ -184,7 +184,7 @@ RSpec.describe Clover, "access control" do
       visit "#{project.path}/user/access-control"
       expect(page.status_code).to eq 403
 
-      AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
+      AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
       page.refresh
       expect(page.title).to eq "Ubicloud - Default - Access Control"
       expect(displayed_access_control_entries).to eq [
@@ -193,7 +193,7 @@ RSpec.describe Clover, "access control" do
       expect(page).to have_no_content("Save All")
       expect(page).to have_no_content("New Access Control Entry")
 
-      AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:editaccess"])
+      AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:editaccess"])
       page.refresh
       expect(displayed_access_control_entries).to eq [
         "foo", "Project:editaccess", "All Objects",
@@ -204,7 +204,7 @@ RSpec.describe Clover, "access control" do
     end
 
     it "does not show access control entries for tokens" do
-      AccessControlEntry.create_with_id(project_id: project.id, subject_id: ApiKey.create_personal_access_token(user, project:).id)
+      AccessControlEntry.create(project_id: project.id, subject_id: ApiKey.create_personal_access_token(user, project:).id)
 
       visit "#{project.path}/user/access-control"
       expect(displayed_access_control_entries).to eq [
@@ -216,9 +216,9 @@ RSpec.describe Clover, "access control" do
     it "can create access control entries" do
       user.update(name: "Tname")
       project_id = project.id
-      SubjectTag.create_with_id(project_id:, name: "STest")
-      ActionTag.create_with_id(project_id:, name: "ATest")
-      ObjectTag.create_with_id(project_id:, name: "OTest")
+      SubjectTag.create(project_id:, name: "STest")
+      ActionTag.create(project_id:, name: "ATest")
+      ObjectTag.create(project_id:, name: "OTest")
 
       visit "#{project.path}/user/access-control"
       within("#ace-template .subject") { select "Tname" }
@@ -269,8 +269,8 @@ RSpec.describe Clover, "access control" do
     end
 
     it "can update access control entries" do
-      ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id)
-      SubjectTag.create_with_id(project_id: project.id, name: "STest")
+      ace = AccessControlEntry.create(project_id: project.id, subject_id: user.id)
+      SubjectTag.create(project_id: project.id, name: "STest")
       visit "#{project.path}/user/access-control"
       within("#ace-#{ace.ubid} .subject") { select "STest" }
       click_button "Save All"
@@ -283,8 +283,8 @@ RSpec.describe Clover, "access control" do
     end
 
     it "skips nonexisting entries when updating access control entries" do
-      ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id)
-      SubjectTag.create_with_id(project_id: project.id, name: "STest")
+      ace = AccessControlEntry.create(project_id: project.id, subject_id: user.id)
+      SubjectTag.create(project_id: project.id, name: "STest")
       visit "#{project.path}/user/access-control"
       within("#ace-#{ace.ubid} .subject") { select "STest" }
       ace.destroy
@@ -314,8 +314,8 @@ RSpec.describe Clover, "access control" do
       visit "#{project.path}/user/access-control"
       expect(page.status_code).to eq 403
 
-      ace1 = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
-      ace2 = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:editaccess"])
+      ace1 = AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
+      ace2 = AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:editaccess"])
       page.refresh
       expect(page.title).to eq "Ubicloud - Default - Access Control"
 
@@ -330,8 +330,8 @@ RSpec.describe Clover, "access control" do
       user.update(name: "Tname")
       project
       AccessControlEntry.dataset.destroy
-      ace1 = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
-      ace2 = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:editaccess"])
+      ace1 = AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
+      ace2 = AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:editaccess"])
       visit "#{project.path}/user/access-control"
 
       within("#ace-#{ace1.ubid} .action") { select "Member" }
@@ -345,8 +345,8 @@ RSpec.describe Clover, "access control" do
       user.update(name: "Tname")
       project
       AccessControlEntry.dataset.destroy
-      ace1 = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
-      ace2 = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:editaccess"])
+      ace1 = AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
+      ace2 = AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:editaccess"])
       visit "#{project.path}/user/access-control"
       within("#ace-#{ace1.ubid}") { check "Delete" }
       ace2.destroy
@@ -395,7 +395,7 @@ RSpec.describe Clover, "access control" do
           expect(tds).to eq []
         end
 
-        model.create_with_id(project_id: project.id, name: "test-#{type}")
+        model.create(project_id: project.id, name: "test-#{type}")
         page.refresh
         tds = page.all("table#tag-list td").map(&:text)
 
@@ -416,23 +416,23 @@ RSpec.describe Clover, "access control" do
         visit "#{project.path}/user/access-control/tag/#{type}"
         expect(page.status_code).to eq 403
 
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
         page.refresh
         expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tags"
         expect(page).to have_content("No managable #{type} tags to display")
 
-        tag = model.create_with_id(project_id: project.id, name: "test-#{type}1")
-        model.create_with_id(project_id: project.id, name: "test-#{type}2")
+        tag = model.create(project_id: project.id, name: "test-#{type}1")
+        model.create(project_id: project.id, name: "test-#{type}2")
 
         if type == "object"
           # Access to object tag does not imply ability to manage tag, only members of tag
           # Must grant access to metatag to manage tag itself
-          AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: tag.id)
+          AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: tag.id)
           page.refresh
           expect(page).to have_content("No managable object tags to display")
         end
 
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag.metatag_uuid : tag.id)
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag.metatag_uuid : tag.id)
         page.refresh
         expect(page).to have_no_content("Create #{cap_type} Tag")
         expect(page.all("table#tag-list td").map(&:text)).to eq [
@@ -442,7 +442,7 @@ RSpec.describe Clover, "access control" do
           "Manage"
         ]
 
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP[perm_type])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP[perm_type])
         page.refresh
         expect(page).to have_content("Create #{cap_type} Tag")
         expect(page.all("table#tag-list td").map(&:text)).to eq [
@@ -477,12 +477,12 @@ RSpec.describe Clover, "access control" do
         visit "#{project.path}/user/access-control/tag/#{type}"
         expect(page.status_code).to eq 403
 
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
         page.refresh
         expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tags"
         expect(page).to have_no_content("Create #{cap_type} Tag")
 
-        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP[perm_type])
+        ace = AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP[perm_type])
         page.refresh
         expect(page).to have_content("Create #{cap_type} Tag")
 
@@ -496,7 +496,7 @@ RSpec.describe Clover, "access control" do
 
       it "can rename #{type} tag" do
         name = "test-#{type}"
-        ubid = model.create_with_id(project_id: project.id, name:).ubid
+        ubid = model.create(project_id: project.id, name:).ubid
         visit "#{project.path}/user/access-control/tag/#{type}"
         click_link "#{ubid}-edit"
 
@@ -521,12 +521,12 @@ RSpec.describe Clover, "access control" do
         project
         AccessControlEntry.dataset.destroy
         name = "test-#{type}"
-        tag = model.create_with_id(project_id: project.id, name:)
+        tag = model.create(project_id: project.id, name:)
         visit "#{project.path}/user/access-control/tag/#{type}/#{tag.ubid}"
         expect(page.status_code).to eq 403
 
-        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP[perm_type])
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag.metatag_uuid : tag.id)
+        ace = AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP[perm_type])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag.metatag_uuid : tag.id)
 
         page.refresh
         expect(page.title).to eq "Ubicloud - Default - #{name}"
@@ -542,7 +542,7 @@ RSpec.describe Clover, "access control" do
       it "can delete #{type} tag" do
         SubjectTag.where(name: "Member").destroy
         name = "test-#{type}"
-        model.create_with_id(project_id: project.id, name:)
+        model.create(project_id: project.id, name:)
         visit "#{project.path}/user/access-control/tag/#{type}"
 
         btn = find ".delete-btn"
@@ -557,10 +557,10 @@ RSpec.describe Clover, "access control" do
         project
         AccessControlEntry.dataset.destroy
         name = "test-#{type}"
-        tag = model.create_with_id(project_id: project.id, name:)
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag.metatag_uuid : tag.id)
-        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP[perm_type])
+        tag = model.create(project_id: project.id, name:)
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag.metatag_uuid : tag.id)
+        ace = AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP[perm_type])
         visit "#{project.path}/user/access-control/tag/#{type}"
 
         ace.destroy
@@ -577,7 +577,7 @@ RSpec.describe Clover, "access control" do
 
       it "can view members of #{type} tag" do
         Account.first.update(name: "test-account") if type == "subject"
-        tag1 = model.create_with_id(project_id: project.id, name: "test-#{type}")
+        tag1 = model.create(project_id: project.id, name: "test-#{type}")
         visit "#{project.path}/user/access-control/tag/#{type}"
         page.find("##{tag1.ubid}-edit").click
 
@@ -599,7 +599,7 @@ RSpec.describe Clover, "access control" do
         end
         default.call
 
-        tag2 = model.create_with_id(project_id: project.id, name: "other-#{type}")
+        tag2 = model.create(project_id: project.id, name: "other-#{type}")
         page.refresh
         expect(page.html).not_to include "Current Members of #{cap_type} Tag"
         case type
@@ -626,12 +626,12 @@ RSpec.describe Clover, "access control" do
         SubjectTag.where(name: "Member").destroy
         AccessControlEntry.dataset.destroy
         name = "test-#{type}"
-        tag = model.create_with_id(project_id: project.id, name:)
-        tag2 = model.create_with_id(project_id: project.id, name: "test2-#{type}")
+        tag = model.create(project_id: project.id, name:)
+        tag2 = model.create(project_id: project.id, name: "test2-#{type}")
         visit "#{project.path}/user/access-control/tag/#{type}/#{tag.ubid}"
         expect(page.status_code).to eq 403
 
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag.metatag_uuid : tag.id)
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag.metatag_uuid : tag.id)
         page.refresh
         expect(page.title).to eq "Ubicloud - Default - #{name}"
         expect(page.html).to match(/No current members of\s+#{type}\s+tag\./m)
@@ -646,7 +646,7 @@ RSpec.describe Clover, "access control" do
         expect(page.html).not_to include("Add Members")
         expect(page.html).not_to include("Remove Members")
 
-        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:remove"], object_id: (type == "object") ? tag.metatag_uuid : tag.id)
+        ace = AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:remove"], object_id: (type == "object") ? tag.metatag_uuid : tag.id)
         page.refresh
         expect(page.all("table#tag-membership-remove td").map(&:text)).to eq ["Tag: test2-#{type}", ""]
         expect(page.all("table#tag-membership-add td").map(&:text)).to be_empty
@@ -654,7 +654,7 @@ RSpec.describe Clover, "access control" do
         expect(page.html).to include("Remove Members")
 
         ace.update(action_id: ActionType::NAME_MAP["#{cap_type}Tag:add"])
-        model.create_with_id(project_id: project.id, name: "test3-#{type}")
+        model.create(project_id: project.id, name: "test3-#{type}")
         page.refresh
         expect(page.all("table#tag-membership-remove td").map(&:text)).to eq ["Tag: test2-#{type}"]
         tds = page.all("table#tag-membership-add td, table#tag-membership-add tbody th").map(&:text)
@@ -689,8 +689,8 @@ RSpec.describe Clover, "access control" do
       end
 
       it "can add members to #{type} tag" do
-        tag1 = model.create_with_id(project_id: project.id, name: "test-#{type}")
-        tag2 = model.create_with_id(project_id: project.id, name: "other-#{type}")
+        tag1 = model.create(project_id: project.id, name: "test-#{type}")
+        tag2 = model.create(project_id: project.id, name: "other-#{type}")
         visit "#{project.path}/user/access-control/tag/#{type}/#{tag1.ubid}"
 
         find("##{tag2.ubid} input").check
@@ -701,8 +701,8 @@ RSpec.describe Clover, "access control" do
       end
 
       it "handles errors when adding members to #{type} tag" do
-        tag1 = model.create_with_id(project_id: project.id, name: "test-#{type}")
-        tag2 = model.create_with_id(project_id: project.id, name: "other-#{type}")
+        tag1 = model.create(project_id: project.id, name: "test-#{type}")
+        tag2 = model.create(project_id: project.id, name: "other-#{type}")
         visit "#{project.path}/user/access-control/tag/#{type}/#{tag1.ubid}"
 
         tag1.add_member(tag2.id)
@@ -716,10 +716,10 @@ RSpec.describe Clover, "access control" do
       it "requires #{model}:add permissions to add members to #{type} tag" do
         project
         AccessControlEntry.dataset.destroy
-        tag1 = model.create_with_id(project_id: project.id, name: "test-#{type}")
-        tag2 = model.create_with_id(project_id: project.id, name: "other-#{type}")
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag1.metatag_uuid : tag1.id)
-        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:add"], object_id: (type == "object") ? tag1.metatag_uuid : tag1.id)
+        tag1 = model.create(project_id: project.id, name: "test-#{type}")
+        tag2 = model.create(project_id: project.id, name: "other-#{type}")
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag1.metatag_uuid : tag1.id)
+        ace = AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:add"], object_id: (type == "object") ? tag1.metatag_uuid : tag1.id)
         visit "#{project.path}/user/access-control/tag/#{type}/#{tag1.ubid}"
 
         ace.destroy
@@ -730,8 +730,8 @@ RSpec.describe Clover, "access control" do
       end
 
       it "can remove members from #{type} tag" do
-        tag1 = model.create_with_id(project_id: project.id, name: "test-#{type}")
-        tag2 = model.create_with_id(project_id: project.id, name: "other-#{type}")
+        tag1 = model.create(project_id: project.id, name: "test-#{type}")
+        tag2 = model.create(project_id: project.id, name: "other-#{type}")
         tag1.add_member(tag2.id)
         visit "#{project.path}/user/access-control/tag/#{type}/#{tag1.ubid}"
 
@@ -745,11 +745,11 @@ RSpec.describe Clover, "access control" do
       it "requires #{model}:remove permissions to remove members from #{type} tag" do
         project
         AccessControlEntry.dataset.destroy
-        tag1 = model.create_with_id(project_id: project.id, name: "test-#{type}")
-        tag2 = model.create_with_id(project_id: project.id, name: "other-#{type}")
+        tag1 = model.create(project_id: project.id, name: "test-#{type}")
+        tag2 = model.create(project_id: project.id, name: "other-#{type}")
         tag1.add_member(tag2.id)
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag1.metatag_uuid : tag1.id)
-        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:remove"], object_id: (type == "object") ? tag1.metatag_uuid : tag1.id)
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag1.metatag_uuid : tag1.id)
+        ace = AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:remove"], object_id: (type == "object") ? tag1.metatag_uuid : tag1.id)
         visit "#{project.path}/user/access-control/tag/#{type}/#{tag1.ubid}"
 
         ace.destroy
@@ -761,7 +761,7 @@ RSpec.describe Clover, "access control" do
     end
 
     it "can add global action tag members to action tag" do
-      tag = ActionTag.create_with_id(project_id: project.id, name: "test-action")
+      tag = ActionTag.create(project_id: project.id, name: "test-action")
       visit "#{project.path}/user/access-control/tag/action/#{tag.ubid}"
 
       member_global_tag = ActionTag[project_id: nil, name: "Member"]
@@ -773,7 +773,7 @@ RSpec.describe Clover, "access control" do
     end
 
     it "does not show ApiKeys on subject tag membership page" do
-      tag = SubjectTag.create_with_id(project_id: project.id, name: "test-subject")
+      tag = SubjectTag.create(project_id: project.id, name: "test-subject")
       api_key = ApiKey.create_personal_access_token(user, project: project)
       tag.add_member(api_key.id)
       visit "#{project.path}/user/access-control/tag/subject/#{tag.ubid}"
@@ -811,7 +811,7 @@ RSpec.describe Clover, "access control" do
     end
 
     it "cannot add Admin subject tag to another subject tag" do
-      tag = SubjectTag.create_with_id(project_id: project.id, name: "test-subject")
+      tag = SubjectTag.create(project_id: project.id, name: "test-subject")
       admin = SubjectTag[project_id: project.id, name: "Admin"]
       admin.update(name: "not-Admin")
       visit "#{project.path}/user/access-control/tag/subject/#{tag.ubid}"
@@ -823,7 +823,7 @@ RSpec.describe Clover, "access control" do
 
     it "supports adding InferenceApiKey to ObjectTag" do
       inference_api_key = ApiKey.create_inference_api_key(project)
-      tag = ObjectTag.create_with_id(project_id: project.id, name: "test-obj")
+      tag = ObjectTag.create(project_id: project.id, name: "test-obj")
       visit "#{project.path}/user/access-control/tag/object/#{tag.ubid}"
       find("##{inference_api_key.ubid} input").check
       click_button "Add Members"
@@ -834,8 +834,8 @@ RSpec.describe Clover, "access control" do
     end
 
     it "supports adding ObjectTag to ObjectTag, both as regular tag and metatag" do
-      tag1 = ObjectTag.create_with_id(project_id: project.id, name: "test-obj")
-      tag2 = ObjectTag.create_with_id(project_id: project.id, name: "other-obj")
+      tag1 = ObjectTag.create(project_id: project.id, name: "test-obj")
+      tag2 = ObjectTag.create(project_id: project.id, name: "other-obj")
       visit "#{project.path}/user/access-control/tag/object/#{tag1.ubid}"
       find("##{tag1.metatag_ubid} input").check
       find("##{tag2.ubid} input").check
@@ -850,9 +850,9 @@ RSpec.describe Clover, "access control" do
     end
 
     it "supports display of SubjectTag/ActionTag in ObjectTag membership page" do
-      st = SubjectTag.create_with_id(project_id: project.id, name: "st")
-      at = ActionTag.create_with_id(project_id: project.id, name: "at")
-      tag = ObjectTag.create_with_id(project_id: project.id, name: "test-obj")
+      st = SubjectTag.create(project_id: project.id, name: "st")
+      at = ActionTag.create(project_id: project.id, name: "at")
+      tag = ObjectTag.create(project_id: project.id, name: "test-obj")
       visit "#{project.path}/user/access-control/tag/object/#{tag.ubid}"
       find("##{st.ubid} input").check
       find("##{at.ubid} input").check
@@ -866,8 +866,8 @@ RSpec.describe Clover, "access control" do
 
     it "shows object metatag with ObjectTag prefix when viewing access control entries" do
       user.update(name: "Tname")
-      tag = ObjectTag.create_with_id(project_id: project.id, name: "test-obj")
-      AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, object_id: tag.metatag_uuid)
+      tag = ObjectTag.create(project_id: project.id, name: "test-obj")
+      AccessControlEntry.create(project_id: project.id, subject_id: user.id, object_id: tag.metatag_uuid)
       visit "#{project.path}/user/access-control"
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
@@ -888,8 +888,8 @@ RSpec.describe Clover, "access control" do
     end
 
     it "handles serialization failure when adding members" do
-      tag1 = SubjectTag.create_with_id(project_id: project.id, name: "test-subject")
-      tag2 = SubjectTag.create_with_id(project_id: project.id, name: "other-subject")
+      tag1 = SubjectTag.create(project_id: project.id, name: "test-subject")
+      tag2 = SubjectTag.create(project_id: project.id, name: "other-subject")
       visit "#{project.path}/user/access-control/tag/subject/#{tag1.ubid}"
 
       find("##{tag2.ubid} input").check

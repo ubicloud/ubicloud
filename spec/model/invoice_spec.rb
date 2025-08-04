@@ -5,7 +5,7 @@ require_relative "spec_helper"
 RSpec.describe Invoice do
   subject(:invoice) { described_class.new(id: "50d5aae4-311c-843b-b500-77fbc7778050", begin_time: Time.utc(2025, 3), end_time: Time.utc(2025, 4), invoice_number: "2503-4ddfa430e8-0006", created_at: Time.now, content: {"cost" => 10, "subtotal" => 11, "credit" => 1, "discount" => 0, "resources" => [], "billing_info" => {"country" => "NL"}}, status: "unpaid") }
 
-  let(:billing_info) { BillingInfo.create_with_id(stripe_id: "cs_1234567890") }
+  let(:billing_info) { BillingInfo.create(stripe_id: "cs_1234567890") }
   let(:client) { instance_double(Aws::S3::Client) }
 
   before do
@@ -44,13 +44,13 @@ RSpec.describe Invoice do
 
   describe ".send_failure_email" do
     it "sends failure email to accounts with billing permissions in addition to the provided billing email" do
-      project = Project.create_with_id(name: "cool-project")
-      accounts = (0..2).map { Account.create_with_id(email: "account#{it}@example.com").tap { |a| a.add_project(project) } }
-      AccessControlEntry.create_with_id(project_id: project.id, subject_id: accounts[0].id)
-      AccessControlEntry.create_with_id(project_id: project.id, subject_id: accounts[1].id, action_id: ActionType::NAME_MAP["Vm:view"])
-      AccessControlEntry.create_with_id(project_id: project.id, subject_id: accounts[2].id, action_id: ActionType::NAME_MAP["Project:billing"])
+      project = Project.create(name: "cool-project")
+      accounts = (0..2).map { Account.create(email: "account#{it}@example.com").tap { |a| a.add_project(project) } }
+      AccessControlEntry.create(project_id: project.id, subject_id: accounts[0].id)
+      AccessControlEntry.create(project_id: project.id, subject_id: accounts[1].id, action_id: ActionType::NAME_MAP["Vm:view"])
+      AccessControlEntry.create(project_id: project.id, subject_id: accounts[2].id, action_id: ActionType::NAME_MAP["Project:billing"])
 
-      invoice = described_class.create_with_id(project_id: project.id, invoice_number: "001", begin_time: Time.now, end_time: Time.now, content: {
+      invoice = described_class.create(project_id: project.id, invoice_number: "001", begin_time: Time.now, end_time: Time.now, content: {
         "billing_info" => {"email" => "billing@example.com"},
         "resources" => [],
         "subtotal" => 0.0,
@@ -67,8 +67,8 @@ RSpec.describe Invoice do
 
   describe ".send_success_email" do
     it "does not send the invoice if it has no billing information" do
-      project = Project.create_with_id(name: "cool-project")
-      invoice = described_class.create_with_id(project_id: project.id, invoice_number: "001", begin_time: Time.now, end_time: Time.now, content: {
+      project = Project.create(name: "cool-project")
+      invoice = described_class.create(project_id: project.id, invoice_number: "001", begin_time: Time.now, end_time: Time.now, content: {
         "resources" => [],
         "subtotal" => 0.0,
         "credit" => 0.0,
@@ -117,8 +117,8 @@ RSpec.describe Invoice do
 
     it "not charge if all payment methods fails" do
       invoice.content["billing_info"] = {"id" => billing_info.id, "email" => "foo@example.com"}
-      payment_method1 = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_1", order: 1)
-      payment_method2 = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_2", order: 2)
+      payment_method1 = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1", order: 1)
+      payment_method2 = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_2", order: 2)
 
       # rubocop:disable RSpec/VerifiedDoubles
       expect(Stripe::PaymentIntent).to receive(:create).with(hash_including(amount: 1000, customer: billing_info.stripe_id, payment_method: payment_method1.stripe_id))
@@ -134,7 +134,7 @@ RSpec.describe Invoice do
 
     it "fails if PaymentIntent does not raise an exception in case of failure" do
       invoice.content["billing_info"] = {"id" => billing_info.id}
-      payment_method = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_1", order: 1)
+      payment_method = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1", order: 1)
 
       # rubocop:disable RSpec/VerifiedDoubles
       expect(Stripe::PaymentIntent).to receive(:create).with(hash_including(amount: 1000, customer: billing_info.stripe_id, payment_method: payment_method.stripe_id))
@@ -176,7 +176,7 @@ RSpec.describe Invoice do
     it "does not update project reputation if cost is less than 5" do
       invoice.content["cost"] = 4
       invoice.content["billing_info"] = {"id" => billing_info.id}
-      PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_1", order: 1)
+      PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1", order: 1)
       # rubocop:disable RSpec/VerifiedDoubles
       expect(Stripe::PaymentIntent).to receive(:create).and_return(double(Stripe::PaymentIntent, status: "succeeded", id: "pi_1234567890"))
       # rubocop:enable RSpec/VerifiedDoubles

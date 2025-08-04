@@ -5,7 +5,7 @@ require_relative "spec_helper"
 require "json"
 
 RSpec.describe Page do
-  subject(:p) { described_class.create_with_id(tag: "dummy-tag") }
+  subject(:p) { described_class.create(tag: "dummy-tag") }
 
   describe "#trigger" do
     before do

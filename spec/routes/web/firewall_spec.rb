@@ -10,11 +10,11 @@ RSpec.describe Clover, "firewall" do
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
 
   let(:firewall) do
-    Firewall.create_with_id(name: "dummy-fw", description: "dummy-fw", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
+    Firewall.create(name: "dummy-fw", description: "dummy-fw", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
   end
 
   let(:fw_wo_permission) {
-    Firewall.create_with_id(name: "dummy-fw-2", description: "dummy-fw-2", location_id: Location::HETZNER_FSN1_ID, project_id: project_wo_permissions.id)
+    Firewall.create(name: "dummy-fw-2", description: "dummy-fw-2", location_id: Location::HETZNER_FSN1_ID, project_id: project_wo_permissions.id)
   }
 
   describe "unauthenticated" do
@@ -59,7 +59,7 @@ RSpec.describe Clover, "firewall" do
 
       it "does not show links to firewalls if user lacks Firewall:view access to them" do
         firewall
-        fw = Firewall.create_with_id(name: "viewable-fw", description: "viewable-fw", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
+        fw = Firewall.create(name: "viewable-fw", description: "viewable-fw", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
 
         visit "#{project.path}/firewall"
         link_texts = page.all("a").map(&:text)
@@ -382,7 +382,7 @@ RSpec.describe Clover, "firewall" do
 
       it "can not delete firewall when does not have permissions" do
         # Give permission to view, so we can see the detail page
-        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Firewall:view"])
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Firewall:view"])
 
         visit "#{project_wo_permissions.path}#{fw_wo_permission.path}"
         expect(page.title).to eq "Ubicloud - dummy-fw-2"

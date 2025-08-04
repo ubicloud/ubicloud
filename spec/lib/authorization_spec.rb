@@ -5,8 +5,8 @@ require "sequel/model"
 RSpec.describe Authorization do
   let(:users) {
     [
-      Account.create_with_id(email: "auth1@example.com"),
-      Account.create_with_id(email: "auth2@example.com")
+      Account.create(email: "auth1@example.com"),
+      Account.create(email: "auth2@example.com")
     ]
   }
   let(:projects) { (0..1).map { users[it].create_project_with_default_policy("project-#{it}") } }
@@ -36,7 +36,7 @@ RSpec.describe Authorization do
       Array(ace_actions).each do |action|
         action_id = ActionType::NAME_MAP.fetch(action) { ActionTag[project_id: nil, name: action].id } if action
         Array(ace_objects).each do |object_id|
-          AccessControlEntry.create_with_id(project_id:, subject_id:, action_id:, object_id:)
+          AccessControlEntry.create(project_id:, subject_id:, action_id:, object_id:)
         end
       end
     end
@@ -45,14 +45,14 @@ RSpec.describe Authorization do
   def add_single_ace(policies, project_id: projects[0].id)
     ace_subjects, ace_actions, ace_objects = policies.values_at(:subjects, :actions, :objects)
 
-    subject_tag = SubjectTag.create_with_id(project_id:, name: "S")
+    subject_tag = SubjectTag.create(project_id:, name: "S")
     Array(ace_subjects).each do |subject_id|
       subject_tag.add_subject(subject_id)
     end
     subject_tag = yield subject_tag if block_given?
 
     action_id = unless ace_actions == [nil]
-      action_tag = ActionTag.create_with_id(project_id:, name: "A")
+      action_tag = ActionTag.create(project_id:, name: "A")
       Array(ace_actions).each_with_index do |action_id, i|
         action_id = ActionType::NAME_MAP.fetch(action_id) { ActionTag[project_id: nil, name: action_id].id }
         action_tag.add_action(action_id)
@@ -62,7 +62,7 @@ RSpec.describe Authorization do
     end
 
     object_id = unless ace_objects == [nil]
-      object_tag = ObjectTag.create_with_id(project_id:, name: "A")
+      object_tag = ObjectTag.create(project_id:, name: "A")
       Array(ace_objects).each do |object_id|
         object_tag.add_object(object_id)
       end
@@ -70,14 +70,14 @@ RSpec.describe Authorization do
       object_tag.id
     end
 
-    AccessControlEntry.create_with_id(project_id:, subject_id: subject_tag.id, action_id:, object_id:)
+    AccessControlEntry.create(project_id:, subject_id: subject_tag.id, action_id:, object_id:)
   end
 
   def add_single_ace_with_nested_tags(policies, project_id: projects[0].id)
     add_single_ace(policies, project_id:) do |tag|
       3.times do |i|
         old_tag = tag
-        tag = tag.class.create_with_id(project_id: tag.project_id, name: i.to_s)
+        tag = tag.class.create(project_id: tag.project_id, name: i.to_s)
         tag.send(:"add_#{tag.class.name.delete_suffix("Tag").downcase}", old_tag.id)
       end
       tag
@@ -136,7 +136,7 @@ RSpec.describe Authorization do
       project_id = projects[0].id
 
       # Backwards compatibility for old TYPE_ETC ubid (etkjnpyp1dst3n9d2mct7s71rh in this example)
-      api_key_id = ApiKey.create_with_id(owner_table: "project", owner_id: project_id, used_for: "inference_endpoint", project_id:) { |api_key| api_key.id = "9cab6f58-2dce-85da-aa5a-2a3347c9c388" }.id
+      api_key_id = ApiKey.create(owner_table: "project", owner_id: project_id, used_for: "inference_endpoint", project_id:) { |api_key| api_key.id = "9cab6f58-2dce-85da-aa5a-2a3347c9c388" }.id
 
       [
         [{subjects: [users[0].id], actions: ["Vm:view"], objects: api_key_id}, users[0].id, "Vm:view", api_key_id, 1],
@@ -209,14 +209,14 @@ RSpec.describe Authorization do
     end
 
     it "does not raise error when there existed a matching access control entry when object_id in in project" do
-      st = SubjectTag.create_with_id(project_id: projects[0].id, name: "test")
+      st = SubjectTag.create(project_id: projects[0].id, name: "test")
       expect { described_class.authorize(projects[0].id, users[0].id, "Vm:view", projects[0].id) }.not_to raise_error
       expect { described_class.authorize(projects[0].id, users[0].id, "Vm:view", vms[0].id) }.not_to raise_error
       expect { described_class.authorize(projects[0].id, users[0].id, "Vm:view", st.id) }.not_to raise_error
     end
 
     it "raises error when has matched policies when object is in project" do
-      st = SubjectTag.create_with_id(project_id: projects[1].id, name: "test")
+      st = SubjectTag.create(project_id: projects[1].id, name: "test")
       expect { described_class.authorize(projects[0].id, users[0].id, "Vm:view", projects[1].id) }.to raise_error Authorization::Unauthorized
       expect { described_class.authorize(projects[0].id, users[0].id, "Vm:view", vms[3].id) }.to raise_error Authorization::Unauthorized
       expect { described_class.authorize(projects[0].id, users[0].id, "Vm:view", st.id) }.to raise_error Authorization::Unauthorized

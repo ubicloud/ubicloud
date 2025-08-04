@@ -19,13 +19,13 @@ class Account < Sequel::Model(:accounts)
 
     if default_policy
       # Grant user Admin access
-      admin_subject_tag = SubjectTag.create_with_id(project_id: project.id, name: "Admin")
+      admin_subject_tag = SubjectTag.create(project_id: project.id, name: "Admin")
       admin_subject_tag.add_subject(id)
-      AccessControlEntry.create_with_id(project_id: project.id, subject_id: admin_subject_tag.id)
+      AccessControlEntry.create(project_id: project.id, subject_id: admin_subject_tag.id)
 
       # Also create a Member subject tag with access to member actions
-      member_subject_tag = SubjectTag.create_with_id(project_id: project.id, name: "Member")
-      AccessControlEntry.create_with_id(project_id: project.id, subject_id: member_subject_tag.id, action_id: ActionTag::MEMBER_ID)
+      member_subject_tag = SubjectTag.create(project_id: project.id, name: "Member")
+      AccessControlEntry.create(project_id: project.id, subject_id: member_subject_tag.id, action_id: ActionTag::MEMBER_ID)
     end
 
     project

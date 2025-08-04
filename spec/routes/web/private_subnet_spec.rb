@@ -199,7 +199,7 @@ RSpec.describe Clover, "private subnet" do
     describe "show firewalls" do
       it "can show attached firewalls" do
         private_subnet
-        fw = Firewall.create_with_id(name: "dummy-fw", description: "dummy-fw", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
+        fw = Firewall.create(name: "dummy-fw", description: "dummy-fw", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
         fw.associate_with_private_subnet(private_subnet)
 
         visit "#{project.path}#{private_subnet.path}"
@@ -222,7 +222,7 @@ RSpec.describe Clover, "private subnet" do
         expect(page.all("a").map(&:text)).to include ps2.name
 
         AccessControlEntry.dataset.destroy
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:view"], object_id: private_subnet.id)
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:view"], object_id: private_subnet.id)
         page.refresh
         expect(page).to have_content ps2.name
         expect(page.all("a").map(&:text)).not_to include ps2.name
@@ -300,7 +300,7 @@ RSpec.describe Clover, "private subnet" do
 
       it "can not delete private subnet when does not have permissions" do
         # Give permission to view, so we can see the detail page
-        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:view"])
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:view"])
 
         visit "#{project_wo_permissions.path}#{ps_wo_permission.path}"
         expect(page.title).to eq "Ubicloud - dummy-ps-2"

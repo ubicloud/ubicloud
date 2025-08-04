@@ -14,7 +14,7 @@ RSpec.describe MetricsTargetResource do
 
     it "initializes with a resource and a tsdb client when VictoriaMetrics is found" do
       expect(Config).to receive(:postgres_service_project_id).at_least(:once).and_return("4d8f9896-26a3-4784-8f52-2ed5d5e55c0e")
-      prj = Project.create_with_id(name: "pg-project") { it.id = Config.postgres_service_project_id }
+      prj = Project.create(name: "pg-project") { it.id = Config.postgres_service_project_id }
       vmr = instance_double(VictoriaMetricsResource, project_id: prj.id)
       expect(VictoriaMetricsResource).to receive(:first).with(project_id: prj.id).and_return(vmr)
       expect(vmr).to receive(:servers).and_return([instance_double(VictoriaMetricsServer, client: "tsdb_client")])
@@ -26,7 +26,7 @@ RSpec.describe MetricsTargetResource do
     it "initializes with a resource and a tsdb client when VictoriaMetrics is not found in development" do
       expect(Config).to receive(:development?).and_return(true)
       expect(Config).to receive(:postgres_service_project_id).at_least(:once).and_return("4d8f9896-26a3-4784-8f52-2ed5d5e55c0e")
-      prj = Project.create_with_id(name: "pg-project") { it.id = Config.postgres_service_project_id }
+      prj = Project.create(name: "pg-project") { it.id = Config.postgres_service_project_id }
       expect(VictoriaMetricsResource).to receive(:first).with(project_id: prj.id).and_return(nil)
       expect(VictoriaMetrics::Client).to receive(:new).with(endpoint: "http://localhost:8428").and_return("tsdb_client")
       expect(resource.instance_variable_get(:@resource)).to eq(postgres_server)
@@ -73,7 +73,7 @@ RSpec.describe MetricsTargetResource do
 
   describe "#export_metrics" do
     before do
-      prj = Project.create_with_id(name: "vm-project") { it.id = "4d8f9896-26a3-4784-8f52-2ed5d5e55c0d" }
+      prj = Project.create(name: "vm-project") { it.id = "4d8f9896-26a3-4784-8f52-2ed5d5e55c0d" }
       expect(Config).to receive(:postgres_service_project_id).and_return(prj.id)
       vmr = instance_double(VictoriaMetricsResource, project_id: prj.id)
       expect(VictoriaMetricsResource).to receive(:first).with(project_id: prj.id).and_return(vmr)

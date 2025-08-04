@@ -4,7 +4,7 @@ class Prog::Storage::RemoveSpdk < Prog::Base
   subject_is :spdk_installation
 
   def self.assemble(spdk_installation_id)
-    Strand.create_with_id(
+    Strand.create(
       prog: "Storage::RemoveSpdk",
       label: "start",
       stack: [{

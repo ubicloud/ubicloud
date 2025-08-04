@@ -4,7 +4,7 @@ require_relative "spec_helper"
 
 RSpec.describe VmPool do
   let(:pool) {
-    described_class.create_with_id(
+    described_class.create(
       size: 3,
       vm_size: "standard-2",
       boot_image: "img",
@@ -26,7 +26,7 @@ RSpec.describe VmPool do
 
   describe ".pick_vm" do
     let(:prj) {
-      Project.create_with_id(name: "default")
+      Project.create(name: "default")
     }
     let(:vm) {
       create_vm(pool_id: pool.id, display_state: "running", project_id: prj.id)

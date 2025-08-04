@@ -141,7 +141,7 @@ class Prog::DownloadBootImage < Prog::Base
 
     fail "Image already exists on host" if vm_host.boot_images_dataset.where(name: image_name, version: version).count > 0
 
-    BootImage.create_with_id(
+    BootImage.create(
       vm_host_id: vm_host.id,
       name: image_name,
       version: version,

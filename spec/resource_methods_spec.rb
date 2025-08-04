@@ -3,7 +3,7 @@
 require_relative "../model"
 
 RSpec.describe ResourceMethods do
-  let(:sa) { Sshable.create_with_id(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair) }
+  let(:sa) { Sshable.create(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair) }
 
   it "#inspect hides sensitive and long columns" do
     [GithubRunner, PostgresResource, Vm, VmHost, MinioCluster, MinioServer, Cert].each do |klass|

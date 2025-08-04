@@ -18,7 +18,7 @@ RSpec.describe Clover, "vm" do
   describe "authenticated" do
     before do
       login_api
-      postgres_project = Project.create_with_id(name: "default")
+      postgres_project = Project.create(name: "default")
       allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
     end
 

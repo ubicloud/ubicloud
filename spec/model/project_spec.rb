@@ -4,7 +4,7 @@ require_relative "spec_helper"
 require "octokit"
 
 RSpec.describe Project do
-  subject(:project) { described_class.create_with_id(name: "test") }
+  subject(:project) { described_class.create(name: "test") }
 
   describe "#validate" do
     invalid_name = "must only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number"
@@ -62,22 +62,22 @@ RSpec.describe Project do
 
     it "returns false when no payment method" do
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
-      bi = BillingInfo.create_with_id(stripe_id: "cus")
+      bi = BillingInfo.create(stripe_id: "cus")
       project.update(billing_info_id: bi.id)
       expect(project.has_valid_payment_method?).to be false
     end
 
     it "returns true when has valid payment method" do
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
-      bi = BillingInfo.create_with_id(stripe_id: "cus123")
-      PaymentMethod.create_with_id(billing_info_id: bi.id, stripe_id: "pm123")
+      bi = BillingInfo.create(stripe_id: "cus123")
+      PaymentMethod.create(billing_info_id: bi.id, stripe_id: "pm123")
       project.update(billing_info_id: bi.id)
       expect(project.has_valid_payment_method?).to be true
     end
 
     it "returns true when has some credits" do
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
-      bi = BillingInfo.create_with_id(stripe_id: "cus")
+      bi = BillingInfo.create(stripe_id: "cus")
       project.update(billing_info_id: bi.id, credit: 100)
       expect(project.has_valid_payment_method?).to be true
     end
@@ -85,7 +85,7 @@ RSpec.describe Project do
 
   describe ".soft_delete" do
     it "deletes github installations" do
-      SubjectTag.create_with_id(project_id: project.id, name: "test").add_subject(project.id)
+      SubjectTag.create(project_id: project.id, name: "test").add_subject(project.id)
       AccessControlEntry.new_with_id(project_id: project.id, subject_id: project.id).save_changes(validate: false)
       expect(project).to receive(:github_installations).and_return([instance_double(GithubInstallation)])
       expect(Prog::Github::DestroyGithubInstallation).to receive(:assemble)
@@ -103,15 +103,15 @@ RSpec.describe Project do
     end
 
     it "returns false if any accounts is suspended" do
-      project = described_class.create_with_id(name: "test")
-      Account.create_with_id(email: "user1@example.com").tap { it.add_project(project) }
-      Account.create_with_id(email: "user2@example.com").tap { it.add_project(project) }.update(suspended_at: Time.now)
+      project = described_class.create(name: "test")
+      Account.create(email: "user1@example.com").tap { it.add_project(project) }
+      Account.create(email: "user2@example.com").tap { it.add_project(project) }.update(suspended_at: Time.now)
       expect(project.active?).to be false
     end
 
     it "returns true if any condition not match" do
-      project = described_class.create_with_id(name: "test")
-      Account.create_with_id(email: "user1@example.com").tap { it.add_project(project) }
+      project = described_class.create(name: "test")
+      Account.create(email: "user1@example.com").tap { it.add_project(project) }
       expect(project.active?).to be true
     end
   end
@@ -183,7 +183,7 @@ RSpec.describe Project do
   end
 
   it "calculates effective quota value" do
-    project = described_class.create_with_id(name: "test")
+    project = described_class.create(name: "test")
     project.add_quota(ProjectQuota.new(value: 1000).tap { it.quota_id = "14fa6820-bf63-41d2-b35e-4a4dcefd1b15" })
     expect(project.effective_quota_value("VmVCpu")).to eq 32
     expect(project.effective_quota_value("GithubRunnerVCpu")).to eq 1000

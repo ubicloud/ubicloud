@@ -243,7 +243,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
           today_record.amount = Sequel[:amount] + tokens
           today_record.save_changes(validate: false)
         else
-          BillingRecord.create_with_id(
+          BillingRecord.create(
             project_id: project.id,
             resource_id: inference_endpoint.id,
             resource_name: "#{resource_family} #{begin_time.strftime("%Y-%m-%d")}",

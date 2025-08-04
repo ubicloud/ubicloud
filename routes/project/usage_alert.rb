@@ -11,7 +11,7 @@ class Clover
         limit = typecast_params.pos_int!("limit")
 
         DB.transaction do
-          ua = UsageAlert.create_with_id(project_id: @project.id, user_id: current_account_id, name:, limit:)
+          ua = UsageAlert.create(project_id: @project.id, user_id: current_account_id, name:, limit:)
           audit_log(ua, "create")
         end
 

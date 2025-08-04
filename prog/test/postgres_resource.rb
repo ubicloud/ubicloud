@@ -17,7 +17,7 @@ class Prog::Test::PostgresResource < Prog::Test::Base
       "postgres_test_project_id" => postgres_test_project.id
     }
 
-    Strand.create_with_id(
+    Strand.create(
       prog: "Test::PostgresResource",
       label: "start",
       stack: [frame]

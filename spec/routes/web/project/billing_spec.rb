@@ -10,12 +10,12 @@ RSpec.describe Clover, "billing" do
   let(:project) { user.create_project_with_default_policy("project-1") }
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
   let(:billing_info) do
-    bi = BillingInfo.create_with_id(stripe_id: "cs_1234567890")
+    bi = BillingInfo.create(stripe_id: "cs_1234567890")
     project.update(billing_info_id: bi.id)
     bi
   end
 
-  let(:payment_method) { PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_1234567890") }
+  let(:payment_method) { PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1234567890") }
 
   def stripe_object(hash)
     Stripe::StripeObject.construct_from(hash.transform_values { it.is_a?(Hash) ? stripe_object(it) : it })
@@ -251,7 +251,7 @@ RSpec.describe Clover, "billing" do
     end
 
     it "can't add fraud payment method" do
-      fraud_payment_method = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pmi_1234567890", fraud: true, card_fingerprint: "cfg1234")
+      fraud_payment_method = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pmi_1234567890", fraud: true, card_fingerprint: "cfg1234")
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}}).exactly(3)
       expect(Stripe::PaymentMethod).to receive(:retrieve).with(fraud_payment_method.stripe_id).and_return(stripe_object("card" => {"brand" => "visa"})).twice
       expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_222222222").and_return(stripe_object("card" => {"brand" => "mastercard", "fingerprint" => "cfg1234"}))
@@ -305,7 +305,7 @@ RSpec.describe Clover, "billing" do
     end
 
     it "can delete payment method" do
-      payment_method_2 = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_2222222222")
+      payment_method_2 = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_2222222222")
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "ACME Inc."}})
       expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return(stripe_object("card" => {"brand" => "visa"}))
       expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method_2.stripe_id).and_return(stripe_object("card" => {"brand" => "mastercard"}))
@@ -342,7 +342,7 @@ RSpec.describe Clover, "billing" do
       end
 
       it "can apply a valid discount code" do
-        DiscountCode.create_with_id(code: "VALID_CODE", credit_amount: 33, expires_at: Time.now + 86400)
+        DiscountCode.create(code: "VALID_CODE", credit_amount: 33, expires_at: Time.now + 86400)
         visit "#{project.path}/billing"
         fill_in "Discount Code", with: "VALID_CODE"
         click_button "Apply"
@@ -372,7 +372,7 @@ RSpec.describe Clover, "billing" do
       end
 
       it "shows error for expired discount code" do
-        DiscountCode.create_with_id(code: "EXPIRED_CODE", credit_amount: 33, expires_at: Time.now - 86400)
+        DiscountCode.create(code: "EXPIRED_CODE", credit_amount: 33, expires_at: Time.now - 86400)
         visit "#{project.path}/billing"
         fill_in "Discount Code", with: "EXPIRED_CODE"
         click_button "Apply"
@@ -383,8 +383,8 @@ RSpec.describe Clover, "billing" do
       end
 
       it "shows error if discount code has already been applied" do
-        used_discount_code = DiscountCode.create_with_id(code: "USED_CODE", credit_amount: 33, expires_at: Time.now + 86400)
-        ProjectDiscountCode.create_with_id(project_id: project.id, discount_code_id: used_discount_code.id)
+        used_discount_code = DiscountCode.create(code: "USED_CODE", credit_amount: 33, expires_at: Time.now + 86400)
+        ProjectDiscountCode.create(project_id: project.id, discount_code_id: used_discount_code.id)
         visit "#{project.path}/billing"
         fill_in "Discount Code", with: "USED_CODE"
         click_button "Apply"
@@ -397,7 +397,7 @@ RSpec.describe Clover, "billing" do
 
     describe "discount code without billing info" do
       it "can create billing info if missing when adding a valid discount code" do
-        DiscountCode.create_with_id(code: "VALID_CODE", credit_amount: 33, expires_at: Time.now + 86400)
+        DiscountCode.create(code: "VALID_CODE", credit_amount: 33, expires_at: Time.now + 86400)
         customer = {
           "id" => "test_customer",
           "name" => "ACME Inc.",
@@ -446,7 +446,7 @@ RSpec.describe Clover, "billing" do
 
       def billing_record(begin_time, end_time)
         vm = create_vm
-        BillingRecord.create_with_id(
+        BillingRecord.create(
           project_id: billing_info.project.id,
           resource_id: vm.id,
           resource_name: vm.name,
@@ -639,8 +639,8 @@ RSpec.describe Clover, "billing" do
 
     describe "usage alerts" do
       before do
-        UsageAlert.create_with_id(project_id: project.id, user_id: user.id, name: "alert-1", limit: 101)
-        UsageAlert.create_with_id(project_id: project_wo_permissions.id, user_id: user.id, name: "alert-2", limit: 100)
+        UsageAlert.create(project_id: project.id, user_id: user.id, name: "alert-1", limit: 101)
+        UsageAlert.create(project_id: project_wo_permissions.id, user_id: user.id, name: "alert-2", limit: 100)
       end
 
       it "can list usage alerts" do

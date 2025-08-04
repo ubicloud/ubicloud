@@ -5,7 +5,7 @@ require_relative "../spec_helper"
 RSpec.describe VictoriaMetricsServer do
   subject(:vms) {
     vm = create_vm(ephemeral_net6: "fdfa:b5aa:14a3:4a3d::/64")
-    vmr = VictoriaMetricsResource.create_with_id(
+    vmr = VictoriaMetricsResource.create(
       location_id: Location::HETZNER_FSN1_ID,
       name: "victoria-metrics-cluster",
       admin_user: "vm-admin",
@@ -17,7 +17,7 @@ RSpec.describe VictoriaMetricsServer do
       project_id: vm.project_id
     )
 
-    described_class.create_with_id(
+    described_class.create(
       victoria_metrics_resource_id: vmr.id,
       vm_id: vm.id,
       cert: "cert",

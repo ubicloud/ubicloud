@@ -20,7 +20,7 @@ RSpec.describe Prog::Base do
   end
 
   it "can bud and reap" do
-    parent = Strand.create_with_id(prog: "Test", label: "budder")
+    parent = Strand.create(prog: "Test", label: "budder")
     expect {
       parent.unsynchronized_run
     }.to change { parent.children_dataset.empty? }.from(true).to(false)
@@ -44,8 +44,8 @@ RSpec.describe Prog::Base do
   end
 
   it "keeps children array state in sync even in consecutive-run mode" do
-    parent = Strand.create_with_id(prog: "Test", label: "reap_exit_no_children")
-    child = Strand.create_with_id(parent_id: parent.id, prog: "Test", label: "napper")
+    parent = Strand.create(prog: "Test", label: "reap_exit_no_children")
+    child = Strand.create(parent_id: parent.id, prog: "Test", label: "napper")
     prg = parent.load
     expect(parent).to receive(:load).twice.and_return(prg)
 
@@ -73,7 +73,7 @@ RSpec.describe Prog::Base do
   end
 
   it "can push prog and frames on the stack" do
-    st = Strand.create_with_id(prog: "Test", label: "pusher1")
+    st = Strand.create(prog: "Test", label: "pusher1")
     expect {
       st.run
     }.to change { st.label }.from("pusher1").to("pusher2")
@@ -102,7 +102,7 @@ RSpec.describe Prog::Base do
   end
 
   it "can nap" do
-    st = Strand.create_with_id(prog: "Test", label: "napper")
+    st = Strand.create(prog: "Test", label: "napper")
     ante = st.schedule
     st.run
     post = st.schedule
@@ -110,7 +110,7 @@ RSpec.describe Prog::Base do
   end
 
   it "can push new subject_id" do
-    st = Strand.create_with_id(prog: "Test", label: "push_subject_id")
+    st = Strand.create(prog: "Test", label: "push_subject_id")
     st.run
     expect(st.stack.first["subject_id"]).not_to eq(st.id)
   end
@@ -128,7 +128,7 @@ RSpec.describe Prog::Base do
   end
 
   it "can manipulate semaphores" do
-    st = Strand.create_with_id(prog: "Test", label: "increment_semaphore")
+    st = Strand.create(prog: "Test", label: "increment_semaphore")
     expect {
       st.run
     }.to change { Semaphore.where(strand_id: st.id).any? }.from(false).to(true)
@@ -140,7 +140,7 @@ RSpec.describe Prog::Base do
   end
 
   it "calls before_run if it is available" do
-    st = Strand.create_with_id(prog: "Prog::Vm::Nexus", label: "wait")
+    st = Strand.create(prog: "Prog::Vm::Nexus", label: "wait")
     prg = instance_double(Prog::Vm::Nexus)
     expect(st).to receive(:load).and_return(prg)
     expect(prg).to receive(:before_run)
@@ -169,7 +169,7 @@ RSpec.describe Prog::Base do
 
   context "with deadlines" do
     it "registers a deadline only if the current deadline is nil, later or to a different target" do
-      st = Strand.create_with_id(prog: "Test", label: :set_expired_deadline)
+      st = Strand.create(prog: "Test", label: :set_expired_deadline)
 
       # register if current deadline is nil
       expect {
@@ -209,7 +209,7 @@ RSpec.describe Prog::Base do
     end
 
     it "triggers a page exactly once when deadline is expired" do
-      st = Strand.create_with_id(prog: "Test", label: :set_expired_deadline)
+      st = Strand.create(prog: "Test", label: :set_expired_deadline)
       st.unsynchronized_run
       expect {
         st.unsynchronized_run
@@ -221,7 +221,7 @@ RSpec.describe Prog::Base do
     end
 
     it "resolves the page if the frame is popped" do
-      st = Strand.create_with_id(prog: "Test", label: :set_popping_deadline1)
+      st = Strand.create(prog: "Test", label: :set_popping_deadline1)
       st.unsynchronized_run
       st.unsynchronized_run
       expect {
@@ -238,7 +238,7 @@ RSpec.describe Prog::Base do
     end
 
     it "resolves the page of the budded prog when pop" do
-      st = Strand.create_with_id(prog: "Test", label: :set_popping_deadline_via_bud)
+      st = Strand.create(prog: "Test", label: :set_popping_deadline_via_bud)
       st.unsynchronized_run
       st.unsynchronized_run
       expect {
@@ -255,7 +255,7 @@ RSpec.describe Prog::Base do
     end
 
     it "resolves the page once the target is reached" do
-      st = Strand.create_with_id(prog: "Test", label: :napper)
+      st = Strand.create(prog: "Test", label: :napper)
       page_id = Prog::PageNexus.assemble("dummy-summary", ["Deadline", st.id, st.prog, :napper], st.ubid).id
 
       st.stack.first["deadline_target"] = "napper"
@@ -269,7 +269,7 @@ RSpec.describe Prog::Base do
     end
 
     it "resolves the page once a new deadline is registered" do
-      st = Strand.create_with_id(prog: "Test", label: :start)
+      st = Strand.create(prog: "Test", label: :start)
       page_id = Prog::PageNexus.assemble("dummy-summary", ["Deadline", st.id, st.prog, :napper], st.ubid).id
 
       st.stack.first["deadline_target"] = "napper"
@@ -287,7 +287,7 @@ RSpec.describe Prog::Base do
     end
 
     it "deletes the deadline information once the target is reached" do
-      st = Strand.create_with_id(prog: "Test", label: :napper)
+      st = Strand.create(prog: "Test", label: :napper)
       st.stack.first["deadline_target"] = "napper"
       st.stack.first["deadline_at"] = Time.now - 1
 
@@ -298,7 +298,7 @@ RSpec.describe Prog::Base do
     end
 
     it "can create pages for progs that are not on the top of the stack" do
-      st = Strand.create_with_id(prog: "Test2", label: "pusher1")
+      st = Strand.create(prog: "Test2", label: "pusher1")
       st.stack.first["deadline_target"] = "t1"
       st.stack.first["deadline_at"] = Time.now + 1
       st.unsynchronized_run

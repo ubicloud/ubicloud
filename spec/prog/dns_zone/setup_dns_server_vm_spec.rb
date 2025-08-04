@@ -12,10 +12,10 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
     allow(Config).to receive(:dns_service_project_id).and_return(project.id)
   end
 
-  let(:ds) { DnsServer.create_with_id(name: "toruk") }
+  let(:ds) { DnsServer.create(name: "toruk") }
   let(:dzs) do
     build_zone = ->(name, neg_ttl) do
-      dz = DnsZone.create_with_id(project_id: project.id, name: name, last_purged_at: Time.now, neg_ttl: neg_ttl)
+      dz = DnsZone.create(project_id: project.id, name: name, last_purged_at: Time.now, neg_ttl: neg_ttl)
       Strand.create(prog: "DnsZone::DnsZoneNexus", label: "wait") { it.id = dz.id }
       dz.add_dns_server ds
       3.times { dz.insert_record(record_name: "#{SecureRandom.alphanumeric(6)}.#{dz.name}", type: "A", ttl: 10, data: IPAddr.new(rand(2**32), Socket::AF_INET).to_s) }
@@ -24,7 +24,7 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
 
     (1..2).map { |i| build_zone.call("zone#{i}.domain.io", 3600) } << build_zone.call("k8s.ubicloud.com", 15)
   end
-  let(:project) { Project.create_with_id(name: "ubicloud-dns") }
+  let(:project) { Project.create(name: "ubicloud-dns") }
 
   describe ".assemble" do
     it "validates input" do

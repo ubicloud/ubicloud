@@ -4,7 +4,7 @@ require_relative "../spec_helper"
 
 RSpec.describe DnsZone do
   subject(:dns_zone) {
-    described_class.create_with_id(
+    described_class.create(
       project_id: "00000000-0000-0000-0000-000000000000",
       name: "example.com"
     )
@@ -29,10 +29,10 @@ RSpec.describe DnsZone do
 
   context "when deleting a record" do
     before do
-      DnsRecord.create_with_id(dns_zone_id: dns_zone.id, name: "test1.", type: "A", ttl: 10, data: "1.2.3.4")
-      DnsRecord.create_with_id(dns_zone_id: dns_zone.id, name: "test1.", type: "A", ttl: 10, data: "5.6.7.8")
-      DnsRecord.create_with_id(dns_zone_id: dns_zone.id, name: "test1.", type: "TXT", ttl: 10, data: "5.6.7.8")
-      DnsRecord.create_with_id(dns_zone_id: dns_zone.id, name: "test2.", type: "A", ttl: 10, data: "5.6.7.8")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test1.", type: "A", ttl: 10, data: "1.2.3.4")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test1.", type: "A", ttl: 10, data: "5.6.7.8")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test1.", type: "TXT", ttl: 10, data: "5.6.7.8")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test2.", type: "A", ttl: 10, data: "5.6.7.8")
     end
 
     it "raises error if data is passed but type is not" do

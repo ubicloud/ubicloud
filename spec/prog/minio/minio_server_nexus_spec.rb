@@ -11,7 +11,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
     ps = Prog::Vnet::SubnetNexus.assemble(
       minio_project.id, name: "minio-cluster-name"
     )
-    mc = MinioCluster.create_with_id(
+    mc = MinioCluster.create(
       location_id: Location::HETZNER_FSN1_ID,
       name: "minio-cluster-name",
       admin_user: "minio-admin",
@@ -24,7 +24,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       root_cert_key_2: "root_cert_key_2"
     )
 
-    MinioPool.create_with_id(
+    MinioPool.create(
       start_index: 0,
       cluster_id: mc.id,
       server_count: 1,
@@ -48,7 +48,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
     }
   }
 
-  let(:minio_project) { Project.create_with_id(name: "default") }
+  let(:minio_project) { Project.create(name: "default") }
 
   before do
     allow(Config).to receive(:minio_service_project_id).and_return(minio_project.id)
@@ -128,7 +128,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
     end
 
     it "inserts dns record and hops to bootstrap_rhizome if dnszone exists" do
-      dz = DnsZone.create_with_id(project_id: minio_project.id, name: Config.minio_host_name)
+      dz = DnsZone.create(project_id: minio_project.id, name: Config.minio_host_name)
       expect(nx.minio_server.cluster).to receive(:dns_zone).and_return(dz).at_least(:once)
       vm = nx.minio_server.vm
       vm.strand.update(label: "wait")
@@ -359,7 +359,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
     end
 
     it "triggers vm destroy, nic, sshable, dnszone delete record and minio server destroy if dnszone exits" do
-      DnsZone.create_with_id(project_id: minio_project.id, name: Config.minio_host_name)
+      DnsZone.create(project_id: minio_project.id, name: Config.minio_host_name)
       expect(nx).to receive(:register_deadline).with(nil, 10 * 60)
       expect(nx).to receive(:decr_destroy)
       expect(nx.minio_server.vm.sshable).to receive(:destroy)
@@ -371,7 +371,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
     end
 
     it "if dnszone exits and vm has ipv4, it gets deleted properly" do
-      DnsZone.create_with_id(project_id: minio_project.id, name: Config.minio_host_name)
+      DnsZone.create(project_id: minio_project.id, name: Config.minio_host_name)
       expect(nx).to receive(:register_deadline).with(nil, 10 * 60)
       expect(nx).to receive(:decr_destroy)
       expect(nx.minio_server.vm.sshable).to receive(:destroy)

@@ -18,7 +18,7 @@ RSpec.describe InvoiceGenerator do
       name = resource.name
     end
 
-    BillingRecord.create_with_id(
+    BillingRecord.create(
       project_id: project.id,
       resource_id: resource.id,
       resource_name: name,
@@ -95,13 +95,13 @@ RSpec.describe InvoiceGenerator do
   end
 
   let(:p1) {
-    Account.create_with_id(email: "auth1@example.com")
-    Project.create_with_id(name: "cool-project")
+    Account.create(email: "auth1@example.com")
+    Project.create(name: "cool-project")
   }
   let(:vm1) { create_vm }
   let(:ps) { Prog::Vnet::SubnetNexus.assemble(p1.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject }
   let(:lb) { Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-1", src_port: 80, dst_port: 80, health_check_endpoint: "/up") }
-  let(:ie1) { InferenceEndpoint.create_with_id(name: "ie1", model_name: "test-model", project_id: p1.id, is_public: true, visible: true, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id) }
+  let(:ie1) { InferenceEndpoint.create(name: "ie1", model_name: "test-model", project_id: p1.id, is_public: true, visible: true, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id) }
 
   let(:day) { 24 * 60 * 60 }
   let(:begin_time) { Time.utc(2023, 6) }
@@ -166,7 +166,7 @@ RSpec.describe InvoiceGenerator do
 
     it "charges no VAT for non-EU customer" do
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "US"}}).at_least(:once)
-      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+      p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
       invoices = described_class.new(begin_time, end_time).run
@@ -175,7 +175,7 @@ RSpec.describe InvoiceGenerator do
 
     it "charges 21% VAT for Dutch customer with tax id" do
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "NL"}}).at_least(:once)
-      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+      p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
       invoices = described_class.new(begin_time, end_time, eur_rate: 1.1).run
@@ -184,7 +184,7 @@ RSpec.describe InvoiceGenerator do
 
     it "charges 21% VAT for Dutch customer without tax id" do
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => {"line1" => "123 Main St", "country" => "NL"}}).at_least(:once)
-      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+      p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
       invoices = described_class.new(begin_time, end_time, eur_rate: 1.1).run
@@ -193,7 +193,7 @@ RSpec.describe InvoiceGenerator do
 
     it "reverse charges VAT for non-Dutch EU customer with tax id" do
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
-      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+      p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
       invoices = described_class.new(begin_time, end_time).run
@@ -203,7 +203,7 @@ RSpec.describe InvoiceGenerator do
     it "charges 21% VAT for non-Dutch EU customer without tax id until threshold" do
       expect(Config).to receive(:annual_non_dutch_eu_sales_exceed_threshold).and_return(false)
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
-      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+      p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
       invoices = described_class.new(begin_time, end_time, eur_rate: 1.1).run
@@ -213,7 +213,7 @@ RSpec.describe InvoiceGenerator do
     it "charges local VAT for non-Dutch EU customer without tax id if threshold exceeds" do
       expect(Config).to receive(:annual_non_dutch_eu_sales_exceed_threshold).and_return(true)
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
-      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+      p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
       invoices = described_class.new(begin_time, end_time, eur_rate: 1.1).run
@@ -222,7 +222,7 @@ RSpec.describe InvoiceGenerator do
 
     it "charges no VAT if the total is less than minimum invoice charge threshold" do
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
-      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+      p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time, begin_time + 0.5 * day), 2)
       invoices = described_class.new(begin_time, end_time).run
@@ -231,7 +231,7 @@ RSpec.describe InvoiceGenerator do
 
     it "charges no VAT if the address is missing" do
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => nil}).at_least(:once)
-      p1.update(billing_info_id: BillingInfo.create_with_id(stripe_id: "cs_1234567890").id)
+      p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time, begin_time + 0.5 * day), 2)
       invoices = described_class.new(begin_time, end_time).run
@@ -240,7 +240,7 @@ RSpec.describe InvoiceGenerator do
   end
 
   it "generates invoice for a single project" do
-    p2 = Project.create_with_id(name: "cool-project")
+    p2 = Project.create(name: "cool-project")
     vm2 = create_vm
 
     generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time, end_time))
@@ -300,7 +300,7 @@ RSpec.describe InvoiceGenerator do
   end
 
   it "handles github runner credit only" do
-    github_runner = GithubRunner.create_with_id(label: "ubicloud", repository_name: "my-repo")
+    github_runner = GithubRunner.create(label: "ubicloud", repository_name: "my-repo")
     generate_billing_record(p1, github_runner, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
     invoice = described_class.new(begin_time, end_time).run.first.content
@@ -311,7 +311,7 @@ RSpec.describe InvoiceGenerator do
   end
 
   it "handles project and github runner credits together" do
-    github_runner = GithubRunner.create_with_id(label: "ubicloud", repository_name: "my-repo")
+    github_runner = GithubRunner.create(label: "ubicloud", repository_name: "my-repo")
     generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
     generate_billing_record(p1, github_runner, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
@@ -327,7 +327,7 @@ RSpec.describe InvoiceGenerator do
   end
 
   it "handles full discount and github runner credits together" do
-    github_runner = GithubRunner.create_with_id(label: "ubicloud", repository_name: "my-repo")
+    github_runner = GithubRunner.create(label: "ubicloud", repository_name: "my-repo")
     generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
     generate_billing_record(p1, github_runner, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
@@ -376,7 +376,7 @@ RSpec.describe InvoiceGenerator do
   end
 
   it "handles inference quota with two different models on the same day" do
-    ie2 = InferenceEndpoint.create_with_id(name: "ie2", model_name: "test-model2", project_id: p1.id, is_public: true, visible: true, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id)
+    ie2 = InferenceEndpoint.create(name: "ie2", model_name: "test-model2", project_id: p1.id, is_public: true, visible: true, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id)
     generate_billing_record(p1, ie1, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time, begin_time.to_date.to_time + day), 100000)
     generate_billing_record(p1, ie2, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time, begin_time.to_date.to_time + day), 800000)
     invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content
@@ -391,7 +391,7 @@ RSpec.describe InvoiceGenerator do
   end
 
   it "handles inference quota with two different models on different days" do
-    ie2 = InferenceEndpoint.create_with_id(name: "ie2", model_name: "test-model2", project_id: p1.id, is_public: true, visible: true, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id)
+    ie2 = InferenceEndpoint.create(name: "ie2", model_name: "test-model2", project_id: p1.id, is_public: true, visible: true, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id)
     generate_billing_record(p1, ie1, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time, begin_time.to_date.to_time + day), 100000)
     generate_billing_record(p1, ie2, Sequel::Postgres::PGRange.new(begin_time.to_date.to_time + 2 * day, begin_time.to_date.to_time + 3 * day), 800000)
     invoice = described_class.new(begin_time, end_time, save_result: true, eur_rate: 1.1).run.first.content

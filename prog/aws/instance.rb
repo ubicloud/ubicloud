@@ -176,7 +176,7 @@ usermod -L ubuntu
     instance_response = client.describe_instances({filters: [{name: "instance-id", values: [vm.aws_instance.instance_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).reservations[0].instances[0]
     if instance_response.dig(:state, :name) == "running"
       public_ipv4 = instance_response.dig(:network_interfaces, 0, :association, :public_ip)
-      AssignedVmAddress.create_with_id(
+      AssignedVmAddress.create(
         dst_vm_id: vm.id,
         ip: public_ipv4
       )

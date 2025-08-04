@@ -122,11 +122,11 @@ class Clover
 
         DB.transaction do
           unless (billing_info = @project.billing_info)
-            billing_info = BillingInfo.create_with_id(stripe_id: customer_stripe_id)
+            billing_info = BillingInfo.create(stripe_id: customer_stripe_id)
             @project.update(billing_info_id: billing_info.id)
           end
 
-          PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: stripe_id, card_fingerprint: card_fingerprint, preauth_intent_id: payment_intent.id, preauth_amount: preauth_amount)
+          PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: stripe_id, card_fingerprint: card_fingerprint, preauth_intent_id: payment_intent.id, preauth_amount: preauth_amount)
         end
 
         unless @project.billing_info.has_address?

@@ -69,7 +69,7 @@ RSpec.describe Ubicloud do
   end
 
   it "supports inference api keys" do
-    account = Account.create_with_id(email: "user@example.com", status_id: 2)
+    account = Account.create(email: "user@example.com", status_id: 2)
     project = account.create_project_with_default_policy("test")
     pat = ApiKey.create_personal_access_token(account, project:)
     SubjectTag.first(project_id: project.id, name: "Admin").add_subject(pat.id)

@@ -18,8 +18,8 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
 
   describe ".assemble" do
     it "creates github repository or updates last_job_at if the repository exists" do
-      project = Project.create_with_id(name: "default")
-      installation = GithubInstallation.create_with_id(installation_id: 123, project_id: project.id, name: "test-user", type: "User")
+      project = Project.create(name: "default")
+      installation = GithubInstallation.create(installation_id: 123, project_id: project.id, name: "test-user", type: "User")
 
       expect {
         described_class.assemble(installation, "ubicloud/ubicloud", "master")
@@ -102,8 +102,8 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     let(:blob_storage_client) { instance_double(Aws::S3::Client) }
 
     before do
-      project = Project.create_with_id(name: "test")
-      installation = GithubInstallation.create_with_id(installation_id: 123, project_id: project.id, name: "test-user", type: "User")
+      project = Project.create(name: "test")
+      installation = GithubInstallation.create(installation_id: 123, project_id: project.id, name: "test-user", type: "User")
       github_repository.installation_id = installation.id
       github_repository.save_changes
       allow(Aws::S3::Client).to receive(:new).and_return(blob_storage_client)

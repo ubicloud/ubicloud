@@ -21,7 +21,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       created_at: Time.now - 8 * 24 * 60 * 60
     )
 
-    Strand.create_with_id(
+    Strand.create(
       prog: "Test::GithubRunner",
       label: "start",
       stack: [{

@@ -7,7 +7,7 @@ RSpec.describe Prog::RemoveBootImage do
 
   let(:sshable) { vm_host.sshable }
   let(:vm_host) { create_vm_host }
-  let(:boot_image) { BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vm_host.id, size_gib: 14) }
+  let(:boot_image) { BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vm_host.id, size_gib: 14) }
 
   before do
     allow(rbi).to receive(:boot_image).and_return(boot_image)
@@ -48,7 +48,7 @@ RSpec.describe Prog::RemoveBootImage do
   describe "#update_database" do
     it "updates storage and destroys boot image" do
       boot_image.id
-      storage_device = StorageDevice.create_with_id(vm_host_id: vm_host.id, name: "DEFAULT", available_storage_gib: 100, total_storage_gib: 200)
+      storage_device = StorageDevice.create(vm_host_id: vm_host.id, name: "DEFAULT", available_storage_gib: 100, total_storage_gib: 200)
       expect { rbi.update_database }.to exit({"msg" => "Boot image was removed."})
       expect(BootImage[boot_image.id]).to be_nil
       expect(storage_device.reload.available_storage_gib).to eq(114)

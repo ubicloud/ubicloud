@@ -15,7 +15,7 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
   }
 
   let(:kubernetes_cluster) {
-    kc = KubernetesCluster.create_with_id(
+    kc = KubernetesCluster.create(
       name: "k8scluster",
       version: "v1.32",
       cp_node_count: 3,

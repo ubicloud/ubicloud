@@ -2,16 +2,16 @@
 
 [SubjectTag, ActionTag, ObjectTag].each do |model|
   RSpec.describe model do
-    let(:user) { Account.create_with_id(email: "auth1@example.com") }
+    let(:user) { Account.create(email: "auth1@example.com") }
     let(:project) do
-      project = Project.create_with_id(name: "project-1")
+      project = Project.create(name: "project-1")
       user.add_project(project)
       project
     end
-    let(:tag) { model.create_with_id(project_id: project.id, name: "test-#{model}") }
+    let(:tag) { model.create(project_id: project.id, name: "test-#{model}") }
     # rubocop:disable RSpec/IndexedLet
-    let(:tag1) { model.create_with_id(project_id: project.id, name: "tag1") }
-    let(:tag2) { model.create_with_id(project_id: project.id, name: "tag2") }
+    let(:tag1) { model.create(project_id: project.id, name: "tag1") }
+    let(:tag2) { model.create(project_id: project.id, name: "tag2") }
     # rubocop:enable RSpec/IndexedLet
 
     it "#add_member adds a member to the tag" do
@@ -73,7 +73,7 @@
 
     if model == SubjectTag
       it "#check_members_to_add does not allow including Admin subject tag" do
-        expect(tag.check_members_to_add([SubjectTag.create_with_id(project_id: project.id, name: "Admin").id])).to eq [[], ["cannot include Admin subject tag in another tag", "1 members not valid"]]
+        expect(tag.check_members_to_add([SubjectTag.create(project_id: project.id, name: "Admin").id])).to eq [[], ["cannot include Admin subject tag in another tag", "1 members not valid"]]
       end
     end
 
@@ -89,11 +89,11 @@
         object_id = tag.id
         meta_id = ObjectMetatag.to_meta_uuid(object_id)
       end
-      subject_id ||= SubjectTag.create_with_id(project_id: project.id, name: "t").id
+      subject_id ||= SubjectTag.create(project_id: project.id, name: "t").id
       meta_id ||= tag.id
-      ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id:, action_id:, object_id:)
-      ace2 = AccessControlEntry.create_with_id(project_id: project.id, subject_id:, action_id:, object_id: meta_id)
-      ot = ObjectTag.create_with_id(project_id: project.id, name: "t2")
+      ace = AccessControlEntry.create(project_id: project.id, subject_id:, action_id:, object_id:)
+      ace2 = AccessControlEntry.create(project_id: project.id, subject_id:, action_id:, object_id: meta_id)
+      ot = ObjectTag.create(project_id: project.id, name: "t2")
       ot.add_member(meta_id)
 
       tag.destroy

@@ -27,7 +27,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     ports = Validation.validate_load_balancer_ports(ports)
 
     DB.transaction do
-      lb = LoadBalancer.create_with_id(
+      lb = LoadBalancer.create(
         private_subnet_id: private_subnet_id, name: name, algorithm: algorithm,
         custom_hostname: custom_hostname, custom_hostname_dns_zone_id: custom_hostname_dns_zone_id,
         stack: stack, project_id: ps.project_id,
