@@ -65,7 +65,17 @@ RSpec.describe Prog::Test::GithubRunner do
   end
 
   describe "#check_test_runs" do
+    # before { expect(gr_test).to receive(:frame).and_return({"github_runner_aws_location_id" => ""}).at_least(:once) }
+
     it "check test runs completed" do
+      puts gr_test
+      puts gr_test.inspect
+      puts gr_test.strand.inspect
+      st = gr_test.strand
+      st.stack.first["github_runner_aws_location_id"] = "33710fd7-4ef3-8020-b77b-a46e9fa76d6a"
+      st.modified!(:stack)
+      st.save_changes
+      update(stack: {})
       expect(client).to receive(:workflow_runs).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{conclusion: "success", created_at: Time.now + 10}]})
       expect { gr_test.check_test_runs }.to hop("clean_resources")
     end
