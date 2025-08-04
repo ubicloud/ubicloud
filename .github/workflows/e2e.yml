@@ -20,7 +20,7 @@ jobs:
     if: vars.RUN_E2E == 'true'
     runs-on: ubicloud-standard-4
     environment: E2E-CI
-    timeout-minutes: 60
+    timeout-minutes: 65
     concurrency: e2e_environment
 
     steps:
@@ -83,6 +83,8 @@ jobs:
         DISPATCHER_MAX_THREADS: 16
         E2E_HETZNER_SERVER_ID: ${{ secrets.E2E_HETZNER_SERVER_ID }}
         E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
+        E2E_AWS_ACCESS_KEY: ${{ secrets.E2E_AWS_ACCESS_KEY }}
+        E2E_AWS_SECRET_KEY: ${{ secrets.E2E_AWS_SECRET_KEY }}
         HETZNER_SSH_PUBLIC_KEY: ${{ secrets.HETZNER_SSH_PUBLIC_KEY }}
         HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
         HETZNER_USER: ${{ secrets.HETZNER_USER }}
@@ -102,6 +104,7 @@ jobs:
         GITHUB_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
         GITHUB_APP_WEBHOOK_SECRET: ${{ secrets.GH_APP_WEBHOOK_SECRET }}
         GITHUB_RUNNER_SERVICE_PROJECT_ID: "89841457-35a2-8ed2-a88a-424ea5ddd83b"
+        GITHUB_RUNNER_AWS_LOCATION_ID: "88adf710-4d8b-8c20-a480-618cbbef802d"
         GITHUB_CACHE_BLOB_STORAGE_ENDPOINT: ${{ secrets.GH_CACHE_BLOB_STORAGE_ENDPOINT }}
         GITHUB_CACHE_BLOB_STORAGE_REGION: ${{ secrets.GH_CACHE_BLOB_STORAGE_REGION }}
         GITHUB_CACHE_BLOB_STORAGE_ACCESS_KEY: ${{ secrets.GH_CACHE_BLOB_STORAGE_ACCESS_KEY }}
@@ -123,7 +126,7 @@ jobs:
         VHOST_BLOCK_BACKEND_VERSION: v0.2.1
       run: |
         set -o pipefail
-        timeout 55m foreman start -m all=1,respirate=2 | tee foreman.log | grep --line-buffered -F "e2e.1"
+        timeout 62m foreman start -m all=1,respirate=2 | tee foreman.log | grep --line-buffered -F "e2e.1"
 
     - name: Print logs
       if: always()
