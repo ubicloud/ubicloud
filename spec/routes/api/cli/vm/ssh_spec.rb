@@ -80,6 +80,6 @@ RSpec.describe Clover, "cli vm ssh" do
   it "handles invalid vm reference" do
     expect(cli(["vm", "#{@vm.display_location}/foo", "ssh"], status: 404)).to eq "! Unexpected response status: 404\nDetails: Sorry, we couldn’t find the resource you’re looking for.\n"
     expect(cli(["vm", "foo/#{@vm.name}", "ssh"], status: 404)).to eq "! Unexpected response status: 404\nDetails: Validation failed for following path components: location\n  location: Given location is not a valid location. Available locations: eu-central-h1, eu-north-h1, us-east-a2\n"
-    expect(cli(["vm", "#{@vm.display_location}/#{@vm.name}/bar", "ssh"], status: 400)).to start_with "! Invalid vm reference, should be in location/vm-name or vm-id format\n"
+    expect(cli(["vm", "#{@vm.display_location}/#{@vm.name}/bar", "ssh"], status: 400)).to start_with "! Invalid vm reference (\"eu-central-h1/test-vm/bar\"), should be in location/vm-name or vm-id format\n"
   end
 end

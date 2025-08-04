@@ -114,7 +114,7 @@ class UbiCli
         end
 
         if extra || !@name
-          raise Rodish::CommandFailure.new("invalid #{cmd} reference, should be in location/#{cmd}-name or #{cmd}-id format", command)
+          raise Rodish::CommandFailure.new("invalid #{cmd} reference (#{ref.inspect}), should be in location/#{cmd}-name or #{cmd}-id format", command)
         end
 
         command.run(self, opts, argv)
