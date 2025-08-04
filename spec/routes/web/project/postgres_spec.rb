@@ -468,14 +468,16 @@ RSpec.describe Clover, "postgres" do
 
         visit "#{project.path}#{pg.path}/backup-restore"
         expect(page).to have_content "Fork PostgreSQL database"
-
         fill_in "#{pg.name}-fork", with: "restored-server"
-        fill_in "Target Time (UTC)", with: restore_target.strftime("%Y-%m-%d %H:%M"), visible: false
-
         click_button "Fork"
+        expect(page.title).to eq("Ubicloud - pg-with-permission")
+        expect(page).to have_flash_error("empty string provided for parameter restore_target")
 
+        fill_in "Target Time (UTC)", with: restore_target.strftime("%Y-%m-%d %H:%M"), visible: false
+        click_button "Fork"
         expect(page.status_code).to eq(200)
         expect(page.title).to eq("Ubicloud - restored-server")
+        expect(page).to have_flash_notice("'restored-server' will be ready in a few minutes")
       end
 
       it "shows proper message when there is no backups to restore" do
