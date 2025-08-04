@@ -19,7 +19,7 @@ class Prog::LearnPci < Prog::Base
 
   def make_model_instances
     PciDeviceRecord.parse_all(sshable.cmd("/usr/bin/lspci -vnmm -d 10de::")).map do |rec|
-      PciDevice.new_with_id(
+      PciDevice.new(
         vm_host_id: vm_host.id,
         slot: rec.slot,
         device_class: rec.device_class,

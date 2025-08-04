@@ -237,7 +237,7 @@ class Clover
 
                 if ubid == "template"
                   next if deleted == "true"
-                  ace = AccessControlEntry.new_with_id(project_id: @project.id)
+                  ace = AccessControlEntry.new(project_id: @project.id)
                   audit_action = "create"
                 else
                   next unless (ace = AccessControlEntry[project_id: @project.id, id: UBID.to_uuid(ubid)])

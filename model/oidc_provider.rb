@@ -19,6 +19,7 @@ class OidcProvider < Sequel::Model
   # information, you'll need to be provided all OIDC information and
   # create the instance manually using OidcProvider.create.
   def self.register(display_name, url, client_id: nil, client_secret: nil)
+    # new_with_id needed for callback_url before saving
     oidc_provider = new_with_id(display_name:)
 
     uri = URI(url)
