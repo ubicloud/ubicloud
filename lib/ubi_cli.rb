@@ -178,6 +178,7 @@ class UbiCli
     end
   end
 
+  MIN_PGPASSWORD_VERSION = Gem::Version.new("1.1.0")
   def self.pg_cmd(cmd, desc)
     on("pg").run_on(cmd) do
       desc(desc)
@@ -193,6 +194,10 @@ class UbiCli
         if (user = opts[:username])
           conn_string.user = user
           conn_string.password = nil
+        elsif comparable_client_version >= MIN_PGPASSWORD_VERSION
+          pgpassword = conn_string.password
+          conn_string.password = nil
+          headers = {"ubi-pgpassword" => pgpassword}
         end
 
         if (database = opts[:dbname])
@@ -201,7 +206,7 @@ class UbiCli
 
         argv = [cmd, *argv, "--", conn_string]
         argv = yield(argv) if block_given?
-        execute_argv(argv)
+        execute_argv(argv, **headers)
       end
     end
   end
@@ -247,9 +252,9 @@ class UbiCli
     i
   end
 
-  def execute_argv(argv)
-    cmd = argv.shift
-    response(argv.join("\0"), headers: {"ubi-command-execute" => cmd})
+  def execute_argv(argv, **headers)
+    headers["ubi-command-execute"] = argv.shift
+    response(argv.join("\0"), headers:)
   end
 
   def check_fields(given_fields, allowed_fields, option_name, cmd)
@@ -340,6 +345,10 @@ class UbiCli
       version_header = @env["HTTP_X_UBI_VERSION"]
       UBI_VERSION_REGEXP.match?(version_header) ? version_header : "unknown"
     end
+  end
+
+  def comparable_client_version
+    Gem::Version.new(/\A(\d+)\.(\d+)\.(\d+)\z/.match?(client_version) ? client_version : "0.0.0")
   end
 
   def invalid_confirmation(message)

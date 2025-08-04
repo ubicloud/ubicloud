@@ -27,6 +27,10 @@ RSpec.describe Clover, "cli pg pg_dumpall" do
     expect(cli_exec(["pg", @ref, "pg_dumpall", "-a"])).to eq %W[pg_dumpall -a -dpostgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require]
   end
 
+  it "puts password in ubi-pgpassword if client is 1.1.0+" do
+    expect(cli_exec(["pg", @ref, "pg_dumpall"], env: {"HTTP_X_UBI_VERSION" => "1.1.0"}, command_pgpassword: @pg.superuser_password)).to eq %W[pg_dumpall -dpostgres://postgres@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require]
+  end
+
   it "supports -U option for user name" do
     expect(cli_exec(["pg", @ref, "-Ufoo", "pg_dumpall", "-a"])).to eq %W[pg_dumpall -a -dpostgres://foo@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require]
   end

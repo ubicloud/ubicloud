@@ -19,8 +19,15 @@ RSpec.configure do |config|
       last_response.body
     end
 
-    def cli_exec(argv, env: {})
+    def cli_exec(argv, env: {}, command_pgpassword: nil)
       body = cli(argv, env:)
+
+      if command_pgpassword
+        expect(last_response["ubi-pgpassword"]).to eq(command_pgpassword)
+      else
+        expect(last_response["ubi-pgpassword"]).to be_nil
+      end
+
       [last_response.headers["ubi-command-execute"], *body.split("\0")]
     end
   end)
