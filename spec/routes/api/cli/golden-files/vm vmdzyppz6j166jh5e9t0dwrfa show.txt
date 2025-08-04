@@ -1,4 +1,4 @@
-! Invalid vm reference, should be in location/vm-name or vm-id format
+! Invalid vm reference ("vmdzyppz6j166jh5e9t0dwrfa"), should be in location/vm-name or vm-id format
 
 Manage virtual machines
 
