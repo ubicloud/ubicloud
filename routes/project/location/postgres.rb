@@ -304,6 +304,7 @@ class Clover
       r.post "restore" do
         authorize("Postgres:create", @project.id)
         authorize("Postgres:view", pg.id)
+        handle_validation_failure("postgres/show") { @page = "backup_restore" }
 
         name, restore_target = typecast_params.nonempty_str!(["name", "restore_target"])
         st = nil
