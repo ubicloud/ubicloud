@@ -104,7 +104,7 @@ RSpec.describe Clover, "project" do
         click_button "Create"
 
         expect(page).to have_flash_error("Project limit exceeded. You can create up to 10 projects. Contact support@ubicloud.com if you need more.")
-        expect(page.title).to eq("Ubicloud - Projects")
+        expect(page.title).to eq("Ubicloud - Create Project")
         expect(user.projects_dataset.count).to eq 10
       end
     end
