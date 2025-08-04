@@ -13,30 +13,22 @@ class Clover
         authorize("Project:user", @project.id)
 
         r.get do
-          @users = @project.accounts_dataset.order_by(:email).all
-          @subject_tag_map = SubjectTag.subject_id_map_for_project_and_accounts(@project.id, @users.map(&:id))
-          @allowed_view_tag_names = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:view").map(:name)
-          @allowed_add_tag_names_map = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").select_hash(:name, Sequel.as(true, :v))
-          @allowed_remove_tag_names_map = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:remove").select_hash(:name, Sequel.as(true, :v))
-          @invitations = @project.invitations_dataset.order_by(:email).all
           view "project/user"
         end
 
         r.post do
           email = typecast_params.nonempty_str!("email")
+          handle_validation_failure("project/user")
 
           if ProjectInvitation[project_id: @project.id, email: email]
-            flash["error"] = "'#{email}' already invited to join the project."
-            r.redirect "#{@project.path}/user"
+            raise CloverError.new(400, nil, "'#{email}' already invited to join the project.")
           elsif @project.invitations_dataset.count >= 50
-            flash["error"] = "You can't have more than 50 pending invitations."
-            r.redirect "#{@project.path}/user"
+            raise CloverError.new(400, nil, "You can't have more than 50 pending invitations.")
           end
 
           if (policy = typecast_params.nonempty_str("policy"))
             unless (tag = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").first(name: policy))
-              flash["error"] = "You don't have permission to invite users with this subject tag."
-              r.redirect "#{@project_data[:path]}/user"
+              raise CloverError.new(400, nil, "You don't have permission to invite users with this subject tag.")
             end
           end
 
@@ -51,8 +43,7 @@ class Clover
               audit_log(@project, "add_account", user)
 
               if result.empty?
-                flash["error"] = "The requested user already has access to this project"
-                r.redirect "#{@project.path}/user"
+                raise CloverError.new(400, nil, "The requested user already has access to this project")
               end
 
               if tag
