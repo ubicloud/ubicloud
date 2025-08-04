@@ -12,12 +12,12 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     lb.strand
   }
   let(:ps) {
-    prj = Project.create_with_id(name: "test-prj")
+    prj = Project.create(name: "test-prj")
     Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps").subject
   }
   let(:dns_zone) {
-    dz = DnsZone.create_with_id(project_id: ps.project_id, name: "lb.ubicloud.com")
-    Strand.create_with_id(prog: "DnsZone::DnsZoneNexus", label: "wait") { it.id = dz.id }
+    dz = DnsZone.create(project_id: ps.project_id, name: "lb.ubicloud.com")
+    Strand.create(prog: "DnsZone::DnsZoneNexus", label: "wait") { it.id = dz.id }
     dz
   }
 
@@ -41,7 +41,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     end
 
     it "creates a new load balancer with custom hostname" do
-      dz = DnsZone.create_with_id(project_id: ps.project_id, name: "custom.ubicloud.com")
+      dz = DnsZone.create(project_id: ps.project_id, name: "custom.ubicloud.com")
       lb = described_class.assemble(ps.id, name: "test-lb2", src_port: 80, dst_port: 8080, custom_hostname_prefix: "test-custom-hostname", custom_hostname_dns_zone_id: dz.id).subject
       expect(LoadBalancer.count).to eq 2
       expect(lb.project).to eq ps.project
@@ -99,7 +99,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
   describe "#create_new_cert" do
     it "creates a new cert" do
-      dns_zone = DnsZone.create_with_id(name: "test-dns-zone", project_id: nx.load_balancer.private_subnet.project_id)
+      dns_zone = DnsZone.create(name: "test-dns-zone", project_id: nx.load_balancer.private_subnet.project_id)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone)
       expect { nx.create_new_cert }.to hop("wait_cert_provisioning")
       expect(Strand.where(prog: "Vnet::CertNexus").count).to eq 2
@@ -328,7 +328,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(nx.load_balancer).to receive(:ipv6_enabled?).and_return(false)
-      dr = DnsRecord.create_with_id(dns_zone_id: dns_zone.id, name: nx.load_balancer.hostname + ".", type: "A", ttl: 10, data: "192.168.1.0/32")
+      dr = DnsRecord.create(dns_zone_id: dns_zone.id, name: nx.load_balancer.hostname + ".", type: "A", ttl: 10, data: "192.168.1.0/32")
       expect(dns_zone).to receive(:records_dataset).and_return(DnsRecord.where(id: dr.id))
       expect(nx.need_to_rewrite_dns_records?).to be false
     end
@@ -338,7 +338,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(nx.load_balancer).to receive(:ipv4_enabled?).and_return(false)
-      dr = DnsRecord.create_with_id(dns_zone_id: dns_zone.id, name: nx.load_balancer.hostname + ".", type: "AAAA", ttl: 10, data: "fd10:9b0b:6b4b:8fb0::2")
+      dr = DnsRecord.create(dns_zone_id: dns_zone.id, name: nx.load_balancer.hostname + ".", type: "AAAA", ttl: 10, data: "fd10:9b0b:6b4b:8fb0::2")
       expect(dns_zone).to receive(:records_dataset).and_return(DnsRecord.where(id: dr.id))
       expect(nx.need_to_rewrite_dns_records?).to be false
     end

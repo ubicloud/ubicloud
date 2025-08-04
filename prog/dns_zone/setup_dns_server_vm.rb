@@ -36,7 +36,7 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
         enable_ip4: true
       )
 
-      Strand.create_with_id(prog: "DnsZone::SetupDnsServerVm", label: "start", stack: [{subject_id: vm_st.id, dns_server_id: dns_server_id}])
+      Strand.create(prog: "DnsZone::SetupDnsServerVm", label: "start", stack: [{subject_id: vm_st.id, dns_server_id: dns_server_id}])
     end
   end
 

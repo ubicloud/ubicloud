@@ -6,11 +6,11 @@ RSpec.describe Firewall do
   let(:project_id) { Project.create(name: "test").id }
 
   let(:fw) {
-    described_class.create_with_id(name: "test-fw", description: "test fw desc", location_id: Location::HETZNER_FSN1_ID, project_id:)
+    described_class.create(name: "test-fw", description: "test fw desc", location_id: Location::HETZNER_FSN1_ID, project_id:)
   }
 
   let(:ps) {
-    PrivateSubnet.create_with_id(name: "test-ps", location_id: Location::HETZNER_FSN1_ID, net6: "2001:db8::/64", net4: "10.0.0.0/24", project_id:)
+    PrivateSubnet.create(name: "test-ps", location_id: Location::HETZNER_FSN1_ID, net6: "2001:db8::/64", net4: "10.0.0.0/24", project_id:)
   }
 
   it "inserts firewall rules" do
@@ -75,12 +75,12 @@ RSpec.describe Firewall do
   end
 
   it "removes referencing access control entries and object tag memberships" do
-    account = Account.create_with_id(email: "test@example.com")
+    account = Account.create(email: "test@example.com")
     project = account.create_project_with_default_policy("project-1", default_policy: false)
-    tag = ObjectTag.create_with_id(project_id: project.id, name: "t")
+    tag = ObjectTag.create(project_id: project.id, name: "t")
     tag.add_member(fw.id)
     fw.update(project_id: project.id)
-    ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: account.id, object_id: fw.id)
+    ace = AccessControlEntry.create(project_id: project.id, subject_id: account.id, object_id: fw.id)
 
     fw.destroy
     expect(tag.member_ids).to be_empty

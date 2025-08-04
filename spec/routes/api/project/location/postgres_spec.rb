@@ -19,7 +19,7 @@ RSpec.describe Clover, "postgres" do
 
   describe "unauthenticated" do
     it "cannot perform authenticated operations" do
-      postgres_project = Project.create_with_id(name: "default")
+      postgres_project = Project.create(name: "default")
       allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
 
       [
@@ -50,7 +50,7 @@ RSpec.describe Clover, "postgres" do
   describe "authenticated" do
     before do
       login_api
-      postgres_project = Project.create_with_id(name: "default")
+      postgres_project = Project.create(name: "default")
       allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
     end
 
@@ -461,7 +461,7 @@ RSpec.describe Clover, "postgres" do
     end
 
     describe "metrics" do
-      let(:prj) { Project.create_with_id(name: "vm-project") { it.id = "1d7edb2f-c1b8-4d28-b7a6-4226b5855e7d" } }
+      let(:prj) { Project.create(name: "vm-project") { it.id = "1d7edb2f-c1b8-4d28-b7a6-4226b5855e7d" } }
       let(:vmr) { instance_double(VictoriaMetricsResource, project_id: prj.id) }
       let(:vm_server) { instance_double(VictoriaMetricsServer, client: tsdb_client) }
       let(:tsdb_client) { instance_double(VictoriaMetrics::Client) }
@@ -699,7 +699,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "metric-destination" do
-        PostgresMetricDestination.create_with_id(
+        PostgresMetricDestination.create(
           postgres_resource_id: pg.id,
           url: "https://example.com",
           username: "username",

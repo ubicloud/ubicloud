@@ -3,9 +3,9 @@
 require_relative "../spec_helper"
 
 RSpec.describe GithubCacheEntry do
-  subject(:entry) { described_class.create_with_id(repository_id: repository.id, key: "k1", version: "v1", scope: "main", upload_id: "upload-123", created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b") }
+  subject(:entry) { described_class.create(repository_id: repository.id, key: "k1", version: "v1", scope: "main", upload_id: "upload-123", created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b") }
 
-  let(:repository) { GithubRepository.create_with_id(name: "test") }
+  let(:repository) { GithubRepository.create(name: "test") }
 
   describe "#after_destroy" do
     let(:client) { instance_double(Aws::S3::Client) }

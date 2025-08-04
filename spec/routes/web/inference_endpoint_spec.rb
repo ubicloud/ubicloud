@@ -21,7 +21,7 @@ RSpec.describe Clover, "inference-endpoint" do
 
     it "shows the right inference endpoints" do
       ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
-      lb = LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-1", health_check_endpoint: "/up", project_id: project.id)
+      lb = LoadBalancer.create(private_subnet_id: ps.id, name: "dummy-lb-1", health_check_endpoint: "/up", project_id: project.id)
       LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 80, dst_port: 8000)
       [
         ["ie1", "e5-mistral-7b-it", project_wo_permissions, true, true, {capability: "Embeddings", hf_model: "foo/bar"}],
@@ -32,7 +32,7 @@ RSpec.describe Clover, "inference-endpoint" do
         ["ie6", "test-model", project_wo_permissions, false, true, {capability: "Text Generation"}],
         ["ie7", "unknown-capability", project_wo_permissions, true, true, {capability: "wrong capability"}]
       ].each do |name, model_name, project, is_public, visible, tags|
-        InferenceEndpoint.create_with_id(name:, model_name:, project_id: project.id, is_public:, visible:, load_balancer_id: lb.id, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, tags:)
+        InferenceEndpoint.create(name:, model_name:, project_id: project.id, is_public:, visible:, load_balancer_id: lb.id, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, tags:)
       end
 
       visit "#{project.path}/inference-endpoint"
@@ -49,7 +49,7 @@ RSpec.describe Clover, "inference-endpoint" do
 
     it "shows the right inference router models" do
       private_subnet = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
-      load_balancer = LoadBalancer.create_with_id(
+      load_balancer = LoadBalancer.create(
         private_subnet_id: private_subnet.id, name: "dummy-lb-1", health_check_endpoint: "/up", project_id: project.id
       )
       LoadBalancerPort.create(load_balancer_id: load_balancer.id, src_port: 80, dst_port: 8000)
@@ -98,9 +98,9 @@ RSpec.describe Clover, "inference-endpoint" do
 
     it "shows both inference endpoints and router models when both are present" do
       private_subnet = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
-      load_balancer = LoadBalancer.create_with_id(private_subnet_id: private_subnet.id, name: "dummy-lb-1", health_check_endpoint: "/up", project_id: project.id)
+      load_balancer = LoadBalancer.create(private_subnet_id: private_subnet.id, name: "dummy-lb-1", health_check_endpoint: "/up", project_id: project.id)
       LoadBalancerPort.create(load_balancer_id: load_balancer.id, src_port: 80, dst_port: 8000)
-      InferenceEndpoint.create_with_id(
+      InferenceEndpoint.create(
         name: "mistral-small-3",
         model_name: "mistral-small-3",
         project_id: project.id,
@@ -154,9 +154,9 @@ RSpec.describe Clover, "inference-endpoint" do
 
     it "does not show inference endpoints without permissions" do
       ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
-      lb = LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-1", health_check_endpoint: "/up", project_id: project.id)
+      lb = LoadBalancer.create(private_subnet_id: ps.id, name: "dummy-lb-1", health_check_endpoint: "/up", project_id: project.id)
       LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 80, dst_port: 80)
-      InferenceEndpoint.create_with_id(name: "ie1", model_name: "test-model", project_id: project_wo_permissions.id, is_public: true, visible: true, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id)
+      InferenceEndpoint.create(name: "ie1", model_name: "test-model", project_id: project_wo_permissions.id, is_public: true, visible: true, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id)
       visit "#{project_wo_permissions.path}/inference-endpoint"
 
       expect(page.title).to eq("Ubicloud - Inference Endpoints")
@@ -165,13 +165,13 @@ RSpec.describe Clover, "inference-endpoint" do
 
     it "shows free quota notice with correct free inference tokens" do
       ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
-      lb = LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-1", health_check_endpoint: "/up", project_id: project.id)
+      lb = LoadBalancer.create(private_subnet_id: ps.id, name: "dummy-lb-1", health_check_endpoint: "/up", project_id: project.id)
       LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 80, dst_port: 80)
-      ie = InferenceEndpoint.create_with_id(name: "ie1", model_name: "test-model", project_id: project.id, is_public: true, visible: true, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id)
+      ie = InferenceEndpoint.create(name: "ie1", model_name: "test-model", project_id: project.id, is_public: true, visible: true, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id)
       visit "#{project.path}/inference-api-key"
       expect(page.text).to include("You have 500000 free inference tokens available (few-minute delay). Free quota refreshes next month.")
 
-      BillingRecord.create_with_id(
+      BillingRecord.create(
         project_id: project.id,
         resource_id: ie.id,
         resource_name: ie.name,
@@ -182,7 +182,7 @@ RSpec.describe Clover, "inference-endpoint" do
       visit "#{project.path}/inference-api-key"
       expect(page.text).to include("You have 400000 free inference tokens available (few-minute delay). Free quota refreshes next month.")
 
-      BillingRecord.create_with_id(
+      BillingRecord.create(
         project_id: project.id,
         resource_id: ie.id,
         resource_name: ie.name,

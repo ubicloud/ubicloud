@@ -61,13 +61,13 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
   end
 
   describe ".assemble" do
-    let(:customer_project) { Project.create_with_id(name: "default") }
-    let(:ie_project) { Project.create_with_id(name: "default") }
+    let(:customer_project) { Project.create(name: "default") }
+    let(:ie_project) { Project.create(name: "default") }
 
     it "validates input" do
       expect(Config).to receive(:inference_endpoint_service_project_id).and_return(ie_project.id).at_least(:once)
-      Firewall.create_with_id(name: "inference-endpoint-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: ie_project.id)
-      DnsZone.create_with_id(name: "ai.ubicloud.com", project_id: ie_project.id)
+      Firewall.create(name: "inference-endpoint-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: ie_project.id)
+      DnsZone.create(name: "ai.ubicloud.com", project_id: ie_project.id)
 
       expect {
         described_class.assemble(project_id: "ed6afccf-7025-4f35-8241-454221d75e18", location_id: Location::HETZNER_FSN1_ID, boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1, tags: {}, max_requests: 500, max_project_rps: 100, max_project_tps: 10000)
@@ -124,7 +124,7 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
 
     it "works without dns zone" do
       expect(Config).to receive(:inference_endpoint_service_project_id).and_return(ie_project.id).at_least(:once)
-      Firewall.create_with_id(name: "inference-endpoint-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: ie_project.id)
+      Firewall.create(name: "inference-endpoint-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: ie_project.id)
       expect {
         described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1, tags: {}, max_requests: 500, max_project_rps: 100, max_project_tps: 10000)
       }.not_to raise_error

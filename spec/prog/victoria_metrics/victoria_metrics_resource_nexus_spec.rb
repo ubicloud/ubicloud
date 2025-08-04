@@ -37,12 +37,12 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
   before do
     allow(nx).to receive(:victoria_metrics_resource).and_return(victoria_metrics_resource)
 
-    victoria_metrics_project = Project.create_with_id(name: "default")
+    victoria_metrics_project = Project.create(name: "default")
     allow(Config).to receive(:victoria_metrics_service_project_id).and_return(victoria_metrics_project.id)
   end
 
   describe ".assemble" do
-    let(:victoria_metrics_project) { Project.create_with_id(name: "default") }
+    let(:victoria_metrics_project) { Project.create(name: "default") }
     let(:private_location) {
       loc = Location.create(
         name: "us-west-2",

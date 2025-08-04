@@ -329,7 +329,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
         if today_record
           today_record.this.update(amount: Sequel[:amount] + tokens)
         else
-          BillingRecord.create_with_id(
+          BillingRecord.create(
             project_id: project.id,
             resource_id: inference_router.id,
             resource_name: "#{resource_family} #{begin_time.strftime("%Y-%m-%d")}",

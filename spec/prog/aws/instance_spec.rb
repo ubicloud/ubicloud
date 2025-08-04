@@ -6,13 +6,13 @@ RSpec.describe Prog::Aws::Instance do
   }
 
   let(:st) {
-    Strand.create_with_id(prog: "Aws::Instance", stack: [{"subject_id" => vm.id}], label: "start")
+    Strand.create(prog: "Aws::Instance", stack: [{"subject_id" => vm.id}], label: "start")
   }
 
   let(:vm) {
-    prj = Project.create_with_id(name: "test-prj")
-    loc = Location.create_with_id(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
-    LocationCredential.create_with_id(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = loc.id }
+    prj = Project.create(name: "test-prj")
+    loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
+    LocationCredential.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = loc.id }
     storage_volumes = [
       {encrypted: true, size_gib: 30},
       {encrypted: true, size_gib: 3800}

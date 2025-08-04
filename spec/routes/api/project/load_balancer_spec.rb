@@ -18,7 +18,7 @@ RSpec.describe Clover, "vm" do
   describe "authenticated" do
     before do
       login_api
-      lb_project = Project.create_with_id(name: "default")
+      lb_project = Project.create(name: "default")
       allow(Config).to receive(:load_balancer_service_project_id).and_return(lb_project.id)
     end
 

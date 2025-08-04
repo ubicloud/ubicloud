@@ -8,7 +8,7 @@ class Prog::Vm::VmPool < Prog::Base
   def self.assemble(size:, vm_size:, boot_image:, location_id:, storage_size_gib:,
     storage_encrypted:, storage_skip_sync:, arch:)
     DB.transaction do
-      vm_pool = VmPool.create_with_id(
+      vm_pool = VmPool.create(
         size:,
         vm_size:,
         boot_image:,

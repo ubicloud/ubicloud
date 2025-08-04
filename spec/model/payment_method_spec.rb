@@ -3,7 +3,7 @@
 require_relative "spec_helper"
 
 RSpec.describe PaymentMethod do
-  subject(:payment_method) { described_class.create_with_id(stripe_id: "pm_1234567890") }
+  subject(:payment_method) { described_class.create(stripe_id: "pm_1234567890") }
 
   it "return Stripe Data if Stripe enabled" do
     allow(Config).to receive(:stripe_secret_key).and_return("secret_key")

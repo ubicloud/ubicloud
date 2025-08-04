@@ -12,7 +12,7 @@ RSpec.describe GithubInstallation do
 
     # let's not create runner for the last vm
     vms[..1].each do |vm|
-      gr = GithubRunner.create_with_id(installation_id: installation.id, vm_id: vm.id, repository_name: "test-repo", label: "ubicloud-standard-#{vm.cores}")
+      gr = GithubRunner.create(installation_id: installation.id, vm_id: vm.id, repository_name: "test-repo", label: "ubicloud-standard-#{vm.cores}")
       Strand.create(prog: "Github::RunnerNexus", label: "allocate_vm") { it.id = gr.id }
     end
 
@@ -23,7 +23,7 @@ RSpec.describe GithubInstallation do
     vms = [2, 4].map { create_vm(cores: it, arch: "arm64") }
 
     vms.each do |vm|
-      gr = GithubRunner.create_with_id(installation_id: installation.id, vm_id: vm.id, repository_name: "test-repo", label: "ubicloud-standard-#{vm.cores}-arm")
+      gr = GithubRunner.create(installation_id: installation.id, vm_id: vm.id, repository_name: "test-repo", label: "ubicloud-standard-#{vm.cores}-arm")
       Strand.create(prog: "Github::RunnerNexus", label: "allocate_vm") { it.id = gr.id }
     end
 

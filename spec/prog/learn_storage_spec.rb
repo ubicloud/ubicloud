@@ -49,7 +49,7 @@ EOS
       allow(ls.sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'nvme0n2$' | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.some-random-id1")
       expect(ls.sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'nvme0n3$' | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.some-random-id2")
 
-      StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100, unix_device_list: ["nvme0n1"])
+      StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100, unix_device_list: ["nvme0n1"])
       expect { ls.start }.to exit({"msg" => "created StorageDevice records"}).and change {
         StorageDevice.map { |sd|
           sd.values.slice(

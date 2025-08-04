@@ -4,7 +4,7 @@ require_relative "../spec_helper"
 
 RSpec.describe MinioPool do
   subject(:mp) {
-    mc = MinioCluster.create_with_id(
+    mc = MinioCluster.create(
       location_id: Location::HETZNER_FSN1_ID,
       name: "minio-cluster-name",
       admin_user: "minio-admin",
@@ -13,7 +13,7 @@ RSpec.describe MinioPool do
       root_cert_2: "dummy-root-cert-2",
       project_id: Project.create(name: "test").id
     )
-    mp = described_class.create_with_id(
+    mp = described_class.create(
       cluster_id: mc.id,
       start_index: 0,
       server_count: 1,
@@ -22,7 +22,7 @@ RSpec.describe MinioPool do
       vm_size: "standard-2"
     )
 
-    MinioServer.create_with_id(
+    MinioServer.create(
       minio_pool_id: mp.id,
       vm_id: create_vm.id,
       index: 0
@@ -65,7 +65,7 @@ RSpec.describe MinioPool do
   it "returns servers in ordered way" do
     mp.update(drive_count: 4, server_count: 2)
 
-    MinioServer.create_with_id(
+    MinioServer.create(
       minio_pool_id: mp.id,
       vm_id: create_vm.id,
       index: 2

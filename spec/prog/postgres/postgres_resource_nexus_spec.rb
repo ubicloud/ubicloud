@@ -48,8 +48,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   end
 
   describe ".assemble" do
-    let(:customer_project) { Project.create_with_id(name: "default") }
-    let(:postgres_project) { Project.create_with_id(name: "default") }
+    let(:customer_project) { Project.create(name: "default") }
+    let(:postgres_project) { Project.create(name: "default") }
     let(:private_location) {
       loc = Location.create(
         name: "us-west-2",
@@ -205,7 +205,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
   describe "#initialize_certificates" do
     it "hops to wait_servers after creating certificates" do
-      postgres_resource = PostgresResource.create_with_id(
+      postgres_resource = PostgresResource.create(
         project_id: "e3e333dd-bd9a-82d2-acc1-1c7c1ee9781f",
         location_id: Location::HETZNER_FSN1_ID,
         name: "pg-name",
@@ -286,7 +286,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(postgres_resource.representative_server).to receive(:storage_size_gib).and_return(128)
       expect(postgres_resource).to receive(:target_server_count).and_return(2)
 
-      expect(BillingRecord).to receive(:create_with_id).with(
+      expect(BillingRecord).to receive(:create).with(
         project_id: postgres_resource.project_id,
         resource_id: postgres_resource.id,
         resource_name: postgres_resource.name,
@@ -294,7 +294,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         amount: postgres_resource.representative_server.vm.vcpus
       )
 
-      expect(BillingRecord).to receive(:create_with_id).with(
+      expect(BillingRecord).to receive(:create).with(
         project_id: postgres_resource.project_id,
         resource_id: postgres_resource.id,
         resource_name: postgres_resource.name,
@@ -302,7 +302,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         amount: postgres_resource.representative_server.vm.vcpus
       )
 
-      expect(BillingRecord).to receive(:create_with_id).with(
+      expect(BillingRecord).to receive(:create).with(
         project_id: postgres_resource.project_id,
         resource_id: postgres_resource.id,
         resource_name: postgres_resource.name,
@@ -310,7 +310,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         amount: 128
       )
 
-      expect(BillingRecord).to receive(:create_with_id).with(
+      expect(BillingRecord).to receive(:create).with(
         project_id: postgres_resource.project_id,
         resource_id: postgres_resource.id,
         resource_name: postgres_resource.name,

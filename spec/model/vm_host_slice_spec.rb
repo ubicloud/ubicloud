@@ -4,7 +4,7 @@ require_relative "../spec_helper"
 
 RSpec.describe VmHostSlice do
   subject(:vm_host_slice) do
-    described_class.create_with_id(
+    described_class.create(
       vm_host_id: vm_host.id,
       name: "standard",
       family: "standard",

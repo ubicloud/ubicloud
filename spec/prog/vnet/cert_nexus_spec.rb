@@ -7,10 +7,10 @@ RSpec.describe Prog::Vnet::CertNexus do
 
   let(:st) { Strand.new }
   let(:project) {
-    Project.create_with_id(name: "test-prj")
+    Project.create(name: "test-prj")
   }
   let(:dns_zone) {
-    DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
+    DnsZone.create(name: "test-dns-zone", project_id: project.id)
   }
   let(:cert) {
     described_class.assemble("cert-hostname", dns_zone.id).subject
@@ -91,7 +91,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       challenge = instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name", record_content: "content")
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect(nx).to receive(:dns_challenge).and_return(challenge).at_least(:once)
-      dns_record = DnsRecord.create_with_id(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "test-record-type", ttl: 600, data: "content")
+      dns_record = DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "test-record-type", ttl: 600, data: "content")
       DB[:seen_dns_records_by_dns_servers].insert(dns_record_id: dns_record.id, dns_server_id: nil)
 
       expect(challenge).to receive(:request_validation)

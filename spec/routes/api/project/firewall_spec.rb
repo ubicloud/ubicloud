@@ -7,7 +7,7 @@ RSpec.describe Clover, "firewall" do
 
   let(:project) { project_with_default_policy(user) }
 
-  let(:firewall) { Firewall.create_with_id(name: "default-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: project.id) }
+  let(:firewall) { Firewall.create(name: "default-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: project.id) }
 
   describe "unauthenticated" do
     it "not list" do
@@ -29,7 +29,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "success get all firewalls" do
-      Firewall.create_with_id(name: "#{firewall.name}-2", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
+      Firewall.create(name: "#{firewall.name}-2", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
 
       get "/project/#{project.ubid}/firewall"
 

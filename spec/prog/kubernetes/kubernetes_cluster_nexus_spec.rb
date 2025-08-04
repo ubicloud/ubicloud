@@ -457,7 +457,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     end
 
     it "deletes the sub-subdomain DNS record if the DNS zone exists" do
-      dns_zone = DnsZone.create_with_id(project_id: Project.first.id, name: "k8s.ubicloud.com", last_purged_at: Time.now)
+      dns_zone = DnsZone.create(project_id: Project.first.id, name: "k8s.ubicloud.com", last_purged_at: Time.now)
       kubernetes_cluster.services_lb.update(custom_hostname_dns_zone_id: dns_zone.id)
 
       dns_zone.insert_record(record_name: "*.#{kubernetes_cluster.services_lb.hostname}.", type: "CNAME", ttl: 123, data: "whatever.")

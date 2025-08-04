@@ -81,7 +81,7 @@ RSpec.configure do |config|
         secret: Config.clover_session_secret
       }).create(password)
 
-      account = Account.create_with_id(email: email, status_id: 2)
+      account = Account.create(email: email, status_id: 2)
       DB[:account_password_hashes].insert(id: account.id, password_hash: hash)
       if enable_otp
         DB[:account_otp_keys].insert(id: account.id, key: "oth555fnbrrfbi3nu2gksjxh63n2xofh")

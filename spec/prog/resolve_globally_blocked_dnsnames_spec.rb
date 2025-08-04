@@ -7,7 +7,7 @@ RSpec.describe Prog::ResolveGloballyBlockedDnsnames do
     described_class.new(Strand.new(prog: "ResolveGloballyBlockedDnsnames", label: "wait"))
   }
 
-  let(:globally_blocked_dnsname) { GloballyBlockedDnsname.create_with_id(dns_name: "example.com", last_check_at: "2023-10-19 19:27:47 +0000") }
+  let(:globally_blocked_dnsname) { GloballyBlockedDnsname.create(dns_name: "example.com", last_check_at: "2023-10-19 19:27:47 +0000") }
 
   describe "#wait" do
     before do

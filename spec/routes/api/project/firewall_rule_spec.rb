@@ -7,9 +7,9 @@ RSpec.describe Clover, "firewall" do
 
   let(:project) { project_with_default_policy(user) }
 
-  let(:firewall) { Firewall.create_with_id(name: "default-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: project.id) }
+  let(:firewall) { Firewall.create(name: "default-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: project.id) }
 
-  let(:firewall_rule) { FirewallRule.create_with_id(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(80..5432)) }
+  let(:firewall_rule) { FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(80..5432)) }
 
   describe "unauthenticated" do
     it "not post" do

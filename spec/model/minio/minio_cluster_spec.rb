@@ -4,7 +4,7 @@ require_relative "../spec_helper"
 
 RSpec.describe MinioCluster do
   subject(:mc) {
-    mc = described_class.create_with_id(
+    mc = described_class.create(
       location_id: Location::HETZNER_FSN1_ID,
       name: "minio-cluster-name",
       admin_user: "minio-admin",
@@ -13,7 +13,7 @@ RSpec.describe MinioCluster do
       root_cert_2: "root_cert_2",
       project_id: Project.create(name: "test").id
     )
-    mp = MinioPool.create_with_id(
+    mp = MinioPool.create(
       cluster_id: mc.id,
       start_index: 0,
       server_count: 1,
@@ -22,7 +22,7 @@ RSpec.describe MinioCluster do
       vm_size: "standard-2"
     )
 
-    MinioServer.create_with_id(
+    MinioServer.create(
       minio_pool_id: mp.id,
       vm_id: create_vm.id,
       index: 0

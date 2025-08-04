@@ -6,7 +6,7 @@ require "octokit"
 RSpec.describe Clover, "github" do
   let(:user) { create_account }
   let(:project) { user.create_project_with_default_policy("project-1") }
-  let(:installation) { GithubInstallation.create_with_id(installation_id: 123, project_id: project.id, name: "test-user", type: "User") }
+  let(:installation) { GithubInstallation.create(installation_id: 123, project_id: project.id, name: "test-user", type: "User") }
   let(:oauth_client) { instance_double(Octokit::Client) }
   let(:adhoc_client) { instance_double(Octokit::Client) }
 

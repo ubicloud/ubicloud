@@ -17,7 +17,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
       "failover_wait_started" => false
     }
 
-    Strand.create_with_id(
+    Strand.create(
       prog: "Test::HaPostgresResource",
       label: "start",
       stack: [frame]

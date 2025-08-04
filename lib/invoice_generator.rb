@@ -153,7 +153,7 @@ class InvoiceGenerator
           invoice_order = format("%04d", project.invoices.count + 1)
           invoice_number = "#{invoice_month}-#{invoice_customer}-#{invoice_order}"
 
-          invoice = Invoice.create_with_id(project_id: project.id, invoice_number: invoice_number, content: project_content, begin_time: @begin_time, end_time: @end_time)
+          invoice = Invoice.create(project_id: project.id, invoice_number: invoice_number, content: project_content, begin_time: @begin_time, end_time: @end_time)
 
           # Don't substract the 1$ credit from customer's overall credit as it will be applied each month to each customer
           project_content[:credit] -= project_content.fetch(:github_credit, 0)

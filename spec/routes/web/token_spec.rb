@@ -28,7 +28,7 @@ RSpec.describe Clover, "personal access token management" do
     visit "#{project.path}/dashboard"
     expect(find_by_id("desktop-menu").text).not_to include("Tokens")
 
-    AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:token"])
+    AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:token"])
     visit "#{project.path}/dashboard"
 
     page.within("#desktop-menu") do
@@ -42,11 +42,11 @@ RSpec.describe Clover, "personal access token management" do
     page.refresh
     expect(page.status_code).to eq 403
 
-    AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+    AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
     page.refresh
     expect(page.status_code).to eq 403
 
-    ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:token"])
+    ace = AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:token"])
     page.refresh
     expect(page.title).to eq "Ubicloud - Default - Personal Access Tokens"
 
@@ -62,7 +62,7 @@ RSpec.describe Clover, "personal access token management" do
     expect(page.status_code).to eq 403
     expect(ApiKey.count).to eq 1
 
-    ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:token"])
+    ace = AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:token"])
     visit "#{project.path}/token"
     ace.destroy
     btn = find(".delete-btn")
@@ -90,7 +90,7 @@ RSpec.describe Clover, "personal access token management" do
   end
 
   it "user page allows removing personal access tokens" do
-    AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
+    AccessControlEntry.create(project_id: project.id, subject_id: @api_key.id)
 
     path = page.current_path
     btn = find(".delete-btn")
@@ -134,7 +134,7 @@ RSpec.describe Clover, "personal access token management" do
     expect(page.title).to eq "Ubicloud - Default - Token #{@api_key.ubid}"
     expect(page.html).to include "Currently, this token has no access to the project."
 
-    AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
+    AccessControlEntry.create(project_id: project.id, subject_id: @api_key.id)
     page.refresh
     expect(displayed_access_control_entries).to eq [
       "All Actions", "All Objects"
@@ -147,7 +147,7 @@ RSpec.describe Clover, "personal access token management" do
     within("#ace-template .action") { select "ActionTag:add" }
     expect(displayed_access_control_entries).to eq []
 
-    ObjectTag.create_with_id(project_id: project.id, name: "OTest")
+    ObjectTag.create(project_id: project.id, name: "OTest")
     click_button "Save All"
     expect(find_by_id("flash-notice").text).to eq "Token access control entries saved successfully"
     expect(displayed_access_control_entries).to eq [
@@ -174,8 +174,8 @@ RSpec.describe Clover, "personal access token management" do
 
   it "can edit token access control entries" do
     @api_key.restrict_token_for_project(project.id)
-    ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
-    ObjectTag.create_with_id(project_id: project.id, name: "OTest")
+    ace = AccessControlEntry.create(project_id: project.id, subject_id: @api_key.id)
+    ObjectTag.create(project_id: project.id, name: "OTest")
     click_link @api_key.ubid
     expect(page.title).to eq "Ubicloud - Default - Token #{@api_key.ubid}"
     within("#ace-#{ace.ubid} .action") { select "ActionTag:view" }
@@ -189,8 +189,8 @@ RSpec.describe Clover, "personal access token management" do
 
   it "ignores unmatched entries when editing access control entries" do
     @api_key.restrict_token_for_project(project.id)
-    ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
-    ObjectTag.create_with_id(project_id: project.id, name: "OTest")
+    ace = AccessControlEntry.create(project_id: project.id, subject_id: @api_key.id)
+    ObjectTag.create(project_id: project.id, name: "OTest")
     click_link @api_key.ubid
     expect(page.title).to eq "Ubicloud - Default - Token #{@api_key.ubid}"
     within("#ace-#{ace.ubid} .action") { select "ActionTag:view" }
@@ -204,8 +204,8 @@ RSpec.describe Clover, "personal access token management" do
 
   it "can delete token access control entries" do
     @api_key.restrict_token_for_project(project.id)
-    ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
-    ObjectTag.create_with_id(project_id: project.id, name: "OTest")
+    ace = AccessControlEntry.create(project_id: project.id, subject_id: @api_key.id)
+    ObjectTag.create(project_id: project.id, name: "OTest")
     click_link @api_key.ubid
     within("#ace-#{ace.ubid}") { check "Delete" }
 
@@ -218,7 +218,7 @@ RSpec.describe Clover, "personal access token management" do
 
   it "can unrestrict tokens after restricting them" do
     @api_key.restrict_token_for_project(project.id)
-    ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
+    ace = AccessControlEntry.create(project_id: project.id, subject_id: @api_key.id)
     click_link @api_key.ubid
     click_button "Unrestrict Token Access"
     expect(find_by_id("flash-notice").text).to eq "Token access is now unrestricted"

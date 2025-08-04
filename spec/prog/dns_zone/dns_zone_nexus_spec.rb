@@ -5,8 +5,8 @@ require_relative "../../model/spec_helper"
 RSpec.describe Prog::DnsZone::DnsZoneNexus do
   subject(:nx) { described_class.new(Strand.new(id: DnsZone.generate_uuid)) }
 
-  let(:dns_zone) { DnsZone.create_with_id(project_id: SecureRandom.uuid, name: "postgres.ubicloud.com") }
-  let(:dns_server) { DnsServer.create_with_id(name: "ns.ubicloud.com") }
+  let(:dns_zone) { DnsZone.create(project_id: SecureRandom.uuid, name: "postgres.ubicloud.com") }
+  let(:dns_server) { DnsServer.create(name: "ns.ubicloud.com") }
   let(:vm) { instance_double(Vm, id: "788525ed-d6f0-4937-a844-323d4fd91946") }
   let(:sshable) { instance_double(Sshable) }
 
@@ -35,9 +35,9 @@ RSpec.describe Prog::DnsZone::DnsZoneNexus do
 
   describe "#refresh_dns_servers" do
     before do
-      r1 = DnsRecord.create_with_id(name: "test-pg-1", type: "A", ttl: 10, data: "1.2.3.4")
-      r2 = DnsRecord.create_with_id(name: "test-pg-2", type: "A", ttl: 10, data: "5.6.7.8")
-      r3 = DnsRecord.create_with_id(name: "test-pg-3", type: "A", ttl: 10, data: "9.10.11.12", tombstoned: true)
+      r1 = DnsRecord.create(name: "test-pg-1", type: "A", ttl: 10, data: "1.2.3.4")
+      r2 = DnsRecord.create(name: "test-pg-2", type: "A", ttl: 10, data: "5.6.7.8")
+      r3 = DnsRecord.create(name: "test-pg-3", type: "A", ttl: 10, data: "9.10.11.12", tombstoned: true)
 
       dns_zone.add_record(r1)
       dns_zone.add_record(r2)
@@ -82,9 +82,9 @@ COMMANDS
 
   describe "#purge_obsolete_records" do
     it "deletes obsoleted records, seen or unseen" do
-      r1 = DnsRecord.create_with_id(created_at: Time.now - 1, name: "test-pg-1", type: "A", ttl: 10, data: "1.2.3.4")
-      r2 = DnsRecord.create_with_id(created_at: Time.now, name: "test-pg-1", type: "A", ttl: 10, data: "1.2.3.4")
-      r3 = DnsRecord.create_with_id(created_at: Time.now + 1, name: "test-pg-1", type: "A", ttl: 10, data: "1.2.3.4")
+      r1 = DnsRecord.create(created_at: Time.now - 1, name: "test-pg-1", type: "A", ttl: 10, data: "1.2.3.4")
+      r2 = DnsRecord.create(created_at: Time.now, name: "test-pg-1", type: "A", ttl: 10, data: "1.2.3.4")
+      r3 = DnsRecord.create(created_at: Time.now + 1, name: "test-pg-1", type: "A", ttl: 10, data: "1.2.3.4")
 
       dns_zone.add_record(r1)
       dns_zone.add_record(r2)
@@ -99,9 +99,9 @@ COMMANDS
     end
 
     it "deletes seen tombstoned records" do
-      r1 = DnsRecord.create_with_id(name: "test-pg-1", type: "A", ttl: 10, data: "1.2.3.4")
-      r2 = DnsRecord.create_with_id(name: "test-pg-2", type: "A", ttl: 10, data: "5.6.7.8", tombstoned: true)
-      r3 = DnsRecord.create_with_id(name: "test-pg-3", type: "A", ttl: 10, data: "9.10.11.12", tombstoned: true)
+      r1 = DnsRecord.create(name: "test-pg-1", type: "A", ttl: 10, data: "1.2.3.4")
+      r2 = DnsRecord.create(name: "test-pg-2", type: "A", ttl: 10, data: "5.6.7.8", tombstoned: true)
+      r3 = DnsRecord.create(name: "test-pg-3", type: "A", ttl: 10, data: "9.10.11.12", tombstoned: true)
 
       dns_zone.add_record(r1)
       dns_zone.add_record(r2)

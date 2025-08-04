@@ -81,7 +81,7 @@ RSpec.describe Clover, "auth" do
   end
 
   it "can create new account, verify it, and visit project which invited" do
-    p = Project.create_with_id(name: "Invited-project")
+    p = Project.create(name: "Invited-project")
     p.add_invitation(email: TEST_USER_EMAIL, inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
 
     visit "/create-account"
@@ -121,9 +121,9 @@ RSpec.describe Clover, "auth" do
   end
 
   it "can create new account, verify it, and visit project which invited with default policy" do
-    p = Project.create_with_id(name: "Invited-project")
-    subject_id = SubjectTag.create_with_id(project_id: p.id, name: "Admin").id
-    AccessControlEntry.create_with_id(project_id: p.id, subject_id:, action_id: ActionType::NAME_MAP["Project:view"])
+    p = Project.create(name: "Invited-project")
+    subject_id = SubjectTag.create(project_id: p.id, name: "Admin").id
+    AccessControlEntry.create(project_id: p.id, subject_id:, action_id: ActionType::NAME_MAP["Project:view"])
     p.add_invitation(email: TEST_USER_EMAIL, policy: "Admin", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
 
     expect(Config).to receive(:managed_service).and_return(true).at_least(:once)
@@ -454,7 +454,7 @@ RSpec.describe Clover, "auth" do
       it "can close account when password entry is #{"not " unless clear_last_password_entry}required" do
         visit "/clear-last-password-entry" if clear_last_password_entry
         account = Account[email: TEST_USER_EMAIL]
-        UsageAlert.create_with_id(project_id: account.projects.first.id, user_id: account.id, name: "test", limit: 100)
+        UsageAlert.create(project_id: account.projects.first.id, user_id: account.id, name: "test", limit: 100)
 
         visit "/account/close-account"
 

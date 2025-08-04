@@ -220,7 +220,7 @@ RSpec.describe Clover, "load balancer" do
       it "can attach vm" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000, algorithm: "hash_based").subject
-        dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
+        dz = DnsZone.create(name: "test-dns-zone", project_id: project.id)
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
         cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
         lb.add_cert(cert)
@@ -247,7 +247,7 @@ RSpec.describe Clover, "load balancer" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         lb1 = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
         lb2 = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-4", src_port: 80, dst_port: 8000).subject
-        dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
+        dz = DnsZone.create(name: "test-dns-zone", project_id: project.id)
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
         cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
         lb1.add_cert(cert)
@@ -282,7 +282,7 @@ RSpec.describe Clover, "load balancer" do
       it "can detach vm" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
-        dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
+        dz = DnsZone.create(name: "test-dns-zone", project_id: project.id)
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
         cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
         lb.add_cert(cert)
@@ -305,7 +305,7 @@ RSpec.describe Clover, "load balancer" do
       it "can not detach vm when it does not exist" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
-        dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
+        dz = DnsZone.create(name: "test-dns-zone", project_id: project.id)
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
         cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
         lb.add_cert(cert)
@@ -345,7 +345,7 @@ RSpec.describe Clover, "load balancer" do
 
       it "can not delete load balancer when does not have permissions" do
         # Give permission to view, so we can see the detail page
-        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["LoadBalancer:view"])
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["LoadBalancer:view"])
 
         visit "#{project_wo_permissions.path}#{lb_wo_permission.path}"
         expect(page.title).to eq "Ubicloud - dummy-lb-2"

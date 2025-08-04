@@ -198,28 +198,28 @@ class VmHost < Sequel::Model
           if Sshable.where(host: source_host_ip).count == 0
             fail "BUG: source host #{source_host_ip} isn't added to the database"
           end
-          adr = Address.create_with_id(cidr: ip_addr, routed_to_host_id: id, is_failover_ip: is_failover_ip)
+          adr = Address.create(cidr: ip_addr, routed_to_host_id: id, is_failover_ip: is_failover_ip)
         end
 
         unless is_failover_ip
-          AssignedHostAddress.create_with_id(host_id: id, ip: ip_addr, address_id: adr.id)
+          AssignedHostAddress.create(host_id: id, ip: ip_addr, address_id: adr.id)
         end
       end
     end
 
-    Strand.create_with_id(prog: "SetupNftables", label: "start", stack: [{subject_id: id}])
+    Strand.create(prog: "SetupNftables", label: "start", stack: [{subject_id: id}])
   end
 
   # Operational Functions
 
   # Introduced for refreshing rhizome programs via REPL.
   def install_rhizome(install_specs: false)
-    Strand.create_with_id(prog: "InstallRhizome", label: "start", stack: [{subject_id: id, target_folder: "host", install_specs: install_specs}])
+    Strand.create(prog: "InstallRhizome", label: "start", stack: [{subject_id: id, target_folder: "host", install_specs: install_specs}])
   end
 
   # Introduced for downloading a new boot image via REPL.
   def download_boot_image(image_name, version:, custom_url: nil)
-    Strand.create_with_id(prog: "DownloadBootImage", label: "start", stack: [{subject_id: id, image_name: image_name, custom_url: custom_url, version: version}])
+    Strand.create(prog: "DownloadBootImage", label: "start", stack: [{subject_id: id, image_name: image_name, custom_url: custom_url, version: version}])
   end
 
   # Introduced for downloading firmware via REPL.
@@ -227,7 +227,7 @@ class VmHost < Sequel::Model
     version, sha256 = (arch == "x64") ? [version_x64, sha256_x64] : [version_arm64, sha256_arm64]
     fail ArgumentError, "No version provided" if version.nil?
     fail ArgumentError, "No SHA-256 digest provided" if sha256.nil?
-    Strand.create_with_id(prog: "DownloadFirmware", label: "start", stack: [{subject_id: id, version: version, sha256: sha256}])
+    Strand.create(prog: "DownloadFirmware", label: "start", stack: [{subject_id: id, version: version, sha256: sha256}])
   end
 
   # Introduced for downloading cloud hypervisor via REPL.
@@ -240,7 +240,7 @@ class VmHost < Sequel::Model
       fail "BUG: unexpected architecture"
     end
     fail ArgumentError, "No version provided" if version.nil?
-    Strand.create_with_id(prog: "DownloadCloudHypervisor", label: "start", stack: [{subject_id: id, version: version, sha256_ch_bin: sha256_ch_bin, sha256_ch_remote: sha256_ch_remote}])
+    Strand.create(prog: "DownloadCloudHypervisor", label: "start", stack: [{subject_id: id, version: version, sha256_ch_bin: sha256_ch_bin, sha256_ch_remote: sha256_ch_remote}])
   end
 
   def hetznerify(server_id)

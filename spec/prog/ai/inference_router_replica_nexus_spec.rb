@@ -10,7 +10,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
   let(:project) { Project.create(name: "test") }
   let(:private_subnet) { PrivateSubnet.create(project_id: project.id, name: "test", location_id: Location::HETZNER_HEL1_ID, net6: "fe80::/64", net4: "192.168.0.0/24") }
   let(:load_balancer) { Prog::Vnet::LoadBalancerNexus.assemble(private_subnet.id, name: "test", src_port: 443, dst_port: 8443).subject }
-  let(:dns_zone) { DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id) }
+  let(:dns_zone) { DnsZone.create(name: "test-dns-zone", project_id: project.id) }
   let(:cert) { Prog::Vnet::CertNexus.assemble(load_balancer.hostname, dns_zone.id).subject }
   let(:inference_router) {
     InferenceRouter.create(
@@ -60,9 +60,9 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
 
   describe ".assemble" do
     it "creates replica and vm with sshable" do
-      user_project = Project.create_with_id(name: "default")
-      ie_project = Project.create_with_id(name: "default")
-      Firewall.create_with_id(name: "inference-router-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: ie_project.id)
+      user_project = Project.create(name: "default")
+      ie_project = Project.create(name: "default")
+      Firewall.create(name: "inference-router-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: ie_project.id)
 
       expect(Config).to receive(:inference_endpoint_service_project_id).and_return(ie_project.id).at_least(:once)
       st_ir = Prog::Ai::InferenceRouterNexus.assemble(
@@ -232,7 +232,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
   end
 
   describe "#ping_inference_router" do
-    let(:projects) { [Project.create_with_id(name: "p1"), Project.create_with_id(name: "p2")] }
+    let(:projects) { [Project.create(name: "p1"), Project.create(name: "p2")] }
 
     it "for public routers" do
       ApiKey.create_inference_api_key(projects.first)
@@ -391,7 +391,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
   end
 
   describe "#update_billing_records" do
-    let(:p1) { Project.create_with_id(name: "default") }
+    let(:p1) { Project.create(name: "default") }
 
     it "updates billing records" do
       expect(BillingRecord.count).to eq(0)
@@ -455,9 +455,9 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
     end
 
     it "failure in updating single record doesn't impact others" do
-      p2 = Project.create_with_id(name: "default")
-      expect(BillingRecord).to receive(:create_with_id).once.ordered.with(hash_including(project_id: p1.id)).and_raise(Sequel::DatabaseConnectionError)
-      expect(BillingRecord).to receive(:create_with_id).once.ordered.with(hash_including(project_id: p2.id)).and_call_original
+      p2 = Project.create(name: "default")
+      expect(BillingRecord).to receive(:create).once.ordered.with(hash_including(project_id: p1.id)).and_raise(Sequel::DatabaseConnectionError)
+      expect(BillingRecord).to receive(:create).once.ordered.with(hash_including(project_id: p2.id)).and_call_original
       expect(BillingRecord.count).to eq(0)
       nx.update_billing_records(
         [

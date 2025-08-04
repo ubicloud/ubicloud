@@ -371,7 +371,7 @@ RSpec.describe Clover, "Kubernetes" do
 
       it "can not delete kubernetes cluster when does not have permissions" do
         # Give permission to view, so we can see the detail page
-        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["KubernetesCluster:view"])
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["KubernetesCluster:view"])
 
         visit "#{project_wo_permissions.path}#{kc_no_perm.path}"
         expect(page.title).to eq "Ubicloud - not-my-k8s"

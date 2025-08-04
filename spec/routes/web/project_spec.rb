@@ -107,7 +107,7 @@ RSpec.describe Clover, "project" do
       end
 
       it "returns not found when user isn't added to project" do
-        new_project = Project.create_with_id(name: "new-project")
+        new_project = Project.create(name: "new-project")
         visit "#{new_project.path}/dashboard"
 
         expect(page.title).to eq("Ubicloud - ResourceNotFound")
@@ -261,7 +261,7 @@ RSpec.describe Clover, "project" do
         visit "#{project.path}/user"
         expect(page.status_code).to eq(403)
 
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
         page.refresh
         expect(page.title).to eq("Ubicloud - project-1 - Users")
       end
@@ -275,9 +275,9 @@ RSpec.describe Clover, "project" do
         expect(page.status_code).to eq(403)
         expect(Mail::TestMailer.deliveries.length).to eq 0
 
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:view"])
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:view"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"])
         visit "#{project.path}/user"
         fill_in "Email", with: user2.email
         select "Admin", from: "policy"
@@ -335,10 +335,10 @@ RSpec.describe Clover, "project" do
       end
 
       it "can only add existing invited user to subject tag if SubjectTag:add permissions are allowed for it" do
-        allowed = SubjectTag.create_with_id(project_id: project.id, name: "Allowed")
+        allowed = SubjectTag.create(project_id: project.id, name: "Allowed")
         AccessControlEntry.dataset.destroy
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:view"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:view"])
 
         visit "#{project.path}/user"
         fill_in "Email", with: user2.email
@@ -375,10 +375,10 @@ RSpec.describe Clover, "project" do
       end
 
       it "can only set subject tag for new invited user if SubjectTag:add permissions are allowed for it" do
-        allowed = SubjectTag.create_with_id(project_id: project.id, name: "Allowed")
+        allowed = SubjectTag.create(project_id: project.id, name: "Allowed")
         AccessControlEntry.dataset.destroy
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:view"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:view"])
 
         visit "#{project.path}/user"
         fill_in "Email", with: user2.email
@@ -387,7 +387,7 @@ RSpec.describe Clover, "project" do
 
         expect(page).to have_flash_error("You don't have permission to invite users with this subject tag.")
 
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: allowed.id)
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: allowed.id)
 
         visit "#{project.path}/user"
         new_email = "newUpper@example.com"
@@ -435,7 +435,7 @@ RSpec.describe Clover, "project" do
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
         expect(page.status_code).to eq 403
 
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
         visit "#{project.path}/user"
         btn = find "#user-#{user2.ubid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
@@ -445,7 +445,7 @@ RSpec.describe Clover, "project" do
       it "can remove user from project" do
         user2.add_project(project)
         project.subject_tags_dataset.first(name: "Admin").add_subject(user2.id)
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user2.id)
+        AccessControlEntry.create(project_id: project.id, subject_id: user2.id)
 
         visit "#{project.path}/user"
 
@@ -487,7 +487,7 @@ RSpec.describe Clover, "project" do
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
         expect(page.status_code).to eq 403
 
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
         visit "#{project.path}/user"
         btn = find "#invitation-#{invited_email.gsub(/\W+/, "")} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
@@ -519,15 +519,15 @@ RSpec.describe Clover, "project" do
         project.add_invitation(email: invited_email, inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
         visit "#{project.path}/user"
         AccessControlEntry.dataset.destroy
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:view"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:view"])
         within "form#managed-policy" do
           select "Admin", from: "invitation_policies[#{invited_email}]"
           click_button "Update"
         end
         expect(page.status_code).to eq 403
 
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"])
         visit "#{project.path}/user"
         within "form#managed-policy" do
           select "Admin", from: "invitation_policies[#{invited_email}]"
@@ -555,13 +555,13 @@ RSpec.describe Clover, "project" do
       end
 
       it "can only update default policy of invited user if new policy is allowed subject tag" do
-        allowed = SubjectTag.create_with_id(project_id: project.id, name: "Allowed")
-        to_be_removed = SubjectTag.create_with_id(project_id: project.id, name: "ToBeRemoved")
+        allowed = SubjectTag.create(project_id: project.id, name: "Allowed")
+        to_be_removed = SubjectTag.create(project_id: project.id, name: "ToBeRemoved")
         AccessControlEntry.dataset.destroy
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:view"])
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: allowed.id)
-        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: to_be_removed.id)
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:view"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: allowed.id)
+        ace = AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: to_be_removed.id)
 
         invited_email = "invited@example.com"
         project.add_invitation(email: invited_email, policy: "Allowed", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
@@ -580,7 +580,7 @@ RSpec.describe Clover, "project" do
         expect(page).to have_flash_error("You don't have permission to remove invitation from 'Allowed' tag")
         expect(page).to have_select("invitation_policies[#{invited_email}]", selected: "Allowed")
 
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: allowed.id)
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: allowed.id)
         within "form#managed-policy" do
           select "ToBeRemoved", from: "invitation_policies[#{invited_email}]"
           ace.destroy
@@ -599,15 +599,15 @@ RSpec.describe Clover, "project" do
       end
 
       it "can update default policy of existing user" do
-        tag1 = SubjectTag.create_with_id(project_id: project.id, name: "FirstTag")
-        tag2 = SubjectTag.create_with_id(project_id: project.id, name: "SecondTag")
+        tag1 = SubjectTag.create(project_id: project.id, name: "FirstTag")
+        tag2 = SubjectTag.create(project_id: project.id, name: "SecondTag")
         AccessControlEntry.dataset.destroy
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:view"])
-        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: tag1.id)
-        remove_ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: tag1.id)
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: tag2.id)
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: tag2.id)
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:view"])
+        ace = AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: tag1.id)
+        remove_ace = AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: tag1.id)
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: tag2.id)
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: tag2.id)
 
         user2.add_project(project)
         tag1.add_subject(user2.id)
@@ -648,7 +648,7 @@ RSpec.describe Clover, "project" do
         expect(noremove["title"]).to eq "You cannot change the policy for this user"
         expect(noremove.text).to eq "FirstTag"
 
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: tag1.id)
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: tag1.id)
         page.refresh
         within "form#managed-policy" do
           select "SecondTag", from: "user_policies[#{user2.ubid}]"
@@ -680,7 +680,7 @@ RSpec.describe Clover, "project" do
         expect(page).to have_flash_notice("1 members added to SecondTag")
         expect(page).to have_select("user_policies[#{user2.ubid}]", selected: "SecondTag")
 
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: admin_tag.id)
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: admin_tag.id)
         page.refresh
         expect(page).to have_select("user_policies[#{user.ubid}]", selected: "Admin")
         within "form#managed-policy" do
@@ -763,7 +763,7 @@ RSpec.describe Clover, "project" do
 
       it "can not delete project when does not have permissions" do
         # Give permission to view, so we can see the detail page
-        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:view"])
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:view"])
 
         visit project_wo_permissions.path
         expect(page.title).to eq "Ubicloud - project-2"

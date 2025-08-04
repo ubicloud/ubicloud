@@ -3,7 +3,7 @@
 require_relative "spec_helper"
 
 RSpec.describe BillingInfo do
-  subject(:billing_info) { described_class.create_with_id(stripe_id: "cs_1234567890") }
+  subject(:billing_info) { described_class.create(stripe_id: "cs_1234567890") }
 
   it "return Stripe Data if Stripe enabled" do
     allow(Config).to receive(:stripe_secret_key).and_return("secret_key")

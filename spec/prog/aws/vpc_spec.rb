@@ -6,13 +6,13 @@ RSpec.describe Prog::Aws::Vpc do
   }
 
   let(:st) {
-    Strand.create_with_id(prog: "Aws::Vpc", stack: [{"subject_id" => ps.id}], label: "create_vpc")
+    Strand.create(prog: "Aws::Vpc", stack: [{"subject_id" => ps.id}], label: "create_vpc")
   }
 
   let(:ps) {
-    prj = Project.create_with_id(name: "test-prj")
-    loc = Location.create_with_id(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
-    LocationCredential.create_with_id(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = loc.id }
+    prj = Project.create(name: "test-prj")
+    loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
+    LocationCredential.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = loc.id }
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps", location_id: loc.id).subject
     PrivateSubnetAwsResource.create { it.id = ps.id }
     ps
@@ -61,7 +61,7 @@ RSpec.describe Prog::Aws::Vpc do
       expect(client).to receive(:describe_vpcs).with({filters: [{name: "vpc-id", values: ["vpc-0123456789abcdefg"]}]}).and_call_original
       expect(client).to receive(:create_security_group).with({group_name: "aws-us-west-2-#{ps.ubid}", description: "Security group for aws-us-west-2-#{ps.ubid}", vpc_id: "vpc-0123456789abcdefg", tag_specifications: Util.aws_tag_specifications("security-group", ps.name)}).and_call_original
       ps.firewalls.map { it.firewall_rules.map { |fw| fw.destroy } }
-      FirewallRule.create_with_id(firewall_id: ps.firewalls.first.id, cidr: "0.0.0.1/32", port_range: 22..80)
+      FirewallRule.create(firewall_id: ps.firewalls.first.id, cidr: "0.0.0.1/32", port_range: 22..80)
       ps.reload
       expect(ps.private_subnet_aws_resource).to receive(:vpc_id).and_return("vpc-0123456789abcdefg").at_least(:once)
       expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-0123456789abcdefg", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 80, ip_ranges: [{cidr_ip: "0.0.0.1/32"}]}]}).and_call_original
@@ -74,8 +74,8 @@ RSpec.describe Prog::Aws::Vpc do
       client.stub_responses(:describe_security_groups, security_groups: [{group_id: "sg-0123456789abcdefg"}])
 
       ps.firewalls.map { it.firewall_rules.map { |fw| fw.destroy } }
-      FirewallRule.create_with_id(firewall_id: ps.firewalls.first.id, cidr: "0.0.0.1/32", port_range: 22..80)
-      FirewallRule.create_with_id(firewall_id: ps.firewalls.first.id, cidr: "::/32", port_range: 22..80)
+      FirewallRule.create(firewall_id: ps.firewalls.first.id, cidr: "0.0.0.1/32", port_range: 22..80)
+      FirewallRule.create(firewall_id: ps.firewalls.first.id, cidr: "::/32", port_range: 22..80)
       ps.reload
       expect { nx.wait_vpc_created }.to hop("create_subnet")
     end
@@ -85,7 +85,7 @@ RSpec.describe Prog::Aws::Vpc do
       client.stub_responses(:authorize_security_group_ingress, Aws::EC2::Errors::InvalidPermissionDuplicate.new(nil, nil))
 
       ps.firewalls.map { it.firewall_rules.map { |fw| fw.destroy } }
-      FirewallRule.create_with_id(firewall_id: ps.firewalls.first.id, cidr: "0.0.0.1/32", port_range: 22..80)
+      FirewallRule.create(firewall_id: ps.firewalls.first.id, cidr: "0.0.0.1/32", port_range: 22..80)
       ps.reload
       expect { nx.wait_vpc_created }.to hop("create_subnet")
     end

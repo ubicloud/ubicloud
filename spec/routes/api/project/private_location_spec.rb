@@ -148,7 +148,7 @@ RSpec.describe Clover, "private-location" do
       it "failure with unauthorized personal access token" do
         private_location
         AccessControlEntry.dataset.destroy
-        AccessControlEntry.create_with_id(project_id: project.id, subject_id: @pat.id, action_id: ActionType::NAME_MAP["Location:edit"])
+        AccessControlEntry.create(project_id: project.id, subject_id: @pat.id, action_id: ActionType::NAME_MAP["Location:edit"])
 
         get "/project/#{project.ubid}/private-location/#{private_location.ui_name}"
         expect(last_response).to have_api_error(403, "Sorry, you don't have permission to continue with this request.")

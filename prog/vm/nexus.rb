@@ -125,7 +125,7 @@ class Prog::Vm::Nexus < Prog::Base
           disk_count = (volume[:size_gib] == 3800) ? 2 : 1
 
           disk_count.times do
-            VmStorageVolume.create_with_id(
+            VmStorageVolume.create(
               vm_id: vm.id,
               size_gib: volume[:size_gib] / disk_count,
               boot: volume[:boot],
@@ -369,7 +369,7 @@ class Prog::Vm::Nexus < Prog::Base
     project = vm.project
     hop_wait unless project.billable
 
-    BillingRecord.create_with_id(
+    BillingRecord.create(
       project_id: project.id,
       resource_id: vm.id,
       resource_name: vm.name,
@@ -379,7 +379,7 @@ class Prog::Vm::Nexus < Prog::Base
 
     unless vm.location.aws?
       vm.storage_volumes.each do |vol|
-        BillingRecord.create_with_id(
+        BillingRecord.create(
           project_id: project.id,
           resource_id: vm.id,
           resource_name: "Disk ##{vol["disk_index"]} of #{vm.name}",
@@ -389,7 +389,7 @@ class Prog::Vm::Nexus < Prog::Base
       end
 
       if vm.ip4_enabled
-        BillingRecord.create_with_id(
+        BillingRecord.create(
           project_id: project.id,
           resource_id: vm.id,
           resource_name: vm.assigned_vm_address.ip,
@@ -402,7 +402,7 @@ class Prog::Vm::Nexus < Prog::Base
         gpu_count = vm.pci_devices.count { |dev| dev.is_gpu }
         gpu = vm.pci_devices.find { |dev| dev.is_gpu }
 
-        BillingRecord.create_with_id(
+        BillingRecord.create(
           project_id: project.id,
           resource_id: vm.id,
           resource_name: "GPUs of #{vm.name}",

@@ -24,7 +24,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       fail "E2E_HETZNER_SERVER_ID must be a nonempty string"
     end
 
-    Strand.create_with_id(
+    Strand.create(
       prog: "Test::HetznerServer",
       label: "start",
       stack: [frame]

@@ -7,14 +7,14 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
 
   let(:st) { Strand.new }
   let(:ps) {
-    PrivateSubnet.create_with_id(name: "ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64",
+    PrivateSubnet.create(name: "ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64",
       net4: "1.1.1.0/26", state: "waiting", project_id: Project.create(name: "test").id)
   }
   let(:tunnel) {
     vmh = create_vm_host
     vm_src = create_vm(name: "hellovm", vm_host_id: vmh.id)
     vm_dst = create_vm(name: "hellovm2", vm_host_id: vmh.id)
-    n_src = Nic.create_with_id(private_subnet_id: ps.id,
+    n_src = Nic.create(private_subnet_id: ps.id,
       private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
       private_ipv4: "10.0.0.1",
       mac: "00:00:00:00:00:00",
@@ -22,7 +22,7 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
       name: "default-nic",
       rekey_payload: {"reqid" => 86879, "spi4" => "0xe2222222", "spi6" => "0xe3333333"},
       vm_id: vm_src.id)
-    n_dst = Nic.create_with_id(private_subnet_id: ps.id,
+    n_dst = Nic.create(private_subnet_id: ps.id,
       private_ipv6: "fd10:9b0b:6b4b:8fbb:def::",
       private_ipv4: "10.0.0.2",
       mac: "00:00:00:00:00:00",
@@ -30,7 +30,7 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
       name: "default-nic",
       rekey_payload: {"reqid" => 14329, "spi4" => "0xe0000000", "spi6" => "0xe1111111"},
       vm_id: vm_dst.id)
-    IpsecTunnel.create_with_id(src_nic_id: n_src.id, dst_nic_id: n_dst.id).tap { it.id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e" }
+    IpsecTunnel.create(src_nic_id: n_src.id, dst_nic_id: n_dst.id).tap { it.id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e" }
   }
 
   before do

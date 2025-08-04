@@ -9,7 +9,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
   }
 
   let(:st) { Strand.new(id: "e29d876b-9437-4ba3-9949-99075ad8767d", prog: "VictoriaMetrics::VictoriaMetricsServerNexus", label: "start") }
-  let(:project) { Project.create_with_id(name: "default") }
+  let(:project) { Project.create(name: "default") }
 
   let(:vm) {
     instance_double(Vm,
@@ -21,7 +21,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
   }
 
   let(:victoria_metrics_resource) {
-    VictoriaMetricsResource.create_with_id(
+    VictoriaMetricsResource.create(
       location_id: Location::HETZNER_FSN1_ID,
       name: "test-vm",
       target_vm_size: "standard-2",

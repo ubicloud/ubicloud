@@ -4,11 +4,11 @@ require_relative "../spec_helper"
 
 RSpec.describe Clover, "github" do
   let(:installation) do
-    prj = Project.create_with_id(name: "test-project")
-    GithubInstallation.create_with_id(installation_id: 123, name: "test-user", type: "User", project_id: prj.id)
+    prj = Project.create(name: "test-project")
+    GithubInstallation.create(installation_id: 123, name: "test-user", type: "User", project_id: prj.id)
   end
 
-  let(:runner) { GithubRunner.create_with_id(installation_id: installation.id, label: "ubicloud", repository_name: "my-repo", runner_id: 123, vm_id: "46683a25-acb1-4371-afe9-d39f303e44b4") }
+  let(:runner) { GithubRunner.create(installation_id: installation.id, label: "ubicloud", repository_name: "my-repo", runner_id: 123, vm_id: "46683a25-acb1-4371-afe9-d39f303e44b4") }
 
   before do
     allow(Config).to receive(:github_app_webhook_secret).and_return("secret")

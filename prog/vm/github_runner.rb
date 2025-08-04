@@ -12,7 +12,7 @@ class Prog::Vm::GithubRunner < Prog::Base
 
     DB.transaction do
       repository = Prog::Github::GithubRepositoryNexus.assemble(installation, repository_name, default_branch).subject
-      github_runner = GithubRunner.create_with_id(
+      github_runner = GithubRunner.create(
         installation_id: installation.id,
         repository_name: repository_name,
         repository_id: repository.id,
@@ -104,7 +104,7 @@ class Prog::Vm::GithubRunner < Prog::Base
         today_record.amount = Sequel[:amount] + used_amount
         today_record.save_changes(validate: false)
       else
-        BillingRecord.create_with_id(
+        BillingRecord.create(
           project_id: project.id,
           resource_id: project.id,
           resource_name: "Daily Usage #{begin_time.strftime("%Y-%m-%d")}",

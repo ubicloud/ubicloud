@@ -21,9 +21,9 @@ RSpec.describe Clover, "inference-playground" do
 
     it "gives choice of inference endpoints" do
       ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
-      lb = LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-1", health_check_endpoint: "/up", project_id: project.id)
+      lb = LoadBalancer.create(private_subnet_id: ps.id, name: "dummy-lb-1", health_check_endpoint: "/up", project_id: project.id)
       LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 80, dst_port: 80)
-      lb2 = LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-2", health_check_endpoint: "/up", project_id: project.id)
+      lb2 = LoadBalancer.create(private_subnet_id: ps.id, name: "dummy-lb-2", health_check_endpoint: "/up", project_id: project.id)
       LoadBalancerPort.create(load_balancer_id: lb2.id, src_port: 80, dst_port: 80)
       [
         ["ie1", "e5-mistral-7b-it", project_wo_permissions, true, true, lb.id, {capability: "Embeddings"}],
@@ -33,7 +33,7 @@ RSpec.describe Clover, "inference-playground" do
         ["ie5", "llama-3-2-3b-it", project, false, false, lb.id, {capability: "Text Generation"}],
         ["ie6", "test-model", project_wo_permissions, true, true, lb.id, {capability: "Text Generation"}]
       ].each do |name, model_name, project, is_public, visible, load_balancer_id, tags|
-        InferenceEndpoint.create_with_id(name:, model_name:, project_id: project.id, is_public:, visible:, load_balancer_id:, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, tags:)
+        InferenceEndpoint.create(name:, model_name:, project_id: project.id, is_public:, visible:, load_balancer_id:, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, tags:)
       end
       inference_router = InferenceRouter.create(
         name: "ir-name",

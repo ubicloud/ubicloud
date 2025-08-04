@@ -260,7 +260,7 @@ module Scheduling::Allocator
       }
       update_args[:family] = vm_host.family if vm.family != "burstable"
       vm.update(**update_args)
-      AssignedVmAddress.create_with_id(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id) if ip4
+      AssignedVmAddress.create(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id) if ip4
       vm.sshable&.update(host: vm.ephemeral_net4 || NetAddr.parse_net(vm.ephemeral_net6).nth(2))
     end
 
@@ -615,7 +615,7 @@ module Scheduling::Allocator
           key_wrapping_key = cipher.random_key
           key_wrapping_iv = cipher.random_iv
 
-          StorageKeyEncryptionKey.create_with_id(
+          StorageKeyEncryptionKey.create(
             algorithm: key_wrapping_algorithm,
             key: Base64.encode64(key_wrapping_key),
             init_vector: Base64.encode64(key_wrapping_iv),
@@ -629,7 +629,7 @@ module Scheduling::Allocator
           allocate_boot_image(vm_host, volume["image"])
         end
 
-        VmStorageVolume.create_with_id(
+        VmStorageVolume.create(
           vm_id: vm.id,
           boot: volume["boot"],
           size_gib: volume["size_gib"],

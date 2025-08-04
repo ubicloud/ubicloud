@@ -6,12 +6,12 @@ RSpec.describe Prog::Minio::SetupMinio do
   subject(:nx) { described_class.new(Strand.new) }
 
   let(:minio_server) {
-    prj = Project.create_with_id(name: "default")
+    prj = Project.create(name: "default")
     ps = Prog::Vnet::SubnetNexus.assemble(
       prj.id, name: "minio-cluster-name"
     )
 
-    mc = MinioCluster.create_with_id(
+    mc = MinioCluster.create(
       location_id: Location::HETZNER_FSN1_ID,
       name: "minio-cluster-name",
       admin_user: "minio-admin",
@@ -24,14 +24,14 @@ RSpec.describe Prog::Minio::SetupMinio do
       project_id: prj.id
     )
 
-    mp = MinioPool.create_with_id(
+    mp = MinioPool.create(
       start_index: 0,
       cluster_id: mc.id,
       vm_size: "standard-2",
       server_count: 1,
       drive_count: 1
     )
-    MinioServer.create_with_id(
+    MinioServer.create(
       minio_pool_id: mp.id,
       vm_id: create_vm.id,
       index: 0,

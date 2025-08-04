@@ -9,7 +9,7 @@ class Prog::Storage::SetupSpdk < Prog::Base
   ]
 
   def self.assemble(vm_host_id, version, start_service: false, allocation_weight: 0)
-    Strand.create_with_id(
+    Strand.create(
       prog: "Storage::SetupSpdk",
       label: "start",
       stack: [{

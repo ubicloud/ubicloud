@@ -147,7 +147,7 @@ class Clover
             firewall_rule = nil
             DB.transaction do
               pg.incr_update_firewall_rules
-              firewall_rule = PostgresFirewallRule.create_with_id(
+              firewall_rule = PostgresFirewallRule.create(
                 postgres_resource_id: pg.id,
                 cidr: parsed_cidr.to_s,
                 description: typecast_params.str("description")&.strip

@@ -16,13 +16,13 @@ RSpec.describe Prog::Ai::InferenceRouterNexus do
   end
 
   describe ".assemble" do
-    let(:customer_project) { Project.create_with_id(name: "default") }
-    let(:ie_project) { Project.create_with_id(name: "default") }
+    let(:customer_project) { Project.create(name: "default") }
+    let(:ie_project) { Project.create(name: "default") }
 
     it "validates input" do
       expect(Config).to receive(:inference_endpoint_service_project_id).and_return(ie_project.id).at_least(:once)
-      Firewall.create_with_id(name: "inference-router-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: ie_project.id)
-      DnsZone.create_with_id(name: "ai.ubicloud.com", project_id: ie_project.id)
+      Firewall.create(name: "inference-router-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: ie_project.id)
+      DnsZone.create(name: "ai.ubicloud.com", project_id: ie_project.id)
 
       expect {
         described_class.assemble(project_id: "ed6afccf-7025-4f35-8241-454221d75e18", location_id: Location::HETZNER_FSN1_ID, name: "test-router", replica_count: 1)
@@ -69,7 +69,7 @@ RSpec.describe Prog::Ai::InferenceRouterNexus do
 
     it "works without dns zone" do
       expect(Config).to receive(:inference_endpoint_service_project_id).and_return(ie_project.id).at_least(:once)
-      Firewall.create_with_id(name: "inference-router-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: ie_project.id)
+      Firewall.create(name: "inference-router-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: ie_project.id)
       expect {
         described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "test-router", replica_count: 1)
       }.not_to raise_error

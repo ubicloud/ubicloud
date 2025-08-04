@@ -275,7 +275,7 @@ class Clover
             r.post do
               authorize(tag_perm_map[tag_type], @project.id)
               DB.transaction do
-                tag = @tag_model.create_with_id(project_id: @project.id, name: typecast_params.nonempty_str("name"))
+                tag = @tag_model.create(project_id: @project.id, name: typecast_params.nonempty_str("name"))
                 audit_log(tag, "create")
               end
               flash["notice"] = "#{@display_tag_type} tag created successfully"

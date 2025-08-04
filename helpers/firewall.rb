@@ -22,7 +22,7 @@ class Clover
 
     firewall = nil
     DB.transaction do
-      firewall = Firewall.create_with_id(
+      firewall = Firewall.create(
         name: firewall_name,
         description:,
         location_id: @location.id,

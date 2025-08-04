@@ -4,7 +4,7 @@ require "net/ssh"
 
 class Prog::Test::VmGroup < Prog::Test::Base
   def self.assemble(boot_images:, storage_encrypted: true, test_reboot: true, test_slices: false, verify_host_capacity: true)
-    Strand.create_with_id(
+    Strand.create(
       prog: "Test::VmGroup",
       label: "start",
       stack: [{
@@ -23,7 +23,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def setup_vms
-    project = Project.create_with_id(name: "project-1")
+    project = Project.create(name: "project-1")
     test_slices = frame.fetch("test_slices")
 
     size_options = test_slices ? ["standard-2", "burstable-1"] : ["standard-2"]

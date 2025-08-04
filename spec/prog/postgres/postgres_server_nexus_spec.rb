@@ -56,9 +56,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe ".assemble" do
-    let(:user_project) { Project.create_with_id(name: "default") }
+    let(:user_project) { Project.create(name: "default") }
     let(:postgres_resource) {
-      PostgresResource.create_with_id(
+      PostgresResource.create(
         project_id: user_project.id,
         location_id: Location::HETZNER_FSN1_ID,
         name: "pg-name",
@@ -69,8 +69,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     }
 
     it "creates postgres server and vm with sshable" do
-      postgres_timeline = PostgresTimeline.create_with_id
-      postgres_project = Project.create_with_id(name: "default")
+      postgres_timeline = PostgresTimeline.create
+      postgres_project = Project.create(name: "default")
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
 
       st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now)

@@ -9,7 +9,7 @@ RSpec.describe Clover, "load-balancer" do
 
   let(:lb) do
     ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location_id: Location[display_name: TEST_LOCATION].id)
-    dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
+    dz = DnsZone.create(name: "test-dns-zone", project_id: project.id)
     cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
     lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "lb-1", src_port: 80, dst_port: 8080).subject
     lb.add_cert(cert)
@@ -37,7 +37,7 @@ RSpec.describe Clover, "load-balancer" do
   describe "authenticated" do
     before do
       login_api
-      lb_project = Project.create_with_id(name: "default")
+      lb_project = Project.create(name: "default")
       allow(Config).to receive(:load_balancer_service_project_id).and_return(lb_project.id)
     end
 
@@ -137,7 +137,7 @@ RSpec.describe Clover, "load-balancer" do
 
     describe "update" do
       let(:vm) {
-        nic = Nic.create_with_id(name: "nic-1", private_subnet_id: lb.private_subnet.id, mac: "00:00:00:00:00:01", private_ipv4: "1.1.1.1", private_ipv6: "2001:db8::1")
+        nic = Nic.create(name: "nic-1", private_subnet_id: lb.private_subnet.id, mac: "00:00:00:00:00:01", private_ipv4: "1.1.1.1", private_ipv6: "2001:db8::1")
         vm = create_vm
         nic.update(vm_id: vm.id)
         vm.update(project_id: project.id)
@@ -200,7 +200,7 @@ RSpec.describe Clover, "load-balancer" do
 
       it "vm already attached to a different load balancer" do
         lb2 = Prog::Vnet::LoadBalancerNexus.assemble(lb.private_subnet.id, name: "lb-2", src_port: 80, dst_port: 8080).subject
-        dz = DnsZone.create_with_id(name: "test-dns-zone2", project_id: lb2.private_subnet.project_id)
+        dz = DnsZone.create(name: "test-dns-zone2", project_id: lb2.private_subnet.project_id)
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
         lb2.add_cert(cert)
         lb2.add_vm(vm)
@@ -225,7 +225,7 @@ RSpec.describe Clover, "load-balancer" do
 
     describe "attach-vm" do
       let(:vm) {
-        nic = Nic.create_with_id(name: "nic-1", private_subnet_id: lb.private_subnet.id, mac: "00:00:00:00:00:01", private_ipv4: "1.1.1.1", private_ipv6: "2001:db8::1")
+        nic = Nic.create(name: "nic-1", private_subnet_id: lb.private_subnet.id, mac: "00:00:00:00:00:01", private_ipv4: "1.1.1.1", private_ipv6: "2001:db8::1")
         vm = create_vm
         nic.update(vm_id: vm.id)
         vm
@@ -247,7 +247,7 @@ RSpec.describe Clover, "load-balancer" do
 
     describe "detach-vm" do
       let(:vm) {
-        nic = Nic.create_with_id(name: "nic-1", private_subnet_id: lb.private_subnet.id, mac: "00:00:00:00:00:01", private_ipv4: "1.1.1.1", private_ipv6: "2001:db8::1")
+        nic = Nic.create(name: "nic-1", private_subnet_id: lb.private_subnet.id, mac: "00:00:00:00:00:01", private_ipv4: "1.1.1.1", private_ipv6: "2001:db8::1")
         vm = create_vm
         nic.update(vm_id: vm.id)
         vm

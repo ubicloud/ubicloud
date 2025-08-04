@@ -4,10 +4,10 @@ require_relative "spec_helper"
 
 RSpec.describe GithubRunner do
   subject(:github_runner) {
-    ins = GithubInstallation.create_with_id(installation_id: 123, name: "test-installation", type: "User")
+    ins = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
     vm = create_vm(vm_host: create_vm_host, boot_image: "github-ubuntu-2204")
     Sshable.create { it.id = vm.id }
-    described_class.create_with_id(repository_name: "test-repo", label: "ubicloud", vm_id: vm.id, installation_id: ins.id)
+    described_class.create(repository_name: "test-repo", label: "ubicloud", vm_id: vm.id, installation_id: ins.id)
   }
 
   def clog_emit_hash
@@ -39,7 +39,7 @@ RSpec.describe GithubRunner do
   end
 
   it "can log duration when it's from a vm pool" do
-    pool = VmPool.create_with_id(size: 1, vm_size: "standard-2", location_id: Location::HETZNER_FSN1_ID, boot_image: "github-ubuntu-2204", storage_size_gib: 86)
+    pool = VmPool.create(size: 1, vm_size: "standard-2", location_id: Location::HETZNER_FSN1_ID, boot_image: "github-ubuntu-2204", storage_size_gib: 86)
     vm = github_runner.vm
     vm.update(pool_id: pool.id)
     expect(clog_emit_hash).to eq({

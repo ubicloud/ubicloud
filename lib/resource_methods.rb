@@ -146,9 +146,5 @@ module ResourceMethods
     def new_with_id(...)
       new(...).set_uuid
     end
-
-    def create_with_id(...)
-      create(...)
-    end
   end
 end

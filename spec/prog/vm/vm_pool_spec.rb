@@ -31,7 +31,7 @@ RSpec.describe Prog::Vm::VmPool do
 
   describe "#create_new_vm" do
     let(:prj) {
-      Project.create_with_id(name: "default")
+      Project.create(name: "default")
     }
 
     it "creates a new vm and hops to wait" do
@@ -59,7 +59,7 @@ RSpec.describe Prog::Vm::VmPool do
     end
 
     let(:pool) {
-      VmPool.create_with_id(
+      VmPool.create(
         size: 0, vm_size: "standard-2", boot_image: "img", location_id: "6b9ef786-b842-8420-8c65-c25e3d4bdf3d",
         storage_size_gib: 86, storage_encrypted: true,
         storage_skip_sync: false, arch: "x64"
@@ -82,7 +82,7 @@ RSpec.describe Prog::Vm::VmPool do
       pool.update(size: 1)
 
       expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
-      Vm.create(vm_host: VmHost.first, unix_user: "ubi", public_key: "k y", name: "vm1", location_id: "6b9ef786-b842-8420-8c65-c25e3d4bdf3d", boot_image: "github-ubuntu-2204", family: "standard", arch: "arm64", cores: 2, vcpus: 2, memory_gib: 8, project_id:) { it.id = Sshable.create_with_id.id }
+      Vm.create(vm_host: VmHost.first, unix_user: "ubi", public_key: "k y", name: "vm1", location_id: "6b9ef786-b842-8420-8c65-c25e3d4bdf3d", boot_image: "github-ubuntu-2204", family: "standard", arch: "arm64", cores: 2, vcpus: 2, memory_gib: 8, project_id:) { it.id = Sshable.create.id }
 
       expect { nx.wait }.to hop("create_new_vm")
     end
@@ -91,7 +91,7 @@ RSpec.describe Prog::Vm::VmPool do
       pool.update(size: 1)
 
       expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
-      Vm.create(vm_host: VmHost.first, unix_user: "ubi", public_key: "k y", name: "vm1", location_id: "6b9ef786-b842-8420-8c65-c25e3d4bdf3d", boot_image: "github-ubuntu-2204", family: "standard", arch: "x64", cores: 2, vcpus: 4, memory_gib: 8, project_id:) { it.id = Sshable.create_with_id.id }
+      Vm.create(vm_host: VmHost.first, unix_user: "ubi", public_key: "k y", name: "vm1", location_id: "6b9ef786-b842-8420-8c65-c25e3d4bdf3d", boot_image: "github-ubuntu-2204", family: "standard", arch: "x64", cores: 2, vcpus: 4, memory_gib: 8, project_id:) { it.id = Sshable.create.id }
 
       expect { nx.wait }.to nap(30)
     end
@@ -99,7 +99,7 @@ RSpec.describe Prog::Vm::VmPool do
 
   describe "#destroy" do
     let(:pool) {
-      VmPool.create_with_id(size: 0, vm_size: "standard-2", boot_image: "img", location_id: Location::HETZNER_FSN1_ID, storage_size_gib: 86)
+      VmPool.create(size: 0, vm_size: "standard-2", boot_image: "img", location_id: Location::HETZNER_FSN1_ID, storage_size_gib: 86)
     }
 
     it "increments vms' destroy semaphore and hops to wait_vms_destroy" do
@@ -115,7 +115,7 @@ RSpec.describe Prog::Vm::VmPool do
 
   describe "#wait_vms_destroy" do
     let(:pool) {
-      VmPool.create_with_id(size: 0, vm_size: "standard-2", boot_image: "img", location_id: Location::HETZNER_FSN1_ID, storage_size_gib: 86)
+      VmPool.create(size: 0, vm_size: "standard-2", boot_image: "img", location_id: Location::HETZNER_FSN1_ID, storage_size_gib: 86)
     }
 
     it "pops if vms are all destroyed" do

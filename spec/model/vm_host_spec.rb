@@ -38,7 +38,7 @@ RSpec.describe VmHost do
 
   it "requires an Sshable too" do
     expect {
-      sa = Sshable.create_with_id(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair)
+      sa = Sshable.create(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair)
       described_class.create(location_id: Location::HETZNER_FSN1_ID, family: "standard") { it.id = sa.id }
     }.not_to raise_error
   end
@@ -234,7 +234,7 @@ RSpec.describe VmHost do
   it "create_addresses creates given addresses and doesn't make an api call when ips given" do
     expect(vh).to receive(:id).and_return("46683a25-acb1-4371-afe9-d39f303e44b4").at_least(:once)
     Sshable.create(host: "1.1.0.0") { it.id = vh.id }
-    Sshable.create_with_id(host: "1.1.1.1")
+    Sshable.create(host: "1.1.1.1")
 
     described_class.create(location_id: Location::HETZNER_FSN1_ID, family: "standard") { it.id = vh.id }
 
@@ -248,7 +248,7 @@ RSpec.describe VmHost do
     expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
     expect(vh).to receive(:id).and_return("46683a25-acb1-4371-afe9-d39f303e44b4").at_least(:once)
     Sshable.create(host: "1.1.0.0") { it.id = vh.id }
-    Sshable.create_with_id(host: "1.1.1.1")
+    Sshable.create(host: "1.1.1.1")
 
     described_class.create(location_id: Location::HETZNER_FSN1_ID, family: "standard") { it.id = vh.id }
 
@@ -268,7 +268,7 @@ RSpec.describe VmHost do
     expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
     expect(vh).to receive(:id).and_return("46683a25-acb1-4371-afe9-d39f303e44b4").at_least(:once)
     Sshable.create(host: "1.1.0.0") { it.id = vh.id }
-    Sshable.create_with_id(host: "1.1.1.1")
+    Sshable.create(host: "1.1.1.1")
     described_class.create(location_id: Location::HETZNER_FSN1_ID, family: "standard") { it.id = vh.id }
 
     expect(vh).to receive(:assigned_subnets).and_return([Address.new(cidr: NetAddr::IPv4Net.parse("1.1.1.0/30".shellescape))]).at_least(:once)
@@ -289,8 +289,8 @@ RSpec.describe VmHost do
     Sshable.create(host: "1.1.0.0") { it.id = old_id }
     described_class.create(location_id: Location::HETZNER_FSN1_ID, family: "standard") { it.id = old_id }
 
-    Sshable.create_with_id(host: "1.1.1.1")
-    adr = Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: old_id)
+    Sshable.create(host: "1.1.1.1")
+    adr = Address.create(cidr: "1.1.1.0/30", routed_to_host_id: old_id)
     expect(Address).to receive(:where).with(cidr: "1.1.1.0/30").and_return([adr]).once
 
     expect(adr).to receive(:update).with(routed_to_host_id: new_id).and_return(true)
@@ -307,7 +307,7 @@ RSpec.describe VmHost do
     Sshable.create(host: "1.1.0.0") { it.id = old_id }
     described_class.create(location_id: Location::HETZNER_FSN1_ID, family: "standard") { it.id = old_id }
 
-    adr = Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: old_id)
+    adr = Address.create(cidr: "1.1.1.0/30", routed_to_host_id: old_id)
     expect(Address).to receive(:where).with(cidr: "1.1.1.0/30").and_return([adr]).once
 
     expect(adr).to receive(:assigned_vm_addresses).and_return([instance_double(Vm)]).at_least(:once)
@@ -342,13 +342,13 @@ RSpec.describe VmHost do
   end
 
   it "returns disk device ids when StorageDevice has unix_device_list" do
-    sd = StorageDevice.create_with_id(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["wwn-random-id1", "wwn-random-id2"])
+    sd = StorageDevice.create(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["wwn-random-id1", "wwn-random-id2"])
     allow(vh).to receive(:storage_devices).and_return([sd])
     expect(vh.disk_device_ids).to eq(["wwn-random-id1", "wwn-random-id2"])
   end
 
   it "returns disk device names" do
-    sd = StorageDevice.create_with_id(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["wwn-random-id1", "wwn-random-id2"])
+    sd = StorageDevice.create(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["wwn-random-id1", "wwn-random-id2"])
     session = {
       ssh_session: instance_double(Net::SSH::Connection::Session)
     }
@@ -361,7 +361,7 @@ RSpec.describe VmHost do
   end
 
   it "converts disk devices when StorageDevice has unix_device_list with the old formatting for SSD disks" do
-    sd = StorageDevice.create_with_id(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["sda"])
+    sd = StorageDevice.create(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["sda"])
     sshable = instance_double(Sshable)
     expect(sd).to receive(:vm_host).and_return(vh)
     expect(sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'sda$' | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-random-id1")
@@ -371,7 +371,7 @@ RSpec.describe VmHost do
   end
 
   it "converts disk devices when StorageDevice has unix_device_list with the old formatting for NVMe disks" do
-    sd = StorageDevice.create_with_id(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["nvme0n1"])
+    sd = StorageDevice.create(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["nvme0n1"])
     sshable = instance_double(Sshable)
     expect(sd).to receive(:vm_host).and_return(vh)
     expect(sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'nvme0n1$' | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id")

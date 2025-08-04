@@ -6,7 +6,7 @@ require_relative "../../../prog/ai/inference_router_target_nexus"
 RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
   subject(:nexus) { described_class.new(target_strand) }
 
-  let(:project) { Project.create_with_id(name: "default") }
+  let(:project) { Project.create(name: "default") }
   let(:location_id) { Location::HETZNER_FSN1_ID }
 
   let(:inference_router) do
@@ -51,7 +51,7 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
   end
 
   before do
-    Firewall.create_with_id(
+    Firewall.create(
       name: "inference-router-firewall",
       project_id: project.id,
       location_id: location_id,
