@@ -789,10 +789,8 @@ RSpec.describe Clover, "access control" do
       admin.update(name: "Admin")
       btn = find ".delete-btn"
       page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+      expect(page.status_code).to eq 400
       expect(SubjectTag[project_id: project.id, name: "Admin"]).not_to be_nil
-
-      visit "#{project.path}/user/access-control/tag/subject"
-      expect(page).to have_flash_error "Cannot modify Admin subject tag"
     end
 
     it "cannot rename Admin subject tag" do
