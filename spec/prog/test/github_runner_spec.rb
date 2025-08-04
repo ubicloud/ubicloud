@@ -67,6 +67,12 @@ RSpec.describe Prog::Test::GithubRunner do
   describe "#check_test_runs" do
     it "check test runs completed" do
       expect(client).to receive(:workflow_runs).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{conclusion: "success", created_at: Time.now + 10}]})
+      expect { gr_test.check_test_runs }.to hop("enable_alien_runners")
+    end
+
+    it "check test runs completed for alien runners" do
+      expect(gr_test).to receive(:frame).and_return(gr_test.frame.merge({"github_runner_aws_location_id" => "c4cf8b4c-70ec-8820-b311-13284f205306"})).at_least(:once)
+      expect(client).to receive(:workflow_runs).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{conclusion: "success", created_at: Time.now + 10}]})
       expect { gr_test.check_test_runs }.to hop("clean_resources")
     end
 
@@ -82,12 +88,25 @@ RSpec.describe Prog::Test::GithubRunner do
 
     it "check test runs failed" do
       expect(client).to receive(:workflow_runs).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{conclusion: "failure", created_at: Time.now + 10}]})
-      expect { gr_test.check_test_runs }.to hop("clean_resources")
+      expect { gr_test.check_test_runs }.to hop("enable_alien_runners")
     end
 
     it "check test runs created before" do
       expect(client).to receive(:workflow_runs).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{conclusion: "failure", created_at: Time.now - 2 * 60 * 60}]})
-      expect { gr_test.check_test_runs }.to hop("clean_resources")
+      expect { gr_test.check_test_runs }.to hop("enable_alien_runners")
+    end
+  end
+
+  describe "#enable_alien_runners" do
+    it "enables alien runners and hops to trigger_test_runs" do
+      location_id = "5f0db214-de30-8420-8a11-98014b01c5b5"
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location_id)
+      expect(Config).to receive(:e2e_aws_access_key).and_return("access_key")
+      expect(Config).to receive(:e2e_aws_secret_key).and_return("secret_key")
+      expect { gr_test.enable_alien_runners }.to hop("trigger_test_runs")
+      expect(Location[location_id]).not_to be_nil
+      expect(LocationCredential[location_id].access_key).to eq("access_key")
+      expect(gr_test.strand.stack.last).to include({"github_runner_aws_location_id" => location_id})
     end
   end
 
@@ -122,6 +141,7 @@ RSpec.describe Prog::Test::GithubRunner do
       expect(client).to receive(:cancel_workflow_run).with("ubicloud/github-e2e-test-workflows", 10)
       expect(GithubRunner).to receive(:any?).and_return(false)
       expect(VmPool).to receive(:[]).with(anything).and_return(instance_double(VmPool, vms: [], incr_destroy: nil))
+      expect(Location).to receive(:[]).with(anything).and_return(instance_double(Location, destroy: nil))
       expect(Project).to receive(:[]).with(anything).and_return(instance_double(Project, destroy: nil)).at_least(:once)
       expect { gr_test.clean_resources }.to hop("finish")
     end

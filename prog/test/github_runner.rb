@@ -101,7 +101,17 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       end
     end
 
+    hop_enable_alien_runners unless frame["github_runner_aws_location_id"]
     hop_clean_resources
+  end
+
+  label def enable_alien_runners
+    project = Project[frame["github_test_project_id"]]
+    project.set_ff_aws_alien_runners_ratio(1)
+    location = Location.create_with_id(Config.github_runner_aws_location_id, name: "eu-central-1", provider: "aws", project_id: project.id, display_name: "aws-e2e", ui_name: "aws-e2e", visible: true)
+    LocationCredential.create_with_id(location.id, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
+    update_stack({"github_runner_aws_location_id" => location.id})
+    hop_trigger_test_runs
   end
 
   label def clean_resources
@@ -130,6 +140,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       nap 15
     end
 
+    Location[frame["github_runner_aws_location_id"]]&.destroy
     Project[frame["github_service_project_id"]]&.destroy
     Project[frame["vm_pool_service_project"]]&.destroy
     Project[frame["github_test_project_id"]]&.destroy
