@@ -202,6 +202,7 @@ class Clover
       r.on "metric-destination" do
         r.post true do
           authorize("Postgres:edit", pg.id)
+          handle_validation_failure("postgres/show") { @page = "charts" }
 
           password_param = (api? ? "password" : "metric-destination-password")
           url, username, password = typecast_params.nonempty_str!(["url", "username", password_param])
