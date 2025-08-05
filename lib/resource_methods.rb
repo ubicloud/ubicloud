@@ -143,6 +143,12 @@ module ResourceMethods
       generate_ubid.to_uuid
     end
 
+    def create_with_id(id, **)
+      obj = new(**)
+      obj.id = id
+      obj.save_changes
+    end
+
     def new_with_id(...)
       new(...).set_uuid
     end
