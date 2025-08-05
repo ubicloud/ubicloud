@@ -186,7 +186,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(postgres_resource).to receive(:hostname).and_return("pg-name.postgres.ubicloud.com.").twice
       dns_zone = instance_double(DnsZone)
       expect(dns_zone).to receive(:delete_record).with(record_name: "pg-name.postgres.ubicloud.com.")
-      expect(dns_zone).to receive(:insert_record).with(record_name: "pg-name.postgres.ubicloud.com.", type: "CNAME", ttl: 10, data: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
+      expect(dns_zone).to receive(:insert_record).with(record_name: "pg-name.postgres.ubicloud.com.", type: "CNAME", ttl: 10, data: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com.")
       expect(described_class).to receive(:dns_zone).and_return(dns_zone).twice
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect { nx.refresh_dns_record }.to hop("initialize_certificates")
