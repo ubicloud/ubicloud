@@ -19,7 +19,7 @@ class Prog::Vm::GithubRunner < Prog::Base
         label: label
       )
 
-      Strand.create(prog: "Vm::GithubRunner", label: "start") { it.id = github_runner.id }
+      Strand.create_with_id(github_runner.id, prog: "Vm::GithubRunner", label: "start")
     end
   end
 

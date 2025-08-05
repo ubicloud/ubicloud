@@ -31,8 +31,9 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
         enable_ip4: true
       )
 
-      vs = VictoriaMetricsServer.create(victoria_metrics_resource_id:, vm_id: vm_st.id) { it.id = ubid.to_uuid }
-      Strand.create(prog: "VictoriaMetrics::VictoriaMetricsServerNexus", label: "start") { it.id = vs.id }
+      id = ubid.to_uuid
+      VictoriaMetricsServer.create_with_id(id, victoria_metrics_resource_id:, vm_id: vm_st.id)
+      Strand.create_with_id(id, prog: "VictoriaMetrics::VictoriaMetricsServerNexus", label: "start")
     end
   end
 

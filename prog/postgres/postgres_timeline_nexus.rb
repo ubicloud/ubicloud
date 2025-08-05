@@ -26,7 +26,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
         blob_storage_id: MinioCluster.first(project_id: Config.postgres_service_project_id, location_id: location.id)&.id,
         location_id: location.id
       )
-      Strand.create(prog: "Postgres::PostgresTimelineNexus", label: "start") { it.id = postgres_timeline.id }
+      Strand.create_with_id(postgres_timeline.id, prog: "Postgres::PostgresTimelineNexus", label: "start")
     end
   end
 

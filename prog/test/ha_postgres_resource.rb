@@ -8,9 +8,9 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
   def self.assemble
     postgres_test_project = Project.create(name: "Postgres-HA-Test-Project")
     Project[Config.postgres_service_project_id] ||
-      Project.create(name: "Postgres-Service-Project") { it.id = Config.postgres_service_project_id }
+      Project.create_with_id(Config.postgres_service_project_id, name: "Postgres-Service-Project")
     Project[Config.minio_service_project_id] ||
-      Project.create(name: "Minio-Service-Project") { it.id = Config.minio_service_project_id }
+      Project.create_with_id(Config.minio_service_project_id, name: "Minio-Service-Project")
 
     frame = {
       "postgres_test_project_id" => postgres_test_project.id,

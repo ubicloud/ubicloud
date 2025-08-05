@@ -13,7 +13,7 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
 
       kn = KubernetesNodepool.create(name:, node_count:, kubernetes_cluster_id:, target_node_size:, target_node_storage_size_gib:)
 
-      Strand.create(prog: "Kubernetes::KubernetesNodepoolNexus", label: "start") { it.id = kn.id }
+      Strand.create_with_id(kn.id, prog: "Kubernetes::KubernetesNodepoolNexus", label: "start")
     end
   end
 

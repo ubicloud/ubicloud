@@ -39,7 +39,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
         health_check_protocol: health_check_protocol
       )
       ports.each { |src_port, dst_port| LoadBalancerPort.create(load_balancer_id: lb.id, src_port:, dst_port:) }
-      Strand.create(prog: "Vnet::LoadBalancerNexus", label: "wait") { it.id = lb.id }
+      Strand.create_with_id(lb.id, prog: "Vnet::LoadBalancerNexus", label: "wait")
     end
   end
 

@@ -41,7 +41,7 @@ class Prog::Ai::InferenceRouterNexus < Prog::Base
         project_id:, location_id:, name:, vm_size:, replica_count:, load_balancer_id: lb_s.id, private_subnet_id: subnet_s.id
       ) { it.id = ubid.to_uuid }
       Prog::Ai::InferenceRouterReplicaNexus.assemble(inference_router.id)
-      Strand.create(prog: "Ai::InferenceRouterNexus", label: "start") { it.id = inference_router.id }
+      Strand.create_with_id(inference_router.id, prog: "Ai::InferenceRouterNexus", label: "start")
     end
   end
 

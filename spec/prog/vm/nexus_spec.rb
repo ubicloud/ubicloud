@@ -216,7 +216,7 @@ RSpec.describe Prog::Vm::Nexus do
         expect(kwargs[:name]).to be_nil
         expect(kwargs[:size]).to eq("new_size")
       end.and_return(Strand.new(id: st_id))
-      expect(Sshable).to receive(:create).with(host: "temp_#{st_id}", raw_private_key_1: "pair", unix_user: "rhizome")
+      expect(Sshable).to receive(:create_with_id).with(st_id, host: "temp_#{st_id}", raw_private_key_1: "pair", unix_user: "rhizome")
 
       described_class.assemble_with_sshable(prj.id, size: "new_size")
     end
