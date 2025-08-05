@@ -23,6 +23,11 @@ class Prog::Aws::Vpc < Prog::Base
     vpc = client.describe_vpcs({filters: [{name: "vpc-id", values: [private_subnet.private_subnet_aws_resource.vpc_id]}]}).vpcs[0]
 
     if vpc.state == "available"
+      client.modify_vpc_attribute({
+        vpc_id: vpc.vpc_id,
+        enable_dns_hostnames: {value: true}
+      })
+
       security_group_response = begin
         client.create_security_group({
           group_name: "aws-#{location.name}-#{private_subnet.ubid}",

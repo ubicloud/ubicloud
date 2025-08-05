@@ -45,17 +45,18 @@ RSpec.describe Prog::Aws::Vpc do
 
   describe "#wait_vpc_created" do
     before do
+      client.stub_responses(:modify_vpc_attribute)
       client.stub_responses(:create_security_group, group_id: "sg-0123456789abcdefg")
       client.stub_responses(:authorize_security_group_ingress)
     end
 
     it "checks if vpc is available, if not naps" do
-      client.stub_responses(:describe_vpcs, vpcs: [{state: "pending"}])
+      client.stub_responses(:describe_vpcs, vpcs: [{state: "pending", vpc_id: "vpc-0123456789abcdefg"}])
       expect { nx.wait_vpc_created }.to nap(1)
     end
 
     it "creates a security group and authorizes ingress" do
-      client.stub_responses(:describe_vpcs, vpcs: [{state: "available"}])
+      client.stub_responses(:describe_vpcs, vpcs: [{state: "available", vpc_id: "vpc-0123456789abcdefg"}])
 
       expect(client).to receive(:describe_vpcs).with({filters: [{name: "vpc-id", values: ["vpc-0123456789abcdefg"]}]}).and_call_original
       expect(client).to receive(:create_security_group).with({group_name: "aws-us-west-2-#{ps.ubid}", description: "Security group for aws-us-west-2-#{ps.ubid}", vpc_id: "vpc-0123456789abcdefg", tag_specifications: Util.aws_tag_specifications("security-group", ps.name)}).and_call_original
@@ -68,7 +69,7 @@ RSpec.describe Prog::Aws::Vpc do
     end
 
     it "does not create a security group if it already exists" do
-      client.stub_responses(:describe_vpcs, vpcs: [{state: "available"}])
+      client.stub_responses(:describe_vpcs, vpcs: [{state: "available", vpc_id: "vpc-0123456789abcdefg"}])
       client.stub_responses(:create_security_group, Aws::EC2::Errors::InvalidGroupDuplicate.new(nil, nil))
       client.stub_responses(:describe_security_groups, security_groups: [{group_id: "sg-0123456789abcdefg"}])
 
@@ -80,7 +81,7 @@ RSpec.describe Prog::Aws::Vpc do
     end
 
     it "skips security group ingress rule if it already exists" do
-      client.stub_responses(:describe_vpcs, vpcs: [{state: "available"}])
+      client.stub_responses(:describe_vpcs, vpcs: [{state: "available", vpc_id: "vpc-0123456789abcdefg"}])
       client.stub_responses(:authorize_security_group_ingress, Aws::EC2::Errors::InvalidPermissionDuplicate.new(nil, nil))
 
       ps.firewalls.map { it.firewall_rules.map { |fw| fw.destroy } }
