@@ -15,7 +15,7 @@ RSpec.describe Prog::Test::HetznerServer do
                                                "server_id" => "1234",
                                                "additional_boot_images" => [],
                                                "setup_host" => true}, hetzner_api: hetzner_api, vm_host: vm_host)
-    SpdkInstallation.create(version: "1.0", vm_host_id: vm_host.id, allocation_weight: 100) { it.id = vm_host.id }
+    SpdkInstallation.create_with_id(vm_host.id, version: "1.0", vm_host_id: vm_host.id, allocation_weight: 100)
   }
 
   describe "#assemble" do

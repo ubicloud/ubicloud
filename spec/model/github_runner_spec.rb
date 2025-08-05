@@ -6,7 +6,7 @@ RSpec.describe GithubRunner do
   subject(:github_runner) {
     ins = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
     vm = create_vm(vm_host: create_vm_host, boot_image: "github-ubuntu-2204")
-    Sshable.create { it.id = vm.id }
+    Sshable.create_with_id(vm.id)
     described_class.create(repository_name: "test-repo", label: "ubicloud", vm_id: vm.id, installation_id: ins.id)
   }
 

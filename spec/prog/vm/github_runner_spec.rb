@@ -16,7 +16,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     runner_project = Project.create(name: "runner-service")
     installation_id = GithubInstallation.create(installation_id: 123, project_id: customer_project.id, name: "ubicloud", type: "Organization", created_at: now - 8 * 24 * 60 * 60).id
     vm_id = create_vm(location_id: Location::GITHUB_RUNNERS_ID, project_id: runner_project.id, boot_image: "github-ubuntu-2204").id
-    Sshable.create { it.id = vm_id }
+    Sshable.create_with_id(vm_id)
     GithubRunner.create(installation_id:, vm_id:, repository_name: "test-repo", label: "ubicloud-standard-4", created_at: now, allocated_at: now + 10, ready_at: now + 20, workflow_job: {"id" => 123})
   end
   let(:vm) { runner.vm }

@@ -82,7 +82,7 @@ RSpec.describe Prog::Vm::VmPool do
       pool.update(size: 1)
 
       expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
-      Vm.create(vm_host: VmHost.first, unix_user: "ubi", public_key: "k y", name: "vm1", location_id: "6b9ef786-b842-8420-8c65-c25e3d4bdf3d", boot_image: "github-ubuntu-2204", family: "standard", arch: "arm64", cores: 2, vcpus: 2, memory_gib: 8, project_id:) { it.id = Sshable.create.id }
+      Vm.create_with_id(Sshable.create.id, vm_host: VmHost.first, unix_user: "ubi", public_key: "k y", name: "vm1", location_id: "6b9ef786-b842-8420-8c65-c25e3d4bdf3d", boot_image: "github-ubuntu-2204", family: "standard", arch: "arm64", cores: 2, vcpus: 2, memory_gib: 8, project_id:)
 
       expect { nx.wait }.to hop("create_new_vm")
     end
@@ -91,7 +91,7 @@ RSpec.describe Prog::Vm::VmPool do
       pool.update(size: 1)
 
       expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
-      Vm.create(vm_host: VmHost.first, unix_user: "ubi", public_key: "k y", name: "vm1", location_id: "6b9ef786-b842-8420-8c65-c25e3d4bdf3d", boot_image: "github-ubuntu-2204", family: "standard", arch: "x64", cores: 2, vcpus: 4, memory_gib: 8, project_id:) { it.id = Sshable.create.id }
+      Vm.create_with_id(Sshable.create.id, vm_host: VmHost.first, unix_user: "ubi", public_key: "k y", name: "vm1", location_id: "6b9ef786-b842-8420-8c65-c25e3d4bdf3d", boot_image: "github-ubuntu-2204", family: "standard", arch: "x64", cores: 2, vcpus: 4, memory_gib: 8, project_id:)
 
       expect { nx.wait }.to nap(30)
     end

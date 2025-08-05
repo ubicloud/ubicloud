@@ -23,7 +23,7 @@ RSpec.describe Prog::DownloadBootImage do
     end
 
     it "fails if image already exists" do
-      BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 3) { it.id = vm_host.id }
+      BootImage.create_with_id(vm_host.id, vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 3)
       expect { dbi.start }.to raise_error RuntimeError, "Image already exists on host"
     end
 

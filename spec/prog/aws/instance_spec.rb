@@ -12,7 +12,7 @@ RSpec.describe Prog::Aws::Instance do
   let(:vm) {
     prj = Project.create(name: "test-prj")
     loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
-    LocationCredential.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = loc.id }
+    LocationCredential.create_with_id(loc.id, access_key: "test-access-key", secret_key: "test-secret-key")
     storage_volumes = [
       {encrypted: true, size_gib: 30},
       {encrypted: true, size_gib: 3800}

@@ -357,7 +357,7 @@ RSpec.describe Clover, "access control" do
 
     it "cannot create access control entries for tokens" do
       # Create subject tag with the same id as token to avoid need to muck with the UI
-      SubjectTag.create(project_id: project.id, name: "STest") { |st| st.id = ApiKey.create_personal_access_token(user, project:).id }
+      SubjectTag.create_with_id(ApiKey.create_personal_access_token(user, project:).id, project_id: project.id, name: "STest")
       visit "#{project.path}/user/access-control"
       within("#ace-template .subject") { select "STest" }
       expect(AccessControlEntry.count).to eq 2
