@@ -211,7 +211,7 @@ usermod -L ubuntu
 
   describe "#create_instance" do
     it "creates an instance" do
-      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}]}])
+      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
       client.stub_responses(:describe_subnets, subnets: [{availability_zone_id: "use1-az1"}])
       expect(vm).to receive(:vcpus).and_return(2)
       expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
@@ -253,7 +253,7 @@ usermod -L ubuntu
         },
         client_token: vm.id
       }).and_call_original
-      expect(AwsInstance).to receive(:create).with(instance_id: "i-0123456789abcdefg", az_id: "use1-az1")
+      expect(AwsInstance).to receive(:create).with(instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
     end
   end

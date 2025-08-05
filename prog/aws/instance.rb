@@ -165,8 +165,9 @@ usermod -L ubuntu
     subnet_id = instance_response.instances[0].network_interfaces[0].subnet_id
     subnet_response = client.describe_subnets(subnet_ids: [subnet_id])
     az_id = subnet_response.subnets[0].availability_zone_id
+    ipv4_dns_name = instance_response.instances[0].public_dns_name
 
-    AwsInstance.create(instance_id: instance_id, az_id: az_id) { it.id = vm.id }
+    AwsInstance.create(instance_id:, az_id:, ipv4_dns_name:) { it.id = vm.id }
 
     hop_wait_instance_created
   end
