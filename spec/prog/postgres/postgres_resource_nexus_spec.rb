@@ -165,12 +165,28 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   end
 
   describe "#refresh_dns_record" do
+    before do
+      allow(postgres_resource).to receive(:location).and_return(instance_double(Location, aws?: false))
+      allow(postgres_resource.representative_server.vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
+    end
+
     it "creates dns records and hops" do
-      expect(postgres_resource.representative_server.vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
       expect(postgres_resource).to receive(:hostname).and_return("pg-name.postgres.ubicloud.com.").twice
       dns_zone = instance_double(DnsZone)
       expect(dns_zone).to receive(:delete_record).with(record_name: "pg-name.postgres.ubicloud.com.")
       expect(dns_zone).to receive(:insert_record).with(record_name: "pg-name.postgres.ubicloud.com.", type: "A", ttl: 10, data: "1.1.1.1")
+      expect(described_class).to receive(:dns_zone).and_return(dns_zone).twice
+      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      expect { nx.refresh_dns_record }.to hop("initialize_certificates")
+    end
+
+    it "creates CNAME DNS records for AWS instances" do
+      expect(postgres_resource).to receive(:location).and_return(instance_double(Location, aws?: true))
+      expect(postgres_resource.representative_server.vm).to receive(:aws_instance).and_return(instance_double(AwsInstance, ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"))
+      expect(postgres_resource).to receive(:hostname).and_return("pg-name.postgres.ubicloud.com.").twice
+      dns_zone = instance_double(DnsZone)
+      expect(dns_zone).to receive(:delete_record).with(record_name: "pg-name.postgres.ubicloud.com.")
+      expect(dns_zone).to receive(:insert_record).with(record_name: "pg-name.postgres.ubicloud.com.", type: "CNAME", ttl: 10, data: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect(described_class).to receive(:dns_zone).and_return(dns_zone).twice
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect { nx.refresh_dns_record }.to hop("initialize_certificates")
