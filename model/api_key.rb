@@ -23,12 +23,15 @@ class ApiKey < Sequel::Model
     create(owner_table: "project", owner_id: project.id, used_for: "inference_endpoint", project_id: project.id)
   end
 
-  def self.create(owner_table:, owner_id:, used_for:, project_id:, key: ApiKey.random_key)
-    unless %w[project accounts].include?(owner_table)
-      fail "Invalid owner_table: #{owner_table}"
+  def before_validation
+    if new?
+      self.key ||= ApiKey.random_key
+      unless %w[project accounts].include?(owner_table)
+        fail "Invalid owner_table: #{owner_table}"
+      end
     end
 
-    super(owner_table:, owner_id:, key:, used_for:, project_id:)
+    super
   end
 
   def unrestricted_token_for_project?(project_id)
