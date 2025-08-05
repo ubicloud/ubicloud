@@ -16,7 +16,7 @@ class Prog::Vnet::CertNexus < Prog::Base
     DB.transaction do
       cert = Cert.create(hostname: hostname, dns_zone_id: dns_zone_id)
 
-      Strand.create(prog: "Vnet::CertNexus", label: "start", stack: [{"restarted" => 0}]) { it.id = cert.id }
+      Strand.create_with_id(cert.id, prog: "Vnet::CertNexus", label: "start", stack: [{"restarted" => 0}])
     end
   end
 

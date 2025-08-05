@@ -31,9 +31,10 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       # TODO: Validate location
       # TODO: Validate node count
 
-      KubernetesCluster.create(name:, version:, cp_node_count:, location_id:, target_node_size:, target_node_storage_size_gib:, project_id: project.id, private_subnet_id: subnet.id) { it.id = ubid.to_uuid }
+      id = ubid.to_uuid
+      KubernetesCluster.create_with_id(id, name:, version:, cp_node_count:, location_id:, target_node_size:, target_node_storage_size_gib:, project_id: project.id, private_subnet_id: subnet.id)
 
-      Strand.create(prog: "Kubernetes::KubernetesClusterNexus", label: "start") { it.id = ubid.to_uuid }
+      Strand.create_with_id(id, prog: "Kubernetes::KubernetesClusterNexus", label: "start")
     end
   end
 

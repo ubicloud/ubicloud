@@ -36,7 +36,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
         vm_id: vm_st.id
       ) { it.id = ubid.to_uuid }
 
-      Strand.create(prog: "Ai::InferenceEndpointReplicaNexus", label: "start") { it.id = replica.id }
+      Strand.create_with_id(replica.id, prog: "Ai::InferenceEndpointReplicaNexus", label: "start")
     end
   end
 

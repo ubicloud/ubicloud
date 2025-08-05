@@ -33,9 +33,9 @@ class Prog::Minio::MinioServerNexus < Prog::Base
         distinct_storage_devices: Config.production? && !Config.is_e2e
       )
 
-      minio_server = MinioServer.create(minio_pool_id: minio_pool_id, vm_id: vm_st.id, index: index) { it.id = ubid.to_uuid }
-
-      Strand.create(prog: "Minio::MinioServerNexus", label: "start") { it.id = minio_server.id }
+      id = ubid.to_uuid
+      MinioServer.create_with_id(id, minio_pool_id:, vm_id: vm_st.id, index:)
+      Strand.create_with_id(id, prog: "Minio::MinioServerNexus", label: "start")
     end
   end
 

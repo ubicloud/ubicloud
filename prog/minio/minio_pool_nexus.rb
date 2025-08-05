@@ -11,21 +11,20 @@ class Prog::Minio::MinioPoolNexus < Prog::Base
     end
 
     DB.transaction do
-      ubid = MinioPool.generate_ubid
+      id = MinioPool.generate_uuid
 
-      minio_pool = MinioPool.create(
+      minio_pool = MinioPool.create_with_id(id,
         cluster_id: cluster_id,
         start_index: start_index,
         server_count: server_count,
         drive_count: drive_count,
         storage_size_gib: storage_size_gib,
-        vm_size: vm_size
-      ) { it.id = ubid.to_uuid }
+        vm_size: vm_size)
 
       minio_pool.server_count.times do |i|
         Prog::Minio::MinioServerNexus.assemble(minio_pool.id, minio_pool.start_index + i)
       end
-      Strand.create(prog: "Minio::MinioPoolNexus", label: "wait_servers") { it.id = minio_pool.id }
+      Strand.create_with_id(id, prog: "Minio::MinioPoolNexus", label: "wait_servers")
     end
   end
 

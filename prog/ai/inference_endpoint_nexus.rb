@@ -76,7 +76,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
         max_requests:, max_project_rps:, max_project_tps:, external_config:
       ) { it.id = ubid.to_uuid }
       Prog::Ai::InferenceEndpointReplicaNexus.assemble(inference_endpoint.id)
-      Strand.create(prog: "Ai::InferenceEndpointNexus", label: "start") { it.id = inference_endpoint.id }
+      Strand.create_with_id(inference_endpoint.id, prog: "Ai::InferenceEndpointNexus", label: "start")
     end
   end
 

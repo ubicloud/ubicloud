@@ -16,6 +16,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     end
 
     ubid = PrivateSubnet.generate_ubid
+    id = ubid.to_uuid
     name ||= PrivateSubnet.ubid_to_name(ubid)
 
     Validation.validate_name(name)
@@ -23,7 +24,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     ipv6_range ||= random_private_ipv6(location, project).to_s
     ipv4_range ||= random_private_ipv4(location, project).to_s
     DB.transaction do
-      ps = PrivateSubnet.create(name: name, location_id: location.id, net6: ipv6_range, net4: ipv4_range, state: "waiting", project_id:) { it.id = ubid.to_uuid }
+      ps = PrivateSubnet.create_with_id(id, name:, location_id: location.id, net6: ipv6_range, net4: ipv4_range, state: "waiting", project_id:)
       firewall_dataset = project.firewalls_dataset.where(location_id:)
 
       if firewall_id
@@ -46,7 +47,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       end
       firewall.associate_with_private_subnet(ps, apply_firewalls: false)
 
-      Strand.create(prog: "Vnet::SubnetNexus", label: "start") { it.id = ubid.to_uuid }
+      Strand.create_with_id(id, prog: "Vnet::SubnetNexus", label: "start")
     end
   end
 
@@ -61,7 +62,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
   label def start
     if private_subnet.location.aws?
-      PrivateSubnetAwsResource.create { it.id = private_subnet.id } unless private_subnet.private_subnet_aws_resource
+      PrivateSubnetAwsResource.create_with_id(private_subnet.id) unless private_subnet.private_subnet_aws_resource
       bud Prog::Aws::Vpc, {"subject_id" => private_subnet.id}, :create_vpc
       hop_wait_vpc_created
     else

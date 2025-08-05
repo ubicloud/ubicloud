@@ -163,9 +163,7 @@ class Prog::Vm::Nexus < Prog::Base
   def self.assemble_with_sshable(*, sshable_unix_user: "rhizome", **kwargs)
     ssh_key = SshKey.generate
     st = assemble(ssh_key.public_key, *, **kwargs)
-    Sshable.create(unix_user: sshable_unix_user, host: "temp_#{st.id}", raw_private_key_1: ssh_key.keypair) {
-      it.id = st.id
-    }
+    Sshable.create_with_id(st.id, unix_user: sshable_unix_user, host: "temp_#{st.id}", raw_private_key_1: ssh_key.keypair)
     st
   end
 

@@ -20,7 +20,7 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
       # This will update the CPU allocation as well as total_cpu_percent and cores values
       vm_host_slice.set_allowed_cpus(allowed_cpus)
 
-      Strand.create(prog: "Vm::VmHostSliceNexus", label: "prep") { it.id = vm_host_slice.id }
+      Strand.create_with_id(vm_host_slice.id, prog: "Vm::VmHostSliceNexus", label: "prep")
     end
   end
 

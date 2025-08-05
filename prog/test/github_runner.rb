@@ -8,9 +8,9 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   IN_PROGRESS_CONCLUSIONS = ["in_progress", "queued", "requested", "waiting", "pending", "neutral"]
 
   def self.assemble(test_cases)
-    github_service_project = Project.create(name: "Github-Runner-Service-Project") { it.id = Config.github_runner_service_project_id }
+    github_service_project = Project.create_with_id(Config.github_runner_service_project_id, name: "Github-Runner-Service-Project")
 
-    vm_pool_service_project = Project.create(name: "Vm-Pool-Service-Project") { it.id = Config.vm_pool_project_id }
+    vm_pool_service_project = Project.create_with_id(Config.vm_pool_project_id, name: "Vm-Pool-Service-Project")
 
     github_test_project = Project.create(name: "Github-Runner-Test-Project")
     GithubInstallation.create(

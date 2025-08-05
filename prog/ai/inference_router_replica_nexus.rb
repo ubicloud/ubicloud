@@ -34,7 +34,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
         vm_id: vm_st.id
       ) { it.id = ubid.to_uuid }
 
-      Strand.create(prog: "Ai::InferenceRouterReplicaNexus", label: "start") { it.id = replica.id }
+      Strand.create_with_id(replica.id, prog: "Ai::InferenceRouterReplicaNexus", label: "start")
     end
   end
 

@@ -33,7 +33,7 @@ class Clover
             provider: "aws",
             project_id: @project.id
           )
-          LocationCredential.create(access_key:, secret_key:) { it.id = loc.id }
+          LocationCredential.create_with_id(loc.id, access_key:, secret_key:)
           audit_log(loc, "create")
         end
 

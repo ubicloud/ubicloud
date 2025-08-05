@@ -253,7 +253,7 @@ usermod -L ubuntu
         },
         client_token: vm.id
       }).and_call_original
-      expect(AwsInstance).to receive(:create).with(instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
+      expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
     end
   end

@@ -44,7 +44,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsResourceNexus < Prog::Base
 
       Prog::VictoriaMetrics::VictoriaMetricsServerNexus.assemble(victoria_metrics_resource.id)
 
-      Strand.create(prog: "VictoriaMetrics::VictoriaMetricsResourceNexus", label: "wait_servers") { it.id = victoria_metrics_resource.id }
+      Strand.create_with_id(victoria_metrics_resource.id, prog: "VictoriaMetrics::VictoriaMetricsResourceNexus", label: "wait_servers")
     end
   end
 

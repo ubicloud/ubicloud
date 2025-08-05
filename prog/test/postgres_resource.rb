@@ -8,9 +8,7 @@ class Prog::Test::PostgresResource < Prog::Test::Base
   def self.assemble
     postgres_test_project = Project.create(name: "Postgres-Test-Project")
     postgres_service_project = Project[Config.postgres_service_project_id] ||
-      Project.create(name: "Postgres-Service-Project") do |project|
-        project.id = Config.postgres_service_project_id
-      end
+      Project.create_with_id(Config.postgres_service_project_id, name: "Postgres-Service-Project")
 
     frame = {
       "postgres_service_project_id" => postgres_service_project.id,
