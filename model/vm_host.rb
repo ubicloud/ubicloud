@@ -243,13 +243,6 @@ class VmHost < Sequel::Model
     Strand.create(prog: "DownloadCloudHypervisor", label: "start", stack: [{subject_id: id, version: version, sha256_ch_bin: sha256_ch_bin, sha256_ch_remote: sha256_ch_remote}])
   end
 
-  def hetznerify(server_id)
-    DB.transaction do
-      HostProvider.create(provider_name: HostProvider::HETZNER_PROVIDER_NAME, server_identifier: server_id) { it.id = id }
-      create_addresses
-    end
-  end
-
   def set_data_center
     update(data_center: Hosting::Apis.pull_data_center(self))
   end
