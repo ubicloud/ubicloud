@@ -7,24 +7,23 @@ class Vm < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :vm_host
   many_to_one :project
-  one_to_many :nics, key: :vm_id, class: :Nic
-  many_to_many :private_subnets, join_table: :nic, left_key: :vm_id, right_key: :private_subnet_id
+  one_to_many :nics
+  many_to_many :private_subnets, join_table: :nic
   one_to_one :sshable, key: :id
-  one_to_one :assigned_vm_address, key: :dst_vm_id, class: :AssignedVmAddress
-  one_to_many :vm_storage_volumes, key: :vm_id, order: Sequel.desc(:boot)
-  one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id do |ds| ds.active end
-  one_to_many :pci_devices, key: :vm_id, class: :PciDevice
-  one_through_one :load_balancer, left_key: :vm_id, right_key: :load_balancer_id, join_table: :load_balancers_vms
-  one_to_one :load_balancers_vms, key: :vm_id, class: :LoadBalancersVms
-  many_to_many :load_balancer_vm_ports, join_table: :load_balancers_vms, right_key: :id, right_primary_key: :load_balancer_vm_id, class: :LoadBalancerVmPort, read_only: true
+  one_to_one :assigned_vm_address, key: :dst_vm_id
+  one_to_many :vm_storage_volumes, order: Sequel.desc(:boot)
+  one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, &:active
+  one_to_many :pci_devices
+  one_through_one :load_balancer
+  one_to_one :load_balancers_vms
+  many_to_many :load_balancer_vm_ports, join_table: :load_balancers_vms, right_key: :id, right_primary_key: :load_balancer_vm_id, read_only: true
   many_to_one :vm_host_slice
-  many_to_one :location, key: :location_id
+  many_to_one :location
   one_to_one :aws_instance, key: :id
 
   many_through_many :firewalls,
     [
       [:nic, :vm_id, :private_subnet_id],
-      [:private_subnet, :id, :id],
       [:firewalls_private_subnets, :private_subnet_id, :firewall_id]
     ]
 
