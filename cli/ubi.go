@@ -163,6 +163,7 @@ func executeValidatedCommand(prog string, resp *http.Response) {
 	prog = getExecutablePath(prog)
 	debugLog("exec: %s %+v\n", prog, cmdArgs)
 	cmd := exec.Command(prog, cmdArgs...)
+	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
