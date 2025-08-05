@@ -21,9 +21,8 @@ RSpec.describe MonitorRunner do
   end
 
   def vm_host_with_id(id)
-    args = {location_id: Location::HETZNER_FSN1_ID, allocation_state: "accepting", arch: "x64", family: "standard", total_cores: 48, used_cores: 2}
-    Sshable.create { it.id = id }
-    VmHost.create(**args) { it.id = id }
+    Sshable.create_with_id(id)
+    VmHost.create_with_id(id, location_id: Location::HETZNER_FSN1_ID, allocation_state: "accepting", arch: "x64", family: "standard", total_cores: 48, used_cores: 2)
   end
 
   after do

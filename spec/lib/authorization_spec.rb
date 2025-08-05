@@ -136,7 +136,8 @@ RSpec.describe Authorization do
       project_id = projects[0].id
 
       # Backwards compatibility for old TYPE_ETC ubid (etkjnpyp1dst3n9d2mct7s71rh in this example)
-      api_key_id = ApiKey.create(owner_table: "project", owner_id: project_id, used_for: "inference_endpoint", project_id:) { |api_key| api_key.id = "9cab6f58-2dce-85da-aa5a-2a3347c9c388" }.id
+      api_key_id = "9cab6f58-2dce-85da-aa5a-2a3347c9c388"
+      ApiKey.create_with_id(api_key_id, owner_table: "project", owner_id: project_id, used_for: "inference_endpoint", project_id:)
 
       [
         [{subjects: [users[0].id], actions: ["Vm:view"], objects: api_key_id}, users[0].id, "Vm:view", api_key_id, 1],

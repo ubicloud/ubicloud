@@ -231,12 +231,12 @@ RSpec.describe UBID do
     expect(sshable.ubid).to start_with UBID::TYPE_SSHABLE
 
     host = create_vm_host
-    si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: host.id) { it.id = host.id }
+    si = SpdkInstallation.create_with_id(host.id, version: "v1", allocation_weight: 100, vm_host_id: host.id)
 
     vm = create_vm
     expect(vm.ubid).to start_with UBID::TYPE_VM
 
-    dev = StorageDevice.create(name: "x", available_storage_gib: 1, total_storage_gib: 1, vm_host_id: host.id) { it.id = host.id }
+    dev = StorageDevice.create_with_id(host.id, name: "x", available_storage_gib: 1, total_storage_gib: 1, vm_host_id: host.id)
 
     sv = VmStorageVolume.create(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false, spdk_installation_id: si.id, storage_device_id: dev.id)
     expect(sv.ubid).to start_with UBID::TYPE_VM_STORAGE_VOLUME
@@ -306,9 +306,9 @@ RSpec.describe UBID do
   it "can decode ids" do
     sshable = Sshable.create
     host = create_vm_host
-    si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: host.id) { it.id = host.id }
+    si = SpdkInstallation.create_with_id(host.id, version: "v1", allocation_weight: 100, vm_host_id: host.id)
     vm = create_vm
-    dev = StorageDevice.create(name: "x", available_storage_gib: 1, total_storage_gib: 1, vm_host_id: host.id) { it.id = host.id }
+    dev = StorageDevice.create_with_id(host.id, name: "x", available_storage_gib: 1, total_storage_gib: 1, vm_host_id: host.id)
     sv = VmStorageVolume.create(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false, spdk_installation_id: si.id, storage_device_id: dev.id)
     kek = StorageKeyEncryptionKey.create(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")
     account = Account.create(email: "x@y.net")
@@ -368,7 +368,7 @@ RSpec.describe UBID do
 
     api_key = ApiKey.create(owner_table: "project", owner_id: project.id, used_for: "inference_endpoint", key: "1", project_id: project.id)
     # Backwards compatibility for old TYPE_ETC ubid (etkjnpyp1dst3n9d2mct7s71rh in this example)
-    old_api_key = ApiKey.create(owner_table: "project", owner_id: project.id, used_for: "inference_endpoint", project_id: project.id) { |ak| ak.id = "9cab6f58-2dce-85da-aa5a-2a3347c9c388" }
+    old_api_key = ApiKey.create_with_id("9cab6f58-2dce-85da-aa5a-2a3347c9c388", owner_table: "project", owner_id: project.id, used_for: "inference_endpoint", project_id: project.id)
 
     invalid = described_class.to_uuid("han2sefsk4f61k91z77vn0y978")
     hash = {page.id => nil, a_type.id => nil, api_key.id => nil, invalid => nil, old_api_key.id => nil}

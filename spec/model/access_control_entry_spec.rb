@@ -29,7 +29,7 @@ RSpec.describe AccessControlEntry do
     expect(ace.valid?).to be true
 
     # Backwards compatibility for old TYPE_ETC ubid (etkjnpyp1dst3n9d2mct7s71rh in this example)
-    ace.subject_id = ApiKey.create(owner_table: "accounts", owner_id: account.id, used_for: "api", project_id: project.id) { |api_key| api_key.id = "9cab6f58-2dce-85da-aa5a-2a3347c9c388" }.id
+    ace.subject_id = ApiKey.create_with_id("9cab6f58-2dce-85da-aa5a-2a3347c9c388", owner_table: "accounts", owner_id: account.id, used_for: "api", project_id: project.id).id
     expect(ace.valid?).to be true
 
     project2 = Project.create(name: "Test-2")

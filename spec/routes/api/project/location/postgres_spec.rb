@@ -461,7 +461,7 @@ RSpec.describe Clover, "postgres" do
     end
 
     describe "metrics" do
-      let(:prj) { Project.create(name: "vm-project") { it.id = "1d7edb2f-c1b8-4d28-b7a6-4226b5855e7d" } }
+      let(:prj) { Project.create_with_id("1d7edb2f-c1b8-4d28-b7a6-4226b5855e7d", name: "vm-project") }
       let(:vmr) { instance_double(VictoriaMetricsResource, project_id: prj.id) }
       let(:vm_server) { instance_double(VictoriaMetricsServer, client: tsdb_client) }
       let(:tsdb_client) { instance_double(VictoriaMetrics::Client) }

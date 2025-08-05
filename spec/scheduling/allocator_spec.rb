@@ -647,7 +647,7 @@ RSpec.describe Al do
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
-      SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { it.id = vmh.id }
+      SpdkInstallation.create_with_id(vmh.id, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
       Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
     end
 
@@ -904,7 +904,7 @@ RSpec.describe Al do
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
-      SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { it.id = vmh.id }
+      SpdkInstallation.create_with_id(vmh.id, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
       Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh.id)
       (0..8).each do |i|
         VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, spdk: i < 1)
@@ -951,7 +951,7 @@ RSpec.describe Al do
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
-      SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { it.id = vmh.id }
+      SpdkInstallation.create_with_id(vmh.id, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
       Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
       (0..16).each do |i|
         VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, spdk: i < 2)
@@ -1019,7 +1019,7 @@ RSpec.describe Al do
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
-      SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { it.id = vmh.id }
+      SpdkInstallation.create_with_id(vmh.id, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
       Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
       (0..16).each do |i|
         VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, spdk: i < 2)
@@ -1193,7 +1193,7 @@ RSpec.describe Al do
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vh2.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create(vm_host_id: vh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vh2.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
-      SpdkInstallation.create(vm_host_id: vh2.id, version: "v1", allocation_weight: 100) { it.id = vh2.id }
+      SpdkInstallation.create_with_id(vh2.id, vm_host_id: vh2.id, version: "v1", allocation_weight: 100)
       Address.create(cidr: "1.1.2.0/30", routed_to_host_id: vh2.id)
       PciDevice.create(vm_host_id: vh2.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
       PciDevice.create(vm_host_id: vh2.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
@@ -1242,7 +1242,7 @@ RSpec.describe Al do
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
-      SpdkInstallation.create(vm_host_id: vmh2.id, version: "v1", allocation_weight: 100) { it.id = vmh2.id }
+      SpdkInstallation.create_with_id(vmh2.id, vm_host_id: vmh2.id, version: "v1", allocation_weight: 100)
       Address.create(cidr: "1.2.1.0/30", routed_to_host_id: vmh2.id)
       (0..16).each do |i|
         VmHostCpu.create(vm_host_id: vmh2.id, cpu_number: i, spdk: i < 2)
@@ -1268,7 +1268,7 @@ RSpec.describe Al do
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh2.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
-      SpdkInstallation.create(vm_host_id: vmh2.id, version: "v1", allocation_weight: 100) { it.id = vmh2.id }
+      SpdkInstallation.create_with_id(vmh2.id, vm_host_id: vmh2.id, version: "v1", allocation_weight: 100)
       Address.create(cidr: "1.2.1.0/30", routed_to_host_id: vmh2.id)
       PciDevice.create(vm_host_id: vmh2.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
       PciDevice.create(vm_host_id: vmh2.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
@@ -1287,7 +1287,7 @@ RSpec.describe Al do
       BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
-      SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { it.id = vmh.id }
+      SpdkInstallation.create_with_id(vmh.id, vm_host_id: vmh.id, version: "v1", allocation_weight: 100)
       Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh.id)
       (0..12).each do |i|
         VmHostCpu.create(vm_host_id: vmh.id, cpu_number: i, spdk: i < 1)

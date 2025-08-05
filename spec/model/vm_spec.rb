@@ -202,7 +202,7 @@ RSpec.describe Vm do
     end
 
     it "can update spdk version" do
-      spdk_installation = SpdkInstallation.create(version: "b", allocation_weight: 100, vm_host_id: vmh.id) { it.id = vmh.id }
+      spdk_installation = SpdkInstallation.create_with_id(vmh.id, version: "b", allocation_weight: 100, vm_host_id: vmh.id)
       volume_dataset = instance_double(Sequel::Dataset)
       expect(vm).to receive(:vm_storage_volumes_dataset).and_return(volume_dataset)
       expect(volume_dataset).to receive(:update).with(spdk_installation_id: spdk_installation.id)

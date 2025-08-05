@@ -39,7 +39,7 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
 
   describe "#before_run" do
     it "pops when destroy is set" do
-      Strand.create(prog: "Vnet:NicNexus", label: "wait_vm") { it.id = tunnel.src_nic.id }
+      Strand.create_with_id(tunnel.src_nic.id, prog: "Vnet:NicNexus", label: "wait_vm")
       tunnel.src_nic.incr_destroy
       expect { nx.before_run }.to exit({"msg" => "nic.destroy semaphore is set"})
     end
