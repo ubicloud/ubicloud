@@ -196,13 +196,6 @@ RSpec.describe VmHost do
     expect(vm_host.sshable_address.ip.network.to_s).to eq("128.0.0.1")
   end
 
-  it "hetznerifies a host" do
-    expect(vh).to receive(:create_addresses).at_least(:once)
-    expect(HostProvider).to receive(:create).with(server_identifier: "12", provider_name: HostProvider::HETZNER_PROVIDER_NAME).and_return(true)
-
-    vh.hetznerify("12")
-  end
-
   it "reimage server fails for non development" do
     expect(Config).to receive(:development?).and_return(false)
     expect {
