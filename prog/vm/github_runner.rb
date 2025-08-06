@@ -1,9 +1,15 @@
 # frozen_string_literal: true
 
+require "forwardable"
 require "net/ssh"
 
 class Prog::Vm::GithubRunner < Prog::Base
   subject_is :github_runner
+
+  extend Forwardable
+
+  def_delegators :github_runner, :installation, :vm, :label_data
+  def_delegators :installation, :project
 
   def self.assemble(installation, repository_name:, label:, actual_label: nil, default_branch: nil)
     unless Github.runner_labels[label]
@@ -11,11 +17,11 @@ class Prog::Vm::GithubRunner < Prog::Base
     end
 
     DB.transaction do
-      repository = Prog::Github::GithubRepositoryNexus.assemble(installation, repository_name, default_branch).subject
+      repository_id = Prog::Github::GithubRepositoryNexus.assemble(installation, repository_name, default_branch).id
       github_runner = GithubRunner.create(
         installation_id: installation.id,
-        repository_name: repository_name,
-        repository_id: repository.id,
+        repository_name:,
+        repository_id:,
         label:,
         actual_label: actual_label || label
       )
@@ -25,9 +31,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   def pick_vm
-    label_data = github_runner.label_data
-    installation = github_runner.installation
-    skip_pool = installation.project.get_ff_skip_runner_pool || github_runner.spill_over_set?
+    skip_pool = project.get_ff_skip_runner_pool || github_runner.spill_over_set?
 
     vm_size = if installation.premium_runner_enabled? || installation.free_runner_upgrade?
       "premium-#{label_data["vcpus"]}"
@@ -55,7 +59,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     size = label_data["vm_size"]
     exclude_availability_zones = []
     alternative_families = []
-    alien_ratio = github_runner.installation.project.get_ff_aws_alien_runners_ratio || 0
+    alien_ratio = project.get_ff_aws_alien_runners_ratio || 0
     if github_runner.spill_over_set? || (x64? && rand < alien_ratio)
       boot_image = Config.send(:"#{boot_image.tr("-", "_")}_aws_ami_version")
       location_id = Config.github_runner_aws_location_id
@@ -94,21 +98,19 @@ class Prog::Vm::GithubRunner < Prog::Base
     # If the runner is destroyed before it's ready or doesn't pick a job, don't charge for it.
     return unless github_runner.ready_at && github_runner.workflow_job
 
-    label_data = github_runner.label_data
     billed_vm_size = if label_data["arch"] == "arm64"
       "#{label_data["vm_size"]}-arm"
-    elsif github_runner.installation.free_runner_upgrade?(github_runner.created_at)
+    elsif installation.free_runner_upgrade?(github_runner.created_at)
       # If we enable free upgrades for the project, we should charge
       # the customer for the label's VM size instead of the effective VM size.
       label_data["vm_size"]
-    elsif github_runner.vm.location.aws?
+    elsif vm.location.aws?
       "standard-#{vm.vcpus}"
     else
       "#{vm.family}-#{vm.vcpus}"
     end
     github_runner.update(billed_vm_size:)
     rate_id = BillingRate.from_resource_properties("GitHubRunnerMinutes", billed_vm_size, "global")["id"]
-    project = github_runner.installation.project
 
     retries = 0
     begin
@@ -145,12 +147,8 @@ class Prog::Vm::GithubRunner < Prog::Base
     end
   end
 
-  def vm
-    @vm ||= github_runner.vm
-  end
-
   def github_client
-    @github_client ||= Github.installation_client(github_runner.installation.installation_id)
+    @github_client ||= Github.installation_client(installation.installation_id)
   end
 
   def busy?
@@ -159,7 +157,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   def x64?
-    github_runner.label_data["arch"] == "x64"
+    label_data["arch"] == "x64"
   end
 
   def before_run
@@ -173,7 +171,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def start
-    unless github_runner.installation.project.active?
+    unless project.active?
       github_runner.destroy
       pop "Could not provision a runner for inactive project"
     end
@@ -194,7 +192,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     # requests. There are some remedies, but it would require some refactoring
     # that I'm not keen to do at the moment. Although it looks weird, passing 0
     # as requested_additional_usage keeps the existing behavior.
-    github_runner.installation.project.quota_available?("GithubRunnerVCpu", 0)
+    project.quota_available?("GithubRunnerVCpu", 0)
   end
 
   label def wait_concurrency_limit
@@ -204,7 +202,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     end
 
     # check utilization, if it's high, wait for it to go down
-    family_utilization = VmHost.where(allocation_state: "accepting", arch: github_runner.label_data["arch"])
+    family_utilization = VmHost.where(allocation_state: "accepting", arch: label_data["arch"])
       .select_group(:family)
       .select_append { round(sum(:used_cores) * 100.0 / sum(:total_cores), 2).cast(:float).as(:utilization) }
       .to_hash(:family, :utilization)
@@ -212,15 +210,15 @@ class Prog::Vm::GithubRunner < Prog::Base
     std_util = family_utilization["standard"]
     prem_util = family_utilization["premium"]
 
-    is_high_util = if x64? && github_runner.label_data["family"] == "standard" && github_runner.installation.premium_runner_enabled?
+    is_high_util = if x64? && label_data["family"] == "standard" && installation.premium_runner_enabled?
       prem_util > 75 && std_util > 80
     else
-      family_utilization.fetch(github_runner.label_data["family"], 0) > 80
+      family_utilization.fetch(label_data["family"], 0) > 80
     end
 
     if is_high_util
       should_spill_over = x64? &&
-        github_runner.installation.project.get_ff_spill_to_alien_runners &&
+        project.get_ff_spill_to_alien_runners &&
         Time.now - github_runner.created_at > Config.github_runner_aws_spill_threshold_seconds
 
       if should_spill_over
@@ -239,7 +237,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       nap rand(5..15)
     end
 
-    if x64? && ((prem_util > 75) || (github_runner.installation.free_runner_upgrade? && prem_util > 50))
+    if x64? && ((prem_util > 75) || (installation.free_runner_upgrade? && prem_util > 50))
       github_runner.incr_not_upgrade_premium
     end
     Clog.emit("allowed because of low utilization") { {exceeded_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
@@ -285,7 +283,6 @@ class Prog::Vm::GithubRunner < Prog::Base
 
   def setup_info
     vmh = vm.vm_host
-    project = github_runner.installation.project
     {
       group: "Ubicloud Managed Runner",
       detail: {
@@ -325,7 +322,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       UBICLOUD_CACHE_URL=#{Config.base_url}/runtime/github/" | sudo tee -a /etc/environment > /dev/null
     COMMAND
 
-    if github_runner.installation.cache_enabled
+    if installation.cache_enabled
       command += <<~COMMAND
         echo "CUSTOM_ACTIONS_CACHE_URL=http://#{vm.private_ipv4}:51123/random_token/" | sudo tee -a /etc/environment > /dev/null
       COMMAND
@@ -380,14 +377,14 @@ class Prog::Vm::GithubRunner < Prog::Base
     # If the runner script is not started yet, we can delete the runner and
     # register it again.
     if vm.sshable.cmd("systemctl show -p SubState --value runner-script").chomp == "dead"
-      Clog.emit("Deregistering runner because it already exists") { [github_runner, {existing_runner: {runner_id: runner_id}}] }
+      Clog.emit("Deregistering runner because it already exists") { [github_runner, {existing_runner: {runner_id:}}] }
       github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{runner_id}")
       nap 5
     end
 
     # The runner script is already started. We persist the runner_id and allow
     # wait label to decide the next step.
-    Clog.emit("The runner already exists but the runner script is started too") { [github_runner, {existing_runner: {runner_id: runner_id}}] }
+    Clog.emit("The runner already exists but the runner script is started too") { [github_runner, {existing_runner: {runner_id:}}] }
     github_runner.update(runner_id: runner_id, ready_at: Time.now)
     hop_wait
   end
