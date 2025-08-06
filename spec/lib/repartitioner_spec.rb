@@ -2,18 +2,22 @@
 
 require_relative "../spec_helper"
 
-RSpec.describe MonitorRepartitioner do
+RSpec.describe Repartitioner do
+  def repartitioner(**)
+    described_class.new(partition_number: 1, channel: :monitor, max_partition: 8, listen_timeout: 1, recheck_seconds: 18, stale_seconds: 40, **)
+  end
+
   describe ".new" do
     it "repartitions when initializing" do
       expect(Clog).to receive(:emit).with("monitor repartitioning").and_call_original
-      mp = described_class.new(1)
+      mp = repartitioner
       expect(mp.repartitioned).to be true
       expect(mp.strand_id_range).to eq("00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff")
     end
 
     it "assumes given partition is last partition" do
       expect(Clog).to receive(:emit).with("monitor repartitioning").and_call_original
-      expect(described_class.new(2).strand_id_range).to eq("80000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff")
+      expect(repartitioner(partition_number: 2).strand_id_range).to eq("80000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff")
     end
   end
 
@@ -28,7 +32,7 @@ RSpec.describe MonitorRepartitioner do
         payload
       end
       q.pop(timeout: 1)
-      Thread.new { described_class.new(1).notify }.join(1)
+      Thread.new { repartitioner.notify }.join(1)
       expect(th.value).to eq "1"
     end
   end
@@ -41,7 +45,7 @@ RSpec.describe MonitorRepartitioner do
     end
 
     it "repartitions when it receives a notification about a new partition" do
-      @mp = mp = described_class.new(1, listen_timeout: 0.01, recheck_seconds: 2)
+      @mp = mp = repartitioner(listen_timeout: 0.01, recheck_seconds: 2)
       q = Queue.new
       mp.define_singleton_method(:notify) do
         super()
@@ -56,14 +60,14 @@ RSpec.describe MonitorRepartitioner do
       q.pop(timeout: 1)
       expect(mp).to receive(:repartition).with(2).and_call_original
       expect(mp.strand_id_range).to eq("00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff")
-      Thread.new { described_class.new(2).notify }.join(1)
+      Thread.new { repartitioner(partition_number: 2).notify }.join(1)
 
       q.pop(timeout: 1)
       expect(mp.strand_id_range).to eq("00000000-0000-0000-0000-000000000000"..."80000000-0000-0000-0000-000000000000")
     end
 
     it "repartitions when an existing partition goes stale" do
-      @mp = mp = described_class.new(1, listen_timeout: 0.01, recheck_seconds: 0.01)
+      @mp = mp = repartitioner(listen_timeout: 0.01, recheck_seconds: 0.01)
       q = Queue.new
       notified = false
       mp.define_singleton_method(:notify) do
@@ -82,12 +86,12 @@ RSpec.describe MonitorRepartitioner do
       expect(mp.strand_id_range).to eq("00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff")
       q2 = Queue.new
       Thread.new do
-        described_class.new(3).notify
+        repartitioner(partition_number: 3).notify
         q2.push nil
       end.join(1)
       Thread.new do
         q2.pop
-        described_class.new(2).notify
+        repartitioner(partition_number: 2).notify
       end.join(1)
 
       q.pop(timeout: 1)
@@ -100,7 +104,7 @@ RSpec.describe MonitorRepartitioner do
     end
 
     it "emits and otherwise ignores invalid partition numbers" do
-      @mp = mp = described_class.new(1, listen_timeout: 0.01)
+      @mp = mp = repartitioner(listen_timeout: 0.01)
       q = Queue.new
       mp.define_singleton_method(:notify) do
         super()
@@ -119,7 +123,7 @@ RSpec.describe MonitorRepartitioner do
           q.push nil
         end
       end
-      Thread.new { described_class.new(1000).notify }.join(1)
+      Thread.new { repartitioner(partition_number: 1000).notify }.join(1)
 
       q.pop(timeout: 1)
       expect(mp.strand_id_range).to eq("00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff")
@@ -127,7 +131,7 @@ RSpec.describe MonitorRepartitioner do
     end
 
     it "stops listen loop if notification is received after shutting down" do
-      @mp = mp = described_class.new(1, listen_timeout: 1)
+      @mp = mp = repartitioner
       q = Queue.new
       mp.define_singleton_method(:notify) do
         super()
@@ -144,7 +148,7 @@ RSpec.describe MonitorRepartitioner do
       mp.shutdown!
 
       expect(mp).not_to receive(:repartition)
-      Thread.new { described_class.new(2).notify }.join(1)
+      Thread.new { repartitioner(partition_number: 2).notify }.join(1)
       q.pop(timeout: 1)
       expect(mp.strand_id_range).to eq("00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff")
     end
