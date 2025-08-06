@@ -38,7 +38,7 @@ class PrivateSubnet < Sequel::Model
   end
 
   def before_destroy
-    FirewallsPrivateSubnets.where(private_subnet_id: id).destroy
+    PrivateSubnetFirewall.where(private_subnet_id: id).destroy
     super
   end
 

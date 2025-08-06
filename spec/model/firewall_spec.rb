@@ -52,7 +52,7 @@ RSpec.describe Firewall do
     expect(ps).to receive(:incr_update_firewall_rules)
     fw.disassociate_from_private_subnet(ps)
     expect(fw.reload.private_subnets.count).to eq(0)
-    expect(FirewallsPrivateSubnets.where(firewall_id: fw.id).count).to eq(0)
+    expect(PrivateSubnetFirewall.where(firewall_id: fw.id).count).to eq(0)
   end
 
   it "disassociates from a private subnet without applying firewalls" do
@@ -62,15 +62,15 @@ RSpec.describe Firewall do
     expect(ps).not_to receive(:incr_update_firewall_rules)
     fw.disassociate_from_private_subnet(ps, apply_firewalls: false)
     expect(fw.reload.private_subnets.count).to eq(0)
-    expect(FirewallsPrivateSubnets.where(firewall_id: fw.id).count).to eq(0)
+    expect(PrivateSubnetFirewall.where(firewall_id: fw.id).count).to eq(0)
   end
 
   it "destroys firewall" do
     fw.associate_with_private_subnet(ps, apply_firewalls: false)
     expect(fw.reload.private_subnets.count).to eq(1)
-    expect(FirewallsPrivateSubnets.where(firewall_id: fw.id).count).to eq(1)
+    expect(PrivateSubnetFirewall.where(firewall_id: fw.id).count).to eq(1)
     fw.destroy
-    expect(FirewallsPrivateSubnets.where(firewall_id: fw.id).count).to eq(0)
+    expect(PrivateSubnetFirewall.where(firewall_id: fw.id).count).to eq(0)
     expect(described_class[fw.id]).to be_nil
   end
 
