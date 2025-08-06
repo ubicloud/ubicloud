@@ -2,7 +2,7 @@
 
 require_relative "../model"
 
-class CertsLoadBalancers < Sequel::Model
+class LoadBalancerCert < Sequel::Model(:certs_load_balancers)
   many_to_one :cert
 
   plugin ResourceMethods, etc_type: true
