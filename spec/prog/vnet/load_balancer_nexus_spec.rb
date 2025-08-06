@@ -294,7 +294,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     it "deletes the load balancer and pops" do
       expect(nx.load_balancer).to receive(:destroy)
       expect { nx.wait_destroy }.to exit({"msg" => "load balancer deleted"})
-      expect(LoadBalancersVms.count).to eq 0
+      expect(LoadBalancerVm.count).to eq 0
     end
 
     it "destroys the certificate if it exists" do

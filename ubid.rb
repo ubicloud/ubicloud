@@ -73,7 +73,7 @@ class UBID
   TYPE_GITHUB_REPOSITORY = "gp"
   TYPE_LOAD_BALANCER = "1b"
   TYPE_LOAD_BALANCER_PORT = "1p"
-  TYPE_LOAD_BALANCERS_VMS = "1s"
+  TYPE_LOAD_BALANCER_VM = "1s"
   TYPE_LOAD_BALANCER_VM_PORT = "1q"
   TYPE_CERT = "ce"
   TYPE_INFERENCE_ENDPOINT = "1e"
@@ -136,7 +136,7 @@ class UBID
     PrivateSubnet: ps
     Firewall: fw
     LoadBalancer: 1b
-    LoadBalancersVms: 1s
+    LoadBalancerVm: 1s
     InferenceEndpoint: 1e
     InferenceApiKey: 1t
     Postgres: pg

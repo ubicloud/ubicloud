@@ -85,7 +85,7 @@ RSpec.describe LoadBalancer do
       cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
       lb.add_cert(cert)
       lb.add_vm(vm1)
-      expect(lb.load_balancers_vms.count).to eq(1)
+      expect(lb.load_balancer_vms.count).to eq(1)
     end
   end
 
@@ -155,7 +155,7 @@ RSpec.describe LoadBalancer do
 
     it "deletes the vm" do
       lb.remove_vm(vm1)
-      expect(lb.load_balancers_vms.count).to eq(0)
+      expect(lb.load_balancer_vms.count).to eq(0)
     end
   end
 
@@ -172,20 +172,20 @@ RSpec.describe LoadBalancer do
 
     it "deletes the load_balancer_vm_port" do
       new_port = LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 443, dst_port: 8443)
-      LoadBalancerVmPort.create(load_balancer_port_id: new_port.id, load_balancer_vm_id: lb.load_balancers_vms.first.id)
+      LoadBalancerVmPort.create(load_balancer_port_id: new_port.id, load_balancer_vm_id: lb.load_balancer_vms.first.id)
       lb.reload
       expect(lb.vm_ports.count).to eq(2)
       lb.remove_vm_port(lb.vm_ports.first)
       lb.reload
       expect(lb.vm_ports.count).to eq(1)
-      expect(lb.load_balancers_vms.count).to eq(1)
+      expect(lb.load_balancer_vms.count).to eq(1)
     end
 
-    it "deletes the load_balancer_vm_port. also deletes load_balancers_vms if the deleted vm_port was the last one" do
+    it "deletes the load_balancer_vm_port also deletes load_balancer_vms if the deleted vm_port was the last one" do
       lb.remove_vm_port(lb.vm_ports.first)
       lb.reload
       expect(lb.vm_ports.count).to eq(0)
-      expect(lb.load_balancers_vms.count).to eq(0)
+      expect(lb.load_balancer_vms.count).to eq(0)
     end
   end
 

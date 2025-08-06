@@ -2,7 +2,7 @@
 
 require_relative "../model"
 
-class LoadBalancersVms < Sequel::Model
+class LoadBalancerVm < Sequel::Model(:load_balancers_vms)
   many_to_one :load_balancer
   many_to_one :vm
   plugin ResourceMethods

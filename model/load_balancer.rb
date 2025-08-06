@@ -7,7 +7,7 @@ class LoadBalancer < Sequel::Model
   many_to_many :vms
   one_to_one :strand, key: :id
   many_to_one :private_subnet
-  one_to_many :load_balancers_vms, key: :load_balancer_id, class: :LoadBalancersVms
+  one_to_many :load_balancer_vms
   one_to_many :ports, key: :load_balancer_id, class: :LoadBalancerPort
   many_to_many :certs, join_table: :certs_load_balancers, left_key: :load_balancer_id, right_key: :cert_id
   one_to_many :certs_load_balancers, key: :load_balancer_id, class: :CertsLoadBalancers
@@ -16,7 +16,7 @@ class LoadBalancer < Sequel::Model
   many_to_many :active_vm_ports, join_table: :load_balancer_port, right_key: :id, right_primary_key: :load_balancer_port_id, class: :LoadBalancerVmPort, read_only: true, conditions: {state: "up"}
   many_through_many :vms_to_dns, [[:load_balancer_port, :load_balancer_id, :id], [:load_balancer_vm_port, :load_balancer_port_id, :load_balancer_vm_id], [:load_balancers_vms, :id, :vm_id]], class: :Vm, conditions: Sequel.~(Sequel[:load_balancer_vm_port][:state] => ["evacuating", "detaching"])
 
-  plugin :association_dependencies, load_balancers_vms: :destroy, ports: :destroy, certs_load_balancers: :destroy
+  plugin :association_dependencies, load_balancer_vms: :destroy, ports: :destroy, certs_load_balancers: :destroy
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy, :update_load_balancer, :rewrite_dns_records, :refresh_cert
@@ -46,7 +46,7 @@ class LoadBalancer < Sequel::Model
   def add_port(src_port, dst_port)
     DB.transaction do
       port = super(src_port:, dst_port:)
-      load_balancers_vms.each do |lb_vm|
+      load_balancer_vms.each do |lb_vm|
         LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: lb_vm.id)
       end
       incr_update_load_balancer
@@ -63,7 +63,7 @@ class LoadBalancer < Sequel::Model
 
   def add_vm(vm)
     DB.transaction do
-      load_balancer_vm = LoadBalancersVms.create(load_balancer_id: id, vm_id: vm.id)
+      load_balancer_vm = LoadBalancerVm.create(load_balancer_id: id, vm_id: vm.id)
       ports.each { |port|
         LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: load_balancer_vm.id)
       }
@@ -96,7 +96,7 @@ class LoadBalancer < Sequel::Model
   def remove_vm(vm)
     DB.transaction do
       vm_ports_by_vm(vm).destroy
-      load_balancers_vms_dataset[vm_id: vm.id].destroy
+      load_balancer_vms_dataset[vm_id: vm.id].destroy
       incr_rewrite_dns_records
     end
   end
@@ -105,7 +105,7 @@ class LoadBalancer < Sequel::Model
     DB.transaction do
       vm_ports_dataset.where(Sequel[:load_balancer_vm_port][:id] => vm_port.id).destroy
       if vm_ports_dataset.where(load_balancer_vm_id: vm_port.load_balancer_vm_id).count.zero?
-        load_balancers_vms_dataset[id: vm_port.load_balancer_vm_id].destroy
+        load_balancer_vms_dataset[id: vm_port.load_balancer_vm_id].destroy
       end
       incr_rewrite_dns_records
     end
