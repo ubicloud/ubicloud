@@ -10,7 +10,7 @@ RSpec.describe MonitorRunner do
   end
   let(:monitor_resources) { MonitorResourceType.create(MonitorableResource, stuck_info, 2, [VmHost]) {} }
   let(:metric_export_resources) { MonitorResourceType.create(MetricsTargetResource, stuck_info, 2, [VmHost]) {} }
-  let(:repartitioner) { MonitorRepartitioner.new(2) }
+  let(:repartitioner) { Repartitioner.new(partition_number: 2, channel: :monitor, listen_timeout: 1, recheck_seconds: 18, stale_seconds: 40, max_partition: 8) }
   let(:monitor_runner_args) do
     {
       scan_every: 0.01,

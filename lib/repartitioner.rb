@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
-class MonitorRepartitioner
+class Repartitioner
   attr_reader :strand_id_range
 
   attr_accessor :repartitioned
 
-  def initialize(partition_number, listen_timeout: 1, recheck_seconds: 18, stale_seconds: 40, max_partition: 8, channel: :monitor)
+  def initialize(partition_number:, channel:, listen_timeout:, recheck_seconds:, stale_seconds:, max_partition:)
     @partition_number = partition_number
 
     # Assume when starting that we are the final partition. For cases where we aren't,
@@ -20,7 +20,7 @@ class MonitorRepartitioner
     @repartitioned = true
 
     # This starts out empty, but will be filled in by notifications from the current
-    # monitor process and other monitor processes.
+    # process and other processes listening on the same channel.
     @partition_times = {}
 
     # Check for shutdown every second
@@ -30,9 +30,10 @@ class MonitorRepartitioner
     # every 18 seconds.
     @recheck_seconds = recheck_seconds
 
-    # Remove a partition if we have not been notified about it in the last 40 seconds.
-    # Combined with the above two settings, this means that if the final monitor partition
-    # process exits, other monitor processes will repartition in 40-59 seconds.
+    # Remove a partition if we have not been notified about it in the given number of seconds.
+    # Combined with the above two settings, this means that if the final partition
+    # process exits, other processes will repartition in at most
+    # listen_timeout + recheck_seconds + stale_seconds seconds.
     @stale_seconds = stale_seconds
 
     # The next deadline after which to check for stale partitions and notify.
@@ -44,6 +45,12 @@ class MonitorRepartitioner
     # The maximum partition we will consider valid.
     @max_partition = max_partition
 
+    # Message to emit when repartitioning
+    @repartition_emit_message = "#{@channel} repartitioning"
+
+    # Top level key used in emit json when repartitioning
+    @repartition_emit_key = :"#{@channel}_repartition"
+
     @shutdown = false
 
     repartition(partition_number)
@@ -53,13 +60,13 @@ class MonitorRepartitioner
     @shutdown = true
   end
 
-  # Notify the monitor channel that we exist, so that other monitor processes
+  # Notify the channel that we exist, so that other processes
   # can repartition appropriately if needed.
   def notify
     DB.notify(@channel, payload: @partition_number_string)
   end
 
-  # Listens on the monitor channel to determine what other monitor processes are
+  # Listens on the channel to determine what other processes are
   # running, and updates the num_partitions information, so that the current process
   # scan thread will use the appropriate partition.
   def listen
@@ -76,7 +83,7 @@ class MonitorRepartitioner
     emit_str = "invalid #{@channel} repartition notification"
     emit_key = :"#{@channel}_notify_payload"
 
-    # Continuouly LISTENs for notifications on the monitor channel until shutdown.
+    # Continuouly LISTENs for notifications on the channel until shutdown.
     # If notified about a higher partition number than the currently expected
     # partitioning, repartition the current process to decrease the partition size.
     DB.listen(@channel, loop:, after_listen: proc { notify }, timeout: @listen_timeout) do |_, _, payload|
@@ -98,7 +105,7 @@ class MonitorRepartitioner
     "%08x-0000-0000-0000-000000000000" % (partition_num * partition_size).to_i
   end
 
-  # This calculates the partition of the id space that this process will monitor.
+  # This calculates the partition of the id space that this process will operate on.
   def calculate_strand_id_range
     partition_size = (16**8) / @num_partitions.to_r
     start_id = partition_boundary(@partition_number - 1, partition_size)
@@ -116,8 +123,8 @@ class MonitorRepartitioner
     @num_partitions = np
     calculate_strand_id_range
     @repartitioned = true
-    Clog.emit("monitor repartitioning") {
-      {monitor_repartition: {
+    Clog.emit(@repartition_emit_message) {
+      {@repartition_emit_key => {
         partition_number: @partition_number,
         num_partitions: np,
         range: @strand_id_range

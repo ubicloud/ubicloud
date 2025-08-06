@@ -10,10 +10,10 @@ class Scheduling::Dispatcher
   STRAND_RUNTIME = Strand::LEASE_EXPIRATION / 4
   APOPTOSIS_MUTEX = Mutex.new
 
-  class Repartitioner < MonitorRepartitioner
-    def initialize(*, dispatcher:, **)
+  class Repartitioner < ::Repartitioner
+    def initialize(dispatcher:, **)
       @dispatcher = dispatcher
-      super(*, **)
+      super(**)
     end
 
     # Update the dispatcher prepared statement when repartitioning.
@@ -112,7 +112,7 @@ class Scheduling::Dispatcher
     if partition_number
       # Handles repartitioning when new partitions show up or old partitions
       # go stale.
-      @repartitioner = Repartitioner.new(partition_number, channel: :respirate,
+      @repartitioner = Repartitioner.new(partition_number:, channel: :respirate,
         max_partition: 256, dispatcher: self, listen_timeout:,
         recheck_seconds: listen_timeout * 2, stale_seconds: listen_timeout * 4)
 
