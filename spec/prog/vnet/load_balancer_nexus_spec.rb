@@ -303,7 +303,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       lb.add_cert(cert)
       expect(lb.certs.count).to eq 2
       expect { nx.wait_destroy }.to exit({"msg" => "load balancer deleted"})
-      expect(CertsLoadBalancers.count).to eq 0
+      expect(LoadBalancerCert.count).to eq 0
       expect(cert.destroy_set?).to be true
     end
   end

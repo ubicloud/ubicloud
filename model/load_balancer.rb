@@ -8,15 +8,15 @@ class LoadBalancer < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :private_subnet
   one_to_many :load_balancer_vms
-  one_to_many :ports, key: :load_balancer_id, class: :LoadBalancerPort
-  many_to_many :certs, join_table: :certs_load_balancers, left_key: :load_balancer_id, right_key: :cert_id
-  one_to_many :certs_load_balancers, key: :load_balancer_id, class: :CertsLoadBalancers
-  many_to_one :custom_hostname_dns_zone, class: :DnsZone, key: :custom_hostname_dns_zone_id
+  one_to_many :ports, class: :LoadBalancerPort
+  many_to_many :certs
+  one_to_many :load_balancer_certs
+  many_to_one :custom_hostname_dns_zone, class: :DnsZone
   many_to_many :vm_ports, join_table: :load_balancer_port, right_key: :id, right_primary_key: :load_balancer_port_id, class: :LoadBalancerVmPort, read_only: true
   many_to_many :active_vm_ports, join_table: :load_balancer_port, right_key: :id, right_primary_key: :load_balancer_port_id, class: :LoadBalancerVmPort, read_only: true, conditions: {state: "up"}
   many_through_many :vms_to_dns, [[:load_balancer_port, :load_balancer_id, :id], [:load_balancer_vm_port, :load_balancer_port_id, :load_balancer_vm_id], [:load_balancers_vms, :id, :vm_id]], class: :Vm, conditions: Sequel.~(Sequel[:load_balancer_vm_port][:state] => ["evacuating", "detaching"])
 
-  plugin :association_dependencies, load_balancer_vms: :destroy, ports: :destroy, certs_load_balancers: :destroy
+  plugin :association_dependencies, load_balancer_vms: :destroy, ports: :destroy, load_balancer_certs: :destroy
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy, :update_load_balancer, :rewrite_dns_records, :refresh_cert
