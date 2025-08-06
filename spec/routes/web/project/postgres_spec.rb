@@ -451,9 +451,8 @@ RSpec.describe Clover, "postgres" do
         storage_size = form.find(:radio_button, "storage_size", checked: true).value
         page.driver.submit :patch, form["action"], {size:, storage_size:, _csrf:}
 
-        # Normally we follow the redirect through javascript handler. Here, we are simulating that by reloading the page.
-        visit "#{project.path}#{pg.path}/resize"
-        expect(page).to have_flash_error "Validation failed for following fields: storage_size"
+        # Error messages are displayed to the user via javascript, using the error.message entry
+        expect(JSON.parse(page.driver.browser.last_response.body).dig("error", "message")).to eq "Validation failed for following fields: storage_size"
 
         pg.reload
         expect(pg.target_vm_size).to eq("standard-2")
