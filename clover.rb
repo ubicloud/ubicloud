@@ -216,7 +216,7 @@ class Clover < Roda
 
     if runtime?
       error
-    elsif api? || request.headers["accept"] == "application/json"
+    elsif api? || request.headers["accept"] == "application/json" || !%w[GET POST].include?(request.request_method)
       {error:}
     else
       @error = error
@@ -230,14 +230,7 @@ class Clover < Roda
       elsif e.is_a?(CloverError) && !e.is_a?(Authorization::Unauthorized)
         flash["error"] = message
         flash["errors"] = (flash["errors"] || {}).merge(details || {}).transform_keys(&:to_s)
-
-        if request.patch?
-          response["location"] = env["HTTP_REFERER"]
-          response.status = 200
-          request.halt
-        else
-          redirect_back_with_inputs
-        end
+        redirect_back_with_inputs
       end
 
       # :nocov:
