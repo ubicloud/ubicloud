@@ -299,7 +299,7 @@ RSpec.describe Clover, "load balancer" do
         expect(page).to have_flash_notice("VM is detached from the load balancer")
         expect(Strand.where(prog: "Vnet::LoadBalancerHealthProbes").all.count { |st| st.stack[0]["subject_id"] == lb.id && st.stack[0]["vm_id"] == vm.id }).to eq(0)
         expect(lb.update_load_balancer_set?).to be(true)
-        expect(lb.vm_ports_dataset.where(load_balancer_vm_id: LoadBalancersVms.where(vm_id: vm.id).select(:id)).first&.state).to eq("detaching")
+        expect(lb.vm_ports_dataset.where(load_balancer_vm_id: LoadBalancerVm.where(vm_id: vm.id).select(:id)).first&.state).to eq("detaching")
       end
 
       it "can not detach vm when it does not exist" do

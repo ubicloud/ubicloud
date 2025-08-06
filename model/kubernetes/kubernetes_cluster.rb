@@ -79,7 +79,7 @@ class KubernetesCluster < Sequel::Model
   def vm_diff_for_lb(load_balancer)
     worker_vms = nodepools.flat_map(&:vms)
     worker_vm_ids = worker_vms.map(&:id).to_set
-    lb_vms = load_balancer.load_balancers_vms.map(&:vm)
+    lb_vms = load_balancer.load_balancer_vms.map(&:vm)
     lb_vm_ids = lb_vms.map(&:id).to_set
 
     extra_vms = lb_vms.reject { |vm| worker_vm_ids.include?(vm.id) }

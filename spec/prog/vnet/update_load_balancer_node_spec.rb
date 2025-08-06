@@ -373,7 +373,7 @@ LOAD_BALANCER
       end
 
       it "creates load balancing with multiple vms if the vm we work on is down" do
-        LoadBalancerVmPort.where(load_balancer_vm_id: vm.load_balancers_vms.id).update(state: "down")
+        LoadBalancerVmPort.where(load_balancer_vm_id: vm.load_balancer_vm.id).update(state: "down")
         expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
@@ -421,7 +421,7 @@ LOAD_BALANCER
       end
 
       it "creates load balancing with multiple vms if the vm we work on is up but the neighbor is down" do
-        LoadBalancerVmPort.where(load_balancer_vm_id: neighbor_vm.load_balancers_vms.id).update(state: "down")
+        LoadBalancerVmPort.where(load_balancer_vm_id: neighbor_vm.load_balancer_vm.id).update(state: "down")
         expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
