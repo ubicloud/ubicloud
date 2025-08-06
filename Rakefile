@@ -281,35 +281,35 @@ end
 desc "Check generated SQL for parameterization"
 task "check_query_parameterization" do
   require "rbconfig"
-  system({"CHECK_LOGGED_SQL" => "1"}, RbConfig.ruby, "-S", "rake", "frozen_sspec")
-  system(RbConfig.ruby, "bin/check_for_parameters", out: "sql_query_parameterization_analysis.txt")
+  sh({"CHECK_LOGGED_SQL" => "1"}, RbConfig.ruby, "-S", "rake", "frozen_sspec")
+  sh(RbConfig.ruby, "bin/check_for_parameters", out: "sql_query_parameterization_analysis.txt")
 end
 
 desc "Check that model files work when required separately"
 task "check_separate_requires" do
   require "rbconfig"
-  system({"RACK_ENV" => "test", "LOAD_FILES_SEPARATELY_CHECK" => "1"}, RbConfig.ruby, "-r", "./loader", "-e", "")
+  sh({"RACK_ENV" => "test", "LOAD_FILES_SEPARATELY_CHECK" => "1"}, RbConfig.ruby, "-r", "./loader", "-e", "")
 end
 
 desc "Run monitor smoke test"
 task :monitor_smoke_test do
-  system(RbConfig.ruby, "spec/monitor_smoke_test.rb")
+  sh(RbConfig.ruby, "spec/monitor_smoke_test.rb")
 end
 
 desc "Run respirate smoke tests"
 task :respirate_smoke_test do
   # not partitioned, 1 process
-  system(RbConfig.ruby, "spec/respirate_smoke_test.rb")
+  sh(RbConfig.ruby, "spec/respirate_smoke_test.rb")
 
   # not partitioned, 8 processes
-  system(RbConfig.ruby, "spec/respirate_smoke_test.rb", "1", "8")
+  sh(RbConfig.ruby, "spec/respirate_smoke_test.rb", "1", "8")
 
   # 8-way partition, 8 processes
-  system(RbConfig.ruby, "spec/respirate_smoke_test.rb", "8")
+  sh(RbConfig.ruby, "spec/respirate_smoke_test.rb", "8")
 
   # 8-way partition, but only 7 processes. This simulates a crash/apoptosis
   # in a respirate process, checking that other processes pick up the slack.
-  system(RbConfig.ruby, "spec/respirate_smoke_test.rb", "8", "7")
+  sh(RbConfig.ruby, "spec/respirate_smoke_test.rb", "8", "7")
 end
 
 desc "Run each spec file in a separate process"
@@ -318,6 +318,7 @@ task :spec_separate do
 
   failures = []
   Dir["spec/**/*_spec.rb"].each do |file|
+    # system instead of sh as we are reporting all failures at the end
     failures << file unless system(RbConfig.ruby, "-w", "-S", "rspec", file)
   end
 
