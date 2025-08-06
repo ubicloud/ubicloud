@@ -142,7 +142,7 @@ class Repartitioner
       @partition_recheck_time = t + @recheck_seconds
       notify
       stale = t - @stale_seconds
-      @partition_times.reject! { |_, time| time < stale }
+      @partition_times.reject! { |number, time| time < stale && number != @partition_number }
       @partition_times.keys.max
     end
   end
