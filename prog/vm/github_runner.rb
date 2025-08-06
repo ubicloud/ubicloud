@@ -172,9 +172,9 @@ class Prog::Vm::GithubRunner < Prog::Base
         .to_hash(:family, :utilization)
 
       not_allow = if github_runner.label_data["arch"] == "x64" && github_runner.label_data["family"] == "standard" && github_runner.installation.premium_runner_enabled?
-        family_utilization["premium"] > 75 && family_utilization["standard"] > 75
+        family_utilization["premium"] > 75 && family_utilization["standard"] > 80
       else
-        family_utilization.fetch(github_runner.label_data["family"], 0) > 75
+        family_utilization.fetch(github_runner.label_data["family"], 0) > 80
       end
 
       if not_allow
