@@ -89,33 +89,20 @@ output.split("\n").each do |line|
 end
 lines.each_value(&:uniq!).each_value { it.sort_by!(&:inspect) }
 
-[up, evloop].each do |r|
-  expected_lines = [
-    {"got_pulse" => {"ubid" => r, "pulse" => {"reading" => "up", "reading_rpt" => 1}}, "message" => "Got new pulse."},
-    {"metrics_export_success" => {"ubid" => r, "count" => 1}, "message" => "Metrics export has finished."}
-  ]
+{
+  up => ["up", 1],
+  evloop => ["up", 1],
+  mc2 => ["up", 2],
+  down => ["down", 1]
+}.each do |r, (reading, count)|
+  expected_lines = Array.new(lines[r].size - 1) do
+    {"got_pulse" => {"ubid" => r, "pulse" => {"reading" => reading, "reading_rpt" => it + 1}}, "message" => "Got new pulse."}
+  end
+  expected_lines << {"metrics_export_success" => {"ubid" => r, "count" => count}, "message" => "Metrics export has finished."}
   unless lines[r] == expected_lines
     warn "unexpected lines for #{r}: #{lines[r]}"
     exit 1
   end
-end
-
-expected_lines = [
-  {"got_pulse" => {"ubid" => mc2, "pulse" => {"reading" => "up", "reading_rpt" => 1}}, "message" => "Got new pulse."},
-  {"metrics_export_success" => {"ubid" => mc2, "count" => 2}, "message" => "Metrics export has finished."}
-]
-unless lines[mc2] == expected_lines
-  warn "unexpected lines for #{mc2}: #{lines[mc2]}"
-  exit 1
-end
-
-expected_lines = Array.new(lines[down].size - 1) do
-  {"got_pulse" => {"ubid" => down, "pulse" => {"reading" => "down", "reading_rpt" => it + 1}}, "message" => "Got new pulse."}
-end
-expected_lines << {"metrics_export_success" => {"ubid" => down, "count" => 1}, "message" => "Metrics export has finished."}
-unless lines[down] == expected_lines
-  warn "unexpected lines for #{down}: #{lines[down]}"
-  exit 1
 end
 
 unless lines[:other].flat_map(&:keys).uniq.sort == ["message", "monitor_metrics"]
