@@ -52,7 +52,7 @@ class Clover
           Serializers::LoadBalancer.serialize(lb, {detailed: true})
         else
           flash["notice"] = "VM is #{actioned} the load balancer"
-          r.redirect "#{@project.path}#{lb.path}"
+          r.redirect path(lb)
         end
       end
 

@@ -51,7 +51,7 @@ class Clover
           Serializers::Vm.serialize(vm, {detailed: true})
         else
           flash["notice"] = "'#{vm.name}' will be restarted in a few seconds"
-          r.redirect "#{@project.path}#{vm.path}"
+          r.redirect path(vm)
         end
       end
     end

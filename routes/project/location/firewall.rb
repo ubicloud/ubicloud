@@ -74,7 +74,7 @@ class Clover
           Serializers::Firewall.serialize(firewall, {detailed: true})
         else
           flash["notice"] = "Private subnet #{private_subnet.name} is #{actioned} the firewall"
-          r.redirect "#{@project.path}#{firewall.path}"
+          r.redirect path(firewall)
         end
       end
 
@@ -97,8 +97,7 @@ class Clover
           end
 
           flash["notice"] = "Firewall rule is created"
-
-          r.redirect "#{@project.path}#{firewall.path}"
+          r.redirect path(firewall)
         end
 
         r.delete :ubid_uuid do |id|
