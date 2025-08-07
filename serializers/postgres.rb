@@ -21,10 +21,6 @@ class Serializers::Postgres < Serializers::Base
       tags: pg.tags || []
     }
 
-    if options[:include_path]
-      base[:path] = pg.path
-    end
-
     if options[:detailed]
       base.merge!(
         connection_string: pg.connection_string,

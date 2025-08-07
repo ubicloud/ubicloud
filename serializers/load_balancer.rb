@@ -15,10 +15,6 @@ class Serializers::LoadBalancer < Serializers::Base
       dst_port: lb.dst_port
     }
 
-    if options[:include_path]
-      base[:path] = lb.path
-    end
-
     if options[:detailed]
       base[:subnet] = lb.private_subnet.name
       base[:vms] = lb.vms.map { it.ubid } || []
