@@ -31,15 +31,15 @@
       rows: @postgres_databases.map do |pg|
         [
           [
-            [pg[:name], {link: @project_data[:path] + pg[:path] + "/overview"}],
-            [pg[:vm_size]],
-            [pg[:storage_size_gib]],
-            [pg[:version]],
-            [pg[:parent] ? pg[:parent].split("/").last : "", {link: pg[:parent] ? @project_data[:path] + pg[:parent] : ""}],
-            pg[:location],
-            ["pg_state_label", {component: { state: pg[:state] }}]
+            [pg.name, {link: @project_data[:path] + pg.path + "/overview"}],
+            [pg.vm_size],
+            [pg.storage_size_gib],
+            [pg.version],
+            pg.parent ? [pg.parent.name, {link: @project_data[:path] + pg.parent.path}] : [""],
+            [pg.display_location],
+            ["pg_state_label", {component: { state: pg.display_state }}]
           ],
-          {id: "pg-#{pg[:id]}"}
+          {id: "pg-#{pg.ubid}"}
         ]
       end
     ) %>
