@@ -13,22 +13,7 @@ class Clover < Roda
   use Rack::Lint if linting
   if linting || Config.development? # Assume Rack::Lint added automatically in development
     require "rack/rewindable_input"
-
-    # Switch to use Rack::RewindableInputMiddleware after Rack 3.2
-    class RewindableInputMiddleware
-      def initialize(app)
-        @app = app
-      end
-
-      def call(env)
-        if (input = env["rack.input"])
-          env["rack.input"] = Rack::RewindableInput.new(input)
-        end
-
-        @app.call(env)
-      end
-    end
-    use RewindableInputMiddleware
+    use Rack::RewindableInput::Middleware
   end
   # :nocov:
 
