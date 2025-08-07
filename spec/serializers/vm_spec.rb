@@ -39,7 +39,7 @@ RSpec.describe Serializers::Vm do
       expect(vm).to receive(:ubid).and_return("1234")
       expect(vm).to receive(:ip6).and_return(nil)
       expect(vm).to receive(:ephemeral_net4).and_return("192.168.1.0/24")
-      expect(vm).to receive(:pci_devices).and_return([PciDevice.new(device: "20b5", device_class: "0300")])
+      expect(vm).to receive(:display_gpu).and_return("1x NVIDIA A100 80GB PCIe")
       expect(vm).to receive(:firewalls).and_return([])
       expect(vm).to receive(:private_ipv4).and_return("10.0.0.1")
       expect(vm).to receive(:private_ipv6).and_return("fd00::1")
