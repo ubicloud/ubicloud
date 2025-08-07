@@ -8,7 +8,7 @@
     rows: @firewalls.map do |fw|
       [
         [
-          [fw.name, {link: @project_data[:path] + fw.path}],
+          [fw.name, {link: path(fw)}],
           fw.display_location,
           fw.description
         ],

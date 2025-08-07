@@ -31,9 +31,9 @@
           <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">5432, 6432</td>
           <% if @edit_perm %>
           <td id="fwr-buttons-<%= fwr.ubid %>" class="py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 flex gap-2 items-center justify-end">
-            <%== part("components/inline_edit_buttons", url: "#{@project_data[:path]}#{@pg.path}/firewall-rule/#{fwr.ubid}", confirmation_message: "Firewall rule is updated successfully.") %>
+            <%== part("components/inline_edit_buttons", url: "#{path(@pg)}/firewall-rule/#{fwr.ubid}", confirmation_message: "Firewall rule is updated successfully.") %>
             <div class="group-[.active]/inline-editable:hidden block">
-              <%== part("components/delete_button", url: "#{@project_data[:path]}#{@pg.path}/firewall-rule/#{fwr.ubid}", text: "") %>
+              <%== part("components/delete_button", url: "#{path(@pg)}/firewall-rule/#{fwr.ubid}", text: "") %>
             </div>
           </td>
           <% end %>
@@ -49,8 +49,8 @@
           </td>
           <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">5432, 6432</td>
           <td class="py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-            <form action="<%= "#{@project_data[:path]}#{@pg.path}/firewall-rule" %>" role="form" method="POST" id="form-pg-fwr-create">
-            <%== csrf_tag("#{@project_data[:path]}#{@pg.path}/firewall-rule") %>
+            <form action="<%= "#{path(@pg)}/firewall-rule" %>" role="form" method="POST" id="form-pg-fwr-create">
+            <%== csrf_tag("#{path(@pg)}/firewall-rule") %>
             <%== part("components/form/submit_button", text: "Create", extra_class: "firewall-rule-create-button") %>
             </form>
           </td>

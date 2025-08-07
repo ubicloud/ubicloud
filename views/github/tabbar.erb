@@ -15,7 +15,7 @@
           #{@project.github_installations.map do |ins|
             <<-ITEM
             <div class="hover:bg-gray-50" role="none">
-              <a href="#{@project_data[:path]}/github/#{ins.ubid}/runner" class="flex items-center px-4 py-3 text-sm leading-6 text-gray-700">
+              <a href="#{path(ins)}/runner" class="flex items-center px-4 py-3 text-sm leading-6 text-gray-700">
                 <img src="https://github.com/#{ins.name}.png?size=64" alt="" class="mr-2 size-6 shrink-0 rounded-lg drop-shadow-sm">
                 <span class="#{(ins.id == @installation.id) ? "font-semibold" : ""}">#{ins.name}</span>
               </a>
@@ -38,11 +38,12 @@
   DROPDOWN
 ) %>
 
+<% installation_path = path(@installation) %>
 <%== part(
   "components/tabbar",
   tabs: [
-    ["Active Runners", "#{@project_data[:path]}/github/#{@installation.ubid}/runner"],
-    ["Caches", "#{@project_data[:path]}/github/#{@installation.ubid}/cache"],
-    ["Settings", "#{@project_data[:path]}/github/#{@installation.ubid}/setting"]
+    ["Active Runners", "#{installation_path}/runner"],
+    ["Caches", "#{installation_path}/cache"],
+    ["Settings", "#{installation_path}/setting"]
   ]
 ) %>

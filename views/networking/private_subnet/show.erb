@@ -9,7 +9,7 @@ perm_checks = {
   "PrivateSubnet:view" => PrivateSubnet.where(id: @connected_subnets.map(&:id))
 }
 
-ps_path = "#{@project_data[:path]}#{@ps.path}"
+ps_path = path(@ps)
 
 viewable_fws, viewable_subnets =
   perm_checks.map do |perm, ds|
@@ -51,7 +51,7 @@ viewable_fws, viewable_subnets =
           [
             (
               if nic.vm
-                [nic.vm.name, { link: "#{@project_data[:path]}#{nic.vm.path}" }]
+                [nic.vm.name, { link: path(nic.vm) }]
               else
                 "-"
               end
@@ -75,7 +75,7 @@ viewable_fws, viewable_subnets =
           [
             (
               if viewable_fws[fw.ubid]
-                [fw.name, { link: "#{@project_data[:path]}#{fw.path}" }]
+                [fw.name, { link: path(fw) }]
               else
                 fw.name
               end
@@ -107,7 +107,7 @@ viewable_fws, viewable_subnets =
           <tr>
             <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
               <% if viewable_subnets[subnet.ubid] %>
-                <a href="<%= "#{@project_data[:path]}#{subnet.path}" %>" class="text-orange-600 hover:text-orange-700"><%= subnet.name %></a>
+                <a href="<%= path(subnet) %>" class="text-orange-600 hover:text-orange-700"><%= subnet.name %></a>
               <% else %>
                 <%= subnet.name %>
               <% end %>

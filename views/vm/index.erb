@@ -22,7 +22,7 @@
     rows: @vms.map do |vm|
       [
         [
-          [vm.name, {link: @project_data[:path] + vm.path}],
+          [vm.name, {link: path(vm)}],
           vm.display_location,
           vm.display_size,
           (vm.storage_size_gib > 0) ? "#{vm.storage_size_gib} GB" : "-",
