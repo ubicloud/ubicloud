@@ -20,6 +20,10 @@ class PaymentMethod < Sequel::Model
     end
     super
   end
+
+  def path
+    "/billing/payment-method/#{ubid}"
+  end
 end
 
 # Table: payment_method
