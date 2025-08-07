@@ -51,7 +51,7 @@ vm = @pg.representative_server.vm
 
 <% @enable_echarts = true %>
 
-<div id="metrics-container" class="p-6" data-metrics-url="<%= "#{@project_data[:path]}#{@pg.path}" %>">
+<div id="metrics-container" class="p-6" data-metrics-url="<%= path(@pg) %>">
   <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
     <div class="min-w-0 flex-1">
       <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Metrics Summary</h3>

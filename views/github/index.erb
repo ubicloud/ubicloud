@@ -1,8 +1,8 @@
 <% @page_title = "GitHub Runners Integration" %>
 
 <% if !@project.has_valid_payment_method? %>
-  <form action="<%= "#{@project_data[:path]}/billing" %>" method="POST">
-    <%== csrf_tag("#{@project_data[:path]}/billing") %>
+  <form action="<%= billing_path %>" method="POST">
+    <%== csrf_tag(billing_path) %>
     <%== part(
       "components/empty_state",
       icon: "hero-banknotes",

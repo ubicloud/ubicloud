@@ -4,7 +4,7 @@
     ["aces[][action]", @action_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] }.sort_by! { _2 } : v] }],
     ["aces[][object]", @object_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }]
   ]
-  form_action = "#{@project_data[:path]}/token/#{@token.ubid}/access-control"
+  form_action = path(@token)
   table_headers = %w[Action Object]
   edit_perm = true
 
@@ -22,7 +22,7 @@ else
     ["aces[][action]", @action_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] }.sort_by! { _2 } : v] }],
     ["aces[][object]", @object_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }]
   ]
-  form_action = "#{@project_data[:path]}/user/access-control"
+  form_action = "#{user_path}/access-control"
   table_headers = %w[Subject Action Object]
   edit_perm = has_project_permission("Project:editaccess")
 end

@@ -46,8 +46,8 @@ end
       </div>
     </div>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <form action="<%= "#{@project_data[:path]}/billing" %>" method="POST">
-        <%== csrf_tag("#{@project_data[:path]}/billing") %>
+      <form action="<%= billing_path %>" method="POST">
+        <%== csrf_tag(billing_path) %>
         <div class="px-4 py-5 sm:p-6">
           <div class="space-y-12">
             <div>
@@ -153,7 +153,7 @@ end
       "components/table_card",
       title: "Payment Methods",
       right_items: [
-        part("components/button", text: "Add Payment Method", link: "#{@project_data[:path]}/billing/payment-method/create")
+        part("components/button", text: "Add Payment Method", link: "#{billing_path}/payment-method/create")
       ],
       rows:
         billing_info.payment_methods.map do |pm|
@@ -166,8 +166,8 @@ end
                 "delete_button",
                 {
                   component: {
-                    url: "#{@project_data[:path]}/billing/payment-method/#{pm.ubid}?project_id=#{@project.ubid}",
-                    csrf_url: "#{@project_data[:path]}/billing/payment-method/#{pm.ubid}",
+                    url: "#{path(pm)}?project_id=#{@project.ubid}",
+                    csrf_url: path(pm),
                     confirmation: pm.stripe_data["last4"]
                   },
                   extra_class: "flex justify-end"
@@ -202,11 +202,7 @@ end
             <% @invoices.each do |inv| %>
               <tr id="invoice-<%= inv[:ubid]%>">
                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <a
-                    href="<%= @project_data[:path] + "/billing" + inv[:path] %>"
-                    target="_blank"
-                    class="text-orange-600 hover:text-orange-700"
-                  >
+                  <a href="<%= billing_path + inv[:path] %>" target="_blank" class="text-orange-600 hover:text-orange-700">
                     <%= inv[:name] %>
                   </a>
                   <span class="text-xs text-gray-400 italic">
@@ -242,8 +238,8 @@ end
     </div>
   </div>
 <% else %>
-  <form action="<%= "#{@project_data[:path]}/billing" %>" method="POST">
-    <%== csrf_tag("#{@project_data[:path]}/billing") %>
+  <form action="<%= billing_path %>" method="POST">
+    <%== csrf_tag(billing_path) %>
 
     <%== part(
       "components/empty_state",

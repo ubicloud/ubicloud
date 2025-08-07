@@ -8,7 +8,7 @@
     rows: @lbs.map do |lb|
       [
         [
-          [lb.name, {link: @project_data[:path] + lb.path}],
+          [lb.name, {link: path(lb)}],
           [lb.hostname, {copyable: true}]
         ],
         {id: "lb-#{lb.ubid}"}

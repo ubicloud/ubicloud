@@ -78,7 +78,7 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
                   <%== part(
                     "components/button",
                     text: "Manage",
-                    link: "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{tag.ubid}",
+                    link: path(tag),
                     attributes: {
                       id: "#{tag.ubid}-edit"
                     }
@@ -87,7 +87,7 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
                     <%== part(
                       "components/delete_button",
                       text: "Remove",
-                      url: "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{tag.ubid}",
+                      url: path(tag),
                       confirmation: tag.name
                     ) %>
                   <% end %>
