@@ -75,6 +75,29 @@ class Clover < Roda
       text: "text/plain"
     }
 
+  plugin :path
+
+  path(:billing) { "#{@project.path}/billing" }
+  path(:user) { "#{@project.path}/user" }
+
+  under_project_path = -> { "#{@project.path}#{it.path}" }
+  [
+    ActionTag,
+    ApiKey,
+    Firewall,
+    KubernetesCluster,
+    LoadBalancer,
+    Location,
+    ObjectTag,
+    PaymentMethod,
+    PostgresResource,
+    PrivateSubnet,
+    SubjectTag,
+    Vm
+  ].each { path(it, &under_project_path) }
+
+  path(GithubInstallation) { "#{it.project.path}/github/#{it.ubid}" }
+
   # :nocov:
   if Config.test? && defined?(SimpleCov)
     plugin :render_coverage
