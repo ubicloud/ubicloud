@@ -65,7 +65,7 @@ viewable_fws =
         view_perm = viewable_fws[fw.ubid]
         (fw.firewall_rules || []).map do |fwr|
           [
-            [[fw.name, view_perm ? { link: @project_data[:path] + fw.path } : {}], fwr.cidr, fwr.display_port_range],
+            [[fw.name, view_perm ? { link: path(fw)} : {}], fwr.cidr, fwr.display_port_range],
             { id: "firewall-rule-#{fwr.ubid}" }
           ]
         end
@@ -84,8 +84,8 @@ viewable_fws =
       <!-- Restart Card -->
       <% if has_permission?("Vm:edit", @vm.id) %>
         <div class="px-4 py-5 sm:p-6">
-          <form action="<%= "#{@project_data[:path]}#{@vm.path}/restart" %>" role="form" method="POST">
-            <%== csrf_tag("#{@project_data[:path]}#{@vm.path}/restart") %>
+          <form action="<%= "#{path(@vm)}/restart" %>" role="form" method="POST">
+            <%== csrf_tag("#{path(@vm)}/restart") %>
             <div class="sm:flex sm:items-center sm:justify-between">
               <div>
                 <h3 class="text-base font-semibold leading-6 text-gray-900">Restart virtual machine</h3>

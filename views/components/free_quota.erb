@@ -15,11 +15,11 @@
         <span>Free quota refreshes next month.</span>
         <br>
         <% if @has_valid_payment_method %>
-          <a href="<%= @project_data[:path] %>/billing" class="font-bold <%= bold_text_color %>">Billing</a>
+          <a href="<%= billing_path %>" class="font-bold <%= bold_text_color %>">Billing</a>
           <span>information is valid. Charges start after the free quota.</span>
         <% else %>
           <span>To avoid service interruption, please</span>
-          <a href="<%= @project_data[:path] %>/billing" class="font-bold <%= bold_text_color %>">click here</a>
+          <a href="<%= billing_path %>" class="font-bold <%= bold_text_color %>">click here</a>
           <span>to add a valid billing method.</span>
         <% end %>
       </h3>

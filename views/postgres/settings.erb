@@ -9,8 +9,8 @@
     </div>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
-        <form action="<%= "#{@project_data[:path]}#{@pg.path}/set-maintenance-window" %>" role="form" method="POST">
-          <%== csrf_tag("#{@project_data[:path]}#{@pg.path}/set-maintenance-window") %>
+        <form action="<%= "#{path(@pg)}/set-maintenance-window" %>" role="form" method="POST">
+          <%== csrf_tag("#{path(@pg)}/set-maintenance-window") %>
           <div class="space-y-4">
             <div class="grid grid-cols-12 gap-6">
               <div class="col-span-12 sm:col-span-7">
@@ -50,8 +50,8 @@
       <!-- Promote -->
       <% if @edit_perm && @pg.read_replica? %>
         <div class="px-4 py-5 sm:p-6">
-          <form action="<%= "#{@project_data[:path]}#{@pg.path}/promote" %>" role="form" method="POST">
-            <%== csrf_tag("#{@project_data[:path]}#{@pg.path}/promote") %>
+          <form action="<%= "#{path(@pg)}/promote" %>" role="form" method="POST">
+            <%== csrf_tag("#{path(@pg)}/promote") %>
             <div class="sm:flex sm:items-center sm:justify-between">
               <div>
                 <h3 class="text-base font-semibold leading-6 text-gray-900">Promote PostgreSQL read replica database</h3>
@@ -72,8 +72,8 @@
       <!-- Reset password -->
       <% if @edit_perm && !@pg.read_replica? %>
         <div class="px-4 py-5 sm:p-6">
-          <form action="<%= "#{@project_data[:path]}#{@pg.path}/reset-superuser-password" %>" role="form" method="POST">
-            <%== csrf_tag("#{@project_data[:path]}#{@pg.path}/reset-superuser-password") %>
+          <form action="<%= "#{path(@pg)}/reset-superuser-password" %>" role="form" method="POST">
+            <%== csrf_tag("#{path(@pg)}/reset-superuser-password") %>
             <div class="space-y-4">
               <div>
                 <h3 class="text-base font-semibold leading-6 text-gray-900">Reset superuser password</h3>
@@ -114,8 +114,8 @@
       <!-- Restart Card -->
       <% if @edit_perm %>
         <div class="px-4 py-5 sm:p-6">
-          <form action="<%= "#{@project_data[:path]}#{@pg.path}/restart" %>" role="form" method="POST">
-            <%== csrf_tag("#{@project_data[:path]}#{@pg.path}/restart") %>
+          <form action="<%= "#{path(@pg)}/restart" %>" role="form" method="POST">
+            <%== csrf_tag("#{path(@pg)}/restart") %>
             <div class="sm:flex sm:items-center sm:justify-between">
               <div>
                 <h3 class="text-base font-semibold leading-6 text-gray-900">Restart PostgreSQL database</h3>
@@ -144,7 +144,7 @@
               </div>
             </div>
             <div id="postgres-delete-<%=@pg.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-              <%== part("components/delete_button", url: "#{@project_data[:path]}#{@pg.path}", confirmation: @pg.name, redirect: "#{@project_data[:path]}/postgres") %>
+              <%== part("components/delete_button", url: path(@pg), confirmation: @pg.name, redirect: "#{@project_data[:path]}/postgres") %>
             </div>
           </div>
         </div>

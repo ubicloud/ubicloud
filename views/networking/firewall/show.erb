@@ -8,7 +8,7 @@ attachable_subnets = dataset_authorize(@project
   .exclude(id: @firewall.private_subnets_dataset.select(:id))
   .all
 
-firewall_path = "#{@project_data[:path]}#{@firewall.path}"
+firewall_path = path(@firewall)
 edit_perm = has_permission?("Firewall:edit", @firewall.ubid) %>
 
 <%== part(
@@ -125,10 +125,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall.ubid) %>
         <% @firewall.private_subnets.each do |ps| %>
           <tr>
             <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <a
-                href="<%= "#{@project_data[:path]}/location/#{ps.display_location}/private-subnet/#{ps.name}" %>"
-                class="text-orange-600 hover:text-orange-700"
-              ><%= ps.name %></a>
+              <a href="<%= path(ps) %>" class="text-orange-600 hover:text-orange-700"><%= ps.name %></a>
             </td>
             <% if edit_perm %>
               <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">

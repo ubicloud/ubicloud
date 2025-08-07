@@ -33,7 +33,7 @@
       @tokens.map do |token|
         [
           [
-            [token.ubid, { link: "#{@project_data[:path]}/token/#{token.ubid}/access-control" }],
+            [token.ubid, { link: path(token) }],
             ["pat-#{token.ubid}-#{token.key}", { revealable: true, copyable: true }],
             [
               "delete_button",

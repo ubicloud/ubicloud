@@ -25,8 +25,8 @@
     </div>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
-        <form action="<%= "#{@project_data[:path]}/user" %>" role="form" method="POST">
-          <%== csrf_tag("#{@project_data[:path]}/user") %>
+        <form action="<%= user_path %>" role="form" method="POST">
+          <%== csrf_tag(user_path) %>
           <div class="space-y-4">
             <div>
               <p class="mt-1 text-sm text-gray-500">
@@ -51,8 +51,8 @@
   </div>
   <!-- User List -->
   <div>
-    <form id="managed-policy" action="<%= "#{@project_data[:path]}/user/policy/managed" %>" role="form" method="POST">
-      <%== csrf_tag("#{@project_data[:path]}/user/policy/managed") %>
+    <form id="managed-policy" action="<%= "#{user_path}/policy/managed" %>" role="form" method="POST">
+      <%== csrf_tag("#{user_path}/policy/managed") %>
       <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
         <div class="min-w-0 flex-1">
           <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
@@ -97,7 +97,7 @@
                   <%== part(
                     "components/delete_button",
                     text: "Remove",
-                    url: "#{@project_data[:path]}/user/#{user.ubid}",
+                    url: "#{user_path}/#{user.ubid}",
                     confirmation: user.email
                   ) %>
                 </td>
@@ -121,7 +121,7 @@
                   <%== part(
                     "components/delete_button",
                     text: "Remove",
-                    url: "#{@project_data[:path]}/user/invitation/#{invitation.email}",
+                    url: "#{user_path}/invitation/#{invitation.email}",
                     confirmation: invitation.email
                   ) %>
                 </td>

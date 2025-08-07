@@ -14,7 +14,7 @@
       rows: @locations.map do |l|
         [
           [
-            [l.ui_name, {link: @project_data[:path] + l.path}],
+            [l.ui_name, {link: path(l)}],
             [l.name]
           ],
           { id: "region-#{l.id}" }

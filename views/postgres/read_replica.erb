@@ -17,7 +17,7 @@
           <% @pg.read_replicas.each do |read_replica| %>
             <tr>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-                <a href="<%= @project_data[:path] + read_replica.path + "/overview" %>" class="text-orange-600 hover:text-orange-700">
+                <a href="<%= path(read_replica) %>/overview" class="text-orange-600 hover:text-orange-700">
                   <%= read_replica.name %>
                 </a>
               </td>
@@ -32,13 +32,8 @@
                 <%== part("components/form/text", name: "name", attributes: { placeholder: @pg.name + "-read-replica", required: true, form: "form-pg-read-replica-create" }) %>
               </td>
               <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                <form
-                  action="<%= "#{@project_data[:path]}#{@pg.path}/read-replica" %>"
-                  role="form"
-                  method="POST"
-                  id="form-pg-read-replica-create"
-                >
-                  <%== csrf_tag("#{@project_data[:path]}#{@pg.path}/read-replica") %>
+                <form action="<%= "#{path(@pg)}/read-replica" %>" role="form" method="POST" id="form-pg-read-replica-create">
+                  <%== csrf_tag("#{path(@pg)}/read-replica") %>
                   <%== part("components/form/submit_button", text: "Create", extra_class: "pg-read-replica-create-btn") %>
                 </form>
               </td>

@@ -18,7 +18,7 @@
  else
         ["border-transparent text-gray-900 hover:bg-gray-50 hover:text-gray-900 group flex items-center border-l-4 px-3 py-2 text-sm font-medium", "text-gray-400 group-hover:text-gray-500"]
       end %>
-      <a href="<%= @project_data[:path] + @pg.path + "/" + page %>" class="<%= url_class %>">
+      <a href="<%= "#{path(@pg)}/#{page}" %>" class="<%= url_class %>">
         <%== part("components/icon", name: icon, classes: icon_class + " -ml-1 mr-3 h-6 w-6 flex-shrink-0") %>
         <span class="truncate"><%= label %></span>
       </a>
