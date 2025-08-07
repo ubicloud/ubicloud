@@ -20,15 +20,12 @@ class Serializers::Vm < Serializers::Base
     end
 
     if options[:detailed]
-      gpu_devices = vm.pci_devices.select { |d| ["0300", "0302"].include?(d.device_class) }
-      gpu = "#{gpu_devices.count}x #{PciDevice.device_name(gpu_devices.first.device)}" if gpu_devices.any?
-
       base.merge!(
         firewalls: Serializers::Firewall.serialize(vm.firewalls, {include_path: true}),
         private_ipv4: vm.private_ipv4,
         private_ipv6: vm.private_ipv6,
         subnet: vm.nics.first.private_subnet.name,
-        gpu:
+        gpu: vm.display_gpu
       )
     end
 

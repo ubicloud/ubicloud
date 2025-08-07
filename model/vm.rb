@@ -42,6 +42,11 @@ class Vm < Sequel::Model
     location.display_name
   end
 
+  def display_gpu
+    gpu_devices = pci_devices.select { |d| ["0300", "0302"].include?(d.device_class) }
+    "#{gpu_devices.count}x #{PciDevice.device_name(gpu_devices.first.device)}" if gpu_devices.any?
+  end
+
   def load_balancer_state
     load_balancer_vm_ports.first&.state
   end

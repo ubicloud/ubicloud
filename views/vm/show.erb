@@ -1,11 +1,11 @@
-<% @page_title = @vm[:name]
+<% @page_title = @vm.name
 
 viewable_fws =
-  dataset_authorize(Firewall.where(id: @vm[:firewalls].map { UBID.to_uuid(it[:id]) }), "Firewall:view")
+  dataset_authorize(Firewall.where(id: @vm.firewalls.map(&:id)), "Firewall:view")
     .select_hash(:id, Sequel.as(true, :v))
     .transform_keys! { UBID.from_uuidish(it).to_s } %>
 
-<% if @vm[:state] != "running" %>
+<% if @vm.display_state != "running" %>
   <div class="auto-refresh hidden" data-interval="10"></div>
 <% end %>
 
@@ -15,32 +15,35 @@ viewable_fws =
     %w[Projects /project],
     [@project_data[:name], @project_data[:path]],
     ["Virtual Machines", "#{@project_data[:path]}/vm"],
-    [@vm[:name], "#"]
+    [@vm.name, "#"]
   ],
-  left_items: [part("components/vm_state_label", state: @vm[:state], extra_class: "text-md")]
+  left_items: [part("components/vm_state_label", state: @vm.display_state, extra_class: "text-md")]
 ) %>
 
 <% data = [
-      ["ID", @vm[:id]],
-      ["Name", @vm[:name]],
-      ["Location", @vm[:location]],
-      ["Size", @vm[:size]],
-      ["Storage", (@vm[:storage_size_gib] > 0) ? "#{@vm[:storage_size_gib]} GB" : nil]
+      ["ID", @vm.ubid],
+      ["Name", @vm.name],
+      ["Location", @vm.display_location],
+      ["Size", @vm.display_size],
+      ["Storage", (@vm.storage_size_gib > 0) ? "#{@vm.storage_size_gib} GB" : nil]
     ]
-  data << ["GPU", @vm[:gpu]] if @vm[:gpu]
+  if (gpu = @vm.display_gpu)
+    data << ["GPU", gpu]
+  end
+  subnet = @vm.nics.first.private_subnet
   data += [
-      ["IPv4", @vm[:ip4_enabled] ? @vm[:ip4] : "Not enabled", { copyable: @vm[:ip4_enabled] }],
-      ["IPv6", @vm[:ip6], { copyable: true }],
+      ["IPv4", @vm.ip4_enabled ? @vm.ephemeral_net4 : "Not enabled", { copyable: @vm.ip4_enabled }],
+      ["IPv6", @vm.ip6, { copyable: true }],
       [
         "SSH Command",
-        "<span class='bg-slate-100 text-rose-500 font-mono px-2 py-1 rounded'>#{h("ssh -i <PRIVATE_KEY_PATH> #{@vm[:unix_user]}@#{@vm[:ip4] || @vm[:ip6]}")}</span>",
+        "<span class='bg-slate-100 text-rose-500 font-mono px-2 py-1 rounded'>#{h("ssh -i <PRIVATE_KEY_PATH> #{@vm.unix_user}@#{@vm.ephemeral_net4 || @vm.ip6}")}</span>",
         { escape: false }
       ],
-      ["Private IPv4", @vm[:private_ipv4], { copyable: true }],
-      ["Private IPv6", @vm[:private_ipv6], { copyable: true }],
+      ["Private IPv4", @vm.private_ipv4, { copyable: true }],
+      ["Private IPv6", @vm.private_ipv6, { copyable: true }],
       [
         "Private subnet",
-        "<a href='#{@project_data[:path]}/location/#{@vm[:location]}/private-subnet/#{@vm[:subnet]}' class='text-rose-500 hover:underline'>#{@vm[:subnet]}</a>",
+        "<a href='#{path(subnet)}' class='text-rose-500 hover:underline'>#{subnet.name}</a>",
         { escape: false }
       ]
     ] %>
@@ -58,12 +61,12 @@ viewable_fws =
     headers: ["Firewall", "CIDR", "Port Range"],
     empty_state: "This VM doesn't have applied firewall",
     rows:
-      @vm[:firewalls].flat_map do |fw|
-        view_perm = viewable_fws[fw[:id]]
-        (fw[:firewall_rules] || []).map do |fwr|
+      @vm.firewalls.flat_map do |fw|
+        view_perm = viewable_fws[fw.ubid]
+        (fw.firewall_rules || []).map do |fwr|
           [
-            [[fw[:name], view_perm ? { link: @project_data[:path] + fw[:path] } : {}], fwr[:cidr], fwr[:port_range]],
-            { id: "firewall-rule-#{fwr[:id]}" }
+            [[fw.name, view_perm ? { link: @project_data[:path] + fw.path } : {}], fwr.cidr, fwr.display_port_range],
+            { id: "firewall-rule-#{fwr.ubid}" }
           ]
         end
       end
@@ -79,10 +82,10 @@ viewable_fws =
     </div>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <!-- Restart Card -->
-      <% if has_permission?("Vm:edit", @vm[:id]) %>
+      <% if has_permission?("Vm:edit", @vm.id) %>
         <div class="px-4 py-5 sm:p-6">
-          <form action="<%= "#{@project_data[:path]}#{@vm[:path]}/restart" %>" role="form" method="POST">
-            <%== csrf_tag("#{@project_data[:path]}#{@vm[:path]}/restart") %>
+          <form action="<%= "#{@project_data[:path]}#{@vm.path}/restart" %>" role="form" method="POST">
+            <%== csrf_tag("#{@project_data[:path]}#{@vm.path}/restart") %>
             <div class="sm:flex sm:items-center sm:justify-between">
               <div>
                 <h3 class="text-base font-semibold leading-6 text-gray-900">Restart virtual machine</h3>
@@ -90,7 +93,7 @@ viewable_fws =
                   <p>This action will restart the virtual machine, causing it to be temporarily offline.</p>
                 </div>
               </div>
-              <div id="vm-restart-<%=@vm[:id]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+              <div id="vm-restart-<%= @vm.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
                 <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
                   <%== part("components/form/submit_button", text: "Restart", extra_class: "restart-btn") %>
                 </div>
@@ -100,7 +103,7 @@ viewable_fws =
         </div>
       <% end %>
       <!-- Delete Card -->
-      <% if has_permission?("Vm:delete", @vm[:id]) %>
+      <% if has_permission?("Vm:delete", @vm.ubid) %>
         <div class="px-4 py-5 sm:p-6">
           <div class="sm:flex sm:items-center sm:justify-between">
             <div>
@@ -110,8 +113,8 @@ viewable_fws =
                   carefully.</p>
               </div>
             </div>
-            <div id="vm-delete-<%=@vm[:id]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-              <%== part("components/delete_button", confirmation: @vm[:name], redirect: "#{@project_data[:path]}/vm") %>
+            <div id="vm-delete-<%= @vm.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+              <%== part("components/delete_button", confirmation: @vm.name, redirect: "#{@project_data[:path]}/vm") %>
             </div>
           </div>
         </div>
