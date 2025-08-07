@@ -45,6 +45,10 @@ class Clover < Roda
     part("components/form/hidden", name: csrf_field, value: csrf_token(*))
   end
 
+  def raise_web_error(message)
+    raise CloverError.new(400, nil, message)
+  end
+
   def handle_validation_failure(template, &block)
     return unless web?
     @validation_failure_template = template

@@ -17,7 +17,7 @@ class Clover
 
       unless discount
         Clog.emit("Invalid discount code attempted") { {invalid_discount_code: {project_id: @project.id, code: discount_code}} }
-        raise CloverError.new(400, nil, "Discount code not found.")
+        raise_web_error("Discount code not found.")
       end
 
       begin
@@ -31,7 +31,7 @@ class Clover
           audit_log(ProjectDiscountCode.call(hash), "create")
         end
       rescue Sequel::UniqueConstraintViolation
-        raise CloverError.new(400, nil, "Discount code has already been applied to this project.")
+        raise_web_error("Discount code has already been applied to this project.")
       end
 
       unless @project.billing_info

@@ -52,7 +52,7 @@ class Clover
             end
             audit_log(@project, "update_billing")
           rescue Stripe::InvalidRequestError => e
-            raise CloverError.new(400, nil, e.message)
+            raise_web_error(e.message)
           end
 
           flash["notice"] = "Billing info updated"
@@ -82,7 +82,7 @@ class Clover
         stripe_payment_method = Stripe::PaymentMethod.retrieve(stripe_id)
         card_fingerprint = stripe_payment_method["card"]["fingerprint"]
         unless PaymentMethod.where(fraud: true, card_fingerprint:).empty?
-          raise CloverError.new(400, nil, "Payment method you added is labeled as fraud. Please contact support.")
+          raise_web_error("Payment method you added is labeled as fraud. Please contact support.")
         end
 
         # Pre-authorize card to check if it is valid, if so
@@ -112,7 +112,7 @@ class Clover
         rescue
           # Log and redirect if Stripe card error or our manual raise
           Clog.emit("Couldn't pre-authorize card") { {card_authorization: {project_id: @project.id, customer_stripe_id: customer_stripe_id}} }
-          raise CloverError.new(400, nil, "We couldn't pre-authorize your card for verification. Please make sure it can be pre-authorized up to $5 or contact our support team at support@ubicloud.com.")
+          raise_web_error("We couldn't pre-authorize your card for verification. Please make sure it can be pre-authorized up to $5 or contact our support team at support@ubicloud.com.")
         end
 
         DB.transaction do
