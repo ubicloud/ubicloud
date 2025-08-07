@@ -136,7 +136,7 @@ class Clover < Roda
       message: "Sorry, we couldn’t find the resource you’re looking for."
     }
 
-    if api? || request.headers["accept"] == "application/json"
+    if api? || request.accepts_json?
       {error: @error}.to_json
     else
       view "/error"
@@ -216,7 +216,7 @@ class Clover < Roda
 
     if runtime?
       error
-    elsif api? || request.headers["accept"] == "application/json" || !%w[GET POST].include?(request.request_method)
+    elsif api? || request.accepts_json? || !%w[GET POST].include?(request.request_method)
       {error:}
     else
       @error = error
