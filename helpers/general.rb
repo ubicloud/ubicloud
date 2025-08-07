@@ -14,6 +14,12 @@ class Clover < Roda
     account.projects_dataset[Sequel[:project][:id] => project_id, :visible => true]
   end
 
+  class RodaRequest
+    def accepts_json?
+      env["HTTP_ACCEPT"]&.include?("application/json")
+    end
+  end
+
   class RodaResponse
     API_DEFAULT_HEADERS = DEFAULT_HEADERS.merge("content-type" => "application/json").freeze
     WEB_DEFAULT_HEADERS = DEFAULT_HEADERS.merge(
