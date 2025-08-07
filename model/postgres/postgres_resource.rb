@@ -32,6 +32,14 @@ class PostgresResource < Sequel::Model
     "/location/#{display_location}/postgres/#{name}"
   end
 
+  def vm_size
+    representative_server&.vm&.display_size || target_vm_size
+  end
+
+  def storage_size_gib
+    representative_server&.storage_size_gib || target_storage_size_gib
+  end
+
   def display_state
     return "deleting" if destroy_set? || strand.nil? || strand.label == "destroy"
     return "unavailable" if representative_server&.strand&.label == "unavailable"
