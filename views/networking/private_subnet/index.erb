@@ -8,11 +8,11 @@
     rows: @pss.map do |ps|
       [
         [
-          [ps[:name], {link: @project_data[:path] + ps[:path]}],
-          ps[:location],
-          ["ps_state_label", {component: { state: ps[:state] }}]
+          [ps.name, {link: @project_data[:path] + ps.path}],
+          ps.display_location,
+          ["ps_state_label", {component: { state: ps.display_state }}]
         ],
-        {id: "ps-#{ps[:id]}"}
+        {id: "ps-#{ps.ubid}"}
       ]
     end,
     empty_state: {
