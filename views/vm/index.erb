@@ -22,14 +22,14 @@
     rows: @vms.map do |vm|
       [
         [
-          [vm[:name], {link: @project_data[:path] + vm[:path]}],
-          vm[:location],
-          vm[:size],
-          (vm[:storage_size_gib] > 0) ? "#{vm[:storage_size_gib]} GB" : "-",
-          ["vm_state_label", {component: { state: vm[:state] }}],
-          [vm[:ip4] || vm[:ip6] || "Not assigned yet", {copyable: true}]
+          [vm.name, {link: @project_data[:path] + vm.path}],
+          vm.display_location,
+          vm.display_size,
+          (vm.storage_size_gib > 0) ? "#{vm.storage_size_gib} GB" : "-",
+          ["vm_state_label", {component: { state: vm.display_state }}],
+          [vm.ephemeral_net4 || vm.ip6 || "Not assigned yet", {copyable: true}]
         ],
-        {id: "vm-#{vm[:id]}"}
+        {id: "vm-#{vm.ubid}"}
       ]
     end,
     empty_state: {
