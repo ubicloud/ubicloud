@@ -390,7 +390,7 @@ class Clover
         certs
       end
 
-      r.get "metrics" do
+      r.get "metrics", r.accepts_json? do
         authorize("Postgres:view", pg.id)
 
         start_time, end_time = typecast_params.str(%w[start end])
