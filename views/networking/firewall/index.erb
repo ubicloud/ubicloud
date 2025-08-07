@@ -8,11 +8,11 @@
     rows: @firewalls.map do |fw|
       [
         [
-          [fw[:name], {link: @project_data[:path] + fw[:path]}],
-          fw[:location],
-          fw[:description]
+          [fw.name, {link: @project_data[:path] + fw.path}],
+          fw.display_location,
+          fw.description
         ],
-        {id: "fw-#{fw[:id]}"}
+        {id: "fw-#{fw.ubid}"}
       ]
     end,
     empty_state: {
