@@ -74,7 +74,7 @@ class Clover
 
           flash["notice"] = "Invitation sent successfully to '#{email}'."
 
-          r.redirect "#{@project.path}/user"
+          r.redirect user_path
         end
       end
 
@@ -181,7 +181,7 @@ class Clover
           flash["error"] = issues.uniq.join(", ") unless issues.empty?
         end
 
-        r.redirect "#{@project.path}/user"
+        r.redirect user_path
       end
 
       r.on "access-control" do
@@ -246,7 +246,7 @@ class Clover
 
             flash["notice"] = "Access control entries saved successfully"
 
-            r.redirect "#{@project_data[:path]}/user/access-control"
+            r.redirect "#{user_path}/access-control"
           end
         end
 
@@ -298,7 +298,7 @@ class Clover
                 @tag.update(name: typecast_params.nonempty_str("name"))
                 audit_log(@tag, "update")
                 flash["notice"] = "#{@display_tag_type} tag name updated successfully"
-                r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
+                r.redirect path(@tag)
               end
 
               r.delete do
@@ -335,7 +335,7 @@ class Clover
                 flash["error"] = "No change in membership#{issues}"
               end
 
-              r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
+              r.redirect path(@tag)
             end
 
             r.post "disassociate" do
@@ -359,7 +359,7 @@ class Clover
               end
 
               flash["notice"] = "#{num_removed} members removed from #{@tag_type} tag"
-              r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
+              r.redirect path(@tag)
             end
           end
         end
