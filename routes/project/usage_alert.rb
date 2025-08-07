@@ -16,7 +16,7 @@ class Clover
           audit_log(ua, "create")
         end
 
-        r.redirect "#{@project.path}/billing"
+        r.redirect billing_path
       end
 
       r.delete :ubid_uuid do |id|

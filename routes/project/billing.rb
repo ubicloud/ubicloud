@@ -56,7 +56,7 @@ class Clover
           end
 
           flash["notice"] = "Billing info updated"
-          r.redirect @project.path + "/billing"
+          r.redirect billing_path
         else
           no_audit_log
         end
@@ -131,7 +131,7 @@ class Clover
         end
 
         flash["notice"] = "Billing info updated"
-        r.redirect @project.path + "/billing"
+        r.redirect billing_path
       end
 
       r.on "payment-method" do
