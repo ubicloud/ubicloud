@@ -15,8 +15,8 @@
       @inference_api_keys.map do |token|
         [
           [
-            token[:id],
-            [token[:key], { revealable: true, copyable: true }],
+            token.ubid,
+            [token.key, { revealable: true, copyable: true }],
             (
               if has_project_permission("InferenceApiKey:delete")
                 [
@@ -24,7 +24,7 @@
                   {
                     component: {
                       text: "Delete",
-                      url: "#{@project_data[:path]}/inference-api-key/#{token[:id]}",
+                      url: "#{@project_data[:path]}#{token.path}",
                       confirmation: "delete api key"
                     },
                     extra_class: "flex justify-end"
@@ -33,7 +33,7 @@
               end
             )
           ],
-          { id: "api-key-#{token[:id]}" }
+          { id: "api-key-#{token.ubid}" }
         ]
       end
   ) %>
