@@ -21,14 +21,14 @@ class Clover
           handle_validation_failure("project/user")
 
           if ProjectInvitation[project_id: @project.id, email: email]
-            raise CloverError.new(400, nil, "'#{email}' already invited to join the project.")
+            raise_web_error("'#{email}' already invited to join the project.")
           elsif @project.invitations_dataset.count >= 50
-            raise CloverError.new(400, nil, "You can't have more than 50 pending invitations.")
+            raise_web_error("You can't have more than 50 pending invitations.")
           end
 
           if (policy = typecast_params.nonempty_str("policy"))
             unless (tag = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").first(name: policy))
-              raise CloverError.new(400, nil, "You don't have permission to invite users with this subject tag.")
+              raise_web_error("You don't have permission to invite users with this subject tag.")
             end
           end
 
@@ -43,7 +43,7 @@ class Clover
               audit_log(@project, "add_account", user)
 
               if result.empty?
-                raise CloverError.new(400, nil, "The requested user already has access to this project")
+                raise_web_error("The requested user already has access to this project")
               end
 
               if tag
@@ -138,7 +138,7 @@ class Clover
           removals.transform_keys!(&:name)
 
           if @project.subject_tags_dataset.first(name: "Admin").member_ids.empty?
-            raise CloverError.new(400, nil, "The project must have at least one admin.")
+            raise_web_error("The project must have at least one admin.")
           end
 
           invitatation_map = @project
@@ -290,7 +290,7 @@ class Clover
 
               if @tag_type == "subject" && @tag.name == "Admin"
                 handle_validation_failure("project/tag-list")
-                raise CloverError.new(400, nil, "Cannot modify Admin subject tag")
+                raise_web_error("Cannot modify Admin subject tag")
               end
 
               r.post do
@@ -381,7 +381,7 @@ class Clover
         next unless (user = @project.accounts_dataset[id:])
 
         unless @project.accounts_dataset.count > 1
-          raise CloverError.new(400, nil, "You can't remove the last user from '#{@project.name}' project. Delete project instead.")
+          raise_web_error("You can't remove the last user from '#{@project.name}' project. Delete project instead.")
         end
 
         @project.disassociate_subject(user.id)
