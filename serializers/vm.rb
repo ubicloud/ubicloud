@@ -15,10 +15,6 @@ class Serializers::Vm < Serializers::Base
       ip4: vm.ephemeral_net4
     }
 
-    if options[:include_path]
-      base[:path] = vm.path
-    end
-
     if options[:detailed]
       base.merge!(
         firewalls: Serializers::Firewall.serialize(vm.firewalls, {include_path: true}),
