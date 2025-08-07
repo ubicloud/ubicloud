@@ -8,10 +8,10 @@
     rows: @lbs.map do |lb|
       [
         [
-          [lb[:name], {link: @project_data[:path] + lb[:path]}],
-          [lb[:hostname], {copyable: true}]
+          [lb.name, {link: @project_data[:path] + lb.path}],
+          [lb.hostname, {copyable: true}]
         ],
-        {id: "lb-#{lb[:id]}"}
+        {id: "lb-#{lb.ubid}"}
       ]
     end,
     empty_state: {
