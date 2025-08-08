@@ -70,6 +70,11 @@ RSpec.describe Clover do
     expect(page.status_code).to eq(400)
   end
 
+  it "handles missing handle_validation_failure_call" do
+    expect(Clog).to receive(:emit).with("web error without handle_validation_failure").and_call_original
+    expect { visit "/webhook/test-missing-handle-validation-failure" }.to raise_error(RuntimeError, /Request failure without handle_validation_failure/)
+  end
+
   it "handles expected errors" do
     expect(Clog).to receive(:emit).with("route exception").and_call_original
 
