@@ -3,14 +3,14 @@
 require "countries"
 
 class Serializers::Invoice < Serializers::Base
-  InvoiceData = Struct.new(:ubid, :path, :name, :date, :begin_time, :end_time, :subtotal, :credit,
+  InvoiceData = Data.define(:ubid, :path, :name, :date, :begin_time, :end_time, :subtotal, :credit,
     :free_inference_tokens_credit, :discount, :total, :status, :invoice_number, :billing_name,
     :billing_email, :billing_address, :billing_country, :billing_city, :billing_state, :billing_postal_code,
     :billing_in_eu_vat, :tax_id, :company_name, :issuer_name, :issuer_address, :issuer_country,
     :issuer_city, :issuer_state, :issuer_postal_code, :issuer_tax_id, :issuer_trade_id, :issuer_in_eu_vat,
     :vat_rate, :vat_amount, :vat_amount_eur, :vat_reversed, :items)
 
-  ItemData = Struct.new(:name, :description, :duration, :amount, :cost, :cost_humanized, :resource_type, :resource_family, :usage)
+  ItemData = Data.define(:name, :description, :duration, :amount, :cost, :cost_humanized, :resource_type, :resource_family, :usage)
 
   def self.serialize_internal(inv, options = {})
     InvoiceData.new(
@@ -76,6 +76,8 @@ class Serializers::Invoice < Serializers::Base
                    amount: amount_sum,
                    cost: cost_sum,
                    cost_humanized: humanized_cost(cost_sum),
+                   resource_type: line_items.first.resource_type,
+                   resource_family: line_items.first.resource_family,
                    usage: BillingRate.line_item_usage(line_items.first.resource_type, line_items.first.resource_family, amount_sum, duration_sum)
                  )
                else
