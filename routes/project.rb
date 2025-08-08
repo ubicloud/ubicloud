@@ -10,7 +10,7 @@ class Clover
         if api?
           paginated_result(dataset, Serializers::Project)
         else
-          @projects = Serializers::Project.serialize(dataset.all, {include_path: true, web: true})
+          @projects = dataset.all
           view "project/index"
         end
       end
