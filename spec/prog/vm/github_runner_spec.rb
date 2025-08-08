@@ -432,25 +432,6 @@ RSpec.describe Prog::Vm::GithubRunner do
         jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{runner.ubid}\\nLabel: ubicloud-standard-4\\nVM Family: standard\\nArch: x64\\nImage: github-ubuntu-2204\\nVM Host: #{vm.vm_host.ubid}\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: #{project.ubid}\\nConsole URL: http://localhost:9292/project/#{project.ubid}/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
         echo "UBICLOUD_RUNTIME_TOKEN=my_token
         UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment > /dev/null
-        if [ ! -f /etc/systemd/system/runner-script.service ]; then
-          sudo tee /etc/systemd/system/runner-script.service > /dev/null <<'EOT'
-        [Unit]
-        Description=runner-script
-        [Service]
-        RemainAfterExit=yes
-        User=runner
-        Group=runner
-        WorkingDirectory=/home/runner
-        ExecStart=/home/runner/actions-runner/run-withenv.sh
-        EOT
-          sudo -u runner tee /home/runner/actions-runner/run-withenv.sh > /dev/null <<'EOT'
-        #!/bin/bash
-        mapfile -t env </etc/environment
-        JIT_CONFIG="$(cat ./actions-runner/.jit_token)"
-        exec env -- "${env[@]}" ./actions-runner/run.sh --jitconfig "$JIT_CONFIG"
-        EOT
-          sudo systemctl daemon-reload
-        fi
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
@@ -468,25 +449,6 @@ RSpec.describe Prog::Vm::GithubRunner do
         echo "UBICLOUD_RUNTIME_TOKEN=my_token
         UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment > /dev/null
         echo "CUSTOM_ACTIONS_CACHE_URL=http://10.0.0.1:51123/random_token/" | sudo tee -a /etc/environment > /dev/null
-        if [ ! -f /etc/systemd/system/runner-script.service ]; then
-          sudo tee /etc/systemd/system/runner-script.service > /dev/null <<'EOT'
-        [Unit]
-        Description=runner-script
-        [Service]
-        RemainAfterExit=yes
-        User=runner
-        Group=runner
-        WorkingDirectory=/home/runner
-        ExecStart=/home/runner/actions-runner/run-withenv.sh
-        EOT
-          sudo -u runner tee /home/runner/actions-runner/run-withenv.sh > /dev/null <<'EOT'
-        #!/bin/bash
-        mapfile -t env </etc/environment
-        JIT_CONFIG="$(cat ./actions-runner/.jit_token)"
-        exec env -- "${env[@]}" ./actions-runner/run.sh --jitconfig "$JIT_CONFIG"
-        EOT
-          sudo systemctl daemon-reload
-        fi
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
@@ -545,20 +507,6 @@ RSpec.describe Prog::Vm::GithubRunner do
         .with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.label]))
         .and_raise(Octokit::Conflict.new({body: "409 - Another issue"}))
       expect { nx.register_runner }.to raise_error Octokit::Conflict
-    end
-
-    it "logs if fails due to runner script failure" do
-      expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.label])).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC$"})
-      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND, stdin: "AABBCC$").and_raise Sshable::SshError.new("command", "", "Job for runner-script.service failed.\n Check logs", 123, nil)
-        sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
-        sudo systemctl start runner-script.service
-      COMMAND
-      expect(Clog).to receive(:emit).with("Failed to start runner script").and_call_original
-      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND)
-        sudo journalctl -xeu runner-script.service
-        cat /run/systemd/transient/runner-script.service || true
-      COMMAND
-      expect { nx.register_runner }.to raise_error Sshable::SshError
     end
 
     it "fails without a log if the ssh error doesn't match" do
