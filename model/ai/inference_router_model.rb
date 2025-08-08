@@ -8,6 +8,10 @@ class InferenceRouterModel < Sequel::Model
 
   plugin ResourceMethods
 
+  def load_balancer
+    inference_router.load_balancer
+  end
+
   def self.from_model_name(name)
     first(model_name: name)
   end
