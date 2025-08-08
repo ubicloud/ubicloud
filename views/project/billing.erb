@@ -9,7 +9,7 @@ end
 <% if billing_info = @project.billing_info %>
   <%== part(
     "components/page_header",
-    breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Billing #]]
+    breadcrumbs: [%w[Projects /project], [@project.name, @project_data[:path]], %w[Billing #]]
   ) %>
 
   <div class="grid gap-6">

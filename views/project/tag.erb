@@ -1,4 +1,4 @@
-<% @page_title = "#{@project_data[:name]} - #{@tag.name}"
+<% @page_title = "#{@project.name} - #{@tag.name}"
 
 members = @current_members = {}
 @tag.member_ids.each do
@@ -46,7 +46,7 @@ current_members.sort! %>
     title: "#{@display_tag_type} Tag: #{@tag.name}",
     breadcrumbs: [
       %w[Projects /project],
-      [@project_data[:name], @project_data[:path]],
+      [@project.name, @project_data[:path]],
       ["Access Control", "#{@project_data[:path]}/user/access-control"],
       ["#{@display_tag_type} Tags", "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}"],
       [@tag.name, "#"]

@@ -26,7 +26,7 @@ else
   table_headers = %w[Subject Action Object]
   edit_perm = has_project_permission("Project:editaccess")
 end
-@page_title = "#{@project_data[:name]} - #{page_header}" %>
+@page_title = "#{@project.name} - #{page_header}" %>
 
 <%== render("project/user-tabbar") unless @token %>
 
@@ -34,7 +34,7 @@ end
   <%== part(
     "components/page_header",
     title: page_header,
-    breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], [page_header, "#"]]
+    breadcrumbs: [%w[Projects /project], [@project.name, @project_data[:path]], [page_header, "#"]]
   ) %>
 </div>
 

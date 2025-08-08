@@ -3,7 +3,7 @@
 <% if @postgres_databases.count > 0 %>
   <%== part(
     "components/page_header",
-    breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["PostgreSQL Databases", "#"]],
+    breadcrumbs: [%w[Projects /project], [@project.name, @project_data[:path]], ["PostgreSQL Databases", "#"]],
     right_items: [<<-DROPDOWN]
       <div class="group dropdown relative inline-block text-left">
         <div>#{part("components/button", text: "Create PostgreSQL Database", right_icon: "hero-chevron-down")}
@@ -48,7 +48,7 @@
   <%== part(
     "components/page_header",
     title: "Create PostgreSQL Database",
-    breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["PostgreSQL Databases", "#"]]
+    breadcrumbs: [%w[Projects /project], [@project.name, @project_data[:path]], ["PostgreSQL Databases", "#"]]
   ) %>
 
   <div class="grid gap-6">

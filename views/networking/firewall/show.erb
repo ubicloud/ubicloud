@@ -15,7 +15,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall.ubid) %>
   "components/page_header",
   breadcrumbs: [
     %w[Projects /project],
-    [@project_data[:name], @project_data[:path]],
+    [@project.name, @project_data[:path]],
     ["Firewall", "#{@project_data[:path]}/firewall"],
     [@firewall.name, "#"]
   ]
