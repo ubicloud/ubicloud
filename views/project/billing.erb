@@ -15,7 +15,7 @@ end
   <div class="grid gap-6">
     <!-- Summary -->
     <div>
-      <dl class="grid grid-cols-2 gap-5 <%= (@project_data[:discount] > 0) ? "sm:grid-cols-4" : "sm:grid-cols-3" %>">
+      <dl class="grid grid-cols-2 gap-5 <%= (@project.discount > 0) ? "sm:grid-cols-4" : "sm:grid-cols-3" %>">
         <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
           <dt class="truncate text-sm font-medium text-gray-500">Current Usage</dt>
           <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= @invoices.first[:subtotal] %></dd>
@@ -28,10 +28,10 @@ end
           <dt class="truncate text-sm font-medium text-gray-500">Remaining Credit</dt>
           <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= "$%0.02f" % @project_data[:credit] %></dd>
         </div>
-        <% if @project_data[:discount] > 0 %>
+        <% if @project.discount > 0 %>
           <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
             <dt class="truncate text-sm font-medium text-gray-500">Discount</dt>
-            <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= @project_data[:discount] %>%</dd>
+            <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= @project.discount %>%</dd>
           </div>
         <% end %>
       </dl>
