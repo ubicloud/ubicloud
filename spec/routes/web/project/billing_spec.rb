@@ -621,7 +621,7 @@ RSpec.describe Clover, "billing" do
         expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {"company_name" => "ACME Inc.", "tax_id" => "123123123"}}).at_least(:once)
         bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
-        pdf = invoice.generate_pdf(Serializers::Invoice.serialize(invoice, {detailed: true}))
+        pdf = invoice.generate_pdf
         response = instance_double(Aws::S3::Types::GetObjectOutput, body: instance_double(StringIO, read: pdf))
         expect(blob_storage_client).to receive(:get_object).with(bucket: "ubicloud-invoices", key: invoice.blob_key).and_return(response)
 

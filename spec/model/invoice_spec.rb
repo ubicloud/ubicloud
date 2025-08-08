@@ -204,7 +204,7 @@ RSpec.describe Invoice do
   describe ".persist" do
     it "uploads the invoice" do
       invoice.update(project_id: Project.create(name: "test").id)
-      pdf = invoice.generate_pdf(Serializers::Invoice.serialize(invoice, {detailed: true}))
+      pdf = invoice.generate_pdf
       expect(client).to receive(:put_object).with(bucket: Config.invoices_bucket_name, key: invoice.blob_key, content_type: "application/pdf", if_none_match: "*", body: pdf)
       invoice.persist(pdf)
     end

@@ -170,9 +170,8 @@ class Clover
       r.get "invoice", ["current", :ubid_uuid] do |id|
         next unless (invoice = (id == "current") ? @project.current_invoice : Invoice[id:, project_id: @project.id])
 
-        @invoice_data = Serializers::Invoice.serialize(invoice, {detailed: true})
-
         if invoice.status == "current"
+          @invoice_data = Serializers::Invoice.serialize(invoice)
           view "project/invoice"
         else
           response["content-type"] = "application/pdf"
@@ -181,7 +180,7 @@ class Clover
             Invoice.blob_storage_client.get_object(bucket: Config.invoices_bucket_name, key: invoice.blob_key).body.read
           rescue Aws::S3::Errors::NoSuchKey
             Clog.emit("Could not find the invoice") { {not_found_invoice: {invoice_ubid: invoice.ubid}} }
-            invoice.generate_pdf(@invoice_data)
+            invoice.generate_pdf
           end
         end
       end
