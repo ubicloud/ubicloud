@@ -20,7 +20,7 @@ viewable_fws, viewable_subnets =
   "components/page_header",
   breadcrumbs: [
     %w[Projects /project],
-    [@project_data[:name], @project_data[:path]],
+    [@project.name, @project_data[:path]],
     ["Private Subnet", "#{@project_data[:path]}/private-subnet"],
     [@ps.name, "#"]
   ],

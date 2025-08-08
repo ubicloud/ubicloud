@@ -13,7 +13,7 @@ viewable_fws =
   "components/page_header",
   breadcrumbs: [
     %w[Projects /project],
-    [@project_data[:name], @project_data[:path]],
+    [@project.name, @project_data[:path]],
     ["Virtual Machines", "#{@project_data[:path]}/vm"],
     [@vm.name, "#"]
   ],

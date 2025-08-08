@@ -3,7 +3,7 @@
 
 <%== part(
   "components/page_header",
-  breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Virtual Machines", "#"]],
+  breadcrumbs: [%w[Projects /project], [@project.name, @project_data[:path]], ["Virtual Machines", "#"]],
   right_items: (!@vms.empty? && has_project_permission("Vm:create")) ?
     (if @project.get_ff_gpu_vm
       [
