@@ -26,7 +26,7 @@ end
         </div>
         <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
           <dt class="truncate text-sm font-medium text-gray-500">Remaining Credit</dt>
-          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= "$%0.02f" % @project_data[:credit] %></dd>
+          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= "$%0.02f" % @project.credit.to_f %></dd>
         </div>
         <% if @project.discount > 0 %>
           <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
