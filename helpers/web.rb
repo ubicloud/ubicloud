@@ -254,4 +254,8 @@ class Clover < Roda
     return "#{(seconds / 3600).to_i} hours ago" if seconds < 86400
     "#{(seconds / 86400).to_i} days ago"
   end
+
+  def million_token_price(resource)
+    (BillingRate.from_resource_properties("InferenceTokens", resource, "global")["unit_price"] * 1_000_000).round(2)
+  end
 end
