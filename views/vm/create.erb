@@ -12,8 +12,8 @@
   "components/page_header",
   breadcrumbs: [
     %w[Projects /project],
-    [@project.name, @project_data[:path]],
-    ["Virtual Machines", "#{@project_data[:path]}/vm"],
+    [@project.name, @project.path],
+    ["Virtual Machines", "#{@project.path}/vm"],
     %w[Create #]
   ]
 ) %>
@@ -55,7 +55,7 @@
     form_elements << {name: "show_gpu", type: "hidden", value: @show_gpu}
   end
 
-  action = "#{@project_data[:path]}/vm"
+  action = "#{@project.path}/vm"
 %>
 
 <%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents) %>

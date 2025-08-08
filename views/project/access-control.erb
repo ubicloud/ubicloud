@@ -11,9 +11,9 @@
   unrestricted = @token.unrestricted_token_for_project?(@project.id)
   restriction_title, restriction_path =
     if unrestricted
-      ["Restrict", "#{@project_data[:path]}/token/#{@token.ubid}/restrict-access"]
+      ["Restrict", "#{@project.path}/token/#{@token.ubid}/restrict-access"]
     else
-      ["Unrestrict", "#{@project_data[:path]}/token/#{@token.ubid}/unrestrict-access"]
+      ["Unrestrict", "#{@project.path}/token/#{@token.ubid}/unrestrict-access"]
     end
 else
   page_header = "Access Control"
@@ -34,7 +34,7 @@ end
   <%== part(
     "components/page_header",
     title: page_header,
-    breadcrumbs: [%w[Projects /project], [@project.name, @project_data[:path]], [page_header, "#"]]
+    breadcrumbs: [%w[Projects /project], [@project.name, @project.path], [page_header, "#"]]
   ) %>
 </div>
 
@@ -64,7 +64,7 @@ end
                   <% unless @token %>
                     <a
                       id="<%= type.downcase %>-tags-link"
-                      href="<%= "#{@project_data[:path]}/user/access-control/tag/#{type.downcase}" %>"
+                      href="<%= "#{@project.path}/user/access-control/tag/#{type.downcase}" %>"
                       class="text-orange-600 hover:text-orange-700 text-xs"
                     >
                       (Tags)

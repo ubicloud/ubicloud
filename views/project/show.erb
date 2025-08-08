@@ -11,13 +11,13 @@
   "components/page_header",
   title: "Project Settings",
   back: "/project",
-  breadcrumbs: [%w[Projects /project], [@project.name, @project_data[:path]], %w[Settings #]]
+  breadcrumbs: [%w[Projects /project], [@project.name, @project.path], %w[Settings #]]
 ) %>
 
 <div class="grid gap-6">
   <!-- Detail Card -->
-  <form action="<%= @project_data[:path] %>" method="POST">
-    <%== csrf_tag(@project_data[:path]) %>
+  <form action="<%= @project.path %>" method="POST">
+    <%== csrf_tag(@project.path) %>
 
     <%== part(
       "components/kv_data_card",

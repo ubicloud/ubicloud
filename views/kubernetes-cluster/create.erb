@@ -8,8 +8,8 @@
   "components/page_header",
   breadcrumbs: [
     %w[Projects /project],
-    [@project.name, @project_data[:path]],
-    ["Kubernetes Clusters", "#{@project_data[:path]}/kubernetes-cluster"],
+    [@project.name, @project.path],
+    ["Kubernetes Clusters", "#{@project.path}/kubernetes-cluster"],
     %w[Create #]
   ]
 ) %>
@@ -24,7 +24,7 @@
     {name: "worker_nodes", type: "select", label: "Worker Nodes", required: "required", placeholder: "Select number of worker nodes", content_generator: ContentGenerator::KubernetesCluster.method(:worker_nodes), opening_tag: "<div class='sm:col-span-3'>"},
   ]
 
-  action = "#{@project_data[:path]}/kubernetes-cluster"
+  action = "#{@project.path}/kubernetes-cluster"
 %>
 
 <%==part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents)%>

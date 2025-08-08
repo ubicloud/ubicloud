@@ -8,8 +8,8 @@
   "components/page_header",
   breadcrumbs: [
     %w[Projects /project],
-    [@project.name, @project_data[:path]],
-    ["Kubernetes Clusters", "#{@project_data[:path]}/kubernetes-cluster"],
+    [@project.name, @project.path],
+    ["Kubernetes Clusters", "#{@project.path}/kubernetes-cluster"],
     [@kc.name, "#"]
   ],
   left_items: [part("components/kubernetes_state_label", state: @kc.display_state, extra_class: "text-md")]
@@ -80,7 +80,7 @@
               </div>
             </div>
             <div id="kc-delete-<%=@kc.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-              <%== part("components/delete_button", confirmation: @kc.name, redirect: "#{@project_data[:path]}/kubernetes-cluster") %>
+              <%== part("components/delete_button", confirmation: @kc.name, redirect: "#{@project.path}/kubernetes-cluster") %>
             </div>
           </div>
         </div>
