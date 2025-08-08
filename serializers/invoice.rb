@@ -3,8 +3,17 @@
 require "countries"
 
 class Serializers::Invoice < Serializers::Base
+  InvoiceData = Struct.new(:ubid, :path, :name, :date, :begin_time, :end_time, :subtotal, :credit,
+    :free_inference_tokens_credit, :discount, :total, :status, :invoice_number, :billing_name,
+    :billing_email, :billing_address, :billing_country, :billing_city, :billing_state, :billing_postal_code,
+    :billing_in_eu_vat, :tax_id, :company_name, :issuer_name, :issuer_address, :issuer_country,
+    :issuer_city, :issuer_state, :issuer_postal_code, :issuer_tax_id, :issuer_trade_id, :issuer_in_eu_vat,
+    :vat_rate, :vat_amount, :vat_amount_eur, :vat_reversed, :items)
+
+  ItemData = Struct.new(:name, :description, :duration, :amount, :cost, :cost_humanized, :resource_type, :resource_family, :usage)
+
   def self.serialize_internal(inv, options = {})
-    {
+    InvoiceData.new(
       ubid: inv.id ? inv.ubid : "current",
       path: inv.path,
       name: inv.name,
@@ -43,35 +52,37 @@ class Serializers::Invoice < Serializers::Base
       vat_reversed: inv.content.dig("vat_info", "reversed"),
       items: inv.content["resources"].flat_map do |resource|
                resource["line_items"].map do |line_item|
-                 {
+                 ItemData.new(
                    name: resource["resource_name"],
                    description: line_item["description"],
                    duration: line_item["duration"].to_i,
                    amount: line_item["amount"],
                    cost: line_item["cost"],
                    cost_humanized: humanized_cost(line_item["cost"]),
+                   resource_type: line_item["resource_type"],
+                   resource_family: line_item["resource_family"],
                    usage: BillingRate.line_item_usage(line_item["resource_type"], line_item["resource_family"], line_item["amount"], line_item["duration"])
-                 }
+                 )
                end
              end.group_by { it[:description] }.flat_map do |description, line_items|
                if line_items.count > 100 && description.end_with?("Address", "Virtual Machine")
                  duration_sum = line_items.sum { it[:duration] }
                  amount_sum = line_items.sum { it[:amount] }
                  cost_sum = line_items.sum { it[:cost] }
-                 {
+                 ItemData.new(
                    name: "#{line_items.count} x #{description} (Aggregated)",
                    description: description,
                    duration: duration_sum,
                    amount: amount_sum,
                    cost: cost_sum,
                    cost_humanized: humanized_cost(cost_sum),
-                   usage: BillingRate.line_item_usage(line_items.first["resource_type"], line_items.first["resource_family"], amount_sum, duration_sum)
-                 }
+                   usage: BillingRate.line_item_usage(line_items.first[:resource_type], line_items.first[:resource_family], amount_sum, duration_sum)
+                 )
                else
                  line_items
                end
              end.sort_by { it[:name] }
-    }
+    )
   end
 
   def self.humanized_cost(cost)
