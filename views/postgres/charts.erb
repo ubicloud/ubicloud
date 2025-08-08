@@ -97,12 +97,12 @@
           </td>
           <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
             <form
-              action="<%= "#{@project_data[:path]}#{@pg.path}/metric-destination" %>"
+              action="<%= "#{@project.path}#{@pg.path}/metric-destination" %>"
               role="form"
               method="POST"
               id="form-pg-md-create"
             >
-              <%== csrf_tag("#{@project_data[:path]}#{@pg.path}/metric-destination") %>
+              <%== csrf_tag("#{@project.path}#{@pg.path}/metric-destination") %>
               <%== part("components/form/submit_button", text: "Create", extra_class: "metric-destination-create-button") %>
             </form>
           </td>

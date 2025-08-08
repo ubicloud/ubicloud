@@ -13,8 +13,8 @@ viewable_fws =
   "components/page_header",
   breadcrumbs: [
     %w[Projects /project],
-    [@project.name, @project_data[:path]],
-    ["Virtual Machines", "#{@project_data[:path]}/vm"],
+    [@project.name, @project.path],
+    ["Virtual Machines", "#{@project.path}/vm"],
     [@vm.name, "#"]
   ],
   left_items: [part("components/vm_state_label", state: @vm.display_state, extra_class: "text-md")]
@@ -114,7 +114,7 @@ viewable_fws =
               </div>
             </div>
             <div id="vm-delete-<%= @vm.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-              <%== part("components/delete_button", confirmation: @vm.name, redirect: "#{@project_data[:path]}/vm") %>
+              <%== part("components/delete_button", confirmation: @vm.name, redirect: "#{@project.path}/vm") %>
             </div>
           </div>
         </div>

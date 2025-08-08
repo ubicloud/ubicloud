@@ -3,8 +3,8 @@
   title: "GitHub Runners Integration",
   breadcrumbs: [
     %w[Projects /project],
-    [@project.name, @project_data[:path]],
-    ["GitHub Runners", "#{@project_data[:path]}/github"],
+    [@project.name, @project.path],
+    ["GitHub Runners", "#{@project.path}/github"],
     [@page_title, "#"]
   ],
   right_items: [<<-DROPDOWN]
@@ -25,7 +25,7 @@
         </div>
         <div>
           <div class="hover:bg-gray-50">
-            <a href="#{@project_data[:path]}/github/create" class="flex items-center px-4 py-3 text-sm leading-6 text-gray-700">
+            <a href="#{@project.path}/github/create" class="flex items-center px-4 py-3 text-sm leading-6 text-gray-700">
               <div class="mr-2 size-6 shrink-0 rounded-lg bg-gray-400 flex items-center justify-center drop-shadow-sm">
                 #{part("components/icon", name: "github", classes: "size-4 text-white")}
               </div>

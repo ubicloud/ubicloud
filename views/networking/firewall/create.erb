@@ -7,8 +7,8 @@
   "components/page_header",
   breadcrumbs: [
     %w[Projects /project],
-    [@project.name, @project_data[:path]],
-    ["Firewalls", "#{@project_data[:path]}/firewall"],
+    [@project.name, @project.path],
+    ["Firewalls", "#{@project.path}/firewall"],
     %w[Create #]
   ]
 ) %>
@@ -21,7 +21,7 @@
     {name: "private_subnet_id", type: "select", label: "Private Subnet", placeholder: "Select private subnet", content_generator: ContentGenerator::Vm.method(:private_subnet), opening_tag: "<div class='sm:col-span-2'>"},
   ]
 
-  action = "#{@project_data[:path]}/firewall"
+  action = "#{@project.path}/firewall"
 %>
 
 <%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents)%>

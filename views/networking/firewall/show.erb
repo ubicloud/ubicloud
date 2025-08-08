@@ -15,8 +15,8 @@ edit_perm = has_permission?("Firewall:edit", @firewall.ubid) %>
   "components/page_header",
   breadcrumbs: [
     %w[Projects /project],
-    [@project.name, @project_data[:path]],
-    ["Firewall", "#{@project_data[:path]}/firewall"],
+    [@project.name, @project.path],
+    ["Firewall", "#{@project.path}/firewall"],
     [@firewall.name, "#"]
   ]
 ) %>
@@ -181,7 +181,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall.ubid) %>
             </div>
           </div>
           <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-            <%== part("components/delete_button", confirmation: @firewall.name, redirect: "#{@project_data[:path]}/firewall") %>
+            <%== part("components/delete_button", confirmation: @firewall.name, redirect: "#{@project.path}/firewall") %>
           </div>
         </div>
       </div>

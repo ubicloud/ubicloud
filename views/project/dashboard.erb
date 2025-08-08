@@ -8,22 +8,22 @@ check_perms =
   end
 
 tiles = [
-  ["Virtual Machines", @project.vms_dataset.count, "#{@project_data[:path]}/vm", "Vm:create"],
-  ["Databases", @project.postgres_resources_dataset.count, "#{@project_data[:path]}/postgres", "Postgres:create"],
+  ["Virtual Machines", @project.vms_dataset.count, "#{@project.path}/vm", "Vm:create"],
+  ["Databases", @project.postgres_resources_dataset.count, "#{@project.path}/postgres", "Postgres:create"],
   [
     "Load Balancers",
     @project.load_balancers_dataset.count,
-    "#{@project_data[:path]}/load-balancer",
+    "#{@project.path}/load-balancer",
     "LoadBalancer:create"
   ],
-  ["Firewalls", @project.firewalls_dataset.count, "#{@project_data[:path]}/firewall", "Firewall:create"],
+  ["Firewalls", @project.firewalls_dataset.count, "#{@project.path}/firewall", "Firewall:create"],
   [
     "GitHub Runners",
     @project.github_runners_dataset.count,
-    "#{@project_data[:path]}/github",
+    "#{@project.path}/github",
     ("Project:github" if Config.github_app_name)
   ],
-  ["Users", @project.accounts_dataset.count, "#{@project_data[:path]}/user", "Project:user"]
+  ["Users", @project.accounts_dataset.count, "#{@project.path}/user", "Project:user"]
 ]
 
 # Use .each.partition so that hidden rows are shuffled to the end.
@@ -43,42 +43,42 @@ cards = [
     "hero-server-stack",
     "Create Virtual Machine",
     "Linux-based virtual machines that run on top of virtualized hardware. Comprehensive, cost-effective computing.",
-    "#{@project_data[:path]}/vm/create",
+    "#{@project.path}/vm/create",
     "Vm:create"
   ],
   [
     "github",
     "Use GitHub Runners",
     "10x cost-effective managed GitHub Actions runners. Install our GitHub app and change one line in your workflow file.",
-    "#{@project_data[:path]}/github",
+    "#{@project.path}/github",
     ("Project:github" if Config.github_app_name)
   ],
   [
     "hero-circle-stack",
     "Create Managed Database",
     "Fully managed PostgreSQL database. Handles backup / restore, health monitoring, high availability, and more for you.",
-    "#{@project_data[:path]}/postgres",
+    "#{@project.path}/postgres",
     "Postgres:create"
   ],
   [
     "hero-users",
     "Add User to Project",
     "Get started by adding other users to your project to be able to share resources and collaborate with them.",
-    "#{@project_data[:path]}/user",
+    "#{@project.path}/user",
     "Project:user"
   ],
   [
     "hero-arrows-pointing-out",
     "Load Balance Your Traffic",
     "Create a load balancer to distribute your traffic across multiple VMs. Ensure high availability for your apps.",
-    "#{@project_data[:path]}/load-balancer",
+    "#{@project.path}/load-balancer",
     "LoadBalancer:create"
   ],
   [
     "hero-key",
     "Create Access Token",
     "Create as many personal access tokens as you want and manage your resources programmatically.",
-    "#{@project_data[:path]}/token",
+    "#{@project.path}/token",
     "Project:token"
   ],
   [

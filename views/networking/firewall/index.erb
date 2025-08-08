@@ -21,7 +21,7 @@
       description: "You don't have permission to create firewalls."
     }.merge(has_project_permission("Firewall:create") ? {
       description: "Get started by creating a new firewall.",
-      button_link: "#{@project_data[:path]}/firewall/create",
+      button_link: "#{@project.path}/firewall/create",
       button_title: "Create Firewall"
     } : {})
   ) %>

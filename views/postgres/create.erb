@@ -16,8 +16,8 @@
   "components/page_header",
   breadcrumbs: [
     %w[Projects /project],
-    [@project.name, @project_data[:path]],
-    ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"],
+    [@project.name, @project.path],
+    ["PostgreSQL Databases", "#{@project.path}/postgres"],
     %w[Create #]
   ],
   right_items: [logo ? "<img src=\"/#{logo}\" class=\"h-6 object-contain\"/>" : nil]
@@ -39,7 +39,7 @@
     form_elements << {name: "partnership_notice", type: "partnership_notice", label: "Partnership Notice", required: "required", content_generator: ContentGenerator::Postgres.method(:partnership_notice)}
   end
 
-  action = "#{@project_data[:path]}/postgres"
+  action = "#{@project.path}/postgres"
 %>
 
 <%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents) %>

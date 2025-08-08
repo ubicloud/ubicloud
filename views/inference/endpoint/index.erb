@@ -81,7 +81,7 @@ curl #{ie[:url]}#{path} \\
         "components/button",
         locals: {
           text: "Try in Playground",
-          link: "#{@project_data[:path]}/inference-playground##{ie[:id]}",
+          link: "#{@project.path}/inference-playground##{ie[:id]}",
           attributes: {
             "type" => "button"
           }

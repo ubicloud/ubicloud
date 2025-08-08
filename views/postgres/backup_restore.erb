@@ -3,8 +3,8 @@ max_date = @pg.timeline.latest_restore_time %>
 
 <% if min_date && max_date > min_date %>
   <div class="p-6">
-    <form action="<%= "#{@project_data[:path]}#{@pg.path}/restore" %>" role="form" method="POST">
-      <%== csrf_tag("#{@project_data[:path]}#{@pg.path}/restore") %>
+    <form action="<%= "#{@project.path}#{@pg.path}/restore" %>" role="form" method="POST">
+      <%== csrf_tag("#{@project.path}#{@pg.path}/restore") %>
       <div class="space-y-4">
         <div>
           <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Fork PostgreSQL database</h3>

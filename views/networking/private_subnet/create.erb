@@ -5,8 +5,8 @@
   "components/page_header",
   breadcrumbs: [
     %w[Projects /project],
-    [@project.name, @project_data[:path]],
-    ["Private Subnets", "#{@project_data[:path]}/private-subnet"],
+    [@project.name, @project.path],
+    ["Private Subnets", "#{@project.path}/private-subnet"],
     %w[Create #]
   ]
 ) %>
@@ -17,7 +17,7 @@
     {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::Vm.method(:location)},
   ]
 
-  action = "#{@project_data[:path]}/private-subnet"
+  action = "#{@project.path}/private-subnet"
 %>
 
 <%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents) %>

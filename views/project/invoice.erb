@@ -4,8 +4,8 @@
   "components/page_header",
   breadcrumbs: [
     %w[Projects /project],
-    [@project.name, @project_data[:path]],
-    ["Billing", "#{@project_data[:path]}/billing"],
+    [@project.name, @project.path],
+    ["Billing", "#{@project.path}/billing"],
     ["Current Usage Summary", "#"]
   ]
 ) %>

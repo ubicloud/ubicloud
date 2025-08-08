@@ -3,10 +3,10 @@
 <%== part(
   "components/page_header",
   title: "Personal Access Tokens",
-  breadcrumbs: [%w[Projects /project], [@project.name, @project_data[:path]], ["Personal Access Tokens", "#"]],
+  breadcrumbs: [%w[Projects /project], [@project.name, @project.path], ["Personal Access Tokens", "#"]],
   right_items: [<<-CREATE]
-    <form id="create-pat" action="#{@project_data[:path]}/token" role="form" method="POST">
-      #{csrf_tag("#{@project_data[:path]}/token")}
+    <form id="create-pat" action="#{@project.path}/token" role="form" method="POST">
+      #{csrf_tag("#{@project.path}/token")}
       #{part("components/form/submit_button", text: "Create Token")}
     </form>
   CREATE
@@ -40,7 +40,7 @@
               {
                 component: {
                   text: "Remove",
-                  url: "#{@project_data[:path]}/token/#{token.ubid}",
+                  url: "#{@project.path}/token/#{token.ubid}",
                   confirmation: "delete token"
                 },
                 extra_class: "flex justify-end"
