@@ -14,12 +14,21 @@ class Invoice < Sequel::Model
 
   plugin ResourceMethods
 
+  def path_id
+    id ? ubid : "current"
+  end
+
   def path
-    "/invoice/#{id ? ubid : "current"}"
+    "/invoice/#{path_id}"
   end
 
   def filename
     "Ubicloud-#{begin_time.strftime("%Y-%m")}-#{invoice_number}.pdf"
+  end
+
+  %i[subtotal cost].each do |meth|
+    str = meth.to_s
+    define_method(meth) { content[str] }
   end
 
   def blob_key

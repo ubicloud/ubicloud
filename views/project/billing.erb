@@ -1,7 +1,7 @@
 <% @page_title = "Project Billing"
 
 if @project.billing_info
-  @invoices = Serializers::Invoice.serialize(@project.invoices.prepend(@project.current_invoice))
+  @invoices = @project.invoices.prepend(@project.current_invoice)
 end
 
 @usage_alerts = @project.usage_alerts_dataset.eager(:user) %>
@@ -18,15 +18,15 @@ end
       <dl class="grid grid-cols-2 gap-5 <%= (@project.discount > 0) ? "sm:grid-cols-4" : "sm:grid-cols-3" %>">
         <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
           <dt class="truncate text-sm font-medium text-gray-500">Current Usage</dt>
-          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= @invoices.first[:subtotal] %></dd>
+          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= money(@invoices.first.subtotal) %></dd>
         </div>
         <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
           <dt class="truncate text-sm font-medium text-gray-500">Last Month</dt>
-          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= (@invoices.count > 1) ? @invoices[1][:subtotal] : "-" %></dd>
+          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= (@invoices.count > 1) ? money(@invoices[1].subtotal) : "-" %></dd>
         </div>
         <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
           <dt class="truncate text-sm font-medium text-gray-500">Remaining Credit</dt>
-          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= "$%0.02f" % @project.credit.to_f %></dd>
+          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= money(@project.credit.to_f) %></dd>
         </div>
         <% if @project.discount > 0 %>
           <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
@@ -200,27 +200,27 @@ end
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <% @invoices.each do |inv| %>
-              <tr id="invoice-<%= inv[:ubid]%>">
+              <tr id="invoice-<%= inv.path_id %>">
                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <a href="<%= billing_path + inv[:path] %>" target="_blank" class="text-orange-600 hover:text-orange-700">
-                    <%= inv[:name] %>
+                  <a href="<%= billing_path + inv.path %>" target="_blank" class="text-orange-600 hover:text-orange-700">
+                    <%= inv.name %>
                   </a>
                   <span class="text-xs text-gray-400 italic">
-                    <% if inv[:invoice_number] %>
-                      #<%= inv[:invoice_number] %>
+                    <% if inv.invoice_number %>
+                      #<%= inv.invoice_number %>
                     <% else %>
                       (not finalized)
                     <% end %>
                   </span>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                  <%= inv[:total] %>
-                  <% if inv[:total] != inv[:subtotal] %>
-                    <span class="text-xs italic">(<%= inv[:subtotal] %>)</span>
+                  <%= money(inv.cost) %>
+                  <% if inv.cost != inv.subtotal %>
+                    <span class="text-xs italic">(<%= money(inv.subtotal) %>)</span>
                   <% end %>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                  <%= inv[:status] %>
+                  <%= inv.status %>
                 </td>
               </tr>
             <% end %>
