@@ -12,12 +12,12 @@
 
 <%
   footer_content = [
-    ["Subtotal", @invoice_data[:subtotal]],
-    (@invoice_data[:discount] != "$0.00") ? ["Discount", "-#{@invoice_data[:discount]}"] : nil,
-    (@invoice_data[:credit] != "$0.00") ? ["Credit", "-#{@invoice_data[:credit]}"] : nil,
-    (@invoice_data[:free_inference_tokens_credit] != "$0.00") ? ["Free Inference Tokens", "-#{@invoice_data[:free_inference_tokens_credit]}"] : nil,
-    (@invoice_data[:vat_amount] != "$0.00") ? ["VAT (#{@invoice_data[:vat_rate]}%)", @invoice_data[:vat_amount]] : nil,
-    ["Total", @invoice_data[:total]]
+    ["Subtotal", @invoice_data.subtotal],
+    (@invoice_data.discount != "$0.00") ? ["Discount", "-#{@invoice_data.discount}"] : nil,
+    (@invoice_data.credit != "$0.00") ? ["Credit", "-#{@invoice_data.credit}"] : nil,
+    (@invoice_data.free_inference_tokens_credit != "$0.00") ? ["Free Inference Tokens", "-#{@invoice_data.free_inference_tokens_credit}"] : nil,
+    (@invoice_data.vat_amount != "$0.00") ? ["VAT (#{@invoice_data.vat_rate}%)", @invoice_data.vat_amount] : nil,
+    ["Total", @invoice_data.total]
   ].compact.map do |name, value|
     <<~CONTENT
       <dl class="grid grid-cols-3 gap-x-3 #{(name == "Total") ? "text-2xl" : nil}">
@@ -31,22 +31,22 @@
 <div class="grid gap-6">
   <div class="md:flex md:items-center md:justify-between text-2xl">
     <div class="min-w-0 flex-1">This invoice will be finalized on the first day of next month</div>
-    <div class="text-right"><%= @invoice_data[:begin_time] %> to <%= @invoice_data[:end_time] %></div>
+    <div class="text-right"><%= @invoice_data.begin_time %> to <%= @invoice_data.end_time %></div>
   </div>
 
   <!-- Invoice Card -->
   <%== part(
       "components/table_card",
       headers: ["Resource", "Description", "Usage", "Amount"],
-      rows: @invoice_data[:items].map do |item|
+      rows: @invoice_data.items.map do |item|
          [
            [
-             item[:name],
-             item[:description],
-             [item[:usage], { extra_class: "text-right"}],
-             [item[:cost_humanized], { extra_class: "text-right"}],
+             item.name,
+             item.description,
+             [item.usage, { extra_class: "text-right"}],
+             [item.cost_humanized, { extra_class: "text-right"}],
            ],
-           { id: "item-#{item[:name]}" }
+           { id: "item-#{item.name}" }
          ]
       end,
       empty_state: "No resources",
