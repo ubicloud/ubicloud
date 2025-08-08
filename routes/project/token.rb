@@ -54,7 +54,7 @@ class Clover
             end
           end
 
-          r.redirect "#{@project.path}/token/#{token.ubid}/access-control"
+          r.redirect path(token)
         end
 
         r.is "access-control" do
@@ -105,7 +105,7 @@ class Clover
             no_audit_log # Possibly no changes
             flash["notice"] = "Token access control entries saved successfully"
 
-            r.redirect "#{@project_data[:path]}/token/#{token.ubid}/access-control"
+            r.redirect path(token)
           end
         end
       end

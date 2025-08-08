@@ -48,7 +48,7 @@
     <% end %>
 
     <div class="mt-5 flex items-center gap-2">
-      CA Certificates: <%== part("components/download_button", link: "#{@project_data[:path]}#{@pg.path}/ca-certificates")%>
+      CA Certificates: <%== part("components/download_button", link: "#{path(@pg)}/ca-certificates")%>
     </div>
   <% else %>
     <div class="flex flex-col items-center justify-center h-full">

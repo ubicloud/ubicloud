@@ -34,6 +34,14 @@ class ApiKey < Sequel::Model
     super
   end
 
+  def path
+    if used_for == "api"
+      "/token/#{ubid}/access-control"
+    else # inference_endpoint
+      "/inference-api-key/#{ubid}"
+    end
+  end
+
   def unrestricted_token_for_project?(project_id)
     !unrestricted_project_access_dataset(project_id).empty?
   end

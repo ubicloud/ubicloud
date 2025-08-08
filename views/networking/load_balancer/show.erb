@@ -24,7 +24,7 @@ load_balancer_path = "#{@project_data[:path]}#{@lb.path}" %>
       ["Connection String", @lb.hostname, { copyable: true }],
       [
         "Private Subnet",
-        "<a href='#{@project_data[:path]}/location/#{@lb.display_location}/private-subnet/#{@lb.private_subnet.name}' class='text-rose-500 hover:underline'>#{@lb.private_subnet.name}</a>",
+        "<a href='#{path(@lb.private_subnet)}' class='text-rose-500 hover:underline'>#{@lb.private_subnet.name}</a>",
         { escape: false }
       ],
       ["Algorithm", (@lb.algorithm == "round_robin") ? "Round Robin" : "Hash Based"],
@@ -56,10 +56,7 @@ load_balancer_path = "#{@project_data[:path]}#{@lb.path}" %>
         <% @lb.vms(eager: :load_balancer_vm_ports).each do |vm| %>
           <tr>
             <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <a
-                href="<%= "#{@project_data[:path]}/location/#{vm.display_location}/vm/#{vm.name}" %>"
-                class="text-orange-600 hover:text-orange-700"
-              ><%= vm.name %></a>
+              <a href="<%= path(vm) %>" class="text-orange-600 hover:text-orange-700"><%= vm.name %></a>
             </td>
             <td class="px-3 py-3.5 whitespace-nowrap text-sm text-gray-900">
               <%= vm.load_balancer_state %>

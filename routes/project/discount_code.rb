@@ -5,7 +5,6 @@ class Clover
     r.post r.web? do
       authorize("Project:billing", @project.id)
       handle_validation_failure("project/billing")
-      billing_path = "#{@project.path}/billing"
 
       if (discount_code = typecast_params.nonempty_str("discount_code"))
         discount_code = discount_code.strip.downcase

@@ -41,7 +41,7 @@ class Clover
         if api?
           Serializers::PrivateLocation.serialize(loc)
         else
-          r.redirect "#{@project.path}#{loc.path}"
+          r.redirect path(loc)
         end
       end
     end
@@ -95,7 +95,7 @@ class Clover
           Serializers::PrivateLocation.serialize(@location)
         else
           flash["notice"] = "The location name is updated to '#{@location.ui_name}'."
-          r.redirect "#{@project.path}#{@location.path}"
+          r.redirect path(@location)
         end
       end
     end

@@ -7,7 +7,7 @@ class Clover
     if api?
       paginated_result(dataset, Serializers::LoadBalancer)
     else
-      @lbs = Serializers::LoadBalancer.serialize(dataset.all, {include_path: true})
+      @lbs = dataset.all
       view "networking/load_balancer/index"
     end
   end

@@ -28,7 +28,7 @@ add_groups.reject! { _2.empty? }
 add_checked = flash.dig("old", "add") || typecast_body_params.array(:nonempty_str, "add")
 remove_checked = flash.dig("old", "remove") || typecast_body_params.array(:nonempty_str, "remove")
 
-base_path = "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
+base_path = path(@tag)
 associate_path = "#{base_path}/associate"
 disassociate_path = "#{base_path}/disassociate"
 current_members =
@@ -59,12 +59,8 @@ current_members.sort! %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6 space-y-2">
         <h3 class="text-lg font-medium leading-6 text-gray-900"><%= "Update #{@display_tag_type} Tag" %></h3>
-        <form
-          action="<%= "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}" %>"
-          role="form"
-          method="POST"
-        >
-          <%== csrf_tag("#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}") %>
+        <form action="<%= path(@tag) %>" role="form" method="POST">
+          <%== csrf_tag(path(@tag)) %>
           <div class="grid grid-cols-12 gap-3">
             <div class="col-span-12 md:col-span-5">
               <%== part(

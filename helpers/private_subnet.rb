@@ -12,7 +12,7 @@ class Clover
       dataset = dataset.where(location: @location) if @location
       paginated_result(dataset.eager(nics: :private_subnet), Serializers::PrivateSubnet)
     else
-      @pss = Serializers::PrivateSubnet.serialize(dataset.all, {include_path: true})
+      @pss = dataset.all
       view "networking/private_subnet/index"
     end
   end

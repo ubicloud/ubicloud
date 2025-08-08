@@ -10,6 +10,7 @@ module AccessControlModelTag
       define_method(:applied_table) { table }
       define_method(:applied_column) { column }
       define_method(:"add_#{base}") { add_member(it) }
+      define_method(:path) { "/user/access-control/tag/#{base}/#{ubid}" }
     end
   end
 

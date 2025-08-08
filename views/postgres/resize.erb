@@ -18,7 +18,7 @@ pre_selected_values = {
 <%== render(
   "components/form/resource_creation_form",
   locals: {
-    action: "#{@project_data[:path]}#{@pg.path}",
+    action: path(@pg),
     method: "PATCH",
     form_elements:,
     pre_selected_values:,

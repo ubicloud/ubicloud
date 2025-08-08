@@ -7,9 +7,9 @@ class Serializers::Postgres < Serializers::Base
       name: pg.name,
       state: pg.display_state,
       location: pg.display_location,
-      vm_size: pg.representative_server&.vm&.display_size || pg.target_vm_size,
+      vm_size: pg.vm_size,
       target_vm_size: pg.target_vm_size,
-      storage_size_gib: pg.representative_server&.storage_size_gib || pg.target_storage_size_gib,
+      storage_size_gib: pg.storage_size_gib,
       target_storage_size_gib: pg.target_storage_size_gib,
       version: pg.version,
       ha_type: pg.ha_type,
@@ -20,10 +20,6 @@ class Serializers::Postgres < Serializers::Base
       parent: pg.parent&.path,
       tags: pg.tags || []
     }
-
-    if options[:include_path]
-      base[:path] = pg.path
-    end
 
     if options[:detailed]
       base.merge!(

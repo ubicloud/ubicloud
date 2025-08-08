@@ -60,12 +60,9 @@ class Clover
       dataset = dataset.where(location_id: @location.id) if @location
       paginated_result(dataset, Serializers::Postgres)
     else
-      dataset = dataset.eager(:representative_server, :timeline)
-      resources = dataset.all
+      @postgres_databases = dataset.eager(:representative_server, :timeline).all
         .group_by { |r| r.read_replica? ? r[:parent_id] : r[:id] }
         .flat_map { |group_id, rs| rs.sort_by { |r| r[:created_at] } }
-
-      @postgres_databases = Serializers::Postgres.serialize(resources, {include_path: true})
       view "postgres/index"
     end
   end

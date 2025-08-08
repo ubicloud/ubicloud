@@ -24,8 +24,8 @@ class Clover
 
       r.get true do
         authorize("Vm:view", vm.id)
-        @vm = Serializers::Vm.serialize(vm, {detailed: true, include_path: web?})
-        api? ? @vm : view("vm/show")
+        @vm = vm
+        api? ? Serializers::Vm.serialize(vm, {detailed: true}) : view("vm/show")
       end
 
       r.delete true do
@@ -51,7 +51,7 @@ class Clover
           Serializers::Vm.serialize(vm, {detailed: true})
         else
           flash["notice"] = "'#{vm.name}' will be restarted in a few seconds"
-          r.redirect "#{@project.path}#{vm.path}"
+          r.redirect path(vm)
         end
       end
     end

@@ -8,7 +8,7 @@
   <%
     free_upgrade_badge = if @installation.free_runner_upgrade?
       <<~CONTENT
-        <a href="#{@project_data[:path]}/github/#{@installation.ubid}/setting">
+        <a href="#{path(@installation)}/setting">
           <span class="rounded-full bg-green-600/10 px-2.5 py-1 text-xs/5 font-medium text-green-600">
             You’re eligible for an exclusive <span class="font-semibold">50% off</span> premium runners until
             <span class="font-semibold">#{@installation.free_runner_upgrade_expires_at.strftime("%B %d, %Y")}</span>

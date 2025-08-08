@@ -67,6 +67,29 @@ class Clover < Roda
     UBID.to_uuid(s)
   end
 
+  plugin :path
+
+  path(:billing) { "#{@project.path}/billing" }
+  path(:user) { "#{@project.path}/user" }
+
+  under_project_path = -> { "#{@project.path}#{it.path}" }
+  %w[
+    ActionTag
+    ApiKey
+    Firewall
+    KubernetesCluster
+    LoadBalancer
+    Location
+    ObjectTag
+    PaymentMethod
+    PostgresResource
+    PrivateSubnet
+    SubjectTag
+    Vm
+  ].each { path(it, class_name: true, &under_project_path) }
+
+  path("GithubInstallation", class_name: true) { "#{it.project.path}/github/#{it.ubid}" }
+
   # :nocov:
   if Config.test? && defined?(SimpleCov)
     plugin :render_coverage

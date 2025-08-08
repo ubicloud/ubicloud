@@ -38,7 +38,7 @@ class Clover
           Serializers::PrivateSubnet.serialize(ps)
         else
           flash["notice"] = "#{subnet.name} will be connected in a few seconds"
-          r.redirect "#{@project.path}#{ps.path}"
+          r.redirect path(ps)
         end
       end
 
@@ -58,7 +58,7 @@ class Clover
           Serializers::PrivateSubnet.serialize(ps)
         else
           flash["notice"] = "#{subnet.name} will be disconnected in a few seconds"
-          r.redirect "#{@project.path}#{ps.path}"
+          r.redirect path(ps)
         end
       end
 

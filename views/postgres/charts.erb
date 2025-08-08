@@ -1,6 +1,6 @@
 <% @enable_echarts = true %>
 
-<div id="metrics-container" class="p-6" data-metrics-url="<%= "#{@project_data[:path]}#{@pg.path}" %>">
+<div id="metrics-container" class="p-6" data-metrics-url="<%= path(@pg) %>">
   <% if @pg.display_state != "creating" %>
     <div class="mb-4 flex gap-2 justify-end">
       <select
@@ -71,7 +71,7 @@
               id="md-delete-<%=md.ubid %>"
               class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
             >
-              <%== part("components/delete_button", url: "#{@project_data[:path]}#{@pg.path}/metric-destination/#{md.ubid}", text: "") %>
+              <%== part("components/delete_button", url: "#{path(@pg)}/metric-destination/#{md.ubid}", text: "") %>
             </td>
           </tr>
         <% end %>

@@ -14,7 +14,7 @@
     rows: @kcs.map do |kc|
       [
         [
-          [kc.name, {link: @project_data[:path] + kc.path}],
+          [kc.name, {link: path(kc)}],
           kc.display_location,
           kc.version,
           ["kubernetes_state_label", {component: { state: kc.display_state }}]
