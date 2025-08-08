@@ -1,6 +1,6 @@
 <div class="flex grow flex-col gap-y-5 overflow-y-auto bg-orange-600 px-6">
   <div class="flex h-16 shrink-0 items-center">
-    <a href="<%= @project_data ? "#{@project.path}/dashboard" : "/project" %>">
+    <a href="<%= @project_permissions ? "#{@project.path}/dashboard" : "/project" %>">
       <img class="h-6 w-auto" src="/logo-white.png" alt="Ubicloud">
     </a>
   </div>
@@ -8,7 +8,7 @@
     <ul role="list" class="flex flex-1 flex-col gap-y-7">
       <li>
         <ul role="list" class="-mx-2 space-y-1">
-          <% if @project_data %>
+          <% if @project_permissions %>
             <%== part(
               "layouts/sidebar/item",
               name: "Dashboard",
@@ -79,7 +79,7 @@
           <% end %>
         </ul>
       </li>
-      <% if @project_data && has_project_permission(["Project:user", "Project:billing", "Project:view", "Project:viewaccess", "Project:token"]) %>
+      <% if @project_permissions && has_project_permission(["Project:user", "Project:billing", "Project:view", "Project:viewaccess", "Project:token"]) %>
         <li>
           <div class="text-xs font-semibold leading-6 text-orange-200">Project Details</div>
           <ul role="list" class="-mx-2 mt-2 space-y-1">
@@ -140,7 +140,7 @@
           </ul>
         </li>
       <% end %>
-      <% if @project_data && has_project_permission("Project:github") %>
+      <% if @project_permissions && has_project_permission("Project:github") %>
               <li>
           <div class="text-xs font-semibold leading-6 text-orange-200">Integrations</div>
           <ul role="list" class="-mx-2 mt-2 space-y-1">

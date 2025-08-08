@@ -7,7 +7,7 @@
   </button>
   <!-- Separator -->
   <div class="h-6 w-px bg-gray-900/10 lg:hidden"></div>
-  <a href="<%= @project_data ? "#{@project.path}/dashboard" : "/project" %>">
+  <a href="<%= @project_permissions ? "#{@project.path}/dashboard" : "/project" %>">
     <img class="h-5 w-auto lg:hidden" src="/logo-primary.png" alt="Ubicloud">
   </a>
   <div class="flex flex-1 gap-x-4 self-stretch justify-end lg:gap-x-6">
