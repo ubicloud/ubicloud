@@ -81,22 +81,22 @@ class Clover < Roda
   path(:user) { "#{@project.path}/user" }
 
   under_project_path = -> { "#{@project.path}#{it.path}" }
-  [
-    ActionTag,
-    ApiKey,
-    Firewall,
-    KubernetesCluster,
-    LoadBalancer,
-    Location,
-    ObjectTag,
-    PaymentMethod,
-    PostgresResource,
-    PrivateSubnet,
-    SubjectTag,
+  %w[
+    ActionTag
+    ApiKey
+    Firewall
+    KubernetesCluster
+    LoadBalancer
+    Location
+    ObjectTag
+    PaymentMethod
+    PostgresResource
+    PrivateSubnet
+    SubjectTag
     Vm
-  ].each { path(it, &under_project_path) }
+  ].each { path(it, class_name: true, &under_project_path) }
 
-  path(GithubInstallation) { "#{it.project.path}/github/#{it.ubid}" }
+  path("GithubInstallation", class_name: true) { "#{it.project.path}/github/#{it.ubid}" }
 
   # :nocov:
   if Config.test? && defined?(SimpleCov)
