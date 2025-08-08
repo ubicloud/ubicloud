@@ -34,7 +34,7 @@ module Option
     "#{family}.#{suffix}"
   end
 
-  AWS_FAMILY_OPTIONS = ["c6gd", "m6id", "m6gd", "m8gd"].freeze
+  AWS_FAMILY_OPTIONS = ["c6gd", "m6id", "m6gd", "m7a", "m8gd"].freeze
   AWS_STORAGE_SIZE_OPTIONS = {2 => ["118"], 4 => ["237"], 8 => ["474"], 16 => ["950"], 32 => ["1900"], 64 => ["3800"]}.freeze
 
   BootImage = Struct.new(:name, :display_name)
@@ -85,7 +85,8 @@ module Option
     VmSize.new("burstable-#{it}", "burstable", it, it * 50, it * 50, (it * 1.6).to_i, storage_size_options, io_limits, false, "arm64")
   }).concat(AWS_FAMILY_OPTIONS.product([2, 4, 8, 16, 32, 64]).map { |family, vcpu|
     memory_coefficient = (family == "c6gd") ? 2 : 4
-    arch = (family == "m6id") ? "x64" : "arm64"
+
+    arch = ["m6id", "m7a"].include?(family) ? "x64" : "arm64"
     VmSize.new(aws_instance_type_name(family, vcpu), family, vcpu, vcpu * 100, 0, vcpu * memory_coefficient, AWS_STORAGE_SIZE_OPTIONS[vcpu], NO_IO_LIMITS, false, arch)
   }).freeze
 
