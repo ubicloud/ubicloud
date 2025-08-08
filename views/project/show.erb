@@ -22,9 +22,9 @@
     <%== part(
       "components/kv_data_card",
       data: [
-        ["ID", @project_data[:id]],
+        ["ID", @project.ubid],
         (
-          if has_permission?("Project:edit", @project_data[:id])
+          if has_permission?("Project:edit", @project.ubid)
             [
               "Name",
               part(
@@ -70,7 +70,7 @@
 
   </div>
   <!-- Delete Card -->
-  <% if has_permission?("Project:delete", @project_data[:id]) %>
+  <% if has_permission?("Project:delete", @project.ubid) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
         <div class="sm:flex sm:items-center sm:justify-between">
