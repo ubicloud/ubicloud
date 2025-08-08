@@ -55,7 +55,7 @@
           <p class="flex items-baseline justify-center gap-x-2">
             <span class="text-4xl font-semibold tracking-tight text-gray-900">Boost your builds</span>
           </p>
-          <%== part("components/form/toggle_form", name: "premium_runner_enabled", action: "#{@project_data[:path]}/github/#{@installation.ubid}", active: @installation.premium_runner_enabled?) %>
+          <%== part("components/form/toggle_form", name: "premium_runner_enabled", action: "#{@project.path}/github/#{@installation.ubid}", active: @installation.premium_runner_enabled?) %>
           <div class="mt-6 text-sm/5 text-gray-600 italic">
             <p class="font-semibold">1/5th the cost of GitHub runners</p>
             <p>For example, 2 gaming vCPUs, 8GB of RAM, 80GB of NVMe storage comes at $0.0016/min.</p>
@@ -87,7 +87,7 @@
           </div>
           <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
             <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
-              <%== part("components/form/toggle_form", name: "cache_enabled", action: "#{@project_data[:path]}/github/#{@installation.ubid}", active: @installation.cache_enabled) %>
+              <%== part("components/form/toggle_form", name: "cache_enabled", action: "#{@project.path}/github/#{@installation.ubid}", active: @installation.cache_enabled) %>
             </div>
           </div>
         </div>

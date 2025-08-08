@@ -42,6 +42,14 @@ class InferenceEndpoint < Sequel::Model
     req.body = {model: model_name, messages: [{role: "user", content: content}]}.to_json
     http.request(req)
   end
+
+  def prompt_billing_resource
+    "#{model_name}-input"
+  end
+
+  def completion_billing_resource
+    "#{model_name}-output"
+  end
 end
 
 # Table: inference_endpoint

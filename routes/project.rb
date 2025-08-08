@@ -10,7 +10,7 @@ class Clover
         if api?
           paginated_result(dataset, Serializers::Project)
         else
-          @projects = Serializers::Project.serialize(dataset.all, {include_path: true, web: true})
+          @projects = dataset.all
           view "project/index"
         end
       end
@@ -46,7 +46,6 @@ class Clover
       @project = Clover.authorized_project(current_account, project_id)
       check_found_object(@project)
 
-      @project_data = Serializers::Project.serialize(@project, {include_path: true, web: true})
       @project_permissions = all_permissions(@project.id) if web?
 
       r.is do

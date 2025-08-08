@@ -12,13 +12,13 @@
           label: "Inference Endpoint",
           placeholder: "Pick an endpoint",
           options: @inference_models.map { |ie|
-            [ie[:model_name], ie[:model_name], nil, {
-              "data-id": ie[:id],
-              "data-url": ie[:url],
-              "data-tags": ie[:tags].to_json
+            [ie.model_name, ie.model_name, nil, {
+              "data-id": ie.ubid,
+              "data-url": "#{ie.load_balancer.health_check_protocol}://#{ie.load_balancer.hostname}",
+              "data-tags": ie.tags.to_json
             }]
           },
-          selected: @inference_models.any? ? @inference_models.first[:model_name] : nil,
+          selected: @inference_models.first&.model_name,
         }
       ) %>
       <%== render(
@@ -27,8 +27,8 @@
           name: "inference_api_key",
           label: "Inference API Key",
           placeholder: "Pick a key",
-          options: @inference_api_keys.map { |it| [it[:key], it[:id]] },
-          selected: @inference_api_keys.any? ? @inference_api_keys.first[:key] : nil
+          options: @inference_api_keys.map { [it.key, it.ubid] },
+          selected: @inference_api_keys.first&.key
         }
       ) %>
     </div>

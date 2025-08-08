@@ -22,7 +22,7 @@
     headers: ["Repository", "Runner", "Workflow Job", "", ""],
     rows:
       @runners.map do |runner|
-        destroy_url = "#{@project_data[:path]}/github/#{@installation.ubid}/runner/#{runner.ubid}"
+        destroy_url = "#{@project.path}/github/#{@installation.ubid}/runner/#{runner.ubid}"
         os = runner.label_data["boot_image"].match(/(ubuntu-\d{2})\d{2}/)[1]
         family = runner.vm&.family || runner.label_data["family"]
         [
