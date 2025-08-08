@@ -236,4 +236,22 @@ class Clover < Roda
     hash.delete_if { |key, value| key.empty? && value.empty? }
     hash
   end
+
+  def humanize_size(bytes)
+    return nil if bytes.nil? || bytes.zero?
+    units = %w[B KB MB GB]
+    exp = (Math.log(bytes) / Math.log(1024)).to_i
+    exp = [exp, units.size - 1].min
+
+    return "%d %s" % [bytes.to_f / 1024**exp, units[exp]] if exp == 0
+    "%.1f %s" % [bytes.to_f / 1024**exp, units[exp]]
+  end
+
+  def humanize_time(time)
+    seconds = Time.now - time
+    return "just now" if seconds < 60
+    return "#{(seconds / 60).to_i} minutes ago" if seconds < 3600
+    return "#{(seconds / 3600).to_i} hours ago" if seconds < 86400
+    "#{(seconds / 86400).to_i} days ago"
+  end
 end

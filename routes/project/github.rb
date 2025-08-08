@@ -79,8 +79,13 @@ class Clover
 
         r.on "cache" do
           r.get true do
-            entries = @installation.cache_entries_dataset.exclude(committed_at: nil).eager(:repository).reverse(:created_at).all
-            @entries_by_repo = Serializers::GithubCacheEntry.serialize(entries).group_by { it[:repository][:id] }
+            @entries_by_repo = @installation
+              .cache_entries_dataset
+              .exclude(committed_at: nil)
+              .eager(:repository)
+              .reverse(:created_at)
+              .all
+              .group_by { it.repository.ubid }
             @quota_per_repo = "#{@installation.cache_storage_gib} GB"
 
             view "github/cache"
