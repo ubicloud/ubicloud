@@ -1,8 +1,8 @@
 <%== part(
   "components/tabbar",
   tabs: [
-    ["Private Subnets", @project_data[:path] + "/private-subnet"],
-    ["Firewalls", @project_data[:path] + "/firewall"],
-    ["Load Balancers", @project_data[:path] + "/load-balancer"]
+    ["Private Subnets", @project.path + "/private-subnet"],
+    ["Firewalls", @project.path + "/firewall"],
+    ["Load Balancers", @project.path + "/load-balancer"]
   ]
 ) %>

@@ -3,7 +3,7 @@
 
 <%== part(
   "components/page_header",
-  breadcrumbs: [%w[Projects /project], [@project.name, @project_data[:path]], ["Virtual Machines", "#"]],
+  breadcrumbs: [%w[Projects /project], [@project.name, @project.path], ["Virtual Machines", "#"]],
   right_items: (!@vms.empty? && has_project_permission("Vm:create")) ?
     (if @project.get_ff_gpu_vm
       [
@@ -41,11 +41,11 @@
       buttons: (
         if @project.get_ff_gpu_vm
           {
-            "Create Virtual Machine" => "#{@project_data[:path]}/vm/create?show_gpu=f",
-            "Create GPU Virtual Machine" => "#{@project_data[:path]}/vm/create?show_gpu=t",
+            "Create Virtual Machine" => "#{@project.path}/vm/create?show_gpu=f",
+            "Create GPU Virtual Machine" => "#{@project.path}/vm/create?show_gpu=t",
           }
         else
-          {"Create Virtual Machine" => "#{@project_data[:path]}/vm/create"}
+          {"Create Virtual Machine" => "#{@project.path}/vm/create"}
         end)
     } : {})
   ) %>

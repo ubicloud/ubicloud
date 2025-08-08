@@ -40,8 +40,8 @@
 
   <% if has_project_permission("InferenceApiKey:create") && @inference_api_keys.size < 10 %>
   <div class="flex justify-end space-y-1 mt-6">
-    <form id="create-inference-api-key" action="<%= "#{@project_data[:path]}/inference-api-key" %>" role="form" method="POST">
-      <%== csrf_tag("#{@project_data[:path]}/inference-api-key") %>
+    <form id="create-inference-api-key" action="<%= "#{@project.path}/inference-api-key" %>" role="form" method="POST">
+      <%== csrf_tag("#{@project.path}/inference-api-key") %>
       <%== part("components/form/submit_button", text: "Create API Key") %>
     </form>
   </div>

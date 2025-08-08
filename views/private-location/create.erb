@@ -12,8 +12,8 @@ options.add_option(name: "secret_key")
   "components/page_header",
   breadcrumbs: [
     %w[Projects project],
-    [@project.name, @project_data[:path]],
-    ["AWS Regions", "#{@project_data[:path]}/private-location"],
+    [@project.name, @project.path],
+    ["AWS Regions", "#{@project.path}/private-location"],
     %w[Create #]
   ]
 ) %>
@@ -25,7 +25,7 @@ options.add_option(name: "secret_key")
     {name: "access_key", type: "text", label: "AWS Access Key", required: "required", placeholder: "Enter AWS access key"},
     {name: "secret_key", type: "text", label: "AWS Secret Key", required: "required", placeholder: "Enter AWS secret key"}
   ]
-  action = "#{@project_data[:path]}/private-location"
+  action = "#{@project.path}/private-location"
 %>
 
 <%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents) %>

@@ -9,7 +9,7 @@ end
 <% if billing_info = @project.billing_info %>
   <%== part(
     "components/page_header",
-    breadcrumbs: [%w[Projects /project], [@project.name, @project_data[:path]], %w[Billing #]]
+    breadcrumbs: [%w[Projects /project], [@project.name, @project.path], %w[Billing #]]
   ) %>
 
   <div class="grid gap-6">
@@ -266,8 +266,8 @@ end
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <!-- Add usage alert -->
       <div class="px-4 py-5 sm:p-6">
-        <form action="<%= "#{@project_data[:path]}/usage-alert" %>" role="form" method="POST">
-          <%== csrf_tag("#{@project_data[:path]}/usage-alert") %>
+        <form action="<%= "#{@project.path}/usage-alert" %>" role="form" method="POST">
+          <%== csrf_tag("#{@project.path}/usage-alert") %>
           <div class="space-y-4">
             <div>
               <h2 class="text-lg font-medium leading-6 text-gray-900">Add new usage alert</h2>
@@ -336,7 +336,7 @@ end
                   <%== part(
                     "components/delete_button",
                     text: "Remove",
-                    url: "#{@project_data[:path]}/usage-alert/#{alert[:ubid]}",
+                    url: "#{@project.path}/usage-alert/#{alert[:ubid]}",
                     confirmation: alert[:name]
                   ) %>
                 </td>

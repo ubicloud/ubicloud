@@ -3,7 +3,7 @@
 <% if @postgres_databases.count > 0 %>
   <%== part(
     "components/page_header",
-    breadcrumbs: [%w[Projects /project], [@project.name, @project_data[:path]], ["PostgreSQL Databases", "#"]],
+    breadcrumbs: [%w[Projects /project], [@project.name, @project.path], ["PostgreSQL Databases", "#"]],
     right_items: [<<-DROPDOWN]
       <div class="group dropdown relative inline-block text-left">
         <div>#{part("components/button", text: "Create PostgreSQL Database", right_icon: "hero-chevron-down")}
@@ -12,7 +12,7 @@
           #{postgres_flavors.values.map do
             <<-ITEM
             <div class="py-1 hover:bg-gray-50" role="none">
-              <a href="#{@project_data[:path]}/postgres/create?flavor=#{it.name}" class="block px-4 py-3 focus:outline-none">
+              <a href="#{@project.path}/postgres/create?flavor=#{it.name}" class="block px-4 py-3 focus:outline-none">
                 <h3 class="text-base font-semibold leading-6 text-gray-900">#{it.title}</h3>
                 <p class="mt-1 text-sm text-gray-500">#{it.description}</p>
               </a>
@@ -48,7 +48,7 @@
   <%== part(
     "components/page_header",
     title: "Create PostgreSQL Database",
-    breadcrumbs: [%w[Projects /project], [@project.name, @project_data[:path]], ["PostgreSQL Databases", "#"]]
+    breadcrumbs: [%w[Projects /project], [@project.name, @project.path], ["PostgreSQL Databases", "#"]]
   ) %>
 
   <div class="grid gap-6">
@@ -62,7 +62,7 @@
           </div>
           <div class="mt-4">
             <h3 class="text-base font-semibold leading-6 text-gray-900">
-              <a href="<%= @project_data[:path] %>/postgres/create?flavor=<%= it.name %>" class="focus:outline-none">
+              <a href="<%= @project.path %>/postgres/create?flavor=<%= it.name %>" class="focus:outline-none">
                 <span class="absolute inset-0" aria-hidden="true"></span>
                 Create <%= it.title %>
               </a>

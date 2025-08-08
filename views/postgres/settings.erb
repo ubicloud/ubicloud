@@ -144,7 +144,7 @@
               </div>
             </div>
             <div id="postgres-delete-<%=@pg.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-              <%== part("components/delete_button", url: path(@pg), confirmation: @pg.name, redirect: "#{@project_data[:path]}/postgres") %>
+              <%== part("components/delete_button", url: path(@pg), confirmation: @pg.name, redirect: "#{@project.path}/postgres") %>
             </div>
           </div>
         </div>

@@ -11,8 +11,8 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
     title: page_title,
     breadcrumbs: [
       %w[Projects /project],
-      [@project.name, @project_data[:path]],
-      ["Access Control", "#{@project_data[:path]}/user/access-control"],
+      [@project.name, @project.path],
+      ["Access Control", "#{@project.path}/user/access-control"],
       [page_title, "#"]
     ]
   ) %>
@@ -45,8 +45,8 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
             tags, recursively, to allow for easier management.
           </p>
 
-          <form action="<%= "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}" %>" role="form" method="POST">
-            <%== csrf_tag("#{@project_data[:path]}/user/access-control/tag/#{@tag_type}") %>
+          <form action="<%= "#{@project.path}/user/access-control/tag/#{@tag_type}" %>" role="form" method="POST">
+            <%== csrf_tag("#{@project.path}/user/access-control/tag/#{@tag_type}") %>
             <div class="grid grid-cols-12 gap-3">
               <div class="col-span-12 md:col-span-5">
                 <%== part("components/form/text", name: "name", button_title: "Create", attributes: { required: true, placeholder: "Name" }) %>

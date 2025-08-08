@@ -1,6 +1,6 @@
 <div class="flex grow flex-col gap-y-5 overflow-y-auto bg-orange-600 px-6">
   <div class="flex h-16 shrink-0 items-center">
-    <a href="<%= @project_data ? "#{@project_data[:path]}/dashboard" : "/project" %>">
+    <a href="<%= @project_data ? "#{@project.path}/dashboard" : "/project" %>">
       <img class="h-6 w-auto" src="/logo-white.png" alt="Ubicloud">
     </a>
   </div>
@@ -12,53 +12,53 @@
             <%== part(
               "layouts/sidebar/item",
               name: "Dashboard",
-              url: "#{@project_data[:path]}/dashboard",
-              is_active: request.path.start_with?("#{@project_data[:path]}/dashboard"),
+              url: "#{@project.path}/dashboard",
+              is_active: request.path.start_with?("#{@project.path}/dashboard"),
               icon: "hero-home"
             ) %>
             <%== part(
               "layouts/sidebar/item",
               name: "Compute",
-              url: "#{@project_data[:path]}/vm",
-              is_active: request.path.start_with?("#{@project_data[:path]}/vm"),
+              url: "#{@project.path}/vm",
+              is_active: request.path.start_with?("#{@project.path}/vm"),
               icon: "hero-server-stack"
             ) %>
             <%== part(
               "layouts/sidebar/item",
               name: "Networking",
-              url: "#{@project_data[:path]}/private-subnet",
+              url: "#{@project.path}/private-subnet",
               is_active:
-                request.path.start_with?("#{@project_data[:path]}/private-subnet") ||
-                request.path.start_with?("#{@project_data[:path]}/firewall") ||
-                request.path.start_with?("#{@project_data[:path]}/load-balancer"),
+                request.path.start_with?("#{@project.path}/private-subnet") ||
+                request.path.start_with?("#{@project.path}/firewall") ||
+                request.path.start_with?("#{@project.path}/load-balancer"),
               icon: "hero-globe-alt"
             ) %>
             <%== part(
               "layouts/sidebar/item",
               name: "PostgreSQL",
-              url: "#{@project_data[:path]}/postgres",
-              is_active: request.path.start_with?("#{@project_data[:path]}/postgres"),
+              url: "#{@project.path}/postgres",
+              is_active: request.path.start_with?("#{@project.path}/postgres"),
               icon: "hero-circle-stack"
             ) %>
             <%== part(
               "layouts/sidebar/item",
               name: "AI Inference",
-              url: "#{@project_data[:path]}/inference-endpoint",
-              is_active: request.path.start_with?("#{@project_data[:path]}/inference"),
+              url: "#{@project.path}/inference-endpoint",
+              is_active: request.path.start_with?("#{@project.path}/inference"),
               icon: "tabler-robot"
             ) %>
             <%== part(
               "layouts/sidebar/item",
               name: "Kubernetes",
-              url: "#{@project_data[:path]}/kubernetes-cluster",
-              is_active: request.path.start_with?("#{@project_data[:path]}/kubernetes-cluster"),
+              url: "#{@project.path}/kubernetes-cluster",
+              is_active: request.path.start_with?("#{@project.path}/kubernetes-cluster"),
               icon: "kubernetes"
             ) %>
             <%== part(
               "layouts/sidebar/item",
               name: "Web Shell",
-              url: "#{@project_data[:path]}/cli",
-              is_active: request.path.start_with?("#{@project_data[:path]}/cli"),
+              url: "#{@project.path}/cli",
+              is_active: request.path.start_with?("#{@project.path}/cli"),
               icon: "shell"
             ) %>
           <% else %>
@@ -84,10 +84,10 @@
           <div class="text-xs font-semibold leading-6 text-orange-200">Project Details</div>
           <ul role="list" class="-mx-2 mt-2 space-y-1">
             <%== if has_project_permission("Project:user")
-                   users_url = "#{@project_data[:path]}/user"
+                   users_url = "#{@project.path}/user"
                    users_label = "Users"
                  elsif has_project_permission("Project:viewaccess")
-                   users_url = "#{@project_data[:path]}/user/access-control"
+                   users_url = "#{@project.path}/user/access-control"
                    users_label = "Access Control"
                  end
 
@@ -96,15 +96,15 @@
                     "layouts/sidebar/item",
                     name: users_label,
                     url: users_url,
-                    is_active: request.path.start_with?("#{@project_data[:path]}/user"),
+                    is_active: request.path.start_with?("#{@project.path}/user"),
                     icon: "hero-users",
                   )
                 end %>
             <%== part(
               "layouts/sidebar/item",
               name: "Tokens",
-              url: "#{@project_data[:path]}/token",
-              is_active: request.path.start_with?("#{@project_data[:path]}/token"),
+              url: "#{@project.path}/token",
+              is_active: request.path.start_with?("#{@project.path}/token"),
               icon: "hero-key",
               has_permission: has_project_permission("Project:token")
             ) %>
@@ -112,8 +112,8 @@
               <%== part(
                 "layouts/sidebar/item",
                 name: "Billing",
-                url: "#{@project_data[:path]}/billing",
-                is_active: request.path.start_with?("#{@project_data[:path]}/billing"),
+                url: "#{@project.path}/billing",
+                is_active: request.path.start_with?("#{@project.path}/billing"),
                 icon: "hero-banknotes",
                 html_id: "billing-icon",
                 has_permission: has_project_permission("Project:billing")
@@ -122,8 +122,8 @@
             <%== part(
               "layouts/sidebar/item",
               name: "Settings",
-              url: @project_data[:path],
-              is_active: request.path == @project_data[:path],
+              url: @project.path,
+              is_active: request.path == @project.path,
               icon: "hero-cog-6-tooth",
               has_permission: has_project_permission("Project:view")
             ) %>
@@ -131,8 +131,8 @@
               <%== part(
                 "layouts/sidebar/item",
                 name: "AWS Regions",
-                url: "#{@project_data[:path]}/private-location",
-                is_active: request.path.start_with?("#{@project_data[:path]}/private-location"),
+                url: "#{@project.path}/private-location",
+                is_active: request.path.start_with?("#{@project.path}/private-location"),
                 icon: "hero-map-pin",
                 has_permission: true
               ) %>
@@ -148,8 +148,8 @@
               <%== part(
                 "layouts/sidebar/item",
                 name: "GitHub Runners",
-                url: "#{@project_data[:path]}/github",
-                is_active: request.path.start_with?("#{@project_data[:path]}/github"),
+                url: "#{@project.path}/github",
+                is_active: request.path.start_with?("#{@project.path}/github"),
                 icon: "github",
                 has_permission: has_project_permission("Project:github")
               ) %>

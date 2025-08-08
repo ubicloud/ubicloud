@@ -46,9 +46,9 @@ current_members.sort! %>
     title: "#{@display_tag_type} Tag: #{@tag.name}",
     breadcrumbs: [
       %w[Projects /project],
-      [@project.name, @project_data[:path]],
-      ["Access Control", "#{@project_data[:path]}/user/access-control"],
-      ["#{@display_tag_type} Tags", "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}"],
+      [@project.name, @project.path],
+      ["Access Control", "#{@project.path}/user/access-control"],
+      ["#{@display_tag_type} Tags", "#{@project.path}/user/access-control/tag/#{@tag_type}"],
       [@tag.name, "#"]
     ]
   ) %>

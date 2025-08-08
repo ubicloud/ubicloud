@@ -20,8 +20,8 @@ viewable_fws, viewable_subnets =
   "components/page_header",
   breadcrumbs: [
     %w[Projects /project],
-    [@project.name, @project_data[:path]],
-    ["Private Subnet", "#{@project_data[:path]}/private-subnet"],
+    [@project.name, @project.path],
+    ["Private Subnet", "#{@project.path}/private-subnet"],
     [@ps.name, "#"]
   ],
   right_items: [part("components/ps_state_label", state: @ps.display_state, extra_class: "text-md")]
@@ -163,7 +163,7 @@ viewable_fws, viewable_subnets =
             </div>
           </div>
           <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-            <%== part("components/delete_button", confirmation: @ps.name, redirect: "#{@project_data[:path]}/private-subnet") %>
+            <%== part("components/delete_button", confirmation: @ps.name, redirect: "#{@project.path}/private-subnet") %>
           </div>
         </div>
       </div>
