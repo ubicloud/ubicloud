@@ -8,7 +8,7 @@
   "components/page_header",
   breadcrumbs: [
     %w[Projects /project],
-    [@project_data[:name], @project_data[:path]],
+    [@project.name, @project_data[:path]],
     ["Kubernetes Clusters", "#{@project_data[:path]}/kubernetes-cluster"],
     [@kc.name, "#"]
   ],

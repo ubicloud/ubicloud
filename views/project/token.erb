@@ -1,9 +1,9 @@
-<% @page_title = "#{@project_data[:name]} - Personal Access Tokens" %>
+<% @page_title = "#{@project.name} - Personal Access Tokens" %>
 
 <%== part(
   "components/page_header",
   title: "Personal Access Tokens",
-  breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Personal Access Tokens", "#"]],
+  breadcrumbs: [%w[Projects /project], [@project.name, @project_data[:path]], ["Personal Access Tokens", "#"]],
   right_items: [<<-CREATE]
     <form id="create-pat" action="#{@project_data[:path]}/token" role="form" method="POST">
       #{csrf_tag("#{@project_data[:path]}/token")}

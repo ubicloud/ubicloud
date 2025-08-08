@@ -1,4 +1,4 @@
-<% @page_title = "#{@project_data[:name]} - Users"
+<% @page_title = "#{@project.name} - Users"
 @users = @project.accounts_dataset.order_by(:email).all
 @subject_tag_map = SubjectTag.subject_id_map_for_project_and_accounts(@project.id, @users.map(&:id))
 @allowed_view_tag_names = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:view").map(:name)
@@ -10,7 +10,7 @@
 <%== part(
   "components/page_header",
   title: "User Management",
-  breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Users #]]
+  breadcrumbs: [%w[Projects /project], [@project.name, @project_data[:path]], %w[Users #]]
 ) %>
 
 <div class="grid gap-6">

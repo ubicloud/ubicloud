@@ -1,5 +1,5 @@
 <% page_title = "#{@display_tag_type} Tags"
-@page_title = "#{@project_data[:name]} - #{page_title}"
+@page_title = "#{@project.name} - #{page_title}"
 @tags = dataset_authorize(@tag_model.where(project_id: @project.id).order(:name), "#{@tag_model}:view").all
 modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion)\z/, "").downcase}tag") %>
 
@@ -11,7 +11,7 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
     title: page_title,
     breadcrumbs: [
       %w[Projects /project],
-      [@project_data[:name], @project_data[:path]],
+      [@project.name, @project_data[:path]],
       ["Access Control", "#{@project_data[:path]}/user/access-control"],
       [page_title, "#"]
     ]

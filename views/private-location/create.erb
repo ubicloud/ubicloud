@@ -12,7 +12,7 @@ options.add_option(name: "secret_key")
   "components/page_header",
   breadcrumbs: [
     %w[Projects project],
-    [@project_data[:name], @project_data[:path]],
+    [@project.name, @project_data[:path]],
     ["AWS Regions", "#{@project_data[:path]}/private-location"],
     %w[Create #]
   ]

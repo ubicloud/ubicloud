@@ -1,4 +1,4 @@
-<% @page_title = @project_data[:name]
+<% @page_title = @project.name
 @quotas = ["VmVCpu", "PostgresVCpu"].map {
   {
     resource_type: it,
@@ -11,7 +11,7 @@
   "components/page_header",
   title: "Project Settings",
   back: "/project",
-  breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Settings #]]
+  breadcrumbs: [%w[Projects /project], [@project.name, @project_data[:path]], %w[Settings #]]
 ) %>
 
 <div class="grid gap-6">
@@ -30,7 +30,7 @@
               part(
                 "components/form/text",
                 name: "name",
-                value: @project_data[:name],
+                value: @project.name,
                 button_title: "Save",
                 attributes: {
                   required: true
@@ -39,7 +39,7 @@
               { escape: false }
             ]
           else
-            ["Name", @project_data[:name]]
+            ["Name", @project.name]
           end
         )
       ]
@@ -81,7 +81,7 @@
             </div>
           </div>
           <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-            <%== part("components/delete_button", confirmation: @project_data[:name], redirect: "/project") %>
+            <%== part("components/delete_button", confirmation: @project.name, redirect: "/project") %>
           </div>
         </div>
       </div>
