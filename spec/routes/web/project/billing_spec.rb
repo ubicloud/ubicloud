@@ -496,6 +496,8 @@ RSpec.describe Clover, "billing" do
         expect(page.status_code).to eq(200)
         expect(page.title).to eq("Ubicloud - Current Usage Summary")
         expect(page).to have_content "Aggregated"
+        expect(page).to have_content "40420 minutes"
+        expect(page).to have_content "$24.700"
         expect(page.has_css?("#invoice-discount")).to be false
         expect(page.has_css?("#invoice-credit")).to be false
 
