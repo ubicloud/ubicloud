@@ -829,7 +829,7 @@ function queryAndUpdateChart(chartInstance, start_time, end_time) {
   const queryString = new URLSearchParams(params).toString();
   const url = $("#metrics-container").data("metrics-url") + "/metrics?" + queryString;
 
-  fetch(url)
+  fetch(url, {headers: {'Accept': 'application/json'}})
     .then(response => response.json())
     .then(data => {
       const metrics = data.metrics || [];
