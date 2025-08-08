@@ -4,7 +4,7 @@ if @project.billing_info
   @invoices = Serializers::Invoice.serialize(@project.invoices.prepend(@project.current_invoice))
 end
 
-@usage_alerts = Serializers::UsageAlert.serialize(@project.usage_alerts_dataset.eager(:user)) %>
+@usage_alerts = @project.usage_alerts_dataset.eager(:user) %>
 
 <% if billing_info = @project.billing_info %>
   <%== part(
@@ -328,16 +328,16 @@ end
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <% @usage_alerts.each do |alert| %>
-              <tr id="alert-<%= alert[:ubid]%>" class="whitespace-nowrap text-sm font-medium">
-                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert[:name] %></td>
-                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert[:limit] %></td>
-                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert[:email] %></td>
+              <tr id="alert-<%= alert.ubid %>" class="whitespace-nowrap text-sm font-medium">
+                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.name %></td>
+                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.limit %></td>
+                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.user.email %></td>
                 <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
                   <%== part(
                     "components/delete_button",
                     text: "Remove",
-                    url: "#{@project.path}/usage-alert/#{alert[:ubid]}",
-                    confirmation: alert[:name]
+                    url: "#{@project.path}/usage-alert/#{alert.ubid}",
+                    confirmation: alert.name
                   ) %>
                 </td>
               </tr>
