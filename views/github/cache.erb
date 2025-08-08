@@ -12,34 +12,34 @@
               <th scope="colgroup" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 w-full group-[.active]:bg-gray-50">
                 <div class="flex">
                   <%== part("components/icon", name: "hero-chevron-right", classes: "w-5 h-5 group-[.active]:rotate-90") %>
-                  <%= entries.first[:repository][:name] %>
+                  <%= entries.first.repository.name %>
                 </div>
               </th>
               <th scope="colgroup" class="py-3.5 pl-3 pr-3 text-right text-sm font-semibold text-gray-900 whitespace-nowrap group-[.active]:bg-gray-50" colspan="2">
                 <%= entries.count %> cache entries
               </th>
               <th scope="colgroup" class="py-3.5 pl-3 pr-4 text-right text-sm font-semibold text-gray-900 whitespace-nowrap group-[.active]:bg-gray-50" colspan="2">
-                <%= Serializers::GithubCacheEntry.humanize_size(entries.sum { it[:size].to_i }) %> used of <%= @quota_per_repo %>
+                <%= humanize_size(entries.sum { it.size.to_i }) %> used of <%= @quota_per_repo %>
               </th>
             </tr>
             <% entries.each do |entry| %>
-              <tr id="entry-<%= entry[:id]%>" class="hidden cache-group-<%= repository_id %>">
+              <tr id="entry-<%= entry.ubid %>" class="hidden cache-group-<%= repository_id %>">
                 <td class="py-3 pl-4 pr-3 text-sm sm:pl-6 w-full" scope="row">
-                  <div class="font-medium text-gray-900"><%= entry[:key] %></div>
-                  <div class="mt-1 text-gray-500 text-xs ">created <span title="<%= entry[:created_at] %>"><%= entry[:created_at_human] %></span></div>
+                  <div class="font-medium text-gray-900"><%= entry.key %></div>
+                  <div class="mt-1 text-gray-500 text-xs ">created <span title="<%= entry.created_at.strftime("%Y-%m-%d %H:%M UTC") %>"><%= humanize_time(entry.created_at) %></span></div>
                 </td>
                 <td class="px-3 py-3 text-sm text-gray-500">
-                  <div><%= entry[:scope] %></div>
+                  <div><%= entry.scope %></div>
                 </td>
                 <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500">
-                  <div class="inline-flex items-baseline rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800" title="<%= entry[:size] %> bytes">
-                    <%= entry[:size_human] %>
+                  <div class="inline-flex items-baseline rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800" title="<%= entry.size %> bytes">
+                    <%= humanize_size(entry.size) %>
                   </div>
                 </td>
                 <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500">
-                  <% if entry[:last_accessed_at] %>
+                  <% if entry.last_accessed_at %>
                     <div>Last used</div>
-                    <div title="<%= entry[:last_accessed_at] %>"> <%= entry[:last_accessed_at_human] %></div>
+                    <div title="<%= entry.last_accessed_at.strftime("%Y-%m-%d %H:%M UTC") %>"> <%= humanize_time(entry.last_accessed_at) %></div>
                   <% else %>
                     <div>Never used</div>
                   <% end %>
@@ -47,7 +47,7 @@
                 <td class="whitespace-nowrap py-3 pl-3 pr-4 text-sm text-right">
                   <%== part(
                     "components/delete_button",
-                    url: "#{@project.path}/github/#{@installation.ubid}/cache/#{entry[:id]}",
+                    url: "#{path(@installation)}/cache/#{entry.ubid}",
                     text: ""
                   ) %>
                 </td>
