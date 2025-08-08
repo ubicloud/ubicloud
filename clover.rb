@@ -231,14 +231,14 @@ class Clover < Roda
 
       if e.is_a?(Sequel::ValidationFailed) || e.is_a?(DependencyError) || e.is_a?(Roda::RodaPlugins::TypecastParams::Error)
         flash["error"] = message
-        redirect_back_with_inputs
+        redirect_back_with_inputs(e)
       elsif e.is_a?(Sequel::SerializationFailure)
         flash["error"] = "There was a temporary error attempting to make this change, please try again."
-        redirect_back_with_inputs
+        redirect_back_with_inputs(e)
       elsif e.is_a?(CloverError) && !e.is_a?(Authorization::Unauthorized)
         flash["error"] = message
         flash["errors"] = (flash["errors"] || {}).merge(details || {}).transform_keys(&:to_s)
-        redirect_back_with_inputs
+        redirect_back_with_inputs(e)
       end
 
       # :nocov:
@@ -788,6 +788,11 @@ class Clover < Roda
     hash_branch(:webhook_prefix, "test-typecast-error-during-validation-failure") do |r|
       r.POST["a"] = {}
       handle_validation_failure(inline: "<%= typecast_body_params.str('a') %>")
+      typecast_body_params.str("a")
+    end
+
+    hash_branch(:webhook_prefix, "test-missing-handle-validation-failure") do |r|
+      r.POST["a"] = {}
       typecast_body_params.str("a")
     end
 
