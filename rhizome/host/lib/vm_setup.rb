@@ -553,7 +553,7 @@ EOS
     write_user_data(unix_user, public_keys, swap_size_bytes, boot_image)
 
     FileUtils.rm_rf(vp.cloudinit_img)
-    r "mkdosfs -n CIDATA -C #{vp.q_cloudinit_img} 8192"
+    r "mkdosfs -n CIDATA -C #{vp.q_cloudinit_img} 128"
     r "mcopy -oi #{vp.q_cloudinit_img} -s #{vp.q_user_data} ::"
     r "mcopy -oi #{vp.q_cloudinit_img} -s #{vp.q_meta_data} ::"
     r "mcopy -oi #{vp.q_cloudinit_img} -s #{vp.q_network_config} ::"
