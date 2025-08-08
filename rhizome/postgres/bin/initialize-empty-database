@@ -15,7 +15,7 @@ r "chown postgres /dat"
 r "rm -rf /dat/#{v}"
 r "rm -rf /etc/postgresql/#{v}"
 
-r "echo \"data_directory = '/dat/#{v}/data'\" | sudo tee -a /etc/postgresql-common/createcluster.conf"
+r "echo \"data_directory = '/dat/#{v}/data'\" | sudo tee /etc/postgresql-common/createcluster.d/data-dir.conf"
 r "pg_createcluster #{v} main --start --locale=C.UTF8"
 
 role_creation_queries = <<~ROLE_CREATION
