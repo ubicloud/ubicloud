@@ -107,22 +107,24 @@ class Prog::Aws::Instance < Prog::Base
     public_keys = (vm.sshable.keys.map(&:public_key) + (vm.project.get_ff_vm_public_ssh_keys || [])).join("\n")
     # Define user data script to set a custom username
     user_data = <<~USER_DATA
-#!/bin/bash
-custom_user="#{vm.unix_user}"
-# Create the custom user
-adduser $custom_user --disabled-password --gecos ""
-# Add the custom user to the sudo group
-usermod -aG sudo $custom_user
-# disable password for the custom user
-echo "$custom_user ALL=(ALL:ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/$custom_user
-# Set up SSH access for the custom user
-mkdir -p /home/$custom_user/.ssh
-cp /home/ubuntu/.ssh/authorized_keys /home/$custom_user/.ssh/
-chown -R $custom_user:$custom_user /home/$custom_user/.ssh
-chmod 700 /home/$custom_user/.ssh
-chmod 600 /home/$custom_user/.ssh/authorized_keys
-echo #{public_keys.shellescape} > /home/$custom_user/.ssh/authorized_keys
-usermod -L ubuntu
+      #!/bin/bash
+      custom_user="#{vm.unix_user}"
+      if [ ! -d /home/$custom_user ]; then
+        # Create the custom user
+        adduser $custom_user --disabled-password --gecos ""
+        # Add the custom user to the sudo group
+        usermod -aG sudo $custom_user
+        # disable password for the custom user
+        echo "$custom_user ALL=(ALL:ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/$custom_user
+        # Set up SSH access for the custom user
+        mkdir -p /home/$custom_user/.ssh
+        cp /home/ubuntu/.ssh/authorized_keys /home/$custom_user/.ssh/
+        chown -R $custom_user:$custom_user /home/$custom_user/.ssh
+        chmod 700 /home/$custom_user/.ssh
+        chmod 600 /home/$custom_user/.ssh/authorized_keys
+      fi
+      echo #{public_keys.shellescape} > /home/$custom_user/.ssh/authorized_keys
+      usermod -L ubuntu
     USER_DATA
 
     instance_response = client.run_instances({
