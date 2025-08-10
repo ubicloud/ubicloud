@@ -127,7 +127,7 @@ class Prog::Aws::Instance < Prog::Base
       usermod -L ubuntu
     USER_DATA
 
-    instance_response = client.run_instances({
+    params = {
       image_id: vm.boot_image, # AMI ID
       instance_type: Option.aws_instance_type_name(vm.family, vm.vcpus),
       block_device_mappings: [
@@ -162,7 +162,13 @@ class Prog::Aws::Instance < Prog::Base
         name: "#{vm.name}-instance-profile"
       },
       client_token: vm.id
-    })
+    }
+    begin
+      instance_response = client.run_instances(params)
+    rescue Aws::EC2::Errors::InvalidParameterValue => e
+      nap 1 if e.message.include?("Invalid IAM Instance Profile name")
+      raise
+    end
     instance_id = instance_response.instances[0].instance_id
     subnet_id = instance_response.instances[0].network_interfaces[0].subnet_id
     subnet_response = client.describe_subnets(subnet_ids: [subnet_id])
