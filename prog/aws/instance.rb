@@ -169,11 +169,12 @@ class Prog::Aws::Instance < Prog::Base
       nap 1 if e.message.include?("Invalid IAM Instance Profile name")
       raise
     end
-    instance_id = instance_response.instances[0].instance_id
-    subnet_id = instance_response.instances[0].network_interfaces[0].subnet_id
+    instance = instance_response.instances.first
+    instance_id = instance.instance_id
+    subnet_id = instance.network_interfaces.first.subnet_id
     subnet_response = client.describe_subnets(subnet_ids: [subnet_id])
-    az_id = subnet_response.subnets[0].availability_zone_id
-    ipv4_dns_name = instance_response.instances[0].public_dns_name
+    az_id = subnet_response.subnets.first.availability_zone_id
+    ipv4_dns_name = instance.public_dns_name
 
     AwsInstance.create_with_id(vm.id, instance_id:, az_id:, ipv4_dns_name:)
 
