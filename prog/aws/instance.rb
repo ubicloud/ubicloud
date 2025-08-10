@@ -4,7 +4,7 @@ class Prog::Aws::Instance < Prog::Base
   subject_is :vm, :aws_instance
 
   label def start
-    assume_role_policy = {
+    assume_role_policy_document = {
       Version: "2012-10-17",
       Statement: [
         {
@@ -16,17 +16,14 @@ class Prog::Aws::Instance < Prog::Base
     }.to_json
 
     ignore_invalid_entity do
-      iam_client.create_role({
-        role_name: vm.name,
-        assume_role_policy_document: assume_role_policy
-      })
+      iam_client.create_role({role_name:, assume_role_policy_document:})
     end
 
     hop_create_role_policy
   end
 
   label def create_role_policy
-    policy = {
+    policy_document = {
       Version: "2012-10-17",
       Statement: [
         {
@@ -53,10 +50,7 @@ class Prog::Aws::Instance < Prog::Base
     }.to_json
 
     ignore_invalid_entity do
-      iam_client.create_policy({
-        policy_name: "#{vm.name}-cw-agent-policy",
-        policy_document: policy
-      })
+      iam_client.create_policy({policy_name:, policy_document:})
     end
 
     hop_attach_role_policy
@@ -64,10 +58,7 @@ class Prog::Aws::Instance < Prog::Base
 
   label def attach_role_policy
     ignore_invalid_entity do
-      iam_client.attach_role_policy({
-        role_name: vm.name,
-        policy_arn: cloudwatch_policy.arn
-      })
+      iam_client.attach_role_policy({role_name:, policy_arn: cloudwatch_policy.arn})
     end
 
     hop_create_instance_profile
@@ -75,9 +66,7 @@ class Prog::Aws::Instance < Prog::Base
 
   label def create_instance_profile
     ignore_invalid_entity do
-      iam_client.create_instance_profile({
-        instance_profile_name: "#{vm.name}-instance-profile"
-      })
+      iam_client.create_instance_profile({instance_profile_name:})
     end
 
     hop_add_role_to_instance_profile
@@ -85,10 +74,7 @@ class Prog::Aws::Instance < Prog::Base
 
   label def add_role_to_instance_profile
     ignore_invalid_entity do
-      iam_client.add_role_to_instance_profile({
-        instance_profile_name: "#{vm.name}-instance-profile",
-        role_name: vm.name
-      })
+      iam_client.add_role_to_instance_profile({instance_profile_name:, role_name:})
     end
 
     hop_wait_instance_profile_created
@@ -96,7 +82,7 @@ class Prog::Aws::Instance < Prog::Base
 
   label def wait_instance_profile_created
     begin
-      iam_client.get_instance_profile({instance_profile_name: "#{vm.name}-instance-profile"})
+      iam_client.get_instance_profile({instance_profile_name:})
     rescue Aws::IAM::Errors::NoSuchEntity
       nap 1
     end
@@ -158,9 +144,7 @@ class Prog::Aws::Instance < Prog::Base
       max_count: 1,
       user_data: Base64.encode64(user_data.gsub(/^(\s*# .*)?\n/, "")),
       tag_specifications: Util.aws_tag_specifications("instance", vm.name),
-      iam_instance_profile: {
-        name: "#{vm.name}-instance-profile"
-      },
+      iam_instance_profile: {name: instance_profile_name},
       client_token: vm.id
     }
     begin
@@ -209,15 +193,15 @@ class Prog::Aws::Instance < Prog::Base
 
   label def cleanup_roles
     ignore_invalid_entity do
-      iam_client.remove_role_from_instance_profile({instance_profile_name: "#{vm.name}-instance-profile", role_name: vm.name})
+      iam_client.remove_role_from_instance_profile({instance_profile_name:, role_name:})
     end
     ignore_invalid_entity do
-      iam_client.delete_instance_profile({instance_profile_name: "#{vm.name}-instance-profile"})
+      iam_client.delete_instance_profile({instance_profile_name:})
     end
 
     if cloudwatch_policy
       ignore_invalid_entity do
-        iam_client.detach_role_policy({role_name: vm.name, policy_arn: cloudwatch_policy.arn})
+        iam_client.detach_role_policy({role_name:, policy_arn: cloudwatch_policy.arn})
       end
 
       ignore_invalid_entity do
@@ -226,7 +210,7 @@ class Prog::Aws::Instance < Prog::Base
     end
 
     ignore_invalid_entity do
-      iam_client.delete_role({role_name: vm.name})
+      iam_client.delete_role({role_name:})
     end
 
     pop "vm destroyed"
@@ -241,7 +225,19 @@ class Prog::Aws::Instance < Prog::Base
   end
 
   def cloudwatch_policy
-    @cloudwatch_policy ||= iam_client.list_policies(scope: "Local").policies.find { |p| p.policy_name == "#{vm.name}-cw-agent-policy" }
+    @cloudwatch_policy ||= iam_client.list_policies(scope: "Local").policies.find { |p| p.policy_name == policy_name }
+  end
+
+  def policy_name
+    "#{vm.name}-cw-agent-policy"
+  end
+
+  def role_name
+    vm.name
+  end
+
+  def instance_profile_name
+    "#{vm.name}-instance-profile"
   end
 
   def ignore_invalid_entity
