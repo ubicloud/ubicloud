@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Prog::Aws::Instance < Prog::Base
-  subject_is :vm
+  subject_is :vm, :aws_instance
 
   label def start
     assume_role_policy = {
@@ -182,7 +182,7 @@ class Prog::Aws::Instance < Prog::Base
   end
 
   label def wait_instance_created
-    instance_response = client.describe_instances({filters: [{name: "instance-id", values: [vm.aws_instance.instance_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).reservations[0].instances[0]
+    instance_response = client.describe_instances({filters: [{name: "instance-id", values: [aws_instance.instance_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).reservations[0].instances[0]
     if instance_response.dig(:state, :name) == "running"
       public_ipv4 = instance_response.dig(:network_interfaces, 0, :association, :public_ip)
       AssignedVmAddress.create(
@@ -198,13 +198,13 @@ class Prog::Aws::Instance < Prog::Base
   end
 
   label def destroy
-    if vm.aws_instance
+    if aws_instance
       begin
-        client.terminate_instances(instance_ids: [vm.aws_instance.instance_id])
+        client.terminate_instances(instance_ids: [aws_instance.instance_id])
       rescue Aws::EC2::Errors::InvalidInstanceIDNotFound
       end
 
-      vm.aws_instance.destroy
+      aws_instance.destroy
     end
 
     hop_cleanup_roles

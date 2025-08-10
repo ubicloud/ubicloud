@@ -20,13 +20,11 @@ RSpec.describe Prog::Aws::Instance do
     Prog::Vm::Nexus.assemble("dummy-public key", prj.id, location_id: loc.id, unix_user: "test-user-aws", boot_image: "ami-030c060f85668b37d", name: "testvm", size: "m6gd.large", arch: "arm64", storage_volumes:).subject
   }
 
-  let(:client) {
-    Aws::EC2::Client.new(stub_responses: true)
-  }
+  let(:aws_instance) { AwsInstance.create_with_id(vm.id, instance_id: "i-0123456789abcdefg") }
 
-  let(:iam_client) {
-    Aws::IAM::Client.new(stub_responses: true)
-  }
+  let(:client) { Aws::EC2::Client.new(stub_responses: true) }
+
+  let(:iam_client) { Aws::IAM::Client.new(stub_responses: true) }
 
   let(:user_data) {
     <<~USER_DATA
@@ -48,7 +46,7 @@ usermod -L ubuntu
   }
 
   before do
-    allow(nx).to receive(:vm).and_return(vm)
+    allow(nx).to receive_messages(vm:, aws_instance:)
     allow(Aws::EC2::Client).to receive(:new).with(access_key_id: "test-access-key", secret_access_key: "test-secret-key", region: "us-west-2").and_return(client)
     allow(Aws::IAM::Client).to receive(:new).with(access_key_id: "test-access-key", secret_access_key: "test-secret-key", region: "us-west-2").and_return(iam_client)
   end
@@ -282,7 +280,6 @@ usermod -L ubuntu
       expect(Time).to receive(:now).and_return(time).at_least(:once)
       expect(client).to receive(:describe_instances).with({filters: [{name: "instance-id", values: ["i-0123456789abcdefg"]}, {name: "tag:Ubicloud", values: ["true"]}]}).and_call_original
       expect(vm).to receive(:update).with(cores: 1, allocated_at: time, ephemeral_net6: "2a01:4f8:173:1ed3:aa7c::/79")
-      expect(vm).to receive(:aws_instance).and_return(instance_double(AwsInstance, instance_id: "i-0123456789abcdefg"))
       expect { nx.wait_instance_created }.to exit({"msg" => "vm created"})
     end
 
@@ -292,29 +289,25 @@ usermod -L ubuntu
       sshable = instance_double(Sshable)
       expect(vm).to receive(:sshable).and_return(sshable)
       expect(sshable).to receive(:update).with(host: "1.2.3.4")
-      expect(vm).to receive(:aws_instance).and_return(instance_double(AwsInstance, instance_id: "i-0123456789abcdefg"))
       expect(vm).to receive(:update).with(cores: 1, allocated_at: time, ephemeral_net6: "2a01:4f8:173:1ed3:aa7c::/79")
       expect { nx.wait_instance_created }.to exit({"msg" => "vm created"})
     end
 
     it "naps if the instance is not running" do
       client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "pending"}}]}])
-      expect(vm).to receive(:aws_instance).and_return(instance_double(AwsInstance, instance_id: "i-0123456789abcdefg"))
       expect { nx.wait_instance_created }.to nap(1)
     end
   end
 
   describe "#destroy" do
     it "deletes the instance" do
-      aws_instance = instance_double(AwsInstance, instance_id: "i-0123456789abcdefg")
       expect(aws_instance).to receive(:destroy)
-      expect(vm).to receive(:aws_instance).and_return(aws_instance).at_least(:once)
       expect(client).to receive(:terminate_instances).with({instance_ids: ["i-0123456789abcdefg"]})
       expect { nx.destroy }.to hop("cleanup_roles")
     end
 
     it "pops directly if there is no aws_instance" do
-      expect(vm).to receive(:aws_instance).and_return(nil)
+      expect(nx).to receive(:aws_instance).and_return(nil)
       expect { nx.destroy }.to hop("cleanup_roles")
     end
   end
