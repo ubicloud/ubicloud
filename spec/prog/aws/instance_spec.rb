@@ -33,13 +33,9 @@ RSpec.describe Prog::Aws::Instance do
 #!/bin/bash
 custom_user="test-user-aws"
 if [ ! -d /home/$custom_user ]; then
-  # Create the custom user
   adduser $custom_user --disabled-password --gecos ""
-  # Add the custom user to the sudo group
   usermod -aG sudo $custom_user
-  # disable password for the custom user
   echo "$custom_user ALL=(ALL:ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/$custom_user
-  # Set up SSH access for the custom user
   mkdir -p /home/$custom_user/.ssh
   cp /home/ubuntu/.ssh/authorized_keys /home/$custom_user/.ssh/
   chown -R $custom_user:$custom_user /home/$custom_user/.ssh
