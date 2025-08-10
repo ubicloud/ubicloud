@@ -254,6 +254,22 @@ usermod -L ubuntu
       expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
     end
+
+    it "naps until instance profile not propagated yet" do
+      client.stub_responses(:run_instances, Aws::EC2::Errors::InvalidParameterValue.new(nil, "Invalid IAM Instance Profile name"))
+      client.stub_responses(:describe_subnets, subnets: [{availability_zone_id: "use1-az1"}])
+      expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
+      expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
+      expect { nx.create_instance }.to nap(1)
+    end
+
+    it "raises exception if it's not for invalid instance profile" do
+      client.stub_responses(:run_instances, Aws::EC2::Errors::InvalidParameterValue.new(nil, "Invalid instance name"))
+      client.stub_responses(:describe_subnets, subnets: [{availability_zone_id: "use1-az1"}])
+      expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
+      expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
+      expect { nx.create_instance }.to raise_error(Aws::EC2::Errors::InvalidParameterValue)
+    end
   end
 
   describe "#wait_instance_created" do
