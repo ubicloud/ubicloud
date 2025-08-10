@@ -183,18 +183,15 @@ class Prog::Aws::Instance < Prog::Base
 
   label def wait_instance_created
     instance_response = client.describe_instances({filters: [{name: "instance-id", values: [aws_instance.instance_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).reservations[0].instances[0]
-    if instance_response.dig(:state, :name) == "running"
-      public_ipv4 = instance_response.dig(:network_interfaces, 0, :association, :public_ip)
-      AssignedVmAddress.create(
-        dst_vm_id: vm.id,
-        ip: public_ipv4
-      )
-      vm.sshable&.update(host: public_ipv4)
-      vm.update(cores: vm.vcpus / 2, allocated_at: Time.now, ephemeral_net6: instance_response.dig(:network_interfaces, 0, :ipv_6_addresses, 0, :ipv_6_address))
+    nap 1 unless instance_response.dig(:state, :name) == "running"
 
-      pop "vm created"
-    end
-    nap 1
+    public_ipv4 = instance_response.dig(:network_interfaces, 0, :association, :public_ip)
+    public_ipv6 = instance_response.dig(:network_interfaces, 0, :ipv_6_addresses, 0, :ipv_6_address)
+    AssignedVmAddress.create(dst_vm_id: vm.id, ip: public_ipv4)
+    vm.sshable&.update(host: public_ipv4)
+    vm.update(cores: vm.vcpus / 2, allocated_at: Time.now, ephemeral_net6: public_ipv6)
+
+    pop "vm created"
   end
 
   label def destroy
