@@ -55,7 +55,7 @@ class Clover < Roda
     @validation_failure_block = block
   end
 
-  def redirect_back_with_inputs
+  def redirect_back_with_inputs(error)
     # :nocov:
     if (template = @validation_failure_template)
       # :nocov:
@@ -70,6 +70,22 @@ class Clover < Roda
       end
     end
 
+    # Emit error if no validation failure template was registered. This will allow
+    # detection of errors in production for cases where we don't have specs that cover
+    # the error. These errors will be monitored and specs will be added for them.
+    Clog.emit("web error without handle_validation_failure") do
+      {
+        missing_handle_validation_failure: {
+          request_method: request.request_method,
+          path_info: request.path_info,
+          referrer: env["HTTP_REFERER"],
+          error_class: error.class,
+          error_message: error.message,
+          backtrace: error.backtrace
+        }
+      }
+    end
+
     # :nocov:
     # This code path is deprecated and will be removed after all routes have been updated
     # to use handle_validation_failure.
@@ -78,19 +94,6 @@ class Clover < Roda
       # Raise error in the tests if we get here. If this error is raised, the route
       # should be fixed to call handle_validation_failure.
       raise "Request failure without handle_validation_failure: #{request.request_method} #{request.path_info}"
-    else
-      # Emit error messages in other environments. This will allow detection of errors in production
-      # for cases where we don't have specs that cover the error. These errors will be
-      # monitored and specs will be added for them.
-      Clog.emit("web error without handle_validation_failure") do
-        {
-          missing_handle_validation_failure: {
-            request_method: request.request_method,
-            path_info: request.path_info,
-            referrer: env["HTTP_REFERER"]
-          }
-        }
-      end
     end
 
     referrer = flash["referrer"] || env["HTTP_REFERER"]
