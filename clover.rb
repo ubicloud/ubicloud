@@ -871,6 +871,8 @@ class Clover < Roda
           response.content_type = :text
           response.status = 400
           next "! Invalid request: No valid personal access token provided\n"
+        elsif (session_id = env["clover.web_cli_session_id"])
+          rodauth.instance_variable_set(:@session, rodauth.session_key.to_s => session_id)
         else
           response.json = true
           fail CloverError.new(401, "MissingCredentials", "must include personal access token in Authorization header")

@@ -1,0 +1,61 @@
+<% @page_title = "Web Shell" %>
+<% multi = typecast_query_params.bool("multi") %>
+
+<h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:tracking-tight">Web Shell</h2>
+
+<form action="<%= request.path_info %>" method="POST">
+  <%== csrf_tag(request.path_info) %>
+
+  <div class="mt-4">
+    <div class="float-right <%= multi ? "mb-2" : "mt-4" %> ml-2">
+      <%== part("components/form/submit_button", text: "Run") %>
+    </div>
+
+    <% if multi %>
+      <%== part("components/form/textarea", name: "multi-cli", label: "Multiple commands, one per line", attributes: {cols: 80, rows: 6, autofocus: true, required: true}) %>
+    <% else %>
+      <%== part("components/form/text", name: "cli", label: "Command", value: @cli, attributes: {autofocus: true, required: true}) %>
+    <% end %>
+  </div>
+
+
+  <% if @clis && !@clis.empty? %>
+    <p>Remaining commands:</p>
+    <% @clis.each do %>
+      <pre><tt class="next-clis"><%= it %></tt></pre>
+      <input type="hidden" name="clis[]" value="<%= it %>">
+    <% end %>
+  <% end %>
+
+  <% if @last_cli %>
+    <p class="mt-4">Ran command:</p>
+    <pre><tt id="cli-executed"><%= @last_cli %></tt></pre>
+
+    <p class="mt-4"><%= @ubi_command_execute ? "Would execute" : "Output" %>:</p>
+    <pre><tt id="cli-output"><%== @output %></tt></pre>
+
+    <% if @ubi_confirm %>
+      <%== part("components/form/text", name: "confirm", label: @ubi_confirm) %>
+    <% end %>
+  <% end %>
+</form>
+
+<% if !@last_cli && !@cli %>
+  <% if multi %>
+    <p class="mt-6 text-base">This page allows scheduling the execution of multiple commands, one per line. It will run the command on the first line and display the output, and the set the next command for execution.</p>
+  <% else %>
+    <p class="mt-6 text-base">This page provides access to a web version of <a class="font-medium text-orange-600 hover:text-orange-700" href="https://www.ubicloud.com/docs/quick-start/cli">Ubicloud's command line program</a>. You can use it without installing the command line program.  All features are available, except ones that execute external programs.</p>
+
+    <h2 class="mt-6 text-xl font-bold">Examples</h2>
+    <dl class="mt-2">
+      <dt><code>help -ru</code></dt>
+      <dd class="inline-block ml-6 mb-2">Display the syntax for all supported commands</dd>
+      <dt><code>help -r</code></dt>
+      <dd class="inline-block ml-6 mb-2">Show full help for all supported commands</dd>
+      <dt><code>vm list</code></dt>
+      <dd class="inline-block ml-6">List all virtual machines</dd>
+    </dl>
+
+    <p class="mt-6 text-base">This page allows execution of a single command. However, you can also <a class="font-medium text-orange-600 hover:text-orange-700" href="?multi=t">schedule execution of multiple commands</a>.</p>
+  <% end %>
+<% end %>

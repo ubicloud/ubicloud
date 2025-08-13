@@ -54,6 +54,13 @@
               is_active: request.path.start_with?("#{@project_data[:path]}/kubernetes-cluster"),
               icon: "kubernetes"
             ) %>
+            <%== part(
+              "layouts/sidebar/item",
+              name: "Web Shell",
+              url: "#{@project_data[:path]}/cli",
+              is_active: request.path.start_with?("#{@project_data[:path]}/cli"),
+              icon: "shell"
+            ) %>
           <% else %>
             <%== part(
               "layouts/sidebar/item",
