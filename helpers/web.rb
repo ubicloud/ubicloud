@@ -190,7 +190,7 @@ class Clover < Roda
   def html_attrs(attributes)
     attributes.map do |key, value|
       case key
-      when :required, :checked, :readonly
+      when :required, :checked, :readonly, :autofocus
         case value
         when true
           key.name
