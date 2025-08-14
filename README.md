@@ -104,7 +104,7 @@ Hypervisor](https://github.com/cloud-hypervisor/cloud-hypervisor) as our virtual
 machine monitor (VMM); and each instance of the VMM is contained within Linux
 namespaces for further isolation / security.
 
-* **Networking**: We use [IPsec](https://en.wikipedia.org/wiki/IPsec) tunneling to
+* **Networking**: We use [IPsec](https://en.wikipedia.org/wiki/IPsec) tunnelling to
 establish an encrypted and private network environment. We support IPv4 and IPv6 in
 a dual-stack setup and provide both public and private networking. For security,
 each customer’s VMs operate in their own networking namespace. For
