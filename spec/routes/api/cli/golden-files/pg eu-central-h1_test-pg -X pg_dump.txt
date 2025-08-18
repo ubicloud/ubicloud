@@ -21,6 +21,7 @@ Post Commands:
     modify-firewall-rule         Modify a PostgreSQL firewall rule
     pg_dump                      Dump a single PostgreSQL database using `pg_dump`
     pg_dumpall                   Dump a entire PostgreSQL database cluster using `pg_dumpall`
+    promote-read-replica         Promote a read replica PostgreSQL database to a primary
     psql                         Connect to a PostgreSQL database using `psql`
     reset-superuser-password     Reset the superuser password for a PostgreSQL database
     restart                      Restart a PostgreSQL database cluster
