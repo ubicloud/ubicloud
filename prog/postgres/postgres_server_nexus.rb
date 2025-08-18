@@ -538,7 +538,7 @@ SQL
       hop_wait
     end
 
-    bud self.class, frame, :restart
+    bud self.class, {}, :restart
     nap 5
   end
 
