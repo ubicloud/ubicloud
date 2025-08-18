@@ -365,6 +365,7 @@ Post Commands:
     delete-firewall-rule         Delete a PostgreSQL firewall rule
     delete-metric-destination    Delete a PostgreSQL metric destination
     destroy                      Destroy a PostgreSQL database
+    modify                       Modify a PostgreSQL database cluster
     pg_dump                      Dump a single PostgreSQL database using `pg_dump`
     pg_dumpall                   Dump a entire PostgreSQL database cluster using `pg_dumpall`
     psql                         Connect to a PostgreSQL database using `psql`
@@ -449,6 +450,29 @@ Usage:
 
 Options:
     -f, --force                      do not require confirmation
+
+
+Modify a PostgreSQL database cluster
+
+Usage:
+    ubi pg (location/pg-name | pg-id) modify [options]
+
+Options:
+    -h, --ha-type=type               replication type
+    -s, --size=size                  server size
+    -S, --storage-size=size          storage size GB
+    -t, --tags=tags                  tags (e.g. key1=value1,key2=value2)
+
+Allowed Option Values:
+    Replication Type: none async sync
+    Size: standard-2 standard-4 standard-8 standard-16 standard-30 standard-60
+          burstable-1 burstable-2 c6gd.large c6gd.xlarge c6gd.2xlarge
+          c6gd.4xlarge c6gd.8xlarge c6gd.16xlarge m6id.large m6id.xlarge
+          m6id.2xlarge m6id.4xlarge m6id.8xlarge m6id.16xlarge m6gd.large
+          m6gd.xlarge m6gd.2xlarge m6gd.4xlarge m6gd.8xlarge m6gd.16xlarge
+          m8gd.large m8gd.xlarge m8gd.2xlarge m8gd.4xlarge m8gd.8xlarge
+          m8gd.16xlarge
+    Storage Size: 16 32 64 128 256 512 1024 2048 4096
 
 
 Dump a single PostgreSQL database using `pg_dump`
