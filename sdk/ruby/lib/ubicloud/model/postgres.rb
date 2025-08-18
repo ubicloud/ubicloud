@@ -29,8 +29,8 @@ module Ubicloud
 
     # Allow the given cidr (ip address range) access to the PostgreSQL database port (5432)
     # for this database. Returns a hash for the firewall rule.
-    def add_firewall_rule(cidr)
-      rule = adapter.post(_path("/firewall-rule"), cidr:)
+    def add_firewall_rule(cidr, description: nil)
+      rule = adapter.post(_path("/firewall-rule"), cidr:, description:)
 
       self[:firewall_rules]&.<<(rule)
 
