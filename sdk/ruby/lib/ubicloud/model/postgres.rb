@@ -6,7 +6,7 @@ module Ubicloud
 
     set_fragment "postgres"
 
-    set_columns :id, :name, :state, :location, :vm_size, :storage_size_gib, :version, :ha_type, :flavor, :ca_certificates, :connection_string, :primary, :firewall_rules, :metric_destinations, :tags
+    set_columns :id, :name, :state, :location, :vm_size, :storage_size_gib, :version, :ha_type, :flavor, :ca_certificates, :connection_string, :primary, :firewall_rules, :metric_destinations, :tags, :maintenance_window_start_at
 
     set_create_param_defaults do |params|
       params[:size] ||= "standard-2"
@@ -95,6 +95,16 @@ module Ubicloud
     # Promote this database from a read replica to a primary.
     def promote_read_replica
       merge_into_values(adapter.post(_path("/promote")))
+    end
+
+    # Set the start hour (0-23) for the maintenance window, or nil
+    # to unset the maintenance window.
+    def set_maintenance_window(start_hour)
+      params = {}
+      if start_hour
+        params[:maintenance_window_start_at] = start_hour
+      end
+      merge_into_values(adapter.post(_path("/set-maintenance-window"), params))
     end
 
     # Schedule a password reset for the database superuser (postgres) for the database.

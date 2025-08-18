@@ -52,6 +52,7 @@ ubi pg (location/pg-name | pg-id) [options] psql [psql-options]
 ubi pg (location/pg-name | pg-id) reset-superuser-password new-password
 ubi pg (location/pg-name | pg-id) restart
 ubi pg (location/pg-name | pg-id) restore new-db-name restore-time
+ubi pg (location/pg-name | pg-id) set-maintenance-window start-hour
 ubi pg (location/pg-name | pg-id) show [options]
 ubi ps command [...]
 ubi ps (location/ps-name | ps-id) post-command [...]
