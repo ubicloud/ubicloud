@@ -5,7 +5,7 @@ class Clover
     r.web do
       unless Config.github_app_name
         response.status = 501
-        response["content-type"] = "text/plain"
+        response.content_type = :text
         next "GitHub Action Runner integration is not enabled. Set GITHUB_APP_NAME to enable it."
       end
 

@@ -67,6 +67,14 @@ class Clover < Roda
     UBID.to_uuid(s)
   end
 
+  plugin :response_content_type,
+    mime_types: {
+      json: "application/json",
+      pdf: "application/pdf",
+      pem: "application/x-pem-file",
+      text: "text/plain"
+    }
+
   # :nocov:
   if Config.test? && defined?(SimpleCov)
     plugin :render_coverage
@@ -855,7 +863,7 @@ class Clover < Roda
     if api?
       unless /\ABearer:?\s+pat-/i.match?(env["HTTP_AUTHORIZATION"].to_s)
         if r.path_info == "/cli"
-          response["content-type"] = "text/plain"
+          response.content_type = :text
           response.status = 400
           next "! Invalid request: No valid personal access token provided\n"
         else
