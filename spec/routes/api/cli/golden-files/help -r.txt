@@ -398,7 +398,10 @@ Allowed Option Values:
 Add a PostgreSQL firewall rule
 
 Usage:
-    ubi pg (location/pg-name | pg-id) add-firewall-rule cidr
+    ubi pg (location/pg-name | pg-id) add-firewall-rule [options] cidr
+
+Options:
+    -d, --description=desc           description of rule
 
 
 Add a PostgreSQL metric destination
