@@ -1089,6 +1089,7 @@ paths:
                 cidr:
                   description: CIDR of the firewall rule
                   type: string
+                  nullable: true
                 description:
                   description: Description of the firewall rule
                   type: string

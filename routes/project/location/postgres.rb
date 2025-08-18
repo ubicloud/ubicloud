@@ -170,12 +170,13 @@ class Clover
 
           r.patch do
             current_cidr = fwr.cidr.to_s
-            new_cidr = Validation.validate_cidr(typecast_params.nonempty_str!("cidr")).to_s
+            new_cidr = Validation.validate_cidr(typecast_params.nonempty_str("cidr") || fwr.cidr.to_s).to_s
+            description = typecast_params.str("description")&.strip || fwr.description
 
             DB.transaction do
               fwr.update(
                 cidr: new_cidr,
-                description: typecast_params.str("description")&.strip
+                description:
               )
               pg.incr_update_firewall_rules if current_cidr != new_cidr
               audit_log(fwr, "update")

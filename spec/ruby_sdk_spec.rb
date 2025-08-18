@@ -139,6 +139,21 @@ RSpec.describe Ubicloud do
     expect(fw.values[:firewall_rules]).to be_nil
   end
 
+  it "Postgres\#{add,delete,modify}_firewall_rule work without firewall rules loaded" do
+    expect(Clover).to receive(:call).thrice.and_invoke(proc do |env|
+      [200, {"content-type" => "application/json"}, ["{}"]]
+    end)
+
+    pg = ubi.postgres.new("foo/bar")
+    expect(pg.values[:firewall_rules]).to be_nil
+    pg.add_firewall_rule("1.2.3.0/24")
+    expect(pg.values[:firewall_rules]).to be_nil
+    pg.delete_firewall_rule("fr345678901234567890123456")
+    expect(pg.values[:firewall_rules]).to be_nil
+    pg.modify_firewall_rule("fr345678901234567890123456", cidr: "1.2.3.0/24")
+    expect(pg.values[:firewall_rules]).to be_nil
+  end
+
   it "Postgres#add_firewall_rule and #delete_firewall_rule work without firewall rules loaded" do
     expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
       [200, {"content-type" => "application/json"}, ["{}"]]
@@ -178,15 +193,22 @@ RSpec.describe Ubicloud do
     expect(fw.values[:firewall_rules]).to eq([])
   end
 
-  it "Postgres#add_firewall_rule and #delete_firewall_rule modify firewall rules if loaded" do
-    expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
-      [200, {"content-type" => "application/json"}, ["{\"id\": \"fr345678901234567890123456\"}"]]
+  it "Postgres\#{add,delete,modify}_firewall_rule modify firewall rules if loaded" do
+    v = "1.2.3.0/24"
+    expect(Clover).to receive(:call).exactly(4).and_invoke(proc do |env|
+      [200, {"content-type" => "application/json"}, ["{\"id\": \"fr345678901234567890123456\", \"cidr\": \"#{v}\"}"]]
     end)
 
     pg = ubi.postgres.new(location: "foo", name: "bar", firewall_rules: [])
     expect(pg.values[:firewall_rules]).to eq([])
-    pg.add_firewall_rule("1.2.3.0/24")
-    expect(pg.values[:firewall_rules]).to eq([{id: "fr345678901234567890123456"}])
+    pg.add_firewall_rule(v)
+    expect(pg.values[:firewall_rules]).to eq([{id: "fr345678901234567890123456", cidr: v}])
+    v = "1.2.4.0/24"
+    pg.modify_firewall_rule("fr345678901234567890123456", cidr: v)
+    expect(pg.values[:firewall_rules]).to eq([{id: "fr345678901234567890123456", cidr: v}])
+    v = "1.2.5.0/24"
+    pg.modify_firewall_rule("fr345678901234567890123457", cidr: v)
+    expect(pg.values[:firewall_rules]).to eq([{id: "fr345678901234567890123456", cidr: "1.2.4.0/24"}])
     pg.delete_firewall_rule("fr345678901234567890123456")
     expect(pg.values[:firewall_rules]).to eq([])
   end

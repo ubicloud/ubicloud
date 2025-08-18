@@ -17,6 +17,7 @@ Post Commands:
     delete-metric-destination    Delete a PostgreSQL metric destination
     destroy                      Destroy a PostgreSQL database
     modify                       Modify a PostgreSQL database cluster
+    modify-firewall-rule         Modify a PostgreSQL firewall rule
     pg_dump                      Dump a single PostgreSQL database using `pg_dump`
     pg_dumpall                   Dump a entire PostgreSQL database cluster using `pg_dumpall`
     psql                         Connect to a PostgreSQL database using `psql`
