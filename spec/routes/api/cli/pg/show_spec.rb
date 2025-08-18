@@ -38,6 +38,7 @@ RSpec.describe Clover, "cli pg show" do
       connection_string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require
       primary: true
       earliest_restore_time: 
+      tags:
       firewall rules:
         1: #{@pg.firewall_rules[0].ubid}  0.0.0.0/0
       metric destinations:

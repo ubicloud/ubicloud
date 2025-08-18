@@ -3,7 +3,7 @@
 UbiCli.on("pg").run_on("show") do
   desc "Show details for a PostgreSQL database"
 
-  fields = %w[id name state location vm-size target-vm-size storage-size-gib target-storage-size-gib version ha-type flavor connection-string primary earliest-restore-time firewall-rules metric-destinations ca-certificates].freeze.each(&:freeze)
+  fields = %w[id name state location vm-size target-vm-size storage-size-gib target-storage-size-gib version ha-type flavor connection-string primary earliest-restore-time tags firewall-rules metric-destinations ca-certificates].freeze.each(&:freeze)
 
   options("ubi pg (location/pg-name | pg-id) show [options]", key: :pg_show) do
     on("-f", "--fields=fields", "show specific fields (comma separated)")
@@ -19,6 +19,11 @@ UbiCli.on("pg").run_on("show") do
 
     underscore_keys(keys).each do |key|
       case key
+      when :tags
+        body << "tags:\n"
+        sdk_object.tags.sort.each do |k, v|
+          body << "  " << k << ": " << v << "\n"
+        end
       when :firewall_rules
         body << "firewall rules:\n"
         data[key].each_with_index do |rule, i|
