@@ -109,7 +109,7 @@ Allowed Option Values:
 Add a firewall rule
 
 Usage:
-    ubi fw (location/fw-name | fw-id) add-rule cidr
+    ubi fw (location/fw-name | fw-id) add-rule [options] cidr
 
 Options:
     -s, --start-port=port            starting (or only) port to allow (default: 0)
