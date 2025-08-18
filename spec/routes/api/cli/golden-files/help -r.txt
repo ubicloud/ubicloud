@@ -366,6 +366,7 @@ Post Commands:
     delete-metric-destination    Delete a PostgreSQL metric destination
     destroy                      Destroy a PostgreSQL database
     modify                       Modify a PostgreSQL database cluster
+    modify-firewall-rule         Modify a PostgreSQL firewall rule
     pg_dump                      Dump a single PostgreSQL database using `pg_dump`
     pg_dumpall                   Dump a entire PostgreSQL database cluster using `pg_dumpall`
     psql                         Connect to a PostgreSQL database using `psql`
@@ -451,6 +452,16 @@ Usage:
 
 Options:
     -f, --force                      do not require confirmation
+
+
+Modify a PostgreSQL firewall rule
+
+Usage:
+    ubi pg (location/pg-name | pg-id) modify-firewall-rule [options] rule-id
+
+Options:
+    -c, --cidr=cidr                  ip range to allow in cidr format (e.g. 1.2.3.0/24)
+    -d, --description=desc           description of rule
 
 
 Modify a PostgreSQL database cluster

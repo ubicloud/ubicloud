@@ -47,6 +47,16 @@ module Ubicloud
       nil
     end
 
+    # Delete the firewall rule with the given id.  Returns nil.
+    def modify_firewall_rule(rule_id, cidr: nil, description: nil)
+      check_no_slash(rule_id, "invalid rule id format")
+      rule = adapter.patch(_path("/firewall-rule/#{rule_id}"), cidr:, description:)
+
+      self[:firewall_rules]&.each { it.replace(rule) if it[:id] == rule_id }
+
+      rule
+    end
+
     # Add a metric destination for this database with the given username, password,
     # and URL. Returns a hash for the metric destination.
     def add_metric_destination(username:, password:, url:)
