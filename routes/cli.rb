@@ -5,7 +5,7 @@ class Clover
     r.post api? do
       no_authorization_needed
       no_audit_log
-      response["content-type"] = "text/plain"
+      response.content_type = :text
 
       unless (argv = r.POST["argv"]).is_a?(Array) && argv.all?(String)
         response.status = 400

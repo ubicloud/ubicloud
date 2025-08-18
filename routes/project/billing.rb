@@ -8,7 +8,7 @@ class Clover
     r.web do
       unless (Stripe.api_key = Config.stripe_secret_key)
         response.status = 501
-        response["content-type"] = "text/plain"
+        response.content_type = :text
         next "Billing is not enabled. Set STRIPE_SECRET_KEY to enable billing."
       end
 
@@ -175,7 +175,7 @@ class Clover
         if invoice.status == "current"
           view "project/invoice"
         else
-          response["content-type"] = "application/pdf"
+          response.content_type = :pdf
           response["content-disposition"] = "inline; filename=\"#{invoice.filename}\""
           begin
             Invoice.blob_storage_client.get_object(bucket: Config.invoices_bucket_name, key: invoice.blob_key).body.read
