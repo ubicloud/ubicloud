@@ -9,6 +9,7 @@ UbiCli.on("pg").run_on("create") do
     on("-s", "--size=size", Option::POSTGRES_SIZE_OPTIONS.keys, "server size")
     on("-S", "--storage-size=size", Option::POSTGRES_STORAGE_SIZE_OPTIONS, "storage size GB")
     on("-v", "--version=version", Option::POSTGRES_VERSION_OPTIONS, "PostgreSQL version")
+    on("-t", "--tags=version", "tags (e.g. key1=value1,key2=value2)")
   end
   help_option_values("Flavor:", Option::POSTGRES_FLAVOR_OPTIONS.keys)
   help_option_values("Replication Type:", Option::POSTGRES_HA_OPTIONS.keys)
@@ -18,6 +19,9 @@ UbiCli.on("pg").run_on("create") do
 
   run do |opts|
     params = underscore_keys(opts[:pg_create])
+    if params[:tags]
+      params[:tags] = params[:tags].split(",").to_h { it.split("=", 2) }
+    end
     id = sdk.postgres.create(location: @location, name: @name, **params).id
     response("PostgreSQL database created with id: #{id}")
   end
