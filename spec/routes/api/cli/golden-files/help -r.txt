@@ -362,6 +362,7 @@ Post Commands:
     add-firewall-rule            Add a PostgreSQL firewall rule
     add-metric-destination       Add a PostgreSQL metric destination
     create                       Create a PostgreSQL database
+    create-read-replica          Create a read replica for a PostgreSQL database
     delete-firewall-rule         Delete a PostgreSQL firewall rule
     delete-metric-destination    Delete a PostgreSQL metric destination
     destroy                      Destroy a PostgreSQL database
@@ -404,6 +405,12 @@ Add a PostgreSQL metric destination
 
 Usage:
     ubi pg (location/pg-name | pg-id) add-metric-destination username password url
+
+
+Create a read replica for a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) create-read-replica name
 
 
 Create a PostgreSQL database

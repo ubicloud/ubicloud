@@ -87,6 +87,11 @@ module Ubicloud
       merge_into_values(adapter.patch(_path, **params))
     end
 
+    # Create a read replica of this database, with the given name.
+    def create_read_replica(name)
+      Postgres.new(adapter, adapter.post(_path("/read-replica"), name:))
+    end
+
     # Schedule a password reset for the database superuser (postgres) for the database.
     # Returns self.
     def reset_superuser_password(password)
