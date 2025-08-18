@@ -10,6 +10,9 @@ module Ubicloud
 
     set_create_param_defaults do |params|
       params[:size] ||= "standard-2"
+      if params[:tags]
+        params[:tags] = params[:tags].map { |key, value| {key:, value:} }
+      end
     end
 
     # Schedule a restart of the PostgreSQL server. Returns self.

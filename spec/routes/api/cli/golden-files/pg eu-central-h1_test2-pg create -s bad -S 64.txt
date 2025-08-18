@@ -11,6 +11,7 @@ Options:
     -s, --size=size                  server size
     -S, --storage-size=size          storage size GB
     -v, --version=version            PostgreSQL version
+    -t, --tags=version               tags (e.g. key1=value1,key2=value2)
 
 Allowed Option Values:
     Flavor: standard paradedb lantern
