@@ -25,9 +25,9 @@ class Clover
       r.is do
         r.get do
           authorize("Postgres:view", pg.id)
-          response.headers["cache-control"] = "no-store"
 
           if api?
+            response.headers["cache-control"] = "no-store"
             Serializers::Postgres.serialize(pg, {detailed: true})
           else
             r.redirect "#{@project.path}#{pg.path}/overview"
