@@ -92,6 +92,11 @@ module Ubicloud
       Postgres.new(adapter, adapter.post(_path("/read-replica"), name:))
     end
 
+    # Promote this database from a read replica to a primary.
+    def promote_read_replica
+      merge_into_values(adapter.post(_path("/promote")))
+    end
+
     # Schedule a password reset for the database superuser (postgres) for the database.
     # Returns self.
     def reset_superuser_password(password)
