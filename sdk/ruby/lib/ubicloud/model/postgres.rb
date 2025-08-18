@@ -57,6 +57,16 @@ module Ubicloud
       nil
     end
 
+    # Modify attributes of the database.
+    def modify(ha_type: nil, size: nil, storage_size: nil, tags: nil)
+      if tags
+        tags = tags.map { |key, value| {key:, value:} }
+      end
+      params = {ha_type:, size:, storage_size:, tags:}
+      params.compact!
+      merge_into_values(adapter.patch(_path, **params))
+    end
+
     # Schedule a password reset for the database superuser (postgres) for the database.
     # Returns self.
     def reset_superuser_password(password)
