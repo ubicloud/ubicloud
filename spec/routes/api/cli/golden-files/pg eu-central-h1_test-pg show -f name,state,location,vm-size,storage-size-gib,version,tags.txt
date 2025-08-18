@@ -4,3 +4,5 @@ location: eu-central-h1
 vm_size: standard-2
 storage_size_gib: 64
 version: 17
+tags:
+  foo: bar

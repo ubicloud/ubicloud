@@ -6,13 +6,20 @@ module Ubicloud
 
     set_fragment "postgres"
 
-    set_columns :id, :name, :state, :location, :vm_size, :storage_size_gib, :version, :ha_type, :flavor, :ca_certificates, :connection_string, :primary, :firewall_rules, :metric_destinations
+    set_columns :id, :name, :state, :location, :vm_size, :storage_size_gib, :version, :ha_type, :flavor, :ca_certificates, :connection_string, :primary, :firewall_rules, :metric_destinations, :tags
 
     set_create_param_defaults do |params|
       params[:size] ||= "standard-2"
       if params[:tags]
         params[:tags] = params[:tags].map { |key, value| {key:, value:} }
       end
+    end
+
+    alias_method :_tags, :tags
+    private :_tags
+    # Return tags as a single hash instead of array of hashes with key and value keys.
+    def tags
+      _tags.to_h { it.values_at(:key, :value) }
     end
 
     # Schedule a restart of the PostgreSQL server. Returns self.

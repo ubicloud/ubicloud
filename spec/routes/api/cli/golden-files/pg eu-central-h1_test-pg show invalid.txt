@@ -11,5 +11,5 @@ Options:
 Allowed Option Values:
     Fields: id name state location vm-size target-vm-size storage-size-gib
             target-storage-size-gib version ha-type flavor connection-string
-            primary earliest-restore-time firewall-rules metric-destinations
-            ca-certificates
+            primary earliest-restore-time tags firewall-rules
+            metric-destinations ca-certificates
