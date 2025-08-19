@@ -1,4 +1,4 @@
-! Invalid add-config-entries argument, does not include `=`: "key2"
+! Invalid argument, does not include `=`: "key2"
 
 Add pgbouncer configuration entries to a PostgreSQL database
 

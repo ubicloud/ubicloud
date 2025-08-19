@@ -44,6 +44,7 @@ pg eu-central-h1/test2-pg create -s bad -S 64
 pg eu-central-h1/test2-pg create -s standard-2 -S bad
 pg eu-central-h1/test2-pg create -s standard-2 -S 64 -f bad
 pg eu-central-h1/test2-pg create -s standard-2 -S 64 -h bad
+pg eu-central-h1/test2-pg create -s standard-2 -S 64 -t bad
 pg eu-central-h1/test2-pg create -s standard-2 -S 64 -v bad
 pg eu-central-h1/test-pg add-config-entries
 pg eu-central-h1/test-pg add-config-entries key
@@ -58,6 +59,7 @@ pg eu-central-h1/test-pg add-pgbouncer-config-entries key=value key2
 pg eu-central-h1/test-pg delete-firewall-rule
 pg eu-central-h1/test-pg delete-metric-destination
 pg eu-central-h1/test-pg destroy invalid
+pg eu-central-h1/test-pg modify -t bad
 pg eu-central-h1/test-pg remove-config-entries
 pg eu-central-h1/test-pg remove-pgbouncer-config-entries
 pg eu-central-h1/test-pg reset-superuser-password
