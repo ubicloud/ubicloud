@@ -47,7 +47,7 @@ module Ubicloud
       nil
     end
 
-    # Delete the firewall rule with the given id.  Returns nil.
+    # Modify the firewall rule with the given id.  Returns the updated rule.
     def modify_firewall_rule(rule_id, cidr: nil, description: nil)
       check_no_slash(rule_id, "invalid rule id format")
       rule = adapter.patch(_path("/firewall-rule/#{rule_id}"), cidr:, description:)
