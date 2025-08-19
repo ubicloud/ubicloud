@@ -52,6 +52,7 @@ ubi pg (location/pg-name | pg-id) [options] pg_dump [pg_dump-options]
 ubi pg (location/pg-name | pg-id) [options] pg_dumpall [pg_dumpall-options]
 ubi pg (location/pg-name | pg-id) promote-read-replica
 ubi pg (location/pg-name | pg-id) [options] psql [psql-options]
+ubi pg (location/pg-name | pg-id) remove-config-entries key [...]
 ubi pg (location/pg-name | pg-id) reset-superuser-password new-password
 ubi pg (location/pg-name | pg-id) restart
 ubi pg (location/pg-name | pg-id) restore new-db-name restore-time

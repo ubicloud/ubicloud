@@ -58,6 +58,7 @@ pg eu-central-h1/test-pg add-pgbouncer-config-entries key=value key2
 pg eu-central-h1/test-pg delete-firewall-rule
 pg eu-central-h1/test-pg delete-metric-destination
 pg eu-central-h1/test-pg destroy invalid
+pg eu-central-h1/test-pg remove-config-entries
 pg eu-central-h1/test-pg reset-superuser-password
 pg eu-central-h1/test-pg restore
 pg eu-central-h1/test-pg show invalid
