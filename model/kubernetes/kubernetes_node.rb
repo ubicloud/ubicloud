@@ -9,6 +9,7 @@ class KubernetesNode < Sequel::Model
   many_to_one :kubernetes_nodepool
 
   plugin ResourceMethods
+  plugin SemaphoreMethods, :destroy
 end
 
 # Table: kubernetes_node
