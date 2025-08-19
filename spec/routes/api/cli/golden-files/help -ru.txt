@@ -38,6 +38,7 @@ ubi pg (location/pg-name | pg-id) [post-options] post-command [...]
 ubi pg list [options]
 ubi pg (location/pg-name | pg-id) add-firewall-rule [options] cidr
 ubi pg (location/pg-name | pg-id) add-metric-destination username password url
+ubi pg (location/pg-name | pg-id) ca-certificates
 ubi pg (location/pg-name | pg-id) create-read-replica name
 ubi pg location/pg-name create [options]
 ubi pg (location/pg-name | pg-id) delete-firewall-rule rule-id
