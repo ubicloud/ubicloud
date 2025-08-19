@@ -7,33 +7,34 @@ Usage:
     ubi pg (location/pg-name | pg-id) [post-options] post-command [...]
 
 Commands:
-    list                            List PostgreSQL databases
+    list                               List PostgreSQL databases
 
 Post Commands:
-    add-config-entries              Add configuration entries to a PostgreSQL database
-    add-firewall-rule               Add a PostgreSQL firewall rule
-    add-metric-destination          Add a PostgreSQL metric destination
-    add-pgbouncer-config-entries    Add pgbouncer configuration entries to a PostgreSQL database
-    ca-certificates                 Print CA certificates for a PostgreSQL database
-    create                          Create a PostgreSQL database
-    create-read-replica             Create a read replica for a PostgreSQL database
-    delete-firewall-rule            Delete a PostgreSQL firewall rule
-    delete-metric-destination       Delete a PostgreSQL metric destination
-    destroy                         Destroy a PostgreSQL database
-    modify                          Modify a PostgreSQL database cluster
-    modify-firewall-rule            Modify a PostgreSQL firewall rule
-    pg_dump                         Dump a single PostgreSQL database using `pg_dump`
-    pg_dumpall                      Dump a entire PostgreSQL database cluster using `pg_dumpall`
-    promote-read-replica            Promote a read replica PostgreSQL database to a primary
-    psql                            Connect to a PostgreSQL database using `psql`
-    remove-config-entries           Remove configuration entries from a PostgreSQL database
-    reset-superuser-password        Reset the superuser password for a PostgreSQL database
-    restart                         Restart a PostgreSQL database cluster
-    restore                         Restore a PostgreSQL database backup to a new database
-    set-maintenance-window          Set the maintenance window for a PostgreSQL database
-    show                            Show details for a PostgreSQL database
-    show-config                     Show configuration for a PostgreSQL database
-    show-pgbouncer-config           Show pgbouncer configuration for a PostgreSQL database
+    add-config-entries                 Add configuration entries to a PostgreSQL database
+    add-firewall-rule                  Add a PostgreSQL firewall rule
+    add-metric-destination             Add a PostgreSQL metric destination
+    add-pgbouncer-config-entries       Add pgbouncer configuration entries to a PostgreSQL database
+    ca-certificates                    Print CA certificates for a PostgreSQL database
+    create                             Create a PostgreSQL database
+    create-read-replica                Create a read replica for a PostgreSQL database
+    delete-firewall-rule               Delete a PostgreSQL firewall rule
+    delete-metric-destination          Delete a PostgreSQL metric destination
+    destroy                            Destroy a PostgreSQL database
+    modify                             Modify a PostgreSQL database cluster
+    modify-firewall-rule               Modify a PostgreSQL firewall rule
+    pg_dump                            Dump a single PostgreSQL database using `pg_dump`
+    pg_dumpall                         Dump a entire PostgreSQL database cluster using `pg_dumpall`
+    promote-read-replica               Promote a read replica PostgreSQL database to a primary
+    psql                               Connect to a PostgreSQL database using `psql`
+    remove-config-entries              Remove configuration entries from a PostgreSQL database
+    remove-pgbouncer-config-entries    Remove pgbouncer configuration entries from a PostgreSQL database
+    reset-superuser-password           Reset the superuser password for a PostgreSQL database
+    restart                            Restart a PostgreSQL database cluster
+    restore                            Restore a PostgreSQL database backup to a new database
+    set-maintenance-window             Set the maintenance window for a PostgreSQL database
+    show                               Show details for a PostgreSQL database
+    show-config                        Show configuration for a PostgreSQL database
+    show-pgbouncer-config              Show pgbouncer configuration for a PostgreSQL database
 
 Post Options:
     -d, --dbname=name                override database name
