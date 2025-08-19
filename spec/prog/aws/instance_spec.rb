@@ -29,7 +29,7 @@ RSpec.describe Prog::Aws::Instance do
   let(:user_data) {
     <<~USER_DATA
 #!/bin/bash
-custom_user="test-user-aws"
+custom_user="#{vm.unix_user}"
 if [ ! -d /home/$custom_user ]; then
   adduser $custom_user --disabled-password --gecos ""
   usermod -aG sudo $custom_user
@@ -267,6 +267,19 @@ usermod -L ubuntu
       expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
       expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
       expect { nx.create_instance }.to raise_error(Aws::EC2::Errors::InvalidParameterValue)
+    end
+
+    it "sets transparent cache host for runners" do
+      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
+      client.stub_responses(:describe_subnets, subnets: [{availability_zone_id: "use1-az1"}])
+      expect(vm).to receive(:private_ipv4).and_return("1.2.3.4")
+      vm.update(unix_user: "runneradmin")
+      expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
+      new_data = user_data + "echo \"1.2.3.4 ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
+      expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
+      expect(client).to receive(:run_instances).with(hash_including(user_data: Base64.encode64(new_data))).and_call_original
+      expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
+      expect { nx.create_instance }.to hop("wait_instance_created")
     end
   end
 

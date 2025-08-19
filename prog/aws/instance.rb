@@ -113,6 +113,9 @@ class Prog::Aws::Instance < Prog::Base
       usermod -L ubuntu
     USER_DATA
 
+    # Normally we use dnsmasq to resolve our transparent cache domain to local IP, but we use /etc/hosts for AWS runners
+    user_data += "\necho \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts" if vm.unix_user == "runneradmin"
+
     params = {
       image_id: vm.boot_image, # AMI ID
       instance_type: Option.aws_instance_type_name(vm.family, vm.vcpus),
