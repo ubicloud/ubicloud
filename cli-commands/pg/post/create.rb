@@ -9,7 +9,7 @@ UbiCli.on("pg").run_on("create") do
     on("-s", "--size=size", Option::POSTGRES_SIZE_OPTIONS.keys, "server size")
     on("-S", "--storage-size=size", Option::POSTGRES_STORAGE_SIZE_OPTIONS, "storage size GB")
     on("-v", "--version=version", Option::POSTGRES_VERSION_OPTIONS, "PostgreSQL version")
-    on("-t", "--tags=version", "tags (e.g. key1=value1,key2=value2)")
+    on("-t", "--tags=tags", "tags (e.g. key1=value1,key2=value2)")
   end
   help_option_values("Flavor:", Option::POSTGRES_FLAVOR_OPTIONS.keys)
   help_option_values("Replication Type:", Option::POSTGRES_HA_OPTIONS.keys)
