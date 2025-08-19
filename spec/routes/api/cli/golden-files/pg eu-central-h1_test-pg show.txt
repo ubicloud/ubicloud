@@ -12,11 +12,15 @@ flavor: standard
 connection_string: postgres://postgres:bar456FOO123@test-pg.pgvm1qb9gwct1mqmay7m54yma5.pg.example.com:5432/postgres?sslmode=require
 primary: true
 earliest_restore_time: 
+maintenance_window_start_at: 
+read_replica: false
+parent: 
 tags:
   foo: bar
 firewall rules:
   1: pfb9g14e5ndt6qf59wfk8109bg  0.0.0.0/0
 metric destinations:
   1: md8ntmx8e1764nwc7p970vf3xw  foo  https://baz.example.com
+read replicas:
 CA certificates:
 

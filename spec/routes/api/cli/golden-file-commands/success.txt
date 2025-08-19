@@ -100,6 +100,7 @@ pg eu-central-h1/test-pg show -f firewall-rules,metric-destinations,ca-certifica
 pg eu-central-h1/test-pg show -f ha-type,flavor,connection-string,primary,earliest-restore-time
 pg eu-central-h1/test-pg show -f id
 pg eu-central-h1/test-pg show -f name,state,location,vm-size,storage-size-gib,version,tags
+pg eu-central-h1/test-pg show -f maintenance-window-start-at,read-replica,parent,read-replicas
 pg list
 pg list -f location
 pg list -f name,id,version,flavor

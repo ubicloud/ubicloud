@@ -38,11 +38,46 @@ RSpec.describe Clover, "cli pg show" do
       connection_string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require
       primary: true
       earliest_restore_time: 
+      maintenance_window_start_at: 
+      read_replica: false
+      parent: 
       tags:
       firewall rules:
         1: #{@pg.firewall_rules[0].ubid}  0.0.0.0/0
       metric destinations:
         1: #{@pg.metric_destinations[0].ubid}  md-user  https://md.example.com
+      read replicas:
+      CA certificates:
+      a
+      b
+    END
+
+    @pg.update(parent_id: @pg.id)
+    expect(cli(%W[pg #{@ref} show])).to eq <<~END
+      id: #{@pg.ubid}
+      name: test-pg
+      state: creating
+      location: eu-central-h1
+      vm_size: standard-2
+      target_vm_size: standard-2
+      storage_size_gib: 64
+      target_storage_size_gib: 64
+      version: 17
+      ha_type: none
+      flavor: standard
+      connection_string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require
+      primary: true
+      earliest_restore_time: 
+      maintenance_window_start_at: 
+      read_replica: true
+      parent: eu-central-h1/test-pg
+      tags:
+      firewall rules:
+        1: #{@pg.firewall_rules[0].ubid}  0.0.0.0/0
+      metric destinations:
+        1: #{@pg.metric_destinations[0].ubid}  md-user  https://md.example.com
+      read replicas:
+        eu-central-h1/test-pg
       CA certificates:
       a
       b
