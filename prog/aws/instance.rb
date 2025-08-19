@@ -148,7 +148,15 @@ class Prog::Aws::Instance < Prog::Base
       user_data: Base64.encode64(user_data.gsub(/^(\s*# .*)?\n/, "")),
       tag_specifications: Util.aws_tag_specifications("instance", vm.name),
       iam_instance_profile: {name: instance_profile_name},
-      client_token: vm.id
+      client_token: vm.id,
+      instance_market_options: {
+        market_type: "spot",
+        spot_options: {
+          spot_instance_type: "one-time",
+          instance_interruption_behavior: "terminate"
+          # Not setting max_price means you'll pay up to the on-demand price
+        }
+      }
     }
     begin
       instance_response = client.run_instances(params)
