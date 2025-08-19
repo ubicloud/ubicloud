@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require_relative "../../common/lib/util"
+require_relative "../lib/postgres_setup"
 
 if ARGV.count != 1
   fail "Wrong number of arguments. Expected 1, Given #{ARGV.count}"
@@ -10,6 +11,8 @@ end
 v = ARGV[0]
 
 r "chown postgres /dat"
+
+PostgresSetup.new(v, Logger.new($stdout)).setup
 
 # Below commands are required for idempotency
 r "rm -rf /dat/#{v}"
