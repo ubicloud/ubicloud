@@ -102,6 +102,11 @@ module Ubicloud
       adapter.patch(_path("/config"), pg_config: values)[:pg_config]
     end
 
+    # Update configuration hash for the PostgreSQL database.
+    def update_pgbouncer_config(**values)
+      adapter.patch(_path("/config"), pgbouncer_config: values)[:pgbouncer_config]
+    end
+
     # Create a read replica of this database, with the given name.
     def create_read_replica(name)
       Postgres.new(adapter, adapter.post(_path("/read-replica"), name:))
