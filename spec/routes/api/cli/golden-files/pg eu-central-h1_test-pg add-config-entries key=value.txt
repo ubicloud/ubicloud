@@ -1,0 +1,7 @@
+! Unexpected response status: 400
+Details: Validation failed for following fields: pg_config.c1, pg_config.c2, pg_config.key, pgbouncer_config.b1, pgbouncer_config.b2
+  pg_config.c1: Unknown configuration parameter
+  pg_config.c2: Unknown configuration parameter
+  pg_config.key: Unknown configuration parameter
+  pgbouncer_config.b1: Unknown configuration parameter
+  pgbouncer_config.b2: Unknown configuration parameter

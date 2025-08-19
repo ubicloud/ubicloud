@@ -10,6 +10,7 @@ Commands:
     list                         List PostgreSQL databases
 
 Post Commands:
+    add-config-entries           Add configuration entries to a PostgreSQL database
     add-firewall-rule            Add a PostgreSQL firewall rule
     add-metric-destination       Add a PostgreSQL metric destination
     ca-certificates              Print CA certificates for a PostgreSQL database

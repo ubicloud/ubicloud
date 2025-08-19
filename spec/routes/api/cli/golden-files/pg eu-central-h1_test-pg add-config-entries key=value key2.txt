@@ -1,0 +1,6 @@
+! Invalid add-config-entries argument, does not include `=`: "key2"
+
+Add configuration entries to a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) add-config-entries key=value [...]
