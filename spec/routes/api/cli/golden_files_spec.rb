@@ -38,6 +38,7 @@ RSpec.describe Clover, "cli" do
 
     cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64 -t foo=bar])
     pg = PostgresResource.first(name: "test-pg")
+    pg.update(user_config: {c1: "v1", c2: 3})
     pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 64, disk_index: 0)
     cli(%w[pg eu-central-h1/test-pg reset-superuser-password bar456FOO123])
     cli(%w[pg eu-central-h1/test-pg add-metric-destination foo bar https://baz.example.com])
