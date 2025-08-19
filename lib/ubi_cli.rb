@@ -228,6 +228,23 @@ class UbiCli
     @project_ubid ||= @env["clover.project_ubid"]
   end
 
+  def config_entries_response(entries, body: [])
+    entries.sort.each do |k, v|
+      body << k.to_s << "=" << v.to_s << "\n"
+    end
+    response(body)
+  end
+
+  def config_entries_to_hash(args, cmd)
+    args.to_h do
+      if it.include?("=")
+        it.split("=", 2)
+      else
+        raise Rodish::CommandFailure.new("invalid add-config-entries argument, does not include `=`: #{it.inspect}", cmd)
+      end
+    end
+  end
+
   def handle_ssh(opts)
     vm = sdk_object.info
     opts = opts[:vm_ssh]

@@ -8,19 +8,6 @@ UbiCli.on("pg").run_on("add-config-entries") do
   args(1..)
 
   run do |args, _, cmd|
-    body = ["Updated config:\n"]
-
-    values = args.to_h do
-      if it.include?("=")
-        it.split("=", 2)
-      else
-        raise Rodish::CommandFailure.new("invalid add-config-entries argument, does not include `=`: #{it.inspect}", cmd)
-      end
-    end
-
-    sdk_object.update_config(**values).sort.each do |k, v|
-      body << k.to_s << "=" << v.to_s << "\n"
-    end
-    response(body)
+    config_entries_response(sdk_object.update_config(**config_entries_to_hash(args, cmd)), body: ["Updated config:\n"])
   end
 end

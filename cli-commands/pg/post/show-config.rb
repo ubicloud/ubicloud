@@ -6,10 +6,6 @@ UbiCli.on("pg").run_on("show-config") do
   banner "ubi pg (location/pg-name | pg-id) show-config"
 
   run do
-    body = []
-    sdk_object.config.sort.each do |k, v|
-      body << k.to_s << "=" << v.to_s << "\n"
-    end
-    response(body)
+    config_entries_response(sdk_object.config)
   end
 end
