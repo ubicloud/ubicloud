@@ -79,6 +79,7 @@ class GithubRepository < Sequel::Model
 
       token_id, token = CloudflareClient.new(Config.github_cache_blob_storage_api_key).create_token("#{bucket_name}-token", policies)
       update(access_key: token_id, secret_key: Digest::SHA256.hexdigest(token))
+      Clog.emit("Blob storage setup completed") { {blob_storage_setup_completed: {bucket_name:}} }
     end
   end
 
