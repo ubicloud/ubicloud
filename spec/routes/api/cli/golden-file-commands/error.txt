@@ -51,6 +51,10 @@ pg eu-central-h1/test-pg add-config-entries key=value
 pg eu-central-h1/test-pg add-config-entries key=value key2
 pg eu-central-h1/test-pg add-firewall-rule
 pg eu-central-h1/test-pg add-metric-destination
+pg eu-central-h1/test-pg add-pgbouncer-config-entries
+pg eu-central-h1/test-pg add-pgbouncer-config-entries key
+pg eu-central-h1/test-pg add-pgbouncer-config-entries key=value
+pg eu-central-h1/test-pg add-pgbouncer-config-entries key=value key2
 pg eu-central-h1/test-pg delete-firewall-rule
 pg eu-central-h1/test-pg delete-metric-destination
 pg eu-central-h1/test-pg destroy invalid
