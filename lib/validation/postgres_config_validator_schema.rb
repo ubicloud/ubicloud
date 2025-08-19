@@ -34,6 +34,11 @@ module Validation
         type: :bool,
         default: "off"
       },
+      "application_name" => {
+        description: "Sets the application name for the session.",
+        type: :string,
+        default: ""
+      },
       "archive_cleanup_command" => {
         description: "Sets the shell command that will be executed at every restart point.",
         type: :string
@@ -2144,6 +2149,11 @@ module Validation
         description: "Allows modifications of the structure of system tables.",
         type: :bool,
         default: "off"
+      },
+      "application_name" => {
+        description: "Sets the application name for the session.",
+        type: :string,
+        default: ""
       },
       "archive_cleanup_command" => {
         description: "Sets the shell command that will be executed at every restart point.",
