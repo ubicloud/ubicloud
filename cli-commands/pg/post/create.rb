@@ -17,11 +17,9 @@ UbiCli.on("pg").run_on("create") do
   help_option_values("Storage Size:", Option::POSTGRES_STORAGE_SIZE_OPTIONS)
   help_option_values("Version:", Option::POSTGRES_VERSION_OPTIONS)
 
-  run do |opts|
+  run do |opts, cmd|
     params = underscore_keys(opts[:pg_create])
-    if params[:tags]
-      params[:tags] = params[:tags].split(",").to_h { it.split("=", 2) }
-    end
+    pg_tags_to_hash(params, cmd)
     id = sdk.postgres.create(location: @location, name: @name, **params).id
     response("PostgreSQL database created with id: #{id}")
   end

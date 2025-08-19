@@ -13,11 +13,9 @@ UbiCli.on("pg").run_on("modify") do
   help_option_values("Size:", Option::POSTGRES_SIZE_OPTIONS.keys)
   help_option_values("Storage Size:", Option::POSTGRES_STORAGE_SIZE_OPTIONS)
 
-  run do |opts|
+  run do |opts, cmd|
     params = underscore_keys(opts[:pg_modify])
-    if params[:tags]
-      params[:tags] = params[:tags].split(",").to_h { it.split("=", 2) }
-    end
+    pg_tags_to_hash(params, cmd)
     id = sdk_object.modify(**params).id
     response("Modified PostgreSQL database with id: #{id}")
   end

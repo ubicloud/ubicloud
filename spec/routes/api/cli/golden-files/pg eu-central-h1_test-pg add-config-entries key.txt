@@ -1,4 +1,4 @@
-! Invalid add-config-entries argument, does not include `=`: "key"
+! Invalid argument, does not include `=`: "key"
 
 Add configuration entries to a PostgreSQL database
 
