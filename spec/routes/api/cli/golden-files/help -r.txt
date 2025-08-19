@@ -375,6 +375,7 @@ Post Commands:
     pg_dumpall                      Dump a entire PostgreSQL database cluster using `pg_dumpall`
     promote-read-replica            Promote a read replica PostgreSQL database to a primary
     psql                            Connect to a PostgreSQL database using `psql`
+    remove-config-entries           Remove configuration entries from a PostgreSQL database
     reset-superuser-password        Reset the superuser password for a PostgreSQL database
     restart                         Restart a PostgreSQL database cluster
     restore                         Restore a PostgreSQL database backup to a new database
@@ -544,6 +545,12 @@ Connect to a PostgreSQL database using `psql`
 
 Usage:
     ubi pg (location/pg-name | pg-id) [options] psql [psql-options]
+
+
+Remove configuration entries from a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) remove-config-entries key [...]
 
 
 Reset the superuser password for a PostgreSQL database
