@@ -92,6 +92,11 @@ module Ubicloud
       adapter.get(_path("/config"))[:pg_config]
     end
 
+    # Return the pgbouncer configuration hash for the PostgreSQL database.
+    def pgbouncer_config
+      adapter.get(_path("/config"))[:pgbouncer_config]
+    end
+
     # Create a read replica of this database, with the given name.
     def create_read_replica(name)
       Postgres.new(adapter, adapter.post(_path("/read-replica"), name:))
