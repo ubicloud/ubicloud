@@ -1,2 +1,2 @@
-c1=v1
-c2=3
+allow_alter_system=off
+allow_in_place_tablespaces=on

@@ -1,2 +1,2 @@
-b1=d1
-b2=4
+disable_pqexec=1
+server_round_robin=1

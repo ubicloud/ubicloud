@@ -7,7 +7,7 @@ UbiCli.on("pg").run_on("show-pgbouncer-config") do
 
   run do
     body = []
-    sdk_object.pgbouncer_config.each do |k, v|
+    sdk_object.pgbouncer_config.sort.each do |k, v|
       body << k.to_s << "=" << v.to_s << "\n"
     end
     response(body)

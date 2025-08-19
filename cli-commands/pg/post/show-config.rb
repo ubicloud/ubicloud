@@ -7,7 +7,7 @@ UbiCli.on("pg").run_on("show-config") do
 
   run do
     body = []
-    sdk_object.config.each do |k, v|
+    sdk_object.config.sort.each do |k, v|
       body << k.to_s << "=" << v.to_s << "\n"
     end
     response(body)
