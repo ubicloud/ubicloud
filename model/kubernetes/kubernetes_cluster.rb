@@ -145,4 +145,5 @@ end
 #  kubernetes_cluster_services_lb_id_fkey    | (services_lb_id) REFERENCES load_balancer(id)
 # Referenced By:
 #  kubernetes_clusters_cp_vms | kubernetes_clusters_cp_vms_kubernetes_cluster_id_fkey | (kubernetes_cluster_id) REFERENCES kubernetes_cluster(id)
+#  kubernetes_node            | kubernetes_node_kubernetes_cluster_id_fkey            | (kubernetes_cluster_id) REFERENCES kubernetes_cluster(id)
 #  kubernetes_nodepool        | kubernetes_nodepool_kubernetes_cluster_id_fkey        | (kubernetes_cluster_id) REFERENCES kubernetes_cluster(id)
