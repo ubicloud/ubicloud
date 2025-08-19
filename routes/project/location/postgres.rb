@@ -501,15 +501,15 @@ class Clover
             pgbouncer_keys = typecast_params.array(:str, "pgbouncer_config_keys") || []
             pgbouncer_values = typecast_params.array(:str, "pgbouncer_config_values") || []
             pgbouncer_config = config_hash_from_kvs(pgbouncer_keys, pgbouncer_values)
-          else
+          elsif r.patch?
             pg_config = typecast_params.Hash("pg_config") || {}
             pgbouncer_config = typecast_params.Hash("pgbouncer_config") || {}
-          end
-
-          # For PATCH requests, merge with existing config
-          if r.patch?
+            # For PATCH requests, merge with existing config
             pg_config = pg.user_config.merge(pg_config).compact
             pgbouncer_config = pg.pgbouncer_user_config.merge(pgbouncer_config).compact
+          else
+            pg_config = typecast_params.Hash!("pg_config")
+            pgbouncer_config = typecast_params.Hash!("pgbouncer_config")
           end
 
           pg_validator = Validation::PostgresConfigValidator.new(pg.version)

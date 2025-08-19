@@ -1016,7 +1016,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PostgresConfig'
+              $ref: '#/components/schemas/PostgresPatchConfig'
       responses:
         '200':
           description: Successful response
@@ -1930,6 +1930,36 @@ components:
       required:
         - pg_config
         - pgbouncer_config
+    PostgresPatchConfig:
+      anyOf:
+        - type: object
+          properties:
+            pg_config:
+              type: object
+              example:
+                max_connections: '100'
+              additionalProperties:
+                type: string
+            pgbouncer_config:
+              type: object
+              example:
+                max_client_conn: '100'
+              additionalProperties:
+                type: string
+          additionalProperties: false
+          required:
+            - pg_config
+        - type: object
+          properties:
+            pgbouncer_config:
+              type: object
+              example:
+                max_client_conn: '100'
+              additionalProperties:
+                type: string
+          additionalProperties: false
+          required:
+            - pgbouncer_config
     PostgresTag:
       type: object
       properties:

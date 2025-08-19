@@ -36,6 +36,7 @@ ubi lb (location/lb-name | lb-id) update algorithm src-port dst-port health-chec
 ubi pg command [...]
 ubi pg (location/pg-name | pg-id) [post-options] post-command [...]
 ubi pg list [options]
+ubi pg (location/pg-name | pg-id) add-config-entries key=value [...]
 ubi pg (location/pg-name | pg-id) add-firewall-rule [options] cidr
 ubi pg (location/pg-name | pg-id) add-metric-destination username password url
 ubi pg (location/pg-name | pg-id) ca-certificates

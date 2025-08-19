@@ -359,6 +359,7 @@ Commands:
     list                         List PostgreSQL databases
 
 Post Commands:
+    add-config-entries           Add configuration entries to a PostgreSQL database
     add-firewall-rule            Add a PostgreSQL firewall rule
     add-metric-destination       Add a PostgreSQL metric destination
     ca-certificates              Print CA certificates for a PostgreSQL database
@@ -398,6 +399,12 @@ Options:
 
 Allowed Option Values:
     Fields: location name id version flavor
+
+
+Add configuration entries to a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) add-config-entries key=value [...]
 
 
 Add a PostgreSQL firewall rule

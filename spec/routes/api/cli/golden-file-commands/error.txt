@@ -45,6 +45,10 @@ pg eu-central-h1/test2-pg create -s standard-2 -S bad
 pg eu-central-h1/test2-pg create -s standard-2 -S 64 -f bad
 pg eu-central-h1/test2-pg create -s standard-2 -S 64 -h bad
 pg eu-central-h1/test2-pg create -s standard-2 -S 64 -v bad
+pg eu-central-h1/test-pg add-config-entries
+pg eu-central-h1/test-pg add-config-entries key
+pg eu-central-h1/test-pg add-config-entries key=value
+pg eu-central-h1/test-pg add-config-entries key=value key2
 pg eu-central-h1/test-pg add-firewall-rule
 pg eu-central-h1/test-pg add-metric-destination
 pg eu-central-h1/test-pg delete-firewall-rule
