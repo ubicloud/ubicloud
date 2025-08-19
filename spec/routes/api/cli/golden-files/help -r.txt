@@ -361,6 +361,7 @@ Commands:
 Post Commands:
     add-firewall-rule            Add a PostgreSQL firewall rule
     add-metric-destination       Add a PostgreSQL metric destination
+    ca-certificates              Print CA certificates for a PostgreSQL database
     create                       Create a PostgreSQL database
     create-read-replica          Create a read replica for a PostgreSQL database
     delete-firewall-rule         Delete a PostgreSQL firewall rule
@@ -410,6 +411,12 @@ Add a PostgreSQL metric destination
 
 Usage:
     ubi pg (location/pg-name | pg-id) add-metric-destination username password url
+
+
+Print CA certificates for a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) ca-certificates
 
 
 Create a read replica for a PostgreSQL database
