@@ -87,6 +87,11 @@ module Ubicloud
       merge_into_values(adapter.patch(_path, **params))
     end
 
+    # Return the configuration hash for the PostgreSQL database.
+    def config
+      adapter.get(_path("/config"))[:pg_config]
+    end
+
     # Create a read replica of this database, with the given name.
     def create_read_replica(name)
       Postgres.new(adapter, adapter.post(_path("/read-replica"), name:))
