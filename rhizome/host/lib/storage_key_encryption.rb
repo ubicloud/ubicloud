@@ -28,8 +28,8 @@ class StorageKeyEncryption
     data_encryption_key = JSON.parse(File.read(key_file))
     wrapped_key1_b64 = data_encryption_key["key"]
     wrapped_key2_b64 = data_encryption_key["key2"]
-    wrapped_key1 = wrapped_key1_b64.map { |s| Base64.strict_decode64(s) }
-    wrapped_key2 = wrapped_key2_b64.map { |s| Base64.strict_decode64(s) }
+    wrapped_key1 = wrapped_key1_b64.map { |s| Base64.decode64(s) }
+    wrapped_key2 = wrapped_key2_b64.map { |s| Base64.decode64(s) }
     {
       cipher: data_encryption_key["cipher"],
       key: unwrap_key(wrapped_key1),
