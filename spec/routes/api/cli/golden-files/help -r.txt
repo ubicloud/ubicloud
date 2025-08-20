@@ -341,7 +341,7 @@ Options:
 Detach a virtual machine from a load balancer
 
 Usage:
-    ubi lb (location/lb-name | lb-id) detach-vm vm-id
+    ubi lb (location/lb-name | lb-id) detach-vm (vm-name | vm-id)
 
 
 Rename a load balancer
