@@ -14,7 +14,7 @@ ubi fw (location/fw-name | fw-id) attach-subnet (ps-name | ps-id)
 ubi fw location/fw-name create [options]
 ubi fw (location/fw-name | fw-id) delete-rule rule-id
 ubi fw (location/fw-name | fw-id) destroy [options]
-ubi fw (location/fw-name | fw-id) detach-subnet ps-id
+ubi fw (location/fw-name | fw-id) detach-subnet (ps-name | ps-id)
 ubi fw (location/fw-name | fw-id) rename new-name
 ubi fw (location/fw-name | fw-id) show [options]
 ubi help [options] [command [subcommand]]
