@@ -56,4 +56,58 @@ RSpec.describe StorageKeyEncryption do
       sek.unwrap_key(wrapped)
     }.to raise_error RuntimeError, "Invalid auth_tag size: 1"
   end
+
+  describe "#read_encrypted_dek" do
+    let(:dek) {
+      k = OpenSSL::Cipher.new("aes-256-xts").random_key.unpack1("H*")
+      {key: k[..63], key2: k[64..]}
+    }
+
+    let(:wrapped_dek) {
+      {
+        key: sek.wrap_key(dek[:key]),
+        key2: sek.wrap_key(dek[:key2])
+      }
+    }
+
+    it "can read a file generated using strict_encode64" do
+      expect(File).to receive(:read).with("key-file").and_return(
+        JSON.pretty_generate({
+          cipher: "AES_XTS",
+          key: [
+            Base64.strict_encode64(wrapped_dek[:key][0]),
+            Base64.strict_encode64(wrapped_dek[:key][1])
+          ],
+          key2: [
+            Base64.strict_encode64(wrapped_dek[:key2][0]),
+            Base64.strict_encode64(wrapped_dek[:key2][1])
+          ]
+        })
+      )
+
+      read_key = sek.read_encrypted_dek("key-file")
+      expect(read_key[:key]).to eq(dek[:key])
+      expect(read_key[:key2]).to eq(dek[:key2])
+    end
+
+    it "can read a file generated using encode64" do
+      expect(File).to receive(:read).with("key-file").and_return(
+        JSON.pretty_generate({
+          cipher: "AES_XTS",
+          key: [
+            Base64.encode64(wrapped_dek[:key][0]),
+            Base64.encode64(wrapped_dek[:key][1])
+          ],
+          key2: [
+            Base64.encode64(wrapped_dek[:key2][0]),
+            Base64.encode64(wrapped_dek[:key2][1])
+          ]
+        })
+      )
+
+      read_key = sek.read_encrypted_dek("key-file")
+      expect(read_key[:key]).to eq(dek[:key])
+      expect(read_key[:key2]).to eq(dek[:key2])
+    end
+  end
 end
