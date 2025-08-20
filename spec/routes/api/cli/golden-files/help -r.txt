@@ -367,7 +367,7 @@ Allowed Option Values:
 Update a load balancer
 
 Usage:
-    ubi lb (location/lb-name | lb-id) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]
+    ubi lb (location/lb-name | lb-id) update algorithm src-port dst-port health-check-endpoint [(vm-name | vm-id) [...]]
 
 
 Manage PostgreSQL databases
