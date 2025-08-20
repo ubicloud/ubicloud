@@ -424,6 +424,21 @@ class UbiCli
     sdk.send(@sdk_method).new("#{@location}/#{@name}")
   end
 
+  def convert_name_to_id(model_adapter, name)
+    unless model_adapter.id_regexp.match?(name)
+      id_for_loc_name(model_adapter, "#{@location}/#{name}")
+    end || name
+  end
+
+  def id_for_loc_name(model_adapter, loc_name)
+    _, name, extra = loc_name.split("/", 3)
+    if name && !extra
+      obj = model_adapter.new(loc_name)
+      obj.info
+      obj.id
+    end
+  end
+
   def finalize_response(res)
     headers = res[1]
     body = res[2]
