@@ -88,6 +88,7 @@ vm eu-central-h1/test-vm -X sftp
 vm list invalid
 vm vmdzyppz6j166jh5e9t0dwrfas show
 vm vmdzyppz6j166jh5e9t0dwrfa show
+vm vmdzyppz6j166jh5e9t2dwrfasa show
 kc eu-central-h1/test-kc create invalid
 kc eu-central-h1/test-kc create -c a
 kc eu-central-h1/test-kc create -c 1 -w bad
