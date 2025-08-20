@@ -81,7 +81,11 @@ class PostgresResource < Sequel::Model
       application_name: application_name
     }.map { |k, v| "#{k}=#{v}" }.join("&")
 
-    URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: identity, query: query_parameters).to_s
+    if Config.production?
+      URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: identity, query: query_parameters).to_s
+    else
+      URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: representative_server.vm.ephemeral_net4.to_s, query: query_parameters).to_s
+    end
   end
 
   def target_standby_count
