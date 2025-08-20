@@ -10,7 +10,7 @@ ubi fw command [...]
 ubi fw (location/fw-name | fw-id) post-command [...]
 ubi fw list [options]
 ubi fw (location/fw-name | fw-id) add-rule [options] cidr
-ubi fw (location/fw-name | fw-id) attach-subnet ps-id
+ubi fw (location/fw-name | fw-id) attach-subnet (ps-name | ps-id)
 ubi fw location/fw-name create [options]
 ubi fw (location/fw-name | fw-id) delete-rule rule-id
 ubi fw (location/fw-name | fw-id) destroy [options]
