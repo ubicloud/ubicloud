@@ -1,1 +1,1 @@
-Connected private subnets with ids psfzm9e26xky5m9ggetw4dpqe2 and pshfgpzvs0t20gpezmz2kkk8e4
+Connected private subnet psfzm9e26xky5m9ggetw4dpqe2 to pshfgpzvs0t20gpezmz2kkk8e4
