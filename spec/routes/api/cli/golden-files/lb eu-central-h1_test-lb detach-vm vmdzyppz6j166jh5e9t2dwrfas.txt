@@ -1,1 +1,1 @@
-Detached VM with id vmdzyppz6j166jh5e9t2dwrfas from load balancer with id 1bvp8yk1karj4ngwhtgrfh6esd
+Detached VM vmdzyppz6j166jh5e9t2dwrfas from load balancer with id 1bvp8yk1karj4ngwhtgrfh6esd
