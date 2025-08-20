@@ -149,7 +149,7 @@ Options:
 Detch a private subnet from a firewall
 
 Usage:
-    ubi fw (location/fw-name | fw-id) detach-subnet ps-id
+    ubi fw (location/fw-name | fw-id) detach-subnet (ps-name | ps-id)
 
 
 Show details for a firewall
