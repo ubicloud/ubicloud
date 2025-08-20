@@ -29,7 +29,7 @@ ubi kc (location/kc-name | kc-id) show [options]
 ubi lb command [...]
 ubi lb (location/lb-name | lb-id) post-command [...]
 ubi lb list [options]
-ubi lb (location/lb-name | lb-id) attach-vm vm-id
+ubi lb (location/lb-name | lb-id) attach-vm (vm-name | vm-id)
 ubi lb location/lb-name create [options] ps-id src-port dst-port
 ubi lb (location/lb-name | lb-id) destroy [options]
 ubi lb (location/lb-name | lb-id) detach-vm vm-id
