@@ -77,8 +77,10 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
     reap do
       decr_destroy
 
+      kubernetes_nodepool.nodes.each(&:incr_destroy)
       kubernetes_nodepool.vms.each(&:incr_destroy)
       kubernetes_nodepool.remove_all_vms
+      nap 5 unless kubernetes_nodepool.nodes.empty?
       kubernetes_nodepool.destroy
       pop "kubernetes nodepool is deleted"
     end

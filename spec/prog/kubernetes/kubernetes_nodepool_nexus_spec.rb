@@ -206,11 +206,19 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       expect { nx.destroy }.to nap(120)
     end
 
-    it "destroys the nodepool and its vms" do
-      vms = [create_vm, create_vm]
-      expect(kn).to receive(:vms).and_return(vms)
+    it "completes destroy when nodes are gone" do
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kn.cluster.id, kubernetes_nodepool_id: kn.id)
+      st.update(prog: "Kubernetes::KubernetesNodepoolNexus", label: "destroy", stack: [{}])
+      expect(kn.nodes).to all(receive(:incr_destroy))
+      expect(kn.vms).to all(receive(:incr_destroy))
+      expect(kn).to receive(:remove_all_vms)
 
-      expect(vms).to all(receive(:incr_destroy))
+      expect { nx.destroy }.to nap(5)
+    end
+
+    it "destroys the nodepool and its vms" do
+      expect(kn.nodes).to all(receive(:incr_destroy))
+      expect(kn.vms).to all(receive(:incr_destroy))
       expect(kn).to receive(:remove_all_vms)
       expect(kn).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "kubernetes nodepool is deleted"})

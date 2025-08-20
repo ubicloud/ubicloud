@@ -61,6 +61,14 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     end
   end
 
+  describe "node" do
+    it "finds the right node" do
+      node = KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id)
+      expect(prog).to receive(:frame).and_return({"node_id" => node.id})
+      expect(prog.node.id).to eq(node.id)
+    end
+  end
+
   describe "#before_run" do
     it "destroys itself if the kubernetes cluster is getting deleted" do
       Strand.create(id: kubernetes_cluster.id, label: "something", prog: "KubernetesClusterNexus")
@@ -323,9 +331,11 @@ table ip6 pod_access {
         nics: [instance_double(Nic, private_ipv4: "10.0.0.37", private_ipv6: "0::1")],
         ephemeral_net6: NetAddr::IPv6Net.new(NetAddr::IPv6.parse("2001:db8::"), NetAddr::Mask128.new(64))
       )
+      node = KubernetesNode.create(vm_id: prog.vm.id, kubernetes_cluster_id: kubernetes_cluster.id)
+      expect(prog).to receive(:node).and_return(node).twice
 
       expect(sshable).to receive(:cmd).with("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: /"type": "ubicni"/)
-      expect { prog.install_cni }.to exit({vm_id: prog.vm.id})
+      expect { prog.install_cni }.to exit({vm_id: prog.vm.id, node_id: prog.node.id})
     end
   end
 end

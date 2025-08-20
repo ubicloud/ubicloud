@@ -434,6 +434,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster.api_server_lb).to receive(:incr_destroy)
       expect(kubernetes_cluster.services_lb).to receive(:incr_destroy)
 
+      expect(kubernetes_cluster.nodes).to all(receive(:incr_destroy))
       expect(kubernetes_cluster.cp_vms).to all(receive(:incr_destroy))
       expect(kubernetes_cluster.nodepools).to all(receive(:incr_destroy))
       expect(kubernetes_cluster.private_subnet).to receive(:incr_destroy)
@@ -450,6 +451,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster.api_server_lb).to receive(:incr_destroy)
       expect(kubernetes_cluster.services_lb).to receive(:incr_destroy)
       expect(kubernetes_cluster.cp_vms).to all(receive(:incr_destroy))
+      expect(kubernetes_cluster.nodes).to all(receive(:incr_destroy))
 
       expect(kubernetes_cluster.nodepools).to be_empty
 

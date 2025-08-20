@@ -247,6 +247,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
       kubernetes_cluster.api_server_lb&.incr_destroy
       kubernetes_cluster.cp_vms.each(&:incr_destroy)
+      kubernetes_cluster.nodes.each(&:incr_destroy)
       kubernetes_cluster.remove_all_cp_vms
       kubernetes_cluster.nodepools.each { it.incr_destroy }
       kubernetes_cluster.private_subnet.incr_destroy

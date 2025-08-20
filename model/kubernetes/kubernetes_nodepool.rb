@@ -6,6 +6,7 @@ class KubernetesNodepool < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :cluster, key: :kubernetes_cluster_id, class: :KubernetesCluster
   many_to_many :vms, order: :created_at
+  one_to_many :nodes, class: :KubernetesNode, order: :created_at
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy, :start_bootstrapping, :upgrade
