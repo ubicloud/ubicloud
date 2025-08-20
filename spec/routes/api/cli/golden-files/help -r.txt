@@ -120,7 +120,7 @@ Options:
 Attach a private subnet to a firewall
 
 Usage:
-    ubi fw (location/fw-name | fw-id) attach-subnet ps-id
+    ubi fw (location/fw-name | fw-id) attach-subnet (ps-name | ps-id)
 
 
 Create a firewall
