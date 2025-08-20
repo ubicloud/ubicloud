@@ -309,7 +309,7 @@ Allowed Option Values:
 Attach a virtual machine to a load balancer
 
 Usage:
-    ubi lb (location/lb-name | lb-id) attach-vm vm-id
+    ubi lb (location/lb-name | lb-id) attach-vm (vm-name | vm-id)
 
 
 Create a load balancer

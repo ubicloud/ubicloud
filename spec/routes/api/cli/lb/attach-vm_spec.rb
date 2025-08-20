@@ -12,9 +12,15 @@ RSpec.describe Clover, "cli lb attach-vm" do
     @lb = LoadBalancer.first
   end
 
-  it "attaches VM to load balancer" do
+  it "attaches VM to load balancer by id" do
     expect(@lb.vms).to be_empty
-    expect(cli(%W[lb eu-central-h1/test-lb attach-vm #{@vm.ubid}])).to eq "Attached VM with id #{@vm.ubid} to load balancer with id #{@lb.ubid}\n"
+    expect(cli(%W[lb eu-central-h1/test-lb attach-vm #{@vm.ubid}])).to eq "Attached VM #{@vm.ubid} to load balancer with id #{@lb.ubid}\n"
+    expect(@lb.reload.vms.map(&:ubid)).to eq [@vm.ubid]
+  end
+
+  it "attaches VM to load balancer by name" do
+    expect(@lb.vms).to be_empty
+    expect(cli(%W[lb eu-central-h1/test-lb attach-vm test-vm])).to eq "Attached VM test-vm to load balancer with id #{@lb.ubid}\n"
     expect(@lb.reload.vms.map(&:ubid)).to eq [@vm.ubid]
   end
 end
