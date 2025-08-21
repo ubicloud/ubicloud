@@ -10,9 +10,15 @@ RSpec.describe Clover, "cli ps connect" do
     cli(%W[ps eu-central-h1/#{@ps1.name} connect #{@ps2.ubid}])
   end
 
-  it "disconnects requested private subnet from this subnet" do
+  it "disconnects requested private subnet from this subnet by id" do
     expect(ConnectedSubnet.count).to eq 1
-    expect(cli(%W[ps eu-central-h1/#{@ps1.name} disconnect #{@ps2.ubid}])).to eq "Disconnected private subnets with ids #{@ps2.ubid} and #{@ps1.ubid}\n"
+    expect(cli(%W[ps eu-central-h1/test-ps disconnect #{@ps2.ubid}])).to eq "Disconnected private subnet #{@ps2.ubid} from #{@ps1.ubid}\n"
+    expect(ConnectedSubnet.count).to eq 0
+  end
+
+  it "disconnects requested private subnet from this subnet by name" do
+    expect(ConnectedSubnet.count).to eq 1
+    expect(cli(%W[ps eu-central-h1/test-ps disconnect eu-central-h1/test-ps2])).to eq "Disconnected private subnet eu-central-h1/test-ps2 from #{@ps1.ubid}\n"
     expect(ConnectedSubnet.count).to eq 0
   end
 end

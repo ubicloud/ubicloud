@@ -71,7 +71,7 @@ ubi ps list [options]
 ubi ps (location/ps-name | ps-id) connect (location/ps-name | ps-id)
 ubi ps location/ps-name create [options]
 ubi ps (location/ps-name | ps-id) destroy [options]
-ubi ps (location/ps-name | ps-id) disconnect ps-id
+ubi ps (location/ps-name | ps-id) disconnect (location/ps-name | ps-id)
 ubi ps (location/ps-name | ps-id) rename new-name
 ubi ps (location/ps-name | ps-id) show [options]
 ubi version

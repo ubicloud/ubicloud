@@ -1,6 +1,3 @@
-! Invalid private subnet id format
-
-Disconnect a private subnet from another private subnet
-
-Usage:
-    ubi ps (location/ps-name | ps-id) disconnect ps-id
+! Unexpected response status: 404
+Details: Validation failed for following path components: location
+  location: Given location is not a valid location. Available locations: eu-central-h1, eu-north-h1, us-east-a2
