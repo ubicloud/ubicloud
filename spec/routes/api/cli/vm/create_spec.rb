@@ -24,10 +24,29 @@ RSpec.describe Clover, "cli vm create" do
     expect(body).to eq "VM created with id: #{vm.ubid}\n"
   end
 
-  it "creates vm with all options" do
+  it "creates vm with all options, specifying private subnet by id" do
     expect(Vm.count).to eq 0
     ps = PrivateSubnet.create(project_id: @project.id, name: "test-ps", location_id: Location[name: "hetzner-hel1"].id, net6: "fe80::/64", net4: "192.168.0.0/24")
     body = cli(%W[vm eu-north-h1/test-vm2 create -6 -b debian-12 -u foo -s standard-4 -S 80 -p #{ps.ubid}] << "b b")
+    vm = Vm.first
+    expect(Vm.count).to eq 1
+    expect(PrivateSubnet.count).to eq 1
+    expect(vm).to be_a Vm
+    expect(vm.name).to eq "test-vm2"
+    expect(vm.public_key).to eq "b b"
+    expect(vm.display_location).to eq "eu-north-h1"
+    expect(vm.display_size).to eq "standard-4"
+    expect(vm.boot_image).to eq "debian-12"
+    expect(vm.ip4_enabled).to be false
+    expect(vm.strand.stack[0]["storage_volumes"][0]["size_gib"]).to eq 80
+    expect(vm.nics.first.private_subnet_id).to eq ps.id
+    expect(body).to eq "VM created with id: #{vm.ubid}\n"
+  end
+
+  it "creates vm with all options, specifying private subnet by name" do
+    expect(Vm.count).to eq 0
+    ps = PrivateSubnet.create(project_id: @project.id, name: "test-ps", location_id: Location[name: "hetzner-hel1"].id, net6: "fe80::/64", net4: "192.168.0.0/24")
+    body = cli(%W[vm eu-north-h1/test-vm2 create -6 -b debian-12 -u foo -s standard-4 -S 80 -p test-ps] << "b b")
     vm = Vm.first
     expect(Vm.count).to eq 1
     expect(PrivateSubnet.count).to eq 1
