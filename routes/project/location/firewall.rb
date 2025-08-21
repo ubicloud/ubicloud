@@ -80,10 +80,6 @@ class Clover
         end
       end
 
-      r.api do
-        r.hash_branches(:project_location_firewall_prefix)
-      end
-
       r.on "firewall-rule" do
         r.post true do
           authorize("Firewall:edit", firewall.id)
@@ -93,25 +89,42 @@ class Clover
           port_range = Validation.validate_port_range(typecast_params.str("port_range"))
           pg_range = Sequel.pg_range(port_range.first..port_range.last)
 
+          firewall_rule = nil
           DB.transaction do
             firewall_rule = firewall.insert_firewall_rule(parsed_cidr.to_s, pg_range)
             audit_log(firewall_rule, "create", firewall)
           end
 
-          flash["notice"] = "Firewall rule is created"
-          r.redirect firewall
+          if api?
+            Serializers::FirewallRule.serialize(firewall_rule)
+          else
+            flash["notice"] = "Firewall rule is created"
+            r.redirect firewall
+          end
         end
 
-        r.delete :ubid_uuid do |id|
-          authorize("Firewall:edit", firewall.id)
-          next 204 unless (fwr = firewall.firewall_rules_dataset[id:])
+        r.is :ubid_uuid do |id|
+          firewall_rule = firewall.firewall_rules_dataset[id:]
+          check_found_object(firewall_rule)
 
-          DB.transaction do
-            firewall.remove_firewall_rule(fwr)
-            audit_log(fwr, "destroy")
+          r.delete do
+            authorize("Firewall:edit", firewall.id)
+            DB.transaction do
+              firewall.remove_firewall_rule(firewall_rule)
+              audit_log(firewall_rule, "destroy", firewall)
+            end
+
+            if api?
+              204
+            else
+              {message: "Firewall rule deleted"}
+            end
           end
 
-          {message: "Firewall rule deleted"}
+          r.get api? do
+            authorize("Firewall:view", firewall.id)
+            Serializers::FirewallRule.serialize(firewall_rule)
+          end
         end
       end
     end
