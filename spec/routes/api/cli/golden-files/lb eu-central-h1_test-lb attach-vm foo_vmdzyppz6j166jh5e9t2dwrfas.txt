@@ -1,0 +1,3 @@
+! Unexpected response status: 400
+Details: Validation failed for following fields: vm_id
+  vm_id: No matching VM found in eu-central-h1
