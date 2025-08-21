@@ -788,7 +788,7 @@ Examples:
 Options:
     -6, --ipv6-only                  do not enable IPv4
     -b, --boot-image=image_name      boot image
-    -p, --private-subnet-id=id       place VM into specific private subnet
+    -p, --private-subnet-id=ps-id    place VM into specific private subnet (also accepts ps-name)
     -s, --size=size                  server size
     -S, --storage-size=size          storage size
     -u, --unix-user=username         username (default: ubi)
