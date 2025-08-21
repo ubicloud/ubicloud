@@ -53,6 +53,9 @@ To get the user credentials, create a user according to
 [these instructions](https://robot.hetzner.com/doc/webservice/en.html#preface).
 The SSH key is the one you set when you created the robot server.
 
+The first thing to make sure is you use the hetzner robot rescue system to
+install ubuntu. Either 22.04 or 24.04 is fine.
+
 Then, run the following script for each instance to cloudify it.
 Currently, the script cloudifies bare metal instances leased from Hetzner.
 After you cloudify your instances, you can provision and manage cloud
