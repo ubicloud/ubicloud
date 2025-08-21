@@ -27,8 +27,8 @@ class Clover
         authorize("LoadBalancer:edit", lb.id)
         handle_validation_failure("networking/load_balancer/show")
 
-        unless (vm = authorized_vm)
-          fail Validation::ValidationFailed.new("vm_id" => "VM not found")
+        unless (vm = authorized_vm(location_id: lb.private_subnet.location_id))
+          fail Validation::ValidationFailed.new("vm_id" => "No matching VM found in #{lb.display_location}")
         end
 
         actioned = nil

@@ -277,7 +277,7 @@ RSpec.describe Clover, "load balancer" do
         click_button "Attach"
 
         expect(page.title).to eq("Ubicloud - #{lb.name}")
-        expect(page).to have_content "VM not found"
+        expect(page).to have_content "No matching VM found in eu-central-h1"
         expect(lb.vms.count).to eq(0)
       end
 
@@ -325,7 +325,7 @@ RSpec.describe Clover, "load balancer" do
         click_button "Detach"
 
         expect(page.title).to eq("Ubicloud - #{lb.name}")
-        expect(page).to have_content "VM not found"
+        expect(page).to have_content "No matching VM found in eu-central-h1"
         expect(lb.reload.vms.count).to eq(0)
       end
     end

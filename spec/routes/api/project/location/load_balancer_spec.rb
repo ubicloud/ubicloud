@@ -243,6 +243,13 @@ RSpec.describe Clover, "load-balancer" do
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: vm_id")
       end
+
+      it "fails for vm in different location" do
+        vm.update(location_id: Location::HETZNER_HEL1_ID)
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}/attach-vm", {vm_id: vm.ubid}.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: vm_id")
+      end
     end
 
     describe "detach-vm" do
