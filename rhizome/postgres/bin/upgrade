@@ -1,0 +1,13 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+require_relative "../lib/postgres_upgrade"
+
+if ARGV.count != 1
+  fail "Wrong number of arguments. Expected 1, Given #{ARGV.count}"
+end
+
+v = Integer(ARGV[0])
+
+PostgresUpgrade.new(v, Logger.new($stdout)).upgrade
