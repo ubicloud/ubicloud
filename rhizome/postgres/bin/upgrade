@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require_relative "../../common/lib/util"
+require_relative "../lib/postgres_upgrade"
 
 if ARGV.count != 1
   fail "Wrong number of arguments. Expected 1, Given #{ARGV.count}"
@@ -9,19 +10,4 @@ end
 
 v = Integer(ARGV[0])
 
-# Stop the old version.
-r "sudo pg_ctlcluster stop #{v - 1} main"
-
-# Disable the old version.
-r "sudo systemctl disable postgresql@#{v - 1}-main"
-
-PostgresSetup.new(v - 1, Logger.new($stdout)).teardown
-
-# Initialize empty database with the new version.
-r "sudo postgres/bin/initialize-empty-database #{v}"
-
-# Enable the new version.
-r "sudo systemctl enable postgresql@#{v}-main"
-
-# Start the new version.
-r "sudo systemctl start postgresql@#{v}-main"
+PostgresUpgrade.new(v, Logger.new($stdout)).upgrade

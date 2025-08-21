@@ -13,6 +13,7 @@ backup_label = ARGV[1]
 
 PostgresSetup.new(v, Logger.new($stdout)).setup
 
+r "echo \"data_directory = '/dat/#{v}/data'\" | sudo tee /etc/postgresql-common/createcluster.d/data-dir.conf"
 r "chown postgres /dat"
 
 # Below commands are required for idempotency
