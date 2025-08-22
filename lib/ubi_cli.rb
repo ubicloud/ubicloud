@@ -159,6 +159,21 @@ class UbiCli
     end
   end
 
+  def self.rename(cmd)
+    on(cmd).run_on("rename") do
+      desc "Rename a #{LOWERCASE_LABELS[cmd]}"
+
+      banner "ubi #{cmd} (location/#{cmd}-name | #{cmd}-id) rename new-name"
+
+      args 1
+
+      run do |name|
+        sdk_object.rename_to(name)
+        response("#{CAPITALIZED_LABELS[cmd]} renamed to #{name}")
+      end
+    end
+  end
+
   def self.destroy(cmd)
     on(cmd).run_on("destroy") do
       desc "Destroy a #{LOWERCASE_LABELS[cmd]}"

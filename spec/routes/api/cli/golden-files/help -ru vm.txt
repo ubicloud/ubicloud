@@ -3,6 +3,7 @@ ubi vm (location/vm-name | vm-id) [post-options] post-command [...]
 ubi vm list [options]
 ubi vm location/vm-name create [options] public_key
 ubi vm (location/vm-name | vm-id) destroy [options]
+ubi vm (location/vm-name | vm-id) rename new-name
 ubi vm (location/vm-name | vm-id) restart
 ubi vm (location/vm-name | vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
 ubi vm (location/vm-name | vm-id) [options] sftp [sftp-options]

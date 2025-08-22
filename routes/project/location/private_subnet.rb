@@ -97,6 +97,8 @@ class Clover
           204
         end
       end
+
+      r.rename ps, perm: "PrivateSubnet:edit", serializer: Serializers::PrivateSubnet
     end
   end
 end

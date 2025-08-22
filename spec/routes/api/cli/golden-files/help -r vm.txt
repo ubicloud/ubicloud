@@ -10,6 +10,7 @@ Commands:
 Post Commands:
     create     Create a virtual machine
     destroy    Destroy a virtual machine
+    rename     Rename a virtual machine
     restart    Restart a virtual machine
     scp        Copy files to or from virtual machine using `scp`
     sftp       Copy files to or from virtual machine using `sftp`
@@ -67,6 +68,12 @@ Usage:
 
 Options:
     -f, --force                      do not require confirmation
+
+
+Rename a virtual machine
+
+Usage:
+    ubi vm (location/vm-name | vm-id) rename new-name
 
 
 Restart a virtual machine
