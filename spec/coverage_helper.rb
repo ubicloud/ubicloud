@@ -20,17 +20,10 @@ if (suite = ENV.delete("COVERAGE"))
         !LOCKED_FILES.include?(file.filename)
       end
     else
-      add_filter "/rhizome"
-      add_filter "/kubernetes"
-      # No need to check coverage for them
-      add_filter "/migrate/"
-      add_filter "/spec/"
-      add_filter "/db.rb"
-      add_filter "/model.rb"
-      add_filter "/loader.rb"
-      add_filter "/.env.rb"
-      add_filter "/var/"
-      add_filter "/vendor/"
+      add_filter do |file|
+        path = file.filename.delete_prefix(File.dirname(__dir__))
+        path.match?(/\A\/(rhizome|kubernetes|migrate|spec|var|vendor|(db|model|loader|\.env)\.rb)/)
+      end
     end
 
     add_group("Missing") { |src| src.covered_percent < 100 }
