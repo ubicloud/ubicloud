@@ -86,7 +86,7 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
   end
 
   label def delete_node_object
-    res = kubernetes_cluster.client.delete_node(old_node.name)
+    res = kubernetes_cluster.client(session: kubernetes_cluster.nodes.last.sshable.connect).delete_node(old_node.name)
     fail "delete node object failed: #{res}" unless res.exitstatus.zero?
     hop_destroy_node
   end

@@ -169,6 +169,9 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
     it "deletes the node object from kubernetes" do
       client = instance_double(Kubernetes::Client)
       expect(kubernetes_cluster).to receive(:client).and_return(client)
+      sshable = instance_double(Sshable)
+      expect(kubernetes_cluster.nodes.last).to receive(:sshable).and_return(sshable)
+      expect(sshable).to receive(:connect)
       expect(client).to receive(:delete_node).with(prog.old_node.name).and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("success", 0))
       expect { prog.delete_node_object }.to hop("destroy_node")
     end
@@ -176,6 +179,9 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
     it "raises if the error of delete node command is not successful" do
       client = instance_double(Kubernetes::Client)
       expect(kubernetes_cluster).to receive(:client).and_return(client)
+      sshable = instance_double(Sshable)
+      expect(kubernetes_cluster.nodes.last).to receive(:sshable).and_return(sshable)
+      expect(sshable).to receive(:connect)
       expect(client).to receive(:delete_node).with(prog.old_node.name).and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("failed", 1))
       expect { prog.delete_node_object }.to raise_error(RuntimeError)
     end
