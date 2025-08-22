@@ -2,6 +2,7 @@ PATH
   remote: .
   specs:
     ubi-csi (0.1.0)
+      base64
       grpc (~> 1.73)
       grpc-tools (~> 1.73)
 
@@ -70,9 +71,6 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
-  base64
-  grpc (~> 1.73)
-  grpc-tools (~> 1.73)
   rspec (~> 3.12)
   simplecov (~> 0.22)
   simplecov-console (~> 0.9)

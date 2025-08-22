@@ -2,8 +2,4 @@
 
 source "https://rubygems.org"
 
-gem "grpc", "~> 1.73"
-gem "grpc-tools", "~> 1.73"
-gem "base64"
-
 gemspec
