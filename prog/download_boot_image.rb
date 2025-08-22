@@ -134,6 +134,8 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   label def start
+    register_deadline(nil, 24 * 60 * 60)
+
     # YYY: we can remove this once we enforce it in the database layer.
     # Although the default version is used if version is not passed, adding
     # a sanity check here to make sure version is not passed as nil.
