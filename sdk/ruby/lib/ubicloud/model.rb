@@ -81,8 +81,11 @@ module Ubicloud
         columns.each do |column|
           next if method_defined?(column)
           define_method(column) do
-            info unless @values.has_key?(column)
-            @values[column]
+            unless (value = @values[column])
+              info
+              value = @values[column]
+            end
+            value
           end
         end
       end
@@ -283,11 +286,7 @@ end
 
 # Require each model subclass, and then resolve associations after
 # all subclasses have been loaded.
-Dir.open(File.join(__dir__, "model")) do |dir|
-  dir.each_child do |file|
-    if file.end_with?(".rb")
-      require_relative "model/#{file}"
-    end
-  end
+Dir.glob("model/*.rb", base: __dir__) do |file|
+  require_relative file
 end
 Ubicloud::Model.subclasses.each(&:resolve_associations)

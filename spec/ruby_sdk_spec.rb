@@ -11,7 +11,8 @@ require "rack/mock_request"
 # rubocop:disable RSpec/SpecFilePathFormat
 RSpec.describe Ubicloud do
   # rubocop:enable RSpec/SpecFilePathFormat
-  let(:ubi) { described_class.new(:rack, app: Clover, env: {}, project_id: nil) }
+  let(:ubi) { described_class.new(:rack, app: Clover, env: {}, project_id:) }
+  let(:project_id) { Project.generate_ubid.to_s }
 
   it "ModelAdapter#respond_to? works as expected" do
     expect(ubi.vm).to respond_to(:create)
@@ -44,6 +45,21 @@ RSpec.describe Ubicloud do
     expect(ubi.vm.new({name: "foo", location: "foo"})).to be_a(Ubicloud::Vm)
   end
 
+  it "Model.new raises for invalid object" do
+    expect(Clover).not_to receive(:call)
+    expect { ubi.vm.new([]) }.to raise_error(Ubicloud::Error, "unsupported value initializing Ubicloud::Vm: []")
+  end
+
+  it "Model.new does not convert association key that isn't in expected format" do
+    expect(Clover).not_to receive(:call)
+    object = Object.new
+    expect(ubi.vm.new(location: "eu-central-h1", name: "test-vm", firewalls: object).firewalls).to eq object
+  end
+
+  it "Model.list raises for location including /" do
+    expect { ubi.vm.list(location: "foo/bar") }.to raise_error(Ubicloud::Error, "invalid location: \"foo/bar\"")
+  end
+
   it "Model.[] raises for invalid id or location/name format" do
     expect(Clover).not_to receive(:call)
     expect { ubi.vm["test-vm"] }.to raise_error(Ubicloud::Error, "invalid vm location/name: \"test-vm\"")
@@ -57,6 +73,53 @@ RSpec.describe Ubicloud do
   it "Model.[] returns nil for valid id format but missing object" do
     expect(Clover).to receive(:call).and_return([404, {}, []])
     expect(ubi.vm["vm345678901234567890123456"]).to be_nil
+  end
+
+  it "Model#id works for values with existing id" do
+    id = "vm345678901234567890123456"
+    expect(ubi.vm.new(id:).id).to eq id
+  end
+
+  it "Model#id retrieves id if id is not known" do
+    id = "vm345678901234567890123456"
+    expect(Clover).to receive(:call).and_invoke(proc do |env|
+      expect(env["PATH_INFO"]).to eq "/project/#{project_id}/location/eu-central-h1/vm/test-vm"
+      expect(env["REQUEST_METHOD"]).to eq "GET"
+      [200, {"content-type" => "application/json"}, [{id:}.to_json]]
+    end)
+    expect(ubi.vm.new(location: "eu-central-h1", name: "test-vm").id).to eq id
+  end
+
+  it "Model#location works for values with existing location" do
+    location = "eu-central-h1"
+    expect(ubi.vm.new(location:, name: "test-vm").location).to eq location
+  end
+
+  it "Model#location retrieves location if location is not known" do
+    location = "eu-central-h1"
+    id = "vm345678901234567890123456"
+    expect(Clover).to receive(:call).and_invoke(proc do |env|
+      expect(env["PATH_INFO"]).to eq "/project/#{project_id}/object-info/#{id}"
+      expect(env["REQUEST_METHOD"]).to eq "GET"
+      [200, {"content-type" => "application/json"}, [{location:}.to_json]]
+    end)
+    expect(ubi.vm.new(id:).location).to eq location
+  end
+
+  it "Model#name works for values with existing name" do
+    name = "test-vm"
+    expect(ubi.vm.new(location: "eu-central-h1", name:).name).to eq name
+  end
+
+  it "Model#name retrieves name if name is not known" do
+    name = "test-vm"
+    id = "vm345678901234567890123456"
+    expect(Clover).to receive(:call).and_invoke(proc do |env|
+      expect(env["PATH_INFO"]).to eq "/project/#{project_id}/object-info/#{id}"
+      expect(env["REQUEST_METHOD"]).to eq "GET"
+      [200, {"content-type" => "application/json"}, [{name:}.to_json]]
+    end)
+    expect(ubi.vm.new(id:).name).to eq name
   end
 
   it "Context#[] returns nil for invalid format" do
@@ -104,12 +167,17 @@ RSpec.describe Ubicloud do
     end)
 
     fw.attach_subnet(ps)
-    expect(path).to eq "/project//location/eu-central-h1/firewall/test-fw/attach-subnet"
+    expect(path).to eq "/project/#{project_id}/location/eu-central-h1/firewall/test-fw/attach-subnet"
     expect(params).to eq({private_subnet_id: "ps345678901234567890123456"})
 
     fw.detach_subnet(ps)
-    expect(path).to eq "/project//location/eu-central-h1/firewall/test-fw/detach-subnet"
+    expect(path).to eq "/project/#{project_id}/location/eu-central-h1/firewall/test-fw/detach-subnet"
     expect(params).to eq({private_subnet_id: "ps345678901234567890123456"})
+  end
+
+  it "Firewall#detach_subnet raises if private subnet id includes a slash" do
+    ps = ubi.private_subnet.new("eu-central-h1/test-ps")
+    expect { ps.disconnect("foo/bar") }.to raise_error(Ubicloud::Error, "invalid private subnet id format")
   end
 
   it "Vm.create converts LF to CRLF in public_keys" do
