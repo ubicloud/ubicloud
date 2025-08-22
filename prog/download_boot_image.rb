@@ -141,7 +141,7 @@ class Prog::DownloadBootImage < Prog::Base
     # a sanity check here to make sure version is not passed as nil.
     fail "Version can not be passed as nil" if version.nil?
 
-    fail "Image already exists on host" if vm_host.boot_images_dataset.where(name: image_name, version: version).count > 0
+    pop "Image already exists on host" unless vm_host.boot_images_dataset.where(name: image_name, version:).empty?
 
     BootImage.create(
       vm_host_id: vm_host.id,
