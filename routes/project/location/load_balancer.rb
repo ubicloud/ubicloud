@@ -112,6 +112,8 @@ class Clover
           Serializers::LoadBalancer.serialize(lb.reload, {detailed: true})
         end
       end
+
+      r.rename lb, perm: "LoadBalancer:edit", serializer: Serializers::LoadBalancer
     end
   end
 end

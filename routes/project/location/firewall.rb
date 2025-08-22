@@ -48,6 +48,8 @@ class Clover
         end
       end
 
+      r.rename firewall, perm: "Firewall:edit", serializer: Serializers::Firewall
+
       r.post %w[attach-subnet detach-subnet] do |action|
         authorize("Firewall:view", firewall.id)
         handle_validation_failure("networking/firewall/show")

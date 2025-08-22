@@ -552,6 +552,34 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
+  '/project/{project_id}/location/{location}/firewall/{firewall_reference}/rename':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/firewall_reference'
+    post:
+      operationId: renameFirewall
+      summary: Rename a firewall
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  description: New name for firewall
+                  type: string
+              additionalProperties: false
+              required:
+                - name
+      responses:
+        '200':
+          $ref: '#/components/responses/Firewall'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
   '/project/{project_id}/location/{location}/kubernetes-cluster':
     get:
       operationId: listLocationKubernetesClusters
@@ -638,6 +666,34 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Kubeconfig'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Kubernetes Cluster
+  '/project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_reference}/rename':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/kubernetes_cluster_reference'
+    post:
+      operationId: renameKubernetesCluster
+      summary: Rename a kubernetes cluster
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  description: New name for kubernetes cluster
+                  type: string
+              additionalProperties: false
+              required:
+                - name
+      responses:
+        '200':
+          $ref: '#/components/responses/KubernetesCluster'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -822,6 +878,34 @@ paths:
               additionalProperties: false
               required:
                 - vm_id
+      responses:
+        '200':
+          $ref: '#/components/responses/LoadBalancer'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
+  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_reference}/rename':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/load_balancer_reference'
+    post:
+      operationId: renameLoadBalancer
+      summary: Rename a load balancer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  description: New name for load balancer
+                  type: string
+              additionalProperties: false
+              required:
+                - name
       responses:
         '200':
           $ref: '#/components/responses/LoadBalancer'
@@ -1245,6 +1329,34 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/rename':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    post:
+      operationId: renamePostgres
+      summary: Rename a Postgres database
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  description: New name for postgres database
+                  type: string
+              additionalProperties: false
+              required:
+                - name
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/reset-superuser-password':
     post:
       operationId: resetSuperuserPassword
@@ -1445,6 +1557,34 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
+  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_reference}/rename':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/private_subnet_reference'
+    post:
+      operationId: renamePrivateSubnet
+      summary: Rename a private subnet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  description: New name for private subnet
+                  type: string
+              additionalProperties: false
+              required:
+                - name
+      responses:
+        '200':
+          $ref: '#/components/responses/PrivateSubnet'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Subnet
   '/project/{project_id}/location/{location}/vm':
     get:
       operationId: listLocationVMs
@@ -1524,6 +1664,34 @@ paths:
               additionalProperties: false
               required:
                 - public_key
+      responses:
+        '200':
+          $ref: '#/components/responses/Vm'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
+  '/project/{project_id}/location/{location}/vm/{vm_reference}/rename':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/vm_reference'
+    post:
+      operationId: renameVM
+      summary: Rename a VM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  description: New name for VM
+                  type: string
+              additionalProperties: false
+              required:
+                - name
       responses:
         '200':
           $ref: '#/components/responses/Vm'

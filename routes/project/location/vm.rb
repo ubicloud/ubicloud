@@ -39,6 +39,8 @@ class Clover
         204
       end
 
+      r.rename vm, perm: "Vm:edit", serializer: Serializers::Vm
+
       r.post "restart" do
         authorize("Vm:edit", vm.id)
 

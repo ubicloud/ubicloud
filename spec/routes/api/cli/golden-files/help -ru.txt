@@ -15,6 +15,7 @@ ubi fw location/fw-name create [options]
 ubi fw (location/fw-name | fw-id) delete-rule rule-id
 ubi fw (location/fw-name | fw-id) destroy [options]
 ubi fw (location/fw-name | fw-id) detach-subnet ps-id
+ubi fw (location/fw-name | fw-id) rename new-name
 ubi fw (location/fw-name | fw-id) show [options]
 ubi help [options] [command [subcommand]]
 ubi kc command [...]
@@ -23,6 +24,7 @@ ubi kc list [options]
 ubi kc location/kc-name create [options]
 ubi kc (location/kc-name | kc-id) destroy [options]
 ubi kc (location/kc-name | kc-id) kubeconfig
+ubi kc (location/kc-name | kc-id) rename new-name
 ubi kc (location/kc-name | kc-id) show [options]
 ubi lb command [...]
 ubi lb (location/lb-name | lb-id) post-command [...]
@@ -31,6 +33,7 @@ ubi lb (location/lb-name | lb-id) attach-vm vm-id
 ubi lb location/lb-name create [options] ps-id src-port dst-port
 ubi lb (location/lb-name | lb-id) destroy [options]
 ubi lb (location/lb-name | lb-id) detach-vm vm-id
+ubi lb (location/lb-name | lb-id) rename new-name
 ubi lb (location/lb-name | lb-id) show [options]
 ubi lb (location/lb-name | lb-id) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]
 ubi pg command [...]
@@ -54,6 +57,7 @@ ubi pg (location/pg-name | pg-id) promote-read-replica
 ubi pg (location/pg-name | pg-id) [options] psql [psql-options]
 ubi pg (location/pg-name | pg-id) remove-config-entries key [...]
 ubi pg (location/pg-name | pg-id) remove-pgbouncer-config-entries key [...]
+ubi pg (location/pg-name | pg-id) rename new-name
 ubi pg (location/pg-name | pg-id) reset-superuser-password new-password
 ubi pg (location/pg-name | pg-id) restart
 ubi pg (location/pg-name | pg-id) restore new-db-name restore-time
@@ -68,6 +72,7 @@ ubi ps (location/ps-name | ps-id) connect ps-id
 ubi ps location/ps-name create [options]
 ubi ps (location/ps-name | ps-id) destroy [options]
 ubi ps (location/ps-name | ps-id) disconnect ps-id
+ubi ps (location/ps-name | ps-id) rename new-name
 ubi ps (location/ps-name | ps-id) show [options]
 ubi version
 ubi vm command [...]
@@ -75,6 +80,7 @@ ubi vm (location/vm-name | vm-id) [post-options] post-command [...]
 ubi vm list [options]
 ubi vm location/vm-name create [options] public_key
 ubi vm (location/vm-name | vm-id) destroy [options]
+ubi vm (location/vm-name | vm-id) rename new-name
 ubi vm (location/vm-name | vm-id) restart
 ubi vm (location/vm-name | vm-id) [options] scp [scp-options] (local-path :remote-path | :remote-path local-path)
 ubi vm (location/vm-name | vm-id) [options] sftp [sftp-options]

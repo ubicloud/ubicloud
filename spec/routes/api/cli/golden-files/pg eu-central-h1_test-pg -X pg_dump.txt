@@ -28,6 +28,7 @@ Post Commands:
     psql                               Connect to a PostgreSQL database using `psql`
     remove-config-entries              Remove configuration entries from a PostgreSQL database
     remove-pgbouncer-config-entries    Remove pgbouncer configuration entries from a PostgreSQL database
+    rename                             Rename a PostgreSQL database
     reset-superuser-password           Reset the superuser password for a PostgreSQL database
     restart                            Restart a PostgreSQL database cluster
     restore                            Restore a PostgreSQL database backup to a new database

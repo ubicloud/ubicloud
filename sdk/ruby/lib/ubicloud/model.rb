@@ -147,6 +147,11 @@ module Ubicloud
       @values[key]
     end
 
+    # Rename the object to the given name.
+    def rename_to(name)
+      merge_into_values(adapter.post(_path("/rename"), name:))
+    end
+
     # Destroy the given model instance in Ubicloud.  It is not possible to restore
     # objects that have been destroyed, so only use this if you are sure you want
     # to destroy the object.

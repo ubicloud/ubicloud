@@ -100,6 +100,8 @@ class Clover
         end
       end
 
+      r.rename pg, perm: "Postgres:edit", serializer: Serializers::Postgres
+
       r.get web?, %w[overview connection charts networking resize high-availability read-replica backup-restore config settings] do |page|
         authorize("Postgres:view", pg.id)
 

@@ -18,6 +18,23 @@ class Clover < Roda
     def accepts_json?
       env["HTTP_ACCEPT"]&.include?("application/json")
     end
+
+    def rename(object, perm:, serializer:)
+      return unless api?
+
+      post "rename" do
+        scope.authorize(perm, object.id)
+        name = scope.typecast_body_params.nonempty_str!("name")
+        Validation.validate_name(name)
+
+        DB.transaction do
+          object.update(name:)
+          scope.audit_log(object, "update")
+        end
+
+        serializer.serialize(object)
+      end
+    end
   end
 
   class RodaResponse

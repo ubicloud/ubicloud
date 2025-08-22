@@ -44,6 +44,8 @@ class Clover
         end
       end
 
+      r.rename kc, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesCluster
+
       r.get "kubeconfig" do
         authorize("KubernetesCluster:edit", kc.id)
 
