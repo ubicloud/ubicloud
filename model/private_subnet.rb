@@ -24,6 +24,9 @@ class PrivateSubnet < Sequel::Model
     NetAddr::IPv4Net.parse("172.18.0.0/16")
   ].freeze
 
+  DEFAULT_AWS_SUBNET_PREFIX_LEN = 16
+  DEFAULT_SUBNET_PREFIX_LEN = 26
+
   dataset_module Pagination
   include ObjectTag::Cleanup
 
@@ -148,6 +151,10 @@ class PrivateSubnet < Sequel::Model
           .join(:subnet, {id: [:subnet_id_1, :subnet_id_2]})
           .select(Sequel.case({subnet_id_1: :subnet_id_2}, :subnet_id_1, Sequel[:subnet][:id])),
         cycle: {columns: :id})
+  end
+
+  def old_aws_subnet?
+    location.aws? && net4.netmask.prefix_len == DEFAULT_SUBNET_PREFIX_LEN
   end
 
   private

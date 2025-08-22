@@ -13,7 +13,8 @@ class Prog::Vnet::NicNexus < Prog::Base
     name ||= Nic.ubid_to_name(ubid)
 
     ipv6_addr ||= subnet.random_private_ipv6.to_s
-    ipv4_addr ||= subnet.random_private_ipv4.to_s
+    ipv4_addr ||= random_private_ipv4(subnet) || subnet.random_private_ipv4
+    ipv4_addr = ipv4_addr.to_s
 
     DB.transaction do
       Nic.create_with_id(id, private_ipv6: ipv6_addr, private_ipv4: ipv4_addr, mac: gen_mac, name:, private_subnet_id:)
@@ -154,5 +155,12 @@ class Prog::Vnet::NicNexus < Prog::Base
     ([rand(256) & 0xFE | 0x02] + Array.new(5) { rand(256) }).map {
       "%0.2X" % it
     }.join(":").downcase
+  end
+
+  def self.random_private_ipv4(private_subnet)
+    random_subnet = private_subnet.random_private_ipv4
+    return random_subnet unless private_subnet.location.aws?
+
+    random_subnet.nth_subnet(32, 4)
   end
 end

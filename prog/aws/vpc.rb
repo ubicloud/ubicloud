@@ -56,41 +56,6 @@ class Prog::Aws::Vpc < Prog::Base
         rescue Aws::EC2::Errors::InvalidPermissionDuplicate
         end
       end
-      hop_create_subnet
-    end
-    nap 1
-  end
-
-  label def create_subnet
-    vpc_response = client.describe_vpcs({filters: [{name: "vpc-id", values: [private_subnet.private_subnet_aws_resource.vpc_id]}]}).vpcs[0]
-    ipv_6_cidr_block = vpc_response.ipv_6_cidr_block_association_set[0].ipv_6_cidr_block.gsub("/56", "")
-
-    subnet_response = client.describe_subnets({filters: [{name: "tag:Name", values: [private_subnet.name]}]})
-    subnet_id = if subnet_response.subnets.empty?
-      client.create_subnet({
-        vpc_id: vpc_response.vpc_id,
-        cidr_block: private_subnet.net4.to_s,
-        ipv_6_cidr_block: "#{ipv_6_cidr_block}/64",
-        availability_zone: location.name + ["a", "b", "c"].sample,
-        tag_specifications: Util.aws_tag_specifications("subnet", private_subnet.name)
-      }).subnet.subnet_id
-    else
-      subnet_response.subnets.first.subnet_id
-    end
-
-    client.modify_subnet_attribute({
-      subnet_id:,
-      assign_ipv_6_address_on_creation: {value: true}
-    })
-
-    private_subnet.private_subnet_aws_resource.update(subnet_id:)
-    hop_wait_subnet_created
-  end
-
-  label def wait_subnet_created
-    subnet_response = client.describe_subnets({filters: [{name: "vpc-id", values: [private_subnet.private_subnet_aws_resource.vpc_id]}]}).subnets[0]
-
-    if subnet_response.state == "available"
       hop_create_route_table
     end
     nap 1
@@ -133,31 +98,10 @@ class Prog::Aws::Vpc < Prog::Base
     rescue Aws::EC2::Errors::RouteAlreadyExists
     end
 
-    route_table_details = client.describe_route_tables({route_table_ids: [route_table_id]}).route_tables.first
-    if route_table_details.associations.empty?
-      client.associate_route_table({
-        route_table_id:,
-        subnet_id: private_subnet.private_subnet_aws_resource.subnet_id
-      })
-    end
-
     pop "subnet created"
   end
 
   label def destroy
-    subnet = client.describe_subnets({filters: [{name: "subnet-id", values: [private_subnet.private_subnet_aws_resource.subnet_id]}]}).subnets.first
-    hop_delete_security_group unless subnet
-
-    nap 5 if subnet.state != "available"
-    begin
-      client.delete_subnet({subnet_id: private_subnet.private_subnet_aws_resource.subnet_id})
-    rescue Aws::EC2::Errors::DependencyViolation
-      nap 5
-    end
-    hop_delete_security_group
-  end
-
-  label def delete_security_group
     ignore_invalid_id do
       client.delete_security_group({group_id: private_subnet.private_subnet_aws_resource.security_group_id})
     end
