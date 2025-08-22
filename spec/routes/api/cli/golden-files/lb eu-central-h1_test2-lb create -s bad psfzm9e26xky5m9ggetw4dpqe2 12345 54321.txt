@@ -3,7 +3,7 @@
 Create a load balancer
 
 Usage:
-    ubi lb location/lb-name create [options] ps-id src-port dst-port
+    ubi lb location/lb-name create [options] (ps-name | ps-id) src-port dst-port
 
 Options:
     -a, --algorithm=alg              set the algorithm to use
