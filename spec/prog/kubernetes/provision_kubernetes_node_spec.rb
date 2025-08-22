@@ -14,12 +14,6 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     Prog::Vnet::SubnetNexus.assemble(Config.kubernetes_service_project_id, name: "test", ipv4_range: "172.19.0.0/16", ipv6_range: "fd40:1a0a:8d48:182a::/64").subject
   }
 
-  let(:vm) {
-    nic = Prog::Vnet::NicNexus.assemble(subnet.id, ipv4_addr: "172.19.145.64/26", ipv6_addr: "fd40:1a0a:8d48:182a::/79").subject
-    vm = Prog::Vm::Nexus.assemble("pub key", Config.kubernetes_service_project_id, name: "test-vm", private_subnet_id: subnet.id, nic_id: nic.id).subject
-    vm.update(ephemeral_net6: "2001:db8:85a3:73f2:1c4a::/79")
-  }
-
   let(:kubernetes_cluster) {
     kc = KubernetesCluster.create(
       name: "k8scluster",
@@ -34,18 +28,22 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
 
     lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", health_check_endpoint: "/foo", project_id: Config.kubernetes_service_project_id)
     LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 123, dst_port: 456)
-    kc.add_cp_vm(vm)
-    kc.add_cp_vm(create_vm)
-
+    KubernetesNode.create(vm_id: create_vm(created_at: Time.now - 1).id, kubernetes_cluster_id: kc.id)
     kc.update(api_server_lb_id: lb.id)
-    kc
+  }
+
+  let(:node) {
+    nic = Prog::Vnet::NicNexus.assemble(subnet.id, ipv4_addr: "172.19.145.64/26", ipv6_addr: "fd40:1a0a:8d48:182a::/79").subject
+    vm = Prog::Vm::Nexus.assemble("pub key", Config.kubernetes_service_project_id, name: "test-vm", private_subnet_id: subnet.id, nic_id: nic.id).subject
+    vm.update(ephemeral_net6: "2001:db8:85a3:73f2:1c4a::/79")
+    KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kubernetes_cluster.id)
   }
 
   let(:kubernetes_nodepool) { KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kubernetes_cluster.id, target_node_size: "standard-8", target_node_storage_size_gib: 78) }
 
   before do
     allow(Config).to receive(:kubernetes_service_project_id).and_return(Project.create(name: "UbicloudKubernetesService").id)
-    allow(prog).to receive_messages(kubernetes_cluster: kubernetes_cluster, frame: {"vm_id" => vm.id})
+    allow(prog).to receive_messages(kubernetes_cluster: kubernetes_cluster, frame: {"node_id" => node.id})
   end
 
   describe "random_ula_cidr" do
@@ -85,16 +83,16 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   end
 
   describe "#start" do
-    it "creates a CP VM and hops if a nodepool is not given" do
+    it "creates a control plane node and hops if a nodepool is not given" do
       expect(prog.kubernetes_nodepool).to be_nil
-      expect(kubernetes_cluster.cp_vms.count).to eq(2)
-      expect(kubernetes_cluster.api_server_lb).to receive(:add_vm)
+      expect(kubernetes_cluster.nodes.count).to eq(2)
 
       expect { prog.start }.to hop("bootstrap_rhizome")
+      kubernetes_cluster.reload
 
-      expect(kubernetes_cluster.cp_vms.count).to eq(3)
+      expect(kubernetes_cluster.nodes.count).to eq(3)
 
-      new_vm = kubernetes_cluster.cp_vms.last
+      new_vm = kubernetes_cluster.cp_vms_via_nodes.last
       expect(new_vm.name).to start_with("#{kubernetes_cluster.ubid}-")
       expect(new_vm.sshable).not_to be_nil
       expect(new_vm.vcpus).to eq(4)
@@ -102,15 +100,15 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(new_vm.boot_image).to eq("kubernetes-v1_32")
     end
 
-    it "creates a worker VM and hops if a nodepool is given" do
+    it "creates a worker node and hops if a nodepool is given" do
       expect(prog).to receive(:frame).and_return({"nodepool_id" => kubernetes_nodepool.id})
-      expect(kubernetes_nodepool.vms.count).to eq(0)
+      expect(kubernetes_nodepool.nodes.count).to eq(0)
 
       expect { prog.start }.to hop("bootstrap_rhizome")
 
-      expect(kubernetes_nodepool.reload.vms.count).to eq(1)
+      expect(kubernetes_nodepool.reload.nodes.count).to eq(1)
 
-      new_vm = kubernetes_nodepool.vms.last
+      new_vm = kubernetes_nodepool.nodes.last.vm
       expect(new_vm.name).to start_with("#{kubernetes_nodepool.ubid}-")
       expect(new_vm.sshable).not_to be_nil
       expect(new_vm.vcpus).to eq(8)
@@ -120,30 +118,31 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
 
     it "assigns the default storage size if not specified" do
       kubernetes_cluster.update(target_node_storage_size_gib: nil)
-      expect(kubernetes_cluster.api_server_lb).to receive(:add_vm)
 
-      expect(kubernetes_cluster.cp_vms.count).to eq(2)
+      expect(kubernetes_cluster.nodes.count).to eq(2)
 
       expect { prog.start }.to hop("bootstrap_rhizome")
+      kubernetes_cluster.reload
 
-      expect(kubernetes_cluster.cp_vms.count).to eq(3)
+      expect(kubernetes_cluster.nodes.count).to eq(3)
 
-      new_vm = kubernetes_cluster.cp_vms.last
+      new_vm = kubernetes_cluster.cp_vms_via_nodes.last
       expect(new_vm.strand.stack.first["storage_volumes"].first["size_gib"]).to eq 80
     end
   end
 
   describe "#bootstrap_rhizome" do
-    it "waits until the VM is ready" do
+    it "waits until the node is ready" do
       st = instance_double(Strand, label: "non-wait")
-      expect(prog.vm).to receive(:strand).and_return(st)
+      expect(prog.node.vm).to receive(:strand).and_return(st)
       expect { prog.bootstrap_rhizome }.to nap(5)
     end
 
     it "enables kubelet and buds a bootstrap rhizome process" do
       sshable = instance_double(Sshable)
       st = instance_double(Strand, label: "wait")
-      expect(prog.vm).to receive_messages(sshable: sshable, strand: st)
+      expect(prog.node.vm).to receive(:strand).and_return(st)
+      expect(prog.vm).to receive(:sshable).and_return(sshable).thrice
       expect(sshable).to receive(:cmd).with("sudo iptables-nft -t nat -A POSTROUTING -s 172.19.145.64/26 -o ens3 -j MASQUERADE")
       expect(sshable).to receive(:cmd).with(
         "sudo nft --file -",
@@ -170,7 +169,7 @@ table ip6 pod_access {
       )
       expect(sshable).to receive(:cmd).with("sudo systemctl enable --now kubelet")
 
-      expect(prog).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "kubernetes", "subject_id" => prog.vm.id, "user" => "ubi"})
+      expect(prog).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "kubernetes", "subject_id" => prog.node.vm.id, "user" => "ubi"})
       expect { prog.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
     end
   end
@@ -189,13 +188,13 @@ table ip6 pod_access {
   end
 
   describe "#assign_role" do
-    it "hops to init_cluster if this is the first vm of the cluster" do
-      expect(prog.kubernetes_cluster.cp_vms).to receive(:count).and_return(1)
+    it "hops to init_cluster if this is the first node of the cluster" do
+      expect(prog.kubernetes_cluster.nodes).to receive(:count).and_return(1)
       expect { prog.assign_role }.to hop("init_cluster")
     end
 
-    it "hops to join_control_plane if this is the not the first vm of the cluster" do
-      expect(prog.kubernetes_cluster.cp_vms.count).to eq(2)
+    it "hops to join_control_plane if this is the not the first node of the cluster" do
+      expect(prog.kubernetes_cluster.nodes.count).to eq(2)
       expect { prog.assign_role }.to hop("join_control_plane")
     end
 
@@ -246,7 +245,7 @@ table ip6 pod_access {
       expect(prog.vm.sshable).to receive(:d_check).with("join_control_plane").and_return("NotStarted")
 
       sshable = instance_double(Sshable)
-      allow(kubernetes_cluster.cp_vms.first).to receive(:sshable).and_return(sshable)
+      allow(kubernetes_cluster.cp_vms_via_nodes.first).to receive(:sshable).and_return(sshable)
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).and_return("jt\n")
       expect(sshable).to receive(:cmd).with("sudo kubeadm init phase upload-certs --upload-certs", log: false).and_return("something\ncertificate key:\nck")
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --print-join-command", log: false).and_return("discovery-token-ca-cert-hash dtcch")
@@ -290,7 +289,7 @@ table ip6 pod_access {
       expect(prog.vm.sshable).to receive(:d_check).with("join_worker").and_return("NotStarted")
 
       sshable = instance_double(Sshable)
-      allow(kubernetes_cluster.cp_vms.first).to receive(:sshable).and_return(sshable)
+      allow(kubernetes_cluster.cp_vms_via_nodes.first).to receive(:sshable).and_return(sshable)
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).and_return("\njt\n")
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --print-join-command", log: false).and_return("discovery-token-ca-cert-hash dtcch")
       expect(prog.vm.sshable).to receive(:d_run).with(
@@ -326,16 +325,14 @@ table ip6 pod_access {
   describe "#install_cni" do
     it "configures ubicni" do
       sshable = instance_double(Sshable)
-      allow(prog.vm).to receive_messages(
-        sshable: sshable,
+      expect(prog.vm).to receive(:sshable).and_return(sshable)
+      expect(prog.node.vm).to receive_messages(
         nics: [instance_double(Nic, private_ipv4: "10.0.0.37", private_ipv6: "0::1")],
         ephemeral_net6: NetAddr::IPv6Net.new(NetAddr::IPv6.parse("2001:db8::"), NetAddr::Mask128.new(64))
       )
-      node = KubernetesNode.create(vm_id: prog.vm.id, kubernetes_cluster_id: kubernetes_cluster.id)
-      expect(prog).to receive(:node).and_return(node).twice
 
       expect(sshable).to receive(:cmd).with("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: /"type": "ubicni"/)
-      expect { prog.install_cni }.to exit({vm_id: prog.vm.id, node_id: prog.node.id})
+      expect { prog.install_cni }.to exit({node_id: prog.node.id})
     end
   end
 end

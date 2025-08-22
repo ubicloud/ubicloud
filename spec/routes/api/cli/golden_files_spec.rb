@@ -79,8 +79,8 @@ RSpec.describe Clover, "cli" do
     vms[1].update(ephemeral_net6: "bbab:de77:9a94:fa69::/64")
     add_ipv4_to_vm(vms[0], "129.0.0.2")
     add_ipv4_to_vm(vms[1], "130.0.0.3")
-    kubernetes_cluster.add_cp_vm(vms[0])
-    KubernetesNodepool.first.add_vm(vms[1])
+    KubernetesNode.create(vm_id: vms[0].id, kubernetes_cluster_id: kubernetes_cluster.id)
+    KubernetesNode.create(vm_id: vms[1].id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: KubernetesNodepool.first.id)
     expect(KubernetesCluster).to receive(:kubeconfig).and_return("example-kubeconfig").at_least(:once)
 
     expect(Vm).to receive(:generate_ubid).and_return(UBID.parse("vmz7b0dxt40t4g7rnmag9hct7c")).at_least(:once)

@@ -30,7 +30,7 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
   end
 
   label def destroy
-    kubernetes_node.vm.incr_destroy
+    kubernetes_node.vm&.incr_destroy
     kubernetes_node.destroy
     pop "kubernetes node is deleted"
   end

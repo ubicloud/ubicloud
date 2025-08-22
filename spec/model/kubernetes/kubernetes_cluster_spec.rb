@@ -133,12 +133,11 @@ RSpec.describe KubernetesCluster do
             client-certificate-data: "mocked_cert_data"
             client-key-data: "mocked_key_data"
     YAML
-    let(:sshable) { instance_double(Sshable) }
-    let(:vm) { instance_double(Vm, sshable: sshable) }
-    let(:cp_vms) { [vm] }
 
     it "removes client certificate and key data from users and adds an RBAC token to users" do
-      expect(kc).to receive(:cp_vms).and_return(cp_vms)
+      sshable = instance_double(Sshable)
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id)
+      expect(kc.cp_vms_via_nodes.first).to receive(:sshable).and_return(sshable).twice
       expect(sshable).to receive(:cmd).with("kubectl --kubeconfig <(sudo cat /etc/kubernetes/admin.conf) -n kube-system get secret k8s-access -o jsonpath='{.data.token}' | base64 -d", log: false).and_return("mocked_rbac_token")
       expect(sshable).to receive(:cmd).with("sudo cat /etc/kubernetes/admin.conf", log: false).and_return(kubeconfig)
       customer_config = kc.kubeconfig
@@ -151,13 +150,13 @@ RSpec.describe KubernetesCluster do
   end
 
   describe "vm_diff_for_lb" do
-    it "finds the extra and missing vms" do
+    it "finds the extra and missing nodes" do
       lb = Prog::Vnet::LoadBalancerNexus.assemble(kc.private_subnet.id, name: kc.services_load_balancer_name, src_port: 443, dst_port: 8443).subject
       extra_vm = Prog::Vm::Nexus.assemble("k y", kc.project.id, name: "extra-vm", private_subnet_id: kc.private_subnet.id).subject
       missing_vm = Prog::Vm::Nexus.assemble("k y", kc.project.id, name: "missing-vm", private_subnet_id: kc.private_subnet.id).subject
       lb.add_vm(extra_vm)
-      np = instance_double(KubernetesNodepool, vms: [missing_vm])
-      expect(kc).to receive(:nodepools).and_return([np])
+      kn = KubernetesNodepool.create(name: "np", node_count: 1, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
+      KubernetesNode.create(vm_id: missing_vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
       extra_vms, missing_vms = kc.vm_diff_for_lb(lb)
       expect(extra_vms.count).to eq(1)
       expect(extra_vms[0].id).to eq(extra_vm.id)
@@ -167,7 +166,7 @@ RSpec.describe KubernetesCluster do
   end
 
   describe "port_diff_for_lb" do
-    it "finds the extra and missing vms" do
+    it "finds the extra and missing nodes" do
       lb = Prog::Vnet::LoadBalancerNexus.assemble(kc.private_subnet.id, name: kc.services_load_balancer_name, src_port: 80, dst_port: 8000).subject
       extra_ports, missing_ports = kc.port_diff_for_lb(lb, [[443, 8443]])
       expect(extra_ports.count).to eq(1)
@@ -177,17 +176,17 @@ RSpec.describe KubernetesCluster do
     end
   end
 
-  describe "#all_vms" do
-    it "returns all VMs in the cluster, including CP and worker nodes" do
-      expect(kc).to receive(:cp_vms).and_return([1, 2])
-      expect(kc).to receive(:nodepools).and_return([instance_double(KubernetesNodepool, vms: [3, 4]), instance_double(KubernetesNodepool, vms: [5, 6])])
-      expect(kc.all_vms).to eq([1, 2, 3, 4, 5, 6])
+  describe "#all_nodes" do
+    it "returns all nodes in the cluster" do
+      expect(kc).to receive(:nodes).and_return([1, 2])
+      expect(kc).to receive(:nodepools).and_return([instance_double(KubernetesNodepool, nodes: [3, 4]), instance_double(KubernetesNodepool, nodes: [5, 6])])
+      expect(kc.all_nodes).to eq([1, 2, 3, 4, 5, 6])
     end
   end
 
   describe "#worker_vms" do
-    it "returns all worker VMs in the cluster" do
-      expect(kc).to receive(:nodepools).and_return([instance_double(KubernetesNodepool, vms: [3, 4]), instance_double(KubernetesNodepool, vms: [5, 6])])
+    it "returns all worker vms in the cluster" do
+      expect(kc).to receive(:nodepools).and_return([instance_double(KubernetesNodepool, vms_via_nodes: [3, 4]), instance_double(KubernetesNodepool, vms_via_nodes: [5, 6])])
       expect(kc.worker_vms).to eq([3, 4, 5, 6])
     end
   end

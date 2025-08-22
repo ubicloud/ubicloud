@@ -26,8 +26,9 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
     apiserver_lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", health_check_endpoint: "/foo", project_id: Config.kubernetes_service_project_id)
     LoadBalancerPort.create(load_balancer_id: apiserver_lb.id, src_port: 123, dst_port: 456)
-    kc.add_cp_vm(create_vm)
-    kc.add_cp_vm(create_vm)
+    [create_vm, create_vm].each do |vm|
+      KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kc.id)
+    end
     kc.update(api_server_lb_id: apiserver_lb.id)
 
     services_lb = Prog::Vnet::LoadBalancerNexus.assemble(
@@ -47,7 +48,6 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     ).subject
 
     kc.update(services_lb_id: services_lb.id)
-    kc
   }
 
   before do
@@ -148,7 +148,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       allow(Config).to receive(:kubernetes_service_hostname).and_return("k8s.ubicloud.com")
       dns_zone = DnsZone.create(project_id: Project.first.id, name: "k8s.ubicloud.com", last_purged_at: Time.now)
 
-      expect { nx.create_load_balancers }.to hop("bootstrap_control_plane_vms")
+      expect { nx.create_load_balancers }.to hop("bootstrap_control_plane_nodes")
 
       expect(kubernetes_cluster.api_server_lb.name).to eq "#{kubernetes_cluster.ubid}-apiserver"
       expect(kubernetes_cluster.api_server_lb.ports.first.src_port).to eq 443
@@ -168,7 +168,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     end
 
     it "creates load balancers with dns zone id on development for api server and services, then hops" do
-      expect { nx.create_load_balancers }.to hop("bootstrap_control_plane_vms")
+      expect { nx.create_load_balancers }.to hop("bootstrap_control_plane_nodes")
 
       expect(kubernetes_cluster.api_server_lb.name).to eq "#{kubernetes_cluster.ubid}-apiserver"
       expect(kubernetes_cluster.api_server_lb.ports.first.src_port).to eq 443
@@ -185,42 +185,47 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     end
   end
 
-  describe "#bootstrap_control_plane_vms" do
+  describe "#bootstrap_control_plane_nodes" do
     it "waits until the load balancer endpoint is set" do
       expect(kubernetes_cluster.api_server_lb).to receive(:hostname).and_return nil
-      expect { nx.bootstrap_control_plane_vms }.to nap(5)
+      expect { nx.bootstrap_control_plane_nodes }.to nap(5)
     end
 
     it "incrs start_bootstrapping on KubernetesNodepool on 3 node control plane setup" do
-      expect(kubernetes_cluster).to receive(:cp_vms).and_return([create_vm, create_vm, create_vm]).twice
+      nodes = [create_vm, create_vm, create_vm].map do |vm|
+        KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kubernetes_cluster.id)
+      end
+      expect(kubernetes_cluster).to receive(:nodes).and_return(nodes).twice
       expect(kubernetes_cluster.nodepools.first).to receive(:incr_start_bootstrapping)
-      expect { nx.bootstrap_control_plane_vms }.to hop("wait_nodes")
+      expect { nx.bootstrap_control_plane_nodes }.to hop("wait_nodes")
     end
 
     it "incrs start_bootstrapping on KubernetesNodepool on 1 node control plane setup" do
       kubernetes_cluster.update(cp_node_count: 1)
-      expect(kubernetes_cluster).to receive(:cp_vms).and_return([create_vm]).twice
+      nodes = [KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id)]
+      expect(kubernetes_cluster).to receive(:nodes).and_return(nodes).twice
       expect(kubernetes_cluster.nodepools.first).to receive(:incr_start_bootstrapping)
-      expect { nx.bootstrap_control_plane_vms }.to hop("wait_nodes")
+      expect { nx.bootstrap_control_plane_nodes }.to hop("wait_nodes")
     end
 
-    it "hops wait_nodes if the target number of CP vms is reached" do
+    it "hops wait_nodes if the target number of CP nodes is reached" do
       expect(kubernetes_cluster.api_server_lb).to receive(:hostname).and_return "endpoint"
-      expect(kubernetes_cluster).to receive(:cp_vms).and_return([1, 2, 3]).twice
-      expect { nx.bootstrap_control_plane_vms }.to hop("wait_nodes")
+      expect(kubernetes_cluster).to receive(:nodes).and_return([1, 2, 3]).twice
+      expect { nx.bootstrap_control_plane_nodes }.to hop("wait_nodes")
     end
 
-    it "buds ProvisionKubernetesNode prog to create VMs" do
+    it "buds ProvisionKubernetesNode prog to create Nodes" do
+      kubernetes_cluster.nodes.last.destroy
       expect(kubernetes_cluster).to receive(:endpoint).and_return "endpoint"
       expect(nx).to receive(:bud).with(Prog::Kubernetes::ProvisionKubernetesNode, {"subject_id" => kubernetes_cluster.id})
-      expect { nx.bootstrap_control_plane_vms }.to hop("wait_control_plane_node")
+      expect { nx.bootstrap_control_plane_nodes }.to hop("wait_control_plane_node")
     end
   end
 
   describe "#wait_control_plane_node" do
-    it "hops back to bootstrap_control_plane_vms if there are no sub-programs running" do
+    it "hops back to bootstrap_control_plane_nodes if there are no sub-programs running" do
       st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "wait_control_plane_node", stack: [{}])
-      expect { nx.wait_control_plane_node }.to hop("bootstrap_control_plane_vms")
+      expect { nx.wait_control_plane_node }.to hop("bootstrap_control_plane_nodes")
     end
 
     it "donates if there are sub-programs running" do
@@ -243,8 +248,10 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   end
 
   describe "#create_billing_records" do
-    it "creates billing records for all cp vms and nodepools" do
-      kubernetes_cluster.nodepools.first.add_vm(create_vm)
+    it "creates billing records for all control plane nodes and nodepool nodes" do
+      vm = create_vm
+      nodepool = kubernetes_cluster.nodepools.first
+      KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: nodepool.id)
 
       expect { nx.create_billing_records }.to hop("wait")
 
@@ -291,50 +298,49 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   end
 
   describe "#upgrade" do
-    let(:first_vm) { create_vm }
-    let(:second_vm) { create_vm }
+    let(:first_node) { kubernetes_cluster.nodes[0] }
+    let(:second_node) { kubernetes_cluster.nodes[1] }
     let(:client) { instance_double(Kubernetes::Client) }
 
     before do
       sshable0, sshable1 = instance_double(Sshable), instance_double(Sshable)
-      expect(kubernetes_cluster).to receive(:cp_vms).and_return([first_vm, second_vm])
-      allow(first_vm).to receive(:sshable).and_return(sshable0)
-      allow(second_vm).to receive(:sshable).and_return(sshable1)
+      expect(first_node).to receive(:sshable).and_return(sshable0).at_least(:once)
+      allow(second_node).to receive(:sshable).and_return(sshable1)
       allow(sshable0).to receive(:connect)
       allow(sshable1).to receive(:connect)
 
       expect(kubernetes_cluster).to receive(:client).and_return(client).at_least(:once)
     end
 
-    it "selects a VM with minor version one less than the cluster's version" do
+    it "selects a Node with minor version one less than the cluster's version" do
       expect(kubernetes_cluster).to receive(:version).and_return("v1.32").twice
       expect(client).to receive(:version).and_return("v1.32", "v1.31")
-      expect(nx).to receive(:bud).with(Prog::Kubernetes::UpgradeKubernetesNode, {"old_vm_id" => second_vm.id})
+      expect(nx).to receive(:bud).with(Prog::Kubernetes::UpgradeKubernetesNode, {"old_node_id" => second_node.id})
       expect { nx.upgrade }.to hop("wait_upgrade")
     end
 
-    it "hops to wait when all VMs are at the cluster's version" do
+    it "hops to wait when all nodes are at the cluster's version" do
       expect(kubernetes_cluster).to receive(:version).and_return("v1.32").twice
       expect(client).to receive(:version).and_return("v1.32", "v1.32")
       expect { nx.upgrade }.to hop("wait")
     end
 
-    it "does not select a VM with minor version more than one less than the cluster's version" do
+    it "does not select a node with minor version more than one less than the cluster's version" do
       expect(kubernetes_cluster).to receive(:version).and_return("v1.32").twice
       expect(client).to receive(:version).and_return("v1.30", "v1.32")
       expect { nx.upgrade }.to hop("wait")
     end
 
-    it "skips VMs with invalid version formats" do
+    it "skips node with invalid version formats" do
       expect(kubernetes_cluster).to receive(:version).and_return("v1.32").twice
       expect(client).to receive(:version).and_return("invalid", "v1.32")
       expect { nx.upgrade }.to hop("wait")
     end
 
-    it "selects the first VM that is one minor version behind" do
+    it "selects the first node that is one minor version behind" do
       expect(kubernetes_cluster).to receive(:version).and_return("v1.32")
       expect(client).to receive(:version).and_return("v1.31")
-      expect(nx).to receive(:bud).with(Prog::Kubernetes::UpgradeKubernetesNode, {"old_vm_id" => first_vm.id})
+      expect(nx).to receive(:bud).with(Prog::Kubernetes::UpgradeKubernetesNode, {"old_node_id" => first_node.id})
       expect { nx.upgrade }.to hop("wait_upgrade")
     end
 
@@ -344,7 +350,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.upgrade }.to hop("wait")
     end
 
-    it "does not select a VM with a higher minor version than the cluster" do
+    it "does not select a node with a higher minor version than the cluster" do
       expect(kubernetes_cluster).to receive(:version).and_return("v1.32").twice
       expect(client).to receive(:version).and_return("v1.33", "v1.32")
       expect { nx.upgrade }.to hop("wait")
@@ -366,11 +372,10 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
   describe "#install_metrics_server" do
     let(:sshable) { instance_double(Sshable) }
-    let(:vm) { create_vm }
+    let(:node) { KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
 
     before do
-      allow(vm).to receive(:sshable).and_return(sshable)
-      allow(kubernetes_cluster).to receive(:cp_vms).and_return([vm])
+      allow(kubernetes_cluster.cp_vms_via_nodes.first).to receive(:sshable).and_return(sshable)
     end
 
     it "runs install_metrics_server and naps when not started" do
@@ -402,21 +407,23 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
   describe "#sync_worker_mesh" do
     let(:first_vm) { Prog::Vm::Nexus.assemble_with_sshable(customer_project.id).subject }
+    let(:first_node) { KubernetesNode.create(vm_id: first_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
     let(:first_ssh_key) { SshKey.generate }
     let(:second_vm) { Prog::Vm::Nexus.assemble_with_sshable(customer_project.id).subject }
+    let(:second_node) { KubernetesNode.create(vm_id: second_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
     let(:second_ssh_key) { SshKey.generate }
 
     before do
-      expect(kubernetes_cluster).to receive(:worker_vms).and_return([first_vm, second_vm])
+      expect(kubernetes_cluster).to receive(:worker_vms).and_return([first_node, second_node]).at_least(:once)
       expect(SshKey).to receive(:generate).and_return(first_ssh_key, second_ssh_key)
     end
 
     it "creates full mesh connectivity on cluster worker nodes" do
-      expect(first_vm.sshable).to receive(:cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: first_ssh_key.private_key)
-      expect(first_vm.sshable).to receive(:cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: [first_vm.sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n"))
+      expect(kubernetes_cluster.worker_vms.first.sshable).to receive(:cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: first_ssh_key.private_key)
+      expect(kubernetes_cluster.worker_vms.first.sshable).to receive(:cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: [first_vm.sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n"))
 
-      expect(second_vm.sshable).to receive(:cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: second_ssh_key.private_key)
-      expect(second_vm.sshable).to receive(:cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: [second_vm.sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n"))
+      expect(kubernetes_cluster.worker_vms.last.sshable).to receive(:cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: second_ssh_key.private_key)
+      expect(kubernetes_cluster.worker_vms.last.sshable).to receive(:cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: [kubernetes_cluster.worker_vms.last.sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n"))
 
       expect { nx.sync_worker_mesh }.to hop("wait")
     end
@@ -438,19 +445,35 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster.cp_vms).to all(receive(:incr_destroy))
       expect(kubernetes_cluster.nodepools).to all(receive(:incr_destroy))
       expect(kubernetes_cluster.private_subnet).to receive(:incr_destroy)
+      expect(kubernetes_cluster).to receive(:remove_all_cp_vms)
 
       expect(kubernetes_cluster).not_to receive(:destroy)
       expect { nx.destroy }.to nap(5)
     end
 
-    it "completes destroy when nodepools are gone" do
+    it "triggers deletion of associated resources and naps until all control plane nodes are gone" do
       st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
       kubernetes_cluster.nodepools.first.destroy
       kubernetes_cluster.reload
 
       expect(kubernetes_cluster.api_server_lb).to receive(:incr_destroy)
       expect(kubernetes_cluster.services_lb).to receive(:incr_destroy)
-      expect(kubernetes_cluster.cp_vms).to all(receive(:incr_destroy))
+      expect(kubernetes_cluster.nodes).to all(receive(:incr_destroy))
+
+      expect(kubernetes_cluster.nodepools).to be_empty
+
+      expect { nx.destroy }.to nap(5)
+    end
+
+    it "completes destroy when nodepools are gone" do
+      st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
+      kubernetes_cluster.nodepools.first.destroy
+      kubernetes_cluster.nodes.map(&:destroy)
+      kubernetes_cluster.reload
+
+      expect(kubernetes_cluster.api_server_lb).to receive(:incr_destroy)
+      expect(kubernetes_cluster.services_lb).to receive(:incr_destroy)
+      expect(kubernetes_cluster.cp_vms_via_nodes).to all(receive(:incr_destroy))
       expect(kubernetes_cluster.nodes).to all(receive(:incr_destroy))
 
       expect(kubernetes_cluster.nodepools).to be_empty
@@ -472,6 +495,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     it "completes the destroy process even if the load balancers do not exist" do
       kubernetes_cluster.update(api_server_lb_id: nil, services_lb_id: nil)
       kubernetes_cluster.nodepools.first.destroy
+      kubernetes_cluster.nodes.map(&:destroy)
       kubernetes_cluster.reload
       expect { nx.destroy }.to exit({"msg" => "kubernetes cluster is deleted"})
     end

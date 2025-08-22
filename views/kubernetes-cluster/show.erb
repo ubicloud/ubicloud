@@ -38,7 +38,7 @@
   <% @nodes = []
   
   @nodes +=
-    @kc.cp_vms.map do |vm|
+    @kc.cp_vms_via_nodes.map do |vm|
       { name: vm.name, role: "Control Plane", state: vm.display_state, hostname: vm.ephemeral_net4.to_s }
     end
   
@@ -47,7 +47,7 @@
       .nodepools_dataset
       .eager(:vms)
       .flat_map do |np|
-        np.vms.map { |vm| { name: vm.name, role: "Worker", state: vm.display_state, hostname: vm.ephemeral_net4.to_s } }
+        np.vms_via_nodes.map { |vm| { name: vm.name, role: "Worker", state: vm.display_state, hostname: vm.ephemeral_net4.to_s } }
       end %>
 
   <%== part(

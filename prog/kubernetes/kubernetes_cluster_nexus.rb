@@ -96,21 +96,21 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
     services_lb.dns_zone&.insert_record(record_name: "*.#{services_lb.hostname}.", type: "CNAME", ttl: 3600, data: "#{services_lb.hostname}.")
 
-    hop_bootstrap_control_plane_vms
+    hop_bootstrap_control_plane_nodes
   end
 
-  label def bootstrap_control_plane_vms
+  label def bootstrap_control_plane_nodes
     nap 5 unless kubernetes_cluster.endpoint
 
     # In 1-node control plane setup, we will wait until it's over
     # In 3-node control plane setup, we start the bootstrapping after
     # the first CP bootstrap
     ready_to_bootstrap_workers =
-      kubernetes_cluster.cp_vms.count >= kubernetes_cluster.cp_node_count ||
-      (kubernetes_cluster.cp_node_count == 3 && kubernetes_cluster.cp_vms.count == 1)
+      kubernetes_cluster.nodes.count >= kubernetes_cluster.cp_node_count ||
+      (kubernetes_cluster.cp_node_count == 3 && kubernetes_cluster.nodes.count == 1)
     kubernetes_cluster.nodepools.each(&:incr_start_bootstrapping) if ready_to_bootstrap_workers
 
-    hop_wait_nodes if kubernetes_cluster.cp_vms.count >= kubernetes_cluster.cp_node_count
+    hop_wait_nodes if kubernetes_cluster.nodes.count >= kubernetes_cluster.cp_node_count
 
     bud Prog::Kubernetes::ProvisionKubernetesNode, {"subject_id" => kubernetes_cluster.id}
 
@@ -118,7 +118,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   end
 
   label def wait_control_plane_node
-    reap(:bootstrap_control_plane_vms)
+    reap(:bootstrap_control_plane_nodes)
   end
 
   label def wait_nodes
@@ -127,14 +127,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   end
 
   label def create_billing_records
-    records =
-      kubernetes_cluster.cp_vms.map { {type: "KubernetesControlPlaneVCpu", family: it.family, amount: it.vcpus} } +
-      kubernetes_cluster.nodepools.flat_map(&:vms).flat_map {
-        [
-          {type: "KubernetesWorkerVCpu", family: it.family, amount: it.vcpus},
-          {type: "KubernetesWorkerStorage", family: "standard", amount: it.storage_size_gib}
-        ]
-      }
+    records = kubernetes_cluster.all_nodes.flat_map(&:billing_record)
 
     records.each do |record|
       BillingRecord.create(
@@ -178,18 +171,18 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def upgrade
     decr_upgrade
 
-    node_to_upgrade = kubernetes_cluster.cp_vms.find do |vm|
-      vm_version = kubernetes_cluster.client(session: vm.sshable.connect).version
-      vm_minor_version = vm_version.match(/^v\d+\.(\d+)$/)&.captures&.first&.to_i
+    node_to_upgrade = kubernetes_cluster.nodes.find do |node|
+      node_version = kubernetes_cluster.client(session: node.sshable.connect).version
+      node_minor_version = node_version.match(/^v\d+\.(\d+)$/)&.captures&.first&.to_i
       cluster_minor_version = kubernetes_cluster.version.match(/^v\d+\.(\d+)$/)&.captures&.first&.to_i
 
-      next false unless vm_minor_version && cluster_minor_version
-      vm_minor_version == cluster_minor_version - 1
+      next false unless node_minor_version && cluster_minor_version
+      node_minor_version == cluster_minor_version - 1
     end
 
     hop_wait unless node_to_upgrade
 
-    bud Prog::Kubernetes::UpgradeKubernetesNode, {"old_vm_id" => node_to_upgrade.id}
+    bud Prog::Kubernetes::UpgradeKubernetesNode, {"old_node_id" => node_to_upgrade.id}
     hop_wait_upgrade
   end
 
@@ -200,7 +193,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def install_metrics_server
     decr_install_metrics_server
 
-    vm = kubernetes_cluster.cp_vms.first
+    vm = kubernetes_cluster.cp_vms_via_nodes.first
     case vm.sshable.d_check("install_metrics_server")
     when "Succeeded"
       Clog.emit("Metrics server is installed")
@@ -252,6 +245,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       kubernetes_cluster.nodepools.each { it.incr_destroy }
       kubernetes_cluster.private_subnet.incr_destroy
       nap 5 unless kubernetes_cluster.nodepools.empty?
+      nap 5 unless kubernetes_cluster.nodes.empty?
       kubernetes_cluster.destroy
       pop "kubernetes cluster is deleted"
     end
