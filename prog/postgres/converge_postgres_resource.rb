@@ -15,11 +15,22 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
 
     if postgres_resource.servers.all? { it.vm.vm_host } || postgres_resource.location.aws?
       exclude_host_ids = []
+      exclude_availability_zones = []
+      availability_zone = nil
       if !(Config.development? || Config.is_e2e) && postgres_resource.location.provider == HostProvider::HETZNER_PROVIDER_NAME
         used_data_centers = postgres_resource.servers.map { it.vm.vm_host.data_center }.uniq
         exclude_host_ids = VmHost.where(data_center: used_data_centers).map(&:id)
       end
-      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: postgres_resource.timeline.id, timeline_access: "fetch", exclude_host_ids: exclude_host_ids)
+
+      if postgres_resource.location.provider == HostProvider::AWS_PROVIDER_NAME
+        if postgres_resource.use_different_az_set?
+          exclude_availability_zones = postgres_resource.servers.map { it.vm.nic.nic_aws_resource.subnet_az }.uniq
+        else
+          availability_zone = postgres_resource.representative_server.vm.nic.nic_aws_resource.subnet_az
+        end
+      end
+
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: postgres_resource.timeline.id, timeline_access: "fetch", exclude_host_ids: exclude_host_ids, exclude_availability_zones: exclude_availability_zones, availability_zone: availability_zone)
     end
 
     nap 5

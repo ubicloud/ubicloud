@@ -10,7 +10,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   extend Forwardable
   def_delegators :postgres_server, :vm
 
-  def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil, exclude_host_ids: [])
+  def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil)
     DB.transaction do
       ubid = PostgresServer.generate_ubid
 
@@ -43,7 +43,9 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         private_subnet_id: postgres_resource.private_subnet_id,
         enable_ip4: true,
         arch: arch,
-        exclude_host_ids: exclude_host_ids
+        exclude_host_ids: exclude_host_ids,
+        exclude_availability_zones: exclude_availability_zones,
+        availability_zone: availability_zone
       )
 
       synchronization_status = representative_at ? "ready" : "catching_up"
