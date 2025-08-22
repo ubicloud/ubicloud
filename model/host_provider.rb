@@ -7,6 +7,7 @@ class HostProvider < Sequel::Model
 
   HETZNER_PROVIDER_NAME = "hetzner"
   LEASEWEB_PROVIDER_NAME = "leaseweb"
+  AWS_PROVIDER_NAME = "aws"
 
   PROVIDER_METHODS = %w[connection_string user password].freeze
 

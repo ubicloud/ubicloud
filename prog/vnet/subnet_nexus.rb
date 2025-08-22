@@ -22,7 +22,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     Validation.validate_name(name)
 
     ipv6_range ||= random_private_ipv6(location, project).to_s
-    ipv4_range ||= random_private_ipv4(location, project).to_s
+    ipv4_range ||= random_private_ipv4(location, project, location.aws? ? PrivateSubnet::DEFAULT_AWS_SUBNET_PREFIX_LEN : PrivateSubnet::DEFAULT_SUBNET_PREFIX_LEN).to_s
     DB.transaction do
       ps = PrivateSubnet.create_with_id(id, name:, location_id: location.id, net6: ipv6_range, net4: ipv4_range, state: "waiting", project_id:)
       firewall_dataset = project.firewalls_dataset.where(location_id:)
