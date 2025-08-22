@@ -173,7 +173,7 @@ RSpec.describe Prog::Aws::Vpc do
 
   describe "#destroy" do
     before do
-      ps.private_subnet_aws_resource.update(subnet_id: "subnet-0123456789abcdefg", security_group_id: "sg-0123456789abcdefg", internet_gateway_id: "igw-0123456789abcdefg")
+      ps.private_subnet_aws_resource.update(security_group_id: "sg-0123456789abcdefg", internet_gateway_id: "igw-0123456789abcdefg")
       client.stub_responses(:describe_subnets, subnets: [{state: "available"}])
     end
 
