@@ -12,7 +12,6 @@ end
 # Columns:
 #  id                  | uuid | PRIMARY KEY
 #  vpc_id              | text |
-#  subnet_id           | text |
 #  internet_gateway_id | text |
 #  route_table_id      | text |
 #  security_group_id   | text |
