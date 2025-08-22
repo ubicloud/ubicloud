@@ -3,7 +3,7 @@
 class Prog::Vnet::NicNexus < Prog::Base
   subject_is :nic
 
-  def self.assemble(private_subnet_id, name: nil, ipv6_addr: nil, ipv4_addr: nil)
+  def self.assemble(private_subnet_id, name: nil, ipv6_addr: nil, ipv4_addr: nil, exclude_availability_zones: [], availability_zone: nil)
     unless (subnet = PrivateSubnet[private_subnet_id])
       fail "Given subnet doesn't exist with the id #{private_subnet_id}"
     end
@@ -23,7 +23,7 @@ class Prog::Vnet::NicNexus < Prog::Base
       else
         "wait_allocation"
       end
-      Strand.create_with_id(id, prog: "Vnet::NicNexus", label:)
+      Strand.create_with_id(id, prog: "Vnet::NicNexus", label:, stack: [{"exclude_availability_zones" => exclude_availability_zones, "availability_zone" => availability_zone}])
     end
   end
 
@@ -36,7 +36,7 @@ class Prog::Vnet::NicNexus < Prog::Base
   label def create_aws_nic
     nap 10 unless nic.private_subnet.strand.label == "wait"
     NicAwsResource.create_with_id(nic.id)
-    bud Prog::Aws::Nic, {"subject_id" => nic.id}, :create_network_interface
+    bud Prog::Aws::Nic, {"subject_id" => nic.id, "exclude_availability_zones" => frame["exclude_availability_zones"], "availability_zone" => frame["availability_zone"]}, :create_subnet
     hop_wait_aws_nic_created
   end
 

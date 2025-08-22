@@ -16,7 +16,7 @@ class Prog::Vm::Nexus < Prog::Base
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
     enable_ip4: false, pool_id: nil, arch: "x64", swap_size_bytes: nil,
     distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0, gpu_device: nil,
-    hugepages: true, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil)
+    hugepages: true, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil, exclude_availability_zones: [], availability_zone: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -95,7 +95,7 @@ class Prog::Vm::Nexus < Prog::Base
         else
           project.default_private_subnet(location)
         end
-        nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic").subject
+        nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic", exclude_availability_zones: exclude_availability_zones, availability_zone: availability_zone).subject
       end
 
       vm = Vm.create(
