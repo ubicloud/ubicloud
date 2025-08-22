@@ -14,9 +14,9 @@ RSpec.describe Prog::Aws::Nic do
     loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
     LocationCredential.create_with_id(loc.id, access_key: "test-access-key", secret_key: "test-secret-key")
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps", location_id: loc.id).subject
-    PrivateSubnetAwsResource.create_with_id(ps.id, subnet_id: "subnet-0123456789abcdefg", security_group_id: "sg-0123456789abcdefg")
+    PrivateSubnetAwsResource.create_with_id(ps.id, subnet_id: "subnet-0123456789abcdefg", security_group_id: "sg-0123456789abcdefg", vpc_id: "vpc-0123456789abcdefg")
     nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "test-nic").subject
-    NicAwsResource.create_with_id(nic.id)
+    NicAwsResource.create_with_id(nic.id, subnet_id: "subnet-0123456789abcdefg", subnet_az: "us-west-2a")
     nic
   }
 
@@ -27,6 +27,51 @@ RSpec.describe Prog::Aws::Nic do
   before do
     allow(nx).to receive(:nic).and_return(nic)
     allow(Aws::EC2::Client).to receive(:new).with(access_key_id: "test-access-key", secret_access_key: "test-secret-key", region: "us-west-2").and_return(client)
+  end
+
+  describe "#create_subnet" do
+    it "creates a subnet and hops to wait_subnet_created" do
+      client.stub_responses(:describe_vpcs, vpcs: [{ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}], vpc_id: "vpc-0123456789abcdefg"}])
+      client.stub_responses(:describe_subnets, subnets: [])
+      client.stub_responses(:create_subnet, subnet: {subnet_id: "subnet-0123456789abcdefg"})
+      client.stub_responses(:modify_subnet_attribute)
+      expect(client).to receive(:modify_subnet_attribute).with({subnet_id: "subnet-0123456789abcdefg", assign_ipv_6_address_on_creation: {value: true}}).and_call_original
+      expect(nic.nic_aws_resource).to receive(:update).with(subnet_id: "subnet-0123456789abcdefg", subnet_az: "a")
+      expect(nx).to receive(:subnet_az).and_return("a").at_least(:once)
+      expect { nx.create_subnet }.to hop("wait_subnet_created")
+    end
+
+    it "reuses existing subnet" do
+      client.stub_responses(:describe_vpcs, vpcs: [{ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}], vpc_id: "vpc-0123456789abcdefg"}])
+      client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-existing"}])
+      client.stub_responses(:modify_subnet_attribute)
+      expect(client).not_to receive(:create_route_table)
+      expect(nic.nic_aws_resource).to receive(:update).with(subnet_id: "subnet-existing", subnet_az: "a")
+      expect(nx).to receive(:subnet_az).and_return("a")
+      expect { nx.create_subnet }.to hop("wait_subnet_created")
+    end
+  end
+
+  describe "#wait_subnet_created" do
+    it "checks if subnet is available, if not naps" do
+      client.stub_responses(:describe_subnets, subnets: [{state: "pending"}])
+      expect { nx.wait_subnet_created }.to nap(1)
+    end
+
+    it "checks if subnet is available, if so associates with the route_table and hops to create_network_interface" do
+      client.stub_responses(:describe_subnets, subnets: [{state: "available"}])
+      client.stub_responses(:describe_route_tables, route_tables: [{route_table_id: "rtb-0123456789abcdefg", associations: []}])
+      client.stub_responses(:associate_route_table)
+      expect(client).to receive(:associate_route_table).with({route_table_id: "rtb-0123456789abcdefg", subnet_id: "subnet-0123456789abcdefg"}).and_call_original
+      expect { nx.wait_subnet_created }.to hop("create_network_interface")
+    end
+
+    it "checks if subnet is available, doesn't associate with the route_table if it's already associated and hops to create_network_interface" do
+      client.stub_responses(:describe_subnets, subnets: [{state: "available"}])
+      client.stub_responses(:describe_route_tables, route_tables: [{route_table_id: "rtb-0123456789abcdefg", associations: [{subnet_id: "subnet-0123456789abcdefg"}]}])
+      expect(client).not_to receive(:associate_route_table)
+      expect { nx.wait_subnet_created }.to hop("create_network_interface")
+    end
   end
 
   describe "#create_network_interface" do
@@ -105,11 +150,6 @@ RSpec.describe Prog::Aws::Nic do
   end
 
   describe "#destroy" do
-    it "naps if the network interface is in use" do
-      client.stub_responses(:describe_network_interfaces, network_interfaces: [{status: "in-use"}])
-      expect { nx.destroy }.to nap(5)
-    end
-
     it "deletes the network interface" do
       client.stub_responses(:describe_network_interfaces, network_interfaces: [{status: "available"}])
       client.stub_responses(:delete_network_interface)
@@ -137,28 +177,60 @@ RSpec.describe Prog::Aws::Nic do
       expect(nic.nic_aws_resource).to receive(:eip_allocation_id).and_return("eip-0123456789abcdefg").at_least(:once)
       client.stub_responses(:release_address)
       expect(client).to receive(:release_address).with({allocation_id: "eip-0123456789abcdefg"}).and_call_original
-      expect { nx.release_eip }.to exit({"msg" => "nic destroyed"})
+      expect { nx.release_eip }.to hop("delete_subnet")
     end
 
     it "gracefully continues if the nic is not found" do
       expect(nic.nic_aws_resource).to receive(:eip_allocation_id).and_return(nil).at_least(:once)
-      expect { nx.release_eip }.to exit({"msg" => "nic destroyed"})
+      expect { nx.release_eip }.to hop("delete_subnet")
     end
 
     it "gracefully continues if the nic_aws_resource is not found" do
       expect(nic).to receive(:nic_aws_resource).and_return(nil).at_least(:once)
-      expect { nx.release_eip }.to exit({"msg" => "nic destroyed"})
+      expect { nx.release_eip }.to hop("delete_subnet")
     end
 
-    it "continues if the eip_allocation_id is found" do
+    it "hops to delete_subnet if the eip_allocation_id is found" do
       expect(nic.nic_aws_resource).to receive(:eip_allocation_id).and_return("eip-0123456789abcdefg").at_least(:once)
-      expect { nx.release_eip }.to exit({"msg" => "nic destroyed"})
+      expect { nx.release_eip }.to hop("delete_subnet")
     end
 
-    it "pops if the address is already released" do
+    it "hops to delete_subnet if the address is already released" do
       client.stub_responses(:describe_addresses, addresses: [{allocation_id: "eip-0123456789abcdefg"}])
       client.stub_responses(:release_address, Aws::EC2::Errors::InvalidAllocationIDNotFound.new(nil, "The address 'eip-0123456789abcdefg' does not exist."))
-      expect { nx.release_eip }.to exit({"msg" => "nic destroyed"})
+      expect { nx.release_eip }.to hop("delete_subnet")
+    end
+  end
+
+  describe "#delete_subnet" do
+    it "deletes the subnet" do
+      client.stub_responses(:delete_subnet)
+      expect(client).to receive(:delete_subnet).with({subnet_id: nic.nic_aws_resource.subnet_id}).and_call_original
+      expect { nx.delete_subnet }.to exit({"msg" => "nic destroyed"})
+    end
+
+    it "gracefully continues if the nic is not found" do
+      client.stub_responses(:delete_subnet, Aws::EC2::Errors::InvalidSubnetIDNotFound.new(nil, "The subnet 'subnet-0123456789abcdefg' does not exist."))
+      expect(nic.nic_aws_resource).to receive(:subnet_id).and_return(nil).at_least(:once)
+      expect { nx.delete_subnet }.to exit({"msg" => "nic destroyed"})
+    end
+  end
+
+  describe "#subnet_az" do
+    it "returns the preferred az if set" do
+      # expect(st).to receive(:stack).and_return([{"preferred_az" => "a"}])
+      expect(nx).to receive(:frame).and_return({"preferred_az" => "a"})
+      expect(nx.subnet_az).to eq("a")
+    end
+
+    it "returns an az that is not in excluded_availability_zones" do
+      expect(nx).to receive(:frame).and_return({"exclude_availability_zones" => ["a"]}).at_least(:once)
+      expect(["b", "c"]).to include(nx.subnet_az) # rubocop:disable RSpec/ExpectActual
+    end
+
+    it "returns a if nothing is available" do
+      expect(nx).to receive(:frame).and_return({"exclude_availability_zones" => ["a", "b", "c"]}).at_least(:once)
+      expect(nx.subnet_az).to eq("a")
     end
   end
 end
