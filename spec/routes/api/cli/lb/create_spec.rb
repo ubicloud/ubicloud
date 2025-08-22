@@ -8,7 +8,7 @@ RSpec.describe Clover, "cli lb create" do
     @ps = PrivateSubnet.first
   end
 
-  it "creates load balancer with no option" do
+  it "creates load balancer with no option and private subnet by id" do
     expect(LoadBalancer.count).to eq 0
     body = cli(%W[lb eu-central-h1/test-lb create #{@ps.ubid} 12345 54321])
     expect(LoadBalancer.count).to eq 1
@@ -25,9 +25,9 @@ RSpec.describe Clover, "cli lb create" do
     expect(body).to eq "Load balancer created with id: #{lb.ubid}\n"
   end
 
-  it "creates load balancer with -aeps options" do
+  it "creates load balancer with -aeps options and private subnet by name" do
     expect(LoadBalancer.count).to eq 0
-    body = cli(%W[lb eu-central-h1/test-lb create -a hash_based -e /up2 -p https -s ipv4 #{@ps.ubid} 1234 5432])
+    body = cli(%W[lb eu-central-h1/test-lb create -a hash_based -e /up2 -p https -s ipv4 test-ps 1234 5432])
     expect(LoadBalancer.count).to eq 1
     lb = LoadBalancer.first
     expect(lb).to be_a LoadBalancer
