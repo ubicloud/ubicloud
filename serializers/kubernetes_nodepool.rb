@@ -10,7 +10,7 @@ class Serializers::KubernetesNodepool < Serializers::Base
       node_size: kn.target_node_size
     }
     if options[:detailed]
-      base[:vms] = Serializers::Vm.serialize(kn.vms_dataset.all)
+      base[:vms] = Serializers::Vm.serialize(kn.vms_via_nodes_dataset.all)
     end
     base
   end

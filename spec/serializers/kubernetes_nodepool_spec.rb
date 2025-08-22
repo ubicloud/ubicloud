@@ -18,7 +18,7 @@ RSpec.describe Serializers::KubernetesNodepool do
       )
       kn = KubernetesNodepool.create(name: "nodepool", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
       vm = create_vm
-      kn.add_vm(vm)
+      KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
 
       expected_result = {
         id: kn.ubid,

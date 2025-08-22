@@ -10,6 +10,35 @@ class KubernetesNode < Sequel::Model
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy
+
+  def sshable
+    vm.sshable
+  end
+
+  def billing_record
+    if kubernetes_nodepool
+      worker_billing_records
+    else
+      control_plane_billing_record
+    end
+  end
+
+  def worker_billing_records
+    [
+      {type: "KubernetesWorkerVCpu", family: vm.family, amount: vm.vcpus},
+      {type: "KubernetesWorkerStorage", family: "standard", amount: vm.storage_size_gib}
+    ]
+  end
+
+  def control_plane_billing_record
+    [
+      {type: "KubernetesControlPlaneVCpu", family: vm.family, amount: vm.vcpus}
+    ]
+  end
+
+  def name
+    vm.name
+  end
 end
 
 # Table: kubernetes_node

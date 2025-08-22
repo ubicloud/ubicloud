@@ -230,8 +230,8 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page).to have_content kc.display_location
         expect(page).to have_content kc.version
 
-        kc.add_cp_vm(create_vm(name: "cp1"))
-        kc.add_cp_vm(create_vm(name: "cp2"))
+        KubernetesNode.create(vm_id: create_vm(name: "cp1").id, kubernetes_cluster_id: kc.id)
+        KubernetesNode.create(vm_id: create_vm(name: "cp2").id, kubernetes_cluster_id: kc.id)
 
         kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
           name: "kn",
@@ -239,7 +239,7 @@ RSpec.describe Clover, "Kubernetes" do
           kubernetes_cluster_id: kc.id
         ).subject
 
-        kn.add_vm(create_vm(name: "node1"))
+        KubernetesNode.create(vm_id: create_vm(name: "node1").id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
 
         kc.reload
         page.refresh

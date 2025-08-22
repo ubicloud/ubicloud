@@ -3,12 +3,12 @@
 class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
   subject_is :kubernetes_cluster
 
-  def old_vm
-    @old_vm ||= Vm[frame.fetch("old_vm_id")]
+  def old_node
+    @old_node ||= KubernetesNode[frame.fetch("old_node_id")]
   end
 
-  def new_vm
-    @new_vm ||= Vm[frame.fetch("new_vm_id")]
+  def new_node
+    @new_node ||= KubernetesNode[frame.fetch("new_node_id")]
   end
 
   def kubernetes_nodepool
@@ -34,16 +34,16 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
   end
 
   label def wait_new_node
-    vm_id = nil
+    node_id = nil
     reaper = lambda do |child|
-      vm_id = child.exitval.fetch("vm_id")
+      node_id = child.exitval.fetch("node_id")
     end
 
     reap(reaper:) do
       current_frame = strand.stack.first
       # This will not work correctly if the strand has multiple children.
       # However, the strand has only has a single child created in start.
-      current_frame["new_vm_id"] = vm_id
+      current_frame["new_node_id"] = node_id
       strand.modified!(:stack)
 
       hop_drain_old_node
@@ -53,13 +53,13 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
   label def drain_old_node
     register_deadline("remove_old_node_from_cluster", 60 * 60)
 
-    vm = kubernetes_cluster.cp_vms.last
+    vm = kubernetes_cluster.cp_vms_via_nodes.last
     case vm.sshable.d_check("drain_node")
     when "Succeeded"
       hop_remove_old_node_from_cluster
     when "NotStarted"
       vm.sshable.d_run("drain_node", "sudo", "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf",
-        "drain", old_vm.name, "--ignore-daemonsets", "--delete-emptydir-data")
+        "drain", old_node.name, "--ignore-daemonsets", "--delete-emptydir-data")
       nap 10
     when "InProgress"
       nap 10
@@ -71,28 +71,28 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
   end
 
   label def remove_old_node_from_cluster
+    vm = old_node.vm
     if kubernetes_nodepool
-      kubernetes_nodepool.remove_vm(old_vm)
+      kubernetes_nodepool.remove_vm(vm)
     else
-      kubernetes_cluster.remove_cp_vm(old_vm)
-      kubernetes_cluster.api_server_lb.detach_vm(old_vm)
+      kubernetes_cluster.remove_cp_vm(vm)
+      kubernetes_cluster.api_server_lb.detach_vm(vm)
     end
-
     # kubeadm reset is necessary for etcd member removal, delete node itself
     # doesn't remove node from the etcd member, hurting the etcd cluster health
-    old_vm.sshable.cmd("sudo kubeadm reset --force")
+    vm.sshable.cmd("sudo kubeadm reset --force")
 
     hop_delete_node_object
   end
 
   label def delete_node_object
-    res = kubernetes_cluster.client.delete_node(old_vm.name)
+    res = kubernetes_cluster.client.delete_node(old_node.name)
     fail "delete node object failed: #{res}" unless res.exitstatus.zero?
     hop_destroy_node
   end
 
   label def destroy_node
-    old_vm.incr_destroy
+    old_node.incr_destroy
     pop "upgraded node"
   end
 end

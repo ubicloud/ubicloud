@@ -74,5 +74,11 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       expect(kd).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "kubernetes node is deleted"})
     end
+
+    it "skips destroying the vm if it is already destroyed" do
+      expect(kd).to receive(:vm).and_return(nil)
+      expect(kd).to receive(:destroy)
+      expect { nx.destroy }.to exit({"msg" => "kubernetes node is deleted"})
+    end
   end
 end

@@ -13,8 +13,7 @@ RSpec.describe Serializers::KubernetesCluster do
       subnet = PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id)
       kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "cluster", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, version: "v1.32", private_subnet_id: subnet.id).subject
       kn = KubernetesNodepool.create(name: "nodepool", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
-      vm = create_vm
-      kn.add_vm(vm)
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
 
       expected_result = {
         id: kc.ubid,
@@ -35,9 +34,8 @@ RSpec.describe Serializers::KubernetesCluster do
       kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "cluster", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, version: "v1.32", private_subnet_id: subnet.id).subject
       kn = KubernetesNodepool.create(name: "nodepool", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
       cp_vm = create_vm
-      kc.add_cp_vm(cp_vm)
-
-      kn.add_vm(create_vm)
+      KubernetesNode.create(vm_id: cp_vm.id, kubernetes_cluster_id: kc.id)
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
 
       expected_result = {
         id: kc.ubid,

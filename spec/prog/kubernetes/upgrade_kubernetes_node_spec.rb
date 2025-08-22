@@ -28,18 +28,11 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
 
     lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", health_check_endpoint: "/foo", project_id: Config.kubernetes_service_project_id)
     LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 123, dst_port: 456)
-    kc.add_cp_vm(create_vm)
-    kc.add_cp_vm(create_vm)
-
     kc.update(api_server_lb_id: lb.id)
-    kc
   }
 
   let(:kubernetes_nodepool) {
-    kn = KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kubernetes_cluster.id, target_node_size: "standard-8", target_node_storage_size_gib: 78)
-    kn.add_vm(create_vm)
-    kn.add_vm(create_vm)
-    kn.reload
+    KubernetesNodepool.create(name: "nodepool", node_count: 2, kubernetes_cluster_id: kubernetes_cluster.id, target_node_size: "standard-8", target_node_storage_size_gib: 78)
   }
 
   before do
@@ -89,29 +82,28 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
 
     it "hops to assign_role if there are no sub-programs running" do
       st.update(prog: "Kubernetes::UpgradeKubernetesNode", label: "wait_new_node", stack: [{}])
-      Strand.create(parent_id: st.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{}], exitval: {"vm_id" => "12345"})
+      Strand.create(parent_id: st.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{}], exitval: {"node_id" => "12345"})
       expect { prog.wait_new_node }.to hop("drain_old_node")
-      expect(prog.strand.stack.first["new_vm_id"]).to eq "12345"
+      expect(prog.strand.stack.first["new_node_id"]).to eq "12345"
     end
   end
 
   describe "#drain_old_node" do
     let(:sshable) { instance_double(Sshable) }
-    let(:old_vm) { create_vm }
+    let(:old_node) { KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
 
     before do
-      allow(prog).to receive(:frame).and_return({"old_vm_id" => old_vm.id})
-      expect(prog.old_vm.id).to eq(old_vm.id)
-      cp_vm = create_vm
-      expect(kubernetes_cluster).to receive(:cp_vms).and_return([old_vm, cp_vm])
-      allow(cp_vm).to receive(:sshable).and_return(sshable)
+      allow(prog).to receive(:frame).and_return({"old_node_id" => old_node.id})
+      expect(prog.old_node.id).to eq(old_node.id)
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id)
+      allow(kubernetes_cluster.cp_vms_via_nodes.last).to receive(:sshable).and_return(sshable)
 
       expect(prog).to receive(:register_deadline).with("remove_old_node_from_cluster", 60 * 60)
     end
 
     it "starts the drain process when run for the first time and naps" do
       expect(sshable).to receive(:d_check).with("drain_node").and_return("NotStarted")
-      expect(sshable).to receive(:d_run).with("drain_node", "sudo", "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf", "drain", old_vm.name, "--ignore-daemonsets", "--delete-emptydir-data")
+      expect(sshable).to receive(:d_run).with("drain_node", "sudo", "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf", "drain", old_node.name, "--ignore-daemonsets", "--delete-emptydir-data")
       expect { prog.drain_old_node }.to nap(10)
     end
 
@@ -139,17 +131,16 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
 
   describe "#remove_old_node_from_cluster" do
     before do
-      old_vm = create_vm
-      new_vm = create_vm
-      allow(prog).to receive(:frame).and_return({"old_vm_id" => old_vm.id, "new_vm_id" => new_vm.id})
-      expect(prog.old_vm.id).to eq(old_vm.id)
-      expect(prog.new_vm.id).to eq(new_vm.id)
+      old_node = KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_nodepool.id)
+      new_node = KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_nodepool.id)
+      allow(prog).to receive(:frame).and_return({"old_node_id" => old_node.id, "new_node_id" => new_node.id})
+      expect(prog.old_node.id).to eq(old_node.id)
+      expect(prog.new_node.id).to eq(new_node.id)
 
-      expect(kubernetes_nodepool.vms.count).to eq(2)
-      expect(kubernetes_cluster.reload.all_vms.map(&:id)).to eq((kubernetes_cluster.cp_vms + kubernetes_nodepool.vms).map(&:id))
+      expect(kubernetes_nodepool.nodes.count).to eq(2)
 
       mock_sshable = instance_double(Sshable)
-      expect(prog.old_vm).to receive(:sshable).and_return(mock_sshable)
+      expect(prog.old_node.vm).to receive(:sshable).and_return(mock_sshable)
       expect(mock_sshable).to receive(:cmd).with("sudo kubeadm reset --force")
     end
 
@@ -157,50 +148,48 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
       expect(prog.kubernetes_nodepool).to be_nil
       api_server_lb = instance_double(LoadBalancer)
       expect(kubernetes_cluster).to receive(:api_server_lb).and_return(api_server_lb)
-      expect(kubernetes_cluster).to receive(:remove_cp_vm).with(prog.old_vm)
-      expect(api_server_lb).to receive(:detach_vm).with(prog.old_vm)
+      expect(api_server_lb).to receive(:detach_vm).with(prog.old_node.vm)
       expect { prog.remove_old_node_from_cluster }.to hop("delete_node_object")
     end
 
     it "removes the old node from the nodepool while upgrading the node pool" do
-      allow(prog).to receive(:frame).and_return({"old_vm_id" => prog.old_vm.id, "new_vm_id" => prog.new_vm.id, "nodepool_id" => kubernetes_nodepool.id})
+      allow(prog).to receive(:frame).and_return({"old_node_id" => prog.old_node.id, "new_node_id" => prog.new_node.id, "nodepool_id" => kubernetes_nodepool.id})
       expect(prog.kubernetes_nodepool).not_to be_nil
-      expect(prog.kubernetes_nodepool).to receive(:remove_vm).with(prog.old_vm)
       expect { prog.remove_old_node_from_cluster }.to hop("delete_node_object")
     end
   end
 
   describe "#delete_node_object" do
     before do
-      old_vm = create_vm
-      allow(prog).to receive(:frame).and_return({"old_vm_id" => old_vm.id})
-      expect(prog.old_vm.id).to eq(old_vm.id)
+      old_node = KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id)
+      allow(prog).to receive(:frame).and_return({"old_node_id" => old_node.id})
+      expect(prog.old_node.id).to eq(old_node.id)
     end
 
     it "deletes the node object from kubernetes" do
       client = instance_double(Kubernetes::Client)
       expect(kubernetes_cluster).to receive(:client).and_return(client)
-      expect(client).to receive(:delete_node).with(prog.old_vm.name).and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("success", 0))
+      expect(client).to receive(:delete_node).with(prog.old_node.name).and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("success", 0))
       expect { prog.delete_node_object }.to hop("destroy_node")
     end
 
     it "raises if the error of delete node command is not successful" do
       client = instance_double(Kubernetes::Client)
       expect(kubernetes_cluster).to receive(:client).and_return(client)
-      expect(client).to receive(:delete_node).with(prog.old_vm.name).and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("failed", 1))
+      expect(client).to receive(:delete_node).with(prog.old_node.name).and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("failed", 1))
       expect { prog.delete_node_object }.to raise_error(RuntimeError)
     end
   end
 
   describe "#destroy_node" do
     before do
-      old_vm = create_vm
-      allow(prog).to receive(:frame).and_return({"old_vm_id" => old_vm.id})
-      expect(prog.old_vm.id).to eq(old_vm.id)
+      old_node = KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id)
+      allow(prog).to receive(:frame).and_return({"old_node_id" => old_node.id})
+      expect(prog.old_node.id).to eq(old_node.id)
     end
 
     it "destroys the old node" do
-      expect(prog.old_vm).to receive(:incr_destroy)
+      expect(prog.old_node).to receive(:incr_destroy)
       expect { prog.destroy_node }.to exit({"msg" => "upgraded node"})
     end
   end
