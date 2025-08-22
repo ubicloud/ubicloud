@@ -31,10 +31,18 @@ RSpec.describe Clover, "committee infrastructure" do
     }.to raise_error ex
   end
 
-  it "rejects paths that cannot be found in the schema" do
+  it "raises in tests for paths that cannot be found in the schema" do
+    project
+    expect { post "/not-a-prefix/" }.to raise_error(RuntimeError, "request not found in openapi schema: POST /not-a-prefix/")
+  end
+
+  it "returns 404 for paths that cannot be found in the schema" do
+    ENV["IGNORE_INVALID_API_PATHS"] = "1"
     project
     post "/not-a-prefix/"
     expect(JSON.parse(last_response.body).dig("error", "message")).to eq("Sorry, we couldn’t find the resource you’re looking for.")
+  ensure
+    ENV.delete("IGNORE_INVALID_API_PATHS")
   end
 
   it "fails when the request has unparsable json" do

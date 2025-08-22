@@ -935,7 +935,12 @@ class Clover < Roda
         @schema_validator = SCHEMA_ROUTER.build_schema_validator(r)
         @schema_validator.request_validate(r)
 
-        next unless @schema_validator.link_exist?
+        unless @schema_validator.link_exist?
+          if Config.test? && !ENV["IGNORE_INVALID_API_PATHS"]
+            raise "request not found in openapi schema: #{r.request_method} #{r.path_info}"
+          end
+          next
+        end
       rescue JSON::ParserError => e
         raise Committee::InvalidRequest.new("Request body wasn't valid JSON.", original_error: e)
       end
