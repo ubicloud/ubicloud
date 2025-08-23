@@ -1,8 +1,10 @@
-<%# locals: (name:, value: nil, label:, description: nil, attributes: {}) %>
+<%# locals: (name:, value: nil, label: nil, description: nil, attributes: {}) %>
 <% value = typecast_body_params.str(name) || value %>
 
 <div class="space-y-2">
-  <label for="<%= name %>" class="block text-sm font-medium leading-6 text-gray-900"><%= label %></label>
+  <% if label %>
+    <label for="<%= name %>" class="block text-sm font-medium leading-6 text-gray-900"><%= label %></label>
+  <% end %>
   <textarea
     id="<%= name %>"
     name="<%= name %>"
