@@ -102,7 +102,7 @@ RSpec.describe VmHost do
     vh.id = "46683a25-acb1-4371-afe9-d39f303e44b4"
     expect(Strand).to receive(:create) do |args|
       expect(args[:prog]).to eq("DownloadBootImage")
-      expect(args[:stack]).to eq([subject_id: vh.id, image_name: "my-image", custom_url: "https://example.com/my-image.raw", version: "20230303"])
+      expect(args[:stack]).to eq([subject_id: vh.id, image_name: "my-image", custom_url: "https://example.com/my-image.raw", version: "20230303", download_r2: false])
     end
     vh.download_boot_image("my-image", custom_url: "https://example.com/my-image.raw", version: "20230303")
   end

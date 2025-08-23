@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "aws-sdk-s3"
 
 class Prog::DownloadBootImage < Prog::Base
   subject_is :sshable, :vm_host
@@ -41,7 +42,8 @@ class Prog::DownloadBootImage < Prog::Base
         image_family = image_name.split("-").first
         suffix = suffixes.fetch(image_family, nil)
         arch = image_name.start_with?("ai-model") ? "-" : "-#{vm_host.arch}-"
-        blob_storage_client.get_presigned_url("GET", Config.ubicloud_images_bucket_name, "#{image_name}#{arch}#{version}.#{suffix}", 60 * 60).to_s
+        key = "#{image_name}#{arch}#{version}.#{suffix}"
+        frame["download_r2"] ? r2_signed_url(key) : minio_signed_url(key)
       elsif image_name == "ubuntu-noble"
         arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
         "https://cloud-images.ubuntu.com/releases/noble/release-#{version}/ubuntu-24.04-server-cloudimg-#{arch}.img"
@@ -124,13 +126,26 @@ class Prog::DownloadBootImage < Prog::Base
     BOOT_IMAGE_SHA256.fetch([image_name, vm_host.arch, version], nil)
   end
 
-  def blob_storage_client
-    @blob_storage_client ||= Minio::Client.new(
+  def r2_signed_url(key)
+    client = Aws::S3::Client.new(
+      endpoint: Config.ubicloud_images_r2_endpoint,
+      access_key_id: Config.ubicloud_images_r2_access_key,
+      secret_access_key: Config.ubicloud_images_r2_secret_key,
+      region: "auto",
+      request_checksum_calculation: "when_required",
+      response_checksum_validation: "when_required"
+    )
+    Aws::S3::Presigner.new(client:).presigned_url(:get_object, bucket: Config.ubicloud_images_r2_bucket_name, key:, expires_in: 60 * 60)
+  end
+
+  def minio_signed_url(key)
+    client = Minio::Client.new(
       endpoint: Config.ubicloud_images_blob_storage_endpoint,
       access_key: Config.ubicloud_images_blob_storage_access_key,
       secret_key: Config.ubicloud_images_blob_storage_secret_key,
       ssl_ca_data: Config.ubicloud_images_blob_storage_certs
     )
+    client.get_presigned_url("GET", Config.ubicloud_images_bucket_name, key, 60 * 60).to_s
   end
 
   label def start

@@ -154,12 +154,18 @@ module Config
   # Logging
   optional :database_logger_level, string
 
-  # Ubicloud Images
+  # Ubicloud Images (Minio)
   override :ubicloud_images_bucket_name, "ubicloud-images", string
   optional :ubicloud_images_blob_storage_endpoint, string
   optional :ubicloud_images_blob_storage_access_key, string, clear: true
   optional :ubicloud_images_blob_storage_secret_key, string, clear: true
   optional :ubicloud_images_blob_storage_certs, string
+
+  # Ubicloud Images (R2)
+  optional :ubicloud_images_r2_bucket_name, string
+  optional :ubicloud_images_r2_endpoint, string
+  optional :ubicloud_images_r2_access_key, string, clear: true
+  optional :ubicloud_images_r2_secret_key, string, clear: true
 
   override :ubuntu_noble_version, "20250502.1", string
   override :ubuntu_jammy_version, "20250508", string
