@@ -6,16 +6,15 @@
 <form action="<%= request.path_info %>" method="POST">
   <%== csrf_tag(request.path_info) %>
 
-  <div class="mt-4">
-    <div class="float-right <%= multi ? "mb-2" : "mt-4" %> ml-2">
-      <%== part("components/form/submit_button", text: "Run") %>
+  <div class="mt-4 flex gap-2 justify-between">
+    <div class="font-mono flex-1">
+      <% if multi %>
+        <%== part("components/form/textarea", name: "multi-cli", attributes: {cols: 80, rows: 6, placeholder: "Multiple commands, one per line", autofocus: true, required: true}) %>
+      <% else %>
+        <%== part("components/form/text", name: "cli", value: @cli, prefix: "ubi", attributes: {placeholder: "Command. i.e: 'vm list'", autofocus: true, required: true}) %>
+      <% end %>
     </div>
-
-    <% if multi %>
-      <%== part("components/form/textarea", name: "multi-cli", label: "Multiple commands, one per line", attributes: {cols: 80, rows: 6, autofocus: true, required: true}) %>
-    <% else %>
-      <%== part("components/form/text", name: "cli", label: "Command", value: @cli, attributes: {autofocus: true, required: true}) %>
-    <% end %>
+    <%== part("components/form/submit_button", text: "Run") %>
   </div>
 
 

@@ -16,7 +16,7 @@ RSpec.describe Clover, "web shell" do
 
   it "supports running help cli commands" do
     expect(page.title).to eq "Ubicloud - Web Shell"
-    fill_in "Command", with: "help -u pg list"
+    fill_in "cli", with: "help -u pg list"
     click_button "Run"
     expect(page.find_by_id("cli-executed").text).to eq "help -u pg list"
     expect(page.find_by_id("cli-output").text).to eq "ubi pg list [options]"
@@ -24,14 +24,14 @@ RSpec.describe Clover, "web shell" do
 
   it "ignores ubi prefix for command" do
     expect(page.title).to eq "Ubicloud - Web Shell"
-    fill_in "Command", with: " ubi help -u pg list"
+    fill_in "cli", with: " ubi help -u pg list"
     click_button "Run"
     expect(page.find_by_id("cli-executed").text).to eq "help -u pg list"
     expect(page.find_by_id("cli-output").text).to eq "ubi pg list [options]"
   end
 
   it "supports creating objects using cli command" do
-    fill_in "Command", with: "ps eu-central-h1/foo create"
+    fill_in "cli", with: "ps eu-central-h1/foo create"
     click_button "Run"
     ps = PrivateSubnet.first
     expect(ps.name).to eq "foo"
@@ -41,7 +41,7 @@ RSpec.describe Clover, "web shell" do
   end
 
   it "links ubids" do
-    fill_in "Command", with: "ps eu-central-h1/foo create"
+    fill_in "cli", with: "ps eu-central-h1/foo create"
     click_button "Run"
     ps = PrivateSubnet.first
     click_link ps.ubid
@@ -50,30 +50,30 @@ RSpec.describe Clover, "web shell" do
   end
 
   it "does not link ubids that cannot be matched" do
-    fill_in "Command", with: "ps eu-central-h1/vm78zgv9w9et4mg6pba1frsz8n create"
+    fill_in "cli", with: "ps eu-central-h1/vm78zgv9w9et4mg6pba1frsz8n create"
     click_button "Run"
     ps = PrivateSubnet.first
-    fill_in "Command", with: "ps list"
+    fill_in "cli", with: "ps list"
     click_button "Run"
     expect(page.html).to include " vm78zgv9w9et4mg6pba1frsz8n "
     expect(page.html).to include ">#{ps.ubid}</a>"
   end
 
   it "supports version" do
-    fill_in "Command", with: "version"
+    fill_in "cli", with: "version"
     click_button "Run"
     expect(page.find_by_id("cli-output").text).to match(/\A\d+\.\d+\.\d+\z/)
   end
 
   it "shows program that would be executed" do
-    fill_in "Command", with: "vm eu-central-h1/foo create 'a a'"
+    fill_in "cli", with: "vm eu-central-h1/foo create 'a a'"
     click_button "Run"
     vm = Vm.first.update(ephemeral_net6: "::1234:0/120")
     expect(page.find_by_id("cli-executed").text).to eq "vm eu-central-h1/foo create 'a a'"
     expect(page.find_by_id("cli-output").text).to eq "VM created with id: #{vm.ubid}"
     expect(page).to have_content "Output:"
 
-    fill_in "Command", with: "vm eu-central-h1/foo -6 ssh"
+    fill_in "cli", with: "vm eu-central-h1/foo -6 ssh"
     click_button "Run"
     expect(page.find_by_id("cli-executed").text).to eq "vm eu-central-h1/foo -6 ssh"
     expect(page.find_by_id("cli-output").text).to eq "$ ssh -- ubi@::1234:2"
@@ -82,7 +82,7 @@ RSpec.describe Clover, "web shell" do
 
   it "respects access permissions when using cli command" do
     AccessControlEntry.dataset.destroy
-    fill_in "Command", with: "ps eu-central-h1/foo create"
+    fill_in "cli", with: "ps eu-central-h1/foo create"
     click_button "Run"
     expect(PrivateSubnet.count).to eq 0
     expect(page.find_by_id("cli-executed").text).to eq "ps eu-central-h1/foo create"
@@ -139,9 +139,9 @@ RSpec.describe Clover, "web shell" do
 
   describe "confirmation" do
     before do
-      fill_in "Command", with: "ps eu-central-h1/foo create"
+      fill_in "cli", with: "ps eu-central-h1/foo create"
       click_button "Run"
-      fill_in "Command", with: "ps eu-central-h1/foo destroy"
+      fill_in "cli", with: "ps eu-central-h1/foo destroy"
       click_button "Run"
       expect(page.find_by_id("cli-executed").text).to eq "ps eu-central-h1/foo destroy"
       expect(page.find_by_id("cli-output").text).to eq "Destroying this private subnet is not recoverable. Enter the following to confirm destruction of the private subnet: foo"
