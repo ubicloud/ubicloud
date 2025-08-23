@@ -25,6 +25,7 @@ end
 
 sha256sum = params_json["sha256sum"]
 certs = params_json["certs"]
+use_htcat = params_json["use_htcat"]
 
 # Not all image downloads require a certificate
 if certs.nil?
@@ -35,5 +36,5 @@ else
 end
 
 BootImage.new(boot_image, version).download(
-  url: url, ca_path: ca_path, sha256sum: sha256sum
+  url: url, ca_path: ca_path, sha256sum: sha256sum, use_htcat: use_htcat
 )

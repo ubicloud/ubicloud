@@ -130,7 +130,8 @@ RSpec.describe Prog::DownloadBootImage do
         "url" => "https://example.com/my-image.raw",
         "version" => "20230303",
         "sha256sum" => nil,
-        "certs" => nil
+        "certs" => nil,
+        "use_htcat" => false
       }.to_json
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("NotStarted")
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_my-image_20230303", stdin: params_json)
@@ -143,14 +144,15 @@ RSpec.describe Prog::DownloadBootImage do
         "url" => "https://minio.example.com/my-image.raw",
         "version" => Config.github_ubuntu_2204_version,
         "sha256sum" => "sha256_sum",
-        "certs" => "certs"
+        "certs" => "certs",
+        "use_htcat" => false
       }.to_json
       expect(dbi).to receive(:frame).and_return({"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version}).at_least(:once)
       expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, get_presigned_url: "https://minio.example.com/my-image.raw"))
       expect(Config).to receive(:ubicloud_images_blob_storage_certs).and_return("certs").at_least(:once)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}").and_return("NotStarted")
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}", stdin: params_json)
-      expect(dbi).to receive(:sha256_sum).and_return("sha256_sum")
+      expect(dbi).to receive(:sha256sum).and_return("sha256_sum")
       expect { dbi.download }.to nap(15)
     end
 
@@ -166,12 +168,13 @@ RSpec.describe Prog::DownloadBootImage do
         "url" => "https://r2.example.com/my-image.raw",
         "version" => Config.github_ubuntu_2204_version,
         "sha256sum" => "sha256_sum",
-        "certs" => nil
+        "certs" => nil,
+        "use_htcat" => true
       }.to_json
       expect(dbi).to receive(:frame).and_return({"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version, "download_r2" => true}).at_least(:once)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}").and_return("NotStarted")
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}", stdin: params_json)
-      expect(dbi).to receive(:sha256_sum).and_return("sha256_sum")
+      expect(dbi).to receive(:sha256sum).and_return("sha256_sum")
       expect { dbi.download }.to nap(15)
     end
 
