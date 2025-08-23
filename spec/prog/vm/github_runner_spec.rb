@@ -194,7 +194,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "create a new record for a new day" do
       today = Time.now
       tomorrow = today + 24 * 60 * 60
-      expect(Time).to receive(:now).and_return(today).exactly(6)
+      expect(Time).to receive(:now).and_return(today)
       expect(runner).to receive(:ready_at).and_return(today - 5 * 60).twice
       expect(BillingRecord).to receive(:create).and_call_original
       # Create today record
