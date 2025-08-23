@@ -137,7 +137,7 @@ RSpec.describe Prog::DownloadBootImage do
       expect { dbi.download }.to nap(15)
     end
 
-    it "generates presigned URL for github-runners images if a custom_url not provided" do
+    it "generates MinIO presigned URL for github-runners images if a custom_url not provided" do
       params_json = {
         "image_name" => "github-ubuntu-2204",
         "url" => "https://minio.example.com/my-image.raw",
@@ -148,6 +148,27 @@ RSpec.describe Prog::DownloadBootImage do
       expect(dbi).to receive(:frame).and_return({"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version}).at_least(:once)
       expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, get_presigned_url: "https://minio.example.com/my-image.raw"))
       expect(Config).to receive(:ubicloud_images_blob_storage_certs).and_return("certs").at_least(:once)
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}").and_return("NotStarted")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}", stdin: params_json)
+      expect(dbi).to receive(:sha256_sum).and_return("sha256_sum")
+      expect { dbi.download }.to nap(15)
+    end
+
+    it "generates R2 presigned URL for github-runners images if a custom_url not provided" do
+      allow(Config).to receive(:ubicloud_images_r2_bucket_name).and_return("images-bucket")
+      url_presigner = instance_double(Aws::S3::Presigner)
+      s3_client = instance_double(Aws::S3::Client)
+      allow(Aws::S3::Presigner).to receive(:new).with(client: s3_client).and_return(url_presigner)
+      allow(Aws::S3::Client).to receive(:new).and_return(s3_client)
+      expect(url_presigner).to receive(:presigned_url).with(:get_object, hash_including(bucket: "images-bucket", key: "github-ubuntu-2204-x64-#{Config.github_ubuntu_2204_version}.raw")).and_return("https://r2.example.com/my-image.raw")
+      params_json = {
+        "image_name" => "github-ubuntu-2204",
+        "url" => "https://r2.example.com/my-image.raw",
+        "version" => Config.github_ubuntu_2204_version,
+        "sha256sum" => "sha256_sum",
+        "certs" => nil
+      }.to_json
+      expect(dbi).to receive(:frame).and_return({"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version, "download_r2" => true}).at_least(:once)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}").and_return("NotStarted")
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}", stdin: params_json)
       expect(dbi).to receive(:sha256_sum).and_return("sha256_sum")
