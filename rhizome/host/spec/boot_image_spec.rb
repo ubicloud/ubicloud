@@ -26,6 +26,19 @@ RSpec.describe BootImage do
 
       bi.download(url: "url", ca_path: "ca_path", sha256sum: "sha256sum")
     end
+
+    it "can download an image with htcat" do
+      expect(File).to receive(:exist?).with("/var/storage/images/ubuntu-jammy-20240110.raw").and_return(false)
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images")
+      expect(bi).to receive(:image_ext).with("url").and_return(".img")
+      tmp_path = "/var/storage/images/ubuntu-jammy-20240110.img.tmp"
+      expect(bi).to receive(:htcat_image).with("url", tmp_path).and_return("returned_sha256sum")
+      expect(bi).to receive(:verify_sha256sum).with("returned_sha256sum", "sha256sum")
+      expect(bi).to receive(:convert_image).with(tmp_path, "qcow2")
+      expect(FileUtils).to receive(:rm_r).with(tmp_path)
+
+      bi.download(url: "url", ca_path: "ca_path", sha256sum: "sha256sum", use_htcat: true)
+    end
   end
 
   describe "#image_ext" do
@@ -71,6 +84,20 @@ RSpec.describe BootImage do
       ).and_return("SHA2-256(stdin)= 81fae9cc21e2b1e3a9a4526c7dad3131b668e346c580702235ad4d02645d9455\n")
 
       bi.curl_image("url", "/var/storage/images/ubuntu-jammy-20240110.img.tmp", "ca_path")
+    end
+  end
+
+  describe "#htcat_image" do
+    it "can htcat image with sha256 checksum" do
+      expect(File).to receive(:open) do |path, *_args|
+        expect(path).to eq("/var/storage/images/ubuntu-jammy-20240110.img.tmp")
+      end.and_yield
+
+      expect(bi).to receive(:r).with(
+        "bash -c 'htcat -parallelism=12 -max-fragment-size=32 URL | tee >(openssl dgst -sha256) > /var/storage/images/ubuntu-jammy-20240110.img.tmp'"
+      ).and_return("SHA2-256(stdin)= 81fae9cc21e2b1e3a9a4526c7dad3131b668e346c580702235ad4d02645d9455\n")
+
+      bi.htcat_image("URL", "/var/storage/images/ubuntu-jammy-20240110.img.tmp")
     end
   end
 

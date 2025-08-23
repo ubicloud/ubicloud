@@ -24,6 +24,10 @@ class Prog::DownloadBootImage < Prog::Base
     Config.send(config_name)
   end
 
+  def download_from_r2?
+    frame["download_r2"]
+  end
+
   def url
     @url ||=
       if frame["custom_url"]
@@ -43,7 +47,7 @@ class Prog::DownloadBootImage < Prog::Base
         suffix = suffixes.fetch(image_family, nil)
         arch = image_name.start_with?("ai-model") ? "-" : "-#{vm_host.arch}-"
         key = "#{image_name}#{arch}#{version}.#{suffix}"
-        frame["download_r2"] ? r2_signed_url(key) : minio_signed_url(key)
+        download_from_r2? ? r2_signed_url(key) : minio_signed_url(key)
       elsif image_name == "ubuntu-noble"
         arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
         "https://cloud-images.ubuntu.com/releases/noble/release-#{version}/ubuntu-24.04-server-cloudimg-#{arch}.img"
@@ -120,7 +124,7 @@ class Prog::DownloadBootImage < Prog::Base
   }.freeze
   BOOT_IMAGE_SHA256.each_key(&:freeze)
 
-  def sha256_sum
+  def sha256sum
     # YYY: In future all images should be checked for sha256 sum, so the nil
     # default will be removed.
     BOOT_IMAGE_SHA256.fetch([image_name, vm_host.arch, version], nil)
@@ -175,14 +179,9 @@ class Prog::DownloadBootImage < Prog::Base
       sshable.cmd("common/bin/daemonizer --clean #{q_daemon_name}")
       hop_update_available_storage_space
     when "NotStarted"
-      params_json = {
-        image_name: image_name,
-        url: url,
-        version: version,
-        sha256sum: sha256_sum,
-        certs: download_from_blob_storage? ? Config.ubicloud_images_blob_storage_certs : nil
-      }.to_json
-      sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image' #{q_daemon_name}", stdin: params_json)
+      certs = download_from_blob_storage? ? Config.ubicloud_images_blob_storage_certs : nil
+      params = {image_name:, url:, version:, sha256sum:, certs:, use_htcat: download_from_r2?}
+      sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image' #{q_daemon_name}", stdin: params.to_json)
     when "Failed"
       if Config.production?
         BootImage.where(vm_host_id: vm_host.id, name: image_name, version: version).destroy
