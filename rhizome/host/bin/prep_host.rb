@@ -92,6 +92,9 @@ r "apt-get -y install nvme-cli systemd-coredump" if is_prod_env
 # We need smartmontools, nvme-cli and jq in order to probe the disk status of VmHosts
 r "apt-get -y install smartmontools nvme-cli jq"
 
+# aria2 is able to download a file from signed URLs concurrently
+r "apt-get -y install aria2"
+
 SpdkSetup.prep
 
 # cron job to store serial.log files

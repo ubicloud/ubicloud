@@ -26,6 +26,18 @@ RSpec.describe BootImage do
 
       bi.download(url: "url", ca_path: "ca_path", sha256sum: "sha256sum")
     end
+
+    it "can download an image with aria2" do
+      expect(File).to receive(:exist?).with("/var/storage/images/ubuntu-jammy-20240110.raw").and_return(false)
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images")
+      expect(bi).to receive(:image_ext).with("url").and_return(".img")
+      tmp_path = "/var/storage/images/ubuntu-jammy-20240110.img.tmp"
+      expect(bi).to receive(:aria2_image).with("url", tmp_path, "sha256sum")
+      expect(bi).to receive(:convert_image).with(tmp_path, "qcow2")
+      expect(FileUtils).to receive(:rm_r).with(tmp_path)
+
+      bi.download(url: "url", ca_path: "ca_path", sha256sum: "sha256sum", use_aria2: true)
+    end
   end
 
   describe "#image_ext" do
@@ -71,6 +83,32 @@ RSpec.describe BootImage do
       ).and_return("SHA2-256(stdin)= 81fae9cc21e2b1e3a9a4526c7dad3131b668e346c580702235ad4d02645d9455\n")
 
       bi.curl_image("url", "/var/storage/images/ubuntu-jammy-20240110.img.tmp", "ca_path")
+    end
+  end
+
+  describe "#aria2_image" do
+    it "can aria2 image without ca_path" do
+      expect(File).to receive(:open) do |path, *_args|
+        expect(path).to eq("/var/storage/images/ubuntu-jammy-20240110.img.tmp")
+      end.and_yield
+
+      expect(bi).to receive(:r).with(
+        "aria2c -x 10 -s 10 --allow-overwrite=true --auto-file-renaming=false -d /var/storage/images -o ubuntu-jammy-20240110.img.tmp URL"
+      )
+
+      bi.aria2_image("URL", "/var/storage/images/ubuntu-jammy-20240110.img.tmp", nil)
+    end
+
+    it "can aria2 image with sha256 checksum" do
+      expect(File).to receive(:open) do |path, *_args|
+        expect(path).to eq("/var/storage/images/ubuntu-jammy-20240110.img.tmp")
+      end.and_yield
+
+      expect(bi).to receive(:r).with(
+        "aria2c -x 10 -s 10 --allow-overwrite=true --auto-file-renaming=false -d /var/storage/images -o ubuntu-jammy-20240110.img.tmp --checksum=sha-256=sha256sum URL"
+      )
+
+      bi.aria2_image("URL", "/var/storage/images/ubuntu-jammy-20240110.img.tmp", "sha256sum")
     end
   end
 
