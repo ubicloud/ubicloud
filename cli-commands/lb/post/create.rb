@@ -6,7 +6,7 @@ UbiCli.on("lb").run_on("create") do
   health_check_protocols = %w[http https tcp].freeze.each(&:freeze)
   stacks = %w[dual ipv4 ipv6].freeze.each(&:freeze)
 
-  options("ubi lb location/lb-name create [options] ps-id src-port dst-port", key: :lb_create) do
+  options("ubi lb location/lb-name create [options] (ps-name | ps-id) src-port dst-port", key: :lb_create) do
     on("-a", "--algorithm=alg", algorithms, "set the algorithm to use")
     on("-e", "--check-endpoint=path", "set the health check endpoint (default: #{Prog::Vnet::LoadBalancerNexus::DEFAULT_HEALTH_CHECK_ENDPOINT})")
     on("-p", "--check-protocol=proto", health_check_protocols, "set the health check protocol")
@@ -19,6 +19,7 @@ UbiCli.on("lb").run_on("create") do
   args 3
 
   run do |private_subnet_id, src_port, dst_port, opts, cmd|
+    private_subnet_id = convert_name_to_id(sdk.private_subnet, private_subnet_id)
     params = underscore_keys(opts[:lb_create])
     if (endpoint = params.delete(:check_endpoint))
       params[:health_check_endpoint] = endpoint

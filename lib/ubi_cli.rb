@@ -32,7 +32,8 @@ class UbiCli
   LOWERCASE_LABELS["ak"] = "inference API key"
   LOWERCASE_LABELS.freeze
 
-  OBJECT_INFO_REGEXP = /((fw|kc|1b|pg|ps|vm)[a-z0-9]{24})/
+  OBJECT_INFO_REGEXP = /((fw|kc|1b|pg|ps|vm)[a-tv-z0-9]{24})/
+  EXACT_OBJECT_INFO_REGEXP = /\A#{OBJECT_INFO_REGEXP}\z/
   UBI_VERSION_REGEXP = /\A\d{1,4}\.\d{1,4}\.\d{1,4}\z/
 
   Rodish.processor(self)
@@ -111,7 +112,7 @@ class UbiCli
 
         @location, @name, extra = ref.split("/", 3)
 
-        if !@name && OBJECT_INFO_REGEXP.match?(@location)
+        if !@name && EXACT_OBJECT_INFO_REGEXP.match?(@location)
           unless (object = sdk[@location])
             raise Rodish::CommandFailure.new("no #{label} with id #{@location} exists", command)
           end
@@ -406,6 +407,27 @@ class UbiCli
 
   def sdk_object
     sdk.send(@sdk_method).new("#{@location}/#{@name}")
+  end
+
+  def convert_name_to_id(model_adapter, name)
+    unless model_adapter.id_regexp.match?(name)
+      id_for_loc_name(model_adapter, "#{@location}/#{name}")
+    end || name
+  end
+
+  def convert_loc_name_to_id(model_adapter, loc_name)
+    if !model_adapter.id_regexp.match?(loc_name) && loc_name.count("/") == 1
+      id_for_loc_name(model_adapter, loc_name)
+    end || loc_name
+  end
+
+  def id_for_loc_name(model_adapter, loc_name)
+    _, name, extra = loc_name.split("/", 3)
+    if name && !extra
+      obj = model_adapter.new(loc_name)
+      obj.info
+      obj.id
+    end
   end
 
   def finalize_response(res)

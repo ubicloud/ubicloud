@@ -119,7 +119,7 @@ Options:
 Attach a private subnet to a firewall
 
 Usage:
-    ubi fw (location/fw-name | fw-id) attach-subnet ps-id
+    ubi fw (location/fw-name | fw-id) attach-subnet (ps-name | ps-id)
 
 
 Create a firewall
@@ -149,7 +149,7 @@ Options:
 Detch a private subnet from a firewall
 
 Usage:
-    ubi fw (location/fw-name | fw-id) detach-subnet ps-id
+    ubi fw (location/fw-name | fw-id) detach-subnet (ps-name | ps-id)
 
 
 Show details for a firewall
@@ -294,13 +294,13 @@ Allowed Option Values:
 Attach a virtual machine to a load balancer
 
 Usage:
-    ubi lb (location/lb-name | lb-id) attach-vm vm-id
+    ubi lb (location/lb-name | lb-id) attach-vm (vm-name | vm-id)
 
 
 Create a load balancer
 
 Usage:
-    ubi lb location/lb-name create [options] ps-id src-port dst-port
+    ubi lb location/lb-name create [options] (ps-name | ps-id) src-port dst-port
 
 Options:
     -a, --algorithm=alg              set the algorithm to use
@@ -326,7 +326,7 @@ Options:
 Detach a virtual machine from a load balancer
 
 Usage:
-    ubi lb (location/lb-name | lb-id) detach-vm vm-id
+    ubi lb (location/lb-name | lb-id) detach-vm (vm-name | vm-id)
 
 
 Show details for a load balancer
@@ -346,7 +346,7 @@ Allowed Option Values:
 Update a load balancer
 
 Usage:
-    ubi lb (location/lb-name | lb-id) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]
+    ubi lb (location/lb-name | lb-id) update algorithm src-port dst-port health-check-endpoint [(vm-name | vm-id) [...]]
 
 
 Manage PostgreSQL databases
@@ -651,7 +651,7 @@ Allowed Option Values:
 Connect a private subnet to another private subnet
 
 Usage:
-    ubi ps (location/ps-name | ps-id) connect ps-id
+    ubi ps (location/ps-name | ps-id) connect (location/ps-name | ps-id)
 
 
 Create a private subnet
@@ -660,7 +660,7 @@ Usage:
     ubi ps location/ps-name create [options]
 
 Options:
-    -f, --firewall-id=id             add to given firewall
+    -f, --firewall-id=fw-id-or-name  add to given firewall
 
 
 Destroy a private subnet
@@ -675,7 +675,7 @@ Options:
 Disconnect a private subnet from another private subnet
 
 Usage:
-    ubi ps (location/ps-name | ps-id) disconnect ps-id
+    ubi ps (location/ps-name | ps-id) disconnect (location/ps-name | ps-id)
 
 
 Show details for a private subnet
@@ -752,7 +752,7 @@ Examples:
 Options:
     -6, --ipv6-only                  do not enable IPv4
     -b, --boot-image=image_name      boot image
-    -p, --private-subnet-id=id       place VM into specific private subnet
+    -p, --private-subnet-id=ps-id    place VM into specific private subnet (also accepts ps-name)
     -s, --size=size                  server size
     -S, --storage-size=size          storage size
     -u, --unix-user=username         username (default: ubi)

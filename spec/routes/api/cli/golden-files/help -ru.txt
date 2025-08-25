@@ -10,11 +10,11 @@ ubi fw command [...]
 ubi fw (location/fw-name | fw-id) post-command [...]
 ubi fw list [options]
 ubi fw (location/fw-name | fw-id) add-rule [options] cidr
-ubi fw (location/fw-name | fw-id) attach-subnet ps-id
+ubi fw (location/fw-name | fw-id) attach-subnet (ps-name | ps-id)
 ubi fw location/fw-name create [options]
 ubi fw (location/fw-name | fw-id) delete-rule rule-id
 ubi fw (location/fw-name | fw-id) destroy [options]
-ubi fw (location/fw-name | fw-id) detach-subnet ps-id
+ubi fw (location/fw-name | fw-id) detach-subnet (ps-name | ps-id)
 ubi fw (location/fw-name | fw-id) show [options]
 ubi help [options] [command [subcommand]]
 ubi kc command [...]
@@ -27,12 +27,12 @@ ubi kc (location/kc-name | kc-id) show [options]
 ubi lb command [...]
 ubi lb (location/lb-name | lb-id) post-command [...]
 ubi lb list [options]
-ubi lb (location/lb-name | lb-id) attach-vm vm-id
-ubi lb location/lb-name create [options] ps-id src-port dst-port
+ubi lb (location/lb-name | lb-id) attach-vm (vm-name | vm-id)
+ubi lb location/lb-name create [options] (ps-name | ps-id) src-port dst-port
 ubi lb (location/lb-name | lb-id) destroy [options]
-ubi lb (location/lb-name | lb-id) detach-vm vm-id
+ubi lb (location/lb-name | lb-id) detach-vm (vm-name | vm-id)
 ubi lb (location/lb-name | lb-id) show [options]
-ubi lb (location/lb-name | lb-id) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]
+ubi lb (location/lb-name | lb-id) update algorithm src-port dst-port health-check-endpoint [(vm-name | vm-id) [...]]
 ubi pg command [...]
 ubi pg (location/pg-name | pg-id) [post-options] post-command [...]
 ubi pg list [options]
@@ -64,10 +64,10 @@ ubi pg (location/pg-name | pg-id) show [options]
 ubi ps command [...]
 ubi ps (location/ps-name | ps-id) post-command [...]
 ubi ps list [options]
-ubi ps (location/ps-name | ps-id) connect ps-id
+ubi ps (location/ps-name | ps-id) connect (location/ps-name | ps-id)
 ubi ps location/ps-name create [options]
 ubi ps (location/ps-name | ps-id) destroy [options]
-ubi ps (location/ps-name | ps-id) disconnect ps-id
+ubi ps (location/ps-name | ps-id) disconnect (location/ps-name | ps-id)
 ubi ps (location/ps-name | ps-id) show [options]
 ubi version
 ubi vm command [...]

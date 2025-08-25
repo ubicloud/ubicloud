@@ -101,6 +101,7 @@ RSpec.describe Clover, "cli" do
     cli_commands = []
     cli_commands.concat File.readlines("spec/routes/api/cli/golden-file-commands/success.txt").map { [it, {}] }
     cli_commands.concat File.readlines("spec/routes/api/cli/golden-file-commands/error.txt").map { [it, {status: 400}] }
+    cli_commands.concat File.readlines("spec/routes/api/cli/golden-file-commands/missing.txt").map { [it, {status: 404}] }
     cli_commands.concat File.readlines("spec/routes/api/cli/golden-file-commands/confirm.txt").map { [it, {confirm_prompt: "Confirmation"}] }
     Dir["spec/routes/api/cli/golden-file-commands/execute/*.txt"].each do |f|
       cmd = File.basename(f).delete_suffix(".txt")
