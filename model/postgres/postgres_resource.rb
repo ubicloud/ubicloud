@@ -105,15 +105,24 @@ class PostgresResource < Sequel::Model
   end
 
   def has_enough_fresh_servers?
-    servers.count { !it.needs_recycling? } >= target_server_count
+    if version.to_i < target_version.to_i
+      !upgrade_candidate_server.nil?
+    else
+      servers.count { !it.needs_recycling? } >= target_server_count
+    end
   end
 
   def has_enough_ready_servers?
-    servers.count { !it.needs_recycling? && it.strand.label == "wait" } >= target_server_count
+    if version.to_i < target_version.to_i
+      upgrade_candidate_server&.strand&.label == "wait"
+    else
+      servers.count { !it.needs_recycling? && it.strand.label == "wait" } >= target_server_count
+    end
   end
 
   def needs_convergence?
-    servers.any? { it.needs_recycling? } || servers.count != target_server_count
+    needs_upgrade = version.to_i < target_version.to_i && !ongoing_failover?
+    servers.any? { it.needs_recycling? } || servers.count != target_server_count || needs_upgrade
   end
 
   def in_maintenance_window?
@@ -153,6 +162,23 @@ class PostgresResource < Sequel::Model
     Semaphore.incr(servers_dataset.select(:id), "restart")
   end
 
+  def upgrade_candidate_server
+    if location.aws?
+      # TODO: We check if the AWS server is running the latest AMI version tracked in
+      # the pg_aws_ami table. We can optimize this to consider more AMIs by tracking
+      # the creation times in the pg_aws_ami table.
+      servers
+        .reject(&:representative_at)
+        .select { |server| PgAwsAmi.where(aws_ami_id: server.vm.boot_image).count > 0 }
+        .max_by(&:created_at)
+    else
+      servers
+        .reject(&:representative_at)
+        .select { |server| server.vm.vm_storage_volumes.filter { it.boot }.any? { it.boot_image.version >= UPGRADE_IMAGE_MIN_VERSIONS[target_version] } }
+        .max_by(&:created_at)
+    end
+  end
+
   module HaType
     NONE = "none"
     ASYNC = "async"
@@ -168,6 +194,10 @@ class PostgresResource < Sequel::Model
   DEFAULT_VERSION = "17"
 
   MAINTENANCE_DURATION_IN_HOURS = 2
+
+  UPGRADE_IMAGE_MIN_VERSIONS = {
+    "17" => "20240801"
+  }
 end
 
 # Table: postgres_resource

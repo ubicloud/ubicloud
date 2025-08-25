@@ -49,7 +49,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       )
 
       synchronization_status = representative_at ? "ready" : "catching_up"
-      postgres_server = PostgresServer.create(
+      postgres_server = PostgresServer.create_with_id(
+        ubid.to_uuid,
         resource_id: resource_id,
         timeline_id: timeline_id,
         timeline_access: timeline_access,
@@ -57,7 +58,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         synchronization_status: synchronization_status,
         vm_id: vm_st.id,
         version: postgres_resource.version
-      ) { it.id = ubid.to_uuid }
+      )
 
       Strand.create_with_id(postgres_server.id, prog: "Postgres::PostgresServerNexus", label: "start")
     end
@@ -133,7 +134,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def configure_walg_credentials
-    refresh_walg_credentials
+    postgres_server.refresh_walg_credentials
     hop_initialize_empty_database if postgres_server.primary?
     hop_initialize_database_from_backup
   end
@@ -143,7 +144,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     when "Succeeded"
       hop_refresh_certificates
     when "Failed", "NotStarted"
-      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/initialize-empty-database #{postgres_server.resource.version}' initialize_empty_database")
+      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/initialize-empty-database #{postgres_server.version}' initialize_empty_database")
     end
 
     nap 5
@@ -159,7 +160,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       else
         postgres_server.timeline.latest_backup_label_before_target(target: postgres_server.resource.restore_target)
       end
-      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/initialize-database-from-backup #{postgres_server.resource.version} #{backup_label}' initialize_database_from_backup")
+      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/initialize-database-from-backup #{postgres_server.version} #{backup_label}' initialize_database_from_backup")
     end
 
     nap 5
@@ -181,13 +182,13 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     # MinIO cluster certificate rotation timelines are similar to postgres
     # servers' timelines. So we refresh the wal-g credentials which uses MinIO
     # certificates when we refresh the certificates of the postgres server.
-    refresh_walg_credentials
+    postgres_server.refresh_walg_credentials
 
     when_initial_provisioning_set? do
       hop_configure_metrics
     end
 
-    vm.sshable.cmd("sudo -u postgres pg_ctlcluster #{postgres_server.resource.version} main reload")
+    vm.sshable.cmd("sudo -u postgres pg_ctlcluster #{postgres_server.version} main reload")
     vm.sshable.cmd("sudo systemctl reload pgbouncer@*.service")
     hop_wait
   end
@@ -295,7 +296,7 @@ TIMER
       "files": {
         "collect_list": [
           {
-            "file_path": "/dat/#{postgres_server.resource.version}/data/pg_log/postgresql.log",
+            "file_path": "/dat/#{postgres_server.version}/data/pg_log/postgresql.log",
             "log_group_name": "/#{postgres_server.ubid}/postgresql",
             "log_stream_name": "#{postgres_server.ubid}/postgresql",
             "timestamp_format": "%Y-%m-%d %H:%M:%S"
@@ -345,7 +346,7 @@ CONFIG
       hop_wait
     when "Failed", "NotStarted"
       configure_hash = postgres_server.configure_hash
-      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/configure #{postgres_server.resource.version}' configure_postgres", stdin: JSON.generate(configure_hash))
+      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/configure #{postgres_server.version}' configure_postgres", stdin: JSON.generate(configure_hash))
     end
 
     nap 5
@@ -429,21 +430,12 @@ SQL
     end
 
     if !is_in_recovery
-      switch_to_new_timeline
+      postgres_server.switch_to_new_timeline
 
       hop_configure
     end
 
     nap 5
-  end
-
-  def switch_to_new_timeline
-    timeline_id = Prog::Postgres::PostgresTimelineNexus.assemble(location_id: postgres_server.resource.location_id, parent_id: postgres_server.timeline.id).id
-    postgres_server.timeline_id = timeline_id
-    postgres_server.timeline_access = "push"
-    postgres_server.save_changes
-
-    refresh_walg_credentials
   end
 
   label def wait
@@ -489,14 +481,14 @@ SQL
     end
 
     when_promote_set? do
-      switch_to_new_timeline
+      postgres_server.switch_to_new_timeline
       decr_promote
       hop_taking_over
     end
 
     when_refresh_walg_credentials_set? do
       decr_refresh_walg_credentials
-      refresh_walg_credentials
+      postgres_server.refresh_walg_credentials
     end
 
     if postgres_server.read_replica? && postgres_server.resource.parent
@@ -568,10 +560,21 @@ SQL
     # minutes at worst) and increased WAL volume are accepted in order
     # to avoid stopping all workloads for a long shutdown checkpoint.
     postgres_server.run_query("CHECKPOINT; CHECKPOINT; CHECKPOINT;")
-    postgres_server.vm.sshable.cmd("sudo postgres/bin/lockout #{postgres_server.resource.version}")
-    postgres_server.vm.sshable.cmd("sudo pg_ctlcluster #{postgres_server.resource.version} main stop -m smart")
+    postgres_server.vm.sshable.cmd("sudo postgres/bin/lockout #{postgres_server.version}")
+    postgres_server.vm.sshable.cmd("sudo pg_ctlcluster #{postgres_server.version} main stop -m smart")
 
-    nap 6 * 60 * 60
+    hop_wait_in_fence
+  end
+
+  label def wait_in_fence
+    when_unfence_set? do
+      decr_unfence
+      postgres_server.incr_configure
+      postgres_server.incr_restart
+      hop_wait
+    end
+
+    nap 60
   end
 
   label def prepare_for_unplanned_take_over
@@ -580,7 +583,7 @@ SQL
     representative_server = postgres_server.resource.representative_server
 
     begin
-      representative_server.vm.sshable.cmd("sudo pg_ctlcluster #{postgres_server.resource.version} main stop -m immediate")
+      representative_server.vm.sshable.cmd("sudo pg_ctlcluster #{postgres_server.version} main stop -m immediate")
     rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
     end
 
@@ -597,7 +600,7 @@ SQL
   end
 
   label def wait_fencing_of_old_primary
-    nap 0 if postgres_server.resource.representative_server.fence_set?
+    nap 0 if postgres_server.resource.representative_server.strand.label != "wait_in_fence"
 
     postgres_server.resource.representative_server.incr_destroy
     hop_taking_over
@@ -621,7 +624,7 @@ SQL
       postgres_server.resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
       hop_configure
     when "Failed", "NotStarted"
-      vm.sshable.cmd("common/bin/daemonizer 'sudo pg_ctlcluster #{postgres_server.resource.version} main promote' promote_postgres")
+      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/promote #{postgres_server.version}' promote_postgres")
       nap 0
     end
 
@@ -647,24 +650,16 @@ SQL
 
   label def restart
     decr_restart
-    vm.sshable.cmd("sudo postgres/bin/restart #{postgres_server.resource.version}")
+    vm.sshable.cmd("sudo postgres/bin/restart #{postgres_server.version}")
     vm.sshable.cmd("sudo systemctl restart pgbouncer@*.service")
     pop "postgres server is restarted"
   end
 
-  def refresh_walg_credentials
-    return if postgres_server.timeline.blob_storage.nil?
-
-    walg_config = postgres_server.timeline.generate_walg_config
-    vm.sshable.cmd("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: walg_config)
-    vm.sshable.cmd("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: postgres_server.timeline.blob_storage.root_certs) unless postgres_server.timeline.aws?
-  end
-
   def available?
+    vm.sshable.invalidate_cache_entry
+
     # Don't declare unavailability if we are upgrading.
     return true if postgres_server.resource.version != postgres_server.resource.target_version && postgres_server == postgres_server.resource.upgrade_candidate_server
-
-    vm.sshable.invalidate_cache_entry
 
     begin
       postgres_server.run_query("SELECT 1")
@@ -674,7 +669,7 @@ SQL
 
     # Do not declare unavailability if Postgres is in crash recovery
     begin
-      return true if vm.sshable.cmd("sudo tail -n 5 /dat/#{postgres_server.resource.version}/data/pg_log/postgresql.log").include?("redo in progress")
+      return true if vm.sshable.cmd("sudo tail -n 5 /dat/#{postgres_server.version}/data/pg_log/postgresql.log").include?("redo in progress")
     rescue
     end
 

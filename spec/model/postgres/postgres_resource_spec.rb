@@ -6,7 +6,9 @@ RSpec.describe PostgresResource do
   subject(:postgres_resource) {
     described_class.new(
       name: "pg-name",
-      superuser_password: "dummy-password"
+      superuser_password: "dummy-password",
+      ha_type: "none",
+      target_version: "17"
     ) { it.id = "6181ddb3-0002-8ad0-9aeb-084832c9273b" }
   }
 
@@ -47,21 +49,120 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.has_enough_fresh_servers?).to be(false)
   end
 
-  it "returns has_enough_ready_servers correctly" do
+  it "returns has_enough_fresh_servers correctly during upgrades" do
+    expect(postgres_resource).to receive(:version).at_least(:once).and_return("16")
+    expect(postgres_resource).to receive(:target_version).at_least(:once).and_return("17")
+    expect(postgres_resource).to receive(:upgrade_candidate_server).and_return(instance_double(PostgresServer), nil)
+    expect(postgres_resource.has_enough_fresh_servers?).to be(true)
+    expect(postgres_resource.has_enough_fresh_servers?).to be(false)
+  end
+
+  it "returns upgrade_candidate_server when candidate is available and location is not aws" do
+    standby_server1 = instance_double(PostgresServer, representative_at: nil, created_at: Time.now - 3600)
+    standby_server2 = instance_double(PostgresServer, representative_at: nil, created_at: Time.now)
+    primary_server = instance_double(PostgresServer, representative_at: Time.now)
+    boot_image = instance_double(BootImage, version: "20240801")
+    volume = instance_double(VmStorageVolume, boot_image: boot_image, boot: true)
+    vm = instance_double(Vm, vm_storage_volumes: [volume])
+    location = instance_double(Location, aws?: false)
+
+    expect(postgres_resource).to receive(:servers).and_return([primary_server, standby_server1, standby_server2])
+    expect(standby_server1).to receive(:vm).and_return(vm)
+    expect(standby_server2).to receive(:vm).and_return(vm)
+    expect(postgres_resource).to receive(:location).and_return(location)
+
+    # Should return the one with latest creation time
+    expect(postgres_resource.upgrade_candidate_server).to eq(standby_server2)
+  end
+
+  it "returns upgrade_candidate_server when candidate is not available and location is not aws" do
+    standby_server1 = instance_double(PostgresServer, representative_at: nil, created_at: Time.now - 3600)
+    standby_server2 = instance_double(PostgresServer, representative_at: nil, created_at: Time.now)
+    primary_server = instance_double(PostgresServer, representative_at: Time.now)
+    boot_image = instance_double(BootImage, version: "20240729")
+    volume = instance_double(VmStorageVolume, boot_image: boot_image, boot: true)
+    vm = instance_double(Vm, vm_storage_volumes: [volume])
+    location = instance_double(Location, aws?: false)
+
+    expect(postgres_resource).to receive(:servers).and_return([primary_server, standby_server1, standby_server2])
+    expect(standby_server1).to receive(:vm).and_return(vm)
+    expect(standby_server2).to receive(:vm).and_return(vm)
+    expect(postgres_resource).to receive(:location).and_return(location)
+
+    expect(postgres_resource.upgrade_candidate_server).to be_nil
+  end
+
+  it "returns upgrade_candidate_server when candidate is available and location is aws" do
+    standby_server1 = instance_double(PostgresServer, representative_at: nil, created_at: Time.now - 3600)
+    standby_server2 = instance_double(PostgresServer, representative_at: nil, created_at: Time.now)
+    primary_server = instance_double(PostgresServer, representative_at: Time.now)
+    vm_1 = instance_double(Vm, boot_image: "ami-12345678")
+    vm_2 = instance_double(Vm, boot_image: "ami-87654321")
+    location = instance_double(Location, aws?: true)
+
+    expect(PgAwsAmi).to receive(:where).with(aws_ami_id: "ami-12345678").and_return([instance_double(PgAwsAmi, aws_ami_id: "ami-12345678")])
+    expect(PgAwsAmi).to receive(:where).with(aws_ami_id: "ami-87654321").and_return([])
+    expect(postgres_resource).to receive(:servers).and_return([primary_server, standby_server1, standby_server2])
+    expect(standby_server1).to receive(:vm).and_return(vm_1)
+    expect(standby_server2).to receive(:vm).and_return(vm_2)
+    expect(postgres_resource).to receive(:location).and_return(location)
+
+    expect(postgres_resource.upgrade_candidate_server).to eq(standby_server1)
+  end
+
+  it "returns has_enough_ready_servers correctly when not upgrading" do
     expect(postgres_resource.servers).to receive(:count).and_return(1, 1)
     expect(postgres_resource).to receive(:target_server_count).and_return(1, 2)
     expect(postgres_resource.has_enough_ready_servers?).to be(true)
     expect(postgres_resource.has_enough_ready_servers?).to be(false)
   end
 
-  it "returns needs_convergence correctly" do
+  it "returns has_enough_ready_servers correctly when upgrading and the candidate is not present" do
+    expect(postgres_resource).to receive(:version).and_return("16")
+    expect(postgres_resource).to receive(:target_version).and_return("17")
+    expect(postgres_resource).to receive(:upgrade_candidate_server).at_least(:once).and_return(nil)
+    expect(postgres_resource.has_enough_ready_servers?).to be(false)
+  end
+
+  it "returns has_enough_ready_servers correctly when upgrading and the candidate is not in wait state" do
+    expect(postgres_resource).to receive(:version).and_return("16")
+    expect(postgres_resource).to receive(:target_version).and_return("17")
+    strand = instance_double(Strand, label: "wait_bootstrap_rhizome")
+    candidate_server = instance_double(PostgresServer, strand: strand, synchronization_status: "ready")
+    expect(postgres_resource).to receive(:upgrade_candidate_server).at_least(:once).and_return(candidate_server)
+    expect(postgres_resource.has_enough_ready_servers?).to be(false)
+  end
+
+  it "returns has_enough_ready_servers correctly when upgrading and the candidate is ready" do
+    expect(postgres_resource).to receive(:version).and_return("16")
+    expect(postgres_resource).to receive(:target_version).and_return("17")
+    strand = instance_double(Strand, label: "wait")
+    candidate_server = instance_double(PostgresServer, strand: strand, synchronization_status: "ready")
+    expect(postgres_resource).to receive(:upgrade_candidate_server).at_least(:once).and_return(candidate_server)
+    expect(postgres_resource.has_enough_ready_servers?).to be(true)
+  end
+
+  it "returns needs_convergence correctly when not upgrading" do
     expect(postgres_resource.servers).to receive(:any?).and_return(true, false, false)
     expect(postgres_resource.servers).to receive(:count).and_return(1, 2)
     expect(postgres_resource).to receive(:target_server_count).and_return(2, 2)
+    expect(postgres_resource).to receive(:version).at_least(:once).and_return("17")
+    expect(postgres_resource).to receive(:target_version).at_least(:once).and_return("17")
 
     expect(postgres_resource.needs_convergence?).to be(true)
     expect(postgres_resource.needs_convergence?).to be(true)
     expect(postgres_resource.needs_convergence?).to be(false)
+  end
+
+  it "returns needs_convergence correctly when upgrading" do
+    expect(postgres_resource).to receive(:version).and_return("16")
+    expect(postgres_resource).to receive(:target_version).and_return("17")
+    expect(postgres_resource.servers).to receive(:any?).and_return(false)
+    expect(postgres_resource.servers).to receive(:count).and_return(2)
+    expect(postgres_resource).to receive(:target_server_count).and_return(2)
+    expect(postgres_resource).to receive(:ongoing_failover?).and_return(false)
+
+    expect(postgres_resource.needs_convergence?).to be(true)
   end
 
   describe "display_state" do

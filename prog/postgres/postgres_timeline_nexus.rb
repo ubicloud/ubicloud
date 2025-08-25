@@ -57,9 +57,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   label def wait_leader
-    hop_destroy if postgres_timeline.leader.nil?
-
-    nap 5 if postgres_timeline.leader.strand.label != "wait"
+    nap 5 if postgres_timeline.leader.nil? || postgres_timeline.leader.strand.label != "wait"
     hop_wait
   end
 
