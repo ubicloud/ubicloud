@@ -45,12 +45,12 @@ class KubernetesCluster < Sequel::Model
     api_server_lb.hostname
   end
 
-  def client(session: cp_vms.first.sshable.connect)
+  def client(session: sshable.connect)
     Kubernetes::Client.new(self, session)
   end
 
   def sshable
-    cp_vms.first.sshable
+    nodes.first.sshable
   end
 
   def services_load_balancer_name
@@ -74,11 +74,11 @@ class KubernetesCluster < Sequel::Model
   end
 
   def kubeconfig
-    self.class.kubeconfig(cp_vms.first)
+    self.class.kubeconfig(nodes.first)
   end
 
   def vm_diff_for_lb(load_balancer)
-    worker_vms = nodepools.flat_map(&:vms)
+    worker_vms = nodepools.flat_map(&:nodes).map(&:vm)
     worker_vm_ids = worker_vms.map(&:id).to_set
     lb_vms = load_balancer.load_balancer_vms.map(&:vm)
     lb_vm_ids = lb_vms.map(&:id).to_set
@@ -112,12 +112,12 @@ class KubernetesCluster < Sequel::Model
     aggregate_readings(previous_pulse: previous_pulse, reading: reading)
   end
 
-  def all_vms
-    cp_vms + nodepools.flat_map(&:vms)
+  def all_nodes
+    nodes + worker_nodes
   end
 
-  def worker_vms
-    nodepools.flat_map(&:vms)
+  def worker_nodes
+    nodepools.flat_map(&:nodes)
   end
 end
 

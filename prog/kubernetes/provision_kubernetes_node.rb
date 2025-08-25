@@ -3,16 +3,16 @@
 class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   subject_is :kubernetes_cluster
 
-  def vm
-    @vm ||= Vm[frame["vm_id"]]
-  end
-
   def node
     @node ||= KubernetesNode[frame["node_id"]]
   end
 
   def kubernetes_nodepool
     @kubernetes_nodepool ||= KubernetesNodepool[frame["nodepool_id"]]
+  end
+
+  def vm
+    @vm ||= node.vm
   end
 
   # We need to create a random ula cidr for the cluster services subnet with
@@ -69,7 +69,6 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     vm = node.vm
 
     current_frame = strand.stack.first
-    current_frame["vm_id"] = vm.id
     current_frame["node_id"] = node.id
     strand.modified!(:stack)
 
@@ -107,7 +106,6 @@ table ip6 pod_access {
   }
 }
 TEMPLATE
-    vm.ephemeral_net6
     vm.sshable.cmd "sudo systemctl enable --now kubelet"
 
     bud Prog::BootstrapRhizome, {"target_folder" => "kubernetes", "subject_id" => vm.id, "user" => "ubi"}
@@ -122,7 +120,7 @@ TEMPLATE
   label def assign_role
     hop_join_worker if kubernetes_nodepool
 
-    hop_init_cluster if kubernetes_cluster.cp_vms.count == 1
+    hop_init_cluster if kubernetes_cluster.nodes.count == 1
 
     hop_join_control_plane
   end
@@ -227,6 +225,6 @@ TEMPLATE
 }
 CONFIG
     vm.sshable.cmd("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
-    pop({vm_id: vm.id, node_id: node.id})
+    pop({node_id: node.id})
   end
 end

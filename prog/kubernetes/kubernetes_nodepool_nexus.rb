@@ -28,12 +28,12 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   label def start
     register_deadline("wait", 120 * 60)
     when_start_bootstrapping_set? do
-      hop_bootstrap_worker_vms
+      hop_bootstrap_worker_nodes
     end
     nap 10
   end
 
-  label def bootstrap_worker_vms
+  label def bootstrap_worker_nodes
     kubernetes_nodepool.node_count.times do
       bud Prog::Kubernetes::ProvisionKubernetesNode, {"nodepool_id" => kubernetes_nodepool.id, "subject_id" => kubernetes_nodepool.kubernetes_cluster_id}
     end
@@ -54,18 +54,18 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   label def upgrade
     decr_upgrade
 
-    node_to_upgrade = kubernetes_nodepool.vms.find do |vm|
-      vm_version = kubernetes_nodepool.cluster.client(session: vm.sshable.connect).version
-      vm_minor_version = vm_version.match(/^v\d+\.(\d+)$/)&.captures&.first&.to_i
+    node_to_upgrade = kubernetes_nodepool.nodes.find do |node|
+      node_version = kubernetes_nodepool.cluster.client(session: node.sshable.connect).version
+      node_minor_version = node_version.match(/^v\d+\.(\d+)$/)&.captures&.first&.to_i
       cluster_minor_version = kubernetes_nodepool.cluster.version.match(/^v\d+\.(\d+)$/)&.captures&.first&.to_i
 
-      next false unless vm_minor_version && cluster_minor_version
-      vm_minor_version == cluster_minor_version - 1
+      next false unless node_minor_version && cluster_minor_version
+      node_minor_version == cluster_minor_version - 1
     end
 
     hop_wait unless node_to_upgrade
 
-    bud Prog::Kubernetes::UpgradeKubernetesNode, {"old_vm_id" => node_to_upgrade.id, "nodepool_id" => kubernetes_nodepool.id, "subject_id" => kubernetes_nodepool.cluster.id}
+    bud Prog::Kubernetes::UpgradeKubernetesNode, {"old_node_id" => node_to_upgrade.id, "nodepool_id" => kubernetes_nodepool.id, "subject_id" => kubernetes_nodepool.cluster.id}
     hop_wait_upgrade
   end
 
