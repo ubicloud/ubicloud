@@ -37,10 +37,12 @@ RSpec.describe "bin/ubi" do
       "UBI_PSQL" => RbConfig.ruby
     }.freeze
     @debug_env = @env.merge("UBI_DEBUG" => "1")
+    @skip_leaked_thread_check = true
   end
 
   after(:all) do
     @server.launcher.send(:stop)
+    @skip_leaked_thread_check = false
   end
   # rubocop:enable RSpec/BeforeAfterAll
 
