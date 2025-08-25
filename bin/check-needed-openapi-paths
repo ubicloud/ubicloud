@@ -1,0 +1,35 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "yaml"
+
+file = "openapi/openapi.yml"
+
+openapi = YAML.load_file(file)
+
+paths = openapi["paths"]
+
+unnecessary_paths = []
+
+# Run all api specs with one path deleted. If there is not a failure,
+# the path isn't actually needed and should be removed.
+paths.keys.each do |path|
+  value = paths.delete(path)
+  File.write(file, YAML.dump(openapi))
+  print "#{path}..."
+  if system("rake api_spec >/dev/null 2>&1")
+    unnecessary_paths << path
+    puts "NOT NEEDED"
+  else
+    puts "needed"
+    paths[path] = value
+  end
+end
+
+File.write(file, YAML.dump(openapi))
+system("rake linter:openapi")
+
+unless unnecessary_paths.empty?
+  puts "These paths are not used:", unnecessary_paths
+  exit 1
+end
