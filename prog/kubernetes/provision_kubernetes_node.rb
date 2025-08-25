@@ -7,6 +7,10 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     @vm ||= Vm[frame["vm_id"]]
   end
 
+  def node
+    @node ||= KubernetesNode[frame["node_id"]]
+  end
+
   def kubernetes_nodepool
     @kubernetes_nodepool ||= KubernetesNodepool[frame["nodepool_id"]]
   end
@@ -49,7 +53,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
 
     boot_image = "kubernetes-#{kubernetes_cluster.version.tr(".", "_")}"
 
-    vm = Prog::Vm::Nexus.assemble_with_sshable(
+    node = Prog::Kubernetes::KubernetesNodeNexus.assemble(
       Config.kubernetes_service_project_id,
       sshable_unix_user: "ubi",
       name: name,
@@ -58,11 +62,15 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
       storage_volumes: storage_volumes,
       boot_image: boot_image,
       private_subnet_id: kubernetes_cluster.private_subnet_id,
-      enable_ip4: true
+      enable_ip4: true,
+      kubernetes_cluster_id: kubernetes_cluster.id,
+      kubernetes_nodepool_id: kubernetes_nodepool&.id
     ).subject
+    vm = node.vm
 
     current_frame = strand.stack.first
     current_frame["vm_id"] = vm.id
+    current_frame["node_id"] = node.id
     strand.modified!(:stack)
 
     if kubernetes_nodepool
@@ -219,6 +227,6 @@ TEMPLATE
 }
 CONFIG
     vm.sshable.cmd("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
-    pop vm_id: vm.id
+    pop({vm_id: vm.id, node_id: node.id})
   end
 end

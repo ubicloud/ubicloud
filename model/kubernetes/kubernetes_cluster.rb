@@ -9,6 +9,7 @@ class KubernetesCluster < Sequel::Model
   many_to_one :private_subnet
   many_to_one :project
   many_to_many :cp_vms, join_table: :kubernetes_clusters_cp_vms, class: :Vm, order: :created_at
+  one_to_many :nodes, class: :KubernetesNode, order: :created_at, conditions: {kubernetes_nodepool_id: nil}
   one_to_many :nodepools, class: :KubernetesNodepool
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, &:active
   many_to_one :location, key: :location_id
@@ -145,4 +146,5 @@ end
 #  kubernetes_cluster_services_lb_id_fkey    | (services_lb_id) REFERENCES load_balancer(id)
 # Referenced By:
 #  kubernetes_clusters_cp_vms | kubernetes_clusters_cp_vms_kubernetes_cluster_id_fkey | (kubernetes_cluster_id) REFERENCES kubernetes_cluster(id)
+#  kubernetes_node            | kubernetes_node_kubernetes_cluster_id_fkey            | (kubernetes_cluster_id) REFERENCES kubernetes_cluster(id)
 #  kubernetes_nodepool        | kubernetes_nodepool_kubernetes_cluster_id_fkey        | (kubernetes_cluster_id) REFERENCES kubernetes_cluster(id)

@@ -337,6 +337,7 @@ end
 #  inference_endpoint_replica | inference_endpoint_replica_vm_id_fkey    | (vm_id) REFERENCES vm(id)
 #  inference_router_replica   | inference_router_replica_vm_id_fkey      | (vm_id) REFERENCES vm(id)
 #  kubernetes_clusters_cp_vms | kubernetes_clusters_cp_vms_cp_vm_id_fkey | (cp_vm_id) REFERENCES vm(id)
+#  kubernetes_node            | kubernetes_node_vm_id_fkey               | (vm_id) REFERENCES vm(id)
 #  kubernetes_nodepools_vms   | kubernetes_nodepools_vms_vm_id_fkey      | (vm_id) REFERENCES vm(id)
 #  load_balancers_vms         | load_balancers_vms_vm_id_fkey            | (vm_id) REFERENCES vm(id)
 #  minio_server               | minio_server_vm_id_fkey                  | (vm_id) REFERENCES vm(id)
