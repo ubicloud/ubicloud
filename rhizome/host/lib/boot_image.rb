@@ -26,7 +26,7 @@ class BootImage
     "/var/storage/images"
   end
 
-  def download(url:, ca_path: nil, sha256sum: nil)
+  def download(url:, ca_path: nil, sha256sum: nil, use_aria2: false)
     return if File.exist?(image_path)
 
     FileUtils.mkdir_p image_root
@@ -42,8 +42,12 @@ class BootImage
     temp_file_name = @version.nil? ? @name : "#{@name}-#{@version}"
     temp_path = File.join(image_root, "#{temp_file_name}#{ext}.tmp")
     begin
-      file_sha256sum = curl_image(url, temp_path, ca_path)
-      verify_sha256sum(file_sha256sum, sha256sum)
+      if use_aria2
+        aria2_image(url, temp_path, sha256sum)
+      else
+        file_sha256sum = curl_image(url, temp_path, ca_path)
+        verify_sha256sum(file_sha256sum, sha256sum)
+      end
       convert_image(temp_path, init_format)
     ensure
       rm_if_exists(temp_path)
@@ -75,6 +79,15 @@ class BootImage
       sha256_sum = digest_out.split(" ").last
     end
     sha256_sum
+  end
+
+  def aria2_image(url, temp_path, sha256sum)
+    sha256_arg = sha256sum ? " --checksum=sha-256=#{sha256sum.shellescape}" : ""
+    dirname = File.dirname(temp_path)
+    filename = File.basename(temp_path)
+    File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
+      r "aria2c -x 10 -s 10 --allow-overwrite=true --auto-file-renaming=false -d #{dirname.shellescape} -o #{filename.shellescape}#{sha256_arg} #{url.shellescape}"
+    end
   end
 
   def verify_sha256sum(file_sha256sum, expected_sha256sum)
