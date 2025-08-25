@@ -61,10 +61,12 @@ RSpec.configure do |config|
     end
     Mail::TestMailer.deliveries.clear if defined?(Mail)
 
-    Thread.list.each do
-      next if leaked_threads[it]
-      p [:leaked_thread, it]
-      leaked_threads[it] = true
+    unless @skip_leaked_thread_check
+      Thread.list.each do
+        next if leaked_threads[it]
+        p [:leaked_thread, it]
+        leaked_threads[it] = true
+      end
     end
   end
 
