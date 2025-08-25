@@ -3,7 +3,7 @@
 class Prog::Vnet::NicNexus < Prog::Base
   subject_is :nic
 
-  def self.assemble(private_subnet_id, name: nil, ipv6_addr: nil, ipv4_addr: nil)
+  def self.assemble(private_subnet_id, name: nil, ipv6_addr: nil, ipv4_addr: nil, exclude_availability_zones: [], preferred_az: nil)
     unless (subnet = PrivateSubnet[private_subnet_id])
       fail "Given subnet doesn't exist with the id #{private_subnet_id}"
     end
@@ -13,7 +13,7 @@ class Prog::Vnet::NicNexus < Prog::Base
     name ||= Nic.ubid_to_name(ubid)
 
     ipv6_addr ||= subnet.random_private_ipv6.to_s
-    ipv4_addr ||= subnet.random_private_ipv4.to_s
+    ipv4_addr ||= random_private_ipv4(subnet).to_s
 
     DB.transaction do
       Nic.create_with_id(id, private_ipv6: ipv6_addr, private_ipv4: ipv4_addr, mac: gen_mac, name:, private_subnet_id:)
@@ -22,7 +22,7 @@ class Prog::Vnet::NicNexus < Prog::Base
       else
         "wait_allocation"
       end
-      Strand.create_with_id(id, prog: "Vnet::NicNexus", label:)
+      Strand.create_with_id(id, prog: "Vnet::NicNexus", label:, stack: [{"exclude_availability_zones" => exclude_availability_zones, "preferred_az" => preferred_az}])
     end
   end
 
@@ -35,7 +35,7 @@ class Prog::Vnet::NicNexus < Prog::Base
   label def create_aws_nic
     nap 10 unless nic.private_subnet.strand.label == "wait"
     NicAwsResource.create_with_id(nic.id)
-    bud Prog::Aws::Nic, {"subject_id" => nic.id}, :create_network_interface
+    bud Prog::Aws::Nic, {"subject_id" => nic.id, "exclude_availability_zones" => frame["exclude_availability_zones"], "preferred_az" => frame["preferred_az"]}, :create_subnet
     hop_wait_aws_nic_created
   end
 
@@ -154,5 +154,12 @@ class Prog::Vnet::NicNexus < Prog::Base
     ([rand(256) & 0xFE | 0x02] + Array.new(5) { rand(256) }).map {
       "%0.2X" % it
     }.join(":").downcase
+  end
+
+  def self.random_private_ipv4(private_subnet)
+    random_subnet = private_subnet.random_private_ipv4
+    return random_subnet unless private_subnet.location.aws?
+
+    random_subnet.nth_subnet(32, 4)
   end
 end
