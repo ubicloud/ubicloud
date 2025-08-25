@@ -14,7 +14,9 @@ RSpec.describe PostgresServer do
       identity: "pgubid.postgres.ubicloud.com",
       ha_type: PostgresResource::HaType::NONE,
       user_config: {},
-      pgbouncer_user_config: {}
+      pgbouncer_user_config: {},
+      location_id: "12b8ad7f-8178-4d27-a61d-e6dc396d69cc",
+      target_version: "16"
     )
   }
 
@@ -42,7 +44,7 @@ RSpec.describe PostgresServer do
   }
 
   before do
-    allow(postgres_server).to receive_messages(resource: resource, vm: vm)
+    allow(postgres_server).to receive_messages(resource: resource, vm: vm, version: "16")
   end
 
   describe "#configure" do
@@ -327,7 +329,7 @@ RSpec.describe PostgresServer do
     postgres_server.check_pulse(session: session, previous_pulse: pulse)
   end
 
-  it "increments checkup semaphore if pulse is down for a while" do
+  it "increments checkup semaphore if pulse is down for a while and the resource is not upgrading" do
     session = {
       ssh_session: instance_double(Net::SSH::Connection::Session),
       db_connection: instance_double(Sequel::Postgres::Database)
@@ -421,6 +423,49 @@ RSpec.describe PostgresServer do
     it "returns false if the strand label is not 'wait'" do
       expect(postgres_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(postgres_server.taking_over?).to be false
+    end
+  end
+
+  describe "#switch_to_new_timeline" do
+    it "switches to new timeline with current parent" do
+      expect(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, id: "12b8ad7f-8178-4d27-a61d-e6dc396d69cc"))
+      expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(PostgresTimeline, id: "1ff21ff9-7534-4d28-820b-1da97199e39e"))
+      expect(postgres_server).to receive(:update).with(timeline_id: "1ff21ff9-7534-4d28-820b-1da97199e39e", timeline_access: "push")
+      expect(postgres_server).to receive(:refresh_walg_credentials)
+      expect { postgres_server.switch_to_new_timeline }.not_to raise_error
+    end
+
+    it "switches to new timeline without current parent" do
+      expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(PostgresTimeline, id: "98637404-a37b-4991-a70f-1b7e3ffcbf31"))
+      expect(postgres_server).to receive(:update).with(timeline_id: "98637404-a37b-4991-a70f-1b7e3ffcbf31", timeline_access: "push")
+      expect(postgres_server).to receive(:refresh_walg_credentials)
+      expect { postgres_server.switch_to_new_timeline(parent_id: nil) }.not_to raise_error
+    end
+  end
+
+  describe "#refresh_walg_credentials" do
+    it "does nothing if timeline has no blob storage" do
+      expect(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, blob_storage: nil))
+      expect(vm.sshable).not_to receive(:cmd)
+      expect { postgres_server.refresh_walg_credentials }.not_to raise_error
+    end
+
+    it "refreshes walg credentials if timeline has blob storage not on aws" do
+      timeline = instance_double(PostgresTimeline, blob_storage: instance_double(MinioCluster, root_certs: "root_certs"), aws?: false)
+      expect(postgres_server).to receive(:timeline).at_least(:once).and_return(timeline)
+      expect(timeline).to receive(:generate_walg_config).and_return("walg_config")
+      expect(vm.sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
+      expect(vm.sshable).to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
+      expect { postgres_server.refresh_walg_credentials }.not_to raise_error
+    end
+
+    it "refreshes walg credentials if timeline has blob storage on aws" do
+      timeline = instance_double(PostgresTimeline, blob_storage: instance_double(MinioCluster, root_certs: "root_certs"), aws?: true)
+      expect(postgres_server).to receive(:timeline).at_least(:once).and_return(timeline)
+      expect(timeline).to receive(:generate_walg_config).and_return("walg_config")
+      expect(vm.sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
+      expect(vm.sshable).not_to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
+      expect { postgres_server.refresh_walg_credentials }.not_to raise_error
     end
   end
 end

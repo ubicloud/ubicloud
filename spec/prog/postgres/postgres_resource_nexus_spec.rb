@@ -338,8 +338,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
   describe "#wait" do
     before do
-      allow(postgres_resource).to receive_messages(certificate_last_checked_at: Time.now, target_server_count: 1)
-      allow(postgres_resource).to receive(:needs_convergence?).and_return(false)
+      allow(postgres_resource).to receive_messages(certificate_last_checked_at: Time.now, target_server_count: 1, needs_convergence?: false)
     end
 
     it "buds ConvergePostgresResource prog if needs_convergence? is true" do
