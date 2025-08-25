@@ -261,6 +261,11 @@ ensure
   File.delete(output_file) if File.file?(output_file)
 end
 
+desc "Run api tests in parallel"
+task "api_spec" do
+  sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "turbo_tests", "-n", nproc.call, "spec/routes/api")
+end
+
 desc "Run rhizome (data plane) tests"
 task "rhizome_spec" do
   sh "COVERAGE=rhizome bundle exec rspec -O /dev/null rhizome"
