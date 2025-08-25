@@ -14,7 +14,7 @@
           options: @inference_models.map { |ie|
             [ie.model_name, ie.model_name, nil, {
               "data-id": ie.ubid,
-              "data-url": "#{ie.load_balancer.health_check_protocol}://#{ie.load_balancer.hostname}",
+              "data-url": ie.load_balancer.health_check_url,
               "data-tags": ie.tags.to_json
             }]
           },

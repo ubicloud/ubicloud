@@ -24,7 +24,7 @@ MSG
 
 
     curl_snippet = <<-CURL
-curl #{ie.load_balancer.health_check_protocol}://#{ie.load_balancer.hostname}#{path} \\
+curl #{ie.load_balancer.health_check_url(path:)} \\
   -H <span class="text-green-400">"Content-Type: application/json"</span> \\
   -H <span class="text-green-400">"Authorization: Bearer <span class="text-orange-500">$INFERENCE_API_KEY</span>"</span> \\
   -d <span class="text-green-400">'{
@@ -66,7 +66,7 @@ curl #{ie.load_balancer.health_check_protocol}://#{ie.load_balancer.hostname}#{p
       </div>
       <div class="sm:col-span-2">
         <h3 class="text-sm font-semibold text-gray-900">URL</h3>
-        <div class="text-gray-500"><%== part("components/copyable_content", content: "#{ie.load_balancer.health_check_protocol}://#{ie.load_balancer.hostname}", message: "Copied URL") %></div>
+        <div class="text-gray-500"><%== part("components/copyable_content", content: ie.load_balancer.health_check_url, message: "Copied URL") %></div>
       </div>
       <div class="sm:col-span-2">
         <h3 class="text-sm font-semibold text-gray-900">

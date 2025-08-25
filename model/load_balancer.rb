@@ -39,6 +39,10 @@ class LoadBalancer < Sequel::Model
     first_port&.dst_port
   end
 
+  def health_check_url(use_endpoint: false, path: (health_check_endpoint if use_endpoint))
+    "#{health_check_protocol}://#{hostname}#{":#{dst_port}" if use_endpoint}#{path}"
+  end
+
   def path
     "/location/#{display_location}/load-balancer/#{name}"
   end
