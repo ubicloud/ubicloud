@@ -101,11 +101,19 @@ class PostgresResource < Sequel::Model
   end
 
   def has_enough_fresh_servers?
-    servers.count { !it.needs_recycling? } >= target_server_count
+    if needs_upgrade?
+      !upgrade_candidate_server.nil?
+    else
+      servers.count { !it.needs_recycling? } >= target_server_count
+    end
   end
 
   def has_enough_ready_servers?
-    servers.count { !it.needs_recycling? && it.strand.label == "wait" } >= target_server_count
+    if needs_upgrade?
+      !upgrade_candidate_server.nil? && upgrade_candidate_server.strand.label == "wait" && upgrade_candidate_server.synchronization_status == "ready"
+    else
+      servers.count { !it.needs_recycling? && it.strand.label == "wait" } >= target_server_count
+    end
   end
 
   def needs_convergence?
@@ -149,6 +157,29 @@ class PostgresResource < Sequel::Model
     Semaphore.incr(servers_dataset.select(:id), "restart")
   end
 
+  def version_int
+    version.to_i
+  end
+
+  def current_version
+    representative_server&.version || version
+  end
+
+  def current_version_int
+    current_version.to_i
+  end
+
+  def needs_upgrade?
+    !read_replica? && !ongoing_failover? && (current_version_int < version_int) || false
+  end
+
+  def upgrade_candidate_server
+    servers
+      .reject(&:representative_at)
+      .select { |server| server.vm.vm_storage_volumes.any? { |vol| vol.boot_image.version && vol.boot_image.version >= UPGRADE_IMAGE_MIN_VERSIONS[version] } }
+      .max_by(&:created_at)
+  end
+
   module HaType
     NONE = "none"
     ASYNC = "async"
@@ -164,6 +195,10 @@ class PostgresResource < Sequel::Model
   DEFAULT_VERSION = "17"
 
   MAINTENANCE_DURATION_IN_HOURS = 2
+
+  UPGRADE_IMAGE_MIN_VERSIONS = {
+    "17" => "20240801"
+  }
 end
 
 # Table: postgres_resource

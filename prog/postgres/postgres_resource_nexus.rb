@@ -199,7 +199,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   label def wait
     reap(fallthrough: true)
 
-    if postgres_resource.needs_convergence? && strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").empty?
+    if (postgres_resource.needs_upgrade? || postgres_resource.needs_convergence?) && strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").empty?
       bud Prog::Postgres::ConvergePostgresResource, frame, :start
     end
 

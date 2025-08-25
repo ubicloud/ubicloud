@@ -338,10 +338,18 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   describe "#wait" do
     before do
       allow(postgres_resource).to receive_messages(certificate_last_checked_at: Time.now, target_server_count: 1)
-      allow(postgres_resource).to receive(:needs_convergence?).and_return(false)
+      allow(postgres_resource).to receive_messages(needs_upgrade?: false, needs_convergence?: false)
+    end
+
+    it "buds ConvergePostgresResource prog if needs_upgrade? is true" do
+      expect(postgres_resource).to receive(:needs_upgrade?).and_return(true)
+      # needs_convergence? won't be called due to short-circuit evaluation
+      expect(nx).to receive(:bud).with(Prog::Postgres::ConvergePostgresResource, {}, :start)
+      expect { nx.wait }.to nap(30)
     end
 
     it "buds ConvergePostgresResource prog if needs_convergence? is true" do
+      expect(postgres_resource).to receive(:needs_upgrade?).and_return(false)
       expect(postgres_resource).to receive(:needs_convergence?).and_return(true)
       expect(nx).to receive(:bud).with(Prog::Postgres::ConvergePostgresResource, {}, :start)
       expect { nx.wait }.to nap(30)
@@ -377,6 +385,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(nx).to receive(:when_promote_set?).and_yield
       expect(postgres_resource).to receive(:read_replica?).and_return(true)
       expect(postgres_resource).to receive(:servers).and_return([])
+      expect(postgres_resource).to receive(:needs_upgrade?).and_return(false)
       expect(postgres_resource).to receive(:update).with(parent_id: nil)
       expect(nx).to receive(:decr_promote)
       expect { nx.wait }.to nap(30)

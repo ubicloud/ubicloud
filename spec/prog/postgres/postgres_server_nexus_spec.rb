@@ -12,6 +12,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       PostgresServer,
       id: "0d77964d-c416-8edb-9237-7e7dd5d6fcf8",
       ubid: "pgubid",
+      version: "16",
       timeline: instance_double(
         PostgresTimeline,
         id: "f6644aae-9759-8ada-9aef-9b6cfccdc167",
@@ -87,7 +88,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(PostgresResource).to receive(:[]).and_return(postgres_resource)
       expect(postgres_resource).to receive(:flavor).and_return(PostgresResource::Flavor::LANTERN).at_least(:once)
       expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).with(anything, hash_including(boot_image: "postgres16-lantern-ubuntu-2204")).and_return(instance_double(Strand, id: "62c62ddb-5b5a-4e9e-b534-e73c16f86bcb"))
-      expect(PostgresServer).to receive(:create).and_return(instance_double(PostgresServer, id: "5c13fd6a-25c2-4fa4-be48-2846f127526a"))
+      expect(PostgresServer).to receive(:create_with_id).and_return(instance_double(PostgresServer, id: "5c13fd6a-25c2-4fa4-be48-2846f127526a"))
       described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
     end
 
@@ -104,7 +105,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_resource).to receive(:location).and_return(loc).at_least(:once)
       expect(postgres_resource).to receive(:version).and_return("16").at_least(:once)
       expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).and_return(instance_double(Strand, id: "62c62ddb-5b5a-4e9e-b534-e73c16f86bcb"))
-      expect(PostgresServer).to receive(:create).and_return(instance_double(PostgresServer, id: "5c13fd6a-25c2-4fa4-be48-2846f127526a"))
+      expect(PostgresServer).to receive(:create_with_id).and_return(instance_double(PostgresServer, id: "5c13fd6a-25c2-4fa4-be48-2846f127526a"))
       described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
     end
 
@@ -122,7 +123,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_resource).to receive(:location).and_return(loc).at_least(:once)
       expect(postgres_resource).to receive(:location_id).and_return(loc.id).at_least(:once)
       expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).and_return(instance_double(Strand, id: "62c62ddb-5b5a-4e9e-b534-e73c16f86bcb"))
-      expect(PostgresServer).to receive(:create).and_return(instance_double(PostgresServer, id: "5c13fd6a-25c2-4fa4-be48-2846f127526a"))
+      expect(PostgresServer).to receive(:create_with_id).and_return(instance_double(PostgresServer, id: "5c13fd6a-25c2-4fa4-be48-2846f127526a"))
       described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
     end
 
@@ -280,27 +281,16 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#configure_walg_credentials" do
     it "hops to initialize_empty_database if the server is primary" do
-      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg config")
-      expect(sshable).to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "certs")
+      expect(postgres_server).to receive(:refresh_walg_credentials)
       expect(postgres_server).to receive(:primary?).and_return(true)
 
       expect { nx.configure_walg_credentials }.to hop("initialize_empty_database")
     end
 
     it "hops to initialize_database_from_backup if the server is not primary" do
-      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg config")
-      expect(sshable).to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "certs")
+      expect(postgres_server).to receive(:refresh_walg_credentials)
       expect(postgres_server).to receive(:primary?).and_return(false)
       expect { nx.configure_walg_credentials }.to hop("initialize_database_from_backup")
-    end
-
-    it "doesn't put the blob_storage_ca if the timeline is aws" do
-      expect(postgres_server.timeline).to receive(:aws?).and_return(true)
-      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg config")
-      expect(sshable).not_to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "certs")
-      expect(postgres_server).to receive(:primary?).and_return(true)
-
-      expect { nx.configure_walg_credentials }.to hop("initialize_empty_database")
     end
   end
 
@@ -376,7 +366,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.crt && sudo chmod 640 /etc/ssl/certs/server.crt")
       expect(sshable).to receive(:cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.key && sudo chmod 640 /etc/ssl/certs/server.key")
 
-      expect(nx).to receive(:refresh_walg_credentials)
+      expect(postgres_server).to receive(:refresh_walg_credentials)
 
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect { nx.refresh_certificates }.to hop("configure_metrics")
@@ -391,7 +381,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.key && sudo chmod 640 /etc/ssl/certs/server.key")
       expect(sshable).to receive(:cmd).with("sudo -u postgres pg_ctlcluster 16 main reload")
       expect(sshable).to receive(:cmd).with("sudo systemctl reload pgbouncer@*.service")
-      expect(nx).to receive(:refresh_walg_credentials)
+      expect(postgres_server).to receive(:refresh_walg_credentials)
       expect { nx.refresh_certificates }.to hop("wait")
     end
   end
@@ -694,26 +684,15 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "stops wal replay and switches to new timeline if it is still in recovery but wal replay is paused" do
       expect(postgres_server).to receive(:run_query).with("SELECT pg_is_in_recovery()").and_return("t")
       expect(postgres_server).to receive(:run_query).with("SELECT pg_get_wal_replay_pause_state()").and_return("paused")
-      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg config")
-      expect(sshable).to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "certs")
-
       expect(postgres_server).to receive(:run_query).with("SELECT pg_wal_replay_resume()")
-      expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(Strand, id: "375b1399-ec21-8eda-8859-2faee6ff6613"))
-      expect(postgres_server).to receive(:timeline_id=).with("375b1399-ec21-8eda-8859-2faee6ff6613")
-      expect(postgres_server).to receive(:timeline_access=).with("push")
-      expect(postgres_server).to receive(:save_changes)
+      expect(postgres_server).to receive(:switch_to_new_timeline)
+
       expect { nx.wait_recovery_completion }.to hop("configure")
     end
 
     it "switches to new timeline if the recovery is completed" do
       expect(postgres_server).to receive(:run_query).with("SELECT pg_is_in_recovery()").and_return("f")
-      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg config")
-      expect(sshable).to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "certs")
-
-      expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(Strand, id: "375b1399-ec21-8eda-8859-2faee6ff6613"))
-      expect(postgres_server).to receive(:timeline_id=).with("375b1399-ec21-8eda-8859-2faee6ff6613")
-      expect(postgres_server).to receive(:timeline_access=).with("push")
-      expect(postgres_server).to receive(:save_changes)
+      expect(postgres_server).to receive(:switch_to_new_timeline)
       expect { nx.wait_recovery_completion }.to hop("configure")
     end
   end
@@ -773,7 +752,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "decrements and calls refresh_walg_credentials if refresh_walg_credentials is set" do
       expect(nx).to receive(:when_refresh_walg_credentials_set?).and_yield
       expect(nx).to receive(:decr_refresh_walg_credentials)
-      expect(nx).to receive(:refresh_walg_credentials)
+      expect(postgres_server).to receive(:refresh_walg_credentials)
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
 
@@ -785,7 +764,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "promotes" do
       expect(nx).to receive(:when_promote_set?).and_yield
-      expect(nx).to receive(:switch_to_new_timeline)
+      expect(postgres_server).to receive(:switch_to_new_timeline)
       expect { nx.wait }.to hop("taking_over")
     end
 
@@ -885,7 +864,21 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_server).to receive(:run_query).with("CHECKPOINT; CHECKPOINT; CHECKPOINT;")
       expect(sshable).to receive(:cmd).with("sudo postgres/bin/lockout 16")
       expect(sshable).to receive(:cmd).with("sudo pg_ctlcluster 16 main stop -m smart")
-      expect { nx.fence }.to nap(6 * 60 * 60)
+      expect { nx.fence }.to hop("wait_fence")
+    end
+  end
+
+  describe "#wait_fence" do
+    it "naps if unfence is not set" do
+      expect { nx.wait_fence }.to nap(60)
+    end
+
+    it "hops to wait if unfence is set" do
+      expect(nx).to receive(:when_unfence_set?).and_yield
+      expect(nx).to receive(:decr_unfence)
+      expect(postgres_server).to receive(:incr_configure)
+      expect(postgres_server).to receive(:incr_restart)
+      expect { nx.wait_fence }.to hop("wait")
     end
   end
 
@@ -942,7 +935,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#taking_over" do
     it "triggers promote if promote command is not sent yet or failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo pg_ctlcluster 16 main promote' promote_postgres").twice
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/promote 16' promote_postgres").twice
 
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check promote_postgres").and_return("NotStarted", "Failed")
       expect { nx.taking_over }.to nap(0)
@@ -1028,13 +1021,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:cmd).with("sudo postgres/bin/restart 16")
       expect(sshable).to receive(:cmd).with("sudo systemctl restart pgbouncer@*.service")
       expect { nx.restart }.to exit({"msg" => "postgres server is restarted"})
-    end
-  end
-
-  describe "#refresh_walg_credentials" do
-    it "returns nil if blob storage is not configures" do
-      expect(postgres_server.timeline).to receive(:blob_storage).and_return(nil)
-      expect(nx.refresh_walg_credentials).to be_nil
     end
   end
 
