@@ -741,7 +741,35 @@ RSpec.describe Clover, "auth" do
       visit "/login"
       click_button "GitHub"
 
-      expect(Account[email: TEST_USER_EMAIL].name).to eq "User"
+      expect(Account[email: TEST_USER_EMAIL].name).to eq "user"
+    end
+
+    it "can create new account even if social account has a name that isn't a valid Ubicloud name" do
+      mock_provider(:github, name: "123Foo..\u1234Bar")
+
+      visit "/login"
+      click_button "GitHub"
+
+      expect(Account[email: TEST_USER_EMAIL].name).to eq "Foo \u1234Bar"
+    end
+
+    it "can create new account even if social account has a name is too long" do
+      mock_provider(:github, name: "F" * 100)
+
+      visit "/login"
+      click_button "GitHub"
+
+      expect(Account[email: TEST_USER_EMAIL].name).to eq("F" * 63)
+    end
+
+    it "can create new account even if name for social login cannot be determined" do
+      email = ".@example.com"
+      mock_provider(:github, email, name: nil)
+
+      visit "/login"
+      click_button "GitHub"
+
+      expect(Account[email:].name).to eq "Unknown"
     end
 
     it "can create new account" do
