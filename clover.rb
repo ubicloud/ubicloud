@@ -515,7 +515,14 @@ class Clover < Roda
         redirect "/login"
       end
 
-      scope.before_rodauth_create_account(account, omniauth_name || account[:email].split("@", 2)[0].gsub(/[^A-Za-z]+/, " ").capitalize)
+      name = (omniauth_name || account[:email].split("@", 2)[0])
+        .gsub(/[^\p{L}0-9\- ]+/, " ")
+        .gsub(/\A[^\p{L}]+/, "")
+        .strip
+        .squeeze(" ")
+        .slice(0...63)
+      name = "Unknown" if name.empty?
+      scope.before_rodauth_create_account(account, name)
     end
 
     after_omniauth_create_account do
