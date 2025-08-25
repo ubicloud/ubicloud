@@ -52,11 +52,20 @@ RSpec.configure do |config|
     clover_freeze
   end
 
+  leaked_threads = ObjectSpace::WeakMap.new
+  leaked_threads[Thread.current] = true
+
   config.around do |example|
     DB.transaction(rollback: :always, auto_savepoint: true) do
       example.run
     end
     Mail::TestMailer.deliveries.clear if defined?(Mail)
+
+    Thread.list.each do
+      next if leaked_threads[it]
+      p [:leaked_thread, it]
+      leaked_threads[it] = true
+    end
   end
 
   # rspec-expectations config goes here. You can use an alternate
