@@ -83,7 +83,13 @@ lines = {}
 output.split("\n").each do |line|
   next if line.include?("monitor_repartition")
   resource = resources.find { line.include?(it) } || :other
-  data = JSON.parse(line)
+  begin
+    data = JSON.parse(line)
+  rescue JSON::ParserError
+    warn "Unexpected/non-JSON monitor output line:"
+    warn line
+    raise
+  end
   data.delete("time")
   (lines[resource] ||= []) << data
 end
