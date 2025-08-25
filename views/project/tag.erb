@@ -25,8 +25,8 @@ add_groups.transform_values! do |v|
 end
 add_groups.reject! { _2.empty? }
 
-add_checked = flash.dig("old", "add") || typecast_body_params.array(:nonempty_str, "add")
-remove_checked = flash.dig("old", "remove") || typecast_body_params.array(:nonempty_str, "remove")
+add_checked = typecast_body_params.array(:nonempty_str, "add")
+remove_checked = typecast_body_params.array(:nonempty_str, "remove")
 
 base_path = path(@tag)
 associate_path = "#{base_path}/associate"

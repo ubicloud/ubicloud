@@ -170,7 +170,7 @@ class Clover < Roda
     if api? || request.accepts_json?
       {error: @error}.to_json
     else
-      view "/error"
+      view "error"
     end
   end
 
@@ -268,7 +268,7 @@ class Clover < Roda
       next exception_page(e, assets: true) if Config.development? && code == 500
       # :nocov:
 
-      view "/error"
+      view "error"
     end
   end
 
