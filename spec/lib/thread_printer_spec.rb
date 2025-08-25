@@ -20,14 +20,18 @@ RSpec.describe ThreadPrinter do
       # The documentation calls out that the backtrace is an array or
       # nil.
       expect(described_class).to receive(:puts).with(/--BEGIN THREAD DUMP, .*/)
-      expect(described_class).to receive(:puts).with(/Thread: #<InstanceDouble.*>/)
+      expect(described_class).to receive(:puts).with(/Thread: #<Thread:.*>/)
       expect(described_class).to receive(:puts).with(/Created at: .*/)
       expect(described_class).to receive(:puts).with(nil)
       expect(described_class).to receive(:puts).with(/--END THREAD DUMP, .*/)
-      th = instance_double(Thread, backtrace: nil)
+      q = Queue.new
+      th = Thread.new { q.pop }
+      expect(th).to receive(:backtrace).and_return(nil)
       expect(th).to receive(:[]).with(:created_at).and_return(Time.now - 30)
       expect(Thread).to receive(:list).and_return([th])
       described_class.run
+      q.push nil
+      th.join(1)
     end
   end
 end
