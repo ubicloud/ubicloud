@@ -15,7 +15,7 @@ class PostgresServer < Sequel::Model
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup,
-    :restart, :configure, :fence, :planned_take_over, :unplanned_take_over, :configure_metrics,
+    :restart, :configure, :fence, :unfence, :planned_take_over, :unplanned_take_over, :configure_metrics,
     :destroy, :recycle, :promote, :refresh_walg_credentials
   include HealthMonitorMethods
   include MetricsTargetMethods
@@ -240,7 +240,7 @@ class PostgresServer < Sequel::Model
         end
       end
 
-      if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30 && !reload.checkup_set?
+      if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30 && !reload.checkup_set? && !resource.needs_upgrade?
         incr_checkup
       end
     end
@@ -305,6 +305,24 @@ class PostgresServer < Sequel::Model
 
   def taking_over?
     unplanned_take_over_set? || planned_take_over_set? || FAILOVER_LABELS.include?(strand.label)
+  end
+
+  def switch_to_new_timeline(use_current_parent: true)
+    parent_id = use_current_parent ? timeline.id : nil
+    update(
+      timeline_id: Prog::Postgres::PostgresTimelineNexus.assemble(location_id: resource.location_id, parent_id: parent_id).id,
+      timeline_access: "push"
+    )
+
+    refresh_walg_credentials
+  end
+
+  def refresh_walg_credentials
+    return if timeline.blob_storage.nil?
+
+    walg_config = timeline.generate_walg_config
+    vm.sshable.cmd("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: walg_config)
+    vm.sshable.cmd("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: timeline.blob_storage.root_certs) unless timeline.aws?
   end
 
   FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over"].freeze
