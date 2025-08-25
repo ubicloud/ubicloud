@@ -12,6 +12,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       PostgresServer,
       id: "0d77964d-c416-8edb-9237-7e7dd5d6fcf8",
       ubid: "pgubid",
+      version: "16",
       timeline: instance_double(
         PostgresTimeline,
         id: "f6644aae-9759-8ada-9aef-9b6cfccdc167",
@@ -40,6 +41,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       server_cert_key: "server_cert_key",
       superuser_password: "dummy-password",
       version: "16",
+      desired_version: "16",
       representative_server: postgres_server,
       metric_destinations: [instance_double(PostgresMetricDestination, ubid: "pgmetricubid", url: "url", username: "username", password: "password")],
       ca_certificates: "root_cert_1\nroot_cert_2",
@@ -872,7 +874,21 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_server).to receive(:run_query).with("CHECKPOINT; CHECKPOINT; CHECKPOINT;")
       expect(sshable).to receive(:cmd).with("sudo postgres/bin/lockout 16")
       expect(sshable).to receive(:cmd).with("sudo pg_ctlcluster 16 main stop -m smart")
-      expect { nx.fence }.to nap(6 * 60 * 60)
+      expect { nx.fence }.to hop("wait_fence")
+    end
+  end
+
+  describe "#wait_fence" do
+    it "naps if unfence is not set" do
+      expect { nx.wait_fence }.to nap(60)
+    end
+
+    it "hops to wait if unfence is set" do
+      expect(nx).to receive(:when_unfence_set?).and_yield
+      expect(nx).to receive(:decr_unfence)
+      expect(postgres_server).to receive(:incr_configure)
+      expect(postgres_server).to receive(:incr_restart)
+      expect { nx.wait_fence }.to hop("wait")
     end
   end
 
@@ -929,7 +945,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#taking_over" do
     it "triggers promote if promote command is not sent yet or failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo pg_ctlcluster 16 main promote' promote_postgres").twice
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/promote 16' promote_postgres").twice
 
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check promote_postgres").and_return("NotStarted", "Failed")
       expect { nx.taking_over }.to nap(0)
