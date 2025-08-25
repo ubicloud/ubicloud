@@ -22,17 +22,17 @@ RSpec.describe Repartitioner do
   end
 
   describe "#notify" do
-    it "uses NOTIFY to notify listeners on monitor channel" do
+    it "uses NOTIFY to notify listeners on given channel" do
       q = Queue.new
       th = Thread.new do
         payload = nil
-        DB.listen(:monitor, after_listen: proc { q.push nil }, timeout: 1) do |_, _, pl|
+        DB.listen(:monitor_notify_spec, after_listen: proc { q.push nil }, timeout: 1) do |_, _, pl|
           payload = pl
         end
         payload
       end
       q.pop(timeout: 1)
-      Thread.new { repartitioner.notify }.join(1)
+      Thread.new { repartitioner(channel: :monitor_notify_spec).notify }.join(1)
       expect(th.value).to eq "1"
     end
   end
