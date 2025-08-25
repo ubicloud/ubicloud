@@ -15,7 +15,7 @@ class PostgresServer < Sequel::Model
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup,
-    :restart, :configure, :fence, :planned_take_over, :unplanned_take_over, :configure_metrics,
+    :restart, :configure, :fence, :unfence, :planned_take_over, :unplanned_take_over, :configure_metrics,
     :destroy, :recycle, :promote, :refresh_walg_credentials
   include HealthMonitorMethods
   include MetricsTargetMethods
@@ -240,7 +240,7 @@ class PostgresServer < Sequel::Model
         end
       end
 
-      if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30 && !reload.checkup_set?
+      if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30 && !reload.checkup_set? && !resource.needs_upgrade?
         incr_checkup
       end
     end

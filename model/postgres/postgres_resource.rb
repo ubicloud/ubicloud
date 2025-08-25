@@ -153,6 +153,10 @@ class PostgresResource < Sequel::Model
     representative_server&.version || desired_version
   end
 
+  def needs_upgrade?
+    !read_replica? && !ongoing_failover? && (representative_server&.version&.to_i&.< desired_version.to_i) || false
+  end
+
   module HaType
     NONE = "none"
     ASYNC = "async"

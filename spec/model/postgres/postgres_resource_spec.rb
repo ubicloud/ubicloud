@@ -140,4 +140,34 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.ongoing_failover?).to be true
     end
   end
+
+  describe "#needs_upgrade?" do
+    it "returns false if the postgres resource is a read replica" do
+      expect(postgres_resource).to receive(:read_replica?).and_return(true)
+      expect(postgres_resource.needs_upgrade?).to be false
+    end
+
+    it "returns false if the postgres resource is in the middle of a failover" do
+      expect(postgres_resource).to receive(:read_replica?).and_return(false)
+      expect(postgres_resource).to receive(:ongoing_failover?).and_return(true)
+      expect(postgres_resource.needs_upgrade?).to be false
+    end
+
+    it "returns true if the postgres resource needs upgrade" do
+      expect(postgres_resource).to receive(:desired_version).and_return("17")
+      expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, version: "16"))
+      expect(postgres_resource.needs_upgrade?).to be true
+    end
+
+    it "returns false if the postgres resource does not need upgrade" do
+      expect(postgres_resource).to receive(:desired_version).and_return("16")
+      expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, version: "16"))
+      expect(postgres_resource.needs_upgrade?).to be false
+    end
+
+    it "returns false if there is no representative server" do
+      expect(postgres_resource).to receive(:representative_server).and_return(nil)
+      expect(postgres_resource.needs_upgrade?).to be false
+    end
+  end
 end
