@@ -112,7 +112,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     hop_wait if retval&.dig("msg") == "VhostBlockBackend was setup"
     push Prog::Storage::SetupVhostBlockBackend, {
       "subject_id" => vm_host.id,
-      "version" => Config.vhost_block_backend_version,
+      "version" => "v0.2.0",
       "allocation_weight" => 100
     }
   end
