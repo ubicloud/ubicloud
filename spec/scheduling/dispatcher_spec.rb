@@ -10,6 +10,10 @@ RSpec.describe Scheduling::Dispatcher do
     Thread.current.name = nil
   end
 
+  def new_dispatcher(**)
+    described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1, recheck_seconds: 10, stale_seconds: 20, **)
+  end
+
   describe "#shutdown" do
     it "sets shutting_down flag" do
       expect { di.shutdown }.to change(di, :shutting_down).from(false).to(true)
@@ -35,7 +39,7 @@ RSpec.describe Scheduling::Dispatcher do
           DB.listen(:respirate) { |_, _, pl| payload = pl }
           payload
         end
-        @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
+        @di = new_dispatcher
 
         # Wait until dispatcher has started listening and notified
         t.join(5)
@@ -59,7 +63,7 @@ RSpec.describe Scheduling::Dispatcher do
         payload
       end
 
-      di = @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
+      di = @di = new_dispatcher(recheck_seconds: 0.02, stale_seconds: 0.04)
 
       # Wait until dispatcher has started listening and notified
       t.join(5)
@@ -129,7 +133,7 @@ RSpec.describe Scheduling::Dispatcher do
 
     it "does not include strands outside of partition" do
       st = Strand.create(prog: "Test", label: "wait_exit", id: "00000000-0000-0000-0000-000000000000")
-      di = @di = described_class.new(partition_number: 2, listen_timeout: 0.01, pool_size: 1)
+      di = @di = new_dispatcher(partition_number: 2)
       di.setup_prepared_statements(strand_id_range: "10000000-0000-0000-0000-000000000000"..."20000000-0000-0000-0000-000000000000")
       st.update(schedule: Time.now - 10)
       expect(di.scan.map(&:id)).to eq([])
@@ -137,7 +141,7 @@ RSpec.describe Scheduling::Dispatcher do
 
     it "includes strands inside of partition" do
       st = Strand.create(prog: "Test", label: "wait_exit", id: "00000000-0000-0000-0000-000000000000")
-      di = @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
+      di = @di = new_dispatcher
       di.setup_prepared_statements(strand_id_range: "00000000-0000-0000-0000-000000000000"..."10000000-0000-0000-0000-000000000000")
       st.update(schedule: Time.now - 10)
       strands = di.scan
@@ -149,7 +153,7 @@ RSpec.describe Scheduling::Dispatcher do
 
     it "uses lease time instead of schedule time as scheduled if lease has expired" do
       st = Strand.create(prog: "Test", label: "wait_exit", id: "00000000-0000-0000-0000-000000000000", lease: Time.now - 1)
-      di = @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
+      di = @di = new_dispatcher
       st.update(schedule: Time.now - 10)
       strands = di.scan
       expect(strands.length).to eq 1
@@ -171,14 +175,14 @@ RSpec.describe Scheduling::Dispatcher do
 
     it "returns empty array when shutting down" do
       Strand.create(prog: "Test", label: "wait_exit", id: "00000000-0000-0000-0000-000000000000")
-      di = @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
+      di = @di = new_dispatcher
       di.shutdown
       expect(di.scan_old).to eq([])
     end
 
     it "includes strands outside of partition, if they are older than old_strand_delay" do
       st = Strand.create(prog: "Test", label: "wait_exit", id: "00000000-0000-0000-0000-000000000000")
-      di = @di = described_class.new(partition_number: 2, listen_timeout: 0.01, pool_size: 1)
+      di = @di = new_dispatcher(partition_number: 2)
       st.update(schedule: Time.now - 3)
       expect(di.scan_old.map(&:id)).to eq([])
       st.update(schedule: Time.now - 7)
