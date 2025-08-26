@@ -7,9 +7,10 @@ class KubernetesNodepool < Sequel::Model
   many_to_one :cluster, key: :kubernetes_cluster_id, class: :KubernetesCluster
   many_to_many :vms, join_table: :kubernetes_node, right_key: :vm_id, class: :Vm, order: :created_at
   one_to_many :nodes, class: :KubernetesNode, order: :created_at
+  one_to_many :functional_nodes, class: :KubernetesNode, order: :created_at, conditions: {state: "active"}
 
   plugin ResourceMethods
-  plugin SemaphoreMethods, :destroy, :start_bootstrapping, :upgrade
+  plugin SemaphoreMethods, :destroy, :start_bootstrapping, :upgrade, :scale_worker_count
 end
 
 # Table: kubernetes_nodepool

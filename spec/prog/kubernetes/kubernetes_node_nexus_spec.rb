@@ -66,17 +66,74 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
     it "naps for 6 hours" do
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
+
+    it "hops to retire when semaphore is set" do
+      expect(nx).to receive(:when_retire_set?).and_yield
+      expect { nx.wait }.to hop("retire")
+    end
+  end
+
+  describe "#retire" do
+    let(:sshable) { instance_double(Sshable) }
+    let(:unit_name) { "drain_node_#{kd.name}" }
+
+    before do
+      expect(kd.kubernetes_cluster).to receive(:sshable).and_return(sshable).at_least(:once)
+    end
+
+    it "starts the drain process when run for the first time and naps" do
+      expect(sshable).to receive(:d_check).with(unit_name).and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with(unit_name, "sudo", "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf", "drain", kd.name, "--ignore-daemonsets", "--delete-emptydir-data")
+      expect { nx.retire }.to nap(10)
+    end
+
+    it "naps when the node is getting drained" do
+      expect(sshable).to receive(:d_check).with(unit_name).and_return("InProgress")
+      expect { nx.retire }.to nap(10)
+    end
+
+    it "restarts when it fails" do
+      expect(sshable).to receive(:d_check).with(unit_name).and_return("Failed")
+      expect(sshable).to receive(:d_restart).with(unit_name)
+      expect { nx.retire }.to nap(10)
+    end
+
+    it "naps when daemonizer something unexpected and waits for the page" do
+      expect(sshable).to receive(:d_check).with(unit_name).and_return("UnexpectedState")
+      expect(nx).to receive(:register_deadline).with("destroy", 0)
+      expect { nx.retire }.to nap(60 * 60 * 24)
+    end
+
+    it "drains the old node and hops to drop the old node" do
+      expect(sshable).to receive(:d_check).with(unit_name).and_return("Succeeded")
+      expect { nx.retire }.to hop("remove_node_from_cluster")
+    end
+  end
+
+  describe "#remove_node_from_cluster" do
+    let(:client) { instance_double(Kubernetes::Client) }
+
+    before do
+      expect(kd.kubernetes_cluster).to receive(:client).and_return(client)
+    end
+
+    it "deletes the node and does nothing else if node doesn't belong to a KubernetesNodepool" do
+      expect(client).to receive(:delete_node).with(kd.name)
+      expect { nx.remove_node_from_cluster }.to hop("destroy")
+    end
+
+    it "deletes the node and deletes the node from its KubernetesNodepool's vms" do
+      kn = KubernetesNodepool.create(name: "np", node_count: 1, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
+      kd.update(kubernetes_nodepool_id: kn.id)
+
+      expect(client).to receive(:delete_node).with(kd.name)
+      expect { nx.remove_node_from_cluster }.to hop("destroy")
+    end
   end
 
   describe "#destroy" do
     it "destroys the vm and itself" do
       expect(kd.vm).to receive(:incr_destroy)
-      expect(kd).to receive(:destroy)
-      expect { nx.destroy }.to exit({"msg" => "kubernetes node is deleted"})
-    end
-
-    it "skips destroying the vm if it is already destroyed" do
-      expect(kd).to receive(:vm).and_return(nil)
       expect(kd).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "kubernetes node is deleted"})
     end

@@ -26,11 +26,40 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
   end
 
   label def wait
+    when_retire_set? do
+      hop_retire
+    end
     nap 6 * 60 * 60
   end
 
+  label def retire
+    unit_name = "drain_node_#{kubernetes_node.name}"
+    sshable = kubernetes_node.kubernetes_cluster.sshable
+    case sshable.d_check(unit_name)
+    when "Succeeded"
+      hop_remove_node_from_cluster
+    when "NotStarted"
+      sshable.d_run(unit_name, "sudo", "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf",
+        "drain", kubernetes_node.name, "--ignore-daemonsets", "--delete-emptydir-data")
+      nap 10
+    when "InProgress"
+      nap 10
+    when "Failed"
+      sshable.d_restart(unit_name)
+      nap 10
+    else
+      register_deadline("destroy", 0)
+      nap(60 * 60 * 24)
+    end
+  end
+
+  label def remove_node_from_cluster
+    kubernetes_node.kubernetes_cluster.client.delete_node(kubernetes_node.name)
+    hop_destroy
+  end
+
   label def destroy
-    kubernetes_node.vm&.incr_destroy
+    kubernetes_node.vm.incr_destroy
     kubernetes_node.destroy
     pop "kubernetes node is deleted"
   end

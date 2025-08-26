@@ -9,7 +9,7 @@ class KubernetesNode < Sequel::Model
   many_to_one :kubernetes_nodepool
 
   plugin ResourceMethods
-  plugin SemaphoreMethods, :destroy
+  plugin SemaphoreMethods, :destroy, :retire
 
   def sshable
     vm.sshable
