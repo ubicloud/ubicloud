@@ -256,9 +256,9 @@ class Clover
           fail CloverError.new(400, "InvalidRequest", error_msg)
         end
 
-        st = nil
+        replica = nil
         DB.transaction do
-          st = Prog::Postgres::PostgresResourceNexus.assemble(
+          replica = Prog::Postgres::PostgresResourceNexus.assemble(
             project_id: @project.id,
             location_id: pg.location_id,
             name:,
@@ -269,16 +269,16 @@ class Clover
             flavor: pg.flavor,
             parent_id: pg.id,
             restore_target: nil
-          )
-          audit_log(pg, "create_replica", st.subject)
+          ).subject
+          audit_log(pg, "create_replica", replica)
         end
-        send_notification_mail_to_partners(st.subject, current_account.email)
+        send_notification_mail_to_partners(replica, current_account.email)
 
         if api?
-          Serializers::Postgres.serialize(st.subject, {detailed: true})
+          Serializers::Postgres.serialize(replica, {detailed: true})
         else
           flash["notice"] = "'#{name}' will be ready in a few minutes"
-          r.redirect st.subject, "/overview"
+          r.redirect replica, "/overview"
         end
       end
 
@@ -310,14 +310,14 @@ class Clover
         handle_validation_failure("postgres/show") { @page = "backup_restore" }
 
         name, restore_target = typecast_params.nonempty_str!(["name", "restore_target"])
-        st = nil
 
         Validation.validate_name(name)
 
         Validation.validate_vcpu_quota(@project, "PostgresVCpu", Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size].vcpu_count)
 
+        restored = nil
         DB.transaction do
-          st = Prog::Postgres::PostgresResourceNexus.assemble(
+          restored = Prog::Postgres::PostgresResourceNexus.assemble(
             project_id: @project.id,
             location_id: pg.location_id,
             name:,
@@ -327,16 +327,16 @@ class Clover
             flavor: pg.flavor,
             parent_id: pg.id,
             restore_target:
-          )
-          audit_log(pg, "restore", st.subject)
+          ).subject
+          audit_log(pg, "restore", restored)
         end
-        send_notification_mail_to_partners(st.subject, current_account.email)
+        send_notification_mail_to_partners(restored, current_account.email)
 
         if api?
-          Serializers::Postgres.serialize(st.subject, {detailed: true})
+          Serializers::Postgres.serialize(restored, {detailed: true})
         else
           flash["notice"] = "'#{name}' will be ready in a few minutes"
-          r.redirect st.subject, "/overview"
+          r.redirect restored, "/overview"
         end
       end
 
