@@ -41,7 +41,7 @@ class Clover
       Serializers::PrivateSubnet.serialize(ps)
     else
       flash["notice"] = "'#{name}' will be ready in a few seconds"
-      request.redirect "#{@project.path}#{ps.path}"
+      request.redirect ps
     end
   end
 

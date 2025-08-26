@@ -298,7 +298,7 @@ class Clover
                 @tag.update(name: typecast_params.nonempty_str("name"))
                 audit_log(@tag, "update")
                 flash["notice"] = "#{@display_tag_type} tag name updated successfully"
-                r.redirect path(@tag)
+                r.redirect @tag
               end
 
               r.delete do
@@ -335,7 +335,7 @@ class Clover
                 flash["error"] = "No change in membership#{issues}"
               end
 
-              r.redirect path(@tag)
+              r.redirect @tag
             end
 
             r.post "disassociate" do
@@ -359,7 +359,7 @@ class Clover
               end
 
               flash["notice"] = "#{num_removed} members removed from #{@tag_type} tag"
-              r.redirect path(@tag)
+              r.redirect @tag
             end
           end
         end

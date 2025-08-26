@@ -54,7 +54,7 @@ class Clover
             end
           end
 
-          r.redirect path(token)
+          r.redirect token
         end
 
         r.is "access-control" do
@@ -105,7 +105,7 @@ class Clover
             no_audit_log # Possibly no changes
             flash["notice"] = "Token access control entries saved successfully"
 
-            r.redirect path(token)
+            r.redirect token
           end
         end
       end

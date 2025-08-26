@@ -30,7 +30,7 @@ class Clover
         Serializers::KubernetesCluster.serialize(kc, {detailed: true})
       else
         flash["notice"] = "'#{name}' will be ready in a few minutes"
-        request.redirect "#{@project.path}#{kc.path}"
+        request.redirect kc
       end
     end
   end

@@ -39,7 +39,7 @@ class Clover
       end
 
       flash["notice"] = "'#{firewall_name}' is created"
-      request.redirect "#{@project.path}#{firewall.path}"
+      request.redirect firewall
     end
   end
 
