@@ -51,6 +51,7 @@ class Clover < Roda
   plugin :part
   plugin :request_headers
   plugin :plain_hash_response_headers
+  plugin :redirect_path
   plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
   plugin :typecast_params do
     invalid_value_message(:pos_int64, "Value must be an integer greater than 0 for parameter")

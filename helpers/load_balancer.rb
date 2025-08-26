@@ -42,7 +42,7 @@ class Clover
       Serializers::LoadBalancer.serialize(lb, {detailed: true})
     else
       flash["notice"] = "'#{name}' is created"
-      request.redirect "#{@project.path}#{lb.path}"
+      request.redirect lb
     end
   end
 

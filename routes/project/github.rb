@@ -13,7 +13,7 @@ class Clover
 
       r.get true do
         if (installation = @project.github_installations_dataset.first)
-          r.redirect "#{path(installation)}/runner"
+          r.redirect installation, "/runner"
         end
         view "github/index"
       end
@@ -51,7 +51,7 @@ class Clover
             audit_log(@installation, "update")
           end
 
-          r.redirect "#{path(@installation)}/setting"
+          r.redirect @installation, "/setting"
         end
 
         r.on "runner" do

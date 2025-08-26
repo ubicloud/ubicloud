@@ -30,7 +30,7 @@ class Clover
             response.headers["cache-control"] = "no-store"
             Serializers::Postgres.serialize(pg, {detailed: true})
           else
-            r.redirect "#{path(pg)}/overview"
+            r.redirect pg, "/overview"
           end
         end
 
@@ -125,7 +125,7 @@ class Clover
           Serializers::Postgres.serialize(pg, {detailed: true})
         else
           flash["notice"] = "'#{pg.name}' will be restarted in a few seconds"
-          r.redirect "#{path(pg)}/settings"
+          r.redirect pg, "/settings"
         end
       end
 
@@ -160,7 +160,7 @@ class Clover
               Serializers::PostgresFirewallRule.serialize(firewall_rule)
             else
               flash["notice"] = "Firewall rule is created"
-              r.redirect "#{path(pg)}/networking"
+              r.redirect pg, "/networking"
             end
           end
         end
@@ -223,7 +223,7 @@ class Clover
             Serializers::Postgres.serialize(pg, {detailed: true})
           else
             flash["notice"] = "Metric destination is created"
-            r.redirect "#{path(pg)}/charts"
+            r.redirect pg, "/charts"
           end
         end
 
@@ -278,7 +278,7 @@ class Clover
           Serializers::Postgres.serialize(st.subject, {detailed: true})
         else
           flash["notice"] = "'#{name}' will be ready in a few minutes"
-          r.redirect "#{path(st.subject)}/overview"
+          r.redirect st.subject, "/overview"
         end
       end
 
@@ -300,7 +300,7 @@ class Clover
           Serializers::Postgres.serialize(pg)
         else
           flash["notice"] = "'#{pg.name}' will be promoted in a few minutes, please refresh the page"
-          r.redirect "#{path(pg)}/settings"
+          r.redirect pg, "/settings"
         end
       end
 
@@ -336,7 +336,7 @@ class Clover
           Serializers::Postgres.serialize(st.subject, {detailed: true})
         else
           flash["notice"] = "'#{name}' will be ready in a few minutes"
-          r.redirect "#{path(st.subject)}/overview"
+          r.redirect st.subject, "/overview"
         end
       end
 
@@ -362,7 +362,7 @@ class Clover
           Serializers::Postgres.serialize(pg, {detailed: true})
         else
           flash["notice"] = "The superuser password will be updated in a few seconds"
-          r.redirect "#{path(pg)}/settings"
+          r.redirect pg, "/settings"
         end
       end
 
@@ -379,7 +379,7 @@ class Clover
           Serializers::Postgres.serialize(pg, {detailed: true})
         else
           flash["notice"] = "Maintenance window is set"
-          r.redirect "#{path(pg)}/settings"
+          r.redirect pg, "/settings"
         end
       end
 
@@ -539,7 +539,7 @@ class Clover
             }
           else
             flash["notice"] = "Configuration updated successfully"
-            r.redirect "#{path(pg)}/config"
+            r.redirect pg, "/config"
           end
         end
       end
