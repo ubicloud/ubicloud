@@ -98,7 +98,7 @@ class Clover < Roda
 
   def redirect_default_project_dashboard
     if (project = current_account.projects_dataset.order(:created_at, :name).first)
-      request.redirect "#{project.path}/dashboard"
+      request.redirect project, "/dashboard"
     else
       request.redirect "/project"
     end

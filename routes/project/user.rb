@@ -269,7 +269,7 @@ class Clover
                 audit_log(tag, "create")
               end
               flash["notice"] = "#{@display_tag_type} tag created successfully"
-              r.redirect "#{@project.path}/user/access-control/tag/#{@tag_type}"
+              r.redirect @project, "/user/access-control/tag/#{@tag_type}"
             end
           end
 

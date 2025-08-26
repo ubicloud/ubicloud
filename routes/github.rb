@@ -34,19 +34,19 @@ class Clover
       unless (access_token = code_response[:access_token])
         flash["error"] = "GitHub App installation failed. For any questions or assistance, reach out to our team at support@ubicloud.com"
         Clog.emit("GitHub callback failed due to lack of permission") { {installation_failed: {id: installation_id, account_ubid: current_account.ubid}} }
-        r.redirect "#{project.path}/github"
+        r.redirect project, "/github"
       end
 
       unless (installation_response = Octokit::Client.new(access_token: access_token).get("/user/installations")[:installations].find { it[:id].to_s == installation_id })
         flash["error"] = "GitHub App installation failed. For any questions or assistance, reach out to our team at support@ubicloud.com"
         Clog.emit("GitHub callback failed due to lack of installation") { {installation_failed: {id: installation_id, account_ubid: current_account.ubid}} }
-        r.redirect "#{project.path}/github"
+        r.redirect project, "/github"
       end
 
       unless project.active?
         flash["error"] = "GitHub runner integration is not allowed for inactive projects"
         Clog.emit("GitHub callback failed due to inactive project") { {installation_failed: {id: installation_id, account_ubid: current_account.ubid}} }
-        r.redirect "#{project.path}/dashboard"
+        r.redirect project, "/dashboard"
       end
 
       installation = GithubInstallation.create(

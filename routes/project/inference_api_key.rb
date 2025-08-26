@@ -26,7 +26,7 @@ class Clover
 
         if web?
           flash["notice"] = "Created Inference API Key with id #{iak.ubid}. It may take a few minutes to sync."
-          r.redirect "#{@project.path}/inference-api-key"
+          r.redirect @project, "/inference-api-key"
         else
           {id: iak.ubid, key: iak.key}
         end

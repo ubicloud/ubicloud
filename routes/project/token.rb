@@ -23,7 +23,7 @@ class Clover
             audit_log(pat, "create")
           end
           flash["notice"] = "Created personal access token with id #{pat.ubid}"
-          r.redirect "#{@project.path}/token"
+          r.redirect @project, "/token"
         end
       end
 

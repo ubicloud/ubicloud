@@ -32,7 +32,7 @@ class Clover
           Serializers::Project.serialize(@project)
         else
           flash["notice"] = "Project created"
-          r.redirect @project.path
+          r.redirect @project
         end
       end
     end
@@ -86,7 +86,7 @@ class Clover
 
           flash["notice"] = "The project name is updated to '#{@project.name}'."
 
-          r.redirect @project.path
+          r.redirect @project
         end
       end
 
