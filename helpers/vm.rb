@@ -116,7 +116,7 @@ class Clover
       if @show_gpu
         if gpu_locations.empty? && web?
           flash["error"] = "Unfortunately, no virtual machines with GPUs are currently available."
-          request.redirect "#{@project.path}/vm/create"
+          request.redirect @project, "/vm/create"
         end
 
         location_family_check = lambda do |location, family|

@@ -97,6 +97,7 @@ class Clover < Roda
     Vm
   ].each { path(it, class_name: true, &under_project_path) }
 
+  path("Project", class_name: true, &:path)
   path("GithubInstallation", class_name: true) { "#{it.project.path}/github/#{it.ubid}" }
 
   # :nocov:
