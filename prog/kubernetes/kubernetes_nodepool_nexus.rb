@@ -34,8 +34,19 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   end
 
   label def bootstrap_worker_nodes
-    kubernetes_nodepool.node_count.times do
-      bud Prog::Kubernetes::ProvisionKubernetesNode, {"nodepool_id" => kubernetes_nodepool.id, "subject_id" => kubernetes_nodepool.kubernetes_cluster_id}
+    current_node_count = kubernetes_nodepool.functional_nodes.count
+    desired_node_count = kubernetes_nodepool.node_count
+
+    if current_node_count < desired_node_count
+      (desired_node_count - current_node_count).times do
+        bud Prog::Kubernetes::ProvisionKubernetesNode, {"nodepool_id" => kubernetes_nodepool.id, "subject_id" => kubernetes_nodepool.kubernetes_cluster_id}
+      end
+    elsif current_node_count > desired_node_count
+      excess_nodes = kubernetes_nodepool.functional_nodes.first(current_node_count - desired_node_count)
+      excess_nodes.each {
+        it.update(state: "draining")
+        it.incr_retire
+      }
     end
     hop_wait_worker_node
   end
@@ -47,6 +58,10 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   label def wait
     when_upgrade_set? do
       hop_upgrade
+    end
+    when_scale_worker_count_set? do
+      decr_scale_worker_count
+      hop_bootstrap_worker_nodes
     end
     nap 6 * 60 * 60
   end
