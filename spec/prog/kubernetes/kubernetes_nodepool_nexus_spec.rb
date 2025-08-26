@@ -99,10 +99,22 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
   end
 
   describe "#bootstrap_worker_nodes" do
-    it "buds a total of node_count times ProvisionKubernetesNode prog to create nodes" do
-      kn.node_count.times do
+    it "buds enough number of times ProvisionKubernetesNode progs when we need to provision more nodes" do
+      kn.update(node_count: 4)
+      (kn.node_count - kn.functional_nodes.count).times do
         expect(nx).to receive(:bud).with(Prog::Kubernetes::ProvisionKubernetesNode, {"nodepool_id" => kn.id, "subject_id" => kn.cluster.id})
       end
+      expect { nx.bootstrap_worker_nodes }.to hop("wait_worker_node")
+    end
+
+    it "retires enough number of nodes when we need to decommission some" do
+      kn.update(node_count: 1)
+      expect(kn.functional_nodes.first).to receive(:update).with({state: "draining"})
+      expect(kn.functional_nodes.first).to receive(:incr_retire)
+      expect { nx.bootstrap_worker_nodes }.to hop("wait_worker_node")
+    end
+
+    it "does nothing when we have the right number of nodes" do
       expect { nx.bootstrap_worker_nodes }.to hop("wait_worker_node")
     end
   end
@@ -128,6 +140,12 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     it "hops to upgrade when semaphore is set" do
       expect(nx).to receive(:when_upgrade_set?).and_yield
       expect { nx.wait }.to hop("upgrade")
+    end
+
+    it "hops to bootstrap_worker_nodes when its semaphore is set" do
+      expect(nx).to receive(:when_scale_worker_count_set?).and_yield
+      expect(nx).to receive(:decr_scale_worker_count)
+      expect { nx.wait }.to hop("bootstrap_worker_nodes")
     end
   end
 
