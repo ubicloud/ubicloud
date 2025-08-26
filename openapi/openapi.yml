@@ -857,6 +857,31 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
+  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_reference}/certificate':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/load_balancer_reference'
+    get:
+      operationId: getLoadBalancerCertificate
+      summary: Download active certificate for a load balancer
+      responses:
+        '200':
+          description: Certificate file
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: attachment; filename="load-balancer-name.pem"
+          content:
+            application/x-pem-file:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
   '/project/{project_id}/location/{location}/load-balancer/{load_balancer_reference}/detach-vm':
     parameters:
       - $ref: '#/components/parameters/project_id'

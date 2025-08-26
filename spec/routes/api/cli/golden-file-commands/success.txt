@@ -65,6 +65,7 @@ kc list -l eu-north-h1 -f name,id
 kc list -l eu-north-h1 -N -f name,id
 kc list -N
 lb 1bvp8yk1karj4ngwhtgrfh6esd show
+lb eu-central-h1/test-lb certificate
 lb eu-central-h1/test2-lb create psfzm9e26xky5m9ggetw4dpqe2 12345 54321
 lb eu-central-h1/test-lb show
 lb eu-central-h1/test-lb show -f id,name,state,location,hostname,algorithm

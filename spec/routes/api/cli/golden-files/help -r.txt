@@ -280,16 +280,17 @@ Usage:
     ubi lb (location/lb-name | lb-id) post-command [...]
 
 Commands:
-    list         List load balancers
+    list           List load balancers
 
 Post Commands:
-    attach-vm    Attach a virtual machine to a load balancer
-    create       Create a load balancer
-    destroy      Destroy a load balancer
-    detach-vm    Detach a virtual machine from a load balancer
-    rename       Rename a load balancer
-    show         Show details for a load balancer
-    update       Update a load balancer
+    attach-vm      Attach a virtual machine to a load balancer
+    certificate    Print active certificate for a load balancer
+    create         Create a load balancer
+    destroy        Destroy a load balancer
+    detach-vm      Detach a virtual machine from a load balancer
+    rename         Rename a load balancer
+    show           Show details for a load balancer
+    update         Update a load balancer
 
 
 List load balancers
@@ -310,6 +311,12 @@ Attach a virtual machine to a load balancer
 
 Usage:
     ubi lb (location/lb-name | lb-id) attach-vm (vm-name | vm-id)
+
+
+Print active certificate for a load balancer
+
+Usage:
+    ubi lb (location/lb-name | lb-id) certificate
 
 
 Create a load balancer

@@ -51,6 +51,7 @@ RSpec.describe Clover, "cli" do
     expect(LoadBalancer).to receive(:generate_uuid).and_return("dd91e986-6ac4-882b-ac39-1d430f899d96")
     lb = Prog::Vnet::LoadBalancerNexus.assemble(@ps.id, name: "test-lb", src_port: 12345, dst_port: 54321).subject
     lb.add_vm(@vm)
+    lb.add_cert(hostname: "foo.ubicloud.com", cert: "EXAMPLE-CERT")
 
     expect(KubernetesCluster).to receive(:generate_ubid).and_return(UBID.parse("kcnzrctjjg4j4g6eqvdsvzthwp"))
     expect(KubernetesNodepool).to receive(:generate_uuid).and_return("2432784b-3c9e-8a75-900d-df23880643ec")

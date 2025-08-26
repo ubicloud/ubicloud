@@ -113,6 +113,15 @@ class Clover
         end
       end
 
+      r.get "certificate" do
+        authorize("LoadBalancer:view", lb.id)
+        next unless (cert = lb.active_cert)
+
+        response.headers["content-disposition"] = "attachment; filename=\"#{lb.name}.pem\""
+        response.content_type = :pem
+        cert.cert
+      end
+
       r.rename lb, perm: "LoadBalancer:edit", serializer: Serializers::LoadBalancer
     end
   end
