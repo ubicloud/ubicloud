@@ -32,7 +32,7 @@ RSpec.describe Prog::Vnet::NicNexus do
         mac: "7a:7b:7b:7b:7b:7b",
         private_subnet_id: "57afa8a7-2357-4012-9632-07fbe13a3133",
         name: "demonic").and_return(nic)
-      expect(Strand).to receive(:create_with_id).with(id, prog: "Vnet::NicNexus", label: "wait_allocation").and_return(Strand.new)
+      expect(Strand).to receive(:create_with_id).with(id, prog: "Vnet::NicNexus", label: "wait_allocation", stack: [{"exclude_availability_zones" => [], "preferred_az" => nil}]).and_return(Strand.new)
       described_class.assemble(ps.id, ipv6_addr: "fd10:9b0b:6b4b:8fbb::/128", name: "demonic")
     end
 
@@ -50,26 +50,26 @@ RSpec.describe Prog::Vnet::NicNexus do
         mac: "00:11:22:33:44:55",
         private_subnet_id: "57afa8a7-2357-4012-9632-07fbe13a3133",
         name: "demonic").and_return(nic)
-      expect(Strand).to receive(:create_with_id).with(id, prog: "Vnet::NicNexus", label: "wait_allocation").and_return(Strand.new)
+      expect(Strand).to receive(:create_with_id).with(id, prog: "Vnet::NicNexus", label: "wait_allocation", stack: [{"exclude_availability_zones" => [], "preferred_az" => nil}]).and_return(Strand.new)
       described_class.assemble(ps.id, ipv4_addr: "10.0.0.12/32", name: "demonic")
     end
 
     it "hops to create_aws_nic if location is aws" do
-      expect(ps).to receive(:location).and_return(instance_double(Location, aws?: true))
+      expect(ps).to receive(:location).and_return(instance_double(Location, aws?: true)).at_least(:once)
       expect(PrivateSubnet).to receive(:[]).with("57afa8a7-2357-4012-9632-07fbe13a3133").and_return(ps).at_least(:once)
       expect(ps).to receive(:random_private_ipv6).and_return("fd10:9b0b:6b4b:8fbb::/128")
-      expect(ps).to receive(:random_private_ipv4).and_return("10.0.0.12/32")
+      expect(ps).to receive(:random_private_ipv4).and_return(NetAddr::IPv4Net.parse("10.0.0.0/26"))
       id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"
       expect(Nic).to receive(:generate_ubid).and_return(UBID.from_uuidish(id))
       expect(described_class).to receive(:gen_mac).and_return("00:11:22:33:44:55")
       nic = instance_double(Nic, private_subnet: ps, id:)
       expect(Nic).to receive(:create_with_id).with(id,
         private_ipv6: "fd10:9b0b:6b4b:8fbb::/128",
-        private_ipv4: "10.0.0.12/32",
+        private_ipv4: "10.0.0.4/32",
         mac: "00:11:22:33:44:55",
         private_subnet_id: "57afa8a7-2357-4012-9632-07fbe13a3133",
         name: "demonic").and_return(nic)
-      expect(Strand).to receive(:create_with_id).with(id, prog: "Vnet::NicNexus", label: "create_aws_nic").and_return(Strand.new)
+      expect(Strand).to receive(:create_with_id).with(id, prog: "Vnet::NicNexus", label: "create_aws_nic", stack: [{"exclude_availability_zones" => [], "preferred_az" => nil}]).and_return(Strand.new)
       described_class.assemble(ps.id, name: "demonic")
     end
   end
@@ -97,7 +97,7 @@ RSpec.describe Prog::Vnet::NicNexus do
       ps = Prog::Vnet::SubnetNexus.assemble(Project.create(name: "test").id)
       nic = described_class.assemble(ps.id, name: "demonic").subject
       ps.update(label: "wait")
-      expect(nx).to receive(:bud).with(Prog::Aws::Nic, {"subject_id" => nic.id}, :create_network_interface)
+      expect(nx).to receive(:bud).with(Prog::Aws::Nic, {"subject_id" => nic.id, "exclude_availability_zones" => nil, "preferred_az" => nil}, :create_subnet)
       expect(nx).to receive(:nic).and_return(nic).at_least(:once)
       expect { nx.create_aws_nic }.to hop("wait_aws_nic_created")
     end
