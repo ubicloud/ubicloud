@@ -1,4 +1,4 @@
-<%# locals: (title: @page_title, breadcrumbs: [], left_items: nil, right_items: nil, back: breadcrumbs.dig(-2, 1) || "#") %>
+<%# locals: (title: @page_title, breadcrumbs: [], right_items: nil, back: breadcrumbs.dig(-2, 1) || "#") %>
 
 <div class="space-y-1 sticky -mx-10 mb-0.5 px-10 top-[2.9rem] bg-gray-50 z-30">
   <% unless breadcrumbs.empty? %>
@@ -32,11 +32,6 @@
     <div class="min-w-0">
       <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:tracking-tight"><%= title %></h2>
     </div>
-    <% if left_items %>
-      <div class="mt-4 flex md:ml-4 md:mt-0 mr-auto">
-        <%== left_items.join %>
-      </div>
-    <% end %>
     <% if right_items %>
       <div class="mt-4 flex md:ml-4 md:mt-0">
         <%== right_items.join %>
