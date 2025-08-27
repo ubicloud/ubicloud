@@ -25,7 +25,7 @@ class Clover
 
       r.post %w[attach-vm detach-vm] do |action|
         authorize("LoadBalancer:edit", lb.id)
-        handle_validation_failure("networking/load_balancer/show")
+        handle_validation_failure("networking/load_balancer/show") { @page = "vms" }
 
         unless (vm = authorized_vm(location_id: lb.private_subnet.location_id))
           fail Validation::ValidationFailed.new("vm_id" => "No matching VM found in #{lb.display_location}")
@@ -52,7 +52,7 @@ class Clover
           Serializers::LoadBalancer.serialize(lb, {detailed: true})
         else
           flash["notice"] = "VM is #{actioned} the load balancer"
-          r.redirect lb
+          r.redirect lb, "/vms"
         end
       end
 
@@ -62,7 +62,7 @@ class Clover
           if api?
             Serializers::LoadBalancer.serialize(lb, {detailed: true})
           else
-            view "networking/load_balancer/show"
+            r.redirect lb, "/overview"
           end
         end
 
@@ -114,6 +114,14 @@ class Clover
       end
 
       r.rename lb, perm: "LoadBalancer:edit", serializer: Serializers::LoadBalancer
+
+      r.get web?, %w[overview vms settings] do |page|
+        authorize("LoadBalancer:view", lb.id)
+
+        response.headers["cache-control"] = "no-store"
+        @page = page
+        view "networking/load_balancer/show"
+      end
     end
   end
 end
