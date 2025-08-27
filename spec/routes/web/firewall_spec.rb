@@ -143,6 +143,7 @@ RSpec.describe Clover, "firewall" do
         expect(page).to have_content name
 
         visit "#{project.path}#{fw.path}"
+        within("#firewall-submenu") { click_link "Networking" }
         expect(page).to have_content ps.name
       end
 
@@ -221,7 +222,7 @@ RSpec.describe Clover, "firewall" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         firewall.associate_with_private_subnet(ps)
 
-        visit "#{project.path}#{firewall.path}"
+        visit "#{project.path}#{firewall.path}/networking"
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
         expect(page).to have_content ps.name
@@ -230,7 +231,7 @@ RSpec.describe Clover, "firewall" do
       it "can attach subnet" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
 
-        visit "#{project.path}#{firewall.path}"
+        visit "#{project.path}#{firewall.path}/networking"
         select ps.name, from: "private_subnet_id"
         click_button "Attach"
 
@@ -238,7 +239,7 @@ RSpec.describe Clover, "firewall" do
         expect(page).to have_flash_notice("Private subnet #{ps.name} is attached to the firewall")
         expect(firewall.private_subnets_dataset.count).to eq(1)
 
-        visit "#{project.path}#{firewall.path}"
+        visit "#{project.path}#{firewall.path}/networking"
         expect(page).to have_content ps.name
 
         visit "#{project.path}#{ps.path}"
@@ -247,7 +248,7 @@ RSpec.describe Clover, "firewall" do
 
       it "can not attach subnet when it does not exist" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
-        visit "#{project.path}#{firewall.path}"
+        visit "#{project.path}#{firewall.path}/networking"
         select "dummy-ps-1", from: "private_subnet_id"
         ps.destroy
         click_button "Attach"
@@ -264,7 +265,7 @@ RSpec.describe Clover, "firewall" do
 
         firewall.associate_with_private_subnet(ps)
 
-        visit "#{project.path}#{firewall.path}"
+        visit "#{project.path}#{firewall.path}/networking"
         click_button "Detach"
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
@@ -277,11 +278,11 @@ RSpec.describe Clover, "firewall" do
 
       it "can not detach subnet when it does not exist" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
-        visit "#{project.path}#{firewall.path}"
+        visit "#{project.path}#{firewall.path}/networking"
         select "dummy-ps-1", from: "private_subnet_id"
         click_button "Attach"
-        visit "#{project.path}#{firewall.path}"
 
+        visit "#{project.path}#{firewall.path}/networking"
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
         ps.destroy
         expect(firewall.private_subnets_dataset.count).to eq(0)
@@ -296,7 +297,7 @@ RSpec.describe Clover, "firewall" do
 
     describe "rules" do
       it "can add" do
-        visit "#{project.path}#{firewall.path}"
+        visit "#{project.path}#{firewall.path}/networking"
 
         fill_in "cidr", with: "1.1.1.1/8"
         fill_in "port_range", with: "80"
@@ -309,7 +310,7 @@ RSpec.describe Clover, "firewall" do
       end
 
       it "can not add rule when it is invalid" do
-        visit "#{project.path}#{firewall.path}"
+        visit "#{project.path}#{firewall.path}/networking"
 
         fill_in "cidr", with: "invalid"
 
@@ -332,7 +333,7 @@ RSpec.describe Clover, "firewall" do
       it "can delete rule" do
         firewall.insert_firewall_rule("1.0.0.0/8", Sequel.pg_range(80..80))
 
-        visit "#{project.path}#{firewall.path}"
+        visit "#{project.path}#{firewall.path}/networking"
 
         btn = find "#fwr-delete-#{firewall.firewall_rules.first.ubid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
@@ -347,7 +348,7 @@ RSpec.describe Clover, "firewall" do
       it "accepts delete rule if it's already deleted" do
         firewall.insert_firewall_rule("1.0.0.0/8", Sequel.pg_range(80..80))
 
-        visit "#{project.path}#{firewall.path}"
+        visit "#{project.path}#{firewall.path}/networking"
 
         firewall.remove_firewall_rule(firewall.firewall_rules.first)
         btn = find "#fwr-delete-#{firewall.firewall_rules.first.ubid} .delete-btn"
@@ -359,18 +360,40 @@ RSpec.describe Clover, "firewall" do
       it "can show firewall rules which have port_range nil" do
         firewall.insert_firewall_rule("1.0.0.0/8", nil)
 
-        visit "#{project.path}#{firewall.path}"
+        visit "#{project.path}#{firewall.path}/networking"
+
+        expect(page.body).to include "fw-create-rule"
+        expect(page.body).to include "fwr-delete"
+        expect(page.body).to include "fw-attach"
 
         expect(page).to have_content "1.0.0.0/8"
         expect(page).to have_content "0..65535"
 
         expect(firewall.firewall_rules_dataset.count).to eq(1)
       end
+
+      it "does not show actions that require edit permissions" do
+        # Give permission to view, so we can see the detail page
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Firewall:view"])
+        ps = Prog::Vnet::SubnetNexus.assemble(project_wo_permissions.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
+        fw_wo_permission.associate_with_private_subnet(ps)
+        fw_wo_permission.insert_firewall_rule("1.0.0.0/8", nil)
+
+        visit "#{project_wo_permissions.path}#{fw_wo_permission.path}/networking"
+        expect(page.title).to eq "Ubicloud - dummy-fw-2"
+        expect(page.all("#fw-private-subnets a").to_a).to eq []
+
+        expect(page).to have_no_content "Detach"
+        expect(page.body).not_to include "fw-create-rule"
+        expect(page.body).not_to include "fwr-delete"
+        expect(page.body).not_to include "fw-attach"
+      end
     end
 
     describe "delete" do
       it "can delete firewall" do
         visit "#{project.path}#{firewall.path}"
+        within("#firewall-submenu") { click_link "Settings" }
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
@@ -386,7 +409,7 @@ RSpec.describe Clover, "firewall" do
         # Give permission to view, so we can see the detail page
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Firewall:view"])
 
-        visit "#{project_wo_permissions.path}#{fw_wo_permission.path}"
+        visit "#{project_wo_permissions.path}#{fw_wo_permission.path}/settings"
         expect(page.title).to eq "Ubicloud - dummy-fw-2"
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound

@@ -1,0 +1,9 @@
+<%== part(
+  "components/kv_data_card",
+  data: [
+    ["ID", @firewall.ubid],
+    ["Name", @firewall.name],
+    ["Location", @firewall.display_location],
+    ["Description", @firewall.description]
+  ]
+) %>
