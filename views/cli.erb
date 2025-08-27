@@ -1,60 +1,80 @@
 <% @page_title = "Web Shell" %>
 <% multi = typecast_query_params.bool("multi") %>
 
-<h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:tracking-tight">Web Shell</h2>
+<%== part(
+  "components/page_header",
+  title: "Web Shell",
+  right_items: [
+    multi ? part("components/button", text: "Single command", link: "?")
+      : part("components/button", text: "Multiple commands", link: "?multi=t")
+  ],
+) %>
 
-<form action="<%= request.path_info %>" method="POST">
-  <%== csrf_tag(request.path_info) %>
-
-  <div class="mt-4 flex gap-2 justify-between">
-    <div class="font-mono flex-1">
-      <% if multi %>
-        <%== part("components/form/textarea", name: "multi-cli", attributes: {cols: 80, rows: 6, placeholder: "Multiple commands, one per line", autofocus: true, required: true}) %>
-      <% else %>
-        <%== part("components/form/text", name: "cli", value: @cli, prefix: "ubi", attributes: {placeholder: "Command. i.e: 'vm list'", autofocus: true, required: true}) %>
-      <% end %>
+<div class="grid gap-6">
+  <% if !@last_cli && !@cli %>
+    <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
+      <div class="min-w-0 flex-1">
+        <% unless multi %>
+          This page provides access to a web version of
+          <a class="font-medium text-orange-600 hover:text-orange-700" href="https://www.ubicloud.com/docs/quick-start/cli">Ubicloud's CLI</a>. You can use it without installing the CLI. All features are available, except ones that execute external
+          programs.
+        <% else %>
+          This page allows scheduling the execution of multiple commands, one per line. It will run the command on the
+          first line and display the output, and the set the next command for execution.
+        <% end %>
+      </div>
     </div>
-    <%== part("components/form/submit_button", text: "Run") %>
-  </div>
+  <% end %>
 
+  <form action="<%= request.path_info %>" method="POST">
+    <%== csrf_tag(request.path_info) %>
 
-  <% if @clis && !@clis.empty? %>
-    <p>Remaining commands:</p>
-    <% @clis.each do %>
-      <pre><tt class="next-clis"><%= it %></tt></pre>
-      <input type="hidden" name="clis[]" value="<%= it %>">
+    <div class="flex gap-2 justify-between">
+      <div class="font-mono flex-1">
+        <% if multi %>
+          <%== part("components/form/textarea", name: "multi-cli", attributes: {cols: 80, rows: 6, placeholder: "Multiple commands, one per line", autofocus: true, required: true}) %>
+        <% else %>
+          <%== part("components/form/text", name: "cli", value: @cli, prefix: "ubi", attributes: {placeholder: "Command. i.e: 'vm list'", autofocus: true, required: true}) %>
+        <% end %>
+      </div>
+      <%== part("components/form/submit_button", text: "Run") %>
+    </div>
+
+    <% if @clis && !@clis.empty? %>
+      <p>Remaining commands:</p>
+      <% @clis.each do %>
+        <pre><tt class="next-clis"><%= it %></tt></pre>
+        <input type="hidden" name="clis[]" value="<%= it %>">
+      <% end %>
+    <% end %>
+
+    <% if @last_cli %>
+      <p class="mt-4">Ran command:</p>
+      <pre><tt id="cli-executed"><%= @last_cli %></tt></pre>
+
+      <p class="mt-4"><%= @ubi_command_execute ? "Would execute" : "Output" %>:</p>
+      <pre><tt id="cli-output"><%== @output %></tt></pre>
+
+      <% if @ubi_confirm %>
+        <%== part("components/form/text", name: "confirm", label: @ubi_confirm) %>
+      <% end %>
+    <% end %>
+  </form>
+
+  <% if !@last_cli && !@cli %>
+    <% unless multi %>
+      <h2 class="mt-6 text-xl font-bold">Examples</h2>
+      <dl class="mt-2">
+        <dt><code>help -ru</code></dt>
+        <dd class="inline-block ml-6 mb-2">Display the syntax for all supported commands</dd>
+        <dt><code>help -r</code></dt>
+        <dd class="inline-block ml-6 mb-2">Show full help for all supported commands</dd>
+        <dt><code>vm list</code></dt>
+        <dd class="inline-block ml-6">List all virtual machines</dd>
+      </dl>
+
+      <p class="mt-6 text-base">This page allows execution of a single command. However, you can also
+        <a class="font-medium text-orange-600 hover:text-orange-700" href="?multi=t">schedule execution of multiple commands</a>.</p>
     <% end %>
   <% end %>
-
-  <% if @last_cli %>
-    <p class="mt-4">Ran command:</p>
-    <pre><tt id="cli-executed"><%= @last_cli %></tt></pre>
-
-    <p class="mt-4"><%= @ubi_command_execute ? "Would execute" : "Output" %>:</p>
-    <pre><tt id="cli-output"><%== @output %></tt></pre>
-
-    <% if @ubi_confirm %>
-      <%== part("components/form/text", name: "confirm", label: @ubi_confirm) %>
-    <% end %>
-  <% end %>
-</form>
-
-<% if !@last_cli && !@cli %>
-  <% if multi %>
-    <p class="mt-6 text-base">This page allows scheduling the execution of multiple commands, one per line. It will run the command on the first line and display the output, and the set the next command for execution.</p>
-  <% else %>
-    <p class="mt-6 text-base">This page provides access to a web version of <a class="font-medium text-orange-600 hover:text-orange-700" href="https://www.ubicloud.com/docs/quick-start/cli">Ubicloud's command line program</a>. You can use it without installing the command line program.  All features are available, except ones that execute external programs.</p>
-
-    <h2 class="mt-6 text-xl font-bold">Examples</h2>
-    <dl class="mt-2">
-      <dt><code>help -ru</code></dt>
-      <dd class="inline-block ml-6 mb-2">Display the syntax for all supported commands</dd>
-      <dt><code>help -r</code></dt>
-      <dd class="inline-block ml-6 mb-2">Show full help for all supported commands</dd>
-      <dt><code>vm list</code></dt>
-      <dd class="inline-block ml-6">List all virtual machines</dd>
-    </dl>
-
-    <p class="mt-6 text-base">This page allows execution of a single command. However, you can also <a class="font-medium text-orange-600 hover:text-orange-700" href="?multi=t">schedule execution of multiple commands</a>.</p>
-  <% end %>
-<% end %>
+</div>
