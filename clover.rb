@@ -546,7 +546,7 @@ class Clover < Roda
         .strip
         .squeeze(" ")
         .slice(0...63)
-      name = "Unknown" if name.empty?
+      name = "Unknown" unless Validation::ALLOWED_ACCOUNT_NAME.match?(name)
       scope.before_rodauth_create_account(account, name)
     end
 
