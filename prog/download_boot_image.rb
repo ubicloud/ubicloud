@@ -185,7 +185,7 @@ class Prog::DownloadBootImage < Prog::Base
     when "Failed"
       sshable.cmd("cat var/log/#{q_daemon_name}.stderr || true")
       sshable.cmd("cat var/log/#{q_daemon_name}.stdout || true")
-      if Config.production?
+      if Config.production? && !Config.is_e2e
         BootImage.where(vm_host_id: vm_host.id, name: image_name, version: version).destroy
       else
         sshable.cmd("common/bin/daemonizer --clean #{q_daemon_name}")
