@@ -19,7 +19,7 @@ class Clover
       end
 
       filter[:location_id] = @location.id
-      kc = @project.kubernetes_clusters_dataset.first(filter)
+      kc = @kc = @project.kubernetes_clusters_dataset.first(filter)
 
       check_found_object(kc)
 
@@ -29,8 +29,7 @@ class Clover
           if api?
             Serializers::KubernetesCluster.serialize(kc, {detailed: true})
           else
-            @kc = kc
-            view "kubernetes-cluster/show"
+            r.redirect kc, "/overview"
           end
         end
 
@@ -45,6 +44,14 @@ class Clover
       end
 
       r.rename kc, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesCluster
+
+      r.get web?, %w[overview nodes settings] do |page|
+        authorize("KubernetesCluster:view", kc.id)
+
+        response.headers["cache-control"] = "no-store"
+        @page = page
+        view "kubernetes-cluster/show"
+      end
 
       r.get "kubeconfig" do
         authorize("KubernetesCluster:edit", kc.id)

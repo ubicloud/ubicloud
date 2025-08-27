@@ -1,90 +1,17 @@
 <% @page_title = @kc.name %>
 
-<% if @kc.display_state != "running" %>
-  <div class="auto-refresh hidden" data-interval="10"></div>
-<% end %>
-
-<%== part(
-  "components/page_header",
-  breadcrumbs: [
-    %w[Projects /project],
-    [@project.name, @project.path],
-    ["Kubernetes Clusters", "#{@project.path}/kubernetes-cluster"],
-    [@kc.name, "#"]
+<%== part("object/show",
+  object: @kc,
+  tabs: [
+    ["Overview", "overview", "hero-squares-plus"],
+    ["Nodes", "nodes", "hero-globe-alt"],
+    ["Settings", "settings", "hero-cog-8-tooth"]
   ],
-  left_items: [part("components/kubernetes_state_label", state: @kc.display_state, extra_class: "text-md")]
+  type: "kubernetes-cluster",
+  breadcrumb_label: "Kubernetes Clusters",
+  right_header: part("components/kubernetes_state_label", state: @kc.display_state, extra_class: "text-md")
 ) %>
 
 <div class="grid gap-6">
-  <!-- Detail Card -->
-  <% data = [
-    ["ID", @kc.ubid],
-    ["Name", @kc.name],
-    ["Location", @kc.display_location],
-    ["Kubernetes Version", @kc.version],
-    ["Control Plane Nodes", @kc.cp_node_count],
-    ["Worker Nodes", @kc.nodepools.sum { it.node_count }]
-  ]
-  
-  if @kc.display_state == "running"
-    data.push(["Service URL", @kc.services_lb.hostname, { copyable: true }]) # TODO: Assign LB to a column properly
-    data.push(["Kubeconfig", part("components/download_button", link: "#{path(@kc)}/kubeconfig"), { escape: false }])
-  else
-    data.push(["Kubeconfig", "Waiting for cluster to be ready..."])
-  end %>
-
-  <%== part("components/kv_data_card", data: data) %>
-  <!-- Nodes Card -->
-  <% @nodes = []
-  
-  @nodes +=
-    @kc.cp_vms.map do |vm|
-      { name: vm.name, role: "Control Plane", state: vm.display_state, hostname: vm.ephemeral_net4.to_s }
-    end
-  
-  @nodes +=
-    @kc
-      .nodepools_dataset
-      .eager(:vms)
-      .flat_map do |np|
-        np.vms.map { |vm| { name: vm.name, role: "Worker", state: vm.display_state, hostname: vm.ephemeral_net4.to_s } }
-      end %>
-
-  <%== part(
-    "components/table_card",
-    title: "Nodes",
-    headers: %w[Name Role State Hostname],
-    empty_state: "This cluster doesn't have any nodes yet",
-    rows:
-      @nodes.map { |n| [[n[:name], n[:role], n[:state], [n[:hostname], { copyable: true }]], { id: "node-#{n[:name]}" }] }
-  ) %>
   <!-- Danger Zone -->
-  <% if has_permission?("KubernetesCluster:delete", @kc.ubid) %>
-    <div>
-      <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
-        <div class="min-w-0 flex-1">
-          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-            Danger Zone
-          </h3>
-        </div>
-      </div>
-      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-        <!-- Delete Card -->
-        <div class="px-4 py-5 sm:p-6">
-          <div class="sm:flex sm:items-center sm:justify-between">
-            <div>
-              <h3 class="text-base font-semibold leading-6 text-gray-900">Delete Kubernetes Cluster</h3>
-              <div class="mt-2 text-sm text-gray-500">
-                <p>This action will permanently delete this cluster. Deleted data cannot be recovered. Use it
-                  carefully.</p>
-              </div>
-            </div>
-            <div id="kc-delete-<%=@kc.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-              <%== part("components/delete_button", confirmation: @kc.name, redirect: "#{@project.path}/kubernetes-cluster") %>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  <% end %>
 </div>

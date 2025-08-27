@@ -242,12 +242,6 @@ RSpec.describe Clover, "Kubernetes" do
         KubernetesNode.create(vm_id: create_vm(name: "node1").id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
 
         kc.reload
-        page.refresh
-
-        expect(page).to have_content "cp1"
-        expect(page).to have_content "cp2"
-        expect(page).to have_content "node1"
-
         expect(kc.display_state).to eq("creating")
         expect(page.body).to include "auto-refresh hidden"
         expect(page.body).to include "creating"
@@ -262,11 +256,17 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page).to have_no_content "Waiting for cluster to be ready..."
         expect(page).to have_content "Download"
 
+        within("#kubernetes-cluster-submenu") { click_link "Nodes" }
+
+        expect(page).to have_content "cp1"
+        expect(page).to have_content "cp2"
+        expect(page).to have_content "node1"
+
         kc.incr_destroy
         kc.reload
 
         expect(kc.display_state).to eq("deleting")
-        page.refresh
+        within("#kubernetes-cluster-submenu") { click_link "Overview" }
         expect(page.body).to include "deleting"
         expect(page.body).to include "auto-refresh hidden"
       end
@@ -360,6 +360,7 @@ RSpec.describe Clover, "Kubernetes" do
     describe "delete" do
       it "can delete kubernetes cluster" do
         visit "#{project.path}#{kc.path}"
+        within("#kubernetes-cluster-submenu") { click_link "Settings" }
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
@@ -373,7 +374,7 @@ RSpec.describe Clover, "Kubernetes" do
         # Give permission to view, so we can see the detail page
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["KubernetesCluster:view"])
 
-        visit "#{project_wo_permissions.path}#{kc_no_perm.path}"
+        visit "#{project_wo_permissions.path}#{kc_no_perm.path}/settings"
         expect(page.title).to eq "Ubicloud - not-my-k8s"
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
