@@ -1,0 +1,18 @@
+<% if has_permission?("LoadBalancer:delete", @lb.ubid) %>
+  <div class="p-6 overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div class="px-4 py-5 sm:p-6">
+      <div class="sm:flex sm:items-center sm:justify-between">
+        <div>
+          <h3 class="text-base font-semibold leading-6 text-gray-900">Delete load balancer</h3>
+          <div class="mt-2 text-sm text-gray-500">
+            <p>This action will permanently delete this load balancer. Deleted load balancer cannot be recovered. Use it
+              carefully.</p>
+          </div>
+        </div>
+        <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+          <%== part("components/delete_button", url: path(@lb), confirmation: @lb.name, redirect: "#{@project.path}/load-balancer") %>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>

@@ -215,7 +215,7 @@ RSpec.describe Clover, "load balancer" do
         lb.add_cert(cert)
         vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
 
-        visit "#{project.path}#{lb.path}"
+        visit "#{project.path}#{lb.path}/vms"
         select vm.name, from: "vm_id"
         click_button "Attach"
 
@@ -223,7 +223,7 @@ RSpec.describe Clover, "load balancer" do
         expect(page).to have_flash_notice("VM is attached to the load balancer")
         expect(lb.vms.count).to eq(1)
 
-        expect(Config).to receive(:load_balancer_service_hostname).and_return("lb.ubicloud.com")
+        expect(Config).to receive(:load_balancer_service_hostname).and_return("lb.ubicloud.com").twice
         visit "#{project.path}#{lb.path}"
         expect(page.all("dt,dd").map(&:text)).to eq [
           "ID", lb.ubid,
@@ -236,11 +236,13 @@ RSpec.describe Clover, "load balancer" do
           "Application Port", "8000",
           "HTTP Health Check Endpoint", "/up"
         ]
+        visit "#{project.path}#{lb.path}/vms"
         expect(page.all("#lb-vms td").map(&:text)).to eq [
           "dummy-vm-1", "down", "Detach",
           "Select a VM", "", "Attach"
         ]
 
+        within("#load-balancer-submenu") { click_link "Overview" }
         click_link "dummy-ps-1"
         expect(page.title).to eq("Ubicloud - #{ps.name}")
       end
@@ -256,6 +258,7 @@ RSpec.describe Clover, "load balancer" do
         vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
 
         visit "#{project.path}#{lb2.path}"
+        within("#load-balancer-submenu") { click_link "Virtual Machines" }
         select vm.name, from: "vm_id"
         lb1.add_vm(vm)
         click_button "Attach"
@@ -270,7 +273,7 @@ RSpec.describe Clover, "load balancer" do
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
         vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
 
-        visit "#{project.path}#{lb.path}"
+        visit "#{project.path}#{lb.path}/vms"
         select vm.name, from: "vm_id"
         vm.nics.first.destroy
         vm.destroy
@@ -293,7 +296,7 @@ RSpec.describe Clover, "load balancer" do
 
         lb.add_vm(vm)
 
-        visit "#{project.path}#{lb.path}"
+        visit "#{project.path}#{lb.path}/vms"
         expect(page).to have_content vm.name
         click_button "Detach"
 
@@ -313,10 +316,9 @@ RSpec.describe Clover, "load balancer" do
         lb.add_cert(cert)
         vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
 
-        visit "#{project.path}#{lb.path}"
+        visit "#{project.path}#{lb.path}/vms"
         select "dummy-vm-1", from: "vm_id"
         click_button "Attach"
-        visit "#{project.path}#{lb.path}"
 
         expect(page.title).to eq("Ubicloud - #{lb.name}")
         expect(lb.reload.vms.count).to eq(1)
@@ -328,6 +330,16 @@ RSpec.describe Clover, "load balancer" do
         expect(page).to have_content "No matching VM found in eu-central-h1"
         expect(lb.reload.vms.count).to eq(0)
       end
+
+      it "can not attach vms without permissions" do
+        # Give permission to view, so we can see the detail page
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["LoadBalancer:view"])
+
+        visit "#{project_wo_permissions.path}#{lb_wo_permission.path}/vms"
+        expect(page.title).to eq "Ubicloud - dummy-lb-2"
+
+        expect(page.body).not_to include "attach-vm"
+      end
     end
 
     describe "delete" do
@@ -336,6 +348,7 @@ RSpec.describe Clover, "load balancer" do
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
 
         visit "#{project.path}#{lb.path}"
+        within("#load-balancer-submenu") { click_link "Settings" }
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
@@ -349,7 +362,7 @@ RSpec.describe Clover, "load balancer" do
         # Give permission to view, so we can see the detail page
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["LoadBalancer:view"])
 
-        visit "#{project_wo_permissions.path}#{lb_wo_permission.path}"
+        visit "#{project_wo_permissions.path}#{lb_wo_permission.path}/settings"
         expect(page.title).to eq "Ubicloud - dummy-lb-2"
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
@@ -359,7 +372,7 @@ RSpec.describe Clover, "load balancer" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
 
-        visit "#{project.path}#{lb.path}"
+        visit "#{project.path}#{lb.path}/settings"
 
         lb.update(name: "new-name")
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.

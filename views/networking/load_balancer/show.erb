@@ -1,119 +1,13 @@
-<% @page_title = @lb.name
-attachable_vms = dataset_authorize(@lb.private_subnet.vms_dataset.eager(:location), "Vm:view")
-  .exclude(Sequel[:vm][:id] => @lb.vms_dataset.select(Sequel[:vm][:id]))
-  .all
-load_balancer_path = "#{@project.path}#{@lb.path}" %>
+<% @page_title = @lb.name %>
 
-<%== part(
-  "components/page_header",
-  breadcrumbs: [
-    %w[Projects /project],
-    [@project.name, @project.path],
-    ["Load Balancer", "#{@project.path}/load-balancer"],
-    [@lb.name, "#"]
-  ]
+<%== part("object/show",
+  object: @lb,
+  tabs: [
+    ["Overview", "overview", "hero-squares-plus"],
+    ["Virtual Machines", "vms", "hero-server-stack"],
+    ["Settings", "settings", "hero-cog-8-tooth"]
+  ],
+  type: "load-balancer",
+  prefix: "networking/load_balancer",
+  breadcrumb_label: "Load Balancer",
 ) %>
-
-<div class="grid gap-6">
-  <!-- Detail Card -->
-  <%== part(
-    "components/kv_data_card",
-    data: [
-      ["ID", @lb.ubid],
-      ["Name", @lb.name],
-      ["Connection String", @lb.hostname, { copyable: true }],
-      [
-        "Private Subnet",
-        "<a href='#{path(@lb.private_subnet)}' class='text-rose-500 hover:underline'>#{@lb.private_subnet.name}</a>",
-        { escape: false }
-      ],
-      ["Algorithm", (@lb.algorithm == "round_robin") ? "Round Robin" : "Hash Based"],
-      ["Stack", @lb.stack.gsub("ip", "IP")],
-      ["Load Balancer Port", @lb.src_port],
-      ["Application Port", @lb.dst_port],
-      ["HTTP Health Check Endpoint", @lb.health_check_endpoint]
-    ]
-  ) %>
-  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
-    <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-        Attached VMs
-      </h3>
-    </div>
-  </div>
-  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-    <table class="min-w-full divide-y divide-gray-300">
-      <thead class="bg-gray-50">
-        <tr>
-          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">VM</th>
-          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Application State</th>
-          <% if has_permission?("LoadBalancer:edit", @lb.ubid) %>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
-          <% end %>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200 bg-white" id="lb-vms">
-        <% @lb.vms(eager: :load_balancer_vm_ports).each do |vm| %>
-          <tr>
-            <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <a href="<%= path(vm) %>" class="text-orange-600 hover:text-orange-700"><%= vm.name %></a>
-            </td>
-            <td class="px-3 py-3.5 whitespace-nowrap text-sm text-gray-900">
-              <%= vm.load_balancer_state %>
-            </td>
-            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-              <form action="<%= "#{load_balancer_path}/detach-vm" %>" role="form" method="POST">
-                <%== csrf_tag("#{load_balancer_path}/detach-vm") %>
-                <input type="hidden" name="vm_id" value="<%= vm.ubid %>">
-                <%== part("components/form/submit_button", text: "Detach") %>
-              </form>
-            </td>
-          </tr>
-        <% end %>
-        <% if has_permission?("LoadBalancer:edit", @lb.ubid) %>
-          <tr>
-            <td class="whitespace-nowrap py-4 pl-2 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <%== part(
-                "components/form/select",
-                name: "vm_id",
-                placeholder: "Select a VM",
-                options: attachable_vms.map { [it.ubid, it.name] },
-                attributes: {
-                  required: true,
-                  form: "form-lb-#{@lb.ubid}"
-                }
-              ) %>
-            </td>
-            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-            </td>
-            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-              <form action="<%= "#{load_balancer_path}/attach-vm" %>" role="form" method="POST" id="form-lb-<%= @lb.ubid %>">
-                <%== csrf_tag("#{load_balancer_path}/attach-vm") %>
-                <%== part("components/form/submit_button", text: "Attach") %>
-              </form>
-            </td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
-  </div>
-  <!-- Delete Card -->
-  <% if has_permission?("LoadBalancer:delete", @lb.ubid) %>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <div class="px-4 py-5 sm:p-6">
-        <div class="sm:flex sm:items-center sm:justify-between">
-          <div>
-            <h3 class="text-base font-semibold leading-6 text-gray-900">Delete load balancer</h3>
-            <div class="mt-2 text-sm text-gray-500">
-              <p>This action will permanently delete this load balancer. Deleted load balancer cannot be recovered. Use
-                it carefully.</p>
-            </div>
-          </div>
-          <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-            <%== part("components/delete_button", confirmation: @lb.name, redirect: "#{@project.path}/load-balancer") %>
-          </div>
-        </div>
-      </div>
-    </div>
-  <% end %>
-</div>
