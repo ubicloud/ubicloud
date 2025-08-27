@@ -628,9 +628,33 @@ RSpec.describe Clover, "vm" do
       end
     end
 
+    describe "networking" do
+      it "shows firewall rules" do
+        visit "#{project.path}#{vm.path}"
+        within("#vm-submenu") { click_link "Networking" }
+        expect(page.all("#vm-firewall-rules td").map(&:text)).to eq [
+          "default-eu-central-h1-default", "0.0.0.0/0", "0..65535",
+          "default-eu-central-h1-default", "::/0", "0..65535"
+        ]
+        page.all("#vm-firewall-rules td a").first.click
+        expect(page.title).to eq "Ubicloud - default-eu-central-h1-default"
+      end
+
+      it "does not link to firewalls that are not viewable" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Vm:view"])
+        visit "#{project_wo_permissions.path}#{vm_wo_permission.path}/networking"
+        expect(page.all("#vm-firewall-rules td").map(&:text)).to eq [
+          "default-eu-central-h1-default", "0.0.0.0/0", "0..65535",
+          "default-eu-central-h1-default", "::/0", "0..65535"
+        ]
+        expect(page.all("#vm-firewall-rules td a").to_a).to eq []
+      end
+    end
+
     describe "delete" do
       it "can delete virtual machine" do
         visit "#{project.path}#{vm.path}"
+        within("#vm-submenu") { click_link "Settings" }
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript engine.
@@ -644,7 +668,7 @@ RSpec.describe Clover, "vm" do
         # Give permission to view, so we can see the detail page
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Vm:view"])
 
-        visit "#{project_wo_permissions.path}#{vm_wo_permission.path}"
+        visit "#{project_wo_permissions.path}#{vm_wo_permission.path}/settings"
         expect(page.title).to eq "Ubicloud - dummy-vm-2"
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
@@ -654,11 +678,21 @@ RSpec.describe Clover, "vm" do
     describe "restart" do
       it "can restart vm" do
         visit "#{project.path}#{vm.path}"
+        within("#vm-submenu") { click_link "Settings" }
         expect(page).to have_content "Restart"
         click_button "Restart"
 
         expect(page.status_code).to eq(200)
         expect(vm.restart_set?).to be true
+      end
+
+      it "can not restart virtual machine without edit permissions" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Vm:view"])
+
+        visit "#{project_wo_permissions.path}#{vm_wo_permission.path}/settings"
+        expect(page.title).to eq "Ubicloud - dummy-vm-2"
+
+        expect(page).to have_no_content "Restart"
       end
     end
   end
