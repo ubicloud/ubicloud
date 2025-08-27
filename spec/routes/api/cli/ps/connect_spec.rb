@@ -6,7 +6,7 @@ RSpec.describe Clover, "cli ps connect" do
   before do
     cli(%w[ps eu-central-h1/test-ps create])
     cli(%w[ps eu-central-h1/test-ps2 create])
-    @ps1, @ps2 = PrivateSubnet.all
+    @ps1, @ps2 = PrivateSubnet.order(:name).all
   end
 
   it "connects requested private subnet to this subnet by id" do
