@@ -1,0 +1,49 @@
+<div class="p-6">
+  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+    <div class="min-w-0 flex-1">
+      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+        Danger Zone
+      </h3>
+    </div>
+  </div>
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <!-- Restart Card -->
+    <% if has_permission?("Vm:edit", @vm.id) %>
+      <div class="px-4 py-5 sm:p-6">
+        <form action="<%= "#{path(@vm)}/restart" %>" role="form" method="POST">
+          <%== csrf_tag("#{path(@vm)}/restart") %>
+          <div class="sm:flex sm:items-center sm:justify-between">
+            <div>
+              <h3 class="text-base font-semibold leading-6 text-gray-900">Restart virtual machine</h3>
+              <div class="mt-2 text-sm text-gray-500">
+                <p>This action will restart the virtual machine, causing it to be temporarily offline.</p>
+              </div>
+            </div>
+            <div id="vm-restart-<%= @vm.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+              <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                <%== part("components/form/submit_button", text: "Restart", extra_class: "restart-btn") %>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    <% end %>
+    <!-- Delete Card -->
+    <% if has_permission?("Vm:delete", @vm.ubid) %>
+      <div class="px-4 py-5 sm:p-6">
+        <div class="sm:flex sm:items-center sm:justify-between">
+          <div>
+            <h3 class="text-base font-semibold leading-6 text-gray-900">Delete virtual machine</h3>
+            <div class="mt-2 text-sm text-gray-500">
+              <p>This action will permanently delete this virtual machine. Deleted data cannot be recovered. Use it
+                carefully.</p>
+            </div>
+          </div>
+          <div id="vm-delete-<%= @vm.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+            <%== part("components/delete_button", confirmation: @vm.name, url: path(@vm), redirect: "#{@project.path}/vm") %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>

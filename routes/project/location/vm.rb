@@ -24,8 +24,12 @@ class Clover
 
       r.get true do
         authorize("Vm:view", vm.id)
-        @vm = vm
-        api? ? Serializers::Vm.serialize(vm, {detailed: true}) : view("vm/show")
+
+        if api?
+          Serializers::Vm.serialize(vm, {detailed: true})
+        else
+          r.redirect vm, "/overview"
+        end
       end
 
       r.delete true do
@@ -41,6 +45,15 @@ class Clover
 
       r.rename vm, perm: "Vm:edit", serializer: Serializers::Vm
 
+      r.get web?, %w[overview networking settings] do |page|
+        authorize("Vm:view", vm.id)
+
+        response.headers["cache-control"] = "no-store"
+        @page = page
+        @vm = vm
+        view "vm/show"
+      end
+
       r.post "restart" do
         authorize("Vm:edit", vm.id)
 
@@ -53,7 +66,7 @@ class Clover
           Serializers::Vm.serialize(vm, {detailed: true})
         else
           flash["notice"] = "'#{vm.name}' will be restarted in a few seconds"
-          r.redirect vm
+          r.redirect vm, "/settings"
         end
       end
     end
