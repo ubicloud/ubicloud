@@ -43,16 +43,24 @@ class Clover
           if api?
             Serializers::Firewall.serialize(firewall, {detailed: true})
           else
-            view "networking/firewall/show"
+            r.redirect firewall, "/overview"
           end
         end
       end
 
       r.rename firewall, perm: "Firewall:edit", serializer: Serializers::Firewall
 
+      r.get web?, %w[overview networking settings] do |page|
+        authorize("Firewall:view", firewall.id)
+
+        response.headers["cache-control"] = "no-store"
+        @page = page
+        view "networking/firewall/show"
+      end
+
       r.post %w[attach-subnet detach-subnet] do |action|
         authorize("Firewall:view", firewall.id)
-        handle_validation_failure("networking/firewall/show")
+        handle_validation_failure("networking/firewall/show") { @page = "networking" }
 
         unless (private_subnet = authorized_private_subnet(location_id: @location.id, perm: "PrivateSubnet:edit"))
           fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{typecast_params.str("private_subnet_id")}\" and the location \"#{@location.display_name}\" is not found"})
@@ -76,14 +84,14 @@ class Clover
           Serializers::Firewall.serialize(firewall, {detailed: true})
         else
           flash["notice"] = "Private subnet #{private_subnet.name} is #{actioned} the firewall"
-          r.redirect firewall
+          r.redirect firewall, "/networking"
         end
       end
 
       r.on "firewall-rule" do
         r.post true do
           authorize("Firewall:edit", firewall.id)
-          handle_validation_failure("networking/firewall/show")
+          handle_validation_failure("networking/firewall/show") { @page = "networking" }
 
           parsed_cidr = Validation.validate_cidr(typecast_params.str!("cidr"))
           port_range = Validation.validate_port_range(typecast_params.str("port_range"))
@@ -99,7 +107,7 @@ class Clover
             Serializers::FirewallRule.serialize(firewall_rule)
           else
             flash["notice"] = "Firewall rule is created"
-            r.redirect firewall
+            r.redirect firewall, "/networking"
           end
         end
 
