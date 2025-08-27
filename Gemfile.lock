@@ -308,7 +308,7 @@ GEM
     regexp_parser (2.11.2)
     reline (0.6.1)
       io-console (~> 0.5)
-    rexml (3.4.1)
+    rexml (3.4.2)
     rodauth (2.40.0)
       roda (>= 2.6.0)
       sequel (>= 4)
