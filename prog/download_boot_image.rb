@@ -183,6 +183,8 @@ class Prog::DownloadBootImage < Prog::Base
       params = {image_name:, url:, version:, sha256sum:, certs:, use_htcat: download_from_r2?}
       sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image' #{q_daemon_name}", stdin: params.to_json)
     when "Failed"
+      sshable.cmd("cat var/log/#{q_daemon_name}.stderr || true")
+      sshable.cmd("cat var/log/#{q_daemon_name}.stdout || true")
       if Config.production?
         BootImage.where(vm_host_id: vm_host.id, name: image_name, version: version).destroy
       else
