@@ -1,0 +1,25 @@
+<% @nodes = []
+
+@nodes +=
+  @kc.cp_vms.map do |vm|
+    { name: vm.name, role: "Control Plane", state: vm.display_state, hostname: vm.ephemeral_net4.to_s }
+  end
+
+@nodes +=
+  @kc
+    .nodepools_dataset
+    .eager(:vms)
+    .flat_map do |np|
+      np.vms.map { |vm| { name: vm.name, role: "Worker", state: vm.display_state, hostname: vm.ephemeral_net4.to_s } }
+    end %>
+
+<div class="p-6">
+  <%== part(
+    "components/table_card",
+    title: "Nodes",
+    headers: %w[Name Role State Hostname],
+    empty_state: "This cluster doesn't have any nodes yet",
+    rows:
+      @nodes.map { |n| [[n[:name], n[:role], n[:state], [n[:hostname], { copyable: true }]], { id: "node-#{n[:name]}" }] }
+  ) %>
+</div>
