@@ -29,7 +29,7 @@
   <form action="<%= request.path_info %>" method="POST">
     <%== csrf_tag(request.path_info) %>
 
-    <div class="flex gap-2 justify-between">
+    <div class="flex gap-2 justify-between mb-6">
       <div class="font-mono flex-1">
         <% if multi %>
           <%== part("components/form/textarea", name: "multi-cli", attributes: {cols: 80, rows: 6, placeholder: "Multiple commands, one per line", autofocus: true, required: true}) %>
@@ -40,41 +40,62 @@
       <%== part("components/form/submit_button", text: "Run") %>
     </div>
 
-    <% if @clis && !@clis.empty? %>
-      <p>Remaining commands:</p>
-      <% @clis.each do %>
-        <pre><tt class="next-clis"><%= it %></tt></pre>
-        <input type="hidden" name="clis[]" value="<%= it %>">
-      <% end %>
-    <% end %>
+    <div
+      class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200 <%= (multi && !@cli) ? "hidden" : ""%>"
+    >
+      <div class="px-4 py-5 sm:p-6 space-y-6">
+        <% if @clis && !@clis.empty? %>
+          <div class="space-y-2">
+            <p class="text-xl font-semibold">Remaining commands:</p>
+            <div class="w-full text-sm border p-3 bg-slate-100 text-rose-500 font-mono rounded">
+              <% @clis.each do %>
+                <pre><tt class="next-clis"><%= it %></tt></pre>
+                <input type="hidden" name="clis[]" value="<%= it %>">
+              <% end %>
+            </div>
+          </div>
+        <% end %>
 
-    <% if @last_cli %>
-      <p class="mt-4">Ran command:</p>
-      <pre><tt id="cli-executed"><%= @last_cli %></tt></pre>
+        <% if @last_cli %>
+          <div class="space-y-2">
+            <p class="text-xl font-semibold">Ran command:</p>
+            <div class="w-full text-sm border p-3 bg-slate-100 text-rose-500 font-mono rounded">
+              <pre><tt id="cli-executed"><%== @last_cli %></tt></pre>
+            </div>
+          </div>
 
-      <p class="mt-4"><%= @ubi_command_execute ? "Would execute" : "Output" %>:</p>
-      <pre><tt id="cli-output"><%== @output %></tt></pre>
+          <div class="space-y-2">
+            <p class="text-xl font-semibold"><%= @ubi_command_execute ? "Would execute" : "Output" %>:</p>
+            <div class="w-full text-sm border p-3 bg-slate-100 text-rose-500 font-mono rounded">
+              <pre><tt id="cli-output"><%== @output %></tt></pre>
+            </div>
+          </div>
+          <% if @ubi_confirm %>
+            <%== part("components/form/text", name: "confirm", label: @ubi_confirm) %>
+          <% end %>
+        <% end %>
 
-      <% if @ubi_confirm %>
-        <%== part("components/form/text", name: "confirm", label: @ubi_confirm) %>
-      <% end %>
-    <% end %>
+        <% if !@last_cli && !@cli %>
+          <% unless multi %>
+            <div class="space-y-2">
+              <h2 class="text-xl font-semibold">Examples</h2>
+              <dl class="w-full text-sm border p-3 bg-slate-100 text-rose-500 font-mono rounded">
+                <dt><code>help -ru</code></dt>
+                <dd class="inline-block ml-6 mb-4">Display the syntax for all supported commands</dd>
+                <dt><code>help -r</code></dt>
+                <dd class="inline-block ml-6 mb-4">Show full help for all supported commands</dd>
+                <dt><code>vm list</code></dt>
+                <dd class="inline-block ml-6">List all virtual machines</dd>
+              </dl>
+            </div>
+
+            <p>
+              This page allows execution of a single command. However, you can also
+              <a class="font-medium text-orange-600 hover:text-orange-700" href="?multi=t">schedule execution of multiple commands</a>.
+            </p>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
   </form>
-
-  <% if !@last_cli && !@cli %>
-    <% unless multi %>
-      <h2 class="mt-6 text-xl font-bold">Examples</h2>
-      <dl class="mt-2">
-        <dt><code>help -ru</code></dt>
-        <dd class="inline-block ml-6 mb-2">Display the syntax for all supported commands</dd>
-        <dt><code>help -r</code></dt>
-        <dd class="inline-block ml-6 mb-2">Show full help for all supported commands</dd>
-        <dt><code>vm list</code></dt>
-        <dd class="inline-block ml-6">List all virtual machines</dd>
-      </dl>
-
-      <p class="mt-6 text-base">This page allows execution of a single command. However, you can also
-        <a class="font-medium text-orange-600 hover:text-orange-700" href="?multi=t">schedule execution of multiple commands</a>.</p>
-    <% end %>
-  <% end %>
 </div>
