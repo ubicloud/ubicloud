@@ -24,7 +24,7 @@ class Clover
 
       r.post "connect" do
         authorize("PrivateSubnet:connect", ps.id)
-        handle_validation_failure("networking/private_subnet/show")
+        handle_validation_failure("networking/private_subnet/show") { @page = "networking" }
         unless (subnet = authorized_private_subnet(key: "connected-subnet-id", perm: "PrivateSubnet:connect"))
           raise CloverError.new(400, "InvalidRequest", "Subnet to be connected not found")
         end
@@ -38,13 +38,13 @@ class Clover
           Serializers::PrivateSubnet.serialize(ps)
         else
           flash["notice"] = "#{subnet.name} will be connected in a few seconds"
-          r.redirect ps
+          r.redirect ps, "/networking"
         end
       end
 
       r.post "disconnect", :ubid_uuid do |id|
         authorize("PrivateSubnet:disconnect", ps.id)
-        handle_validation_failure("networking/private_subnet/show")
+        handle_validation_failure("networking/private_subnet/show") { @page = "networking" }
         unless (subnet = authorized_private_subnet(id:, perm: "PrivateSubnet:disconnect"))
           raise CloverError.new(400, "InvalidRequest", "Subnet to be disconnected not found")
         end
@@ -58,7 +58,7 @@ class Clover
           Serializers::PrivateSubnet.serialize(ps)
         else
           flash["notice"] = "#{subnet.name} will be disconnected in a few seconds"
-          r.redirect ps
+          r.redirect ps, "/networking"
         end
       end
 
@@ -68,7 +68,7 @@ class Clover
           if api?
             Serializers::PrivateSubnet.serialize(ps)
           else
-            view "networking/private_subnet/show"
+            r.redirect ps, "/overview"
           end
         end
 
@@ -99,6 +99,14 @@ class Clover
       end
 
       r.rename ps, perm: "PrivateSubnet:edit", serializer: Serializers::PrivateSubnet
+
+      r.get web?, %w[overview vms networking settings] do |page|
+        authorize("PrivateSubnet:view", ps.id)
+
+        response.headers["cache-control"] = "no-store"
+        @page = page
+        view "networking/private_subnet/show"
+      end
     end
   end
 end

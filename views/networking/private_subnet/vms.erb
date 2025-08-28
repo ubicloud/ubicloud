@@ -1,0 +1,31 @@
+<% viewable_vm_map = dataset_authorize(Vm.where(id: @ps.nics_dataset.select(:vm_id)), "Vm:view").select_hash(:id, Sequel.as(true, :v)) %>
+
+<div id="private-subnet-nics" class="p-6">
+  <%== part(
+    "components/table_card",
+    title: "Attached VMs",
+    headers: ["VM", "Private IPv4", "Private IPv6"],
+    empty_state: "No VM attached",
+    rows:
+      @ps.nics(eager: :vm).map do |nic|
+        [
+          [
+            (
+              if nic.vm
+                if viewable_vm_map[nic.vm_id]
+                  [nic.vm.name, { link: path(nic.vm) }]
+                else
+                  [nic.vm.name, {}]
+                end
+              else
+                "-"
+              end
+            ),
+            [nic.private_ipv4_address, { copyable: true }],
+            [nic.private_ipv6_address, { copyable: true }]
+          ],
+          { id: "nic-#{nic.ubid}" }
+        ]
+      end
+  ) %>
+</div>

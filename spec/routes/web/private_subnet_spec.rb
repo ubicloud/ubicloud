@@ -144,7 +144,7 @@ RSpec.describe Clover, "private subnet" do
           ps = PrivateSubnet.first
           expect(ps.project_id).to eq(project.id)
 
-          visit "#{project.path}#{ps.path}"
+          visit "#{project.path}#{ps.path}/settings"
           btn = find ".delete-btn"
           page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
@@ -189,10 +189,23 @@ RSpec.describe Clover, "private subnet" do
           ipv4_addr: "172.17.226.186/32").id
         nic = Nic[n_id]
         visit "#{project.path}#{private_subnet.path}"
+        within("#private-subnet-submenu") { click_link "Virtual Machines" }
 
         expect(page.title).to eq("Ubicloud - #{private_subnet.name}")
         expect(page).to have_content nic.private_ipv4.network.to_s
         expect(page).to have_content nic.private_ipv6.nth(2).to_s
+
+        Prog::Vm::Nexus.assemble("key a", project.id, name: "dummy-vm", nic_id: n_id)
+        page.refresh
+        expect(page).to have_content "dummy-vm"
+        expect(page.all("#private-subnet-nics a").length).to eq 1
+        click_link "dummy-vm"
+        expect(page.title).to eq("Ubicloud - dummy-vm")
+
+        AccessControlEntry.where(project_id: project.id, action_id: nil).update(action_id: ActionType::NAME_MAP["PrivateSubnet:view"])
+        visit "#{project.path}#{private_subnet.path}/vms"
+        expect(page).to have_content "dummy-vm"
+        expect(page.all("#private-subnet-nics a").to_a).to eq []
       end
     end
 
@@ -202,7 +215,7 @@ RSpec.describe Clover, "private subnet" do
         fw = Firewall.create(name: "dummy-fw", description: "dummy-fw", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
         fw.associate_with_private_subnet(private_subnet)
 
-        visit "#{project.path}#{private_subnet.path}"
+        visit "#{project.path}#{private_subnet.path}/networking"
 
         expect(page.title).to eq("Ubicloud - #{private_subnet.name}")
         expect(page).to have_content fw.name
@@ -217,6 +230,7 @@ RSpec.describe Clover, "private subnet" do
         private_subnet.connect_subnet(ps2)
 
         visit "#{project.path}#{private_subnet.path}"
+        within("#private-subnet-submenu") { click_link "Networking" }
 
         expect(page).to have_content ps2.name
         expect(page.all("a").map(&:text)).to include ps2.name
@@ -233,7 +247,7 @@ RSpec.describe Clover, "private subnet" do
         ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID).subject
         private_subnet.connect_subnet(ps2)
 
-        visit "#{project.path}#{private_subnet.path}"
+        visit "#{project.path}#{private_subnet.path}/networking"
 
         expect(page).to have_content ps2.name
 
@@ -245,7 +259,7 @@ RSpec.describe Clover, "private subnet" do
         private_subnet
         ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID).subject
         expect(private_subnet.connected_subnets.count).to eq(0)
-        visit "#{project.path}#{private_subnet.path}"
+        visit "#{project.path}#{private_subnet.path}/networking"
 
         select ps2.name, from: "connected-subnet-id"
         click_button "Connect"
@@ -256,7 +270,7 @@ RSpec.describe Clover, "private subnet" do
       it "cannot connect to a subnet when it does not exist" do
         private_subnet
         ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID).subject
-        visit "#{project.path}#{private_subnet.path}"
+        visit "#{project.path}#{private_subnet.path}/networking"
         ps2.strand.destroy
         ps2.destroy
         select "dummy-ps-2", from: "connected-subnet-id"
@@ -269,7 +283,7 @@ RSpec.describe Clover, "private subnet" do
         private_subnet
         ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID).subject
         private_subnet.connect_subnet(ps2)
-        visit "#{project.path}#{private_subnet.path}"
+        visit "#{project.path}#{private_subnet.path}/networking"
         small_id, large_id = (private_subnet.id < ps2.id) ? [private_subnet.id, ps2.id] : [ps2.id, private_subnet.id]
         ConnectedSubnet.where(subnet_id_1: small_id, subnet_id_2: large_id).destroy
         ps2.semaphores.map(&:destroy)
@@ -286,6 +300,7 @@ RSpec.describe Clover, "private subnet" do
     describe "delete" do
       it "can delete private subnet" do
         visit "#{project.path}#{private_subnet.path}"
+        within("#private-subnet-submenu") { click_link "Settings" }
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
@@ -299,7 +314,7 @@ RSpec.describe Clover, "private subnet" do
         # Give permission to view, so we can see the detail page
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:view"])
 
-        visit "#{project_wo_permissions.path}#{ps_wo_permission.path}"
+        visit "#{project_wo_permissions.path}#{ps_wo_permission.path}/settings"
         expect(page.title).to eq "Ubicloud - dummy-ps-2"
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
@@ -312,7 +327,7 @@ RSpec.describe Clover, "private subnet" do
           ipv4_addr: "172.17.226.186/32").id
         Prog::Vm::Nexus.assemble("key a", project.id, name: "dummy-vm", nic_id: n_id)
 
-        visit "#{project.path}#{private_subnet.path}"
+        visit "#{project.path}#{private_subnet.path}/settings"
         btn = find ".delete-btn"
         Capybara.current_session.driver.header "Accept", "application/json"
         response = page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
