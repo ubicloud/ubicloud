@@ -88,6 +88,7 @@ class CloverAdmin < Roda
       id = DB[:admin_account].insert(login:)
       DB[:admin_password_hash].insert(id:, password_hash:)
     end
+    Clog.emit("Created admin account") { {admin_account_created: login} }
     password
   end
 
