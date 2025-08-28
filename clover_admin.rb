@@ -78,6 +78,10 @@ class CloverAdmin < Roda
   Forme.default_config = :clover_admin
 
   def self.create_admin_account(login)
+    if Config.production? && defined?(Pry)
+      raise "cannot create admin account in production via pry as it would log the password"
+    end
+
     password = SecureRandom.urlsafe_base64(16)
     password_hash = rodauth.new(nil).password_hash(password)
     DB.transaction do

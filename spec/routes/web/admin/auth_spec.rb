@@ -3,6 +3,14 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin do
+  unless ENV["CLOVER_FREEZE"] == "1"
+    it "does not allow calling create_admin_account inside Pry" do
+      expect(Config).to receive(:production?).and_return(true)
+      stub_const("CloverAdmin::Pry", true)
+      expect { described_class.create_admin_account("foo") }.to raise_error(RuntimeError)
+    end
+  end
+
   it "shows invalid security token if CSRF token is not valid" do
     visit "/login"
     find(".rodauth input[name=_csrf]", visible: false).set("")
