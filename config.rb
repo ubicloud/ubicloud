@@ -184,6 +184,7 @@ module Config
   override :ai_ubuntu_2404_nvidia_version, "20250505.1.0", string
   override :kubernetes_v1_32_version, "20250320.1.0", string
   override :kubernetes_v1_33_version, "20250506.1.0", string
+  override :kubernetes_v1_34_version, "20250828.1.0", string
 
   override :aws_based_postgres_16_ubuntu_2204_ami_version, "ami-0c15093fa829f190a", string
   override :aws_based_postgres_17_ubuntu_2204_ami_version, "ami-0c8f8ddefeb7bd695", string
