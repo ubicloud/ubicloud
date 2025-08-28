@@ -46,7 +46,7 @@ RSpec.describe Clover, "web shell" do
     ps = PrivateSubnet.first
     click_link ps.ubid
     expect(page.title).to eq "Ubicloud - foo"
-    expect(page).to have_current_path "#{project.path}#{ps.path}", ignore_query: true
+    expect(page).to have_current_path "#{project.path}#{ps.path}/overview", ignore_query: true
   end
 
   it "does not link ubids that cannot be matched" do

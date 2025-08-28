@@ -139,7 +139,7 @@ RSpec.describe Clover, "firewall" do
         fw = Firewall[name: name]
         expect(fw.private_subnets.first.id).to eq(ps.id)
 
-        visit "#{project.path}#{ps.path}"
+        visit "#{project.path}#{ps.path}/networking"
         expect(page).to have_content name
 
         visit "#{project.path}#{fw.path}"
@@ -242,7 +242,7 @@ RSpec.describe Clover, "firewall" do
         visit "#{project.path}#{firewall.path}/networking"
         expect(page).to have_content ps.name
 
-        visit "#{project.path}#{ps.path}"
+        visit "#{project.path}#{ps.path}/networking"
         expect(page).to have_content firewall.name
       end
 
