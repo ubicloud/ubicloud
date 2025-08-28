@@ -84,8 +84,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       health_check_endpoint: "/",
       health_check_protocol: "tcp",
       custom_hostname_dns_zone_id:,
-      custom_hostname_prefix: custom_services_hostname_prefix,
-      stack: LoadBalancer::Stack::IPV4 # TODO: Can we change this to DUAL?
+      custom_hostname_prefix: custom_services_hostname_prefix
     ).subject
 
     kubernetes_cluster.update(api_server_lb_id: api_server_lb.id, services_lb_id: services_lb.id)
