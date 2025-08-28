@@ -61,7 +61,7 @@ JSON
   }
 ]
 JSON
-      }.to raise_error RuntimeError, "only one one interface supported"
+      }.to raise_error RuntimeError, "only one interface supported"
     end
 
     it "crashes if more than one global unique address prefix is provided" do
