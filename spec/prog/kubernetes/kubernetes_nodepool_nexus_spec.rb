@@ -216,7 +216,6 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       st.update(prog: "Kubernetes::KubernetesNodepoolNexus", label: "destroy", stack: [{}])
       expect(kn.nodes).to all(receive(:incr_destroy))
       expect(kn.vms).to all(receive(:incr_destroy))
-      expect(kn).to receive(:remove_all_vms)
 
       expect { nx.destroy }.to nap(5)
     end
@@ -227,7 +226,6 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
 
       expect(kn.nodes).to all(receive(:incr_destroy))
       expect(kn.vms).to all(receive(:incr_destroy))
-      expect(kn).to receive(:remove_all_vms)
       expect(kn).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "kubernetes nodepool is deleted"})
     end

@@ -8,8 +8,7 @@ class KubernetesCluster < Sequel::Model
   many_to_one :services_lb, class: :LoadBalancer
   many_to_one :private_subnet
   many_to_one :project
-  many_to_many :cp_vms, join_table: :kubernetes_clusters_cp_vms, class: :Vm, order: :created_at
-  many_to_many :cp_vms_via_nodes, join_table: :kubernetes_node, right_key: :vm_id, class: :Vm, order: :created_at, conditions: {kubernetes_nodepool_id: nil}
+  many_to_many :cp_vms, join_table: :kubernetes_node, right_key: :vm_id, class: :Vm, order: :created_at, conditions: {kubernetes_nodepool_id: nil}
   one_to_many :nodes, class: :KubernetesNode, order: :created_at, conditions: {kubernetes_nodepool_id: nil}
   one_to_many :nodepools, class: :KubernetesNodepool
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, &:active
@@ -51,7 +50,7 @@ class KubernetesCluster < Sequel::Model
   end
 
   def sshable
-    cp_vms_via_nodes.first.sshable
+    cp_vms.first.sshable
   end
 
   def services_load_balancer_name
@@ -75,11 +74,11 @@ class KubernetesCluster < Sequel::Model
   end
 
   def kubeconfig
-    self.class.kubeconfig(cp_vms_via_nodes.first)
+    self.class.kubeconfig(cp_vms.first)
   end
 
   def vm_diff_for_lb(load_balancer)
-    worker_vms = nodepools.flat_map(&:vms_via_nodes)
+    worker_vms = nodepools.flat_map(&:vms)
     worker_vm_ids = worker_vms.map(&:id).to_set
     lb_vms = load_balancer.load_balancer_vms.map(&:vm)
     lb_vm_ids = lb_vms.map(&:id).to_set
@@ -118,7 +117,7 @@ class KubernetesCluster < Sequel::Model
   end
 
   def worker_vms
-    nodepools.flat_map(&:vms_via_nodes)
+    nodepools.flat_map(&:vms)
   end
 end
 

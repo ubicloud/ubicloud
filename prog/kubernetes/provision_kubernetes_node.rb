@@ -72,10 +72,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     current_frame["node_id"] = node.id
     strand.modified!(:stack)
 
-    if kubernetes_nodepool
-      kubernetes_nodepool.add_vm(vm)
-    else
-      kubernetes_cluster.add_cp_vm(vm)
+    unless kubernetes_nodepool
       kubernetes_cluster.api_server_lb.add_vm(vm)
     end
 

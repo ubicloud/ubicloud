@@ -376,7 +376,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     let(:node) { KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
 
     before do
-      allow(kubernetes_cluster.cp_vms_via_nodes.first).to receive(:sshable).and_return(sshable)
+      allow(kubernetes_cluster.cp_vms.first).to receive(:sshable).and_return(sshable)
     end
 
     it "runs install_metrics_server and naps when not started" do
@@ -446,7 +446,6 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster.cp_vms).to all(receive(:incr_destroy))
       expect(kubernetes_cluster.nodepools).to all(receive(:incr_destroy))
       expect(kubernetes_cluster.private_subnet).to receive(:incr_destroy)
-      expect(kubernetes_cluster).to receive(:remove_all_cp_vms)
 
       expect(kubernetes_cluster).not_to receive(:destroy)
       expect { nx.destroy }.to nap(5)
@@ -474,7 +473,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
       expect(kubernetes_cluster.api_server_lb).to receive(:incr_destroy)
       expect(kubernetes_cluster.services_lb).to receive(:incr_destroy)
-      expect(kubernetes_cluster.cp_vms_via_nodes).to all(receive(:incr_destroy))
+      expect(kubernetes_cluster.cp_vms).to all(receive(:incr_destroy))
       expect(kubernetes_cluster.nodes).to all(receive(:incr_destroy))
 
       expect(kubernetes_cluster.nodepools).to be_empty

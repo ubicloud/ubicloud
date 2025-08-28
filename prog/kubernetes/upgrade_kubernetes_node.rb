@@ -53,7 +53,7 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
   label def drain_old_node
     register_deadline("remove_old_node_from_cluster", 60 * 60)
 
-    vm = kubernetes_cluster.cp_vms_via_nodes.last
+    vm = kubernetes_cluster.cp_vms.last
     case vm.sshable.d_check("drain_node")
     when "Succeeded"
       hop_remove_old_node_from_cluster

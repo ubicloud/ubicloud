@@ -137,7 +137,7 @@ RSpec.describe KubernetesCluster do
     it "removes client certificate and key data from users and adds an RBAC token to users" do
       sshable = instance_double(Sshable)
       KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id)
-      expect(kc.cp_vms_via_nodes.first).to receive(:sshable).and_return(sshable).twice
+      expect(kc.cp_vms.first).to receive(:sshable).and_return(sshable).twice
       expect(sshable).to receive(:cmd).with("kubectl --kubeconfig <(sudo cat /etc/kubernetes/admin.conf) -n kube-system get secret k8s-access -o jsonpath='{.data.token}' | base64 -d", log: false).and_return("mocked_rbac_token")
       expect(sshable).to receive(:cmd).with("sudo cat /etc/kubernetes/admin.conf", log: false).and_return(kubeconfig)
       customer_config = kc.kubeconfig
@@ -186,7 +186,7 @@ RSpec.describe KubernetesCluster do
 
   describe "#worker_vms" do
     it "returns all worker vms in the cluster" do
-      expect(kc).to receive(:nodepools).and_return([instance_double(KubernetesNodepool, vms_via_nodes: [3, 4]), instance_double(KubernetesNodepool, vms_via_nodes: [5, 6])])
+      expect(kc).to receive(:nodepools).and_return([instance_double(KubernetesNodepool, vms: [3, 4]), instance_double(KubernetesNodepool, vms: [5, 6])])
       expect(kc.worker_vms).to eq([3, 4, 5, 6])
     end
   end
