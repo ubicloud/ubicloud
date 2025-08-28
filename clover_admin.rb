@@ -77,7 +77,8 @@ class CloverAdmin < Roda
   Forme.register_config(:clover_admin, base: :default, labeler: :explicit)
   Forme.default_config = :clover_admin
 
-  def self.create_admin_account(login, password = SecureRandom.urlsafe_base64(16))
+  def self.create_admin_account(login)
+    password = SecureRandom.urlsafe_base64(16)
     password_hash = rodauth.new(nil).password_hash(password)
     DB.transaction do
       id = DB[:admin_account].insert(login:)
