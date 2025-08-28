@@ -230,7 +230,7 @@ Options:
     -z, --worker-size=size           Worker size
 
 Allowed Option Values:
-    Version: v1.33 v1.32
+    Version: v1.34 v1.33
     Control Plane Node Count: 1 3
 
 
