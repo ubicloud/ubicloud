@@ -114,14 +114,7 @@ class Clover
       end
 
       r.rename lb, perm: "LoadBalancer:edit", serializer: Serializers::LoadBalancer
-
-      r.get web?, %w[overview vms settings] do |page|
-        authorize("LoadBalancer:view", lb.id)
-
-        response.headers["cache-control"] = "no-store"
-        @page = page
-        view "networking/load_balancer/show"
-      end
+      r.show_object(lb, actions: %w[overview vms settings], perm: "LoadBalancer:view", template: "networking/load_balancer/show")
     end
   end
 end

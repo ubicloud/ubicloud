@@ -101,18 +101,12 @@ class Clover
       end
 
       r.rename pg, perm: "Postgres:edit", serializer: Serializers::Postgres
-
-      r.get web?, %w[overview connection charts networking resize high-availability read-replica backup-restore config settings] do |page|
-        authorize("Postgres:view", pg.id)
-
-        next if pg.read_replica? && %w[resize high-availability read-replica backup-restore].include?(page)
-
-        response.headers["cache-control"] = "no-store"
-
-        @page = page
-
-        view "postgres/show"
+      show_actions = if pg.read_replica?
+        %w[overview connection charts networking config settings]
+      else
+        %w[overview connection charts networking resize high-availability read-replica backup-restore config settings]
       end
+      r.show_object(pg, actions: show_actions, perm: "Postgres:view", template: "postgres/show")
 
       r.post "restart" do
         authorize("Postgres:edit", pg.id)

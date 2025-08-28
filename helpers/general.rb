@@ -35,6 +35,20 @@ class Clover < Roda
         serializer.serialize(object)
       end
     end
+
+    def show_object(object, actions:, perm:, template:)
+      return unless web?
+
+      get actions do |page|
+        scope.instance_exec do
+          authorize(perm, object.id)
+
+          response.headers["cache-control"] = "no-store"
+          @page = page
+          view template
+        end
+      end
+    end
   end
 
   class RodaResponse

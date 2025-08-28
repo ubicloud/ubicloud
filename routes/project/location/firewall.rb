@@ -49,14 +49,7 @@ class Clover
       end
 
       r.rename firewall, perm: "Firewall:edit", serializer: Serializers::Firewall
-
-      r.get web?, %w[overview networking settings] do |page|
-        authorize("Firewall:view", firewall.id)
-
-        response.headers["cache-control"] = "no-store"
-        @page = page
-        view "networking/firewall/show"
-      end
+      r.show_object(firewall, actions: %w[overview networking settings], perm: "Firewall:view", template: "networking/firewall/show")
 
       r.post %w[attach-subnet detach-subnet] do |action|
         authorize("Firewall:view", firewall.id)
