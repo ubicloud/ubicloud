@@ -283,6 +283,13 @@ end
 
 # Other
 
+desc "Create admin account in production environment"
+task "create_prod_admin_account", [:login] do |_, args|
+  load_db.call("production")
+  require_relative "loader"
+  puts "Password for account is: #{CloverAdmin.create_admin_account(args[:login])}"
+end
+
 desc "Check generated SQL for parameterization"
 task "check_query_parameterization" do
   require "rbconfig"
