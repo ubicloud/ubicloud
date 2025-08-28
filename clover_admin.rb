@@ -105,6 +105,12 @@ class CloverAdmin < Roda
       rodauth_get_salt: :rodauth_admin_get_salt,
       rodauth_valid_password_hash: :rodauth_admin_valid_password_hash
     }.to_proc)
+
+    password_minimum_length 16
+    password_maximum_bytes 72
+    password_meets_requirements? do |password|
+      super(password) && password.match?(/[a-z]/) && password.match?(/[A-Z]/) && password.match?(/[0-9]/)
+    end
   end
 
   route do |r|
