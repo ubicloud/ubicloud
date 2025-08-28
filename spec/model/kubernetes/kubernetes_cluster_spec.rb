@@ -8,7 +8,7 @@ RSpec.describe KubernetesCluster do
     private_subnet = PrivateSubnet.create(project_id: project.id, name: "test", location_id: Location::HETZNER_FSN1_ID, net6: "fe80::/64", net4: "192.168.0.0/24")
     described_class.create(
       name: "kc-name",
-      version: "v1.32",
+      version: Option.kubernetes_versions.first,
       location_id: Location::HETZNER_FSN1_ID,
       cp_node_count: 3,
       project_id: project.id,
@@ -102,11 +102,11 @@ RSpec.describe KubernetesCluster do
     end
 
     it "validates version" do
-      kc.version = "v1.34"
+      kc.version = "v1.30"
       expect(kc.valid?).to be false
       expect(kc.errors[:version]).to eq(["must be a valid Kubernetes version"])
 
-      kc.version = "v1.32"
+      kc.version = Option.kubernetes_versions.first
       expect(kc.valid?).to be true
     end
 

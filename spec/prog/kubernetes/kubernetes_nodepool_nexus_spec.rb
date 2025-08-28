@@ -11,7 +11,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
   let(:kc) {
     kc = KubernetesCluster.create(
       name: "k8scluster",
-      version: "v1.32",
+      version: Option.kubernetes_versions.first,
       cp_node_count: 3,
       private_subnet_id: subnet.id,
       location_id: Location::HETZNER_FSN1_ID,

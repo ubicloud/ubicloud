@@ -17,7 +17,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   let(:kubernetes_cluster) {
     kc = KubernetesCluster.create(
       name: "k8scluster",
-      version: "v1.32",
+      version: Option.kubernetes_versions.first,
       cp_node_count: 3,
       private_subnet_id: subnet.id,
       location_id: Location::HETZNER_FSN1_ID,
@@ -97,7 +97,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(new_vm.sshable).not_to be_nil
       expect(new_vm.vcpus).to eq(4)
       expect(new_vm.strand.stack.first["storage_volumes"].first["size_gib"]).to eq(37)
-      expect(new_vm.boot_image).to eq("kubernetes-v1_32")
+      expect(new_vm.boot_image).to eq("kubernetes-#{Option.kubernetes_versions.first.tr(".", "_")}")
     end
 
     it "creates a worker node and hops if a nodepool is given" do
@@ -113,7 +113,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(new_vm.sshable).not_to be_nil
       expect(new_vm.vcpus).to eq(8)
       expect(new_vm.strand.stack.first["storage_volumes"].first["size_gib"]).to eq(78)
-      expect(new_vm.boot_image).to eq("kubernetes-v1_32")
+      expect(new_vm.boot_image).to eq("kubernetes-#{Option.kubernetes_versions.first.tr(".", "_")}")
     end
 
     it "assigns the default storage size if not specified" do

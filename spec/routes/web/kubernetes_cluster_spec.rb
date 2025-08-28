@@ -12,7 +12,7 @@ RSpec.describe Clover, "Kubernetes" do
   let(:kc) do
     cluster = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "myk8s",
-      version: "v1.32",
+      version: Option.kubernetes_versions.first,
       project_id: project.id,
       private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "mysubnet", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id).id,
       location_id: Location::HETZNER_FSN1_ID
@@ -39,7 +39,7 @@ RSpec.describe Clover, "Kubernetes" do
   let(:kc_no_perm) do
     Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "not-my-k8s",
-      version: "v1.32",
+      version: Option.kubernetes_versions.first,
       project_id: project_wo_permissions.id,
       private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "othersubnet", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id).id,
       location_id: Location::HETZNER_FSN1_ID
