@@ -96,7 +96,7 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
       allow(prog).to receive(:frame).and_return({"old_node_id" => old_node.id})
       expect(prog.old_node.id).to eq(old_node.id)
       KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id)
-      allow(kubernetes_cluster.cp_vms_via_nodes.last).to receive(:sshable).and_return(sshable)
+      allow(kubernetes_cluster.cp_vms.last).to receive(:sshable).and_return(sshable)
 
       expect(prog).to receive(:register_deadline).with("remove_old_node_from_cluster", 60 * 60)
     end

@@ -188,7 +188,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def install_metrics_server
     decr_install_metrics_server
 
-    vm = kubernetes_cluster.cp_vms_via_nodes.first
+    vm = kubernetes_cluster.cp_vms.first
     case vm.sshable.d_check("install_metrics_server")
     when "Succeeded"
       Clog.emit("Metrics server is installed")
@@ -236,7 +236,6 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       kubernetes_cluster.api_server_lb&.incr_destroy
       kubernetes_cluster.cp_vms.each(&:incr_destroy)
       kubernetes_cluster.nodes.each(&:incr_destroy)
-      kubernetes_cluster.remove_all_cp_vms
       kubernetes_cluster.nodepools.each { it.incr_destroy }
       kubernetes_cluster.private_subnet.incr_destroy
       nap 5 unless kubernetes_cluster.nodepools.empty?
