@@ -44,14 +44,7 @@ class Clover
       end
 
       r.rename kc, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesCluster
-
-      r.get web?, %w[overview nodes settings] do |page|
-        authorize("KubernetesCluster:view", kc.id)
-
-        response.headers["cache-control"] = "no-store"
-        @page = page
-        view "kubernetes-cluster/show"
-      end
+      r.show_object(kc, actions: %w[overview nodes settings], perm: "KubernetesCluster:view", template: "kubernetes-cluster/show")
 
       r.get "kubeconfig" do
         authorize("KubernetesCluster:edit", kc.id)

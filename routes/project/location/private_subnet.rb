@@ -99,14 +99,7 @@ class Clover
       end
 
       r.rename ps, perm: "PrivateSubnet:edit", serializer: Serializers::PrivateSubnet
-
-      r.get web?, %w[overview vms networking settings] do |page|
-        authorize("PrivateSubnet:view", ps.id)
-
-        response.headers["cache-control"] = "no-store"
-        @page = page
-        view "networking/private_subnet/show"
-      end
+      r.show_object(ps, actions: %w[overview vms networking settings], perm: "PrivateSubnet:view", template: "networking/private_subnet/show")
     end
   end
 end

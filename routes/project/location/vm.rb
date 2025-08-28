@@ -19,7 +19,7 @@ class Clover
       end
 
       filter[:location_id] = @location.id
-      vm = @project.vms_dataset.first(filter)
+      vm = @vm = @project.vms_dataset.first(filter)
       check_found_object(vm)
 
       r.get true do
@@ -44,15 +44,7 @@ class Clover
       end
 
       r.rename vm, perm: "Vm:edit", serializer: Serializers::Vm
-
-      r.get web?, %w[overview networking settings] do |page|
-        authorize("Vm:view", vm.id)
-
-        response.headers["cache-control"] = "no-store"
-        @page = page
-        @vm = vm
-        view "vm/show"
-      end
+      r.show_object(vm, actions: %w[overview networking settings], perm: "Vm:view", template: "vm/show")
 
       r.post "restart" do
         authorize("Vm:edit", vm.id)
