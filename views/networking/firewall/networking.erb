@@ -105,7 +105,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall.ubid) %>
       <tbody class="divide-y divide-gray-200 bg-white">
         <% @firewall.private_subnets.each do |ps| %>
           <tr>
-            <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
               <% if viewable_subnet_map[ps.id] %>
                 <a href="<%= path(ps) %>" class="text-orange-600 hover:text-orange-700"><%= ps.name %></a>
               <% else %>
