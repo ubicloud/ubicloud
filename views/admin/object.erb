@@ -46,9 +46,15 @@
 <div class="associations">
   <% @klass.associations.sort.each do |assoc| %>
     <%
-    assoc_objs = Array(@obj.send(assoc)).select { defined?(it.ubid) && it.ubid }
+    reflection = @klass.association_reflection(assoc)
+    associated_class = reflection.associated_class
+    next unless associated_class.method_defined?(:ubid)
+    assoc_objs = if reflection.returns_array?
+      @obj.send(assoc) { it.limit(100) }
+    else
+      Array(@obj.send(assoc))
+    end
     next if assoc_objs.empty?
-    associated_class = @klass.association_reflection(assoc).associated_class
     %>
 
     <div class="association">
