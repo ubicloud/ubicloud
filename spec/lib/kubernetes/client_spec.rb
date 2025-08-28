@@ -6,7 +6,7 @@ RSpec.describe Kubernetes::Client do
   let(:kubernetes_cluster) {
     KubernetesCluster.create(
       name: "test",
-      version: "v1.32",
+      version: Option.kubernetes_versions.first,
       cp_node_count: 3,
       private_subnet_id: private_subnet.id,
       location_id: Location::HETZNER_FSN1_ID,

@@ -57,7 +57,7 @@ RSpec.describe Clover, "cli" do
     expect(Firewall).to receive(:generate_uuid).and_return("850f5687-1a76-8dfc-8949-a115826d20e7")
     expect(FirewallRule).to receive(:generate_uuid).and_return("d5889073-4aed-89f8-8894-1c376ebea8f6", "0803b040-d565-81f8-b2ed-f4d28df19f7c")
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("ps788q81w5w26h900k13ad8bkx"))
-    cli(%W[kc eu-central-h1/test-kc create -c 1 -z standard-2 -w 1 -v v1.32])
+    cli(%W[kc eu-central-h1/test-kc create -c 1 -z standard-2 -w 1 -v #{Option.kubernetes_versions.first}])
 
     expect(Vm).to receive(:generate_ubid).and_return(UBID.parse("vmgbbazmznfa0mp49nzh5v0z25"), UBID.parse("vmnwfmjk5k462kkzsfa4n1h4xm"))
     expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("ncnqx1bbxgra7k8r9k9qwvspwd"), UBID.parse("nc1c3bggqpxt5kqqrdtkym1g03"))

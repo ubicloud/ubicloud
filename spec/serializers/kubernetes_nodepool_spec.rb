@@ -9,7 +9,7 @@ RSpec.describe Serializers::KubernetesNodepool do
       subnet = PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
       kc = KubernetesCluster.create(
         name: "cluster",
-        version: "v1.32",
+        version: Option.kubernetes_versions.first,
         cp_node_count: 3,
         private_subnet_id: subnet.id,
         location_id: Location::HETZNER_FSN1_ID,
@@ -37,7 +37,7 @@ RSpec.describe Serializers::KubernetesNodepool do
       subnet = PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
       kc = KubernetesCluster.create(
         name: "cluster",
-        version: "v1.32",
+        version: Option.kubernetes_versions.first,
         cp_node_count: 3,
         private_subnet_id: subnet.id,
         location_id: Location::HETZNER_FSN1_ID,

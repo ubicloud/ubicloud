@@ -11,7 +11,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
   let(:kc) {
     Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "cluster",
-      version: "v1.32",
+      version: Option.kubernetes_versions.first,
       cp_node_count: 3,
       project_id: project.id,
       private_subnet_id: subnet.id,
@@ -55,7 +55,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
         expect(parsed_body["items"].length).to eq(1)
         expect(parsed_body["count"]).to eq(1)
         expect(parsed_body["items"][0]["name"]).to eq("cluster")
-        expect(parsed_body["items"][0]["version"]).to eq("v1.32")
+        expect(parsed_body["items"][0]["version"]).to eq(Option.kubernetes_versions.first)
       end
     end
 
