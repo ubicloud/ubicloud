@@ -72,10 +72,7 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
 
   label def remove_old_node_from_cluster
     vm = old_node.vm
-    if kubernetes_nodepool
-      kubernetes_nodepool.remove_vm(vm)
-    else
-      kubernetes_cluster.remove_cp_vm(vm)
+    unless kubernetes_nodepool
       kubernetes_cluster.api_server_lb.detach_vm(vm)
     end
     # kubeadm reset is necessary for etcd member removal, delete node itself
