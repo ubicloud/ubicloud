@@ -373,7 +373,8 @@ class VmHost < Sequel::Model
   def check_pulse(session:, previous_pulse:)
     reading = begin
       perform_health_checks(session[:ssh_session]) ? "up" : "down"
-    rescue
+    rescue => e
+      Clog.emit("Exception in VmHost #{ubid}") { Util.exception_to_hash(e) }
       "down"
     end
     pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading)
