@@ -161,7 +161,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster.api_server_lb.custom_hostname).to eq "k8scluster-apiserver-#{kubernetes_cluster.ubid[-5...]}.k8s.ubicloud.com"
 
       expect(kubernetes_cluster.services_lb.name).to eq "#{kubernetes_cluster.ubid}-services"
-      expect(kubernetes_cluster.services_lb.stack).to eq LoadBalancer::Stack::IPV4
+      expect(kubernetes_cluster.services_lb.stack).to eq LoadBalancer::Stack::DUAL
       expect(kubernetes_cluster.services_lb.ports.count).to eq 0
       expect(kubernetes_cluster.services_lb.private_subnet_id).to eq subnet.id
       expect(kubernetes_cluster.services_lb.custom_hostname_dns_zone_id).to eq dns_zone.id
