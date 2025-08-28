@@ -76,15 +76,11 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       custom_hostname_prefix: custom_apiserver_hostname_prefix
     ).subject
 
-    services_lb = Prog::Vnet::LoadBalancerNexus.assemble(
+    services_lb = Prog::Vnet::LoadBalancerNexus.assemble_with_multiple_ports(
       kubernetes_cluster.private_subnet_id,
+      ports: [],
       name: kubernetes_cluster.services_load_balancer_name,
       algorithm: "hash_based",
-      # TODO: change the api to support LBs without ports
-      # The next two fields will be later modified by the sync_kubernetes_services label
-      # These are just set for passing the creation validations
-      src_port: 443,
-      dst_port: 6443,
       health_check_endpoint: "/",
       health_check_protocol: "tcp",
       custom_hostname_dns_zone_id:,
