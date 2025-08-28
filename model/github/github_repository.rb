@@ -19,6 +19,15 @@ class GithubRepository < Sequel::Model
 
   alias_method :bucket_name, :ubid
 
+  def concurrency_limit_available?
+    return true if limits.empty? || limits["concurrent_job_count"].nil?
+
+    DB.transaction do
+      lock!(:update)
+      runners_dataset.exclude(allocated_at: nil).count < limits["concurrent_job_count"]
+    end
+  end
+
   def blob_storage_client
     @blob_storage_client ||= s3_client(access_key, secret_key)
   end
@@ -97,15 +106,16 @@ end
 
 # Table: github_repository
 # Columns:
-#  id              | uuid                     | PRIMARY KEY
-#  installation_id | uuid                     |
-#  name            | text                     | NOT NULL
-#  created_at      | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
-#  last_job_at     | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
-#  last_check_at   | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
-#  default_branch  | text                     |
-#  access_key      | text                     |
-#  secret_key      | text                     |
+#  id                    | uuid                     | PRIMARY KEY
+#  installation_id       | uuid                     |
+#  name                  | text                     | NOT NULL
+#  created_at            | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  last_job_at           | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  last_check_at         | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  default_branch        | text                     |
+#  access_key            | text                     |
+#  secret_key            | text                     |
+#  limits                | jsonb                    | DEFAULT '{}'::jsonb
 # Indexes:
 #  github_repository_pkey                       | PRIMARY KEY btree (id)
 #  github_repository_installation_id_name_index | UNIQUE btree (installation_id, name)

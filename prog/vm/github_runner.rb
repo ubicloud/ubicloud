@@ -160,7 +160,9 @@ class Prog::Vm::GithubRunner < Prog::Base
 
   label def start
     pop "Could not provision a runner for inactive project" unless github_runner.installation.project.active?
-    hop_wait_concurrency_limit unless quota_available?
+
+    hop_wait_concurrency_limit unless quota_available? && github_runner.repository.concurrency_limit_available?
+
     hop_allocate_vm
   end
 
@@ -199,6 +201,12 @@ class Prog::Vm::GithubRunner < Prog::Base
       end
       Clog.emit("allowed because of low utilization") { {exceeded_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
     end
+
+    unless github_runner.repository.concurrency_limit_available?
+      Clog.emit("waiting for repository concurrency limit") { {repository_concurrency_limit: {repository_name: github_runner.repository_name}} }
+      nap rand(5..15)
+    end
+
     github_runner.log_duration("runner_capacity_waited", Time.now - github_runner.created_at)
     hop_allocate_vm
   end
