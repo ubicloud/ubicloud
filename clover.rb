@@ -546,7 +546,19 @@ class Clover < Roda
         .strip
         .squeeze(" ")
         .slice(0...63)
-      name = "Unknown" unless Validation::ALLOWED_ACCOUNT_NAME.match?(name)
+      unless Validation::ALLOWED_ACCOUNT_NAME.match?(name)
+        Clog.emit("invalid social login account name") do
+          {
+            invalid_social_login_account_name: {
+              omniauth_name:,
+              email: account[:email],
+              name:
+            }
+          }
+        end
+        name = "Unknown"
+      end
+
       scope.before_rodauth_create_account(account, name)
     end
 
