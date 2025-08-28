@@ -18,22 +18,22 @@ RSpec.configure do |config|
       @admin_webauthn_client ||= WebAuthn::FakeClient.new("http://admin.ubicloud.com")
     end
 
-    def admin_account_setup_and_login(password: TEST_USER_PASSWORD)
-      CloverAdmin.create_admin_account("admin", password)
+    def admin_account_setup_and_login
+      @password = CloverAdmin.create_admin_account("admin")
       visit "/"
-      admin_login(password:)
-      admin_webauthn_auth_setup(password:)
+      admin_login
+      admin_webauthn_auth_setup
     end
 
-    def admin_login(password: TEST_USER_PASSWORD)
+    def admin_login
       fill_in "Login", with: "admin"
-      fill_in "Password", with: password
+      fill_in "Password", with: @password
       click_button "Login"
     end
 
-    def admin_webauthn_auth_setup(password: TEST_USER_PASSWORD)
+    def admin_webauthn_auth_setup
       challenge = JSON.parse(page.find_by_id("webauthn-setup-form")["data-credential-options"])["challenge"]
-      fill_in "Password", with: password
+      fill_in "Password", with: @password
       fill_in "webauthn_setup", with: admin_webauthn_client.create(challenge:).to_json
       click_button "Setup WebAuthn Authentication"
       expect(page).to have_flash_notice("WebAuthn authentication is now setup")

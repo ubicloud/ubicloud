@@ -17,13 +17,13 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Login"
 
     fill_in "Login", with: account.email
-    fill_in "Password", with: TEST_USER_PASSWORD
+    fill_in "Password", with: @password
     click_button "Login"
     expect(page).to have_flash_error("There was an error logging in")
     expect(page).to have_content("no matching login")
     expect(page.title).to eq "Ubicloud Admin - Login"
 
-    described_class.create_admin_account("admin", TEST_USER_PASSWORD)
+    password = @password = described_class.create_admin_account("admin")
 
     fill_in "Login", with: "admin"
     fill_in "Password", with: "bad"
@@ -33,7 +33,7 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Login"
 
     fill_in "Login", with: "admin"
-    fill_in "Password", with: TEST_USER_PASSWORD
+    fill_in "Password", with: password
     click_button "Login"
     expect(page).to have_flash_notice("You have been logged in")
     expect(page.title).to eq "Ubicloud Admin - Setup WebAuthn Authentication"
@@ -47,7 +47,7 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Login"
 
     fill_in "Login", with: "admin"
-    fill_in "Password", with: TEST_USER_PASSWORD
+    fill_in "Password", with: password
     click_button "Login"
     expect(page).to have_flash_notice("You have been logged in")
     expect(page.title).to eq "Ubicloud Admin - Authenticate Using WebAuthn"
@@ -59,9 +59,9 @@ RSpec.describe CloverAdmin do
 
   it "supports changing password" do
     admin_account_setup_and_login
-    password = TEST_USER_PASSWORD + "1"
     click_link "Change Password"
-    fill_in "Password", with: TEST_USER_PASSWORD
+    fill_in "Password", with: @password
+    password = @password = TEST_USER_PASSWORD + "1"
     fill_in "New Password", with: password
     fill_in "Confirm Password", with: password
     click_button "Change Password"
@@ -72,7 +72,7 @@ RSpec.describe CloverAdmin do
     expect(page).to have_flash_notice("You have been logged out")
     expect(page.title).to eq "Ubicloud Admin - Login"
 
-    admin_login(password:)
+    admin_login
     admin_webauthn_auth
     expect(page).to have_flash_notice("You have been multifactor authenticated")
     expect(page.title).to eq "Ubicloud Admin"
@@ -82,7 +82,7 @@ RSpec.describe CloverAdmin do
     admin_account_setup_and_login
     click_link "Manage Multifactor Authentication"
     click_link "Remove WebAuthn Authenticator"
-    fill_in "Password", with: TEST_USER_PASSWORD
+    fill_in "Password", with: @password
     choose "webauthn_remove"
     click_button "Remove WebAuthn Authenticator"
 
