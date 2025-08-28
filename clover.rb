@@ -348,7 +348,7 @@ class Clover < Roda
       password_minimum_length 8
       password_maximum_bytes 72
       password_meets_requirements? do |password|
-        password.match?(/[a-z]/) && password.match?(/[A-Z]/) && password.match?(/[0-9]/)
+        super(password) && password.match?(/[a-z]/) && password.match?(/[A-Z]/) && password.match?(/[0-9]/)
       end
 
       invalid_password_message = "Password must have 8 characters minimum and contain at least one lowercase letter, one uppercase letter, and one digit."

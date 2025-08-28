@@ -433,12 +433,22 @@ RSpec.describe Clover, "auth" do
         visit "/account/change-password"
 
         fill_in "Current Password", with: TEST_USER_PASSWORD if clear_last_password_entry
-        fill_in "New Password", with: "#{TEST_USER_PASSWORD}_new"
-        fill_in "New Password Confirmation", with: "#{TEST_USER_PASSWORD}_new"
+        bad_pass = "aA0"
+        fill_in "New Password", with: bad_pass
+        fill_in "New Password Confirmation", with: bad_pass
 
         click_button "Change Password"
 
         expect(page.title).to eq("Ubicloud - Change Password")
+        expect(page).to have_flash_error("There was an error changing your password")
+        expect(page).to have_content("Password must have 8 characters minimum and contain at least one lowercase letter, one uppercase letter, and one digit.")
+
+        new_pass = TEST_USER_EMAIL + "New0"
+        fill_in "New Password", with: new_pass
+        fill_in "New Password Confirmation", with: new_pass
+
+        click_button "Change Password"
+        expect(page).to have_flash_notice("Your password has been changed")
 
         click_button "Log out"
 
@@ -446,9 +456,10 @@ RSpec.describe Clover, "auth" do
 
         fill_in "Email Address", with: TEST_USER_EMAIL
         click_button "Sign in"
-        fill_in "Password", with: "#{TEST_USER_PASSWORD}_new"
+        fill_in "Password", with: new_pass
 
         click_button "Sign in"
+        expect(page).to have_flash_notice("You have been logged in")
       end
 
       it "can close account when password entry is #{"not " unless clear_last_password_entry}required" do
