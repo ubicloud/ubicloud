@@ -349,24 +349,27 @@ class RegenScreenshots
     k8s_cluster.update(services_lb_id: services_lb.id)
 
     ["le9ec", "e12en", "zd3ka"].each do |suffix|
-      k8s_cluster.add_cp_vm Prog::Vm::Nexus.assemble_with_sshable(
+      Prog::Kubernetes::KubernetesNodeNexus.assemble(
         project.id,
         sshable_unix_user: "ubi",
         name: "#{kc_ubid}-#{suffix}",
         location_id: k8s_cluster.location.id,
         private_subnet_id: k8s_cluster.private_subnet_id,
-        enable_ip4: true
+        enable_ip4: true,
+        kubernetes_cluster_id: k8s_cluster.id
       ).subject
     end
 
     ["ubicl", "krn71", "fysgd", "mant4", "m0h11"].each do |suffix|
-      k8s_nodepool.add_vm Prog::Vm::Nexus.assemble_with_sshable(
+      Prog::Kubernetes::KubernetesNodeNexus.assemble(
         project.id,
         sshable_unix_user: "ubi",
         name: "#{kn_ubid}-#{suffix}",
         location_id: k8s_cluster.location.id,
         private_subnet_id: k8s_cluster.private_subnet_id,
-        enable_ip4: true
+        enable_ip4: true,
+        kubernetes_cluster_id: k8s_cluster.id,
+        kubernetes_nodepool_id: k8s_nodepool.id
       ).subject
     end
 
