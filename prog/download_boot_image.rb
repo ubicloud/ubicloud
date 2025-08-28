@@ -120,7 +120,8 @@ class Prog::DownloadBootImage < Prog::Base
     ["ai-model-ms-phi-4", "x64", "20250213.1.0"] => "0e998c4916c837c0992c4546404ecb51d0c5d5923f998f7cff0a9cddc5bf1689",
     ["ai-model-mistral-small-3", "x64", "20250217.1.0"] => "01ce8d1d0b7b0f717c51c26590234f4cb7971a9a5276de92b6cb4dc2c7a085e5",
     ["kubernetes-v1_32", "x64", "20250320.1.0"] => "369c7c869bba690771a1dcbbae52159defaa3fd3540f008ba6feea291e7a220a",
-    ["kubernetes-v1_33", "x64", "20250506.1.0"] => "35ca03c19385227117fa6579f58c73a362970359fa9486024ca393b134a698d4"
+    ["kubernetes-v1_33", "x64", "20250506.1.0"] => "35ca03c19385227117fa6579f58c73a362970359fa9486024ca393b134a698d4",
+    ["kubernetes-v1_34", "x64", "20250828.1.0"] => "3a29122a3836109df78778df24899f864bc8beff7d92d86dc4ab8b99314f520c"
   }.freeze
   BOOT_IMAGE_SHA256.each_key(&:freeze)
 
