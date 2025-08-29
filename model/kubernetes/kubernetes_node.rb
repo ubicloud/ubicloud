@@ -9,7 +9,7 @@ class KubernetesNode < Sequel::Model
   many_to_one :kubernetes_nodepool
 
   plugin ResourceMethods
-  plugin SemaphoreMethods, :destroy
+  plugin SemaphoreMethods, :destroy, :retire
 
   def sshable
     vm.sshable
@@ -48,6 +48,7 @@ end
 #  vm_id                  | uuid                     | NOT NULL
 #  kubernetes_cluster_id  | uuid                     | NOT NULL
 #  kubernetes_nodepool_id | uuid                     |
+#  state                  | text                     | NOT NULL DEFAULT 'active'::text
 # Indexes:
 #  kubernetes_node_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:

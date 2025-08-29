@@ -22,6 +22,11 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
     lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "lb", health_check_endpoint: "/", project_id: project.id)
     LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 123, dst_port: 456)
     kc.update(api_server_lb_id: lb.id)
+
+    services_lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "services_lb", health_check_endpoint: "/", project_id: project.id)
+    LoadBalancerPort.create(load_balancer_id: services_lb.id, src_port: 123, dst_port: 456)
+    kc.update(services_lb_id: services_lb.id)
+
     kc
   }
   let(:kd) { described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "vm", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: subnet.id, enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: nil).subject }
@@ -66,17 +71,91 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
     it "naps for 6 hours" do
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
+
+    it "hops to retire when semaphore is set" do
+      expect(nx).to receive(:when_retire_set?).and_yield
+      expect { nx.wait }.to hop("retire")
+    end
+  end
+
+  describe "#drain" do
+    let(:sshable) { instance_double(Sshable) }
+    let(:unit_name) { "drain_node_#{kd.name}" }
+
+    before do
+      vm = create_vm
+      expect(kd.kubernetes_cluster).to receive(:cp_vms).and_return([vm]).at_least(:once)
+      expect(vm).to receive(:sshable).and_return(sshable).at_least(:once)
+    end
+
+    it "starts the drain process when run for the first time and naps" do
+      expect(sshable).to receive(:d_check).with(unit_name).and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with(unit_name, "sudo", "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf", "drain", kd.name, "--ignore-daemonsets", "--delete-emptydir-data")
+      expect { nx.drain }.to nap(10)
+    end
+
+    it "naps when the node is getting drained" do
+      expect(sshable).to receive(:d_check).with(unit_name).and_return("InProgress")
+      expect { nx.drain }.to nap(10)
+    end
+
+    it "restarts when it fails" do
+      expect(sshable).to receive(:d_check).with(unit_name).and_return("Failed")
+      expect(sshable).to receive(:d_restart).with(unit_name)
+      expect { nx.drain }.to nap(10)
+    end
+
+    it "naps when daemonizer something unexpected and waits for the page" do
+      expect(sshable).to receive(:d_check).with(unit_name).and_return("UnexpectedState")
+      expect(nx).to receive(:register_deadline).with("destroy", 0)
+      expect { nx.drain }.to nap(3 * 60 * 60)
+    end
+
+    it "drains the old node and hops to remove_node_from_cluster" do
+      expect(sshable).to receive(:d_check).with(unit_name).and_return("Succeeded")
+      expect { nx.drain }.to hop("remove_node_from_cluster")
+    end
+  end
+
+  describe "#retire" do
+    it "updates the state and hops to drain" do
+      expect(kd).to receive(:update).with({state: "draining"})
+      expect { nx.retire }.to hop("drain")
+    end
+  end
+
+  describe "#remove_node_from_cluster" do
+    let(:client) { instance_double(Kubernetes::Client) }
+    let(:sshable) { instance_double(Sshable) }
+
+    before do
+      expect(kd.kubernetes_cluster).to receive(:client).and_return(client)
+      expect(kd.kubernetes_cluster.nodes.last).to receive(:sshable).and_return(sshable)
+      expect(sshable).to receive(:connect)
+      expect(kd).to receive(:sshable).and_return(sshable).twice
+    end
+
+    it "runs kubeadm reset and remove nodepool node from services_lb and deletes the node from cluster" do
+      kn = KubernetesNodepool.create(name: "np", node_count: 1, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
+      kd.update(kubernetes_nodepool_id: kn.id)
+      expect(kd.sshable).to receive(:cmd).with("sudo kubeadm reset --force")
+      expect(kd.kubernetes_cluster.services_lb).to receive(:detach_vm).with(kd.vm)
+      expect(client).to receive(:delete_node).with(kd.name)
+      expect { nx.remove_node_from_cluster }.to hop("destroy")
+    end
+
+    it "runs kubeadm reset and remove cluster node from api_server_lb and deletes the node from cluster" do
+      expect(kd.sshable).to receive(:cmd).with("sudo kubeadm reset --force")
+      expect(nx).to receive(:nodepool).and_return(nil)
+      expect(kd.kubernetes_cluster.api_server_lb).to receive(:detach_vm).with(kd.vm)
+      expect(client).to receive(:delete_node).with(kd.name)
+      expect { nx.remove_node_from_cluster }.to hop("destroy")
+    end
   end
 
   describe "#destroy" do
     it "destroys the vm and itself" do
       expect(kd.vm).to receive(:incr_destroy)
-      expect(kd).to receive(:destroy)
-      expect { nx.destroy }.to exit({"msg" => "kubernetes node is deleted"})
-    end
-
-    it "skips destroying the vm if it is already destroyed" do
-      expect(kd).to receive(:vm).and_return(nil)
       expect(kd).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "kubernetes node is deleted"})
     end
