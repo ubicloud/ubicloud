@@ -100,7 +100,7 @@ class Clover
         end
       end
 
-      r.rename pg, perm: "Postgres:edit", serializer: Serializers::Postgres
+      r.rename pg, perm: "Postgres:edit", serializer: Serializers::Postgres, template_prefix: "postgres"
       show_actions = if pg.read_replica?
         %w[overview connection charts networking config settings]
       else

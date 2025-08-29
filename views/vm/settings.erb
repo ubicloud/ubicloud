@@ -1,3 +1,11 @@
+<% edit_perm = has_permission?("Vm:edit", @vm.id) %>
+
+<% if edit_perm %>
+  <div class="p-6">
+    <%== part("components/rename_object", object: @vm, type: "virtual machine") %>
+  </div>
+<% end %>
+
 <div class="p-6">
   <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
     <div class="min-w-0 flex-1">
@@ -8,7 +16,7 @@
   </div>
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
     <!-- Restart Card -->
-    <% if has_permission?("Vm:edit", @vm.id) %>
+    <% if edit_perm %>
       <div class="px-4 py-5 sm:p-6">
         <form action="<%= "#{path(@vm)}/restart" %>" role="form" method="POST">
           <%== csrf_tag("#{path(@vm)}/restart") %>
