@@ -16,7 +16,12 @@ tiles = [
     "#{@project.path}/load-balancer",
     "LoadBalancer:create"
   ],
-  ["Firewalls", @project.firewalls_dataset.count, "#{@project.path}/firewall", "Firewall:create"],
+  [
+    "Kubernetes Clusters",
+    @project.kubernetes_clusters_dataset.count,
+    "#{@project.path}/kubernetes-cluster",
+    "KubernetesCluster:create"
+  ],
   [
     "GitHub Runners",
     @project.github_runners_dataset.count,
@@ -59,6 +64,13 @@ cards = [
     "Fully managed PostgreSQL database. Handles backup / restore, health monitoring, high availability, and more for you.",
     "#{@project.path}/postgres",
     "Postgres:create"
+  ],
+  [
+    "kubernetes-filled",
+    "Create Kubernetes Cluster",
+    "Fully managed Kubernetes. Handles scaling, upgrades, load balancing and persistent volumes.",
+    "#{@project.path}/kubernetes-cluster",
+    "KubernetesCluster:create"
   ],
   [
     "hero-users",
