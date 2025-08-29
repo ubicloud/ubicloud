@@ -10,7 +10,7 @@ class Clover
   hash_branch(:project_prefix, "user") do |r|
     r.web do
       r.is do
-        authorize("Project:user", @project.id)
+        authorize("Project:user", @project)
 
         r.get do
           view "project/user"
@@ -79,7 +79,7 @@ class Clover
       end
 
       r.post "policy/managed" do
-        authorize("Project:user", @project.id)
+        authorize("Project:user", @project)
         handle_validation_failure("project/user")
         user_policies = typecast_params.Hash("user_policies") || {}
         invitation_policies = typecast_params.Hash("invitation_policies") || {}
@@ -187,7 +187,7 @@ class Clover
       r.on "access-control" do
         r.is do
           r.get do
-            authorize("Project:viewaccess", @project.id)
+            authorize("Project:viewaccess", @project)
 
             uuids = {}
             @project.access_control_entries.each do |ace|
@@ -213,7 +213,7 @@ class Clover
           end
 
           r.post do
-            authorize("Project:editaccess", @project.id)
+            authorize("Project:editaccess", @project)
 
             DB.transaction do
               typecast_params.array!(:Hash, "aces").each do
@@ -257,12 +257,12 @@ class Clover
 
           r.is do
             r.get do
-              authorize("Project:viewaccess", @project.id)
+              authorize("Project:viewaccess", @project)
               view "project/tag-list"
             end
 
             r.post do
-              authorize(tag_perm_map[tag_type], @project.id)
+              authorize(tag_perm_map[tag_type], @project)
               handle_validation_failure("project/tag-list")
               DB.transaction do
                 tag = @tag_model.create(project_id: @project.id, name: typecast_params.nonempty_str("name"))
@@ -286,7 +286,7 @@ class Clover
                 view "project/tag"
               end
 
-              authorize(tag_perm_map[tag_type], @project.id)
+              authorize(tag_perm_map[tag_type], @project)
 
               if @tag_type == "subject" && @tag.name == "Admin"
                 handle_validation_failure("project/tag-list")
@@ -366,7 +366,7 @@ class Clover
       end
 
       r.delete "invitation", String do |email|
-        authorize("Project:user", @project.id)
+        authorize("Project:user", @project)
 
         @project.invitations_dataset.where(email: email).destroy
         audit_log(@project, "destroy_invitation")
@@ -376,7 +376,7 @@ class Clover
       end
 
       r.delete :ubid_uuid do |id|
-        authorize("Project:user", @project.id)
+        authorize("Project:user", @project)
 
         next unless (user = @project.accounts_dataset[id:])
 

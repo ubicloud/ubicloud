@@ -13,7 +13,7 @@ class Clover
   end
 
   def load_balancer_post(name)
-    authorize("LoadBalancer:create", @project.id)
+    authorize("LoadBalancer:create", @project)
 
     algorithm, health_check_protocol, stack = typecast_params.nonempty_str!(%w[algorithm health_check_protocol stack])
     src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port])

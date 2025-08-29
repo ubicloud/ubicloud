@@ -194,6 +194,10 @@ RSpec.describe Authorization do
       expect(described_class.has_permission?(projects[0].id, users[0].id, "Vm:view", vms[0].id)).to be(true)
     end
 
+    it "works when arguments are model objects" do
+      expect(described_class.has_permission?(projects[0], users[0], "Vm:view", vms[0])).to be(true)
+    end
+
     it "returns false when has no matched policies" do
       AccessControlEntry.dataset.destroy
       expect(described_class.has_permission?(projects[0].id, users[0].id, "Vm:view", vms[0].id)).to be(false)

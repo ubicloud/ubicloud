@@ -1,5 +1,5 @@
-<% @edit_perm = has_permission?("Postgres:edit", @pg.ubid)
-@delete_perm = has_permission?("Postgres:delete", @pg.ubid)
+<% @edit_perm = has_permission?("Postgres:edit", @pg)
+@delete_perm = has_permission?("Postgres:delete", @pg)
 @page_title = @pg.name
 
 tabs = [

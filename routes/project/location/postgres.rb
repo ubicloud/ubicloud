@@ -24,7 +24,7 @@ class Clover
 
       r.is do
         r.get do
-          authorize("Postgres:view", pg.id)
+          authorize("Postgres:view", pg)
 
           if api?
             response.headers["cache-control"] = "no-store"
@@ -35,7 +35,7 @@ class Clover
         end
 
         r.delete do
-          authorize("Postgres:delete", pg.id)
+          authorize("Postgres:delete", pg)
           DB.transaction do
             pg.incr_destroy
             audit_log(pg, "destroy")
@@ -44,7 +44,7 @@ class Clover
         end
 
         r.patch do
-          authorize("Postgres:edit", pg.id)
+          authorize("Postgres:edit", pg)
 
           size = typecast_params.nonempty_str("size", pg.target_vm_size)
           target_storage_size_gib = typecast_params.pos_int("storage_size", pg.target_storage_size_gib)
@@ -109,7 +109,7 @@ class Clover
       r.show_object(pg, actions: show_actions, perm: "Postgres:view", template: "postgres/show")
 
       r.post "restart" do
-        authorize("Postgres:edit", pg.id)
+        authorize("Postgres:edit", pg)
         DB.transaction do
           Semaphore.incr(pg.servers_dataset.select(:id), "restart")
           audit_log(pg, "restart")
@@ -126,7 +126,7 @@ class Clover
       r.on "firewall-rule" do
         r.is do
           r.get api? do
-            authorize("Postgres:view", pg.id)
+            authorize("Postgres:view", pg)
             {
               items: Serializers::PostgresFirewallRule.serialize(pg.firewall_rules),
               count: pg.firewall_rules.count
@@ -134,7 +134,7 @@ class Clover
           end
 
           r.post do
-            authorize("Postgres:edit", pg.id)
+            authorize("Postgres:edit", pg)
             handle_validation_failure("postgres/show") { @page = "networking" }
 
             parsed_cidr = Validation.validate_cidr(typecast_params.nonempty_str!("cidr"))
@@ -160,7 +160,7 @@ class Clover
         end
 
         r.is :ubid_uuid do |id|
-          authorize("Postgres:edit", pg.id)
+          authorize("Postgres:edit", pg)
           fwr = pg.firewall_rules_dataset[id:]
           check_found_object(fwr)
 
@@ -199,7 +199,7 @@ class Clover
 
       r.on "metric-destination" do
         r.post true do
-          authorize("Postgres:edit", pg.id)
+          authorize("Postgres:edit", pg)
           handle_validation_failure("postgres/show") { @page = "charts" }
 
           password_param = (api? ? "password" : "metric-destination-password")
@@ -222,7 +222,7 @@ class Clover
         end
 
         r.delete :ubid_uuid do |id|
-          authorize("Postgres:edit", pg.id)
+          authorize("Postgres:edit", pg)
 
           if (md = pg.metric_destinations_dataset[id:])
             DB.transaction do
@@ -237,7 +237,7 @@ class Clover
       end
 
       r.post "read-replica" do
-        authorize("Postgres:edit", pg.id)
+        authorize("Postgres:edit", pg)
         handle_validation_failure("postgres/show") { @page = "read-replica" }
 
         name = typecast_params.nonempty_str!("name")
@@ -277,7 +277,7 @@ class Clover
       end
 
       r.post "promote" do
-        authorize("Postgres:edit", pg.id)
+        authorize("Postgres:edit", pg)
         handle_validation_failure("postgres/show") { @page = "settings" }
 
         unless pg.read_replica?
@@ -299,8 +299,8 @@ class Clover
       end
 
       r.post "restore" do
-        authorize("Postgres:create", @project.id)
-        authorize("Postgres:view", pg.id)
+        authorize("Postgres:create", @project)
+        authorize("Postgres:view", pg)
         handle_validation_failure("postgres/show") { @page = "backup_restore" }
 
         name, restore_target = typecast_params.nonempty_str!(["name", "restore_target"])
@@ -335,7 +335,7 @@ class Clover
       end
 
       r.post "reset-superuser-password" do
-        authorize("Postgres:view", pg.id)
+        authorize("Postgres:view", pg)
         handle_validation_failure("postgres/show") { @page = "settings" }
 
         if pg.read_replica?
@@ -361,7 +361,7 @@ class Clover
       end
 
       r.post "set-maintenance-window" do
-        authorize("Postgres:edit", pg.id)
+        authorize("Postgres:edit", pg)
         maintenance_window_start_at = typecast_params.int("maintenance_window_start_at")
 
         DB.transaction do
@@ -378,7 +378,7 @@ class Clover
       end
 
       r.get "ca-certificates" do
-        authorize("Postgres:view", pg.id)
+        authorize("Postgres:view", pg)
 
         next unless (certs = pg.ca_certificates)
 
@@ -388,7 +388,7 @@ class Clover
       end
 
       r.get "metrics", r.accepts_json? do
-        authorize("Postgres:view", pg.id)
+        authorize("Postgres:view", pg)
 
         start_time, end_time = typecast_params.str(%w[start end])
         start_time ||= (DateTime.now.new_offset(0) - 30.0 / 1440).rfc3339
@@ -477,7 +477,7 @@ class Clover
 
       r.is "config" do
         r.get do
-          authorize("Postgres:view", pg.id)
+          authorize("Postgres:view", pg)
 
           {
             pg_config: pg.user_config,
@@ -486,7 +486,7 @@ class Clover
         end
 
         r.on method: [:post, :patch] do
-          authorize("Postgres:edit", pg.id)
+          authorize("Postgres:edit", pg)
           handle_validation_failure("postgres/show") { @page = "config" }
 
           if web?

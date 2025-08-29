@@ -24,7 +24,7 @@ class Clover
       check_found_object(lb)
 
       r.post %w[attach-vm detach-vm] do |action|
-        authorize("LoadBalancer:edit", lb.id)
+        authorize("LoadBalancer:edit", lb)
         handle_validation_failure("networking/load_balancer/show") { @page = "vms" }
 
         unless (vm = authorized_vm(location_id: lb.private_subnet.location_id))
@@ -58,7 +58,7 @@ class Clover
 
       r.is do
         r.get do
-          authorize("LoadBalancer:view", lb.id)
+          authorize("LoadBalancer:view", lb)
           if api?
             Serializers::LoadBalancer.serialize(lb, {detailed: true})
           else
@@ -67,7 +67,7 @@ class Clover
         end
 
         r.delete do
-          authorize("LoadBalancer:delete", lb.id)
+          authorize("LoadBalancer:delete", lb)
           DB.transaction do
             lb.incr_destroy
             audit_log(lb, "destroy")
@@ -76,7 +76,7 @@ class Clover
         end
 
         r.patch api? do
-          authorize("LoadBalancer:edit", lb.id)
+          authorize("LoadBalancer:edit", lb)
           algorithm, health_check_endpoint = typecast_params.nonempty_str!(%w[algorithm health_check_endpoint])
           src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port])
           vm_ids = typecast_params.array(:ubid_uuid, "vms")

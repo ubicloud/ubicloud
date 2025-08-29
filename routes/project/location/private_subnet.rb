@@ -23,7 +23,7 @@ class Clover
       check_found_object(ps)
 
       r.post "connect" do
-        authorize("PrivateSubnet:connect", ps.id)
+        authorize("PrivateSubnet:connect", ps)
         handle_validation_failure("networking/private_subnet/show") { @page = "networking" }
         unless (subnet = authorized_private_subnet(key: "connected-subnet-id", perm: "PrivateSubnet:connect"))
           raise CloverError.new(400, "InvalidRequest", "Subnet to be connected not found")
@@ -43,7 +43,7 @@ class Clover
       end
 
       r.post "disconnect", :ubid_uuid do |id|
-        authorize("PrivateSubnet:disconnect", ps.id)
+        authorize("PrivateSubnet:disconnect", ps)
         handle_validation_failure("networking/private_subnet/show") { @page = "networking" }
         unless (subnet = authorized_private_subnet(id:, perm: "PrivateSubnet:disconnect"))
           raise CloverError.new(400, "InvalidRequest", "Subnet to be disconnected not found")
@@ -64,7 +64,7 @@ class Clover
 
       r.is do
         r.get do
-          authorize("PrivateSubnet:view", ps.id)
+          authorize("PrivateSubnet:view", ps)
           if api?
             Serializers::PrivateSubnet.serialize(ps)
           else
@@ -73,7 +73,7 @@ class Clover
         end
 
         r.delete do
-          authorize("PrivateSubnet:delete", ps.id)
+          authorize("PrivateSubnet:delete", ps)
 
           vms_dataset = ps.vms_dataset
             .association_join(:strand)
