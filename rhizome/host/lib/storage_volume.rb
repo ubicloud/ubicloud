@@ -248,7 +248,8 @@ class StorageVolume
       "copy_on_read" => @copy_on_read,
       "poll_queue_timeout_us" => 1000,
       "device_id" => @device_id,
-      "skip_sync" => @skip_sync
+      "skip_sync" => @skip_sync,
+      "write_through" => write_through_device?
     }
 
     if @image_path
@@ -273,6 +274,16 @@ class StorageVolume
       "init_vector" => key_wrapping_secrets["init_vector"].strip,
       "auth_data" => Base64.strict_encode64(key_wrapping_secrets["auth_data"]).strip
     }
+  end
+
+  def write_through_device?
+    st = File.stat(disk_file)
+
+    rp = File.realpath("/sys/dev/block/#{st.dev_major}:#{st.dev_minor}")
+    dev = File.basename(rp)
+    base = File.exist?("/sys/block/#{dev}") ? dev : File.basename(File.dirname(rp))
+
+    File.read("/sys/block/#{base}/queue/write_cache").include?("write through")
   end
 
   def start(key_wrapping_secrets)
