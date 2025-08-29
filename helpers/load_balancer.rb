@@ -52,7 +52,7 @@ class Clover
     options.add_option(name: "description")
     options.add_option(name: "private_subnet_id", values: dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view").map { {value: it.ubid, display_name: it.name} })
     options.add_option(name: "algorithm", values: ["Round Robin", "Hash Based"].map { {value: it.downcase.tr(" ", "_"), display_name: it} })
-    options.add_option(name: "stack", values: [LoadBalancer::Stack::IPV4, LoadBalancer::Stack::IPV6, LoadBalancer::Stack::DUAL].map { {value: it.downcase, display_name: it.gsub("ip", "IP")} })
+    options.add_option(name: "stack", values: [LoadBalancer::Stack::DUAL, LoadBalancer::Stack::IPV4, LoadBalancer::Stack::IPV6].map { {value: it.downcase, display_name: it.gsub("ip", "IP")} })
     options.add_option(name: "src_port")
     options.add_option(name: "dst_port")
     options.add_option(name: "health_check_endpoint")
