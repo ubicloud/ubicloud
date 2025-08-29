@@ -477,6 +477,7 @@ Options:
     -S, --storage-size=size          storage size GB
     -v, --version=version            PostgreSQL version
     -t, --tags=tags                  tags (e.g. key1=value1,key2=value2)
+    -R, --restrict-by-default        restrict access by default (add firewall rules to allow access)
 
 Allowed Option Values:
     Flavor: standard paradedb lantern
