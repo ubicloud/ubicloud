@@ -21,6 +21,14 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
     end
   end
 
+  def cluster
+    kubernetes_node.kubernetes_cluster
+  end
+
+  def nodepool
+    kubernetes_node.kubernetes_nodepool
+  end
+
   label def start
     hop_wait
   end
@@ -33,8 +41,13 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
   end
 
   label def retire
+    kubernetes_node.update(state: "draining")
+    hop_drain
+  end
+
+  label def drain
     unit_name = "drain_node_#{kubernetes_node.name}"
-    sshable = kubernetes_node.kubernetes_cluster.sshable
+    sshable = cluster.cp_vms.last.sshable
     case sshable.d_check(unit_name)
     when "Succeeded"
       hop_remove_node_from_cluster
@@ -49,12 +62,22 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
       nap 10
     else
       register_deadline("destroy", 0)
-      nap(60 * 60 * 24)
+      nap 3 * 60 * 60
     end
   end
 
   label def remove_node_from_cluster
-    kubernetes_node.kubernetes_cluster.client.delete_node(kubernetes_node.name)
+    # kubeadm reset is necessary for etcd member removal, deleting the node itself
+    # won't remove the node from the etcd cluster, hurting the etcd cluster health
+    kubernetes_node.sshable.cmd("sudo kubeadm reset --force")
+
+    if nodepool
+      cluster.services_lb.detach_vm(kubernetes_node.vm)
+    else
+      cluster.api_server_lb.detach_vm(kubernetes_node.vm)
+    end
+
+    cluster.client(session: cluster.nodes.last.sshable.connect).delete_node(kubernetes_node.name)
     hop_destroy
   end
 

@@ -43,10 +43,7 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
       end
     elsif current_node_count > desired_node_count
       excess_nodes = kubernetes_nodepool.functional_nodes.first(current_node_count - desired_node_count)
-      excess_nodes.each {
-        it.update(state: "draining")
-        it.incr_retire
-      }
+      excess_nodes.each(&:incr_retire)
     end
     hop_wait_worker_node
   end

@@ -7,10 +7,6 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
     @old_node ||= KubernetesNode[frame.fetch("old_node_id")]
   end
 
-  def new_node
-    @new_node ||= KubernetesNode[frame.fetch("new_node_id")]
-  end
-
   def kubernetes_nodepool
     @kubernetes_nodepool ||= KubernetesNodepool[frame.fetch("nodepool_id", nil)]
   end
@@ -51,45 +47,16 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
   end
 
   label def drain_old_node
-    register_deadline("remove_old_node_from_cluster", 60 * 60)
-
-    vm = kubernetes_cluster.cp_vms.last
-    case vm.sshable.d_check("drain_node")
-    when "Succeeded"
-      hop_remove_old_node_from_cluster
-    when "NotStarted"
-      vm.sshable.d_run("drain_node", "sudo", "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf",
-        "drain", old_node.name, "--ignore-daemonsets", "--delete-emptydir-data")
-      nap 10
-    when "InProgress"
-      nap 10
-    when "Failed"
-      vm.sshable.d_restart("drain_node")
-      nap 10
-    end
-    nap 60 * 60
+    old_node.incr_retire
+    hop_wait_for_drain
   end
 
-  label def remove_old_node_from_cluster
-    vm = old_node.vm
-    unless kubernetes_nodepool
-      kubernetes_cluster.api_server_lb.detach_vm(vm)
-    end
-    # kubeadm reset is necessary for etcd member removal, delete node itself
-    # doesn't remove node from the etcd member, hurting the etcd cluster health
-    vm.sshable.cmd("sudo kubeadm reset --force")
-
-    hop_delete_node_object
+  label def wait_for_drain
+    nap 5 if old_node
+    hop_destroy
   end
 
-  label def delete_node_object
-    res = kubernetes_cluster.client(session: kubernetes_cluster.nodes.last.sshable.connect).delete_node(old_node.name)
-    fail "delete node object failed: #{res}" unless res.exitstatus.zero?
-    hop_destroy_node
-  end
-
-  label def destroy_node
-    old_node.incr_destroy
+  label def destroy
     pop "upgraded node"
   end
 end

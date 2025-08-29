@@ -93,110 +93,37 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
     let(:old_node) { KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
 
     before do
-      allow(prog).to receive(:frame).and_return({"old_node_id" => old_node.id})
+      expect(prog).to receive(:frame).and_return({"old_node_id" => old_node.id})
       expect(prog.old_node.id).to eq(old_node.id)
-      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id)
-      allow(kubernetes_cluster.cp_vms.last).to receive(:sshable).and_return(sshable)
-
-      expect(prog).to receive(:register_deadline).with("remove_old_node_from_cluster", 60 * 60)
     end
 
     it "starts the drain process when run for the first time and naps" do
-      expect(sshable).to receive(:d_check).with("drain_node").and_return("NotStarted")
-      expect(sshable).to receive(:d_run).with("drain_node", "sudo", "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf", "drain", old_node.name, "--ignore-daemonsets", "--delete-emptydir-data")
-      expect { prog.drain_old_node }.to nap(10)
-    end
-
-    it "naps when the node is getting drained" do
-      expect(sshable).to receive(:d_check).with("drain_node").and_return("InProgress")
-      expect { prog.drain_old_node }.to nap(10)
-    end
-
-    it "restarts when it fails" do
-      expect(sshable).to receive(:d_check).with("drain_node").and_return("Failed")
-      expect(sshable).to receive(:d_restart).with("drain_node")
-      expect { prog.drain_old_node }.to nap(10)
-    end
-
-    it "naps when daemonizer something unexpected and waits for the page" do
-      expect(sshable).to receive(:d_check).with("drain_node").and_return("UnexpectedState")
-      expect { prog.drain_old_node }.to nap(60 * 60)
-    end
-
-    it "drains the old node and hops to drop the old node" do
-      expect(sshable).to receive(:d_check).with("drain_node").and_return("Succeeded")
-      expect { prog.drain_old_node }.to hop("remove_old_node_from_cluster")
+      expect(prog.old_node).to receive(:incr_retire)
+      expect { prog.drain_old_node }.to hop("wait_for_drain")
     end
   end
 
-  describe "#remove_old_node_from_cluster" do
+  describe "#wait_for_drain" do
+    let(:old_node) { KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
+
     before do
-      old_node = KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_nodepool.id)
-      new_node = KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_nodepool.id)
-      allow(prog).to receive(:frame).and_return({"old_node_id" => old_node.id, "new_node_id" => new_node.id})
-      expect(prog.old_node.id).to eq(old_node.id)
-      expect(prog.new_node.id).to eq(new_node.id)
-
-      expect(kubernetes_nodepool.nodes.count).to eq(2)
-
-      mock_sshable = instance_double(Sshable)
-      expect(prog.old_node.vm).to receive(:sshable).and_return(mock_sshable)
-      expect(mock_sshable).to receive(:cmd).with("sudo kubeadm reset --force")
-    end
-
-    it "removes the old node from the CP while upgrading the control plane" do
-      expect(prog.kubernetes_nodepool).to be_nil
-      api_server_lb = instance_double(LoadBalancer)
-      expect(kubernetes_cluster).to receive(:api_server_lb).and_return(api_server_lb)
-      expect(api_server_lb).to receive(:detach_vm).with(prog.old_node.vm)
-      expect { prog.remove_old_node_from_cluster }.to hop("delete_node_object")
-    end
-
-    it "removes the old node from the nodepool while upgrading the node pool" do
-      allow(prog).to receive(:frame).and_return({"old_node_id" => prog.old_node.id, "new_node_id" => prog.new_node.id, "nodepool_id" => kubernetes_nodepool.id})
-      expect(prog.kubernetes_nodepool).not_to be_nil
-      expect { prog.remove_old_node_from_cluster }.to hop("delete_node_object")
-    end
-  end
-
-  describe "#delete_node_object" do
-    before do
-      old_node = KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id)
-      allow(prog).to receive(:frame).and_return({"old_node_id" => old_node.id})
+      expect(prog).to receive(:frame).and_return({"old_node_id" => old_node.id})
       expect(prog.old_node.id).to eq(old_node.id)
     end
 
-    it "deletes the node object from kubernetes" do
-      client = instance_double(Kubernetes::Client)
-      expect(kubernetes_cluster).to receive(:client).and_return(client)
-      sshable = instance_double(Sshable)
-      expect(kubernetes_cluster.nodes.last).to receive(:sshable).and_return(sshable)
-      expect(sshable).to receive(:connect)
-      expect(client).to receive(:delete_node).with(prog.old_node.name).and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("success", 0))
-      expect { prog.delete_node_object }.to hop("destroy_node")
+    it "naps if node is not drained yet" do
+      expect { prog.wait_for_drain }.to nap(5)
     end
 
-    it "raises if the error of delete node command is not successful" do
-      client = instance_double(Kubernetes::Client)
-      expect(kubernetes_cluster).to receive(:client).and_return(client)
-      sshable = instance_double(Sshable)
-      expect(kubernetes_cluster.nodes.last).to receive(:sshable).and_return(sshable)
-      expect(sshable).to receive(:connect)
-      expect(client).to receive(:delete_node).with(prog.old_node.name).and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("failed", 1))
-      expect { prog.delete_node_object }.to raise_error(RuntimeError)
+    it "hops to destroy when node is retired" do
+      expect(prog).to receive(:old_node).and_return(nil)
+      expect { prog.wait_for_drain }.to hop("destroy")
     end
   end
 
   describe "#destroy_node" do
-    before do
-      old_node = KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id)
-      allow(prog).to receive(:frame).and_return({"old_node_id" => old_node.id})
-      expect(prog.old_node.id).to eq(old_node.id)
-    end
-
     it "destroys the old node" do
-      expect(prog.old_node).to receive(:incr_destroy)
-      expect { prog.destroy_node }.to exit({"msg" => "upgraded node"})
+      expect { prog.destroy }.to exit({"msg" => "upgraded node"})
     end
   end
 end
