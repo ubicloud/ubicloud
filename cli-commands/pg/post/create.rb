@@ -10,6 +10,7 @@ UbiCli.on("pg").run_on("create") do
     on("-S", "--storage-size=size", Option::POSTGRES_STORAGE_SIZE_OPTIONS, "storage size GB")
     on("-v", "--version=version", Option::POSTGRES_VERSION_OPTIONS, "PostgreSQL version")
     on("-t", "--tags=tags", "tags (e.g. key1=value1,key2=value2)")
+    on("-R", "--restrict-by-default", "restrict access by default (add firewall rules to allow access)")
   end
   help_option_values("Flavor:", Option::POSTGRES_FLAVOR_OPTIONS.keys)
   help_option_values("Replication Type:", Option::POSTGRES_HA_OPTIONS.keys)

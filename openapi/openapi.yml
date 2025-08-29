@@ -838,6 +838,9 @@ paths:
                 version:
                   description: PostgreSQL version
                   type: string
+                restrict_by_default:
+                  description: 'Whether to restrict access by default (if so, firewall rules must be added to access)'
+                  type: boolean
                 tags:
                   description: Tags for the Postgres Database
                   type: array
