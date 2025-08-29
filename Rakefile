@@ -60,9 +60,9 @@ migrate = lambda do |env, version|
   case DB[<<SQL].get
 SELECT count(*)
 FROM pg_class
-WHERE relnamespace = 'public'::regnamespace AND relname = 'account_password_hashes'
+WHERE relnamespace = 'public'::regnamespace AND relname IN ('account_password_hashes', 'admin_password_hash')
 SQL
-  when 0
+  when 0, 1
     user = DB.get(Sequel.lit("current_user"))
     ph_user = "#{user}_password"
 
@@ -74,8 +74,8 @@ SQL
       Sequel::Migrator.run(ph_db, "migrate/ph", table: "schema_migrations_password")
     end
     DB["REVOKE ALL ON SCHEMA public FROM ?", ph_user.to_sym].get
-  when 1
-    # Already ran the "ph" migration as the alternate user.  This
+  when 2
+    # Already ran the "ph" migrations as the alternate user.  This
     # branch is taken nearly all the time in a production situation.
   else
     fail "BUG: account_password_hashes table probing query should return 0 or 1"
@@ -282,6 +282,13 @@ task "update_golden_files" do
 end
 
 # Other
+
+desc "Create admin account in production environment"
+task "create_prod_admin_account", [:login] do |_, args|
+  load_db.call("production")
+  require_relative "loader"
+  puts "Password for account is: #{CloverAdmin.create_admin_account(args[:login])}"
+end
 
 desc "Check generated SQL for parameterization"
 task "check_query_parameterization" do

@@ -178,6 +178,8 @@ GEM
     fiddle (1.1.8)
     foreman (0.90.0)
       thor (~> 1.4)
+    forme (2.6.0)
+      bigdecimal
     hashdiff (1.2.0)
     hashery (2.1.2)
     hashie (5.0.0)
@@ -490,6 +492,7 @@ DEPENDENCIES
   erubi (>= 1.5)
   excon
   foreman
+  forme
   jwt
   mail
   net-ssh

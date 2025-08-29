@@ -107,10 +107,12 @@ class Clover < Roda
   # :nocov:
 
   plugin :host_routing, scope_predicates: true do |hosts|
-    hosts.register :api, :web, :runtime
+    hosts.register :api, :web, :runtime, :admin
     hosts.default :web do |host|
       if host.start_with?("api.")
         :api
+      elsif host.start_with?("admin.")
+        :admin
       elsif request.path_info.start_with?("/runtime")
         :runtime
       end
@@ -924,6 +926,8 @@ class Clover < Roda
       end
       response.json = true
       response.skip_content_security_policy!
+    elsif r.admin?
+      r.run(CloverAdmin.app)
     else
       r.on "runtime" do
         response.json = true
