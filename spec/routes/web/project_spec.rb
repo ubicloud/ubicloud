@@ -144,7 +144,7 @@ RSpec.describe Clover, "project" do
           expect(page).to have_content "Virtual Machines"
           expect(page).to have_content "Databases"
           expect(page).to have_content "Load Balancers"
-          expect(page).to have_content "Firewalls"
+          expect(page).to have_content "Kubernetes Clusters"
           if Config.github_app_name
             expect(page).to have_content "GitHub Runners"
           else
@@ -162,6 +162,7 @@ RSpec.describe Clover, "project" do
           end
           expect(page).to have_content "Create Managed Database"
           expect(page).to have_content "Add User to Project"
+          expect(page).to have_content "Create Kubernetes Cluster"
           expect(page).to have_content "Load Balance Your Traffic"
           expect(page).to have_content "Create Access Token"
           expect(page).to have_content "Documentation"
