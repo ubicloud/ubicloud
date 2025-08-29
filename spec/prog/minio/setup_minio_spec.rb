@@ -54,7 +54,7 @@ RSpec.describe Prog::Minio::SetupMinio do
 
     it "installs minio if failed" do
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check install_minio").and_return("Failed")
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'minio/bin/install_minio minio_20240406052602.0.0_amd64' install_minio")
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'minio/bin/install_minio minio_20250723155402.0.0_amd64' install_minio")
       expect { nx.install_minio }.to nap(5)
     end
 
@@ -65,7 +65,7 @@ RSpec.describe Prog::Minio::SetupMinio do
 
     it "installs minio if NotStarted" do
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check install_minio").and_return("NotStarted")
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'minio/bin/install_minio minio_20240406052602.0.0_amd64' install_minio")
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'minio/bin/install_minio minio_20250723155402.0.0_amd64' install_minio")
       expect { nx.install_minio }.to nap(5)
     end
   end
@@ -78,6 +78,7 @@ MINIO_OPTS="--console-address :9001"
 MINIO_ROOT_USER="minio-admin"
 MINIO_ROOT_PASSWORD="dummy-password"
 MINIO_SERVER_URL="https://minio-cluster-name.minio.ubicloud.com:9000"
+MINIO_STORAGE_CLASS_STANDARD="EC:0"
 ECHO
       minio_hosts = <<ECHO
 ::1 ip6-localhost ip6-loopback

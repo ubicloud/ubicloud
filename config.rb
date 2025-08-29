@@ -123,7 +123,7 @@ module Config
   # Minio
   override :minio_host_name, "minio.ubicloud.com", string
   optional :minio_service_project_id, string
-  override :minio_version, "minio_20240406052602.0.0_amd64"
+  override :minio_version, "minio_20250723155402.0.0_amd64"
 
   # VictoriaMetrics
   optional :victoria_metrics_service_project_id, string
