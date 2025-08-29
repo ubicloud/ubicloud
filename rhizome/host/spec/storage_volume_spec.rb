@@ -392,7 +392,34 @@ RSpec.describe StorageVolume do
       expect(f).to receive(:write).with(/image_path/)
       expect(encrypted_vhost_sv).to receive(:fsync_or_fail).with(f)
       expect(encrypted_vhost_sv).to receive(:sync_parent_dir).with(config_path)
+      expect(encrypted_vhost_sv).to receive(:write_through_device?).and_return(true)
       encrypted_vhost_sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets)
+    end
+  end
+
+  describe "#write_through_device" do
+    it "can check if a device is write-through" do
+      expect(File).to receive(:stat).with(disk_file).and_return(instance_double(File::Stat, dev_major: 1, dev_minor: 2))
+      expect(File).to receive(:realpath).with("/sys/dev/block/1:2").and_return("/sys/devices/pci0000:c0/0000:c0:03.1/0000:c2:00.0/nvme/nvme0/nvme0n1")
+      expect(File).to receive(:exist?).with("/sys/block/nvme0n1").and_return(true)
+      expect(File).to receive(:read).with("/sys/block/nvme0n1/queue/write_cache").and_return("write through\n")
+      expect(encrypted_vhost_sv.write_through_device?).to be true
+    end
+
+    it "can check if a device is not write-through" do
+      expect(File).to receive(:stat).with(disk_file).and_return(instance_double(File::Stat, dev_major: 1, dev_minor: 2))
+      expect(File).to receive(:realpath).with("/sys/dev/block/1:2").and_return("/sys/devices/virtual/block/md2")
+      expect(File).to receive(:exist?).with("/sys/block/md2").and_return(true)
+      expect(File).to receive(:read).with("/sys/block/md2/queue/write_cache").and_return("write back\n")
+      expect(encrypted_vhost_sv.write_through_device?).to be false
+    end
+
+    it "can check if the file is on a partition" do
+      expect(File).to receive(:stat).with(disk_file).and_return(instance_double(File::Stat, dev_major: 8, dev_minor: 1))
+      expect(File).to receive(:realpath).with("/sys/dev/block/8:1").and_return("/sys/devices/pci0000:c0/0000:c0:03.2/0000:c4:00.0/nvme/nvme1/nvme1n1/nvme1n1p4")
+      expect(File).to receive(:exist?).with("/sys/block/nvme1n1p4").and_return(false)
+      expect(File).to receive(:read).with("/sys/block/nvme1n1/queue/write_cache").and_return("write through\n")
+      expect(encrypted_vhost_sv.write_through_device?).to be true
     end
   end
 
