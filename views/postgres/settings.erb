@@ -1,3 +1,5 @@
+<% delete_perm = has_permission?("Postgres:delete", @pg) %>
+
 <% if @edit_perm %>
   <div class="p-6">
     <%== part("components/rename_object", object: @pg, type: "PostgreSQL database") %>
@@ -41,7 +43,7 @@
   </div>
 <% end %>
 <!-- Danger Zone -->
-<% if @edit_perm || @delete_perm %>
+<% if @edit_perm || delete_perm %>
   <div class="p-6">
     <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
       <div class="min-w-0 flex-1">
@@ -138,7 +140,7 @@
         </div>
       <% end %>
       <!-- Delete Card -->
-      <% if @delete_perm %>
+      <% if delete_perm %>
         <div class="px-4 py-5 sm:p-6">
           <div class="sm:flex sm:items-center sm:justify-between">
             <div>
