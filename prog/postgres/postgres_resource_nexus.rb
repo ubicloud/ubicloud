@@ -60,6 +60,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       postgres_resource.update(private_subnet_id: private_subnet_id)
 
       PostgresFirewallRule.create(postgres_resource_id: postgres_resource.id, cidr: "0.0.0.0/0")
+      PostgresFirewallRule.create(postgres_resource_id: postgres_resource.id, cidr: "::/0")
       postgres_resource.set_firewall_rules
 
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: timeline_id, timeline_access: timeline_access, representative_at: Time.now)

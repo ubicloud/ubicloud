@@ -44,6 +44,7 @@ RSpec.describe Clover, "cli pg show" do
       tags:
       firewall rules:
         1: #{@pg.firewall_rules[0].ubid}  0.0.0.0/0
+        2: #{@pg.firewall_rules[1].ubid}  ::/0
       metric destinations:
         1: #{@pg.metric_destinations[0].ubid}  md-user  https://md.example.com
       read replicas:
@@ -74,6 +75,7 @@ RSpec.describe Clover, "cli pg show" do
       tags:
       firewall rules:
         1: #{@pg.firewall_rules[0].ubid}  0.0.0.0/0
+        2: #{@pg.firewall_rules[1].ubid}  ::/0
       metric destinations:
         1: #{@pg.metric_destinations[0].ubid}  md-user  https://md.example.com
       read replicas:
