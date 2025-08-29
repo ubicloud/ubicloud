@@ -24,7 +24,7 @@ class Clover
       end
 
       r.get "create" do
-        authorize("Vm:create", @project.id)
+        authorize("Vm:create", @project)
         view "vm/create"
       end
     end

@@ -23,7 +23,7 @@ class Clover
       check_found_object(vm)
 
       r.get true do
-        authorize("Vm:view", vm.id)
+        authorize("Vm:view", vm)
 
         if api?
           Serializers::Vm.serialize(vm, {detailed: true})
@@ -33,7 +33,7 @@ class Clover
       end
 
       r.delete true do
-        authorize("Vm:delete", vm.id)
+        authorize("Vm:delete", vm)
 
         DB.transaction do
           vm.incr_destroy
@@ -47,7 +47,7 @@ class Clover
       r.show_object(vm, actions: %w[overview networking settings], perm: "Vm:view", template: "vm/show")
 
       r.post "restart" do
-        authorize("Vm:edit", vm.id)
+        authorize("Vm:edit", vm)
 
         DB.transaction do
           vm.incr_restart

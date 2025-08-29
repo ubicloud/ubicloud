@@ -50,7 +50,7 @@ class Clover
 
       r.is do
         r.get do
-          authorize("Project:view", @project.id)
+          authorize("Project:view", @project)
 
           if api?
             Serializers::Project.serialize(@project)
@@ -60,7 +60,7 @@ class Clover
         end
 
         r.delete do
-          authorize("Project:delete", @project.id)
+          authorize("Project:delete", @project)
 
           if @project.has_resources?
             fail DependencyError.new("'#{@project.name}' project has some resources. Delete all related resources first.")
@@ -75,7 +75,7 @@ class Clover
         end
 
         r.post web? do
-          authorize("Project:edit", @project.id)
+          authorize("Project:edit", @project)
 
           handle_validation_failure("project/show")
 

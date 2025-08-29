@@ -3,7 +3,7 @@
 class Clover
   hash_branch(:project_prefix, "usage-alert") do |r|
     r.web do
-      authorize("Project:billing", @project.id)
+      authorize("Project:billing", @project)
 
       r.post true do
         handle_validation_failure("project/billing")

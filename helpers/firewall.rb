@@ -15,7 +15,7 @@ class Clover
   end
 
   def firewall_post(firewall_name)
-    authorize("Firewall:create", @project.id)
+    authorize("Firewall:create", @project)
     Validation.validate_name(firewall_name)
 
     description = typecast_params.str("description") || ""
