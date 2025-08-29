@@ -31,13 +31,18 @@ module Ubicloud
       merge_into_values(adapter.patch(_path, algorithm:, src_port:, dst_port:, health_check_endpoint:, vms:))
     end
 
-    # Attach the given virtual machine to the firewall. Accepts either a Vm instance
+    # Return the active certificate for the load balancer.
+    def active_certificate
+      adapter.get(_path("/certificate"))
+    end
+
+    # Attach the given virtual machine to the load balancer. Accepts either a Vm instance
     # or a virtual machine id string.  Returns a Vm instance.
     def attach_vm(vm)
       vm_action(vm, "/attach-vm")
     end
 
-    # Detach the given virtual machine from the firewall. Accepts either a Vm instance
+    # Detach the given virtual machine from the load balancer. Accepts either a Vm instance
     # or a virtual machine id string.  Returns a Vm instance.
     def detach_vm(vm)
       vm_action(vm, "/detach-vm")
