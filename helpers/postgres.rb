@@ -11,6 +11,7 @@ class Clover
     ha_type = typecast_params.nonempty_str("ha_type", PostgresResource::HaType::NONE)
     version = typecast_params.nonempty_str("version", PostgresResource::DEFAULT_VERSION)
     tags = typecast_params.array(:Hash, "tags", [])
+    with_firewall_rules = !typecast_params.bool("restrict_by_default")
 
     postgres_params = {
       "flavor" => flavor,
@@ -39,6 +40,7 @@ class Clover
         target_storage_size_gib: storage_size,
         ha_type:,
         version:,
+        with_firewall_rules:,
         flavor:
       ).subject
       pg.update(tags:)

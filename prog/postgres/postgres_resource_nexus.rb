@@ -12,7 +12,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,
     version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
-    ha_type: PostgresResource::HaType::NONE, parent_id: nil, restore_target: nil)
+    ha_type: PostgresResource::HaType::NONE, parent_id: nil, restore_target: nil, with_firewall_rules: true)
 
     unless Project[project_id]
       fail "No existing project"
@@ -59,8 +59,10 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       private_subnet_id = Prog::Vnet::SubnetNexus.assemble(Config.postgres_service_project_id, name: "#{postgres_resource.ubid}-subnet", location_id: location.id, firewall_id: firewall.id).id
       postgres_resource.update(private_subnet_id: private_subnet_id)
 
-      PostgresFirewallRule.create(postgres_resource_id: postgres_resource.id, cidr: "0.0.0.0/0")
-      PostgresFirewallRule.create(postgres_resource_id: postgres_resource.id, cidr: "::/0")
+      if with_firewall_rules
+        PostgresFirewallRule.create(postgres_resource_id: postgres_resource.id, cidr: "0.0.0.0/0")
+        PostgresFirewallRule.create(postgres_resource_id: postgres_resource.id, cidr: "::/0")
+      end
       postgres_resource.set_firewall_rules
 
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: timeline_id, timeline_access: timeline_access, representative_at: Time.now)
