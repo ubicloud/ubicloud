@@ -323,6 +323,7 @@ RSpec.describe Prog::Vm::Nexus do
             "slice_name" => "system.slice",
             "cpu_percent_limit" => 200,
             "cpu_burst_percent_limit" => 0,
+            "ipv6_disabled" => false,
             **frame_update
           )
         end

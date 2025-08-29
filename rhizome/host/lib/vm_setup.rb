@@ -57,11 +57,11 @@ class VmSetup
 
   def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology,
     mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices,
-    boot_image, dns_ipv4, slice_name, cpu_percent_limit, cpu_burst_percent_limit)
+    boot_image, dns_ipv4, slice_name, cpu_percent_limit, cpu_burst_percent_limit, ipv6_disabled)
 
-    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4)
+    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled: ipv6_disabled)
     network_thread = Thread.new do
-      setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: max_vcpus > 1)
+      setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: max_vcpus > 1, ipv6_disabled: ipv6_disabled)
     end
     storage_thread = Thread.new do
       storage(storage_params, storage_secrets, true)
@@ -108,7 +108,7 @@ class VmSetup
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
 
-  def setup_networking(skip_persisted, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue:)
+  def setup_networking(skip_persisted, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue:, ipv6_disabled:)
     ip4 = nil if ip4.empty?
     guest_ephemeral, clover_ephemeral = subdivide_network(NetAddr.parse_net(gua))
 
@@ -130,7 +130,7 @@ class VmSetup
     setup_veths_6(guest_ephemeral, clover_ephemeral, gua, ndp_needed)
     setup_taps_6(gua, nics, dns_ipv4)
     routes4(ip4, local_ip4, nics)
-    write_nftables_conf(ip4, gua, nics)
+    write_nftables_conf(ip4, gua, nics, ipv6_disabled: ipv6_disabled)
     forwarding
   end
 
@@ -382,8 +382,8 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     end
   end
 
-  def write_nftables_conf(ip4, gua, nics)
-    config = build_nftables_config(gua, nics, ip4)
+  def write_nftables_conf(ip4, gua, nics, ipv6_disabled:)
+    config = build_nftables_config(gua, nics, ip4, ipv6_disabled)
     vp.write_nftables_conf(config)
     apply_nftables
   end
@@ -428,7 +428,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     nics.map { "ether saddr #{_1.mac} ip6 saddr != #{_1.net6} drop" }.join("\n")
   end
 
-  def build_nftables_config(gua, nics, ip4)
+  def build_nftables_config(gua, nics, ip4, ipv6_disabled)
     guest_ephemeral = subdivide_network(NetAddr.parse_net(gua)).first
     <<~NFTABLES_CONF
       table ip raw {
@@ -480,13 +480,14 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     r "ip netns exec #{q_vm} nft -f #{vp.q_nftables_conf}"
   end
 
-  def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4)
+  def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled:)
     vp.write_meta_data(<<EOS)
 instance-id: #{yq(@vm_name)}
 local-hostname: #{yq(@vm_name)}
 EOS
 
-    guest_network = subdivide_network(NetAddr.parse_net(gua)).first
+    guest_network = subdivide_network(NetAddr.parse_net(gua)).first unless ipv6_disabled
+    guest_network_dhcp = "dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}" unless ipv6_disabled
     private_ip_dhcp = nics.map do |nic|
       vm_sub_6 = NetAddr::IPv6Net.parse(nic.net6)
       vm_net4 = NetAddr::IPv4Net.parse(nic.net4)
@@ -518,20 +519,20 @@ bogus-priv
 no-resolv
 #{raparams}
 #{interfaces}
-dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
+#{guest_network_dhcp || ""}
 #{private_ip_dhcp}
-server=2606:4700:4700::1111
-server=2001:4860:4860::8888
-dhcp-option=6,#{dns_ipv4}
-listen-address=#{dns_ipv4}
+#{ipv6_disabled ? "" : "server=8.8.8.8"}
+#{ipv6_disabled ? "" : "server=1.1.1.1"}
+dhcp-option=6,#{ipv6_disabled ? "8.8.8.8" : dns_ipv4}
+#{ipv6_disabled ? "" : "listen-address=#{dns_ipv4}"}
 dhcp-option=26,1400
 bind-interfaces
 #{runner_config}
-dhcp-option=54,#{dns_ipv4}
+#{ipv6_disabled ? "" : "dhcp-option=54,#{dns_ipv4}"}
 dns-forward-max=10000
-dhcp-option=option6:dns-server,#{dnsmasq_address_ip6}
-listen-address=#{dnsmasq_address_ip6}
-all-servers
+#{ipv6_disabled ? "" : "dhcp-option=option6:dns-server,#{dnsmasq_address_ip6}"}
+#{ipv6_disabled ? "" : "listen-address=#{dnsmasq_address_ip6}"}
+#{ipv6_disabled ? "" : "all-servers"}
 DNSMASQ_CONF
 
     ethernets = nics.map do |nic|
