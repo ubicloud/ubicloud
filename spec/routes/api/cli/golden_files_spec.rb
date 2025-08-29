@@ -17,9 +17,9 @@ RSpec.describe Clover, "cli" do
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("psfzm9e26xky5m9ggetw4dpqe2"))
     expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("nc69z0cda8jt0g5b120hamn4vf"))
     expect(Firewall).to receive(:generate_uuid).and_return("24242d92-217b-85fc-b891-7046af3c1150")
-    expect(FirewallRule).to receive(:generate_uuid).and_return("51e5bc7d-245b-8df8-bf91-7c5d150cb160", "3b367895-7f18-89f8-a295-ff247e9d5192", "305d838d-a3cd-85f8-aa08-9a66e71a5877", "5aa5b086-37bd-81f8-8d03-dd4b0e09a436", "20c360fa-bc06-8df8-b067-33f4a1ebdbbd", "2b628450-25bd-8df8-8b42-fb5cc5d01ad1", "da42e2ef-b5f1-8df8-966d-1387afb1b2f4", "bc9b093a-0e00-89f8-991a-5e0cd15a7942", "b5e13849-a04f-89f8-b564-ab8ad37298aa", "e46b8b76-88e2-89f8-972b-692232699d16", "e0804078-98cf-85f8-bf74-702ec92c91e8", "d62c8465-7f9b-85f8-a548-5a8772352988")
+    expect(FirewallRule).to receive(:generate_uuid).and_return("51e5bc7d-245b-8df8-bf91-7c5d150cb160", "3b367895-7f18-89f8-a295-ff247e9d5192", "305d838d-a3cd-85f8-aa08-9a66e71a5877", "5aa5b086-37bd-81f8-8d03-dd4b0e09a436", "20c360fa-bc06-8df8-b067-33f4a1ebdbbd", "2b628450-25bd-8df8-8b42-fb5cc5d01ad1", "da42e2ef-b5f1-8df8-966d-1387afb1b2f4", "bc9b093a-0e00-89f8-991a-5e0cd15a7942", "b5e13849-a04f-89f8-b564-ab8ad37298aa", "e46b8b76-88e2-89f8-972b-692232699d16", "e0804078-98cf-85f8-bf74-702ec92c91e8", "d62c8465-7f9b-85f8-a548-5a8772352988", "ff48a299-529c-8df8-993a-ddb0450be4a4", "ce327a30-12cb-8df8-86c3-d2db53a4b837")
     expect(PostgresResource).to receive(:generate_uuid).and_return("dd0375a6-1c66-82d0-a5e8-af1e8527a8a2")
-    expect(PostgresFirewallRule).to receive(:generate_uuid).and_return("5a601238-b56e-8ecf-bbca-9e3e680812b8")
+    expect(PostgresFirewallRule).to receive(:generate_uuid).and_return("5a601238-b56e-8ecf-bbca-9e3e680812b8", "02d5082e-e75c-82cf-af6f-5f8f5aa89a52")
     expect(PostgresMetricDestination).to receive(:generate_uuid).and_return("45754ea1-c139-8a8d-af18-7b24e0dbc7de")
     cli(%w[vm eu-central-h1/test-vm create] << "ssh-rsa a")
     @vm = Vm.first
@@ -87,10 +87,11 @@ RSpec.describe Clover, "cli" do
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("ps9a8v5tm1020qn73f0c7db0x7")).at_least(:once)
     fw_uuids = %w[2b4ae5cf-1aac-8dfc-bc80-c87e3e381e10 f5e6cb31-e580-81fc-88d6-a379f13494bf].cycle
     expect(Firewall).to receive(:generate_uuid).and_invoke(-> { fw_uuids.next }).at_least(:once)
-    fwr_uuids = %w[c81cb3d1-81bc-89f8-96c8-6b4e8d4375bd e3fdf2f2-2603-85f8-b0f9-3fc2c28636cd 99785615-0cc7-8df8-a937-4f1d26b620c8 168054f0-e069-89f8-b12a-e4b010cf47b5 6d590d38-5f88-89f8-b6d8-0a079e1c61b6 9ccb12b4-813c-81f8-9ffc-4a2da3236e51 c5146202-2682-85f8-985f-91adfa07c3da ab7066fa-399b-8df8-a650-826d095211af 3d0c8e62-ad6f-85f8-b9f0-17f02a007d34 7a494601-25ec-85f8-8cb9-b84e05894d2e a4161d96-595a-85f8-a95b-5893bd5b34b1].cycle
+    fwr_uuids = %w[c81cb3d1-81bc-89f8-96c8-6b4e8d4375bd e3fdf2f2-2603-85f8-b0f9-3fc2c28636cd 99785615-0cc7-8df8-a937-4f1d26b620c8 168054f0-e069-89f8-b12a-e4b010cf47b5 6d590d38-5f88-89f8-b6d8-0a079e1c61b6 9ccb12b4-813c-81f8-9ffc-4a2da3236e51 c5146202-2682-85f8-985f-91adfa07c3da ab7066fa-399b-8df8-a650-826d095211af 3d0c8e62-ad6f-85f8-b9f0-17f02a007d34 7a494601-25ec-85f8-8cb9-b84e05894d2e a4161d96-595a-85f8-a95b-5893bd5b34b1 2d1e405e-6e6f-81f8-8d10-0d9ed6496fcb 2f0b82a9-fac2-85f8-8991-d29b3893633b].cycle
     expect(FirewallRule).to receive(:generate_uuid).and_invoke(-> { fwr_uuids.next }).at_least(:once)
     expect(PostgresResource).to receive(:generate_uuid).and_return("97eb0a77-7869-86d0-9dcb-a46416ddc5c9").at_least(:once)
-    expect(PostgresFirewallRule).to receive(:generate_uuid).and_return("6d674a31-e1c1-8ecf-b5ac-363abb5b9185").at_least(:once)
+    pg_fwr_uuids = %w[6d674a31-e1c1-8ecf-b5ac-363abb5b9185 e92edec8-453e-8ecf-9c82-f8bdbe0c5811].cycle
+    expect(PostgresFirewallRule).to receive(:generate_uuid).and_invoke(-> { pg_fwr_uuids.next }).at_least(:once)
     expect(PostgresMetricDestination).to receive(:generate_uuid).and_return("46d93419-abcc-8a8d-823a-55efe660727f").at_least(:once)
     expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("nc186qw3d23j1kzsgjqg2t811r")).at_least(:once)
     expect(LoadBalancer).to receive(:generate_uuid).and_return("eb8e0b21-94f2-8c2b-82c8-da57fcfe88c7").at_least(:once)

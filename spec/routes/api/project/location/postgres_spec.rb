@@ -647,7 +647,8 @@ RSpec.describe Clover, "postgres" do
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["items"][0]["cidr"]).to eq("0.0.0.0/0")
-        expect(JSON.parse(last_response.body)["count"]).to eq(1)
+        expect(JSON.parse(last_response.body)["items"][1]["cidr"]).to eq("::/0")
+        expect(JSON.parse(last_response.body)["count"]).to eq(2)
       end
     end
 
