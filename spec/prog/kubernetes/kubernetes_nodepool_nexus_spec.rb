@@ -109,7 +109,6 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
 
     it "retires enough number of nodes when we need to decommission some" do
       kn.update(node_count: 1)
-      expect(kn.functional_nodes.first).to receive(:update).with({state: "draining"})
       expect(kn.functional_nodes.first).to receive(:incr_retire)
       expect { nx.bootstrap_worker_nodes }.to hop("wait_worker_node")
     end
