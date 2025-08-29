@@ -31,6 +31,7 @@ class Prog::Vnet::CertServer < Prog::Base
 
   label def remove_cert_server
     vm.vm_host.sshable.cmd("sudo host/bin/setup-cert-server stop_and_remove #{vm.inhost_name}")
+    vm.incr_removed_from_lb
     pop "certificate resources and server are removed"
   end
 

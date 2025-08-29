@@ -1068,11 +1068,19 @@ RSpec.describe Prog::Vm::Nexus do
         expect(vm).to receive(:load_balancer).and_return(lb).at_least(:once)
         expect(vm).to receive(:lb_expiry_started_set?).and_return(true)
         expect(vm.vm_host.sshable).to receive(:cmd).with(/sudo.*bin\/setup-vm delete_net #{nx.vm_name}/)
+        expect(vm).to receive(:removed_from_lb_set?).and_return(true)
         expect { nx.wait_lb_expiry }.to hop("destroy_slice")
+      end
+
+      it "naps if the vm is not removed from lb, completely, yet" do
+        expect(vm).to receive(:load_balancer).and_return(nil)
+        expect(vm).to receive(:removed_from_lb_set?).and_return(false)
+        expect { nx.wait_lb_expiry }.to nap(5)
       end
 
       it "destroys properly after 10 minutes if the lb is gone" do
         expect(vm).to receive(:load_balancer).and_return(nil)
+        expect(vm).to receive(:removed_from_lb_set?).and_return(true)
         expect(vm.vm_host.sshable).to receive(:cmd).with(/sudo.*bin\/setup-vm delete_net #{nx.vm_name}/)
         expect { nx.wait_lb_expiry }.to hop("destroy_slice")
       end

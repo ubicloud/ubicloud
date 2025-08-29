@@ -75,6 +75,7 @@ RSpec.describe Prog::Vnet::CertServer do
   describe "#remove_cert_server" do
     it "removes the certificate files, server and hops to remove_load_balancer" do
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo host/bin/setup-cert-server stop_and_remove test-vm")
+      expect(vm).to receive(:incr_removed_from_lb)
 
       expect { nx.remove_cert_server }.to exit({"msg" => "certificate resources and server are removed"})
     end
