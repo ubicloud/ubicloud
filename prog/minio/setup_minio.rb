@@ -26,6 +26,7 @@ MINIO_OPTS="--console-address :9001"
 MINIO_ROOT_USER="#{minio_server.cluster.admin_user}"
 MINIO_ROOT_PASSWORD="#{minio_server.cluster.admin_password}"
 #{server_url_config}
+MINIO_STORAGE_CLASS_STANDARD="EC:#{[minio_server.pool.per_server_drive_count * minio_server.pool.servers.count / 2, 8].min}"
 ECHO
 
       hosts = <<ECHO
