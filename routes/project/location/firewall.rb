@@ -24,7 +24,7 @@ class Clover
 
       r.is do
         r.delete do
-          authorize("Firewall:delete", firewall.id)
+          authorize("Firewall:delete", firewall)
           ds = firewall.private_subnets_dataset
           unless ds.exclude(id: dataset_authorize(ds, "PrivateSubnet:edit").select(:id)).empty?
             fail Authorization::Unauthorized
@@ -38,7 +38,7 @@ class Clover
         end
 
         r.get do
-          authorize("Firewall:view", firewall.id)
+          authorize("Firewall:view", firewall)
 
           if api?
             Serializers::Firewall.serialize(firewall, {detailed: true})
@@ -53,7 +53,7 @@ class Clover
       r.show_object(firewall, actions: %w[overview networking settings], perm: "Firewall:view", template: "networking/firewall/show")
 
       r.post %w[attach-subnet detach-subnet] do |action|
-        authorize("Firewall:view", firewall.id)
+        authorize("Firewall:view", firewall)
         handle_validation_failure("networking/firewall/show") { @page = "networking" }
 
         unless (private_subnet = authorized_private_subnet(location_id: @location.id, perm: "PrivateSubnet:edit"))
@@ -84,7 +84,7 @@ class Clover
 
       r.on "firewall-rule" do
         r.post true do
-          authorize("Firewall:edit", firewall.id)
+          authorize("Firewall:edit", firewall)
           handle_validation_failure("networking/firewall/show") { @page = "networking" }
 
           parsed_cidr = Validation.validate_cidr(typecast_params.str!("cidr"))
@@ -110,7 +110,7 @@ class Clover
           check_found_object(firewall_rule)
 
           r.delete do
-            authorize("Firewall:edit", firewall.id)
+            authorize("Firewall:edit", firewall)
             DB.transaction do
               firewall.remove_firewall_rule(firewall_rule)
               audit_log(firewall_rule, "destroy", firewall)
@@ -124,7 +124,7 @@ class Clover
           end
 
           r.get api? do
-            authorize("Firewall:view", firewall.id)
+            authorize("Firewall:view", firewall)
             Serializers::FirewallRule.serialize(firewall_rule)
           end
         end

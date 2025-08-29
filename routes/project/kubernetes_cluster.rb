@@ -14,7 +14,7 @@ class Clover
       end
 
       r.get "create" do
-        authorize("KubernetesCluster:create", @project.id)
+        authorize("KubernetesCluster:create", @project)
         view "kubernetes-cluster/create"
       end
     end

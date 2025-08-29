@@ -1,10 +1,10 @@
-<% if has_permission?("KubernetesCluster:edit", @kc.id) %>
+<% if has_permission?("KubernetesCluster:edit", @kc) %>
   <div class="p-6">
     <%== part("components/rename_object", object: @kc, type: "Kubernetes Cluster") %>
   </div>
 <% end %>
 
-<% if has_permission?("KubernetesCluster:delete", @kc.ubid) %>
+<% if has_permission?("KubernetesCluster:delete", @kc) %>
   <div class="p-6">
     <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
       <div class="min-w-0 flex-1">

@@ -3,7 +3,7 @@
 class Clover
   hash_branch(:project_prefix, "discount-code") do |r|
     r.post r.web? do
-      authorize("Project:billing", @project.id)
+      authorize("Project:billing", @project)
       handle_validation_failure("project/billing")
 
       if (discount_code = typecast_params.nonempty_str("discount_code"))

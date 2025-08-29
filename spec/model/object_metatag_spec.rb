@@ -44,13 +44,13 @@ RSpec.describe ObjectMetatag do
     project = account.create_project_with_default_policy("Default", default_policy: false)
     tag = ObjectTag.create(project_id: project.id, name: "T")
     ace = AccessControlEntry.create(project_id: project.id, subject_id: account.id, object_id: tag.id)
-    expect(Authorization.has_permission?(project.id, account.id, "ObjectTag:view", tag.metatag_uuid)).to be false
+    expect(Authorization.has_permission?(project, account, "ObjectTag:view", tag.metatag_uuid)).to be false
     ace.update(object_id: tag.metatag_uuid)
-    expect(Authorization.has_permission?(project.id, account.id, "ObjectTag:view", tag.metatag_uuid)).to be true
+    expect(Authorization.has_permission?(project, account, "ObjectTag:view", tag.metatag_uuid)).to be true
 
     ot = ObjectTag.create(project_id: project.id, name: "S")
     ot.destroy
-    expect(Authorization.has_permission?(project.id, account.id, "ObjectTag:view", ot.metatag_uuid)).to be false
+    expect(Authorization.has_permission?(project, account, "ObjectTag:view", ot.metatag_uuid)).to be false
   end
 
   it "supports only valid metatag when creating AccessControlEntry" do

@@ -9,7 +9,7 @@ class Clover
         next "GitHub Action Runner integration is not enabled. Set GITHUB_APP_NAME to enable it."
       end
 
-      authorize("Project:github", @project.id)
+      authorize("Project:github", @project)
 
       r.get true do
         if (installation = @project.github_installations_dataset.first)

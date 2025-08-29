@@ -35,7 +35,7 @@
     ) %>
   </form>
   <!-- Danger Zone -->
-  <% if has_permission?("Location:delete", @project.ubid) %>
+  <% if has_permission?("Location:delete", @project) %>
     <div>
       <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
         <div class="min-w-0 flex-1">

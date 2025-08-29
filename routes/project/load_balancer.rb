@@ -13,7 +13,7 @@ class Clover
       end
 
       r.get "create" do
-        authorize("LoadBalancer:create", @project.id)
+        authorize("LoadBalancer:create", @project)
         view "networking/load_balancer/create"
       end
     end
