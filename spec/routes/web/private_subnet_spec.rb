@@ -297,6 +297,30 @@ RSpec.describe Clover, "private subnet" do
       end
     end
 
+    describe "rename" do
+      it "can rename private subnet" do
+        old_name = private_subnet.name
+        visit "#{project.path}#{private_subnet.path}/settings"
+        fill_in "name", with: "new-name%"
+        click_button "Rename"
+        expect(page).to have_flash_error("Validation failed for following fields: name")
+        expect(page).to have_content("Name must only contain lowercase letters, numbers, and hyphens and have max length 63.")
+        expect(private_subnet.reload.name).to eq old_name
+
+        fill_in "name", with: "new-name"
+        click_button "Rename"
+        expect(page).to have_flash_notice("Name updated")
+        expect(private_subnet.reload.name).to eq "new-name"
+        expect(page).to have_content("new-name")
+      end
+
+      it "does not show rename option without permissions" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Firewall:view"])
+        visit "#{project_wo_permissions.path}#{ps_wo_permission.path}/settings"
+        expect(page).to have_no_content("Rename")
+      end
+    end
+
     describe "delete" do
       it "can delete private subnet" do
         visit "#{project.path}#{private_subnet.path}"

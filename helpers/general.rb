@@ -19,20 +19,26 @@ class Clover < Roda
       env["HTTP_ACCEPT"]&.include?("application/json")
     end
 
-    def rename(object, perm:, serializer:)
-      return unless api?
-
+    def rename(object, perm:, serializer:, template_prefix:)
       post "rename" do
-        scope.authorize(perm, object.id)
-        name = scope.typecast_body_params.nonempty_str!("name")
-        Validation.validate_name(name)
+        scope.instance_exec do
+          authorize(perm, object.id)
+          handle_validation_failure("#{template_prefix}/show") { @page = "settings" }
+          name = typecast_body_params.nonempty_str!("name")
+          Validation.validate_name(name)
 
-        DB.transaction do
-          object.update(name:)
-          scope.audit_log(object, "update")
+          DB.transaction do
+            object.update(name:)
+            audit_log(object, "update")
+          end
+
+          if api?
+            serializer.serialize(object)
+          else
+            flash["notice"] = "Name updated"
+            request.redirect object, "/settings"
+          end
         end
-
-        serializer.serialize(object)
       end
     end
 
