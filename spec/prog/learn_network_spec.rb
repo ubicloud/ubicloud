@@ -85,5 +85,12 @@ JSON
 JSON
       }.to raise_error RuntimeError, "only one global unique address prefix supported on interface"
     end
+
+    it "pops if there is no global unique address prefix provided" do
+      sshable = instance_double(Sshable)
+      expect(sshable).to receive(:cmd).with("/usr/sbin/ip -j -6 addr show scope global").and_return("[]")
+      expect(lm).to receive(:sshable).and_return(sshable)
+      expect { lm.start }.to exit({"msg" => "learned network information"})
+    end
   end
 end

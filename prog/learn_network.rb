@@ -45,7 +45,7 @@ class Prog::LearnNetwork < Prog::Base
       else
         fail "only one global unique address prefix supported on interface"
       end
-    in nil
+    in []
       nil
     else
       fail "only one interface supported"
