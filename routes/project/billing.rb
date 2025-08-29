@@ -12,7 +12,7 @@ class Clover
         next "Billing is not enabled. Set STRIPE_SECRET_KEY to enable billing."
       end
 
-      authorize("Project:billing", @project.id)
+      authorize("Project:billing", @project)
 
       r.get true do
         view "project/billing"

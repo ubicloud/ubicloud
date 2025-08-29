@@ -4,7 +4,7 @@ class Clover
   hash_branch(:project_prefix, "private-location") do |r|
     r.is do
       r.get do
-        authorize("Location:view", @project.id)
+        authorize("Location:view", @project)
 
         @dataset = @project.locations_dataset
 
@@ -17,7 +17,7 @@ class Clover
       end
 
       r.post do
-        authorize("Location:create", @project.id)
+        authorize("Location:create", @project)
         handle_validation_failure("private-location/create")
         name, provider_location_name, access_key, secret_key = typecast_params.nonempty_str!(["name", "provider_location_name", "access_key", "secret_key"])
 
@@ -47,7 +47,7 @@ class Clover
     end
 
     r.get(web?, "create") do
-      authorize("Location:create", @project.id)
+      authorize("Location:create", @project)
       view "private-location/create"
     end
 
@@ -56,7 +56,7 @@ class Clover
       check_found_object(@location)
 
       r.get do
-        authorize("Location:view", @project.id)
+        authorize("Location:view", @project)
 
         if api?
           Serializers::PrivateLocation.serialize(@location)
@@ -66,7 +66,7 @@ class Clover
       end
 
       r.delete do
-        authorize("Location:delete", @project.id)
+        authorize("Location:delete", @project)
 
         if @location.has_resources?
           fail DependencyError.new("Private location '#{@location.ui_name}' has some resources, first, delete them.")
@@ -82,7 +82,7 @@ class Clover
       end
 
       r.post do
-        authorize("Location:edit", @project.id)
+        authorize("Location:edit", @project)
         name = typecast_params.nonempty_str("name")
         Validation.validate_name(name)
 

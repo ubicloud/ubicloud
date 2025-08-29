@@ -18,7 +18,7 @@ class Clover
   end
 
   def private_subnet_post(name)
-    authorize("PrivateSubnet:create", @project.id)
+    authorize("PrivateSubnet:create", @project)
 
     if (firewall_id = typecast_params.nonempty_str("firewall_id"))
       unless (firewall = authorized_firewall(location_id: @location.id))

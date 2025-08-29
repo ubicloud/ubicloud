@@ -1,5 +1,5 @@
-<% edit_perm = has_permission?("LoadBalancer:edit", @lb.id)
-delete_perm = has_permission?("LoadBalancer:delete", @lb.ubid) %>
+<% edit_perm = has_permission?("LoadBalancer:edit", @lb)
+delete_perm = has_permission?("LoadBalancer:delete", @lb) %>
 
 <% if edit_perm || delete_perm %>
   <div class="p-6">

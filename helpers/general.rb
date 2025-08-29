@@ -22,7 +22,7 @@ class Clover < Roda
     def rename(object, perm:, serializer:, template_prefix:)
       post "rename" do
         scope.instance_exec do
-          authorize(perm, object.id)
+          authorize(perm, object)
           handle_validation_failure("#{template_prefix}/show") { @page = "settings" }
           name = typecast_body_params.nonempty_str!("name")
 
@@ -57,7 +57,7 @@ class Clover < Roda
 
       get actions do |page|
         scope.instance_exec do
-          authorize(perm, object.id)
+          authorize(perm, object)
 
           response.headers["cache-control"] = "no-store"
           @page = page
@@ -221,24 +221,24 @@ class Clover < Roda
   end
 
   def authorize(actions, object_id)
-    if @project_permissions && object_id == @project.id
+    if @project_permissions && (object_id == @project || object_id == @project.id)
       fail Authorization::Unauthorized unless has_project_permission(actions)
     else
       each_authorization_id do |id|
-        Authorization.authorize(@project.id, id, actions, object_id)
+        Authorization.authorize(@project, id, actions, object_id)
       end
     end
   end
 
   def has_permission?(actions, object_id)
     each_authorization_id.all? do |id|
-      Authorization.has_permission?(@project.id, id, actions, object_id)
+      Authorization.has_permission?(@project, id, actions, object_id)
     end
   end
 
   def all_permissions(object_id)
     each_authorization_id.map do |id|
-      Authorization.all_permissions(@project.id, id, object_id)
+      Authorization.all_permissions(@project, id, object_id)
     end.reduce(:&)
   end
 

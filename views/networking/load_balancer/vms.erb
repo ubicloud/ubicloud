@@ -2,7 +2,7 @@
   .exclude(Sequel[:vm][:id] => @lb.vms_dataset.select(Sequel[:vm][:id]))
   .all
 load_balancer_path = "#{@project.path}#{@lb.path}"
-edit_perm = has_permission?("LoadBalancer:edit", @lb.ubid) %>
+edit_perm = has_permission?("LoadBalancer:edit", @lb) %>
 
 <div class="p-6">
   <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">

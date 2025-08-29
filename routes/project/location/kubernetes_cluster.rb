@@ -25,7 +25,7 @@ class Clover
 
       r.is do
         r.get do
-          authorize("KubernetesCluster:view", kc.id)
+          authorize("KubernetesCluster:view", kc)
           if api?
             Serializers::KubernetesCluster.serialize(kc, {detailed: true})
           else
@@ -34,7 +34,7 @@ class Clover
         end
 
         r.delete do
-          authorize("KubernetesCluster:delete", kc.id)
+          authorize("KubernetesCluster:delete", kc)
           DB.transaction do
             kc.incr_destroy
             audit_log(kc, "destroy")
@@ -48,7 +48,7 @@ class Clover
       r.show_object(kc, actions: %w[overview nodes settings], perm: "KubernetesCluster:view", template: "kubernetes-cluster/show")
 
       r.get "kubeconfig" do
-        authorize("KubernetesCluster:edit", kc.id)
+        authorize("KubernetesCluster:edit", kc)
 
         response.content_type = :text
         response["content-disposition"] = "attachment; filename=\"#{kc.name}-kubeconfig.yaml\""

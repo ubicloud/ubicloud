@@ -14,7 +14,7 @@ class Clover
       end
 
       r.get "create" do
-        authorize("PrivateSubnet:create", @project.id)
+        authorize("PrivateSubnet:create", @project)
         view "networking/private_subnet/create"
       end
     end

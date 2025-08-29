@@ -1,10 +1,10 @@
-<% if has_permission?("PrivateSubnet:edit", @ps.id) %>
+<% if has_permission?("PrivateSubnet:edit", @ps) %>
   <div class="p-6">
     <%== part("components/rename_object", object: @ps, type: "private subnet") %>
   </div>
 <% end %>
 
-<% if has_permission?("PrivateSubnet:delete", @ps.ubid) %>
+<% if has_permission?("PrivateSubnet:delete", @ps) %>
   <div class="p-6">
     <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
       <div class="min-w-0 flex-1">
