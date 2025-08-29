@@ -56,7 +56,7 @@ class Clover
             UBID.resolve_map(ubids)
             h(body).gsub(UbiCli::OBJECT_INFO_REGEXP) do
               if (obj = ubids[UBID.to_uuid(it)]) && obj.respond_to?(:path)
-                "<a class=\"text-orange-600\" href=\"#{@project.path}#{obj.path}\">#{it}</a>"
+                "<a class=\"text-orange-600 underline\" href=\"#{@project.path}#{obj.path}\">#{it}</a>"
               else
                 it
               end
