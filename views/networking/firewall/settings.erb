@@ -1,18 +1,34 @@
-<% if has_permission?("Firewall:delete", @firewall.ubid) %>
-  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-    <div class="px-4 py-5 sm:p-6">
-      <div class="sm:flex sm:items-center sm:justify-between">
-        <div>
-          <h3 class="text-base font-semibold leading-6 text-gray-900">Delete firewall</h3>
-          <div class="mt-2 text-sm text-gray-500">
-            <p>This action will permanently delete this firewall. Deleted firewall cannot be recovered. Use it
-              carefully.</p>
+<% if has_permission?("Firewall:edit", @firewall.id) %>
+  <div class="p-6">
+    <%== part("components/rename_object", object: @firewall, type: "firewall") %>
+  </div>
+<% end %>
+
+<div class="p-6">
+  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+    <div class="min-w-0 flex-1">
+      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+        Danger Zone
+      </h3>
+    </div>
+  </div>
+
+  <% if has_permission?("Firewall:delete", @firewall.ubid) %>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="sm:flex sm:items-center sm:justify-between">
+          <div>
+            <h3 class="text-base font-semibold leading-6 text-gray-900">Delete firewall</h3>
+            <div class="mt-2 text-sm text-gray-500">
+              <p>This action will permanently delete this firewall. Deleted firewall cannot be recovered. Use it
+                carefully.</p>
+            </div>
           </div>
-        </div>
-        <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-          <%== part("components/delete_button", url: path(@firewall), confirmation: @firewall.name, redirect: "#{@project.path}/firewall") %>
+          <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+            <%== part("components/delete_button", url: path(@firewall), confirmation: @firewall.name, redirect: "#{@project.path}/firewall") %>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-<% end %>
+  <% end %>
+</div>
