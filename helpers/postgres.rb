@@ -2,7 +2,7 @@
 
 class Clover
   def postgres_post(name)
-    authorize("Postgres:create", @project.id)
+    authorize("Postgres:create", @project)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
     flavor = typecast_params.nonempty_str("flavor", PostgresResource::Flavor::STANDARD)

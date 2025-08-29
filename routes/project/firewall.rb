@@ -15,7 +15,7 @@ class Clover
 
     r.web do
       r.get "create" do
-        authorize("Firewall:create", @project.id)
+        authorize("Firewall:create", @project)
         view "networking/firewall/create"
       end
 

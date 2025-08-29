@@ -1,4 +1,4 @@
-<% edit_perm = has_permission?("Vm:edit", @vm.id) %>
+<% edit_perm = has_permission?("Vm:edit", @vm) %>
 
 <% if edit_perm %>
   <div class="p-6">
@@ -36,7 +36,7 @@
       </div>
     <% end %>
     <!-- Delete Card -->
-    <% if has_permission?("Vm:delete", @vm.ubid) %>
+    <% if has_permission?("Vm:delete", @vm) %>
       <div class="px-4 py-5 sm:p-6">
         <div class="sm:flex sm:items-center sm:justify-between">
           <div>

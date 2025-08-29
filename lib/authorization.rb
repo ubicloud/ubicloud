@@ -60,6 +60,9 @@ module Authorization
   end
 
   def self.matched_policies_dataset(project_id, subject_id, actions = nil, object_id = nil)
+    project_id = project_id.id if project_id.is_a?(Project)
+    subject_id = subject_id.id if subject_id.is_a?(Sequel::Model)
+
     dataset = DB[:access_control_entry]
       .where(project_id:)
       .where(Sequel.or([subject_id, recursive_tag_query(:subject, subject_id)].map { [:subject_id, it] }))
@@ -70,8 +73,11 @@ module Authorization
     end
 
     if object_id
-      # Recognize UUID format
-      if /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/.match?(object_id)
+      if object_id.is_a?(Sequel::Model)
+        klass = object_id.class
+        object_id = object_id.id
+      elsif /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/.match?(object_id)
+        # Recognize UUID format
         ubid = UBID.from_uuidish(object_id).to_s
       else
         ubid = object_id
@@ -79,8 +85,11 @@ module Authorization
         object_id = UBID.parse(object_id).to_uuid
       end
 
-      klass = UBID.class_for_ubid(ubid)
-      klass = ApiKey if ubid.start_with?("et")
+      unless klass
+        klass = UBID.class_for_ubid(ubid)
+        klass = ApiKey if ubid.start_with?("et")
+      end
+
       in_project_cond = if klass
         # This checks that the object being authorized is actually related to the project.
         # This is probably a redundant check, but I think it helps to have defense in depth
