@@ -64,13 +64,19 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   label def wait
+    leader = postgres_timeline.leader
+    if leader.nil? && postgres_timeline.backups.empty? && Time.now - postgres_timeline.created_at > 10 * 24 * 60 * 60
+      Clog.emit("Self-destructing timeline as no leader or backups are present and it is older than 10 days") { postgres_timeline }
+      hop_destroy
+    end
+
     nap 20 * 60 if postgres_timeline.blob_storage.nil?
 
     # For the purpose of missing backup pages, we act like the very first backup
     # is taken at the creation, which ensures that we would get a page if and only
     # if no backup is taken for 2 days.
     latest_backup_completed_at = postgres_timeline.backups.map(&:last_modified).max || postgres_timeline.created_at
-    if postgres_timeline.leader && latest_backup_completed_at < Time.now - 2 * 24 * 60 * 60 # 2 days
+    if leader && latest_backup_completed_at < Time.now - 2 * 24 * 60 * 60 # 2 days
       Prog::PageNexus.assemble("Missing backup at #{postgres_timeline}!", ["MissingBackup", postgres_timeline.id], postgres_timeline.ubid)
     else
       Page.from_tag_parts("MissingBackup", postgres_timeline.id)&.incr_resolve
