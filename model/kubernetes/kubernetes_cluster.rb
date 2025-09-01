@@ -10,6 +10,7 @@ class KubernetesCluster < Sequel::Model
   many_to_one :project
   many_to_many :cp_vms, join_table: :kubernetes_node, right_key: :vm_id, class: :Vm, order: :created_at, conditions: {kubernetes_nodepool_id: nil}
   one_to_many :nodes, class: :KubernetesNode, order: :created_at, conditions: {kubernetes_nodepool_id: nil}
+  one_to_many :functional_nodes, class: :KubernetesNode, order: :created_at, conditions: {kubernetes_nodepool_id: nil, state: "active"}
   one_to_many :nodepools, class: :KubernetesNodepool
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, &:active
   many_to_one :location, key: :location_id
@@ -50,7 +51,7 @@ class KubernetesCluster < Sequel::Model
   end
 
   def sshable
-    cp_vms.first.sshable
+    functional_nodes.first.sshable
   end
 
   def services_load_balancer_name

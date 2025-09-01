@@ -245,7 +245,7 @@ table ip6 pod_access {
       expect(prog.vm.sshable).to receive(:d_check).with("join_control_plane").and_return("NotStarted")
 
       sshable = instance_double(Sshable)
-      allow(kubernetes_cluster.cp_vms.first).to receive(:sshable).and_return(sshable)
+      expect(kubernetes_cluster.functional_nodes.first).to receive(:sshable).and_return(sshable)
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).and_return("jt\n")
       expect(sshable).to receive(:cmd).with("sudo kubeadm init phase upload-certs --upload-certs", log: false).and_return("something\ncertificate key:\nck")
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --print-join-command", log: false).and_return("discovery-token-ca-cert-hash dtcch")
@@ -289,7 +289,7 @@ table ip6 pod_access {
       expect(prog.vm.sshable).to receive(:d_check).with("join_worker").and_return("NotStarted")
 
       sshable = instance_double(Sshable)
-      allow(kubernetes_cluster.cp_vms.first).to receive(:sshable).and_return(sshable)
+      expect(kubernetes_cluster.functional_nodes.first).to receive(:sshable).and_return(sshable)
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).and_return("\njt\n")
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --print-join-command", log: false).and_return("discovery-token-ca-cert-hash dtcch")
       expect(prog.vm.sshable).to receive(:d_run).with(
