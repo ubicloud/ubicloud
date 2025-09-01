@@ -13,7 +13,7 @@ RSpec.describe Prog::Vnet::UpdateFirewallRules do
     vmh = instance_double(VmHost, sshable: instance_double(Sshable, cmd: nil))
     nic = instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd00::1/128"), ubid_to_tap_name: "tap0")
     ephemeral_net6 = NetAddr::IPv6Net.parse("fd00::1/79")
-    instance_double(Vm, private_subnets: [ps], vm_host: vmh, inhost_name: "x", nics: [nic], ephemeral_net6: ephemeral_net6, load_balancer: nil, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.0/32").network, location: Location[Location::HETZNER_FSN1_ID])
+    instance_double(Vm, project: instance_double(Project, get_ff_ipv6_disabled: false), private_subnets: [ps], vm_host: vmh, inhost_name: "x", nics: [nic], ephemeral_net6: ephemeral_net6, load_balancer: nil, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.0/32").network, location: Location[Location::HETZNER_FSN1_ID])
   }
 
   describe "#before_run" do
@@ -482,12 +482,14 @@ ADD_RULES
       expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
     end
 
-    it "does not pass elements if there are not fw rules" do
+    it "does not pass elements if there are not fw rules and ipv6 is disabled" do
       # An address to block but not discovered the ip_list, yet.
       GloballyBlockedDnsname.create(dns_name: "blockedhost.com", ip_list: nil)
+      GloballyBlockedDnsname.create(dns_name: "blockedhost6.com", ip_list: ["2a00:1450:400e:811::200e"])
 
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
       expect(vm).to receive(:firewalls).and_return([])
+      expect(vm.project).to receive(:get_ff_ipv6_disabled).and_return(true).at_least(:once)
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec x nft --file -", stdin: <<ADD_RULES)
 # An nftables idiom for idempotent re-create of a named entity: merge
 # in an empty table (a no-op if the table already exists) and then
@@ -568,8 +570,8 @@ table inet fw_table {
     # to allow traffic for the private communication and block via firewall
     # rules through @allowed_ipv4_port_tuple and @allowed_ipv6_port_tuple in the
     # next section of rules.
-    ip6 daddr fd00::1:0:0:0/80 counter accept
-    ip6 saddr fd00::1:0:0:0/80 counter accept
+    ip6 daddr ::/0 counter accept
+    ip6 saddr ::/0 counter accept
 
     # Allow TCP and UDP traffic for allowed_ipv4_port_tuple and
     # allowed_ipv6_port_tuple into the VM using any address, such as;
@@ -586,12 +588,12 @@ table inet fw_table {
     # Allow outgoing traffic from the VM using the following addresses as
     # source address.
     ip6 saddr @private_ipv6_cidrs ct state established,related,new counter accept
-    ip6 saddr fd00::/80 ct state established,related,new counter accept
+    ip6 saddr ::/0 ct state established,related,new counter accept
 
     # Allow incoming traffic to the VM using the following addresses as
     # destination address. This is needed to allow the return traffic.
     ip6 daddr @private_ipv6_cidrs ct state established,related counter accept
-    ip6 daddr fd00::/80 ct state established,related counter accept
+    ip6 daddr ::/0 ct state established,related counter accept
     ip daddr @private_ipv4_cidrs ct state established,related counter accept
 
     # Allow ping for all
