@@ -83,9 +83,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
     let(:unit_name) { "drain_node_#{kd.name}" }
 
     before do
-      vm = create_vm
-      expect(kd.kubernetes_cluster).to receive(:cp_vms).and_return([vm]).at_least(:once)
-      expect(vm).to receive(:sshable).and_return(sshable).at_least(:once)
+      expect(kd.kubernetes_cluster).to receive(:sshable).and_return(sshable).at_least(:once)
     end
 
     it "starts the drain process when run for the first time and naps" do
@@ -130,8 +128,6 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
 
     before do
       expect(kd.kubernetes_cluster).to receive(:client).and_return(client)
-      expect(kd.kubernetes_cluster.nodes.last).to receive(:sshable).and_return(sshable)
-      expect(sshable).to receive(:connect)
       expect(kd).to receive(:sshable).and_return(sshable).twice
     end
 

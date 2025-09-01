@@ -47,7 +47,7 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
 
   label def drain
     unit_name = "drain_node_#{kubernetes_node.name}"
-    sshable = cluster.cp_vms.last.sshable
+    sshable = cluster.sshable
     case sshable.d_check(unit_name)
     when "Succeeded"
       hop_remove_node_from_cluster
@@ -77,7 +77,8 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
       cluster.api_server_lb.detach_vm(kubernetes_node.vm)
     end
 
-    cluster.client(session: cluster.nodes.last.sshable.connect).delete_node(kubernetes_node.name)
+    cluster.client.delete_node(kubernetes_node.name)
+
     hop_destroy
   end
 
