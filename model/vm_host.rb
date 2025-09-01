@@ -77,6 +77,7 @@ class VmHost < Sequel::Model
   # Generate a random network that is a slice of the host's network
   # for delegation to a VM.
   def ip6_random_vm_network
+    return nil unless net6
     prefix = host_prefix + 15
     # We generate 2 bytes of entropy for the lower bits
     # and append them to the host's network. This way,

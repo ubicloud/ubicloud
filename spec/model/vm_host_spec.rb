@@ -89,6 +89,11 @@ RSpec.describe VmHost do
     expect(vh.ip6_random_vm_network.to_s).to eq("::8000:0:0:0/79")
   end
 
+  it "returns nil if there is no ip6 address" do
+    vh.net6 = nil
+    expect(vh.ip6_random_vm_network).to be_nil
+  end
+
   it "has a shortcut to install Rhizome" do
     vh.id = "46683a25-acb1-4371-afe9-d39f303e44b4"
     expect(Strand).to receive(:create) do |args|
