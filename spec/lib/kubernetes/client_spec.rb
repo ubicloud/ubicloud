@@ -197,21 +197,30 @@ RSpec.describe Kubernetes::Client do
 
   describe "kubectl" do
     it "runs kubectl command in the right format" do
-      expect(session).to receive(:exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes")
-      kubernetes_client.kubectl("get nodes")
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("", 0)
+      expect(session).to receive(:exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes").and_return(response)
+      expect { kubernetes_client.kubectl("get nodes") }.not_to raise_error
+    end
+
+    it "raises an error" do
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("error happened", 1)
+      expect(session).to receive(:exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes").and_return(response)
+      expect { kubernetes_client.kubectl("get nodes") }.to raise_error(RuntimeError, "error happened")
     end
   end
 
   describe "version" do
     it "runs a version command on kubectl" do
-      expect(session).to receive(:exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf version --client").and_return("Client Version: v1.33.0\nKustomize Version: v5.6.0")
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("Client Version: v1.33.0\nKustomize Version: v5.6.0", 0)
+      expect(session).to receive(:exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf version --client").and_return(response)
       expect(kubernetes_client.version).to eq("v1.33")
     end
   end
 
   describe "delete_node" do
     it "deletes a node" do
-      expect(session).to receive(:exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf delete node asdf")
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("node deleted", 0)
+      expect(session).to receive(:exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf delete node asdf").and_return(response)
       kubernetes_client.delete_node("asdf")
     end
   end
