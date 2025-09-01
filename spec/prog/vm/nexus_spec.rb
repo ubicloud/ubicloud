@@ -289,7 +289,7 @@ RSpec.describe Prog::Vm::Nexus do
         vm.unix_user = "test_user"
         vm.public_key = "test_ssh_key"
         vm.local_vetho_ip = "169.254.0.0"
-        ps = instance_double(PrivateSubnet, location_id: Location::HETZNER_FSN1_ID, net4: NetAddr::IPv4Net.parse("10.0.0.0/26"))
+        ps = instance_double(PrivateSubnet, location_id: Location::HETZNER_FSN1_ID, net4: NetAddr::IPv4Net.parse("10.0.0.0/26"), random_private_ipv6: "fd10:9b0b:6b4b:8fbb::/64")
         nic = Nic.new(private_ipv6: "fd10:9b0b:6b4b:8fbb::/64", private_ipv4: "10.0.0.3/32", mac: "5a:0f:75:80:c3:64")
         pci = PciDevice.new(slot: "01:00.0", iommu_group: 23)
         expect(nic).to receive(:ubid_to_tap_name).and_return("tap4ncdd56m")
@@ -297,7 +297,9 @@ RSpec.describe Prog::Vm::Nexus do
         expect(nic).to receive(:private_subnet).and_return(ps).at_least(:once)
         expect(vm).to receive(:cloud_hypervisor_cpu_topology).and_return(Vm::CloudHypervisorCpuTopo.new(2, 1, 1, 1))
         expect(vm).to receive(:pci_devices).and_return([pci]).at_least(:once)
+
         prj.set_ff_vm_public_ssh_keys(["operator_ssh_key"])
+        expect(prj).to receive(:get_ff_ipv6_disabled).and_return(true).at_least(:once)
         expect(vm).to receive(:project).and_return(prj).at_least(:once)
 
         sshable = instance_double(Sshable)
@@ -305,14 +307,14 @@ RSpec.describe Prog::Vm::Nexus do
         vmh = instance_double(VmHost, sshable: sshable,
           total_cpus: 80, total_cores: 80, total_sockets: 10, ndp_needed: false, arch: "arm64")
         expect(vm).to receive(:vm_host).and_return(vmh).at_least(:once)
-
         expect(sshable).to receive(:cmd).with(/sudo -u vm[0-9a-z]+ tee/, stdin: String) do |**kwargs|
           require "json"
           params = JSON(kwargs.fetch(:stdin))
           expect(params).to include(
-            "public_ipv6" => "fe80::/64",
+            "public_ipv6" => "fd10:9b0b:6b4b:8fbb::/64",
             "unix_user" => "test_user",
             "ssh_public_keys" => ["test_ssh_key", "operator_ssh_key"],
+            "ipv6_disabled" => true,
             "max_vcpus" => 2,
             "cpu_topology" => "2:1:1:1",
             "mem_gib" => 8,

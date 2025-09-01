@@ -221,7 +221,7 @@ class Vm < Sequel::Model
     # shouldn't be stored in the host for security reasons.
     JSON.pretty_generate(
       vm_name: name,
-      public_ipv6: ephemeral_net6.to_s,
+      public_ipv6: project.get_ff_ipv6_disabled ? nic.private_subnet.random_private_ipv6.to_s : ephemeral_net6.to_s,
       public_ipv4: ip4.to_s || "",
       local_ipv4: local_vetho_ip.to_s.shellescape || "",
       dns_ipv4: nic.private_subnet.net4.nth(2).to_s,
@@ -241,7 +241,8 @@ class Vm < Sequel::Model
       cpu_burst_percent_limit: cpu_burst_percent_limit || 0,
       ch_version:,
       firmware_version:,
-      hugepages:
+      hugepages:,
+      ipv6_disabled: project.get_ff_ipv6_disabled || false
     )
   end
 

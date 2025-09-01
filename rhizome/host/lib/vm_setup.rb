@@ -57,9 +57,9 @@ class VmSetup
 
   def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology,
     mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices,
-    boot_image, dns_ipv4, slice_name, cpu_percent_limit, cpu_burst_percent_limit)
+    boot_image, dns_ipv4, slice_name, cpu_percent_limit, cpu_burst_percent_limit, ipv6_disabled)
 
-    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4)
+    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled: ipv6_disabled)
     network_thread = Thread.new do
       setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: max_vcpus > 1)
     end
@@ -480,13 +480,14 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     r "ip netns exec #{q_vm} nft -f #{vp.q_nftables_conf}"
   end
 
-  def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4)
+  def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled:)
     vp.write_meta_data(<<EOS)
 instance-id: #{yq(@vm_name)}
 local-hostname: #{yq(@vm_name)}
 EOS
 
-    guest_network = subdivide_network(NetAddr.parse_net(gua)).first
+    guest_network = subdivide_network(NetAddr.parse_net(gua)).first unless ipv6_disabled
+    guest_network_dhcp = "dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}" unless ipv6_disabled
     private_ip_dhcp = nics.map do |nic|
       vm_sub_6 = NetAddr::IPv6Net.parse(nic.net6)
       vm_net4 = NetAddr::IPv4Net.parse(nic.net4)
@@ -508,6 +509,23 @@ DHCP
     else
       ""
     end
+    ip_config = if ipv6_disabled
+      <<~IP6_CONFIG
+dhcp-option=6,8.8.8.8
+      IP6_CONFIG
+    else
+      <<~IP4_CONFIG
+dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
+server=2606:4700:4700::1111
+server=2001:4860:4860::8888
+dhcp-option=6,#{dns_ipv4}
+listen-address=#{dns_ipv4}
+dhcp-option=54,#{dns_ipv4}
+dhcp-option=option6:dns-server,#{dnsmasq_address_ip6}
+listen-address=#{dnsmasq_address_ip6}
+all-servers
+      IP4_CONFIG
+    end
     vp.write_dnsmasq_conf(<<DNSMASQ_CONF)
 pid-file=
 leasefile-ro
@@ -516,22 +534,15 @@ dhcp-authoritative
 domain-needed
 bogus-priv
 no-resolv
+#{runner_config}
+bind-interfaces
+dhcp-option=26,1400
+dns-forward-max=10000
 #{raparams}
 #{interfaces}
-dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
+#{guest_network_dhcp || ""}
 #{private_ip_dhcp}
-server=2606:4700:4700::1111
-server=2001:4860:4860::8888
-dhcp-option=6,#{dns_ipv4}
-listen-address=#{dns_ipv4}
-dhcp-option=26,1400
-bind-interfaces
-#{runner_config}
-dhcp-option=54,#{dns_ipv4}
-dns-forward-max=10000
-dhcp-option=option6:dns-server,#{dnsmasq_address_ip6}
-listen-address=#{dnsmasq_address_ip6}
-all-servers
+#{ip_config}
 DNSMASQ_CONF
 
     ethernets = nics.map do |nic|
