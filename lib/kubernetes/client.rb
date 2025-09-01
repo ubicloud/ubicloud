@@ -31,7 +31,9 @@ class Kubernetes::Client
   end
 
   def kubectl(cmd)
-    @session.exec!("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf #{cmd}")
+    output = @session.exec!("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf #{cmd}")
+    raise output if output.exitstatus != 0
+    output
   end
 
   def version
