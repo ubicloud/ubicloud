@@ -49,6 +49,7 @@ class Clover
       end
 
       r.rename firewall, perm: "Firewall:edit", serializer: Serializers::Firewall, template_prefix: "networking/firewall"
+
       r.show_object(firewall, actions: %w[overview networking settings], perm: "Firewall:view", template: "networking/firewall/show")
 
       r.post %w[attach-subnet detach-subnet] do |action|
