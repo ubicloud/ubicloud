@@ -125,6 +125,7 @@ RSpec.describe LogDnaBatcher do
 
     it "logs error in case of an exception during batch processing" do
       q = Queue.new
+      wait = Queue.new
 
       expect(log_dna_batcher.instance_variable_get(:@input_queue)).to receive(:closed?).at_least(:once).and_wrap_original do |m, *args|
         q.push(true)
@@ -136,11 +137,12 @@ RSpec.describe LogDnaBatcher do
 
       expect(log_dna_batcher.instance_variable_get(:@input_queue)).to receive(:empty?).and_raise(StandardError, "Unexpected error")
       expect(log_dna_batcher).to receive(:puts).with("Error in processor: Unexpected error").ordered
-      expect(log_dna_batcher).to receive(:puts).with(anything).ordered
+      expect(log_dna_batcher).to receive(:puts).with(anything).ordered { wait << :done }
       expect(log_dna_batcher).to receive(:exit).with(1)
 
       expect(q.pop(timeout: 5)).to be true
       expect(q.empty?).to be(true)
+      expect(wait.pop(timeout: 1)).to eq(:done)
     end
   end
 
