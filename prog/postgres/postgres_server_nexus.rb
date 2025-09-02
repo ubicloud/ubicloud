@@ -451,6 +451,10 @@ SQL
       hop_fence
     end
 
+    when_unfence_set? do
+      hop_unfence
+    end
+
     when_unplanned_take_over_set? do
       hop_prepare_for_unplanned_take_over
     end
@@ -551,6 +555,15 @@ SQL
     postgres_server.vm.sshable.cmd("sudo pg_ctlcluster #{postgres_server.version} main stop -m smart")
 
     nap 6 * 60 * 60
+  end
+
+  label def unfence
+    decr_unfence
+
+    postgres_server.vm.sshable.cmd("sudo pg_ctlcluster #{postgres_server.version} main start")
+    postgres_server.incr_configure
+
+    hop_wait
   end
 
   label def prepare_for_unplanned_take_over
