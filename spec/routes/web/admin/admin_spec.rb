@@ -41,17 +41,17 @@ RSpec.describe CloverAdmin do
     expect(object_data).to eq(email: "user@example.com", name: "", status_id: "2", suspended_at: "")
 
     project = account.projects.first
-    click_link project.ubid
+    click_link project.name
     expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
     expect(object_data).to eq(billable: "true", billing_info_id: "", credit: "0.0", discount: "0", feature_flags: "{}", name: "Default", reputation: "new", visible: "true")
 
     subject_tag = project.subject_tags.first
-    click_link subject_tag.ubid
+    click_link subject_tag.name
     expect(page.title).to eq "Ubicloud Admin - SubjectTag #{subject_tag.ubid}"
-    expect(object_data).to eq(name: "Admin", project_id: project.ubid)
+    expect(object_data).to eq(name: "Admin", project_id: "Default")
 
     # Column Link
-    click_link project.ubid
+    click_link project.name
     expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
   end
 

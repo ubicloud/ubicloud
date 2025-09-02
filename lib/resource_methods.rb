@@ -34,6 +34,10 @@ module ResourceMethods
       @ubid ||= UBID.from_uuidish(id).to_s.downcase
     end
 
+    def admin_label
+      defined?(name) ? name : ubid
+    end
+
     def to_s
       inspect_prefix
     end

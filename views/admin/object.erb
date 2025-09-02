@@ -31,8 +31,8 @@
     <tr>
       <td><%= k %></td>
       <td>
-        <% if v.is_a?(String) && v.bytesize == 26 && (column_class = UBID.class_for_ubid(v)) %>
-          <a href="/model/<%= column_class %>/<%= v %>"><%= v %></a>
+        <% if v.is_a?(String) && v.bytesize == 26 && (column_class = UBID.class_for_ubid(v)) && column_class.method_defined?(:ubid) && (obj = UBID.decode(v)) %>
+          <a href="/model/<%= column_class %>/<%= v %>"><%= obj.admin_label %></a>
         <% else %>
           <%= v %>
         <% end %>
@@ -61,7 +61,7 @@
       <h3><%= assoc %></h3>
       <ul>
       <% assoc_objs.each do %>
-	<li><a href="/model/<%= associated_class %>/<%= it.ubid %>"><%= it.ubid %></a></li>
+        <li><a href="/model/<%= associated_class %>/<%= it.ubid %>"><%= it.admin_label %></a></li>
       <% end %>
       </ul>
     </div>
