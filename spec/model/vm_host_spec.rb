@@ -526,6 +526,14 @@ RSpec.describe VmHost do
     expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
   end
 
+  [IOError.new("closed stream"), Errno::ECONNRESET.new("recvfrom(2)")].each do |ex|
+    let(:session) { {ssh_session: instance_double(Net::SSH::Connection::Session)} }
+    it "#check_pulse", "reraises the exception for exception class: #{ex.class}" do
+      expect(vh).to receive(:perform_health_checks).and_raise(ex)
+      expect { vh.check_pulse(session: session, previous_pulse: "notnil") }.to raise_error(ex)
+    end
+  end
+
   it "#render_arch errors on an unexpected architecture" do
     expect(vh).to receive(:arch).and_return("nope")
     expect { vh.render_arch(arm64: "a", x64: "x") }.to raise_error RuntimeError, "BUG: inexhaustive render code"
