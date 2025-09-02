@@ -16,15 +16,21 @@ class GithubRunner < Sequel::Model
 
   dataset_module do
     def total_active_runner_vcpus
+      static_labels = Github.static_runner_labels
+      custom_labels = GithubCustomLabel.all.to_h { |cl| [cl.label, cl] }
+
       left_join(:strand, id: :id)
         .exclude(Sequel[:strand][:label] => ["start", "wait_concurrency_limit"])
         .select_map(Sequel[:github_runner][:label])
-        .sum { Github.runner_labels[it]["vcpus"] }
+        .sum do |label|
+          static_labels[label]&.dig("vcpus") || static_labels[custom_labels[label]&.alias_for]&.dig("vcpus")
+        end
     end
   end
 
   def label_data
-    @label_data ||= Github.runner_labels[label]
+    static_labels = Github.static_runner_labels
+    @label_data ||= static_labels[label] || static_labels[GithubCustomLabel.first(label: label, installation_id: installation_id).alias_for]
   end
 
   def repository_url
