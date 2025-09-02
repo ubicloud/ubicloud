@@ -1,0 +1,11 @@
+<% @page_title = @klass.name %>
+
+<ul id="object-list">
+  <% @objects.each do |object| %>
+    <li><a href="/model/<%= @klass %>/<%= object.ubid %>"><%= object.admin_label %></a></li>
+  <% end %>
+</ul>
+
+<% if @after %>
+  <p><a href="?after=<%= @after %>">More</a></p>
+<% end %>

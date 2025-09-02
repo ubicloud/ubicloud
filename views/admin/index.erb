@@ -49,6 +49,18 @@
 <% end %>
 
 <div class="container">
-  <p><a href="/change-password">Change Password</a></p>
-  <p><a href="/multifactor-manage">Manage Multifactor Authentication</a></p>
+  <h2>Browse by Model Class</h2>
+
+  <ul id="model-class-list">
+    <% @classes.each do |klass| %>
+      <li><a href="/model/<%= klass %>"><%= klass %></a></li>
+    <% end %>
+  </ul>
+
+  <h2 class="container">Manage</h2>
+
+  <ul>
+    <li><a href="/change-password">Change Password</a></li>
+    <li><a href="/multifactor-manage">Manage Multifactor Authentication</a></li>
+  </ul>
 </div>
