@@ -112,6 +112,10 @@ code {
   }
 }
 
+#model-class-list, #object-list {
+  columns: 5;
+}
+
 .rodauth {
   div { margin-bottom: 10px; }
   label { min-width: 100px; }

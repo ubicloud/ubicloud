@@ -47,8 +47,14 @@ class CloverAdmin < Roda
 
   plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
   plugin :typecast_params do
+    ubid_regexp = /\A[a-tv-z0-9]{26}\z/
+
     handle_type(:ubid) do
-      it if /\A[a-tv-z0-9]{26}\z/.match?(it)
+      it if ubid_regexp.match?(it)
+    end
+
+    handle_type(:ubid_uuid) do
+      UBID.to_uuid(it) if ubid_regexp.match?(it)
     end
   end
 
@@ -128,7 +134,7 @@ class CloverAdmin < Roda
     r.exception_page_assets if Config.development?
     # :nocov:
 
-    r.get "model", /([A-Z][a-zA-Z]+)/, :ubid do |model_name, ubid|
+    r.on "model", /([A-Z][a-zA-Z]+)/ do |model_name|
       begin
         @klass = Object.const_get(model_name)
       rescue NameError
@@ -136,9 +142,30 @@ class CloverAdmin < Roda
       end
 
       next unless @klass.is_a?(Class) && @klass < ResourceMethods::InstanceMethods
-      next unless (@obj = @klass[ubid])
 
-      view("object")
+      r.get true do
+        limit = 101
+        ds = @klass.limit(limit).order(:id)
+
+        if (after = typecast_params.ubid_uuid("after"))
+          ds = ds.where { id > after }
+        end
+
+        @objects = ds.all
+
+        if @objects.length == limit
+          @objects.pop
+          @after = @objects.last.ubid
+        end
+
+        view("objects")
+      end
+
+      r.get :ubid do |ubid|
+        next unless (@obj = @klass[ubid])
+
+        view("object")
+      end
     end
 
     r.root do
@@ -149,6 +176,12 @@ class CloverAdmin < Roda
       end
 
       @grouped_pages = Page.active.reverse(:created_at, :summary).group_by_vm_host
+      @classes = Sequel::Model
+        .subclasses
+        .map { [it, it.subclasses] }
+        .flatten
+        .select { it < ResourceMethods::InstanceMethods }
+        .sort_by(&:name)
 
       view("index")
     end

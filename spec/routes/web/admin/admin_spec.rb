@@ -55,6 +55,42 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
   end
 
+  it "allows browsing by class" do
+    account = create_account
+    page.refresh
+    click_link "Account"
+    click_link account.email
+    expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
+
+    project = account.projects.first
+    click_link project.name
+    expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
+  end
+
+  it "handles basic pagination when browsing by class" do
+    accounts = Array.new(101) { |i| create_account("a#{i}@a.com", with_project: false) }
+    page.refresh
+    click_link "Account"
+    found_accounts = page.all("#object-list a").map(&:text)
+
+    click_link "More"
+    found_accounts.concat(page.all("#object-list a").map(&:text))
+
+    expect(accounts.map(&:email) - found_accounts).to eq []
+    account = Account.last
+    click_link account.email
+    expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
+  end
+
+  it "ignores bogus ubids when paginating" do
+    account = create_account
+    page.refresh
+    click_link "Account"
+    page.visit "#{page.current_path}?after=foo"
+    click_link account.email
+    expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
+  end
+
   it "shows semaphores set on the object, if any" do
     fill_in "UBID", with: vm_pool.ubid
     click_button "Show Object"
