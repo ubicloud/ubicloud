@@ -12,7 +12,8 @@ end
 file_name = "node_exporter-#{version}.linux-#{Arch.render(x64: "amd64", arm64: "arm64")}"
 url = "https://github.com/prometheus/node_exporter/releases/download/v#{version}/#{file_name}.tar.gz"
 
-r "wget -q \"#{url}\""
+# r "wget -q \"#{url}\""
+r "cp -r /gitrepos/#{file_name}.tar.gz ./"
 r "tar xvfz #{file_name}.tar.gz"
 r "sudo mv #{file_name}/node_exporter /usr/local/bin/"
 r "sudo rm -rf #{file_name}*"

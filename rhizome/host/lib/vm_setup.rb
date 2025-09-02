@@ -403,7 +403,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
       chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
-        ip saddr #{private_ipv4} ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to #{public_ipv4}
+        ip saddr #{private_ipv4} ip daddr != { 172.16.0.0/12, 192.168.0.0/16 } snat to #{public_ipv4}
         ip saddr #{private_ipv4} ip daddr #{private_ipv4} snat to #{public_ipv4}
       }
     }

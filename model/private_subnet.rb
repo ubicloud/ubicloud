@@ -13,7 +13,6 @@ class PrivateSubnet < Sequel::Model
   one_to_one :private_subnet_aws_resource, key: :id
 
   PRIVATE_SUBNET_RANGES = [
-    "10.0.0.0/8",
     "172.16.0.0/12",
     "192.168.0.0/16"
   ].freeze

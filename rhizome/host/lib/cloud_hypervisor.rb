@@ -27,16 +27,22 @@ module CloudHypervisor
     end
 
     def download
-      return if downloaded?
       FileUtils.mkdir_p(firmware_root)
+      move_file("CLOUDHV-#{Arch.sym}.fd", path)
+      # return if downloaded?
+      # FileUtils.mkdir_p(firmware_root)
 
-      safe_write_to_file(path) do |f|
-        unless curl_file(url, f.path) == sha256
-          fail "Invalid SHA-256 digest"
-        end
-      end
+      # safe_write_to_file(path) do |f|
+      #   unless curl_file(url, f.path) == sha256
+      #     fail "Invalid SHA-256 digest"
+      #   end
+      # end
 
-      sha256
+      # sha256
+    end
+
+    def move_file(file_name, path)
+      r "cp -r /gitrepos/#{file_name} #{path}"
     end
 
     default = Arch.render(
@@ -87,8 +93,14 @@ module CloudHypervisor
     end
 
     def download
-      download_file(ch_remote_url, ch_remote_bin, sha256_ch_remote)
-      download_file(cloud_hypervisor_url, bin, sha256_ch_bin)
+      move_file("ch-remote", ch_remote_bin)
+      move_file("cloud-hypervisor", bin)
+    end
+
+    def move_file(file_name, path)
+      FileUtils.mkdir_p(dir)
+      r "cp -r /gitrepos/#{file_name}.bin #{path}"
+      FileUtils.chmod "a+x", path
     end
 
     def download_file(url, path, sha256)

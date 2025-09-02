@@ -119,7 +119,7 @@ table inet nat {
 #{ipv6_postrouting_rule}
 
     # Basic NAT for private IPv4 to public IPv4
-    ip saddr #{private_ipv4} ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to #{public_ipv4}
+    ip saddr #{private_ipv4} ip daddr != { 172.16.0.0/12, 192.168.0.0/16 } snat to #{public_ipv4}
     ip saddr #{private_ipv4} ip daddr #{private_ipv4} snat to #{public_ipv4}
   }
 }
@@ -172,7 +172,7 @@ table ip nat {
   }
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
-    ip saddr #{current_private_ipv4} ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to #{current_public_ipv4}
+    ip saddr #{current_private_ipv4} ip daddr != { 172.16.0.0/12, 192.168.0.0/16 } snat to #{current_public_ipv4}
     ip saddr #{current_private_ipv4} ip daddr #{current_private_ipv4} snat to #{current_public_ipv4}
   }
 }
