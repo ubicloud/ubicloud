@@ -99,6 +99,7 @@ class Clover
       end
 
       r.rename ps, perm: "PrivateSubnet:edit", serializer: Serializers::PrivateSubnet, template_prefix: "networking/private_subnet"
+
       r.show_object(ps, actions: %w[overview vms networking settings], perm: "PrivateSubnet:view", template: "networking/private_subnet/show")
     end
   end
