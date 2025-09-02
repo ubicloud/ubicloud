@@ -17,9 +17,18 @@ class PostgresUpgrade
     r "sudo chown postgres:postgres /dat/upgrade/#{@version}"
   end
 
-  def promote_previous_version
-    # Try to promote, ignore failure if output in case server is already promoted.
-    r "sudo pg_ctlcluster promote #{@prev_version} main", expect: [0, 1]
+  def disable_archive_mode
+    r "echo 'archive_mode = off' | sudo tee /etc/postgresql/#{@prev_version}/main/conf.d/100-upgrade.conf"
+    r "sudo pg_ctlcluster #{@prev_version} main restart"
+  end
+
+  def promote(version)
+    if r("sudo -u postgres psql -t -c 'SELECT pg_is_in_recovery();' 2>/dev/null || echo 't'").strip == "f"
+      @logger.info("Server is already promoted (not in recovery mode)")
+      return
+    end
+
+    r "sudo pg_ctlcluster promote #{version} main", expect: [0, 1]
   end
 
   def disable_previous_version
@@ -78,7 +87,7 @@ class PostgresUpgrade
     puts "Creating upgrade directory"
     create_upgrade_dir
     puts "Promoting previous version"
-    promote_previous_version
+    promote @prev_version
     puts "Disabling previous version"
     disable_previous_version
     puts "Initializing new version"

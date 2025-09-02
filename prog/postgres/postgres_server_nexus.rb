@@ -53,7 +53,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         timeline_access: timeline_access,
         representative_at: representative_at,
         synchronization_status: synchronization_status,
-        vm_id: vm_st.id
+        vm_id: vm_st.id,
+        version: postgres_resource.version
       ) { it.id = ubid.to_uuid }
 
       Strand.create_with_id(postgres_server.id, prog: "Postgres::PostgresServerNexus", label: "start")
@@ -184,7 +185,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       hop_configure_metrics
     end
 
-    vm.sshable.cmd("sudo -u postgres pg_ctlcluster #{postgres_server.resource.version} main reload")
+    vm.sshable.cmd("sudo -u postgres pg_ctlcluster #{postgres_server.version} main reload")
     vm.sshable.cmd("sudo systemctl reload pgbouncer@*.service")
     hop_wait
   end
@@ -292,7 +293,7 @@ TIMER
       "files": {
         "collect_list": [
           {
-            "file_path": "/dat/#{postgres_server.resource.version}/data/pg_log/postgresql.log",
+            "file_path": "/dat/#{postgres_server.version}/data/pg_log/postgresql.log",
             "log_group_name": "/#{postgres_server.ubid}/postgresql",
             "log_stream_name": "#{postgres_server.ubid}/postgresql",
             "timestamp_format": "%Y-%m-%d %H:%M:%S"
@@ -342,7 +343,7 @@ CONFIG
       hop_wait
     when "Failed", "NotStarted"
       configure_hash = postgres_server.configure_hash
-      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/configure #{postgres_server.resource.version}' configure_postgres", stdin: JSON.generate(configure_hash))
+      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/configure #{postgres_server.version}' configure_postgres", stdin: JSON.generate(configure_hash))
     end
 
     nap 5
@@ -546,8 +547,8 @@ SQL
     decr_fence
 
     postgres_server.run_query("CHECKPOINT; CHECKPOINT; CHECKPOINT;")
-    postgres_server.vm.sshable.cmd("sudo postgres/bin/lockout #{postgres_server.resource.version}")
-    postgres_server.vm.sshable.cmd("sudo pg_ctlcluster #{postgres_server.resource.version} main stop -m smart")
+    postgres_server.vm.sshable.cmd("sudo postgres/bin/lockout #{postgres_server.version}")
+    postgres_server.vm.sshable.cmd("sudo pg_ctlcluster #{postgres_server.version} main stop -m smart")
 
     nap 6 * 60 * 60
   end
@@ -558,7 +559,7 @@ SQL
     representative_server = postgres_server.resource.representative_server
 
     begin
-      representative_server.vm.sshable.cmd("sudo pg_ctlcluster #{postgres_server.resource.version} main stop -m immediate")
+      representative_server.vm.sshable.cmd("sudo pg_ctlcluster #{postgres_server.version} main stop -m immediate")
     rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
     end
 
@@ -599,7 +600,7 @@ SQL
       postgres_server.resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
       hop_configure
     when "Failed", "NotStarted"
-      vm.sshable.cmd("common/bin/daemonizer 'sudo pg_ctlcluster #{postgres_server.resource.version} main promote' promote_postgres")
+      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/promote #{postgres_server.version}' promote_postgres")
       nap 0
     end
 
@@ -618,7 +619,7 @@ SQL
 
   label def restart
     decr_restart
-    vm.sshable.cmd("sudo postgres/bin/restart #{postgres_server.resource.version}")
+    vm.sshable.cmd("sudo postgres/bin/restart #{postgres_server.version}")
     vm.sshable.cmd("sudo systemctl restart pgbouncer@*.service")
     pop "postgres server is restarted"
   end
@@ -642,7 +643,7 @@ SQL
 
     # Do not declare unavailability if Postgres is in crash recovery
     begin
-      return true if vm.sshable.cmd("sudo tail -n 5 /dat/#{postgres_server.resource.version}/data/pg_log/postgresql.log").include?("redo in progress")
+      return true if vm.sshable.cmd("sudo tail -n 5 /dat/#{postgres_server.version}/data/pg_log/postgresql.log").include?("redo in progress")
     rescue
     end
 
