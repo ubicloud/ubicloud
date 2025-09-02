@@ -25,7 +25,12 @@ class Clover < Roda
           authorize(perm, object.id)
           handle_validation_failure("#{template_prefix}/show") { @page = "settings" }
           name = typecast_body_params.nonempty_str!("name")
-          Validation.validate_name(name)
+
+          if object.is_a?(KubernetesCluster)
+            Validation.validate_kubernetes_name(name)
+          else
+            Validation.validate_name(name)
+          end
 
           DB.transaction do
             object.update(name:)
