@@ -13,6 +13,8 @@ class Account < Sequel::Model(:accounts)
   plugin ResourceMethods
   include SubjectTag::Cleanup
 
+  alias_method :admin_label, :email
+
   def create_project_with_default_policy(name, default_policy: true)
     project = Project.create(name: name)
     add_project(project)
