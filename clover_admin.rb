@@ -62,6 +62,7 @@ class CloverAdmin < Roda
   symbol_matcher(:ubid, /([a-tv-z0-9]{26})/)
 
   plugin :not_found do
+    raise "admin route not handled: #{request.path}" if Config.test? && !ENV["DONT_RAISE_ADMIN_ERRORS"]
     @page_title = "File Not Found"
     view(content: "")
   end
