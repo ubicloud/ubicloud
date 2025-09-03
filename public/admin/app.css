@@ -116,6 +116,10 @@ code {
   columns: 5;
 }
 
+#strand-info form {
+  display: inline-block;
+}
+
 .rodauth {
   div { margin-bottom: 10px; }
   label { min-width: 100px; }

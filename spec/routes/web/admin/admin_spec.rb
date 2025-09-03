@@ -215,4 +215,17 @@ RSpec.describe CloverAdmin do
     visit "/error"
     expect(page.title).to eq "Ubicloud Admin - Internal Server Error"
   end
+
+  it "supports scheduling strands to run immediately" do
+    schedule = Time.now + 10
+    st = Strand.create(prog: "Test", label: "hop_entry", schedule:)
+    fill_in "UBID", with: st.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - Strand #{st.ubid}"
+
+    click_button "Schedule Strand to Run Now"
+    expect(page).to have_flash_notice("Scheduled strand to run immediately")
+    expect(page.title).to eq "Ubicloud Admin - Strand #{st.ubid}"
+    expect(st.reload.schedule).to be_within(5).of(Time.now)
+  end
 end
