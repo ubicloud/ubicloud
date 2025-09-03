@@ -108,6 +108,10 @@ class PostgresResource < Sequel::Model
     servers.any? { it.needs_recycling? } || servers.count != target_server_count
   end
 
+  def needs_upgrade?
+    representative_server&.version&.< desired_version
+  end
+
   def in_maintenance_window?
     maintenance_window_start_at.nil? || (Time.now.utc.hour - maintenance_window_start_at) % 24 < MAINTENANCE_DURATION_IN_HOURS
   end

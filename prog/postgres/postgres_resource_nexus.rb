@@ -189,7 +189,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   label def wait
     reap(fallthrough: true)
 
-    if postgres_resource.upgrade_set? && strand.children_dataset.where(prog: "Postgres::UpgradePostgresResource").empty?
+    if postgres_resource.needs_upgrade? && strand.children_dataset.where(prog: "Postgres::UpgradePostgresResource").empty?
       candidate_server = Prog::Postgres::PostgresServerNexus.assemble(
         resource_id: postgres_resource.id,
         timeline_id: postgres_resource.timeline.id,
@@ -200,7 +200,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       ).id
 
       bud Prog::Postgres::UpgradePostgresResource, {"candidate_server_id" => candidate_server.id, "new_timeline_id" => new_timeline_id}, :start
-    elsif postgres_resource.needs_convergence? && strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").empty? && !postgres_resource.upgrade_set?
+    end
+
+    if !postgres_resource.needs_upgrade? && postgres_resource.needs_convergence? && strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").empty?
       bud Prog::Postgres::ConvergePostgresResource, frame, :start
     end
 
