@@ -10,6 +10,10 @@ RSpec.describe PostgresResource do
     ) { it.id = "6181ddb3-0002-8ad0-9aeb-084832c9273b" }
   }
 
+  before do
+    allow(postgres_resource).to receive(:project).and_return(instance_double(Project, get_ff_postgres_hostname_override: nil))
+  end
+
   it "returns connection string without ubid qualifier" do
     expect(postgres_resource).to receive(:dns_zone).and_return("something").at_least(:once)
     expect(postgres_resource).to receive(:hostname_version).and_return("v1")
