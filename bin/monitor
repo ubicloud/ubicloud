@@ -63,12 +63,9 @@ monitor_resources = MonitorResourceType.create(
   MonitorableResource,
   monitor_pulse_info,
   Config.max_health_monitor_threads,
-  monitor_models
-) do
-  it.process_event_loop
-  it.check_pulse
-end
-
+  monitor_models,
+  &:check_pulse
+)
 metric_export_resources = MonitorResourceType.create(
   MetricsTargetResource,
   metric_export_pulse_info,

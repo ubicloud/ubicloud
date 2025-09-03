@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class MonitorableResource
-  attr_reader :deleted, :run_event_loop, :resource
+  attr_reader :deleted, :resource
   attr_accessor :monitor_job_started_at, :monitor_job_finished_at
 
   def initialize(resource)
@@ -10,7 +10,6 @@ class MonitorableResource
     @pulse = {}
     @pulse_check_started_at = Time.now
     @pulse_thread = nil
-    @run_event_loop = false
     @deleted = false
   end
 
@@ -26,20 +25,19 @@ class MonitorableResource
     end
   end
 
-  def process_event_loop
-    return if @session.nil? || !@resource.needs_event_loop_for_pulse_check?
-
-    @pulse_thread = Thread.new do
-      sleep 0.01 until @run_event_loop
-      @session[:ssh_session].loop(0.01) { @run_event_loop }
-    rescue => ex
-      Clog.emit("SSH event loop has failed.") { {event_loop_failure: {ubid: @resource.ubid, exception: Util.exception_to_hash(ex)}} }
-      close_resource_session
-    end
-  end
-
   def check_pulse
-    @run_event_loop = true if @resource.needs_event_loop_for_pulse_check?
+    return unless @session
+
+    if @resource.needs_event_loop_for_pulse_check?
+      run_event_loop = true
+      event_loop_failed = false
+      pulse_thread = Thread.new do
+        @session[:ssh_session].loop(0.01) { run_event_loop }
+      rescue => ex
+        event_loop_failed = true
+        Clog.emit("SSH event loop has failed.") { {event_loop_failure: {ubid: @resource.ubid, exception: Util.exception_to_hash(ex)}} }
+      end
+    end
 
     @pulse_check_started_at = Time.now
     begin
@@ -49,8 +47,9 @@ class MonitorableResource
       Clog.emit("Pulse checking has failed.") { {pulse_check_failure: {ubid: @resource.ubid, exception: Util.exception_to_hash(ex)}} }
     end
 
-    @run_event_loop = false if @resource.needs_event_loop_for_pulse_check?
-    @pulse_thread&.join
+    run_event_loop = false
+    pulse_thread&.join
+    close_resource_session if event_loop_failed
   end
 
   def close_resource_session
