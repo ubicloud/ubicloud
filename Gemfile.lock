@@ -51,6 +51,11 @@ GEM
     argon2-kdf (0.3.1)
       fiddle
     ast (2.4.3)
+    autoforme (1.13.0)
+      enum_csv
+      forme (>= 2.0.0)
+      rack
+      sequel (>= 3.0.0)
     awesome_print (1.9.2)
     aws-eventstream (1.3.2)
     aws-partitions (1.1067.0)
@@ -125,6 +130,7 @@ GEM
       bigdecimal
       rexml
     crass (1.0.6)
+    csv (3.3.5)
     cuprite (0.17)
       capybara (~> 3.0)
       ferrum (~> 0.17.0)
@@ -133,6 +139,8 @@ GEM
     docile (1.4.1)
     drb (2.2.3)
     ed25519 (1.4.0)
+    enum_csv (1.2.0)
+      csv
     erubi (1.13.1)
     excon (1.3.0)
       logger
@@ -463,6 +471,7 @@ DEPENDENCIES
   acme-client
   argon2
   argon2-kdf
+  autoforme
   awesome_print
   aws-sdk-ec2 (~> 1.512)
   aws-sdk-iam
