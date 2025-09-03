@@ -243,6 +243,6 @@ def clover_freeze
     Validation::ValidationFailed
   ].each(&:freeze)
 
-  RubyVM::YJIT.enable
+  RubyVM::YJIT.enable if defined?(RubyVM::YJIT)
   Refrigerator.freeze_core
 end
