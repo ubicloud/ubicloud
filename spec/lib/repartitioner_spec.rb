@@ -3,20 +3,22 @@
 require_relative "../spec_helper"
 
 RSpec.describe Repartitioner do
+  let(:channel) { :"monitor_#{object_id}" }
+
   def repartitioner(**)
-    described_class.new(partition_number: 1, channel: :monitor, max_partition: 8, listen_timeout: 1, recheck_seconds: 18, stale_seconds: 40, **)
+    described_class.new(partition_number: 1, channel:, max_partition: 8, listen_timeout: 1, recheck_seconds: 18, stale_seconds: 40, **)
   end
 
   describe ".new" do
     it "repartitions when initializing" do
-      expect(Clog).to receive(:emit).with("monitor repartitioning").and_call_original
+      expect(Clog).to receive(:emit).with("#{channel} repartitioning").and_call_original
       mp = repartitioner
       expect(mp.repartitioned).to be true
       expect(mp.strand_id_range).to eq("00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff")
     end
 
     it "assumes given partition is last partition" do
-      expect(Clog).to receive(:emit).with("monitor repartitioning").and_call_original
+      expect(Clog).to receive(:emit).with("#{channel} repartitioning").and_call_original
       expect(repartitioner(partition_number: 2).strand_id_range).to eq("80000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff")
     end
   end
@@ -26,13 +28,13 @@ RSpec.describe Repartitioner do
       q = Queue.new
       th = Thread.new do
         payload = nil
-        DB.listen(:monitor_notify_spec, after_listen: proc { q.push nil }, timeout: 1) do |_, _, pl|
+        DB.listen(channel, after_listen: proc { q.push nil }, timeout: 1) do |_, _, pl|
           payload = pl
         end
         payload
       end
       q.pop(timeout: 1)
-      Thread.new { repartitioner(channel: :monitor_notify_spec).notify }.join(1)
+      Thread.new { repartitioner(channel:).notify }.join(1)
       expect(th.value).to eq "1"
     end
   end
@@ -118,7 +120,7 @@ RSpec.describe Repartitioner do
       received_invalid = false
       expect(Clog).to receive(:emit).at_least(:once).and_wrap_original do |m, msg, &blk|
         m.call(msg, &blk)
-        if msg == "invalid monitor repartition notification"
+        if msg == "invalid #{channel} repartition notification"
           received_invalid = true
           q.push nil
         end
