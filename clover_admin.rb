@@ -73,7 +73,7 @@ class CloverAdmin < Roda
   end
 
   plugin :error_handler do |e|
-    raise e if Config.test? && ENV["SHOW_ERRORS"]
+    raise e if Config.test? && !ENV["DONT_RAISE_ADMIN_ERRORS"]
     Clog.emit("admin route exception") { Util.exception_to_hash(e) }
     @page_title = "Internal Server Error"
     view(content: "")
