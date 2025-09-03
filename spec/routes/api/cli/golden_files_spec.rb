@@ -29,9 +29,8 @@ RSpec.describe Clover, "cli" do
     @ps.update(net4: "172.27.99.128/26", net6: "fdd9:1ea7:125d:5fa4::/64")
 
     expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
-    @dns_zone = DnsZone.new
     expect(Vm).to receive(:generate_ubid).and_return(UBID.parse("vma9rnygexga6jns6x3yj9a6b2"))
-    expect(Prog::Postgres::PostgresResourceNexus).to receive(:dns_zone).and_return(@dns_zone).at_least(:once)
+    DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("psnqtahcasrj1hn16kh1ygekmn"))
     expect(Firewall).to receive(:generate_uuid).and_return("30a3eec9-afb5-81fc-bbb5-8691d252ef03")
     expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("nc2kyevjaqey6h0et8qj89zvm1"))

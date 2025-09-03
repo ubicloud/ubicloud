@@ -103,8 +103,10 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     type, data = postgres_resource.location.aws? ? ["CNAME", representative_server.vm.aws_instance.ipv4_dns_name + "."] : ["A", representative_server.vm.ephemeral_net4.to_s]
 
-    Prog::Postgres::PostgresResourceNexus.dns_zone&.delete_record(record_name: postgres_resource.hostname)
-    Prog::Postgres::PostgresResourceNexus.dns_zone&.insert_record(record_name: postgres_resource.hostname, type:, ttl: 10, data:)
+    if postgres_resource.dns_zone
+      postgres_resource.dns_zone.delete_record(record_name: postgres_resource.hostname)
+      postgres_resource.dns_zone.insert_record(record_name: postgres_resource.hostname, type:, ttl: 10, data:)
+    end
 
     when_initial_provisioning_set? do
       hop_initialize_certificates
@@ -231,7 +233,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     postgres_resource.private_subnet.incr_destroy
     servers.each(&:incr_destroy)
 
-    Prog::Postgres::PostgresResourceNexus.dns_zone&.delete_record(record_name: postgres_resource.hostname)
+    postgres_resource.dns_zone&.delete_record(record_name: postgres_resource.hostname)
     postgres_resource.destroy
 
     pop "postgres resource is deleted"
@@ -252,17 +254,5 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       issuer_cert: root_cert,
       issuer_key: root_cert_key
     ).map(&:to_pem)
-  end
-
-  # :nocov:
-  def self.freeze
-    dns_zone
-    super
-  end
-  # :nocov:
-
-  def self.dns_zone
-    return @dns_zone if defined?(@dns_zone)
-    @dns_zone = DnsZone[project_id: Config.postgres_service_project_id, name: Config.postgres_service_hostname]
   end
 end
