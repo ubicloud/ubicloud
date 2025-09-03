@@ -551,7 +551,7 @@ RSpec.describe Clover, "billing" do
       end
 
       it "show finalized invoice as PDF from US issuer without VAT" do
-        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {"company_name" => "Acme Inc.", "tax_id" => "123123123"}}).at_least(:once)
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {"company_name" => "Acme Inc.", "tax_id" => "123123123", "note" => "PO123123"}}).at_least(:once)
         bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
 
@@ -565,6 +565,7 @@ RSpec.describe Clover, "billing" do
         expect(text).not_to include("John Doe")
         expect(text).to include("test-vm")
         expect(text).not_to include("VAT")
+        expect(text).to include("PO123123")
       end
 
       it "show finalized invoice as PDF from EU issuer with 21% VAT" do

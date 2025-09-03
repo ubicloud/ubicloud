@@ -232,12 +232,13 @@ class Invoice < Sequel::Model
       end
     end
 
-    # Row 2, Right Column: Invoice dates
+    # Row 2, Right Column: Invoice dates and note
     pdf.bounding_box([right_column_x, row_y], width: column_width) do
-      dates = [["Invoice date:", data.date], ["Due date:", data.date]]
-      pdf.table(dates, position: :right) do
-        style(row(0..1).columns(0..1), padding: [2, 5, 2, 5], borders: [])
-        style(column(0), align: :right, font_style: :semibold, text_color: dark_gray)
+      right_data = [["Invoice date:", data.date], ["Due date:", data.date]]
+      right_data << ["Note:", data.note] if data.note
+      pdf.table(right_data, position: :right) do
+        style(row(0..2).columns(0..2), padding: [2, 5, 2, 5], borders: [])
+        style(column(0), align: :right, width: 90, text_wrap: :right, font_style: :semibold, text_color: dark_gray)
         style(column(1), align: :right)
       end
     end

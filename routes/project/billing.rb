@@ -39,7 +39,8 @@ class Clover
               },
               metadata: {
                 tax_id: new_tax_id,
-                company_name: tp.str!("company_name")
+                company_name: tp.str!("company_name"),
+                note: tp.nonempty_str("note")
               }
             })
             if new_tax_id != current_tax_id
