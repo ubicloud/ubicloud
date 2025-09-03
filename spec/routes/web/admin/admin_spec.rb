@@ -244,4 +244,38 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Strand #{st.ubid}"
     expect(st.reload.schedule).to be_within(5).of(Time.now)
   end
+
+  it "supports restarting Vms" do
+    vm = Prog::Vm::Nexus.assemble("dummy-public key", Project.create(name: "Default").id, name: "dummy-vm-1").subject
+    fill_in "UBID", with: vm.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
+
+    expect(vm.semaphores_dataset.select_map(:name)).to eq []
+    click_button "Restart Vm"
+    expect(page).to have_flash_notice("Restart scheduled for Vm")
+    expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
+    expect(vm.semaphores_dataset.select_map(:name)).to eq ["restart"]
+  end
+
+  it "supports restarting PostgresResource" do
+    project_id = Project.create(name: "Default").id
+    expect(Config).to receive(:postgres_service_project_id).and_return(project_id).at_least(:once)
+    pg = Prog::Postgres::PostgresResourceNexus.assemble(
+      project_id:,
+      location_id: Location::HETZNER_FSN1_ID,
+      name: "a",
+      target_vm_size: "standard-2",
+      target_storage_size_gib: 64
+    ).subject
+    fill_in "UBID", with: pg.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - PostgresResource #{pg.ubid}"
+
+    expect(Semaphore.where(strand_id: pg.servers_dataset.select_map(:id)).select_map(:name)).to eq []
+    click_button "Restart PostgresResource"
+    expect(page).to have_flash_notice("Restart scheduled for PostgresResource")
+    expect(page.title).to eq "Ubicloud Admin - PostgresResource #{pg.ubid}"
+    expect(Semaphore.where(strand_id: pg.servers_dataset.select_map(:id)).select_map(:name)).to eq ["restart"]
+  end
 end
