@@ -34,63 +34,59 @@ RSpec.describe MonitorableResource do
     end
   end
 
-  describe "#process_event_loop" do
-    before do
-      # We are monkeypatching the sleep method here to avoid the actual sleep.
-      # We also use it to flip the @run_event_loop flag to true, so that the
-      # loop in the process_event_loop method can exit.
-      def r_w_event_loop.sleep(duration)
-        @run_event_loop = true
-      end
-    end
-
-    it "returns if session is nil or resource does not need event loop" do
+  describe "#check_pulse" do
+    it "does not create thread if session is nil or resource does not need event loop" do
       expect(Thread).not_to receive(:new)
 
       # session is nil
-      r_w_event_loop.process_event_loop
+      r_w_event_loop.check_pulse
 
       # resource does not need event loop
       r_without_event_loop.instance_variable_set(:@session, "not nil")
-      r_without_event_loop.process_event_loop
-    end
-
-    it "creates a new thread and runs the event loop" do
-      session = {ssh_session: instance_double(Net::SSH::Connection::Session)}
-      r_w_event_loop.instance_variable_set(:@session, session)
-      expect(Thread).to receive(:new).and_yield
-      expect(session[:ssh_session]).to receive(:loop)
-      r_w_event_loop.process_event_loop
+      r_without_event_loop.check_pulse
     end
 
     it "swallows exception and logs it if event loop fails" do
       session = {ssh_session: instance_double(Net::SSH::Connection::Session)}
       r_w_event_loop.instance_variable_set(:@session, session)
-      expect(Thread).to receive(:new).and_yield
+      expect(Thread).to receive(:new).and_call_original
       expect(session[:ssh_session]).to receive(:loop).and_raise(StandardError)
-      expect(Clog).to receive(:emit).and_call_original
+      expect(Clog).to receive(:emit).twice.and_call_original
       expect(r_w_event_loop).to receive(:close_resource_session)
-      r_w_event_loop.process_event_loop
+      r_w_event_loop.check_pulse
+    end
+
+    it "swallows exception and logs it if check_pulse fails" do
+      session = {ssh_session: instance_double(Net::SSH::Connection::Session)}
+      r_without_event_loop.instance_variable_set(:@session, session)
+      expect(vm_host).to receive(:check_pulse).and_raise(StandardError)
+      expect(Clog).to receive(:emit).and_call_original
+      expect { r_without_event_loop.check_pulse }.not_to raise_error
     end
   end
 
-  describe "#check_pulse" do
+  describe "#check_pulse with session and event loop" do
+    let(:session) { {ssh_session: instance_double(Net::SSH::Connection::Session)} }
+
+    before do
+      r_w_event_loop.instance_variable_set(:@session, session)
+      expect(session[:ssh_session]).to receive(:loop)
+    end
+
+    it "creates a new thread and runs the event loop" do
+      expect(Thread).to receive(:new).and_call_original
+      r_w_event_loop.check_pulse
+    end
+
     it "calls check_pulse on resource and sets pulse" do
       expect(postgres_server).to receive(:check_pulse).and_return({reading: "up"})
       expect { r_w_event_loop.check_pulse }.to change { r_w_event_loop.instance_variable_get(:@pulse) }.from({}).to({reading: "up"})
     end
 
     it "swallows exception and logs it if check_pulse fails" do
-      expect(vm_host).to receive(:check_pulse).and_raise(StandardError)
+      expect(postgres_server).to receive(:check_pulse).and_raise(StandardError)
       expect(Clog).to receive(:emit).and_call_original
-      expect { r_without_event_loop.check_pulse }.not_to raise_error
-    end
-
-    it "waits for the pulse thread to finish" do
-      pulse_thread = Thread.new {}
-      expect(pulse_thread).to receive(:join)
-      r_w_event_loop.instance_variable_set(:@pulse_thread, pulse_thread)
-      r_w_event_loop.check_pulse
+      expect { r_w_event_loop.check_pulse }.not_to raise_error
     end
 
     it "does not log the pulse if reading is up and reading_rpt is not every 5th and reading_rpt is large enough" do
