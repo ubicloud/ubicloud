@@ -321,6 +321,7 @@ end
 #  timeline_access        | timeline_access          | NOT NULL DEFAULT 'push'::timeline_access
 #  representative_at      | timestamp with time zone |
 #  synchronization_status | synchronization_status   | NOT NULL DEFAULT 'ready'::synchronization_status
+#  version                | postgres_version         |
 # Indexes:
 #  postgres_server_pkey1             | PRIMARY KEY btree (id)
 #  postgres_server_resource_id_index | UNIQUE btree (resource_id) WHERE representative_at IS NOT NULL
