@@ -163,7 +163,7 @@ module Option
     [PostgresResource::HaType::SYNC, 2, "2 Standbys"]
   ].map { |args| [args[0], PostgresHaOption.new(*args)] }.to_h.freeze
 
-  AWS_LOCATIONS = ["us-west-2", "us-east-1", "us-east-2", "ap-southeast-2", "eu-west-1"].freeze
+  AWS_LOCATIONS = ["us-west-2", "us-east-1", "us-east-2", "ap-southeast-2", "eu-west-1", "eu-central-1"].freeze
 
   KubernetesCPOption = Struct.new(:cp_node_count, :title, :explanation)
   KubernetesCPOptions = [[1, "1 Node", "Single control plane node without resilience"],
