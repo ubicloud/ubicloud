@@ -47,8 +47,12 @@ class PostgresResource < Sequel::Model
     "creating"
   end
 
+  def dns_zone
+    @dns_zone ||= DnsZone[project_id: Config.postgres_service_project_id, name: Config.postgres_service_hostname]
+  end
+
   def hostname
-    if Prog::Postgres::PostgresResourceNexus.dns_zone
+    if dns_zone
       return "#{name}.#{Config.postgres_service_hostname}" if hostname_version == "v1"
       "#{name}.#{ubid}.#{Config.postgres_service_hostname}"
     else
