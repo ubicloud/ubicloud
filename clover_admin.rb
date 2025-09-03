@@ -108,6 +108,7 @@ class CloverAdmin < Roda
     login_redirect do
       uses_two_factor_authentication? ? "/webauthn-auth" : "/webauthn-setup"
     end
+    check_csrf? false
     require_bcrypt? false
     title_instance_variable :@page_title
     argon2_secret OpenSSL::HMAC.digest("SHA256", Config.clover_session_secret, "admin-argon2-secret")
@@ -126,6 +127,7 @@ class CloverAdmin < Roda
 
   route do |r|
     r.public
+    check_csrf!
     r.rodauth
     rodauth.require_authentication
     rodauth.require_two_factor_setup

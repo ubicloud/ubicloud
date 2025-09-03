@@ -216,6 +216,19 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Internal Server Error"
   end
 
+  it "handles incorrect/missing CSRF tokens" do
+    schedule = Time.now + 10
+    st = Strand.create(prog: "Test", label: "hop_entry", schedule:)
+    fill_in "UBID", with: st.ubid
+    click_button "Show Object"
+
+    find("#strand-info input[name=_csrf]", visible: false).set("")
+    click_button "Schedule Strand to Run Now"
+    expect(page.title).to eq "Ubicloud Admin - Invalid Security Token"
+    expect(page).to have_flash_error("An invalid security token submitted with this request, please try again")
+    expect(st.reload.schedule).not_to be_within(5).of(Time.now)
+  end
+
   it "supports scheduling strands to run immediately" do
     schedule = Time.now + 10
     st = Strand.create(prog: "Test", label: "hop_entry", schedule:)
