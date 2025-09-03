@@ -112,8 +112,12 @@ code {
   }
 }
 
-#model-class-list, #object-list {
+#model-class-list {
   columns: 5;
+}
+
+#object-list {
+  columns: 4;
 }
 
 #strand-info form {
