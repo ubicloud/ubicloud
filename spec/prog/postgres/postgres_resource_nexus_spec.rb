@@ -206,8 +206,9 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
   describe "#initialize_certificates" do
     it "hops to wait_servers after creating certificates" do
+      project = Project.create(name: "default")
       postgres_resource = PostgresResource.create(
-        project_id: "e3e333dd-bd9a-82d2-acc1-1c7c1ee9781f",
+        project_id: project.id,
         location_id: Location::HETZNER_FSN1_ID,
         name: "pg-name",
         target_vm_size: "standard-2",
