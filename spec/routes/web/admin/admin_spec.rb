@@ -183,24 +183,27 @@ RSpec.describe CloverAdmin do
     expect(page).to have_flash_error("Invalid ubid provided")
 
     fill_in "UBID", with: "ts1cyaqvp5ha6j5jt8ypbyagw9"
-    click_button "Show Object"
-    expect(page.title).to eq "Ubicloud Admin - File Not Found"
+    expect { click_button "Show Object" }.to raise_error(RuntimeError, "admin route not handled: /model/SubjectTag/ts1cyaqvp5ha6j5jt8ypbyagw9")
   end
 
   it "handles request for invalid model or missing object" do
-    visit "/model/Foo/ts1cyaqvp5ha6j5jt8ypbyagw9"
-    expect(page.title).to eq "Ubicloud Admin - File Not Found"
-
-    visit "/model/ArchivedRecord/ts1cyaqvp5ha6j5jt8ypbyagw9"
-    expect(page.title).to eq "Ubicloud Admin - File Not Found"
-
-    visit "/model/SubjectTag/ts1cyaqvp5ha6j5jt8ypbyagw9"
-    expect(page.title).to eq "Ubicloud Admin - File Not Found"
+    %w[/model/Foo/ts1cyaqvp5ha6j5jt8ypbyagw9
+      /model/ArchivedRecord/ts1cyaqvp5ha6j5jt8ypbyagw9
+      /model/SubjectTag/ts1cyaqvp5ha6j5jt8ypbyagw9].each do |path|
+      expect { visit path }.to raise_error(RuntimeError, "admin route not handled: #{path}")
+    end
   end
 
-  it "handles 404 page" do
+  it "raises for 404 by default in tests" do
+    expect { visit "/invalid-page" }.to raise_error(RuntimeError)
+  end
+
+  it "shows 404 page if DONT_RAISE_ADMIN_ERRORS environment variable is set" do
+    ENV["DONT_RAISE_ADMIN_ERRORS"] = "1"
     visit "/invalid-page"
     expect(page.title).to eq "Ubicloud Admin - File Not Found"
+  ensure
+    ENV.delete("DONT_RAISE_ADMIN_ERRORS")
   end
 
   it "raises errors by default in tests" do
