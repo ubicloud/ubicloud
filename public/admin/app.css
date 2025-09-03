@@ -14,7 +14,7 @@ a {
   &:hover { text-decoration: underline; }
 }
 
-input {
+input, select, textarea {
   padding: 5px;
   font-size: 1em;
 }
@@ -139,4 +139,28 @@ code {
   div { margin-bottom: 10px; }
   label { min-width: 100px; }
   .rodauth_hidden { display: none; }
+}
+
+#autoforme_table, .nav-tabs, .pager {
+  padding: 0;
+  margin: 0;
+}
+
+.nav-tabs, .pager {
+  li {
+    display: inline-block;
+    padding: 10px;
+  }
+  & > :first-child { border-right: 1px solid black; }
+}
+
+#autoforme_content form div {
+  margin: 10px;
+
+  & label {
+    min-width: 150px;
+  }
+  & input[type=text] {
+    min-width: 300px;
+  }
 }
