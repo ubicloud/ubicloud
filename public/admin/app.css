@@ -120,6 +120,10 @@ code {
   display: inline-block;
 }
 
+#restart-button {
+  float: right;
+}
+
 .rodauth {
   div { margin-bottom: 10px; }
   label { min-width: 100px; }

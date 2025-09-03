@@ -176,6 +176,12 @@ class CloverAdmin < Roda
           flash["notice"] = "Scheduled strand to run immediately"
           r.redirect("/model/#{UBID.class_for_ubid(ubid)}/#{ubid}")
         end
+
+        r.post(Vm === @obj || PostgresResource === @obj, "restart") do
+          @obj.incr_restart
+          flash["notice"] = "Restart scheduled for #{@obj.class}"
+          r.redirect("/model/#{@obj.class}/#{ubid}")
+        end
       end
     end
 
