@@ -112,7 +112,7 @@ class Clover
       r.post "restart" do
         authorize("Postgres:edit", pg.id)
         DB.transaction do
-          Semaphore.incr(pg.servers_dataset.select(:id), "restart")
+          pg.incr_restart
           audit_log(pg, "restart")
         end
 
