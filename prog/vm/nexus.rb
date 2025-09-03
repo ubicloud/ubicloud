@@ -588,6 +588,7 @@ class Prog::Vm::Nexus < Prog::Base
       end
       lb.remove_vm(vm)
     end
+    nap 5 unless vm.removed_from_lb_set?
 
     vm.vm_host.sshable.cmd("sudo host/bin/setup-vm delete_net #{q_vm}")
 

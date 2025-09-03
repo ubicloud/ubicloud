@@ -167,7 +167,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   label def wait_destroy
     reap(nap: 5) do
       load_balancer.destroy
-
+      load_balancer.vms.map(&:incr_removed_from_lb)
       pop "load balancer deleted"
     end
   end
