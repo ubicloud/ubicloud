@@ -50,7 +50,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     location_id = Location::GITHUB_RUNNERS_ID
     size = label_data["vm_size"]
     alien_ratio = github_runner.installation.project.get_ff_aws_alien_runners_ratio || 0
-    if label_data["arch"] == "x64" && boot_image == "github-ubuntu-2204" && rand < alien_ratio
+    if label_data["arch"] == "x64" && rand < alien_ratio
       boot_image = Config.send(:"#{boot_image.tr("-", "_")}_aws_ami_version")
       location_id = Config.github_runner_aws_location_id
       size = Option.aws_instance_type_name("m7a", label_data["vcpus"])
