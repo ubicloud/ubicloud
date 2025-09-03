@@ -203,17 +203,17 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - File Not Found"
   end
 
-  it "raises errors if SHOW_ERRORS environment variable is set" do
-    show_errors, ENV["SHOW_ERRORS"] = ENV["SHOW_ERRORS"], "1"
+  it "raises errors by default in tests" do
     expect { visit "/error" }.to raise_error(RuntimeError)
-  ensure
-    ENV.delete("SHOW_ERRORS") unless show_errors
   end
 
-  it "shows error page for errors if SHOW_ERRORS environment variable is not set" do
+  it "shows error page for errors if DONT_RAISE_ADMIN_ERRORS environment variable is set" do
+    ENV["DONT_RAISE_ADMIN_ERRORS"] = "1"
     expect(Clog).to receive(:emit).with("admin route exception").and_call_original
     visit "/error"
     expect(page.title).to eq "Ubicloud Admin - Internal Server Error"
+  ensure
+    ENV.delete("DONT_RAISE_ADMIN_ERRORS")
   end
 
   it "handles incorrect/missing CSRF tokens" do
