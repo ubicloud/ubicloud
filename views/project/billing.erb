@@ -136,6 +136,17 @@ end
                 <div class="sm:col-span-4">
                   <%== part("components/form/text", name: "company_name", label: "Company Name", value: stripe_data["company_name"]) %>
                 </div>
+                <div class="col-span-full">
+                  <%== part(
+                    "components/form/textarea",
+                    name: "note",
+                    label: "Invoice Note",
+                    value: stripe_data["note"],
+                    attributes: {
+                      placeholder: "Enter details for your invoices, such as a PO number, tax information, or special instructions"
+                    }
+                  ) %>
+                </div>
               </div>
             </div>
           </div>

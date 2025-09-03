@@ -6,7 +6,7 @@ class Serializers::Invoice < Serializers::Base
   InvoiceData = Data.define(:ubid, :path, :name, :date, :begin_time, :end_time, :subtotal, :credit,
     :free_inference_tokens_credit, :discount, :total, :status, :invoice_number, :billing_name,
     :billing_email, :billing_address, :billing_country, :billing_city, :billing_state, :billing_postal_code,
-    :billing_in_eu_vat, :tax_id, :company_name, :issuer_name, :issuer_address, :issuer_country,
+    :billing_in_eu_vat, :tax_id, :company_name, :note, :issuer_name, :issuer_address, :issuer_country,
     :issuer_city, :issuer_state, :issuer_postal_code, :issuer_tax_id, :issuer_trade_id, :issuer_in_eu_vat,
     :vat_rate, :vat_amount, :vat_amount_eur, :vat_reversed, :items)
 
@@ -37,6 +37,7 @@ class Serializers::Invoice < Serializers::Base
       billing_in_eu_vat: inv.content.dig("billing_info", "in_eu_vat"),
       tax_id: inv.content.dig("billing_info", "tax_id"),
       company_name: inv.content.dig("billing_info", "company_name"),
+      note: inv.content.dig("billing_info", "note"),
       issuer_name: inv.content.dig("issuer_info", "name"),
       issuer_address: inv.content.dig("issuer_info", "address"),
       issuer_country: ISO3166::Country.new(inv.content.dig("issuer_info", "country"))&.common_name,
