@@ -161,10 +161,18 @@ class CloverAdmin < Roda
         view("objects")
       end
 
-      r.get :ubid do |ubid|
+      r.on :ubid do |ubid|
         next unless (@obj = @klass[ubid])
 
-        view("object")
+        r.get true do
+          view("object")
+        end
+
+        r.post(Strand === @obj, "schedule") do
+          @obj.this.update(schedule: Sequel::CURRENT_TIMESTAMP)
+          flash["notice"] = "Scheduled strand to run immediately"
+          r.redirect("/model/#{UBID.class_for_ubid(ubid)}/#{ubid}")
+        end
       end
     end
 

@@ -4,15 +4,20 @@
   <p>SSH Command: <code>ssh -i &lt;PRIVATE_KEY_PATH&gt; <%= sshable.unix_user %>@<%= sshable.host %></code></p>
 <% end %>
 
-<% if @klass.associations.include?(:strand) && (strand = @obj.strand) %>
-  <p>
-    <a href="/model/Strand/<%= strand.ubid %>">Strand</a>: <%= strand.prog %>#<%= strand.label %>
-    | schedule: <%= strand.schedule.strftime("%F %T") %>
-    <% if strand.try > 0 %>
-      | try: <%= strand.try %>
-    <% end %>
-  </p>
-<% end %>
+<div id="strand-info">
+  <% if @klass.associations.include?(:strand) && (strand = @obj.strand) %>
+      <a href="/model/Strand/<%= strand.ubid %>">Strand</a>: <%= strand.prog %>#<%= strand.label %>
+      | schedule: <%= strand.schedule.strftime("%F %T") %>
+      <% if strand.try > 0 %>
+        | try: <%= strand.try %>
+      <% end %>
+  <% end %>
+
+  <% if strand || @obj.is_a?(Strand) %>
+    <% strand ||= @obj %>
+    <%== form({action: "/model/Strand/#{strand.ubid}/schedule", method: :post}, button: "Schedule Strand to Run Now") %>
+  <% end %>
+</div>
 
 <% if @klass.associations.include?(:semaphores) && !(semaphores = @obj.semaphores_dataset.select_order_map(:name)).empty? %>
   <p>Semaphores Set: <%= semaphores.join(", ") %></p>
