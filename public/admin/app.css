@@ -105,14 +105,14 @@ code {
     padding-top: 0;
     margin-top: 0;
   }
-  
+
   & ul {
     list-style-type: none;
     padding: 0;
   }
 }
 
-#model-class-list, #object-list {
+#model-class-list {
   columns: 5;
 }
 

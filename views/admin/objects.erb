@@ -1,10 +1,33 @@
 <% @page_title = @klass.name %>
 
-<ul id="object-list">
-  <% @objects.each do |object| %>
-    <li><a href="/model/<%= @klass %>/<%= object.ubid %>"><%= object.admin_label %></a></li>
+<table class="objects-table">
+<thead>
+  <tr>
+    <th>UBID</th>
+    <% (@objects.first&.inspect_values_hash&.keys || []).each do |key| %>
+      <th><%= key %></th>
+    <% end %>
+  </tr>
+</thead>
+<tbody>
+  <% @objects.each do |obj| %>
+    <tr>
+    <td>
+      <a href="/model/<%= @klass %>/<%= obj.ubid %>"><%= obj.admin_label %></a>
+    </td>
+    <% obj.inspect_values_hash.values.each do |v| %>
+      <td>
+        <% if v.is_a?(String) && v.bytesize == 26 && (column_class = UBID.class_for_ubid(v)) && column_class.method_defined?(:ubid) && (obj = UBID.decode(v)) %>
+          <a href="/model/<%= column_class %>/<%= v %>"><%= obj.admin_label %></a>
+        <% else %>
+          <%= v %>
+        <% end %>
+      </td>
+    <% end %>
+    </tr>
   <% end %>
-</ul>
+</tbody>
+</table>
 
 <% if @after %>
   <p><a href="?after=<%= @after %>">More</a></p>
