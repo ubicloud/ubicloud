@@ -1,5 +1,9 @@
 <% @page_title = "#{@klass.name} #{@obj.ubid}" %>
 
+<% if @obj.is_a?(Vm) || @obj.is_a?(PostgresResource) %>
+  <%== form({action: "/model/#{@obj.class}/#{@obj.ubid}/restart", method: :post, id: "restart-button"}, button: "Restart #{@obj.class}") %>
+<% end %>
+
 <% if @klass.associations.include?(:sshable) && (sshable = @obj.sshable) %>
   <p>SSH Command: <code>ssh -i &lt;PRIVATE_KEY_PATH&gt; <%= sshable.unix_user %>@<%= sshable.host %></code></p>
 <% end %>
