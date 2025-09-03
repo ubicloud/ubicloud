@@ -137,6 +137,10 @@ class PostgresResource < Sequel::Model
     servers.any? { it.taking_over? }
   end
 
+  def incr_restart
+    Semaphore.incr(servers_dataset.select(:id), "restart")
+  end
+
   module HaType
     NONE = "none"
     ASYNC = "async"
