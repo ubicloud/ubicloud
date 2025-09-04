@@ -286,4 +286,24 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - PostgresResource #{pg.ubid}"
     expect(Semaphore.where(strand_id: pg.servers_dataset.select_map(:id)).select_map(:name)).to eq ["restart"]
   end
+
+  it "supports moving VmHost to draining/accepting state" do
+    vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
+    fill_in "UBID", with: vmh.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
+    expect(vmh.allocation_state).to eq "unprepared"
+
+    click_link "Move to Draining"
+    click_button "Move to Draining"
+    expect(page).to have_flash_notice("Host allocation state changed to draining")
+    expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
+    expect(vmh.reload.allocation_state).to eq "draining"
+
+    click_link "Move to Accepting"
+    click_button "Move to Accepting"
+    expect(page).to have_flash_notice("Host allocation state changed to accepting")
+    expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
+    expect(vmh.reload.allocation_state).to eq "accepting"
+  end
 end
