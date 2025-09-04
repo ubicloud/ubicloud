@@ -334,4 +334,21 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
     expect(vmh.semaphores_dataset.select_map(:name)).to eq ["hardware_reset"]
   end
+
+  it "supports provisioning spare GitHubRunner" do
+    ins = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
+    ghr = GithubRunner.create(repository_name: "test-repo", label: "ubicloud", installation_id: ins.id)
+
+    fill_in "UBID", with: ghr.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - GithubRunner #{ghr.ubid}"
+
+    expect(GithubRunner.count).to eq 1
+    click_link "Provision Spare Runner"
+    click_button "Provision Spare Runner"
+    expect(page).to have_flash_notice("Spare runner provisioned")
+    expect(page.title).to eq "Ubicloud Admin - GithubRunner #{ghr.ubid}"
+    expect(GithubRunner.count).to eq 2
+    expect(GithubRunner.select_map([:repository_name, :label, :installation_id])).to eq([["test-repo", "ubicloud", ins.id]] * 2)
+  end
 end
