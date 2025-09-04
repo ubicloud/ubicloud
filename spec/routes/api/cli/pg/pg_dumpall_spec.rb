@@ -15,8 +15,7 @@ RSpec.describe Clover, "cli pg pg_dumpall" do
     @ref = [@pg.display_location, @pg.name].join("/")
     @conn_string = URI("postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require")
     expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
-    @dns_zone = DnsZone.new
-    expect(Prog::Postgres::PostgresResourceNexus).to receive(:dns_zone).and_return(@dns_zone).at_least(:once)
+    DnsZone.create(project_id: @project.id, name: "pg.example.com")
   end
 
   it "connects to database via pg_dumpall" do

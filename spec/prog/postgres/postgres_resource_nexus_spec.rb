@@ -175,7 +175,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       dns_zone = instance_double(DnsZone)
       expect(dns_zone).to receive(:delete_record).with(record_name: "pg-name.postgres.ubicloud.com.")
       expect(dns_zone).to receive(:insert_record).with(record_name: "pg-name.postgres.ubicloud.com.", type: "A", ttl: 10, data: "1.1.1.1")
-      expect(described_class).to receive(:dns_zone).and_return(dns_zone).twice
+      expect(postgres_resource).to receive(:dns_zone).and_return(dns_zone).twice
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect { nx.refresh_dns_record }.to hop("initialize_certificates")
     end
@@ -187,17 +187,18 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       dns_zone = instance_double(DnsZone)
       expect(dns_zone).to receive(:delete_record).with(record_name: "pg-name.postgres.ubicloud.com.")
       expect(dns_zone).to receive(:insert_record).with(record_name: "pg-name.postgres.ubicloud.com.", type: "CNAME", ttl: 10, data: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com.")
-      expect(described_class).to receive(:dns_zone).and_return(dns_zone).twice
+      expect(postgres_resource).to receive(:dns_zone).and_return(dns_zone).twice
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect { nx.refresh_dns_record }.to hop("initialize_certificates")
     end
 
     it "hops even if dns zone is not configured" do
-      expect(described_class).to receive(:dns_zone).and_return(nil).twice
+      expect(postgres_resource).to receive(:dns_zone).and_return(nil).twice
       expect { nx.refresh_dns_record }.to hop("wait")
     end
 
     it "hops to wait if initial_provisioning is not set" do
+      expect(postgres_resource).to receive(:dns_zone).and_return(nil).twice
       expect(nx).to receive(:when_initial_provisioning_set?)
       expect { nx.refresh_dns_record }.to hop("wait")
     end
@@ -205,8 +206,9 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
   describe "#initialize_certificates" do
     it "hops to wait_servers after creating certificates" do
+      project = Project.create(name: "default")
       postgres_resource = PostgresResource.create(
-        project_id: "e3e333dd-bd9a-82d2-acc1-1c7c1ee9781f",
+        project_id: project.id,
         location_id: Location::HETZNER_FSN1_ID,
         name: "pg-name",
         target_vm_size: "standard-2",
@@ -215,7 +217,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       )
 
       expect(nx).to receive(:postgres_resource).and_return(postgres_resource).at_least(:once)
-      expect(described_class).to receive(:dns_zone).and_return("something").at_least(:once)
+      expect(postgres_resource).to receive(:dns_zone).and_return("something").at_least(:once)
 
       expect(Util).to receive(:create_root_certificate).with(duration: 60 * 60 * 24 * 365 * 5, common_name: "#{postgres_resource.ubid} Root Certificate Authority").and_call_original
       expect(Util).to receive(:create_root_certificate).with(duration: 60 * 60 * 24 * 365 * 10, common_name: "#{postgres_resource.ubid} Root Certificate Authority").and_call_original
@@ -375,7 +377,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   describe "#destroy" do
     it "triggers server deletion and waits until it is deleted" do
       dns_zone = instance_double(DnsZone)
-      expect(described_class).to receive(:dns_zone).and_return(dns_zone)
+      expect(postgres_resource).to receive(:dns_zone).and_return(dns_zone)
 
       expect(postgres_resource.private_subnet.firewalls).to all(receive(:destroy))
       expect(postgres_resource.private_subnet).to receive(:incr_destroy)
@@ -389,7 +391,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "completes destroy even if dns zone is not configured" do
-      expect(described_class).to receive(:dns_zone).and_return(nil)
+      expect(postgres_resource).to receive(:dns_zone).and_return(nil)
       expect(postgres_resource.private_subnet.firewalls).to all(receive(:destroy))
       expect(postgres_resource.private_subnet).to receive(:incr_destroy)
       expect(postgres_resource).to receive(:servers).and_return([])

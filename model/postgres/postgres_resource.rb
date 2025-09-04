@@ -47,17 +47,25 @@ class PostgresResource < Sequel::Model
     "creating"
   end
 
+  def postgres_service_hostname
+    project.get_ff_postgres_hostname_override || Config.postgres_service_hostname
+  end
+
+  def dns_zone
+    @dns_zone ||= DnsZone[project_id: Config.postgres_service_project_id, name: postgres_service_hostname]
+  end
+
   def hostname
-    if Prog::Postgres::PostgresResourceNexus.dns_zone
-      return "#{name}.#{Config.postgres_service_hostname}" if hostname_version == "v1"
-      "#{name}.#{ubid}.#{Config.postgres_service_hostname}"
+    if dns_zone
+      return "#{name}.#{postgres_service_hostname}" if hostname_version == "v1"
+      "#{name}.#{ubid}.#{postgres_service_hostname}"
     else
       representative_server&.vm&.ephemeral_net4&.to_s
     end
   end
 
   def identity
-    "#{ubid}.#{Config.postgres_service_hostname}"
+    "#{ubid}.#{postgres_service_hostname}"
   end
 
   def connection_string
