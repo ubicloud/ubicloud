@@ -41,10 +41,6 @@ class Clover < Roda
     PostgresResource::HaType::SYNC => "Active (2 standbys with synchronous replication)"
   }.freeze
 
-  def csrf_tag(*)
-    part("components/form/hidden", name: csrf_field, value: csrf_token(*))
-  end
-
   def raise_web_error(message)
     raise CloverError.new(400, nil, message)
   end
