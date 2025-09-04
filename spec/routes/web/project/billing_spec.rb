@@ -652,6 +652,76 @@ RSpec.describe Clover, "billing" do
         expect(text).to include("ACME Inc.")
       end
 
+      it "can pay unpaid invoice" do
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"line1" => "Some Rd", "country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}}).at_least(:once)
+        bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
+        # rubocop:disable RSpec/VerifiedDoubles
+        expect(Stripe::Checkout::Session).to receive(:create).with(
+          hash_including(billing_address_collection: "auto")
+        ).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/invoice/#{invoice.ubid}/success?session_id=session_123"))
+        # rubocop:enable RSpec/VerifiedDoubles
+        expect(Stripe::Checkout::Session).to receive(:retrieve).with("session_123").and_return(stripe_object("customer" => "cs_1234567890", "metadata" => {"invoice" => invoice.ubid}, "payment_status" => "paid"))
+
+        visit "#{project.path}/billing"
+
+        within("#invoice-#{invoice.ubid}") do
+          expect(page).to have_content "unpaid"
+          click_button "Pay Now"
+        end
+
+        expect(page.status_code).to eq(200)
+        expect(page.title).to eq("Ubicloud - Project Billing")
+        expect(page).to have_flash_notice "Invoice #{invoice.invoice_number} paid successfully"
+        within("#invoice-#{invoice.ubid}") do
+          expect(page).to have_content "paid"
+          expect(page).to have_no_content "Pay Now"
+        end
+      end
+
+      it "fails if the invoice id doesn’t match the invoice id in the checkout session" do
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"line1" => "Some Rd", "country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}}).at_least(:once)
+        bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
+        # rubocop:disable RSpec/VerifiedDoubles
+        expect(Stripe::Checkout::Session).to receive(:create).with(
+          hash_including(billing_address_collection: "auto")
+        ).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/invoice/#{invoice.ubid}/success?session_id=session_123"))
+        # rubocop:enable RSpec/VerifiedDoubles
+        expect(Stripe::Checkout::Session).to receive(:retrieve).with("session_123").and_return(stripe_object("metadata" => {"invoice" => "1vvc31wac0za4gx65xd6mt2a42"}, "payment_status" => "paid"))
+
+        visit "#{project.path}/billing"
+
+        within("#invoice-#{invoice.ubid}") do
+          expect(page).to have_content "unpaid"
+          click_button "Pay Now"
+        end
+
+        expect(page.status_code).to eq(400)
+        expect(page.title).to eq("Ubicloud - Project Billing")
+        expect(page).to have_flash_error "Invoice payment was not successful"
+        within("#invoice-#{invoice.ubid}") do
+          expect(page).to have_content "unpaid"
+          expect(page).to have_content "Pay Now"
+        end
+      end
+
+      it "raises not found if invoice already paid" do
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"line1" => "Some Rd", "country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}}).at_least(:once)
+        bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
+
+        visit "#{project.path}/billing"
+
+        invoice.update(status: "paid")
+        within("#invoice-#{invoice.ubid}") do
+          expect(page).to have_content "unpaid"
+          click_button "Pay Now"
+        end
+
+        expect(page.status_code).to eq(404)
+      end
+
       it "raises not found when invoice not exists" do
         visit "#{project.path}/billing/invoice/1vfp96nprnxe7gneajmxn5ncnh"
 

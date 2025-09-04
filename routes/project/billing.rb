@@ -167,21 +167,69 @@ class Clover
         end
       end
 
-      r.get "invoice", ["current", :ubid_uuid] do |id|
+      r.on "invoice", ["current", :ubid_uuid] do |id|
         next unless (invoice = (id == "current") ? @project.current_invoice : Invoice[id:, project_id: @project.id])
 
-        if invoice.status == "current"
-          @invoice_data = Serializers::Invoice.serialize(invoice)
-          view "project/invoice"
-        else
-          response.content_type = :pdf
-          response["content-disposition"] = "inline; filename=\"#{invoice.filename}\""
-          begin
-            Invoice.blob_storage_client.get_object(bucket: Config.invoices_bucket_name, key: invoice.blob_key).body.read
-          rescue Aws::S3::Errors::NoSuchKey
-            Clog.emit("Could not find the invoice") { {not_found_invoice: {invoice_ubid: invoice.ubid}} }
-            invoice.generate_pdf
+        r.get true do
+          if invoice.status == "current"
+            @invoice_data = Serializers::Invoice.serialize(invoice)
+            view "project/invoice"
+          else
+            response.content_type = :pdf
+            response["content-disposition"] = "inline; filename=\"#{invoice.filename}\""
+            begin
+              Invoice.blob_storage_client.get_object(bucket: Config.invoices_bucket_name, key: invoice.blob_key).body.read
+            rescue Aws::S3::Errors::NoSuchKey
+              Clog.emit("Could not find the invoice") { {not_found_invoice: {invoice_ubid: invoice.ubid}} }
+              invoice.generate_pdf
+            end
           end
+        end
+
+        r.post "pay" do
+          no_audit_log
+          next unless invoice.payable?
+          bi = invoice.project.billing_info
+          checkout = Stripe::Checkout::Session.create(
+            payment_method_types: ["card"],
+            mode: "payment",
+            line_items: [{
+              price_data: {
+                currency: "usd",
+                product_data: {
+                  name: "Invoice Payment",
+                  description: invoice.invoice_number
+                },
+                unit_amount: (invoice.cost.to_f * 100).to_i  # Stripe expects amount in cents
+              },
+              quantity: 1
+            }],
+            payment_intent_data: {
+              capture_method: "automatic"
+            },
+            customer: bi.stripe_id,
+            metadata: {
+              invoice: invoice.ubid
+            },
+            billing_address_collection: "auto",
+            success_url: "#{Config.base_url}#{path(invoice)}/success?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url: "#{Config.base_url}#{billing_path}"
+          )
+
+          r.redirect checkout.url, 303
+        end
+
+        r.get "success" do
+          handle_validation_failure("project/billing")
+          checkout_session = Stripe::Checkout::Session.retrieve(typecast_params.str!("session_id"))
+          unless checkout_session["customer"] == @project.billing_info.stripe_id && checkout_session["metadata"]["invoice"] == invoice.ubid && checkout_session["payment_status"] == "paid"
+            Clog.emit("Invoice payment was not successful") { {unsuccessful_invoice_payment: {invoice_ubid: invoice.ubid, session_id: checkout_session["id"]}} }
+            raise_web_error("Invoice payment was not successful")
+          end
+          invoice.update(status: "paid")
+          flash["notice"] = "Invoice #{invoice.invoice_number} paid successfully"
+
+          r.redirect billing_path
         end
       end
     end
