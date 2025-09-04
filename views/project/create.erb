@@ -3,8 +3,7 @@
 <%== part("components/page_header", breadcrumbs: [%w[Projects /project], %w[Create #]]) %>
 
 <div class="grid gap-6">
-  <form action="/project" method="POST">
-    <%== csrf_tag("/project") %>
+  <% form(action: "/project", method: :post) do %>
     <!-- Create Card -->
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
@@ -30,5 +29,5 @@
         </div>
       </div>
     </div>
-  </form>
+  <% end %>
 </div>

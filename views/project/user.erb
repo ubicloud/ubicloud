@@ -25,8 +25,7 @@
     </div>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
-        <form action="<%= user_path %>" role="form" method="POST">
-          <%== csrf_tag(user_path) %>
+        <% form(action: user_path, role: :form, method: :post) do %>
           <div class="space-y-4">
             <div>
               <p class="mt-1 text-sm text-gray-500">
@@ -45,14 +44,13 @@
               </div>
             </div>
           </div>
-        </form>
+        <% end %>
       </div>
     </div>
   </div>
   <!-- User List -->
   <div>
-    <form id="managed-policy" action="<%= "#{user_path}/policy/managed" %>" role="form" method="POST">
-      <%== csrf_tag("#{user_path}/policy/managed") %>
+    <% form(action: "#{user_path}/policy/managed", role: :form, method: :post, id: "managed-policy") do %>
       <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
         <div class="min-w-0 flex-1">
           <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
@@ -133,6 +131,6 @@
           <%== part("components/form/submit_button", text: "Update") %>
         </div>
       </div>
-    </form>
+    <% end %>
   </div>
 </div>

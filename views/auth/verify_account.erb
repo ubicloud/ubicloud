@@ -2,12 +2,11 @@
 
 <% @page_message = "Verify your account" %>
 
-<form class="rodauth space-y-6" role="form" method="POST">
+<% form(role: :form, method: :post, class: "rodauth space-y-6") do %>
   <%== rodauth.verify_account_additional_form_tags %>
-  <%== rodauth.csrf_tag %>
 
   <div class="flex flex-col text-center">
     <%== part("components/form/submit_button", text: "Verify Account") %>
     <a href="/login" class="mt-2 text-sm font-semibold leading-6 text-gray-900">Sign in to another account</a>
   </div>
-</form>
+<% end %>

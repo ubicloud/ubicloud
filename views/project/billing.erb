@@ -46,8 +46,7 @@ end
       </div>
     </div>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <form action="<%= billing_path %>" method="POST">
-        <%== csrf_tag(billing_path) %>
+      <% form(action: billing_path, method: :post) do %>
         <div class="px-4 py-5 sm:p-6">
           <div class="space-y-12">
             <div>
@@ -157,7 +156,7 @@ end
             <%== part("components/form/submit_button", text: "Update") %>
           </div>
         </div>
-      </form>
+      <% end %>
     </div>
     <!-- Payment Methods Card -->
     <%== part(
@@ -249,9 +248,7 @@ end
     </div>
   </div>
 <% else %>
-  <form action="<%= billing_path %>" method="POST">
-    <%== csrf_tag(billing_path) %>
-
+  <% form(action: billing_path, method: :post) do %>
     <%== part(
       "components/empty_state",
       icon: "hero-banknotes",
@@ -259,7 +256,7 @@ end
       description: "Get started by adding new billing information.",
       button_title: "Add new billing information"
     ) %>
-  </form>
+  <% end %>
   <br/>
   <%== part("components/discount_code") %>
 <% end %>
@@ -277,8 +274,7 @@ end
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <!-- Add usage alert -->
       <div class="px-4 py-5 sm:p-6">
-        <form action="<%= "#{@project.path}/usage-alert" %>" role="form" method="POST">
-          <%== csrf_tag("#{@project.path}/usage-alert") %>
+        <% form(action: "#{@project.path}/usage-alert", role: :form, method: :post) do %>
           <div class="space-y-4">
             <div>
               <h2 class="text-lg font-medium leading-6 text-gray-900">Add new usage alert</h2>
@@ -321,7 +317,7 @@ end
               </div>
             </div>
           </div>
-        </form>
+        <% end %>
 
       </div>
       <!-- List alerts -->

@@ -59,8 +59,7 @@ current_members.sort! %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6 space-y-2">
         <h3 class="text-lg font-medium leading-6 text-gray-900"><%= "Update #{@display_tag_type} Tag" %></h3>
-        <form action="<%= path(@tag) %>" role="form" method="POST">
-          <%== csrf_tag(path(@tag)) %>
+        <% form(action: path(@tag), role: :form, method: :post) do %>
           <div class="grid grid-cols-12 gap-3">
             <div class="col-span-12 md:col-span-5">
               <%== part(
@@ -76,7 +75,7 @@ current_members.sort! %>
               ) %>
             </div>
           </div>
-        </form>
+        <% end %>
       </div>
     </div>
   <% end %>
@@ -93,8 +92,7 @@ current_members.sort! %>
           <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Current Members</h3>
         </div>
       </div>
-      <form action="<%= disassociate_path %>" method="POST">
-        <%== csrf_tag(disassociate_path) %>
+      <% form(action: disassociate_path, role: :form, method: :post) do %>
         <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
           <table id="tag-membership-remove" class="min-w-full divide-y divide-gray-300">
             <thead class="bg-gray-50">
@@ -130,7 +128,7 @@ current_members.sort! %>
             <%== part("components/form/submit_button", text: "Remove Members") %>
           </div>
         <% end %>
-      </form>
+      <% end %>
     <% end %>
   </div>
   <div>
@@ -140,8 +138,7 @@ current_members.sort! %>
           <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Add Members</h3>
         </div>
       </div>
-      <form action="<%= associate_path %>" method="POST">
-        <%== csrf_tag(associate_path) %>
+      <% form(action: associate_path, method: :post) do %>
         <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
           <table id="tag-membership-add" class="min-w-full divide-y divide-gray-300">
             <thead class="bg-gray-50">
@@ -177,7 +174,7 @@ current_members.sort! %>
         <div class="py-4">
           <%== part("components/form/submit_button", text: "Add Members") %>
         </div>
-      </form>
+      <% end %>
     <% end %>
   </div>
 </div>

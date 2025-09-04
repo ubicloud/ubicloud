@@ -11,14 +11,13 @@
           <div class="divide-y divide-gray-200 lg:col-span-8 xl:col-span-9 2xl:col-span-10 pb-10">
             <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
               <h2 class="text-lg font-medium leading-6 text-gray-900">Verify New Email</h2>
-              <form role="form" method="POST">
-                <%== rodauth.csrf_tag("/" + rodauth.verify_login_change_route) %>
+              <% form(role: :form, method: :post) do %>
                 <div class="mt-6 grid grid-cols-6 gap-6">
                   <div class="col-span-6">
                     <%== part("components/form/submit_button", text: "Click to Verify New Email") %>
                   </div>
                 </div>
-              </form>
+              <% end %>
             </div>
           </div>
         </div>
@@ -28,12 +27,10 @@
 <% else %>
   <% @page_message = "Verify your new email" %>
 
-  <form class="rodauth space-y-6" role="form" method="POST">
-    <%== rodauth.csrf_tag %>
-
+  <% form(role: :form, method: :post, class: "rodauth space-y-6") do %>
     <div class="flex flex-col text-center">
       <%== part("components/form/submit_button", text: "Click to Verify New Email") %>
       <a href="/login" class="mt-2 text-sm font-semibold leading-6 text-gray-900">Sign in to another account</a>
     </div>
-  </form>
+  <% end %>
 <% end %>

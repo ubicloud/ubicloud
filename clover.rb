@@ -39,6 +39,7 @@ class Clover < Roda
   plugin :assets, js: "app.js", css: "app.css", css_opts: {style: :compressed, cache: false}, timestamp_paths: true
   plugin :disallow_file_uploads
   plugin :flash
+  plugin :forme_route_csrf
   plugin :h
   plugin :hash_branches
   plugin :hooks

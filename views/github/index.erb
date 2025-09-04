@@ -1,8 +1,7 @@
 <% @page_title = "GitHub Runners Integration" %>
 
 <% if !@project.has_valid_payment_method? %>
-  <form action="<%= billing_path %>" method="POST">
-    <%== csrf_tag(billing_path) %>
+  <% form(action: billing_path, method: :post) do %>
     <%== part(
       "components/empty_state",
       icon: "hero-banknotes",
@@ -11,7 +10,7 @@
         "Project doesn't have valid billing information. First, you need to update the project's billing details to use GitHub Runners.",
       button_title: "New Billing Information"
     ) %>
-  </form>
+  <% end %>
 <% else %>
   <%== part(
     "components/empty_state",

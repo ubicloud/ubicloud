@@ -16,12 +16,10 @@
   end
 %>
 
-<form action="<%= "#{path(@pg)}/config" %>" role="form" method="POST" class="min-w-2/3 pg-config">
-  <%== csrf_tag("#{path(@pg)}/config") %>
-
+<% form(action: "#{path(@pg)}/config", role: :form, method: :post, class: "min-w-2/3 pg-config") do %>
   <%== part("components/config_card", title: "PostgreSQL Configuration", config: pg_config, extra_class: "pg-config-card", name: "pg_config", errors: errors) %>
   <%== part("components/config_card", title: "PgBouncer Configuration", config: pgbouncer_config, extra_class: "pgbouncer-config-card", name: "pgbouncer_config", errors: errors) %>
   <div class="flex justify-end">
     <%== part("components/form/submit_button", text: "Save", extra_class: "save-config-btn") if @edit_perm %>
   </div>
-</form>
+<% end %>

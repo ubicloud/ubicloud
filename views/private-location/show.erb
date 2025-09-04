@@ -9,9 +9,7 @@
 
 <div class="grid gap-6">
   <!-- Detail Card -->
-  <form action="<%= path(@location) %>" method="POST">
-    <%== csrf_tag(path(@location)) %>
-
+  <% form(action: path(@location), method: :post) do %>
     <%== part(
       "components/kv_data_card",
       data: [
@@ -33,7 +31,7 @@
         ["AWS Region", @location.name]
       ]
     ) %>
-  </form>
+  <% end %>
   <!-- Danger Zone -->
   <% if has_permission?("Location:delete", @project.ubid) %>
     <div>
