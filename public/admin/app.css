@@ -124,8 +124,15 @@ code {
   display: inline-block;
 }
 
-#restart-button {
-  float: right;
+#action-list a {
+  display: inline-block;
+  border-left: 1px solid black;
+  padding-left: 10px;
+  padding-right: 5px;
+  &:first-child {
+    padding-left: 0;
+    border-left: none;
+  }
 }
 
 .rodauth {
