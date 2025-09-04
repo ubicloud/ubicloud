@@ -229,8 +229,13 @@ end
                     <span class="text-xs italic">(<%= money(inv.subtotal) %>)</span>
                   <% end %>
                 </td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 flex items-center gap-2 justify-between">
                   <%= inv.status %>
+                  <% if inv.payable? %>
+                    <% form(action: "#{path(inv)}/pay", method: :post) do %>
+                      <%== part("components/form/submit_button", text: "Pay Now") %>
+                    <% end %>
+                  <% end %>
                 </td>
               </tr>
             <% end %>
