@@ -224,7 +224,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       decr_destroy
 
       if (services_lb = kubernetes_cluster.services_lb)
-        services_lb.dns_zone.delete_record(record_name: "*.#{services_lb.hostname}.")
+        services_lb.dns_zone&.delete_record(record_name: "*.#{services_lb.hostname}.")
         services_lb.incr_destroy
       end
 

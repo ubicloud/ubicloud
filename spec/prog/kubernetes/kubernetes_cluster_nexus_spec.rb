@@ -493,6 +493,11 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(DnsRecord[name: "*.#{kubernetes_cluster.services_lb.hostname}.", tombstoned: true]).not_to be_nil
     end
 
+    it "does not attempt to delete if dns zone does not exist" do
+      kubernetes_cluster.services_lb.update(custom_hostname_dns_zone_id: nil)
+      expect { nx.destroy }.to nap(5)
+    end
+
     it "completes the destroy process even if the load balancers do not exist" do
       kubernetes_cluster.update(api_server_lb_id: nil, services_lb_id: nil)
       kubernetes_cluster.nodepools.first.destroy
