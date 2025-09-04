@@ -232,6 +232,12 @@ RSpec.describe CloverAdmin do
     expect(st.reload.schedule).not_to be_within(5).of(Time.now)
   end
 
+  it "raises for 404 by default for missing action" do
+    account = create_account(with_project: false)
+    path = "/model/Account/#{account.ubid}/invalid"
+    expect { visit path }.to raise_error(RuntimeError, "admin route not handled: #{path}")
+  end
+
   it "supports scheduling strands to run immediately" do
     schedule = Time.now + 10
     st = Strand.create(prog: "Test", label: "hop_entry", schedule:)
@@ -252,7 +258,8 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
 
     expect(vm.semaphores_dataset.select_map(:name)).to eq []
-    click_button "Restart Vm"
+    click_link "Restart"
+    click_button "Restart"
     expect(page).to have_flash_notice("Restart scheduled for Vm")
     expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
     expect(vm.semaphores_dataset.select_map(:name)).to eq ["restart"]
@@ -273,7 +280,8 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - PostgresResource #{pg.ubid}"
 
     expect(Semaphore.where(strand_id: pg.servers_dataset.select_map(:id)).select_map(:name)).to eq []
-    click_button "Restart PostgresResource"
+    click_link "Restart"
+    click_button "Restart"
     expect(page).to have_flash_notice("Restart scheduled for PostgresResource")
     expect(page.title).to eq "Ubicloud Admin - PostgresResource #{pg.ubid}"
     expect(Semaphore.where(strand_id: pg.servers_dataset.select_map(:id)).select_map(:name)).to eq ["restart"]
