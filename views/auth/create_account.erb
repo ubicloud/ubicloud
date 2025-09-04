@@ -2,9 +2,8 @@
 
 <% @page_message = "Create a new account" %>
 
-<form class="rodauth space-y-6" role="form" method="POST">
+<% form(class: "rodauth space-y-6", role: :form, method: :post) do %>
   <%== rodauth.create_account_additional_form_tags %>
-  <%== rodauth.csrf_tag %>
 
   <%== part(
     "components/form/text",
@@ -25,6 +24,6 @@
     <%== part("components/form/submit_button", text: "Create Account") %>
     <a href="/login" class="mt-2 text-sm font-semibold leading-6 text-gray-900">Sign in to existing account</a>
   </div>
-</form>
+<% end %>
 
 <%== render("auth/social_buttons") %>

@@ -24,22 +24,15 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
                 </div>
                 <div class="col-span-6 sm:col-span-2 text-right space-y-1">
                   <% if uid = @identities[provider.to_s] %>
-                    <form action="/account/login-method/disconnect" role="form" method="POST" class="grow">
-                      <%== csrf_tag("/account/login-method/disconnect") %>
+                    <% form(action: "/account/login-method/disconnect", role: :form, method: :post, class: :grow) do %>
                       <%== part("components/form/hidden", name: "provider", value: provider) %>
                       <%== part("components/form/hidden", name: "uid", value: uid) %>
                       <%== part("components/button", text: "Disconnect", type: "danger") %>
-                    </form>
+                    <% end %>
                   <% else %>
-                    <form
-                      action="<%= rodauth.omniauth_request_path(provider, redirect_url: "/account/login-method") %>"
-                      role="form"
-                      method="POST"
-                      class="grow"
-                    >
-                      <div class="hidden"><%== rodauth.csrf_tag(rodauth.omniauth_request_path(provider)) %></div>
+                    <% form(action: rodauth.omniauth_request_path(provider, redirect_url: "/account/login-method"), role: :form, method: :post, class: :grow) do %>
                       <%== part("components/button", text: "Connect") %>
-                    </form>
+                    <% end %>
                   <% end %>
                 </div>
               </div>
@@ -58,12 +51,11 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
                     account to log in to your Ubicloud account using OIDC</p>
                 </div>
                 <div class="col-span-6 sm:col-span-2 text-right space-y-1">
-                  <form action="/account/login-method/disconnect" role="form" method="POST" class="grow">
-                    <%== csrf_tag("/account/login-method/disconnect") %>
+                  <% form(action: "/account/login-method/disconnect", role: :form, method: :post, class: :grow) do %>
                     <%== part("components/form/hidden", name: "provider", value: provider) %>
                     <%== part("components/form/hidden", name: "uid", value: uid) %>
                     <%== part("components/button", text: "Disconnect", type: "danger") %>
-                  </form>
+                  <% end %>
                 </div>
               </div>
             </div>
@@ -100,11 +92,10 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
               <div class="col-span-6 sm:col-span-2 text-right space-y-2">
                 <%== part("components/button", text: rodauth.has_password? ? "Change" : "Create", link: "/account/change-password") %>
                 <% if rodauth.has_password? %>
-                  <form action="/account/login-method/disconnect" role="form" method="POST" class="grow">
-                    <%== csrf_tag("/account/login-method/disconnect") %>
+                  <% form(action: "/account/login-method/disconnect", role: :form, method: :post, class: :grow) do %>
                     <%== part("components/form/hidden", name: "provider", value: "password") %>
                     <%== part("components/button", text: "Delete", type: "danger") %>
-                  </form>
+                  <% end %>
                 <% end %>
               </div>
             </div>

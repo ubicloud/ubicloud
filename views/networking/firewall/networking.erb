@@ -70,15 +70,9 @@ edit_perm = has_permission?("Firewall:edit", @firewall.ubid) %>
               ) %>
             </td>
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-              <form
-                action="<%= "#{firewall_path}/firewall-rule" %>"
-                role="form"
-                method="POST"
-                id="form-fw-create-rule-<%= @firewall.ubid %>"
-              >
-                <%== csrf_tag("#{firewall_path}/firewall-rule") %>
+              <% form(action: "#{firewall_path}/firewall-rule", method: :post, role: :form, id: "form-fw-create-rule-#{@firewall.ubid}") do %>
                 <%== part("components/form/submit_button", text: "Create") %>
-              </form>
+              <% end %>
             </td>
           </tr>
         <% end %>
@@ -114,11 +108,10 @@ edit_perm = has_permission?("Firewall:edit", @firewall.ubid) %>
             </td>
             <% if edit_perm %>
               <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                <form action="<%= "#{firewall_path}/detach-subnet" %>" role="form" method="POST">
-                  <%== csrf_tag("#{firewall_path}/detach-subnet") %>
+                <% form(action: "#{firewall_path}/detach-subnet", method: :post, role: :form) do %>
                   <input type="hidden" name="private_subnet_id" value="<%= ps.ubid %>">
                   <%== part("components/form/submit_button", text: "Detach") %>
-                </form>
+                <% end %>
               </td>
             <% end %>
           </tr>
@@ -138,15 +131,9 @@ edit_perm = has_permission?("Firewall:edit", @firewall.ubid) %>
               ) %>
             </td>
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-              <form
-                action="<%= "#{firewall_path}/attach-subnet" %>"
-                role="form"
-                method="POST"
-                id="form-fw-attach-<%= @firewall.ubid %>"
-              >
-                <%== csrf_tag("#{firewall_path}/attach-subnet") %>
+              <% form(action: "#{firewall_path}/attach-subnet", method: :post, role: :form, id: "form-fw-attach-#{@firewall.ubid}") do %>
                 <%== part("components/form/submit_button", text: "Attach") %>
-              </form>
+              <% end %>
             </td>
           </tr>
         <% end %>

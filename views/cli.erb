@@ -26,9 +26,7 @@
     </div>
   <% end %>
 
-  <form action="<%= request.path_info %>" method="POST">
-    <%== csrf_tag(request.path_info) %>
-
+  <% form(action: request.path_info, role: :form, method: :post) do %>
     <div class="flex gap-2 justify-between mb-6">
       <div class="font-mono flex-1">
         <% if multi %>
@@ -97,5 +95,5 @@
         <% end %>
       </div>
     </div>
-  </form>
+  <% end %>
 </div>

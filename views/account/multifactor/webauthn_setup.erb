@@ -10,15 +10,8 @@
         <div class="divide-y divide-gray-200 lg:col-span-8 xl:col-span-9 2xl:col-span-10 pb-10">
           <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
             <h2 class="text-lg font-medium leading-6 text-gray-900">Setup Security Key</h2>
-            <form
-              action="/<%= rodauth.webauthn_setup_route %>"
-              role="form"
-              method="POST"
-              id="webauthn-setup-form"
-              data-credential-options="<%= (cred = rodauth.new_webauthn_credential).as_json.to_json %>"
-            >
+            <% form(:action => rodauth.webauthn_setup_path, :role => :form, :method => :post, :id => "webauthn-setup-form", "data-credential-options" => (cred = rodauth.new_webauthn_credential).as_json.to_json) do %>
               <%== rodauth.webauthn_setup_additional_form_tags %>
-              <%== rodauth.csrf_tag("/" + rodauth.webauthn_setup_route) %>
               <%== part("components/form/hidden", name: rodauth.webauthn_setup_challenge_param, value: cred.challenge) %>
               <%== part(
                 "components/form/hidden",
@@ -41,7 +34,7 @@
                   </div>
                 </div>
               </div>
-            </form>
+            <% end %>
           </div>
         </div>
       </div>

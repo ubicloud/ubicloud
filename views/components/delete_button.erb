@@ -17,10 +17,9 @@
 ) %>
 
 <% if method == "POST" %>
-  <form method="POST" action="<%= url %>">
-    <%== csrf_tag(url) %>
+  <% form(action: url, method: :post) do %>
     <%== button %>
-  </form>
+  <% end %>
 <% else %>
   <%== button %>
 <% end %>

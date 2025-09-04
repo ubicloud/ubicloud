@@ -16,9 +16,7 @@
 
 <div class="grid gap-6">
   <!-- Detail Card -->
-  <form action="<%= @project.path %>" method="POST">
-    <%== csrf_tag(@project.path) %>
-
+  <% form(action: @project.path, method: :post) do %>
     <%== part(
       "components/kv_data_card",
       data: [
@@ -44,7 +42,7 @@
         )
       ]
     ) %>
-  </form>
+  <% end %>
   <!-- Quota Card -->
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
     <div class="px-4 py-5 sm:p-6">

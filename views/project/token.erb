@@ -4,12 +4,9 @@
   "components/page_header",
   title: "Personal Access Tokens",
   breadcrumbs: [%w[Projects /project], [@project.name, @project.path], ["Personal Access Tokens", "#"]],
-  right_items: [<<-CREATE]
-    <form id="create-pat" action="#{@project.path}/token" role="form" method="POST">
-      #{csrf_tag("#{@project.path}/token")}
-      #{part("components/form/submit_button", text: "Create Token")}
-    </form>
-  CREATE
+  right_items: [form(nil, {action: "#{@project.path}/token", role: :form, method: :post, id: "create-pat"}, emit: false) do |f|
+    f << part("components/form/submit_button", text: "Create Token")
+  end]
 ) %>
 
 <div class="grid gap-6">

@@ -36,11 +36,9 @@
             <a href="/project" class="block px-3 py-1 hover:bg-gray-100" role="menuitem" tabindex="-1">Projects</a>
           </div>
           <div>
-
-            <form action="/logout" method="post">
-              <%== csrf_tag("/logout") %>
+            <% form(action: "/logout", method: :post) do %>
               <button type="submit" class="block px-3 py-1 hover:bg-gray-100 w-full text-left" role="menuitem" tabindex="-1">Log out</button>
-            </form>
+            <% end %>
           </div>
         </div>
       </div>

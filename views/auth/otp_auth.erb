@@ -2,9 +2,8 @@
 
 <% @page_message = "Verify your sign in" %>
 
-<form action="<%= rodauth.otp_auth_path %>" class="rodauth space-y-6" role="form" method="POST">
+<% form(action: rodauth.otp_auth_path, role: :form, method: :post, class: "rodauth space-y-6") do %>
   <%== rodauth.otp_auth_additional_form_tags %>
-  <%== rodauth.csrf_tag(rodauth.otp_auth_path) %>
 
   <%== render("components/rodauth/otp_auth_code_field") %>
 
@@ -18,6 +17,6 @@
       <a href="mailto:support@ubicloud.com" class="font-semibold leading-6 text-orange-500 hover:text-orange-700">contact support</a>
     </p>
   </div>
-</form>
+<% end %>
 
 <%== rodauth.otp_auth_form_footer %>

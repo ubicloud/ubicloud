@@ -1,8 +1,7 @@
 <% @page_message = "Your one-time password authentication has been locked out, and must be unlocked to be used." %>
 
-<form class="rodauth space-y-6" role="form" method="POST">
+<% form(role: :form, method: :post, class: "rodauth space-y-6") do %>
   <%== rodauth.otp_unlock_additional_form_tags %>
-  <%== rodauth.csrf_tag %>
 
   <p><%= rodauth.otp_unlock_consecutive_successes_label %>: <%= rodauth.otp_unlock_num_successes %></p>
   <p><%= rodauth.otp_unlock_required_consecutive_successes_label %>: <%= rodauth.otp_unlock_auths_required %></p>
@@ -20,6 +19,6 @@
       <a href="mailto:support@ubicloud.com" class="font-semibold leading-6 text-orange-500 hover:text-orange-700">contact support</a>
     </p>
   </div>
-</form>
+<% end %>
 
 <%== rodauth.otp_unlock_form_footer %>

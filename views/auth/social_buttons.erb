@@ -10,8 +10,7 @@
     </div>
     <div class="mt-4 grid sm:grid-cols-<%= omniauth_providers.length %> gap-4">
       <% omniauth_providers.each do |provider, name| %>
-        <form action="<%= rodauth.omniauth_request_path(provider) %>" role="form" method="POST" class="grow">
-          <div class="hidden"><%== rodauth.csrf_tag(rodauth.omniauth_request_path(provider)) %></div>
+        <% form(action: rodauth.omniauth_request_path(provider), role: :form, method: :post, class: :grow) do %>
           <button
             class="flex w-full items-center justify-center gap-3 rounded-md bg-white px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
             type="submit"
@@ -19,7 +18,7 @@
             <%== part("components/icon", name: provider.to_s) %>
             <span class="text-sm font-semibold leading-6"><%= name %></span>
           </button>
-        </form>
+        <% end %>
       <% end %>
     </div>
   </div>
