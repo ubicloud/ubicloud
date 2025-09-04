@@ -158,7 +158,9 @@ class CloverAdmin < Roda
       end,
       "drain" => object_action("Move to Draining", "Host allocation state changed to draining") do |obj|
         obj.update(allocation_state: "draining")
-      end
+      end,
+      "reset" => object_action("Hardware Reset", "Hardware reset scheduled for VmHost", &:incr_hardware_reset),
+      "reboot" => object_action("Reboot", "Reboot scheduled for VmHost", &:incr_reboot)
     }
   }.freeze
   OBJECT_ACTIONS.each_value(&:freeze)

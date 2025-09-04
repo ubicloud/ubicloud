@@ -306,4 +306,32 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
     expect(vmh.reload.allocation_state).to eq "accepting"
   end
+
+  it "supports rebooting VmHosts" do
+    vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
+    fill_in "UBID", with: vmh.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
+
+    expect(vmh.semaphores_dataset.select_map(:name)).to eq []
+    click_link "Reboot"
+    click_button "Reboot"
+    expect(page).to have_flash_notice("Reboot scheduled for VmHost")
+    expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
+    expect(vmh.semaphores_dataset.select_map(:name)).to eq ["reboot"]
+  end
+
+  it "supports hardware reseting VmHosts" do
+    vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
+    fill_in "UBID", with: vmh.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
+
+    expect(vmh.semaphores_dataset.select_map(:name)).to eq []
+    click_link "Hardware Reset"
+    click_button "Hardware Reset"
+    expect(page).to have_flash_notice("Hardware reset scheduled for VmHost")
+    expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
+    expect(vmh.semaphores_dataset.select_map(:name)).to eq ["hardware_reset"]
+  end
 end
