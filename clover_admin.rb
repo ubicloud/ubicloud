@@ -126,6 +126,35 @@ class CloverAdmin < Roda
     end
   end
 
+  ObjectAction = Data.define(:label, :flash, :action) do
+    def self.define(*, &action)
+      new(*, action)
+    end
+
+    def call(obj)
+      action.call(obj)
+    end
+  end
+
+  def self.object_action(...)
+    ObjectAction.define(...)
+  end
+
+  OBJECT_ACTIONS = {
+    "PostgresResource" => {
+      "restart" => object_action("Restart", "Restart scheduled for PostgresResource", &:incr_restart)
+    },
+    "Strand" => {
+      "schedule" => object_action("Schedule Strand to Run Immediately", "Scheduled strand to run immediately") do |obj|
+        obj.this.update(schedule: Sequel::CURRENT_TIMESTAMP)
+      end
+    },
+    "Vm" => {
+      "restart" => object_action("Restart", "Restart scheduled for Vm", &:incr_restart)
+    }
+  }.freeze
+  OBJECT_ACTIONS.each_value(&:freeze)
+
   route do |r|
     r.public
     check_csrf!
@@ -171,16 +200,21 @@ class CloverAdmin < Roda
           view("object")
         end
 
-        r.post(Strand === @obj, "schedule") do
-          @obj.this.update(schedule: Sequel::CURRENT_TIMESTAMP)
-          flash["notice"] = "Scheduled strand to run immediately"
-          r.redirect("/model/#{UBID.class_for_ubid(ubid)}/#{ubid}")
-        end
+        if (actions = OBJECT_ACTIONS[@obj.class.name])
+          r.is actions.keys do |key|
+            action = actions[key]
 
-        r.post(Vm === @obj || PostgresResource === @obj, "restart") do
-          @obj.incr_restart
-          flash["notice"] = "Restart scheduled for #{@obj.class}"
-          r.redirect("/model/#{@obj.class}/#{ubid}")
+            r.get do
+              @label = action.label
+              view("object_action")
+            end
+
+            r.post do
+              action.call(@obj)
+              flash["notice"] = action.flash
+              r.redirect("/model/#{@obj.class}/#{ubid}")
+            end
+          end
         end
       end
     end
