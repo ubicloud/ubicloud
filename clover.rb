@@ -111,6 +111,7 @@ class Clover < Roda
 
   path("Project", class_name: true, &:path)
   path("GithubInstallation", class_name: true) { "#{it.project.path}/github/#{it.ubid}" }
+  path("Invoice", class_name: true) { "#{it.project.path}/billing#{it.path}" }
 
   # :nocov:
   if Config.test? && defined?(SimpleCov)
