@@ -141,6 +141,9 @@ class CloverAdmin < Roda
   end
 
   OBJECT_ACTIONS = {
+    "GithubRunner" => {
+      "provision" => object_action("Provision Spare Runner", "Spare runner provisioned", &:provision_spare_runner)
+    },
     "PostgresResource" => {
       "restart" => object_action("Restart", "Restart scheduled for PostgresResource", &:incr_restart)
     },
