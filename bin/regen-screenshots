@@ -46,7 +46,7 @@ require "tilt/string"
 
 queue = Queue.new
 server = Puma::CLI.new(["-s", "-e", "test", "-b", "tcp://localhost:#{PORT}", "-t", "1:1", "config.ru"])
-server.launcher.events.on_booted { queue.push(nil) }
+server.launcher.events.after_booted { queue.push(nil) }
 Thread.new do
   server.launcher.run
 end

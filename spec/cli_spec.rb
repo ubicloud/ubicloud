@@ -23,7 +23,7 @@ RSpec.describe "bin/ubi" do
     port = 8484
     queue = Queue.new
     @server = Puma::CLI.new(["-s", "-e", "test", "-b", "tcp://localhost:#{port}", "-t", "1:1", "spec/cli_config.ru"])
-    @server.launcher.events.on_booted { queue.push(nil) }
+    @server.launcher.events.after_booted { queue.push(nil) }
     Thread.new do
       @server.launcher.run
     end
