@@ -77,7 +77,7 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
       locals = {name:, label:, description: element[:description], attributes: attributes.merge!({placeholder:, rows: 3})}
     when "hidden"
       selected_options[name] = element[:value]
-      locals = {name:, value: element[:value]}
+      locals = {name => element[:value]}
       container_opening_tag, container_closing_tag = "", ""
     when "partnership_notice"
       description, tos_text = content_generator.call(@flavor)
