@@ -35,7 +35,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   let(:node) {
     nic = Prog::Vnet::NicNexus.assemble(subnet.id, ipv4_addr: "172.19.145.64/26", ipv6_addr: "fd40:1a0a:8d48:182a::/79").subject
     vm = Prog::Vm::Nexus.assemble("pub key", Config.kubernetes_service_project_id, name: "test-vm", private_subnet_id: subnet.id, nic_id: nic.id).subject
-    vm.update(ephemeral_net6: "2001:db8:85a3:73f2:1c4a::/79")
+    vm.update(ephemeral_net6: "2001:db8:85a3:73f2:1c4a::/79", created_at: Time.now - 1)
     KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kubernetes_cluster.id)
   }
 
