@@ -11,7 +11,7 @@
   <% end %>
 
   <% if rodauth.param_or_nil(rodauth.login_param) %>
-    <%== part("components/form/hidden", name: rodauth.login_param, value: rodauth.param(rodauth.login_param)) %>
+    <%== hidden_inputs(rodauth.login_param => rodauth.param(rodauth.login_param)) %>
   <% else %>
     <%== render("components/rodauth/login_field") %>
   <% end %>

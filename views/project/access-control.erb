@@ -96,7 +96,7 @@ end
                     </td>
                   <% end %>
                   <td class="py-4 px-3 text-right">
-                    <%== part("components/form/hidden", name: "aces[][ubid]", value: ubid) %>
+                    <%== hidden_inputs("aces[][ubid]" => ubid) %>
                     <%== part("components/form/checkbox", id_prefix: "ace-#{ubid}-", name: "aces[][deleted]", options: [%w[true Delete]]) %>
                   </td>
                 <% else %>

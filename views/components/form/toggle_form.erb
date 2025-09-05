@@ -1,7 +1,7 @@
 <%# locals: (name:, action:, active:) %>
 
 <% form(action:, role: :form, method: :post, id: "#{name}_toggle") do %>
-  <%== part("components/form/hidden", name:, value: !active) %>
+  <%== hidden_inputs(name => !active) %>
   <div class="group <%= active ? "active" : "" %>">
     <button
       type="submit"
