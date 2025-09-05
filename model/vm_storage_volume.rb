@@ -67,6 +67,7 @@ end
 #  max_read_mbytes_per_sec  | integer |
 #  max_write_mbytes_per_sec | integer |
 #  vhost_block_backend_id   | uuid    |
+#  vring_workers            | integer |
 # Indexes:
 #  vm_storage_volume_pkey                 | PRIMARY KEY btree (id)
 #  vm_storage_volume_vm_id_disk_index_key | UNIQUE btree (vm_id, disk_index)
