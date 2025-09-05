@@ -1,5 +1,4 @@
-<% 
-  pg_config = @pg.user_config || {}
+<% pg_config = @pg.user_config || {}
   pgbouncer_config = @pg.pgbouncer_user_config || {}
 
   errors = flash.now["errors"] || {}
@@ -13,8 +12,7 @@
 
     pg_config = pg_keys.zip(pg_values).to_h
     pgbouncer_config = pgbouncer_keys.zip(pgbouncer_values).to_h
-  end
-%>
+  end %>
 
 <% form(action: "#{path(@pg)}/config", role: :form, method: :post, class: "min-w-2/3 pg-config") do %>
   <%== part("components/config_card", title: "PostgreSQL Configuration", config: pg_config, extra_class: "pg-config-card", name: "pg_config", errors: errors) %>

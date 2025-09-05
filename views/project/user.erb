@@ -5,6 +5,7 @@
 @allowed_add_tag_names_map = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").select_hash(:name, Sequel.as(true, :v))
 @allowed_remove_tag_names_map = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:remove").select_hash(:name, Sequel.as(true, :v))
 @invitations = @project.invitations_dataset.order_by(:email).all %>
+
 <%== render("project/user-tabbar") %>
 
 <%== part(
@@ -18,27 +19,40 @@
   <div>
     <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
       <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+        <h3
+          class="
+            text-2xl font-bold leading-7 text-gray-900 sm:truncate
+            sm:text-2xl sm:tracking-tight
+          "
+        >
           Invite a new user
         </h3>
       </div>
     </div>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div
+      class="
+        overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5
+        bg-white divide-y divide-gray-200
+      "
+    >
       <div class="px-4 py-5 sm:p-6">
         <% form(action: user_path, role: :form, method: :post) do %>
           <div class="space-y-4">
             <div>
               <p class="mt-1 text-sm text-gray-500">
-                You can invite a new user to your project, adding them to the given subject tag (role).
+                You can invite a new user to your project, adding them to the
+                given subject tag (role).
               </p>
             </div>
             <div class="grid grid-cols-12 gap-3">
               <div class="col-span-12 sm:col-span-5">
                 <%== part("components/form/text", name: "email", type: "email", attributes: { required: true, placeholder: "Email" }) %>
               </div>
+
               <div class="col-span-12 sm:col-span-3">
                 <%== part("components/form/policy_select", name: "policy", selected: "Member", id: "invited-user-policy") %>
               </div>
+
               <div class="col-span-3 sm:col-span-2">
                 <%== part("components/form/submit_button", text: "Invite") %>
               </div>
@@ -48,38 +62,79 @@
       </div>
     </div>
   </div>
+
   <!-- User List -->
   <div>
     <% form(action: "#{user_path}/policy/managed", role: :form, method: :post, id: "managed-policy") do %>
       <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
         <div class="min-w-0 flex-1">
-          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+          <h3
+            class="
+              text-2xl font-bold leading-7 text-gray-900 sm:truncate
+              sm:text-2xl sm:tracking-tight
+            "
+          >
             Users
           </h3>
         </div>
       </div>
-      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div
+        class="
+          overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5
+          bg-white divide-y divide-gray-200
+        "
+      >
         <table class="min-w-full divide-y divide-gray-300">
           <thead class="bg-gray-50">
             <tr>
-              <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Email</th>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Subject Tag</th>
-              <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-6 text-left text-sm font-semibold text-gray-900"></th>
+              <th
+                scope="col"
+                class="
+                  py-3.5 pl-4 pr-3 text-left text-sm font-semibold
+                  text-gray-900 sm:pl-6
+                "
+              >
+                Email
+              </th>
+              <th
+                scope="col"
+                class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+              >
+                Subject Tag
+              </th>
+              <th
+                scope="col"
+                class="
+                  py-3.5 pl-3 pr-4 sm:pr-6 text-left text-sm font-semibold
+                  text-gray-900
+                "
+              ></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <% @users.each do |user| %>
               <tr id="user-<%= user.ubid %>">
-                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                <td
+                  class="
+                    whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium
+                    text-gray-900 sm:pl-6
+                  "
+                  scope="row"
+                >
                   <%= user.email %>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                   <% if (tags = @subject_tag_map[user.id]) && tags.length >= 2 %>
-                    <span title="You can manage this user's policies from the Access Control tab.">
+                    <span
+                      title="You can manage this user's policies from the Access Control tab."
+                    >
                       <%= tags.join(", ") %>
                     </span>
                   <% elsif (tag = tags&.first) && !@allowed_remove_tag_names_map[tag] %>
-                    <span id="user-<%= user.ubid %>-noremove" title="You cannot change the policy for this user">
+                    <span
+                      id="user-<%= user.ubid %>-noremove"
+                      title="You cannot change the policy for this user"
+                    >
                       <%= tag %>
                     </span>
                   <% else %>
@@ -103,13 +158,22 @@
             <% end %>
             <% @invitations.each do |invitation| %>
               <tr id="invitation-<%= invitation.email.gsub(/\W+/, "") %>">
-                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                <td
+                  class="
+                    whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium
+                    text-gray-900 sm:pl-6
+                  "
+                  scope="row"
+                >
                   <%= invitation[:email] %>
                   <span
-                    class="inline-flex items-baseline rounded-full ml-1 px-2 text-xs font-semibold leading-5 bg-yellow-100 text-yellow-800"
+                    class="
+                      inline-flex items-baseline rounded-full ml-1 px-2
+                      text-xs font-semibold leading-5 bg-yellow-100
+                      text-yellow-800
+                    "
                   >
-                    Invitation expires on
-                    <%= invitation.expires_at.strftime("%B %d, %Y") %>
+                    Invitation expires on <%= invitation.expires_at.strftime("%B %d, %Y") %>
                   </span>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">

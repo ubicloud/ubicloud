@@ -5,12 +5,24 @@
 <main>
   <div class="max-w-screen-xl pb-6 lg:pb-16">
     <div class="overflow-hidden rounded-lg bg-white shadow">
-      <div class="divide-y divide-gray-200 lg:grid lg:grid-cols-12 lg:divide-x lg:divide-y-0">
+      <div
+        class="
+          divide-y divide-gray-200 lg:grid lg:grid-cols-12 lg:divide-x
+          lg:divide-y-0
+        "
+      >
         <%== render("account/submenu") %>
-        <div class="divide-y divide-gray-200 lg:col-span-8 xl:col-span-9 2xl:col-span-10 pb-10">
+        <div
+          class="
+            divide-y divide-gray-200 lg:col-span-8 xl:col-span-9
+            2xl:col-span-10 pb-10
+          "
+        >
           <% if rodauth.two_factor_modifications_require_password? %>
             <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
-              <h2 class="text-lg font-medium leading-6 text-gray-900">Recovery Codes</h2>
+              <h2 class="text-lg font-medium leading-6 text-gray-900">
+                Recovery Codes
+              </h2>
               <% form(action: rodauth.recovery_codes_path, role: :form, method: :post) do %>
                 <div class="mt-6 grid grid-cols-6 gap-6">
                   <div class="col-span-6 sm:col-span-2">
@@ -24,21 +36,35 @@
             </div>
           <% else %>
             <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
-              <h2 class="text-lg font-medium leading-6 text-gray-900">Recovery Codes</h2>
+              <h2 class="text-lg font-medium leading-6 text-gray-900">
+                Recovery Codes
+              </h2>
+
               <p class="mt-1 text-sm text-gray-500">
-                Copy these recovery codes to a safe location. You can also download them
+                Copy these recovery codes to a safe location. You can also
+                download them
                 <a
-                  class="font-medium text-orange-500 hover:text-orange-600 underline underline-offset-2"
+                  class="
+                    font-medium text-orange-500 hover:text-orange-600
+                    underline underline-offset-2
+                  "
                   href="data:text/plain;base64,<%= Base64.encode64(rodauth.recovery_codes.join("\n")) %>"
                   download="ubicloud-recovery-codes.txt"
-                >here</a>.
+                >
+                  here
+                </a>
+                .
               </p>
+
               <div class="mt-6 grid grid-cols-6 gap-6">
                 <div class="col-span-6 sm:col-span-6">
                   <% if rodauth.recovery_codes.any? %>
                     <div
                       id="recovery-codes-text"
-                      class="w-fit text-sm xl:text-base whitespace-nowrap border p-3 bg-slate-100 text-rose-500 font-mono rounded"
+                      class="
+                        w-fit text-sm xl:text-base whitespace-nowrap border
+                        p-3 bg-slate-100 text-rose-500 font-mono rounded
+                      "
                     >
                       <% rodauth.recovery_codes.each do |code| %>
                         <div><%= code %></div>
@@ -50,7 +76,9 @@
             </div>
             <% if rodauth.can_add_recovery_codes? %>
               <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
-                <h2 class="text-lg font-medium leading-6 text-gray-900"><%== rodauth.add_recovery_codes_heading %></h2>
+                <h2 class="text-lg font-medium leading-6 text-gray-900">
+                  <%== rodauth.add_recovery_codes_heading %>
+                </h2>
                 <% form(action: rodauth.recovery_codes_path, role: :form, method: :post) do %>
                   <div class="mt-6 grid grid-cols-6 gap-6">
                     <div class="col-span-6">

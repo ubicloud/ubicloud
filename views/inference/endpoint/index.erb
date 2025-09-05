@@ -1,5 +1,7 @@
 <% @page_title = "Inference Endpoints" %>
+
 <%== render("components/free_quota") %>
+
 <%== render("inference/tabbar") %>
 
 <div class="grid xl:grid-cols-2 2xl:grid-cols-3 gap-4">
@@ -31,53 +33,77 @@ curl #{ie.load_balancer.health_check_url(path:)} \\
     "model": "#{ie.model_name}",
     #{curl_message}   }'</span>
   CURL
-    %>
-  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white p-4">
-    <h2 class="text-lg font-bold mb-4 text-gray-800 line-clamp-1"><%= ie.tags["display_name"] || ie.model_name %></h2>
-    <div class="grid sm:grid-cols-2 gap-4">
-      <div>
-        <h3 class="text-sm font-semibold text-gray-900">Model card</h3>
-        <div class="flex items-center gap-1 text-gray-500">
-          <%if hf_model = ie.tags["hf_model"]%>
-          <a target="_blank" rel="noreferrer" href="https://huggingface.co/<%= hf_model %>" class="text-orange-600 line-clamp-2">🤗 <%= hf_model %></a>
-          <%else%>
-          <p class="text-gray-500">Not available</p>
-          <%end%>
+%>
+    <div
+      class="
+        overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5
+        bg-white p-4
+      "
+    >
+      <h2 class="text-lg font-bold mb-4 text-gray-800 line-clamp-1">
+        <%= ie.tags["display_name"] || ie.model_name %>
+      </h2>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+          <h3 class="text-sm font-semibold text-gray-900">Model card</h3>
+          <div class="flex items-center gap-1 text-gray-500">
+            <% if hf_model = ie.tags["hf_model"] %>
+              <a
+                target="_blank"
+                rel="noreferrer"
+                href="https://huggingface.co/<%= hf_model %>"
+                class="text-orange-600 line-clamp-2"
+              >
+                🤗 <%= hf_model %>
+              </a>
+            <% else %>
+              <p class="text-gray-500">Not available</p>
+            <% end %>
+          </div>
         </div>
-      </div>
-      <div>
-        <h3 class="text-sm font-semibold text-gray-900">Price</h3>
-        <p class="text-gray-500">
-          Input: $<%= "%0.02f" % million_token_price(ie.prompt_billing_resource) %> / 1M tokens
-          <br>
-          Output: $<%= "%0.02f" % million_token_price(ie.completion_billing_resource) %> / 1M tokens
-        </p>
-      </div>
-      <div>
-        <h3 class="text-sm font-semibold text-gray-900">Capability</h3>
-        <div class="flex items-center gap-1 text-gray-500">
-          <%== part("components/icon", name: model_icon, classes: "w-5 h-5 text-gray-400") %>
-          <%= ie.tags["capability"] %>
+
+        <div>
+          <h3 class="text-sm font-semibold text-gray-900">Price</h3>
+          <p class="text-gray-500">
+            Input: $<%= "%0.02f" % million_token_price(ie.prompt_billing_resource) %> / 1M tokens
+            <br>
+            Output: $<%= "%0.02f" % million_token_price(ie.completion_billing_resource) %> / 1M tokens
+          </p>
         </div>
-      </div>
-      <div>
-        <h3 class="text-sm font-semibold text-gray-900">Context length</h3>
-        <p class="text-gray-500"><%= ie.tags.fetch("context_length", "Full") %></p>
-      </div>
-      <div class="sm:col-span-2">
-        <h3 class="text-sm font-semibold text-gray-900">URL</h3>
-        <div class="text-gray-500"><%== part("components/copyable_content", content: ie.load_balancer.health_check_url, message: "Copied URL") %></div>
-      </div>
-      <div class="sm:col-span-2">
-        <h3 class="text-sm font-semibold text-gray-900">
-          CURL usage example
-        </h3>
-        <div class="mt-2">
-          <pre class="text-sm bg-gray-800 text-white p-2 rounded-lg overflow-scroll"><%== curl_snippet %></pre>
+
+        <div>
+          <h3 class="text-sm font-semibold text-gray-900">Capability</h3>
+          <div class="flex items-center gap-1 text-gray-500">
+            <%== part("components/icon", name: model_icon, classes: "w-5 h-5 text-gray-400") %>
+            <%= ie.tags["capability"] %>
+          </div>
         </div>
-      </div>
-      <% if ie.tags["capability"] == "Text Generation" %>
-      <%== render(
+
+        <div>
+          <h3 class="text-sm font-semibold text-gray-900">Context length</h3>
+          <p class="text-gray-500">
+            <%= ie.tags.fetch("context_length", "Full") %>
+          </p>
+        </div>
+
+        <div class="sm:col-span-2">
+          <h3 class="text-sm font-semibold text-gray-900">URL</h3>
+          <div class="text-gray-500">
+            <%== part("components/copyable_content", content: ie.load_balancer.health_check_url, message: "Copied URL") %>
+          </div>
+        </div>
+
+        <div class="sm:col-span-2">
+          <h3 class="text-sm font-semibold text-gray-900">
+            CURL usage example
+          </h3>
+          <div class="mt-2">
+            <pre class="text-sm bg-gray-800 text-white p-2 rounded-lg overflow-scroll"><%== curl_snippet %></pre>
+          </div>
+        </div>
+
+        <% if ie.tags["capability"] == "Text Generation" %>
+          <%== render(
         "components/button",
         locals: {
           text: "Try in Playground",
@@ -87,9 +113,8 @@ curl #{ie.load_balancer.health_check_url(path:)} \\
           }
         }
       ) %>
-      <% end %>
+        <% end %>
+      </div>
     </div>
-  </div>
   <% end %>
-
 </div>

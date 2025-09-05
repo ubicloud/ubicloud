@@ -5,25 +5,40 @@
 <main>
   <div class="max-w-screen-xl pb-6 lg:pb-16">
     <div class="overflow-hidden rounded-lg bg-white shadow">
-      <div class="divide-y divide-gray-200 lg:grid lg:grid-cols-12 lg:divide-x lg:divide-y-0">
+      <div
+        class="
+          divide-y divide-gray-200 lg:grid lg:grid-cols-12 lg:divide-x
+          lg:divide-y-0
+        "
+      >
         <%== render("account/submenu") %>
-        <div class="divide-y divide-gray-200 lg:col-span-8 xl:col-span-9 2xl:col-span-10 pb-10">
+        <div
+          class="
+            divide-y divide-gray-200 lg:col-span-8 xl:col-span-9
+            2xl:col-span-10 pb-10
+          "
+        >
           <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
-            <h2 class="text-lg font-medium leading-6 text-gray-900">Change Email Address</h2>
+            <h2 class="text-lg font-medium leading-6 text-gray-900">
+              Change Email Address
+            </h2>
             <% form(action: rodauth.change_login_path, role: :form, method: :post) do %>
               <%== rodauth.change_login_additional_form_tags %>
               <div class="mt-6 grid grid-cols-6 gap-6">
                 <div class="col-span-6 sm:col-span-3 xl:col-span-2">
                   <%== part("components/form/text", label: "Current Email", value: current_account.email, extra_class: "bg-gray-50 text-gray-500 ring-gray-200 ", attributes: {disabled: true}) %>
                 </div>
+
                 <div class="col-span-6 sm:col-span-3 xl:col-span-2">
                   <%== part("components/rodauth/login_field", label: "New Email Address") %>
                 </div>
+
                 <% if rodauth.change_login_requires_password? %>
                   <div class="col-span-6 sm:col-span-3 xl:col-span-2">
                     <%== render("components/rodauth/password_field") %>
                   </div>
                 <% end %>
+
                 <div class="col-span-6">
                   <%== part("components/form/submit_button", text: "Change Email") %>
                 </div>

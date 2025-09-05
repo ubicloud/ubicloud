@@ -14,8 +14,7 @@
   ]
 ) %>
 
-<%
-  form_elements = [
+<% form_elements = [
     {name: "name", type: "text", label: "Cluster Name", required: "required", placeholder: "Enter cluster name"},
     {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::KubernetesCluster.method(:location)},
     {name: "version", type: "radio_small_cards", label: "Version", required: "required", content_generator: ContentGenerator::KubernetesCluster.method(:version)},
@@ -24,7 +23,6 @@
     {name: "worker_nodes", type: "select", label: "Worker Nodes", required: "required", placeholder: "Select number of worker nodes", content_generator: ContentGenerator::KubernetesCluster.method(:worker_nodes), opening_tag: "<div class='sm:col-span-3'>"},
   ]
 
-  action = "#{@project.path}/kubernetes-cluster"
-%>
+  action = "#{@project.path}/kubernetes-cluster" %>
 
-<%==part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents)%>
+<%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents) %>

@@ -6,18 +6,28 @@ max_date = @pg.timeline.latest_restore_time %>
     <% form(action: "#{path(@pg)}/restore", role: :form, method: :post) do %>
       <div class="space-y-4">
         <div>
-          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Fork PostgreSQL database</h3>
+          <h3
+            class="
+              text-2xl font-bold leading-7 text-gray-900 sm:truncate
+              sm:text-2xl sm:tracking-tight
+            "
+          >
+            Fork PostgreSQL database
+          </h3>
           <p class="mt-1 text-sm text-gray-500">
-            When you fork your existing PostgreSQL database, a new server will be provisioned.
+            When you fork your existing PostgreSQL database, a new server will
+            be provisioned.
           </p>
         </div>
         <div class="grid grid-cols-12 gap-6">
           <div class="col-span-12 sm:col-span-5">
             <%== part("components/form/text", label: "New server name", name: "name", attributes: { placeholder: @pg.name + "-fork", required: true }) %>
           </div>
+
           <div class="col-span-12 sm:col-span-5">
             <%== part("components/form/datepicker", label: "Target Time (UTC)", name: "restore_target", default_date: max_date, max_date:, min_date:) %>
           </div>
+
           <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
             <%== part("components/form/submit_button", text: "Fork") %>
           </div>
@@ -34,30 +44,68 @@ max_date = @pg.timeline.latest_restore_time %>
 <% end %>
 
 <% backups = @pg.timeline.backups %>
+
 <% if backups.count > 0 %>
   <div class="p-6">
     <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
       <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Backups</h3>
+        <h3
+          class="
+            text-2xl font-bold leading-7 text-gray-900 sm:truncate
+            sm:text-2xl sm:tracking-tight
+          "
+        >
+          Backups
+        </h3>
       </div>
     </div>
 
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div
+      class="
+        overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5
+        bg-white divide-y divide-gray-200
+      "
+    >
       <table class="min-w-full divide-y divide-gray-300">
         <thead class="bg-gray-50">
           <tr>
-            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Backup Time</th>
-            <th scope="col" class="py-3.5 text-left text-sm font-semibold text-gray-900">Type</th>
-            <th scope="col" class="py-3.5 text-left text-sm font-semibold text-gray-900">Fork</th>
+            <th
+              scope="col"
+              class="
+                py-3.5 pl-4 pr-3 text-left text-sm font-semibold
+                text-gray-900 sm:pl-6
+              "
+            >
+              Backup Time
+            </th>
+            <th
+              scope="col"
+              class="py-3.5 text-left text-sm font-semibold text-gray-900"
+            >
+              Type
+            </th>
+            <th
+              scope="col"
+              class="py-3.5 text-left text-sm font-semibold text-gray-900"
+            >
+              Fork
+            </th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 bg-white">
           <% backups.each do %>
             <tr>
-              <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6"><%= it.last_modified %></td>
-              <td class="py-4 text-sm font-medium text-gray-900">Full Backup</td>
+              <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+                <%= it.last_modified %>
+              </td>
               <td class="py-4 text-sm font-medium text-gray-900">
-                <div class="cursor-pointer fork-icon" data-target-datetime="<%= it.last_modified %>">
+                Full Backup
+              </td>
+              <td class="py-4 text-sm font-medium text-gray-900">
+                <div
+                  class="cursor-pointer fork-icon"
+                  data-target-datetime="<%= it.last_modified %>"
+                >
                   <%== part("components/icon", name: "fork", classes: "text-black-600 h-6 w-6") %>
                 </div>
               </td>

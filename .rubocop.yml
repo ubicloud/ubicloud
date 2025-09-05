@@ -108,3 +108,6 @@ RSpec/IndexedLet:
 
 RSpec/NestedGroups:
   Enabled: false
+
+Layout/AssignmentIndentation:
+  Enabled: false

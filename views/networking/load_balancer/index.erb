@@ -1,4 +1,5 @@
 <% @page_title = "Load Balancers" %>
+
 <%== render("networking/tabbar") %>
 
 <div class="grid gap-6">
@@ -25,7 +26,7 @@
     } : {})
   ) %>
 
-  <% if @lbs.count > 0 && has_project_permission("LoadBalancer:create")%>
+  <% if @lbs.count > 0 && has_project_permission("LoadBalancer:create") %>
     <div class="flex justify-end">
       <%== part("components/button", text: "Create Load Balancer", link: "load-balancer/create") %>
     </div>

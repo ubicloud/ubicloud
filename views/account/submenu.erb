@@ -9,28 +9,36 @@
         ["Close Account", "/account/close-account", "hero-x-circle"]
       ].each do |label, url, icon, disallowed| %>
       <% next if disallowed %>
-      <% if request.path == url %>
-        <a
-          href="<%= url %>"
-          class="border-orange-600 bg-orange-50 text-orange-600 hover:bg-orange-50 hover:text-orange-700 group flex items-center border-l-4 px-3 py-2 text-sm font-medium"
-          aria-current="page"
-        >
-          <%== part(
+        <% if request.path == url %>
+          <a
+            href="<%= url %>"
+            class="
+              border-orange-600 bg-orange-50 text-orange-600
+              hover:bg-orange-50 hover:text-orange-700 group flex
+              items-center border-l-4 px-3 py-2 text-sm font-medium
+            "
+            aria-current="page"
+          >
+            <%== part(
             "components/icon",
             name: icon,
             classes: "text-orange-600 group-hover:text-orange-600 -ml-1 mr-3 h-6 w-6 flex-shrink-0"
           ) %>
-          <span class="truncate"><%= label %></span>
-        </a>
-      <% else %>
-        <a
-          href="<%= url %>"
-          class="border-transparent text-gray-900 hover:bg-gray-50 hover:text-gray-900 group flex items-center border-l-4 px-3 py-2 text-sm font-medium"
-        >
-          <%== part("components/icon", name: icon, classes: "text-gray-400 group-hover:text-gray-500 -ml-1 mr-3 h-6 w-6 flex-shrink-0") %>
-          <span class="truncate"><%= label %></span>
-        </a>
+            <span class="truncate"><%= label %></span>
+          </a>
+        <% else %>
+          <a
+            href="<%= url %>"
+            class="
+              border-transparent text-gray-900 hover:bg-gray-50
+              hover:text-gray-900 group flex items-center border-l-4 px-3
+              py-2 text-sm font-medium
+            "
+          >
+            <%== part("components/icon", name: icon, classes: "text-gray-400 group-hover:text-gray-500 -ml-1 mr-3 h-6 w-6 flex-shrink-0") %>
+            <span class="truncate"><%= label %></span>
+          </a>
+        <% end %>
       <% end %>
-    <% end %>
   </nav>
 </aside>

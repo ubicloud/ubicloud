@@ -15,13 +15,6 @@ GIT
     roda (3.95.0)
       rack
 
-GIT
-  remote: https://github.com/ubicloud/erb-formatter.git
-  revision: df3174476986706828f7baf3e5e6f5ec8ecd849b
-  ref: df3174476986706828f7baf3e5e6f5ec8ecd849b
-  specs:
-    erb-formatter (0.7.3)
-
 GEM
   remote: https://rubygems.org/
   specs:
@@ -482,7 +475,6 @@ DEPENDENCIES
   countries
   cuprite
   ed25519
-  erb-formatter!
   erubi (>= 1.5)
   excon
   foreman
