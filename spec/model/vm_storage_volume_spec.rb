@@ -42,16 +42,16 @@ RSpec.describe VmStorageVolume do
 
   describe "#num_queues" do
     it "returns 1 for SPDK volumes" do
-      v = described_class.new(disk_index: 7)
+      v = described_class.new(disk_index: 7, vring_workers: 5)
       allow(v).to receive(:vhost_block_backend).and_return(nil)
       expect(v.num_queues).to eq(1)
     end
 
-    it "returns max of vm.vcpus / 2 and 1 for vhost_block_backend volumes" do
+    it "returns vring_workers for vhost_block_backend volumes" do
       vm = Vm.new(vcpus: 4).tap { it.id = "eb3dbcb3-2c90-8b74-8fb4-d62a244d7ae5" }
-      v = described_class.new(disk_index: 7, vm: vm)
+      v = described_class.new(disk_index: 7, vm: vm, vring_workers: 5)
       allow(v).to receive(:vhost_block_backend).and_return(VhostBlockBackend.new)
-      expect(v.num_queues).to eq(2)
+      expect(v.num_queues).to eq(5)
     end
   end
 
