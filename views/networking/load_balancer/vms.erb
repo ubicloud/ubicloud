@@ -33,7 +33,7 @@ edit_perm = has_permission?("LoadBalancer:edit", @lb.ubid) %>
               <%= vm.load_balancer_state %>
             </td>
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-              <% form(action: "#{load_balancer_path}/detach-vm", role: :form, method: :post) do %>
+              <% form(action: "#{load_balancer_path}/detach-vm", method: :post) do %>
                 <input type="hidden" name="vm_id" value="<%= vm.ubid %>">
                 <%== part("components/form/submit_button", text: "Detach") %>
               <% end %>
@@ -57,7 +57,7 @@ edit_perm = has_permission?("LoadBalancer:edit", @lb.ubid) %>
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
             </td>
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-              <% form(action: "#{load_balancer_path}/attach-vm", role: :form, method: :post, id: "form-lb-#{@lb.ubid}") do %>
+              <% form(action: "#{load_balancer_path}/attach-vm", method: :post, id: "form-lb-#{@lb.ubid}") do %>
                 <%== part("components/form/submit_button", text: "Attach") %>
               <% end %>
             </td>

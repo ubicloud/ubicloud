@@ -70,7 +70,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall.ubid) %>
               ) %>
             </td>
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-              <% form(action: "#{firewall_path}/firewall-rule", method: :post, role: :form, id: "form-fw-create-rule-#{@firewall.ubid}") do %>
+              <% form(action: "#{firewall_path}/firewall-rule", method: :post, id: "form-fw-create-rule-#{@firewall.ubid}") do %>
                 <%== part("components/form/submit_button", text: "Create") %>
               <% end %>
             </td>
@@ -108,7 +108,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall.ubid) %>
             </td>
             <% if edit_perm %>
               <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                <% form(action: "#{firewall_path}/detach-subnet", method: :post, role: :form) do %>
+                <% form(action: "#{firewall_path}/detach-subnet", method: :post) do %>
                   <input type="hidden" name="private_subnet_id" value="<%= ps.ubid %>">
                   <%== part("components/form/submit_button", text: "Detach") %>
                 <% end %>
@@ -131,7 +131,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall.ubid) %>
               ) %>
             </td>
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-              <% form(action: "#{firewall_path}/attach-subnet", method: :post, role: :form, id: "form-fw-attach-#{@firewall.ubid}") do %>
+              <% form(action: "#{firewall_path}/attach-subnet", method: :post, id: "form-fw-attach-#{@firewall.ubid}") do %>
                 <%== part("components/form/submit_button", text: "Attach") %>
               <% end %>
             </td>

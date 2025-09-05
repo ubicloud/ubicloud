@@ -274,7 +274,7 @@ end
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <!-- Add usage alert -->
       <div class="px-4 py-5 sm:p-6">
-        <% form(action: "#{@project.path}/usage-alert", role: :form, method: :post) do %>
+        <% form(action: "#{@project.path}/usage-alert", method: :post) do %>
           <div class="space-y-4">
             <div>
               <h2 class="text-lg font-medium leading-6 text-gray-900">Add new usage alert</h2>

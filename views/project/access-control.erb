@@ -52,7 +52,7 @@ end
       </div>
     <% end %>
 
-    <% form(action: form_action, role: :form, method: :post, id: "access-control-form") do %>
+    <% form(action: form_action, method: :post, id: "access-control-form") do %>
       <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
         <table id="access-control-entries" class="min-w-full divide-y divide-gray-300 group">
           <thead class="bg-gray-50 <% if @token %> hidden group-[&:has(tr:nth-child(n+3))]:table-header-group <% end %>">
@@ -137,7 +137,7 @@ end
   <% if @token %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
-        <% form(action: restriction_path, role: :form, method: :post) do %>
+        <% form(action: restriction_path, method: :post) do %>
           <div class="sm:flex sm:items-center sm:justify-between">
             <div>
               <h3 class="text-base font-semibold leading-6 text-gray-900"><%= restriction_title %>

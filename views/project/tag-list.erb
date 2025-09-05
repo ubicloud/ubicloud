@@ -45,7 +45,7 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
             tags, recursively, to allow for easier management.
           </p>
 
-          <% form(action: "#{@project.path}/user/access-control/tag/#{@tag_type}", role: :form, method: :post) do %>
+          <% form(action: "#{@project.path}/user/access-control/tag/#{@tag_type}", method: :post) do %>
             <div class="grid grid-cols-12 gap-3">
               <div class="col-span-12 md:col-span-5">
                 <%== part("components/form/text", name: "name", button_title: "Create", attributes: { required: true, placeholder: "Name" }) %>

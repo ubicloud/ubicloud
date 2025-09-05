@@ -9,7 +9,7 @@ else
   @page_message = "Sign in to your account on #{@oidc_provider.display_name} using OpenID Connect"
 end %>
 
-<% form(action: form_action, role: :form, method: :post, class: "rodauth space-y-6") do %>
+<% form(action: form_action, method: :post, class: "rodauth space-y-6") do %>
   <button
     class="flex w-full items-center justify-center gap-3 rounded-md bg-white px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
     type="submit"
