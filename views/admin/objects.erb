@@ -2,7 +2,9 @@
 
 <ul id="object-list">
   <% @objects.each do |object| %>
-    <li><a href="/model/<%= @klass %>/<%= object.ubid %>"><%= object.admin_label %></a></li>
+    <li>
+      <a href="/model/<%= @klass %>/<%= object.ubid %>"><%= object.admin_label %></a>
+    </li>
   <% end %>
 </ul>
 

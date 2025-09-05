@@ -1,16 +1,22 @@
 <% @page_title = "#{@klass.name} #{@obj.ubid}" %>
 
 <% if @klass.associations.include?(:sshable) && (sshable = @obj.sshable) %>
-  <p>SSH Command: <code>ssh -i &lt;PRIVATE_KEY_PATH&gt; <%= sshable.unix_user %>@<%= sshable.host %></code></p>
+  <p>
+    SSH Command:
+    <code>ssh -i &lt;PRIVATE_KEY_PATH&gt; <%= sshable.unix_user %>@<%= sshable.host %></code>
+  </p>
 <% end %>
 
 <div id="strand-info">
   <% if @klass.associations.include?(:strand) && (strand = @obj.strand) %>
-      <a href="/model/Strand/<%= strand.ubid %>">Strand</a>: <%= strand.prog %>#<%= strand.label %>
-      | schedule: <%= strand.schedule.strftime("%F %T") %>
-      <% if strand.try > 0 %>
-        | try: <%= strand.try %>
-      <% end %>
+    <a href="/model/Strand/<%= strand.ubid %>">Strand</a>:
+    <%= strand.prog %>#<%= strand.label %>
+    | schedule:
+    <%= strand.schedule.strftime("%F %T") %>
+    <% if strand.try > 0 %>
+      | try:
+      <%= strand.try %>
+    <% end %>
   <% end %>
 
   <% if strand || @obj.is_a?(Strand) %>
@@ -24,7 +30,8 @@
 <% end %>
 
 <% if actions = OBJECT_ACTIONS[@obj.class.name] %>
-  <p id="action-list">Actions:
+  <p id="action-list">
+    Actions:
     <% actions.each do |key, action| %>
       <a href="/model/<%= @obj.class.name %>/<%= @obj.ubid %>/<%= key %>"><%= action.label %></a>
     <% end %>
@@ -32,34 +39,34 @@
 <% end %>
 
 <table class="object-table">
-<caption>Data</caption>
-<thead>
-  <tr>
-    <th>Column</th>
-    <th>Value</th>
-  </tr>
-</thead>
-<tbody>
-  <% @obj.inspect_values_hash.each do |k, v| %>
+  <caption>Data</caption>
+  <thead>
     <tr>
-      <td><%= k %></td>
-      <td>
-        <% if v.is_a?(String) && v.bytesize == 26 && (column_class = UBID.class_for_ubid(v)) && column_class.method_defined?(:ubid) && (obj = UBID.decode(v)) %>
-          <a href="/model/<%= column_class %>/<%= v %>"><%= obj.admin_label %></a>
-        <% else %>
-          <%= v %>
-        <% end %>
-      </td>
+      <th>Column</th>
+      <th>Value</th>
     </tr>
-  <% end %>
-</tbody>
+  </thead>
+  <tbody>
+    <% @obj.inspect_values_hash.each do |k, v| %>
+      <tr>
+        <td><%= k %></td>
+        <td>
+          <% if v.is_a?(String) && v.bytesize == 26 && (column_class = UBID.class_for_ubid(v)) && column_class.method_defined?(:ubid) && (obj = UBID.decode(v)) %>
+            <a href="/model/<%= column_class %>/<%= v %>"><%= obj.admin_label %></a>
+          <% else %>
+            <%= v %>
+          <% end %>
+        </td>
+      </tr>
+    <% end %>
+  </tbody>
 </table>
 
 <h2 id="associations-header">Associations</h2>
+
 <div class="associations">
   <% @klass.associations.sort.each do |assoc| %>
-    <%
-    reflection = @klass.association_reflection(assoc)
+    <% reflection = @klass.association_reflection(assoc)
     associated_class = reflection.associated_class
     next unless associated_class.method_defined?(:ubid)
     assoc_objs = if reflection.returns_array?
@@ -67,16 +74,16 @@
     else
       Array(@obj.send(assoc))
     end
-    next if assoc_objs.empty?
-    %>
-
-    <div class="association">
-      <h3><%= assoc %></h3>
-      <ul>
-      <% assoc_objs.each do %>
-        <li><a href="/model/<%= associated_class %>/<%= it.ubid %>"><%= it.admin_label %></a></li>
-      <% end %>
-      </ul>
-    </div>
-  <% end %>
+    next if assoc_objs.empty? %>
+      <div class="association">
+        <h3><%= assoc %></h3>
+        <ul>
+          <% assoc_objs.each do %>
+            <li>
+              <a href="/model/<%= associated_class %>/<%= it.ubid %>"><%= it.admin_label %></a>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
 </div>

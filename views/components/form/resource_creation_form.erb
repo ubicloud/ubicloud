@@ -1,4 +1,5 @@
 <%# locals: (action:, form_elements:, option_tree:, option_parents:, method: "POST", pre_selected_values: {}, mode: "create") %>
+
 <% nonce = SecureRandom.base64(32)
 content_security_policy.add_script_src [:nonce, nonce] %>
 
@@ -100,7 +101,12 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
         <div class="px-4 py-5 sm:p-6">
           <div class="flex items-center justify-end gap-x-6">
             <% if mode == "create" %>
-              <a href="<%= action %>" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+              <a
+                href="<%= action %>"
+                class="text-sm font-semibold leading-6 text-gray-900"
+              >
+                Cancel
+              </a>
               <%== part("components/form/submit_button", text: "Create") %>
             <% else %>
               <%== part("components/form/submit_button", text: "Update") %>

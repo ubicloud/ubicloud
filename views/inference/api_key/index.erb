@@ -1,5 +1,7 @@
 <% @page_title = "Inference API Keys" %>
+
 <%== render("components/free_quota") %>
+
 <%== render("inference/tabbar") %>
 
 <div>
@@ -39,10 +41,10 @@
   ) %>
 
   <% if has_project_permission("InferenceApiKey:create") && @inference_api_keys.size < 10 %>
-  <div class="flex justify-end space-y-1 mt-6">
-    <% form(action: "#{@project.path}/inference-api-key", method: :post, role: :form, id: "create-inference-api-key") do %>
-      <%== part("components/form/submit_button", text: "Create API Key") %>
-    <% end %>
-  </div>
+    <div class="flex justify-end space-y-1 mt-6">
+      <% form(action: "#{@project.path}/inference-api-key", method: :post, role: :form, id: "create-inference-api-key") do %>
+        <%== part("components/form/submit_button", text: "Create API Key") %>
+      <% end %>
+    </div>
   <% end %>
 </div>

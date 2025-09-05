@@ -7,7 +7,9 @@
   <% recently_sent = rodauth.verify_account_email_recently_sent? if rodauth.account %>
 
   <% if !rodauth.account || recently_sent %>
-    <div class="leading-6 text-sm"><%== rodauth.verify_account_resend_explanatory_text %></div>
+    <div class="leading-6 text-sm">
+      <%== rodauth.verify_account_resend_explanatory_text %>
+    </div>
   <% end %>
 
   <% if rodauth.param_or_nil(rodauth.login_param) %>

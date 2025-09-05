@@ -4,6 +4,7 @@
   <% if label %>
     <label class="block text-sm font-medium leading-6"><%== label %></label>
   <% end %>
+
   <fieldset>
     <div class="space-y-5">
       <% options.each_with_index do |(opt_val, opt_text, opt_classes, opt_attrs), idx| %>
@@ -15,7 +16,10 @@
               name="<%= name %>"
               type="checkbox"
               value="<%= opt_val %>"
-              class="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-600"
+              class="
+                h-4 w-4 rounded border-gray-300 text-orange-600
+                focus:ring-orange-600
+              "
               <%== html_attrs(opt_attrs || {}) %>
             >
           </div>
@@ -28,6 +32,7 @@
       <% end %>
     </div>
   </fieldset>
+
   <% if description %>
     <p class="text-sm text-gray-500 leading-6"><%== description %></p>
   <% end %>

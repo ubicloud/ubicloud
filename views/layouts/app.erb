@@ -1,22 +1,30 @@
 <!DOCTYPE html>
+
 <html class="h-full bg-gray-50">
   <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
+
     <title><%= ["Ubicloud", @page_title].compact.join(" - ") %></title>
+
     <%== assets(:css) %>
     <script
       src="https://cdn.jsdelivr.net/npm/jquery@3.7.0/dist/jquery.min.js"
       integrity="sha256-2Pmvv0kuTBOenSvLm6bvfBSSHrUJ+3A7x6P5Ebd07/g="
       crossorigin="anonymous"
     ></script>
+
     <script
       src="https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js"
       integrity="sha256-QigBQMy2be3IqJD2ezKJUJ5gycSmyYlRHj2VGBuITpU="
       crossorigin="anonymous"
     ></script>
+
     <% if @enable_datepicker %>
       <link
         rel="stylesheet"
@@ -30,9 +38,11 @@
         crossorigin="anonymous"
       ></script>
     <% end %>
+
     <% if @enable_cloudflare_turnstile %>
       <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" defer></script>
     <% end %>
+
     <% if @enable_marked %>
       <script
         src="https://cdn.jsdelivr.net/npm/marked@15.0.5/marked.min.js"
@@ -40,6 +50,7 @@
         crossorigin="anonymous"
       ></script>
     <% end %>
+
     <% if @enable_echarts %>
       <script
         src="https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js"
@@ -48,7 +59,6 @@
       >
       </script>
     <% end %>
-
   </head>
 
   <body class="h-full">
@@ -77,25 +87,38 @@
           <div class="flex shrink-0 items-center px-10 py-4">
             <img class="" src="/logo-primary.png" alt="Ubicloud">
           </div>
-          <h2 class="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900"><%= @page_message %></h2>
+          <h2 class="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
+            <%= @page_message %>
+          </h2>
         </div>
 
         <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
           <div class="bg-white px-4 py-8 shadow sm:rounded-lg sm:px-10">
-            <div class="pt-4 empty:hidden"><%== render("components/flash_message") %></div>
+            <div class="pt-4 empty:hidden">
+              <%== render("components/flash_message") %>
+            </div>
             <%== yield %>
           </div>
         </div>
+
         <div class="mt-10 flex justify-center space-x-5">
-          <a href="https://github.com/ubicloud/ubicloud" target="_blank" class="text-gray-400 hover:text-gray-500">
+          <a
+            href="https://github.com/ubicloud/ubicloud"
+            target="_blank"
+            class="text-gray-400 hover:text-gray-500"
+          >
             <span class="sr-only">GitHub</span>
             <%== part("components/icon", name: "github") %>
           </a>
-          <a href="mailto:support@ubicloud.com" class="text-gray-400 hover:text-gray-500">
+          <a
+            href="mailto:support@ubicloud.com"
+            class="text-gray-400 hover:text-gray-500"
+          >
             <span class="sr-only">Support</span>
             <%== part("components/icon", name: "hero-envelope") %>
           </a>
         </div>
+
         <% if Config.managed_service %>
           <div class="text-sm text-gray-500 text-center mt-10 w-full">
             By using Ubicloud console you agree to our

@@ -1,5 +1,4 @@
-<% 
-viewable_fws =
+<% viewable_fws =
   dataset_authorize(Firewall.where(id: @vm.firewalls.map(&:id)), "Firewall:view")
     .select_hash(:id, Sequel.as(true, :v))
     .transform_keys! { UBID.from_uuidish(it).to_s } %>

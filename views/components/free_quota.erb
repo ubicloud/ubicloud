@@ -1,5 +1,7 @@
 <% warning_style = !@has_valid_payment_method %>
+
 <% bold_text_color = warning_style ? "text-orange-700" : "text-green-900" %>
+
 <div class="mb-2 rounded-md p-4 <%= warning_style ? "bg-orange-50" : "bg-green-50" %>">
   <div class="flex items-center <%= warning_style ? "text-orange-600" : "text-green-800" %>">
     <div class="flex-shrink-0">
@@ -7,19 +9,27 @@
     </div>
     <div class="ml-3">
       <h3 class="text-sm font-medium">
-        <span>You have
-          <%= @remaining_free_quota.to_i %>
-          free
-          <%= @free_quota_unit %>
-          available (few-minute delay).</span>
+        <span>
+          You have <%= @remaining_free_quota.to_i %> free <%= @free_quota_unit %> available (few-minute delay).
+        </span>
         <span>Free quota refreshes next month.</span>
         <br>
         <% if @has_valid_payment_method %>
-          <a href="<%= billing_path %>" class="font-bold <%= bold_text_color %>">Billing</a>
+          <a
+            href="<%= billing_path %>"
+            class="font-bold <%= bold_text_color %>"
+          >
+            Billing
+          </a>
           <span>information is valid. Charges start after the free quota.</span>
         <% else %>
           <span>To avoid service interruption, please</span>
-          <a href="<%= billing_path %>" class="font-bold <%= bold_text_color %>">click here</a>
+          <a
+            href="<%= billing_path %>"
+            class="font-bold <%= bold_text_color %>"
+          >
+            click here
+          </a>
           <span>to add a valid billing method.</span>
         <% end %>
       </h3>

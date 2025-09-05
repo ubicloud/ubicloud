@@ -1,5 +1,11 @@
 <%# locals: (data:) %>
-<div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+
+<div
+  class="
+    overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5
+    bg-white divide-y divide-gray-200
+  "
+>
   <div class="px-4 py-5 sm:p-0">
     <dl class="sm:divide-y sm:divide-gray-200">
       <% data.reject { !it }.each do |name, value, opts| %>

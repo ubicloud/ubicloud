@@ -1,4 +1,5 @@
 <% @page_title = "Web Shell" %>
+
 <% multi = typecast_query_params.bool("multi") %>
 
 <%== part(
@@ -16,11 +17,18 @@
       <div class="min-w-0 flex-1">
         <% unless multi %>
           This page provides access to a web version of
-          <a class="font-medium text-orange-600 hover:text-orange-700" href="https://www.ubicloud.com/docs/quick-start/cli">Ubicloud's CLI</a>. You can use it without installing the CLI. All features are available, except ones that execute external
-          programs.
+          <a
+            class="font-medium text-orange-600 hover:text-orange-700"
+            href="https://www.ubicloud.com/docs/quick-start/cli"
+          >
+            Ubicloud's CLI
+          </a>
+          . You can use it without installing the CLI. All features are
+          available, except ones that execute external programs.
         <% else %>
-          This page allows scheduling the execution of multiple commands, one per line. It will run the command on the
-          first line and display the output, and the set the next command for execution.
+          This page allows scheduling the execution of multiple commands, one
+          per line. It will run the command on the first line and display the
+          output, and the set the next command for execution.
         <% end %>
       </div>
     </div>
@@ -38,14 +46,17 @@
       <%== part("components/form/submit_button", text: "Run") %>
     </div>
 
-    <div
-      class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200 <%= (multi && !@cli) ? "hidden" : ""%>"
-    >
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200 <%= (multi && !@cli) ? "hidden" : ""%>">
       <div class="px-4 py-5 sm:p-6 space-y-6">
         <% if @clis && !@clis.empty? %>
           <div class="space-y-2">
             <p class="text-xl font-semibold">Remaining commands:</p>
-            <div class="w-full text-sm border p-3 bg-slate-100 text-rose-500 font-mono rounded">
+            <div
+              class="
+                w-full text-sm border p-3 bg-slate-100 text-rose-500
+                font-mono rounded
+              "
+            >
               <% @clis.each do %>
                 <pre><tt class="next-clis"><%= it %></tt></pre>
                 <input type="hidden" name="clis[]" value="<%= it %>">
@@ -57,14 +68,25 @@
         <% if @last_cli %>
           <div class="space-y-2">
             <p class="text-xl font-semibold">Ran command:</p>
-            <div class="w-full text-sm border p-3 bg-slate-100 text-rose-500 font-mono rounded">
+            <div
+              class="
+                w-full text-sm border p-3 bg-slate-100 text-rose-500
+                font-mono rounded
+              "
+            >
               <pre><tt id="cli-executed"><%= @last_cli %></tt></pre>
             </div>
           </div>
-
           <div class="space-y-2">
-            <p class="text-xl font-semibold"><%= @ubi_command_execute ? "Would execute" : "Output" %>:</p>
-            <div class="w-full text-sm border p-3 bg-slate-100 text-rose-500 font-mono rounded">
+            <p class="text-xl font-semibold">
+              <%= @ubi_command_execute ? "Would execute" : "Output" %>:
+            </p>
+            <div
+              class="
+                w-full text-sm border p-3 bg-slate-100 text-rose-500
+                font-mono rounded
+              "
+            >
               <pre><tt id="cli-output"><%== @output %></tt></pre>
             </div>
           </div>
@@ -77,19 +99,34 @@
           <% unless multi %>
             <div class="space-y-2">
               <h2 class="text-xl font-semibold">Examples</h2>
-              <dl class="w-full text-sm border p-3 bg-slate-100 text-rose-500 font-mono rounded">
+              <dl
+                class="
+                  w-full text-sm border p-3 bg-slate-100 text-rose-500
+                  font-mono rounded
+                "
+              >
                 <dt><code>help -ru</code></dt>
-                <dd class="inline-block ml-6 mb-4">Display the syntax for all supported commands</dd>
+                <dd class="inline-block ml-6 mb-4">
+                  Display the syntax for all supported commands
+                </dd>
                 <dt><code>help -r</code></dt>
-                <dd class="inline-block ml-6 mb-4">Show full help for all supported commands</dd>
+                <dd class="inline-block ml-6 mb-4">
+                  Show full help for all supported commands
+                </dd>
                 <dt><code>vm list</code></dt>
                 <dd class="inline-block ml-6">List all virtual machines</dd>
               </dl>
             </div>
-
             <p>
-              This page allows execution of a single command. However, you can also
-              <a class="font-medium text-orange-600 hover:text-orange-700" href="?multi=t">schedule execution of multiple commands</a>.
+              This page allows execution of a single command. However, you can
+              also
+              <a
+                class="font-medium text-orange-600 hover:text-orange-700"
+                href="?multi=t"
+              >
+                schedule execution of multiple commands
+              </a>
+              .
             </p>
           <% end %>
         <% end %>

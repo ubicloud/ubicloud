@@ -113,15 +113,22 @@ cards = [
 
 <div id="tiles" class="grid gap-6">
   <div
-    class="mb-5 grid grid-cols-2 divide-x divide-y divide-gray-200 overflow-hidden rounded-lg bg-white shadow lg:grid-cols-3 xl:grid-cols-6 xl:divide-y-0"
+    class="
+      mb-5 grid grid-cols-2 divide-x divide-y divide-gray-200
+      overflow-hidden rounded-lg bg-white shadow lg:grid-cols-3
+      xl:grid-cols-6 xl:divide-y-0
+    "
   >
     <% tiles.each do |title, count, link, perm| %>
       <% if perm %>
         <a href="<%= link %>">
           <div class="px-4 py-5 sm:p-6">
-            <dt class="truncate text-sm font-medium text-gray-900"><%= title %></dt>
+            <dt class="truncate text-sm font-medium text-gray-900">
+              <%= title %>
+            </dt>
             <dd class="mt-1 text-3xl font-semibold tracking-tight text-orange-600">
-              <%= count %></dd>
+              <%= count %>
+            </dd>
           </div>
         </a>
       <% else %>
@@ -130,18 +137,37 @@ cards = [
     <% end %>
   </div>
 
-  <h2 class="text-xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Getting Started with your Project</h2>
+  <h2
+    class="
+      text-xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl
+      sm:tracking-tight
+    "
+  >
+    Getting Started with your Project
+  </h2>
 
-  <div id="cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 lg:gap-8">
+  <div
+    id="cards"
+    class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 lg:gap-8"
+  >
     <% cards.each do |icon, title, description, link| %>
       <div
-        class="rounded-lg shadow group relative bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-orange-600"
+        class="
+          rounded-lg shadow group relative bg-white p-6 focus-within:ring-2
+          focus-within:ring-inset focus-within:ring-orange-600
+        "
       >
         <div>
-          <span class="inline-flex rounded-lg p-3 bg-orange-50 text-orange-700 ring-4 ring-white">
+          <span
+            class="
+              inline-flex rounded-lg p-3 bg-orange-50 text-orange-700 ring-4
+              ring-white
+            "
+          >
             <%== part("components/icon", name: icon) %>
           </span>
         </div>
+
         <div class="mt-8">
           <h3 class="text-base font-semibold leading-6 text-gray-900">
             <a href="<%= link %>" class="focus:outline-none">
@@ -152,7 +178,12 @@ cards = [
           </h3>
           <p class="mt-2 text-sm text-gray-500"><%= description %></p>
         </div>
-        <span class="pointer-events-none absolute right-6 top-6 text-gray-300 group-hover:text-gray-400">
+        <span
+          class="
+            pointer-events-none absolute right-6 top-6 text-gray-300
+            group-hover:text-gray-400
+          "
+        >
           <%== part("components/icon", name: "hero-arrow-up-right") %>
         </span>
       </div>

@@ -1,22 +1,33 @@
 <!DOCTYPE html>
+
 <html>
   <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
+
     <title>Ubicloud Admin<%= " - " if @page_title %><%= @page_title %></title>
-    <link rel="stylesheet" href="/admin/app.css?m=<%= File.mtime("public/admin/app.css").to_i %>"/>
+
+    <link
+      rel="stylesheet"
+      href="/admin/app.css?m=<%= File.mtime("public/admin/app.css").to_i %>"
+    />
   </head>
 
   <body>
     <nav class="navbar" role="navigation">
       <div class="container">
         <a class="navbar-brand" href="/">Ubicloud Admin</a>
+
         <% form(id: "ubid_form", action: "/") do |f| %>
           <%== f.input("text", key: "ubid", placeholder: "UBID", attr: {pattern: "[a-tv-z0-9]{26}", title: "UBID format: [a-tv-z0-9]{26}"}) %>
           <%== f.button("Show Object") %>
         <% end %>
+
         <% if rodauth.logged_in? %>
           <% form(action: "/logout", method: :post, id: :logout_form) do |f| %>
             <%== f.button("Logout") %>
@@ -27,14 +38,21 @@
 
     <div class="<%= @content_class || "container" %>" id="content">
       <% if flash["notice"] %>
-        <div class="alert alert-success" role="alert" id="flash-notice"><%= flash["notice"] %></div>
+        <div class="alert alert-success" role="alert" id="flash-notice">
+          <%= flash["notice"] %>
+        </div>
       <% end %>
+
       <% if flash["error"] %>
-        <div class="alert alert-danger" role="alert" id="flash-error"><%= flash["error"] %></div>
+        <div class="alert alert-danger" role="alert" id="flash-error">
+          <%= flash["error"] %>
+        </div>
       <% end %>
+
       <% if @page_title %>
         <h1><%= @page_title %></h1>
       <% end %>
+
       <%== yield %>
     </div>
   </body>
