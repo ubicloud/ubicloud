@@ -39,11 +39,24 @@ class MonitorableResource
       end
     end
 
+    stale_retry = false
     @pulse_check_started_at = Time.now
     begin
       @pulse = @resource.check_pulse(session: @session, previous_pulse: @pulse)
       Clog.emit("Got new pulse.") { {got_pulse: {ubid: @resource.ubid, pulse: @pulse}} } if (rpt = @pulse[:reading_rpt]) && (rpt < 6 || rpt % 5 == 1) || @pulse[:reading] != "up"
     rescue => ex
+      if !stale_retry &&
+          (
+            # Seen when sending on a broken connection.
+            ex.is_a?(IOError) && ex.message == "closed stream" ||
+            # Seen when receiving on a broken connection.
+            ex.is_a?(Errno::ECONNRESET) && ex.message.start_with?("Connection reset by peer - recvfrom(2)")
+          ) &&
+          @session[:last_pulse]&.<(Time.now - 8)
+        stale_retry = true
+        @session.merge!(@resource.init_health_monitor_session)
+        retry
+      end
       Clog.emit("Pulse checking has failed.") { {pulse_check_failure: {ubid: @resource.ubid, exception: Util.exception_to_hash(ex)}} }
     end
 

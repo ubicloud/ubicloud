@@ -100,56 +100,21 @@ RSpec.describe LoadBalancerVmPort do
       end
     end
 
-    [IOError.new("closed stream"), Errno::ECONNRESET.new("Connection reset by peer - recvfrom(2)")].each do |ex|
-      describe "#check_probe", "stale connection retry behavior with #{ex.class}" do
-        let(:session) { {ssh_session: instance_double(Net::SSH::Connection::Session)} }
-
-        it "is down if :last_pulse is not set, even with a qualifying exception" do
-          expect(session[:ssh_session]).to receive(:exec!).and_raise(ex)
-          expect(lb_vm_port.check_probe(session, :ipv6)).to eq("down")
-        end
-
-        it "does not retry if the connection is fresh" do
-          session[:last_pulse] = Time.now - 1
-          expect(session[:ssh_session]).to receive(:exec!).and_raise(ex)
-          expect(lb_vm_port.check_probe(session, :ipv6)).to eq("down")
-        end
-
-        it "is up on a retry on a stale connection that works the second time" do
-          session[:last_pulse] = Time.now - 10
-          expect(session[:ssh_session]).to receive(:exec!).and_raise(ex)
-          second_ssh = instance_double(Net::SSH::Connection::Session)
-          expect(second_ssh).to receive(:exec!).and_return("200")
-          expect(lb_vm_port).to receive(:init_health_monitor_session).and_return(ssh_session: second_ssh)
-
-          expect(lb_vm_port.check_probe(session, :ipv6)).to eq("up")
-
-          expect(session[:ssh_session]).to eq(second_ssh)
-        end
-
-        it "is down if consecutive errors are raised even on a stale connection" do
-          session[:last_pulse] = Time.now - 10
-
-          expect(session[:ssh_session]).to receive(:exec!).and_raise(ex)
-
-          second_ssh = instance_double(Net::SSH::Connection::Session)
-          expect(second_ssh).to receive(:exec!).and_raise(ex)
-          expect(lb_vm_port).to receive(:init_health_monitor_session).and_return(ssh_session: second_ssh)
-
-          expect(lb_vm_port.check_probe(session, :ipv6)).to eq("down")
-        end
-
-        it "is down for a matching exception without a matching message" do
-          session[:last_pulse] = Time.now - 10
-          expect(session[:ssh_session]).to receive(:exec!).and_raise(ex.class.new("something else"))
-          expect(lb_vm_port.check_probe(session, :ipv6)).to eq("down")
-        end
-      end
-    end
-
     describe "#check_probe" do
+      let(:session) {
+        {ssh_session: instance_double(Net::SSH::Connection::Session)}
+      }
+
       it "raises an exception if health check type is not valid" do
         expect { lb_vm_port.check_probe(nil, :invalid) }.to raise_error("Invalid type: invalid")
+      end
+
+      [IOError.new("closed stream"), Errno::ECONNRESET.new("recvfrom(2)")].each do |ex|
+        it "reraises the exception for exception class: #{ex.class}" do
+          expect(lb_vm_port).to receive(:health_check_cmd).and_return("healthcheck command").at_least(:once)
+          expect(session[:ssh_session]).to receive(:exec!).with("healthcheck command").and_raise(ex)
+          expect { lb_vm_port.check_probe(session, :ipv6) }.to raise_error(ex)
+        end
       end
     end
 

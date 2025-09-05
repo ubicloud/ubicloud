@@ -114,6 +114,58 @@ RSpec.describe MonitorableResource do
     end
   end
 
+  [IOError.new("closed stream"), Errno::ECONNRESET.new("recvfrom(2)")].each do |ex|
+    describe "#check_pulse", "stale connection retry behavior with #{ex.class}" do
+      let(:session) { {ssh_session: instance_double(Net::SSH::Connection::Session)} }
+
+      before do
+        r_w_event_loop.instance_variable_set(:@session, session)
+        expect(session[:ssh_session]).to receive(:loop)
+      end
+
+      it "does not retry if the last pulse is not set" do
+        expect(postgres_server).to receive(:check_pulse).and_raise(ex)
+        expect(Clog).to receive(:emit).and_call_original
+        expect { r_w_event_loop.check_pulse }.not_to raise_error
+      end
+
+      it "does not retry if the connection is fresh" do
+        session[:last_pulse] = Time.now - 1
+        expect(postgres_server).to receive(:check_pulse).and_raise(ex)
+        expect(Clog).to receive(:emit).and_call_original
+        expect { r_w_event_loop.check_pulse }.not_to raise_error
+      end
+
+      it "is up on a retry on a stale connection that works the second time" do
+        session[:last_pulse] = Time.now - 10
+        expect(postgres_server).to receive(:check_pulse).and_raise(ex)
+        second_session = instance_double(Net::SSH::Connection::Session)
+        expect(postgres_server).to receive(:init_health_monitor_session).and_return(second_session)
+        expect(session).to receive(:merge!).with(second_session)
+        expect(postgres_server).to receive(:check_pulse).and_return({reading: "up", reading_rpt: 1})
+        r_w_event_loop.check_pulse
+      end
+
+      it "is down if consecutive errors are raised even on a stale connection" do
+        session[:last_pulse] = Time.now - 10
+        expect(postgres_server).to receive(:check_pulse).and_raise(ex)
+        second_session = instance_double(Net::SSH::Connection::Session)
+        expect(postgres_server).to receive(:init_health_monitor_session).and_return(second_session)
+        expect(session).to receive(:merge!).with(second_session)
+        expect(postgres_server).to receive(:check_pulse).and_return(ex)
+        expect(Clog).to receive(:emit).and_call_original
+        expect { r_w_event_loop.check_pulse }.not_to raise_error
+      end
+
+      it "is down for a matching exception without a matching message" do
+        session[:last_pulse] = Time.now - 10
+        expect(postgres_server).to receive(:check_pulse).and_raise(ex.class.new("something else"))
+        expect(Clog).to receive(:emit).and_call_original
+        expect { r_w_event_loop.check_pulse }.not_to raise_error
+      end
+    end
+  end
+
   describe "#close_resource_session" do
     it "returns if session is nil" do
       session = {ssh_session: instance_double(Net::SSH::Connection::Session)}
