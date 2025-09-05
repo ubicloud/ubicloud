@@ -969,7 +969,7 @@ class Clover < Roda
         if current_account
           redirect_default_project_dashboard
         else
-          r.redirect rodauth.login_route
+          r.redirect rodauth.login_path
         end
       end
     end
