@@ -39,7 +39,7 @@
             </div>
           </div>
           <div
-            id="kc-delete-<%=@kc.ubid%>"
+            id="kc-delete-<%= @kc.ubid %>"
             class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center"
           >
             <%== part("components/delete_button", url: path(@kc), confirmation: @kc.name, redirect: "#{@project.path}/kubernetes-cluster") %>

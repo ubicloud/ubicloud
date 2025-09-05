@@ -21,14 +21,14 @@
                 value="<%= key %>"
                 name="<%= name %>_keys[]"
                 required
-              />
+              >
 
               <input
                 type="text"
                 value="<%= value %>"
                 class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500 <%= error ? "border-red-500" : "" %>"
                 name="<%= name %>_values[]"
-              />
+              >
 
               <% if error %>
                 <span
@@ -41,7 +41,7 @@
                   <% if error.is_a?(Array) %>
                     <% error.each do |error| %>
                       <%= error %>
-                      <br />
+                      <br>
                     <% end %>
                   <% else %>
                     <%= error %>
@@ -75,7 +75,7 @@
               value=""
               name="<%= name %>_keys[]"
               disabled
-            />
+            >
 
             <input
               type="text"
@@ -86,7 +86,7 @@
               "
               name="<%= name %>_values[]"
               disabled
-            />
+            >
             <span
               class="
                 error inline-block h-8 w-54 py-2 px-2 max-w-54 text-xs
@@ -114,7 +114,7 @@
                 "
                 placeholder="New Key"
                 name="<%= name %>_keys[]"
-              />
+              >
 
               <input
                 type="text"
@@ -124,7 +124,7 @@
                   focus:border-blue-500
                 "
                 name="<%= name %>_values[]"
-              />
+              >
               <span
                 class="
                   error inline-block h-8 w-54 py-2 px-2 max-w-54 text-xs

@@ -28,7 +28,7 @@ error = rodauth.field_error(name) || flash.dig("errors", name) %>
       <% if value %>
         value="<%= value %>"
       <% end %>
-      class="block w-full border-0 py-1.5 pl-3 pr-10 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 <%= error ? "text-red-900 ring-red-300 placeholder:text-red-300 focus:ring-red-500" : "text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-orange-600"%> <%= prefix ? "rounded-r-md" : "rounded-md" %> <%= extra_class %>"
+      class="block w-full border-0 py-1.5 pl-3 pr-10 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 <%= error ? "text-red-900 ring-red-300 placeholder:text-red-300 focus:ring-red-500" : "text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-orange-600" %> <%= prefix ? "rounded-r-md" : "rounded-md" %> <%= extra_class %>"
       <%== html_attrs(attributes) %>
     >
 
@@ -42,7 +42,7 @@ error = rodauth.field_error(name) || flash.dig("errors", name) %>
       <p class="text-sm text-red-600 leading-6" id="<%= name %>-error">
         <% error.each do |e| %>
           <%= e %>
-          <br />
+          <br>
         <% end %>
       </p>
     <% else %>

@@ -46,7 +46,7 @@
       <%== part("components/form/submit_button", text: "Run") %>
     </div>
 
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200 <%= (multi && !@cli) ? "hidden" : ""%>">
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200 <%= (multi && !@cli) ? "hidden" : "" %>">
       <div class="px-4 py-5 sm:p-6 space-y-6">
         <% if @clis && !@clis.empty? %>
           <div class="space-y-2">

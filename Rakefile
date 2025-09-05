@@ -462,6 +462,8 @@ namespace :linter do
   task :erb_formatter do
     # Temporarily disable due to bugs in herb formatter
     # sh "npm run format-erb"
+    # Temporarily disable due to bugs in herb linter
+    # sh "npm run lint-erb"
   end
 
   desc "Run golangci-lint"

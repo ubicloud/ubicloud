@@ -13,7 +13,8 @@
     "dev": "npx tailwindcss -o assets/css/app.css -i assets/css/tailwind.css",
     "prod": "npx tailwindcss -o assets/css/app.css -i assets/css/tailwind.css --minify",
     "watch": "npx tailwindcss -o assets/css/app.css -i assets/css/tailwind.css --watch",
-    "format-erb": "npx @herb-tools/formatter 'views/**/*.erb'"
+    "format-erb": "npx @herb-tools/formatter 'views/**/*.erb'",
+    "lint-erb": "npx @herb-tools/linter 'views/**/*.erb'"
   },
   "engines": {
     "node": "24.6.0",
