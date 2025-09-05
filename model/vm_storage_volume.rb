@@ -33,7 +33,7 @@ class VmStorageVolume < Sequel::Model
 
   def num_queues
     @num_queues ||= if vhost_block_backend
-      [vm.vcpus / 2, 1].max
+      vring_workers
     else
       # SPDK volumes
       1
