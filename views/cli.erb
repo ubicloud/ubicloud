@@ -45,9 +45,9 @@
         <% if @clis && !@clis.empty? %>
           <div class="space-y-2">
             <p class="text-xl font-semibold">Remaining commands:</p>
-            <div class="w-full text-sm border p-3 bg-slate-100 text-rose-500 font-mono rounded">
+            <div class="w-full text-sm border p-3 bg-slate-100 font-mono rounded">
               <% @clis.each do %>
-                <pre><tt class="next-clis"><%= it %></tt></pre>
+                <pre><code class="next-clis"><%= it %></code></pre>
                 <input type="hidden" name="clis[]" value="<%= it %>">
               <% end %>
             </div>
@@ -57,15 +57,15 @@
         <% if @last_cli %>
           <div class="space-y-2">
             <p class="text-xl font-semibold">Ran command:</p>
-            <div class="w-full text-sm border p-3 bg-slate-100 text-rose-500 font-mono rounded">
-              <pre><tt id="cli-executed"><%= @last_cli %></tt></pre>
+            <div class="w-full text-sm border p-3 bg-slate-100 font-mono rounded">
+              <pre><code id="cli-executed"><%= @last_cli %></code></pre>
             </div>
           </div>
 
           <div class="space-y-2">
             <p class="text-xl font-semibold"><%= @ubi_command_execute ? "Would execute" : "Output" %>:</p>
-            <div class="w-full text-sm border p-3 bg-slate-100 text-rose-500 font-mono rounded">
-              <pre><tt id="cli-output"><%== @output %></tt></pre>
+            <div class="w-full text-sm border p-3 bg-slate-100 font-mono rounded">
+              <pre><code id="cli-output"><%== @output %></code></pre>
             </div>
           </div>
           <% if @ubi_confirm %>
