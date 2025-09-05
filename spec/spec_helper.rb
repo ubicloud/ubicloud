@@ -42,7 +42,7 @@ require "sequel/core"
 require "webmock/rspec"
 
 def Object.method_added(method)
-  if self == Object && method != :Nokogiri
+  if self == Object && method != :Nokogiri && method != :CSV
     raise "unexpected Object##{method} defined\n#{caller(1, 3).join("\n")}"
   end
 end

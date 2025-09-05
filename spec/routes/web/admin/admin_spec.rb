@@ -67,6 +67,59 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
   end
 
+  it "allows browsing by class when using Autoforme" do
+    project = Project.create(name: "Default")
+    firewall = Firewall.create(name: "fw", project_id: project.id, location_id: Location::HETZNER_FSN1_ID)
+    click_link "Firewall"
+    expect(page.title).to eq "Ubicloud Admin - Firewall - Browse"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["fw", "Default", "hetzner-fsn1", "Default firewall"]
+    path = page.current_path
+
+    click_link firewall.name
+    expect(page.title).to eq "Ubicloud Admin - Firewall #{firewall.ubid}"
+
+    visit path
+    click_link project.name
+    expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
+
+    visit path
+    click_link "hetzner-fsn1"
+    expect(page.title).to eq "Ubicloud Admin - Location #{Location::HETZNER_FSN1_UBID}"
+  end
+
+  it "allows searching by class when using Autoforme" do
+    project = Project.create(name: "Default")
+    firewall = Firewall.create(name: "fw", project_id: project.id, location_id: Location::HETZNER_FSN1_ID)
+    click_link "Firewall"
+    click_link "Search"
+    expect(page.title).to eq "Ubicloud Admin - Firewall - Search"
+
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["fw", "Default", "hetzner-fsn1", "Default firewall"]
+
+    click_link "Search"
+    fill_in "Name", with: "fw2"
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq []
+
+    click_link "Search"
+    fill_in "Name", with: "fw"
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["fw", "Default", "hetzner-fsn1", "Default firewall"]
+
+    path = page.current_url
+    click_link firewall.name
+    expect(page.title).to eq "Ubicloud Admin - Firewall #{firewall.ubid}"
+
+    visit path
+    click_link project.name
+    expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
+
+    visit path
+    click_link "hetzner-fsn1"
+    expect(page.title).to eq "Ubicloud Admin - Location #{Location::HETZNER_FSN1_UBID}"
+  end
+
   it "handles basic pagination when browsing by class" do
     accounts = Array.new(101) { |i| create_account("a#{i}@a.com", with_project: false) }
     page.refresh

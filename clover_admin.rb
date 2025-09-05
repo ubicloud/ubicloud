@@ -168,6 +168,38 @@ class CloverAdmin < Roda
   }.freeze
   OBJECT_ACTIONS.each_value(&:freeze)
 
+  plugin :autoforme
+  autoforme_framework = ::AutoForme.for(:roda, self) do
+    # :nocov:
+    register_by_name if Config.development?
+    # :nocov:
+
+    order [:id]
+    supported_actions [:browse, :search]
+    form_options(wrapper: :div)
+
+    link = lambda do |obj|
+      "<a href=\"/model/#{obj.class}/#{obj.ubid}\">#{Erubi.h(obj.name)}</a>"
+    end
+
+    show_html do |obj, column|
+      case column
+      when :name
+        link.call(obj)
+      when :project, :location
+        link.call(obj.send(column))
+      end
+    end
+
+    model Firewall do
+      eager [:project, :location]
+      columns [:name, :project, :location, :description]
+    end
+  end
+  @autoforme_routes[nil] = autoforme_framework.route_proc
+  @autoforme_models = autoforme_framework.models
+  singleton_class.attr_reader :autoforme_models
+
   route do |r|
     r.public
     check_csrf!
@@ -230,6 +262,10 @@ class CloverAdmin < Roda
           end
         end
       end
+    end
+
+    r.on "autoforme" do
+      autoforme
     end
 
     r.root do
