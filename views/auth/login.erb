@@ -4,7 +4,6 @@
 
 <div class="space-y-6">
   <% form(class: "rodauth space-y-6", role: :form, method: :post, id: "login-form") do %>
-    <%== rodauth.login_additional_form_tags %>
 
     <%== render("components/rodauth/login_field") %>
     <% if rodauth.valid_login_entered? %>

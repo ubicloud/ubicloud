@@ -3,7 +3,6 @@
 <% @page_message = "Verify your sign in" %>
 
 <% form(:action => rodauth.webauthn_auth_form_path, :role => :form, :method => :post, :class => "rodauth space-y-6", :id => "webauthn-auth-form", "data-credential-options" => (cred = rodauth.webauthn_credential_options_for_get).as_json.to_json) do %>
-  <%== rodauth.webauthn_auth_additional_form_tags %>
   <%== hidden_inputs(rodauth.webauthn_auth_challenge_param => cred.challenge, rodauth.webauthn_auth_challenge_hmac_param => rodauth.compute_hmac(cred.challenge)) %>
   <input id="webauthn-auth" class="hidden" type="text" name="<%= rodauth.webauthn_auth_param %>" value="" hidden/>
   <div id="webauthn-auth-button" class="flex flex-col text-center">

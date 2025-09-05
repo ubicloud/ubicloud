@@ -11,7 +11,6 @@
           <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
             <h2 class="text-lg font-medium leading-6 text-gray-900">Change Email Address</h2>
             <% form(action: rodauth.change_login_path, role: :form, method: :post) do %>
-              <%== rodauth.change_login_additional_form_tags %>
               <div class="mt-6 grid grid-cols-6 gap-6">
                 <div class="col-span-6 sm:col-span-3 xl:col-span-2">
                   <%== part("components/form/text", label: "Current Email", value: current_account.email, extra_class: "bg-gray-50 text-gray-500 ring-gray-200 ", attributes: {disabled: true}) %>
