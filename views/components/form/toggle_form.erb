@@ -1,6 +1,6 @@
 <%# locals: (name:, action:, active:) %>
 
-<% form(action:, role: :form, method: :post, id: "#{name}_toggle") do %>
+<% form(action:, method: :post, id: "#{name}_toggle") do %>
   <%== part("components/form/hidden", name:, value: !active) %>
   <div class="group <%= active ? "active" : "" %>">
     <button

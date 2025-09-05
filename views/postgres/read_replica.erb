@@ -32,7 +32,7 @@
                 <%== part("components/form/text", name: "name", attributes: { placeholder: @pg.name + "-read-replica", required: true, form: "form-pg-read-replica-create" }) %>
               </td>
               <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                <% form(action: "#{path(@pg)}/read-replica", role: :form, method: :post, id: "form-pg-read-replica-create") do %>
+                <% form(action: "#{path(@pg)}/read-replica", method: :post, id: "form-pg-read-replica-create") do %>
                   <%== part("components/form/submit_button", text: "Create", extra_class: "pg-read-replica-create-btn") %>
                 <% end %>
               </td>
