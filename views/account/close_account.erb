@@ -12,7 +12,6 @@
             <h2 class="text-lg font-medium leading-6 text-gray-900">Close Account</h2>
             <p class="mt-1 text-sm text-gray-500">This action will permanently delete this account. Deleted data cannot be recovered. Use it carefully.</p>
             <% form(action: rodauth.close_account_path, role: :form, method: :post) do %>
-              <%== rodauth.close_account_additional_form_tags %>
               <div class="mt-6 grid grid-cols-6 gap-6">
                 <% if rodauth.close_account_requires_password? %>
                   <div class="col-span-6 sm:col-span-3 xl:col-span-2">

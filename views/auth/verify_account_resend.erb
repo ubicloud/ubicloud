@@ -3,7 +3,6 @@
 <% @page_message = "Resend account verification" %>
 
 <% form(action: rodauth.verify_account_resend_path, role: :form, method: :post, class: "rodauth space-y-6") do %>
-  <%== rodauth.verify_account_resend_additional_form_tags %>
   <% recently_sent = rodauth.verify_account_email_recently_sent? if rodauth.account %>
 
   <% if !rodauth.account || recently_sent %>
