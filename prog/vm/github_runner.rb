@@ -32,7 +32,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     else
       label_data["vm_size"]
     end
-    pool = VmPool.where(
+    pool = installation.project.get_ff_skip_runner_pool ? nil : VmPool.where(
       vm_size:,
       boot_image: label_data["boot_image"],
       location_id: Location::GITHUB_RUNNERS_ID,

@@ -101,6 +101,16 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(picked_vm.family).to eq("premium")
     end
 
+    it "skips pool if feature flag is enabled even when the pool has a vm" do
+      pool = VmPool.create(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64", storage_skip_sync: true)
+      vm = create_vm(pool_id: pool.id, display_state: "running")
+      project.set_ff_skip_runner_pool(true)
+      expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).and_call_original
+      picked_vm = nx.pick_vm
+      expect(vm.id).not_to eq(picked_vm.id)
+      expect(picked_vm.pool_id).to be_nil
+    end
+
     it "uses alien vms if enabled" do
       project.set_ff_aws_alien_runners_ratio(0.5)
       expect(nx).to receive(:rand).and_return(0.4)
