@@ -1,7 +1,6 @@
 <% @page_message = "Your one-time password authentication has been locked out, and must be unlocked to be used." %>
 
 <% form(role: :form, method: :post, class: "rodauth space-y-6") do %>
-  <%== rodauth.otp_unlock_additional_form_tags %>
 
   <p><%= rodauth.otp_unlock_consecutive_successes_label %>: <%= rodauth.otp_unlock_num_successes %></p>
   <p><%= rodauth.otp_unlock_required_consecutive_successes_label %>: <%= rodauth.otp_unlock_auths_required %></p>

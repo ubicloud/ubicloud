@@ -3,7 +3,6 @@
 <% @page_message = "Verify your sign in" %>
 
 <% form(action: rodauth.otp_auth_path, role: :form, method: :post, class: "rodauth space-y-6") do %>
-  <%== rodauth.otp_auth_additional_form_tags %>
 
   <%== render("components/rodauth/otp_auth_code_field") %>
 
