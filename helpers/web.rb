@@ -227,4 +227,8 @@ class Clover < Roda
   def money(amount)
     "$%0.02f" % amount
   end
+
+  def hidden_inputs(hash)
+    hash.map { |name, value| "<input #{html_attrs(type: "hidden", name:, value:)} />" }.join("\n")
+  end
 end

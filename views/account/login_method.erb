@@ -25,8 +25,7 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
                 <div class="col-span-6 sm:col-span-2 text-right space-y-1">
                   <% if uid = @identities[provider.to_s] %>
                     <% form(action: "/account/login-method/disconnect", role: :form, method: :post, class: :grow) do %>
-                      <%== part("components/form/hidden", name: "provider", value: provider) %>
-                      <%== part("components/form/hidden", name: "uid", value: uid) %>
+                      <%== hidden_inputs(provider:, uid:) %>
                       <%== part("components/button", text: "Disconnect", type: "danger") %>
                     <% end %>
                   <% else %>
@@ -52,8 +51,7 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
                 </div>
                 <div class="col-span-6 sm:col-span-2 text-right space-y-1">
                   <% form(action: "/account/login-method/disconnect", role: :form, method: :post, class: :grow) do %>
-                    <%== part("components/form/hidden", name: "provider", value: provider) %>
-                    <%== part("components/form/hidden", name: "uid", value: uid) %>
+                    <%== hidden_inputs(provider:, uid:) %>
                     <%== part("components/button", text: "Disconnect", type: "danger") %>
                   <% end %>
                 </div>
@@ -93,7 +91,7 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
                 <%== part("components/button", text: rodauth.has_password? ? "Change" : "Create", link: "/account/change-password") %>
                 <% if rodauth.has_password? %>
                   <% form(action: "/account/login-method/disconnect", role: :form, method: :post, class: :grow) do %>
-                    <%== part("components/form/hidden", name: "provider", value: "password") %>
+                    <%== hidden_inputs(provider: "password") %>
                     <%== part("components/button", text: "Delete", type: "danger") %>
                   <% end %>
                 <% end %>
