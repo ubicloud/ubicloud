@@ -178,8 +178,8 @@ module Config
   override :github_ubuntu_2404_aws_ami_version, "ami-0908b850ff3e635a2", string
   override :postgres16_ubuntu_2204_version, "20250425.1.1", string
   override :postgres17_ubuntu_2204_version, "20250425.1.1", string
-  override :postgres16_paradedb_ubuntu_2204_version, "20250425.1.1", string
-  override :postgres17_paradedb_ubuntu_2204_version, "20250425.1.1", string
+  override :postgres16_paradedb_ubuntu_2204_version, "20250901.1.0", string
+  override :postgres17_paradedb_ubuntu_2204_version, "20250901.1.0", string
   override :postgres16_lantern_ubuntu_2204_version, "20250103.1.0", string
   override :postgres17_lantern_ubuntu_2204_version, "20250103.1.0", string
   override :ai_ubuntu_2404_nvidia_version, "20250505.1.0", string
