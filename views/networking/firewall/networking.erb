@@ -10,7 +10,7 @@ viewable_subnet_map = dataset_authorize(@firewall.private_subnets_dataset, "Priv
   .select_hash(:id, Sequel.as(true, :v))
 
 firewall_path = path(@firewall)
-edit_perm = has_permission?("Firewall:edit", @firewall.ubid) %>
+edit_perm = has_permission?("Firewall:edit", @firewall) %>
 
 <div class="p-6 grid gap-6">
   <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">

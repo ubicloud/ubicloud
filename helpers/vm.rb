@@ -16,7 +16,7 @@ class Clover
 
   def vm_post(name)
     project = @project
-    authorize("Vm:create", project.id)
+    authorize("Vm:create", project)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless project.has_valid_payment_method?
 
     public_key = typecast_params.nonempty_str!("public_key")
