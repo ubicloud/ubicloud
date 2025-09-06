@@ -111,7 +111,8 @@ module Validation
   def self.validate_storage_volumes(storage_volumes, boot_disk_index)
     allowed_keys = [
       :encrypted, :size_gib, :boot, :skip_sync, :read_only, :image,
-      :max_read_mbytes_per_sec, :max_write_mbytes_per_sec
+      :max_read_mbytes_per_sec, :max_write_mbytes_per_sec,
+      :vring_workers
     ]
     fail ValidationFailed.new({storage_volumes: "At least one storage volume is required."}) if storage_volumes.empty?
     if boot_disk_index < 0 || boot_disk_index >= storage_volumes.length
