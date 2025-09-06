@@ -642,7 +642,8 @@ module Scheduling::Allocator
           vhost_block_backend_id:,
           storage_device_id: @volume_to_device_map[disk_index],
           max_read_mbytes_per_sec: volume["max_read_mbytes_per_sec"],
-          max_write_mbytes_per_sec: volume["max_write_mbytes_per_sec"]
+          max_write_mbytes_per_sec: volume["max_write_mbytes_per_sec"],
+          vring_workers: vhost_block_backend_id ? volume["vring_workers"] : nil
         )
       end
     end
