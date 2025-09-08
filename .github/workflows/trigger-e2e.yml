@@ -15,7 +15,7 @@ jobs:
       runs-on: ubicloud
       steps:
         - name: Trigger E2E tests
-          uses: actions/github-script@v7
+          uses: actions/github-script@v8
           with:
             script: |
               // Check if the comment is from a contributor
