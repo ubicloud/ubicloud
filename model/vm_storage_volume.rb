@@ -71,6 +71,9 @@ end
 # Indexes:
 #  vm_storage_volume_pkey                 | PRIMARY KEY btree (id)
 #  vm_storage_volume_vm_id_disk_index_key | UNIQUE btree (vm_id, disk_index)
+# Check constraints:
+#  vring_workers_null_if_not_ubiblk | (vhost_block_backend_id IS NOT NULL OR vring_workers IS NULL)
+#  vring_workers_positive_if_ubiblk | (vhost_block_backend_id IS NULL OR vring_workers IS NOT NULL AND vring_workers > 0)
 # Foreign key constraints:
 #  vm_storage_volume_boot_image_id_fkey           | (boot_image_id) REFERENCES boot_image(id)
 #  vm_storage_volume_key_encryption_key_1_id_fkey | (key_encryption_key_1_id) REFERENCES storage_key_encryption_key(id)
