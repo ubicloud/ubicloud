@@ -4,15 +4,20 @@
     ["error", "hero-x-circle-mini", "bg-red-50", "text-red-800", "text-red-400"]
   ].each do |type, icon, bg_color, text_color, icon_color| %>
     <% next unless flash[type] %>
-    <div class="rounded-md <%= bg_color %> p-4">
-      <div class="flex">
-        <div class="flex-shrink-0">
-          <%== part("components/icon", name: icon, classes: "h-5 w-5 #{icon_color}") %>
-        </div>
-        <div class="ml-3">
-          <h3 id="flash-<%= type %>" class="text-sm font-medium <%= text_color %>"><%= flash[type] %></h3>
+      <div class="rounded-md <%= bg_color %> p-4">
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <%== part("components/icon", name: icon, classes: "h-5 w-5 #{icon_color}") %>
+          </div>
+          <div class="ml-3">
+            <h3
+              id="flash-<%= type %>"
+              class="text-sm font-medium <%= text_color %>"
+            >
+              <%= flash[type] %>
+            </h3>
+          </div>
         </div>
       </div>
-    </div>
-  <% end %>
+    <% end %>
 </div>

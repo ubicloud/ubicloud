@@ -5,8 +5,7 @@
 <%== render("github/tabbar") %>
 
 <div class="grid gap-6">
-  <%
-    free_upgrade_badge = if @installation.free_runner_upgrade?
+  <% free_upgrade_badge = if @installation.free_runner_upgrade?
       <<~CONTENT
         <a href="#{path(@installation)}/setting">
           <span class="rounded-full bg-green-600/10 px-2.5 py-1 text-xs/5 font-medium text-green-600">
@@ -15,8 +14,7 @@
           </span>
         </a>
       CONTENT
-    end
-  %>
+    end %>
   <%== part(
     "components/table_card",
     headers: ["Repository", "Runner", "Workflow Job", "", ""],

@@ -1,11 +1,12 @@
 <%# locals: (action:, form_elements:, option_tree:, option_parents:, method: "POST", pre_selected_values: {}, mode: "create") %>
+
 <% nonce = SecureRandom.base64(32)
 content_security_policy.add_script_src [:nonce, nonce] %>
 
-<script nonce="<%==nonce%>">
-let option_tree = <%==JSON.generate(option_tree)%>
-let option_children = <%==JSON.generate(option_parents.each_with_object(Hash.new { |h, k| h[k] = [] }) { |(child, parents), h| h[parents.last] << child if parents.any? })%>
-let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_object(Hash.new { |h, k| h[k] = [] }) { |option, h| h[option] = typecast_body_params.str(option) || pre_selected_values[option] })%>
+<script nonce="<%== nonce %>">
+let option_tree = <%== JSON.generate(option_tree) %>
+let option_children = <%== JSON.generate(option_parents.each_with_object(Hash.new { |h, k| h[k] = [] }) { |(child, parents), h| h[parents.last] << child if parents.any? }) %>
+let option_dirty = <%== JSON.generate(form_elements.map { it[:name] }.each_with_object(Hash.new { |h, k| h[k] = [] }) { |option, h| h[option] = typecast_body_params.str(option) || pre_selected_values[option] }) %>
 </script>
 
 <div>
@@ -100,7 +101,12 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
         <div class="px-4 py-5 sm:p-6">
           <div class="flex items-center justify-end gap-x-6">
             <% if mode == "create" %>
-              <a href="<%= action %>" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+              <a
+                href="<%= action %>"
+                class="text-sm font-semibold leading-6 text-gray-900"
+              >
+                Cancel
+              </a>
               <%== part("components/form/submit_button", text: "Create") %>
             <% else %>
               <%== part("components/form/submit_button", text: "Update") %>

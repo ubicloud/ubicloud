@@ -11,13 +11,11 @@
   ]
 ) %>
 
-<%
-  form_elements = [
+<% form_elements = [
     {name: "name", type: "text", label: "Name", required: "required", placeholder: "Enter name", opening_tag: "<div class='sm:col-span-3'>"},
     {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::Vm.method(:location)},
   ]
 
-  action = "#{@project.path}/private-subnet"
-%>
+  action = "#{@project.path}/private-subnet" %>
 
 <%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents) %>

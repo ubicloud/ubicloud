@@ -1,10 +1,7 @@
-<%
-vm = @pg.representative_server.vm
-%>
+<% vm = @pg.representative_server.vm %>
 
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 database-overview">
-  <%
-    vmr = VictoriaMetricsResource.first(project_id: @pg.representative_server.metrics_config[:project_id])
+  <% vmr = VictoriaMetricsResource.first(project_id: @pg.representative_server.metrics_config[:project_id])
     if vmr
       tsdb_client = vmr.servers.first.client
       query = Metrics::POSTGRES_METRICS[:disk_usage].series[0].query.gsub("$ubicloud_resource_id", @pg.ubid)
@@ -41,12 +38,9 @@ vm = @pg.representative_server.vm
       ["hero-square-2-stack-modified", ha_option.description, ""],
       ["hero-map-pin", @pg.location.display_name, "#{location_details} (#{provider})"],
       ["postgres-logo", "Version #{@pg.version}", ""],
-    ].each do |icon, text, subtext|
-  %>
-  <%== part("components/icon_with_text", icon:, text:, subtext:) %>
-  <%
-    end
-  %>
+    ].each do |icon, text, subtext| %>
+    <%== part("components/icon_with_text", icon:, text:, subtext:) %>
+  <% end %>
 </div>
 
 <% @enable_echarts = true %>
@@ -54,29 +48,41 @@ vm = @pg.representative_server.vm
 <div id="metrics-container" class="p-6" data-metrics-url="<%= path(@pg) %>">
   <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
     <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Metrics Summary</h3>
+      <h3
+        class="
+          text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl
+          sm:tracking-tight
+        "
+      >
+        Metrics Summary
+      </h3>
     </div>
   </div>
   <% if @pg.display_state != "creating" %>
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 border-t-0">
       <% Metrics::POSTGRES_METRICS.slice(:cpu_usage, :disk_usage).each do |key, metric| %>
         <div class="p-4 bg-gray-50 rounded-lg border border-gray-100">
-          <h4 class="text-sm font-medium text-gray-900 mb-2"><%= metric.name %></h4>
+          <h4 class="text-sm font-medium text-gray-900 mb-2">
+            <%= metric.name %>
+          </h4>
+
           <p class="text-xs text-gray-500 mt-2"><%= metric.description %></p>
+
           <div
             class="metric-chart h-64 w-full"
             id="<%= key %>-chart"
             data-metric-key="<%= key %>"
             data-metric-unit="<%= metric.unit %>"
-          >
-          </div>
+          ></div>
         </div>
       <% end %>
     </div>
   <% else %>
     <div class="flex flex-col items-center justify-center h-full">
       <h2 class="text-2xl font-semibold text-gray-900">No metrics available</h2>
-      <p class="text-gray-500 mt-2">Metrics will be available once the database is running.</p>
+      <p class="text-gray-500 mt-2">
+        Metrics will be available once the database is running.
+      </p>
     </div>
   <% end %>
 </div>

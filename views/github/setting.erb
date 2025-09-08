@@ -4,36 +4,66 @@
 
 <div class="grid gap-6">
   <!-- Premium runners -->
-  <div class="overflow-hidden rounded-lg ring-1 ring-black ring-opacity-5 bg-white lg:flex shadow">
+  <div
+    class="
+      overflow-hidden rounded-lg ring-1 ring-black ring-opacity-5 bg-white
+      lg:flex shadow
+    "
+  >
     <div class="p-8 sm:p-10 lg:flex-auto">
       <div class="flex items-center">
-        <h3 class="text-3xl font-semibold tracking-tight text-gray-900 whitespace-nowrap">
+        <h3
+          class="
+            text-3xl font-semibold tracking-tight text-gray-900
+            whitespace-nowrap
+          "
+        >
           Premium Runners
         </h3>
         <% if @installation.premium_runner_enabled? %>
-          <span class="rounded-full bg-orange-600/10 px-2.5 py-1 text-xs/5 font-semibold text-orange-600 ml-2">
+          <span
+            class="
+              rounded-full bg-orange-600/10 px-2.5 py-1 text-xs/5
+              font-semibold text-orange-600 ml-2
+            "
+          >
             Enabled
           </span>
         <% end %>
       </div>
+
       <% if @installation.free_runner_upgrade? %>
-        <span class="rounded-full bg-green-600/10 px-2.5 py-1 text-xs/5 font-medium text-green-600">
+        <span
+          class="
+            rounded-full bg-green-600/10 px-2.5 py-1 text-xs/5 font-medium
+            text-green-600
+          "
+        >
           You’re eligible for an exclusive
           <span class="font-semibold">50% off</span>
           premium runners until
           <span class="font-semibold"><%= @installation.free_runner_upgrade_expires_at.strftime("%B %d, %Y") %></span>
         </span>
       <% end %>
+
       <p class="mt-4 text-base/7 text-gray-600">
-        Speed up your builds with cutting edge gaming CPUs! We automatically route your jobs to premium machines. If
-        capacity's full, you seamlessly fall back to standard runners with no extra wait time. You always get billed by
-        the minute and for the runner type you're using.
+        Speed up your builds with cutting edge gaming CPUs! We automatically
+        route your jobs to premium machines. If capacity's full, you seamlessly
+        fall back to standard runners with no extra wait time. You always get
+        billed by the minute and for the runner type you're using.
       </p>
+
       <div class="mt-6 flex items-center gap-x-4">
-        <h4 class="flex-none text-sm/6 font-semibold text-orange-600">What’s different</h4>
+        <h4 class="flex-none text-sm/6 font-semibold text-orange-600">
+          What’s different
+        </h4>
         <div class="h-px flex-auto bg-gray-100"></div>
       </div>
-      <ul role="list" class="mt-4 grid grid-cols-1 gap-4 text-sm/6 text-gray-600 sm:grid-cols-2">
+
+      <ul
+        role="list"
+        class="mt-4 grid grid-cols-1 gap-4 text-sm/6 text-gray-600 sm:grid-cols-2"
+      >
         <% [
           "Twice as fast",
           "One fifth the cost",
@@ -49,40 +79,67 @@
     </div>
     <div class="-mt-2 p-2 lg:mt-0 lg:w-full lg:max-w-sm lg:shrink-0">
       <div
-        class="rounded-lg h-full bg-gray-50 py-10 text-center ring-1 ring-inset ring-gray-900/5 lg:flex lg:flex-col lg:justify-center lg:py-16"
+        class="
+          rounded-lg h-full bg-gray-50 py-10 text-center ring-1 ring-inset
+          ring-gray-900/5 lg:flex lg:flex-col lg:justify-center lg:py-16
+        "
       >
         <div class="mx-auto max-w-sm px-8 space-y-8">
           <p class="flex items-baseline justify-center gap-x-2">
             <span class="text-4xl font-semibold tracking-tight text-gray-900">Boost your builds</span>
           </p>
+
           <%== part("components/form/toggle_form", name: "premium_runner_enabled", action: "#{@project.path}/github/#{@installation.ubid}", active: @installation.premium_runner_enabled?) %>
           <div class="mt-6 text-sm/5 text-gray-600 italic">
             <p class="font-semibold">1/5th the cost of GitHub runners</p>
-            <p>For example, 2 gaming vCPUs, 8GB of RAM, 80GB of NVMe storage comes at $0.0016/min.</p>
+            <p>
+              For example, 2 gaming vCPUs, 8GB of RAM, 80GB of NVMe storage
+              comes at $0.0016/min.
+            </p>
           </div>
         </div>
       </div>
     </div>
   </div>
+
   <div>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div
+      class="
+        overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5
+        bg-white divide-y divide-gray-200
+      "
+    >
       <!-- Transparent Cache Card -->
       <div class="px-4 py-5 sm:p-6">
         <div class="sm:flex sm:items-center sm:justify-between">
           <div>
             <div class="flex items-center">
-              <h3 class="text-base font-semibold leading-6 text-gray-900">Ubicloud Transparent Cache</h3>
+              <h3 class="text-base font-semibold leading-6 text-gray-900">
+                Ubicloud Transparent Cache
+              </h3>
               <% if @installation.cache_enabled %>
-                <span class="rounded-full bg-orange-600/10 px-2.5 py-1 text-xs font-semibold text-orange-600 ml-2">
+                <span
+                  class="
+                    rounded-full bg-orange-600/10 px-2.5 py-1 text-xs
+                    font-semibold text-orange-600 ml-2
+                  "
+                >
                   Enabled
                 </span>
               <% end %>
             </div>
             <div class="mt-2 text-sm text-gray-500">
-              <p>Transparent cache allows you to use Ubicloud’s cache service without modifying your workflow files.
-                Check out
-                <a href="https://www.ubicloud.com/docs/github-actions-integration/ubicloud-cache" class="text-orange-500 font-medium">our documentation</a>
-                for information.</p>
+              <p>
+                Transparent cache allows you to use Ubicloud’s cache service
+                without modifying your workflow files. Check out
+                <a
+                  href="https://www.ubicloud.com/docs/github-actions-integration/ubicloud-cache"
+                  class="text-orange-500 font-medium"
+                >
+                  our documentation
+                </a>
+                for information.
+              </p>
             </div>
           </div>
           <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
@@ -92,16 +149,25 @@
           </div>
         </div>
       </div>
+
       <!-- Configure Repositories -->
       <div class="px-4 py-5 sm:p-6">
         <div class="sm:flex sm:items-center sm:justify-between">
           <div>
-            <h3 class="text-base font-semibold leading-6 text-gray-900">Repository Access</h3>
+            <h3 class="text-base font-semibold leading-6 text-gray-900">
+              Repository Access
+            </h3>
             <div class="mt-2 text-sm text-gray-500">
-              <p>Configure the list of repositories that Ubicloud can access on GitHub's UI.</p>
+              <p>
+                Configure the list of repositories that Ubicloud can access on
+                GitHub's UI.
+              </p>
             </div>
           </div>
-          <div id="configure-<%=@installation.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+          <div
+            id="configure-<%= @installation.ubid %>"
+            class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center"
+          >
             <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
               <%== part("components/button", text: "Configure", link: "https://github.com/apps/#{Config.github_app_name}/installations/#{@installation.installation_id}") %>
             </div>

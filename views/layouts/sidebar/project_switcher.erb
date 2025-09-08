@@ -2,7 +2,10 @@
   <div>
     <button
       type="button"
-      class="inline-flex w-full items-center gap-x-4 px-6 py-3 text-md font-semibold leading-6 text-white bg-orange-700 hover:bg-orange-800"
+      class="
+        inline-flex w-full items-center gap-x-4 px-6 py-3 text-md
+        font-semibold leading-6 text-white bg-orange-700 hover:bg-orange-800
+      "
       id="menu-button"
     >
       <%== part("components/icon", name: "hero-folder-open", classes: "h-8 w-8 rounded-full") %>
@@ -11,7 +14,13 @@
     </button>
   </div>
   <div
-    class="hidden opacity-0 scale-95 group-[.active]:block group-[.active]:opacity-100 group-[.active]:scale-100 transition ease-out duration-100 absolute bottom-12 left-12 z-10 mt-2 w-64 origin-bottom divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none text-gray-800"
+    class="
+      hidden opacity-0 scale-95 group-[.active]:block
+      group-[.active]:opacity-100 group-[.active]:scale-100 transition
+      ease-out duration-100 absolute bottom-12 left-12 z-10 mt-2 w-64
+      origin-bottom divide-y divide-gray-100 rounded-md bg-white shadow-lg
+      ring-1 ring-black ring-opacity-5 focus:outline-none text-gray-800
+    "
     role="menu"
     tabindex="-1"
   >
@@ -22,13 +31,18 @@
           class="block px-4 py-2 hover:bg-gray-100 hover:text-gray-900 <% if p.id == @project&.id %> bg-orange-50 text-orange-600 hover:bg-orange-50 hover:text-orange-700 <% end %>"
           role="menuitem"
           tabindex="-1"
-        ><%= p.name %></a>
+        >
+          <%= p.name %>
+        </a>
       <% end %>
     </div>
     <div class="py-1" role="none">
       <a
         href="/project/create"
-        class="group flex items-center px-4 py-2 hover:bg-gray-100 hover:text-gray-900"
+        class="
+          group flex items-center px-4 py-2 hover:bg-gray-100
+          hover:text-gray-900
+        "
         role="menuitem"
         tabindex="-1"
       >

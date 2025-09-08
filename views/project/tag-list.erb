@@ -20,24 +20,31 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
 
 <div class="grid gap-6">
   <div>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div
+      class="
+        overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5
+        bg-white divide-y divide-gray-200
+      "
+    >
       <% if modification_allowed %>
         <div class="px-4 py-5 sm:p-6 space-y-2">
-          <h3 class="text-lg font-medium leading-6 text-gray-900"><%= "Create #{@display_tag_type} Tag" %></h3>
+          <h3 class="text-lg font-medium leading-6 text-gray-900">
+            <%= "Create #{@display_tag_type} Tag" %>
+          </h3>
+
           <p class="text-sm text-gray-500">
             <% case @tag_type
            when "subject" %>
-              Subject tags in Ubicloud are similar to roles or user groups. Instead of creating separate access control
-              entries for each user, you can create a single access control entry for the subject tag, and add the
-              appropriate users to the tag.
             <% when "action" %>
-              Action tags in Ubicloud are groups of actions. Instead of creating separate access control entries for
-              each action, you can create a single access control entry for the action tag, and add the appropriate
-              actions to the tag.
+              Action tags in Ubicloud are groups of actions. Instead of creating
+              separate access control entries for each action, you can create a
+              single access control entry for the action tag, and add the
+              appropriate actions to the tag.
             <% else %>
-              Objects tags in Ubicloud are groups of related objects. Instead of creating separate access control
-              entries for each object, you can create a single access control entry for the object tag, and add the
-              appropriate objects to the tag.
+              Objects tags in Ubicloud are groups of related objects. Instead of
+              creating separate access control entries for each object, you can
+              create a single access control entry for the object tag, and add
+              the appropriate objects to the tag.
             <% end %>
             <%= @display_tag_type %>
             tags can contain other
@@ -56,24 +63,50 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
       <% end %>
       <% if @tags.empty? %>
         <div class="text-center py-4 px-8 lg:px-32">
-          <h3 class="text-xl leading-10 font-medium mb-2"><%= "No managable #{@tag_type} tags to display" %></h3>
+          <h3 class="text-xl leading-10 font-medium mb-2">
+            <%= "No managable #{@tag_type} tags to display" %>
+          </h3>
         </div>
       <% else %>
         <table id="tag-list" class="min-w-full divide-y divide-gray-300">
           <thead class="bg-gray-50">
             <tr>
-              <th scope="col" class="pl-4 pr-3 sm:pl-6 py-3.5 text-left text-sm font-semibold text-gray-900">Name</th>
-              <th scope="col" class="pl-3 pr-4 sm:pr-6 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
+              <th
+                scope="col"
+                class="
+                  pl-4 pr-3 sm:pl-6 py-3.5 text-left text-sm font-semibold
+                  text-gray-900
+                "
+              >
+                Name
+              </th>
+              <th
+                scope="col"
+                class="
+                  pl-3 pr-4 sm:pr-6 py-3.5 text-left text-sm font-semibold
+                  text-gray-900
+                "
+              ></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <% @tags.each do |tag| %>
               <% editable = !(@tag_type == "subject" && tag.name == "Admin") && modification_allowed %>
               <tr id="<%= tag.ubid %>">
-                <td class="pl-4 pr-3 sm:pl-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td
+                  class="
+                    pl-4 pr-3 sm:pl-6 py-4 whitespace-nowrap text-sm
+                    text-gray-500
+                  "
+                >
                   <%= tag.name %>
                 </td>
-                <td class="pl-3 pr-4 sm:pr-6 py-4 flex items-center space-x-2 justify-end">
+                <td
+                  class="
+                    pl-3 pr-4 sm:pr-6 py-4 flex items-center space-x-2
+                    justify-end
+                  "
+                >
                   <%== part(
                     "components/button",
                     text: "Manage",

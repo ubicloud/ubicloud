@@ -9,89 +9,135 @@
     <% config.each_with_index do |(key, value), index| %>
       <% error = errors[name + "." + key] %>
       <% next if key.empty? && value.empty? %>
-      <div class="px-6 py-2 hover:bg-gray-50 config-group group font-mono" data-config-id="<%= index %>">
+        <div
+          class="px-6 py-2 hover:bg-gray-50 config-group group font-mono"
+          data-config-id="<%= index %>"
+        >
+          <div class="flex items-center justify-between">
+            <div class="flex flex-wrap items-center config-entry">
+              <input
+                type="text"
+                class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500 mr-2 <%= (error && !error.is_a?(Array)) ? "border-red-500" : "" %>"
+                value="<%= key %>"
+                name="<%= name %>_keys[]"
+                required
+              >
+
+              <input
+                type="text"
+                value="<%= value %>"
+                class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500 <%= error ? "border-red-500" : "" %>"
+                name="<%= name %>_values[]"
+              >
+
+              <% if error %>
+                <span
+                  class="
+                    error inline-block h-8 w-54 py-2 px-2 max-w-54 text-xs
+                    text-red-600 bg-red-100 rounded
+                  "
+                  aria-live="polite"
+                >
+                  <% if error.is_a?(Array) %>
+                    <% error.each do |error| %>
+                      <%= error %>
+                      <br>
+                    <% end %>
+                  <% else %>
+                    <%= error %>
+                  <% end %>
+                </span>
+              <% end %>
+            </div>
+            <div class="min-w-16 flex items-center ml-2">
+              <%== part("components/button", type: "danger", text: "", icon: "hero-trash", extra_class: "delete-config-btn") if @edit_perm %>
+            </div>
+          </div>
+        </div>
+      <% end %>
+
+      <!-- Hidden row for generating new entries -->
+      <div
+        class="
+          px-6 py-2 hover:bg-gray-50 group config-placeholder-group
+          font-mono hidden
+        "
+        data-config-id=""
+      >
         <div class="flex items-center justify-between">
           <div class="flex flex-wrap items-center config-entry">
             <input
               type="text"
-              class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500 mr-2 <%= (error && !error.is_a?(Array)) ? "border-red-500" : "" %>"
-              value="<%= key %>"
+              class="
+                border rounded py-1 focus:ring-blue-500
+                focus:border-blue-500 mr-2
+              "
+              value=""
               name="<%= name %>_keys[]"
-              required
-            />
+              disabled
+            >
+
             <input
               type="text"
-              value="<%= value %>"
-              class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500 <%= error ? "border-red-500" : "" %>"
+              value=""
+              class="
+                border rounded py-1 focus:ring-blue-500
+                focus:border-blue-500
+              "
               name="<%= name %>_values[]"
-            />
-            <% if error %>
-              <span class="error inline-block h-8 w-54 py-2 px-2 max-w-54 text-xs text-red-600 bg-red-100 rounded" aria-live="polite">
-                <% if error.is_a?(Array) %>
-                  <% error.each do |error| %>
-                    <%= error %><br/>
-                  <% end %>
-                <% else %>
-                  <%= error %>
-                <% end %>
-              </span>
-            <% end %>
+              disabled
+            >
+            <span
+              class="
+                error inline-block h-8 w-54 py-2 px-2 max-w-54 text-xs
+                text-red-600 hidden bg-red-100 rounded
+              "
+              aria-live="polite"
+            ></span>
           </div>
           <div class="min-w-16 flex items-center ml-2">
-            <%== part("components/button", type: "danger", text: "", icon: "hero-trash", extra_class: "delete-config-btn") if @edit_perm %>
+            <%== part("components/button", type: "danger", text: "", icon: "hero-trash", extra_class: "delete-config-btn") %>
           </div>
         </div>
       </div>
-    <% end %>
-    <!-- Hidden row for generating new entries -->
-    <div class="px-6 py-2 hover:bg-gray-50 group config-placeholder-group font-mono hidden" data-config-id="">
-      <div class="flex items-center justify-between">
-        <div class="flex flex-wrap items-center config-entry">
-          <input
-            type="text"
-            class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500 mr-2"
-            value=""
-            name="<%= name %>_keys[]"
-            disabled
-          />
-          <input
-            type="text"
-            value=""
-            class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500"
-            name="<%= name %>_values[]"
-            disabled
-          />
-          <span class="error inline-block h-8 w-54 py-2 px-2 max-w-54 text-xs text-red-600 hidden bg-red-100 rounded" aria-live="polite"></span>
-        </div>
-        <div class="min-w-16 flex items-center ml-2">
-          <%== part("components/button", type: "danger", text: "", icon: "hero-trash", extra_class: "delete-config-btn") %>
-        </div>
-      </div>
-    </div>
-    <!-- Empty row for new configuration -->
-    <% if @edit_perm %>
-      <div class="px-6 py-2 hover:bg-gray-50 group new-config font-mono">
-        <div class="flex items-center justify-between">
-          <div class="flex flex-wrap items-center">
-            <input
-              type="text"
-              class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500 mr-2"
-              placeholder="New Key"
-              name="<%= name %>_keys[]"
-            />
-            <input
-              type="text"
-              placeholder="New Value"
-              class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500"
-              name="<%= name %>_values[]"
-            />
-            <span class="error inline-block h-8 w-54 py-2 px-2 max-w-54 text-xs text-red-600 hidden bg-red-100 rounded" aria-live="polite"></span>
-          </div>
-          <div class="min-w-16 flex items-center ml-2">
-            <%== part("components/button", text: "", type: "safe", icon: "hero-plus", extra_class: "add-config-btn") %>
+
+      <!-- Empty row for new configuration -->
+      <% if @edit_perm %>
+        <div class="px-6 py-2 hover:bg-gray-50 group new-config font-mono">
+          <div class="flex items-center justify-between">
+            <div class="flex flex-wrap items-center">
+              <input
+                type="text"
+                class="
+                  border rounded py-1 focus:ring-blue-500
+                  focus:border-blue-500 mr-2
+                "
+                placeholder="New Key"
+                name="<%= name %>_keys[]"
+              >
+
+              <input
+                type="text"
+                placeholder="New Value"
+                class="
+                  border rounded py-1 focus:ring-blue-500
+                  focus:border-blue-500
+                "
+                name="<%= name %>_values[]"
+              >
+              <span
+                class="
+                  error inline-block h-8 w-54 py-2 px-2 max-w-54 text-xs
+                  text-red-600 hidden bg-red-100 rounded
+                "
+                aria-live="polite"
+              ></span>
+            </div>
+            <div class="min-w-16 flex items-center ml-2">
+              <%== part("components/button", text: "", type: "safe", icon: "hero-plus", extra_class: "add-config-btn") %>
+            </div>
           </div>
         </div>
-      </div>
-    <% end %>
+      <% end %>
   </div>
 </div>

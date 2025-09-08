@@ -1,12 +1,15 @@
 <%# locals: (description:, tos_text:) %>
+
 <div class="col-span-full">
   <div class="space-y-2">
     <label class="text-sm font-medium leading-6 text-gray-900">Partnership Notice</label>
+
     <div class="space-y-1 text-sm leading-6 text-gray-600">
       <% Array(description).each do |desc| %>
         <p><%== desc %></p>
       <% end %>
     </div>
+
     <%== part("components/form/checkbox", options: [["1", tos_text, {}, { required: true }]]) %>
   </div>
 </div>

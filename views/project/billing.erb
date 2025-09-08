@@ -11,41 +11,64 @@ end
     "components/page_header",
     breadcrumbs: [%w[Projects /project], [@project.name, @project.path], %w[Billing #]]
   ) %>
-
   <div class="grid gap-6">
     <!-- Summary -->
     <div>
       <dl class="grid grid-cols-2 gap-5 <%= (@project.discount > 0) ? "sm:grid-cols-4" : "sm:grid-cols-3" %>">
         <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
-          <dt class="truncate text-sm font-medium text-gray-500">Current Usage</dt>
-          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= money(@invoices.first.subtotal) %></dd>
+          <dt class="truncate text-sm font-medium text-gray-500">
+            Current Usage
+          </dt>
+          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900">
+            <%= money(@invoices.first.subtotal) %>
+          </dd>
         </div>
         <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
           <dt class="truncate text-sm font-medium text-gray-500">Last Month</dt>
-          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= (@invoices.count > 1) ? money(@invoices[1].subtotal) : "-" %></dd>
+          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900">
+            <%= (@invoices.count > 1) ? money(@invoices[1].subtotal) : "-" %>
+          </dd>
         </div>
         <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
-          <dt class="truncate text-sm font-medium text-gray-500">Remaining Credit</dt>
-          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= money(@project.credit.to_f) %></dd>
+          <dt class="truncate text-sm font-medium text-gray-500">
+            Remaining Credit
+          </dt>
+          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900">
+            <%= money(@project.credit.to_f) %>
+          </dd>
         </div>
         <% if @project.discount > 0 %>
           <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
             <dt class="truncate text-sm font-medium text-gray-500">Discount</dt>
-            <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= @project.discount %>%</dd>
+            <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900">
+              <%= @project.discount %>%
+            </dd>
           </div>
         <% end %>
       </dl>
     </div>
+
     <!-- Billing Info Update Card -->
     <% stripe_data = billing_info.stripe_data %>
     <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
       <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+        <h3
+          class="
+            text-2xl font-bold leading-7 text-gray-900 sm:truncate
+            sm:text-2xl sm:tracking-tight
+          "
+        >
           Billing Details
         </h3>
       </div>
     </div>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+
+    <div
+      class="
+        overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5
+        bg-white divide-y divide-gray-200
+      "
+    >
       <% form(action: billing_path, method: :post) do %>
         <div class="px-4 py-5 sm:p-6">
           <div class="space-y-12">
@@ -62,6 +85,7 @@ end
                     }
                   ) %>
                 </div>
+
                 <div class="sm:col-span-4">
                   <%== part(
                     "components/form/text",
@@ -73,6 +97,7 @@ end
                     }
                   ) %>
                 </div>
+
                 <div class="sm:col-span-4 md:col-span-2">
                   <%== part(
                     "components/form/select",
@@ -93,15 +118,19 @@ end
                     }
                   ) %>
                 </div>
+
                 <div class="sm:col-span-4 md:col-span-2">
                   <%== part("components/form/text", name: "state", label: "State", value: stripe_data["state"]) %>
                 </div>
+
                 <div class="sm:col-span-4 md:col-span-2">
                   <%== part("components/form/text", name: "city", label: "City", value: stripe_data["city"]) %>
                 </div>
+
                 <div class="sm:col-span-4 md:col-span-2">
                   <%== part("components/form/text", name: "postal_code", label: "Postal Code", value: stripe_data["postal_code"]) %>
                 </div>
+
                 <div class="col-span-full">
                   <%== part(
                     "components/form/textarea",
@@ -113,6 +142,7 @@ end
                     }
                   ) %>
                 </div>
+
                 <div class="sm:col-span-4">
                   <%== part(
                     "components/form/text",
@@ -123,18 +153,22 @@ end
                   <% if billing_info.country&.in_eu_vat? %>
                     <div class="mt-2 text-sm text-gray-500">
                       <% if billing_info.country.alpha2 == "NL" %>
-                        21% VAT is collected from customers located in the Netherlands.
+                        21% VAT is collected from customers located in the
+                        Netherlands.
                       <% elsif stripe_data["tax_id"].to_s.strip.empty? %>
-                        EU registered business can enter their VAT ID to remove VAT from future invoices.
+                        EU registered business can enter their VAT ID to remove
+                        VAT from future invoices.
                       <% else %>
                         VAT subject to reverse charge.
                       <% end %>
                     </div>
                   <% end %>
                 </div>
+
                 <div class="sm:col-span-4">
                   <%== part("components/form/text", name: "company_name", label: "Company Name", value: stripe_data["company_name"]) %>
                 </div>
+
                 <div class="col-span-full">
                   <%== part(
                     "components/form/textarea",
@@ -158,6 +192,7 @@ end
         </div>
       <% end %>
     </div>
+
     <!-- Payment Methods Card -->
     <%== part(
       "components/table_card",
@@ -194,30 +229,72 @@ end
     <div>
       <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
         <div class="min-w-0 flex-1">
-          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+          <h3
+            class="
+              text-2xl font-bold leading-7 text-gray-900 sm:truncate
+              sm:text-2xl sm:tracking-tight
+            "
+          >
             Invoices
           </h3>
         </div>
       </div>
-      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div
+        class="
+          overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5
+          bg-white divide-y divide-gray-200
+        "
+      >
         <table class="min-w-full divide-y divide-gray-300">
           <thead class="bg-gray-50">
             <tr>
-              <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Invoice</th>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Amount</th>
-              <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-6 text-left text-sm font-semibold text-gray-900">Status</th>
+              <th
+                scope="col"
+                class="
+                  py-3.5 pl-4 pr-3 text-left text-sm font-semibold
+                  text-gray-900 sm:pl-6
+                "
+              >
+                Invoice
+              </th>
+              <th
+                scope="col"
+                class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+              >
+                Amount
+              </th>
+              <th
+                scope="col"
+                class="
+                  py-3.5 pl-3 pr-4 sm:pr-6 text-left text-sm font-semibold
+                  text-gray-900
+                "
+              >
+                Status
+              </th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <% @invoices.each do |inv| %>
               <tr id="invoice-<%= inv.path_id %>">
-                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <a href="<%= billing_path + inv.path %>" target="_blank" class="text-orange-600 hover:text-orange-700">
+                <td
+                  class="
+                    whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium
+                    text-gray-900 sm:pl-6
+                  "
+                  scope="row"
+                >
+                  <a
+                    href="<%= billing_path + inv.path %>"
+                    target="_blank"
+                    class="text-orange-600 hover:text-orange-700"
+                  >
                     <%= inv.name %>
                   </a>
                   <span class="text-xs text-gray-400 italic">
                     <% if inv.invoice_number %>
-                      #<%= inv.invoice_number %>
+                      #
+                      <%= inv.invoice_number %>
                     <% else %>
                       (not finalized)
                     <% end %>
@@ -237,8 +314,10 @@ end
             <% if @invoices.count == 1 %>
               <tr>
                 <td colspan="3">
-                  <div class="text-center text-lg p-4">No invoices finalized yet. Invoice for the current month will be created on the first day of next
-                    month.</div>
+                  <div class="text-center text-lg p-4">
+                    No invoices finalized yet. Invoice for the current month
+                    will be created on the first day of next month.
+                  </div>
                 </td>
               </tr>
             <% end %>
@@ -257,33 +336,50 @@ end
       button_title: "Add new billing information"
     ) %>
   <% end %>
-  <br/>
+  <br>
   <%== part("components/discount_code") %>
 <% end %>
-<br/>
+
+<br>
+
 <!-- Usage alerts -->
+
 <div>
   <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
     <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+      <h3
+        class="
+          text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl
+          sm:tracking-tight
+        "
+      >
         Usage Alerts
       </h3>
     </div>
   </div>
   <div class="grid gap-6">
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div
+      class="
+        overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5
+        bg-white divide-y divide-gray-200
+      "
+    >
       <!-- Add usage alert -->
       <div class="px-4 py-5 sm:p-6">
         <% form(action: "#{@project.path}/usage-alert", role: :form, method: :post) do %>
           <div class="space-y-4">
             <div>
-              <h2 class="text-lg font-medium leading-6 text-gray-900">Add new usage alert</h2>
+              <h2 class="text-lg font-medium leading-6 text-gray-900">
+                Add new usage alert
+              </h2>
               <p class="mt-1 text-sm text-gray-500">
-                Usage alerts will be sent to your email address. If you want to send alerts to specific email
-                addresses, you need to log in with that email address.
-                <br/>
-                <br/>
-                Please note that alerts are only for informational purposes and no action is taken automatically.
+                Usage alerts will be sent to your email address. If you want to
+                send alerts to specific email addresses, you need to log in with
+                that email address.
+                <br>
+                <br>
+                Please note that alerts are only for informational purposes and
+                no action is taken automatically.
               </p>
             </div>
             <div class="grid grid-cols-12 gap-6">
@@ -299,6 +395,7 @@ end
                   extra_class: "pr-3"
                 ) %>
               </div>
+
               <div class="col-span-5 sm:col-span-3">
                 <%== part(
                   "components/form/text",
@@ -312,22 +409,47 @@ end
                   extra_class: "pr-3"
                 ) %>
               </div>
+
               <div class="col-span-2 sm:col-span-3 flex justify-begin items-end">
                 <%== part("components/form/submit_button", text: "Add") %>
               </div>
             </div>
           </div>
         <% end %>
-
       </div>
+
       <!-- List alerts -->
       <% if @usage_alerts.count > 0 %>
         <table class="min-w-full divide-y divide-gray-300">
           <thead class="bg-gray-50">
             <tr>
-              <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">Name</th>
-              <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">Limit</th>
-              <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">E-mail</th>
+              <th
+                scope="col"
+                class="
+                  py-3.5 pl-4 pr-3 text-left text-sm font-semibold
+                  text-gray-900 sm:pl-4
+                "
+              >
+                Name
+              </th>
+              <th
+                scope="col"
+                class="
+                  py-3.5 pl-4 pr-3 text-left text-sm font-semibold
+                  text-gray-900 sm:pl-4
+                "
+              >
+                Limit
+              </th>
+              <th
+                scope="col"
+                class="
+                  py-3.5 pl-4 pr-3 text-left text-sm font-semibold
+                  text-gray-900 sm:pl-4
+                "
+              >
+                E-mail
+              </th>
               <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-4">
                 <span class="sr-only">Remove</span>
               </th>
@@ -335,10 +457,19 @@ end
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <% @usage_alerts.each do |alert| %>
-              <tr id="alert-<%= alert.ubid %>" class="whitespace-nowrap text-sm font-medium">
-                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.name %></td>
-                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.limit %></td>
-                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.user.email %></td>
+              <tr
+                id="alert-<%= alert.ubid %>"
+                class="whitespace-nowrap text-sm font-medium"
+              >
+                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row">
+                  <%= alert.name %>
+                </td>
+                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row">
+                  <%= alert.limit %>
+                </td>
+                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row">
+                  <%= alert.user.email %>
+                </td>
                 <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
                   <%== part(
                     "components/delete_button",

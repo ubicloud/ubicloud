@@ -10,8 +10,7 @@
   ]
 ) %>
 
-<%
-  footer_content = [
+<% footer_content = [
     ["Subtotal", @invoice_data.subtotal],
     (@invoice_data.discount != "$0.00") ? ["Discount", "-#{@invoice_data.discount}"] : nil,
     (@invoice_data.credit != "$0.00") ? ["Credit", "-#{@invoice_data.credit}"] : nil,
@@ -25,13 +24,16 @@
         <dd class="text-gray-500" id="invoice-#{name.downcase.tr(" ", "-")}">#{value}</dd>
       </dl>
     CONTENT
-  end.join
-%>
+  end.join %>
 
 <div class="grid gap-6">
   <div class="md:flex md:items-center md:justify-between text-2xl">
-    <div class="min-w-0 flex-1">This invoice will be finalized on the first day of next month</div>
-    <div class="text-right"><%= @invoice_data.begin_time %> to <%= @invoice_data.end_time %></div>
+    <div class="min-w-0 flex-1">
+      This invoice will be finalized on the first day of next month
+    </div>
+    <div class="text-right">
+      <%= @invoice_data.begin_time %> to <%= @invoice_data.end_time %>
+    </div>
   </div>
 
   <!-- Invoice Card -->
@@ -51,6 +53,5 @@
       end,
       empty_state: "No resources",
       footer: "<div class=\"px-4 py-5 sm:p-6 flex justify-end\"><div class=\"grid gap-2 text-right\">#{footer_content}</div></div>"
-    )
-  %>
+    ) %>
 </div>

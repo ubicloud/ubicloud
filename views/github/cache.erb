@@ -3,43 +3,91 @@
 <%== render("github/tabbar") %>
 
 <div class="grid gap-6">
-  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+  <div
+    class="
+      overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5
+      bg-white divide-y divide-gray-200
+    "
+  >
     <table class="min-w-full divide-y divide-gray-300">
       <tbody class="divide-y divide-gray-200 bg-white">
         <% if @entries_by_repo.count > 0 %>
           <% @entries_by_repo.each do |repository_id, entries| %>
-            <tr class="cache-group-row cursor-pointer group" data-repository="<%= repository_id %>">
-              <th scope="colgroup" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 w-full group-[.active]:bg-gray-50">
+            <tr
+              class="cache-group-row cursor-pointer group"
+              data-repository="<%= repository_id %>"
+            >
+              <th
+                scope="colgroup"
+                class="
+                  py-3.5 pl-4 pr-3 text-left text-sm font-semibold
+                  text-gray-900 w-full group-[.active]:bg-gray-50
+                "
+              >
                 <div class="flex">
                   <%== part("components/icon", name: "hero-chevron-right", classes: "w-5 h-5 group-[.active]:rotate-90") %>
                   <%= entries.first.repository.name %>
                 </div>
               </th>
-              <th scope="colgroup" class="py-3.5 pl-3 pr-3 text-right text-sm font-semibold text-gray-900 whitespace-nowrap group-[.active]:bg-gray-50" colspan="2">
+              <th
+                scope="colgroup"
+                class="
+                  py-3.5 pl-3 pr-3 text-right text-sm font-semibold
+                  text-gray-900 whitespace-nowrap group-[.active]:bg-gray-50
+                "
+                colspan="2"
+              >
                 <%= entries.count %> cache entries
               </th>
-              <th scope="colgroup" class="py-3.5 pl-3 pr-4 text-right text-sm font-semibold text-gray-900 whitespace-nowrap group-[.active]:bg-gray-50" colspan="2">
+              <th
+                scope="colgroup"
+                class="
+                  py-3.5 pl-3 pr-4 text-right text-sm font-semibold
+                  text-gray-900 whitespace-nowrap group-[.active]:bg-gray-50
+                "
+                colspan="2"
+              >
                 <%= humanize_size(entries.sum { it.size.to_i }) %> used of <%= @quota_per_repo %>
               </th>
             </tr>
             <% entries.each do |entry| %>
-              <tr id="entry-<%= entry.ubid %>" class="hidden cache-group-<%= repository_id %>">
+              <tr
+                id="entry-<%= entry.ubid %>"
+                class="hidden cache-group-<%= repository_id %>"
+              >
                 <td class="py-3 pl-4 pr-3 text-sm sm:pl-6 w-full" scope="row">
                   <div class="font-medium text-gray-900"><%= entry.key %></div>
-                  <div class="mt-1 text-gray-500 text-xs ">created <span title="<%= entry.created_at.strftime("%Y-%m-%d %H:%M UTC") %>"><%= humanize_time(entry.created_at) %></span></div>
+                  <div class="mt-1 text-gray-500 text-xs">
+                    created
+                    <span
+                      title="<%= entry.created_at.strftime("%Y-%m-%d %H:%M UTC") %>"
+                    >
+                      <%= humanize_time(entry.created_at) %>
+                    </span>
+                  </div>
                 </td>
                 <td class="px-3 py-3 text-sm text-gray-500">
                   <div><%= entry.scope %></div>
                 </td>
                 <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500">
-                  <div class="inline-flex items-baseline rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800" title="<%= entry.size %> bytes">
+                  <div
+                    class="
+                      inline-flex items-baseline rounded-md px-2 text-xs
+                      font-medium leading-5 bg-slate-100 text-slate-800
+                    "
+                    title="<%= entry.size %> bytes"
+                  >
                     <%= humanize_size(entry.size) %>
                   </div>
                 </td>
                 <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500">
                   <% if entry.last_accessed_at %>
                     <div>Last used</div>
-                    <div title="<%= entry.last_accessed_at.strftime("%Y-%m-%d %H:%M UTC") %>"> <%= humanize_time(entry.last_accessed_at) %></div>
+                    <div
+                      title="<%= entry.last_accessed_at.strftime("%Y-%m-%d %H:%M UTC") %>"
+                    >
+                      <%= humanize_time(entry.last_accessed_at) %>
+                    </div>
                   <% else %>
                     <div>Never used</div>
                   <% end %>
@@ -58,9 +106,18 @@
           <tr>
             <td colspan="6">
               <div class="text-center py-4 px-8 lg:px-32">
-                <h3 class="text-xl leading-10 font-medium mb-3">No cache entries</h3>
+                <h3 class="text-xl leading-10 font-medium mb-3">
+                  No cache entries
+                </h3>
                 <p class="leading-6">
-                  Check out <a href="https://www.ubicloud.com/docs/github-actions-integration/ubicloud-cache" class="text-orange-500 font-medium">our documentation</a> to use Ubicloud Cache for faster caching.
+                  Check out
+                  <a
+                    href="https://www.ubicloud.com/docs/github-actions-integration/ubicloud-cache"
+                    class="text-orange-500 font-medium"
+                  >
+                    our documentation
+                  </a>
+                  to use Ubicloud Cache for faster caching.
                 </p>
               </div>
             </td>

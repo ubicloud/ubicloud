@@ -1,5 +1,4 @@
-<%
-  @flavor = typecast_params.nonempty_str("flavor", PostgresResource::Flavor::STANDARD)
+<% @flavor = typecast_params.nonempty_str("flavor", PostgresResource::Flavor::STANDARD)
   @flavor = PostgresResource::Flavor::STANDARD unless Option::POSTGRES_FLAVOR_OPTIONS.any? { |k,| k == @flavor }
   @prices = fetch_location_based_prices("PostgresVCpu", "PostgresStorage")
   @has_valid_payment_method = @project.has_valid_payment_method?
@@ -7,8 +6,7 @@
   @option_tree, @option_parents = generate_postgres_options(flavor: @flavor)
 
   @page_title, logo = postgres_flavors[@flavor].yield_self { ["Create #{it.title}", "logo-#{it.brand}.png"] }
-  logo = nil if @flavor == PostgresResource::Flavor::STANDARD
-%>
+  logo = nil if @flavor == PostgresResource::Flavor::STANDARD %>
 
 <%== render("components/billing_warning") %>
 
@@ -23,8 +21,7 @@
   right_items: [logo ? "<img src=\"/#{logo}\" class=\"h-6 object-contain\"/>" : nil]
 ) %>
 
-<%
-  form_elements = [
+<% form_elements = [
     {name: "flavor", type: "hidden", value: @flavor},
     {name: "name", type: "text", label: "Name", required: "required", placeholder: "Enter name", opening_tag: "<div class='sm:col-span-3'>"},
     {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::Postgres.method(:location)},
@@ -39,7 +36,6 @@
     form_elements << {name: "partnership_notice", type: "partnership_notice", label: "Partnership Notice", required: "required", content_generator: ContentGenerator::Postgres.method(:partnership_notice)}
   end
 
-  action = "#{@project.path}/postgres"
-%>
+  action = "#{@project.path}/postgres" %>
 
 <%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents) %>

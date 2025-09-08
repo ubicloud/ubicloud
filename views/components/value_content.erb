@@ -1,9 +1,14 @@
 <%# locals: (content:, opts: nil) %>
+
 <% opts ||= {} %>
+
 <% if opts[:copyable] && content %>
   <%== part("components/copyable_content", content:, revealable: opts[:revealable]) %>
 <% elsif opts[:link] %>
-  <a href="<%= opts[:link] %>" class="font-medium text-orange-600 hover:text-orange-700">
+  <a
+    href="<%= opts[:link] %>"
+    class="font-medium text-orange-600 hover:text-orange-700"
+  >
     <%= content %>
   </a>
 <% elsif opts[:component] %>

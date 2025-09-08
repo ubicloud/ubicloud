@@ -43,22 +43,35 @@ end
     <% if @token.nil? && edit_perm %>
       <div class="md:flex md:items-center md:justify-between">
         <div class="min-w-0 flex-1">
-          Access is allowed if there is an access control entry allowing the subject to take the action on the object.
-          Subjects, actions, and objects can all be tags, which are used for grouping. The recommended way to handle
-          access control in Ubicloud is to create appropriate tags, add the subjects, actions, and objects to the tags,
-          and create the minimum number of access control entries you need to enforce the access you want. However, you
-          can create access control entries referencing specific subjects, actions, or objects.
+          Access is allowed if there is an access control entry allowing the
+          subject to take the action on the object. Subjects, actions, and
+          objects can all be tags, which are used for grouping. The recommended
+          way to handle access control in Ubicloud is to create appropriate
+          tags, add the subjects, actions, and objects to the tags, and create
+          the minimum number of access control entries you need to enforce the
+          access you want. However, you can create access control entries
+          referencing specific subjects, actions, or objects.
         </div>
       </div>
     <% end %>
-
     <% form(action: form_action, role: :form, method: :post, id: "access-control-form") do %>
-      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-        <table id="access-control-entries" class="min-w-full divide-y divide-gray-300 group">
+      <div
+        class="
+          overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5
+          bg-white divide-y divide-gray-200
+        "
+      >
+        <table
+          id="access-control-entries"
+          class="min-w-full divide-y divide-gray-300 group"
+        >
           <thead class="bg-gray-50 <% if @token %> hidden group-[&:has(tr:nth-child(n+3))]:table-header-group <% end %>">
             <tr>
               <% table_headers.each do |type| %>
-                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                <th
+                  scope="col"
+                  class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                >
                   <%= type %>
                   <% unless @token %>
                     <a
@@ -72,14 +85,20 @@ end
                 </th>
               <% end %>
               <% if edit_perm %>
-                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
+                <th
+                  scope="col"
+                  class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                ></th>
               <% end %>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <% @aces.append(["template", [], true]).each do |ubid, tags, editable| %>
               <% editable &&= edit_perm %>
-              <tr id="ace-<%= ubid %>" class="<%= "existing-aces#{"-view" unless editable}" unless ubid == "template" %>">
+              <tr
+                id="ace-<%= ubid %>"
+                class="<%= "existing-aces#{"-view" unless editable}" unless ubid == "template" %>"
+              >
                 <% if editable %>
                   <% ace_options.each_with_index do | (name, options), index| %>
                     <% attributes = (!@token && index == 0 && ubid != "template") ? { required: "required" } : {} %>
@@ -114,12 +133,19 @@ end
             <% if @aces.count == 1 %>
               <tr class="group-[&:has(tr:nth-child(n+3))]:hidden">
                 <td colspan="3" class="py-4 px-8">
-                  <p class="mb-4">Currently, this token has no access to the project.</p>
-                  <p>You should grant the token the access you think the token should have. Be aware that the token can
-                    never have more access to the project than your account has. Each access control entry has a single
-                    action and object. Access is allowed if there is an access control entry allowing the token to take
-                    the action on the object. Actions and objects can be tags, which are used for grouping multiple
-                    actions or multiple objects into a single entity.</p>
+                  <p class="mb-4">
+                    Currently, this token has no access to the project.
+                  </p>
+                  <p>
+                    You should grant the token the access you think the token
+                    should have. Be aware that the token can never have more
+                    access to the project than your account has. Each access
+                    control entry has a single action and object. Access is
+                    allowed if there is an access control entry allowing the
+                    token to take the action on the object. Actions and objects
+                    can be tags, which are used for grouping multiple actions or
+                    multiple objects into a single entity.
+                  </p>
                 </td>
               </tr>
             <% end %>
@@ -135,30 +161,47 @@ end
     <% end %>
   <% end %>
   <% if @token %>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div
+      class="
+        overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5
+        bg-white divide-y divide-gray-200
+      "
+    >
       <div class="px-4 py-5 sm:p-6">
         <% form(action: restriction_path, role: :form, method: :post) do %>
           <div class="sm:flex sm:items-center sm:justify-between">
             <div>
-              <h3 class="text-base font-semibold leading-6 text-gray-900"><%= restriction_title %>
-                Personal Access Token</h3>
+              <h3 class="text-base font-semibold leading-6 text-gray-900">
+                <%= restriction_title %> Personal Access Token
+              </h3>
               <div class="mt-2 text-sm text-gray-500">
                 <p>
                   <% if unrestricted %>
-                    This token currently has the same access to this project that your account has. If you would like
-                    to restrict the access of this token, use the "Restrict Token Access" button. After restricting
-                    token access, the token will have no access to the project, and you can grant the specific access
-                    you want the token to have. Be aware that the token can never have more access to the project than
-                    your account has.
+                    This token currently has the same access to this project
+                    that your account has. If you would like to restrict the
+                    access of this token, use the "Restrict Token Access"
+                    button. After restricting token access, the token will have
+                    no access to the project, and you can grant the specific
+                    access you want the token to have. Be aware that the token
+                    can never have more access to the project than your account
+                    has.
                   <% else %>
-                    This token currently has access to the project based on the access control entries above. If you
-                    would like to remove access control restrictions, and grant the token full access to your account,
-                    click on the "Unrestrict Token Access" button.
+                    This token currently has access to the project based on the
+                    access control entries above. If you would like to remove
+                    access control restrictions, and grant the token full access
+                    to your account, click on the "Unrestrict Token Access"
+                    button.
                   <% end %>
                 </p>
               </div>
             </div>
-            <div id="restrict-<%=@token.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+            <div
+              id="restrict-<%= @token.ubid %>"
+              class="
+                mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0
+                sm:items-center
+              "
+            >
               <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
                 <%== part("components/form/submit_button", text: "#{restriction_title} Token Access") %>
               </div>

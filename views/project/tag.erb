@@ -38,6 +38,7 @@ current_members =
     @current_members.map { [ace_label(_2), _2.ubid] }
   end
 current_members.sort! %>
+
 <%== render("project/user-tabbar") %>
 
 <div class="space-y-1">
@@ -56,9 +57,16 @@ current_members.sort! %>
 
 <div class="grid gap-6">
   <% if editable %>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div
+      class="
+        overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5
+        bg-white divide-y divide-gray-200
+      "
+    >
       <div class="px-4 py-5 sm:p-6 space-y-2">
-        <h3 class="text-lg font-medium leading-6 text-gray-900"><%= "Update #{@display_tag_type} Tag" %></h3>
+        <h3 class="text-lg font-medium leading-6 text-gray-900">
+          <%= "Update #{@display_tag_type} Tag" %>
+        </h3>
         <% form(action: path(@tag), role: :form, method: :post) do %>
           <div class="grid grid-cols-12 gap-3">
             <div class="col-span-12 md:col-span-5">
@@ -79,34 +87,64 @@ current_members.sort! %>
       </div>
     </div>
   <% end %>
+
   <div>
     <% if current_members.empty? %>
       <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
-        No current members of
-        <%= @tag_type %>
-        tag.
+        No current members of <%= @tag_type %> tag.
       </div>
     <% else %>
       <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
         <div class="min-w-0 flex-1">
-          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Current Members</h3>
+          <h3
+            class="
+              text-2xl font-bold leading-7 text-gray-900 sm:truncate
+              sm:text-2xl sm:tracking-tight
+            "
+          >
+            Current Members
+          </h3>
         </div>
       </div>
       <% form(action: disassociate_path, role: :form, method: :post) do %>
-        <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-          <table id="tag-membership-remove" class="min-w-full divide-y divide-gray-300">
+        <div
+          class="
+            overflow-hidden rounded-lg shadow ring-1 ring-black
+            ring-opacity-5 bg-white divide-y divide-gray-200
+          "
+        >
+          <table
+            id="tag-membership-remove"
+            class="min-w-full divide-y divide-gray-300"
+          >
             <thead class="bg-gray-50">
               <tr>
-                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Name</th>
+                <th
+                  scope="col"
+                  class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                >
+                  Name
+                </th>
                 <% if removal_allowed %>
-                  <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Remove?</th>
+                  <th
+                    scope="col"
+                    class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                  >
+                    Remove?
+                  </th>
                 <% end %>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200 bg-white">
               <% current_members.each do |label, ubid| %>
                 <tr id="<%= ubid %>" class="cursor-pointer">
-                  <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                  <td
+                    class="
+                      whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium
+                      text-gray-900 sm:pl-6
+                    "
+                    scope="row"
+                  >
                     <%== label %>
                   </td>
                   <% if removal_allowed %>
@@ -131,31 +169,66 @@ current_members.sort! %>
       <% end %>
     <% end %>
   </div>
+
   <div>
     <% if addition_allowed && !add_groups.all? { _2.empty? } %>
       <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
         <div class="min-w-0 flex-1">
-          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Add Members</h3>
+          <h3
+            class="
+              text-2xl font-bold leading-7 text-gray-900 sm:truncate
+              sm:text-2xl sm:tracking-tight
+            "
+          >
+            Add Members
+          </h3>
         </div>
       </div>
       <% form(action: associate_path, method: :post) do %>
-        <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-          <table id="tag-membership-add" class="min-w-full divide-y divide-gray-300">
+        <div
+          class="
+            overflow-hidden rounded-lg shadow ring-1 ring-black
+            ring-opacity-5 bg-white divide-y divide-gray-200
+          "
+        >
+          <table
+            id="tag-membership-add"
+            class="min-w-full divide-y divide-gray-300"
+          >
             <thead class="bg-gray-50">
               <tr>
-                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Name</th>
-                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Add?</th>
+                <th
+                  scope="col"
+                  class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                >
+                  Name
+                </th>
+                <th
+                  scope="col"
+                  class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                >
+                  Add?
+                </th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200 bg-white">
               <% add_groups.each do |name, available_to_add| %>
                 <% name = name["label"] if name.is_a?(Hash) %>
                 <tr>
-                  <th colspan="2" class="text-left px-3 py-3.5 bg-gray-50"><%= name %></th>
+                  <th colspan="2" class="text-left px-3 py-3.5 bg-gray-50">
+                    <%= name %>
+                  </th>
                 </tr>
+
                 <% available_to_add.each do |label, ubid| %>
                   <tr id="<%= ubid %>" class="cursor-pointer">
-                    <td class="whitespace-nowrap py-4 pl-5 pr-3 text-sm font-medium text-gray-900 sm:pl-7" scope="row">
+                    <td
+                      class="
+                        whitespace-nowrap py-4 pl-5 pr-3 text-sm font-medium
+                        text-gray-900 sm:pl-7
+                      "
+                      scope="row"
+                    >
                       <%== label %>
                     </td>
                     <td class="py-4 pl-3 pr-4 text-right sm:pr-6">

@@ -1,16 +1,15 @@
 <% @content_class = "" %>
 
-
 <% unless @grouped_pages.empty? %>
   <table class="page-table">
     <caption>Active Pages</caption>
     <thead>
       <tr>
-	<th>VmHost</th>
-	<th>UBID</th>
-	<th>Created At</th>
-	<th>Summary</th>
-	<th>Details</th>
+        <th>VmHost</th>
+        <th>UBID</th>
+        <th>Created At</th>
+        <th>Summary</th>
+        <th>Details</th>
       </tr>
     </thead>
     <tbody>
@@ -21,23 +20,25 @@
               <td rowspan="<%= pages.size %>">
                 <% if vmh_ubid %>
                   <a href="/model/VmHost/<%= vmh_ubid %>"><%= vmh_ubid %></a>
-                <% end%>
+                <% end %>
               </td>
             <% end %>
 
             <td><a href="/model/Page/<%= page.ubid %>"><%= page.ubid %></a></td>
             <td><%= page.created_at.strftime("%F %T") %></td>
             <td><%= page.summary %></td>
-            <td><%== h(page.details).gsub(/\b[a-tv-z0-9]{26}\b/) do
+            <td>
+              <%== h(page.details).gsub(/\b[a-tv-z0-9]{26}\b/) do
               if (klass = UBID.class_for_ubid(it))
                 "<a href=\"/model/#{klass}/#{it}\">#{it}</a>"
               else
                 it
               end
-            end %></td>
+            end %>
+            </td>
           </tr>
-         <% end %>
-       <% end %>
+        <% end %>
+      <% end %>
     </tbody>
   </table>
 <% end %>
