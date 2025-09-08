@@ -3,7 +3,7 @@
 <% @page_message = "Sign in to your account" %>
 
 <div class="space-y-6">
-  <% form(class: "rodauth space-y-6", role: :form, method: :post, id: "login-form") do %>
+  <% form(class: "rodauth space-y-6", method: :post, id: "login-form") do %>
 
     <%== render("components/rodauth/login_field") %>
     <% if rodauth.valid_login_entered? %>
@@ -28,7 +28,7 @@
         <% provider_name = provider.display_name %>
         <% content_security_policy.add_form_action(provider.url) %>
       <% end %>
-      <% form(action: rodauth.omniauth_request_path(identity.provider), role: :form, method: :post, class: "grow") do %>
+      <% form(action: rodauth.omniauth_request_path(identity.provider), method: :post, class: "grow") do %>
         <button
           class="flex w-full items-center justify-center gap-3 rounded-md bg-white px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
           type="submit"

@@ -24,12 +24,12 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
                 </div>
                 <div class="col-span-6 sm:col-span-2 text-right space-y-1">
                   <% if uid = @identities[provider.to_s] %>
-                    <% form(action: "/account/login-method/disconnect", role: :form, method: :post, class: :grow) do %>
+                    <% form(action: "/account/login-method/disconnect", method: :post, class: :grow) do %>
                       <%== hidden_inputs(provider:, uid:) %>
                       <%== part("components/button", text: "Disconnect", type: "danger") %>
                     <% end %>
                   <% else %>
-                    <% form(action: rodauth.omniauth_request_path(provider, redirect_url: "/account/login-method"), role: :form, method: :post, class: :grow) do %>
+                    <% form(action: rodauth.omniauth_request_path(provider, redirect_url: "/account/login-method"), method: :post, class: :grow) do %>
                       <%== part("components/button", text: "Connect") %>
                     <% end %>
                   <% end %>
@@ -50,7 +50,7 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
                     account to log in to your Ubicloud account using OIDC</p>
                 </div>
                 <div class="col-span-6 sm:col-span-2 text-right space-y-1">
-                  <% form(action: "/account/login-method/disconnect", role: :form, method: :post, class: :grow) do %>
+                  <% form(action: "/account/login-method/disconnect", method: :post, class: :grow) do %>
                     <%== hidden_inputs(provider:, uid:) %>
                     <%== part("components/button", text: "Disconnect", type: "danger") %>
                   <% end %>
@@ -60,7 +60,7 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
           <% end %>
 
           <div id="login-method-connect-oidc" class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
-            <form action="/account/login-method/oidc" role="form" method="GET" class="grow">
+            <form action="/account/login-method/oidc" method="GET" class="grow">
               <div class="mt-6 grid grid-cols-6 gap-6">
                 <div class="col-span-6 sm:col-span-4">
                   <div class="text-lg font-medium leading-6 text-gray-900">Login using an OIDC provider</div>
@@ -90,7 +90,7 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
               <div class="col-span-6 sm:col-span-2 text-right space-y-2">
                 <%== part("components/button", text: rodauth.has_password? ? "Change" : "Create", link: "/account/change-password") %>
                 <% if rodauth.has_password? %>
-                  <% form(action: "/account/login-method/disconnect", role: :form, method: :post, class: :grow) do %>
+                  <% form(action: "/account/login-method/disconnect", method: :post, class: :grow) do %>
                     <%== hidden_inputs(provider: "password") %>
                     <%== part("components/button", text: "Delete", type: "danger") %>
                   <% end %>

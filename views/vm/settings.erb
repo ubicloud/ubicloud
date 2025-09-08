@@ -18,7 +18,7 @@
     <!-- Restart Card -->
     <% if edit_perm %>
       <div class="px-4 py-5 sm:p-6">
-        <% form(action: "#{path(@vm)}/restart", role: :form, method: :post) do %>
+        <% form(action: "#{path(@vm)}/restart", method: :post) do %>
           <div class="sm:flex sm:items-center sm:justify-between">
             <div>
               <h3 class="text-base font-semibold leading-6 text-gray-900">Restart virtual machine</h3>

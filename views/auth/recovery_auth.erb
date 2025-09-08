@@ -2,7 +2,7 @@
 
 <% @page_message = "Verify your sign in" %>
 
-<% form(action: rodauth.recovery_auth_path, role: :form, method: :post, class: "rodauth space-y-6") do %>
+<% form(action: rodauth.recovery_auth_path, method: :post, class: "rodauth space-y-6") do %>
 
   <%== part(
     "components/form/text",
