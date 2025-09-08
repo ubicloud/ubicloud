@@ -23,6 +23,76 @@ RSpec.describe Sshable do
     expect(sa.raw_private_key_1).to eq(key)
   end
 
+  describe "#maybe_ssh_session_lock_name" do
+    it "does not yield if SSH_SESSION_LOCK_NAME is not defined" do
+      expect(sa.maybe_ssh_session_lock_name).to be_nil
+    end
+
+    unless ENV["CLOVER_FREEZE"]
+      it "yields if SSH_SESSION_LOCK_NAME is defined" do
+        stub_const("SSH_SESSION_LOCK_NAME", "testlockname")
+        expect(sa.maybe_ssh_session_lock_name).to eq("testlockname")
+      end
+    end
+  end
+
+  describe "session locking" do
+    lock_script = <<LOCK
+exec 999>/dev/shm/session-lock-testlockname || exit 92
+flock -xn 999 || { echo "Another session active: " testlockname; exit 124; }
+exec -a session-lock-testlockname sleep infinity </dev/null >/dev/null 2>&1 &
+disown
+LOCK
+
+    it "interlocks" do
+      portable_pkill = lambda { system(%q(ps -eo pid,args | awk '$2=="session-lock-testlockname"{print $1}' | xargs -I {} sh -c 'test -n "{}" && kill {}')) }
+      portable_pkill.call
+      q_lock_script = lock_script.shellescape
+      expect([`bash -c #{q_lock_script}`, $?.exitstatus]).to eq(["", 0])
+      expect([`bash -c #{q_lock_script}`, $?.exitstatus]).to eq(["Another session active:  testlockname\n", 124])
+      expect(portable_pkill.call).to be true
+    end
+
+    describe "exit code handling" do
+      before do
+        expect(sa).to receive(:maybe_ssh_session_lock_name).and_return("testlockname")
+        sa.invalidate_cache_entry
+        expect(Net::SSH).to receive(:start) do
+          instance_double(Net::SSH::Connection::Session, close: nil)
+        end
+      end
+
+      it "runs the session lock script if SSH_SESSION_LOCK_NAME is set" do
+        expect(sa).to receive(:cmd).with(lock_script, log: false)
+        sa.connect
+      end
+
+      it "reports a failure to obtain a file descriptor with an obscure exit code" do
+        expect(sa).to receive(:cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 92, nil))
+        expect(Clog).to receive(:emit).with("session lock failure").and_wrap_original do |m, a, &b|
+          expect(b.call.dig(:contended_session_lock, :session_fail_msg)).to eq("could not create session lock file for testlockname")
+        end
+        sa.connect
+      end
+
+      it "reports lock conflicts when an obscure exit code is raised" do
+        expect(sa).to receive(:cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 124, nil))
+        expect(Clog).to receive(:emit).with("session lock failure").and_wrap_original do |m, a, &b|
+          expect(b.call.dig(:contended_session_lock, :session_fail_msg)).to eq("session lock conflict for testlockname")
+        end
+        sa.connect
+      end
+
+      it "has a generic message for unrecognized errors" do
+        expect(sa).to receive(:cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 1, nil))
+        expect(Clog).to receive(:emit).with("session lock failure").and_wrap_original do |m, a, &b|
+          expect(b.call.dig(:contended_session_lock, :session_fail_msg)).to eq("unknown SshError")
+        end
+        sa.connect
+      end
+    end
+  end
+
   describe "caching" do
     # The cache is thread local, so re-set the thread state by boxing
     # each test in a new thread.

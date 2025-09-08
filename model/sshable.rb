@@ -135,6 +135,10 @@ class Sshable < Sequel::Model
                      verify_host_key: :accept_new, keys: [], key_data: [], use_agent: false,
                      keepalive: true, keepalive_interval: 3, keepalive_maxcount: 5}.freeze
 
+  def maybe_ssh_session_lock_name
+    SSH_SESSION_LOCK_NAME if defined?(SSH_SESSION_LOCK_NAME)
+  end
+
   def connect
     Thread.current[:clover_ssh_cache] ||= {}
 
@@ -148,6 +152,33 @@ class Sshable < Sequel::Model
     sess = start_fresh_session
     @connect_duration = Time.now - start
     Thread.current[:clover_ssh_cache][[host, unix_user]] = sess
+
+    if (lock_name = maybe_ssh_session_lock_name&.shellescape)
+      lock_contents = <<LOCK
+exec 999>/dev/shm/session-lock-#{lock_name} || exit 92
+flock -xn 999 || { echo "Another session active: " #{lock_name}; exit 124; }
+exec -a session-lock-#{lock_name} sleep infinity </dev/null >/dev/null 2>&1 &
+disown
+LOCK
+
+      begin
+        cmd(lock_contents, log: false)
+      rescue SshError => ex
+        session_fail_msg = case (exit_code = ex.exit_code)
+        when 92
+          "could not create session lock file for #{lock_name}"
+        when 124
+          "session lock conflict for #{lock_name}"
+        else
+          "unknown SshError"
+        end
+
+        Clog.emit("session lock failure") do
+          {contended_session_lock: {exit_code:, session_fail_msg:}}
+        end
+      end
+    end
+
     sess
   end
 
