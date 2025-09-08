@@ -36,8 +36,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         name: ubid.to_s,
         size: postgres_resource.target_vm_size,
         storage_volumes: [
-          {encrypted: true, size_gib: 30},
-          {encrypted: true, size_gib: postgres_resource.target_storage_size_gib}
+          {encrypted: true, size_gib: 30, vring_workers: 1},
+          {encrypted: true, size_gib: postgres_resource.target_storage_size_gib, vring_workers: 1}
         ],
         boot_image: boot_image,
         private_subnet_id: postgres_resource.private_subnet_id,
