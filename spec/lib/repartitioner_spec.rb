@@ -70,38 +70,51 @@ RSpec.describe Repartitioner do
 
     it "repartitions when an existing partition goes stale" do
       @mp = mp = repartitioner(listen_timeout: 0.01, recheck_seconds: 0.01)
-      q = Queue.new
+      notify_q = Queue.new
+      repartition_3q = Queue.new
+      repartition_2q = Queue.new
       notified = false
       mp.define_singleton_method(:notify) do
         super()
-        q.push nil unless notified
-        notified = true
+        unless notified
+          notified = true
+          notify_q.push true
+        end
       end
       mp.define_singleton_method(:repartition) do |n|
         super(n)
-        q.push nil if n > 1
+
+        case n
+        when 3
+          repartition_3q.push true
+        when 2
+          repartition_2q.push true
+        end
       end
       @th = Thread.new { mp.listen }
 
-      q.pop(timeout: 1)
+      expect(notify_q.pop(timeout: 1)).to be true
       expect(mp).to receive(:repartition).with(3).and_call_original
       expect(mp.strand_id_range).to eq("00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff")
-      q2 = Queue.new
-      Thread.new do
+      t = Thread.new do
         repartitioner(partition_number: 3).notify
-        q2.push nil
-      end.join(1)
-      Thread.new do
-        q2.pop
-        repartitioner(partition_number: 2).notify
-      end.join(1)
+        true
+      end
+      t.join(1)
+      expect(t.value).to be true
 
-      q.pop(timeout: 1)
+      expect(repartition_3q.pop(timeout: 1)).to be true
       expect(mp.strand_id_range).to eq("00000000-0000-0000-0000-000000000000"..."55555555-0000-0000-0000-000000000000")
+      t = Thread.new do
+        repartitioner(partition_number: 2).notify
+        true
+      end
+      t.join(1)
+      expect(t.value).to be true
 
       expect(mp).to receive(:repartition).with(2).and_call_original
       mp.instance_variable_get(:@partition_times)[3] = Time.now - 60
-      q.pop(timeout: 1)
+      expect(repartition_2q.pop(timeout: 1)).to be true
       expect(mp.strand_id_range).to eq("00000000-0000-0000-0000-000000000000"..."80000000-0000-0000-0000-000000000000")
     end
 
