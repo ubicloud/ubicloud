@@ -29,3 +29,13 @@
     animation: sweep 1.6s linear infinite;
   }
 }
+
+#creation-form {
+  #new-private-subnet-name {
+    display: none;
+  }
+
+  &:has(select#private_subnet_id option[value^=new-]:checked) #new-private-subnet-name {
+    display: block;
+  }
+}

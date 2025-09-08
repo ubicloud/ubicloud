@@ -25,6 +25,7 @@
     {name: "name", type: "text", label: "Name", placeholder: "Enter name", required: "required", opening_tag: "<div class='sm:col-span-3'>"},
     {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::Vm.method(:location)},
     {name: "private_subnet_id", type: "select", label: "Private Subnet", placeholder: "Default", description_html: ps_description, content_generator: ContentGenerator::Vm.method(:private_subnet), opening_tag: "<div class='sm:col-span-3'>"},
+    {name: "new_private_subnet_name", type: "text", label: "Private Subnet Name", placeholder: "Private Subnet Name", opening_tag: "<div class='sm:col-span-3' id='new-private-subnet-name'>", value: typecast_body_params.str("new_private_subnet_name")},
     {name: "enable_ip4", type: "checkbox", label: "Public IPv4 Support", description: "Needed for inbound and outbound public IPv4 connections. Websites that do not support IPv6 will be inaccessible without an IPv4 address.", content_generator: ContentGenerator::Vm.method(:enable_ipv4)},
     {name: "family", type: "radio_small_cards", label: "Server family", required: "required", content_generator: ContentGenerator::Vm.method(:family)}
   ]
