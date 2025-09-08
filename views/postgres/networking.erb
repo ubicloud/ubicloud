@@ -49,7 +49,7 @@
           </td>
           <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">5432, 6432</td>
           <td class="py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-            <% form(action: "#{path(@pg)}/firewall-rule", role: :form, method: :post, id: "form-pg-fwr-create") do %>
+            <% form(action: "#{path(@pg)}/firewall-rule", method: :post, id: "form-pg-fwr-create") do %>
               <%== part("components/form/submit_button", text: "Create", extra_class: "firewall-rule-create-button") %>
             <% end %>
           </td>

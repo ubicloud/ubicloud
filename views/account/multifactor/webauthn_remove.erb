@@ -10,7 +10,7 @@
         <div class="divide-y divide-gray-200 lg:col-span-8 xl:col-span-9 2xl:col-span-10 pb-10">
           <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
             <h2 class="text-lg font-medium leading-6 text-gray-900">Remove Security Key</h2>
-            <% form(action: rodauth.webauthn_remove_path, role: :form, method: :post, id: "webauthn-remove-form") do %>
+            <% form(action: rodauth.webauthn_remove_path, method: :post, id: "webauthn-remove-form") do %>
               <%== rodauth.webauthn_remove_additional_form_tags %>
               <div class="mt-6 grid grid-cols-6 gap-6">
                 <% if rodauth.two_factor_modifications_require_password? %>

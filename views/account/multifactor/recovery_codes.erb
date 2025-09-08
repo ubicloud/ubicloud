@@ -11,7 +11,7 @@
           <% if rodauth.two_factor_modifications_require_password? %>
             <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
               <h2 class="text-lg font-medium leading-6 text-gray-900">Recovery Codes</h2>
-              <% form(action: rodauth.recovery_codes_path, role: :form, method: :post) do %>
+              <% form(action: rodauth.recovery_codes_path, method: :post) do %>
                 <div class="mt-6 grid grid-cols-6 gap-6">
                   <div class="col-span-6 sm:col-span-2">
                     <%== render("components/rodauth/password_field") %>
@@ -51,7 +51,7 @@
             <% if rodauth.can_add_recovery_codes? %>
               <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
                 <h2 class="text-lg font-medium leading-6 text-gray-900"><%== rodauth.add_recovery_codes_heading %></h2>
-                <% form(action: rodauth.recovery_codes_path, role: :form, method: :post) do %>
+                <% form(action: rodauth.recovery_codes_path, method: :post) do %>
                   <div class="mt-6 grid grid-cols-6 gap-6">
                     <div class="col-span-6">
                       <%== part("components/form/submit_button", text: rodauth.add_recovery_codes_button, name: rodauth.add_recovery_codes_param) %>
