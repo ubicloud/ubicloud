@@ -172,7 +172,7 @@ GEM
       thor (~> 1.4)
     forme (2.6.0)
       bigdecimal
-    hashdiff (1.2.0)
+    hashdiff (1.2.1)
     hashery (2.1.2)
     hashie (5.0.0)
     i18n (1.14.7)
@@ -317,7 +317,7 @@ GEM
     regexp_parser (2.11.2)
     reline (0.6.2)
       io-console (~> 0.5)
-    rexml (3.4.2)
+    rexml (3.4.3)
     rodauth (2.40.0)
       roda (>= 2.6.0)
       sequel (>= 4)
