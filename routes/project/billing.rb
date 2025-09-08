@@ -131,7 +131,7 @@ class Clover
           })
         end
 
-        flash["notice"] = "Billing info updated"
+        flash["notice"] = "Payment method added successfully. $#{preauth_amount / 100} is authorized on your card for verification purposes. It's canceled already and depending on your bank, it may take up to two weeks to refund the money."
         r.redirect billing_path
       end
 

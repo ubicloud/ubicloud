@@ -79,7 +79,7 @@ RSpec.describe Clover, "billing" do
       click_button "Add new billing information"
 
       expect(page.title).to eq("Ubicloud - Project Billing")
-      expect(page).to have_flash_notice("Billing info updated")
+      expect(page).to have_flash_notice("Payment method added successfully. $#{PaymentMethod[stripe_id: "pm_1234567890"].preauth_amount / 100} is authorized on your card for verification purposes. It's canceled already and depending on your bank, it may take up to two weeks to refund the money.")
 
       billing_info = project.reload.billing_info
       expect(page.status_code).to eq(200)
@@ -221,6 +221,7 @@ RSpec.describe Clover, "billing" do
       expect(billing_info.payment_methods.count).to eq(2)
       expect(page).to have_content "Visa"
       expect(page).to have_content "Mastercard"
+      expect(page).to have_flash_notice "Payment method added successfully. $#{PaymentMethod[stripe_id: "pm_222222222"].preauth_amount / 100} is authorized on your card for verification purposes. It's canceled already and depending on your bank, it may take up to two weeks to refund the money."
     end
 
     it "can copy billing address from new payment method when missing" do
