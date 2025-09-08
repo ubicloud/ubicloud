@@ -1,7 +1,7 @@
 <% @page_title = "#{@klass.name} #{@obj.ubid}" %>
 
 <% if @klass.associations.include?(:sshable) && (sshable = @obj.sshable) %>
-  <p>SSH Command: <code>ssh -i &lt;PRIVATE_KEY_PATH&gt; <%= sshable.unix_user %>@<%= sshable.host %></code></p>
+  <p>SSH Command: <code>ssh root@<%= sshable.host %></code></p>
 <% end %>
 
 <div id="strand-info">

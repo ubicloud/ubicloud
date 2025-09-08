@@ -127,7 +127,7 @@ RSpec.describe CloverAdmin do
     fill_in "UBID", with: vm_host.ubid
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vm_host.ubid}"
-    expect(page).to have_content "SSH Command: ssh -i <PRIVATE_KEY_PATH> rhizome@1.2.3.4"
+    expect(page).to have_content "SSH Command: ssh root@1.2.3.4"
 
     visit "/"
     fill_in "UBID", with: vm_pool.ubid
