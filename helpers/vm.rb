@@ -54,12 +54,20 @@ class Clover
       assemble_params.delete(:gpu)
     end
 
-    if assemble_params[:private_subnet_id]
-      unless (ps = authorized_private_subnet(location_id: @location.id))
-        fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{assemble_params[:private_subnet_id]}\" is not found in the location \"#{@location.display_name}\""})
+    if (ps_id = assemble_params[:private_subnet_id])
+      if web? && ps_id.start_with?("new-")
+        assemble_params[:private_subnet_id] = nil
+        ps_name = typecast_params.nonempty_str!("new_private_subnet_name")
+        unless ps_name.match(Validation::ALLOWED_NAME_PATTERN)
+          fail Validation::ValidationFailed.new({new_private_subnet_name: "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."})
+        end
+        assemble_params[:new_private_subnet_name] = ps_name
+      elsif (ps = authorized_private_subnet(location_id: @location.id))
+        assemble_params[:private_subnet_id] = ps.id
+      else
+        fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{ps_id}\" is not found in the location \"#{@location.display_name}\""})
       end
     end
-    assemble_params[:private_subnet_id] = ps&.id
 
     requested_vm_vcpu_count = parsed_size.nil? ? 2 : parsed_size.vcpus
     Validation.validate_vcpu_quota(project, "VmVCpu", requested_vm_vcpu_count)
@@ -137,6 +145,13 @@ class Clover
         display_name: it.name
       }
     }
+    Option.locations(feature_flags: @project.feature_flags).each do |location|
+      subnets << {
+        location_id: location.id,
+        value: "new-#{location.ubid}",
+        display_name: "New Private Subnet"
+      }
+    end
     options.add_option(name: "private_subnet_id", values: subnets, parent: "location") do |location, private_subnet|
       private_subnet[:location_id] == location.id
     end

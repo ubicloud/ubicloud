@@ -215,6 +215,36 @@ RSpec.describe Clover, "vm" do
         expect(Vm.first.ip4_enabled).to be_truthy
       end
 
+      it "can create new virtual machine in a new private subnet" do
+        project
+
+        visit "#{project.path}/vm/create"
+
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+        name = "dummy-vm"
+        fill_in "Name", with: name
+        fill_in "SSH Public Key", with: "a a"
+        find("option[value=new-#{Location::HETZNER_FSN1_UBID}]").select_option
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "ubuntu-jammy"
+        choose option: "standard-2"
+        click_button "Create"
+        expect(page).to have_flash_error("empty string provided for parameter new_private_subnet_name")
+
+        fill_in "Private Subnet Name", with: "bad ps name"
+        click_button "Create"
+        expect(page).to have_flash_error("Validation failed for following fields: new_private_subnet_name")
+        expect(page).to have_content("Name must only contain lowercase letters, numbers, and hyphens and have max length 63.")
+        fill_in "Private Subnet Name", with: "test-ps-name"
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
+        expect(Vm.count).to eq(1)
+        expect(Vm.first.project_id).to eq(project.id)
+        expect(Vm.first.private_subnets.first.name).to eq "test-ps-name"
+      end
+
       it "can create a virtual machine with gpu" do
         project
         project.set_ff_gpu_vm(true)
