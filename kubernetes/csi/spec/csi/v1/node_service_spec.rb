@@ -918,21 +918,16 @@ RSpec.describe Csi::V1::NodeService do
     it "trims PVC metadata and spec for recreation" do
       result = service.trim_pvc(pvc, pv_name)
 
-      # Should set the old PV name annotation
-      expect(result["metadata"]["annotations"]).to eq({"csi.ubicloud.com/old-pv-name" => pv_name})
+      expect(result["metadata"]["annotations"]).to eq({"csi.ubicloud.com/old-pv-name" => pv_name, "existing-annotation" => "value"})
 
-      # Should remove metadata fields
       expect(result["metadata"]).not_to have_key("resourceVersion")
       expect(result["metadata"]).not_to have_key("uid")
       expect(result["metadata"]).not_to have_key("creationTimestamp")
 
-      # Should remove volumeName from spec
       expect(result["spec"]).not_to have_key("volumeName")
 
-      # Should remove status
       expect(result).not_to have_key("status")
 
-      # Should return the same object
       expect(result).to eq(pvc)
     end
   end
