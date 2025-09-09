@@ -21,23 +21,30 @@
       "components/kv_data_card",
       data: [
         ["ID", @project.ubid],
-        (
+        *(
           if has_permission?("Project:edit", @project)
             [
-              "Name",
-              part(
-                "components/form/text",
-                name: "name",
-                value: @project.name,
-                button_title: "Save",
-                attributes: {
-                  required: true
-                }
-              ),
-              { escape: false }
+              [
+                "Name",
+                part(
+                  "components/form/text",
+                  name: "name",
+                  value: @project.name,
+                  button_title: "Save",
+                  attributes: {
+                    required: true
+                  }
+                ),
+                { escape: false }
+              ],
+              [
+                "SSH Public Keys",
+                "<a href=\"#{@project.path}/ssh-public-key\" class=\"font-semibold leading-6 text-orange-500 hover:text-orange-700\">Manage</a>",
+                { escape: false}
+              ]
             ]
           else
-            ["Name", @project.name]
+            [["Name", @project.name]]
           end
         )
       ]
