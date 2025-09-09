@@ -18,12 +18,16 @@ module Validation
 
     def validate
       super
-      if new?
+      if validate_ssh_public_key?
         validates_format(VALID_SSH_AUTHORIZED_KEYS, :public_key, message: "invalid SSH public key format")
         unless errors.on(:public_key)
           validates_format(VALID_SSH_PUBLIC_KEY_LINE, :public_key, message: "must contain at least one valid SSH public key")
         end
       end
+    end
+
+    def validate_ssh_public_key?
+      new?
     end
   end
 
