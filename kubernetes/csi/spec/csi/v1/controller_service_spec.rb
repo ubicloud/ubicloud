@@ -172,7 +172,7 @@ RSpec.describe Csi::V1::ControllerService do
       it "raises OUT_OF_RANGE when volume size exceeds maximum" do
         request = Csi::V1::CreateVolumeRequest.new(
           name: "test",
-          capacity_range: {required_bytes: 3 * 1024 * 1024 * 1024} # 3GB > 2GB max
+          capacity_range: {required_bytes: 11 * 1024 * 1024 * 1024} # 11GB > 10GB max
         )
         expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume size exceeds maximum allowed size of 2GB")
       end

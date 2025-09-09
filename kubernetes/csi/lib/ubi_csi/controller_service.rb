@@ -10,7 +10,7 @@ module Csi
     class ControllerService < Controller::Service
       include Csi::ServiceHelper
 
-      MAX_VOLUME_SIZE = 2 * 1024 * 1024 * 1024 # 2GB in bytes
+      MAX_VOLUME_SIZE = 10 * 1024 * 1024 * 1024 # 10GB in bytes
 
       def initialize(logger:)
         @logger = logger
