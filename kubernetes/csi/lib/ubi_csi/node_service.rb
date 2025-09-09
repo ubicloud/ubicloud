@@ -303,7 +303,9 @@ module Csi
       end
 
       def trim_pvc(pvc, pv_name)
-        pvc["metadata"]["annotations"] = {OLD_PV_NAME_ANNOTATION_KEY => pv_name}
+        pvc["metadata"]["annotations"] ||= {}
+        pvc["metadata"]["annotations"].delete(OLD_PVC_OBJECT_ANNOTATION_KEY)
+        pvc["metadata"]["annotations"][OLD_PV_NAME_ANNOTATION_KEY] = pv_name
         %w[resourceVersion uid creationTimestamp].each do |key|
           pvc["metadata"].delete(key)
         end
