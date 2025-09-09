@@ -19,6 +19,7 @@ module Csi
       VOLUME_BASE_PATH = "/var/lib/ubicsi"
       OLD_PV_NAME_ANNOTATION_KEY = "csi.ubicloud.com/old-pv-name"
       OLD_PVC_OBJECT_ANNOTATION_KEY = "csi.ubicloud.com/old-pvc-object"
+      ACCEPTABLE_FS = ["ext4", "xfs"].freeze
 
       def self.mkdir_p
         FileUtils.mkdir_p(VOLUME_BASE_PATH)
@@ -98,6 +99,14 @@ module Csi
       end
       alias_method :is_copied_pvc?, :pvc_needs_migration?
 
+      def find_file_system(loop_device, req_id:)
+        output, ok = run_cmd("blkid", "-o", "value", "-s", "TYPE", loop_device, req_id:)
+        if !ok
+          raise "Failed to get the loop device filesystem status: #{output}"
+        end
+        output.strip
+      end
+
       def node_stage_volume(req, _call)
         log_request_response(req, "node_stage_volume") do |req_id|
           client = KubernetesClient.new(req_id:, logger: @logger)
@@ -158,18 +167,26 @@ module Csi
             log_with_id(req_id, "Loop device already exists: #{loop_device}")
           end
 
-          should_mkfs = is_new_loop_device
-          # in the case of copied PVCs, the previous has run the mkfs and by doing it again,
-          # we would wipe data so we avoid it here
-          if is_copied_pvc?(pvc)
-            should_mkfs = false
-          end
-          if !req.volume_capability.mount.nil? && should_mkfs
-            fs_type = req.volume_capability.mount.fs_type || "ext4"
-            output, ok = run_cmd("mkfs.#{fs_type}", loop_device, req_id:)
-            unless ok
-              log_with_id(req_id, "gRPC error in node_stage_volume: failed to format device: #{output}")
-              raise GRPC::Internal, "Failed to format device #{loop_device} with #{fs_type}: #{output}"
+          if req.volume_capability.mount
+            current_fs_type = find_file_system(loop_device, req_id:)
+            if !current_fs_type.empty? && !ACCEPTABLE_FS.include?(current_fs_type)
+              error_message = "Unacceptable file system type for #{loop_device}: #{current_fs_type}"
+              log_with_id(req_id, error_message)
+              raise error_message
+            end
+
+            desired_fs_type = req.volume_capability.mount.fs_type || "ext4"
+            if current_fs_type != "" && current_fs_type != desired_fs_type
+              error_message = "Unexpected filesystem on volume. desired: #{desired_fs_type}, current: #{current_fs_type}"
+              log_with_id(req_id, error_message)
+              raise error_message
+            elsif current_fs_type == ""
+              output, ok = run_cmd("mkfs.#{desired_fs_type}", loop_device, req_id:)
+              unless ok
+                error_message = "Failed to format device #{loop_device} with #{desired_fs_type}: #{output}"
+                log_with_id(req_id, error_message)
+                raise error_message
+              end
             end
           end
           unless is_mounted?(staging_path, req_id:)

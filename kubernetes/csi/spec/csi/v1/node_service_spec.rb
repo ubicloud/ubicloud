@@ -154,6 +154,25 @@ RSpec.describe Csi::V1::NodeService do
     end
   end
 
+  describe "#find_file_system" do
+    let(:req_id) { "test-req-id" }
+
+    it "raises an error if blkid command is not successful" do
+      expect(service).to receive(:run_cmd).with("blkid", "-o", "value", "-s", "TYPE", "/dev/loop4", req_id:).and_return(["some error", false])
+      expect { service.find_file_system("/dev/loop4", req_id:) }.to raise_error("Failed to get the loop device filesystem status: some error")
+    end
+
+    it "strips the output and returns the filesystem" do
+      expect(service).to receive(:run_cmd).with("blkid", "-o", "value", "-s", "TYPE", "/dev/loop4", req_id:).and_return(["ext4\n", true])
+      expect(service.find_file_system("/dev/loop4", req_id:)).to eq("ext4")
+    end
+
+    it "returns empty string when no filesystem is installed on the device" do
+      expect(service).to receive(:run_cmd).with("blkid", "-o", "value", "-s", "TYPE", "/dev/loop4", req_id:).and_return(["", true])
+      expect(service.find_file_system("/dev/loop4", req_id:)).to eq("")
+    end
+  end
+
   # Additional tests to cover uncovered branches systematically
   describe "branch coverage improvements" do
     describe "#find_loop_device" do
@@ -253,6 +272,7 @@ RSpec.describe Csi::V1::NodeService do
       allow(service).to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id: req_id).and_return(["", true])
       allow(Dir).to receive(:exist?).with(staging_path).and_return(false)
       allow(service).to receive(:run_cmd).with("mount", "/dev/loop0", staging_path, req_id: req_id).and_return(["", true])
+      allow(service).to receive(:find_file_system).and_return("")
     end
 
     describe "backing file creation logic" do
@@ -311,6 +331,7 @@ RSpec.describe Csi::V1::NodeService do
       it "logs when loop device already exists" do
         expect(FileUtils).to receive(:mkdir_p).with(staging_path)
         expect(service).to receive(:find_loop_device).and_return("/dev/loop1")
+        expect(service).to receive(:find_file_system).with("/dev/loop1", req_id: "test-req-id").and_return("ext4")
         expect(service).to receive(:run_cmd).with("mount", "/dev/loop1", staging_path, req_id: req_id).and_return(["", true])
 
         service.perform_node_stage_volume(req_id, pvc, req, nil)
@@ -324,9 +345,17 @@ RSpec.describe Csi::V1::NodeService do
         allow(service).to receive(:find_loop_device).and_return("/dev/loop0")
       end
 
-      it "skips mkfs when PVC is copied" do
+      it "does nothing if block device is requested" do
         expect(FileUtils).to receive(:mkdir_p).with(staging_path)
-        expect(service).to receive(:is_copied_pvc?).and_return(true)
+
+        req.volume_capability.mount = nil
+        expect(service).not_to receive(:find_file_system)
+        service.perform_node_stage_volume(req_id, pvc, req, nil)
+      end
+
+      it "skips mkfs when filesystem is already created" do
+        expect(FileUtils).to receive(:mkdir_p).with(staging_path)
+        expect(service).to receive(:find_file_system).with("/dev/loop0", req_id:).and_return("ext4")
         expect(service).not_to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id: req_id)
 
         service.perform_node_stage_volume(req_id, pvc, req, nil)
@@ -335,16 +364,33 @@ RSpec.describe Csi::V1::NodeService do
       it "runs nothing when requested storage is already mounted and needs no mkfs" do
         expect(service).to receive_messages(
           find_loop_device: "/dev/loop0",
+          find_file_system: "ext4",
           is_mounted?: true
         )
-
+        expect(service).not_to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id:)
         service.perform_node_stage_volume(req_id, pvc, req, nil)
+      end
+
+      it "raises an error if device filesystem is not in the acceptable list of filesystems" do
+        expect(service).to receive_messages(
+          find_loop_device: "/dev/loop0",
+          find_file_system: "zfs"
+        )
+        expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error("13:NodeStageVolume error: Unacceptable file system type for /dev/loop0: zfs")
+      end
+
+      it "raises an error if current filesystem differs from the expected file_system" do
+        expect(service).to receive_messages(
+          find_loop_device: "/dev/loop0",
+          find_file_system: "xfs"
+        )
+        expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error("13:NodeStageVolume error: Unexpected filesystem on volume. desired: ext4, current: xfs")
       end
 
       it "handles mkfs failure" do
         expect(service).to receive_messages(
           find_loop_device: nil,  # New loop device
-          is_copied_pvc?: false
+          find_file_system: ""
         )
         expect(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id: req_id).and_return(["/dev/loop0", true])
         expect(service).to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id: req_id).and_return(["mkfs error", false])
@@ -355,7 +401,7 @@ RSpec.describe Csi::V1::NodeService do
       it "handles mount failure" do
         expect(service).to receive_messages(
           find_loop_device: "/dev/loop0",
-          is_copied_pvc?: false,
+          find_file_system: "",
           is_mounted?: false
         )
         expect(FileUtils).to receive(:mkdir_p).with(staging_path)
