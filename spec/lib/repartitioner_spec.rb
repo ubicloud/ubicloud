@@ -106,30 +106,33 @@ RSpec.describe Repartitioner do
     end
 
     it "emits and otherwise ignores invalid partition numbers" do
-      @mp = mp = repartitioner(listen_timeout: 0.01)
+      @mp = mp = repartitioner(listen_timeout: 0.01, max_partition: 1)
       q = Queue.new
+      listen_q = Queue.new
+      expect(mp.strand_id_range).to eq("00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff")
+      expect(mp).not_to receive(:repartition)
       mp.define_singleton_method(:notify) do
         super()
-        q.push nil
+        listen_q.push true
       end
+
       @th = Thread.new { mp.listen }
-
-      q.pop(timeout: 1)
-      expect(mp.strand_id_range).to eq("00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff")
-
-      received_invalid = false
+      expect(listen_q.pop(timeout: 1)).to be true
       expect(Clog).to receive(:emit).at_least(:once).and_wrap_original do |m, msg, &blk|
         m.call(msg, &blk)
         if msg == "invalid #{channel} repartition notification"
-          received_invalid = true
-          q.push nil
+          q.push true
         end
       end
-      Thread.new { repartitioner(partition_number: 1000).notify }.join(1)
+      th = Thread.new do
+        repartitioner(partition_number: 1000).notify
+        true
+      end
+      th.join(1)
+      expect(th.value).to be true
 
-      q.pop(timeout: 1)
+      expect(q.pop(timeout: 1)).to be true
       expect(mp.strand_id_range).to eq("00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff")
-      expect(received_invalid).to be true
     end
 
     it "stops listen loop if notification is received after shutting down" do
