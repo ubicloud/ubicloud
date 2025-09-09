@@ -317,11 +317,13 @@ module Csi
           staging_path = req.staging_target_path
           target_path = req.target_path
           begin
-            FileUtils.mkdir_p(target_path)
-            output, ok = run_cmd("mount", "--bind", staging_path, target_path, req_id:)
-            unless ok
-              log_with_id(req_id, "gRPC error in node_publish_volume: failed to bind mount device: #{output}")
-              raise GRPC::Internal, "Failed to bind mount #{staging_path} to #{target_path}: #{output}"
+            unless is_mounted?(target_path, req_id:)
+              FileUtils.mkdir_p(target_path)
+              output, ok = run_cmd("mount", "--bind", staging_path, target_path, req_id:)
+              unless ok
+                log_with_id(req_id, "gRPC error in node_publish_volume: failed to bind mount device: #{output}")
+                raise GRPC::Internal, "Failed to bind mount #{staging_path} to #{target_path}: #{output}"
+              end
             end
           rescue GRPC::BadStatus => e
             log_with_id(req_id, "gRPC error in node_publish_volume: #{e.class} - #{e.message}")
