@@ -748,6 +748,7 @@ RSpec.describe Csi::V1::NodeService do
   describe "#node_publish_volume" do
     let(:staging_path) { "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/vol-test-123/globalmount" }
     let(:target_path) { "/var/lib/kubelet/pods/pod-123/volumes/kubernetes.io~csi/vol-test-123/mount" }
+    let(:req_id) { "test-req-id" }
     let(:req) do
       Csi::V1::NodePublishVolumeRequest.new(
         volume_id: "vol-test-123",
@@ -764,7 +765,14 @@ RSpec.describe Csi::V1::NodeService do
       allow(SecureRandom).to receive(:uuid).and_return("test-req-id")
     end
 
+    it "does nothing if target_path is already mounted" do
+      expect(service).to receive(:is_mounted?).with(target_path, req_id:).and_return(true)
+      result = service.node_publish_volume(req, nil)
+      expect(result).to be_a(Csi::V1::NodePublishVolumeResponse)
+    end
+
     it "publishes a volume successfully" do
+      expect(service).to receive(:is_mounted?).with(target_path, req_id:).and_return(false)
       expect(FileUtils).to receive(:mkdir_p).with(target_path)
       expect(service).to receive(:run_cmd).with("mount", "--bind", staging_path, target_path, req_id: "test-req-id").and_return(["", true])
 
@@ -774,6 +782,7 @@ RSpec.describe Csi::V1::NodeService do
     end
 
     it "handles bind mount failure" do
+      expect(service).to receive(:is_mounted?).with(target_path, req_id:).and_return(false)
       expect(FileUtils).to receive(:mkdir_p).with(target_path)
       expect(service).to receive(:run_cmd).with("mount", "--bind", staging_path, target_path, req_id: "test-req-id").and_return(["mount error", false])
 
@@ -782,6 +791,7 @@ RSpec.describe Csi::V1::NodeService do
     end
 
     it "handles GRPC::BadStatus exceptions" do
+      expect(service).to receive(:is_mounted?).with(target_path, req_id:).and_return(false)
       expect(FileUtils).to receive(:mkdir_p).with(target_path).and_raise(GRPC::InvalidArgument, "Invalid argument")
 
       expect(service).to receive(:log_with_id).with("test-req-id", /gRPC error in node_publish_volume/)
@@ -789,6 +799,7 @@ RSpec.describe Csi::V1::NodeService do
     end
 
     it "handles general exceptions and converts to GRPC::Internal" do
+      expect(service).to receive(:is_mounted?).with(target_path, req_id:).and_return(false)
       expect(FileUtils).to receive(:mkdir_p).with(target_path).and_raise(StandardError, "Unexpected error")
 
       expect(service).to receive(:log_with_id).with("test-req-id", /Internal error in node_publish_volume/)
