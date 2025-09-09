@@ -105,6 +105,7 @@ class Clover < Roda
     PaymentMethod
     PostgresResource
     PrivateSubnet
+    SshPublicKey
     SubjectTag
     Vm
   ].each { path(it, class_name: true, &under_project_path) }
