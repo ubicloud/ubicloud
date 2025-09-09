@@ -107,6 +107,29 @@ RSpec.describe Csi::V1::NodeService do
       end
     end
 
+    describe "#remove_loop_device" do
+      let(:req_id) { "test-req-id" }
+      let(:volume_id) { "vol-test-123" }
+      let(:backing_file) { "/var/lib/ubicsi/vol-test-123.img" }
+
+      it "returns early when loop device is not found" do
+        expect(service).to receive(:find_loop_device).and_return(nil)
+        service.remove_loop_device(backing_file, req_id:)
+      end
+
+      it "tries to remove the loop device but gets an error" do
+        expect(service).to receive(:find_loop_device).and_return("/dev/loop4")
+        expect(service).to receive(:run_cmd).with("losetup", "-d", "/dev/loop4", req_id:).and_return(["some output", false])
+        expect { service.remove_loop_device(backing_file, req_id:) }.to raise_error("Could not remove loop device: some output")
+      end
+
+      it "successfully removes the loop device" do
+        expect(service).to receive(:find_loop_device).and_return("/dev/loop4")
+        expect(service).to receive(:run_cmd).with("losetup", "-d", "/dev/loop4", req_id:).and_return(["some output", true])
+        expect { service.remove_loop_device(backing_file, req_id:) }.not_to raise_error
+      end
+    end
+
     describe "#pvc_needs_migration?" do
       it "returns true when old PV name annotation exists" do
         pvc = {
@@ -587,6 +610,7 @@ RSpec.describe Csi::V1::NodeService do
 
     it "unstages a volume successfully when node is schedulable" do
       expect(client).to receive(:node_schedulable?).with(service.node_id).and_return(true)
+      expect(service).to receive(:remove_loop_device)
       expect(service).to receive(:is_mounted?).with(req.staging_target_path, req_id: "test-req-id").and_return(true)
 
       result = service.node_unstage_volume(req, nil)
@@ -596,6 +620,7 @@ RSpec.describe Csi::V1::NodeService do
     it "prepares data migration when node is not schedulable" do
       expect(client).to receive(:node_schedulable?).with(service.node_id).and_return(false)
       expect(service).to receive(:prepare_data_migration).with(client, "test-req-id", "vol-test-123")
+      expect(service).to receive(:remove_loop_device)
       expect(service).to receive(:is_mounted?).with(req.staging_target_path, req_id:).and_return(true)
 
       result = service.node_unstage_volume(req, nil)
@@ -610,6 +635,7 @@ RSpec.describe Csi::V1::NodeService do
 
     it "handles umount failure when staging path is mounted" do
       expect(client).to receive(:node_schedulable?).with(service.node_id).and_return(true)
+      expect(service).to receive(:remove_loop_device)
       expect(service).to receive(:is_mounted?).with("/var/lib/kubelet/plugins/kubernetes.io/csi/pv/vol-test-123/globalmount", req_id:).and_return(true)
       expect(service).to receive(:run_cmd).with("umount", "-q", "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/vol-test-123/globalmount", req_id:).and_return(["umount: device is busy", false])
 
@@ -618,6 +644,7 @@ RSpec.describe Csi::V1::NodeService do
 
     it "skips umount when staging path is not mounted" do
       expect(client).to receive(:node_schedulable?).with(service.node_id).and_return(true)
+      expect(service).to receive(:remove_loop_device)
       expect(service).to receive(:is_mounted?).with("/var/lib/kubelet/plugins/kubernetes.io/csi/pv/vol-test-123/globalmount", req_id:).and_return(false)
 
       result = service.node_unstage_volume(req, nil)
@@ -626,6 +653,7 @@ RSpec.describe Csi::V1::NodeService do
 
     it "handles GRPC::BadStatus exceptions" do
       expect(client).to receive(:node_schedulable?).with(service.node_id).and_return(true)
+      expect(service).to receive(:remove_loop_device)
       expect(service).to receive(:is_mounted?).with("/var/lib/kubelet/plugins/kubernetes.io/csi/pv/vol-test-123/globalmount", req_id:).and_raise(GRPC::InvalidArgument, "Invalid argument")
 
       expect { service.node_unstage_volume(req, nil) }.to raise_error(GRPC::InvalidArgument, "3:Invalid argument")
@@ -633,6 +661,7 @@ RSpec.describe Csi::V1::NodeService do
 
     it "handles general exceptions and converts to GRPC::Internal" do
       expect(client).to receive(:node_schedulable?).with(service.node_id).and_return(true)
+      expect(service).to receive(:remove_loop_device)
       expect(service).to receive(:is_mounted?).with("/var/lib/kubelet/plugins/kubernetes.io/csi/pv/vol-test-123/globalmount", req_id:).and_raise(StandardError, "Unexpected error")
       expect { service.node_unstage_volume(req, nil) }.to raise_error(GRPC::Internal, "13:NodeUnstageVolume error: StandardError - Unexpected error")
     end

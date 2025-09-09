@@ -79,6 +79,15 @@ module Csi
         nil
       end
 
+      def remove_loop_device(backing_file, req_id:)
+        loop_device = find_loop_device(backing_file, req_id:)
+        return unless loop_device
+        output, ok = run_cmd("losetup", "-d", loop_device, req_id:)
+        if !ok
+          raise "Could not remove loop device: #{output}"
+        end
+      end
+
       def self.backing_file_path(volume_id)
         File.join(VOLUME_BASE_PATH, "#{volume_id}.img")
       end
@@ -230,11 +239,13 @@ module Csi
 
       def node_unstage_volume(req, _call)
         log_request_response(req, "node_unstage_volume") do |req_id|
+          backing_file = NodeService.backing_file_path(req.volume_id)
           begin
             client = KubernetesClient.new(req_id:, logger: @logger)
             if !client.node_schedulable?(@node_id)
               prepare_data_migration(client, req_id, req.volume_id)
             end
+            remove_loop_device(backing_file, req_id:)
             staging_path = req.staging_target_path
             if is_mounted?(staging_path, req_id:)
               output, ok = run_cmd("umount", "-q", staging_path, req_id:)
