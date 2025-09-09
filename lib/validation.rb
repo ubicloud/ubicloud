@@ -11,6 +11,22 @@ module Validation
     end
   end
 
+  module PublicKeyValidation
+    ssh_public_key_line = /(([^# \r\n]|"[^"\r\n]+")+ +)? *[^# \r\n]+ +[A-Za-z0-9+\/]+=*( +[^\r\n]*)?/
+    VALID_SSH_PUBLIC_KEY_LINE = /^#{ssh_public_key_line}\r?$/
+    VALID_SSH_AUTHORIZED_KEYS = /\A(([ \t]*|(#[^\r\n]*)?|#{ssh_public_key_line})(\r?\n|\z))+\z/
+
+    def validate
+      super
+      if new?
+        validates_format(VALID_SSH_AUTHORIZED_KEYS, :public_key, message: "invalid SSH public key format")
+        unless errors.on(:public_key)
+          validates_format(VALID_SSH_PUBLIC_KEY_LINE, :public_key, message: "must contain at least one valid SSH public key")
+        end
+      end
+    end
+  end
+
   # Allow DNS compatible names
   # - Max length 63
   # - Only lowercase letters, numbers, and hyphens
