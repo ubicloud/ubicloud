@@ -46,8 +46,16 @@ class Project < Sequel::Model
     end
   end
 
-  plugin :association_dependencies, accounts: :nullify, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy, access_control_entries: :destroy, subject_tags: :destroy, action_tags: :destroy, object_tags: :destroy,
-    locations: :destroy
+  plugin :association_dependencies,
+    access_control_entries: :destroy,
+    accounts: :nullify,
+    action_tags: :destroy,
+    api_keys: :destroy,
+    billing_info: :destroy,
+    github_installations: :destroy,
+    locations: :destroy,
+    object_tags: :destroy,
+    subject_tags: :destroy
 
   plugin ResourceMethods
 
