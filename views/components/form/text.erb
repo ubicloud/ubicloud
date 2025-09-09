@@ -26,15 +26,5 @@ error = rodauth.field_error(name) || flash.dig("errors", name) %>
       <%== part("components/form/submit_button", text: button_title) %>
     <% end %>
   </div>
-  <% if error %>
-    <% if error.is_a?(Array) %>
-      <p class="text-sm text-red-600 leading-6" id="<%= name %>-error">
-        <% error.each do |e| %>
-          <%= e %><br/>
-        <% end %>
-      </p>
-    <% else %>
-      <p class="text-sm text-red-600 leading-6" id="<%= name %>-error"><%= error %></p>
-    <% end %>
-  <% end %>
+  <%== part("components/form/error", name:, error:) if error %>
 </div>
