@@ -203,7 +203,8 @@ RSpec.describe Clover, "location-credential" do
           name: "dummy-postgres",
           location_id: private_location.id,
           target_vm_size: "standard-2",
-          target_storage_size_gib: 118
+          target_storage_size_gib: 128,
+          desired_version: "16"
         )
 
         visit "#{project.path}#{private_location.path}"
