@@ -83,6 +83,7 @@ module Csi
       def remove_loop_device(backing_file, req_id:)
         loop_device = find_loop_device(backing_file, req_id:)
         return unless loop_device
+
         output, ok = run_cmd("losetup", "-d", loop_device, req_id:)
         unless ok
           raise "Could not remove loop device: #{output}"
@@ -103,6 +104,7 @@ module Csi
         unless ok
           raise "Failed to get the loop device filesystem status: #{output}"
         end
+
         output.strip
       end
 
@@ -139,6 +141,7 @@ module Csi
           unless ok
             raise GRPC::ResourceExhausted.new("Failed to allocate backing file: #{output}")
           end
+
           output, ok = run_cmd("fallocate", "--punch-hole", "--keep-size", "-o", "0", "-l", size_bytes.to_s, backing_file, req_id:)
           unless ok
             raise GRPC::ResourceExhausted.new("Failed to punch hole in backing file: #{output}")
