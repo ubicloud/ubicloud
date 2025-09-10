@@ -28,5 +28,10 @@ module Csi
         Open3.capture2e(*cmd, **kwargs)
       end
     end
+
+    def log_and_raise(req_id, exception)
+      log_with_id(req_id, "#{exception.class}: #{exception.message}\n#{exception.backtrace.join("\n")}")
+      raise GRPC::Internal.new(exception.message)
+    end
   end
 end
