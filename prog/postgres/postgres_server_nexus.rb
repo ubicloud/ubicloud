@@ -8,6 +8,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   subject_is :postgres_server
 
   extend Forwardable
+
   def_delegators :postgres_server, :vm
 
   def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil)

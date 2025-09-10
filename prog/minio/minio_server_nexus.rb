@@ -8,6 +8,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   subject_is :minio_server
 
   extend Forwardable
+
   def_delegators :minio_server, :vm
 
   def self.assemble(minio_pool_id, index)
