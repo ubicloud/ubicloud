@@ -45,7 +45,7 @@ class Clover
 
       r.rename vm, perm: "Vm:edit", serializer: Serializers::Vm, template_prefix: "vm"
 
-      r.show_object(vm, actions: %w[overview networking settings], perm: "Vm:view", template: "vm/show")
+      r.show_object(vm, actions: %w[overview networking storage settings], perm: "Vm:view", template: "vm/show")
 
       r.post "restart" do
         authorize("Vm:edit", vm)
