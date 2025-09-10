@@ -180,6 +180,18 @@ RSpec.describe Ubicloud do
     expect { ps.disconnect("foo/bar") }.to raise_error(Ubicloud::Error, "invalid private subnet id format")
   end
 
+  it "SshPublicKey.new raises if given bad values" do
+    expect { ubi.ssh_public_key.new("a/b") }.to raise_error(Ubicloud::Error, "invalid SSH public key id format")
+    expect { ubi.ssh_public_key.new({}) }.to raise_error(Ubicloud::Error, "hash must have :id or :name key")
+    expect { ubi.ssh_public_key.new([]) }.to raise_error(Ubicloud::Error, "unsupported value initializing Ubicloud::SshPublicKey: []")
+  end
+
+  it "SshPublicKey#check_exists" do
+    spk = ubi.ssh_public_key.new("spk")
+    expect(Clover).to receive(:call).and_return([404, {"content-type" => "application/json"}, ["{}"]])
+    expect(spk.check_exists).to be_nil
+  end
+
   it "Vm.create converts LF to CRLF in public_keys" do
     public_key = nil
     expect(Clover).to receive(:call).twice.and_invoke(proc do |env|

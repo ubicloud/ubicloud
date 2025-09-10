@@ -13,6 +13,7 @@ module Ubicloud
   # +load_balancer+ :: Ubicloud::LoadBalancer
   # +postgres+ :: Ubicloud::Postgres
   # +private_subnet+ :: Ubicloud::PrivateSubnet
+  # +ssh_public_key+ :: Ubicloud::SshPublicKey
   # +vm+ :: Ubicloud::Vm
   class Context
     def initialize(adapter)
@@ -27,7 +28,8 @@ module Ubicloud
       private_subnet: PrivateSubnet,
       load_balancer: LoadBalancer,
       inference_api_key: InferenceApiKey,
-      kubernetes_cluster: KubernetesCluster
+      kubernetes_cluster: KubernetesCluster,
+      ssh_public_key: SshPublicKey
     }.each do |meth, model|
       define_method(meth) { @models[meth] ||= ModelAdapter.new(model, @adapter) }
     end
@@ -39,7 +41,8 @@ module Ubicloud
       "ps" => PrivateSubnet,
       "1b" => LoadBalancer,
       "ak" => InferenceApiKey,
-      "kc" => KubernetesCluster
+      "kc" => KubernetesCluster,
+      "sk" => SshPublicKey
     }.freeze
 
     # Return a new model instance for the given id, assuming the id is properly
