@@ -1747,6 +1747,79 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
+  '/project/{project_id}/ssh-public-key':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: getSshPublicKeys
+      summary: Return the list of SSH public keys in the project
+      responses:
+        '200':
+          $ref: '#/components/responses/SshPublicKeys'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - SSH Public Key
+    post:
+      operationId: registerSshPublicKey
+      summary: Register a SSH public key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SshPublicKeyCreate'
+      responses:
+        '200':
+          $ref: '#/components/responses/SshPublicKey'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - SSH Public Key
+  '/project/{project_id}/ssh-public-key/{ssh_public_key_reference}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/ssh_public_key_reference'
+    get:
+      operationId: getSshPublicKey
+      summary: Get a specific SSH public key
+      responses:
+        '200':
+          $ref: '#/components/responses/SshPublicKey'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - SSH Public Key
+    post:
+      operationId: updateSshPublicKey
+      summary: Update SSH public key information
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SshPublicKeyUpdate'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SshPublicKey'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - SSH Public Key
+    delete:
+      operationId: deleteSshPublicKey
+      summary: Delete a specific SSH public key
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - SSH Public Key
   '/project/{project_id}/vm':
     get:
       operationId: listProjectVMs
@@ -1931,6 +2004,18 @@ components:
         type: string
         example: pjkkmx0f2vke4h36nk9cm8v8q0
         pattern: '^pj[0-9a-hj-km-np-tv-z]{24}$'
+    ssh_public_key_reference:
+      description: SSH public key ID or name
+      examples:
+        id:
+          value: skn30gjk1d1e2jj34v9x0dq4rp
+        name:
+          value: ssh-public-key-name
+      in: path
+      name: ssh_public_key_reference
+      required: true
+      schema:
+        $ref: '#/components/schemas/Reference'
     start_after:
       description: Pagination - Start after
       in: query
@@ -1996,6 +2081,35 @@ components:
       required:
         - pg_config
         - pgbouncer_config
+    SshPublicKeyCreate:
+      type: object
+      properties:
+        name:
+          type: string
+        public_key:
+          type: string
+      additionalProperties: false
+      required:
+        - name
+        - public_key
+    SshPublicKeyUpdate:
+      anyOf:
+        - type: object
+          properties:
+            name:
+              type: string
+            public_key:
+              type: string
+          additionalProperties: false
+          required:
+            - name
+        - type: object
+          properties:
+            public_key:
+              type: string
+          additionalProperties: false
+          required:
+            - public_key
     PostgresPatchConfig:
       anyOf:
         - type: object
@@ -2112,6 +2226,24 @@ components:
         - cidr
         - id
         - port_range
+    SshPublicKey:
+      type: object
+      properties:
+        id:
+          description: ID of the SSH public key
+          type: string
+          example: skaz0q3vbrpa7pkg7zbmah9csn
+          pattern: '^sk[0-9a-hj-km-np-tv-z]{24}$'
+        name:
+          description: Name of the SSH public key
+          type: string
+        public_key:
+          description: SSH public key data
+          type: string
+      additionalProperties: false
+      required:
+        - id
+        - name
     InferenceApiKey:
       type: object
       properties:
@@ -2640,6 +2772,26 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/FirewallRule'
+    SshPublicKey:
+      description: An SSH Public Key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SshPublicKey'
+    SshPublicKeys:
+      description: A list of Ssh Public Keys
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SshPublicKey'
+            additionalProperties: false
+            required:
+              - items
     InferenceApiKey:
       description: An Inference API Key
       content:
@@ -2986,5 +3138,7 @@ tags:
     name: Private Location
   - description: Kubernetes Cluster Operations
     name: Kubernetes Cluster
+  - description: SSH Public Key Operations
+    name: SSH Public Key
 security:
   - BearerAuth: []
