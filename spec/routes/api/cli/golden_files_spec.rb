@@ -21,6 +21,7 @@ RSpec.describe Clover, "cli" do
     expect(PostgresResource).to receive(:generate_uuid).and_return("dd0375a6-1c66-82d0-a5e8-af1e8527a8a2")
     expect(PostgresFirewallRule).to receive(:generate_uuid).and_return("5a601238-b56e-8ecf-bbca-9e3e680812b8", "02d5082e-e75c-82cf-af6f-5f8f5aa89a52")
     expect(PostgresMetricDestination).to receive(:generate_uuid).and_return("45754ea1-c139-8a8d-af18-7b24e0dbc7de")
+    SshPublicKey.create_with_id("32092997-2a00-8f33-8129-4c0f18e5153c", project_id: @project.id, name: "spk", public_key: "a a")
     cli(%w[vm eu-central-h1/test-vm create] << "ssh-rsa a")
     @vm = Vm.first
     add_ipv4_to_vm(@vm, "128.0.0.1")
@@ -97,6 +98,7 @@ RSpec.describe Clover, "cli" do
     ApiKey.create_with_id("13012223-089c-8953-ac55-889bca83c6e5", owner_table: "project", owner_id: @project.id, used_for: "inference_endpoint", project_id: @project.id, key: "89k2Q8FSzNU3lbQ1ZIpS6HCAQzxplOq1")
     expect(ApiKey).to receive(:random_key).and_return("B5T6fbB5wXBX9kZEEdQXmAWbNY9rWuoL").at_least(:once)
     expect(ApiKey).to receive(:generate_uuid).and_return("6677de33-3888-8953-bde1-ed8a8137d507").at_least(:once)
+    expect(SshPublicKey).to receive(:generate_uuid).and_return("7c2410cd-511a-8b33-8771-8a169d368d2d").at_least(:once)
 
     cli_commands = []
     cli_commands.concat File.readlines("spec/routes/api/cli/golden-file-commands/success.txt").map { [it, {}] }

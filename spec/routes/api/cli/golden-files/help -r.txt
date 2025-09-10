@@ -15,6 +15,7 @@ Commands:
     lb         Manage load balancers
     pg         Manage PostgreSQL databases
     ps         Manage private subnets
+    sk         Manage SSH public keys
     version    Display CLI program version
     vm         Manage virtual machines
 
@@ -739,6 +740,72 @@ Allowed Option Values:
     Nic Fields: id name private-ipv4 private-ipv6 vm-name
     Firewall Rule Fields: id cidr port-range
     Firewall Fields: id name description location path firewall-rules
+
+
+Manage SSH public keys
+
+Usage:
+    ubi sk command [...]
+    ubi sk (sk-name | sk-id) post-command [...]
+
+Commands:
+    list       List SSH public keys
+
+Post Commands:
+    create     Register an SSH public key
+    destroy    Destroy an SSH public key
+    rename     Rename an SSH public key
+    show       Show details for an SSH public key
+    update     Update an SSH public key
+
+
+List SSH public keys
+
+Usage:
+    ubi sk (sk-name | sk-id) list [options]
+
+Options:
+    -N, --no-headers                 do not show headers
+
+
+Register an SSH public key
+
+Usage:
+    ubi sk sk-name create public-key
+
+Examples:
+    ubi sk my-sk-name create "$(cat ~/.ssh/id_ed25519.pub)"
+    ubi sk my-sk-name create "$(cat ~/.ssh/authorized_keys)"
+
+
+Destroy an SSH public key
+
+Usage:
+    ubi sk (sk-name | sk-id) destroy [options]
+
+Options:
+    -f, --force                      do not require confirmation
+
+
+Rename an SSH public key
+
+Usage:
+    ubi sk (sk-id | sk-name) rename new-name
+
+
+Show details for an SSH public key
+
+Usage:
+    ubi sk (sk-id | sk-name) show
+
+
+Update an SSH public key
+
+Usage:
+    ubi sk (sk-id | sk-name) update public-key
+
+Examples:
+    ubi sk my-sk-name update "$(cat ~/.ssh/id_ed25519.pub)"
 
 
 Display CLI program version

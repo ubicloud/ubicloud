@@ -75,6 +75,14 @@ ubi ps (location/ps-name | ps-id) destroy [options]
 ubi ps (location/ps-name | ps-id) disconnect (location/ps-name | ps-id)
 ubi ps (location/ps-name | ps-id) rename new-name
 ubi ps (location/ps-name | ps-id) show [options]
+ubi sk command [...]
+ubi sk (sk-name | sk-id) post-command [...]
+ubi sk (sk-name | sk-id) list [options]
+ubi sk sk-name create public-key
+ubi sk (sk-name | sk-id) destroy [options]
+ubi sk (sk-id | sk-name) rename new-name
+ubi sk (sk-id | sk-name) show
+ubi sk (sk-id | sk-name) update public-key
 ubi version
 ubi vm command [...]
 ubi vm (location/vm-name | vm-id) [post-options] post-command [...]
