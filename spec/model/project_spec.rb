@@ -174,9 +174,9 @@ RSpec.describe Project do
 
     expect(Config).to receive(:postgres_service_project_id).and_return(project.id).at_least(:once)
     expect(project.current_resource_usage("PostgresVCpu")).to eq 0
-    Prog::Postgres::PostgresResourceNexus.assemble(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "a", target_vm_size: "standard-2", target_storage_size_gib: 64)
+    Prog::Postgres::PostgresResourceNexus.assemble(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "a", target_vm_size: "standard-2", target_storage_size_gib: 64, desired_version: "16")
     expect(project.current_resource_usage("PostgresVCpu")).to eq 2
-    Prog::Postgres::PostgresResourceNexus.assemble(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "b", target_vm_size: "standard-4", target_storage_size_gib: 128)
+    Prog::Postgres::PostgresResourceNexus.assemble(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "b", target_vm_size: "standard-4", target_storage_size_gib: 128, desired_version: "16")
     expect(project.current_resource_usage("PostgresVCpu")).to eq 6
 
     expect { project.current_resource_usage("UnknownResource") }.to raise_error(RuntimeError)

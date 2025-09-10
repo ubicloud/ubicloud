@@ -13,7 +13,8 @@ RSpec.describe Clover, "postgres" do
       location_id: Location::HETZNER_FSN1_ID,
       name: "pg-with-permission",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 128
+      target_storage_size_gib: 128,
+      desired_version: "16"
     ).subject
   end
 
@@ -75,7 +76,8 @@ RSpec.describe Clover, "postgres" do
           location_id: Location::HETZNER_FSN1_ID,
           name: "pg-test-2",
           target_vm_size: "standard-2",
-          target_storage_size_gib: 128
+          target_storage_size_gib: 128,
+          desired_version: "16"
         )
 
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres"

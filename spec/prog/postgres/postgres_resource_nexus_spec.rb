@@ -70,50 +70,50 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
 
       expect {
-        described_class.assemble(project_id: "26820e05-562a-4e25-a51b-de5f78bd00af", location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128)
+        described_class.assemble(project_id: "26820e05-562a-4e25-a51b-de5f78bd00af", location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, desired_version: "16")
       }.to raise_error RuntimeError, "No existing project"
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location_id: nil, name: "pg/server/name", target_vm_size: "standard-2", target_storage_size_gib: 128)
+        described_class.assemble(project_id: customer_project.id, location_id: nil, name: "pg/server/name", target_vm_size: "standard-2", target_storage_size_gib: 128, desired_version: "16")
       }.to raise_error RuntimeError, "No existing location"
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128)
+        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, desired_version: "16")
       }.not_to raise_error
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: "69c0f4cd-99c1-8ed0-acfe-7b013ce2fa0b")
+        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: "69c0f4cd-99c1-8ed0-acfe-7b013ce2fa0b", desired_version: "16")
       }.to raise_error RuntimeError, "No existing parent"
 
       private_location.update(project_id: customer_project.id)
-      described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 118)
+      described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 118, desired_version: "16")
 
       expect {
-        parent = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+        parent = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128, desired_version: "16").subject
         expect(PostgresResource).to receive(:[]).with(parent.id).and_return(parent)
-        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, restore_target: Time.now)
+        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, restore_target: Time.now, desired_version: "16")
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: restore_target"
     end
 
     it "does not allow giving different version than parent for restore" do
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
-      parent = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128, version: "16").subject
+      parent = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128, desired_version: "16").subject
       expect(PostgresResource).to receive(:[]).with(parent.id).and_return(parent)
       expect {
-        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, version: "17", restore_target: Time.now)
+        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, desired_version: "17", restore_target: Time.now)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: version"
     end
 
     it "passes timeline of parent resource if parent is passed" do
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
 
-      parent = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      parent = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, desired_version: "16").subject
       restore_target = Time.now
       expect(parent.timeline).to receive(:earliest_restore_time).and_return(restore_target - 10 * 60)
       expect(PostgresResource).to receive(:[]).with(parent.id).and_return(parent)
       expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: parent.timeline.id, timeline_access: "fetch")).and_return(instance_double(Strand, subject: postgres_resource.representative_server))
 
-      described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name-2", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, restore_target: restore_target)
+      described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name-2", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, restore_target: restore_target, desired_version: "16")
     end
   end
 
@@ -213,7 +213,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         name: "pg-name",
         target_vm_size: "standard-2",
         target_storage_size_gib: 128,
-        superuser_password: "dummy-password"
+        superuser_password: "dummy-password",
+        desired_version: "16"
       )
 
       expect(nx).to receive(:postgres_resource).and_return(postgres_resource).at_least(:once)

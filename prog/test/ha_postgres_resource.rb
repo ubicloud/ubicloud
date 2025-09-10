@@ -47,7 +47,8 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
       name: "postgres-test-ha",
       target_vm_size: "standard-2",
       target_storage_size_gib: 128,
-      ha_type: "async"
+      ha_type: "async",
+      desired_version: "16"
     )
 
     update_stack({"postgres_resource_id" => st.id})

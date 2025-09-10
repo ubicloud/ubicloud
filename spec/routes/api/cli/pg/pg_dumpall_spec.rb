@@ -10,7 +10,8 @@ RSpec.describe Clover, "cli pg pg_dumpall" do
       location_id: Location::HETZNER_FSN1_ID,
       name: "test-pg",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 64
+      target_storage_size_gib: 64,
+      desired_version: "16"
     ).subject
     @ref = [@pg.display_location, @pg.name].join("/")
     @conn_string = URI("postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require")
