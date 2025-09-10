@@ -1030,8 +1030,8 @@ RSpec.describe Prog::Vm::Nexus do
         expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-dnsmasq/).and_raise(
           Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
         )
-        expect(sshable).to receive(:cmd).with(/sudo.*bin\/setup-vm delete_keep_net #{nx.vm_name}/)
-        expect { nx.destroy }.to hop("wait_lb_expiry")
+        expect(sshable).not_to receive(:cmd).with(/sudo.*bin\/setup-vm delete #{nx.vm_name}/)
+        expect { nx.destroy }.to hop("remove_vm_from_load_balancer")
       end
 
       it "raises other stop errors" do
@@ -1054,29 +1054,6 @@ RSpec.describe Prog::Vm::Nexus do
         expect(sshable).to receive(:cmd).with(/sudo.*bin\/setup-vm delete #{nx.vm_name}/)
 
         expect { nx.destroy }.to hop("destroy_slice")
-      end
-
-      it "naps for 30 seconds" do
-        lb = instance_double(LoadBalancer)
-        expect(lb).to receive(:evacuate_vm).with(vm)
-        expect(vm).to receive(:load_balancer).and_return(lb).at_least(:once)
-        expect(vm).to receive(:incr_lb_expiry_started)
-        expect { nx.wait_lb_expiry }.to nap(30)
-      end
-
-      it "destroys properly after 10 minutes" do
-        lb = instance_double(LoadBalancer)
-        expect(lb).to receive(:remove_vm).with(vm)
-        expect(vm).to receive(:load_balancer).and_return(lb).at_least(:once)
-        expect(vm).to receive(:lb_expiry_started_set?).and_return(true)
-        expect(vm.vm_host.sshable).to receive(:cmd).with(/sudo.*bin\/setup-vm delete_net #{nx.vm_name}/)
-        expect { nx.wait_lb_expiry }.to hop("destroy_slice")
-      end
-
-      it "destroys properly after 10 minutes if the lb is gone" do
-        expect(vm).to receive(:load_balancer).and_return(nil)
-        expect(vm.vm_host.sshable).to receive(:cmd).with(/sudo.*bin\/setup-vm delete_net #{nx.vm_name}/)
-        expect { nx.wait_lb_expiry }.to hop("destroy_slice")
       end
     end
 
@@ -1185,6 +1162,34 @@ RSpec.describe Prog::Vm::Nexus do
       st.update(prog: "Vm::Nexus", label: "wait_aws_vm_destroyed", stack: [{}])
       Strand.create(parent_id: st.id, prog: "Aws::Instance", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_aws_vm_destroyed }.to nap(10)
+    end
+  end
+
+  describe "#remove_vm_from_load_balancer" do
+    it "hops to wait_vm_removal_from_load_balancer" do
+      expect(nx).to receive(:bud).with(Prog::Vnet::LoadBalancerRemoveVm, {"subject_id" => vm.id}, :mark_vm_ports_as_evacuating)
+      expect { nx.remove_vm_from_load_balancer }.to hop("wait_vm_removal_from_load_balancer")
+    end
+  end
+
+  describe "#wait_vm_removal_from_load_balancer" do
+    let(:sshable) { instance_double(Sshable) }
+    let(:vm_host) { instance_double(VmHost, sshable: sshable) }
+
+    before do
+      allow(vm).to receive(:vm_host).and_return(vm_host)
+    end
+
+    it "naps if vm is not removed" do
+      st.update(prog: "Vm::Nexus", label: "wait_vm_removal_from_load_balancer", stack: [{}])
+      Strand.create(parent_id: st.id, prog: "Vnet::LoadBalancerRemoveVm", label: "evacuate_vm", stack: [{}], lease: Time.now + 10)
+      expect { nx.wait_vm_removal_from_load_balancer }.to nap(10)
+    end
+
+    it "hops to destroy_slice if vm is removed" do
+      expect(nx).to receive(:reap).and_yield
+      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo host/bin/setup-vm delete_net #{vm.inhost_name}")
+      expect { nx.wait_vm_removal_from_load_balancer }.to hop("destroy_slice")
     end
   end
 

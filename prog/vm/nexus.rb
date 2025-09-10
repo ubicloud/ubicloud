@@ -568,7 +568,7 @@ class Prog::Vm::Nexus < Prog::Base
 
     vm.pci_devices_dataset.update(vm_id: nil)
 
-    hop_wait_lb_expiry if vm.load_balancer
+    hop_remove_vm_from_load_balancer if vm.load_balancer
 
     hop_destroy_slice
   end
@@ -580,19 +580,16 @@ class Prog::Vm::Nexus < Prog::Base
     end
   end
 
-  label def wait_lb_expiry
-    if (lb = vm.load_balancer)
-      unless vm.lb_expiry_started_set?
-        vm.incr_lb_expiry_started
-        lb.evacuate_vm(vm)
-        nap 30
-      end
-      lb.remove_vm(vm)
+  label def remove_vm_from_load_balancer
+    bud Prog::Vnet::LoadBalancerRemoveVm, {"subject_id" => vm.id}, :mark_vm_ports_as_evacuating
+    hop_wait_vm_removal_from_load_balancer
+  end
+
+  label def wait_vm_removal_from_load_balancer
+    reap(nap: 10) do
+      vm.vm_host.sshable.cmd("sudo host/bin/setup-vm delete_net #{q_vm}")
+      hop_destroy_slice
     end
-
-    vm.vm_host.sshable.cmd("sudo host/bin/setup-vm delete_net #{q_vm}")
-
-    hop_destroy_slice
   end
 
   label def destroy_slice
