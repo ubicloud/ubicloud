@@ -8,6 +8,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
   subject_is :inference_endpoint
 
   extend Forwardable
+
   def_delegators :inference_endpoint, :replicas, :load_balancer, :private_subnet, :project
 
   def self.model_for_id(model_id)

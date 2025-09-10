@@ -61,6 +61,7 @@ class Clover
         unless ps_name.match(Validation::ALLOWED_NAME_PATTERN)
           fail Validation::ValidationFailed.new({new_private_subnet_name: "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."})
         end
+
         assemble_params[:new_private_subnet_name] = ps_name
       elsif (ps = authorized_private_subnet(location_id: @location.id))
         assemble_params[:private_subnet_id] = ps.id
