@@ -50,7 +50,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       postgres_resource = PostgresResource.create(
         project_id: project_id, location_id: location.id, name: name,
         target_vm_size: target_vm_size, target_storage_size_gib: target_storage_size_gib,
-        superuser_password: superuser_password, ha_type: ha_type, desired_version: desired_version, version: desired_version, flavor: flavor,
+        superuser_password: superuser_password, ha_type: ha_type, desired_version: desired_version, flavor: flavor,
         parent_id: parent_id, restore_target: restore_target, hostname_version: "v2"
       )
 

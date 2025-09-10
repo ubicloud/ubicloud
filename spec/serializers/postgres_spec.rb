@@ -12,7 +12,7 @@ RSpec.describe Serializers::Postgres do
   it "can serialize when no earliest/latest restore times" do
     expect(pg).to receive(:strand).and_return(instance_double(Strand, label: "start", children: [])).at_least(:once)
     expect(pg).to receive(:timeline).and_return(instance_double(PostgresTimeline, earliest_restore_time: nil, latest_restore_time: nil)).exactly(3)
-    expect(pg).to receive(:representative_server).and_return(instance_double(PostgresServer, primary?: true, vm: nil, strand: nil, storage_size_gib: 64)).at_least(:once)
+    expect(pg).to receive(:representative_server).and_return(instance_double(PostgresServer, primary?: true, vm: nil, strand: nil, storage_size_gib: 64, version: "16")).at_least(:once)
     data = described_class.serialize(pg, {detailed: true})
     expect(data[:earliest_restore_time]).to be_nil
     expect(data[:latest_restore_time]).to be_nil
@@ -21,7 +21,7 @@ RSpec.describe Serializers::Postgres do
   it "can serialize when earliest_restore_time calculation raises an exception" do
     expect(pg).to receive(:strand).and_return(instance_double(Strand, label: "start", children: [])).at_least(:once)
     expect(pg).to receive(:timeline).and_return(instance_double(PostgresTimeline, latest_restore_time: nil)).exactly(4)
-    expect(pg).to receive(:representative_server).and_return(instance_double(PostgresServer, primary?: true, vm: nil, strand: nil, storage_size_gib: 64)).at_least(:once)
+    expect(pg).to receive(:representative_server).and_return(instance_double(PostgresServer, primary?: true, vm: nil, strand: nil, storage_size_gib: 64, version: "16")).at_least(:once)
     expect(pg.timeline).to receive(:earliest_restore_time).and_raise("error")
     data = described_class.serialize(pg, {detailed: true})
     expect(data[:earliest_restore_time]).to be_nil
@@ -32,7 +32,7 @@ RSpec.describe Serializers::Postgres do
     time = Time.now
     expect(pg).to receive(:strand).and_return(instance_double(Strand, label: "start", children: [])).at_least(:once)
     expect(pg).to receive(:timeline).and_return(instance_double(PostgresTimeline, earliest_restore_time: time, latest_restore_time: time)).exactly(3)
-    expect(pg).to receive(:representative_server).and_return(instance_double(PostgresServer, primary?: true, vm: nil, strand: nil, storage_size_gib: 64)).at_least(:once)
+    expect(pg).to receive(:representative_server).and_return(instance_double(PostgresServer, primary?: true, vm: nil, strand: nil, storage_size_gib: 64, version: "16")).at_least(:once)
     data = described_class.serialize(pg, {detailed: true})
     expect(data[:earliest_restore_time]).to eq(time.iso8601)
     expect(data[:latest_restore_time]).to eq(time.iso8601)
@@ -40,7 +40,7 @@ RSpec.describe Serializers::Postgres do
 
   it "can serialize when not primary" do
     expect(pg).to receive(:strand).and_return(instance_double(Strand, label: "start", children: [])).at_least(:once)
-    expect(pg).to receive(:representative_server).and_return(instance_double(PostgresServer, primary?: false, vm: nil, strand: nil, storage_size_gib: 64)).at_least(:once)
+    expect(pg).to receive(:representative_server).and_return(instance_double(PostgresServer, primary?: false, vm: nil, strand: nil, storage_size_gib: 64, version: "16")).at_least(:once)
     data = described_class.serialize(pg, {detailed: true})
     expect(data[:earliest_restore_time]).to be_nil
     expect(data[:latest_restore_time]).to be_nil

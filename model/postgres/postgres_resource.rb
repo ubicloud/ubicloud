@@ -149,6 +149,10 @@ class PostgresResource < Sequel::Model
     Semaphore.incr(servers_dataset.select(:id), "restart")
   end
 
+  def version
+    representative_server&.version || desired_version
+  end
+
   module HaType
     NONE = "none"
     ASYNC = "async"
