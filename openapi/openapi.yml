@@ -1533,7 +1533,7 @@ paths:
                   description: ID of the private subnet
                   type: string
                 public_key:
-                  description: Public SSH key for the VM, or name of registered SSH public key
+                  description: 'Public SSH key for the VM, or name of registered SSH public key'
                   type: string
                 size:
                   description: Size of the VM
