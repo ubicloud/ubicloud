@@ -116,16 +116,15 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   end
 
   label def wait_cert_broadcast
-    reap
-    if strand.children.select { it.prog == "Vnet::CertServer" }.all? { it.exitval == "certificate is reshared" } || strand.children.empty?
-      decr_refresh_cert
-      load_balancer.certs_dataset.exclude(id: load_balancer.active_cert.id).all do |cert|
-        LoadBalancerCert[cert_id: cert.id].destroy
+    reap(:wait, nap: 1) do
+      if strand.children.select { it.prog == "Vnet::CertServer" }.all? { it.exitval == "certificate is reshared" } || strand.children.empty?
+        decr_refresh_cert
+        load_balancer.certs_dataset.exclude(id: load_balancer.active_cert.id).all do |cert|
+          LoadBalancerCert[cert_id: cert.id].destroy
+        end
+        hop_wait
       end
-      hop_wait
     end
-
-    nap 1
   end
 
   label def update_vm_load_balancers
