@@ -40,7 +40,7 @@ Allowed Option Values:
 Create a virtual machine
 
 Usage:
-    ubi vm location/vm-name create [options] public_key
+    ubi vm location/vm-name create [options] public-key
 
 Examples:
     ubi vm eu-central-h1/my-vm-name create "$(cat ~/.ssh/id_ed25519.pub)"

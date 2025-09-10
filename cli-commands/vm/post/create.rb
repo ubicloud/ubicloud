@@ -7,7 +7,7 @@ UbiCli.on("vm").run_on("create") do
   server_sizes = vm_sizes.map(&:name).uniq.freeze
   storage_sizes = vm_sizes.map(&:storage_size_options).flatten.uniq.sort.map(&:to_s).freeze.each(&:freeze)
 
-  options("ubi vm location/vm-name create [options] public_key", key: :vm_create) do
+  options("ubi vm location/vm-name create [options] public-key", key: :vm_create) do
     on("-6", "--ipv6-only", "do not enable IPv4")
     on("-b", "--boot-image=image_name", Option::BootImages.map(&:name), "boot image")
     on("-p", "--private-subnet-id=ps-id", "place VM into specific private subnet (also accepts ps-name)")
