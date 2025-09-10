@@ -58,7 +58,7 @@ class Clover
             "size" => size,
             "storage_size" => target_storage_size_gib.to_s,
             "ha_type" => ha_type,
-            "version" => pg.version
+            "version" => pg.desired_version
           }
 
           validate_postgres_input(pg.name, postgres_params)
@@ -260,7 +260,7 @@ class Clover
             target_vm_size: pg.target_vm_size,
             target_storage_size_gib: pg.target_storage_size_gib,
             ha_type: PostgresResource::HaType::NONE,
-            desired_version: pg.version,
+            desired_version: pg.desired_version,
             flavor: pg.flavor,
             parent_id: pg.id,
             restore_target: nil
@@ -318,7 +318,7 @@ class Clover
             name:,
             target_vm_size: pg.target_vm_size,
             target_storage_size_gib: pg.target_storage_size_gib,
-            desired_version: pg.version,
+            desired_version: pg.desired_version,
             flavor: pg.flavor,
             parent_id: pg.id,
             restore_target:
