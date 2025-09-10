@@ -118,7 +118,8 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
   describe "#before_run" do
     it "hops to destroy" do
-      expect { nx.create_billing_records }.to hop("wait")
+      expect { nx.update_billing_records }.to hop("wait")
+      kubernetes_cluster.reload
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect(kubernetes_cluster.active_billing_records).not_to be_empty
       expect(kubernetes_cluster.active_billing_records).to all(receive(:finalize))
@@ -253,23 +254,83 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.wait_nodes }.to nap(10)
     end
 
-    it "hops to create_billing_records when all nodepools are ready" do
+    it "hops to wait when all nodepools are ready" do
       expect(kubernetes_cluster.nodepools.first).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
-      expect { nx.wait_nodes }.to hop("create_billing_records")
+      expect { nx.wait_nodes }.to hop("wait")
     end
   end
 
-  describe "#create_billing_records" do
-    it "creates billing records for all control plane nodes and nodepool nodes" do
-      vm = create_vm
-      nodepool = kubernetes_cluster.nodepools.first
-      KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: nodepool.id)
+  describe "#update_billing_records" do
+    before do
+      @nodepool = kubernetes_cluster.nodepools.first
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: @nodepool.id)
 
-      expect { nx.create_billing_records }.to hop("wait")
+      expect(kubernetes_cluster.active_billing_records.length).to eq 0
 
+      expect { nx.update_billing_records }.to hop("wait")
+
+      # Manually shift the starting time of all billing records to make sure finalize works.
+      kubernetes_cluster.active_billing_records_dataset.update(span: Sequel.lit("tstzrange(lower(span) - interval '10 seconds', NULL)"))
+      kubernetes_cluster.reload
+    end
+
+    it "creates billing records for all control plane nodes and nodepool nodes when there are no billing records" do
       expect(kubernetes_cluster.active_billing_records.length).to eq 4
-
       expect(kubernetes_cluster.active_billing_records.map { it.billing_rate["resource_type"] }).to eq ["KubernetesControlPlaneVCpu", "KubernetesControlPlaneVCpu", "KubernetesWorkerVCpu", "KubernetesWorkerStorage"]
+    end
+
+    it "can be run idempotently" do
+      expect(kubernetes_cluster.active_billing_records.length).to eq 4
+      expect(BillingRecord).not_to receive(:create)
+      records = kubernetes_cluster.active_billing_records.map(&:id)
+
+      5.times do
+        expect { nx.update_billing_records }.to hop("wait")
+        kubernetes_cluster.reload
+      end
+
+      expect(kubernetes_cluster.active_billing_records.map(&:id)).to eq records
+    end
+
+    it "creates missing billing records and finalizes surplus billing records" do
+      old_records = kubernetes_cluster.active_billing_records.map(&:id)
+      expect(old_records.length).to eq 4
+
+      older_cp_record, newer_cp_record = kubernetes_cluster.active_billing_records.select { |it| it.billing_rate["resource_type"] == "KubernetesControlPlaneVCpu" }
+
+      # Make sure of the records is older, so that we can test that the newer record is finalized
+      older_cp_record.this.update(span: Sequel.lit("tstzrange(lower(span) - interval '1 day', NULL)"))
+
+      # Replace one CP vm with a bigger one, add one more nodepool VM
+      kubernetes_cluster.nodes.first.destroy
+      KubernetesNode.create(vm_id: create_vm(vcpus: 8).id, kubernetes_cluster_id: kubernetes_cluster.id)
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: @nodepool.id)
+
+      kubernetes_cluster.reload
+
+      expect { nx.update_billing_records }.to hop("wait")
+      kubernetes_cluster.reload
+
+      new_records = kubernetes_cluster.active_billing_records.map(&:id)
+      expect(new_records.length).to eq 6
+      expect(newer_cp_record.reload.span.end).not_to be_nil # the newer record is finalized
+      expect(older_cp_record.reload.span.end).to be_nil
+
+      expect((new_records - old_records).length).to eq 3 # 2 for the new worker node, 1 for the new bigger CP node
+      expect((new_records & old_records).length).to eq 3 # 1 CP node and 2 worker nodes stayed the same
+      expect((old_records - new_records).length).to eq 1 # 1 removed CP node
+      expect(new_records).to include(*(old_records - [newer_cp_record.id]))
+      expect(new_records).not_to include newer_cp_record.id
+    end
+
+    it "removes the nodes marked for retirement from the billing calcuation" do
+      expect(kubernetes_cluster.active_billing_records.length).to eq 4
+      n = kubernetes_cluster.nodepools.first.nodes.first
+      expect(n).to receive(:retire_set?).and_return(true)
+      expect { nx.update_billing_records }.to hop("wait")
+      kubernetes_cluster.reload
+
+      expect(kubernetes_cluster.active_billing_records.length).to eq 2
     end
   end
 
@@ -309,7 +370,12 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.wait }.to hop("install_csi")
     end
 
-    it "naps until sync_kubernetes_service or upgrade is set" do
+    it "hops to update_billing_records" do
+      expect(nx).to receive(:when_update_billing_records_set?).and_yield
+      expect { nx.wait }.to hop("update_billing_records")
+    end
+
+    it "naps if no semaphore is set" do
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
   end

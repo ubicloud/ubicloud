@@ -49,7 +49,10 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   end
 
   label def wait_worker_node
-    reap(:wait)
+    reap do
+      kubernetes_nodepool.cluster.incr_update_billing_records
+      hop_wait
+    end
   end
 
   label def wait
