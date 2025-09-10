@@ -20,6 +20,10 @@ class Clover
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless project.has_valid_payment_method?
 
     public_key = typecast_params.nonempty_str!("public_key")
+    if api? && !public_key.include?(" ") && (ssh_public_key = project.ssh_public_keys_dataset.first(name: public_key))
+      public_key = ssh_public_key.public_key
+    end
+
     assemble_params = typecast_params.convert!(symbolize: true) do |tp|
       tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu"])
       tp.pos_int("storage_size")

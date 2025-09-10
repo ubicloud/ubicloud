@@ -21,6 +21,7 @@ UbiCli.on("vm").run_on("create") do
 
   help_example 'ubi vm eu-central-h1/my-vm-name create "$(cat ~/.ssh/id_ed25519.pub)"'
   help_example 'ubi vm eu-central-h1/my-vm-name create "$(cat ~/.ssh/authorized_keys)"'
+  help_example "ubi vm eu-central-h1/my-vm-name create registered-ssh-public-key-name"
 
   args 1
 
@@ -33,16 +34,23 @@ UbiCli.on("vm").run_on("create") do
       params[:private_subnet_id] = convert_name_to_id(sdk.private_subnet, params[:private_subnet_id])
     end
 
-    unless Vm::VALID_SSH_AUTHORIZED_KEYS.match?(public_key)
-      command.raise_failure("public key provided is not in authorized_keys format")
-    end
-
-    unless Vm::VALID_SSH_PUBLIC_KEY_LINE.match?(public_key)
-      command.raise_failure("public key provided does not contain a valid public key")
-    end
-
     params[:public_key] = public_key
-    id = sdk.vm.create(location: @location, name: @name, **params).id
+    begin
+      id = sdk.vm.create(location: @location, name: @name, **params).id
+    rescue Ubicloud::Error => e
+      if e.code == 400 && e.params.dig("error", "message").match?(/public_key invalid SSH public key format|public_key must contain at least one valid SSH public key/)
+        raise Rodish::CommandFailure.new(<<~END.chomp, command)
+          Invalid SSH public key provided:
+
+          #{public_key}
+
+          The public key given must be the name of a registered SSH public key,
+          or must be a valid SSH public key
+        END
+      end
+
+      raise
+    end
     response("VM created with id: #{id}")
   end
 end
