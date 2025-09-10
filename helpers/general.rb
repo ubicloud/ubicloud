@@ -34,6 +34,7 @@ class Clover < Roda
 
           DB.transaction do
             object.update(name:)
+            yield if block_given?
             audit_log(object, "update")
           end
 

@@ -1,4 +1,4 @@
-<%# locals: (object:, type:) %>
+<%# locals: (object:, type:, text: nil) %>
 
 <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
   <div class="min-w-0 flex-1">
@@ -15,6 +15,11 @@
         <div>
           <h3 class="text-base font-semibold leading-6 text-gray-900">Rename
             <%= type %></h3>
+          <% if text %>
+            <div class="mt-2 text-sm text-gray-500">
+              <p><%= text %></p>
+            </div>
+          <% end %>
           <div class="mt-2 text-sm text-gray-500">
             <%== part(
                 "components/form/text",

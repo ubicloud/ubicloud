@@ -1,6 +1,6 @@
 <% if @edit_perm %>
   <div class="p-6">
-    <%== part("components/rename_object", object: @pg, type: "PostgreSQL database") %>
+    <%== part("components/rename_object", object: @pg, type: "PostgreSQL database", text: "Renaming a PostgreSQL database changes the connection info, so doing so requires updating your applications.") %>
   </div>
 
   <div class="p-6">

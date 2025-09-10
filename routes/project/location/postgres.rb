@@ -100,7 +100,9 @@ class Clover
         end
       end
 
-      r.rename pg, perm: "Postgres:edit", serializer: Serializers::Postgres, template_prefix: "postgres"
+      r.rename pg, perm: "Postgres:edit", serializer: Serializers::Postgres, template_prefix: "postgres" do
+        pg.incr_refresh_dns_record
+      end
 
       show_actions = if pg.read_replica?
         %w[overview connection charts networking config settings]
