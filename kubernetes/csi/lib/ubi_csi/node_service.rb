@@ -97,7 +97,6 @@ module Csi
         old_pv_name = pvc.dig("metadata", "annotations", OLD_PV_NAME_ANNOTATION_KEY)
         !old_pv_name.nil?
       end
-      alias_method :is_copied_pvc?, :pvc_needs_migration?
 
       def find_file_system(loop_device, req_id:)
         output, ok = run_cmd("blkid", "-o", "value", "-s", "TYPE", loop_device, req_id:)
