@@ -19,9 +19,17 @@ class Clover
     authorize("Vm:create", project)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless project.has_valid_payment_method?
 
-    public_key = typecast_params.nonempty_str!("public_key")
-    if api? && !public_key.include?(" ") && (ssh_public_key = project.ssh_public_keys_dataset.first(name: public_key))
-      public_key = ssh_public_key.public_key
+    if api?
+      public_key = typecast_params.nonempty_str!("public_key")
+      if !public_key.include?(" ") && (ssh_public_key = project.ssh_public_keys_dataset.first(name: public_key))
+        public_key = ssh_public_key.public_key
+      end
+    else
+      public_key = if (spk_id = typecast_params.ubid_uuid("ssh_public_key")) && (ssh_public_key = project.ssh_public_keys_dataset.first(id: spk_id))
+        ssh_public_key.public_key
+      else
+        typecast_params.nonempty_str!("public_key")
+      end
     end
 
     assemble_params = typecast_params.convert!(symbolize: true) do |tp|
@@ -194,6 +202,7 @@ class Clover
 
     options.add_option(name: "boot_image", values: Option::BootImages.map(&:name))
     options.add_option(name: "unix_user")
+    options.add_option(name: "ssh_public_key", values: @project.ssh_public_keys)
     options.add_option(name: "public_key")
 
     options.serialize
