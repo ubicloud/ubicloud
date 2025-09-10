@@ -223,7 +223,6 @@ RSpec.describe Csi::V1::NodeService do
       # Keep these as allow since they're not used in every test
       allow(service).to receive_messages(
         is_mounted?: false,
-        is_copied_pvc?: false,
         find_loop_device: nil
       )
       allow(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id: req_id).and_return(["/dev/loop0", true])
@@ -499,30 +498,6 @@ RSpec.describe Csi::V1::NodeService do
       expect(client).to receive(:get_pv).with("old-pv-123").and_raise("Kubernetes API error")
 
       expect { service.roll_back_reclaim_policy(req_id, client, req, pvc) }.to raise_error("Kubernetes API error")
-    end
-  end
-
-  describe "#is_copied_pvc?" do
-    it "returns true when PVC needs migration" do
-      pvc = {
-        "metadata" => {
-          "annotations" => {
-            "csi.ubicloud.com/old-pv-name" => "old-pv-123"
-          }
-        }
-      }
-
-      expect(service.is_copied_pvc?(pvc)).to be true
-    end
-
-    it "returns false when PVC does not need migration" do
-      pvc = {
-        "metadata" => {
-          "annotations" => {}
-        }
-      }
-
-      expect(service.is_copied_pvc?(pvc)).to be false
     end
   end
 
