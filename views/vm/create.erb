@@ -48,9 +48,18 @@
 
   form_elements.push(
     {name: "boot_image", type: "radio_small_cards", label: "Boot Image", required: "required", content_generator: ContentGenerator::Vm.method(:boot_image)},
-    {name: "unix_user", type: "text", label: "Username", placeholder: "ubi", value: "ubi", required: "required", opening_tag: "<div class='sm:col-span-2'>"},
-    {name: "public_key", type: "textarea", label: "SSH Public Key", required: "required", placeholder: "ssh-ed25519 AAAA...", description: "SSH keys are a more secure method of logging into a server."}
+    {name: "unix_user", type: "text", label: "Username", placeholder: "ubi", value: "ubi", required: "required", opening_tag: "<div class='sm:col-span-2'>"}
   )
+
+  public_key_params = {name: "public_key", type: "textarea", label: "SSH Public Key", placeholder: "ssh-ed25519 AAAA...", description: "SSH keys are a more secure method of logging into a server.", opening_tag: "<div id='public-key-wrapper' class='col-span-full'>"}
+
+  if @project.ssh_public_keys.empty?
+    public_key_params[:required] = "required"
+  else
+    form_elements.push({name: "ssh_public_key", type: "select", label: "Registered SSH Public Key", placeholder: "New", content_generator: ContentGenerator::Vm.method(:ssh_public_key), opening_tag: "<div class='sm:col-span-3'>"})
+  end
+
+  form_elements.push(public_key_params)
 
   if @project.get_ff_gpu_vm
     form_elements << {name: "show_gpu", type: "hidden", value: @show_gpu}
