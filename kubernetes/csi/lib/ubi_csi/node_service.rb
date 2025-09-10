@@ -84,7 +84,7 @@ module Csi
         loop_device = find_loop_device(backing_file, req_id:)
         return unless loop_device
         output, ok = run_cmd("losetup", "-d", loop_device, req_id:)
-        if !ok
+        unless ok
           raise "Could not remove loop device: #{output}"
         end
       end
@@ -101,7 +101,7 @@ module Csi
 
       def find_file_system(loop_device, req_id:)
         output, ok = run_cmd("blkid", "-o", "value", "-s", "TYPE", loop_device, req_id:)
-        if !ok
+        unless ok
           raise "Failed to get the loop device filesystem status: #{output}"
         end
         output.strip
@@ -115,6 +115,8 @@ module Csi
           roll_back_reclaim_policy(req_id, client, req, pvc)
           remove_old_pv_annotation(client, pvc)
           NodeStageVolumeResponse.new
+        rescue => e
+          log_and_raise(req_id, e)
         end
       end
 
@@ -124,14 +126,7 @@ module Csi
         if pvc_needs_migration?(pvc)
           migrate_pvc_data(req_id, client, pvc, req)
         end
-
         pvc
-      rescue CopyNotFinishedError => e
-        log_with_id(req_id, "Waiting for data copy to finish in node_stage_volume: #{e.message}")
-        raise GRPC::Internal, e.message
-      rescue => e
-        log_with_id(req_id, "Internal error in node_stage_volume: #{e.class} - #{e.message} - #{e.backtrace}")
-        raise GRPC::Internal, "Unexpected error: #{e.class} - #{e.message}"
       end
 
       def perform_node_stage_volume(req_id, pvc, req, _call)
@@ -140,71 +135,54 @@ module Csi
         size_bytes = Integer(req.volume_context["size_bytes"], 10)
         backing_file = NodeService.backing_file_path(volume_id)
 
-        begin
-          unless File.exist?(backing_file)
-            output, ok = run_cmd("fallocate", "-l", size_bytes.to_s, backing_file, req_id:)
-            unless ok
-              log_with_id(req_id, "gRPC error in node_stage_volume: failed to fallocate: #{output}")
-              raise GRPC::ResourceExhausted, "Failed to allocate backing file: #{output}"
-            end
-            output, ok = run_cmd("fallocate", "--punch-hole", "--keep-size", "-o", "0", "-l", size_bytes.to_s, backing_file, req_id:)
-            unless ok
-              log_with_id(req_id, "gRPC error in node_stage_volume: failed to punchhole: #{output}")
-              raise GRPC::ResourceExhausted, "Failed to punch hole in backing file: #{output}"
-            end
+        unless File.exist?(backing_file)
+          output, ok = run_cmd("fallocate", "-l", size_bytes.to_s, backing_file, req_id:)
+          unless ok
+            raise GRPC::ResourceExhausted.new("Failed to allocate backing file: #{output}")
           end
-
-          loop_device = find_loop_device(backing_file, req_id:)
-          is_new_loop_device = loop_device.nil?
-          if is_new_loop_device
-            log_with_id(req_id, "Setting up new loop device for: #{backing_file}")
-            output, ok = run_cmd("losetup", "--find", "--show", backing_file, req_id:)
-            loop_device = output.strip
-            unless ok && !loop_device.empty?
-              raise GRPC::Internal, "Failed to setup loop device: #{output}"
-            end
-          else
-            log_with_id(req_id, "Loop device already exists: #{loop_device}")
+          output, ok = run_cmd("fallocate", "--punch-hole", "--keep-size", "-o", "0", "-l", size_bytes.to_s, backing_file, req_id:)
+          unless ok
+            raise GRPC::ResourceExhausted.new("Failed to punch hole in backing file: #{output}")
           end
-
-          if req.volume_capability.mount
-            current_fs_type = find_file_system(loop_device, req_id:)
-            if !current_fs_type.empty? && !ACCEPTABLE_FS.include?(current_fs_type)
-              error_message = "Unacceptable file system type for #{loop_device}: #{current_fs_type}"
-              log_with_id(req_id, error_message)
-              raise error_message
-            end
-
-            desired_fs_type = req.volume_capability.mount.fs_type || "ext4"
-            if current_fs_type != "" && current_fs_type != desired_fs_type
-              error_message = "Unexpected filesystem on volume. desired: #{desired_fs_type}, current: #{current_fs_type}"
-              log_with_id(req_id, error_message)
-              raise error_message
-            elsif current_fs_type == ""
-              output, ok = run_cmd("mkfs.#{desired_fs_type}", loop_device, req_id:)
-              unless ok
-                error_message = "Failed to format device #{loop_device} with #{desired_fs_type}: #{output}"
-                log_with_id(req_id, error_message)
-                raise error_message
-              end
-            end
-          end
-          unless is_mounted?(staging_path, req_id:)
-            FileUtils.mkdir_p(staging_path)
-            output, ok = run_cmd("mount", loop_device, staging_path, req_id:)
-            unless ok
-              log_with_id(req_id, "gRPC error in node_stage_volume: failed to mount loop device: #{output}")
-              raise GRPC::Internal, "Failed to mount #{loop_device} to #{staging_path}: #{output}"
-            end
-          end
-          # If block, do nothing else
-        rescue GRPC::BadStatus => e
-          log_with_id(req_id, "gRPC error in node_stage_volume: #{e.class} - #{e.message}")
-          raise e
-        rescue => e
-          log_with_id(req_id, "Internal error in node_stage_volume: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}")
-          raise GRPC::Internal, "NodeStageVolume error: #{e.message}"
         end
+
+        loop_device = find_loop_device(backing_file, req_id:)
+        is_new_loop_device = loop_device.nil?
+        if is_new_loop_device
+          log_with_id(req_id, "Setting up new loop device for: #{backing_file}")
+          output, ok = run_cmd("losetup", "--find", "--show", backing_file, req_id:)
+          loop_device = output.strip
+          unless ok && !loop_device.empty?
+            raise "Failed to setup loop device: #{output}"
+          end
+        else
+          log_with_id(req_id, "Loop device already exists: #{loop_device}")
+        end
+
+        if req.volume_capability.mount
+          current_fs_type = find_file_system(loop_device, req_id:)
+          if !current_fs_type.empty? && !ACCEPTABLE_FS.include?(current_fs_type)
+            raise "Unacceptable file system type for #{loop_device}: #{current_fs_type}"
+          end
+
+          desired_fs_type = req.volume_capability.mount.fs_type || "ext4"
+          if current_fs_type != "" && current_fs_type != desired_fs_type
+            raise "Unexpected filesystem on volume. desired: #{desired_fs_type}, current: #{current_fs_type}"
+          elsif current_fs_type == ""
+            output, ok = run_cmd("mkfs.#{desired_fs_type}", loop_device, req_id:)
+            unless ok
+              raise "Failed to format device #{loop_device} with #{desired_fs_type}: #{output}"
+            end
+          end
+        end
+        unless is_mounted?(staging_path, req_id:)
+          FileUtils.mkdir_p(staging_path)
+          output, ok = run_cmd("mount", loop_device, staging_path, req_id:)
+          unless ok
+            raise "Failed to mount #{loop_device} to #{staging_path}: #{output}"
+          end
+        end
+        # If block, do nothing else
       end
 
       def remove_old_pv_annotation(client, pvc)
@@ -224,9 +202,6 @@ module Csi
           pv["spec"]["persistentVolumeReclaimPolicy"] = "Delete"
           client.update_pv(pv)
         end
-      rescue => e
-        log_with_id(req_id, "Internal error in node_stage_volume: #{e.class} - #{e.message} - #{e.backtrace}")
-        raise GRPC::Internal, "Unexpected error: #{e.class} - #{e.message}"
       end
 
       def migrate_pvc_data(req_id, client, pvc, req)
@@ -257,28 +232,21 @@ module Csi
       def node_unstage_volume(req, _call)
         log_request_response(req, "node_unstage_volume") do |req_id|
           backing_file = NodeService.backing_file_path(req.volume_id)
-          begin
-            client = KubernetesClient.new(req_id:, logger: @logger)
-            if !client.node_schedulable?(@node_id)
-              prepare_data_migration(client, req_id, req.volume_id)
+          client = KubernetesClient.new(req_id:, logger: @logger)
+          if !client.node_schedulable?(@node_id)
+            prepare_data_migration(client, req_id, req.volume_id)
+          end
+          remove_loop_device(backing_file, req_id:)
+          staging_path = req.staging_target_path
+          if is_mounted?(staging_path, req_id:)
+            output, ok = run_cmd("umount", "-q", staging_path, req_id:)
+            unless ok
+              raise "Failed to unmount #{staging_path}: #{output}"
             end
-            remove_loop_device(backing_file, req_id:)
-            staging_path = req.staging_target_path
-            if is_mounted?(staging_path, req_id:)
-              output, ok = run_cmd("umount", "-q", staging_path, req_id:)
-              unless ok
-                log_with_id(req_id, "gRPC error in node_unstage_volume: failed to umount device: #{output}")
-                raise GRPC::Internal, "Failed to unmount #{staging_path}: #{output}"
-              end
-            end
-          rescue GRPC::BadStatus => e
-            log_with_id(req_id, "gRPC error in node_unstage_volume: #{e.class} - #{e.message}")
-            raise e
-          rescue => e
-            log_with_id(req_id, "Internal error in node_unstage_volume: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}")
-            raise GRPC::Internal, "NodeUnstageVolume error: #{e.class} - #{e.message}"
           end
           NodeUnstageVolumeResponse.new
+        rescue => e
+          log_and_raise(req_id, e)
         end
       end
 
@@ -305,10 +273,10 @@ module Csi
 
         begin
           pvc = client.get_pvc(pvc_namespace, pvc_name)
-        rescue ObjectNotFoundError => e
+        rescue ObjectNotFoundError
           old_pvc_object = pv.dig("metadata", "annotations", OLD_PVC_OBJECT_ANNOTATION_KEY)
           if old_pvc_object.empty?
-            raise e
+            raise
           end
           pvc = YAML.load(Base64.decode64(old_pvc_object))
         end
@@ -346,47 +314,37 @@ module Csi
         log_request_response(req, "node_publish_volume") do |req_id|
           staging_path = req.staging_target_path
           target_path = req.target_path
-          begin
-            unless is_mounted?(target_path, req_id:)
-              FileUtils.mkdir_p(target_path)
-              output, ok = run_cmd("mount", "--bind", staging_path, target_path, req_id:)
-              unless ok
-                log_with_id(req_id, "gRPC error in node_publish_volume: failed to bind mount device: #{output}")
-                raise GRPC::Internal, "Failed to bind mount #{staging_path} to #{target_path}: #{output}"
-              end
+
+          unless is_mounted?(target_path, req_id:)
+            FileUtils.mkdir_p(target_path)
+            output, ok = run_cmd("mount", "--bind", staging_path, target_path, req_id:)
+            unless ok
+              raise "Failed to bind mount #{staging_path} to #{target_path}: #{output}"
             end
-          rescue GRPC::BadStatus => e
-            log_with_id(req_id, "gRPC error in node_publish_volume: #{e.class} - #{e.message}")
-            raise e
-          rescue => e
-            log_with_id(req_id, "Internal error in node_publish_volume: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}")
-            raise GRPC::Internal, "NodePublishVolume error: #{e.message}"
           end
+
           NodePublishVolumeResponse.new
+        rescue => e
+          log_and_raise(req_id, e)
         end
       end
 
       def node_unpublish_volume(req, _call)
         log_request_response(req, "node_unpublish_volume") do |req_id|
           target_path = req.target_path
-          begin
-            if is_mounted?(target_path, req_id:)
-              output, ok = run_cmd("umount", "-q", target_path, req_id:)
-              unless ok
-                log_with_id(req_id, "gRPC error in node_unpublish_volume: failed to umount device: #{output}")
-                raise GRPC::Internal, "Failed to unmount #{target_path}: #{output}"
-              end
-            else
-              log_with_id(req_id, "#{target_path} is not mounted, skipping umount")
+
+          if is_mounted?(target_path, req_id:)
+            output, ok = run_cmd("umount", "-q", target_path, req_id:)
+            unless ok
+              raise "Failed to unmount #{target_path}: #{output}"
             end
-          rescue GRPC::BadStatus => e
-            log_with_id(req_id, "gRPC error in node_unpublish_volume: #{e.class} - #{e.message}")
-            raise e
-          rescue => e
-            log_with_id(req_id, "Internal error in node_unpublish_volume: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}")
-            raise GRPC::Internal, "NodeUnpublishVolume error: #{e.message}"
+          else
+            log_with_id(req_id, "#{target_path} is not mounted, skipping umount")
           end
+
           NodeUnpublishVolumeResponse.new
+        rescue => e
+          log_and_raise(req_id, e)
         end
       end
     end
