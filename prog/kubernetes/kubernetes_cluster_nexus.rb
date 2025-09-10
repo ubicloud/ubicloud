@@ -118,7 +118,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   end
 
   label def create_billing_records
-    records = kubernetes_cluster.all_nodes.flat_map(&:billing_record)
+    records = kubernetes_cluster.all_nodes.flat_map(&:billing_records)
 
     records.each do |record|
       BillingRecord.create(

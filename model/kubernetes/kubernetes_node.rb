@@ -15,25 +15,17 @@ class KubernetesNode < Sequel::Model
     vm.sshable
   end
 
-  def billing_record
+  def billing_records
     if kubernetes_nodepool
-      worker_billing_records
+      [
+        {type: "KubernetesWorkerVCpu", family: vm.family, amount: BigDecimal(vm.vcpus)},
+        {type: "KubernetesWorkerStorage", family: "standard", amount: BigDecimal(vm.storage_size_gib)}
+      ]
     else
-      control_plane_billing_record
+      [
+        {type: "KubernetesControlPlaneVCpu", family: vm.family, amount: BigDecimal(vm.vcpus)}
+      ]
     end
-  end
-
-  def worker_billing_records
-    [
-      {type: "KubernetesWorkerVCpu", family: vm.family, amount: vm.vcpus},
-      {type: "KubernetesWorkerStorage", family: "standard", amount: vm.storage_size_gib}
-    ]
-  end
-
-  def control_plane_billing_record
-    [
-      {type: "KubernetesControlPlaneVCpu", family: vm.family, amount: vm.vcpus}
-    ]
   end
 
   def name
