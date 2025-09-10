@@ -798,17 +798,21 @@ RSpec.describe Clover, "postgres" do
       it "can rename PostgreSQL database" do
         old_name = pg.name
         visit "#{project.path}#{pg.path}/settings"
+        expect(page).to have_content("Renaming a PostgreSQL database changes the connection info")
+
         fill_in "name", with: "new-name%"
         click_button "Rename"
         expect(page).to have_flash_error("Validation failed for following fields: name")
         expect(page).to have_content("Name must only contain lowercase letters, numbers, and hyphens and have max length 63.")
         expect(pg.reload.name).to eq old_name
 
+        expect(pg.semaphores_dataset.all).to eq []
         fill_in "name", with: "new-name"
         click_button "Rename"
         expect(page).to have_flash_notice("Name updated")
         expect(pg.reload.name).to eq "new-name"
         expect(page).to have_content("new-name")
+        expect(pg.semaphores_dataset.select_map(:name)).to eq ["refresh_dns_record"]
       end
 
       it "does not show rename option without permissions" do
