@@ -36,6 +36,7 @@ module Ubicloud
         unless values[:id]
           raise Error, "hash must have :id key"
         end
+
         @values = {}
         merge_into_values(values)
       else

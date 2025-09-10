@@ -85,6 +85,7 @@ RSpec.describe LogDnaBatcher do
       log_dna_batcher.instance_variable_set(:@max_batch_size, 2)
       log_dna_batcher.define_singleton_method(:send_batch) do |batch|
         raise unless expected
+
         q.push(batch.dup)
         super(batch)
       end

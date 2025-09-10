@@ -108,6 +108,7 @@ class Sshable < Sequel::Model
     end
 
     fail SshError.new(cmd, stdout_str, stderr.string.freeze, exit_code, exit_signal) unless exit_code.zero?
+
     stdout_str
   end
 

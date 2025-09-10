@@ -112,6 +112,7 @@ class Clover
             end
             policy = nil if policy == ""
             next if existing_tags.include?(policy)
+
             unless (added_tag = allowed_add_tags[policy]) || !policy
               issues << "You don't have permission to add members to '#{policy}' tag"
               next
@@ -149,8 +150,10 @@ class Clover
           invitation_policies.each do |email, policy|
             policy = nil if policy == ""
             next unless (inv = invitatation_map[email])
+
             old_policy = inv.policy
             next if policy == old_policy
+
             if policy && !allowed_add_tags[policy]
               issues << "You don't have permission to add invitation to '#{policy}' tag"
               next
@@ -199,6 +202,7 @@ class Clover
             UBID.resolve_map(uuids)
             @aces = @project.access_control_entries.map do |ace|
               next unless (subject = uuids[ace.subject_id])
+
               editable = !(subject.is_a?(SubjectTag) && subject.name == "Admin")
               [ace.ubid, [subject, uuids[ace.action_id], uuids[ace.object_id]], editable]
             end
@@ -223,14 +227,17 @@ class Clover
                 object_id = nil if object_id == ""
 
                 next unless subject_id
+
                 check_ace_subject(UBID.to_uuid(subject_id)) unless deleted
 
                 if ubid == "template"
                   next if deleted == "true"
+
                   ace = AccessControlEntry.new(project_id: @project.id)
                   audit_action = "create"
                 else
                   next unless (ace = AccessControlEntry[project_id: @project.id, id: UBID.to_uuid(ubid)])
+
                   check_ace_subject(ace.subject_id)
                   if deleted == "true"
                     ace.destroy
@@ -275,6 +282,7 @@ class Clover
 
           r.on :ubid_uuid do |id|
             next unless (@tag = @tag_model[project_id: @project.id, id:])
+
             # Metatag uuid is used to differentiate being allowed to manage
             # tag itself, compared to being able to manage things contained in
             # the tag.

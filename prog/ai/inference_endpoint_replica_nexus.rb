@@ -224,6 +224,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
     resource_family = "#{inference_endpoint.model_name}-#{token_type}"
     rate = BillingRate.from_resource_properties("InferenceTokens", resource_family, "global")
     return if rate["unit_price"].zero?
+
     rate_id = rate["id"]
     begin_time = Time.now.to_date.to_time
     end_time = begin_time + 24 * 60 * 60
@@ -231,6 +232,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
     project_usage.each do |usage|
       tokens = usage[usage_key]
       next if tokens.zero?
+
       project = Project[id: UBID.to_uuid(usage["ubid"])]
 
       begin
@@ -358,6 +360,7 @@ sudo cat /ie/workdir/.ssh/runpod.pub
 
   def delete_runpod_pod
     return unless (pod_id = inference_endpoint_replica.external_state["pod_id"])
+
     Excon.post("https://api.runpod.io/graphql",
       headers: {"content-type" => "application/json", "authorization" => "Bearer #{Config.runpod_api_key}"},
       body: {"query" => "mutation { podTerminate(input: {podId: \"#{pod_id}\"}) }"}.to_json,

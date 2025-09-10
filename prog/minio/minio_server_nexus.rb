@@ -181,6 +181,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
   def available?
     return true if minio_server.initial_provisioning_set?
+
     server_data = JSON.parse(minio_server.client.admin_info.body)["servers"].find { it["endpoint"] == minio_server.endpoint }
     server_data["state"] == "online" && server_data["drives"].all? { it["state"] == "ok" }
   rescue => ex
