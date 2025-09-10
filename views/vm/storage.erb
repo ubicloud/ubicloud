@@ -1,0 +1,21 @@
+<div class="p-6">
+  <%== part(
+    "components/table_card",
+    title: "Disks",
+    headers: ["Disk", "Size", "Encryption", "Device Path"],
+    empty_state: "No disks attached",
+    rows: @vm.vm_storage_volumes_dataset.order(:disk_index).map do |volume|
+      name = "Disk ##{volume.disk_index}" + (volume.boot ? " (Boot)" : "")
+      encryption = volume.key_encryption_key_1 ? "Encrypted" : "Unencrypted"
+      [
+        [
+          name,
+          "#{volume.size_gib} GB",
+          encryption,
+          volume.device_path
+        ],
+        { id: "vm-storage-volume-#{volume.disk_index}" }
+      ]
+    end
+  ) %>
+</div>

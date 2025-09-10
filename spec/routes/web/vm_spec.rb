@@ -753,6 +753,15 @@ RSpec.describe Clover, "vm" do
       end
     end
 
+    describe "storage" do
+      it "shows attached disks" do
+        visit "#{project.path}#{vm.path}"
+        within("#vm-submenu") { click_link "Storage" }
+        expect(page).to have_content "Disk #0"
+        expect(page).to have_content "#{vm.vm_storage_volumes.first.size_gib} GB"
+      end
+    end
+
     describe "rename" do
       it "can rename virtual machine" do
         old_name = vm.name
