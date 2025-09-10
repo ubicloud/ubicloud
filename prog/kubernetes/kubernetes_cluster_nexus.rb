@@ -114,20 +114,37 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
   label def wait_nodes
     nap 10 unless kubernetes_cluster.nodepools.all? { it.strand.label == "wait" }
-    hop_create_billing_records
+    hop_wait
   end
 
-  label def create_billing_records
-    records = kubernetes_cluster.all_nodes.flat_map(&:billing_records)
+  label def update_billing_records
+    decr_update_billing_records
+    desired_records = kubernetes_cluster.all_nodes.reject(&:retire_set?).flat_map(&:billing_records).tally
+    existing_records = kubernetes_cluster.active_billing_records.map do |record|
+      {type: record.billing_rate["resource_type"], family: record.billing_rate["resource_family"], amount: record.amount}
+    end.tally
 
-    records.each do |record|
-      BillingRecord.create(
-        project_id: kubernetes_cluster.project_id,
-        resource_id: kubernetes_cluster.id,
-        resource_name: kubernetes_cluster.name,
-        billing_rate_id: BillingRate.from_resource_properties(record[:type], record[:family], kubernetes_cluster.location.name)["id"],
-        amount: record[:amount]
-      )
+    desired_records.each do |record, want|
+      have = existing_records[record] || 0
+      (want - have).times do
+        BillingRecord.create(
+          project_id: kubernetes_cluster.project_id,
+          resource_id: kubernetes_cluster.id,
+          resource_name: kubernetes_cluster.name,
+          billing_rate_id: BillingRate.from_resource_properties(record[:type], record[:family], kubernetes_cluster.location.name)["id"],
+          amount: record[:amount]
+        )
+      end
+    end
+
+    existing_records.each do |record, have|
+      want = desired_records[record] || 0
+      next unless (surplus = have - want) > 0
+
+      br = BillingRate.from_resource_properties(record[:type], record[:family], kubernetes_cluster.location.name)
+      kubernetes_cluster.active_billing_records_dataset.where(billing_rate_id: br["id"], amount: record[:amount]).order_by(Sequel.desc(Sequel.function(:lower, :span))).limit(surplus).each do |r|
+        r.finalize
+      end
     end
 
     hop_wait
@@ -153,6 +170,11 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     when_install_csi_set? do
       hop_install_csi
     end
+
+    when_update_billing_records_set? do
+      hop_update_billing_records
+    end
+
     nap 6 * 60 * 60
   end
 
