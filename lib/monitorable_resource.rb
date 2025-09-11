@@ -17,12 +17,10 @@ class MonitorableResource
     return if @session && @pulse[:reading] == "up"
 
     @session = @resource.reload.init_health_monitor_session
-  rescue => ex
-    if ex.is_a?(Sequel::NoExistingObject)
-      Clog.emit("Resource is deleted.") { {resource_deleted: {ubid: @resource.ubid}} }
-      @session = nil
-      @deleted = true
-    end
+  rescue Sequel::NoExistingObject
+    Clog.emit("Resource is deleted.") { {resource_deleted: {ubid: @resource.ubid}} }
+    @session = nil
+    @deleted = true
   end
 
   def check_pulse

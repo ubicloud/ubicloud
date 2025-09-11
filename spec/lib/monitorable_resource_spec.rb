@@ -28,9 +28,9 @@ RSpec.describe MonitorableResource do
       expect { r_w_event_loop.open_resource_session }.to change(r_w_event_loop, :deleted).from(false).to(true)
     end
 
-    it "ignores exception if it is not Sequel::NoExistingObject" do
+    it "raises the exception if it is not Sequel::NoExistingObject" do
       expect(postgres_server).to receive(:reload).and_raise(StandardError)
-      expect { r_w_event_loop.open_resource_session }.not_to raise_error
+      expect { r_w_event_loop.open_resource_session }.to raise_error(StandardError)
     end
   end
 
