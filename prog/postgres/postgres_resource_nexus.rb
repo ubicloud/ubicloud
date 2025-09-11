@@ -142,13 +142,21 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       servers.each(&:incr_refresh_certificates)
     end
 
+    refresh = false
     if OpenSSL::X509::Certificate.new(postgres_resource.server_cert).not_after < Time.now + 60 * 60 * 24 * 30
+      refresh = true
+    end
+    when_refresh_certificates_set? do
+      refresh = true
+    end
+    if refresh
       postgres_resource.server_cert, postgres_resource.server_cert_key = create_certificate
       servers.each(&:incr_refresh_certificates)
     end
 
     postgres_resource.certificate_last_checked_at = Time.now
     postgres_resource.save_changes
+    decr_refresh_certificates
 
     hop_wait
   end
@@ -203,7 +211,14 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       hop_refresh_dns_record
     end
 
+    refresh = false
     if postgres_resource.certificate_last_checked_at < Time.now - 60 * 60 * 24 * 30 # ~1 month
+      refresh = true
+    end
+    when_refresh_certificates_set? do
+      refresh = true
+    end
+    if refresh
       hop_refresh_certificates
     end
 

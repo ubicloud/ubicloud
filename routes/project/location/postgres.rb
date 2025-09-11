@@ -102,6 +102,7 @@ class Clover
 
       r.rename pg, perm: "Postgres:edit", serializer: Serializers::Postgres, template_prefix: "postgres" do
         pg.incr_refresh_dns_record
+        pg.incr_refresh_certificates
       end
 
       show_actions = if pg.read_replica?
