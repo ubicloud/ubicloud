@@ -26,16 +26,20 @@ class Clover < Roda
           handle_validation_failure("#{template_prefix}/show") { @page = "settings" }
           name = typecast_body_params.nonempty_str!("name")
 
-          if object.is_a?(KubernetesCluster)
-            Validation.validate_kubernetes_name(name)
+          if name == object.name
+            no_audit_log
           else
-            Validation.validate_name(name)
-          end
+            if object.is_a?(KubernetesCluster)
+              Validation.validate_kubernetes_name(name)
+            else
+              Validation.validate_name(name)
+            end
 
-          DB.transaction do
-            object.update(name:)
-            yield if block_given?
-            audit_log(object, "update")
+            DB.transaction do
+              object.update(name:)
+              yield if block_given?
+              audit_log(object, "update")
+            end
           end
 
           if api?
