@@ -31,22 +31,27 @@ MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :submit_que
     threads = Array.new(pool_size) do
       Thread.new do
         while (r = submit_queue.pop)
-          # We keep track of started at information to check for stuck pulses.
-          r.monitor_job_started_at = Time.now
-          r.open_resource_session
+          begin
+            # We keep track of started at information to check for stuck pulses.
+            r.monitor_job_started_at = Time.now
+            r.open_resource_session
 
-          # Yield so that monitored resources and metric export resources can be
-          # handled differently.
-          yield r
+            # Yield so that monitored resources and metric export resources can be
+            # handled differently.
+            yield r
+          rescue => ex
+            Clog.emit("Monitoring job has failed.") { {monitoring_job_failure: {resource: r.resource, exception: Util.exception_to_hash(ex)}} }
+            r.resource.incr_checkup if r.resource.respond_to?(:incr_checkup)
+          ensure
+            # We unset the started at time so we will not check for stuck pulses
+            # while this is in the run queue.
+            r.monitor_job_started_at = nil
 
-          # We unset the started at time so we will not check for stuck pulses
-          # while this is in the run queue.
-          r.monitor_job_started_at = nil
-
-          # We record the finish time before pushing to the queue to allow for
-          # more accurate scheduling.
-          r.monitor_job_finished_at = Time.now
-          finish_queue.push(r)
+            # We record the finish time before pushing to the queue to allow for
+            # more accurate scheduling.
+            r.monitor_job_finished_at = Time.now
+            finish_queue.push(r)
+          end
         end
       end
     end
