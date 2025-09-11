@@ -65,7 +65,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       is_destroying = ["destroy", nil].include?(postgres_server.resource&.strand&.label)
 
       if is_destroying || !postgres_server.taking_over?
-        if strand.label != "destroy"
+        if !%w[destroy wait_children_destroy destroy_vm_and_pg].include?(strand.label)
           hop_destroy
         elsif strand.stack.count > 1
           pop "operation is cancelled due to the destruction of the postgres server"
@@ -608,8 +608,15 @@ SQL
 
   label def destroy
     decr_destroy
+    Semaphore.incr(strand.children_dataset.exclude(prog: "Postgres::PostgresServerNexus").select(:id), "destroy")
+    hop_wait_children_destroy
+  end
 
-    strand.children.each { it.destroy }
+  label def wait_children_destroy
+    reap(:destroy_vm_and_pg, nap: 30)
+  end
+
+  label def destroy_vm_and_pg
     vm.incr_destroy
     postgres_server.destroy
 

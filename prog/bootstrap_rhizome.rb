@@ -4,9 +4,16 @@ require_relative "../lib/util"
 
 class Prog::BootstrapRhizome < Prog::Base
   subject_is :sshable
+  semaphore :destroy
 
   def user
     @user ||= frame.fetch("user", "root")
+  end
+
+  def before_run
+    when_destroy_set? do
+      pop "exiting early due to destroy semaphore"
+    end
   end
 
   label def start

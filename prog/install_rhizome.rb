@@ -6,8 +6,15 @@ require "digest/sha2"
 
 class Prog::InstallRhizome < Prog::Base
   subject_is :sshable
+  semaphore :destroy
 
   SKIP_VALIDATION = ["Gemfile.lock"]
+
+  def before_run
+    when_destroy_set? do
+      pop "exiting early due to destroy semaphore"
+    end
+  end
 
   label def start
     tar = StringIO.new

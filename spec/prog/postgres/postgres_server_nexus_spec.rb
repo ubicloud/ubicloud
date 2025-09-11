@@ -166,6 +166,20 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.before_run }.not_to hop("destroy")
     end
 
+    it "does not hop to destroy if already in the wait_children_destroy state" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(resource).to receive(:strand).and_return(nil)
+      expect(nx.strand).to receive(:label).and_return("wait_children_destroy").at_least(:once)
+      expect { nx.before_run }.not_to hop("destroy")
+    end
+
+    it "does not hop to destroy if already in the destroy_vm_and_pg state" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(resource).to receive(:strand).and_return(nil)
+      expect(nx.strand).to receive(:label).and_return("destroy_vm_and_pg").at_least(:once)
+      expect { nx.before_run }.not_to hop("destroy")
+    end
+
     it "cancels the destroy if the server is picked up for take over" do
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect(resource).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
@@ -977,10 +991,35 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#destroy" do
     it "deletes resources and exits" do
+      expect(nx).to receive(:decr_destroy)
+      child = st.add_child(prog: "BootstrapRhizome", label: "start")
+      st.add_child(prog: "Postgres::PostgresServerNexus", label: "restart")
+      expect(Semaphore).to receive(:incr) do |ds, name|
+        expect(ds.map(:id)).to eq [child.id]
+        expect(name).to eq "destroy"
+      end
+
+      expect { nx.destroy }.to hop("wait_children_destroy")
+    end
+  end
+
+  describe "#wait_children_destroy" do
+    it "naps if children exist" do
+      st.add_child(prog: "BootstrapRhizome", label: "start")
+      expect { nx.wait_children_destroy }.to nap(30)
+    end
+
+    it "hops if all children have exited" do
+      expect { nx.wait_children_destroy }.to hop("destroy_vm_and_pg")
+    end
+  end
+
+  describe "#destroy_vm_and_pg" do
+    it "deletes resources and exits" do
       expect(postgres_server.vm).to receive(:incr_destroy)
       expect(postgres_server).to receive(:destroy)
 
-      expect { nx.destroy }.to exit({"msg" => "postgres server is deleted"})
+      expect { nx.destroy_vm_and_pg }.to exit({"msg" => "postgres server is deleted"})
     end
   end
 
