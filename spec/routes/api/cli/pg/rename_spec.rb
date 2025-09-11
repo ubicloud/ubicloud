@@ -12,4 +12,13 @@ RSpec.describe Clover, "cli pg rename" do
     expect(pg.reload.name).to eq "new-name"
     expect(pg.semaphores_dataset.select_order_map(:name)).to eq %w[refresh_certificates refresh_dns_record]
   end
+
+  it "does not set semaphores if there is no actual rename" do
+    expect(Config).to receive(:postgres_service_project_id).and_return(@project.id).at_least(:once)
+    cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
+    pg = PostgresResource.first
+    expect(cli(%w[pg eu-central-h1/test-pg rename test-pg])).to eq "PostgreSQL database renamed to test-pg\n"
+    expect(pg.reload.name).to eq "test-pg"
+    expect(pg.semaphores_dataset.all).to eq []
+  end
 end
