@@ -1,9 +1,5 @@
 <% if @edit_perm %>
   <div class="p-6">
-    <%== part("components/rename_object", object: @pg, type: "PostgreSQL database", text: "Renaming a PostgreSQL database changes the connection info, so doing so requires updating your applications.") %>
-  </div>
-
-  <div class="p-6">
     <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
       <div class="min-w-0 flex-1">
         <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
@@ -130,6 +126,11 @@
                 </div>
               </div>
             </div>
+          <% end %>
+        </div>
+        <div class="px-4 py-5 sm:p-6">
+          <% form(action: "#{path(@pg)}/rename", method: :post) do %>
+            <%== part("components/rename_object_input", object: @pg, type: "PostgreSQL database", text: "Renaming a PostgreSQL database changes the connection info, so doing so requires updating your applications.") %>
           <% end %>
         </div>
       <% end %>
