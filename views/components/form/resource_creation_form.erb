@@ -74,7 +74,7 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
       locals = {name:, label:, type: "number", attributes: attributes.merge!({placeholder:})}
       type = "text"
     when "textarea"
-      locals = {name:, label:, description: element[:description], attributes: attributes.merge!({placeholder:, rows: 3})}
+      locals = {name:, label:, description: element[:description], escape_description: element.fetch(:escape_description, true), attributes: attributes.merge!({placeholder:, rows: 3})}
     when "hidden"
       selected_options[name] = element[:value]
       locals = {name => element[:value]}
