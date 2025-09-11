@@ -540,10 +540,9 @@ class Prog::Vm::Nexus < Prog::Base
         raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
       end
 
-      # # If there is a load balancer setup, we want to keep the network setup in
-      # # tact for a while
-      # action = vm.load_balancer ? "delete_keep_net" : "delete"
-      # host.sshable.cmd("sudo host/bin/setup-vm #{action} #{q_vm}")
+      # If there is a load balancer setup, we want to keep the network setup in
+      # tact for a while
+      host.sshable.cmd("sudo host/bin/setup-vm delete #{q_vm}") unless vm.load_balancer
     end
 
     vm.vm_storage_volumes.each do |vol|
@@ -586,7 +585,7 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   label def wait_vm_removal_from_load_balancer
-    reap do
+    reap(nap: 10) do
       vm.vm_host.sshable.cmd("sudo host/bin/setup-vm delete #{q_vm}")
       hop_destroy_slice
     end

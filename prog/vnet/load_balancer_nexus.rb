@@ -116,14 +116,12 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   end
 
   label def wait_cert_broadcast
-    reap(:wait, nap: 1) do
-      if strand.children.select { it.prog == "Vnet::CertServer" }.all? { it.exitval == "certificate is reshared" } || strand.children.empty?
-        decr_refresh_cert
-        load_balancer.certs_dataset.exclude(id: load_balancer.active_cert.id).all do |cert|
-          LoadBalancerCert[cert_id: cert.id].destroy
-        end
-        hop_wait
+    reap(nap: 1) do
+      decr_refresh_cert
+      load_balancer.certs_dataset.exclude(id: load_balancer.active_cert.id).all do |cert|
+        LoadBalancerCert[cert_id: cert.id].destroy
       end
+      hop_wait
     end
   end
 
@@ -145,26 +143,36 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   label def destroy
     decr_destroy
     strand.children.map { it.destroy }
-    load_balancer.private_subnet.incr_update_firewall_rules
-
-    # The following if statement makes sure that it's OK to not have dns_zone
-    # only if it's not in production.
-    if (dns_zone = load_balancer.dns_zone) && (Config.production? || dns_zone)
-      dns_zone.delete_record(record_name: load_balancer.hostname)
-    end
-
-    load_balancer.vm_ports.map(&:destroy)
-
     load_balancer.vms.each do |vm|
-      bud Prog::Vnet::UpdateLoadBalancerNode, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :update_load_balancer
-      bud Prog::Vnet::CertServer, {"subject_id" => load_balancer.id, "vm_id" => vm.id}, :remove_cert_server
+      bud Prog::Vnet::LoadBalancerRemoveVm, {subject_id: vm.id, load_balancer_id: load_balancer.id}, :remove_vm
     end
+    hop_wait_all_vms_removed
+    # load_balancer.private_subnet.incr_update_firewall_rules
 
-    hop_wait_destroy
+    # # The following if statement makes sure that it's OK to not have dns_zone
+    # # only if it's not in production.
+    # if (dns_zone = load_balancer.dns_zone) && (Config.production? || dns_zone)
+    #   dns_zone.delete_record(record_name: load_balancer.hostname)
+    # end
+
+    # load_balancer.vm_ports.map(&:destroy)
+
+    # load_balancer.vms.each do |vm|
+    #   bud Prog::Vnet::UpdateLoadBalancerNode, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :update_load_balancer
+    #   bud Prog::Vnet::CertServer, {"subject_id" => load_balancer.id, "vm_id" => vm.id}, :remove_cert_server
+    # end
+
+    # hop_wait_destroy
   end
 
-  label def wait_destroy
+  label def wait_all_vms_removed
     reap(nap: 5) do
+      load_balancer.private_subnet.incr_update_firewall_rules
+      # The following if statement makes sure that it's OK to not have dns_zone
+      # only if it's not in production.
+      if (dns_zone = load_balancer.dns_zone) && (Config.production? || dns_zone)
+        dns_zone.delete_record(record_name: load_balancer.hostname)
+      end
       load_balancer.destroy
 
       pop "load balancer deleted"
