@@ -51,10 +51,15 @@
     {name: "unix_user", type: "text", label: "Username", placeholder: "ubi", value: "ubi", required: "required", opening_tag: "<div class='sm:col-span-2'>"}
   )
 
-  public_key_params = {name: "public_key", type: "textarea", label: "SSH Public Key", placeholder: "ssh-ed25519 AAAA...", description: "SSH keys are a more secure method of logging into a server.", opening_tag: "<div id='public-key-wrapper' class='col-span-full'>"}
+  public_key_params = {name: "public_key", type: "textarea", label: "SSH Public Key", placeholder: "ssh-ed25519 AAAA...", opening_tag: "<div id='public-key-wrapper' class='col-span-full'>"}
 
   if @project.ssh_public_keys.empty?
     public_key_params[:required] = "required"
+    public_key_params[:description] = "SSH keys are a more secure method of logging into a server."
+    if has_project_permission("Project:edit")
+      public_key_params[:description] += " You can <a class='text-orange-600 hover:text-orange-700' href='#{h @project.path}/ssh-public-key'>register SSH keys for this project</a> to avoid having to reenter the same key multiple times."
+      public_key_params[:escape_description] = false
+    end
   else
     form_elements.push({name: "ssh_public_key", type: "select", label: "Registered SSH Public Key", placeholder: "New", content_generator: ContentGenerator::Vm.method(:ssh_public_key), opening_tag: "<div class='sm:col-span-3'>"})
   end
