@@ -223,7 +223,7 @@ RSpec.describe Clover, "load balancer" do
         expect(page).to have_flash_notice("VM is attached to the load balancer")
         expect(lb.vms.count).to eq(1)
 
-        expect(Config).to receive(:load_balancer_service_hostname).and_return("lb.ubicloud.com").twice
+        expect(Config).to receive(:load_balancer_service_hostname).and_return("lb.ubicloud.com").thrice
         visit "#{project.path}#{lb.path}"
         expect(page.all("dt,dd").map(&:text)).to eq [
           "ID", lb.ubid,
@@ -234,8 +234,24 @@ RSpec.describe Clover, "load balancer" do
           "Stack", "dual",
           "Load Balancer Port", "80",
           "Application Port", "8000",
+          "Health Check Protocol", "HTTP",
           "HTTP Health Check Endpoint", "/up"
         ]
+
+        lb.update(health_check_protocol: "tcp")
+        page.refresh
+        expect(page.all("dt,dd").map(&:text)).to eq [
+          "ID", lb.ubid,
+          "Name", "dummy-lb-3",
+          "Connection String", "dummy-lb-3.#{ps.ubid[-5...]}.lb.ubicloud.com",
+          "Private Subnet", "dummy-ps-1",
+          "Algorithm", "Hash Based",
+          "Stack", "dual",
+          "Load Balancer Port", "80",
+          "Application Port", "8000",
+          "Health Check Protocol", "TCP"
+        ]
+
         visit "#{project.path}#{lb.path}/vms"
         expect(page.all("#lb-vms td").map(&:text)).to eq [
           "dummy-vm-1", "down", "Detach",
