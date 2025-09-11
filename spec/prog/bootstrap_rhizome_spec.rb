@@ -39,7 +39,9 @@ RSpec.describe Prog::BootstrapRhizome do
       expect(br).to receive(:sshable).and_return(sshable).at_least(:once)
       expect(Util).to receive(:rootish_ssh).with "hostname", "root", ["test private key"], <<'FIXTURE'
 set -ueo pipefail
-sudo apt update && sudo apt-get -y install ruby-bundler
+sudo apt-get update
+sudo apt-get -y install ruby-bundler
+sudo which bundler
 sudo userdel -rf rhizome || true
 sudo adduser --disabled-password --gecos '' rhizome
 echo 'rhizome ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-rhizome
