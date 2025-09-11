@@ -31,20 +31,50 @@ RSpec.describe MonitorResourceType do
   end
 
   describe "thread pool" do
+    after do
+      expect(@mrt.finish_queue.pop(timeout: 1)).to eq @mr
+      expect(@started_at).to be_within(1).of(Time.now)
+      expect(@mr.monitor_job_started_at).to be_nil
+      expect(@mr.monitor_job_finished_at).to be_within(1).of(Time.now)
+    end
+
     it "processes jobs on submit queue" do
-      started_at = nil
-      @mrt = mrt = described_class.create(Object, :foo, 2, [[]]) do
-        started_at = it.monitor_job_started_at
+      @started_at = nil
+      @mrt = described_class.create(Object, :foo, 2, [[]]) do
+        @started_at = it.monitor_job_started_at
       end
 
-      mr = MonitorableResource.new(nil)
-      expect(mr).to receive(:open_resource_session)
-      mrt.submit_queue.push(mr)
+      @mr = MonitorableResource.new(nil)
+      expect(@mr).to receive(:open_resource_session)
+      @mrt.submit_queue.push(@mr)
+    end
 
-      expect(mrt.finish_queue.pop(timeout: 1)).to eq mr
-      expect(started_at).to be_within(1).of(Time.now)
-      expect(mr.monitor_job_started_at).to be_nil
-      expect(mr.monitor_job_finished_at).to be_within(1).of(Time.now)
+    it "handles exceptions raised during job processing and invokes checkup" do
+      @started_at = nil
+      @mrt = described_class.create(Object, :foo, 2, [[]]) do
+        @started_at = it.monitor_job_started_at
+        raise StandardError
+      end
+
+      @mr = MonitorableResource.new(VmHost.new { it.id = "46683a25-acb1-4371-afe9-d39f303e44b4" })
+      expect(@mr).to receive(:open_resource_session)
+      expect(Clog).to receive(:emit).with("Monitoring job has failed.").and_call_original
+      expect(@mr.resource).to receive(:incr_checkup)
+      @mrt.submit_queue.push(@mr)
+    end
+
+    it "skips checkup if the resource doesn't support that" do
+      @started_at = nil
+      @mrt = described_class.create(Object, :foo, 2, [[]]) do
+        @started_at = it.monitor_job_started_at
+        raise StandardError
+      end
+
+      @mr = MonitorableResource.new(KubernetesCluster.new { it.id = "46683a25-acb1-4371-afe9-d39f303e44b4" })
+      expect(@mr).to receive(:open_resource_session)
+      expect(Clog).to receive(:emit).with("Monitoring job has failed.").and_call_original
+      expect(@mr.resource).to receive(:respond_to?).with(:incr_checkup).and_return(false)
+      @mrt.submit_queue.push(@mr)
     end
   end
 
