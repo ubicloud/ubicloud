@@ -28,7 +28,7 @@ class Hosting::HetznerApis
   # without giving the Server operating system time to gracefully stop. This
   # may lead to data loss, it’s equivalent to pulling the power cord and
   # plugging it in again. Reset should only be used when reboot does not work.
-  def reset(server_id, dist: "Ubuntu 22.04.2 LTS base")
+  def reset(server_id)
     create_connection.post(path: "/reset/#{server_id}", body: "type=hw", expects: 200)
     nil
   end
