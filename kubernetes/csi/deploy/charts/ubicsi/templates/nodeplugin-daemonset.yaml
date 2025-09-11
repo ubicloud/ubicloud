@@ -3,7 +3,7 @@ kind: DaemonSet
 apiVersion: apps/v1
 metadata:
   name: ubicsi-nodeplugin
-  namespace: ubicsi
+  namespace: {{ .Values.namespace }}
 spec:
   selector:
     matchLabels:
@@ -24,8 +24,8 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: ubicsi
-          image: ubicloud/ubicsi:0.1.0
-          imagePullPolicy: IfNotPresent
+          image: {{ .Values.nodePlugin.image.repository }}:{{ .Values.nodePlugin.image.tag }}
+          imagePullPolicy: {{ .Values.nodePlugin.image.pullPolicy }}
           env:
             - name: NODE_ID
               valueFrom:
@@ -63,13 +63,13 @@ spec:
               mountPath: /var/lib/ubicsi
               mountPropagation: Bidirectional
           resources:
-            {}
+            {{- toYaml .Values.nodePlugin.resources | nindent 12 }}
         - name: driver-registrar
           securityContext:
             privileged: true
             allowPrivilegeEscalation: true
-          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.13.0
-          imagePullPolicy: IfNotPresent
+          image: {{ .Values.driverRegistrar.image.repository }}:{{ .Values.driverRegistrar.image.tag }}
+          imagePullPolicy: {{ .Values.driverRegistrar.image.pullPolicy }}
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
@@ -85,7 +85,7 @@ spec:
             - name: registration-dir
               mountPath: /registration
           resources:
-            {}
+            {{- toYaml .Values.driverRegistrar.resources | nindent 12 }}
       volumes:
         - name: socket-dir
           hostPath:

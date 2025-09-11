@@ -1,0 +1,67 @@
+provisioner:
+  replicas: 1
+  image:
+    repository: ubicloud/ubicsi
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+csiProvisioner:
+  image:
+    repository: registry.k8s.io/sig-storage/csi-provisioner
+    tag: "v5.3.0"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+csiAttacher:
+  image:
+    repository: registry.k8s.io/sig-storage/csi-attacher
+    tag: "v4.9.0"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+nodePlugin:
+  image:
+    repository: ubicloud/ubicsi
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+driverRegistrar:
+  image:
+    repository: registry.k8s.io/sig-storage/csi-node-driver-registrar
+    tag: "v2.13.0"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+namespace: ubicsi

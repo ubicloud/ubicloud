@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ubicsi
+description: Helm chart for deploying Ubicsi on Ubicloud Kubernetes Clusters
+type: application
+version: 0.1.0
+appVersion: v0.1.0

@@ -3,9 +3,9 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: ubicsi-provisioner
-  namespace: ubicsi
+  namespace: {{ .Values.namespace }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.provisioner.replicas }}
   selector:
     matchLabels:
       app: ubicsi
@@ -34,8 +34,10 @@ spec:
       priorityClassName: system-cluster-critical
       containers:
         - name: ubicsi
-          image: ubicloud/ubicsi:0.1.0
-          imagePullPolicy: IfNotPresent
+          image: {{ .Values.provisioner.image.repository }}:{{ .Values.provisioner.image.tag }}
+          imagePullPolicy: {{ .Values.provisioner.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.provisioner.resources | nindent 12 }}
           env:
             - name: NODE_ID
               valueFrom:
@@ -49,8 +51,10 @@ spec:
             - name: ssh-creds
               mountPath: /ssh
         - name: csi-provisioner
-          image: registry.k8s.io/sig-storage/csi-provisioner:v5.3.0
-          imagePullPolicy: IfNotPresent
+          image: {{ .Values.csiProvisioner.image.repository }}:{{ .Values.csiProvisioner.image.tag }}
+          imagePullPolicy: {{ .Values.csiProvisioner.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.csiProvisioner.resources | nindent 12 }}
           args:
             - "--csi-address=unix:///csi/csi.sock"
             - "--v=1"
@@ -61,8 +65,10 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: csi-attacher
-          image: registry.k8s.io/sig-storage/csi-attacher:v4.9.0
-          imagePullPolicy: IfNotPresent
+          image: {{ .Values.csiAttacher.image.repository }}:{{ .Values.csiAttacher.image.tag }}
+          imagePullPolicy: {{ .Values.csiAttacher.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.csiAttacher.resources | nindent 12 }}
           args:
             - "--csi-address=unix:///csi/csi.sock"
             - "--v=1"
