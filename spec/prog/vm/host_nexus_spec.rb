@@ -208,7 +208,7 @@ RSpec.describe Prog::Vm::HostNexus do
   describe "#wait_prep" do
     it "updates the vm_host record from the finished programs" do
       Strand.create(parent_id: st.id, prog: "LearnMemory", label: "start", stack: [{}], exitval: {"mem_gib" => 1})
-      Strand.create(parent_id: st.id, prog: "LearnOs", label: "start", stack: [{}], exitval: {"os_version" => "ubuntu-22.04"})
+      Strand.create(parent_id: st.id, prog: "LearnOs", label: "start", stack: [{}], exitval: {"os_version" => "ubuntu-24.04"})
       Strand.create(parent_id: st.id, prog: "LearnCpu", label: "start", stack: [{}], exitval: {"arch" => "arm64", "total_sockets" => 2, "total_dies" => 3, "total_cores" => 4, "total_cpus" => 5})
       Strand.create(parent_id: st.id, prog: "ArbitraryOtherProg", label: "start", stack: [{}], exitval: {})
 
@@ -219,7 +219,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
       vm_host.reload
       expect(vm_host.total_mem_gib).to eq 1
-      expect(vm_host.os_version).to eq "ubuntu-22.04"
+      expect(vm_host.os_version).to eq "ubuntu-24.04"
       expect(vm_host.arch).to eq "arm64"
       expect(vm_host.total_cores).to eq 4
       expect(vm_host.total_cpus).to eq 5
