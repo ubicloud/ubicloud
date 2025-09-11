@@ -50,7 +50,9 @@ LOGIND
     key_data = sshable.keys.map(&:private_key)
     Util.rootish_ssh(sshable.host, user, key_data, <<SH)
 set -ueo pipefail
-sudo apt update && sudo apt-get -y install ruby-bundler
+sudo apt-get update
+sudo apt-get -y install ruby-bundler
+sudo which bundler
 sudo userdel -rf rhizome || true
 sudo adduser --disabled-password --gecos '' rhizome
 echo 'rhizome ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-rhizome
