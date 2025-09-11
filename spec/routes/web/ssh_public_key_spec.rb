@@ -18,6 +18,29 @@ RSpec.describe Clover do
     expect(page.title).to eq "Ubicloud - SSH Public Keys"
   end
 
+  it "can navigate to management page from vm create page" do
+    visit "#{project.path}/vm/create"
+    click_link "register SSH keys for this project"
+    expect(page.title).to eq "Ubicloud - SSH Public Keys"
+  end
+
+  it "does not show link on vm create page if user lacks permissions" do
+    visit "#{project.path}/vm/create"
+    expect(page.title).to eq "Ubicloud - Create Virtual Machine"
+    expect(page).to have_content("register SSH keys for this project")
+
+    AccessControlEntry.dataset.destroy
+    AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Vm:create"])
+    page.refresh
+    expect(page.title).to eq "Ubicloud - Create Virtual Machine"
+    expect(page).to have_no_content("register SSH keys for this project")
+
+    AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:edit"])
+    page.refresh
+    expect(page.title).to eq "Ubicloud - Create Virtual Machine"
+    expect(page).to have_content("register SSH keys for this project")
+  end
+
   it "does not allow access to SSH public keys in other projects" do
     click_link "Register SSH Public Key"
     fill_in "Name", with: "a"
