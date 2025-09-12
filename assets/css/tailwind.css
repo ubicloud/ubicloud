@@ -31,6 +31,10 @@
 }
 
 #creation-form {
+  &:has(select#health_check_protocol option[value=tcp]:checked) #health-check-endpoint-wrapper {
+    display: none;
+  }
+ 
   #new-private-subnet-name {
     display: none;
   }
