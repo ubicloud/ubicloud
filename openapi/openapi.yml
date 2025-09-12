@@ -826,8 +826,6 @@ paths:
                 connect_to_subnet_id:
                   description: Connect to given private subnet id
                   type: string
-                  example: pskkmx0f2vke4h36nk9cm8v8q0
-                  pattern: '^ps[0-9a-hj-km-np-tv-z]{24}$'
                 flavor:
                   description: Kind of database
                   type: string
@@ -1407,12 +1405,12 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
-  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_reference}/disconnect/{private_subnet_id}':
+  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_reference}/disconnect/{private_subnet_or_postgres_id}':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/private_subnet_reference'
-      - $ref: '#/components/parameters/private_subnet_id'
+      - $ref: '#/components/parameters/private_subnet_or_postgres_id'
     post:
       operationId: disconnectPrivateSubnet
       summary: Disconnect private subnet from another private subnet
@@ -1869,15 +1867,15 @@ components:
       required: true
       schema:
         type: string
-    private_subnet_id:
-      description: ID of the private subnet
+    private_subnet_or_postgres_id:
+      description: ID of the private subnet or postgres database
       in: path
-      name: private_subnet_id
+      name: private_subnet_or_postgres_id
       required: true
       schema:
         type: string
         example: pskkmx0f2vke4h36nk9cm8v8q0
-        pattern: '^ps[0-9a-hj-km-np-tv-z]{24}$'
+        pattern: '^p[sg][0-9a-hj-km-np-tv-z]{24}$'
     private_subnet_reference:
       description: Private subnet ID or name
       examples:
