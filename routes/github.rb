@@ -11,7 +11,7 @@ class Clover
 
       if (installation = GithubInstallation[installation_id: installation_id])
         @project = installation.project
-        authorize("Project:github", installation.project.id)
+        authorize("Project:github", installation.project)
         flash["notice"] = "GitHub runner integration is already enabled for #{installation.project.name} project."
         Clog.emit("GitHub installation already exists") { {installation_failed: {id: installation_id, account_ubid: current_account.ubid}} }
         r.redirect installation, "/runner"
@@ -23,7 +23,7 @@ class Clover
         r.redirect "/project"
       end
 
-      authorize("Project:github", project.id)
+      authorize("Project:github", project)
 
       if setup_action == "request"
         flash["notice"] = "The GitHub App installation request is awaiting approval from the GitHub organization's administrator. As GitHub will redirect your admin back to the Ubicloud console, the admin needs to have an Ubicloud account with the necessary permissions to finalize the installation. Please invite the admin to your project if they don't have an account yet."

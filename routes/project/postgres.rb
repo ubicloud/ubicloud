@@ -14,7 +14,7 @@ class Clover
       end
 
       r.get "create" do
-        authorize("Postgres:create", @project.id)
+        authorize("Postgres:create", @project)
         view "postgres/create"
       end
     end

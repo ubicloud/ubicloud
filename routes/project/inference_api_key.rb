@@ -17,7 +17,7 @@ class Clover
       end
 
       r.post do
-        authorize("InferenceApiKey:create", @project.id)
+        authorize("InferenceApiKey:create", @project)
         iak = nil
         DB.transaction do
           iak = ApiKey.create_inference_api_key(@project)
@@ -44,7 +44,7 @@ class Clover
 
       r.delete do
         if iak
-          authorize("InferenceApiKey:delete", iak.id)
+          authorize("InferenceApiKey:delete", iak)
           DB.transaction do
             iak.destroy
             audit_log(iak, "destroy")
