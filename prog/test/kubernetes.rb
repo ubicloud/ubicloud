@@ -6,7 +6,7 @@ class Prog::Test::Kubernetes < Prog::Test::Base
   semaphore :destroy
 
   def self.assemble
-    kubernetes_test_project = Project.create(name: "Kubernetes-Test-Project")
+    kubernetes_test_project = Project.create(name: "Kubernetes-Test-Project", feature_flags: {"install_csi" => true})
     kubernetes_service_project = Project.create_with_id(Config.kubernetes_service_project_id, name: "Ubicloud-Kubernetes-Resources")
 
     Strand.create(
@@ -59,11 +59,11 @@ class Prog::Test::Kubernetes < Prog::Test::Base
   end
 
   label def wait_for_kubernetes_bootstrap
-    hop_test_kubernetes if kubernetes_cluster.strand.label == "wait"
+    hop_test_nodes if kubernetes_cluster.strand.label == "wait"
     nap 10
   end
 
-  label def test_kubernetes
+  label def test_nodes
     begin
       nodes_output = kubernetes_cluster.client.kubectl("get nodes")
     rescue RuntimeError => ex
@@ -74,7 +74,81 @@ class Prog::Test::Kubernetes < Prog::Test::Base
     kubernetes_cluster.all_nodes.each { |node|
       missing_nodes.append(node.name) unless nodes_output.include?(node.name)
     }
-    update_stack({"fail_message" => "node #{missing_nodes.join(", ")} not found in cluster"}) if missing_nodes.any?
+    if missing_nodes.any?
+      update_stack({"fail_message" => "node #{missing_nodes.join(", ")} not found in cluster"})
+      hop_destroy_kubernetes
+    end
+    hop_test_csi
+  end
+
+  label def test_csi
+    sts = <<STS
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ubuntu-statefulset
+spec:
+  serviceName: ubuntu
+  replicas: 1
+  selector:
+    matchLabels: { app: ubuntu }
+  template:
+    metadata:
+      labels: { app: ubuntu }
+    spec:
+      containers:
+      - name: ubuntu
+        image: ubuntu:24.04
+        command: ["/bin/sh", "-c", "sleep infinity"]
+        volumeMounts:
+        - { name: data-volume, mountPath: /etc/data }
+  volumeClaimTemplates:
+  - metadata:
+      name: data-volume
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests: { storage: 1Gi }
+      storageClassName: ubicloud-standard
+STS
+    kubernetes_cluster.sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f -", stdin: sts)
+    hop_wait_for_statefulset
+  end
+
+  label def wait_for_statefulset
+    pod_status = kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").strip
+    nap 5 unless pod_status == "Running"
+    hop_test_lsblk
+  end
+
+  label def test_lsblk
+    lsblk_output = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- lsblk")
+    lines = lsblk_output.split("\n")[1..]
+    data_mount = lines.find { |line| line.include?("/etc/data") }
+    if data_mount
+      cols = data_mount.split
+      device_name = cols[0]  # e.g. "loop3"
+      size = cols[3]         # e.g. "1G"
+      mountpoint = cols[6]   # e.g. "/etc/data"
+
+      if device_name.start_with?("loop") && size == "1G" && mountpoint == "/etc/data"
+        hop_test_data_write
+      else
+        update_stack({"fail_message" => "/etc/data is mounted incorrectly: #{data_mount}"})
+        hop_destroy_kubernetes
+      end
+    else
+      update_stack({"fail_message" => "No /etc/data mount found in lsblk output"})
+      hop_destroy_kubernetes
+    end
+  end
+
+  label def test_data_write
+    write_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"head -c 200M /dev/urandom | tee /etc/data/random-data | sha256sum | awk '{print \\$1}'\"").strip
+    read_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").strip
+    if write_hash != read_hash
+      update_stack({"fail_message" => "wrong read hash, expected: #{write_hash}, got: #{read_hash}"})
+    end
     hop_destroy_kubernetes
   end
 

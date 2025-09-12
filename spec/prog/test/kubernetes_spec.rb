@@ -8,7 +8,7 @@ RSpec.describe Prog::Test::Kubernetes do
   }
 
   let(:kubernetes_service_project_id) { "546a1ed8-53e5-86d2-966c-fb782d2ae3aa" }
-  let(:kubernetes_test_project) { Project.create(name: "Kubernetes-Test-Project") }
+  let(:kubernetes_test_project) { Project.create(name: "Kubernetes-Test-Project", feature_flags: {"install_csi" => true}) }
   let(:kubernetes_service_project) { Project.create_with_id(kubernetes_service_project_id, name: "Ubicloud-Kubernetes-Resources") }
   let(:private_subnet) { PrivateSubnet.create(name: "test-subnet", location_id: Location::HETZNER_FSN1_ID, project_id: kubernetes_test_project.id, net6: "fe80::/64", net4: "192.168.0.0/24") }
   let(:kubernetes_cluster) {
@@ -110,10 +110,10 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
     end
 
-    it "hops to test_kubernetes if cluster is ready" do
-      expect(kubernetes_cluster).to receive(:strand).at_least(:once).and_return(instance_double(Strand, label: "wait"))
+    it "hops to test_nodes if cluster is ready" do
+      expect(kubernetes_cluster).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
 
-      expect { kubernetes_test.wait_for_kubernetes_bootstrap }.to hop("test_kubernetes")
+      expect { kubernetes_test.wait_for_kubernetes_bootstrap }.to hop("test_nodes")
     end
 
     it "naps if cluster is not ready" do
@@ -123,7 +123,7 @@ RSpec.describe Prog::Test::Kubernetes do
     end
   end
 
-  describe "#test_kubernetes" do
+  describe "#test_nodes" do
     before do
       expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
     end
@@ -136,7 +136,7 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(kubernetes_cluster).to receive(:client).and_return(client)
       expect(client).to receive(:kubectl).with("get nodes").and_return("NAME                               STATUS   ROLES           AGE     VERSION\nkcz70f4yk68e0ne5n6s938pmb2-ut4i8   Ready    control-plane   7m47s   v1.34.0\nkngp6bg8qmx61gd46vk8cvdv6m-d2h94   Ready    <none>          3m48s   v1.34.0")
 
-      expect { kubernetes_test.test_kubernetes }.to hop("destroy_kubernetes")
+      expect { kubernetes_test.test_nodes }.to hop("test_csi")
     end
 
     it "fails and hops to destroy_kubernetes with fail message" do
@@ -145,7 +145,7 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(client).to receive(:kubectl).with("get nodes").and_raise("cluster issue")
       expect(kubernetes_test).to receive(:update_stack).with({"fail_message" => "Failed to run test kubectl command: cluster issue"})
 
-      expect { kubernetes_test.test_kubernetes }.to hop("destroy_kubernetes")
+      expect { kubernetes_test.test_nodes }.to hop("destroy_kubernetes")
     end
 
     it "fails if all nodes are not found and hops to destroy_kubernetes with fail message" do
@@ -158,7 +158,87 @@ RSpec.describe Prog::Test::Kubernetes do
 
       expect(kubernetes_test).to receive(:update_stack).with({"fail_message" => "node kngp6bg8qmx61gd46vk8cvdv6m-d2h94 not found in cluster"})
 
-      expect { kubernetes_test.test_kubernetes }.to hop("destroy_kubernetes")
+      expect { kubernetes_test.test_nodes }.to hop("destroy_kubernetes")
+    end
+  end
+
+  describe "#test_csi" do
+    before do
+      expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
+    end
+
+    it "creates a statefulset for the following tests" do
+      sshable = instance_double(Sshable)
+      expect(kubernetes_cluster).to receive(:sshable).and_return(sshable)
+      expect(sshable).to receive(:cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f -", stdin: /apiVersion: apps/)
+      expect { kubernetes_test.test_csi }.to hop("wait_for_statefulset")
+    end
+  end
+
+  describe "#wait_for_statefulset" do
+    let(:client) { instance_double(Kubernetes::Client) }
+
+    before do
+      expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
+      expect(kubernetes_cluster).to receive(:client).and_return(client)
+    end
+
+    it "waits for the stateful pod to become running" do
+      expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").and_return("Running")
+      expect { kubernetes_test.wait_for_statefulset }.to hop("test_lsblk")
+    end
+
+    it "naps if pod is not running yet" do
+      expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").and_return("ContainerCreating")
+      expect { kubernetes_test.wait_for_statefulset }.to nap(5)
+    end
+  end
+
+  describe "#test_lsblk" do
+    let(:client) { instance_double(Kubernetes::Client) }
+
+    before do
+      expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
+      expect(kubernetes_cluster).to receive(:client).and_return(client)
+    end
+
+    it "fails if the expected mount does not appear in lsblk output" do
+      expect(client).to receive(:kubectl).with("exec -t ubuntu-statefulset-0 -- lsblk").and_return("no-data")
+      expect(kubernetes_test).to receive(:update_stack).with({"fail_message" => "No /etc/data mount found in lsblk output"})
+      expect { kubernetes_test.test_lsblk }.to hop("destroy_kubernetes")
+    end
+
+    it "fails if expected mount is not found for data volume" do
+      expect(client).to receive(:kubectl).with("exec -t ubuntu-statefulset-0 -- lsblk").and_return("NAME MAJ:MIN RM SIZE RO TYPE MOUNTPOINTS\nvda 252:0 0 40G 0 disk\n|-vda1 252:1 0 39.9G 0 part /etc/resolv.conf\n| /etc/hosts\n| /etc/data")
+      expect(kubernetes_test).to receive(:update_stack).with({"fail_message" => "/etc/data is mounted incorrectly: | /etc/data"})
+      expect { kubernetes_test.test_lsblk }.to hop("destroy_kubernetes")
+    end
+
+    it "hops to the next test if lsblk output is ok" do
+      expect(client).to receive(:kubectl).with("exec -t ubuntu-statefulset-0 -- lsblk").and_return("NAME MAJ:MIN RM SIZE RO TYPE MOUNTPOINTS\nloop3 7:3 0 1G 0 loop /etc/data\nvda 252:0 0 40G 0 disk\n|-vda1 252:1 0 39.9G 0 part /etc/resolv.conf\n| /etc/hosts\n|-vda14 252:14 0 4M 0 part")
+      expect { kubernetes_test.test_lsblk }.to hop("test_data_write")
+    end
+  end
+
+  describe "#test_data_write" do
+    let(:client) { instance_double(Kubernetes::Client) }
+
+    before do
+      expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
+      expect(kubernetes_cluster).to receive(:client).and_return(client).twice
+      expect(client).to receive(:kubectl).with("exec -t ubuntu-statefulset-0 -- sh -c \"head -c 200M /dev/urandom | tee /etc/data/random-data | sha256sum | awk '{print \\$1}'\"").and_return("hash")
+    end
+
+    it "writes data and validates the file hash and is ok" do
+      expect(client).to receive(:kubectl).with("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").and_return("hash")
+      expect(kubernetes_test).not_to receive(:update_stack)
+      expect { kubernetes_test.test_data_write }.to hop("destroy_kubernetes")
+    end
+
+    it "writes data and validates the file hash and is not ok" do
+      expect(client).to receive(:kubectl).with("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").and_return("wrong_hash")
+      expect(kubernetes_test).to receive(:update_stack).with({"fail_message" => "wrong read hash, expected: hash, got: wrong_hash"})
+      expect { kubernetes_test.test_data_write }.to hop("destroy_kubernetes")
     end
   end
 
