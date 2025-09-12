@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
 class Clover
+  def authorized_postgres_resource(perm: "Postgres:view", location_id: nil, key: "postgres_resource_id", id: nil)
+    authorized_object(association: :postgres_resources, key:, perm:, location_id:, id:)
+  end
+
   def postgres_post(name)
     authorize("Postgres:create", @project.id)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
