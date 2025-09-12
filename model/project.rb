@@ -21,6 +21,7 @@ class Project < Sequel::Model
   one_to_many :load_balancers
   one_to_many :inference_endpoints
   one_to_many :kubernetes_clusters
+  one_to_many :ssh_public_keys, order: :name
 
   RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners]
   RESOURCE_ASSOCIATION_DATASET_METHODS = RESOURCE_ASSOCIATIONS.map { :"#{it}_dataset" }
@@ -46,8 +47,17 @@ class Project < Sequel::Model
     end
   end
 
-  plugin :association_dependencies, accounts: :nullify, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy, access_control_entries: :destroy, subject_tags: :destroy, action_tags: :destroy, object_tags: :destroy,
-    locations: :destroy
+  plugin :association_dependencies,
+    access_control_entries: :destroy,
+    accounts: :nullify,
+    action_tags: :destroy,
+    api_keys: :destroy,
+    billing_info: :destroy,
+    github_installations: :destroy,
+    locations: :destroy,
+    object_tags: :destroy,
+    ssh_public_keys: :destroy,
+    subject_tags: :destroy
 
   plugin ResourceMethods
 
@@ -212,6 +222,7 @@ end
 #  object_tag                | object_tag_project_id_fkey                | (project_id) REFERENCES project(id)
 #  private_subnet            | private_subnet_project_id_fkey            | (project_id) REFERENCES project(id)
 #  project_discount_code     | project_discount_code_project_id_fkey     | (project_id) REFERENCES project(id)
+#  ssh_public_key            | ssh_public_key_project_id_fkey            | (project_id) REFERENCES project(id)
 #  subject_tag               | subject_tag_project_id_fkey               | (project_id) REFERENCES project(id)
 #  usage_alert               | usage_alert_project_id_fkey               | (project_id) REFERENCES project(id)
 #  victoria_metrics_resource | victoria_metrics_resource_project_id_fkey | (project_id) REFERENCES project(id)

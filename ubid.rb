@@ -103,6 +103,7 @@ class UBID
   TYPE_NIC_AWS_RESOURCE = "na"
   TYPE_VICTORIA_METRICS_RESOURCE = "vr"
   TYPE_VICTORIA_METRICS_SERVER = "vn"
+  TYPE_SSH_PUBLIC_KEY = "sk"
   # TYPE_AUDIT_LOG = "a1"
 
   # Common entropy-based type for everything else

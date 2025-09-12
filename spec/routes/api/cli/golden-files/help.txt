@@ -15,5 +15,6 @@ Commands:
     lb         Manage load balancers
     pg         Manage PostgreSQL databases
     ps         Manage private subnets
+    sk         Manage SSH public keys
     version    Display CLI program version
     vm         Manage virtual machines

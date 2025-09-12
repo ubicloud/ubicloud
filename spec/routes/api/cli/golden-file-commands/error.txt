@@ -5,6 +5,8 @@
 --confirm foo lb eu-central-h1/test-lb destroy
 --confirm foo pg eu-central-h1/test-pg destroy
 --confirm foo ps eu-central-h1/test-ps destroy
+--confirm sk684jk5sa027g4mmr3rrwmakr sk sk684jk5sa027g4mmr3rrwmakr destroy
+--confirm foo sk spk destroy
 --confirm foo vm eu-central-h1/test-vm destroy
 ai api-key badc0j48r8kj4nharh6yagf3eb show
 fw eu-central-h1/default-eu-central-h1-default add-rule foo
@@ -75,6 +77,7 @@ ps eu-central-h1/test2-ps create invalid
 ps eu-central-h1/test-ps destroy invalid
 ps list -f invalid
 ps list invalid
+sk spk/ show
 vm eu-central-h1/test2-vm create
 vm eu-central-h1/test2-vm create a
 vm eu-central-h1/test2-vm create "# a"
