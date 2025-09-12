@@ -46,8 +46,9 @@
   <h2>Browse by Model Class</h2>
 
   <ul id="model-class-list">
+    <% autoforme_models = self.class.autoforme_models %>
     <% @classes.each do |klass| %>
-      <li><a href="/model/<%= klass %>"><%= klass %></a></li>
+      <li><a href="<%= autoforme_models[klass.to_s] ? "/autoforme/#{klass}/browse" : "/model/#{klass}" %>"><%= klass %></a></li>
     <% end %>
   </ul>
 
