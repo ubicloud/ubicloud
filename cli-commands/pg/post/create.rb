@@ -4,6 +4,7 @@ UbiCli.on("pg").run_on("create") do
   desc "Create a PostgreSQL database"
 
   options("ubi pg location/pg-name create [options]", key: :pg_create) do
+    on("-C", "--connect-to-subnet-id=ps-id", "connect created subnet to given subnet id or name")
     on("-f", "--flavor=type", Option::POSTGRES_FLAVOR_OPTIONS.keys, "flavor")
     on("-h", "--ha-type=type", Option::POSTGRES_HA_OPTIONS.keys, "replication type")
     on("-s", "--size=size", Option::POSTGRES_SIZE_OPTIONS.keys, "server size")
@@ -20,6 +21,9 @@ UbiCli.on("pg").run_on("create") do
 
   run do |opts, cmd|
     params = underscore_keys(opts[:pg_create])
+    if (ps_id = params[:connect_to_subnet_id])
+      params[:connect_to_subnet_id] = convert_name_to_id(sdk.private_subnet, ps_id)
+    end
     pg_tags_to_hash(params, cmd)
     id = sdk.postgres.create(location: @location, name: @name, **params).id
     response("PostgreSQL database created with id: #{id}")
