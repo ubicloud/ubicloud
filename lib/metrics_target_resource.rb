@@ -40,6 +40,7 @@ class MetricsTargetResource
       @last_export_success = false
       close_resource_session
       Clog.emit("Metrics export has failed.") { {metrics_export_failure: {ubid: @resource.ubid, exception: Util.exception_to_hash(ex)}} }
+      # TODO: Consider raising the exception here, and let the caller handle it.
     end
   end
 
