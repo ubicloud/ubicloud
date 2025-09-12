@@ -113,7 +113,10 @@ class Clover
         end
       end
 
-      r.rename lb, perm: "LoadBalancer:edit", serializer: Serializers::LoadBalancer, template_prefix: "networking/load_balancer"
+      r.rename lb, perm: "LoadBalancer:edit", serializer: Serializers::LoadBalancer, template_prefix: "networking/load_balancer" do
+        lb.incr_rewrite_dns_records
+        lb.incr_refresh_cert
+      end
 
       r.show_object(lb, actions: %w[overview vms settings], perm: "LoadBalancer:view", template: "networking/load_balancer/show")
     end
