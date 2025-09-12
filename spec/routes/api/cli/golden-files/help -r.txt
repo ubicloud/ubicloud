@@ -684,7 +684,10 @@ Allowed Option Values:
 Connect a private subnet to another private subnet
 
 Usage:
-    ubi ps (location/ps-name | ps-id) connect (location/ps-name | ps-id)
+    ubi ps (location/ps-name | ps-id) connect [options] (location/ps-name | ps-id)
+
+Options:
+    -P, --postgres                   treat argument as PostgreSQL database name or id
 
 
 Create a private subnet

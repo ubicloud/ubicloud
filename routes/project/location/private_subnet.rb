@@ -25,13 +25,19 @@ class Clover
       r.post "connect" do
         authorize("PrivateSubnet:connect", ps.id)
         handle_validation_failure("networking/private_subnet/show") { @page = "networking" }
-        unless (subnet = authorized_private_subnet(key: "connected-subnet-id", perm: "PrivateSubnet:connect"))
+
+        if typecast_params.nonempty_str!("connected-subnet-id").start_with?("pg")
+          unless (pg = authorized_postgres_resource(key: "connected-subnet-id", perm: "Postgres:edit", location_id: @location.id))
+            raise CloverError.new(400, "InvalidRequest", "PostgreSQL database subnet to be connected not found")
+          end
+          subnet = pg.private_subnet
+        elsif !(subnet = authorized_private_subnet(key: "connected-subnet-id", perm: "PrivateSubnet:connect"))
           raise CloverError.new(400, "InvalidRequest", "Subnet to be connected not found")
         end
 
         DB.transaction do
           ps.connect_subnet(subnet)
-          audit_log(ps, "connect", subnet)
+          audit_log(ps, "connect", pg || subnet)
         end
 
         if api?
