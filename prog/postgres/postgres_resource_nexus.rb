@@ -12,7 +12,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,
     version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
-    ha_type: PostgresResource::HaType::NONE, parent_id: nil, restore_target: nil, with_firewall_rules: true)
+    ha_type: PostgresResource::HaType::NONE, parent_id: nil, restore_target: nil, with_firewall_rules: true,
+    connect_to_subnet: nil)
 
     unless Project[project_id]
       fail "No existing project"
@@ -56,8 +57,11 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
       firewall = Firewall.create(name: "#{postgres_resource.ubid}-firewall", location_id: location.id, description: "Postgres default firewall", project_id: Config.postgres_service_project_id)
 
-      private_subnet_id = Prog::Vnet::SubnetNexus.assemble(Config.postgres_service_project_id, name: "#{postgres_resource.ubid}-subnet", location_id: location.id, firewall_id: firewall.id).id
-      postgres_resource.update(private_subnet_id: private_subnet_id)
+      private_subnet = Prog::Vnet::SubnetNexus.assemble(Config.postgres_service_project_id, name: "#{postgres_resource.ubid}-subnet", location_id: location.id, firewall_id: firewall.id).subject
+
+      # connect_to_subnet should be checked by the caller to ensure it is a valid subnet to connect to
+      connect_to_subnet&.connect_subnet(private_subnet)
+      postgres_resource.update(private_subnet_id: private_subnet.id)
 
       if with_firewall_rules
         PostgresFirewallRule.create(postgres_resource_id: postgres_resource.id, cidr: "0.0.0.0/0")

@@ -93,6 +93,7 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
 
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
+        expect(page).to have_no_content("Connect to Private Subnet")
         name = "new-pg-db"
         fill_in "Name", with: name
         choose option: Location::HETZNER_FSN1_UBID
@@ -105,6 +106,49 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
         expect(PostgresResource.count).to eq(1)
         expect(PostgresResource.first.project_id).to eq(project.id)
+      end
+
+      it "can create new PostgreSQL database connected to an existing subnet" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps").subject
+        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
+
+        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
+        name = "new-pg-db"
+        fill_in "Name", with: name
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "standard-2"
+        choose option: PostgresResource::HaType::NONE
+        select "test-ps"
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
+        expect(PostgresResource.count).to eq(1)
+        pg = PostgresResource.first
+        expect(pg.project_id).to eq(project.id)
+        expect(ps.connected_subnets.map(&:id)).to eq [pg.private_subnet.id]
+      end
+
+      it "shows error if attempting to create new PostgreSQL database connected to an invalid subnet" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps").subject
+        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
+
+        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
+        expect(page).to have_content("Connect to Private Subnet")
+        name = "new-pg-db"
+        fill_in "Name", with: name
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "standard-2"
+        choose option: PostgresResource::HaType::NONE
+        select "test-ps"
+
+        ps.destroy
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
+        expect(page).to have_flash_error("Subnet to be connected not found")
+        expect(PostgresResource.count).to eq(0)
       end
 
       it "can create new PostgreSQL database in a custom AWS region" do
