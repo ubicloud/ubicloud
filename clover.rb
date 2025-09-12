@@ -58,7 +58,7 @@ class Clover < Roda
     invalid_value_message(:pos_int64, "Value must be an integer greater than 0 for parameter")
 
     handle_type(:ubid_uuid, invalid_value_message: "Value provided not a valid id for parameter") do
-      if it.is_a?(String) && it.bytesize == 26
+      if it.is_a?(String) && /\A([a-tv-z0-9]{26})\z/.match?(it)
         UBID.to_uuid(it)
       end
     end
