@@ -41,7 +41,7 @@ RSpec.describe Prog::BootstrapRhizome do
 set -ueo pipefail
 sudo apt-get update
 sudo apt-get -y install ruby-bundler
-sudo which bundler
+sudo which bundle
 sudo userdel -rf rhizome || true
 sudo adduser --disabled-password --gecos '' rhizome
 echo 'rhizome ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-rhizome
