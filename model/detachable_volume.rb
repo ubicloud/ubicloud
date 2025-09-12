@@ -12,6 +12,7 @@ class DetachableVolume < Sequel::Model
   plugin :association_dependencies, source_key_encryption_key: :destroy, target_key_encryption_key: :destroy
 
   plugin ResourceMethods
+  plugin SemaphoreMethods, :destroy
 end
 
 # Table: detachable_volume
