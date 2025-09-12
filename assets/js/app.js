@@ -268,12 +268,13 @@ $(".fork-icon").on("click", function () {
 
 $(".connection-info-format-selector select, .connection-info-format-selector input").on('change', function() {
   let format = $(".connection-info-format-selector select").val();
-  let port = $(".connection-info-format-selector input").is(":checked") ? "6432" : "5432";
+  let port = $(".connection-info-format-selector input[name=use_pgbouncer]").is(":checked") ? "6432" : "5432";
+  let suffix = $(".connection-info-format-selector input[name=use_private_ip]").is(":checked") ? "-private" : "";
   let reveal_status = $(".connection-info-box:visible").find(".group").hasClass('active')
 
   $(".connection-info-box").hide();
-  $(".connection-info-box-" + format + "-" + port).find(".group").toggleClass('active', reveal_status);
-  $(".connection-info-box-" + format + "-" + port).show();
+  $(".connection-info-box-" + format + "-" + port + suffix).find(".group").toggleClass('active', reveal_status);
+  $(".connection-info-box-" + format + "-" + port + suffix).show();
 });
 
 

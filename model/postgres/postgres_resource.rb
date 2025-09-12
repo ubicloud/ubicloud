@@ -80,6 +80,10 @@ class PostgresResource < Sequel::Model
     ).to_s
   end
 
+  def private_ipv4
+    representative_server&.vm&.private_ipv4
+  end
+
   def replication_connection_string(application_name:)
     query_parameters = {
       sslrootcert: "/etc/ssl/certs/ca.crt",

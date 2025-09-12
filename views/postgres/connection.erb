@@ -1,20 +1,21 @@
 <%
   hostname = @pg.hostname
   password = URI.encode_uri_component(@pg.superuser_password)
+  hostnames = [[hostname, ""]]
+  allow_private = @pg.private_subnet.connected_subnets.any? && (private_ipv4 = @pg.private_ipv4)
+  hostnames << [private_ipv4, "-private"] if allow_private
 
-  connection_infos = {
-    "url-5432" => "postgresql://postgres:#{password}@#{hostname}:5432/postgres",
-    "url-6432" => "postgresql://postgres:#{password}@#{hostname}:6432/postgres",
-    "psql-5432" => "psql postgresql://postgres:#{password}@#{hostname}:5432/postgres",
-    "psql-6432" => "psql postgresql://postgres:#{password}@#{hostname}:6432/postgres",
-    "env-5432" => "PGHOST=#{hostname}\nPGPORT=5432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres",
-    "env-6432" => "PGHOST=#{hostname}\nPGPORT=6432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres",
-    "yaml-5432" => "host: #{hostname}\nport: 5432\nuser: postgres\npassword: #{password}\ndatabase: postgres",
-    "yaml-6432" => "host: #{hostname}\nport: 6432\nuser: postgres\npassword: #{password}\ndatabase: postgres",
-    "jdbc-5432" => "jdbc:postgresql://#{hostname}:5432/postgres?user=postgres&password=#{password}&ssl=true",
-    "jdbc-6432" => "jdbc:postgresql://#{hostname}:6432/postgres?user=postgres&password=#{password}&ssl=true"
-  }
-
+  connection_infos = {}
+  ports = [5432, 6432]
+  hostnames.each do |hostname, suffix|
+    ports.each do |port|
+      connection_infos["url-#{port}#{suffix}"] = "postgresql://postgres:#{password}@#{hostname}:#{port}/postgres"
+      connection_infos["psql-#{port}#{suffix}"] = "psql postgresql://postgres:#{password}@#{hostname}:#{port}/postgres"
+      connection_infos["env-#{port}#{suffix}"] = "PGHOST=#{hostname}\nPGPORT=#{port}\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres"
+      connection_infos["yaml-#{port}#{suffix}"] = "host: #{hostname}\nport: #{port}\nuser: postgres\npassword: #{password}\ndatabase: postgres"
+      connection_infos["jdbc-#{port}#{suffix}"] = "jdbc:postgresql://#{hostname}:#{port}/postgres?user=postgres&password=#{password}&ssl=true"
+    end
+  end
 %>
 
 <div class="p-6">
@@ -35,7 +36,10 @@
           ) %>
         </div>
       </div>
-      <div><%== part("components/form/checkbox", options: [["1", "Use pgBouncer?", "", {}]]) %></div>
+      <div><%== part("components/form/checkbox", name: :use_pgbouncer, options: [["1", "Use pgBouncer?", "", {}]]) %></div>
+      <% if allow_private %>
+        <div><%== part("components/form/checkbox", name: :use_private_ip, options: [["1", "Use Private IP?", "", {}]]) %></div>
+      <% end %>
     </div>
 
     <%
