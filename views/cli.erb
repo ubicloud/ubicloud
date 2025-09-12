@@ -47,7 +47,7 @@
             <p class="text-xl font-semibold">Remaining commands:</p>
             <div class="w-full text-sm border p-3 bg-slate-100 font-mono rounded">
               <% @clis.each do %>
-                <pre><code class="next-clis"><%= it %></code></pre>
+                <pre class="whitespace-pre-wrap"><code class="next-clis"><%= it %></code></pre>
                 <input type="hidden" name="clis[]" value="<%= it %>">
               <% end %>
             </div>
@@ -58,14 +58,14 @@
           <div class="space-y-2">
             <p class="text-xl font-semibold">Ran command:</p>
             <div class="w-full text-sm border p-3 bg-slate-100 font-mono rounded">
-              <pre><code id="cli-executed"><%= @last_cli %></code></pre>
+              <pre class="whitespace-pre-wrap"><code id="cli-executed"><%= @last_cli %></code></pre>
             </div>
           </div>
 
           <div class="space-y-2">
             <p class="text-xl font-semibold"><%= @ubi_command_execute ? "Would execute" : "Output" %>:</p>
             <div class="w-full text-sm border p-3 bg-slate-100 font-mono rounded">
-              <pre><code id="cli-output"><%== @output %></code></pre>
+              <pre class="whitespace-pre-wrap"><code id="cli-output"><%== @output %></code></pre>
             </div>
           </div>
           <% if @ubi_confirm %>
@@ -77,7 +77,7 @@
           <% unless multi %>
             <div class="space-y-2">
               <h2 class="text-xl font-semibold">Examples</h2>
-              <dl class="w-full text-sm border p-3 bg-slate-100 text-rose-500 font-mono rounded">
+              <dl class="w-full text-sm border p-3 bg-slate-100 font-mono rounded">
                 <dt><code>help -ru</code></dt>
                 <dd class="inline-block ml-6 mb-4">Display the syntax for all supported commands</dd>
                 <dt><code>help -r</code></dt>
