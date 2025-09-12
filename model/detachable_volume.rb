@@ -1,0 +1,38 @@
+# frozen_string_literal: true
+
+require_relative "../model"
+
+class DetachableVolume < Sequel::Model
+  many_to_one :vm
+  many_to_one :source_vhost_block_backend_id, class: :VhostBlockBackend
+  many_to_one :source_key_encryption_key_id, class: :StorageKeyEncryptionKey
+  many_to_one :target_vhost_block_backend_id, class: :VhostBlockBackend
+  many_to_one :target_key_encryption_key_id, class: :StorageKeyEncryptionKey
+
+  plugin :association_dependencies, source_key_encryption_key_id: :destroy, target_key_encryption_key_id: :destroy
+
+  plugin ResourceMethods
+end
+
+# Table: detachable_volume
+# Columns:
+#  id                            | uuid    | PRIMARY KEY
+#  project_id                    | uuid    | NOT NULL
+#  vm_id                         | uuid    |
+#  source_vhost_block_backend_id | uuid    |
+#  source_key_encryption_key_id  | uuid    |
+#  target_vhost_block_backend_id | uuid    |
+#  target_key_encryption_key_id  | uuid    |
+#  name                          | text    | NOT NULL
+#  size_gib                      | integer | NOT NULL
+#  max_read_mbytes_per_sec       | integer |
+#  max_write_mbytes_per_sec      | integer |
+#  vring_workers                 | integer |
+# Indexes:
+#  detachable_volume_pkey | PRIMARY KEY btree (id)
+# Foreign key constraints:
+#  detachable_volume_source_key_encryption_key_id_fkey  | (source_key_encryption_key_id) REFERENCES storage_key_encryption_key(id)
+#  detachable_volume_source_vhost_block_backend_id_fkey | (source_vhost_block_backend_id) REFERENCES vhost_block_backend(id)
+#  detachable_volume_target_key_encryption_key_id_fkey  | (target_key_encryption_key_id) REFERENCES storage_key_encryption_key(id)
+#  detachable_volume_target_vhost_block_backend_id_fkey | (target_vhost_block_backend_id) REFERENCES vhost_block_backend(id)
+#  detachable_volume_vm_id_fkey                         | (vm_id) REFERENCES vm(id)
