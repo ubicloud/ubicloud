@@ -382,6 +382,7 @@ end
 #  vm_vm_host_slice_id_fkey | (vm_host_slice_id) REFERENCES vm_host_slice(id)
 # Referenced By:
 #  assigned_vm_address        | assigned_vm_address_dst_vm_id_fkey    | (dst_vm_id) REFERENCES vm(id)
+#  detachable_volume          | detachable_volume_vm_id_fkey          | (vm_id) REFERENCES vm(id)
 #  dns_servers_vms            | dns_servers_vms_vm_id_fkey            | (vm_id) REFERENCES vm(id)
 #  firewalls_vms              | firewalls_vms_vm_id_fkey              | (vm_id) REFERENCES vm(id) ON DELETE CASCADE
 #  gpu_partition              | gpu_partition_vm_id_fkey              | (vm_id) REFERENCES vm(id)
