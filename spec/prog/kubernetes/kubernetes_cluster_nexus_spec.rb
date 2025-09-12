@@ -137,6 +137,16 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(nx).to receive(:register_deadline)
       expect(nx).to receive(:incr_install_metrics_server)
       expect(nx).to receive(:incr_sync_worker_mesh)
+      expect(nx).not_to receive(:incr_install_csi)
+      expect { nx.start }.to hop("create_load_balancers")
+    end
+
+    it "also increments install_csi when its feature flag is set" do
+      customer_project.set_ff_install_csi(true)
+      expect(nx).to receive(:register_deadline)
+      expect(nx).to receive(:incr_install_metrics_server)
+      expect(nx).to receive(:incr_sync_worker_mesh)
+      expect(nx).to receive(:incr_install_csi)
       expect { nx.start }.to hop("create_load_balancers")
     end
   end
@@ -294,6 +304,11 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.wait }.to hop("sync_worker_mesh")
     end
 
+    it "hops to install_csi when semaphore is set" do
+      expect(nx).to receive(:when_install_csi_set?).and_yield
+      expect { nx.wait }.to hop("install_csi")
+    end
+
     it "naps until sync_kubernetes_service or upgrade is set" do
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
@@ -428,6 +443,15 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster.worker_vms.last.sshable).to receive(:cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: [kubernetes_cluster.worker_vms.last.sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n"))
 
       expect { nx.sync_worker_mesh }.to hop("wait")
+    end
+  end
+
+  describe "#install_csi" do
+    it "installs the ubicsi on the cluster" do
+      client = instance_double(Kubernetes::Client)
+      expect(kubernetes_cluster).to receive(:client).and_return(client)
+      expect(client).to receive(:kubectl).with("apply -f kubernetes/manifests/ubicsi")
+      expect { nx.install_csi }.to hop("wait")
     end
   end
 
