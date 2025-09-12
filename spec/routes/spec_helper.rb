@@ -20,6 +20,7 @@ RSpec.configure do |config|
 
       match do |response|
         return false if response.body.empty?
+
         parsed_body = JSON.parse(response.body)
 
         message_match = case expected_message

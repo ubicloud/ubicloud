@@ -16,6 +16,7 @@ class BillingInfo < Sequel::Model
       @stripe_data ||= begin
         data = Stripe::Customer.retrieve(stripe_id)
         return nil unless data
+
         address = data["address"] || {}
         metadata = data["metadata"] || {}
         {

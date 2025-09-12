@@ -89,8 +89,10 @@ class Vm < Sequel::Model
     return "deleting" if destroy_set? || label == "destroy"
     return "restarting" if restart_set? || label == "restart"
     return "stopped" if stop_set? || label == "stopped"
+
     if waiting_for_capacity_set?
       return "no capacity available" if Time.now - created_at > 15 * 60
+
       return "waiting for capacity"
     end
     super
@@ -144,6 +146,7 @@ class Vm < Sequel::Model
       # :nocov:
       fail "BUG: non-integer in topology array" unless num.denominator == 1
       # :nocov:
+
       Integer(num)
     }
 
@@ -208,6 +211,7 @@ class Vm < Sequel::Model
   def update_spdk_version(version)
     spdk_installation = vm_host.spdk_installations_dataset[version: version]
     fail "SPDK version #{version} not found on host" unless spdk_installation
+
     vm_storage_volumes_dataset.update(spdk_installation_id: spdk_installation.id)
     incr_update_spdk_dependency
   end
@@ -222,8 +226,8 @@ class Vm < Sequel::Model
     JSON.pretty_generate(
       vm_name: name,
       public_ipv6: project.get_ff_ipv6_disabled ? nic.private_subnet.random_private_ipv6.to_s : ephemeral_net6.to_s,
-      public_ipv4: ip4.to_s || "",
-      local_ipv4: local_vetho_ip.to_s.shellescape || "",
+      public_ipv4: ip4.to_s,
+      local_ipv4: local_vetho_ip.to_s.shellescape,
       dns_ipv4: nic.private_subnet.net4.nth(2).to_s,
       unix_user:,
       ssh_public_keys: [public_key] + project_public_keys,

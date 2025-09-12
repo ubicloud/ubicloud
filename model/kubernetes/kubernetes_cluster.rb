@@ -31,6 +31,7 @@ class KubernetesCluster < Sequel::Model
     label = strand.label
     return "deleting" if destroy_set? || label == "destroy"
     return "running" if label == "wait"
+
     "creating"
   end
 

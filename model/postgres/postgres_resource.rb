@@ -44,12 +44,14 @@ class PostgresResource < Sequel::Model
     return "deleting" if destroy_set? || strand.nil? || strand.label == "destroy"
     return "unavailable" if representative_server&.strand&.label == "unavailable"
     return "running" if ["wait", "refresh_certificates", "refresh_dns_record"].include?(strand.label) && !initial_provisioning_set?
+
     "creating"
   end
 
   def hostname
     if Prog::Postgres::PostgresResourceNexus.dns_zone
       return "#{name}.#{Config.postgres_service_hostname}" if hostname_version == "v1"
+
       "#{name}.#{ubid}.#{Config.postgres_service_hostname}"
     else
       representative_server&.vm&.ephemeral_net4&.to_s
@@ -62,6 +64,7 @@ class PostgresResource < Sequel::Model
 
   def connection_string
     return nil unless (hn = hostname)
+
     URI::Generic.build2(
       scheme: "postgres",
       userinfo: "postgres:#{URI.encode_uri_component(superuser_password)}",

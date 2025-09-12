@@ -56,25 +56,25 @@ table inet fw_table {
   set allowed_ipv4_port_tuple {
     type ipv4_addr . inet_service;
     flags interval;
-#{allowed_ingress_ip4_port_set.empty? ? "" : "elements = {#{allowed_ingress_ip4_port_set}}"}
+#{"elements = {#{allowed_ingress_ip4_port_set}}" unless allowed_ingress_ip4_port_set.empty?}
   }
 
   set allowed_ipv4_lb_dest_set {
     type ipv4_addr . inet_service;
     flags interval;
-#{allowed_ingress_ip4_lb_dest_set.empty? ? "" : "elements = {#{allowed_ingress_ip4_lb_dest_set}}"}
+#{"elements = {#{allowed_ingress_ip4_lb_dest_set}}" unless allowed_ingress_ip4_lb_dest_set.empty?}
   }
 
   set allowed_ipv6_port_tuple {
     type ipv6_addr . inet_service;
     flags interval;
-#{allowed_ingress_ip6_port_set.empty? ? "" : "elements = {#{allowed_ingress_ip6_port_set}}"}
+#{"elements = {#{allowed_ingress_ip6_port_set}}" unless allowed_ingress_ip6_port_set.empty?}
   }
 
   set allowed_ipv6_lb_dest_set {
     type ipv6_addr . inet_service;
     flags interval;
-#{allowed_ingress_ip6_lb_dest_set.empty? ? "" : "elements = {#{allowed_ingress_ip6_lb_dest_set}}"}
+#{"elements = {#{allowed_ingress_ip6_lb_dest_set}}" unless allowed_ingress_ip6_lb_dest_set.empty?}
   }
 
   set private_ipv4_cidrs {
@@ -94,13 +94,13 @@ table inet fw_table {
   set globally_blocked_ipv4s {
     type ipv4_addr;
     flags interval;
-#{globally_blocked_ipv4s.empty? ? "" : "elements = {#{globally_blocked_ipv4s}}"}
+#{"elements = {#{globally_blocked_ipv4s}}" unless globally_blocked_ipv4s.empty?}
   }
 
   set globally_blocked_ipv6s {
     type ipv6_addr;
     flags interval;
-#{globally_blocked_ipv6s.empty? ? "" : "elements = {#{globally_blocked_ipv6s}}"}
+#{"elements = {#{globally_blocked_ipv6s}}" unless globally_blocked_ipv6s.empty?}
   }
 
   chain forward_ingress {
@@ -212,6 +212,7 @@ TEMPLATE
     # Remove existing rules that aren't in our current rules list
     permissions_to_revoke = security_group.ip_permissions.filter_map do |permission|
       next unless permission.ip_protocol == "tcp"
+
       ip_ranges_to_revoke = permission.ip_ranges.select do |ip_range|
         ip4_rules.none? { |r| r.cidr.to_s == ip_range.cidr_ip && r.port_range.begin == permission.from_port && r.port_range.end - 1 == permission.to_port }
       end

@@ -8,6 +8,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
   subject_is :inference_endpoint
 
   extend Forwardable
+
   def_delegators :inference_endpoint, :replicas, :load_balancer, :private_subnet, :project
 
   def self.model_for_id(model_id)
@@ -58,8 +59,10 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
       ubid = InferenceEndpoint.generate_ubid
       internal_project = Project[Config.inference_endpoint_service_project_id]
       fail "No project configured for inference endpoints" unless internal_project
+
       firewall = internal_project.firewalls_dataset.where(location_id:).where(Sequel[:firewall][:name] => "inference-endpoint-firewall").first
       fail "No firewall named 'inference-endpoint-firewall' configured for inference endpoints in #{Location[location_id].name}" unless firewall
+
       subnet_s = Prog::Vnet::SubnetNexus.assemble(internal_project.id, name: ubid.to_s, location_id:, firewall_id: firewall.id)
 
       custom_dns_zone = DnsZone.where(project_id: Config.inference_endpoint_service_project_id).where(name: "ai.ubicloud.com").first

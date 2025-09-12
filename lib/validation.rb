@@ -17,7 +17,7 @@ module Validation
   # - Not start or end with a hyphen
   # Adapted from https://stackoverflow.com/a/7933253
   # Do not allow uppercase letters to not deal with case sensitivity
-  ALLOWED_NAME_PATTERN = %r{\A[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\z}
+  ALLOWED_NAME_PATTERN = %r{\A[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\z}
 
   # Different operating systems have different conventions.
   # Below are reasonable restrictions that works for most (all?) systems.
@@ -36,7 +36,7 @@ module Validation
 
   # - Max length 63
   # - Alphanumeric, hyphen, underscore, space, parantheses, exclamation, question mark, star
-  ALLOWED_SHORT_TEXT_PATTERN = %r{\A[a-zA-Z0-9_\-!?\*\(\) ]{1,63}\z}
+  ALLOWED_SHORT_TEXT_PATTERN = %r{\A[a-zA-Z0-9_\-!?*() ]{1,63}\z}
 
   # - Max length 63
   # - Unicode letters, numbers, hyphen, space
@@ -44,7 +44,7 @@ module Validation
 
   # Allow Kubernetes Names
   # - Same with regular name pattern, but shorter (40 chars)
-  ALLOWED_KUBERNETES_NAME_PATTERN = %r{\A[a-z0-9](?:[a-z0-9\-]{0,38}[a-z0-9])?\z}
+  ALLOWED_KUBERNETES_NAME_PATTERN = %r{\A[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?\z}
 
   def self.validate_name(name)
     msg = "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."
@@ -61,6 +61,7 @@ module Validation
     unless (vm_size = available_vm_sizes.find { it.name == size && it.arch == arch })
       fail ValidationFailed.new({size: "\"#{size}\" is not a valid virtual machine size. Available sizes: #{available_vm_sizes.map(&:name)}"})
     end
+
     vm_size
   end
 
@@ -68,6 +69,7 @@ module Validation
     storage_size = storage_size.to_i
     vm_size = validate_vm_size(size, arch)
     fail ValidationFailed.new({storage_size: "Storage size must be one of the following: #{vm_size.storage_size_options.join(", ")}"}) unless vm_size.storage_size_options.include?(storage_size)
+
     storage_size
   end
 
@@ -100,6 +102,7 @@ module Validation
     unless [LoadBalancer::Stack::IPV4, LoadBalancer::Stack::IPV6, LoadBalancer::Stack::DUAL].include?(stack)
       fail ValidationFailed.new({stack: "\"#{stack}\" is not a valid load balancer stack option. Available options: #{LoadBalancer::Stack::IPV4}, #{LoadBalancer::Stack::IPV6}, #{LoadBalancer::Stack::DUAL}"})
     end
+
     stack
   end
 
@@ -118,6 +121,7 @@ module Validation
     if boot_disk_index < 0 || boot_disk_index >= storage_volumes.length
       fail ValidationFailed.new({boot_disk_index: "Boot disk index must be between 0 and #{storage_volumes.length - 1}"})
     end
+
     storage_volumes.each { |volume|
       volume.each_key { |key|
         fail ValidationFailed.new({storage_volumes: "Invalid key: #{key}"}) unless allowed_keys.include?(key)
@@ -172,6 +176,7 @@ module Validation
     return [0, 65535] if port_range.nil?
 
     fail ValidationFailed.new({port_range: "Invalid port range"}) unless (match = port_range.match(ALLOWED_PORT_RANGE_PATTERN))
+
     start_port = match[1].to_i
 
     if match[2]
@@ -189,6 +194,7 @@ module Validation
   def self.validate_port(port_name, port)
     fail ValidationFailed.new({port_name => "Port must be an integer"}) unless port.to_i.to_s == port.to_s
     fail ValidationFailed.new({port_name => "Port must be between 0 to 65535"}) unless (0..65535).cover?(port.to_i)
+
     port.to_i
   end
 
@@ -203,6 +209,7 @@ module Validation
         if seen_ports.include?(port)
           fail ValidationFailed.new({port: "Port conflict detected: #{port} is already in use"})
         end
+
         seen_ports << port
       end
     end
@@ -276,6 +283,7 @@ module Validation
     storage_size = storage_size.to_i
 
     fail ValidationFailed.new({storage_size: "VictoriaMetrics storage must be between #{min_storage_size}GiB and #{max_storage_size}GiB"}) unless storage_size.between?(min_storage_size, max_storage_size)
+
     storage_size
   end
 

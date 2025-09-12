@@ -15,6 +15,7 @@ UbiCli.on("help") do
 
     argv.each do |arg|
       break unless (command = command.subcommand(arg) || command.post_subcommand(arg))
+
       orig_command = command
     end
 

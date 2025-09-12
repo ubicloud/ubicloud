@@ -33,6 +33,7 @@ class SemSnap
     name = name.intern
     ids = @extant.delete(name)
     return unless ids && ids.length > 0
+
     @defer_delete.concat(ids)
     apply unless @deferred
   end
@@ -47,6 +48,7 @@ class SemSnap
 
   def apply
     return if @defer_delete.empty?
+
     Semaphore.where(strand_id: @strand_id, id: @defer_delete).destroy
     @defer_delete.clear
   end

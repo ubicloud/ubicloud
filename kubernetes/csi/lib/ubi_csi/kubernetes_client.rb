@@ -25,6 +25,7 @@ module Csi
         if output.strip.end_with?("not found")
           raise ObjectNotFoundError, output
         end
+
         raise "Command failed: #{cmd.join(" ")}\nOutput: #{output}"
       end
       output

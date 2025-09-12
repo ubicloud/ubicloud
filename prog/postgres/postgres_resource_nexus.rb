@@ -8,6 +8,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   subject_is :postgres_resource
 
   extend Forwardable
+
   def_delegators :postgres_resource, :servers, :representative_server
 
   def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,
@@ -263,6 +264,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   def self.dns_zone
     return @dns_zone if defined?(@dns_zone)
+
     @dns_zone = DnsZone[project_id: Config.postgres_service_project_id, name: Config.postgres_service_hostname]
   end
 end

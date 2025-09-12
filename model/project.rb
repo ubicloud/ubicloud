@@ -53,6 +53,7 @@ class Project < Sequel::Model
 
   def has_valid_payment_method?
     return true unless Config.stripe_secret_key
+
     !!billing_info&.payment_methods&.any? || (!!billing_info && credit > 0)
   end
 
@@ -145,7 +146,7 @@ class Project < Sequel::Model
   def validate
     super
     if new? || changed_columns.include?(:name)
-      validates_format(%r{\A[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\z}i, :name, message: "must be less than 64 characters and only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number")
+      validates_format(%r{\A[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\z}i, :name, message: "must be less than 64 characters and only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number")
     end
   end
 

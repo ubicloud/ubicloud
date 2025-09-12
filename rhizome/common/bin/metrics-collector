@@ -43,6 +43,7 @@ File.open(pending_file_path, "w") do |file|
 
     response = http.get(uri.request_uri)
     fail "HTTP request failed with status: #{response.code}" unless response.is_a?(Net::HTTPSuccess)
+
     file.write(response.body)
   end
   file.flush
