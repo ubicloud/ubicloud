@@ -21,7 +21,7 @@ class PostgresResource < Sequel::Model
 
   plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2, :server_cert],
     encrypted_columns: [:superuser_password, :root_cert_key_1, :root_cert_key_2, :server_cert_key]
-  plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records, :destroy, :promote
+  plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records, :destroy, :promote, :refresh_certificates
   include ObjectTag::Cleanup
 
   def display_location

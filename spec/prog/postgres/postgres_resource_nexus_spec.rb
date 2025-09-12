@@ -254,6 +254,17 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect { nx.refresh_certificates }.to hop("wait")
     end
 
+    it "rotates server certificate if refresh_certificate semaphore is set" do
+      expect(OpenSSL::X509::Certificate).to receive(:new).with("root cert 1").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 365 * 4))
+      expect(OpenSSL::X509::Certificate).to receive(:new).with("server cert").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 365 * 4))
+
+      expect(nx).to receive(:create_certificate)
+      expect(nx).to receive(:when_refresh_certificates_set?).and_yield
+      expect(postgres_resource.servers).to all(receive(:incr_refresh_certificates))
+
+      expect { nx.refresh_certificates }.to hop("wait")
+    end
+
     it "rotates server certificate using root_cert_2 if root_cert_1 is close to expiration" do
       root_cert_2 = instance_double(OpenSSL::X509::Certificate)
       expect(OpenSSL::X509::Certificate).to receive(:new).with("root cert 1").twice.and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 360))
@@ -346,6 +357,11 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
     it "hops to refresh_certificates if the certificate is checked more than 1 months ago" do
       expect(postgres_resource).to receive(:certificate_last_checked_at).and_return(Time.now - 60 * 60 * 24 * 30 - 1)
+      expect { nx.wait }.to hop("refresh_certificates")
+    end
+
+    it "hops to refresh_certificates when refresh_certificates is set" do
+      expect(nx).to receive(:when_refresh_certificates_set?).and_yield
       expect { nx.wait }.to hop("refresh_certificates")
     end
 
