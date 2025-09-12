@@ -98,6 +98,30 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content("31/32 (96%)")
       end
 
+      it "can create vm with detachable volume" do
+        project
+        dv = Prog::Storage::DetachableVolumeNexus.assemble("dv1", project, 10).subject
+
+        visit "#{project.path}/vm/create"
+        expect(page).to have_select("Detachable Volume", options: ["None", dv.name])
+
+        name = "vm-with-dv"
+        fill_in "Name", with: name
+        fill_in "SSH Public Key", with: "a a"
+        choose option: Location::HETZNER_FSN1_UBID
+        uncheck "enable_ip4"
+        choose option: "ubuntu-jammy"
+        choose option: "standard-2"
+        select dv.name, from: "Detachable Volume"
+
+        expect(Prog::Vm::Nexus).to receive(:assemble)
+          .with("a a", project.id, hash_including(detachable_volume_ids: [dv.id]))
+          .and_call_original
+
+        click_button "Create"
+        expect(page.title).to eq("Ubicloud - #{name}")
+      end
+
       it "shows 404 page if attempting to create a VM with an invalid location" do
         visit "#{project.path}/vm/create"
         fill_in "Name", with: "dummy-vm"

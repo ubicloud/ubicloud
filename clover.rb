@@ -81,7 +81,8 @@ class Clover < Roda
     PostgresResource,
     PrivateSubnet,
     SshPublicKey,
-    Vm
+    Vm,
+    DetachableVolume
   ].each do |model, regexp|
     sym = :"#{model.table_name}_ubid_uuid"
     symbol_matcher(sym, /(#{model.ubid_type}[a-tv-z0-9]{24})/) do |ubid|
@@ -110,6 +111,7 @@ class Clover < Roda
   %w[
     ActionTag
     ApiKey
+    DetachableVolume
     Firewall
     KubernetesCluster
     KubernetesNodepool

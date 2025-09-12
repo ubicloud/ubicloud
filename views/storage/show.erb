@@ -1,0 +1,13 @@
+<% @page_title = @detachable_volume.name %>
+
+<%== part("object/show",
+  object: @detachable_volume,
+  tabs: [
+    ["Overview", "overview", "hero-squares-plus"],
+    ["Settings", "settings", "hero-cog-8-tooth"]
+  ],
+  type: "detachable-volume",
+  prefix: "storage",
+  breadcrumb_label: "Data Disks",
+  right_header: part("components/dv_state_label", state: @detachable_volume.display_state, extra_class: "text-md")
+) %>

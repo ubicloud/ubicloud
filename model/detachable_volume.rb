@@ -13,6 +13,20 @@ class DetachableVolume < Sequel::Model
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy
+
+  def path
+    "/detachable-volume/#{name}"
+  end
+
+  def display_state
+    return "destroying" if destroy_set?
+    return "attached" if vm_id
+    "ready"
+  end
+
+  def encrypted?
+    !!source_key_encryption_key_id || !!target_key_encryption_key_id
+  end
 end
 
 # Table: detachable_volume

@@ -1,0 +1,25 @@
+<% @page_title = "Create Data Disk" %>
+<%== part(
+  "components/page_header",
+  breadcrumbs: [%w[Projects /project], [@project.name, @project.path], ["Data Disks", "#{@project.path}/detachable-volume"], ["Create", "#"]]
+) %>
+
+<div class="grid gap-6">
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white p-6">
+    <% form(action: "#{@project.path}/detachable-volume", method: :post, class: "space-y-6") do %>
+      <%== part("components/form/text", name: "name", label: "Name", attributes: {required: true, placeholder: "Volume name"}) %>
+      <%
+        options = [10, 20, 40].map do |size|
+          monthly = @price_per_gib.to_f * size
+          hourly = monthly / 672
+          [size.to_s, ["#{size}GB", nil, "$#{"%.2f" % monthly}/mo", "$#{"%.3f" % hourly}/hour"], "", {}]
+        end
+      %>
+      <%== part("components/form/radio_small_cards", name: "size_gib", label: "Storage Size", options:, attributes: {required: true}) %>
+      <div class="flex items-center justify-end gap-x-6">
+        <a href="#{@project.path}/detachable-volume" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+        <%== part("components/form/submit_button", text: "Create") %>
+      </div>
+    <% end %>
+  </div>
+</div>

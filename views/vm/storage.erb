@@ -16,6 +16,18 @@
         ],
         { id: "vm-storage-volume-#{volume.disk_index}" }
       ]
+    end + @vm.detachable_volumes.map do |volume|
+      name = volume.name + " (Data Disk)"
+      encryption = volume.encrypted? ? "Encrypted" : "Unencrypted"
+      [
+        [
+          name,
+          "#{volume.size_gib} GB",
+          encryption,
+          volume.device_path
+        ],
+        { id: "detachable-volume-#{volume.id}" }
+      ]
     end
   ) %>
 </div>
