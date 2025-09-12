@@ -68,6 +68,10 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.private_ipv4).to be_nil
   end
 
+  it "private_connection_string returns nil if there is no representitive server" do
+    expect(postgres_resource.private_connection_string).to be_nil
+  end
+
   describe "display_state" do
     it "returns 'deleting' when strand label is 'destroy'" do
       expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "destroy")).at_least(:once)

@@ -2713,6 +2713,10 @@ components:
                   primary:
                     description: Is the database primary
                     type: boolean
+                  private_connection_string:
+                    description: Connection string to the Postgres database using private address
+                    type: string
+                    nullable: true
                   maintenance_window_start_at:
                     description: Maintenance window start time
                     type: integer

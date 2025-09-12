@@ -84,6 +84,17 @@ class PostgresResource < Sequel::Model
     representative_server&.vm&.private_ipv4
   end
 
+  def private_connection_string
+    return if !private_subnet || private_subnet.connected_subnets.empty? || !(ip = private_ipv4)
+
+    URI::Generic.build2(
+      scheme: "postgres",
+      userinfo: "postgres:#{URI.encode_uri_component(superuser_password)}",
+      host: ip.to_s,
+      query: "ssl_mode=require"
+    ).to_s
+  end
+
   def replication_connection_string(application_name:)
     query_parameters = {
       sslrootcert: "/etc/ssl/certs/ca.crt",

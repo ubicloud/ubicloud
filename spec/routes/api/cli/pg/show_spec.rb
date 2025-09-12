@@ -35,6 +35,7 @@ RSpec.describe Clover, "cli pg show" do
       ha_type: none
       flavor: standard
       connection_string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require
+      private_connection_string: 
       primary: true
       earliest_restore_time: 
       maintenance_window_start_at: 
@@ -66,6 +67,7 @@ RSpec.describe Clover, "cli pg show" do
       ha_type: none
       flavor: standard
       connection_string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require
+      private_connection_string: 
       primary: true
       earliest_restore_time: 
       maintenance_window_start_at: 
@@ -86,9 +88,12 @@ RSpec.describe Clover, "cli pg show" do
   end
 
   it "-f option controls which fields are shown for the PostgreSQL database" do
-    expect(cli(%W[pg #{@ref} show -f id,name])).to eq <<~END
+    ps = Prog::Vnet::SubnetNexus.assemble(@project.id, name: "test-ps").subject
+    ps.connect_subnet(@pg.private_subnet)
+    expect(cli(%W[pg #{@ref} show -f id,name,private-connection-string])).to eq <<~END
       id: #{@pg.ubid}
       name: test-pg
+      private_connection_string: postgres://postgres:#{@pg.superuser_password}@#{@pg.private_ipv4}?ssl_mode=require
     END
   end
 end

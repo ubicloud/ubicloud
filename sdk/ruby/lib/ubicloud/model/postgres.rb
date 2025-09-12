@@ -6,7 +6,7 @@ module Ubicloud
 
     set_fragment "postgres"
 
-    set_columns :id, :name, :state, :location, :vm_size, :storage_size_gib, :version, :ha_type, :flavor, :ca_certificates, :connection_string, :primary, :firewall_rules, :metric_destinations, :tags, :maintenance_window_start_at, :read_replica, :parent, :read_replicas
+    set_columns :id, :name, :state, :location, :vm_size, :storage_size_gib, :version, :ha_type, :flavor, :ca_certificates, :connection_string, :private_connection_string, :primary, :firewall_rules, :metric_destinations, :tags, :maintenance_window_start_at, :read_replica, :parent, :read_replicas
 
     set_create_param_defaults do |params|
       params[:size] ||= "standard-2"
