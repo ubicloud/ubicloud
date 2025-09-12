@@ -4,7 +4,8 @@
   @prices = fetch_location_based_prices("PostgresVCpu", "PostgresStorage")
   @has_valid_payment_method = @project.has_valid_payment_method?
   @enabled_postgres_sizes = Option::VmSizes.select { @project.quota_available?("PostgresVCpu", it.vcpus) }.map(&:name)
-  @option_tree, @option_parents = generate_postgres_options(flavor: @flavor)
+  connectable_subnets = dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:connect").order(:name).all
+  @option_tree, @option_parents = generate_postgres_options(flavor: @flavor, connectable_subnets:)
 
   @page_title, logo = postgres_flavors[@flavor].yield_self { ["Create #{it.title}", "logo-#{it.brand}.png"] }
   logo = nil if @flavor == PostgresResource::Flavor::STANDARD
@@ -34,6 +35,10 @@
     {name: "version", type: "radio_small_cards", label: "Version", required: "required", content_generator: ContentGenerator::Postgres.method(:version)},
     {name: "ha_type", type: "radio_small_cards", label: "High Availability", required: "required", content_generator: ContentGenerator::Postgres.method(:ha_type)},
   ]
+
+  if connectable_subnets.any?
+    form_elements << {name: "connect_to_subnet_id", type: "select", label: "Connect to Private Subnet", placeholder: "None", description_html: "Connecting to a private subnet will allow access to the PostgreSQL database from virtual machines in the connected subnet, potentially allowing you to better restrict access to the database.", content_generator: ContentGenerator::Postgres.method(:private_subnet), opening_tag: "<div class='sm:col-span-3'>"}
+  end
 
   if [PostgresResource::Flavor::PARADEDB, PostgresResource::Flavor::LANTERN].include?(@flavor)
     form_elements << {name: "partnership_notice", type: "partnership_notice", label: "Partnership Notice", required: "required", content_generator: ContentGenerator::Postgres.method(:partnership_notice)}

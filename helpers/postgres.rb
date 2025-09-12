@@ -30,6 +30,12 @@ class Clover
     requested_postgres_vcpu_count = (requested_standby_count + 1) * parsed_size.vcpu_count
     Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count)
 
+    if typecast_params.ubid_uuid("connect_to_subnet_id")
+      unless (connect_to_subnet = authorized_private_subnet(key: "connect_to_subnet_id", location_id: @location.id, perm: "PrivateSubnet:connect"))
+        raise CloverError.new(400, "InvalidRequest", "Subnet to be connected not found")
+      end
+    end
+
     pg = nil
     DB.transaction do
       pg = Prog::Postgres::PostgresResourceNexus.assemble(
@@ -41,6 +47,7 @@ class Clover
         ha_type:,
         version:,
         with_firewall_rules:,
+        connect_to_subnet:,
         flavor:
       ).subject
       pg.update(tags:)
@@ -85,7 +92,7 @@ class Clover
     end
   end
 
-  def generate_postgres_options(flavor: nil, location: nil)
+  def generate_postgres_options(flavor: nil, location: nil, connectable_subnets: nil)
     options = OptionTreeGenerator.new
 
     options.add_option(name: "name")
@@ -124,6 +131,12 @@ class Clover
     options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS)
 
     options.add_option(name: "ha_type", values: Option::POSTGRES_HA_OPTIONS.keys, parent: "storage_size")
+
+    if connectable_subnets&.any?
+      options.add_option(name: "connect_to_subnet_id", values: connectable_subnets, parent: "location") do |flavor, location, private_subnet|
+        private_subnet[:location_id] == location.id
+      end
+    end
 
     options.serialize
   end

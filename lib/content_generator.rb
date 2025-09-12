@@ -123,6 +123,10 @@ module ContentGenerator
       ]
     end
 
+    def self.private_subnet(flavor, location, private_subnet)
+      private_subnet.name
+    end
+
     def self.partnership_notice(flavor)
       notice = {
         PostgresResource::Flavor::PARADEDB => [[
