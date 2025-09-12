@@ -29,5 +29,7 @@ end
 # Indexes:
 #  storage_key_encryption_key_pkey | PRIMARY KEY btree (id)
 # Referenced By:
-#  vm_storage_volume | vm_storage_volume_key_encryption_key_1_id_fkey | (key_encryption_key_1_id) REFERENCES storage_key_encryption_key(id)
-#  vm_storage_volume | vm_storage_volume_key_encryption_key_2_id_fkey | (key_encryption_key_2_id) REFERENCES storage_key_encryption_key(id)
+#  detachable_volume | detachable_volume_source_key_encryption_key_id_fkey | (source_key_encryption_key_id) REFERENCES storage_key_encryption_key(id)
+#  detachable_volume | detachable_volume_target_key_encryption_key_id_fkey | (target_key_encryption_key_id) REFERENCES storage_key_encryption_key(id)
+#  vm_storage_volume | vm_storage_volume_key_encryption_key_1_id_fkey      | (key_encryption_key_1_id) REFERENCES storage_key_encryption_key(id)
+#  vm_storage_volume | vm_storage_volume_key_encryption_key_2_id_fkey      | (key_encryption_key_2_id) REFERENCES storage_key_encryption_key(id)
