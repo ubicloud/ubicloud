@@ -7,6 +7,12 @@ RSpec.describe Prog::BootstrapRhizome do
     described_class.new(Strand.new(prog: "BootstrapRhizome"))
   }
 
+  it "exits if destroy is set" do
+    expect(br.before_run).to be_nil
+    expect(br).to receive(:when_destroy_set?).and_yield
+    expect { br.before_run }.to exit({"msg" => "exiting early due to destroy semaphore"})
+  end
+
   describe "#start" do
     before { br.strand.label = "start" }
 

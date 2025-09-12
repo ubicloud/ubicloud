@@ -11,6 +11,12 @@ RSpec.describe Prog::InstallRhizome do
     allow(ir).to receive(:sshable).and_return(sshable)
   end
 
+  it "exits if destroy is set" do
+    expect(ir.before_run).to be_nil
+    expect(ir).to receive(:when_destroy_set?).and_yield
+    expect { ir.before_run }.to exit({"msg" => "exiting early due to destroy semaphore"})
+  end
+
   describe "#start" do
     it "writes tar" do
       expect(sshable).to receive(:cmd) do |*args, **kwargs|
