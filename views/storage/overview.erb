@@ -1,0 +1,17 @@
+<%
+  data = [
+    ["ID", @detachable_volume.ubid],
+    ["Name", @detachable_volume.name],
+    ["Size", "#{@detachable_volume.size_gib} GB"],
+    ["Encryption", @detachable_volume.encrypted? ? "Encrypted" : "Unencrypted"],
+    [
+      "Attached VM",
+      @detachable_volume.vm ? "<a href='#{path(@detachable_volume.vm)}' class='text-rose-500 hover:underline'>#{@detachable_volume.vm.name}</a>" : "None",
+      { escape: !@detachable_volume.vm }
+    ]
+  ]
+%>
+<%== part(
+  "components/kv_data_card",
+  data:
+) %>
