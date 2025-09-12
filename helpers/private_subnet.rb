@@ -5,6 +5,36 @@ class Clover
     authorized_object(association: :private_subnets, key:, perm:, location_id:, id:)
   end
 
+  def private_subnet_connection_action(type, ubid)
+    authorize("PrivateSubnet:#{type}", @ps.id)
+    handle_validation_failure("networking/private_subnet/show") { @page = "networking" }
+
+    id = UBID.to_uuid(ubid)
+    if ubid.start_with?("pg")
+      unless (pg = authorized_postgres_resource(perm: "Postgres:edit", location_id: @location.id, id:))
+        raise CloverError.new(400, "InvalidRequest", "PostgreSQL database subnet to be #{type}ed not found")
+      end
+      subnet = pg.private_subnet
+      name = "PostgreSQL database #{pg.name}"
+    elsif (subnet = authorized_private_subnet(perm: "PrivateSubnet:#{type}", id:))
+      name = subnet.name
+    else
+      raise CloverError.new(400, "InvalidRequest", "Subnet to be #{type}ed not found")
+    end
+
+    DB.transaction do
+      @ps.send(:"#{type}_subnet", subnet)
+      audit_log(@ps, type, pg || subnet)
+    end
+
+    if api?
+      Serializers::PrivateSubnet.serialize(@ps)
+    else
+      flash["notice"] = "#{name} will be #{type}ed in a few seconds"
+      request.redirect @ps, "/networking"
+    end
+  end
+
   def private_subnet_list
     dataset = dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view")
 

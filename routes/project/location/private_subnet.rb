@@ -23,49 +23,11 @@ class Clover
       check_found_object(ps)
 
       r.post "connect" do
-        authorize("PrivateSubnet:connect", ps.id)
-        handle_validation_failure("networking/private_subnet/show") { @page = "networking" }
-
-        if typecast_params.nonempty_str!("connected-subnet-id").start_with?("pg")
-          unless (pg = authorized_postgres_resource(key: "connected-subnet-id", perm: "Postgres:edit", location_id: @location.id))
-            raise CloverError.new(400, "InvalidRequest", "PostgreSQL database subnet to be connected not found")
-          end
-          subnet = pg.private_subnet
-        elsif !(subnet = authorized_private_subnet(key: "connected-subnet-id", perm: "PrivateSubnet:connect"))
-          raise CloverError.new(400, "InvalidRequest", "Subnet to be connected not found")
-        end
-
-        DB.transaction do
-          ps.connect_subnet(subnet)
-          audit_log(ps, "connect", pg || subnet)
-        end
-
-        if api?
-          Serializers::PrivateSubnet.serialize(ps)
-        else
-          flash["notice"] = "#{subnet.name} will be connected in a few seconds"
-          r.redirect ps, "/networking"
-        end
+        private_subnet_connection_action("connect", typecast_params.ubid!("connected-subnet-id"))
       end
 
-      r.post "disconnect", :ubid_uuid do |id|
-        authorize("PrivateSubnet:disconnect", ps.id)
-        handle_validation_failure("networking/private_subnet/show") { @page = "networking" }
-        unless (subnet = authorized_private_subnet(id:, perm: "PrivateSubnet:disconnect"))
-          raise CloverError.new(400, "InvalidRequest", "Subnet to be disconnected not found")
-        end
-
-        DB.transaction do
-          ps.disconnect_subnet(subnet)
-          audit_log(ps, "disconnect", subnet)
-        end
-
-        if api?
-          Serializers::PrivateSubnet.serialize(ps)
-        else
-          flash["notice"] = "#{subnet.name} will be disconnected in a few seconds"
-          r.redirect ps, "/networking"
-        end
+      r.post "disconnect", :ubid do |ubid|
+        private_subnet_connection_action("disconnect", ubid)
       end
 
       r.is do
