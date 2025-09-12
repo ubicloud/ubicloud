@@ -40,6 +40,8 @@ Strand.dataset.insert_conflict.insert(id: "776c1c3a-d804-9f3a-6683-5d874ad04155"
 # We always insert this strand using the same UBID ("st10g0vmh0st0vt111zat10nzz")
 Strand.dataset.insert_conflict.insert(id: "08200dd2-20ce-833a-de82-10fd5a082bff", prog: "LogVmHostUtilizations", label: "wait")
 
+SSH_SESSION_LOCK_NAME = "respirate"
+
 clover_freeze
 
 if partition_number
