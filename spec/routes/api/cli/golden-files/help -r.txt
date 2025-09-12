@@ -471,6 +471,7 @@ Usage:
     ubi pg location/pg-name create [options]
 
 Options:
+    -C, --connect-to-subnet-id=ps-id connect created subnet to given subnet id or name
     -f, --flavor=type                flavor
     -h, --ha-type=type               replication type
     -s, --size=size                  server size

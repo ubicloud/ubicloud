@@ -823,6 +823,11 @@ paths:
             schema:
               type: object
               properties:
+                connect_to_subnet_id:
+                  description: Connect to given private subnet id
+                  type: string
+                  example: pskkmx0f2vke4h36nk9cm8v8q0
+                  pattern: '^ps[0-9a-hj-km-np-tv-z]{24}$'
                 flavor:
                   description: Kind of database
                   type: string
