@@ -56,6 +56,7 @@ class MonitorableResource
         retry
       end
       Clog.emit("Pulse checking has failed.") { {pulse_check_failure: {ubid: @resource.ubid, exception: Util.exception_to_hash(ex)}} }
+      # TODO: Consider raising the exception here, and let the caller handle it.
     end
 
     run_event_loop = false
