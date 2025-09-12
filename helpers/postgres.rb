@@ -35,11 +35,11 @@ class Clover
       pg = Prog::Postgres::PostgresResourceNexus.assemble(
         project_id: @project.id,
         location_id: @location.id,
+        desired_version: version,
         name:,
         target_vm_size: parsed_size.name,
         target_storage_size_gib: storage_size,
         ha_type:,
-        version:,
         with_firewall_rules:,
         flavor:
       ).subject

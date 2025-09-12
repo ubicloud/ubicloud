@@ -14,7 +14,8 @@ RSpec.describe PostgresServer do
       identity: "pgubid.postgres.ubicloud.com",
       ha_type: PostgresResource::HaType::NONE,
       user_config: {},
-      pgbouncer_user_config: {}
+      pgbouncer_user_config: {},
+      needs_upgrade?: false
     )
   }
 
@@ -327,7 +328,7 @@ RSpec.describe PostgresServer do
     postgres_server.check_pulse(session: session, previous_pulse: pulse)
   end
 
-  it "increments checkup semaphore if pulse is down for a while" do
+  it "increments checkup semaphore if pulse is down for a while and the resource is not upgrading" do
     session = {
       ssh_session: instance_double(Net::SSH::Connection::Session),
       db_connection: instance_double(Sequel::Postgres::Database)
@@ -338,6 +339,7 @@ RSpec.describe PostgresServer do
       reading_chg: Time.now - 30
     }
 
+    expect(resource).to receive(:needs_upgrade?).and_return(false)
     expect(session[:db_connection]).to receive(:[]).and_raise(Sequel::DatabaseConnectionError)
     expect(postgres_server).to receive(:reload).and_return(postgres_server)
     expect(postgres_server).to receive(:incr_checkup)

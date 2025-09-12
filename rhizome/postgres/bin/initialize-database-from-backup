@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require_relative "../../common/lib/util"
+require_relative "../lib/postgres_setup"
 
 if ARGV.count != 2
   fail "Wrong number of arguments. Expected 2, Given #{ARGV.count}"
@@ -10,11 +11,9 @@ end
 v = ARGV[0]
 backup_label = ARGV[1]
 
-r "chown postgres /dat"
-
-# Below commands are required for idempotency
-r "rm -rf /dat/#{v}"
-r "rm -rf /etc/postgresql/#{v}"
+pg_setup = PostgresSetup.new(v)
+pg_setup.setup_packages
+pg_setup.setup_data_directory
 
 r "sudo -u postgres wal-g backup-fetch /dat/#{v}/data #{backup_label} --config /etc/postgresql/wal-g.env"
 

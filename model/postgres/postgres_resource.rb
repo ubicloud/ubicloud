@@ -141,6 +141,14 @@ class PostgresResource < Sequel::Model
     Semaphore.incr(servers_dataset.select(:id), "restart")
   end
 
+  def version
+    representative_server&.version || desired_version
+  end
+
+  def needs_upgrade?
+    !read_replica? && !ongoing_failover? && (representative_server&.version&.to_i&.< desired_version.to_i) || false
+  end
+
   module HaType
     NONE = "none"
     ASYNC = "async"
@@ -181,12 +189,12 @@ end
 #  hostname_version            | hostname_version         | NOT NULL DEFAULT 'v1'::hostname_version
 #  private_subnet_id           | uuid                     |
 #  flavor                      | postgres_flavor          | NOT NULL DEFAULT 'standard'::postgres_flavor
-#  version                     | postgres_version         | NOT NULL DEFAULT '16'::postgres_version
 #  location_id                 | uuid                     | NOT NULL
 #  maintenance_window_start_at | integer                  |
 #  user_config                 | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 #  pgbouncer_user_config       | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 #  tags                        | jsonb                    | NOT NULL DEFAULT '[]'::jsonb
+#  desired_version             | postgres_version         |
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
