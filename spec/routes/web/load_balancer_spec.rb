@@ -360,9 +360,12 @@ RSpec.describe Clover, "load balancer" do
       end
 
       it "does not show rename option without permissions" do
-        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Firewall:view"])
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["LoadBalancer:view"])
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["LoadBalancer:delete"])
         visit "#{project_wo_permissions.path}#{lb_wo_permission.path}/settings"
+        expect(page.title).to eq "Ubicloud - dummy-lb-2"
         expect(page).to have_no_content("Rename")
+        find ".delete-btn"
       end
     end
 
@@ -385,11 +388,15 @@ RSpec.describe Clover, "load balancer" do
       it "can not delete load balancer when does not have permissions" do
         # Give permission to view, so we can see the detail page
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["LoadBalancer:view"])
-
         visit "#{project_wo_permissions.path}#{lb_wo_permission.path}/settings"
         expect(page.title).to eq "Ubicloud - dummy-lb-2"
+        expect(page).to have_no_content("Rename")
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
+
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["LoadBalancer:edit"])
+        page.refresh
+        expect(page).to have_content("Rename")
       end
 
       it "can not delete load balancer when it doesn't exist" do
