@@ -51,6 +51,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     register_deadline("wait", 120 * 60)
     incr_install_metrics_server
     incr_sync_worker_mesh
+    incr_install_csi if kubernetes_cluster.project.get_ff_install_csi
     hop_create_load_balancers
   end
 
@@ -148,6 +149,10 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     when_sync_worker_mesh_set? do
       hop_sync_worker_mesh
     end
+
+    when_install_csi_set? do
+      hop_install_csi
+    end
     nap 6 * 60 * 60
   end
 
@@ -216,6 +221,12 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       vm.sshable.cmd("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: all_keys_str)
     end
 
+    hop_wait
+  end
+
+  label def install_csi
+    decr_install_csi
+    kubernetes_cluster.client.kubectl("apply -f kubernetes/manifests/ubicsi")
     hop_wait
   end
 

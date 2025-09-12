@@ -174,6 +174,7 @@ class Project < Sequel::Model
   feature_flag :private_locations, :enable_c6gd, :enable_m6gd, :enable_m8gd, :enable_i8g
   feature_flag :free_runner_upgrade_until, :gpu_vm, :postgres_lantern, :aws_cloudwatch_logs
   feature_flag :aws_alien_runners_ratio, :ipv6_disabled, :skip_runner_pool, :postgres_hostname_override
+  feature_flag :install_csi
 end
 
 # Table: project
