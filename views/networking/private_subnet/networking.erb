@@ -1,5 +1,9 @@
 <% @connected_subnets = @ps.connected_subnets
 @connectable_subnets = @ps.project.private_subnets_dataset.exclude(id: @ps.connected_subnets.map(&:id)).all
+postgres_ds = @ps.project.postgres_resources_dataset.where(location_id: @location.id)
+postgres_editable_databases = dataset_authorize(postgres_ds, "Postgres:edit").select_hash(:private_subnet_id, Sequel.as(true, :v))
+postgres_viewable_databases = dataset_authorize(postgres_ds, "Postgres:view").select_hash(:private_subnet_id, Sequel.as(true, :v))
+postgres_databases = postgres_ds.to_hash(:private_subnet_id)
 
 perm_checks = {
   "Firewall:view" => Firewall.where(id: @ps.firewalls.map(&:id)),
@@ -54,29 +58,49 @@ viewable_fws, viewable_subnets =
       </thead>
       <tbody class="divide-y divide-gray-200 bg-white">
         <% @connected_subnets.each do |subnet| %>
+          <%
+            if (obj = postgres_databases.delete(subnet.id))
+              name = "PostgreSQL Database: #{obj.name}"
+              show_delete = postgres_editable_databases[subnet.id]
+              viewable = postgres_viewable_databases[subnet.id]
+            else
+              obj = subnet
+              name = obj.name
+              viewable = viewable_subnets[subnet.ubid]
+              show_delete = true
+            end
+          %>
           <tr>
             <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <% if viewable_subnets[subnet.ubid] %>
-                <a href="<%= path(subnet) %>" class="text-orange-600 hover:text-orange-700"><%= subnet.name %></a>
+              <% if viewable %>
+                <a href="<%= path(obj) %>" class="text-orange-600 hover:text-orange-700"><%= name %></a>
               <% else %>
-                <%= subnet.name %>
+                <%= name %>
               <% end %>
             </td>
             <td
-              id="cps-delete-<%= subnet.ubid %>"
+              id="cps-delete-<%= obj.ubid %>"
               class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
             >
-              <%== part(
-                "components/delete_button",
-                url: "#{ps_path}/disconnect/#{subnet.ubid}",
-                confirmation_message: "Are you sure to disconnect?",
-                redirect: ps_path,
-                method: "POST",
-                text: "Disconnect"
-              ) %>
+              <% if show_delete %>
+                <%== part(
+                  "components/delete_button",
+                  url: "#{ps_path}/disconnect/#{obj.ubid}",
+                  confirmation_message: "Are you sure to disconnect?",
+                  redirect: ps_path,
+                  method: "POST",
+                  text: "Disconnect"
+                ) %>
+              <% end %>
             </td>
           </tr>
         <% end %>
+        <%
+          options = @connectable_subnets.map { |s| [s.ubid, s.name] }.sort_by(&:last) +
+            postgres_databases.select { |id| postgres_editable_databases[id] }
+              .map { |_, s| [s.ubid, "PostgreSQL Database: #{s.name}"] }
+              .sort_by(&:last)
+        %>
         <tr>
           <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
             <%== part(
@@ -84,7 +108,7 @@ viewable_fws, viewable_subnets =
               name: "connected-subnet-id",
               label: "",
               placeholder: "Pick a subnet to connect",
-              options: @connectable_subnets.map { |s| [s.ubid, s.name] },
+              options:,
               attributes: {
                 form: "form-connect-subnet"
               }

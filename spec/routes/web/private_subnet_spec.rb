@@ -295,6 +295,59 @@ RSpec.describe Clover, "private subnet" do
         expect(page).to have_flash_error("Subnet to be disconnected not found")
         expect(page.title).to eq("Ubicloud - dummy-ps-1")
       end
+
+      it "can show, connect, and disconnect postgres subnets" do
+        postgres_project = Project.create(name: "pg-project")
+        expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(1)
+        @pg = Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: project.id,
+          location_id: Location::HETZNER_FSN1_ID,
+          name: "test-pg",
+          target_vm_size: "standard-2",
+          target_storage_size_gib: 128
+        ).subject
+
+        private_subnet
+
+        visit "#{project.path}#{private_subnet.path}/networking"
+        expect(page.title).to eq "Ubicloud - dummy-ps-1"
+
+        select "PostgreSQL Database: test-pg"
+        click_button "Connect"
+        expect(page.title).to eq "Ubicloud - dummy-ps-1"
+        expect(page).to have_flash_notice("PostgreSQL database test-pg subnet will be connected in a few seconds")
+        expect(@pg.refresh.private_subnet.connected_subnets.map(&:id)).to eq [private_subnet.id]
+
+        click_link "PostgreSQL Database: test-pg"
+        expect(page.title).to eq "Ubicloud - test-pg"
+
+        visit "#{project.path}#{private_subnet.path}/networking"
+        click_button "Disconnect"
+        expect(page.title).to eq "Ubicloud - dummy-ps-1"
+        expect(page).to have_flash_notice("PostgreSQL database test-pg subnet will be disconnected in a few seconds")
+        expect(@pg.refresh.private_subnet.connected_subnets.map(&:id)).to eq []
+
+        select "PostgreSQL Database: test-pg"
+        click_button "Connect"
+        expect(@pg.refresh.private_subnet.connected_subnets.map(&:id)).to eq [private_subnet.id]
+
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:view"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:connect"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:disconnect"])
+        page.refresh
+        expect(page).to have_content "PostgreSQL Database: test-pg"
+        expect(page).to have_no_content "Disconnect"
+        expect(page.all("a").map(&:text)).not_to include "PostgreSQL Database: test-pg"
+
+        @pg.private_subnet.disconnect_subnet(private_subnet)
+        page.refresh
+        expect(page).to have_no_content "PostgreSQL Database: test-pg"
+
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:edit"])
+        page.refresh
+        expect(page).to have_content "PostgreSQL Database: test-pg"
+      end
     end
 
     describe "rename" do
