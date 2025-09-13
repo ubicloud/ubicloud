@@ -15,7 +15,7 @@ class Clover
         raise CloverError.new(400, "InvalidRequest", "PostgreSQL database subnet to be #{type}ed not found")
       end
       subnet = pg.private_subnet
-      name = "PostgreSQL database #{pg.name}"
+      name = "PostgreSQL database #{pg.name} subnet"
     elsif (subnet = authorized_private_subnet(perm: "PrivateSubnet:#{type}", id:))
       name = subnet.name
     else
