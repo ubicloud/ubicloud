@@ -55,7 +55,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         timeline_access: timeline_access,
         representative_at: representative_at,
         synchronization_status: synchronization_status,
-        vm_id: vm_st.id
+        vm_id: vm_st.id,
+        version: postgres_resource.version
       ) { it.id = ubid.to_uuid }
 
       Strand.create_with_id(postgres_server.id, prog: "Postgres::PostgresServerNexus", label: "start")
