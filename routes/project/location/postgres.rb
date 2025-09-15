@@ -105,7 +105,7 @@ class Clover
       show_actions = if pg.read_replica?
         %w[overview connection charts networking config settings]
       else
-        %w[overview connection charts networking resize high-availability read-replica backup-restore config settings]
+        %w[overview connection charts networking resize high-availability read-replica backup-restore config upgrade settings]
       end
       r.show_object(pg, actions: show_actions, perm: "Postgres:view", template: "postgres/show")
 
@@ -569,12 +569,17 @@ class Clover
           audit_log(pg, "upgrade")
           pg.update(version: pg.version_int + 1)
 
-          {
-            current_version: pg.current_version,
-            desired_version: pg.version,
-            upgrade_status: pg.upgrade_status,
-            upgrade_progress: pg.upgrade_progress
-          }
+          if api?
+            {
+              current_version: pg.current_version,
+              desired_version: pg.version,
+              upgrade_status: pg.upgrade_status,
+              upgrade_progress: pg.upgrade_progress
+            }
+          else
+            flash["notice"] = "Database upgrade started successfully"
+            r.redirect pg, "/upgrade"
+          end
         end
       end
     end
