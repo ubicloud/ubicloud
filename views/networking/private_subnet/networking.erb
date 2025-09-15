@@ -1,10 +1,15 @@
-<% @connected_subnets = @ps.connected_subnets
-@connectable_subnets = @ps.project.private_subnets_dataset.where(location_id: @location.id).exclude(id: @connected_subnets.map(&:id)).all
+<% location_id = @location.id
+connected_subnets = @ps.connected_subnets
+connectable_subnets = @ps.project
+  .private_subnets_dataset
+  .where(location_id:)
+  .exclude(id: connected_subnets.map(&:id))
+  .all
 
 @ps.firewalls(eager: :location)
 perm_checks = {
   "Firewall:view" => Firewall.where(id: @ps.firewalls.map(&:id)),
-  "PrivateSubnet:view" => PrivateSubnet.where(id: @connected_subnets.map(&:id))
+  "PrivateSubnet:view" => PrivateSubnet.where(id: connected_subnets.map(&:id))
 }
 
 ps_path = path(@ps)
@@ -54,7 +59,7 @@ viewable_fws, viewable_subnets =
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-200 bg-white">
-        <% @connected_subnets.each do |subnet| %>
+        <% connected_subnets.each do |subnet| %>
           <%
             viewable = viewable_subnets[subnet.ubid]
             show_delete = true
@@ -91,7 +96,7 @@ viewable_fws, viewable_subnets =
               name: "connected-subnet-id",
               label: "",
               placeholder: "Pick a subnet to connect",
-              options: @connectable_subnets.map { |s| [s.ubid, s.name] }.sort_by(&:last),
+              options: connectable_subnets.map { |s| [s.ubid, s.name] }.sort_by(&:last),
               attributes: {
                 form: "form-connect-subnet"
               }
