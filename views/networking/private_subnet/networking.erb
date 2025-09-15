@@ -1,5 +1,5 @@
 <% @connected_subnets = @ps.connected_subnets
-@connectable_subnets = @ps.project.private_subnets_dataset.exclude(id: @ps.connected_subnets.map(&:id)).all
+@connectable_subnets = @ps.project.private_subnets_dataset.where(location_id: @location.id).exclude(id: @connected_subnets.map(&:id)).all
 
 @ps.firewalls(eager: :location)
 perm_checks = {
@@ -55,9 +55,13 @@ viewable_fws, viewable_subnets =
       </thead>
       <tbody class="divide-y divide-gray-200 bg-white">
         <% @connected_subnets.each do |subnet| %>
+          <%
+            viewable = viewable_subnets[subnet.ubid]
+            show_delete = true
+          %>
           <tr>
             <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <% if viewable_subnets[subnet.ubid] %>
+              <% if viewable %>
                 <a href="<%= path(subnet) %>" class="text-orange-600 hover:text-orange-700"><%= subnet.name %></a>
               <% else %>
                 <%= subnet.name %>
@@ -67,15 +71,17 @@ viewable_fws, viewable_subnets =
               id="cps-delete-<%= subnet.ubid %>"
               class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
             >
-              <%== part(
-                "components/delete_button",
-                url: "#{ps_path}/disconnect/#{subnet.ubid}",
-                confirmation_message: "Are you sure to disconnect?",
-                redirect: ps_path,
-                method: "POST",
-                text: "Disconnect"
-              ) %>
-            </td>
+              <% if show_delete %>
+                <%== part(
+                  "components/delete_button",
+                  url: "#{ps_path}/disconnect/#{subnet.ubid}",
+                  confirmation_message: "Are you sure to disconnect?",
+                  redirect: ps_path,
+                  method: "POST",
+                  text: "Disconnect"
+                ) %>
+              </td>
+            <% end %>
           </tr>
         <% end %>
         <tr>
@@ -85,7 +91,7 @@ viewable_fws, viewable_subnets =
               name: "connected-subnet-id",
               label: "",
               placeholder: "Pick a subnet to connect",
-              options: @connectable_subnets.map { |s| [s.ubid, s.name] },
+              options: @connectable_subnets.map { |s| [s.ubid, s.name] }.sort_by(&:last),
               attributes: {
                 form: "form-connect-subnet"
               }
