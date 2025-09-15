@@ -89,6 +89,7 @@ module ThawedMock
   allow_mocking(VmPool, :[], :where)
   allow_mocking(VmHostCpu, :create)
   allow_mocking(VmHostSlice, :[], :dataset)
+  allow_mocking(VmStorageVolume, :create)
   allow_mocking(VictoriaMetricsServer, :[])
   allow_mocking(VictoriaMetricsResource, :[], :first)
 
