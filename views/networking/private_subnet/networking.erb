@@ -4,6 +4,7 @@ connected_subnet_ids = connected_subnets.map(&:id)
 connectable_subnets = @ps.project
   .private_subnets_dataset
   .where(location_id:)
+  .exclude(id: @ps.id)
   .exclude(id: connected_subnet_ids)
 connectable_subnets = dataset_authorize(connectable_subnets, "PrivateSubnet:connect").all
 connected_subnet_ds = PrivateSubnet.where(id: connected_subnet_ids)
