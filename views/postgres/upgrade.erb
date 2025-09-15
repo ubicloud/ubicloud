@@ -1,0 +1,80 @@
+<% upgrade_stage_descriptions = {
+    "start" => "Start",
+    "wait_servers_to_be_ready" => "Wait for standby to be ready",
+    "wait_for_maintenance_window" => "Wait for maintenance window",
+    "wait_fence_primary" => "Wait to fence primary",
+    "upgrade_standby" => "Upgrade standby",
+    "upgrade_failed" => "Upgrade failed",
+    "update_metadata" => "Update metadata",
+    "wait_takeover" => "Wait for takeover",
+    "prune_servers" => "Prune old servers"
+} %>
+
+<div class="p-6">
+  <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Upgrade</h3>
+
+  <% if @pg.display_state == "creating" %>
+    <p class="text-gray-500 mt-2">Upgrade operation is not available while the database is being created.</p>
+  <% elsif @pg.needs_upgrade? %>
+    <% if @pg.upgrade_stage == "upgrade_failed" %>
+      <p>Database upgrade failed. We have reverted the database to the previous version, and it is now available again.</p>
+    <% else %>
+      <p>Database upgrade is in progress.</p>
+    <% end %>
+    <% database_available_upgrade_stages = ["start", "wait_servers_to_be_ready", "wait_for_maintenance_window"]
+    hidden_stages = ["recycle_representative_server", "provision_servers"]
+    
+    upgrade_status = @pg.upgrade_progress
+    .reject { |stage| hidden_stages.include?(stage[:stage]) }
+    .map do |stage|
+      [
+        [
+          upgrade_stage_descriptions[stage[:stage]],
+          (stage[:status] == "running") ? [
+            "icon",
+            {
+              component: {
+                name:
+                if database_available_upgrade_stages.include?(stage[:stage])
+                  "hero-check"
+                else
+                  "hero-x-mark"
+                end
+              }
+            }
+          ] : "",
+          [
+            "icon",
+            {
+              component: {
+                name:
+                if stage[:status] == "done"
+                  "hero-check"
+                elsif stage[:status] == "running"
+                  "hero-refresh"
+                else
+                  "hero-ellipsis-horizontal"
+                end
+              }
+            }
+          ]
+        ],
+        { id: "upgrade-stage-#{stage[:stage]}" }
+      ]
+    end %>
+    <%== part("components/table_card", title: "", headers: ["Stage", "Database Availability", "Status"], rows: upgrade_status) %>
+  <% elsif @pg.version == PostgresResource::LATEST_VERSION %>
+    <p>Your database is already on the latest version.</p>
+  <% else %>
+    <p>Your database can be upgraded to Postgres
+      <%= @pg.version_int + 1 %>.</p>
+
+    <% form(action: "#{path(@pg)}/upgrade", method: :post, class: "min-w-2/3 pg-config mt-6") do %>
+      <%== part("components/form/section", label: "Preparing for an Upgrade", content: "Before starting an upgrade, make sure to test the upgrade on a staging database along with your application to ensure compatibility. During the upgrade, your database will be unavailable for a short period. If a maintenance window is configured, the upgrade will take place during the first available maintenance window after the new server is ready. Otherwise, the upgrade will take place as soon as the new server becomes ready.") %>
+
+      <div class="flex justify-end mt-6">
+        <%== part("components/form/submit_button", text: "Start Upgrade", extra_class: "") if @edit_perm %>
+      </div>
+    <% end %>
+  <% end %>
+</div>
