@@ -42,12 +42,15 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     before do
       allow(Github).to receive(:installation_client).and_return(client)
       allow(client).to receive(:auto_paginate=)
-      installation = instance_double(GithubInstallation, installation_id: "123")
+      installation = GithubInstallation.create(installation_id: 123, name: "test-user", type: "User")
       expect(github_repository).to receive(:installation).and_return(installation).at_least(:once)
       expect(installation).to receive(:project).and_return(instance_double(Project, active?: true)).at_least(:once)
     end
 
     it "creates extra runner if needed" do
+      GithubCustomLabel.create(installation_id: github_repository.installation.id, label: "custom-label-1", alias_for: "ubicloud-standard-4")
+      GithubCustomLabel.create(installation_id: github_repository.installation.id, label: "custom-label-2", alias_for: "ubicloud-standard-8")
+
       expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: [
         {id: 1, run_attempt: 2, status: "queued"},
         {id: 2, run_attempt: 1, status: "queued"}
@@ -59,6 +62,8 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
         {status: "queued", labels: ["ubicloud"]},
         {status: "queued", labels: ["ubicloud-standard-4"]},
         {status: "queued", labels: ["ubicloud-standard-8"]},
+        {status: "queued", labels: ["custom-label-1"]},
+        {status: "queued", labels: ["custom-label-2"]},
         {status: "failed", labels: ["ubicloud"]}
       ]})
       expect(client).to receive(:workflow_run_attempt_jobs).with("ubicloud/ubicloud", 2, 1).and_return({jobs: [
@@ -68,9 +73,13 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(github_repository.runners_dataset).to receive(:where).with(label: "ubicloud", workflow_job: nil).and_return([instance_double(GithubRunner)])
       expect(github_repository.runners_dataset).to receive(:where).with(label: "ubicloud-standard-4", workflow_job: nil).and_return([])
       expect(github_repository.runners_dataset).to receive(:where).with(label: "ubicloud-standard-8", workflow_job: nil).and_return([instance_double(GithubRunner)])
+      expect(github_repository.runners_dataset).to receive(:where).with(label: "custom-label-1", workflow_job: nil).and_return([instance_double(GithubRunner)])
+      expect(github_repository.runners_dataset).to receive(:where).with(label: "custom-label-2", workflow_job: nil).and_return([])
       expect(Prog::Vm::GithubRunner).to receive(:assemble).with(github_repository.installation, repository_name: "ubicloud/ubicloud", label: "ubicloud").twice
       expect(Prog::Vm::GithubRunner).to receive(:assemble).with(github_repository.installation, repository_name: "ubicloud/ubicloud", label: "ubicloud-standard-4")
       expect(Prog::Vm::GithubRunner).not_to receive(:assemble).with(github_repository.installation, repository_name: "ubicloud/ubicloud", label: "ubicloud-standard-8")
+      expect(Prog::Vm::GithubRunner).not_to receive(:assemble).with(github_repository.installation, repository_name: "ubicloud/ubicloud", label: "custom-label-1")
+      expect(Prog::Vm::GithubRunner).to receive(:assemble).with(github_repository.installation, repository_name: "ubicloud/ubicloud", label: "custom-label-2")
       nx.check_queued_jobs
       expect(nx.polling_interval).to eq(5 * 60)
     end

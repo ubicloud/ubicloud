@@ -113,4 +113,23 @@ RSpec.describe GithubRunner do
     expect(session[:ssh_session]).to receive(:exec!).and_raise Sshable::SshError
     github_runner.check_pulse(session: session, previous_pulse: pulse)
   end
+
+  it "returns sum of used vm cores for predefined and custom labels" do
+    GithubCustomLabel.create(installation_id: github_runner.installation.id, label: "custom-label-1", alias_for: "ubicloud-standard-8")
+    GithubCustomLabel.create(installation_id: github_runner.installation.id, label: "custom-label-2", alias_for: "ubicloud-standard-16")
+
+    vms = [1, 2].map { create_vm(cores: it) }
+    vms.each do |vm|
+      gr = described_class.create(installation_id: github_runner.installation.id, vm_id: vm.id, repository_name: "test-repo", label: "custom-label-#{vm.cores}")
+      Strand.create_with_id(gr.id, prog: "Github::RunnerNexus", label: "allocate_vm")
+    end
+
+    vms = [4, 8].map { create_vm(cores: it) }
+    vms.each do |vm|
+      gr = described_class.create(installation_id: github_runner.installation.id, vm_id: vm.id, repository_name: "test-repo", label: "ubicloud-standard-#{vm.cores}")
+      Strand.create_with_id(gr.id, prog: "Github::RunnerNexus", label: "allocate_vm")
+    end
+
+    expect(github_runner.installation.total_active_runner_vcpus).to eq(36)
+  end
 end

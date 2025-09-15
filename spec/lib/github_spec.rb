@@ -31,14 +31,14 @@ RSpec.describe Github do
   end
 
   it "can map alias to actual label" do
-    labels = described_class.runner_labels
+    labels = described_class.predefined_runner_labels
     expect(labels["ubicloud"]).to eq(labels["ubicloud-standard-2-ubuntu-2204"])
     expect(labels["ubicloud-standard-8"]).to eq(labels["ubicloud-standard-8-ubuntu-2204"])
     expect(labels["ubicloud-standard-4-arm"]).to eq(labels["ubicloud-standard-4-arm-ubuntu-2204"])
   end
 
   it "can map all aliases to actual tag" do
-    expect(described_class.runner_labels.values).to be_all
+    expect(described_class.predefined_runner_labels.values).to be_all
   end
 
   it ".failed_deliveries" do
