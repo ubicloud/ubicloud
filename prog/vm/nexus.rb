@@ -125,7 +125,8 @@ class Prog::Vm::Nexus < Prog::Base
       label = if location.aws?
         disk_index = 0
         storage_volumes.each do |volume|
-          disk_count = (volume[:size_gib] == 3800) ? 2 : 1
+          max_disk_size = (vm_size.family == "i8g") ? 3750.0 : 1900.0
+          disk_count = (volume[:size_gib] / max_disk_size).ceil
 
           disk_count.times do
             VmStorageVolume.create(

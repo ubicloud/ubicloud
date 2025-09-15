@@ -199,6 +199,17 @@ RSpec.describe Prog::Vm::Nexus do
       expect(st.stack[0]["gpu_count"]).to eq(0)
     end
 
+    it "creates correct number of storage volumes for storage optimized instance types" do
+      loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
+      storage_volumes = [
+        {encrypted: true, size_gib: 30},
+        {encrypted: true, size_gib: 7500}
+      ]
+
+      vm = described_class.assemble("some_ssh key", prj.id, location_id: loc.id, size: "i8g.8xlarge", arch: "arm64", storage_volumes:).subject
+      expect(vm.vm_storage_volumes.count).to eq(3)
+    end
+
     it "hops to start_aws if location is aws" do
       loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
       st = described_class.assemble("some_ssh key", prj.id, location_id: loc.id)
