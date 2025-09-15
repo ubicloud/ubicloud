@@ -182,7 +182,7 @@ class Vm < Sequel::Model
   end
 
   def storage_size_gib
-    vm_storage_volumes.map { it.size_gib }.sum
+    vm_storage_volumes.map { it.size_gib }.sum + detachable_volumes.map { it.size_gib }.sum
   end
 
   def init_health_monitor_session
@@ -234,7 +234,7 @@ class Vm < Sequel::Model
       cpu_topology: topo.to_s,
       mem_gib: memory_gib,
       ndp_needed: vm_host.ndp_needed,
-      storage_volumes:,
+      storage_volumes: storage_volumes + detachable_volumes_hash,
       swap_size_bytes:,
       pci_devices: pci_devices.map { [it.slot, it.iommu_group] },
       slice_name: vm_host_slice&.inhost_name || "system.slice",
@@ -245,6 +245,21 @@ class Vm < Sequel::Model
       hugepages:,
       ipv6_disabled: project.get_ff_ipv6_disabled || false
     )
+  end
+
+  def detachable_volumes_hash
+    detachable_volumes.map { |dv|
+      {
+        "name" => dv.name,
+        "size_gib" => dv.size_gib,
+        "max_read_mbytes_per_sec" => dv.max_read_mbytes_per_sec,
+        "max_write_mbytes_per_sec" => dv.max_write_mbytes_per_sec,
+        "num_queues" => dv.vring_workers || 1,
+        "device_id" => dv.device_id,
+        "vhost_block_backend_version" => dv.target_vhost_block_backend&.version,
+        "detachable" => true
+      }
+    }
   end
 
   def storage_volumes

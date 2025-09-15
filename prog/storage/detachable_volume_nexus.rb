@@ -7,7 +7,8 @@ class Prog::Storage::DetachableVolumeNexus < Prog::Base
     detachable_volume = DetachableVolume.create(
       name: name,
       project_id: project.id,
-      size_gib: size_gib
+      size_gib: size_gib,
+      vring_workers: 1,
     )
 
     Strand.create_with_id(detachable_volume.id, prog: "Storage::DetachableVolumeNexus", label: "wait")
