@@ -21,11 +21,11 @@ RSpec.describe Clover, "detachable volume" do
   describe "authenticated" do
     before { login(user.email) }
 
-    it "can create and view storage volume" do
+    it "can create and view data disk" do
       visit "#{project.path}/detachable-volume"
-      expect(page).to have_content "No storage volumes"
-      click_link "Create Storage Volume"
-      expect(page.title).to eq("Ubicloud - Create Storage Volume")
+      expect(page).to have_content "No data disks"
+      click_link "Create Data Disk"
+      expect(page.title).to eq("Ubicloud - Create Data Disk")
       fill_in "Name", with: "vol1"
       choose option: "10"
       click_button "Create"
