@@ -1,5 +1,13 @@
-<% @page_title = "Web Shell" %>
-<% multi = typecast_query_params.bool("multi") %>
+<% @page_title = "Web Shell"
+multi = typecast_query_params.bool("multi")
+if @repeat_cli
+  if @cli
+    @clis ||= []
+    @clis.prepend(@cli)
+  end
+  @cli = @last_cli
+  @last_cli = nil if @no_last_cli
+end %>
 
 <%== part(
   "components/page_header",
