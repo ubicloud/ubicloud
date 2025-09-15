@@ -39,7 +39,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   end
 
   label def create_vm_pool
-    label_data = Github.runner_labels["ubicloud"]
+    label_data = Github.predefined_runner_labels["ubicloud"]
     pool = Prog::Vm::VmPool.assemble(
       size: 1,
       vm_size: label_data["vm_size"],
