@@ -20,4 +20,9 @@ RSpec.describe Clover, "cli ps connect" do
     expect(cli(%W[ps eu-central-h1/test-ps connect test-ps2])).to eq "Connected private subnet test-ps2 to #{@ps1.ubid}\n"
     expect(ConnectedSubnet.count).to eq 1
   end
+
+  it "errors if attempting to connect private subnet to itself" do
+    expect(cli(%W[ps eu-central-h1/test-ps connect test-ps], status: 400)).to eq "! Unexpected response status: 400\nDetails: Cannot connect private subnet to itself\n"
+    expect(ConnectedSubnet.count).to eq 0
+  end
 end
