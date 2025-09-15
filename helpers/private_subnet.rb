@@ -16,7 +16,7 @@ class Clover
       end
       subnet = pg.private_subnet
       name = "PostgreSQL database #{pg.name} subnet"
-    elsif (subnet = authorized_private_subnet(perm: "PrivateSubnet:#{type}", id:))
+    elsif (subnet = authorized_private_subnet(perm: "PrivateSubnet:#{type}", location_id: @location.id, id:))
       name = subnet.name
     else
       raise CloverError.new(400, "InvalidRequest", "Subnet to be #{type}ed not found")

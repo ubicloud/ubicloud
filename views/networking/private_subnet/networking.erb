@@ -1,5 +1,5 @@
 <% @connected_subnets = @ps.connected_subnets
-@connectable_subnets = @ps.project.private_subnets_dataset.exclude(id: @ps.connected_subnets.map(&:id)).all
+@connectable_subnets = @ps.project.private_subnets_dataset.where(location_id: @location.id).exclude(id: @connected_subnets.map(&:id)).all
 postgres_ds = @ps.project.postgres_resources_dataset.where(location_id: @location.id)
 postgres_editable_databases = dataset_authorize(postgres_ds, "Postgres:edit").select_hash(:private_subnet_id, Sequel.as(true, :v))
 postgres_viewable_databases = dataset_authorize(postgres_ds, "Postgres:view").select_hash(:private_subnet_id, Sequel.as(true, :v))
