@@ -123,9 +123,19 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
   label def update_billing_records
     decr_update_billing_records
-    desired_records = kubernetes_cluster.all_nodes.reject(&:retire_set?).flat_map(&:billing_records).tally
+
+    desired_records = kubernetes_cluster
+      .all_nodes
+      .reject(&:retire_set?)
+      .flat_map(&:billing_records)
+      .tally
+
     existing_records = kubernetes_cluster.active_billing_records.map do |record|
-      {type: record.billing_rate["resource_type"], family: record.billing_rate["resource_family"], amount: record.amount}
+      {
+        type: record.billing_rate["resource_type"],
+        family: record.billing_rate["resource_family"],
+        amount: record.amount
+      }
     end.tally
 
     desired_records.each do |record, want|
@@ -146,7 +156,12 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       next unless (surplus = have - want) > 0
 
       br = billing_rate_for(record[:type], record[:family])
-      kubernetes_cluster.active_billing_records_dataset.where(billing_rate_id: br["id"], amount: record[:amount]).order_by(Sequel.desc(Sequel.function(:lower, :span))).limit(surplus).each do |r|
+      kubernetes_cluster
+        .active_billing_records_dataset
+        .where(billing_rate_id: br["id"], amount: record[:amount])
+        .reverse(Sequel.function(:lower, :span))
+        .limit(surplus)
+        .all do |r|
         r.finalize
       end
     end
