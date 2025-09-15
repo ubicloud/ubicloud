@@ -113,8 +113,21 @@ class Prog::Aws::Instance < Prog::Base
       usermod -L ubuntu
     USER_DATA
 
-    # Normally we use dnsmasq to resolve our transparent cache domain to local IP, but we use /etc/hosts for AWS runners
-    user_data += "\necho \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts" if vm.unix_user == "runneradmin"
+    instance_market_options = nil
+    if vm.unix_user == "runneradmin"
+      # Normally we use dnsmasq to resolve our transparent cache domain to local IP, but we use /etc/hosts for AWS runners
+      user_data += "\necho \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
+      instance_market_options = if Config.github_runner_aws_spot_instance_enabled
+        {
+          market_type: "spot",
+          spot_options: {
+            spot_instance_type: "one-time",
+            instance_interruption_behavior: "terminate"
+            # Not setting max_price means you'll pay up to the on-demand price
+          }
+        }
+      end
+    end
 
     params = {
       image_id: vm.boot_image, # AMI ID
@@ -148,7 +161,8 @@ class Prog::Aws::Instance < Prog::Base
       user_data: Base64.encode64(user_data.gsub(/^(\s*# .*)?\n/, "")),
       tag_specifications: Util.aws_tag_specifications("instance", vm.name),
       iam_instance_profile: {name: instance_profile_name},
-      client_token: vm.id
+      client_token: vm.id,
+      instance_market_options:
     }
     begin
       instance_response = client.run_instances(params)
