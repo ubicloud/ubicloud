@@ -47,4 +47,9 @@ RSpec.describe Clover, "cli ps connect" do
     expect(cli(%W[ps eu-central-h1/test-ps connect -P test-pg], status: 400)).to eq "! Unexpected response status: 400\nDetails: PostgreSQL database subnet to be connected not found\n"
     expect(ConnectedSubnet.count).to eq 0
   end
+
+  it "errors if attempting to connect private subnet to itself" do
+    expect(cli(%W[ps eu-central-h1/test-ps connect test-ps], status: 400)).to eq "! Unexpected response status: 400\nDetails: Cannot connect private subnet to itself\n"
+    expect(ConnectedSubnet.count).to eq 0
+  end
 end

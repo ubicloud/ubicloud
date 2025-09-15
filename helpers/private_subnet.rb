@@ -10,6 +10,10 @@ class Clover
     handle_validation_failure("networking/private_subnet/show") { @page = "networking" }
 
     id = UBID.to_uuid(ubid)
+    if type == "connect" && id == @ps.id
+      raise CloverError.new(400, "InvalidRequest", "Cannot connect private subnet to itself")
+    end
+
     if ubid.start_with?("pg")
       unless (pg = authorized_postgres_resource(perm: "Postgres:edit", location_id: @location.id, id:))
         raise CloverError.new(400, "InvalidRequest", "PostgreSQL database subnet to be #{type}ed not found")
