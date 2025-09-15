@@ -47,6 +47,10 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     end
   end
 
+  def billing_rate_for(type, family)
+    BillingRate.from_resource_properties(type, family, kubernetes_cluster.location.name)
+  end
+
   label def start
     register_deadline("wait", 120 * 60)
     incr_install_metrics_server
@@ -131,7 +135,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
           project_id: kubernetes_cluster.project_id,
           resource_id: kubernetes_cluster.id,
           resource_name: kubernetes_cluster.name,
-          billing_rate_id: BillingRate.from_resource_properties(record[:type], record[:family], kubernetes_cluster.location.name)["id"],
+          billing_rate_id: billing_rate_for(record[:type], record[:family])["id"],
           amount: record[:amount]
         )
       end
@@ -141,7 +145,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       want = desired_records[record] || 0
       next unless (surplus = have - want) > 0
 
-      br = BillingRate.from_resource_properties(record[:type], record[:family], kubernetes_cluster.location.name)
+      br = billing_rate_for(record[:type], record[:family])
       kubernetes_cluster.active_billing_records_dataset.where(billing_rate_id: br["id"], amount: record[:amount]).order_by(Sequel.desc(Sequel.function(:lower, :span))).limit(surplus).each do |r|
         r.finalize
       end
