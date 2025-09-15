@@ -8,6 +8,7 @@ class Vm < Sequel::Model
   many_to_one :vm_host
   many_to_one :project
   one_to_many :nics
+  one_to_many :detachable_volumes
   many_to_many :private_subnets, join_table: :nic
   one_to_one :sshable, key: :id
   one_to_one :assigned_vm_address, key: :dst_vm_id
@@ -27,7 +28,7 @@ class Vm < Sequel::Model
       [:firewalls_private_subnets, :private_subnet_id, :firewall_id]
     ]
 
-  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancer_vm: :destroy
+  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancer_vm: :destroy, detachable_volumes: :nullify
 
   dataset_module Pagination
 
