@@ -334,4 +334,11 @@ module Validation
       end
     end
   end
+
+  def self.validate_postgres_upgrade(postgres_resource)
+    fail ValidationFailed.new({needs_convergence: "Database cluster is waiting for convergence, please wait for it to complete"}) if postgres_resource.needs_convergence?
+    fail ValidationFailed.new({read_replica: "Read replicas cannot be upgraded"}) if postgres_resource.read_replica?
+    fail ValidationFailed.new({flavor: "Lantern Postgres instances cannot be upgraded"}) if postgres_resource.flavor == PostgresResource::Flavor::LANTERN
+    fail ValidationFailed.new({version: "Database is already at the latest version"}) if postgres_resource.version.to_i >= PostgresResource::LATEST_VERSION.to_i
+  end
 end

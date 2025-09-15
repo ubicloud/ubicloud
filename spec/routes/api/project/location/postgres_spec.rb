@@ -13,7 +13,8 @@ RSpec.describe Clover, "postgres" do
       location_id: Location::HETZNER_FSN1_ID,
       name: "pg-with-permission",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 128
+      target_storage_size_gib: 128,
+      target_version: "16"
     ).subject
   end
 
@@ -38,7 +39,8 @@ RSpec.describe Clover, "postgres" do
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/reset-superuser-password"],
         [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/ca-certificates"],
-        [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics"]
+        [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics"],
+        [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade"]
       ].each do |method, path|
         send method, path
 
@@ -761,6 +763,54 @@ RSpec.describe Clover, "postgres" do
 
         expect(pg.reload.user_config).to eq({"max_connections" => "120", "huge_pages" => "on", "shared_buffers" => "128MB"})
         expect(pg.reload.pgbouncer_user_config).to eq({"max_client_conn" => "100", "admin_users" => "postgres"})
+      end
+    end
+
+    describe "upgrade" do
+      before do
+        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
+        allow(pg.representative_server).to receive(:version).and_return("16")
+      end
+
+      it "success post" do
+        old_pg_version = pg.version.to_i
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade"
+
+        expect(last_response.status).to eq(200)
+        response = JSON.parse(last_response.body)
+        expect(response["upgrade_status"]).to eq("running")
+        expect(response["current_version"]).to eq(pg.version)
+        expect(response["target_version"]).to eq(pg.reload.target_version)
+        expect(pg.reload.target_version.to_i).to eq(old_pg_version + 1)
+      end
+
+      it "failed post" do
+        old_pg_version = pg.version.to_i
+        pg.update(target_storage_size_gib: 256)
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade"
+
+        expect(last_response.status).to eq(400)
+        expect(pg.reload.version.to_i).to eq(old_pg_version)
+      end
+
+      it "success get" do
+        old_pg_version = pg.version.to_i
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade"
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade"
+
+        expect(last_response.status).to eq(200)
+        response = JSON.parse(last_response.body)
+        expect(response["upgrade_status"]).to eq("running")
+        expect(response["current_version"]).to eq(pg.version)
+        expect(response["target_version"]).to eq(pg.reload.target_version)
+        expect(pg.reload.target_version.to_i).to eq(old_pg_version + 1)
+      end
+
+      it "no ongoing upgrade" do
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade"
+
+        expect(last_response.status).to eq(400)
       end
     end
   end
