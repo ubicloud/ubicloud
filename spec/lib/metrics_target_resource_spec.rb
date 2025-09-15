@@ -65,9 +65,9 @@ RSpec.describe MetricsTargetResource do
       expect(resource.instance_variable_get(:@session)).to be_nil
     end
 
-    it "ignores other exceptions" do
+    it "raises the exception if it is not Sequel::NoExistingObject" do
       expect(postgres_server).to receive(:reload).and_raise(StandardError)
-      expect { resource.open_resource_session }.not_to raise_error
+      expect { resource.open_resource_session }.to raise_error(StandardError)
     end
   end
 

@@ -20,12 +20,10 @@ class MetricsTargetResource
     return if @session && @last_export_success
 
     @session = @resource.reload.init_metrics_export_session
-  rescue => ex
-    if ex.is_a?(Sequel::NoExistingObject)
-      Clog.emit("Resource is deleted.") { {resource_deleted: {ubid: @resource.ubid}} }
-      @session = nil
-      @deleted = true
-    end
+  rescue Sequel::NoExistingObject
+    Clog.emit("Resource is deleted.") { {resource_deleted: {ubid: @resource.ubid}} }
+    @session = nil
+    @deleted = true
   end
 
   def export_metrics
