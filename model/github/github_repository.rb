@@ -38,7 +38,7 @@ class GithubRepository < Sequel::Model
       blob_storage_client.list_multipart_uploads(bucket: bucket_name).uploads.each do
         blob_storage_client.abort_multipart_upload(bucket: bucket_name, key: it.key, upload_id: it.upload_id)
       end
-    rescue Aws::S3::Errors::Unauthorized
+    rescue Aws::S3::Errors::Unauthorized, Aws::S3::Errors::NoSuchBucket
       Clog.emit("Repository credentials failed to abort multipart uploads") { {failed_abort_multipart_uploads: {bucket_name: bucket_name}} }
     end
 
