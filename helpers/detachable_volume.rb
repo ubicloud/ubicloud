@@ -18,5 +18,7 @@ class Clover
       flash["notice"] = "'#{name}' will be ready in a few minutes"
       request.redirect dv
     end
+  rescue Sequel::UniqueConstraintViolation
+    raise_web_error("Storage volume name '#{name}' already exists in this project. Please choose a different name.")
   end
 end
