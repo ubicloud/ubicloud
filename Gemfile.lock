@@ -162,7 +162,7 @@ GEM
     fiddle (1.1.8)
     foreman (0.90.0)
       thor (~> 1.4)
-    forme (2.6.0)
+    forme (2.7.0)
       bigdecimal
     hashdiff (1.2.0)
     hashery (2.1.2)
