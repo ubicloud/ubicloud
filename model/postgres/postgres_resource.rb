@@ -195,6 +195,7 @@ end
 #  user_config                 | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 #  pgbouncer_user_config       | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 #  tags                        | jsonb                    | NOT NULL DEFAULT '[]'::jsonb
+#  target_version              | postgres_version         |
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
