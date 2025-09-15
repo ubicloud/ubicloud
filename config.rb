@@ -110,6 +110,7 @@ module Config
   optional :github_runner_service_project_id, string
   override :enable_github_workflow_poller, true, bool
   optional :github_runner_aws_location_id, string
+  override :github_runner_aws_spot_instance_enabled, false, bool
 
   # GitHub Cache
   optional :github_cache_blob_storage_endpoint, string
