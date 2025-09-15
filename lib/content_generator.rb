@@ -6,6 +6,10 @@ module ContentGenerator
       location.ui_name
     end
 
+    def self.ssh_public_key(ssh_public_key)
+      ssh_public_key.name
+    end
+
     def self.private_subnet(location, private_subnet)
       private_subnet[:display_name]
     end

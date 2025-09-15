@@ -94,6 +94,7 @@ class Clover < Roda
     PaymentMethod
     PostgresResource
     PrivateSubnet
+    SshPublicKey
     SubjectTag
     Vm
   ].each { path(it, class_name: true, &under_project_path) }
@@ -257,7 +258,11 @@ class Clover < Roda
     else
       @error = error
 
-      if e.is_a?(Sequel::ValidationFailed) || e.is_a?(DependencyError) || e.is_a?(Roda::RodaPlugins::TypecastParams::Error)
+      if e.is_a?(Sequel::ValidationFailed)
+        flash["error"] = message
+        flash["errors"] = (flash["errors"] || {}).merge(e.errors).transform_keys(&:to_s) if e.errors
+        redirect_back_with_inputs(e)
+      elsif e.is_a?(DependencyError) || e.is_a?(Roda::RodaPlugins::TypecastParams::Error)
         flash["error"] = message
         redirect_back_with_inputs(e)
       elsif e.is_a?(Sequel::SerializationFailure)

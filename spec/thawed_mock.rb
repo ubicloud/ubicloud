@@ -80,6 +80,7 @@ module ThawedMock
   allow_mocking(PostgresServer, :create)
   allow_mocking(Project, :[], :order_by)
   allow_mocking(Semaphore, :where, :create)
+  allow_mocking(SshPublicKey, :generate_uuid)
   allow_mocking(Sshable, :create_with_id, :repl?)
   allow_mocking(StorageKeyEncryptionKey, :create)
   allow_mocking(Strand, :create, :create_with_id)
