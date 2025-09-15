@@ -118,14 +118,15 @@ class Prog::Aws::Instance < Prog::Base
       # Normally we use dnsmasq to resolve our transparent cache domain to local IP, but we use /etc/hosts for AWS runners
       user_data += "\necho \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
       instance_market_options = if Config.github_runner_aws_spot_instance_enabled
-        {
-          market_type: "spot",
-          spot_options: {
-            spot_instance_type: "one-time",
-            instance_interruption_behavior: "terminate"
-            # Not setting max_price means you'll pay up to the on-demand price
-          }
+        spot_options = {
+          spot_instance_type: "one-time",
+          instance_interruption_behavior: "terminate"
         }
+        if Config.github_runner_aws_spot_instance_max_price_per_vcpu > 0
+          # Not setting max_price means you'll pay up to the on-demand price,
+          spot_options[:max_price] = (vm.vcpus * Config.github_runner_aws_spot_instance_max_price_per_vcpu * 60).to_s
+        end
+        {market_type: "spot", spot_options:}
       end
     end
 
