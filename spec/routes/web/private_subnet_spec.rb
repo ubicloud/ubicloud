@@ -309,6 +309,45 @@ RSpec.describe Clover, "private subnet" do
         expect(page.title).to eq("Ubicloud - dummy-ps-1")
       end
 
+      it "cannot connect to a subnet without access" do
+        private_subnet
+        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID).subject
+        expect(private_subnet.connected_subnets.count).to eq(0)
+        visit "#{project.path}#{private_subnet.path}/networking"
+
+        select ps2.name, from: "connected-subnet-id"
+
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:view"])
+        click_button "Connect"
+        expect(private_subnet.reload.connected_subnets.count).to eq(0)
+        expect(page.title).to eq "Ubicloud - Forbidden"
+
+        visit "#{project.path}#{private_subnet.path}/networking"
+        expect { click_button "Connect" }.to raise_error(Capybara::ElementNotFound)
+      end
+
+      it "cannot disconnect connected subnet without access" do
+        private_subnet
+        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID).subject
+        private_subnet.connect_subnet(ps2)
+
+        visit "#{project.path}#{private_subnet.path}/networking"
+
+        expect(page).to have_content ps2.name
+
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:view"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:connect"])
+
+        click_button "Disconnect"
+        expect(private_subnet.reload.connected_subnets.count).to eq(1)
+        expect(page.title).to eq "Ubicloud - Forbidden"
+
+        visit "#{project.path}#{private_subnet.path}/networking"
+        expect(page).to have_no_content "Disconnect"
+      end
+
       it "can show, connect, and disconnect postgres subnets" do
         postgres_project = Project.create(name: "pg-project")
         expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(1)

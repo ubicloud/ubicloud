@@ -1,6 +1,8 @@
 <% location_id = @location.id
 connected_subnets = @ps.connected_subnets
-connectable_subnets = @ps.project.private_subnets_dataset.where(location_id:).exclude(id: connected_subnets.map(&:id)).all
+connected_subnet_ids = connected_subnets.map(&:id)
+connectable_subnets = dataset_authorize(@ps.project.private_subnets_dataset.where(location_id:).exclude(id: connected_subnet_ids), "PrivateSubnet:connect").all
+connected_subnet_ds = PrivateSubnet.where(id: connected_subnet_ids)
 postgres_ds = @ps.project.postgres_resources_dataset.where(location_id:)
 postgres_editable_databases = dataset_authorize(postgres_ds, "Postgres:edit").select_hash(:private_subnet_id, Sequel.as(true, :v))
 postgres_viewable_databases = dataset_authorize(postgres_ds, "Postgres:view").select_hash(:private_subnet_id, Sequel.as(true, :v))
@@ -8,12 +10,13 @@ postgres_databases = postgres_ds.to_hash(:private_subnet_id)
 
 perm_checks = {
   "Firewall:view" => Firewall.where(id: @ps.firewalls.map(&:id)),
-  "PrivateSubnet:view" => PrivateSubnet.where(id: connected_subnets.map(&:id))
+  "PrivateSubnet:view" => connected_subnet_ds,
+  "PrivateSubnet:disconnect" => connected_subnet_ds
 }
 
 ps_path = path(@ps)
 
-viewable_fws, viewable_subnets =
+viewable_fws, viewable_subnets, disconnectable_subnets =
   perm_checks.map do |perm, ds|
     dataset_authorize(ds, perm).select_hash(:id, Sequel.as(true, :v)).transform_keys! { UBID.from_uuidish(it).to_s }
   end %>
@@ -68,7 +71,7 @@ viewable_fws, viewable_subnets =
               obj = subnet
               name = obj.name
               viewable = viewable_subnets[subnet.ubid]
-              show_delete = true
+              show_delete = disconnectable_subnets[subnet.ubid]
             end
           %>
           <tr>
@@ -102,25 +105,27 @@ viewable_fws, viewable_subnets =
               .map { |_, s| [s.ubid, "PostgreSQL Database: #{s.name}"] }
               .sort_by(&:last)
         %>
-        <tr>
-          <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-            <%== part(
-              "components/form/select",
-              name: "connected-subnet-id",
-              label: "",
-              placeholder: "Pick a subnet to connect",
-              options:,
-              attributes: {
-                form: "form-connect-subnet"
-              }
-            ) %>
-          </td>
-          <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-            <% form(action: "#{ps_path}/connect", method: :post, id: "form-connect-subnet") do %>
-              <%== part("components/form/submit_button", text: "Connect") %>
-            <% end %>
-          </td>
-        </tr>
+        <% unless options.empty? %>
+          <tr>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+              <%== part(
+                "components/form/select",
+                name: "connected-subnet-id",
+                label: "",
+                placeholder: "Pick a subnet to connect",
+                options:,
+                attributes: {
+                  form: "form-connect-subnet"
+                }
+              ) %>
+            </td>
+            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+              <% form(action: "#{ps_path}/connect", method: :post, id: "form-connect-subnet") do %>
+                <%== part("components/form/submit_button", text: "Connect") %>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
       </tbody>
     </table>
   </div>
