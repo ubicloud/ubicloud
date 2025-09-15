@@ -267,6 +267,19 @@ RSpec.describe Clover, "private subnet" do
         expect(private_subnet.reload.connected_subnets.count).to eq(1)
       end
 
+      it "cannot connect to a subnet in a different location" do
+        private_subnet
+        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID).subject
+        visit "#{project.path}#{private_subnet.path}/networking"
+        ps2.strand.destroy
+        ps2.update(location_id: Location::HETZNER_HEL1_ID)
+        select "dummy-ps-2", from: "connected-subnet-id"
+        click_button "Connect"
+
+        expect(page).to have_flash_error("Subnet to be connected not found")
+        expect(page).to have_no_content("dummy-ps-2")
+      end
+
       it "cannot connect to a subnet when it does not exist" do
         private_subnet
         ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID).subject
