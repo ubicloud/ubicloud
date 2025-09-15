@@ -304,4 +304,12 @@ module Validation
       end
     end
   end
+
+  def self.validate_postgres_upgrade(version_int:, needs_convergence:, ongoing_failover:, read_replica:, needs_upgrade:)
+    fail ValidationFailed.new({needs_convergence: "Database cluster is waiting for convergence, please wait for it to complete"}) if needs_convergence
+    fail ValidationFailed.new({ongoing_failover: "Database cluster is in the middle of a failover, please wait for it to complete"}) if ongoing_failover
+    fail ValidationFailed.new({read_replica: "Read replicas cannot be upgraded"}) if read_replica
+    fail ValidationFailed.new({needs_upgrade: "Database is already upgrading"}) if needs_upgrade
+    fail ValidationFailed.new({version: "Database is already at the latest version"}) if version_int >= PostgresResource::LATEST_VERSION.to_i
+  end
 end

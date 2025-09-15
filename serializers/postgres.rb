@@ -12,6 +12,7 @@ class Serializers::Postgres < Serializers::Base
       storage_size_gib: pg.storage_size_gib,
       target_storage_size_gib: pg.target_storage_size_gib,
       version: pg.version,
+      current_version: pg.current_version,
       ha_type: pg.ha_type,
       flavor: pg.flavor,
       ca_certificates: pg.ca_certificates,
