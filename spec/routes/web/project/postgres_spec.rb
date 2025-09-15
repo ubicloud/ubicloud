@@ -14,7 +14,8 @@ RSpec.describe Clover, "postgres" do
       location_id: Location::HETZNER_FSN1_ID,
       name: "pg-with-permission",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 128
+      target_storage_size_gib: 128,
+      target_version: "16"
     ).subject
   end
 
@@ -24,7 +25,8 @@ RSpec.describe Clover, "postgres" do
       location_id: Location::HETZNER_FSN1_ID,
       name: "pg-without-permission",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 128
+      target_storage_size_gib: 128,
+      target_version: "16"
     ).subject
   end
 
@@ -920,6 +922,79 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_flash_error "Validation failed for following fields: pg_config.work_mem"
         expect(page).to have_content "must match pattern: ^[0-9]+(kB|MB|GB|TB)?$"
         expect(pg.reload.user_config).to eq({"max_connections" => "120"})
+      end
+    end
+
+    describe "upgrade" do
+      it "does not show upgrade button when upgrade is not available" do
+        pg.strand.update(label: "wait_servers")
+        visit "#{project.path}#{pg.path}/upgrade"
+        expect(page).to have_no_button "Start Upgrade"
+      end
+
+      it "does not show upgrade button when user has read only permissions" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+        pg_wo_permission.strand.update(label: "wait")
+        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/upgrade"
+        expect(page).to have_no_button "Start Upgrade"
+      end
+
+      it "shows upgrade button when user has edit permissions" do
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:edit"])
+        pg.strand.update(label: "wait")
+        visit "#{project.path}#{pg.path}/upgrade"
+        expect(page).to have_button "Start Upgrade"
+      end
+
+      it "starts the upgrade when user clicks on start upgrade button" do
+        old_version_int = pg.version.to_i
+        pg.strand.update(label: "wait")
+        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
+        visit "#{project.path}#{pg.path}/upgrade"
+        click_button "Start Upgrade"
+        expect(page).to have_content "Database upgrade is in progress"
+        expect(page).to have_flash_notice "Database upgrade started successfully"
+        expect(pg.reload.target_version.to_i).to eq(old_version_int + 1)
+      end
+
+      it "shows upgrade progress when upgrade is in progress" do
+        pg.strand.update(label: "wait")
+        pg.update(target_version: "17")
+
+        pg.strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first&.update(label: "wait_for_maintenance_window")
+
+        visit "#{project.path}#{pg.path}/upgrade"
+        expect(page).to have_content "Database upgrade is in progress"
+      end
+
+      it "shows database unavailability when upgrade is in progress" do
+        pg.strand.update(label: "wait")
+        pg.update(target_version: "17")
+        pg.strand.run
+
+        pg.strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first&.update(label: "upgrade_standby")
+
+        visit "#{project.path}#{pg.path}/upgrade"
+        expect(page).to have_content "Database upgrade is in progress"
+      end
+
+      it "shows failed upgrade indication when upgrade fails" do
+        pg.strand.update(label: "wait")
+        pg.update(target_version: "17")
+        pg.strand.run
+
+        pg.strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first&.update(label: "upgrade_failed")
+
+        visit "#{project.path}#{pg.path}/upgrade"
+        expect(page).to have_content "Database upgrade failed"
+      end
+
+      it "shows latest version message if the database is already on the latest version" do
+        pg.strand.update(label: "wait")
+        pg.update(target_version: PostgresResource::LATEST_VERSION)
+        pg.representative_server.update(version: PostgresResource::LATEST_VERSION)
+        visit "#{project.path}#{pg.path}/upgrade"
+        expect(page).to have_content "Your database is already on the latest version."
       end
     end
   end
