@@ -309,7 +309,7 @@ RSpec.describe Clover, "private subnet" do
         expect(page.title).to eq("Ubicloud - dummy-ps-1")
       end
 
-      it "cannot connect to a subnet without access" do
+      it "cannot connect to a subnet without access to connected subnet" do
         private_subnet
         ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID).subject
         expect(private_subnet.connected_subnets.count).to eq(0)
@@ -319,15 +319,15 @@ RSpec.describe Clover, "private subnet" do
 
         AccessControlEntry.dataset.destroy
         AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:view"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:connect"], object_id: private_subnet.id)
         click_button "Connect"
         expect(private_subnet.reload.connected_subnets.count).to eq(0)
-        expect(page.title).to eq "Ubicloud - Forbidden"
-
-        visit "#{project.path}#{private_subnet.path}/networking"
+        expect(page.title).to eq "Ubicloud - dummy-ps-1"
+        expect(page).to have_flash_error "Subnet to be connected not found"
         expect { click_button "Connect" }.to raise_error(Capybara::ElementNotFound)
       end
 
-      it "cannot disconnect connected subnet without access" do
+      it "cannot disconnect connected subnet without access to connected subnet" do
         private_subnet
         ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID).subject
         private_subnet.connect_subnet(ps2)
@@ -338,7 +338,46 @@ RSpec.describe Clover, "private subnet" do
 
         AccessControlEntry.dataset.destroy
         AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:view"])
-        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:connect"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:disconnect"], object_id: private_subnet.id)
+
+        click_button "Disconnect"
+        expect(private_subnet.reload.connected_subnets.count).to eq(1)
+        expect(page.title).to eq "Ubicloud - dummy-ps-1"
+        expect(page).to have_flash_error "Subnet to be disconnected not found"
+        expect(page).to have_no_content "Disconnect"
+      end
+
+      it "cannot connect to a subnet without access to current subnet" do
+        private_subnet
+        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID).subject
+        expect(private_subnet.connected_subnets.count).to eq(0)
+        visit "#{project.path}#{private_subnet.path}/networking"
+
+        select ps2.name, from: "connected-subnet-id"
+
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:view"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:connect"], object_id: ps2.id)
+        click_button "Connect"
+        expect(private_subnet.reload.connected_subnets.count).to eq(0)
+        expect(page.title).to eq "Ubicloud - Forbidden"
+
+        visit "#{project.path}#{private_subnet.path}/networking"
+        expect { click_button "Connect" }.to raise_error(Capybara::ElementNotFound)
+      end
+
+      it "cannot disconnect connected subnet without access to current subnet" do
+        private_subnet
+        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID).subject
+        private_subnet.connect_subnet(ps2)
+
+        visit "#{project.path}#{private_subnet.path}/networking"
+
+        expect(page).to have_content ps2.name
+
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:view"])
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:disconnect"], object_id: ps2.id)
 
         click_button "Disconnect"
         expect(private_subnet.reload.connected_subnets.count).to eq(1)
