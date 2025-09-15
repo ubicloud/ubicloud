@@ -720,7 +720,7 @@ Allowed Option Values:
 Connect a private subnet to another private subnet
 
 Usage:
-    ubi ps (location/ps-name | ps-id) connect (location/ps-name | ps-id)
+    ubi ps (location/ps-name | ps-id) connect (ps-name | ps-id)
 
 
 Create a private subnet
@@ -744,7 +744,7 @@ Options:
 Disconnect a private subnet from another private subnet
 
 Usage:
-    ubi ps (location/ps-name | ps-id) disconnect (location/ps-name | ps-id)
+    ubi ps (location/ps-name | ps-id) disconnect (ps-name | ps-id)
 
 
 Rename a private subnet
