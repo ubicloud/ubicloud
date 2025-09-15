@@ -18,7 +18,7 @@ ps_path = path(@ps)
 
 viewable_fws, viewable_subnets, disconnectable_subnets =
   perm_checks.map do |perm, ds|
-    dataset_authorize(ds, perm).select_hash(:id, Sequel.as(true, :v)).transform_keys! { UBID.from_uuidish(it).to_s }
+    dataset_authorize(ds, perm).select_hash(:id, Sequel.as(true, :v))
   end %>
 
 <div class="p-6">
@@ -32,7 +32,7 @@ viewable_fws, viewable_subnets, disconnectable_subnets =
         [
           [
             (
-              if viewable_fws[fw.ubid]
+              if viewable_fws[fw.id]
                 [fw.name, { link: path(fw) }]
               else
                 fw.name
@@ -70,8 +70,8 @@ viewable_fws, viewable_subnets, disconnectable_subnets =
             else
               obj = subnet
               name = obj.name
-              viewable = viewable_subnets[subnet.ubid]
-              show_delete = disconnectable_subnets[subnet.ubid]
+              viewable = viewable_subnets[subnet.id]
+              show_delete = disconnectable_subnets[subnet.id]
             end
           %>
           <tr>
