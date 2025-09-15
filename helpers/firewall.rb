@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Clover
-  def authorized_firewall(perm: "Firewall:view", location_id: nil)
+  def authorized_firewall(location_id:, perm: "Firewall:view")
     authorized_object(association: :firewalls, key: "firewall_id", perm:, location_id:)
   end
 

@@ -257,11 +257,9 @@ class Clover < Roda
     @current_account = Account[rodauth.session_value]
   end
 
-  def authorized_object(key:, perm:, association: nil, id: nil, ds: @project.send(:"#{association}_dataset"), location_id: nil)
+  def authorized_object(key:, perm:, location_id:, association: nil, id: nil, ds: @project.send(:"#{association}_dataset"))
     if id ||= typecast_params.ubid_uuid(key)
-      ds = dataset_authorize(ds, perm)
-      ds = ds.where(location_id:) if location_id
-      ds.first(id:)
+      dataset_authorize(ds, perm).first(location_id:, id:)
     end
   end
 
