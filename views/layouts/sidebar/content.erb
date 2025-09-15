@@ -140,20 +140,18 @@
           </ul>
         </li>
       <% end %>
-      <% if @project_permissions && has_project_permission("Project:github") %>
-              <li>
+      <% if @project_permissions && has_project_permission("Project:github") && Config.github_app_name %>
+        <li>
           <div class="text-xs font-semibold leading-6 text-orange-200">Integrations</div>
           <ul role="list" class="-mx-2 mt-2 space-y-1">
-            <% if Config.github_app_name %>
-              <%== part(
-                "layouts/sidebar/item",
-                name: "GitHub Runners",
-                url: "#{@project.path}/github",
-                is_active: request.path.start_with?("#{@project.path}/github"),
-                icon: "github",
-                has_permission: has_project_permission("Project:github")
-              ) %>
-            <% end %>
+            <%== part(
+              "layouts/sidebar/item",
+              name: "GitHub Runners",
+              url: "#{@project.path}/github",
+              is_active: request.path.start_with?("#{@project.path}/github"),
+              icon: "github",
+              has_permission: has_project_permission("Project:github")
+            ) %>
           </ul>
         </li>
 
