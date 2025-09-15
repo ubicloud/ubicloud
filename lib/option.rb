@@ -38,14 +38,15 @@ module Option
     [1, vcpus / 2].max
   end
 
-  AWS_FAMILY_OPTIONS = ["c6gd", "m6id", "m6gd", "m7a", "m8gd"].freeze
+  AWS_FAMILY_OPTIONS = ["c6gd", "m6id", "m6gd", "m7a", "m8gd", "i8g"].freeze
   non_storage_optimized_vm_storage_size_options = {2 => ["118"], 4 => ["237"], 8 => ["474"], 16 => ["950"], 32 => ["1900"], 64 => ["3800"]}
   AWS_STORAGE_SIZE_OPTIONS = {
     "c6gd" => non_storage_optimized_vm_storage_size_options,
     "m6id" => non_storage_optimized_vm_storage_size_options,
     "m6gd" => non_storage_optimized_vm_storage_size_options,
     "m7a" => non_storage_optimized_vm_storage_size_options,
-    "m8gd" => non_storage_optimized_vm_storage_size_options
+    "m8gd" => non_storage_optimized_vm_storage_size_options,
+    "i8g" => {2 => ["468"], 4 => ["937"], 8 => ["1875"], 16 => ["3750"], 32 => ["7500"], 64 => ["15000"]}
   }.freeze
 
   BootImage = Struct.new(:name, :display_name)
@@ -116,7 +117,8 @@ module Option
     ["c6gd", "Compute Optimized, Graviton2"],
     ["m6id", "General Purpose, Intel Xeon"],
     ["m6gd", "General Purpose, Graviton2"],
-    ["m8gd", "General Purpose, Graviton3"]
+    ["m8gd", "General Purpose, Graviton3"],
+    ["i8g", "Storage Optimized, Graviton4"]
   ].map { |args| [args[0], PostgresFamilyOption.new(*args)] }.to_h.freeze
 
   PostgresSizeOption = Data.define(:name, :family, :vcpu_count, :memory_gib)
@@ -152,7 +154,13 @@ module Option
     ["m8gd", 8, 32],
     ["m8gd", 16, 64],
     ["m8gd", 32, 128],
-    ["m8gd", 64, 256]
+    ["m8gd", 64, 256],
+    ["i8g", 2, 16],
+    ["i8g", 4, 32],
+    ["i8g", 8, 64],
+    ["i8g", 16, 128],
+    ["i8g", 32, 256],
+    ["i8g", 64, 512]
   ].map do |args|
     name = if AWS_FAMILY_OPTIONS.include?(args[0])
       aws_instance_type_name(args[0], args[1])
