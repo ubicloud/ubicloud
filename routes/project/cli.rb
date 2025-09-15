@@ -33,7 +33,13 @@ class Clover
           end
 
           @last_cli = @last_cli.sub(/\A\s*ubi\s+/, "")
-          argv = @last_cli.shellsplit
+          begin
+            argv = @last_cli.shellsplit
+          rescue ArgumentError => ex
+            @repeat_cli = @no_last_cli = true
+            flash.now["error"] = "Unable to parse CLI command: #{ex.message}"
+            next view "cli"
+          end
 
           env["clover.project_id"] = @project.id
           env["clover.project_ubid"] = @project.ubid
@@ -63,14 +69,7 @@ class Clover
             end
           end
 
-          if (@ubi_confirm = headers["ubi-confirm"])
-            if @cli
-              @clis ||= []
-              @clis.prepend(@cli)
-            end
-            @cli = @last_cli
-          end
-
+          @repeat_cli = @ubi_confirm = headers["ubi-confirm"]
           view "cli"
         end
       end

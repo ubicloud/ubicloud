@@ -137,6 +137,48 @@ RSpec.describe Clover, "web shell" do
     expect(page.all(".next-clis").map(&:text)).to eq []
   end
 
+  it "handles errors in cli" do
+    expect(page.title).to eq "Ubicloud - Web Shell"
+    fill_in "cli", with: "ps 'list"
+    click_button "Run"
+    expect(page.title).to eq "Ubicloud - Web Shell"
+    expect(page).to have_flash_error "Unable to parse CLI command: Unmatched quote at 3: ...'"
+    expect(page.find_by_id("cli").value).to eq "ps 'list"
+    expect { page.find_by_id("cli-executed") }.to raise_error(Capybara::ElementNotFound)
+    expect { page.find_by_id("cli-output") }.to raise_error(Capybara::ElementNotFound)
+  end
+
+  it "handles errors when parsing commands the scheduling multiple commands" do
+    click_link "schedule execution of multiple commands"
+    fill_in "Multiple commands, one per line", with: <<~END
+      'ps eu-central-h1/bar create
+      ps eu-central-h1/bar show -f id
+    END
+    click_button "Run"
+    ps = PrivateSubnet.first
+    expect(ps).to be_nil
+    expect(page.find_by_id("cli").value).to eq "'ps eu-central-h1/bar create"
+    expect(page.all(".next-clis").map(&:text)).to eq ["ps eu-central-h1/bar show -f id"]
+    expect { page.find_by_id("cli-executed") }.to raise_error(Capybara::ElementNotFound)
+    expect { page.find_by_id("cli-output") }.to raise_error(Capybara::ElementNotFound)
+
+    fill_in "cli", with: "ps eu-central-h1/bar create"
+    click_button "Run"
+    ps = PrivateSubnet.first
+    expect(ps.name).to eq "bar"
+    expect(ps.display_location).to eq "eu-central-h1"
+    expect(page.find_by_id("cli").value).to eq "ps eu-central-h1/bar show -f id"
+    expect(page.find_by_id("cli-executed").text).to eq "ps eu-central-h1/bar create"
+    expect(page.find_by_id("cli-output").text).to eq "Private subnet created with id: #{ps.ubid}"
+    expect(page.all(".next-clis").map(&:text)).to eq []
+
+    click_button "Run"
+    expect(page.find_by_id("cli").value).to be_nil
+    expect(page.find_by_id("cli-executed").text).to eq "ps eu-central-h1/bar show -f id"
+    expect(page.find_by_id("cli-output").text).to eq "id: #{ps.ubid}"
+    expect(page.all(".next-clis").map(&:text)).to eq []
+  end
+
   describe "confirmation" do
     before do
       fill_in "cli", with: "ps eu-central-h1/foo create"
