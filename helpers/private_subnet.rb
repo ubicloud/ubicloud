@@ -9,6 +9,10 @@ class Clover
     authorize("PrivateSubnet:#{type}", @ps.id)
     handle_validation_failure("networking/private_subnet/show") { @page = "networking" }
 
+    if type == "connect" && id == @ps.id
+      raise CloverError.new(400, "InvalidRequest", "Cannot connect private subnet to itself")
+    end
+
     if (subnet = authorized_private_subnet(perm: "PrivateSubnet:#{type}", location_id: @location.id, id:))
       name = subnet.name
     else
