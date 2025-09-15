@@ -541,6 +541,32 @@ class Clover
           end
         end
       end
+
+      r.is "upgrade" do
+        r.get api? do
+          # api-only route, web GET upgrade route handled by r.show_object call earlier in route
+          authorize("Postgres:view", pg.id)
+
+          unless pg.needs_upgrade?
+            raise CloverError.new(400, "InvalidRequest", "Database is not upgrading")
+          end
+
+          Serializers::PostgresUpgrade.serialize(pg)
+        end
+
+        r.post do
+          authorize("Postgres:edit", pg.id)
+
+          Validation.validate_postgres_upgrade(postgres_resource: pg)
+
+          DB.transaction do
+            pg.update(version: pg.version_int + 1)
+            audit_log(pg, "upgrade")
+          end
+
+          Serializers::PostgresUpgrade.serialize(pg)
+        end
+      end
     end
   end
 end

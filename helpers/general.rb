@@ -107,6 +107,7 @@ class Clover < Roda
     update
     update_billing
     update_invitation
+    upgrade
   ACTIONS
   LOGGED_ACTIONS = Set.new(%w[create create_replica destroy promote reset_superuser_password restart restore update]).freeze
 
