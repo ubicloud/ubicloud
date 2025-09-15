@@ -8,6 +8,7 @@ class Vm < Sequel::Model
   many_to_one :vm_host
   many_to_one :project
   one_to_many :nics
+  one_to_many :detachable_volumes
   many_to_many :private_subnets, join_table: :nic
   one_to_one :sshable, key: :id
   one_to_one :assigned_vm_address, key: :dst_vm_id
@@ -31,7 +32,7 @@ class Vm < Sequel::Model
     class: :Firewall
   many_to_many :vm_firewalls, class: :Firewall, join_table: :firewalls_vms, right_key: :firewall_id
 
-  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancer_vm: :destroy, init_script: :destroy
+  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancer_vm: :destroy, init_script: :destroy, detachable_volumes: :nullify
 
   dataset_module Pagination
 
@@ -211,7 +212,7 @@ class Vm < Sequel::Model
   end
 
   def storage_size_gib
-    vm_storage_volumes.map { it.size_gib }.sum
+    vm_storage_volumes.map { it.size_gib }.sum + detachable_volumes.map { it.size_gib }.sum
   end
 
   def init_health_monitor_session
@@ -267,7 +268,7 @@ class Vm < Sequel::Model
       cpu_topology: topo.to_s,
       mem_gib: memory_gib,
       ndp_needed: vm_host.ndp_needed,
-      storage_volumes:,
+      storage_volumes: storage_volumes + detachable_volumes_hash,
       swap_size_bytes:,
       pci_devices: pci_devices.map { [it.slot, it.iommu_group] },
       gpu_partition_id: gpu_partition&.partition_id,
@@ -281,6 +282,21 @@ class Vm < Sequel::Model
       init_script: init_script&.init_script || "",
       ipv6_disabled: project.get_ff_ipv6_disabled || false
     )
+  end
+
+  def detachable_volumes_hash
+    detachable_volumes.map { |dv|
+      {
+        "name" => dv.name,
+        "size_gib" => dv.size_gib,
+        "max_read_mbytes_per_sec" => dv.max_read_mbytes_per_sec,
+        "max_write_mbytes_per_sec" => dv.max_write_mbytes_per_sec,
+        "num_queues" => dv.vring_workers || 1,
+        "device_id" => dv.device_id,
+        "vhost_block_backend_version" => dv.target_vhost_block_backend&.version,
+        "detachable" => true
+      }
+    }
   end
 
   def storage_volumes

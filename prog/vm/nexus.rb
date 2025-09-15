@@ -120,6 +120,14 @@ class Prog::Vm::Nexus < Prog::Base
         VmInitScript.create_with_id(vm, init_script:)
       end
 
+      detachable_volume_ids&.each do |dv_id|
+        dv = DetachableVolume[dv_id]
+        raise "Detachable volume #{dv_id} doesn't exist" unless dv
+        raise "Detachable volume #{dv_id} is not available in the given project" unless project.detachable_volumes.any? { |v| v.id == dv.id }
+        raise "Detachable volume #{dv_id} is already attached to a VM" if dv.vm_id
+        dv.update(vm_id: vm.id)
+      end
+
       if vm_size.family == "standard-gpu"
         gpu_count = 1
         gpu_device = "27b0"
