@@ -14,6 +14,16 @@ class DetachableVolume < Sequel::Model
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy
 
+  def device_id
+    raise "Volume is not attached to a VM" unless vm_id
+    ubid.to_s[0..7]
+  end
+
+  def device_path
+    raise "Volume is not attached to a VM" unless vm_id
+    "/dev/disk/by-id/virtio-#{device_id}"
+  end
+
   def path
     "/detachable-volume/#{name}"
   end
