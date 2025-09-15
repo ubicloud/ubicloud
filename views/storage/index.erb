@@ -1,14 +1,14 @@
-<% @page_title = "Storage Volumes" %>
+<% @page_title = "Data Disks" %>
 <div class="auto-refresh hidden" data-interval="10"></div>
 
 <% right_items = []
    if has_project_permission("DetachableVolume:create")
-     right_items << part("components/button", text: "Create Storage Volume", link: "detachable-volume/create")
+     right_items << part("components/button", text: "Create Data Disk", link: "detachable-volume/create")
    end %>
 
 <%== part(
   "components/page_header",
-  breadcrumbs: [%w[Projects /project], [@project.name, @project.path], ["Storage", "#"]],
+  breadcrumbs: [%w[Projects /project], [@project.name, @project.path], ["Data Disks", "#"]],
   right_items: right_items
 ) %>
 
@@ -30,9 +30,9 @@
     end,
     empty_state: {
       icon: "hero-circle-stack",
-      title: "No storage volumes",
-      description: has_project_permission("DetachableVolume:create") ? "Get started by creating a new storage volume." : "You don't have permission to create storage volumes.",
-      buttons: has_project_permission("DetachableVolume:create") ? {"Create Storage Volume" => "#{@project.path}/detachable-volume/create"} : {}
+      title: "No data disks",
+      description: has_project_permission("DetachableVolume:create") ? "Get started by creating a new data disk." : "You don't have permission to create data disks.",
+      buttons: has_project_permission("DetachableVolume:create") ? {"Create Data Disk" => "#{@project.path}/detachable-volume/create"} : {}
     }
   ) %>
 </div>
