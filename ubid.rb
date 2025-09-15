@@ -147,6 +147,7 @@ class UBID
     ActionTag: ta
     ObjectTag: t0
     KubernetesCluster: kc
+    DetachableVolume: dv
     Location: 10
   TYPES
   def self.generate_vanity_action_type(action)
