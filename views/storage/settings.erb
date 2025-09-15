@@ -2,7 +2,7 @@
 
 <% if edit_perm %>
   <div class="p-6">
-    <%== part("components/rename_object", object: @detachable_volume, type: "storage volume") %>
+    <%== part("components/rename_object", object: @detachable_volume, type: "data disk") %>
   </div>
 <% end %>
 
@@ -19,9 +19,9 @@
       <div class="px-4 py-5 sm:p-6">
         <div class="sm:flex sm:items-center sm:justify-between">
           <div>
-            <h3 class="text-base font-semibold leading-6 text-gray-900">Delete storage volume</h3>
+            <h3 class="text-base font-semibold leading-6 text-gray-900">Delete data disk</h3>
             <div class="mt-2 text-sm text-gray-500">
-              <p>This action will permanently delete this storage volume.</p>
+              <p>This action will permanently delete this data disk.</p>
             </div>
           </div>
           <div id="detachable-volume-delete-<%= @detachable_volume.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
