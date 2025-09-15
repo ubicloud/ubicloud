@@ -3,10 +3,12 @@
 DEFAULT_STORAGE_DEVICE = "DEFAULT"
 
 class StoragePath
-  def initialize(vm_name, device, disk_index)
+  def initialize(vm_name, device, disk_index, detachable, id)
     @vm_name = vm_name
     @device = device
     @disk_index = disk_index
+    @detachable = detachable
+    @id = id
   end
 
   def device_path
@@ -21,7 +23,10 @@ class StoragePath
   end
 
   def storage_dir
-    @storage_dir ||= File.join(storage_root, @disk_index.to_s)
+    @storage_dir ||=
+      @detachable ?
+        File.join(device_path, @id.to_s) :
+        File.join(storage_root, @disk_index.to_s)
   end
 
   def disk_file
