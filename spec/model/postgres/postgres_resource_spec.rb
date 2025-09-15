@@ -248,4 +248,38 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.hostname_suffix).to eq(Config.postgres_service_hostname)
     end
   end
+
+  describe "#upgrade_stage" do
+    it "returns nil if there's no ongoing upgrade" do
+      st = instance_double(Strand, children_dataset: instance_double(Sequel::Dataset))
+      allow(postgres_resource).to receive(:strand).and_return(st)
+      allow(st.children_dataset).to receive(:where).and_return([])
+      expect(postgres_resource.upgrade_stage).to be_nil
+    end
+
+    it "returns the upgrade stage if there's an ongoing upgrade" do
+      st = instance_double(Strand, children_dataset: instance_double(Sequel::Dataset))
+      allow(postgres_resource).to receive(:strand).and_return(st)
+      allow(st.children_dataset).to receive(:where).and_return([instance_double(Strand, prog: "Postgres::ConvergePostgresResource", label: "upgrade_standby")])
+      expect(postgres_resource.upgrade_stage).to eq("upgrade_standby")
+    end
+  end
+
+  describe "#upgrade_status" do
+    it "returns failed if the postgres resource upgrade failed" do
+      expect(postgres_resource).to receive(:upgrade_stage).and_return("upgrade_failed")
+      expect(postgres_resource.upgrade_status).to eq("failed")
+    end
+
+    it "returns not_running if the postgres resource does not need upgrade" do
+      expect(postgres_resource).to receive(:upgrade_stage).and_return(nil)
+      expect(postgres_resource.upgrade_status).to eq("not_running")
+    end
+
+    it "returns running if the postgres resource upgrade is in progress" do
+      expect(postgres_resource).to receive(:upgrade_stage).and_return("upgrade_standby")
+      expect(postgres_resource).to receive(:version).and_return("16")
+      expect(postgres_resource.upgrade_status).to eq("running")
+    end
+  end
 end

@@ -1340,6 +1340,35 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/upgrade':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    post:
+      operationId: upgradePostgresDatabase
+      summary: Upgrade a Postgres database to the next major version
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabaseUpgradeStatus'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
+    get:
+      operationId: getPostgresDatabaseUpgradeStatus
+      summary: Get details of a specific Postgres database upgrade
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_reference'
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabaseUpgradeStatus'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   '/project/{project_id}/location/{location}/private-subnet':
     get:
       operationId: listLocationPrivateSubnets
@@ -2362,7 +2391,10 @@ components:
           description: Desired storage size in GiB
           type: integer
         version:
-          description: Postgres version
+          description: Current Postgres version
+          type: string
+        target_version:
+          description: Target Postgres version
           type: string
         vm_size:
           description: Size of the underlying VM
@@ -2400,6 +2432,7 @@ components:
         - state
         - storage_size_gib
         - version
+        - target_version
         - vm_size
         - maintenance_window_start_at
         - read_replica
@@ -2935,6 +2968,24 @@ components:
             required:
               - count
               - items
+    PostgresDatabaseUpgradeStatus:
+      description: A Postgres Database Upgrade Status
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              current_version:
+                type: string
+              target_version:
+                type: string
+              upgrade_status:
+                type: string
+            additionalProperties: false
+            required:
+              - current_version
+              - target_version
+              - upgrade_status
     PostgresFirewallRule:
       description: A Postgres Firewall Rule
       content:
