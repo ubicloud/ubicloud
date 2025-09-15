@@ -25,7 +25,7 @@ class DetachableVolume < Sequel::Model
   end
 
   def encrypted?
-    !!source_key_encryption_key_id || !!target_key_encryption_key_id
+    true
   end
 end
 
