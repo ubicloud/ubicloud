@@ -108,12 +108,12 @@ class Clover
       Option::POSTGRES_SIZE_OPTIONS[size].family == family
     end
 
-    storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS + Option::AWS_STORAGE_SIZE_OPTIONS.values.flatten.uniq
+    storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS + Option::AWS_STORAGE_SIZE_OPTIONS.values.flat_map { |h| h.values.flatten }.uniq
     options.add_option(name: "storage_size", values: storage_size_options, parent: "size") do |flavor, location, family, size, storage_size|
       vcpu_count = Option::POSTGRES_SIZE_OPTIONS[size].vcpu_count
 
       if location.aws?
-        Option::AWS_STORAGE_SIZE_OPTIONS[vcpu_count].include?(storage_size)
+        Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpu_count].include?(storage_size)
       else
         min_storage = (vcpu_count >= 30) ? 1024 : vcpu_count * 32
         min_storage /= 2 if family == "burstable"

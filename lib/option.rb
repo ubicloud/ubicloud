@@ -39,7 +39,14 @@ module Option
   end
 
   AWS_FAMILY_OPTIONS = ["c6gd", "m6id", "m6gd", "m7a", "m8gd"].freeze
-  AWS_STORAGE_SIZE_OPTIONS = {2 => ["118"], 4 => ["237"], 8 => ["474"], 16 => ["950"], 32 => ["1900"], 64 => ["3800"]}.freeze
+  non_storage_optimized_vm_storage_size_options = {2 => ["118"], 4 => ["237"], 8 => ["474"], 16 => ["950"], 32 => ["1900"], 64 => ["3800"]}
+  AWS_STORAGE_SIZE_OPTIONS = {
+    "c6gd" => non_storage_optimized_vm_storage_size_options,
+    "m6id" => non_storage_optimized_vm_storage_size_options,
+    "m6gd" => non_storage_optimized_vm_storage_size_options,
+    "m7a" => non_storage_optimized_vm_storage_size_options,
+    "m8gd" => non_storage_optimized_vm_storage_size_options
+  }.freeze
 
   BootImage = Struct.new(:name, :display_name)
   BootImages = [
@@ -91,7 +98,7 @@ module Option
     memory_coefficient = (family == "c6gd") ? 2 : 4
 
     arch = ["m6id", "m7a"].include?(family) ? "x64" : "arm64"
-    VmSize.new(aws_instance_type_name(family, vcpu), family, vcpu, vcpu * 100, 0, vcpu * memory_coefficient, AWS_STORAGE_SIZE_OPTIONS[vcpu], NO_IO_LIMITS, nil, false, arch)
+    VmSize.new(aws_instance_type_name(family, vcpu), family, vcpu, vcpu * 100, 0, vcpu * memory_coefficient, AWS_STORAGE_SIZE_OPTIONS[family][vcpu], NO_IO_LIMITS, nil, false, arch)
   }).freeze
 
   # Postgres Global Options
