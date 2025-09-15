@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Clover
-  def authorized_private_subnet(perm: "PrivateSubnet:view", location_id: nil, key: "private_subnet_id", id: nil)
+  def authorized_private_subnet(location_id:, perm: "PrivateSubnet:view", key: "private_subnet_id", id: nil)
     authorized_object(association: :private_subnets, key:, perm:, location_id:, id:)
   end
 

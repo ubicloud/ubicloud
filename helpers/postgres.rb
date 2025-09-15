@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Clover
-  def authorized_postgres_resource(perm: "Postgres:view", location_id: nil, key: "postgres_resource_id", id: nil)
+  def authorized_postgres_resource(location_id:, perm: "Postgres:view", key: "postgres_resource_id", id: nil)
     authorized_object(association: :postgres_resources, key:, perm:, location_id:, id:)
   end
 

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Clover
-  def authorized_vm(perm: "Vm:view", location_id: nil)
+  def authorized_vm(location_id:, perm: "Vm:view")
     authorized_object(association: :vms, key: "vm_id", perm:, location_id:)
   end
 
