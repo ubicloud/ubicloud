@@ -488,7 +488,8 @@ Allowed Option Values:
           m6id.2xlarge m6id.4xlarge m6id.8xlarge m6id.16xlarge m6gd.large
           m6gd.xlarge m6gd.2xlarge m6gd.4xlarge m6gd.8xlarge m6gd.16xlarge
           m8gd.large m8gd.xlarge m8gd.2xlarge m8gd.4xlarge m8gd.8xlarge
-          m8gd.16xlarge
+          m8gd.16xlarge i8g.large i8g.xlarge i8g.2xlarge i8g.4xlarge i8g.8xlarge
+          i8g.16xlarge
     Storage Size: 16 32 64 128 256 512 1024 2048 4096
     Version: 17 16
 
@@ -543,7 +544,8 @@ Allowed Option Values:
           m6id.2xlarge m6id.4xlarge m6id.8xlarge m6id.16xlarge m6gd.large
           m6gd.xlarge m6gd.2xlarge m6gd.4xlarge m6gd.8xlarge m6gd.16xlarge
           m8gd.large m8gd.xlarge m8gd.2xlarge m8gd.4xlarge m8gd.8xlarge
-          m8gd.16xlarge
+          m8gd.16xlarge i8g.large i8g.xlarge i8g.2xlarge i8g.4xlarge i8g.8xlarge
+          i8g.16xlarge
     Storage Size: 16 32 64 128 256 512 1024 2048 4096
 
 
