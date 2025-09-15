@@ -108,7 +108,7 @@ class Clover
       show_actions = if pg.read_replica?
         %w[overview connection charts networking config settings]
       else
-        %w[overview connection charts networking resize high-availability read-replica backup-restore config settings]
+        %w[overview connection charts networking resize high-availability read-replica backup-restore config upgrade settings]
       end
       r.show_object(pg, actions: show_actions, perm: "Postgres:view", template: "postgres/show")
 
@@ -560,7 +560,12 @@ class Clover
             audit_log(pg, "upgrade")
           end
 
-          Serializers::PostgresUpgrade.serialize(pg)
+          if api?
+            Serializers::PostgresUpgrade.serialize(pg)
+          else
+            flash["notice"] = "Database upgrade started successfully"
+            r.redirect pg, "/upgrade"
+          end
         end
       end
     end

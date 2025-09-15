@@ -1,0 +1,114 @@
+<% upgrade_stages = [
+  # [stage, description, database_available?]
+  ["start", "Start", true],
+  ["provision_servers", "Wait for standby to be ready", true],
+  ["wait_for_maintenance_window", "Wait for maintenance window", true],
+  ["wait_fence_primary", "Wait to fence primary", false],
+  ["upgrade_standby", "Upgrade standby", false],
+  ["update_metadata", "Update metadata", false],
+  ["recycle_representative_server", "Wait for takeover", false],
+  ["prune_servers", "Prune old servers", true]
+]
+
+current_stage = @pg.upgrade_stage || "start"
+stage_status = "done"
+
+upgrade_progress = upgrade_stages.map do |stage, description, database_available|
+  if stage_status == "running"
+    stage_status = "pending"
+  end
+  if stage == current_stage
+    stage_status = "running"
+  end
+
+  stage_status_icon = if stage_status == "done"
+    "hero-check"
+  elsif stage_status == "running"
+    "hero-refresh"
+  else
+    "hero-ellipsis-horizontal"
+  end
+
+  database_availability_icon = if database_available && stage_status == "running"
+    "hero-check"
+  elsif stage_status == "running"
+    "hero-x-mark"
+  else
+    ""
+  end
+
+  [stage, description, database_availability_icon, stage_status_icon]
+end %>
+
+<div class="p-6">
+  <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Upgrade</h3>
+
+  <% if @pg.display_state == "creating" %>
+    <p class="text-gray-500 mt-2">Upgrade operation is not available while the database is being created.</p>
+  <% elsif @pg.target_version != @pg.version %>
+    <% if @pg.upgrade_stage == "upgrade_failed" %>
+      <p>Database upgrade failed. We have reverted the database to the previous version, and it is now available again.</p>
+    <% else %>
+      <p>Database upgrade is in progress.</p>
+    <% end %>
+    <% upgrade_progress_rows = upgrade_progress
+    .map do |stage, description, database_availability_icon, stage_status_icon|
+      [
+        [
+          description,
+          database_availability_icon.empty? ? "" : [
+            "icon",
+            {
+              component: {
+                name: database_availability_icon
+              }
+            }
+          ],
+          [
+            "icon",
+            {
+              component: {
+                name: stage_status_icon
+              }
+            }
+          ]
+        ],
+        { id: "upgrade-stage-#{stage}" }
+      ]
+    end %>
+    <%== part("components/table_card", title: "", headers: ["Stage", "Database Availability", "Status"], rows: upgrade_progress_rows) %>
+  <% elsif @pg.version == PostgresResource::LATEST_VERSION %>
+    <p>Your database is already on the latest version.</p>
+  <% else %>
+    <p>Your database can be upgraded to Postgres
+      <%= @pg.version.to_i + 1 %>.</p>
+
+    <% form(action: "#{path(@pg)}/restore", method: :post, class: "min-w-2/3 pg-config mt-6") do %>
+      <%== part("components/form/section", label: "Preparing for an Upgrade",
+      content: "Before starting an upgrade, make sure to test the upgrade on a
+      staging database along with your application to ensure compatibility. 
+      Use the \"Create a test fork\" button to create a new copy of your
+      database at the current version. This will allow you to test the upgrade
+      without any risk to the current database.") %>
+
+      <%== part("components/form/hidden", name: "#{@pg.name}-upgrade-test") %>
+      <%== part("components/form/hidden", restore_target: @pg.timeline.latest_restore_time.to_s) %>
+      <div class="flex justify-end mt-6">
+        <%== part("components/form/submit_button", text: "Create a test fork") if @edit_perm %>
+      </div>
+    <% end %>
+
+    <% form(action: "#{path(@pg)}/upgrade", method: :post, class: "min-w-2/3 pg-config mt-6") do %>
+      <%== part("components/form/section", label: "Upgrade Process",
+      content: "During the upgrade, your database will be unavailable for a short period.
+      If a maintenance window is configured, the upgrade will take place during
+      the first available maintenance window after the new server is ready.
+      Otherwise, the upgrade will take place as soon as the new server becomes
+      ready.") %>
+
+      <div class="flex justify-end mt-6">
+        <%== part("components/form/submit_button", text: "Start Upgrade", extra_class: "") if @edit_perm %>
+      </div>
+    <% end %>
+  <% end %>
+</div>
