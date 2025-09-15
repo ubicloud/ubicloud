@@ -1,1 +1,1 @@
-ps eu-central-h1/test-ps disconnect psfzm9e26xky5m9ggetw4dpqe2/foo
+ps eu-central-h1/test-ps disconnect foo2

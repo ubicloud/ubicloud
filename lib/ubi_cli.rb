@@ -430,12 +430,6 @@ class UbiCli
     end || name
   end
 
-  def convert_loc_name_to_id(model_adapter, loc_name)
-    if !model_adapter.id_regexp.match?(loc_name) && loc_name.count("/") == 1
-      id_for_loc_name(model_adapter, loc_name)
-    end || loc_name
-  end
-
   def id_for_loc_name(model_adapter, loc_name)
     _, name, extra = loc_name.split("/", 3)
     if name && !extra

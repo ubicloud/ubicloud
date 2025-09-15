@@ -1,3 +1,0 @@
-! Unexpected response status: 404
-Details: Validation failed for following path components: location
-  location: Given location is not a valid location. Available locations: eu-central-h1, eu-north-h1, us-east-a2

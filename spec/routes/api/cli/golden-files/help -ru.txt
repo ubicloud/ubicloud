@@ -68,10 +68,10 @@ ubi pg (location/pg-name | pg-id) show [options]
 ubi ps command [...]
 ubi ps (location/ps-name | ps-id) post-command [...]
 ubi ps list [options]
-ubi ps (location/ps-name | ps-id) connect [options] (location/ps-name | ps-id)
+ubi ps (location/ps-name | ps-id) connect [options] (ps-name | ps-id)
 ubi ps location/ps-name create [options]
 ubi ps (location/ps-name | ps-id) destroy [options]
-ubi ps (location/ps-name | ps-id) disconnect [options] (location/ps-name | ps-id)
+ubi ps (location/ps-name | ps-id) disconnect [options] (ps-name | ps-id)
 ubi ps (location/ps-name | ps-id) rename new-name
 ubi ps (location/ps-name | ps-id) show [options]
 ubi version

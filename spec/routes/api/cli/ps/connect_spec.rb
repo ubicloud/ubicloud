@@ -17,7 +17,7 @@ RSpec.describe Clover, "cli ps connect" do
 
   it "connects requested private subnet to this subnet by name" do
     expect(ConnectedSubnet.count).to eq 0
-    expect(cli(%W[ps eu-central-h1/test-ps connect eu-central-h1/test-ps2])).to eq "Connected private subnet eu-central-h1/test-ps2 to #{@ps1.ubid}\n"
+    expect(cli(%W[ps eu-central-h1/test-ps connect test-ps2])).to eq "Connected private subnet test-ps2 to #{@ps1.ubid}\n"
     expect(ConnectedSubnet.count).to eq 1
   end
 
