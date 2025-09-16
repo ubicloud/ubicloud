@@ -29,6 +29,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
       [
         [:get, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster"],
         [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name"],
+        [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/foo_name/nodepool/bar_name/resize"],
         [:delete, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"],
         [:delete, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}"],
         [:get, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"],
@@ -110,6 +111,38 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(kc.id).set?("destroy")).to be true
+      end
+    end
+
+    describe "nodepool" do
+      let(:kn) do
+        Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
+          name: "np",
+          node_count: 2,
+          kubernetes_cluster_id: kc.id
+        ).subject
+      end
+
+      describe "resize" do
+        it "success" do
+          [kn.name, kn.ubid].each do |identifier|
+            new_count = rand(1..10)
+            kn.strand.load.decr_scale_worker_count
+            post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{identifier}/resize", {node_count: new_count}.to_json
+
+            expect(last_response.status).to eq(200)
+            body = JSON.parse(last_response.body)
+            expect(body["nodepools"][0]["node_count"]).to eq(new_count)
+            expect(kn.reload.node_count).to eq(new_count)
+            expect(kn.scale_worker_count_set?).to be true
+          end
+        end
+
+        it "returns validation error for bad input" do
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 0}.to_json
+
+          expect(last_response.status).to eq(400)
+        end
       end
     end
   end
