@@ -85,7 +85,7 @@ class StorageVolume
 
   def prep_vhost_backend(encryption_key, key_wrapping_secrets)
     vhost_backend_create_config(encryption_key, key_wrapping_secrets)
-    vhost_backend_create_metadata(key_wrapping_secrets) if @image_path
+    vhost_backend_create_metadata(key_wrapping_secrets) if vhost_backend_metadata_required?
     vhost_backend_create_service_file
   end
 
@@ -253,8 +253,13 @@ class StorageVolume
       "write_through" => write_through_device?
     }
 
+    config["track_written"] = true if @detachable
+
     if @image_path
       config["image_path"] = @image_path
+    end
+
+    if vhost_backend_metadata_required?
       config["metadata_path"] = sp.vhost_backend_metadata
     end
 
@@ -578,6 +583,10 @@ class StorageVolume
 
   def sp
     @sp ||= StoragePath.new(@vm_name, @device, @disk_index, @detachable, @device_id)
+  end
+
+  def vhost_backend_metadata_required?
+    !!(@image_path || @detachable)
   end
 
   def storage_root
