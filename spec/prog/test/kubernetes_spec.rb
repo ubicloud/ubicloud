@@ -277,6 +277,12 @@ RSpec.describe Prog::Test::Kubernetes do
     end
   end
 
+  describe "#failed" do
+    it "naps" do
+      expect { kubernetes_test.failed }.to nap(15)
+    end
+  end
+
   describe "#ensure_hosts_entry" do
     let(:sshable) { instance_double(Sshable) }
     let(:api_hostname) { "api.example.com" }

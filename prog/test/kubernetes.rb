@@ -166,6 +166,10 @@ STS
     pop "Kubernetes tests are finished!"
   end
 
+  label def failed
+    nap 15
+  end
+
   def ensure_hosts_entry(sshable, api_hostname)
     host_line = "#{kubernetes_cluster.sshable.host} #{api_hostname}"
     output = sshable.cmd("cat /etc/hosts")
