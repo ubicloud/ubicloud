@@ -303,18 +303,35 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
       # Replace one CP vm with a bigger one, add one more nodepool VM
       kubernetes_cluster.nodes.first.destroy
-      KubernetesNode.create(vm_id: create_vm(vcpus: 8).id, kubernetes_cluster_id: kubernetes_cluster.id)
-      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: @nodepool.id)
+      kubernetes_cluster_id = kubernetes_cluster.id
+      KubernetesNode.create(vm_id: create_vm(vcpus: 8).id, kubernetes_cluster_id:)
+      n = KubernetesNode.create(vm_id: create_vm(vcpus: 16).id, kubernetes_cluster_id:, kubernetes_nodepool_id: @nodepool.id)
+      VmStorageVolume.create(vm_id: n.vm.id, size_gib: 37, boot: true, disk_index: 0)
 
       kubernetes_cluster.reload
 
       expect { nx.update_billing_records }.to hop("wait")
       kubernetes_cluster.reload
 
+      expected_records = [
+        ["KubernetesControlPlaneVCpu", "standard", 2], # old CP node
+        ["KubernetesControlPlaneVCpu", "standard", 8], # new bigger CP node
+        ["KubernetesWorkerVCpu", "standard", 2], # old worker node
+        ["KubernetesWorkerVCpu", "standard", 16], # new worker node
+        ["KubernetesWorkerStorage", "standard", 0], # old worker node
+        ["KubernetesWorkerStorage", "standard", 37] # new worker node
+      ]
+
+      actual_records = kubernetes_cluster.active_billing_records.map {
+        [it.billing_rate["resource_type"], it.billing_rate["resource_family"], it.amount.to_i]
+      }
+
+      expect(actual_records).to match_array expected_records
+
       new_records = kubernetes_cluster.active_billing_records.map(&:id)
       expect(new_records.length).to eq 6
       expect(newer_cp_record.reload.span.end).not_to be_nil # the newer record is finalized
-      expect(older_cp_record.reload.span.end).to be_nil
+      expect(older_cp_record.reload.span.end).to be_nil # the older record is still active
 
       expect((new_records - old_records).length).to eq 3 # 2 for the new worker node, 1 for the new bigger CP node
       expect((new_records & old_records).length).to eq 3 # 1 CP node and 2 worker nodes stayed the same
