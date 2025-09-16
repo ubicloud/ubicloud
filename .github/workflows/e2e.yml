@@ -145,6 +145,15 @@ jobs:
         echo '|---|---|---|---|' >> $GITHUB_STEP_SUMMARY
         grep "vm provisioned" foreman.log | cut -d'|' -f2 | jq -r '[.thread, .vm.name, .vm.boot_image, .provision.duration] | "| " + join(" | ") + " |"' >> $GITHUB_STEP_SUMMARY
 
+    - name: Extract runner queue times
+      if: always()
+      continue-on-error: true
+      run: |
+        echo "## Runner Queue Times" >> $GITHUB_STEP_SUMMARY
+        echo '| Runner | Label | VM | Duration |' >> $GITHUB_STEP_SUMMARY
+        echo '|---|---|---|---|' >> $GITHUB_STEP_SUMMARY
+        grep "runner_started" foreman.log | cut -d'|' -f2 | jq -r '[.runner_started.ubid, .runner_started.label, .runner_started.vm_ubid, .runner_started.duration] | "| " + join(" | ") + " |"' >> $GITHUB_STEP_SUMMARY
+
     - name: Upload logs
       if: always()
       uses: actions/upload-artifact@v4
