@@ -140,4 +140,11 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.ongoing_failover?).to be true
     end
   end
+
+  describe "#hostname_suffix" do
+    it "returns default hostname suffix if project is nil" do
+      expect(postgres_resource).to receive(:project).and_return(nil)
+      expect(postgres_resource.hostname_suffix).to eq(Config.postgres_service_hostname)
+    end
+  end
 end

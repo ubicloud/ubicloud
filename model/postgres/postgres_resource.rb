@@ -48,7 +48,7 @@ class PostgresResource < Sequel::Model
   end
 
   def hostname_suffix
-    project.get_ff_postgres_hostname_override || Config.postgres_service_hostname
+    project&.get_ff_postgres_hostname_override || Config.postgres_service_hostname
   end
 
   def dns_zone
