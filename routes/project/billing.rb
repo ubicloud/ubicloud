@@ -23,23 +23,22 @@ class Clover
           handle_validation_failure("project/billing")
           current_tax_id = billing_info.stripe_data["tax_id"]
           tp = typecast_params
-          new_tax_id = tp.str!("tax_id").gsub(/[^a-zA-Z0-9]/, "")
-
+          new_tax_id = tp.nonempty_str("tax_id")&.gsub(/[^a-zA-Z0-9]/, "")
           begin
             Stripe::Customer.update(billing_info.stripe_id, {
               name: tp.str!("name"),
               email: tp.str!("email").strip,
               address: {
                 country: tp.str!("country"),
-                state: tp.str!("state"),
-                city: tp.str!("city"),
-                postal_code: tp.str!("postal_code"),
+                state: tp.nonempty_str("state"),
+                city: tp.nonempty_str("city"),
+                postal_code: tp.nonempty_str("postal_code"),
                 line1: tp.str!("address"),
                 line2: nil
               },
               metadata: {
                 tax_id: new_tax_id,
-                company_name: tp.str!("company_name"),
+                company_name: tp.nonempty_str("company_name"),
                 note: tp.nonempty_str("note")
               }
             })
