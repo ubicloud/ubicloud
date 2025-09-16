@@ -176,8 +176,24 @@ RSpec.describe Clover, "billing" do
       expect(page).to have_field("Billing Name", with: "New Inc.")
       expect(page).to have_field("Country", with: "US")
       expect(page).to have_field("Tax ID", with: "DE456789")
+    end
 
-      fill_in "Tax ID", with: nil
+    it "can remove tax id" do
+      expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return(
+        {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
+        {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
+        {"name" => "Old Inc.", "address" => {"country" => nil}, "metadata" => {"tax_id" => nil}}
+      ).at_least(:once)
+      expect(Stripe::Customer).to receive(:update).with(billing_info.stripe_id, anything).at_least(:once)
+
+      visit "#{project.path}/billing"
+
+      expect(page.title).to eq("Ubicloud - Project Billing")
+      fill_in "VAT ID", with: nil
+
+      click_button "Update"
+
+      fill_in "Tax ID", with: "TR123123"
 
       click_button "Update"
     end
