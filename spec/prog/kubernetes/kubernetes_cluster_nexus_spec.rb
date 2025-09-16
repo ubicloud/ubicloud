@@ -296,7 +296,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       old_records = kubernetes_cluster.active_billing_records.map(&:id)
       expect(old_records.length).to eq 4
 
-      older_cp_record, newer_cp_record = kubernetes_cluster.active_billing_records.select { |it| it.billing_rate["resource_type"] == "KubernetesControlPlaneVCpu" }
+      older_cp_record, newer_cp_record = kubernetes_cluster.active_billing_records.select { it.billing_rate["resource_type"] == "KubernetesControlPlaneVCpu" }
 
       # Make sure of the records is older, so that we can test that the newer record is finalized
       older_cp_record.this.update(span: Sequel.lit("tstzrange(lower(span) - interval '1 day', NULL)"))
