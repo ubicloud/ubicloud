@@ -48,4 +48,8 @@ class VhostBlockBackend
     end
     FileUtils.rm_f temp_tarball
   end
+
+  def remove
+    FileUtils.rm_rf(dir)
+  end
 end
