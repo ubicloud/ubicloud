@@ -136,6 +136,15 @@ jobs:
         echo "### Image downloaded in $download_time" >> $GITHUB_STEP_SUMMARY
         echo "DOWNLOAD_TIME=$download_time" >> $GITHUB_OUTPUT
 
+    - name: Extract vm provision times
+      if: always()
+      continue-on-error: true
+      run: |
+        echo "## VM Provisioning Times" >> $GITHUB_STEP_SUMMARY
+        echo '| UBID | Name | Boot Image | Duration |' >> $GITHUB_STEP_SUMMARY
+        echo '|---|---|---|---|' >> $GITHUB_STEP_SUMMARY
+        grep "vm provisioned" foreman.log | cut -d'|' -f2 | jq -r '[.thread, .vm.name, .vm.boot_image, .provision.duration] | "| " + join(" | ") + " |"' >> $GITHUB_STEP_SUMMARY
+
     - name: Upload logs
       if: always()
       uses: actions/upload-artifact@v4
