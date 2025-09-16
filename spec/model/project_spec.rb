@@ -55,6 +55,12 @@ RSpec.describe Project do
       expect(project.has_valid_payment_method?).to be true
     end
 
+    it "returns true when discount is 100" do
+      expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
+      project.discount = 100
+      expect(project.has_valid_payment_method?).to be true
+    end
+
     it "returns false when no billing info" do
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
       expect(project.has_valid_payment_method?).to be false
