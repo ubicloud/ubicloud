@@ -54,6 +54,35 @@ class Clover
         response["content-disposition"] = "attachment; filename=\"#{kc.name}-kubeconfig.yaml\""
         kc.kubeconfig
       end
+
+      r.on "nodepool" do
+        r.on KUBERNETES_NODEPOOL_NAME_OR_UBID do |kn_name, kn_id|
+          filter = if kn_name
+            {Sequel[:kubernetes_nodepool][:name] => kn_name}
+          else
+            {Sequel[:kubernetes_nodepool][:id] => kn_id}
+          end
+
+          filter[:kubernetes_cluster_id] = kc.id
+          kn = @kn = kc.nodepools_dataset.first(filter)
+
+          check_found_object(kn)
+
+          r.post "resize" do
+            authorize("KubernetesCluster:edit", kc.id)
+            node_count = typecast_params.pos_int!("node_count")
+            Validation.validate_kubernetes_worker_node_count(node_count)
+
+            DB.transaction do
+              kn.update(node_count:)
+              kn.incr_scale_worker_count
+              audit_log(kn, "update")
+            end
+
+            Serializers::KubernetesCluster.serialize(kc, {detailed: true})
+          end
+        end
+      end
     end
   end
 end
