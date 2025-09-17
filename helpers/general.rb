@@ -1,14 +1,6 @@
 # frozen_string_literal: true
 
 class Clover < Roda
-  def self.name_or_ubid_for(model)
-    # (\z)? to force a nil as first capture
-    [/(\z)?(#{model.ubid_type}[a-tv-z0-9]{24})/, /([a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?)/]
-  end
-  [Firewall, KubernetesCluster, LoadBalancer, PostgresResource, PrivateSubnet, Vm].each do |model|
-    const_set(:"#{model.table_name.upcase}_NAME_OR_UBID", name_or_ubid_for(model))
-  end
-
   # Designed only for compatibility with existing mocking in the specs
   def self.authorized_project(account, project_id)
     account.projects_dataset[Sequel[:project][:id] => project_id, :visible => true]

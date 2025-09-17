@@ -6,7 +6,7 @@ class Clover
       kubernetes_cluster_list
     end
 
-    r.on KUBERNETES_CLUSTER_NAME_OR_UBID do |kc_name, kc_ubid|
+    r.on KUBERNETES_CLUSTER_NAME_OR_UBID do |kc_name, kc_id|
       filter = if kc_name
         r.post api? do
           check_visible_location
@@ -15,7 +15,7 @@ class Clover
 
         {Sequel[:kubernetes_cluster][:name] => kc_name}
       else
-        {Sequel[:kubernetes_cluster][:id] => UBID.to_uuid(kc_ubid)}
+        {Sequel[:kubernetes_cluster][:id] => kc_id}
       end
 
       filter[:location_id] = @location.id

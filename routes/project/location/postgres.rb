@@ -6,7 +6,7 @@ class Clover
       postgres_list
     end
 
-    r.on POSTGRES_RESOURCE_NAME_OR_UBID do |pg_name, pg_ubid|
+    r.on POSTGRES_RESOURCE_NAME_OR_UBID do |pg_name, pg_id|
       if pg_name
         r.post api? do
           check_visible_location
@@ -15,7 +15,7 @@ class Clover
 
         filter = {Sequel[:postgres_resource][:name] => pg_name}
       else
-        filter = {Sequel[:postgres_resource][:id] => UBID.to_uuid(pg_ubid)}
+        filter = {Sequel[:postgres_resource][:id] => pg_id}
       end
 
       filter[:location_id] = @location.id
