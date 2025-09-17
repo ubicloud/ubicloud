@@ -24,7 +24,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: ubicsi
-          image: ubicloud/ubicsi:0.1.0
+          image: ubicloud/ubicsi:0.2.0
           imagePullPolicy: IfNotPresent
           env:
             - name: NODE_ID
