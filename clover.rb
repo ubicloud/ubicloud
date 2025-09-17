@@ -57,15 +57,17 @@ class Clover < Roda
   plugin :typecast_params do
     invalid_value_message(:pos_int64, "Value must be an integer greater than 0 for parameter")
 
+    handle_type(:ubid, invalid_value_message: "Value provided not a valid id for parameter") do
+      it if it.is_a?(String) && /\A([a-tv-z0-9]{26})\z/.match?(it)
+    end
     handle_type(:ubid_uuid, invalid_value_message: "Value provided not a valid id for parameter") do
-      if it.is_a?(String) && it.bytesize == 26
-        UBID.to_uuid(it)
-      end
+      UBID.to_uuid(it) if convert_ubid(it)
     end
   end
 
   plugin :symbol_matchers
-  symbol_matcher(:ubid_uuid, /([a-tv-z0-9]{26})/) do |s|
+  symbol_matcher(:ubid, /([a-tv-z0-9]{26})/)
+  symbol_matcher(:ubid_uuid, :ubid) do |s|
     UBID.to_uuid(s)
   end
 

@@ -471,6 +471,7 @@ Usage:
     ubi pg location/pg-name create [options]
 
 Options:
+    -C, --connect-to-subnet-id=ps-id connect created subnet to given subnet id or name
     -f, --flavor=type                flavor
     -h, --ha-type=type               replication type
     -s, --size=size                  server size
@@ -643,9 +644,9 @@ Options:
 Allowed Option Values:
     Fields: id name state location vm-size target-vm-size storage-size-gib
             target-storage-size-gib version ha-type flavor connection-string
-            primary earliest-restore-time maintenance-window-start-at
-            read-replica parent tags firewall-rules metric-destinations
-            read-replicas ca-certificates
+            private-connection-string primary earliest-restore-time
+            maintenance-window-start-at read-replica parent tags firewall-rules
+            metric-destinations read-replicas ca-certificates
 
 
 Manage private subnets
@@ -683,7 +684,10 @@ Allowed Option Values:
 Connect a private subnet to another private subnet
 
 Usage:
-    ubi ps (location/ps-name | ps-id) connect (location/ps-name | ps-id)
+    ubi ps (location/ps-name | ps-id) connect [options] (location/ps-name | ps-id)
+
+Options:
+    -P, --postgres                   treat argument as PostgreSQL database name or id
 
 
 Create a private subnet
@@ -707,7 +711,10 @@ Options:
 Disconnect a private subnet from another private subnet
 
 Usage:
-    ubi ps (location/ps-name | ps-id) disconnect (location/ps-name | ps-id)
+    ubi ps (location/ps-name | ps-id) disconnect [options] (location/ps-name | ps-id)
+
+Options:
+    -P, --postgres                   treat argument as PostgreSQL database name or id
 
 
 Rename a private subnet

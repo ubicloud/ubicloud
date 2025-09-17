@@ -3,15 +3,21 @@
 UbiCli.on("ps").run_on("disconnect") do
   desc "Disconnect a private subnet from another private subnet"
 
-  banner "ubi ps (location/ps-name | ps-id) disconnect (location/ps-name | ps-id)"
+  options("ubi ps (location/ps-name | ps-id) disconnect [options] (location/ps-name | ps-id)") do
+    on("-P", "--postgres", "treat argument as PostgreSQL database name or id")
+  end
 
   args 1
 
-  run do |ps_id, _, cmd|
-    arg = ps_id
-    ps_id = convert_loc_name_to_id(sdk.private_subnet, ps_id)
+  run do |arg, opts, cmd|
+    ps_id = if opts[:postgres]
+      prefix = "PostgreSQL database "
+      convert_name_to_id(sdk.postgres, arg)
+    else
+      convert_loc_name_to_id(sdk.private_subnet, arg)
+    end
     check_no_slash(ps_id, "invalid private subnet id format", cmd)
     id = sdk_object.disconnect(ps_id).id
-    response("Disconnected private subnet #{arg} from #{id}")
+    response("Disconnected #{prefix}private subnet #{arg} from #{id}")
   end
 end

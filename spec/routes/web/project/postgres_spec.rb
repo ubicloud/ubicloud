@@ -93,6 +93,7 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
 
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
+        expect(page).to have_no_content("Connect to Private Subnet")
         name = "new-pg-db"
         fill_in "Name", with: name
         choose option: Location::HETZNER_FSN1_UBID
@@ -105,6 +106,49 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
         expect(PostgresResource.count).to eq(1)
         expect(PostgresResource.first.project_id).to eq(project.id)
+      end
+
+      it "can create new PostgreSQL database connected to an existing subnet" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps").subject
+        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
+
+        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
+        name = "new-pg-db"
+        fill_in "Name", with: name
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "standard-2"
+        choose option: PostgresResource::HaType::NONE
+        select "test-ps"
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
+        expect(PostgresResource.count).to eq(1)
+        pg = PostgresResource.first
+        expect(pg.project_id).to eq(project.id)
+        expect(ps.connected_subnets.map(&:id)).to eq [pg.private_subnet.id]
+      end
+
+      it "shows error if attempting to create new PostgreSQL database connected to an invalid subnet" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps").subject
+        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
+
+        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
+        expect(page).to have_content("Connect to Private Subnet")
+        name = "new-pg-db"
+        fill_in "Name", with: name
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "standard-2"
+        choose option: PostgresResource::HaType::NONE
+        select "test-ps"
+
+        ps.destroy
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
+        expect(page).to have_flash_error("Subnet to be connected not found")
+        expect(PostgresResource.count).to eq(0)
       end
 
       it "can create new PostgreSQL database in a custom AWS region" do
@@ -353,16 +397,64 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_css(".metric-chart")
       end
 
-      it "shows connections if the resource is running" do
+      it "shows connection information if the resource is running" do
         pg.strand.update(label: "wait")
         visit "#{project.path}#{pg.path}/connection"
         expect(page).to have_no_content "No connection information available"
+        expect(page).to have_no_content "Use Private IP?"
+        password = pg.superuser_password
+        expect(page.all(".connection-info-box div[data-content]").map { it["data-content"] }).to eq [
+          "postgresql://postgres:#{password}@:5432/postgres",
+          "psql postgresql://postgres:#{password}@:5432/postgres",
+          "PGHOST=\nPGPORT=5432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres",
+          "host: \nport: 5432\nuser: postgres\npassword: #{password}\ndatabase: postgres",
+          "jdbc:postgresql://:5432/postgres?user=postgres&password=#{password}&ssl=true",
+          "postgresql://postgres:#{password}@:6432/postgres",
+          "psql postgresql://postgres:#{password}@:6432/postgres",
+          "PGHOST=\nPGPORT=6432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres",
+          "host: \nport: 6432\nuser: postgres\npassword: #{password}\ndatabase: postgres",
+          "jdbc:postgresql://:6432/postgres?user=postgres&password=#{password}&ssl=true"
+        ]
       end
 
-      it "does not show connections if the resource is creating" do
+      it "includes connection information for private IP address if the resource is running" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps").subject
+        pg.strand.update(label: "wait")
+        pg.private_subnet.connect_subnet(ps)
+        visit "#{project.path}#{pg.path}/connection"
+        expect(page).to have_no_content "No connection information available"
+        expect(page).to have_content "Use Private IP?"
+        password = pg.superuser_password
+        ip = pg.private_ipv4
+        expect(page.all(".connection-info-box div[data-content]").map { it["data-content"] }).to eq [
+          "postgresql://postgres:#{password}@:5432/postgres",
+          "psql postgresql://postgres:#{password}@:5432/postgres",
+          "PGHOST=\nPGPORT=5432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres",
+          "host: \nport: 5432\nuser: postgres\npassword: #{password}\ndatabase: postgres",
+          "jdbc:postgresql://:5432/postgres?user=postgres&password=#{password}&ssl=true",
+          "postgresql://postgres:#{password}@:6432/postgres",
+          "psql postgresql://postgres:#{password}@:6432/postgres",
+          "PGHOST=\nPGPORT=6432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres",
+          "host: \nport: 6432\nuser: postgres\npassword: #{password}\ndatabase: postgres",
+          "jdbc:postgresql://:6432/postgres?user=postgres&password=#{password}&ssl=true",
+          "postgresql://postgres:#{password}@#{ip}:5432/postgres",
+          "psql postgresql://postgres:#{password}@#{ip}:5432/postgres",
+          "PGHOST=#{ip}\nPGPORT=5432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres",
+          "host: #{ip}\nport: 5432\nuser: postgres\npassword: #{password}\ndatabase: postgres",
+          "jdbc:postgresql://#{ip}:5432/postgres?user=postgres&password=#{password}&ssl=true",
+          "postgresql://postgres:#{password}@#{ip}:6432/postgres",
+          "psql postgresql://postgres:#{password}@#{ip}:6432/postgres",
+          "PGHOST=#{ip}\nPGPORT=6432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres",
+          "host: #{ip}\nport: 6432\nuser: postgres\npassword: #{password}\ndatabase: postgres",
+          "jdbc:postgresql://#{ip}:6432/postgres?user=postgres&password=#{password}&ssl=true"
+        ]
+      end
+
+      it "does not show connection information if the resource is creating" do
         pg.strand.update(label: "wait_servers")
         visit "#{project.path}#{pg.path}/connection"
         expect(page).to have_content "No connection information available"
+        expect(page.all(".connection-info-box div[data-content]").to_a).to eq []
       end
 
       it "shows 404 for invalid pages for read replicas" do
