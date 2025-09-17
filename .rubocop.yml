@@ -57,6 +57,9 @@ Layout/SpaceInsideHashLiteralBraces:
 Layout/EmptyLinesAroundMethodBody:
   Enabled: false
 
+Layout/EmptyLineAfterGuardClause:
+  Enabled: false
+
 Lint/UnderscorePrefixedVariableName:
   Enabled: false
 
