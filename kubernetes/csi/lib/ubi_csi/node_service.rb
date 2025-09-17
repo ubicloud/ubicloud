@@ -198,6 +198,7 @@ module Csi
         if old_pv_name.nil?
           return
         end
+
         pv = client.get_pv(old_pv_name)
         if pv.dig("spec", "persistentVolumeReclaimPolicy") == "Retain"
           pv["spec"]["persistentVolumeReclaimPolicy"] = "Delete"
@@ -279,6 +280,7 @@ module Csi
           if old_pvc_object.empty?
             raise
           end
+
           pvc = YAML.load(Base64.decode64(old_pvc_object))
         end
         log_with_id(req_id, "Found matching PVC for PV #{pv_name}: #{pvc}")

@@ -23,6 +23,7 @@ class Prog::InstallRhizome < Prog::Base
       base = Config.root + "/rhizome"
       Dir.glob(["Gemfile", "Gemfile.lock", "common/**/*", "#{frame["target_folder"]}/**/*"], base: base) do |file|
         next if !frame["install_specs"] && file.end_with?("_spec.rb")
+
         full_path = base + "/" + file
         stat = File.stat(full_path)
         if stat.directory?

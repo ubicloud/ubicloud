@@ -182,6 +182,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
   def available?
     return true if minio_server.initial_provisioning_set?
+
     server_data = minio_server.server_data
     server_data["state"] == "online" && server_data["drives"].all? { it["state"] == "ok" }
   rescue => ex

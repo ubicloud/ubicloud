@@ -51,6 +51,7 @@ PGHOST=/var/run/postgresql
       recoverable_errors = ["The AWS Access Key Id you provided does not exist in our records.", "The specified bucket does not exist", "AccessDenied", "No route to host", "Connection refused"]
       Clog.emit("Backup fetch exception") { Util.exception_to_hash(ex) }
       return [] if recoverable_errors.any? { ex.message.include?(it) }
+
       raise
     end
   end
@@ -58,6 +59,7 @@ PGHOST=/var/run/postgresql
   def latest_backup_label_before_target(target:)
     backup = backups.sort_by(&:last_modified).reverse.find { it.last_modified < target }
     fail "BUG: no backup found" unless backup
+
     backup.key.delete_prefix("basebackups_005/").delete_suffix("_backup_stop_sentinel.json")
   end
 

@@ -22,6 +22,7 @@ class BillingRecord < Sequel::Model
     # 'amount' column, and billing is based on that amount.
     # For records billed by amount, the duration is always set to 1.
     return 1 if billing_rate["billed_by"] == "amount"
+
     # begin_time and end_time refers to begin and end of the billing window. Duration of
     # BillingRecord is subjective to the billing window we are querying for. For example
     # if span of the BillingRecord is ['2023-06-15', '2023-08-20'] and billing window is

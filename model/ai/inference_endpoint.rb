@@ -28,6 +28,7 @@ class InferenceEndpoint < Sequel::Model
     label = strand.label
     return "running" if label == "wait"
     return "deleting" if destroy_set? || label == "destroy"
+
     "creating"
   end
 

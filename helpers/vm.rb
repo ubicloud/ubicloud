@@ -161,6 +161,7 @@ class Clover
 
     options.add_option(name: "family", values: Option.families.map(&:name), parent: "location") do |location, family|
       next false if location_family_check&.call(location, family)
+
       !!BillingRate.from_resource_properties("VmVCpu", family, location.name)
     end
 
