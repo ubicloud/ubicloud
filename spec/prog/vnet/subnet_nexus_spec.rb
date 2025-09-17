@@ -444,7 +444,8 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     it "increments the destroy semaphore of nics" do
       expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
       expect(nic).to receive(:incr_destroy).and_return(true)
-      expect { nx.destroy }.to nap(1)
+      expect(nx).to receive(:rand).with(5..10).and_return(6)
+      expect { nx.destroy }.to nap(6)
     end
 
     it "deletes and pops if nics are destroyed" do

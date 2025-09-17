@@ -210,7 +210,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     else
       private_subnet.nics.map { |n| n.incr_destroy }
       private_subnet.load_balancers.map { |lb| lb.incr_destroy }
-      nap 1
+      nap rand(5..10)
     end
   end
 
