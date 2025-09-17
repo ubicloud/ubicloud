@@ -15,7 +15,7 @@ class Clover
 
         filter = {Sequel[:load_balancer][:name] => lb_name}
       else
-        filter = {Sequel[:load_balancer][:id] => UBID.to_uuid(lb_id)}
+        filter = {Sequel[:load_balancer][:id] => lb_id}
       end
 
       filter[:private_subnet_id] = @project.private_subnets_dataset.where(location_id: @location.id).select(Sequel[:private_subnet][:id])

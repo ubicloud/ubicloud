@@ -68,6 +68,16 @@ class Clover < Roda
   symbol_matcher(:ubid_uuid, /([a-tv-z0-9]{26})/) do |s|
     UBID.to_uuid(s)
   end
+  [Firewall, KubernetesCluster, LoadBalancer, PostgresResource, PrivateSubnet, Vm].each do |model|
+    sym = :"#{model.table_name}_ubid_uuid"
+    symbol_matcher(sym, /(#{model.ubid_type}[a-tv-z0-9]{24})/) do |ubid|
+      if (uuid = UBID.to_uuid(ubid))
+        # yield nil as first element to differentiate case where name matches
+        [nil, uuid]
+      end
+    end
+    const_set(:"#{model.table_name.upcase}_NAME_OR_UBID", [sym, /([a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?)/])
+  end
 
   plugin :response_content_type,
     mime_types: {
