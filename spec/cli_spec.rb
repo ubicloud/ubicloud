@@ -24,7 +24,7 @@ RSpec.describe "bin/ubi" do
     queue = Queue.new
     @server = Puma::CLI.new(["-s", "-e", "test", "-b", "tcp://localhost:#{port}", "-t", "1:1", "spec/cli_config.ru"])
     @server.launcher.events.after_booted { queue.push(nil) }
-    Thread.new do
+    @server_thread = Thread.new do
       @server.launcher.run
     end
     queue.pop
@@ -43,6 +43,7 @@ RSpec.describe "bin/ubi" do
   after(:all) do
     @server.launcher.send(:stop)
     @skip_leaked_thread_check = false
+    @server_thread.join(5)
   end
   # rubocop:enable RSpec/BeforeAfterAll
 
