@@ -17,7 +17,7 @@ RSpec.describe Clover, "cli ps connect" do
 
   it "connects requested private subnet to this subnet by name" do
     expect(ConnectedSubnet.count).to eq 0
-    expect(cli(%W[ps eu-central-h1/test-ps connect eu-central-h1/test-ps2])).to eq "Connected private subnet eu-central-h1/test-ps2 to #{@ps1.ubid}\n"
+    expect(cli(%W[ps eu-central-h1/test-ps connect test-ps2])).to eq "Connected private subnet test-ps2 to #{@ps1.ubid}\n"
     expect(ConnectedSubnet.count).to eq 1
   end
 
@@ -45,6 +45,11 @@ RSpec.describe Clover, "cli ps connect" do
     AccessControlEntry.create(project_id: @project.id, subject_id: @pat.id, action_id: ActionType::NAME_MAP["PrivateSubnet:connect"])
     AccessControlEntry.create(project_id: @project.id, subject_id: @pat.id, action_id: ActionType::NAME_MAP["Postgres:view"])
     expect(cli(%W[ps eu-central-h1/test-ps connect -P test-pg], status: 400)).to eq "! Unexpected response status: 400\nDetails: PostgreSQL database subnet to be connected not found\n"
+    expect(ConnectedSubnet.count).to eq 0
+  end
+
+  it "errors if attempting to connect private subnet to itself" do
+    expect(cli(%W[ps eu-central-h1/test-ps connect test-ps], status: 400)).to eq "! Unexpected response status: 400\nDetails: Cannot connect private subnet to itself\n"
     expect(ConnectedSubnet.count).to eq 0
   end
 end

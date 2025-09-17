@@ -19,7 +19,7 @@ class Clover
     src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port])
     health_check_endpoint = typecast_params.nonempty_str("health_check_endpoint") || Prog::Vnet::LoadBalancerNexus::DEFAULT_HEALTH_CHECK_ENDPOINT
 
-    unless (ps = authorized_private_subnet)
+    unless (ps = authorized_private_subnet(location_id: Sequel::NOTNULL))
       fail Validation::ValidationFailed.new("private_subnet_id" => "Private subnet not found")
     end
 

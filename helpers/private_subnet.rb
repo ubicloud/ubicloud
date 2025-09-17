@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Clover
-  def authorized_private_subnet(perm: "PrivateSubnet:view", location_id: nil, key: "private_subnet_id", id: nil)
+  def authorized_private_subnet(location_id:, perm: "PrivateSubnet:view", key: "private_subnet_id", id: nil)
     authorized_object(association: :private_subnets, key:, perm:, location_id:, id:)
   end
 
@@ -10,13 +10,17 @@ class Clover
     handle_validation_failure("networking/private_subnet/show") { @page = "networking" }
 
     id = UBID.to_uuid(ubid)
+    if type == "connect" && id == @ps.id
+      raise CloverError.new(400, "InvalidRequest", "Cannot connect private subnet to itself")
+    end
+
     if ubid.start_with?("pg")
       unless (pg = authorized_postgres_resource(perm: "Postgres:edit", location_id: @location.id, id:))
         raise CloverError.new(400, "InvalidRequest", "PostgreSQL database subnet to be #{type}ed not found")
       end
       subnet = pg.private_subnet
       name = "PostgreSQL database #{pg.name} subnet"
-    elsif (subnet = authorized_private_subnet(perm: "PrivateSubnet:#{type}", id:))
+    elsif (subnet = authorized_private_subnet(perm: "PrivateSubnet:#{type}", location_id: @location.id, id:))
       name = subnet.name
     else
       raise CloverError.new(400, "InvalidRequest", "Subnet to be #{type}ed not found")
