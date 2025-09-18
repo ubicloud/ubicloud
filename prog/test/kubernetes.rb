@@ -29,7 +29,7 @@ class Prog::Test::Kubernetes < Prog::Test::Base
     ).subject
     Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
       name: "kubernetes-test-standard-nodepool",
-      node_count: 1,
+      node_count: 2,
       kubernetes_cluster_id: kc.id,
       target_node_size: "standard-2"
     )
@@ -151,6 +151,26 @@ STS
     read_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").strip
     if write_hash != read_hash
       update_stack({"fail_message" => "wrong read hash, expected: #{write_hash}, got: #{read_hash}"})
+      hop_destroy_kubernetes
+    end
+    update_stack({"read_hash" => read_hash})
+    hop_test_pod_data_migration
+  end
+
+  label def test_pod_data_migration
+    pod_node = kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
+    kubernetes_cluster.client.kubectl("cordon #{pod_node}")
+    kubernetes_cluster.client.kubectl("delete pod ubuntu-statefulset-0 --wait=false")
+    hop_verify_data_after_migration
+  end
+
+  label def verify_data_after_migration
+    pod_status = kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").strip
+    nap 5 unless pod_status == "Running"
+    new_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").strip
+    expected_hash = strand.stack.first["read_hash"]
+    if new_hash != expected_hash
+      update_stack({"fail_message" => "data hash changed after migration, expected: #{expected_hash}, got: #{new_hash}"})
     end
     hop_destroy_kubernetes
   end
