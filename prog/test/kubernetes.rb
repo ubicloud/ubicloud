@@ -48,8 +48,8 @@ class Prog::Test::Kubernetes < Prog::Test::Base
   end
 
   label def update_all_nodes_hosts_entries
-    expected_node_count = kubernetes_cluster.cp_node_count + kubernetes_cluster.nodepools.first.node_count
-    current_nodes = kubernetes_cluster.nodes + kubernetes_cluster.nodepools.first.nodes
+    expected_node_count = kubernetes_cluster.cp_node_count + nodepool.node_count
+    current_nodes = kubernetes_cluster.nodes + nodepool.nodes
     current_node_count = current_nodes.count
 
     current_nodes.each { |node|
@@ -165,7 +165,7 @@ STS
     pod_node = client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
     client.kubectl("cordon #{pod_node}")
     # we need to uncordon other nodes each time so we won't run out of nodes accepting pods
-    kubernetes_cluster.nodepools.first.nodes.reject { |node| node.name == pod_node }.each { |node|
+    nodepool.nodes.reject { it.name == pod_node }.each { |node|
       client.kubectl("uncordon #{node.name}")
     }
     client.kubectl("delete pod ubuntu-statefulset-0 --wait=false")
@@ -226,6 +226,10 @@ STS
 
   def kubernetes_cluster
     @kubernetes_cluster ||= KubernetesCluster.with_pk(frame["kubernetes_cluster_id"])
+  end
+
+  def nodepool
+    kubernetes_cluster.nodepools.first
   end
 
   def node_host_entries_set?(node_name)
