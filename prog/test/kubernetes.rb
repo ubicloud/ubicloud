@@ -5,6 +5,8 @@ require_relative "../../lib/util"
 class Prog::Test::Kubernetes < Prog::Test::Base
   semaphore :destroy
 
+  MIGRATION_TRIES = 3
+
   def self.assemble
     kubernetes_test_project = Project.create(name: "Kubernetes-Test-Project", feature_flags: {"install_csi" => true})
     kubernetes_service_project = Project.create_with_id(Config.kubernetes_service_project_id, name: "Ubicloud-Kubernetes-Resources")
@@ -14,7 +16,8 @@ class Prog::Test::Kubernetes < Prog::Test::Base
       label: "start",
       stack: [{
         "kubernetes_service_project_id" => kubernetes_service_project.id,
-        "kubernetes_test_project_id" => kubernetes_test_project.id
+        "kubernetes_test_project_id" => kubernetes_test_project.id,
+        "migration_number" => 0
       }]
     )
   end
@@ -158,9 +161,14 @@ STS
   end
 
   label def test_pod_data_migration
-    pod_node = kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
-    kubernetes_cluster.client.kubectl("cordon #{pod_node}")
-    kubernetes_cluster.client.kubectl("delete pod ubuntu-statefulset-0 --wait=false")
+    client = kubernetes_cluster.client
+    pod_node = client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
+    client.kubectl("cordon #{pod_node}")
+    # we need to uncordon other nodes each time so we won't run out of nodes accepting pods
+    kubernetes_cluster.nodepools.first.nodes.reject { |node| node.name == pod_node }.each { |node|
+      client.kubectl("uncordon #{node.name}")
+    }
+    client.kubectl("delete pod ubuntu-statefulset-0 --wait=false")
     hop_verify_data_after_migration
   end
 
@@ -171,8 +179,11 @@ STS
     expected_hash = strand.stack.first["read_hash"]
     if new_hash != expected_hash
       update_stack({"fail_message" => "data hash changed after migration, expected: #{expected_hash}, got: #{new_hash}"})
+      hop_destroy_kubernetes
     end
-    hop_destroy_kubernetes
+    hop_destroy_kubernetes if migration_number == MIGRATION_TRIES
+    increment_migration_number
+    hop_test_pod_data_migration
   end
 
   label def destroy_kubernetes
@@ -226,5 +237,13 @@ STS
     frame["nodes_status"] ||= {}
     frame["nodes_status"][node_name] = true
     update_stack(frame)
+  end
+
+  def migration_number
+    strand.stack.first["migration_number"]
+  end
+
+  def increment_migration_number
+    update_stack({"migration_number" => migration_number + 1})
   end
 end
