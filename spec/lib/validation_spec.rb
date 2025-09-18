@@ -512,4 +512,78 @@ RSpec.describe Validation do
       expect(described_class.validate_rfc3339_datetime_str("2025-05-12T11:57:24+00:00")).to be_a(Time)
     end
   end
+
+  describe "#validate_postgres_upgrade" do
+    it "validates postgres upgrade" do
+      expect {
+        described_class.validate_postgres_upgrade(
+          version_int: 16,
+          needs_convergence: false,
+          ongoing_failover: false,
+          read_replica: false,
+          needs_upgrade: false
+        )
+      }.not_to raise_error
+    end
+
+    it "invalidates postgres upgrade when needs_convergence is true" do
+      expect {
+        described_class.validate_postgres_upgrade(
+          version_int: 16,
+          needs_convergence: true,
+          ongoing_failover: false,
+          read_replica: false,
+          needs_upgrade: false
+        )
+      }.to raise_error described_class::ValidationFailed
+    end
+
+    it "invalidates postgres upgrade when ongoing_failover is true" do
+      expect {
+        described_class.validate_postgres_upgrade(
+          version_int: 16,
+          needs_convergence: false,
+          ongoing_failover: true,
+          read_replica: false,
+          needs_upgrade: false
+        )
+      }.to raise_error described_class::ValidationFailed
+    end
+
+    it "invalidates postgres upgrade when read_replica is true" do
+      expect {
+        described_class.validate_postgres_upgrade(
+          version_int: 16,
+          needs_convergence: false,
+          ongoing_failover: false,
+          read_replica: true,
+          needs_upgrade: false
+        )
+      }.to raise_error described_class::ValidationFailed
+    end
+
+    it "invalidates postgres upgrade when needs_upgrade is true" do
+      expect {
+        described_class.validate_postgres_upgrade(
+          version_int: 16,
+          needs_convergence: false,
+          ongoing_failover: false,
+          read_replica: false,
+          needs_upgrade: true
+        )
+      }.to raise_error described_class::ValidationFailed
+    end
+
+    it "invalidates postgres upgrade when version is latest" do
+      expect {
+        described_class.validate_postgres_upgrade(
+          version_int: PostgresResource::LATEST_VERSION.to_i,
+          needs_convergence: false,
+          ongoing_failover: false,
+          read_replica: false,
+          needs_upgrade: false
+        )
+      }.to raise_error described_class::ValidationFailed
+    end
+  end
 end

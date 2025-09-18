@@ -105,7 +105,7 @@ class Clover
       show_actions = if pg.read_replica?
         %w[overview connection charts networking config settings]
       else
-        %w[overview connection charts networking resize high-availability read-replica backup-restore config settings]
+        %w[overview connection charts networking resize high-availability read-replica backup-restore config upgrade settings]
       end
       r.show_object(pg, actions: show_actions, perm: "Postgres:view", template: "postgres/show")
 
@@ -535,6 +535,50 @@ class Clover
           else
             flash["notice"] = "Configuration updated successfully"
             r.redirect pg, "/config"
+          end
+        end
+      end
+
+      r.is "upgrade" do
+        r.get do
+          authorize("Postgres:view", pg.id)
+
+          unless pg.needs_upgrade?
+            raise CloverError.new(400, "InvalidRequest", "Database is not upgrading")
+          end
+
+          {
+            current_version: pg.current_version,
+            desired_version: pg.version,
+            upgrade_status: pg.upgrade_status,
+            upgrade_progress: pg.upgrade_progress
+          }
+        end
+
+        r.post do
+          authorize("Postgres:edit", pg.id)
+
+          Validation.validate_postgres_upgrade(
+            version_int: pg.version_int,
+            needs_convergence: pg.needs_convergence?,
+            ongoing_failover: pg.ongoing_failover?,
+            read_replica: pg.read_replica?,
+            needs_upgrade: pg.needs_upgrade?
+          )
+
+          audit_log(pg, "upgrade")
+          pg.update(version: pg.version_int + 1)
+
+          if api?
+            {
+              current_version: pg.current_version,
+              desired_version: pg.version,
+              upgrade_status: pg.upgrade_status,
+              upgrade_progress: pg.upgrade_progress
+            }
+          else
+            flash["notice"] = "Database upgrade started successfully"
+            r.redirect pg, "/upgrade"
           end
         end
       end

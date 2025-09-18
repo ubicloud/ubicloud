@@ -165,6 +165,43 @@ class PostgresResource < Sequel::Model
     !read_replica? && !ongoing_failover? && (current_version_int < version_int) || false
   end
 
+  def upgrade_stage
+    strand.children_dataset.where(prog: "Postgres::UpgradePostgresResource").first&.label
+  end
+
+  def upgrade_status
+    if upgrade_stage == "upgrade_failed"
+      "failed"
+    elsif needs_upgrade?
+      "running"
+    else
+      "not_running"
+    end
+  end
+
+  def upgrade_progress
+    return nil unless needs_upgrade?
+
+    upgrade_stages = Prog::Postgres::UpgradePostgresResource.labels.map(&:to_s)
+    current_stage = upgrade_stage || "start"
+    current_stage_idx = upgrade_stages.index(current_stage)
+
+    upgrade_stages
+      .reject { |stage| ["upgrade_failed", "finish_upgrade"].include?(stage) }
+      .map.with_index do |stage, idx|
+      {
+        stage: stage,
+        status: if idx == current_stage_idx
+                  "running"
+                elsif idx < current_stage_idx
+                  "done"
+                else
+                  "pending"
+                end
+      }
+    end
+  end
+
   module HaType
     NONE = "none"
     ASYNC = "async"
@@ -178,6 +215,7 @@ class PostgresResource < Sequel::Model
   end
 
   DEFAULT_VERSION = "17"
+  LATEST_VERSION = "17"
 
   MAINTENANCE_DURATION_IN_HOURS = 2
 end
