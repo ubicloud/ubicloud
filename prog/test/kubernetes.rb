@@ -41,21 +41,24 @@ class Prog::Test::Kubernetes < Prog::Test::Base
   label def update_loadbalancer_hostname
     nap 5 unless kubernetes_cluster.api_server_lb
     kubernetes_cluster.api_server_lb.update(custom_hostname: "k8s-e2e-test.ubicloud.test")
-    hop_update_cp_vm_hosts_entries
+    hop_update_all_nodes_hosts_entries
   end
 
-  label def update_cp_vm_hosts_entries
-    cp_vm = kubernetes_cluster.cp_vms.first
-    nap 5 unless vm_ready?(cp_vm)
-    ensure_hosts_entry(cp_vm.sshable, kubernetes_cluster.api_server_lb.hostname)
-    hop_update_worker_hosts_entries
-  end
+  label def update_all_nodes_hosts_entries
+    expected_node_count = kubernetes_cluster.cp_node_count + kubernetes_cluster.nodepools.first.node_count
+    current_nodes = kubernetes_cluster.nodes + kubernetes_cluster.nodepools.first.nodes
+    current_node_count = current_nodes.count
 
-  label def update_worker_hosts_entries
-    vm = kubernetes_cluster.nodepools.first.vms.first
-    nap 5 unless vm_ready?(vm)
-    ensure_hosts_entry(vm.sshable, kubernetes_cluster.api_server_lb.hostname)
-    hop_wait_for_kubernetes_bootstrap
+    current_nodes.each { |node|
+      unless node_host_entries_set?(node.name)
+        nap 5 unless vm_ready?(node.vm)
+        ensure_hosts_entry(node.sshable, kubernetes_cluster.api_server_lb.hostname)
+        set_node_entries_status(node.name)
+      end
+    }
+
+    hop_wait_for_kubernetes_bootstrap if current_node_count == expected_node_count
+    nap 10
   end
 
   label def wait_for_kubernetes_bootstrap
@@ -192,5 +195,16 @@ STS
 
   def kubernetes_cluster
     @kubernetes_cluster ||= KubernetesCluster.with_pk(frame["kubernetes_cluster_id"])
+  end
+
+  def node_host_entries_set?(node_name)
+    strand.stack.first.dig("nodes_status", node_name) == true
+  end
+
+  def set_node_entries_status(node_name)
+    frame = strand.stack.first
+    frame["nodes_status"] ||= {}
+    frame["nodes_status"][node_name] = true
+    update_stack(frame)
   end
 end
