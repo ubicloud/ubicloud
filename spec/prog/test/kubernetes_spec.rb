@@ -4,7 +4,7 @@ require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Test::Kubernetes do
   subject(:kubernetes_test) {
-    described_class.new(Strand.new(prog: "Test::Kubernetes", stack: [{}]))
+    described_class.new(Strand.new(prog: "Test::Kubernetes", label: "start", stack: [{}]))
   }
 
   let(:kubernetes_service_project_id) { "546a1ed8-53e5-86d2-966c-fb782d2ae3aa" }
@@ -252,14 +252,20 @@ RSpec.describe Prog::Test::Kubernetes do
 
   describe "#test_pod_data_migration" do
     before do
+      nodepool = kubernetes_cluster.nodepools.first
+      nodepool.update(node_count: 2)
+      KubernetesNode.create(vm_id: create_vm(name: "cp-node").id, kubernetes_cluster_id: kubernetes_cluster.id)
+      KubernetesNode.create(vm_id: create_vm(name: "w1-node").id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: nodepool.id)
+      KubernetesNode.create(vm_id: create_vm(name: "w2-node").id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: nodepool.id)
       expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
     end
 
     it "cordons the node, deletes the pod and hops to verify_data_after_migration" do
       client = instance_double(Kubernetes::Client)
-      expect(kubernetes_cluster).to receive(:client).and_return(client).thrice
-      expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return("nodename")
-      expect(client).to receive(:kubectl).with("cordon nodename")
+      expect(kubernetes_cluster).to receive(:client).and_return(client)
+      expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return("w1-node")
+      expect(client).to receive(:kubectl).with("cordon w1-node")
+      expect(client).to receive(:kubectl).with("uncordon w2-node")
       expect(client).to receive(:kubectl).with("delete pod ubuntu-statefulset-0 --wait=false")
       expect { kubernetes_test.test_pod_data_migration }.to hop("verify_data_after_migration")
     end
@@ -269,6 +275,7 @@ RSpec.describe Prog::Test::Kubernetes do
     let(:client) { instance_double(Kubernetes::Client) }
 
     before do
+      kubernetes_test.update_stack({"migration_number" => 0, "read_hash" => "hash"})
       expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
       expect(kubernetes_cluster).to receive(:client).and_return(client).at_least(:once)
     end
@@ -278,18 +285,23 @@ RSpec.describe Prog::Test::Kubernetes do
       expect { kubernetes_test.verify_data_after_migration }.to nap(5)
     end
 
-    it "checks the data hash after migration and hash is correct" do
+    it "checks the data hash after migration and hash is correct but goes for another round of migration" do
       expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").and_return("Running")
       expect(client).to receive(:kubectl).with("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").and_return("hash")
-      expect(kubernetes_test.strand).to receive(:stack).and_return([{"read_hash" => "hash"}])
+      expect(kubernetes_test).to receive(:increment_migration_number)
+      expect { kubernetes_test.verify_data_after_migration }.to hop("test_pod_data_migration")
+    end
 
+    it "checks the data hash after migration and hash is correct and is done with migrations, hops to destroy_kubernetes" do
+      kubernetes_test.update_stack({"migration_number" => Prog::Test::Kubernetes::MIGRATION_TRIES})
+      expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").and_return("Running")
+      expect(client).to receive(:kubectl).with("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").and_return("hash")
       expect { kubernetes_test.verify_data_after_migration }.to hop("destroy_kubernetes")
     end
 
     it "checks the data hash after migration and hash is not correct" do
       expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").and_return("Running")
       expect(client).to receive(:kubectl).with("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").and_return("wronghash")
-      expect(kubernetes_test.strand).to receive(:stack).and_return([{"read_hash" => "hash"}])
       expect(kubernetes_test).to receive(:update_stack).with({"fail_message" => "data hash changed after migration, expected: hash, got: wronghash"})
 
       expect { kubernetes_test.verify_data_after_migration }.to hop("destroy_kubernetes")
@@ -434,6 +446,14 @@ RSpec.describe Prog::Test::Kubernetes do
         }
       })
       kubernetes_test.set_node_entries_status("somenode")
+    end
+  end
+
+  describe "#increment_migration_number" do
+    it "increments the migration number" do
+      kubernetes_test.update_stack({"migration_number" => 0})
+      kubernetes_test.increment_migration_number
+      expect(kubernetes_test.migration_number).to eq(1)
     end
   end
 end
