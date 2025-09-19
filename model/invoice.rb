@@ -31,6 +31,10 @@ class Invoice < Sequel::Model
     define_method(meth) { content[str] }
   end
 
+  def payable?
+    cost > 0 && status == "unpaid" && ubid != "current"
+  end
+
   def blob_key
     group = if status == "below_minimum_threshold"
       "below_minimum_threshold"
