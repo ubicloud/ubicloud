@@ -151,8 +151,8 @@ code {
     display: inline-block;
     padding: 10px;
   }
-  & > :first-child { border-right: 1px solid black; }
 }
+.nav-tabs > :first-child { border-right: 1px solid black; }
 
 #autoforme_content form div {
   margin: 10px;

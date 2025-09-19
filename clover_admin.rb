@@ -168,12 +168,12 @@ class CloverAdmin < Roda
   }.freeze
   OBJECT_ACTIONS.each_value(&:freeze)
 
-  plugin :autoforme
-  autoforme_framework = ::AutoForme.for(:roda, self) do
+  plugin :autoforme do
     # :nocov:
     register_by_name if Config.development?
     # :nocov:
 
+    pagination_strategy :filter
     order [:id]
     supported_actions [:browse, :search]
     form_options(wrapper: :div)
@@ -196,9 +196,6 @@ class CloverAdmin < Roda
       columns [:name, :project, :location, :description]
     end
   end
-  @autoforme_routes[nil] = autoforme_framework.route_proc
-  @autoforme_models = autoforme_framework.models
-  singleton_class.attr_reader :autoforme_models
 
   route do |r|
     r.public
