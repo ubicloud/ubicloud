@@ -6,7 +6,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   subject_is :github_runner
 
   def self.assemble(installation, repository_name:, label:, default_branch: nil)
-    unless Github.runner_labels[label]
+    unless Github.predefined_runner_labels[label] || GithubCustomLabel.where(label: label, installation_id: installation.id).any?
       fail "Invalid GitHub runner label: #{label}"
     end
 
@@ -161,6 +161,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   label def start
     pop "Could not provision a runner for inactive project" unless github_runner.installation.project.active?
     hop_wait_concurrency_limit unless quota_available?
+    hop_apply_custom_label_quota if GithubCustomLabel.where(label: github_runner.label, installation_id: github_runner.installation_id).any?
     hop_allocate_vm
   end
 
@@ -200,6 +201,23 @@ class Prog::Vm::GithubRunner < Prog::Base
       Clog.emit("allowed because of low utilization") { {exceeded_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
     end
     github_runner.log_duration("runner_capacity_waited", Time.now - github_runner.created_at)
+
+    hop_apply_custom_label_quota if GithubCustomLabel.where(label: github_runner.label, installation_id: github_runner.installation_id).any?
+    hop_allocate_vm
+  end
+
+  label def apply_custom_label_quota
+    label = github_runner.label
+    installation_id = github_runner.installation_id
+    custom_label = GithubCustomLabel.where(label:, installation_id:).first
+    hop_allocate_vm unless custom_label
+
+    unless custom_label.concurrency_limit_available?
+      Clog.emit("hit custom label concurrency limit") { {custom_label_concurrency_limit: {label:, installation_id:, repository_name: github_runner.repository_name}} }
+      nap rand(5..15)
+    end
+
+    custom_label.update(allocated_runner_count: custom_label.allocated_runner_count + 1)
     hop_allocate_vm
   end
 
@@ -422,6 +440,8 @@ class Prog::Vm::GithubRunner < Prog::Base
       vm.incr_destroy
     end
 
+    custom_label = GithubCustomLabel.where(label: github_runner.label, installation_id: github_runner.installation_id).first
+    custom_label&.update(allocated_runner_count: custom_label.allocated_runner_count - 1)
     hop_wait_vm_destroy
   end
 

@@ -41,13 +41,13 @@ module Github
 
   # :nocov:
   def self.freeze
-    runner_labels
+    predefined_runner_labels
     super
   end
   # :nocov:
 
-  def self.runner_labels
-    @runner_labels ||= begin
+  def self.predefined_runner_labels
+    @predefined_runner_labels ||= begin
       labels = YAML.load_file("config/github_runner_labels.yml").to_h { [it["name"], it] }
       labels.transform_values do |v|
         new = (a = v["alias_for"]) ? labels[a] : v

@@ -53,8 +53,8 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
 
       jobs.each do |job|
         next if job[:status] != "queued"
-        next unless (label = job[:labels].find { Github.runner_labels.key?(it) })
-        queued_labels[label] += 1
+        label = job[:labels].find { Github.predefined_runner_labels.key?(it) } || GithubCustomLabel.where(installation_id: github_repository.installation.id, label: job[:labels]).first&.label
+        queued_labels[label] += 1 if label
       end
     end
 
