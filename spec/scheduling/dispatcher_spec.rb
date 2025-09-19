@@ -63,7 +63,7 @@ RSpec.describe Scheduling::Dispatcher do
         payload
       end
 
-      di = @di = new_dispatcher(recheck_seconds: 0.02, stale_seconds: 0.04)
+      di = @di = new_dispatcher(recheck_seconds: 0.02)
 
       # Wait until dispatcher has started listening and notified
       t.join(5)
@@ -72,8 +72,8 @@ RSpec.describe Scheduling::Dispatcher do
       args = []
       expect(di).to receive(:setup_prepared_statements).twice.and_wrap_original do |m, **kw|
         args << kw
-        q.push true if args.length == 2
         m.call(**kw)
+        q.push true if args.length == 2
       end
 
       q2 = Queue.new
@@ -95,19 +95,14 @@ RSpec.describe Scheduling::Dispatcher do
       ])
       args.clear
       q3 = Queue.new
+      partition_times = di.instance_variable_get(:@repartitioner).instance_variable_get(:@partition_times)
+      partition_times[3] = partition_times[2] = Time.now - 60
 
       expect(di).to receive(:setup_prepared_statements).at_least(:once).and_wrap_original do |m, **kw|
         args << kw
-        if kw == {strand_id_range: "00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff"}
-          q.push true
-          q3.push true
-        end
         m.call(**kw)
-      end
-      t = Thread.new do
-        until q.pop(timeout: 0.1)
-          DB.notify(:respirate, payload: "1")
-          sleep(0.005)
+        if kw == {strand_id_range: "00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff"}
+          q3.push true
         end
       end
       expect(q3.pop(timeout: 5)).to be true
