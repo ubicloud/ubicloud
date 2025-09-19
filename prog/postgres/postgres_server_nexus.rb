@@ -8,6 +8,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   subject_is :postgres_server
 
   extend Forwardable
+
   def_delegators :postgres_server, :vm
 
   def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil)
@@ -15,7 +16,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       ubid = PostgresServer.generate_ubid
 
       postgres_resource = PostgresResource[resource_id]
-      arch = Option::VmSizes.find { |it| it.name == postgres_resource.target_vm_size }.arch
+      arch = Option::VmSizes.find { it.name == postgres_resource.target_vm_size }.arch
       boot_image = if postgres_resource.location.aws?
         postgres_resource.location.pg_ami(postgres_resource.version, arch)
       else

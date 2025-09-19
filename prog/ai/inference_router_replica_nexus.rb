@@ -10,6 +10,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
   subject_is :inference_router_replica
 
   extend Forwardable
+
   def_delegators :inference_router_replica, :vm, :inference_router, :load_balancer_vm_port
 
   def self.assemble(inference_router_id)
