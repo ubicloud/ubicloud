@@ -6,7 +6,7 @@ class Clover
       vm_list_api_response(vm_list_dataset)
     end
 
-    r.on VM_NAME_OR_UBID do |vm_name, vm_ubid|
+    r.on VM_NAME_OR_UBID do |vm_name, vm_id|
       if vm_name
         r.post api? do
           check_visible_location
@@ -15,7 +15,7 @@ class Clover
 
         filter = {Sequel[:vm][:name] => vm_name}
       else
-        filter = {Sequel[:vm][:id] => UBID.to_uuid(vm_ubid)}
+        filter = {Sequel[:vm][:id] => vm_id}
       end
 
       filter[:location_id] = @location.id

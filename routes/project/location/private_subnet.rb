@@ -15,7 +15,7 @@ class Clover
 
         filter = {Sequel[:private_subnet][:name] => ps_name}
       else
-        filter = {Sequel[:private_subnet][:id] => UBID.to_uuid(ps_id)}
+        filter = {Sequel[:private_subnet][:id] => ps_id}
       end
 
       filter[:location_id] = @location.id

@@ -15,7 +15,7 @@ class Clover
 
         filter = {Sequel[:firewall][:name] => firewall_name}
       else
-        filter = {Sequel[:firewall][:id] => UBID.to_uuid(firewall_id)}
+        filter = {Sequel[:firewall][:id] => firewall_id}
       end
 
       filter[:location_id] = @location.id

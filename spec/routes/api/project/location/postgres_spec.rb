@@ -642,6 +642,12 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
       end
 
+      it "not found with valid looking but invalid ubid" do
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/pgg54eqqv6q26kgqrszmkypn7g"
+
+        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+      end
+
       it "show firewall" do
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/firewall-rule"
 
