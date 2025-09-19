@@ -36,15 +36,12 @@ module Config
 
   # Mandatory -- exception is raised for these variables when missing.
   mandatory :clover_database_url, string, clear: true
+  mandatory :clover_column_encryption_key, base64, clear: true
+  mandatory :clover_session_secret, base64, clear: true
   mandatory :rack_env, string
 
   # Optional -- value is returned or `nil` if it wasn't present.
-  optional :app_name, string
-  optional :versioning_default, string
-  optional :versioning_app_name, string
-  optional :clover_session_secret, base64, clear: true
   optional :clover_runtime_token_secret, base64, clear: true
-  optional :clover_column_encryption_key, base64, clear: true
   optional :heartbeat_url, string
   optional :clover_database_root_certs, string
   override :max_health_monitor_threads, 32, int
@@ -74,21 +71,11 @@ module Config
   override :database_timeout, 10, int
   override :db_pool, 5, int
   override :db_pool_monitor, Config.db_pool, int
-  override :deployment, "production", string
-  override :force_ssl, true, bool
-  override :port, 3000, int
-  override :pretty_json, false, bool
   override :dispatcher_max_threads, 8, int
   override :dispatcher_min_threads, 1, int
   override :dispatcher_queue_size_ratio, 4, float
-  override :puma_max_threads, 16, int
-  override :puma_min_threads, 1, int
-  override :puma_workers, 3, int
-  override :raise_errors, false, bool
   override :recursive_tag_limit, 32, int
   override :root, File.expand_path(__dir__), string
-  override :timeout, 10, int
-  override :versioning, false, bool
   optional :hetzner_user, string, clear: true
   optional :hetzner_password, string, clear: true
   override :hetzner_connection_string, "https://robot-ws.your-server.de", string
@@ -120,7 +107,6 @@ module Config
   optional :github_cache_blob_storage_secret_key, string, clear: true
   optional :github_cache_blob_storage_account_id, string
   optional :github_cache_blob_storage_api_key, string, clear: true
-  optional :github_cache_proxy_repo_uri, string, clear: true
 
   # Minio
   override :minio_host_name, "minio.ubicloud.com", string
@@ -230,7 +216,6 @@ module Config
   optional :kubernetes_service_hostname, string
 
   # Billing
-  optional :stripe_public_key, string, clear: true
   optional :stripe_secret_key, string, clear: true
   override :annual_non_dutch_eu_sales_exceed_threshold, false, bool
   optional :invalid_vat_notification_email, string
