@@ -94,7 +94,17 @@ RSpec.describe GithubRunner do
 
   it "initiates a new health monitor session" do
     expect(github_runner.vm.sshable).to receive(:start_fresh_session)
+    expect(github_runner.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
     github_runner.init_health_monitor_session
+  end
+
+  it "initiates an empty health monitor session if VM is not ready" do
+    allow(github_runner.vm).to receive(:strand).and_return(instance_double(Strand, label: "not-wait"))
+    expect(github_runner.vm.sshable).not_to receive(:start_fresh_session)
+    expect(github_runner.init_health_monitor_session[:ssh_session]).to be_nil
+
+    github_runner.update(vm_id: nil)
+    expect(github_runner.init_health_monitor_session[:ssh_session]).to be_nil
   end
 
   it "checks pulse" do
@@ -108,9 +118,11 @@ RSpec.describe GithubRunner do
     }
 
     expect(session[:ssh_session]).to receive(:exec!).with("awk '/MemAvailable/ {print $2}' /proc/meminfo").and_return("123\n")
-    github_runner.check_pulse(session: session, previous_pulse: pulse)
+    expect(github_runner.check_pulse(session: session, previous_pulse: pulse)).to include(reading: "up", reading_rpt: 6)
 
     expect(session[:ssh_session]).to receive(:exec!).and_raise Sshable::SshError
-    github_runner.check_pulse(session: session, previous_pulse: pulse)
+    expect(github_runner.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+
+    expect(github_runner.check_pulse(session: {ssh_session: nil}, previous_pulse: pulse)[:reading]).to eq("down")
   end
 end
