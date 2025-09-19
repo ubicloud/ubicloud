@@ -5,6 +5,8 @@ require_relative "../../lib/util"
 class Prog::Test::Kubernetes < Prog::Test::Base
   semaphore :destroy
 
+  MIGRATION_TRIES = 3
+
   def self.assemble
     kubernetes_test_project = Project.create(name: "Kubernetes-Test-Project", feature_flags: {"install_csi" => true})
     kubernetes_service_project = Project.create_with_id(Config.kubernetes_service_project_id, name: "Ubicloud-Kubernetes-Resources")
@@ -14,7 +16,8 @@ class Prog::Test::Kubernetes < Prog::Test::Base
       label: "start",
       stack: [{
         "kubernetes_service_project_id" => kubernetes_service_project.id,
-        "kubernetes_test_project_id" => kubernetes_test_project.id
+        "kubernetes_test_project_id" => kubernetes_test_project.id,
+        "migration_number" => 0
       }]
     )
   end
@@ -29,7 +32,7 @@ class Prog::Test::Kubernetes < Prog::Test::Base
     ).subject
     Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
       name: "kubernetes-test-standard-nodepool",
-      node_count: 1,
+      node_count: 2,
       kubernetes_cluster_id: kc.id,
       target_node_size: "standard-2"
     )
@@ -41,21 +44,24 @@ class Prog::Test::Kubernetes < Prog::Test::Base
   label def update_loadbalancer_hostname
     nap 5 unless kubernetes_cluster.api_server_lb
     kubernetes_cluster.api_server_lb.update(custom_hostname: "k8s-e2e-test.ubicloud.test")
-    hop_update_cp_vm_hosts_entries
+    hop_update_all_nodes_hosts_entries
   end
 
-  label def update_cp_vm_hosts_entries
-    cp_vm = kubernetes_cluster.cp_vms.first
-    nap 5 unless vm_ready?(cp_vm)
-    ensure_hosts_entry(cp_vm.sshable, kubernetes_cluster.api_server_lb.hostname)
-    hop_update_worker_hosts_entries
-  end
+  label def update_all_nodes_hosts_entries
+    expected_node_count = kubernetes_cluster.cp_node_count + nodepool.node_count
+    current_nodes = kubernetes_cluster.nodes + nodepool.nodes
+    current_node_count = current_nodes.count
 
-  label def update_worker_hosts_entries
-    vm = kubernetes_cluster.nodepools.first.vms.first
-    nap 5 unless vm_ready?(vm)
-    ensure_hosts_entry(vm.sshable, kubernetes_cluster.api_server_lb.hostname)
-    hop_wait_for_kubernetes_bootstrap
+    current_nodes.each { |node|
+      unless node_host_entries_set?(node.name)
+        nap 5 unless vm_ready?(node.vm)
+        ensure_hosts_entry(node.sshable, kubernetes_cluster.api_server_lb.hostname)
+        set_node_entries_status(node.name)
+      end
+    }
+
+    hop_wait_for_kubernetes_bootstrap if current_node_count == expected_node_count
+    nap 10
   end
 
   label def wait_for_kubernetes_bootstrap
@@ -148,8 +154,36 @@ STS
     read_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").strip
     if write_hash != read_hash
       update_stack({"fail_message" => "wrong read hash, expected: #{write_hash}, got: #{read_hash}"})
+      hop_destroy_kubernetes
     end
-    hop_destroy_kubernetes
+    update_stack({"read_hash" => read_hash})
+    hop_test_pod_data_migration
+  end
+
+  label def test_pod_data_migration
+    client = kubernetes_cluster.client
+    pod_node = client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
+    client.kubectl("cordon #{pod_node}")
+    # we need to uncordon other nodes each time so we won't run out of nodes accepting pods
+    nodepool.nodes.reject { it.name == pod_node }.each { |node|
+      client.kubectl("uncordon #{node.name}")
+    }
+    client.kubectl("delete pod ubuntu-statefulset-0 --wait=false")
+    hop_verify_data_after_migration
+  end
+
+  label def verify_data_after_migration
+    pod_status = kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").strip
+    nap 5 unless pod_status == "Running"
+    new_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").strip
+    expected_hash = strand.stack.first["read_hash"]
+    if new_hash != expected_hash
+      update_stack({"fail_message" => "data hash changed after migration, expected: #{expected_hash}, got: #{new_hash}"})
+      hop_destroy_kubernetes
+    end
+    hop_destroy_kubernetes if migration_number == MIGRATION_TRIES
+    increment_migration_number
+    hop_test_pod_data_migration
   end
 
   label def destroy_kubernetes
@@ -192,5 +226,28 @@ STS
 
   def kubernetes_cluster
     @kubernetes_cluster ||= KubernetesCluster.with_pk(frame["kubernetes_cluster_id"])
+  end
+
+  def nodepool
+    kubernetes_cluster.nodepools.first
+  end
+
+  def node_host_entries_set?(node_name)
+    strand.stack.first.dig("nodes_status", node_name) == true
+  end
+
+  def set_node_entries_status(node_name)
+    frame = strand.stack.first
+    frame["nodes_status"] ||= {}
+    frame["nodes_status"][node_name] = true
+    update_stack(frame)
+  end
+
+  def migration_number
+    strand.stack.first["migration_number"]
+  end
+
+  def increment_migration_number
+    update_stack({"migration_number" => migration_number + 1})
   end
 end
