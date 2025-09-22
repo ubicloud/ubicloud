@@ -785,6 +785,7 @@ RSpec.describe Csi::V1::NodeService do
       expect(client).to receive(:get_pvc).with("default", "pvc-123").and_return(pvc)
       expect(client).to receive(:update_pv).with(pv)
       expect(client).to receive(:delete_pvc).with("default", "pvc-123")
+      expect(client).to receive(:remove_pvc_finalizers).with("default", "pvc-123")
       expect(client).to receive(:create_pvc).with(pvc)
 
       service.recreate_pvc(req_id, client, pv)
@@ -803,6 +804,7 @@ RSpec.describe Csi::V1::NodeService do
       # Since the annotation content is different from base64_content, it should update
       expect(client).to receive(:update_pv).with(pv)
       expect(client).to receive(:delete_pvc).with("default", "pvc-123")
+      expect(client).to receive(:remove_pvc_finalizers).with("default", "pvc-123")
       expect(client).to receive(:create_pvc).with(pvc)
 
       service.recreate_pvc(req_id, client, pv)
@@ -823,6 +825,7 @@ RSpec.describe Csi::V1::NodeService do
       expect(client).to receive(:get_pvc).with("default", "pvc-123").and_return(pvc)
       expect(client).not_to receive(:update_pv)
       expect(client).to receive(:delete_pvc).with("default", "pvc-123")
+      expect(client).to receive(:remove_pvc_finalizers).with("default", "pvc-123")
       expect(client).to receive(:create_pvc).with(pvc)
 
       service.recreate_pvc(req_id, client, pv)

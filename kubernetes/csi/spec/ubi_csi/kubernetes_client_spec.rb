@@ -116,6 +116,20 @@ RSpec.describe Csi::KubernetesClient do
       expect(client).to receive(:run_kubectl).with("-n", "test-namespace", "delete", "pvc", "test-pvc", "--wait=false", "--ignore-not-found=true")
       client.delete_pvc("test-namespace", "test-pvc")
     end
+
+    it "does not try to remove finalizers when pvc does not exist" do
+      namespace, name = "namespace", "pvc-name"
+      expect(client).to receive(:get_pvc).with(namespace, name).and_raise(ObjectNotFoundError)
+      expect(client).not_to receive(:run_kubectl)
+      client.remove_pvc_finalizers(namespace, name)
+    end
+
+    it "removes finalizers when pvc exists" do
+      namespace, name = "namespace", "pvc-name"
+      expect(client).to receive(:get_pvc).with(namespace, name).and_return({})
+      expect(client).to receive(:run_kubectl).with("-n", namespace, "patch", "pvc", name, "--type=merge", "-p", "{\"metadata\":{\"finalizers\":null}}")
+      client.remove_pvc_finalizers(namespace, name)
+    end
   end
 
   describe "#node_schedulable?" do

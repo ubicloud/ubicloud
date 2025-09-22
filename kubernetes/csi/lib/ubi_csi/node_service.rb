@@ -293,6 +293,8 @@ module Csi
 
         client.delete_pvc(pvc_namespace, pvc_name)
         log_with_id(req_id, "Deleted PVC #{pvc_namespace}/#{pvc_name}")
+        client.remove_pvc_finalizers(pvc_namespace, pvc_name)
+        log_with_id(req_id, "Removed PVC finalizers #{pvc_namespace}/#{pvc_name}")
         client.create_pvc(pvc)
         log_with_id(req_id, "Recreated PVC with the new spec")
       end

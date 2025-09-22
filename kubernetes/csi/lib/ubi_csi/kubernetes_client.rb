@@ -75,6 +75,13 @@ module Csi
       run_kubectl("-n", namespace, "delete", "pvc", name, "--wait=false", "--ignore-not-found=true")
     end
 
+    # This function will first try to get the pvc in order to make sure pvc exists
+    def remove_pvc_finalizers(namespace, name)
+      get_pvc(namespace, name)
+      run_kubectl("-n", namespace, "patch", "pvc", name, "--type=merge", "-p", "{\"metadata\":{\"finalizers\":null}}")
+    rescue ObjectNotFoundError
+    end
+
     def node_schedulable?(name)
       !get_node(name).dig("spec", "unschedulable")
     end
