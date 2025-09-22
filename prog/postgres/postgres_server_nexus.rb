@@ -104,7 +104,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def mount_data_disk
-    case vm.sshable.cmd("common/bin/daemonizer --check format_disk")
+    case vm.sshable.d_check("format_disk")
     when "Succeeded"
       storage_device_paths = postgres_server.storage_device_paths
       device_path = if storage_device_paths.count > 1
@@ -123,10 +123,10 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     when "Failed", "NotStarted"
       storage_device_paths = postgres_server.storage_device_paths
       if storage_device_paths.count == 1
-        vm.sshable.cmd("common/bin/daemonizer 'sudo mkfs --type ext4 #{storage_device_paths.first}' format_disk")
+        vm.sshable.d_run("format_disk", "sudo", "mkfs", "--type", "ext4", storage_device_paths.first)
       else
         vm.sshable.cmd("sudo mdadm --create --verbose /dev/md0 --level=0 --raid-devices=#{storage_device_paths.count} #{storage_device_paths.join(" ")}")
-        vm.sshable.cmd("common/bin/daemonizer 'sudo mkfs --type ext4 /dev/md0' format_disk")
+        vm.sshable.d_run("format_disk", "sudo", "mkfs", "--type", "ext4", "/dev/md0")
       end
     end
 
@@ -140,18 +140,18 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def initialize_empty_database
-    case vm.sshable.cmd("common/bin/daemonizer --check initialize_empty_database")
+    case vm.sshable.d_check("initialize_empty_database")
     when "Succeeded"
       hop_refresh_certificates
     when "Failed", "NotStarted"
-      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/initialize-empty-database #{postgres_server.version}' initialize_empty_database")
+      vm.sshable.d_run("initialize_empty_database", "sudo", "postgres/bin/initialize-empty-database", postgres_server.version)
     end
 
     nap 5
   end
 
   label def initialize_database_from_backup
-    case vm.sshable.cmd("common/bin/daemonizer --check initialize_database_from_backup")
+    case vm.sshable.d_check("initialize_database_from_backup")
     when "Succeeded"
       hop_refresh_certificates
     when "Failed", "NotStarted"
@@ -160,7 +160,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       else
         postgres_server.timeline.latest_backup_label_before_target(target: postgres_server.resource.restore_target)
       end
-      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/initialize-database-from-backup #{postgres_server.version} #{backup_label}' initialize_database_from_backup")
+      vm.sshable.d_run("initialize_database_from_backup", "sudo", "postgres/bin/initialize-database-from-backup", postgres_server.version, backup_label)
     end
 
     nap 5
@@ -332,9 +332,9 @@ CONFIG
   end
 
   label def configure
-    case vm.sshable.cmd("common/bin/daemonizer --check configure_postgres")
+    case vm.sshable.d_check("configure_postgres")
     when "Succeeded"
-      vm.sshable.cmd("common/bin/daemonizer --clean configure_postgres")
+      vm.sshable.d_clean("configure_postgres")
 
       when_initial_provisioning_set? do
         hop_update_superuser_password if postgres_server.primary?
@@ -346,7 +346,7 @@ CONFIG
       hop_wait
     when "Failed", "NotStarted"
       configure_hash = postgres_server.configure_hash
-      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/configure #{postgres_server.version}' configure_postgres", stdin: JSON.generate(configure_hash))
+      vm.sshable.d_run("configure_postgres", "sudo", "postgres/bin/configure", postgres_server.version, stdin: JSON.generate(configure_hash))
     end
 
     nap 5
@@ -614,7 +614,7 @@ SQL
       hop_configure
     end
 
-    case vm.sshable.cmd("common/bin/daemonizer --check promote_postgres")
+    case vm.sshable.d_check("promote_postgres")
     when "Succeeded"
       postgres_server.update(timeline_access: "push", representative_at: Time.now, synchronization_status: "ready")
       postgres_server.resource.incr_refresh_dns_record
@@ -624,7 +624,7 @@ SQL
       postgres_server.resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
       hop_configure
     when "Failed", "NotStarted"
-      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/promote #{postgres_server.version}' promote_postgres")
+      vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
       nap 0
     end
 
