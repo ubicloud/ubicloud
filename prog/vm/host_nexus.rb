@@ -373,7 +373,7 @@ TIMER
       hop_wait
     end
 
-    register_deadline("wait", 0)
+    register_deadline("wait", 45)
     nap 30
   end
 
