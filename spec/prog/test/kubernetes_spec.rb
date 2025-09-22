@@ -281,30 +281,85 @@ RSpec.describe Prog::Test::Kubernetes do
     end
 
     it "naps until the pod is running" do
-      expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").and_return("ContainerCreating")
+      expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return("ContainerCreating")
       expect { kubernetes_test.verify_data_after_migration }.to nap(5)
     end
 
     it "checks the data hash after migration and hash is correct but goes for another round of migration" do
-      expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").and_return("Running")
+      expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return("Running")
       expect(client).to receive(:kubectl).with("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").and_return("hash")
       expect(kubernetes_test).to receive(:increment_migration_number)
       expect { kubernetes_test.verify_data_after_migration }.to hop("test_pod_data_migration")
     end
 
-    it "checks the data hash after migration and hash is correct and is done with migrations, hops to destroy_kubernetes" do
+    it "checks the data hash after migration and hash is correct and is done with migrations, hops to test_normal_pod_restart" do
       kubernetes_test.update_stack({"migration_number" => Prog::Test::Kubernetes::MIGRATION_TRIES})
-      expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").and_return("Running")
+      expect(kubernetes_test).to receive(:pod_status).and_return("Running")
       expect(client).to receive(:kubectl).with("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").and_return("hash")
-      expect { kubernetes_test.verify_data_after_migration }.to hop("destroy_kubernetes")
+      expect { kubernetes_test.verify_data_after_migration }.to hop("test_normal_pod_restart")
     end
 
     it "checks the data hash after migration and hash is not correct" do
-      expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").and_return("Running")
+      expect(kubernetes_test).to receive(:pod_status).and_return("Running")
       expect(client).to receive(:kubectl).with("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").and_return("wronghash")
       expect(kubernetes_test).to receive(:update_stack).with({"fail_message" => "data hash changed after migration, expected: hash, got: wronghash"})
 
       expect { kubernetes_test.verify_data_after_migration }.to hop("destroy_kubernetes")
+    end
+  end
+
+  describe "#test_normal_pod_restart" do
+    let(:client) { instance_double(Kubernetes::Client) }
+
+    before do
+      expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
+      expect(kubernetes_cluster).to receive(:client).and_return(client).at_least(:once)
+    end
+
+    it "saves the current node and deletes the pod and hops to verify_normal_pod_restart" do
+      expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return("nodename")
+      expect(kubernetes_test).to receive(:update_stack).with({"normal_pod_restart_test_node" => "nodename"})
+      expect(client).to receive(:kubectl).with("delete pod ubuntu-statefulset-0 --wait=false")
+      expect { kubernetes_test.test_normal_pod_restart }.to hop("verify_normal_pod_restart")
+    end
+  end
+
+  describe "#verify_normal_pod_restart" do
+    let(:client) { instance_double(Kubernetes::Client) }
+
+    before do
+      expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
+      expect(kubernetes_cluster).to receive(:client).and_return(client).at_least(:once)
+    end
+
+    it "waits until pod is runnning" do
+      expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return("ContainerCreating")
+      expect { kubernetes_test.verify_normal_pod_restart }.to nap(5)
+    end
+
+    it "verifies mount and hops to destroy kubernetes" do
+      expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return("Running")
+      expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return("nodename")
+      expect(kubernetes_test.strand).to receive(:stack).and_return([{"normal_pod_restart_test_node" => "nodename"}])
+      expect(kubernetes_test).to receive(:verify_mount)
+      expect { kubernetes_test.verify_normal_pod_restart }.to hop("destroy_kubernetes")
+    end
+
+    it "finds a mismatch in node name" do
+      expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return("Running")
+      expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return("othernode")
+      expect(kubernetes_test.strand).to receive(:stack).and_return([{"normal_pod_restart_test_node" => "nodename"}])
+      expect(kubernetes_test).to receive(:update_stack).with({"fail_message" => "unexpected pod node change after restart, expected: nodename, got: othernode"})
+      expect { kubernetes_test.verify_normal_pod_restart }.to hop("destroy_kubernetes")
+    end
+
+    it "fails when verifying the mount" do
+      expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return("Running")
+      expect(client).to receive(:kubectl).with("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return("nodename")
+      expect(kubernetes_test.strand).to receive(:stack).and_return([{"normal_pod_restart_test_node" => "nodename"}])
+      expect(kubernetes_test).to receive(:verify_mount).and_raise("some error")
+      expect(kubernetes_test).to receive(:update_stack).with({"fail_message" => "some error"})
+      expect { kubernetes_test.verify_normal_pod_restart }.to hop("destroy_kubernetes")
     end
   end
 

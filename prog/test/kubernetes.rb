@@ -128,25 +128,13 @@ STS
   end
 
   label def test_lsblk
-    lsblk_output = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- lsblk")
-    lines = lsblk_output.split("\n")[1..]
-    data_mount = lines.find { |line| line.include?("/etc/data") }
-    if data_mount
-      cols = data_mount.split
-      device_name = cols[0]  # e.g. "loop3"
-      size = cols[3]         # e.g. "1G"
-      mountpoint = cols[6]   # e.g. "/etc/data"
-
-      if device_name.start_with?("loop") && size == "1G" && mountpoint == "/etc/data"
-        hop_test_data_write
-      else
-        update_stack({"fail_message" => "/etc/data is mounted incorrectly: #{data_mount}"})
-        hop_destroy_kubernetes
-      end
-    else
-      update_stack({"fail_message" => "No /etc/data mount found in lsblk output"})
+    begin
+      verify_mount
+    rescue => e
+      update_stack({"fail_message" => e.message})
       hop_destroy_kubernetes
     end
+    hop_test_data_write
   end
 
   label def test_data_write
@@ -173,7 +161,6 @@ STS
   end
 
   label def verify_data_after_migration
-    pod_status = kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.status.phase}").strip
     nap 5 unless pod_status == "Running"
     new_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").strip
     expected_hash = strand.stack.first["read_hash"]
@@ -181,9 +168,34 @@ STS
       update_stack({"fail_message" => "data hash changed after migration, expected: #{expected_hash}, got: #{new_hash}"})
       hop_destroy_kubernetes
     end
-    hop_destroy_kubernetes if migration_number == MIGRATION_TRIES
+    hop_test_normal_pod_restart if migration_number == MIGRATION_TRIES
     increment_migration_number
     hop_test_pod_data_migration
+  end
+
+  label def test_normal_pod_restart
+    client = kubernetes_cluster.client
+    pod_node = client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
+    update_stack({"normal_pod_restart_test_node" => pod_node})
+    client.kubectl("delete pod ubuntu-statefulset-0 --wait=false")
+    hop_verify_normal_pod_restart
+  end
+
+  label def verify_normal_pod_restart
+    nap 5 unless pod_status == "Running"
+    pod_node = kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
+    expected_pod_node = strand.stack.first["normal_pod_restart_test_node"]
+    if pod_node != expected_pod_node
+      update_stack({"fail_message" => "unexpected pod node change after restart, expected: #{expected_pod_node}, got: #{pod_node}"})
+      hop_destroy_kubernetes
+    end
+
+    begin
+      verify_mount
+    rescue => e
+      update_stack({"fail_message" => e.message})
+    end
+    hop_destroy_kubernetes
   end
 
   label def destroy_kubernetes
@@ -249,5 +261,34 @@ STS
 
   def increment_migration_number
     update_stack({"migration_number" => migration_number + 1})
+  end
+
+  def verify_mount
+    lsblk_output = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- lsblk")
+    lines = lsblk_output.split("\n")[1..]
+    data_mount = lines.find { |line| line.include?("/etc/data") }
+    if data_mount
+      cols = data_mount.split
+      device_name = cols[0]  # e.g. "loop3"
+      size = cols[3]         # e.g. "1G"
+      mountpoint = cols[6]   # e.g. "/etc/data"
+
+      if device_name.start_with?("loop") && size == "1G" && mountpoint == "/etc/data"
+        # no op
+      else
+        raise "/etc/data is mounted incorrectly: #{data_mount}"
+      end
+    else
+      raise "No /etc/data mount found in lsblk output"
+    end
+  end
+
+  # we are not using jsonpath for extracting the status because even though a pod is termination, its phase
+  # from API Server's point of view is Running, in order to detect that using jsonpath, we needed to check for
+  # deletion timestamp, all conditions in status and .status.phase.
+  # to keep the query simple, we let the kubectl do the processing and observe the system from the eyes of a
+  # customer. This also keeps the logic simpler
+  def pod_status
+    kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").strip
   end
 end
