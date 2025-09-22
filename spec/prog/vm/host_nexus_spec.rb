@@ -338,8 +338,8 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#unavailable" do
-    it "registers an immediate deadline if host is unavailable" do
-      expect(nx).to receive(:register_deadline).with("wait", 0)
+    it "registers a short deadline if host is unavailable" do
+      expect(nx).to receive(:register_deadline).with("wait", 45)
       expect(nx).to receive(:available?).and_return(false)
       expect { nx.unavailable }.to nap(30)
     end
