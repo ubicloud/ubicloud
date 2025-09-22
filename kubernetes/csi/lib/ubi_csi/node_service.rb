@@ -299,13 +299,15 @@ module Csi
 
       def trim_pvc(pvc, pv_name)
         pvc["metadata"]["annotations"] ||= {}
-        pvc["metadata"]["annotations"].delete(OLD_PVC_OBJECT_ANNOTATION_KEY)
-        pvc["metadata"]["annotations"][OLD_PV_NAME_ANNOTATION_KEY] = pv_name
-        %w[resourceVersion uid creationTimestamp].each do |key|
+        %W[#{OLD_PVC_OBJECT_ANNOTATION_KEY} volume.kubernetes.io/selected-node pv.kubernetes.io/bind-completed].each do |key|
+          pvc["metadata"]["annotations"].delete(key)
+        end
+        %w[resourceVersion uid creationTimestamp deletionTimestamp deletionGracePeriodSeconds].each do |key|
           pvc["metadata"].delete(key)
         end
         pvc["spec"].delete("volumeName")
         pvc.delete("status")
+        pvc["metadata"]["annotations"][OLD_PV_NAME_ANNOTATION_KEY] = pv_name
         pvc
       end
 

@@ -837,11 +837,15 @@ RSpec.describe Csi::V1::NodeService do
           "name" => "pvc-123",
           "namespace" => "default",
           "annotations" => {
-            "existing-annotation" => "value"
+            "existing-annotation" => "value",
+            "volume.kubernetes.io/selected-node" => "somenode",
+            "pv.kubernetes.io/bind-completed" => "yes"
           },
           "resourceVersion" => "12345",
           "uid" => "uid-123",
-          "creationTimestamp" => "2023-01-01T00:00:00Z"
+          "creationTimestamp" => "2023-01-01T00:00:00Z",
+          "deletionTimestamp" => "2023-01-01T00:00:00Z",
+          "deletionGracePeriodSeconds" => 0
         },
         "spec" => {
           "volumeName" => "old-pv-name"
@@ -856,10 +860,12 @@ RSpec.describe Csi::V1::NodeService do
       result = service.trim_pvc(pvc, pv_name)
 
       expect(result["metadata"]["annotations"]).to eq({"csi.ubicloud.com/old-pv-name" => pv_name, "existing-annotation" => "value"})
-
-      expect(result["metadata"]).not_to have_key("resourceVersion")
-      expect(result["metadata"]).not_to have_key("uid")
-      expect(result["metadata"]).not_to have_key("creationTimestamp")
+      %w[csi.ubicloud.com/old-pvc-object volume.kubernetes.io/selected-node pv.kubernetes.io/bind-completed].each do |key|
+        expect(result["metadata"]["annotations"]).not_to have_key key
+      end
+      %w[resourceVersion creationTimestamp uid deletionTimestamp deletionGracePeriodSeconds].each do |key|
+        expect(result["metadata"]).not_to have_key key
+      end
 
       expect(result["spec"]).not_to have_key("volumeName")
 
