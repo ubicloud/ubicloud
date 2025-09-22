@@ -44,13 +44,15 @@ exec -a session-lock-testlockname sleep infinity </dev/null >/dev/null 2>&1 &
 disown
 LOCK
 
-    it "interlocks" do
-      portable_pkill = lambda { system(%q(ps -eo pid,args | awk '$2=="session-lock-testlockname"{print $1}' | xargs -I {} sh -c 'test -n "{}" && kill {}')) }
-      portable_pkill.call
-      q_lock_script = lock_script.shellescape
-      expect([`bash -c #{q_lock_script}`, $?.exitstatus]).to eq(["", 0])
-      expect([`bash -c #{q_lock_script}`, $?.exitstatus]).to eq(["Another session active:  testlockname\n", 124])
-      expect(portable_pkill.call).to be true
+    if File.directory?("/dev/shm")
+      it "interlocks" do
+        portable_pkill = lambda { system(%q(ps -eo pid,args | awk '$2=="session-lock-testlockname"{print $1}' | xargs -I {} sh -c 'test -n "{}" && kill {}')) }
+        portable_pkill.call
+        q_lock_script = lock_script.shellescape
+        expect([`bash -c #{q_lock_script}`, $?.exitstatus]).to eq(["", 0])
+        expect([`bash -c #{q_lock_script}`, $?.exitstatus]).to eq(["Another session active:  testlockname\n", 124])
+        expect(portable_pkill.call).to be true
+      end
     end
 
     describe "exit code handling" do
