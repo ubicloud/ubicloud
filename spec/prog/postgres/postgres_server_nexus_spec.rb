@@ -241,23 +241,23 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#mount_data_disk" do
     it "formats data disk if format command is not sent yet or failed" do
       expect(postgres_server).to receive(:storage_device_paths).and_return(["/dev/vdb"])
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo mkfs --type ext4 /dev/vdb' format_disk")
+      expect(sshable).to receive(:d_run).with("format_disk", "sudo", "mkfs", "--type", "ext4", "/dev/vdb")
 
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check format_disk").and_return("NotStarted")
+      expect(sshable).to receive(:d_check).with("format_disk").and_return("NotStarted")
       expect { nx.mount_data_disk }.to nap(5)
     end
 
     it "formats data disk correctly when there are multiple storage volumes" do
       expect(postgres_server).to receive(:storage_device_paths).and_return(["/dev/nvme1n1", "/dev/nvme2n1"])
       expect(sshable).to receive(:cmd).with("sudo mdadm --create --verbose /dev/md0 --level=0 --raid-devices=2 /dev/nvme1n1 /dev/nvme2n1")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo mkfs --type ext4 /dev/md0' format_disk")
+      expect(sshable).to receive(:d_run).with("format_disk", "sudo", "mkfs", "--type", "ext4", "/dev/md0")
 
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check format_disk").and_return("NotStarted")
+      expect(sshable).to receive(:d_check).with("format_disk").and_return("NotStarted")
       expect { nx.mount_data_disk }.to nap(5)
     end
 
     it "mounts data disk if format disk is succeeded and hops to configure_walg_credentials" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check format_disk").and_return("Succeeded")
+      expect(sshable).to receive(:d_check).with("format_disk").and_return("Succeeded")
       expect(sshable).to receive(:cmd).with("sudo mkdir -p /dat")
       expect(sshable).to receive(:cmd).with("sudo common/bin/add_to_fstab /dev/vdb /dat ext4 defaults 0 0")
       expect(sshable).to receive(:cmd).with("sudo mount /dev/vdb /dat")
@@ -265,7 +265,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "mounts data disk correctly when there are multiple storage volumes" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check format_disk").and_return("Succeeded")
+      expect(sshable).to receive(:d_check).with("format_disk").and_return("Succeeded")
       expect(postgres_server).to receive(:storage_device_paths).and_return(["/dev/nvme1n1", "/dev/nvme2n1"])
       expect(sshable).to receive(:cmd).with("sudo mdadm --detail --scan | sudo tee -a /etc/mdadm/mdadm.conf")
       expect(sshable).to receive(:cmd).with("sudo update-initramfs -u")
@@ -276,7 +276,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "naps if script return unknown status" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check format_disk").and_return("Unknown")
+      expect(sshable).to receive(:d_check).with("format_disk").and_return("Unknown")
       expect { nx.mount_data_disk }.to nap(5)
     end
   end
@@ -298,24 +298,24 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#initialize_empty_database" do
     it "triggers initialize_empty_database if initialize_empty_database command is not sent yet or failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/initialize-empty-database 16' initialize_empty_database").twice
+      expect(sshable).to receive(:d_run).with("initialize_empty_database", "sudo", "postgres/bin/initialize-empty-database", "16").twice
 
       # NotStarted
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_empty_database").and_return("NotStarted")
+      expect(sshable).to receive(:d_check).with("initialize_empty_database").and_return("NotStarted")
       expect { nx.initialize_empty_database }.to nap(5)
 
       # Failed
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_empty_database").and_return("Failed")
+      expect(sshable).to receive(:d_check).with("initialize_empty_database").and_return("Failed")
       expect { nx.initialize_empty_database }.to nap(5)
     end
 
     it "hops to refresh_certificates if initialize_empty_database command is succeeded" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_empty_database").and_return("Succeeded")
+      expect(sshable).to receive(:d_check).with("initialize_empty_database").and_return("Succeeded")
       expect { nx.initialize_empty_database }.to hop("refresh_certificates")
     end
 
     it "naps if script return unknown status" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_empty_database").and_return("Unknown")
+      expect(sshable).to receive(:d_check).with("initialize_empty_database").and_return("Unknown")
       expect { nx.initialize_empty_database }.to nap(5)
     end
   end
@@ -325,31 +325,31 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_server.resource).to receive(:restore_target).and_return(Time.now).twice
       expect(postgres_server.timeline).to receive(:latest_backup_label_before_target).and_return("backup-label").twice
       expect(postgres_server).to receive(:standby?).and_return(false).twice
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/initialize-database-from-backup 16 backup-label' initialize_database_from_backup").twice
+      expect(sshable).to receive(:d_run).with("initialize_database_from_backup", "sudo", "postgres/bin/initialize-database-from-backup", "16", "backup-label").twice
 
       # NotStarted
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_database_from_backup").and_return("NotStarted")
+      expect(sshable).to receive(:d_check).with("initialize_database_from_backup").and_return("NotStarted")
       expect { nx.initialize_database_from_backup }.to nap(5)
 
       # Failed
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_database_from_backup").and_return("Failed")
+      expect(sshable).to receive(:d_check).with("initialize_database_from_backup").and_return("Failed")
       expect { nx.initialize_database_from_backup }.to nap(5)
     end
 
     it "hops to refresh_certificates if initialize_database_from_backup command is succeeded" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_database_from_backup").and_return("Succeeded")
+      expect(sshable).to receive(:d_check).with("initialize_database_from_backup").and_return("Succeeded")
       expect { nx.initialize_database_from_backup }.to hop("refresh_certificates")
     end
 
     it "naps if script return unknown status" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_database_from_backup").and_return("Unknown")
+      expect(sshable).to receive(:d_check).with("initialize_database_from_backup").and_return("Unknown")
       expect { nx.initialize_database_from_backup }.to nap(5)
     end
 
     it "triggers initialize_database_from_backup with LATEST as backup_label for standbys" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_database_from_backup").and_return("NotStarted")
+      expect(sshable).to receive(:d_check).with("initialize_database_from_backup").and_return("NotStarted")
       expect(postgres_server).to receive(:standby?).and_return(true)
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/initialize-database-from-backup 16 LATEST' initialize_database_from_backup")
+      expect(sshable).to receive(:d_run).with("initialize_database_from_backup", "sudo", "postgres/bin/initialize-database-from-backup", "16", "LATEST")
       expect { nx.initialize_database_from_backup }.to nap(5)
     end
   end
@@ -512,29 +512,29 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#configure" do
     it "triggers configure if configure command is not sent yet or failed" do
       expect(postgres_server).to receive(:configure_hash).and_return("dummy-configure-hash").twice
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/configure 16' configure_postgres", stdin: JSON.generate("dummy-configure-hash")).twice
+      expect(sshable).to receive(:d_run).with("configure_postgres", "sudo", "postgres/bin/configure", "16", stdin: JSON.generate("dummy-configure-hash")).twice
 
       # NotStarted
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("NotStarted")
+      expect(sshable).to receive(:d_check).with("configure_postgres").and_return("NotStarted")
       expect { nx.configure }.to nap(5)
 
       # Failed
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Failed")
+      expect(sshable).to receive(:d_check).with("configure_postgres").and_return("Failed")
       expect { nx.configure }.to nap(5)
     end
 
     it "hops to update_superuser_password if configure command is succeeded during the initial provisioning and if the server is primary" do
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_postgres").and_return("Succeeded")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:d_clean).with("configure_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:d_check).with("configure_postgres").and_return("Succeeded")
       expect(postgres_server).to receive(:primary?).and_return(true)
       expect { nx.configure }.to hop("update_superuser_password")
     end
 
     it "hops to wait_catch_up if configure command is succeeded during the initial provisioning and if the server is standby" do
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_postgres").and_return("Succeeded")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:d_clean).with("configure_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:d_check).with("configure_postgres").and_return("Succeeded")
       expect(postgres_server).to receive(:primary?).and_return(false)
       expect(postgres_server).to receive(:standby?).and_return(true)
       expect { nx.configure }.to hop("wait_catch_up")
@@ -542,8 +542,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "hops to wait_recovery_completion if configure command is succeeded during the initial provisioning and if the server is doing pitr" do
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_postgres").and_return("Succeeded")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:d_clean).with("configure_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:d_check).with("configure_postgres").and_return("Succeeded")
       expect(postgres_server).to receive(:primary?).and_return(false)
       expect(postgres_server).to receive(:standby?).and_return(false)
       expect { nx.configure }.to hop("wait_recovery_completion")
@@ -551,16 +551,16 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "hops to wait for primaries if configure command is succeeded at times other than the initial provisioning" do
       expect(nx).to receive(:when_initial_provisioning_set?)
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_postgres").and_return("Succeeded")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:d_clean).with("configure_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:d_check).with("configure_postgres").and_return("Succeeded")
       expect(postgres_server).to receive(:standby?).and_return(false)
       expect { nx.configure }.to hop("wait")
     end
 
     it "hops to wait_catchup for standbys if configure command is succeeded at times other than the initial provisioning" do
       expect(nx).to receive(:when_initial_provisioning_set?)
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_postgres").and_return("Succeeded")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:d_clean).with("configure_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:d_check).with("configure_postgres").and_return("Succeeded")
       expect(postgres_server).to receive(:standby?).and_return(true)
       expect(postgres_server).to receive(:synchronization_status).and_return("catching_up")
       expect { nx.configure }.to hop("wait_catch_up")
@@ -568,8 +568,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "hops to wait for read replicas if configure command is succeeded" do
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_postgres").and_return("Succeeded")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:d_clean).with("configure_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:d_check).with("configure_postgres").and_return("Succeeded")
       expect(postgres_server).to receive(:primary?).and_return(false)
       expect(postgres_server).to receive(:standby?).and_return(false)
       expect(postgres_server).to receive(:read_replica?).and_return(true)
@@ -577,7 +577,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "naps if script return unknown status" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Unknown")
+      expect(sshable).to receive(:d_check).with("configure_postgres").and_return("Unknown")
       expect { nx.configure }.to nap(5)
     end
   end
@@ -935,15 +935,15 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#taking_over" do
     it "triggers promote if promote command is not sent yet or failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/promote 16' promote_postgres").twice
+      expect(sshable).to receive(:d_run).with("promote_postgres", "sudo", "postgres/bin/promote", "16").twice
 
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check promote_postgres").and_return("NotStarted", "Failed")
+      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("NotStarted", "Failed")
       expect { nx.taking_over }.to nap(0)
       expect { nx.taking_over }.to nap(0)
     end
 
     it "updates the metadata and hops to configure if promote command is succeeded" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check promote_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
 
       expect(postgres_server).to receive(:update).with(timeline_access: "push", representative_at: anything, synchronization_status: "ready")
       expect(postgres_server.resource).to receive(:incr_refresh_dns_record)
@@ -964,7 +964,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "naps if script return unknown status" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check promote_postgres").and_return("Unknown")
+      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("Unknown")
       expect { nx.taking_over }.to nap(5)
     end
 
