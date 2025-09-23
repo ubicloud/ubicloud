@@ -106,6 +106,7 @@ pg eu-central-h1/test-pg show -f name,state,location,vm-size,storage-size-gib,ve
 pg eu-central-h1/test-pg show -f maintenance-window-start-at,read-replica,parent,read-replicas
 pg eu-central-h1/test-pg show-config
 pg eu-central-h1/test-pg show-pgbouncer-config
+pg eu-central-h1/test-pg upgrade
 pg list
 pg list -f location
 pg list -f name,id,version,flavor

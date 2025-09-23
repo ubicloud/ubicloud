@@ -32,6 +32,7 @@ RSpec.describe Clover, "cli pg show" do
       storage_size_gib: 64
       target_storage_size_gib: 64
       version: 17
+      target_version: 17
       ha_type: none
       flavor: standard
       connection_string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require
@@ -63,6 +64,7 @@ RSpec.describe Clover, "cli pg show" do
       storage_size_gib: 64
       target_storage_size_gib: 64
       version: 17
+      target_version: 17
       ha_type: none
       flavor: standard
       connection_string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?sslmode=require
