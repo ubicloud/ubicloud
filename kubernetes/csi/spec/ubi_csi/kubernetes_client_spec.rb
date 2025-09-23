@@ -6,6 +6,10 @@ require "spec_helper"
 RSpec.describe Csi::KubernetesClient do
   let(:client) { described_class.new(req_id: "test-req-id", logger: Logger.new($stdout)) }
 
+  before do
+    allow(client).to receive(:log_with_id) # suppress logs during test runs
+  end
+
   describe "#initialize" do
     it "initializes correctly with req_id" do
       expect(client.instance_variable_get(:@logger)).to be_a(Logger)
@@ -129,6 +133,28 @@ RSpec.describe Csi::KubernetesClient do
       expect(client).to receive(:get_pvc).with(namespace, name).and_return({})
       expect(client).to receive(:run_kubectl).with("-n", namespace, "patch", "pvc", name, "--type=merge", "-p", "{\"metadata\":{\"finalizers\":null}}")
       client.remove_pvc_finalizers(namespace, name)
+    end
+  end
+
+  describe "#patch_resource" do
+    it "patches a pvc correctly with the given namespace" do
+      resource, name, namespace, annotation_key, annotation_value = "pvc", "name", "default", "foo", "bar"
+      expect(client).to receive(:run_kubectl).with("-n", namespace, "patch", "pvc", name, "--type=merge", "-p", "{\"metadata\":{\"annotations\":{\"#{annotation_key}\":\"#{annotation_value}\"}}}")
+      client.patch_resource(resource, name, annotation_key, annotation_value, namespace:)
+    end
+
+    it "patches a pv correctly which requires no namespace" do
+      resource, name, annotation_key, annotation_value = "pv", "name", "foo", "bar"
+      expect(client).to receive(:run_kubectl).with("patch", "pv", name, "--type=merge", "-p", "{\"metadata\":{\"annotations\":{\"#{annotation_key}\":\"#{annotation_value}\"}}}")
+      client.patch_resource(resource, name, annotation_key, annotation_value)
+    end
+  end
+
+  describe "#remove_pvc_annotation" do
+    it "removes the given pvc annotations" do
+      namespace, name, annotation_key = "namespace", "name", "key"
+      expect(client).to receive(:run_kubectl).with("-n", namespace, "patch", "pvc", name, "--type=merge", "-p", "{\"metadata\":{\"annotations\":{\"#{annotation_key}\":null}}}")
+      client.remove_pvc_annotation(namespace, name, annotation_key)
     end
   end
 

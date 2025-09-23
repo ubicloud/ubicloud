@@ -112,7 +112,7 @@ module Csi
           pvc = fetch_and_migrate_pvc(req_id, client, req)
           perform_node_stage_volume(req_id, pvc, req, _call)
           roll_back_reclaim_policy(req_id, client, req, pvc)
-          remove_old_pv_annotation(req_id, client, pvc)
+          remove_old_pv_annotation_from_pvc(req_id, client, pvc)
           NodeStageVolumeResponse.new
         rescue => e
           log_and_raise(req_id, e)
@@ -184,12 +184,10 @@ module Csi
         # If block, do nothing else
       end
 
-      def remove_old_pv_annotation(req_id, client, pvc)
-        if !pvc.dig("metadata", "annotations", OLD_PV_NAME_ANNOTATION_KEY).nil?
-          log_with_id(req_id, "Removing old pv annotation #{OLD_PV_NAME_ANNOTATION_KEY}")
-          pvc["metadata"]["annotations"].delete(OLD_PV_NAME_ANNOTATION_KEY)
-          client.update_pvc(pvc)
-        end
+      def remove_old_pv_annotation_from_pvc(req_id, client, pvc)
+        namespace, name = pvc["metadata"].values_at("namespace", "name")
+        log_with_id(req_id, "Removing old pv annotation #{OLD_PV_NAME_ANNOTATION_KEY}")
+        client.remove_pvc_annotation(namespace, name, OLD_PV_NAME_ANNOTATION_KEY)
       end
 
       def roll_back_reclaim_policy(req_id, client, req, pvc)
@@ -270,7 +268,7 @@ module Csi
 
       def recreate_pvc(req_id, client, pv)
         pvc_namespace, pvc_name = pv["spec"]["claimRef"].values_at("namespace", "name")
-
+        pv_name = pv.dig("metadata", "name")
         begin
           pvc = client.get_pvc(pvc_namespace, pvc_name)
         rescue ObjectNotFoundError
@@ -280,24 +278,30 @@ module Csi
           end
           pvc = YAML.load(Base64.decode64(old_pvc_object))
         end
-        log_with_id(req_id, "Found matching PVC for PV #{pv["metadata"]["name"]}: #{pvc}")
-
-        pvc = trim_pvc(pvc, pv["metadata"]["name"])
+        log_with_id(req_id, "Found matching PVC for PV #{pv_name}: #{pvc}")
+        pvc_uid = pvc.dig("metadata", "uid")
+        pvc_deletion_timestamp = pvc.dig("metadata", "deletionTimestamp")
+        trim_pvc(pvc, pv_name)
         log_with_id(req_id, "Trimmed PVC for recreation: #{pvc}")
 
-        base64_encoded_pvc = Base64.strict_encode64(YAML.dump(pvc))
-        if pv.dig("metadata", "annotations", OLD_PVC_OBJECT_ANNOTATION_KEY) != base64_encoded_pvc
-          pv["metadata"]["annotations"][OLD_PVC_OBJECT_ANNOTATION_KEY] = base64_encoded_pvc
-          pv["metadata"].delete("resourceVersion")
-          client.update_pv(pv)
-        end
+        client.patch_resource("pv", pv_name, OLD_PVC_OBJECT_ANNOTATION_KEY, Base64.strict_encode64(YAML.dump(pvc)))
 
-        client.delete_pvc(pvc_namespace, pvc_name)
-        log_with_id(req_id, "Deleted PVC #{pvc_namespace}/#{pvc_name}")
-        client.remove_pvc_finalizers(pvc_namespace, pvc_name)
-        log_with_id(req_id, "Removed PVC finalizers #{pvc_namespace}/#{pvc_name}")
-        client.create_pvc(pvc)
-        log_with_id(req_id, "Recreated PVC with the new spec")
+        if pvc_uid == pv_name.delete_prefix("pvc-")
+          if !pvc_deletion_timestamp
+            client.delete_pvc(pvc_namespace, pvc_name)
+            log_with_id(req_id, "Deleted PVC #{pvc_namespace}/#{pvc_name}")
+            client.remove_pvc_finalizers(pvc_namespace, pvc_name)
+            log_with_id(req_id, "Removed PVC finalizers #{pvc_namespace}/#{pvc_name}")
+          end
+          client.create_pvc(pvc)
+          log_with_id(req_id, "Recreated PVC with the new spec")
+        else
+          # PVC is recreated now.
+          # At this stage we don't know whether we have created the PVC or
+          # Statefulset controller has created it. We just need to make sure
+          # the csi.ubicloud.com/old-pv-name annotation is set.
+          client.patch_resource("pvc", pvc_name, OLD_PV_NAME_ANNOTATION_KEY, pv_name, namespace: pvc_namespace)
+        end
       end
 
       def trim_pvc(pvc, pv_name)
