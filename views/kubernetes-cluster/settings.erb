@@ -1,6 +1,40 @@
 <% if has_permission?("KubernetesCluster:edit", @kc) %>
+  <% np = @kc.nodepools.first %>
   <div class="p-6">
     <%== part("components/rename_object", object: @kc, type: "Kubernetes Cluster") %>
+  </div>
+
+  <div class="p-6">
+    <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+      <div class="min-w-0 flex-1">
+        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+          Resize Worker Node Pool
+        </h3>
+      </div>
+    </div>
+
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-4 py-5 sm:p-6">
+        <% form(action: "#{path(np)}/resize", method: :post) do %>
+          <div class="gap-6 sm:flex sm:items-center sm:justify-between">
+            <div class="flex-grow">
+              <%== part(
+                "components/form/select",
+                name: "node_count",
+                selected: np.node_count,
+                attributes: { required: true },
+                options: (1..10).map {
+                  [it, ContentGenerator::KubernetesCluster.worker_nodes(@kc.location, np.target_node_size, {value: it, display_name: "#{it} Nodes"})]
+                }
+              ) %>
+            </div>
+            <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+              <%== part("components/button", text: "Resize") %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
   </div>
 <% end %>
 

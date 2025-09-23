@@ -18,6 +18,12 @@ RSpec.describe Clover, "Kubernetes" do
       location_id: Location::HETZNER_FSN1_ID
     ).subject
 
+    Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
+      name: "kn",
+      node_count: 2,
+      kubernetes_cluster_id: cluster.id
+    ).subject
+
     services_lb = Prog::Vnet::LoadBalancerNexus.assemble(
       cluster.private_subnet_id,
       name: cluster.services_load_balancer_name,
@@ -233,11 +239,7 @@ RSpec.describe Clover, "Kubernetes" do
         KubernetesNode.create(vm_id: create_vm(name: "cp1").id, kubernetes_cluster_id: kc.id)
         KubernetesNode.create(vm_id: create_vm(name: "cp2").id, kubernetes_cluster_id: kc.id)
 
-        kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
-          name: "kn",
-          node_count: 2,
-          kubernetes_cluster_id: kc.id
-        ).subject
+        kn = kc.nodepools.first
 
         KubernetesNode.create(vm_id: create_vm(name: "node1").id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
 
@@ -375,9 +377,27 @@ RSpec.describe Clover, "Kubernetes" do
       end
 
       it "does not show rename option without permissions" do
-        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Firewall:view"])
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["KubernetesCluster:view"])
         visit "#{project_wo_permissions.path}#{kc_no_perm.path}/settings"
         expect(page).to have_no_content("Rename")
+      end
+    end
+
+    describe "resize" do
+      it "can resize kubernetes cluster" do
+        visit "#{project.path}#{kc.path}/settings"
+        expect(kc.nodepools.first.reload.node_count).not_to eq(4)
+        find('select#node_count option[value="4"]:not([disabled])').select_option
+        click_button "Resize"
+
+        expect(page).to have_flash_notice("myk8s node pool kn will be resized")
+        expect(kc.nodepools.first.reload.node_count).to eq(4)
+      end
+
+      it "does not show resize option without permissions" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["KubernetesCluster:view"])
+        visit "#{project_wo_permissions.path}#{kc_no_perm.path}/settings"
+        expect(page).to have_no_content("Resize")
       end
     end
 
