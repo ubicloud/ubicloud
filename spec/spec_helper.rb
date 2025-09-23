@@ -59,6 +59,7 @@ RSpec.configure do |config|
     DB.transaction(rollback: :always, auto_savepoint: true) do
       example.run
     end
+    Thread.current[:clover_ssh_cache] = nil
     Mail::TestMailer.deliveries.clear if defined?(Mail)
 
     unless @skip_leaked_thread_check
