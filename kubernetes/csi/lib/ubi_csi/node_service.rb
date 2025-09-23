@@ -112,7 +112,7 @@ module Csi
           pvc = fetch_and_migrate_pvc(req_id, client, req)
           perform_node_stage_volume(req_id, pvc, req, _call)
           roll_back_reclaim_policy(req_id, client, req, pvc)
-          remove_old_pv_annotation(client, pvc)
+          remove_old_pv_annotation(req_id, client, pvc)
           NodeStageVolumeResponse.new
         rescue => e
           log_and_raise(req_id, e)
@@ -184,8 +184,9 @@ module Csi
         # If block, do nothing else
       end
 
-      def remove_old_pv_annotation(client, pvc)
+      def remove_old_pv_annotation(req_id, client, pvc)
         if !pvc.dig("metadata", "annotations", OLD_PV_NAME_ANNOTATION_KEY).nil?
+          log_with_id(req_id, "Removing old pv annotation #{OLD_PV_NAME_ANNOTATION_KEY}")
           pvc["metadata"]["annotations"].delete(OLD_PV_NAME_ANNOTATION_KEY)
           client.update_pvc(pvc)
         end

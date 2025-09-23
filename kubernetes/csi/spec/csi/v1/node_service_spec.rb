@@ -414,7 +414,7 @@ RSpec.describe Csi::V1::NodeService do
       }
 
       expect(client).to receive(:update_pvc).with(pvc)
-      service.remove_old_pv_annotation(client, pvc)
+      service.remove_old_pv_annotation(req_id, client, pvc)
 
       expect(pvc["metadata"]["annotations"]["csi.ubicloud.com/old-pv-name"]).to be_nil
     end
@@ -427,7 +427,7 @@ RSpec.describe Csi::V1::NodeService do
       }
 
       expect(client).not_to receive(:update_pvc)
-      service.remove_old_pv_annotation(client, pvc)
+      service.remove_old_pv_annotation(req_id, client, pvc)
     end
   end
 
