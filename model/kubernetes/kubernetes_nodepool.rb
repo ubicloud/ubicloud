@@ -11,6 +11,10 @@ class KubernetesNodepool < Sequel::Model
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy, :start_bootstrapping, :upgrade, :scale_worker_count
+
+  def path
+    "#{cluster.path}/nodepool/#{ubid}"
+  end
 end
 
 # Table: kubernetes_nodepool
