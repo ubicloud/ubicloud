@@ -13,10 +13,6 @@ module Csi
       @logger = logger
     end
 
-    def log_with_id(req_id, message)
-      @logger.debug("[req_id=#{req_id}] #{message}")
-    end
-
     def run_kubectl(*args, yaml_data: nil)
       cmd = ["kubectl", *args]
       stdin_data = yaml_data ? YAML.dump(yaml_data) : nil
