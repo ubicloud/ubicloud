@@ -590,7 +590,7 @@ class Prog::Vm::Nexus < Prog::Base
 
   label def wait_vm_removal_from_load_balancer
     reap(nap: 10) do
-      vm.vm_host.sshable.cmd("sudo host/bin/setup-vm delete_net #{q_vm}")
+      vm.vm_host&.sshable&.cmd("sudo host/bin/setup-vm delete_net #{q_vm}")
       hop_destroy_slice
     end
   end
