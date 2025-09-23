@@ -10,6 +10,7 @@ RSpec.describe Csi::V1::NodeService do
 
   before do
     allow(SecureRandom).to receive(:uuid).and_return("test-req-id")
+    allow(service).to receive(:log_with_id) # suppress logs during test runs
   end
 
   describe ".mkdir_p" do
@@ -389,7 +390,7 @@ RSpec.describe Csi::V1::NodeService do
         fetch_and_migrate_pvc: pvc,
         perform_node_stage_volume: response,
         roll_back_reclaim_policy: nil,
-        remove_old_pv_annotation: nil
+        remove_old_pv_annotation_from_pvc: nil
       )
 
       result = service.node_stage_volume(req, nil)
@@ -403,31 +404,21 @@ RSpec.describe Csi::V1::NodeService do
     end
   end
 
-  describe "#remove_old_pv_annotation" do
+  describe "#remove_old_pv_annotation_from_pvc" do
     it "removes old PV annotation when present" do
+      namespace, name = "default", "pvc-o"
       pvc = {
         "metadata" => {
+          "namespace" => namespace,
+          "name" => name,
           "annotations" => {
             "csi.ubicloud.com/old-pv-name" => "old-pv-123"
           }
         }
       }
 
-      expect(client).to receive(:update_pvc).with(pvc)
-      service.remove_old_pv_annotation(req_id, client, pvc)
-
-      expect(pvc["metadata"]["annotations"]["csi.ubicloud.com/old-pv-name"]).to be_nil
-    end
-
-    it "does nothing when annotation is not present" do
-      pvc = {
-        "metadata" => {
-          "annotations" => {}
-        }
-      }
-
-      expect(client).not_to receive(:update_pvc)
-      service.remove_old_pv_annotation(req_id, client, pvc)
+      expect(client).to receive(:remove_pvc_annotation).with(namespace, name, "csi.ubicloud.com/old-pv-name")
+      service.remove_old_pv_annotation_from_pvc(req_id, client, pvc)
     end
   end
 
@@ -746,16 +737,20 @@ RSpec.describe Csi::V1::NodeService do
   end
 
   describe "#recreate_pvc" do
+    let(:pvc_uid) { "182437f9-cd4b-4bfd-9ec1-6ca83e55ebd2" }
+    let(:pv_name) { "pvc-#{pvc_uid}" }
+    let(:pvc_name) { "pvc-123" }
+    let(:namespace) { "default" }
     let(:pv) do
       {
         "metadata" => {
-          "name" => "pv-123",
+          "name" => pv_name,
           "annotations" => {}
         },
         "spec" => {
           "claimRef" => {
-            "namespace" => "default",
-            "name" => "pvc-123"
+            "namespace" => namespace,
+            "name" => pvc_name
           }
         }
       }
@@ -763,48 +758,44 @@ RSpec.describe Csi::V1::NodeService do
     let(:pvc) do
       {
         "metadata" => {
-          "name" => "pvc-123",
-          "namespace" => "default",
+          "name" => pvc_name,
+          "namespace" => namespace,
           "resourceVersion" => "12345",
-          "uid" => "uid-123",
+          "uid" => pvc_uid,
           "creationTimestamp" => "2023-01-01T00:00:00Z"
         },
         "spec" => {
-          "volumeName" => "pv-123"
+          "volumeName" => pv_name
         },
         "status" => {}
       }
     end
 
     before do
-      allow(service).to receive(:trim_pvc).and_return(pvc)
       allow(Base64).to receive(:strict_encode64).and_return("base64_content")
     end
 
     it "recreates PVC when PVC exists" do
-      expect(client).to receive(:get_pvc).with("default", "pvc-123").and_return(pvc)
-      expect(client).to receive(:update_pv).with(pv)
-      expect(client).to receive(:delete_pvc).with("default", "pvc-123")
-      expect(client).to receive(:remove_pvc_finalizers).with("default", "pvc-123")
+      expect(client).to receive(:get_pvc).with(namespace, pvc_name).and_return(pvc)
+      expect(client).to receive(:patch_resource).with("pv", pv_name, Csi::V1::NodeService::OLD_PVC_OBJECT_ANNOTATION_KEY, "base64_content")
+      expect(client).to receive(:delete_pvc).with(namespace, pvc_name)
+      expect(client).to receive(:remove_pvc_finalizers).with(namespace, pvc_name)
       expect(client).to receive(:create_pvc).with(pvc)
 
       service.recreate_pvc(req_id, client, pv)
-
-      expect(pv["metadata"]["annotations"]["csi.ubicloud.com/old-pvc-object"]).to eq("base64_content")
     end
 
     it "recreates PVC from annotation when PVC not found" do
       old_pvc_data = "different_base64_content"  # Different from "base64_content"
       pv["metadata"]["annotations"]["csi.ubicloud.com/old-pvc-object"] = old_pvc_data
 
-      expect(client).to receive(:get_pvc).with("default", "pvc-123").and_raise(ObjectNotFoundError.new("PVC not found"))
+      expect(client).to receive(:get_pvc).with(namespace, pvc_name).and_raise(ObjectNotFoundError.new("PVC not found"))
       expect(Base64).to receive(:decode64).with(old_pvc_data).and_return("decoded_yaml")
       expect(YAML).to receive(:load).with("decoded_yaml").and_return(pvc)
 
-      # Since the annotation content is different from base64_content, it should update
-      expect(client).to receive(:update_pv).with(pv)
-      expect(client).to receive(:delete_pvc).with("default", "pvc-123")
-      expect(client).to receive(:remove_pvc_finalizers).with("default", "pvc-123")
+      expect(client).to receive(:patch_resource).with("pv", pv_name, Csi::V1::NodeService::OLD_PVC_OBJECT_ANNOTATION_KEY, "base64_content")
+      expect(client).to receive(:delete_pvc).with(namespace, pvc_name)
+      expect(client).to receive(:remove_pvc_finalizers).with(namespace, pvc_name)
       expect(client).to receive(:create_pvc).with(pvc)
 
       service.recreate_pvc(req_id, client, pv)
@@ -814,19 +805,25 @@ RSpec.describe Csi::V1::NodeService do
       pv["metadata"]["annotations"]["csi.ubicloud.com/old-pvc-object"] = ""
 
       error = ObjectNotFoundError.new("PVC not found")
-      expect(client).to receive(:get_pvc).with("default", "pvc-123").and_raise(error)
+      expect(client).to receive(:get_pvc).with(namespace, pvc_name).and_raise(error)
 
       expect { service.recreate_pvc(req_id, client, pv) }.to raise_error(ObjectNotFoundError)
     end
 
-    it "skips PV update when annotation already matches" do
-      pv["metadata"]["annotations"]["csi.ubicloud.com/old-pvc-object"] = "base64_content"
-
-      expect(client).to receive(:get_pvc).with("default", "pvc-123").and_return(pvc)
-      expect(client).not_to receive(:update_pv)
-      expect(client).to receive(:delete_pvc).with("default", "pvc-123")
-      expect(client).to receive(:remove_pvc_finalizers).with("default", "pvc-123")
+    it "does not try to delete the pvc if deletion timestamp is already set" do
+      pvc["metadata"]["deletionTimestamp"] = "2023-01-01T00:00:00Z"
+      expect(client).to receive(:get_pvc).with(namespace, pvc_name).and_return(pvc)
+      expect(client).to receive(:patch_resource).with("pv", pv_name, Csi::V1::NodeService::OLD_PVC_OBJECT_ANNOTATION_KEY, "base64_content")
       expect(client).to receive(:create_pvc).with(pvc)
+
+      service.recreate_pvc(req_id, client, pv)
+    end
+
+    it "only patches the PVC if controller didn't create the PVC" do
+      pvc["metadata"]["uid"] = "someotheruid"
+      expect(client).to receive(:get_pvc).with(namespace, pvc_name).and_return(pvc)
+      expect(client).to receive(:patch_resource).with("pv", pv_name, Csi::V1::NodeService::OLD_PVC_OBJECT_ANNOTATION_KEY, "base64_content")
+      expect(client).to receive(:patch_resource).with("pvc", pvc_name, Csi::V1::NodeService::OLD_PV_NAME_ANNOTATION_KEY, pv_name, namespace:)
 
       service.recreate_pvc(req_id, client, pv)
     end
