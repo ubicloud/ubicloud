@@ -6,7 +6,7 @@ module Ubicloud
 
     set_fragment "postgres"
 
-    set_columns :id, :name, :state, :location, :vm_size, :storage_size_gib, :version, :ha_type, :flavor, :ca_certificates, :connection_string, :primary, :firewall_rules, :metric_destinations, :tags, :maintenance_window_start_at, :read_replica, :parent, :read_replicas
+    set_columns :id, :name, :state, :location, :vm_size, :storage_size_gib, :version, :target_version, :ha_type, :flavor, :ca_certificates, :connection_string, :primary, :firewall_rules, :metric_destinations, :tags, :maintenance_window_start_at, :read_replica, :parent, :read_replicas
 
     set_create_param_defaults do |params|
       params[:size] ||= "standard-2"
@@ -138,6 +138,16 @@ module Ubicloud
     # database.
     def restore(name:, restore_target:)
       Postgres.new(adapter, adapter.post(_path("/restore"), name:, restore_target:))
+    end
+
+    # Schedule a major version upgrade of the database.
+    def upgrade
+      merge_into_values(adapter.post(_path("/upgrade")))
+    end
+
+    # Show the status of a major version upgrade of the database.
+    def upgrade_status
+      adapter.get(_path("/upgrade"))
     end
   end
 end
