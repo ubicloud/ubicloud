@@ -70,6 +70,7 @@ class Clover
 
           r.post "resize" do
             authorize("KubernetesCluster:edit", kc.id)
+            handle_validation_failure("kubernetes-cluster/show") { @page = "settings" }
             node_count = typecast_params.pos_int!("node_count")
             Validation.validate_kubernetes_worker_node_count(node_count)
 
@@ -79,7 +80,12 @@ class Clover
               audit_log(kn, "update")
             end
 
-            Serializers::KubernetesCluster.serialize(kc, {detailed: true})
+            if api?
+              Serializers::KubernetesCluster.serialize(kc, {detailed: true})
+            else
+              flash["notice"] = "#{kc.name} node pool #{kn.name} will be resized"
+              r.redirect kc
+            end
           end
         end
       end
