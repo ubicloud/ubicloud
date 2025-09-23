@@ -36,6 +36,8 @@ Post Commands:
     show                               Show details for a PostgreSQL database
     show-config                        Show configuration for a PostgreSQL database
     show-pgbouncer-config              Show pgbouncer configuration for a PostgreSQL database
+    show-upgrade-status                Show the status of a major version upgrade of the PostgreSQL database
+    upgrade                            Schedule a major version upgrade of the PostgreSQL database
 
 Post Options:
     -d, --dbname=name                override database name
