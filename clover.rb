@@ -98,6 +98,7 @@ class Clover < Roda
     ApiKey
     Firewall
     KubernetesCluster
+    KubernetesNodepool
     LoadBalancer
     Location
     ObjectTag
@@ -110,7 +111,6 @@ class Clover < Roda
 
   path("Project", class_name: true, &:path)
   path("GithubInstallation", class_name: true) { "#{it.project.path}/github/#{it.ubid}" }
-  path("KubernetesNodepool", class_name: true) { "#{it.cluster.project.path}#{it.cluster.path}/nodepool/#{it.ubid}" }
 
   # :nocov:
   if Config.test? && defined?(SimpleCov)
