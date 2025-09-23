@@ -55,38 +55,34 @@ class Clover
         kc.kubeconfig
       end
 
-      r.on "nodepool" do
-        r.on KUBERNETES_NODEPOOL_NAME_OR_UBID do |kn_name, kn_id|
-          filter = if kn_name
-            {Sequel[:kubernetes_nodepool][:name] => kn_name}
-          else
-            {Sequel[:kubernetes_nodepool][:id] => kn_id}
-          end
+      r.post "nodepool", KUBERNETES_NODEPOOL_NAME_OR_UBID, "resize" do |kn_name, kn_id|
+        filter = if kn_name
+          {Sequel[:kubernetes_nodepool][:name] => kn_name}
+        else
+          {Sequel[:kubernetes_nodepool][:id] => kn_id}
+        end
 
-          filter[:kubernetes_cluster_id] = kc.id
-          kn = @kn = kc.nodepools_dataset.first(filter)
+        filter[:kubernetes_cluster_id] = kc.id
+        kn = @kn = kc.nodepools_dataset.first(filter)
 
-          check_found_object(kn)
+        check_found_object(kn)
 
-          r.post "resize" do
-            authorize("KubernetesCluster:edit", kc.id)
-            handle_validation_failure("kubernetes-cluster/show") { @page = "settings" }
-            node_count = typecast_params.pos_int!("node_count")
-            Validation.validate_kubernetes_worker_node_count(node_count)
+        authorize("KubernetesCluster:edit", kc.id)
+        handle_validation_failure("kubernetes-cluster/show") { @page = "settings" }
+        node_count = typecast_params.pos_int!("node_count")
+        Validation.validate_kubernetes_worker_node_count(node_count)
 
-            DB.transaction do
-              kn.update(node_count:)
-              kn.incr_scale_worker_count
-              audit_log(kn, "update")
-            end
+        DB.transaction do
+          kn.update(node_count:)
+          kn.incr_scale_worker_count
+          audit_log(kn, "update")
+        end
 
-            if api?
-              Serializers::KubernetesCluster.serialize(kc, {detailed: true})
-            else
-              flash["notice"] = "#{kc.name} node pool #{kn.name} will be resized"
-              r.redirect kc
-            end
-          end
+        if api?
+          Serializers::KubernetesCluster.serialize(kc, {detailed: true})
+        else
+          flash["notice"] = "#{kc.name} node pool #{kn.name} will be resized"
+          r.redirect kc
         end
       end
     end
