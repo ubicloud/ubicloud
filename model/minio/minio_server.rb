@@ -91,7 +91,7 @@ class MinioServer < Sequel::Model
       endpoint: server_url,
       access_key: cluster.admin_user,
       secret_key: cluster.admin_password,
-      ssl_ca_data: cluster.root_certs + cert,
+      ssl_ca_data: cluster.root_certs,
       socket: socket
     )
   end
