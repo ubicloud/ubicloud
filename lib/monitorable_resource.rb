@@ -53,6 +53,10 @@ class MonitorableResource
           ) &&
           (@session[:last_pulse].nil? || @session[:last_pulse] < (Time.now - 8))
         stale_retry = true
+        begin
+          @session[:ssh_session].shutdown!
+        rescue
+        end
         @session.merge!(@resource.init_health_monitor_session)
         retry
       end
