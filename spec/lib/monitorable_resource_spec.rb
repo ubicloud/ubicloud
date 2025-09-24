@@ -123,10 +123,13 @@ RSpec.describe MonitorableResource do
         expect(session[:ssh_session]).to receive(:loop)
       end
 
-      it "does not retry if the last pulse is not set" do
+      it "retries if the last pulse is not set" do
         expect(postgres_server).to receive(:check_pulse).and_raise(ex)
-        expect(Clog).to receive(:emit).and_call_original
-        expect { r_w_event_loop.check_pulse }.not_to raise_error
+        second_session = instance_double(Net::SSH::Connection::Session)
+        expect(postgres_server).to receive(:init_health_monitor_session).and_return(second_session)
+        expect(session).to receive(:merge!).with(second_session)
+        expect(postgres_server).to receive(:check_pulse).and_return({reading: "up", reading_rpt: 1})
+        r_w_event_loop.check_pulse
       end
 
       it "does not retry if the connection is fresh" do

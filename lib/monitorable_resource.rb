@@ -51,7 +51,7 @@ class MonitorableResource
             # Seen when receiving on a broken connection.
             ex.is_a?(Errno::ECONNRESET) && ex.message.start_with?("Connection reset by peer - recvfrom(2)")
           ) &&
-          @session[:last_pulse]&.<(Time.now - 8)
+          (@session[:last_pulse].nil? || @session[:last_pulse] < (Time.now - 8))
         stale_retry = true
         @session.merge!(@resource.init_health_monitor_session)
         retry
