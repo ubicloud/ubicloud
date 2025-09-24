@@ -35,6 +35,18 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       expect {
         described_class.assemble(minio_project.id, "minio", Location::HETZNER_FSN1_ID, "mu", 100, 1, 1, 1, "standard-2")
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: username"
+
+      expect {
+        described_class.assemble(minio_project.id, "minio", Location::HETZNER_FSN1_ID, "minio-admin", 100, 2, 1, 1, "standard-2")
+      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: server_count"
+
+      expect {
+        described_class.assemble(minio_project.id, "minio", Location::HETZNER_FSN1_ID, "minio-admin", 100, 2, 2, 1, "standard-2")
+      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: drive_count"
+
+      expect {
+        described_class.assemble(minio_project.id, "minio", Location::HETZNER_FSN1_ID, "minio-admin", 1, 2, 2, 4, "standard-2")
+      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: storage_size_gib"
     end
 
     it "creates a minio cluster" do

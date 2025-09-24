@@ -18,6 +18,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     Validation.validate_vm_size(vm_size, "x64")
     Validation.validate_name(cluster_name)
     Validation.validate_minio_username(admin_user)
+    per_pool_server_count, per_pool_drive_count, per_pool_storage_size = Validation.validate_minio_setup(storage_size_gib:, pool_count:, server_count:, drive_count:)
 
     DB.transaction do
       ubid = MinioCluster.generate_ubid
@@ -42,9 +43,6 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
         project_id:
       ) { it.id = ubid.to_uuid }
 
-      per_pool_server_count = server_count / pool_count
-      per_pool_drive_count = drive_count / pool_count
-      per_pool_storage_size = storage_size_gib / pool_count
       pool_count.times do |i|
         start_index = i * per_pool_server_count
         Prog::Minio::MinioPoolNexus.assemble(minio_cluster.id, start_index, per_pool_server_count, per_pool_drive_count, per_pool_storage_size, vm_size)

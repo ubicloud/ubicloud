@@ -56,6 +56,16 @@ module Validation
     fail ValidationFailed.new({username: msg}) unless username&.match(ALLOWED_MINIO_USERNAME_PATTERN)
   end
 
+  def self.validate_minio_setup(storage_size_gib:, pool_count:, server_count:, drive_count:)
+    per_pool_server_count = server_count / pool_count
+    per_pool_drive_count = drive_count / pool_count
+    per_pool_storage_size = storage_size_gib / pool_count
+    fail ValidationFailed.new({server_count: "Minio per pool server count < 1"}) if per_pool_server_count < 1
+    fail ValidationFailed.new({drive_count: "Minio per pool drive count < 1"}) if per_pool_drive_count < 1
+    fail ValidationFailed.new({storage_size_gib: "Minio per pool storage size < 1"}) if per_pool_storage_size < 1
+    [per_pool_server_count, per_pool_drive_count, per_pool_storage_size]
+  end
+
   def self.validate_vm_size(size, arch, only_visible: false)
     available_vm_sizes = Option::VmSizes.select { !only_visible || it.visible }
     unless (vm_size = available_vm_sizes.find { it.name == size && it.arch == arch })
