@@ -176,6 +176,18 @@ RSpec.describe KubernetesCluster do
     end
   end
 
+  describe "#install_rhizome" do
+    it "creates a strand for each control plane vm to update the contents of rhizome folder" do
+      sshable = instance_double(Sshable, id: "someid")
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id)
+      expect(kc.cp_vms.first).to receive(:sshable).and_return(sshable).twice
+      kc.cp_vms.each do |vm|
+        expect(Strand).to receive(:create).with(prog: "InstallRhizome", label: "start", stack: [{subject_id: vm.sshable.id, target_folder: "kubernetes"}])
+      end
+      kc.install_rhizome
+    end
+  end
+
   describe "#all_nodes" do
     it "returns all nodes in the cluster" do
       expect(kc).to receive(:nodes).and_return([1, 2])
