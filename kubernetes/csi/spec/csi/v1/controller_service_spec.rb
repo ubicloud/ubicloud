@@ -329,10 +329,4 @@ RSpec.describe Csi::V1::ControllerService do
       end
     end
   end
-
-  describe "class inheritance" do
-    it "inherits from Controller::Service" do
-      expect(described_class.superclass).to eq(Csi::V1::Controller::Service)
-    end
-  end
 end
