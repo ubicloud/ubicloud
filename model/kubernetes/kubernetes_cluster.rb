@@ -113,6 +113,12 @@ class KubernetesCluster < Sequel::Model
     aggregate_readings(previous_pulse: previous_pulse, reading: reading)
   end
 
+  def install_rhizome
+    cp_vms.each do |vm|
+      Strand.create(prog: "InstallRhizome", label: "start", stack: [{subject_id: vm.sshable.id, target_folder: "kubernetes"}])
+    end
+  end
+
   def all_nodes
     nodes + nodepools.flat_map(&:nodes)
   end
