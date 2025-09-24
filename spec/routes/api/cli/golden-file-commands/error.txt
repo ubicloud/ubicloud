@@ -92,3 +92,6 @@ vm vmdzyppz6j166jh5e9t2dwrfasa show
 kc eu-central-h1/test-kc create invalid
 kc eu-central-h1/test-kc create -c a
 kc eu-central-h1/test-kc create -c 1 -w bad
+kc eu-central-h1/test-kc resize-nodepool something
+kc eu-central-h1/test-kc resize-nodepool test-kc-np -1
+kc eu-central-h1/test-kc resize-nodepool test-kc-np 2.9

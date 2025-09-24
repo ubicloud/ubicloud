@@ -194,14 +194,15 @@ Usage:
     ubi kc (location/kc-name | kc-id) post-command [...]
 
 Commands:
-    list          List Kubernetes clusters
+    list               List Kubernetes clusters
 
 Post Commands:
-    create        Create a Kubernetes cluster
-    destroy       Destroy a Kubernetes cluster
-    kubeconfig    Print kubeconfig.yaml for a Kubernetes cluster
-    rename        Rename a Kubernetes cluster
-    show          Show details for a Kubernetes cluster
+    create             Create a Kubernetes cluster
+    destroy            Destroy a Kubernetes cluster
+    kubeconfig         Print kubeconfig.yaml for a Kubernetes cluster
+    rename             Rename a Kubernetes cluster
+    resize-nodepool    Resize a Kubernetes cluster nodepool
+    show               Show details for a Kubernetes cluster
 
 
 List Kubernetes clusters
@@ -253,6 +254,12 @@ Rename a Kubernetes cluster
 
 Usage:
     ubi kc (location/kc-name | kc-id) rename new-name
+
+
+Resize a Kubernetes cluster nodepool
+
+Usage:
+    ubi kc (location/kc-name | kc-id) resize-nodepool (np-name | np-id) node-count
 
 
 Show details for a Kubernetes cluster

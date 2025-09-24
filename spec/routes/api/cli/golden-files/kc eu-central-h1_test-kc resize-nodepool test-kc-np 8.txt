@@ -1,0 +1,1 @@
+Resized nodepool test-kc-np to 8 nodes.
