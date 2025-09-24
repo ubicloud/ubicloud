@@ -425,13 +425,13 @@ RSpec.describe Prog::Minio::MinioServerNexus do
     end
 
     it "returns true if health check is successful" do
-      expect(nx.minio_server.vm).to receive(:ephemeral_net4).and_return("1.2.3.4").twice
+      expect(nx.minio_server.vm).to receive(:ephemeral_net4).and_return("1.2.3.4")
       stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok"}]}]}))
       expect(nx.available?).to be(true)
     end
 
     it "returns false if health check is unsuccessful" do
-      expect(nx.minio_server.vm).to receive(:ephemeral_net4).and_return("1.2.3.4").twice
+      expect(nx.minio_server.vm).to receive(:ephemeral_net4).and_return("1.2.3.4")
       stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "offline", endpoint: "1.2.3.4:9000"}]}))
       expect(nx.available?).to be(false)
     end

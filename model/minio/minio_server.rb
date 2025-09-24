@@ -62,9 +62,18 @@ class MinioServer < Sequel::Model
     }
   end
 
+  def server_data(client = self.client)
+    server_data = JSON.parse(client.admin_info.body)["servers"]
+    if cluster.server_count == 1
+      server_data.first
+    else
+      server_data.find { it["endpoint"] == endpoint }
+    end
+  end
+
   def check_pulse(session:, previous_pulse:)
     reading = begin
-      server_data = JSON.parse(session[:minio_client].admin_info.body)["servers"].find { it["endpoint"] == endpoint }
+      server_data = self.server_data(session[:minio_client])
       (server_data["state"] == "online" && server_data["drives"].all? { it["state"] == "ok" }) ? "up" : "down"
     rescue
       "down"

@@ -83,13 +83,36 @@ RSpec.describe MinioServer do
     ms.init_health_monitor_session
   end
 
-  it "checks pulse" do
+  it "checks pulse using endpoint for multiple servers" do
     session = {
       ssh_session: instance_double(Net::SSH::Connection::Session),
       minio_client: Minio::Client.new(endpoint: "https://1.2.3.4:9000", access_key: "dummy-key", secret_key: "dummy-secret", ssl_ca_data: "data")
     }
 
     expect(ms.vm).to receive(:ephemeral_net4).and_return("1.2.3.4").at_least(:once)
+    expect(ms).not_to receive(:incr_checkup)
+    ms.pool.update(server_count: 2)
+
+    stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok"}]}]}))
+    ms.check_pulse(session: session, previous_pulse: {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30})
+
+    stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [
+      {state: "online", endpoint: "1.2.3.5:9000", drives: [{state: "ok"}]},
+      {state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "faulty"}]}
+    ]}))
+    ms.check_pulse(session: session, previous_pulse: {})
+
+    stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "offline", endpoint: "1.2.3.4:9000"}]}))
+    ms.check_pulse(session: session, previous_pulse: {})
+  end
+
+  it "checks pulse without endpoint for single server" do
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session),
+      minio_client: Minio::Client.new(endpoint: "https://1.2.3.4:9000", access_key: "dummy-key", secret_key: "dummy-secret", ssl_ca_data: "data")
+    }
+
+    expect(ms.vm).not_to receive(:ephemeral_net4)
     expect(ms).not_to receive(:incr_checkup)
 
     stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok"}]}]}))
