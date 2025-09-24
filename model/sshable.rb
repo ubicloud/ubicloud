@@ -174,7 +174,7 @@ LOCK
         end
 
         Clog.emit("session lock failure") do
-          {contended_session_lock: {exit_code:, session_fail_msg:, sshable_ubid: ubid.to_s}}
+          {contended_session_lock: {exit_code:, session_fail_msg:, sshable_ubid: ubid.to_s, prog: Prog::Base.current_prog}}
         end
       end
     end
