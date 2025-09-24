@@ -78,9 +78,14 @@ LOCK
       end
 
       it "reports lock conflicts when an obscure exit code is raised" do
+        sa.id = "624ec0d1-95d9-8f31-bbaa-bcccb76fe98b"
         expect(sa).to receive(:cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 124, nil))
         expect(Clog).to receive(:emit).with("session lock failure").and_wrap_original do |m, a, &b|
-          expect(b.call.dig(:contended_session_lock, :session_fail_msg)).to eq("session lock conflict for testlockname")
+          expect(b.call).to eq(contended_session_lock: {
+            exit_code: 124,
+            session_fail_msg: "session lock conflict for testlockname",
+            sshable_ubid: "shc97c1mcnv67qenbsk5qdzmrp"
+          })
         end
         sa.connect
       end
