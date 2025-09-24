@@ -139,6 +139,20 @@ RSpec.describe Prog::Base do
     }.to change { Semaphore.where(strand_id: st.id).any? }.from(true).to(false)
   end
 
+  describe Prog::Base, :current_prog do
+    it "returns nil if Progs are not in the call stack" do
+      expect(described_class.current_prog).to be_nil
+    end
+
+    it "can have its label located deeper in the call stack by Prog.current_prog" do
+      st = Strand.create(prog: "Test", label: "callee_find_current_prog")
+      expect(described_class).to receive(:current_prog).and_wrap_original do |om, *args, **kwargs, &blk|
+        om.call(*args, **kwargs, &blk).tap { expect(it).to eq("Prog::Test#callee_find_current_prog") }
+      end
+      st.run
+    end
+  end
+
   it "calls before_run if it is available" do
     st = Strand.create(prog: "Prog::Vm::Nexus", label: "wait")
     prg = instance_double(Prog::Vm::Nexus)

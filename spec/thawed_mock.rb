@@ -94,6 +94,7 @@ module ThawedMock
   allow_mocking(VictoriaMetricsResource, :[], :first)
 
   # Progs
+  allow_mocking(Prog::Base, :current_prog)
   allow_mocking(Prog::Ai::InferenceEndpointNexus, :assemble, :model_for_id)
   allow_mocking(Prog::Ai::InferenceEndpointReplicaNexus, :assemble)
   allow_mocking(Prog::Ai::InferenceRouterReplicaNexus, :assemble)
