@@ -39,7 +39,7 @@ class LoadBalancerVmPort < Sequel::Model
     end
 
     begin
-      ((session[:ssh_session].exec!(health_check_cmd(type)).strip == "200") ? "up" : "down").tap { session[:last_pulse] = Time.now }
+      (session[:ssh_session].exec!(health_check_cmd(type)).strip == "200") ? "up" : "down"
     rescue IOError, Errno::ECONNRESET
       raise
     rescue => e

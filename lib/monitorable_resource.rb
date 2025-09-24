@@ -41,6 +41,7 @@ class MonitorableResource
     @pulse_check_started_at = Time.now
     begin
       @pulse = @resource.check_pulse(session: @session, previous_pulse: @pulse)
+      @session[:last_pulse] = Time.now
       Clog.emit("Got new pulse.") { {got_pulse: {ubid: @resource.ubid, pulse: @pulse}} } if (rpt = @pulse[:reading_rpt]) && (rpt < 6 || rpt % 5 == 1) || @pulse[:reading] != "up"
     rescue => ex
       if !stale_retry &&
