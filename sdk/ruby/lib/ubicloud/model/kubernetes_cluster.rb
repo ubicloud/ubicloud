@@ -12,5 +12,9 @@ module Ubicloud
     def kubeconfig
       adapter.get(_path("/kubeconfig"))
     end
+
+    def resize_nodepool(nodepool_ref, node_count)
+      adapter.post(_path("/nodepool/#{nodepool_ref}/resize"), {node_count: node_count})
+    end
   end
 end
