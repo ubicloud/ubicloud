@@ -170,11 +170,25 @@ RSpec.describe Csi::V1::ControllerService do
       end
 
       it "raises OUT_OF_RANGE when volume size exceeds maximum" do
+        ENV.delete("DISK_LIMIT_GB")
+        service = described_class.new(logger: Logger.new($stdout))
+
         request = Csi::V1::CreateVolumeRequest.new(
           name: "test",
           capacity_range: {required_bytes: 11 * 1024 * 1024 * 1024} # 11GB > 10GB max
         )
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume size exceeds maximum allowed size of 2GB")
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume size exceeds maximum allowed size of 10GB")
+      end
+
+      it "raises OUT_OF_RANGE when volume size exceeds maximum when a dynamic value is set" do
+        ENV["DISK_LIMIT_GB"] = "40"
+        service = described_class.new(logger: Logger.new($stdout))
+
+        request = Csi::V1::CreateVolumeRequest.new(
+          name: "test",
+          capacity_range: {required_bytes: 45 * 1024 * 1024 * 1024}
+        )
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume size exceeds maximum allowed size of 40GB")
       end
 
       it "raises InvalidArgument when volume_capabilities is nil" do
