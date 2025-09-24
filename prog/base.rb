@@ -9,6 +9,13 @@ class Prog::Base
     @subject_id = frame.dig("subject_id") || @strand.id
   end
 
+  # Searches the stack for the Prog that caused execution of the code,
+  # which can be useful in logging from nested method calls.
+  def self.current_prog
+    caller_locations.reverse_each { return it.label if it.label.start_with?("Prog::") }
+    nil
+  end
+
   def self.subject_is(*names)
     names.each do |name|
       class_eval %(

@@ -142,6 +142,15 @@ class Prog::Test < Prog::Base
   label def push_subject_id
     push Prog::Test, {"subject_id" => "70b633b7-1d24-4526-a47f-d2580597d53f"}
   end
+
+  label def callee_find_current_prog
+    find_current_prog
+    pop ""
+  end
+
+  def find_current_prog
+    Base.current_prog
+  end
 end
 
 class Prog::Test2 < Prog::Test
