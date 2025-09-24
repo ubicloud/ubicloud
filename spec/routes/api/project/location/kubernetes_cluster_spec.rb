@@ -132,7 +132,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
             expect(last_response.status).to eq(200)
             body = JSON.parse(last_response.body)
-            expect(body["nodepools"][0]["node_count"]).to eq(new_count)
+            expect(body["node_count"]).to eq(new_count)
             expect(kn.reload.node_count).to eq(new_count)
             expect(kn.scale_worker_count_set?).to be true
           end

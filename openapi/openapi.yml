@@ -548,7 +548,7 @@ paths:
                 - node_count
       responses:
         '200':
-          $ref: '#/components/responses/KubernetesCluster'
+          $ref: '#/components/responses/KubernetesNodepool'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -2945,6 +2945,15 @@ components:
             required:
               - count
               - items
+    KubernetesNodepool:
+      description: A Kubernetes node pool
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            allOf:
+              - $ref: '#/components/schemas/KubernetesNodepool'
   securitySchemes:
     BearerAuth:
       bearerFormat: JWT
