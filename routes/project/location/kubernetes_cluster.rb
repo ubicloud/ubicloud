@@ -79,7 +79,7 @@ class Clover
         end
 
         if api?
-          Serializers::KubernetesCluster.serialize(kc, {detailed: true})
+          Serializers::KubernetesNodepool.serialize(kn, {detailed: true})
         else
           flash["notice"] = "#{kc.name} node pool #{kn.name} will be resized"
           r.redirect kc
