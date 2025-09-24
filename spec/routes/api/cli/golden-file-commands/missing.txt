@@ -1,1 +1,2 @@
+kc eu-central-h1/test-kc resize-nodepool something 5
 ps eu-central-h1/test-ps disconnect psfzm9e26xky5m9ggetw4dpqe2/foo

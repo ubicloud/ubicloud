@@ -25,6 +25,7 @@ ubi kc location/kc-name create [options]
 ubi kc (location/kc-name | kc-id) destroy [options]
 ubi kc (location/kc-name | kc-id) kubeconfig
 ubi kc (location/kc-name | kc-id) rename new-name
+ubi kc (location/kc-name | kc-id) resize-nodepool (np-name | np-id) node-count
 ubi kc (location/kc-name | kc-id) show [options]
 ubi lb command [...]
 ubi lb (location/lb-name | lb-id) post-command [...]
