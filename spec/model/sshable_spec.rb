@@ -84,7 +84,8 @@ LOCK
           expect(b.call).to eq(contended_session_lock: {
             exit_code: 124,
             session_fail_msg: "session lock conflict for testlockname",
-            sshable_ubid: "shc97c1mcnv67qenbsk5qdzmrp"
+            sshable_ubid: "shc97c1mcnv67qenbsk5qdzmrp",
+            prog: nil
           })
         end
         sa.connect
