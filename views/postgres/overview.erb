@@ -4,9 +4,7 @@ vm = @pg.representative_server.vm
 
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 database-overview">
   <%
-    vmr = VictoriaMetricsResource.first(project_id: @pg.representative_server.metrics_config[:project_id])
-    if vmr
-      tsdb_client = vmr.servers.first.client
+    if (tsdb_client = PostgresServer.victoria_metrics_client)
       query = Metrics::POSTGRES_METRICS[:disk_usage].series[0].query.gsub("$ubicloud_resource_id", @pg.ubid)
       disk_usage = begin
         tsdb_client.query_range(query:, start_ts: Time.now.to_i - 60 * 60, end_ts: Time.now.to_i)[0]

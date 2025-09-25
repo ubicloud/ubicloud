@@ -13,6 +13,16 @@ class VictoriaMetricsResource < Sequel::Model
     encrypted_columns: [:admin_password, :root_cert_key_1, :root_cert_key_2]
   plugin SemaphoreMethods, :destroy, :reconfigure
 
+  def self.client_for_project(prj_id)
+    vmr = nil
+    [prj_id, Config.victoria_metrics_service_project_id].each do |project_id|
+      next unless project_id
+      break if (vmr = VictoriaMetricsResource.first(project_id:))
+    end
+
+    vmr&.servers&.first&.client || (VictoriaMetrics::Client.new(endpoint: "http://localhost:8428") if Config.development?)
+  end
+
   def hostname
     "#{name}.#{Config.victoria_metrics_host_name}"
   end
