@@ -20,6 +20,10 @@ class PostgresServer < Sequel::Model
   include HealthMonitorMethods
   include MetricsTargetMethods
 
+  def self.victoria_metrics_client
+    VictoriaMetricsResource.client_for_project(Config.postgres_service_project_id)
+  end
+
   def configure_hash
     configs = {
       "listen_addresses" => "'*'",

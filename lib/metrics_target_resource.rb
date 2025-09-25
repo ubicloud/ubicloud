@@ -10,13 +10,7 @@ class MetricsTargetResource
     @last_export_success = false
     @export_started_at = Time.now
     @deleted = false
-
-    vmr = nil
-    [resource.metrics_config[:project_id], Config.victoria_metrics_service_project_id].each do |project_id|
-      next unless project_id
-      break if (vmr = VictoriaMetricsResource.first(project_id:))
-    end
-    @tsdb_client = vmr&.servers&.first&.client || (VictoriaMetrics::Client.new(endpoint: "http://localhost:8428") if Config.development?)
+    @tsdb_client = VictoriaMetricsResource.client_for_project(resource.metrics_config[:project_id])
   end
 
   def open_resource_session

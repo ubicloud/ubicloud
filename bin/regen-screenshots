@@ -265,6 +265,7 @@ class RegenScreenshots
 
     # Mock the metrics_config method on PostgresServer to return the correct project_id
     PostgresServer.define_method(:metrics_config) { {project_id: project.id} }
+    Config.define_singleton_method(:postgres_service_project_id) { project.id }
 
     resize(900, width: 1600)
     click_link "PostgreSQL"

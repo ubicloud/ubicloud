@@ -480,6 +480,7 @@ RSpec.describe Clover, "postgres" do
         allow(Config).to receive(:postgres_service_project_id).and_return(prj.id)
         allow(VictoriaMetricsResource).to receive(:first).with(project_id: prj.id).and_return(vmr)
         allow(vmr).to receive(:servers_dataset).and_return([vm_server])
+        allow(VictoriaMetricsResource).to receive(:client_for_project).and_return(tsdb_client)
         allow(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
       end
 
@@ -561,24 +562,8 @@ RSpec.describe Clover, "postgres" do
         expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Invalid metric name")
       end
 
-      it "returns 404 when victori_ametrics resource is not available" do
-        allow(VictoriaMetricsResource).to receive(:first).and_return(nil)
-        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics"
-
-        expect(last_response.status).to eq(404)
-        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Metrics are not configured for this instance")
-      end
-
-      it "returns 404 when victoria_metrics servers are not available" do
-        allow(vmr).to receive(:servers_dataset).and_return([])
-        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics"
-
-        expect(last_response.status).to eq(404)
-        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Metrics are not configured for this instance")
-      end
-
-      it "returns 404 when tsdb_client is not available" do
-        allow(vm_server).to receive(:client).and_return(nil)
+      it "returns 404 when victoria_metrics client is not available" do
+        expect(PostgresServer).to receive(:victoria_metrics_client).and_return(nil)
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics"
 
         expect(last_response.status).to eq(404)

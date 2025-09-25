@@ -77,7 +77,7 @@ module ThawedMock
   allow_mocking(PostgresLsnMonitor, :new)
   allow_mocking(PostgresMetricDestination, :generate_uuid)
   allow_mocking(PostgresResource, :[], :generate_uuid)
-  allow_mocking(PostgresServer, :create)
+  allow_mocking(PostgresServer, :create, :victoria_metrics_client)
   allow_mocking(Project, :[], :order_by)
   allow_mocking(Semaphore, :where, :create, :incr)
   allow_mocking(Sshable, :create_with_id, :repl?)
@@ -91,7 +91,7 @@ module ThawedMock
   allow_mocking(VmHostSlice, :[], :dataset)
   allow_mocking(VmStorageVolume, :create)
   allow_mocking(VictoriaMetricsServer, :[])
-  allow_mocking(VictoriaMetricsResource, :[], :first)
+  allow_mocking(VictoriaMetricsResource, :[], :first, :client_for_project)
 
   # Progs
   allow_mocking(Prog::Ai::InferenceEndpointNexus, :assemble, :model_for_id)
