@@ -5,7 +5,6 @@ require_relative "../../model"
 
 class MinioServer < Sequel::Model
   one_to_one :strand, key: :id
-  many_to_one :project
   many_to_one :vm
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, conditions: {Sequel.function(:upper, :span) => nil}
   many_to_one :pool, key: :minio_pool_id, class: :MinioPool
