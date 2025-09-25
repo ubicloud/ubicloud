@@ -23,6 +23,9 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
     ipv6_range ||= random_private_ipv6(location, project).to_s
     ipv4_range ||= random_private_ipv4(location, project).to_s
+
+    Clog.emit("ipv6_range: #{ipv6_range}")
+    Clog.emit("ipv4_range: #{ipv4_range}")
     DB.transaction do
       ps = PrivateSubnet.create_with_id(id, name:, location_id: location.id, net6: ipv6_range, net4: ipv4_range, state: "waiting", project_id:)
       firewall_dataset = project.firewalls_dataset.where(location_id:)
@@ -62,6 +65,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
   label def start
     if private_subnet.location.aws?
+      Clog.emit("Creating VPC at time #{Time.now} for #{private_subnet.name}")
       PrivateSubnetAwsResource.create_with_id(private_subnet.id) unless private_subnet.private_subnet_aws_resource
       bud Prog::Aws::Vpc, {"subject_id" => private_subnet.id}, :create_vpc
       hop_wait_vpc_created
@@ -71,7 +75,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def wait_vpc_created
-    reap(:wait, nap: 2)
+    reap(:wait, nap: 1)
   end
 
   label def wait

@@ -19,6 +19,7 @@ class Prog::Vm::GithubRunner < Prog::Base
         label: label
       )
 
+      Clog.emit("Github Runner Created at time #{Time.now}")
       Strand.create_with_id(github_runner.id, prog: "Vm::GithubRunner", label: "start")
     end
   end
@@ -243,6 +244,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def setup_environment
+    Clog.emit("At the state setup_environment at time #{Time.now}")
     command = <<~COMMAND
       # To make sure the script errors out if any command fails
       set -ueo pipefail
@@ -276,6 +278,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def register_runner
+    Clog.emit("At the state register_runner at time #{Time.now}")
     # We use generate-jitconfig instead of registration-token because it's
     # recommended by GitHub for security reasons.
     # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-just-in-time-runners
@@ -320,6 +323,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def wait
+    Clog.emit("At the state wait at time #{Time.now}")
     register_deadline(nil, 5 * 24 * 60 * 60)
     case vm.sshable.cmd("systemctl show -p SubState --value runner-script").chomp
     when "exited"

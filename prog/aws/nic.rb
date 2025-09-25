@@ -5,6 +5,7 @@ class Prog::Aws::Nic < Prog::Base
   subject_is :nic
 
   label def create_network_interface
+    Clog.emit("Creating network interface at time #{Time.now}")
     network_interface_response = client.create_network_interface({
       subnet_id: nic.private_subnet.private_subnet_aws_resource.subnet_id,
       private_ip_address: nic.private_ipv4.network.to_s,
@@ -22,12 +23,15 @@ class Prog::Aws::Nic < Prog::Base
   end
 
   label def assign_ipv6_address
+    Clog.emit("Assigning IPv6 address at time #{Time.now}")
     client.assign_ipv_6_addresses({network_interface_id: nic.nic_aws_resource.network_interface_id, ipv_6_address_count: 1}) if get_network_interface.ipv_6_addresses.empty?
+    Clog.emit("IPv6 address assigned at time #{Time.now}")
     hop_wait_network_interface_created
   end
 
   label def wait_network_interface_created
     if get_network_interface.status == "available"
+      Clog.emit("Network interface created at time #{Time.now}")
       hop_allocate_eip
     end
 
@@ -35,6 +39,7 @@ class Prog::Aws::Nic < Prog::Base
   end
 
   label def allocate_eip
+    Clog.emit("Allocating EIP at time #{Time.now}")
     eip_response = client.describe_addresses({filters: [{name: "tag:Name", values: [nic.name]}]})
     eip_allocation_id = if eip_response.addresses.empty?
       client.allocate_address(tag_specifications: Util.aws_tag_specifications("elastic-ip", nic.nic_aws_resource.network_interface_id)).allocation_id
@@ -43,14 +48,17 @@ class Prog::Aws::Nic < Prog::Base
     end
 
     nic.nic_aws_resource.update(eip_allocation_id:)
+    Clog.emit("EIP allocated at time #{Time.now}")
     hop_attach_eip_network_interface
   end
 
   label def attach_eip_network_interface
+    Clog.emit("Attaching EIP to network interface at time #{Time.now}")
     eip_response = client.describe_addresses({filters: [{name: "allocation-id", values: [nic.nic_aws_resource.eip_allocation_id]}]})
     if eip_response.addresses.first.network_interface_id.nil?
       client.associate_address({allocation_id: nic.nic_aws_resource.eip_allocation_id, network_interface_id: nic.nic_aws_resource.network_interface_id})
     end
+    Clog.emit("EIP attached to network interface at time #{Time.now}")
     pop "nic created"
   end
 

@@ -174,7 +174,7 @@ module Config
   override :github_ubuntu_2404_version, "20250821.1.0", string
   override :github_ubuntu_2204_version, "20250821.1.0", string
   override :github_gpu_ubuntu_2204_version, "20250821.1.0", string
-  override :github_ubuntu_2204_aws_ami_version, "ami-04b5534ef1aed6bde", string
+  override :github_ubuntu_2204_aws_ami_version, "ami-065c974cba102083d", string
   override :github_ubuntu_2404_aws_ami_version, "ami-0908b850ff3e635a2", string
   override :postgres16_ubuntu_2204_version, "20250425.1.1", string
   override :postgres17_ubuntu_2204_version, "20250425.1.1", string
