@@ -210,13 +210,14 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   label def start_aws
-    nap 5 unless vm.nics.all? { |nic| nic.strand.label == "wait" }
+    nap 1 unless vm.nics.all? { |nic| nic.strand.label == "wait" }
     bud Prog::Aws::Instance, {"subject_id" => vm.id}, :start
     hop_wait_aws_vm_started
   end
 
   label def wait_aws_vm_started
-    reap(:wait_sshable, nap: 10)
+    # Clog.emit("At the state wait_aws_vm_started at time #{Time.now}")
+    reap(:wait_sshable, nap: 1)
   end
 
   label def start
@@ -344,6 +345,7 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   label def wait_sshable
+    Clog.emit("At the state wait_sshable at time #{Time.now}")
     unless vm.update_firewall_rules_set?
       vm.incr_update_firewall_rules
       # This is the first time we get into this state and we know that
@@ -364,6 +366,7 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   label def create_billing_record
+    Clog.emit("At the state create_billing_record at time #{Time.now}")
     vm.update(display_state: "running", provisioned_at: Time.now)
 
     Clog.emit("vm provisioned") { [vm, {provision: {vm_ubid: vm.ubid, vm_host_ubid: host&.ubid, duration: (Time.now - vm.allocated_at).round(3)}}] }

@@ -4,25 +4,12 @@ class Prog::Aws::Instance < Prog::Base
   subject_is :vm, :aws_instance
 
   label def start
-    assume_role_policy_document = {
-      Version: "2012-10-17",
-      Statement: [
-        {
-          Effect: "Allow",
-          Principal: {Service: "ec2.amazonaws.com"},
-          Action: "sts:AssumeRole"
-        }
-      ]
-    }.to_json
-
-    ignore_invalid_entity do
-      iam_client.create_role({role_name:, assume_role_policy_document:})
-    end
-
-    hop_create_role_policy
+    Clog.emit("At the state start at time #{Time.now}")
+    hop_create_instance
   end
 
   label def create_role_policy
+    Clog.emit("Creating role policy at time #{Time.now}")
     policy_document = {
       Version: "2012-10-17",
       Statement: [
@@ -53,12 +40,15 @@ class Prog::Aws::Instance < Prog::Base
       iam_client.create_policy({policy_name:, policy_document:})
     end
 
+    Clog.emit("Role policy created at time #{Time.now}")
     hop_attach_role_policy
   end
 
   label def attach_role_policy
     ignore_invalid_entity do
+      Clog.emit("Attaching role policy at time #{Time.now}")
       iam_client.attach_role_policy({role_name:, policy_arn: cloudwatch_policy.arn})
+      Clog.emit("Role policy attached at time #{Time.now}")
     end
 
     hop_create_instance_profile
@@ -66,6 +56,7 @@ class Prog::Aws::Instance < Prog::Base
 
   label def create_instance_profile
     ignore_invalid_entity do
+      Clog.emit("Creating instance profile at time #{Time.now}")
       iam_client.create_instance_profile({instance_profile_name:})
     end
 
@@ -74,7 +65,9 @@ class Prog::Aws::Instance < Prog::Base
 
   label def add_role_to_instance_profile
     ignore_invalid_entity do
+      Clog.emit("Adding role to instance profile at time #{Time.now}")
       iam_client.add_role_to_instance_profile({instance_profile_name:, role_name:})
+      Clog.emit("Role added to instance profile at time #{Time.now}")
     end
 
     hop_wait_instance_profile_created
@@ -83,6 +76,7 @@ class Prog::Aws::Instance < Prog::Base
   label def wait_instance_profile_created
     begin
       iam_client.get_instance_profile({instance_profile_name:})
+      Clog.emit("Instance profile created at time #{Time.now}")
     rescue Aws::IAM::Errors::NoSuchEntity
       nap 1
     end
@@ -90,6 +84,7 @@ class Prog::Aws::Instance < Prog::Base
   end
 
   label def create_instance
+    Clog.emit("At the beginning of the state create_instance at time #{Time.now}")
     public_keys = (vm.sshable.keys.map(&:public_key) + (vm.project.get_ff_vm_public_ssh_keys || [])).join("\n")
     # Define user data script to set a custom username
     user_data = <<~USER_DATA
@@ -143,7 +138,7 @@ class Prog::Aws::Instance < Prog::Base
             iops: 3000,
             volume_size: vm.vm_storage_volumes_dataset.where(:boot).get(:size_gib),
             volume_type: "gp3",
-            throughput: 125
+            throughput: 250
           }
         }
       ],
@@ -162,11 +157,11 @@ class Prog::Aws::Instance < Prog::Base
       max_count: 1,
       user_data: Base64.encode64(user_data.gsub(/^(\s*# .*)?\n/, "")),
       tag_specifications: Util.aws_tag_specifications("instance", vm.name),
-      iam_instance_profile: {name: instance_profile_name},
       client_token: vm.id,
       instance_market_options:
     }
     begin
+      Clog.emit("Running instance at time #{Time.now}")
       instance_response = client.run_instances(params)
     rescue Aws::EC2::Errors::InvalidParameterValue => e
       nap 1 if e.message.include?("Invalid IAM Instance Profile name")
@@ -195,6 +190,7 @@ class Prog::Aws::Instance < Prog::Base
   label def wait_instance_created
     instance_response = client.describe_instances({filters: [{name: "instance-id", values: [aws_instance.instance_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).reservations[0].instances[0]
     nap 1 unless instance_response.dig(:state, :name) == "running"
+    Clog.emit("Instance created at time #{Time.now}")
 
     public_ipv4 = instance_response.dig(:network_interfaces, 0, :association, :public_ip)
     public_ipv6 = instance_response.dig(:network_interfaces, 0, :ipv_6_addresses, 0, :ipv_6_address)
@@ -215,7 +211,9 @@ class Prog::Aws::Instance < Prog::Base
       aws_instance.destroy
     end
 
-    hop_cleanup_roles
+    pop "vm destroyed"
+
+    # hop_cleanup_roles
   end
 
   label def cleanup_roles

@@ -4,6 +4,7 @@ class Prog::Vnet::NicNexus < Prog::Base
   subject_is :nic
 
   def self.assemble(private_subnet_id, name: nil, ipv6_addr: nil, ipv4_addr: nil, exclude_availability_zones: [], availability_zone: nil)
+    Clog.emit("Creating NIC at time #{Time.now}")
     unless (subnet = PrivateSubnet[private_subnet_id])
       fail "Given subnet doesn't exist with the id #{private_subnet_id}"
     end
@@ -34,14 +35,14 @@ class Prog::Vnet::NicNexus < Prog::Base
   end
 
   label def create_aws_nic
-    nap 10 unless nic.private_subnet.strand.label == "wait"
+    nap 1 unless nic.private_subnet.strand.label == "wait"
     NicAwsResource.create_with_id(nic.id)
     bud Prog::Aws::Nic, {"subject_id" => nic.id, "exclude_availability_zones" => frame["exclude_availability_zones"], "availability_zone" => frame["availability_zone"]}, :create_subnet
     hop_wait_aws_nic_created
   end
 
   label def wait_aws_nic_created
-    reap(:wait, nap: 10)
+    reap(:wait, nap: 1)
   end
 
   label def wait_allocation
@@ -66,6 +67,7 @@ class Prog::Vnet::NicNexus < Prog::Base
   end
 
   label def wait
+    Clog.emit("At the state wait at time #{Time.now}")
     if nic.private_subnet.location.aws?
       nic.semaphores.each(&:destroy)
       nap 60 * 60 * 24 * 365

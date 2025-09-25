@@ -5,6 +5,7 @@ class Prog::Aws::Vpc < Prog::Base
   subject_is :private_subnet
 
   label def create_vpc
+    Clog.emit("Creating VPC at time #{Time.now}")
     vpc_response = client.describe_vpcs({filters: [{name: "tag:Name", values: [private_subnet.name]}]})
 
     vpc_id = if vpc_response.vpcs.empty?
@@ -23,10 +24,13 @@ class Prog::Aws::Vpc < Prog::Base
     vpc = client.describe_vpcs({filters: [{name: "vpc-id", values: [private_subnet.private_subnet_aws_resource.vpc_id]}]}).vpcs[0]
 
     if vpc.state == "available"
+      Clog.emit("VPC created at time #{Time.now}")
       client.modify_vpc_attribute({
         vpc_id: vpc.vpc_id,
         enable_dns_hostnames: {value: true}
       })
+
+      Clog.emit("Enabling DNS hostnames at time #{Time.now}")
 
       security_group_response = begin
         client.create_security_group({
@@ -38,6 +42,8 @@ class Prog::Aws::Vpc < Prog::Base
       rescue Aws::EC2::Errors::InvalidGroupDuplicate
         client.describe_security_groups({filters: [{name: "group-name", values: ["aws-#{location.name}-#{private_subnet.ubid}"]}]}).security_groups[0]
       end
+
+      Clog.emit("Creating security group at time #{Time.now}")
 
       private_subnet.private_subnet_aws_resource.update(security_group_id: security_group_response.group_id)
 
@@ -62,6 +68,7 @@ class Prog::Aws::Vpc < Prog::Base
   end
 
   label def create_route_table
+    Clog.emit("Creating route table at time #{Time.now}")
     # Step 3: Update the route table for ipv_6 traffic
     route_table_response = client.describe_route_tables({filters: [{name: "vpc-id", values: [private_subnet.private_subnet_aws_resource.vpc_id]}]})
     route_table_id = route_table_response.route_tables[0].route_table_id
