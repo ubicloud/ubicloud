@@ -141,6 +141,9 @@ class CloverAdmin < Roda
   end
 
   OBJECT_ACTIONS = {
+    "Account" => {
+      "suspend" => object_action("Suspend", "Account suspended", &:suspend)
+    },
     "GithubRunner" => {
       "provision" => object_action("Provision Spare Runner", "Spare runner provisioned", &:provision_spare_runner)
     },
