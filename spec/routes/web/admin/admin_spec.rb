@@ -286,8 +286,8 @@ RSpec.describe CloverAdmin do
   end
 
   it "raises for 404 by default for missing action" do
-    account = create_account(with_project: false)
-    path = "/model/Account/#{account.ubid}/invalid"
+    location = Location.create(name: "l1", display_name: "l1", ui_name: "l1", visible: true, provider: "aws")
+    path = "/model/Location/#{location.ubid}/invalid"
     expect { visit path }.to raise_error(RuntimeError, "admin route not handled: #{path}")
   end
 
@@ -403,5 +403,19 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - GithubRunner #{ghr.ubid}"
     expect(GithubRunner.count).to eq 2
     expect(GithubRunner.select_map([:repository_name, :label, :installation_id])).to eq([["test-repo", "ubicloud", ins.id]] * 2)
+  end
+
+  it "supports suspending Accounts" do
+    account = create_account(with_project: false)
+    fill_in "UBID", with: account.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
+
+    expect(account.suspended_at).to be_nil
+    click_link "Suspend"
+    click_button "Suspend"
+    expect(page).to have_flash_notice("Account suspended")
+    expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
+    expect(account.reload.suspended_at).not_to be_nil
   end
 end
