@@ -843,7 +843,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nx.strand).to receive(:label).and_return("destroy_slice")
       expect { nx.before_run }.not_to hop("destroy")
 
-      expect(nx.strand).to receive(:label).and_return("wait_lb_expiry")
+      expect(nx.strand).to receive(:label).and_return("remove_vm_from_load_balancer")
       expect { nx.before_run }.not_to hop("destroy")
     end
 

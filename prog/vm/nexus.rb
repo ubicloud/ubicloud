@@ -200,7 +200,7 @@ class Prog::Vm::Nexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      unless ["destroy", "wait_lb_expiry", "destroy_slice"].include? strand.label
+      unless ["destroy", "wait_aws_vm_destroyed", "remove_vm_from_load_balancer", "wait_vm_removal_from_load_balancer", "destroy_slice"].include? strand.label
         vm.active_billing_records.each(&:finalize)
         vm.assigned_vm_address&.active_billing_record&.finalize
         register_deadline(nil, 5 * 60)
