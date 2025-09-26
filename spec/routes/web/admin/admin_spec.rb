@@ -118,6 +118,17 @@ RSpec.describe CloverAdmin do
     visit path
     click_link "hetzner-fsn1"
     expect(page.title).to eq "Ubicloud Admin - Location #{Location::HETZNER_FSN1_UBID}"
+
+    sshable = Sshable.create_with_id(VmHost.generate_uuid, host: "1.1.0.0")
+    vmh = VmHost.create_with_id(sshable.id, location_id: Location::HETZNER_FSN1_ID, family: "standard")
+    click_link "Ubicloud Admin"
+    click_link "VmHost"
+    click_link "Search"
+
+    select "standard", from: "Family"
+    fill_in "Sshable", with: "1.0"
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [vmh.ubid, "1.1.0.0", "unprepared", "", "hetzner-fsn1", "", "standard", "", "0"]
   end
 
   it "handles basic pagination when browsing by class" do
