@@ -273,6 +273,6 @@ class Prog::Aws::Instance < Prog::Base
     Aws::IAM::Errors::InvalidRoleName,
     Aws::IAM::Errors::NoSuchEntity,
     Aws::IAM::Errors::EntityAlreadyExists => e
-    Clog.emit("Entity does not exist or already exists") { Util.exception_to_hash(e) }
+    Clog.emit("ID not found or already exists for aws instance") { {ignored_aws_instance_failure: {exception: Util.exception_to_hash(e, backtrace: nil)}} }
   end
 end

@@ -70,8 +70,8 @@ module Util
     [cert, key]
   end
 
-  def self.exception_to_hash(ex)
-    {exception: {message: ex.message, class: ex.class.to_s, backtrace: ex.backtrace, cause: ex.cause.inspect}}
+  def self.exception_to_hash(ex, backtrace: ex.backtrace)
+    {exception: {message: ex.message, class: ex.class.to_s, backtrace:, cause: ex.cause.inspect}}
   end
 
   def self.safe_write_to_file(filename, content)
