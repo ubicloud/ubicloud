@@ -129,6 +129,25 @@ RSpec.describe CloverAdmin do
     fill_in "Sshable", with: "1.0"
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [vmh.ubid, "1.1.0.0", "unprepared", "", "hetzner-fsn1", "", "standard", "", "0"]
+
+    GithubInstallation.create(name: "ins1", installation_id: 1, type: "Organization", allocator_preferences: {family_filter: nil})
+    ins2 = GithubInstallation.create(name: "ins2", installation_id: 2, type: "Organization", allocator_preferences: {"family_filter" => ["standard", "premium"]})
+    ins3 = GithubInstallation.create(name: "ins3", installation_id: 3, type: "User", allocator_preferences: {"family_filter" => ["standard"]})
+    click_link "Ubicloud Admin"
+    click_link "GithubInstallation"
+    click_link "Search"
+    path = page.current_path
+    select "True", from: "Premium enabled"
+    fill_in "Allocator preferences", with: "premium"
+    fill_in "Created at", with: ins2.created_at.strftime("%Y-%m")
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["ins2", "2", "Organization", "true", "true", ins2.created_at.to_s, "{\"family_filter\" => [\"standard\", \"premium\"]}"]
+
+    visit path
+    select "False", from: "Premium enabled"
+    select "User", from: "Type"
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["ins3", "3", "User", "true", "false", ins3.created_at.to_s, "{\"family_filter\" => [\"standard\"]}"]
   end
 
   it "handles basic pagination when browsing by class" do
