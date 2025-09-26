@@ -38,8 +38,8 @@ class Clover
         name:,
         target_vm_size: parsed_size.name,
         target_storage_size_gib: storage_size,
+        target_version: version,
         ha_type:,
-        version:,
         with_firewall_rules:,
         flavor:
       ).subject

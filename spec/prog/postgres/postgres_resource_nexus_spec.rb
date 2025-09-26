@@ -97,10 +97,10 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
     it "does not allow giving different version than parent for restore" do
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
-      parent = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128, version: "16").subject
+      parent = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128, target_version: "16").subject
       expect(PostgresResource).to receive(:[]).with(parent.id).and_return(parent)
       expect {
-        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, version: "17", restore_target: Time.now)
+        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, target_version: "17", restore_target: Time.now)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: version"
     end
 
@@ -213,7 +213,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         name: "pg-name",
         target_vm_size: "standard-2",
         target_storage_size_gib: 128,
-        superuser_password: "dummy-password"
+        superuser_password: "dummy-password",
+        target_version: "16"
       )
 
       expect(nx).to receive(:postgres_resource).and_return(postgres_resource).at_least(:once)
