@@ -57,14 +57,15 @@ RSpec.describe CloverAdmin do
 
   it "allows browsing by class" do
     account = create_account
-    page.refresh
-    click_link "Account"
-    click_link account.email
-    expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
-
+    AccountIdentity.create(account_id: account.id, provider: "github", uid: "789")
     project = account.projects.first
+    page.refresh
+    click_link "Project"
     click_link project.name
     expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
+
+    click_link account.email
+    expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
   end
 
   it "allows browsing by class when using Autoforme" do
@@ -162,30 +163,52 @@ RSpec.describe CloverAdmin do
     select "User", from: "Type"
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq ["ins3", "3", "User", "true", "false", ins3.created_at.to_s, "{\"family_filter\" => [\"standard\"]}"]
+
+    account = create_account
+    AccountIdentity.create(account_id: account.id, provider: "github", uid: "789")
+    click_link "Ubicloud Admin"
+    click_link "Account"
+    click_link "Search"
+
+    select "True", from: "Suspended"
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq []
+
+    click_link "Search"
+    fill_in "Email", with: "example"
+    fill_in "Created at", with: account.created_at.strftime("%Y-%m")
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["", "user@example.com", "2", "github", account.created_at.to_s, ""]
+
+    click_link "Search"
+    select "github", from: "Providers"
+    select "False", from: "Suspended"
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["", "user@example.com", "2", "github", account.created_at.to_s, ""]
   end
 
   it "handles basic pagination when browsing by class" do
-    accounts = Array.new(101) { |i| create_account("a#{i}@a.com", with_project: false) }
+    projects = Array.new(101) { |i| Project.create(name: "project-#{i}") }
     page.refresh
-    click_link "Account"
-    found_accounts = page.all("#object-list a").map(&:text)
+    click_link "Project"
+    found_projects = page.all("#object-list a").map(&:text)
 
     click_link "More"
-    found_accounts.concat(page.all("#object-list a").map(&:text))
+    found_projects.concat(page.all("#object-list a").map(&:text))
 
-    expect(accounts.map(&:email) - found_accounts).to eq []
-    account = Account.last
-    click_link account.email
-    expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
+    expect(projects.map(&:name) - found_projects).to eq []
+    project = Project.last
+    click_link project.name
+    expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
   end
 
   it "ignores bogus ubids when paginating" do
-    account = create_account
+    project = Project.create(name: "test")
     page.refresh
-    click_link "Account"
+    click_link "Project"
     page.visit "#{page.current_path}?after=foo"
-    click_link account.email
-    expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
+    click_link project.name
+    expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
   end
 
   it "shows semaphores set on the object, if any" do

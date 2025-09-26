@@ -204,6 +204,28 @@ class CloverAdmin < Roda
       columns [:name, :project, :location, :description]
     end
 
+    model Account do
+      order Sequel.desc(Sequel[:accounts][:created_at])
+      eager_graph [:identities]
+      columns [:name, :email, :status_id, :provider_names, :created_at, :suspended_at]
+      column_options email: {type: "text"},
+        status_id: {type: "select", options: {Unverified: 1, Verified: 2, Closed: 3}, add_blank: true},
+        provider_names: {label: "Providers", type: "select", options: ["google", "github"], add_blank: true},
+        created_at: {type: "text"},
+        suspended_at: {label: "Suspended", type: "boolean", value: nil}
+
+      column_search_filter do |ds, column, value|
+        case column
+        when :provider_names
+          ds.where(provider: value)
+        when :created_at
+          column_grep.call(ds, Sequel[:accounts][:created_at], value)
+        when :suspended_at
+          ds.send((value == "t") ? :exclude : :where, suspended_at: nil)
+        end
+      end
+    end
+
     model GithubInstallation do
       order Sequel.desc(:created_at)
       columns [:name, :installation_id, :type, :cache_enabled, :premium_runner_enabled?, :created_at, :allocator_preferences]
