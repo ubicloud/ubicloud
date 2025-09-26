@@ -56,7 +56,7 @@ RSpec.describe VictoriaMetricsServer do
       expect(vms).to receive(:private_ipv4_address).and_return("192.168.1.1")
       expect(VictoriaMetrics::Client).to receive(:new).with(
         endpoint: vms.endpoint,
-        ssl_ca_data: vms.resource.root_certs + vms.cert,
+        ssl_ca_data: vms.resource.root_certs,
         socket: File.join("unix://", socket_path, "health_monitor_socket"),
         username: vms.resource.admin_user,
         password: vms.resource.admin_password
@@ -154,7 +154,7 @@ RSpec.describe VictoriaMetricsServer do
     it "creates a client with the correct parameters in prod" do
       expect(VictoriaMetrics::Client).to receive(:new).with(
         endpoint: vms.endpoint,
-        ssl_ca_data: vms.resource.root_certs + vms.cert,
+        ssl_ca_data: vms.resource.root_certs,
         socket: nil,
         username: vms.resource.admin_user,
         password: vms.resource.admin_password
@@ -167,7 +167,7 @@ RSpec.describe VictoriaMetricsServer do
       socket = "unix:///path/to/socket"
       expect(VictoriaMetrics::Client).to receive(:new).with(
         endpoint: vms.endpoint,
-        ssl_ca_data: vms.resource.root_certs + vms.cert,
+        ssl_ca_data: vms.resource.root_certs,
         socket: socket,
         username: vms.resource.admin_user,
         password: vms.resource.admin_password
