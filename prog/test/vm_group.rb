@@ -39,6 +39,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
     vms = Array.new(vm_count) do |index|
       Prog::Vm::Nexus.assemble_with_sshable(project.id,
         sshable_unix_user: "ubi",
+        name: "vm-#{index + 1}-#{encrypted ? "enc" : "noenc"}",
         size: size_options[index % size_options.size],
         private_subnet_id: subnets[index % subnets.size].id,
         storage_volumes: storage_options[index % storage_options.size],
