@@ -113,8 +113,9 @@ class Prog::Aws::Instance < Prog::Base
       usermod -L ubuntu
     USER_DATA
 
+    is_runner = (vm.unix_user == "runneradmin")
     instance_market_options = nil
-    if vm.unix_user == "runneradmin"
+    if is_runner
       # Normally we use dnsmasq to resolve our transparent cache domain to local IP, but we use /etc/hosts for AWS runners
       user_data += "\necho \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
       instance_market_options = if Config.github_runner_aws_spot_instance_enabled
@@ -169,6 +170,14 @@ class Prog::Aws::Instance < Prog::Base
       instance_response = client.run_instances(params)
     rescue Aws::EC2::Errors::InvalidParameterValue => e
       nap 1 if e.message.include?("Invalid IAM Instance Profile name")
+      raise
+    rescue Aws::EC2::Errors::InsufficientInstanceCapacity => e
+      if is_runner && (runner = GithubRunner[vm_id: vm.id])
+        Clog.emit("insufficient instance capacity") { {insufficient_instance_capacity: {vm:, message: e.message}} }
+        runner.provision_spare_runner
+        runner.incr_destroy
+        nap 30 # It will be destroyed through runner -> vm destroy before next attempt
+      end
       raise
     end
     instance = instance_response.instances.first
