@@ -224,12 +224,12 @@ module Validation
     fail ValidationFailed.new({url: "Invalid URL"})
   end
 
-  def self.validate_vcpu_quota(project, resource_type, requested_vcpu_count)
+  def self.validate_vcpu_quota(project, resource_type, requested_vcpu_count, name: :size)
     if !project.quota_available?(resource_type, requested_vcpu_count)
       current_used_vcpu_count = project.current_resource_usage(resource_type)
       effective_quota_value = project.effective_quota_value(resource_type)
 
-      fail ValidationFailed.new({size: "Insufficient quota for requested size. Requested vCPU count: #{requested_vcpu_count}, currently used vCPU count: #{current_used_vcpu_count}, maximum allowed vCPU count: #{effective_quota_value}, remaining vCPU count: #{effective_quota_value - current_used_vcpu_count}"})
+      fail ValidationFailed.new({name => "Insufficient quota for requested size. Requested vCPU count: #{requested_vcpu_count}, currently used vCPU count: #{current_used_vcpu_count}, maximum allowed vCPU count: #{effective_quota_value}, remaining vCPU count: #{effective_quota_value - current_used_vcpu_count}"})
     end
   end
 
