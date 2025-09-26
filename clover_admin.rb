@@ -194,9 +194,36 @@ class CloverAdmin < Roda
       end
     end
 
+    column_grep = lambda do |ds, column, value|
+      ds.where(Sequel.cast(column, :text).ilike("%#{ds.escape_like(value)}%"))
+    end
+
     model Firewall do
       eager [:project, :location]
       columns [:name, :project, :location, :description]
+    end
+
+    model VmHost do
+      order Sequel[:vm_host][:id]
+      eager [:location]
+      eager_graph [:sshable]
+      columns do |type_symbol, request|
+        cs = [:sshable_host, :allocation_state, :arch, :location, :data_center, :family, :total_cores, :total_hugepages_1g]
+        cs.prepend(:name) unless type_symbol == :search_form
+        cs
+      end
+      column_options sshable_host: {label: "Sshable", type: :text, value: ""},
+        allocation_state: {type: "select", options: ["accepting", "draining", "unprepared"], add_blank: true},
+        arch: {type: "select", options: ["x64", "arm64"], add_blank: true},
+        family: {type: "select", options: Option::VmFamilies.map(&:name), add_blank: true},
+        total_cores: {type: "number"},
+        total_hugepages_1g: {type: "number"}
+
+      column_search_filter do |ds, column, value|
+        if column == :sshable_host
+          column_grep.call(ds, Sequel[:sshable][:host], value)
+        end
+      end
     end
   end
 
