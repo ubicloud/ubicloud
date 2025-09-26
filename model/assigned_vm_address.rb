@@ -8,6 +8,8 @@ class AssignedVmAddress < Sequel::Model
   one_to_one :active_billing_record, class: :BillingRecord, key: :resource_id, &:active
 
   plugin ResourceMethods
+
+  alias_method :admin_label, :ip
 end
 
 # Table: assigned_vm_address

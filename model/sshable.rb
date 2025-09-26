@@ -18,6 +18,10 @@ class Sshable < Sequel::Model
     IOError
   ].freeze
 
+  def admin_label
+    "#{unix_user}@#{host}"
+  end
+
   class SshError < StandardError
     attr_reader :stdout, :stderr, :exit_code, :exit_signal
 
