@@ -269,9 +269,13 @@ class Prog::Vm::GithubRunner < Prog::Base
       COMMAND
     end
 
-    # Remove comments and empty lines before sending them to the machine
-    vm.sshable.cmd(command.gsub(/^(\s*# .*)?\n/, ""))
-
+    begin
+      # Remove comments and empty lines before sending them to the machine
+      vm.sshable.cmd(command.gsub(/^(\s*# .*)?\n/, ""))
+    rescue Net::SSH::AuthenticationFailed
+      Clog.emit("ssh authentication failed") { {failed_runner_authentication: github_runner} }
+      nap 1
+    end
     hop_register_runner
   end
 
