@@ -132,7 +132,7 @@ class Prog::Aws::Vpc < Prog::Base
     Aws::EC2::Errors::InvalidNetworkInterfaceIDNotFound,
     Aws::EC2::Errors::InvalidInternetGatewayIDNotFound,
     Aws::EC2::Errors::InvalidVpcIDNotFound => e
-    Clog.emit("ID not found") { Util.exception_to_hash(e) }
+    Clog.emit("ID not found for aws vpc") { {ignored_aws_vpc_failure: {exception: Util.exception_to_hash(e, backtrace: nil)}} }
   end
 
   def location

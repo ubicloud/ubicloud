@@ -124,7 +124,7 @@ class Prog::Aws::Nic < Prog::Base
       client.delete_subnet({subnet_id: nic.nic_aws_resource.subnet_id})
     rescue Aws::EC2::Errors::DependencyViolation => e
       raise e if private_subnet.nics.count == 1
-      Clog.emit("DependencyViolation") { Util.exception_to_hash(e) }
+      Clog.emit("dependency violation for aws nic") { {ignored_aws_nic_failure: {exception: Util.exception_to_hash(e, backtrace: nil)}} }
     end
     pop "nic destroyed"
   end
@@ -154,6 +154,6 @@ class Prog::Aws::Nic < Prog::Base
     Aws::EC2::Errors::InvalidAllocationIDNotFound,
     Aws::EC2::Errors::InvalidAddressIDNotFound,
     Aws::EC2::Errors::InvalidSubnetIDNotFound => e
-    Clog.emit("ID not found") { Util.exception_to_hash(e) }
+    Clog.emit("ID not found for aws nic") { {ignored_aws_nic_failure: {exception: Util.exception_to_hash(e, backtrace: nil)}} }
   end
 end
