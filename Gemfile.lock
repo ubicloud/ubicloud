@@ -9,8 +9,8 @@ GIT
 
 GIT
   remote: https://github.com/jeremyevans/autoforme.git
-  revision: 15a6da4d7dc1d2ea7d28e4b572c99b8dd3d7dafc
-  ref: 15a6da4d7dc1d2ea7d28e4b572c99b8dd3d7dafc
+  revision: 42d883177970cc6bd66b70239e21a425b335a379
+  ref: 42d883177970cc6bd66b70239e21a425b335a379
   specs:
     autoforme (1.13.0)
       enum_csv
