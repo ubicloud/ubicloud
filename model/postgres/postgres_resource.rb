@@ -92,6 +92,10 @@ class PostgresResource < Sequel::Model
     URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: identity, query: query_parameters).to_s
   end
 
+  def version
+    representative_server&.version || target_version
+  end
+
   def target_standby_count
     Option::POSTGRES_HA_OPTIONS[ha_type].standby_count
   end
