@@ -64,7 +64,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         name: "pg-name",
         target_vm_size: "standard-2",
         target_storage_size_gib: 128,
-        superuser_password: "dummy-password"
+        superuser_password: "dummy-password",
+        target_version: "16"
       )
     }
 

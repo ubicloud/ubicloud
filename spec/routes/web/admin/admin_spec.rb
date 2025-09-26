@@ -393,7 +393,8 @@ RSpec.describe CloverAdmin do
       location_id: Location::HETZNER_FSN1_ID,
       name: "a",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 64
+      target_storage_size_gib: 64,
+      target_version: "16"
     ).subject
     fill_in "UBID", with: pg.ubid
     click_button "Show Object"
