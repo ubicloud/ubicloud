@@ -185,6 +185,14 @@ RSpec.describe Project do
     Prog::Postgres::PostgresResourceNexus.assemble(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "b", target_vm_size: "standard-4", target_storage_size_gib: 128)
     expect(project.current_resource_usage("PostgresVCpu")).to eq 6
 
+    expect(Config).to receive(:kubernetes_service_project_id).and_return(project.id).at_least(:once)
+    expect(project.current_resource_usage("KubernetesVCpu")).to eq 0
+    cluster = Prog::Kubernetes::KubernetesClusterNexus.assemble(name: "a", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 1).subject
+    Prog::Kubernetes::KubernetesNodeNexus.assemble(project.id, sshable_unix_user: "ubi", name: "cp-node", location_id: cluster.location.id, size: cluster.target_node_size, storage_volumes: [{encrypted: true, size_gib: cluster.target_node_storage_size_gib}], boot_image: "kubernetes-#{cluster.version.tr(".", "_")}", private_subnet_id: cluster.private_subnet_id, enable_ip4: true, kubernetes_cluster_id: cluster.id).subject
+    expect(project.current_resource_usage("KubernetesVCpu")).to eq 2
+    Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "a-np", node_count: 3, kubernetes_cluster_id: cluster.id, target_node_size: "standard-4").subject
+    expect(project.current_resource_usage("KubernetesVCpu")).to eq 14
+
     expect { project.current_resource_usage("UnknownResource") }.to raise_error(RuntimeError)
   end
 
