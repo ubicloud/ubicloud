@@ -182,6 +182,7 @@ class CloverAdmin < Roda
     form_options(wrapper: :div)
 
     link = lambda do |obj|
+      return "" unless obj
       "<a href=\"/model/#{obj.class}/#{obj.ubid}\">#{Erubi.h(obj.name)}</a>"
     end
 
@@ -189,7 +190,7 @@ class CloverAdmin < Roda
       case column
       when :name
         link.call(obj)
-      when :project, :location
+      when :project, :location, :vm_host
         link.call(obj.send(column))
       end
     end
@@ -222,6 +223,23 @@ class CloverAdmin < Roda
             ds.where(~cond | {family_filter => nil})
           end
         when :allocator_preferences, :created_at
+          column_grep.call(ds, column, value)
+        end
+      end
+    end
+
+    model Vm do
+      order Sequel.desc(:created_at)
+      eager [:location, :vm_host]
+      columns [:name, :display_state, :vm_host, :location, :arch, :boot_image, :family, :vcpus, :created_at]
+      column_options display_state: {type: "select", options: ["running", "creating", "starting", "rebooting", "deleting"], add_blank: true},
+        arch: {type: "select", options: ["x64", "arm64"], add_blank: true},
+        family: {type: "select", options: Option::VmFamilies.map(&:name), add_blank: true},
+        vcpus: {type: "number"},
+        created_at: {type: "text"}
+
+      column_search_filter do |ds, column, value|
+        if column == :created_at
           column_grep.call(ds, column, value)
         end
       end
