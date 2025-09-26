@@ -15,6 +15,10 @@ class Account < Sequel::Model(:accounts)
 
   alias_method :admin_label, :email
 
+  def provider_names
+    identities.map(&:provider).join(", ")
+  end
+
   def create_project_with_default_policy(name, default_policy: true)
     project = Project.create(name: name)
     add_project(project)
