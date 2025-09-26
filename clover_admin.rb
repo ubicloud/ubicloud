@@ -194,6 +194,17 @@ class CloverAdmin < Roda
       end
     end
 
+    model Account do
+      order Sequel.desc(:created_at)
+      columns [:ubid, :name, :email, :status_id, :created_at, :suspended_at]
+      column_options(ubid: {type: :text, value: ""})
+      column_search_filter do |ds, column, value|
+        if column == :ubid
+          ds.where(id: UBID.to_uuid(value))
+        end
+      end
+    end
+
     model Firewall do
       eager [:project, :location]
       columns [:name, :project, :location, :description]
