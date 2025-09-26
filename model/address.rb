@@ -9,6 +9,8 @@ class Address < Sequel::Model
 
   plugin ResourceMethods
 
+  alias_method :admin_label, :cidr
+
   def validate
     super
 

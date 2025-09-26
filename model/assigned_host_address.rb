@@ -7,6 +7,8 @@ class AssignedHostAddress < Sequel::Model
   many_to_one :address, key: :address_id
 
   plugin ResourceMethods
+
+  alias_method :admin_label, :ip
 end
 
 # Table: assigned_host_address

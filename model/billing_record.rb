@@ -11,6 +11,8 @@ class BillingRecord < Sequel::Model
 
   plugin ResourceMethods
 
+  alias_method :admin_label, :resource_name
+
   def duration(begin_time, end_time)
     # Billing logic differs based on the resource type: some are billed by duration, others
     # by amount. For 'VmVCpu' billing records, the core counts are stored in the amount
