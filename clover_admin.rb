@@ -203,6 +203,30 @@ class CloverAdmin < Roda
       columns [:name, :project, :location, :description]
     end
 
+    model GithubInstallation do
+      order Sequel.desc(:created_at)
+      columns [:name, :installation_id, :type, :cache_enabled, :premium_runner_enabled?, :created_at, :allocator_preferences]
+
+      column_options type: {type: "select", options: ["Organization", "User"], add_blank: true},
+        premium_runner_enabled?: {label: "Premium enabled", type: "boolean", value: nil},
+        created_at: {type: "text"}
+
+      column_search_filter do |ds, column, value|
+        case column
+        when :premium_runner_enabled?
+          family_filter = Sequel.pg_jsonb(:allocator_preferences).get("family_filter")
+          cond = family_filter.contains(["premium"])
+          if value == "t"
+            ds.where(cond)
+          else
+            ds.where(~cond | {family_filter => nil})
+          end
+        when :allocator_preferences, :created_at
+          column_grep.call(ds, column, value)
+        end
+      end
+    end
+
     model VmHost do
       order Sequel[:vm_host][:id]
       eager [:location]
