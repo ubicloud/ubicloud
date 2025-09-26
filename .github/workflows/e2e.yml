@@ -18,7 +18,7 @@ on:
 jobs:
   run-ci:
     if: vars.RUN_E2E == 'true'
-    runs-on: ubicloud-standard-4
+    runs-on: ubicloud-standard-8
     environment: E2E-CI
     timeout-minutes: 60
     concurrency: e2e_environment
