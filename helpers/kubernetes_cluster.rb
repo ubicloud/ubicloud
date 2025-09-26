@@ -8,6 +8,11 @@ class Clover
     version, target_node_size = typecast_params.nonempty_str!(["version", "worker_size"])
     node_count = typecast_params.pos_int("worker_nodes", 1)
     cp_node_count = typecast_params.pos_int("cp_nodes", 1)
+    node_size = Validation.validate_vm_size(target_node_size, "x64")
+
+    requested_kubernetes_vcpu_count = cp_node_count * 2 # since default control plane size is standard-2
+    requested_kubernetes_vcpu_count += node_count * node_size.vcpus
+    Validation.validate_vcpu_quota(@project, "KubernetesVCpu", requested_kubernetes_vcpu_count, name: :worker_size)
 
     DB.transaction do
       kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
