@@ -69,21 +69,25 @@ RSpec.describe CloverAdmin do
 
   it "allows browsing by class when using Autoforme" do
     project = Project.create(name: "Default")
-    firewall = Firewall.create(name: "fw", project_id: project.id, location_id: Location::HETZNER_FSN1_ID)
-    click_link "Firewall"
-    expect(page.title).to eq "Ubicloud Admin - Firewall - Browse"
-    expect(page.all("#autoforme_content td").map(&:text)).to eq ["fw", "Default", "hetzner-fsn1", "Default firewall"]
+    vm = Prog::Vm::Nexus.assemble("dummy key", project.id, name: "my-vm").subject
+    click_link "Vm"
+    expect(page.title).to eq "Ubicloud Admin - Vm - Browse"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["my-vm", "creating", "", "hetzner-fsn1", "x64", "ubuntu-jammy", "standard", "2", vm.created_at.to_s]
+
+    click_link vm.name
+    expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
     path = page.current_path
 
+    firewall = vm.firewalls.first
     click_link firewall.name
     expect(page.title).to eq "Ubicloud Admin - Firewall #{firewall.ubid}"
 
     visit path
-    click_link project.name
+    within(".associations") { click_link project.name }
     expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
 
     visit path
-    click_link "hetzner-fsn1"
+    within(".associations") { click_link "hetzner-fsn1" }
     expect(page.title).to eq "Ubicloud Admin - Location #{Location::HETZNER_FSN1_UBID}"
   end
 
@@ -129,6 +133,16 @@ RSpec.describe CloverAdmin do
     fill_in "Sshable", with: "1.0"
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [vmh.ubid, "1.1.0.0", "unprepared", "", "hetzner-fsn1", "", "standard", "", "0"]
+
+    vm = Vm.create(unix_user: "ubi", public_key: "k y", name: "vm1", location_id: Location::HETZNER_FSN1_ID, boot_image: "github-ubuntu-2204", family: "standard", arch: "x64", cores: 2, vcpus: 2, memory_gib: 8, project_id: project.id)
+    click_link "Ubicloud Admin"
+    click_link "Vm"
+    click_link "Search"
+
+    select "x64", from: "Arch"
+    fill_in "Created at", with: vm.created_at.strftime("%Y-%m")
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["vm1", "creating", "", "hetzner-fsn1", "x64", "github-ubuntu-2204", "standard", "2", vm.created_at.to_s]
 
     GithubInstallation.create(name: "ins1", installation_id: 1, type: "Organization", allocator_preferences: {family_filter: nil})
     ins2 = GithubInstallation.create(name: "ins2", installation_id: 2, type: "Organization", allocator_preferences: {"family_filter" => ["standard", "premium"]})
