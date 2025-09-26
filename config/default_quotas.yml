@@ -2,3 +2,4 @@
 - { id: 14fa6820-bf63-41d2-b35e-4a4dcefd1b15, resource_type: GithubRunnerVCpu,         new_value: 300,  verified_value: 300 }
 - { id: 0ac764de-48c5-4432-876d-389878da0885, resource_type: GithubRunnerCacheStorage, new_value: 30,   verified_value: 30  }
 - { id: 91d616ea-a15b-4d54-90b7-aaa1e1bd2f19, resource_type: PostgresVCpu,             new_value: 128,  verified_value: 256 }
+- { id: 3acfffdb-37d6-42ff-8d1f-78a1915c7912, resource_type: KubernetesVCpu,           new_value: 32,  verified_value: 256 }
