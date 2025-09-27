@@ -56,6 +56,7 @@ kc eu-central-h1/test-kc show -v id,name,state,location,size,unix-user,storage-s
 kc eu-central-h1/test-kc show -v ip6,ip4-enabled,ip4
 kc kcnzrctjjg4j4g6eqvdsvzthwp show
 kc list
+kc eu-central-h1/test-kc resize-nodepool test-kc-np 8
 kc list -f location
 kc list -l eu-central-h1
 kc list -l eu-central-h1 -f name,id
