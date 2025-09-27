@@ -237,7 +237,7 @@ RSpec.describe Prog::Vnet::NicNexus do
   describe "#destroy" do
     let(:ps) {
       PrivateSubnet.create(name: "ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64",
-        net4: "1.1.1.0/26", state: "waiting", project_id: Project.create(name: "test").id).tap { it.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
+        net4: "1.1.1.0/26", state: "waiting", project_id: Project.create(name: "test").id)
     }
     let(:nic) {
       Nic.new(private_subnet_id: ps.id,
@@ -271,10 +271,14 @@ RSpec.describe Prog::Vnet::NicNexus do
     end
 
     it "buds aws nic destroy if location is aws" do
-      expect(nic).to receive(:private_subnet).and_return(ps).at_least(:once)
-      expect(nx).to receive(:bud).with(Prog::Aws::Nic, {"subject_id" => "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"}, :destroy)
-      expect(ps).to receive(:location).and_return(instance_double(Location, aws?: true))
+      location_id = Location.create(name: "us-west-2", provider: "aws", project_id: ps.project_id, display_name: "us-west-2", ui_name: "us-west-2", visible: true).id
+      nic.update(private_subnet_id: ps.id)
+      ps.update(location_id:)
+      st.update(prog: "Vnet::NicNexus", label: "destroy", stack: [{}])
+      child = Strand.create(parent_id: st.id, prog: "Aws::Nic", label: "start", stack: [{}])
+      expect(nx).to receive(:bud).with(Prog::Aws::Nic, {"subject_id" => nic.id}, :destroy)
       expect { nx.destroy }.to hop("wait_aws_nic_destroyed")
+      expect(Semaphore[strand_id: child.id, name: "destroy"]).not_to be_nil
     end
   end
 
