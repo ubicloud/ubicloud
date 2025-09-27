@@ -1154,11 +1154,14 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "hops to wait_aws_vm_destroyed if vm is in aws" do
-      vm = instance_double(Vm, location: instance_double(Location, aws?: true), id: "vm_id")
-      expect(vm).to receive(:update).with(display_state: "deleting")
-      expect(nx).to receive(:vm).and_return(vm).at_least(:once)
-      expect(nx).to receive(:bud).with(Prog::Aws::Instance, {"subject_id" => "vm_id"}, :destroy)
+      location_id = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true).id
+      vm.update(project_id: prj.id, location_id:)
+      st.update(prog: "Vm::Nexus", label: "destroy", stack: [{}])
+      child = Strand.create(parent_id: st.id, prog: "Aws::Instance", label: "start", stack: [{}])
+      expect(nx).to receive(:bud).with(Prog::Aws::Instance, {"subject_id" => vm.id}, :destroy)
       expect { nx.destroy }.to hop("wait_aws_vm_destroyed")
+      expect(Semaphore[strand_id: child.id, name: "destroy"]).not_to be_nil
+      expect(vm.display_state).to eq("deleting")
     end
   end
 

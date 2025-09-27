@@ -3,6 +3,12 @@
 class Prog::Aws::Instance < Prog::Base
   subject_is :vm, :aws_instance
 
+  def before_run
+    when_destroy_set? do
+      pop "exiting early due to destroy semaphore"
+    end
+  end
+
   label def start
     # Cloudwatch is not needed for runner instances
     hop_create_instance if is_runner?
@@ -178,7 +184,7 @@ class Prog::Aws::Instance < Prog::Base
         Clog.emit("insufficient instance capacity") { {insufficient_instance_capacity: {vm:, message: e.message}} }
         runner.provision_spare_runner
         runner.incr_destroy
-        nap 30 # It will be destroyed through runner -> vm destroy before next attempt
+        pop "exiting due to insufficient instance capacity"
       end
       raise
     end
