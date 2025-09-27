@@ -76,7 +76,7 @@ class Clover < Roda
         [nil, uuid]
       end
     end
-    const_set(:"#{model.table_name.upcase}_NAME_OR_UBID", [sym, /([a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?)/])
+    const_set(:"#{model.table_name.upcase}_NAME_OR_UBID", [sym, /([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)/])
   end
 
   plugin :response_content_type,
@@ -246,6 +246,7 @@ class Clover < Roda
       Clog.emit("route exception") { Util.exception_to_hash(e) }
     else
       raise e if Config.test? && e.message != "test error"
+
       Clog.emit("route exception") { Util.exception_to_hash(e) }
 
       code = 500
@@ -998,6 +999,7 @@ class Clover < Roda
           if Config.test? && !ENV["IGNORE_INVALID_API_PATHS"]
             raise "request not found in openapi schema: #{r.request_method} #{r.path_info}"
           end
+
           next
         end
       rescue JSON::ParserError => e
@@ -1013,6 +1015,7 @@ class Clover < Roda
   after do |res|
     status, headers, body = res
     next unless api? && status && headers && body
+
     @schema_validator ||= SCHEMA_ROUTER.build_schema_validator(request)
     @schema_validator.response_validate(status, headers, body, true) if @schema_validator.link_exist?
   rescue JSON::ParserError => e
@@ -1100,6 +1103,7 @@ class Clover < Roda
 
       def no_authorization_needed
         raise "called no_authorization_needed when authorization already not needed: #{request.inspect}" unless @still_need_authorization
+
         @still_need_authorization = false
         super
       end

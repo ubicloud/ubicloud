@@ -33,6 +33,7 @@ class Kubernetes::Client
   def kubectl(cmd)
     output = @session.exec!("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf #{cmd}")
     raise output if output.exitstatus != 0
+
     output
   end
 
@@ -72,6 +73,7 @@ class Kubernetes::Client
     missing_ports.each { |port| @load_balancer.add_port(port[0], port[1]) }
 
     return unless @load_balancer.strand.label == "wait"
+
     svc_list.each { |svc| set_load_balancer_hostname(svc, @load_balancer.hostname) }
   end
 

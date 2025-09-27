@@ -27,6 +27,7 @@ end
 def r(commandline, stdin: "", expect: [0])
   stdout, stderr, status = Open3.capture3(commandline, stdin_data: stdin)
   fail CommandFail.new("command failed: " + commandline, stdout, stderr) unless expect.include?(status.exitstatus)
+
   stdout
 end
 
@@ -60,6 +61,7 @@ end
 
 def safe_write_to_file(filename, content = nil)
   raise ArgumentError, "must provide either content or block" if (content.nil? && !block_given?) || (!content.nil? && block_given?)
+
   temp_filename = filename + ".tmp"
   lock_filename = "/tmp/#{Digest::SHA256.hexdigest(temp_filename)}.lock"
   File.open(lock_filename, File::RDWR | File::CREAT) do |lock_file|

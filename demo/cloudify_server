@@ -10,7 +10,7 @@ LOCATIONS = Location.where(visible: true).map { |l| [l, "#{l.provider} #{l.name}
 REQUIRED_ENV_VARS = %w[HETZNER_USER HETZNER_PASSWORD HETZNER_SSH_PUBLIC_KEY HETZNER_SSH_PRIVATE_KEY].freeze
 
 def get_input(msg, default = nil)
-  prompt = "#{msg}#{default.nil? ? "" : " [default: #{default}]"}: "
+  prompt = "#{msg}#{" [default: #{default}]" unless default.nil?}: "
   input = ""
 
   while input.empty?
@@ -27,7 +27,7 @@ def select_option(msg, options, default = nil)
   options.each_with_index { |(key, name), index| puts "#{index + 1}. #{name}" }
   puts "\n"
 
-  prompt = "#{msg}#{default.nil? ? "" : " [default: #{default}]"}: "
+  prompt = "#{msg}#{" [default: #{default}]" unless default.nil?}: "
   selected = nil
 
   while selected.nil?
@@ -36,7 +36,7 @@ def select_option(msg, options, default = nil)
     option = if option.empty?
       default
     elsif option.to_i < 1
-      puts "Plese enter a number between 1-#{options.count}#{default.nil? ? "" : " or leave empty for default"}"
+      puts "Plese enter a number between 1-#{options.count}#{" or leave empty for default" unless default.nil?}"
     else
       option.to_i
     end

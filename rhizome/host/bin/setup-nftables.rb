@@ -28,7 +28,7 @@ table inet drop_unused_ip_packets {
   set blocked_ipv4_addresses {
     type ipv4_addr;
     flags interval;
-#{ip_ranges_to_block.empty? ? "" : "elements = {#{ip_ranges_to_block.join(",")}}"}
+#{"elements = {#{ip_ranges_to_block.join(",")}}" unless ip_ranges_to_block.empty?}
   }
 
   chain prerouting {
@@ -42,6 +42,7 @@ SETUP_ADDITIONAL_IP_BLOCKING
 File.open("/etc/nftables.conf", File::APPEND | File::RDWR) do |f|
   # Necessary to keep this idempotent
   break if f.each_line.any? { |line| line.include?("include \"/etc/nftables.d/*.conf") }
+
   f.write("include \"/etc/nftables.d/*.conf\"\n")
 end
 

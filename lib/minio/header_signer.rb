@@ -121,6 +121,7 @@ class Minio::HeaderSigner
     headers.each do |key, value|
       key = key.downcase
       next if (key == "authorization") || (key == "user-agent")
+
       value = value.gsub(/\s+/, " ")
       canonical_headers[key] = value
     end

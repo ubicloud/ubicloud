@@ -301,6 +301,7 @@ class UbiCli
 
   def need_integer_arg(v, arg_name, cmd)
     raise Rodish::CommandFailure.new("invalid #{arg_name} argument: #{v.inspect}", cmd) unless (i = Integer(v, exception: false))
+
     i
   end
 

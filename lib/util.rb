@@ -19,6 +19,7 @@ module Util
         use_agent: Config.development?)) do |ssh|
       ret = ssh.exec!(cmd)
       fail "Ssh command failed: #{ret}" unless ret.exitstatus.zero?
+
       ret
     end
   end
