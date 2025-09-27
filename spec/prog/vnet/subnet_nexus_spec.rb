@@ -433,12 +433,13 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
 
     it "hops to wait_aws_vpc_destroyed if location is aws" do
-      expect(ps).to receive(:location).and_return(Location.create(name: "aws-us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true))
-      expect(nx).to receive(:private_subnet).and_return(ps).at_least(:once)
-      expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
-      expect(nic).to receive(:incr_destroy)
+      location_id = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true).id
+      ps.update(project_id: prj.id, location_id:)
+      st.update(prog: "Vnet::SubnetNexus", label: "destroy", stack: [{}])
+      child = Strand.create(parent_id: st.id, prog: "Aws::Vpc", label: "start", stack: [{}])
       expect(nx).to receive(:bud).with(Prog::Aws::Vpc, {"subject_id" => ps.id}, :destroy)
       expect { nx.destroy }.to hop("wait_aws_vpc_destroyed")
+      expect(Semaphore[strand_id: child.id, name: "destroy"]).not_to be_nil
     end
 
     it "increments the destroy semaphore of nics" do

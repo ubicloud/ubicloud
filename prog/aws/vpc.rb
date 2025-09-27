@@ -4,6 +4,12 @@ require "aws-sdk-ec2"
 class Prog::Aws::Vpc < Prog::Base
   subject_is :private_subnet
 
+  def before_run
+    when_destroy_set? do
+      pop "exiting early due to destroy semaphore"
+    end
+  end
+
   label def create_vpc
     vpc_response = client.describe_vpcs({filters: [{name: "tag:Name", values: [private_subnet.name]}]})
 
