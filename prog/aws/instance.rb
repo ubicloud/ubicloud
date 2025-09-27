@@ -3,6 +3,12 @@
 class Prog::Aws::Instance < Prog::Base
   subject_is :vm, :aws_instance
 
+  def before_run
+    when_destroy_set? do
+      pop "exiting early due to destroy semaphore"
+    end
+  end
+
   label def start
     assume_role_policy_document = {
       Version: "2012-10-17",
@@ -176,7 +182,8 @@ class Prog::Aws::Instance < Prog::Base
         Clog.emit("insufficient instance capacity") { {insufficient_instance_capacity: {vm:, message: e.message}} }
         runner.provision_spare_runner
         runner.incr_destroy
-        nap 30 # It will be destroyed through runner -> vm destroy before next attempt
+        incr_destroy
+        nap 0
       end
       raise
     end
