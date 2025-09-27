@@ -194,7 +194,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     if private_subnet.location.aws?
       private_subnet.nics.map(&:incr_destroy)
       private_subnet.firewalls.map(&:destroy)
-      strand.children.each { it.destroy }
+      Semaphore.incr(strand.children_dataset.where(prog: "Aws::Vpc").select(:id), "destroy")
       bud Prog::Aws::Vpc, {"subject_id" => private_subnet.id}, :destroy
       hop_wait_aws_vpc_destroyed
     end
