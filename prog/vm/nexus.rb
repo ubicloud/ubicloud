@@ -525,7 +525,7 @@ class Prog::Vm::Nexus < Prog::Base
 
     vm.update(display_state: "deleting")
     if vm.location.aws?
-      strand.children.select { it.prog == "Aws::Instance" }.each { it.destroy }
+      Semaphore.incr(strand.children_dataset.where(prog: "Aws::Instance").select(:id), "destroy")
       bud Prog::Aws::Instance, {"subject_id" => vm.id}, :destroy
       hop_wait_aws_vm_destroyed
     end
