@@ -62,7 +62,7 @@ class GithubRunner < Sequel::Model
 
   def init_health_monitor_session
     {
-      ssh_session: vm.sshable.start_fresh_session
+      ssh_session: (vm && vm.strand.label == "wait") ? vm.sshable.start_fresh_session : nil
     }
   end
 
