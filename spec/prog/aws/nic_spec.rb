@@ -29,6 +29,12 @@ RSpec.describe Prog::Aws::Nic do
     allow(Aws::EC2::Client).to receive(:new).with(access_key_id: "test-access-key", secret_access_key: "test-secret-key", region: "us-west-2").and_return(client)
   end
 
+  it "exits if destroy is set" do
+    expect(nx.before_run).to be_nil
+    expect(nx).to receive(:when_destroy_set?).and_yield
+    expect { nx.before_run }.to exit({"msg" => "exiting early due to destroy semaphore"})
+  end
+
   describe "#create_subnet" do
     it "creates a subnet and hops to wait_subnet_created" do
       expect(nic.private_subnet).to receive(:old_aws_subnet?).and_return(false)

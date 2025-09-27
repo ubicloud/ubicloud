@@ -4,6 +4,12 @@ require "aws-sdk-ec2"
 class Prog::Aws::Nic < Prog::Base
   subject_is :nic
 
+  def before_run
+    when_destroy_set? do
+      pop "exiting early due to destroy semaphore"
+    end
+  end
+
   label def create_subnet
     register_deadline("attach_eip_network_interface", 3 * 60)
     vpc_response = client.describe_vpcs({filters: [{name: "vpc-id", values: [private_subnet.private_subnet_aws_resource.vpc_id]}]}).vpcs[0]
