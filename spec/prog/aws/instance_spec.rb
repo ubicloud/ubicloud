@@ -51,6 +51,12 @@ usermod -L ubuntu
     allow(Aws::IAM::Client).to receive(:new).with(access_key_id: "test-access-key", secret_access_key: "test-secret-key", region: "us-west-2").and_return(iam_client)
   end
 
+  it "exits if destroy is set" do
+    expect(nx.before_run).to be_nil
+    expect(nx).to receive(:when_destroy_set?).and_yield
+    expect { nx.before_run }.to exit({"msg" => "exiting early due to destroy semaphore"})
+  end
+
   describe "#start" do
     it "creates a role for instance" do
       iam_client.stub_responses(:create_role, {})
@@ -344,7 +350,7 @@ usermod -L ubuntu
       expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
       expect(Clog).to receive(:emit).with("insufficient instance capacity").and_call_original
       expect(Prog::Vm::GithubRunner).to receive(:assemble).and_call_original
-      expect { nx.create_instance }.to nap(30)
+      expect { nx.create_instance }.to exit({"msg" => "exiting due to insufficient instance capacity"})
     end
 
     it "fails if not runner when encountering insufficient capacity error" do
