@@ -87,6 +87,11 @@ usermod -L ubuntu
       }.to_json}).and_raise(Aws::IAM::Errors::EntityAlreadyExists.new(nil, "EntityAlreadyExists"))
       expect { nx.start }.to hop("create_role_policy")
     end
+
+    it "hops to create_instance if it's a runner instance" do
+      vm.update(unix_user: "runneradmin")
+      expect { nx.start }.to hop("create_instance")
+    end
   end
 
   describe "#create_role_policy" do
@@ -254,6 +259,17 @@ usermod -L ubuntu
       expect { nx.create_instance }.to hop("wait_instance_created")
     end
 
+    it "skips instance profile creation for runner instances" do
+      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
+      client.stub_responses(:describe_subnets, subnets: [{availability_zone_id: "use1-az1"}])
+      vm.update(unix_user: "runneradmin")
+      expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
+      expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
+      expect(client).to receive(:run_instances).with(hash_not_including(:iam_instance_profile)).and_call_original
+      expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
+      expect { nx.create_instance }.to hop("wait_instance_created")
+    end
+
     it "naps until instance profile not propagated yet" do
       client.stub_responses(:run_instances, Aws::EC2::Errors::InvalidParameterValue.new(nil, "Invalid IAM Instance Profile name"))
       client.stub_responses(:describe_subnets, subnets: [{availability_zone_id: "use1-az1"}])
@@ -378,6 +394,11 @@ usermod -L ubuntu
     it "pops directly if there is no aws_instance" do
       expect(nx).to receive(:aws_instance).and_return(nil)
       expect { nx.destroy }.to hop("cleanup_roles")
+    end
+
+    it "exits directly if it's a runner" do
+      vm.update(unix_user: "runneradmin")
+      expect { nx.destroy }.to exit({"msg" => "vm destroyed"})
     end
   end
 
