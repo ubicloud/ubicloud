@@ -4,6 +4,9 @@ class Prog::Aws::Instance < Prog::Base
   subject_is :vm, :aws_instance
 
   label def start
+    # Cloudwatch is not needed for runner instances
+    hop_create_instance if is_runner?
+
     assume_role_policy_document = {
       Version: "2012-10-17",
       Statement: [
@@ -113,9 +116,8 @@ class Prog::Aws::Instance < Prog::Base
       usermod -L ubuntu
     USER_DATA
 
-    is_runner = (vm.unix_user == "runneradmin")
     instance_market_options = nil
-    if is_runner
+    if is_runner?
       # Normally we use dnsmasq to resolve our transparent cache domain to local IP, but we use /etc/hosts for AWS runners
       user_data += "\necho \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
       instance_market_options = if Config.github_runner_aws_spot_instance_enabled
@@ -162,17 +164,17 @@ class Prog::Aws::Instance < Prog::Base
       max_count: 1,
       user_data: Base64.encode64(user_data.gsub(/^(\s*# .*)?\n/, "")),
       tag_specifications: Util.aws_tag_specifications("instance", vm.name),
-      iam_instance_profile: {name: instance_profile_name},
       client_token: vm.id,
       instance_market_options:
     }
+    params[:iam_instance_profile] = {name: instance_profile_name} unless is_runner?
     begin
       instance_response = client.run_instances(params)
     rescue Aws::EC2::Errors::InvalidParameterValue => e
       nap 1 if e.message.include?("Invalid IAM Instance Profile name")
       raise
     rescue Aws::EC2::Errors::InsufficientInstanceCapacity => e
-      if is_runner && (runner = GithubRunner[vm_id: vm.id])
+      if is_runner? && (runner = GithubRunner[vm_id: vm.id])
         Clog.emit("insufficient instance capacity") { {insufficient_instance_capacity: {vm:, message: e.message}} }
         runner.provision_spare_runner
         runner.incr_destroy
@@ -214,6 +216,8 @@ class Prog::Aws::Instance < Prog::Base
 
       aws_instance.destroy
     end
+
+    pop "vm destroyed" if is_runner?
 
     hop_cleanup_roles
   end
@@ -265,6 +269,10 @@ class Prog::Aws::Instance < Prog::Base
 
   def instance_profile_name
     "#{vm.name}-instance-profile"
+  end
+
+  def is_runner?
+    @is_runner ||= vm.unix_user == "runneradmin"
   end
 
   def ignore_invalid_entity
