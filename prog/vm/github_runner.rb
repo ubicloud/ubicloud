@@ -330,7 +330,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def wait
-    Clog.emit("At the state wait at time #{Time.now}")
+    Clog.emit("At the state wait of github runner nexus at time #{Time.now}")
     register_deadline(nil, 5 * 24 * 60 * 60)
     case vm.sshable.cmd("systemctl show -p SubState --value runner-script").chomp
     when "exited"

@@ -62,7 +62,6 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
   label def start
     if private_subnet.location.aws?
-      Clog.emit("Creating VPC at time #{Time.now} for #{private_subnet.name}")
       PrivateSubnetAwsResource.create_with_id(private_subnet.id) unless private_subnet.private_subnet_aws_resource
       bud Prog::Aws::Vpc, {"subject_id" => private_subnet.id}, :create_vpc
       hop_wait_vpc_created

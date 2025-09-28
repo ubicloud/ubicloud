@@ -67,7 +67,7 @@ class Prog::Vnet::NicNexus < Prog::Base
   end
 
   label def wait
-    Clog.emit("At the state wait at time #{Time.now}")
+    Clog.emit("At the state wait of nic nexus at time #{Time.now}")
     if nic.private_subnet.location.aws?
       nic.semaphores.each(&:destroy)
       nap 60 * 60 * 24 * 365

@@ -27,10 +27,10 @@ class Prog::Aws::Vpc < Prog::Base
       Clog.emit("VPC created at time #{Time.now}")
       client.modify_vpc_attribute({
         vpc_id: vpc.vpc_id,
-        enable_dns_hostnames: {value: true}
+        enable_dns_hostnames: {value: false}
       })
 
-      Clog.emit("Enabling DNS hostnames at time #{Time.now}")
+      Clog.emit("Enabled DNS hostnames at time #{Time.now}")
 
       security_group_response = begin
         client.create_security_group({
@@ -43,7 +43,7 @@ class Prog::Aws::Vpc < Prog::Base
         client.describe_security_groups({filters: [{name: "group-name", values: ["aws-#{location.name}-#{private_subnet.ubid}"]}]}).security_groups[0]
       end
 
-      Clog.emit("Creating security group at time #{Time.now}")
+      Clog.emit("Created security group at time #{Time.now}")
 
       private_subnet.private_subnet_aws_resource.update(security_group_id: security_group_response.group_id)
 
@@ -62,13 +62,13 @@ class Prog::Aws::Vpc < Prog::Base
         rescue Aws::EC2::Errors::InvalidPermissionDuplicate
         end
       end
+      Clog.emit("Created security group ingress firewall rules at time #{Time.now}")
       hop_create_route_table
     end
     nap 1
   end
 
   label def create_route_table
-    Clog.emit("Creating route table at time #{Time.now}")
     # Step 3: Update the route table for ipv_6 traffic
     route_table_response = client.describe_route_tables({filters: [{name: "vpc-id", values: [private_subnet.private_subnet_aws_resource.vpc_id]}]})
     route_table_id = route_table_response.route_tables[0].route_table_id
@@ -89,6 +89,7 @@ class Prog::Aws::Vpc < Prog::Base
         client.attach_internet_gateway({internet_gateway_id:, vpc_id: private_subnet.private_subnet_aws_resource.vpc_id})
       end
     end
+    Clog.emit("Created internet gateway at time #{Time.now}")
 
     begin
       client.create_route({
@@ -104,6 +105,7 @@ class Prog::Aws::Vpc < Prog::Base
       })
     rescue Aws::EC2::Errors::RouteAlreadyExists
     end
+    Clog.emit("Created routes at time #{Time.now}")
 
     pop "subnet created"
   end

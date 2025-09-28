@@ -5,6 +5,7 @@ class Prog::Aws::Nic < Prog::Base
   subject_is :nic
 
   label def create_subnet
+    Clog.emit("Creating subnet at time #{Time.now}")
     register_deadline("attach_eip_network_interface", 3 * 60)
     vpc_response = client.describe_vpcs({filters: [{name: "vpc-id", values: [private_subnet.private_subnet_aws_resource.vpc_id]}]}).vpcs[0]
     ipv_6_cidr_block = NetAddr::IPv6Net.parse(vpc_response.ipv_6_cidr_block_association_set[0].ipv_6_cidr_block).nth_subnet(64, SecureRandom.random_number(2**8))
@@ -40,6 +41,7 @@ class Prog::Aws::Nic < Prog::Base
     end
 
     if subnet_response.state == "available"
+      Clog.emit("Subnet created at time #{Time.now}")
       route_table_response = client.describe_route_tables({filters: [{name: "vpc-id", values: [private_subnet.private_subnet_aws_resource.vpc_id]}]})
       route_table_id = route_table_response.route_tables[0].route_table_id
       route_table_details = client.describe_route_tables({route_table_ids: [route_table_id]}).route_tables.first
@@ -49,7 +51,8 @@ class Prog::Aws::Nic < Prog::Base
           subnet_id: nic.nic_aws_resource.subnet_id
         })
       end
-      hop_create_network_interface
+      Clog.emit("Route table associated with subnet at time #{Time.now}")
+      pop "subnet created"
     end
     nap 1
   end
@@ -82,7 +85,7 @@ class Prog::Aws::Nic < Prog::Base
   label def wait_network_interface_created
     if get_network_interface.status == "available"
       Clog.emit("Network interface created at time #{Time.now}")
-      hop_allocate_eip
+      pop "network interface created"
     end
 
     nap 1
@@ -116,7 +119,7 @@ class Prog::Aws::Nic < Prog::Base
     ignore_invalid_nic do
       client.delete_network_interface({network_interface_id: nic.nic_aws_resource.network_interface_id})
     end
-    hop_release_eip
+    hop_delete_subnet
   end
 
   label def release_eip

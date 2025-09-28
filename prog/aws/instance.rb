@@ -4,7 +4,7 @@ class Prog::Aws::Instance < Prog::Base
   subject_is :vm, :aws_instance
 
   label def start
-    Clog.emit("At the state start at time #{Time.now}")
+    Clog.emit("At the state of aws instance start at time #{Time.now}")
     hop_create_instance
   end
 
@@ -138,14 +138,17 @@ class Prog::Aws::Instance < Prog::Base
             iops: 3000,
             volume_size: vm.vm_storage_volumes_dataset.where(:boot).get(:size_gib),
             volume_type: "gp3",
-            throughput: 250
+            throughput: 125
           }
         }
       ],
       network_interfaces: [
         {
-          network_interface_id: vm.nics.first.nic_aws_resource.network_interface_id,
-          device_index: 0
+          device_index: 0,
+          subnet_id: vm.nics.first.nic_aws_resource.subnet_id,
+          groups: [vm.nics.first.private_subnet.private_subnet_aws_resource.security_group_id],
+          associate_public_ip_address: true,
+          ipv_6_address_count: 1
         }
       ],
       private_dns_name_options: {
