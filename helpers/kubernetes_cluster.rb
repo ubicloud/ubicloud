@@ -12,7 +12,7 @@ class Clover
 
     requested_kubernetes_vcpu_count = cp_node_count * 2 # since default control plane size is standard-2
     requested_kubernetes_vcpu_count += node_count * node_size.vcpus
-    Validation.validate_vcpu_quota(@project, "KubernetesVCpu", requested_kubernetes_vcpu_count, name: :worker_size)
+    Validation.validate_vcpu_quota(@project, "KubernetesVCpu", requested_kubernetes_vcpu_count, name: :worker_nodes)
 
     DB.transaction do
       kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(

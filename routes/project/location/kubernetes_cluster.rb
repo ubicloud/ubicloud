@@ -72,6 +72,13 @@ class Clover
         node_count = typecast_params.pos_int!("node_count")
         Validation.validate_kubernetes_worker_node_count(node_count)
 
+        if node_count > kn.node_count
+          node_size = Validation.validate_vm_size(kn.target_node_size, "x64")
+          extra_vcpu_count = (node_count - kn.node_count) * node_size.vcpus
+
+          Validation.validate_vcpu_quota(@project, "KubernetesVCpu", extra_vcpu_count, name: :node_count)
+        end
+
         DB.transaction do
           kn.update(node_count:)
           kn.incr_scale_worker_count

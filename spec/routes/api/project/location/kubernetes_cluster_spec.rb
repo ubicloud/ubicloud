@@ -143,6 +143,23 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
           expect(last_response.status).to eq(400)
         end
+
+        it "checks vCPU quota when scaling up" do
+          kn.update(target_node_size: "standard-4", node_count: 5)
+          expect(project.reload.current_resource_usage("KubernetesVCpu")).to eq 26 # cp: 3*2 + workers: 5*4
+
+          project.add_quota(quota_id: ProjectQuota.default_quotas["KubernetesVCpu"]["id"], value: 15)
+          expect(project.reload.effective_quota_value("KubernetesVCpu")).to eq 15
+
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 10}.to_json
+          expect(last_response.status).to eq(400)
+          expect(last_response.body).to include("Insufficient quota for requested size")
+
+          # Allows downsizing, even though the new quota is still not enough
+          post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/nodepool/#{kn.name}/resize", {node_count: 4}.to_json
+          expect(last_response.status).to eq(200)
+          expect(kn.reload.node_count).to eq(4)
+        end
       end
     end
   end
