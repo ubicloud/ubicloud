@@ -112,7 +112,7 @@ RSpec.describe Prog::Vnet::NicNexus do
     it "naps if not leaf" do
       st.update(prog: "Vnet::NicNexus", label: "wait_aws_nic_created", stack: [{}])
       Strand.create(parent_id: st.id, prog: "Aws::Nic", label: "create_network_interface", stack: [{}], lease: Time.now + 10)
-      expect { nx.wait_aws_nic_created }.to nap(2)
+      expect { nx.wait_aws_nic_created }.to nap(1)
     end
   end
 

@@ -41,7 +41,7 @@ class Prog::Vnet::NicNexus < Prog::Base
   end
 
   label def wait_aws_nic_created
-    reap(:wait, nap: 2)
+    reap(:wait, nap: 1)
   end
 
   label def wait_allocation

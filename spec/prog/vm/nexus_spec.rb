@@ -236,7 +236,7 @@ RSpec.describe Prog::Vm::Nexus do
   describe "#start_aws" do
     it "naps if vm nics are not in wait state" do
       expect(nx).to receive(:vm).and_return(instance_double(Vm, nics: [instance_double(Nic, strand: instance_double(Strand, label: "start"))]))
-      expect { nx.start_aws }.to nap(2)
+      expect { nx.start_aws }.to nap(1)
     end
 
     it "hops to wait_aws_vm_started if vm nics are in wait state" do
