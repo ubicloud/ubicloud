@@ -34,7 +34,7 @@ class Prog::Vnet::NicNexus < Prog::Base
   end
 
   label def create_aws_nic
-    nap 10 unless nic.private_subnet.strand.label == "wait"
+    nap 2 unless nic.private_subnet.strand.label == "wait"
     NicAwsResource.create_with_id(nic.id)
     bud Prog::Aws::Nic, {"subject_id" => nic.id, "exclude_availability_zones" => frame["exclude_availability_zones"], "availability_zone" => frame["availability_zone"]}, :create_subnet
     hop_wait_aws_nic_created
