@@ -252,8 +252,7 @@ usermod -L ubuntu
         iam_instance_profile: {
           name: "#{vm.name}-instance-profile"
         },
-        client_token: vm.id,
-        instance_market_options: nil
+        client_token: vm.id
       }).and_call_original
       expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
@@ -264,7 +263,8 @@ usermod -L ubuntu
       client.stub_responses(:describe_subnets, subnets: [{availability_zone_id: "use1-az1"}])
       vm.update(unix_user: "runneradmin")
       expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
-      expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
+      expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, subnet_id: "subnet-12345678"))
+      expect(vm.nics.first).to receive(:private_subnet).and_return(instance_double(PrivateSubnet, private_subnet_aws_resource: instance_double(PrivateSubnetAwsResource, security_group_id: "sg-12345678")))
       expect(client).to receive(:run_instances).with(hash_not_including(:iam_instance_profile)).and_call_original
       expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
@@ -293,7 +293,8 @@ usermod -L ubuntu
       vm.update(unix_user: "runneradmin")
       expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
       new_data = user_data + "echo \"1.2.3.4 ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
-      expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
+      expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, subnet_id: "subnet-12345678"))
+      expect(vm.nics.first).to receive(:private_subnet).and_return(instance_double(PrivateSubnet, private_subnet_aws_resource: instance_double(PrivateSubnetAwsResource, security_group_id: "sg-12345678")))
       expect(client).to receive(:run_instances).with(hash_including(user_data: Base64.encode64(new_data))).and_call_original
       expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
@@ -307,7 +308,8 @@ usermod -L ubuntu
       vm.update(unix_user: "runneradmin")
       expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
       new_data = user_data + "echo \"1.2.3.4 ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
-      expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
+      expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, subnet_id: "subnet-12345678"))
+      expect(vm.nics.first).to receive(:private_subnet).and_return(instance_double(PrivateSubnet, private_subnet_aws_resource: instance_double(PrivateSubnetAwsResource, security_group_id: "sg-12345678")))
       expect(client).to receive(:run_instances).with(hash_including(
         user_data: Base64.encode64(new_data),
         instance_market_options: {market_type: "spot", spot_options: {instance_interruption_behavior: "terminate", spot_instance_type: "one-time"}}
@@ -326,7 +328,8 @@ usermod -L ubuntu
       vm.update(unix_user: "runneradmin")
       expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
       new_data = user_data + "echo \"1.2.3.4 ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
-      expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
+      expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, subnet_id: "subnet-12345678"))
+      expect(vm.nics.first).to receive(:private_subnet).and_return(instance_double(PrivateSubnet, private_subnet_aws_resource: instance_double(PrivateSubnetAwsResource, security_group_id: "sg-12345678")))
       expect(client).to receive(:run_instances).with(hash_including(
         user_data: Base64.encode64(new_data),
         instance_market_options: {market_type: "spot", spot_options: {instance_interruption_behavior: "terminate", spot_instance_type: "one-time", max_price: "0.12"}}
@@ -341,7 +344,8 @@ usermod -L ubuntu
       installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
       GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
       expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
-      expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
+      expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, subnet_id: "subnet-12345678"))
+      expect(vm.nics.first).to receive(:private_subnet).and_return(instance_double(PrivateSubnet, private_subnet_aws_resource: instance_double(PrivateSubnetAwsResource, security_group_id: "sg-12345678")))
       expect(Clog).to receive(:emit).with("insufficient instance capacity").and_call_original
       expect(Prog::Vm::GithubRunner).to receive(:assemble).and_call_original
       expect { nx.create_instance }.to nap(30)

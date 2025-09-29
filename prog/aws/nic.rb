@@ -49,6 +49,11 @@ class Prog::Aws::Nic < Prog::Base
           subnet_id: nic.nic_aws_resource.subnet_id
         })
       end
+
+      # Runner instances don't need to have EIP, so we pop here.
+      # Public IP will be assigned by AWS while creating the instance.
+      pop "subnet created" if is_runner?
+
       hop_create_network_interface
     end
     nap 1
@@ -143,6 +148,10 @@ class Prog::Aws::Nic < Prog::Base
 
   def get_network_interface
     client.describe_network_interfaces({filters: [{name: "network-interface-id", values: [nic.nic_aws_resource.network_interface_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).network_interfaces[0]
+  end
+
+  def is_runner?
+    nic.vm&.unix_user == "runneradmin"
   end
 
   private

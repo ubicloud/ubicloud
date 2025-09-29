@@ -117,8 +117,7 @@ class Prog::Aws::Instance < Prog::Base
       min_count: 1,
       max_count: 1,
       tag_specifications: Util.aws_tag_specifications("instance", vm.name),
-      client_token: vm.id,
-      network_interfaces: standard_network_interfaces
+      client_token: vm.id
     }
 
     params = base_params.merge(instance_specific_params)
@@ -234,12 +233,14 @@ class Prog::Aws::Instance < Prog::Base
     if is_runner?
       {
         user_data: Base64.encode64(runner_user_data.gsub(/^(\s*# .*)?\n/, "")),
-        instance_market_options: runner_market_options
+        instance_market_options: runner_market_options,
+        network_interfaces: runner_network_interfaces
       }
     else
       {
         user_data: Base64.encode64(standard_user_data.gsub(/^(\s*# .*)?\n/, "")),
-        iam_instance_profile: {name: instance_profile_name}
+        iam_instance_profile: {name: instance_profile_name},
+        network_interfaces: standard_network_interfaces
       }
     end
   end
@@ -288,6 +289,20 @@ class Prog::Aws::Instance < Prog::Base
 
   def standard_network_interfaces
     [{device_index: 0, network_interface_id: vm.nics.first.nic_aws_resource.network_interface_id}]
+  end
+
+  # While creating runner instance, NIC and EIP are not created. So, we depend on
+  # AWS to assign a public IP to the instance.
+  def runner_network_interfaces
+    [
+      {
+        device_index: 0,
+        subnet_id: vm.nics.first.nic_aws_resource.subnet_id,
+        groups: [vm.nics.first.private_subnet.private_subnet_aws_resource.security_group_id],
+        associate_public_ip_address: true,
+        ipv_6_address_count: 1
+      }
+    ]
   end
 
   def ignore_invalid_entity

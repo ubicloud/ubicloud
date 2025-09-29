@@ -83,6 +83,15 @@ RSpec.describe Prog::Aws::Nic do
       expect { nx.wait_subnet_created }.to hop("create_network_interface")
     end
 
+    it "exits if it's a runner" do
+      client.stub_responses(:describe_subnets, subnets: [{state: "available"}])
+      client.stub_responses(:describe_route_tables, route_tables: [{route_table_id: "rtb-0123456789abcdefg", associations: []}])
+      client.stub_responses(:associate_route_table)
+      expect(client).to receive(:associate_route_table).with({route_table_id: "rtb-0123456789abcdefg", subnet_id: "subnet-0123456789abcdefg"}).and_call_original
+      expect(nic).to receive(:vm).and_return(instance_double(Vm, unix_user: "runneradmin"))
+      expect { nx.wait_subnet_created }.to exit({"msg" => "subnet created"})
+    end
+
     it "checks if subnet is available, doesn't associate with the route_table if it's already associated and hops to create_network_interface" do
       client.stub_responses(:describe_subnets, subnets: [{state: "available"}])
       client.stub_responses(:describe_route_tables, route_tables: [{route_table_id: "rtb-0123456789abcdefg", associations: [{subnet_id: "subnet-0123456789abcdefg"}]}])
