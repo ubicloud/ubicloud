@@ -93,47 +93,7 @@ class Prog::Aws::Instance < Prog::Base
   end
 
   label def create_instance
-    public_keys = (vm.sshable.keys.map(&:public_key) + (vm.project.get_ff_vm_public_ssh_keys || [])).join("\n")
-    # Define user data script to set a custom username
-    user_data = <<~USER_DATA
-      #!/bin/bash
-      custom_user="#{vm.unix_user}"
-      if [ ! -d /home/$custom_user ]; then
-        # Create the custom user
-        adduser $custom_user --disabled-password --gecos ""
-        # Add the custom user to the sudo group
-        usermod -aG sudo $custom_user
-        # disable password for the custom user
-        echo "$custom_user ALL=(ALL:ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/$custom_user
-        # Set up SSH access for the custom user
-        mkdir -p /home/$custom_user/.ssh
-        cp /home/ubuntu/.ssh/authorized_keys /home/$custom_user/.ssh/
-        chown -R $custom_user:$custom_user /home/$custom_user/.ssh
-        chmod 700 /home/$custom_user/.ssh
-        chmod 600 /home/$custom_user/.ssh/authorized_keys
-      fi
-      echo #{public_keys.shellescape} > /home/$custom_user/.ssh/authorized_keys
-      usermod -L ubuntu
-    USER_DATA
-
-    instance_market_options = nil
-    if is_runner?
-      # Normally we use dnsmasq to resolve our transparent cache domain to local IP, but we use /etc/hosts for AWS runners
-      user_data += "\necho \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
-      instance_market_options = if Config.github_runner_aws_spot_instance_enabled
-        spot_options = {
-          spot_instance_type: "one-time",
-          instance_interruption_behavior: "terminate"
-        }
-        if Config.github_runner_aws_spot_instance_max_price_per_vcpu > 0
-          # Not setting max_price means you'll pay up to the on-demand price,
-          spot_options[:max_price] = (vm.vcpus * Config.github_runner_aws_spot_instance_max_price_per_vcpu * 60).to_s
-        end
-        {market_type: "spot", spot_options:}
-      end
-    end
-
-    params = {
+    base_params = {
       image_id: vm.boot_image, # AMI ID
       instance_type: Option.aws_instance_type_name(vm.family, vm.vcpus),
       block_device_mappings: [
@@ -149,12 +109,6 @@ class Prog::Aws::Instance < Prog::Base
           }
         }
       ],
-      network_interfaces: [
-        {
-          network_interface_id: vm.nics.first.nic_aws_resource.network_interface_id,
-          device_index: 0
-        }
-      ],
       private_dns_name_options: {
         hostname_type: "ip-name",
         enable_resource_name_dns_a_record: false,
@@ -162,12 +116,13 @@ class Prog::Aws::Instance < Prog::Base
       },
       min_count: 1,
       max_count: 1,
-      user_data: Base64.encode64(user_data.gsub(/^(\s*# .*)?\n/, "")),
       tag_specifications: Util.aws_tag_specifications("instance", vm.name),
       client_token: vm.id,
-      instance_market_options:
+      network_interfaces: standard_network_interfaces
     }
-    params[:iam_instance_profile] = {name: instance_profile_name} unless is_runner?
+
+    params = base_params.merge(instance_specific_params)
+
     begin
       instance_response = client.run_instances(params)
     rescue Aws::EC2::Errors::InvalidParameterValue => e
@@ -273,6 +228,66 @@ class Prog::Aws::Instance < Prog::Base
 
   def is_runner?
     @is_runner ||= vm.unix_user == "runneradmin"
+  end
+
+  def instance_specific_params
+    if is_runner?
+      {
+        user_data: Base64.encode64(runner_user_data.gsub(/^(\s*# .*)?\n/, "")),
+        instance_market_options: runner_market_options
+      }
+    else
+      {
+        user_data: Base64.encode64(standard_user_data.gsub(/^(\s*# .*)?\n/, "")),
+        iam_instance_profile: {name: instance_profile_name}
+      }
+    end
+  end
+
+  def runner_user_data
+    standard_user_data + "\necho \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
+  end
+
+  def standard_user_data
+    public_keys = (vm.sshable.keys.map(&:public_key) + (vm.project.get_ff_vm_public_ssh_keys || [])).join("\n")
+    <<~USER_DATA
+      #!/bin/bash
+      custom_user="#{vm.unix_user}"
+      if [ ! -d /home/$custom_user ]; then
+        # Create the custom user
+        adduser $custom_user --disabled-password --gecos ""
+        # Add the custom user to the sudo group
+        usermod -aG sudo $custom_user
+        # disable password for the custom user
+        echo "$custom_user ALL=(ALL:ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/$custom_user
+        # Set up SSH access for the custom user
+        mkdir -p /home/$custom_user/.ssh
+        cp /home/ubuntu/.ssh/authorized_keys /home/$custom_user/.ssh/
+        chown -R $custom_user:$custom_user /home/$custom_user/.ssh
+        chmod 700 /home/$custom_user/.ssh
+        chmod 600 /home/$custom_user/.ssh/authorized_keys
+      fi
+      echo #{public_keys.shellescape} > /home/$custom_user/.ssh/authorized_keys
+      usermod -L ubuntu
+    USER_DATA
+  end
+
+  def runner_market_options
+    if Config.github_runner_aws_spot_instance_enabled
+      spot_options = {
+        spot_instance_type: "one-time",
+        instance_interruption_behavior: "terminate"
+      }
+      if Config.github_runner_aws_spot_instance_max_price_per_vcpu > 0
+        # Not setting max_price means you'll pay up to the on-demand price,
+        spot_options[:max_price] = (vm.vcpus * Config.github_runner_aws_spot_instance_max_price_per_vcpu * 60).to_s
+      end
+      {market_type: "spot", spot_options:}
+    end
+  end
+
+  def standard_network_interfaces
+    [{device_index: 0, network_interface_id: vm.nics.first.nic_aws_resource.network_interface_id}]
   end
 
   def ignore_invalid_entity
