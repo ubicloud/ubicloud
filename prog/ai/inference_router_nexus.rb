@@ -47,7 +47,7 @@ class Prog::Ai::InferenceRouterNexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      if strand.label != "destroy"
+      unless ["destroy", "self_destroy"].include?(strand.label)
         hop_destroy
       end
     end

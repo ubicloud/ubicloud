@@ -29,7 +29,7 @@ class Prog::Vnet::NicNexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      hop_destroy if strand.label != "destroy"
+      hop_destroy unless ["destroy", "wait_aws_nic_destroyed"].include?(strand.label)
     end
   end
 

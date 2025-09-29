@@ -53,7 +53,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      if strand.label != "destroy"
+      unless ["destroy", "wait_aws_vpc_destroyed"].include?(strand.label)
         register_deadline(nil, 10 * 60)
         hop_destroy
       end
