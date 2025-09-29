@@ -24,6 +24,25 @@ RSpec.describe Prog::Vnet::LoadBalancerRemoveVm do
     allow(Vm).to receive(:[]).and_return(vm)
   end
 
+  describe "#before_run" do
+    it "pops if the vm is not found" do
+      expect(Vm).to receive(:[]).and_return(nil)
+      expect { nx.before_run }.to exit({"msg" => "vm is removed from load balancer"})
+    end
+
+    it "pops if the vm exists but the load balancer reference is nil" do
+      expect(Vm).to receive(:[]).and_return(vm)
+      expect(vm).to receive(:load_balancer).and_return(nil)
+      expect { nx.before_run }.to exit({"msg" => "vm is removed from load balancer"})
+    end
+
+    it "does nothing if the vm exists and the load balancer reference is not nil" do
+      expect(Vm).to receive(:[]).and_return(vm)
+      expect(vm).to receive(:load_balancer).and_return(lb)
+      expect { nx.before_run }.not_to exit
+    end
+  end
+
   describe "#destroy_vm_ports_and_update_node" do
     it "removes the vm from load balancer and hops to wait_for_node_update" do
       expect(lb).to receive(:vm_ports_by_vm).with(vm).and_return(instance_double(LoadBalancerPort, destroy: nil)).at_least(:once)
