@@ -216,7 +216,7 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   label def wait_aws_vm_started
-    reap(:wait_sshable, nap: 10)
+    reap(:wait_sshable, nap: 3)
   end
 
   label def start

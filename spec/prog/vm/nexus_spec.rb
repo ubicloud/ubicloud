@@ -250,7 +250,7 @@ RSpec.describe Prog::Vm::Nexus do
     it "reaps and naps if not leaf" do
       st.update(prog: "Vm::Nexus", label: "wait_aws_vm_started", stack: [{}])
       Strand.create(parent_id: st.id, prog: "Aws::Instance", label: "start", stack: [{}], lease: Time.now + 10)
-      expect { nx.wait_aws_vm_started }.to nap(10)
+      expect { nx.wait_aws_vm_started }.to nap(3)
     end
 
     it "hops to wait_sshable if leaf" do
