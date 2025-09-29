@@ -210,7 +210,7 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   label def start_aws
-    nap 2 unless vm.nics.all? { |nic| nic.strand.label == "wait" }
+    nap 1 unless vm.nics.all? { |nic| nic.strand.label == "wait" }
     bud Prog::Aws::Instance, {"subject_id" => vm.id}, :start
     hop_wait_aws_vm_started
   end
