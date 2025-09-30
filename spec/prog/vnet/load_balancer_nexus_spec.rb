@@ -125,7 +125,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       vm = Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "testvm", private_subnet_id: ps.id).subject
       nx.load_balancer.add_vm(vm)
       nx.load_balancer.incr_refresh_cert
-      expect(Strand.where(prog: "Vnet::CertServer", label: "put_certificate").count).to eq 1
+      expect(Strand.where(prog: "Vnet::CertServer", label: "setup_cert_server").count).to eq 1
       expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
       expect { nx.wait_cert_provisioning }.to hop("wait_cert_broadcast")
       expect(Strand.where(prog: "Vnet::CertServer", label: "reshare_certificate").count).to eq 1
@@ -134,7 +134,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     it "hops to wait need_certificates? and refresh_cert are false" do
       vm = Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "testvm", private_subnet_id: ps.id).subject
       nx.load_balancer.add_vm(vm)
-      expect(Strand.where(prog: "Vnet::CertServer", label: "put_certificate").count).to eq 1
+      expect(Strand.where(prog: "Vnet::CertServer", label: "setup_cert_server").count).to eq 1
       expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
       expect { nx.wait_cert_provisioning }.to hop("wait")
       expect(Strand.where(prog: "Vnet::CertServer", label: "reshare_certificate").count).to eq 0
