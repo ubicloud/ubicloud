@@ -17,16 +17,15 @@ class Prog::Vnet::CertServer < Prog::Base
     pop "certificate is reshared"
   end
 
-  label def put_certificate
-    nap 5 unless load_balancer.active_cert&.cert
-
-    put_cert_to_vm
-    hop_start_certificate_server
+  label def setup_cert_server
+    vm.vm_host.sshable.cmd("sudo host/bin/setup-cert-server setup #{vm.inhost_name}")
+    hop_put_certificate
   end
 
-  label def start_certificate_server
-    vm.vm_host.sshable.cmd("sudo host/bin/setup-cert-server setup #{vm.inhost_name}")
-    pop "certificate server is started"
+  label def put_certificate
+    nap 5 unless load_balancer.active_cert&.cert
+    put_cert_to_vm
+    pop "certificate server is setup"
   end
 
   label def remove_cert_server

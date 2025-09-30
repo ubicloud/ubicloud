@@ -68,7 +68,8 @@ class CertServerSetup
       download_server
     end
 
-    r "cp #{server_main_path}/metadata-endpoint #{vm_server_path}"
+    create_cert_folder
+    r "cp #{server_main_path}/metadata-endpoint #{vm_server_path}" unless File.exist?(vm_server_path)
     r "sudo chown #{@vm_name}:#{@vm_name} #{vm_server_path}"
   end
 
@@ -130,11 +131,16 @@ CERT_SERVICE
     FileUtils.rm_f(service_file_path)
   end
 
+  # Here we are deliberately using mkdir instead of mkdir_p to avoid the bug
+  # that is mentioned in this commit
+  # https://github.com/ubicloud/ubicloud/commit/af0d3ed67b8b4f0e2f815298670cf39dadbc2309
+  def create_cert_folder
+    FileUtils.mkdir(cert_folder)
+  rescue Errno::EEXIST
+  end
+
   def put_certificate(cert_payload, cert_key_payload)
-    begin
-      FileUtils.mkdir(cert_folder)
-    rescue Errno::EEXIST
-    end
+    create_cert_folder
     safe_write_to_file(cert_path, cert_payload)
     safe_write_to_file(key_path, cert_key_payload)
   end
