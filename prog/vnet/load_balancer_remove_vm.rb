@@ -8,7 +8,7 @@ class Prog::Vnet::LoadBalancerRemoveVm < Prog::Base
   end
 
   label def before_run
-    pop "vm is removed from load balancer" unless load_balancer
+    reap { pop "vm is removed from load balancer" } unless load_balancer
   end
 
   label def destroy_vm_ports_and_update_node
