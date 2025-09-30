@@ -41,6 +41,20 @@ RSpec.describe Clover, "auth" do
     expect(page).to have_content("Name must only contain letters, numbers, spaces, and hyphens and have max length 63.")
   end
 
+  it "can not create new account with invalid email" do
+    visit "/create-account"
+    fill_in "Email Address", with: "\u1234@something.com"
+    fill_in "Full Name", with: "test"
+    fill_in "Password", with: TEST_USER_PASSWORD
+    fill_in "Password Confirmation", with: TEST_USER_PASSWORD
+    expect(EmailRenderer).to receive(:sendmail).and_raise(Net::SMTPSyntaxError, "501 5.1.3 Bad recipient address syntax")
+    click_button "Create Account"
+
+    expect(page.title).to eq("Ubicloud - Create Account")
+    expect(Mail::TestMailer.deliveries.length).to eq 0
+    expect(page).to have_flash_error("Invalid email address used")
+  end
+
   it "can send email verification email again after 300 seconds" do
     visit "/create-account"
     fill_in "Full Name", with: "John Doe"
