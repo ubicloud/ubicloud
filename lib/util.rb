@@ -86,6 +86,8 @@ module Util
 
   def self.send_email(...)
     EmailRenderer.sendmail("/", ...)
+  rescue Net::SMTPSyntaxError
+    raise CloverError.new(400, "InvalidRequest", "Invalid email address used")
   end
 
   def self.aws_tag_specifications(resource_type, name, additional_tags = {})
