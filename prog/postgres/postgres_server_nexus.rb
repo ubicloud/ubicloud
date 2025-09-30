@@ -547,6 +547,25 @@ SQL
   label def fence
     decr_fence
 
+    # Use multiple checkpoints so the final shutdown checkpoint is
+    # brief.
+    #
+    # The mechanism is to progressively reduce dirty buffers. The
+    # first `CHECKPOINT` may take a long time, during which more
+    # buffers become dirty. The next CHECKPOINT runs faster: even with
+    # a "long" first CHECKPOINT, the number of dirty buffers generated
+    # in the interim will be far fewer.
+    #
+    # By the third checkpoint, runtime is usually 1-2
+    # seconds. Shutdown then proceeds with only a short final
+    # checkpoint.
+    #
+    # Closely spaced checkpoints make UPDATEs more expensive due to
+    # full-page write amplification. After each checkpoint, the first
+    # change to a page requires writing a full 8KB copy instead of a
+    # smaller incremental WAL record. This short-term slowdown (a few
+    # minutes at worst) and increased WAL volume are accepted in order
+    # to avoid stopping all workloads for a long shutdown checkpoint.
     postgres_server.run_query("CHECKPOINT; CHECKPOINT; CHECKPOINT;")
     postgres_server.vm.sshable.cmd("sudo postgres/bin/lockout #{postgres_server.resource.version}")
     postgres_server.vm.sshable.cmd("sudo pg_ctlcluster #{postgres_server.resource.version} main stop -m smart")
