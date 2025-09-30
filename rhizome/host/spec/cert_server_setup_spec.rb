@@ -26,18 +26,31 @@ RSpec.describe CertServerSetup do
 
   describe "#copy_server" do
     it "downloads the server if it doesn't exist, copies the server, and sets the owner" do
-      expect(File).to receive(:exist?).with("/opt/metadata-endpoint-0.1.5").and_return(false)
+      expect(File).to receive(:exist?).with("/opt/metadata-endpoint-0.1.6").and_return(false)
+      expect(File).to receive(:exist?).with("/vm/test-vm/cert/metadata-endpoint-0.1.6").and_return(false)
       expect(cert_server_setup).to receive(:download_server)
-      expect(cert_server_setup).to receive(:r).with("cp /opt/metadata-endpoint-0.1.5/metadata-endpoint /vm/test-vm/cert/metadata-endpoint-0.1.5")
-      expect(cert_server_setup).to receive(:r).with("sudo chown test-vm:test-vm /vm/test-vm/cert/metadata-endpoint-0.1.5")
+      expect(FileUtils).to receive(:mkdir).with("/vm/test-vm/cert")
+      expect(cert_server_setup).to receive(:r).with("cp /opt/metadata-endpoint-0.1.6/metadata-endpoint /vm/test-vm/cert/metadata-endpoint-0.1.6")
+      expect(cert_server_setup).to receive(:r).with("sudo chown test-vm:test-vm /vm/test-vm/cert/metadata-endpoint-0.1.6")
       expect { cert_server_setup.copy_server }.not_to raise_error
     end
 
     it "doesn't download the server if it already exists" do
-      expect(File).to receive(:exist?).with("/opt/metadata-endpoint-0.1.5").and_return(true)
+      expect(File).to receive(:exist?).with("/opt/metadata-endpoint-0.1.6").and_return(true)
+      expect(File).to receive(:exist?).with("/vm/test-vm/cert/metadata-endpoint-0.1.6").and_return(false)
       expect(cert_server_setup).not_to receive(:download_server)
-      expect(cert_server_setup).to receive(:r).with("cp /opt/metadata-endpoint-0.1.5/metadata-endpoint /vm/test-vm/cert/metadata-endpoint-0.1.5")
-      expect(cert_server_setup).to receive(:r).with("sudo chown test-vm:test-vm /vm/test-vm/cert/metadata-endpoint-0.1.5")
+      expect(FileUtils).to receive(:mkdir).with("/vm/test-vm/cert")
+      expect(cert_server_setup).to receive(:r).with("cp /opt/metadata-endpoint-0.1.6/metadata-endpoint /vm/test-vm/cert/metadata-endpoint-0.1.6")
+      expect(cert_server_setup).to receive(:r).with("sudo chown test-vm:test-vm /vm/test-vm/cert/metadata-endpoint-0.1.6")
+      expect { cert_server_setup.copy_server }.not_to raise_error
+    end
+
+    it "doesn't copy the server if it already exists" do
+      expect(File).to receive(:exist?).with("/opt/metadata-endpoint-0.1.6").and_return(true)
+      expect(File).to receive(:exist?).with("/vm/test-vm/cert/metadata-endpoint-0.1.6").and_return(true)
+      expect(cert_server_setup).not_to receive(:download_server)
+      expect(FileUtils).to receive(:mkdir).with("/vm/test-vm/cert")
+      expect(cert_server_setup).not_to receive(:r).with("cp /opt/metadata-endpoint-0.1.6/metadata-endpoint /vm/test-vm/cert/metadata-endpoint-0.1.6")
       expect { cert_server_setup.copy_server }.not_to raise_error
     end
   end
@@ -45,19 +58,19 @@ RSpec.describe CertServerSetup do
   describe "#download_server" do
     it "downloads the server, extracts it, and removes the tarball" do
       expect(Arch).to receive(:render).with(x64: "x86_64", arm64: "arm64").and_return("arm64")
-      expect(cert_server_setup).to receive(:r).with("curl -L3 -o /tmp/metadata-endpoint-0.1.5.tar.gz https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.5/metadata-endpoint_Linux_arm64.tar.gz")
-      expect(FileUtils).to receive(:mkdir_p).with("/opt/metadata-endpoint-0.1.5")
-      expect(FileUtils).to receive(:cd).with("/opt/metadata-endpoint-0.1.5")
-      expect(FileUtils).to receive(:rm_f).with("/tmp/metadata-endpoint-0.1.5.tar.gz")
+      expect(cert_server_setup).to receive(:r).with("curl -L3 -o /tmp/metadata-endpoint-0.1.6.tar.gz https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.6/metadata-endpoint_Linux_arm64.tar.gz")
+      expect(FileUtils).to receive(:mkdir_p).with("/opt/metadata-endpoint-0.1.6")
+      expect(FileUtils).to receive(:cd).with("/opt/metadata-endpoint-0.1.6")
+      expect(FileUtils).to receive(:rm_f).with("/tmp/metadata-endpoint-0.1.6.tar.gz")
       expect { cert_server_setup.download_server }.not_to raise_error
     end
 
     it "downloads the server for x64" do
       expect(Arch).to receive(:render).with(x64: "x86_64", arm64: "arm64").and_return("x86_64")
-      expect(cert_server_setup).to receive(:r).with("curl -L3 -o /tmp/metadata-endpoint-0.1.5.tar.gz https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.5/metadata-endpoint_Linux_x86_64.tar.gz")
-      expect(FileUtils).to receive(:mkdir_p).with("/opt/metadata-endpoint-0.1.5")
-      expect(FileUtils).to receive(:cd).with("/opt/metadata-endpoint-0.1.5")
-      expect(FileUtils).to receive(:rm_f).with("/tmp/metadata-endpoint-0.1.5.tar.gz")
+      expect(cert_server_setup).to receive(:r).with("curl -L3 -o /tmp/metadata-endpoint-0.1.6.tar.gz https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.6/metadata-endpoint_Linux_x86_64.tar.gz")
+      expect(FileUtils).to receive(:mkdir_p).with("/opt/metadata-endpoint-0.1.6")
+      expect(FileUtils).to receive(:cd).with("/opt/metadata-endpoint-0.1.6")
+      expect(FileUtils).to receive(:rm_f).with("/tmp/metadata-endpoint-0.1.6.tar.gz")
       expect { cert_server_setup.download_server }.not_to raise_error
     end
   end
@@ -71,7 +84,7 @@ After=network.target
 
 [Service]
 NetworkNamespacePath=/var/run/netns/test-vm
-ExecStart=/vm/test-vm/cert/metadata-endpoint-0.1.5
+ExecStart=/vm/test-vm/cert/metadata-endpoint-0.1.6
 Restart=always
 RestartSec=15
 Type=simple
