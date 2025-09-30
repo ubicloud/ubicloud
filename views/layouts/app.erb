@@ -69,7 +69,7 @@
         </div>
       </div>
       <%== render("layouts/notifications") %>
-    <% elsif @error %>
+    <% elsif @direct_body_yield %>
       <%== yield %>
     <% else %>
       <div class="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
