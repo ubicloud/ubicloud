@@ -34,6 +34,11 @@ class MonitorableResource
       rescue => ex
         event_loop_failed = true
         Clog.emit("SSH event loop has failed.") { {event_loop_failure: {ubid: @resource.ubid, exception: Util.exception_to_hash(ex)}} }
+        @session[:ssh_session].shutdown!
+        begin
+          @session[:ssh_session].close
+        rescue
+        end
       end
     end
 
@@ -66,17 +71,6 @@ class MonitorableResource
 
     run_event_loop = false
     pulse_thread&.join
-    close_resource_session if event_loop_failed
-  end
-
-  def close_resource_session
-    return if @session.nil?
-
-    @session[:ssh_session].shutdown!
-    begin
-      @session[:ssh_session].close
-    rescue
-    end
-    @session = nil
+    @session = nil if event_loop_failed
   end
 end
