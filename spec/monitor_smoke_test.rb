@@ -5,25 +5,18 @@ ENV["RACK_ENV"] = "test"
 require "json"
 require_relative "../ubid"
 
-r, w = IO.pipe
-output = +""
-Thread.new do
-  until (s = r.read(4096).to_s).empty?
-    output << s
-  end
-rescue
-  p $!
+output_filename = "spec/monitor-smoke-test-output-"
+
+fd_map = lambda do |i|
+  {:in => :close, [:out, :err] => "#{output_filename}#{i}"}
 end
 
-fd_map = {:in => :close, [:out, :err] => w}
 monitor_pids = [
-  Process.spawn({"DYNO" => "monitor.2"}, "bin/monitor", **fd_map),
-  Process.spawn({"PS" => "monitor.3"}, "bin/monitor", **fd_map),
-  Process.spawn("bin/monitor", "4", **fd_map),
-  Process.spawn("bin/monitor", **fd_map)
+  Process.spawn({"DYNO" => "monitor.2"}, "bin/monitor", **fd_map.call(0)),
+  Process.spawn({"PS" => "monitor.3"}, "bin/monitor", **fd_map.call(1)),
+  Process.spawn("bin/monitor", "4", **fd_map.call(2)),
+  Process.spawn("bin/monitor", **fd_map.call(3))
 ]
-
-w.close
 
 print("monitor smoke test: ")
 10.times do
@@ -61,6 +54,9 @@ possible_ranges = required_ranges + [
   ["80000000-0000-0000-0000-000000000000", "ffffffff-ffff-ffff-ffff-ffffffffffff"], # 2/2
   ["aaaaaaaa-0000-0000-0000-000000000000", "ffffffff-ffff-ffff-ffff-ffffffffffff"]  # 3/3
 ]
+
+output_filenames = Array.new(4) { |i| "#{output_filename}#{i}" }
+output = output_filenames.map { File.read(it) }.join
 ranges = output.scan(/"range":"([-0-9a-f]+)\.\.\.?([-0-9a-f]+)"/)
 ranges.each do
   next if possible_ranges.include?(it)
@@ -88,6 +84,9 @@ output.split("\n").each do |line|
   rescue JSON::ParserError
     warn "Unexpected/non-JSON monitor output line:"
     warn line
+    warn ""
+    warn "Full output:"
+    warn output
     raise
   end
   data.delete("time")
@@ -117,3 +116,4 @@ unless lines[:other].flat_map(&:keys).uniq.sort == ["message", "monitor_metrics"
 end
 
 puts "all checks passed!"
+output_filenames.each { File.delete(it) }
