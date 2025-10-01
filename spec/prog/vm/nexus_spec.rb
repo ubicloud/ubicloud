@@ -1022,7 +1022,7 @@ RSpec.describe Prog::Vm::Nexus do
       end
 
       it "absorbs an already deleted errors as a success" do
-        expect(sshable).to receive(:cmd).with("sudo timeout 10s systemctl stop #{nx.vm_name}").and_raise(
+        expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10).and_raise(
           Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
         )
         expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-dnsmasq/).and_raise(
@@ -1035,7 +1035,7 @@ RSpec.describe Prog::Vm::Nexus do
 
       it "absorbs an already deleted errors as a success and hops to lb_expiry if vm is part of a load balancer" do
         expect(vm).to receive(:load_balancer).and_return(instance_double(LoadBalancer)).at_least(:once)
-        expect(sshable).to receive(:cmd).with("sudo timeout 10s systemctl stop #{nx.vm_name}").and_raise(
+        expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10).and_raise(
           Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
         )
         expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-dnsmasq/).and_raise(
@@ -1047,20 +1047,20 @@ RSpec.describe Prog::Vm::Nexus do
 
       it "raises other stop errors" do
         ex = Sshable::SshError.new("stop", "", "unknown error", 1, nil)
-        expect(sshable).to receive(:cmd).with("sudo timeout 10s systemctl stop #{nx.vm_name}").and_raise(ex)
+        expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10).and_raise(ex)
 
         expect { nx.destroy }.to raise_error ex
       end
 
       it "raises other stop-dnsmasq errors" do
         ex = Sshable::SshError.new("stop", "", "unknown error", 1, nil)
-        expect(sshable).to receive(:cmd).with("sudo timeout 10s systemctl stop #{nx.vm_name}")
+        expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
         expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-dnsmasq/).and_raise(ex)
         expect { nx.destroy }.to raise_error ex
       end
 
       it "deletes and pops when all commands are succeeded" do
-        expect(sshable).to receive(:cmd).with("sudo timeout 10s systemctl stop #{nx.vm_name}")
+        expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
         expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-dnsmasq/)
         expect(sshable).to receive(:cmd).with(/sudo.*bin\/setup-vm delete #{nx.vm_name}/)
 
