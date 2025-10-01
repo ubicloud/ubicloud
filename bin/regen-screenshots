@@ -311,7 +311,7 @@ class RegenScreenshots
 
     k8s_cluster = KubernetesCluster.create(
       name: "kubernetes-demo",
-      version: "v1.32",
+      version: "v1.34",
       cp_node_count: 3,
       location_id: Location::HETZNER_FSN1_ID,
       target_node_size: "standard-2",
@@ -330,7 +330,7 @@ class RegenScreenshots
       name: "kubernetes-demo-np",
       node_count: 5,
       kubernetes_cluster_id: k8s_cluster.id,
-      target_node_size: "standard-2"
+      target_node_size: "standard-8"
     ) do |kn|
       kn.id = UBID.parse(kn_ubid).to_uuid
     end
@@ -355,10 +355,13 @@ class RegenScreenshots
         sshable_unix_user: "ubi",
         name: "#{kc_ubid}-#{suffix}",
         location_id: k8s_cluster.location.id,
+        size: k8s_cluster.target_node_size,
+        storage_volumes: nil,
+        boot_image: "kubernetes-v1_34",
         private_subnet_id: k8s_cluster.private_subnet_id,
         enable_ip4: true,
         kubernetes_cluster_id: k8s_cluster.id
-      ).subject
+      )
     end
 
     ["ubicl", "krn71", "fysgd", "mant4", "m0h11"].each do |suffix|
@@ -367,11 +370,14 @@ class RegenScreenshots
         sshable_unix_user: "ubi",
         name: "#{kn_ubid}-#{suffix}",
         location_id: k8s_cluster.location.id,
+        size: k8s_nodepool.target_node_size,
+        storage_volumes: nil,
+        boot_image: "kubernetes-v1_34",
         private_subnet_id: k8s_cluster.private_subnet_id,
         enable_ip4: true,
         kubernetes_cluster_id: k8s_cluster.id,
         kubernetes_nodepool_id: k8s_nodepool.id
-      ).subject
+      )
     end
 
     Project.define_method(:kubernetes_clusters_dataset) do |*a|
@@ -386,8 +392,19 @@ class RegenScreenshots
 
     click_link "Kubernetes"
     click_link "kubernetes-demo"
-    resize(1400)
+    resize(800, width: 1600)
     screenshot "managed-kubernetes/overview-screenshot.png"
+
+    resize(1000, width: 1600)
+    within("aside nav") do
+      click_link "Settings"
+    end
+    screenshot "managed-kubernetes/resize-screenshot.png"
+
+    within("aside nav") do
+      click_link "Nodes"
+    end
+    screenshot "managed-kubernetes/nodes-screenshot.png"
 
     resize(800)
     click_link "Users"
