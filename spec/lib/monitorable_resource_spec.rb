@@ -49,10 +49,11 @@ RSpec.describe MonitorableResource do
     it "swallows exception and logs it if event loop fails" do
       session = {ssh_session: instance_double(Net::SSH::Connection::Session)}
       r_w_event_loop.instance_variable_set(:@session, session)
+      expect(session[:ssh_session]).to receive(:shutdown!)
+      expect(session[:ssh_session]).to receive(:close)
       expect(Thread).to receive(:new).and_call_original
       expect(session[:ssh_session]).to receive(:loop).and_raise(StandardError)
       expect(Clog).to receive(:emit).twice.and_call_original
-      expect(r_w_event_loop).to receive(:close_resource_session)
       r_w_event_loop.check_pulse
     end
 
@@ -169,24 +170,6 @@ RSpec.describe MonitorableResource do
         expect(Clog).to receive(:emit).and_call_original
         expect { r_w_event_loop.check_pulse }.not_to raise_error
       end
-    end
-  end
-
-  describe "#close_resource_session" do
-    it "returns if session is nil" do
-      session = {ssh_session: instance_double(Net::SSH::Connection::Session)}
-      expect(session[:ssh_session]).not_to receive(:shutdown!)
-      expect(session).to receive(:nil?).and_return(true)
-      r_w_event_loop.instance_variable_set(:@session, session)
-      r_w_event_loop.close_resource_session
-    end
-
-    it "shuts down and closes the session" do
-      session = {ssh_session: instance_double(Net::SSH::Connection::Session)}
-      expect(session[:ssh_session]).to receive(:shutdown!)
-      expect(session[:ssh_session]).to receive(:close)
-      r_w_event_loop.instance_variable_set(:@session, session)
-      r_w_event_loop.close_resource_session
     end
   end
 end
