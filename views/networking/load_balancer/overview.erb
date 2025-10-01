@@ -16,7 +16,23 @@
 
 unless @lb.health_check_protocol == "tcp"
   data << ["HTTP Health Check Endpoint", @lb.health_check_endpoint]
+  data << ["SSL Certificate Status", @lb.active_cert&.cert ? "Available" : "Creating"] if @lb.health_check_protocol == "https"
 end
 %>
 
 <%== part("components/kv_data_card", data:) %>
+<% if @lb.health_check_protocol == "https" %>
+  <div class="p-1 overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200 mt-4 px-4 py-5 sm:flex sm:items-center">
+    <div>
+      <h3 class="text-base font-semibold leading-6 text-gray-900">How to fetch the SSL certificate?</h3>
+      <div class="mt-2 text-sm text-gray-500">
+        <p>Run the following commands on your attached virtual machines:</p>
+          <div class="px-4 py-3">
+            <p><code>sudo curl [FD00:0B1C:100D:5AFE:CE::]/load-balancer/cert.pem</code></p>
+            <p><code>sudo curl [FD00:0B1C:100D:5AFE:CE::]/load-balancer/key.pem</code></p>
+          </div>
+        <p>Learn more about Ubicloud SSL certificates in the <a href="https://www.ubicloud.com/docs/networking/load-balancer#ssl-certificates" class="text-orange-600 hover:text-orange-700" target="_blank">documentation</a>.</p>
+      </div>
+    </div>
+  </div>
+<% end %>
