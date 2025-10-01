@@ -9,12 +9,19 @@ class CloudflareClient
   end
 
   def create_token(name, policies)
-    response = @connection.post(path: "/client/v4/user/tokens", body: {name: name, policies: policies}.to_json, expects: 200)
+    response = @connection.post(path:, body: {name: name, policies: policies}.to_json, expects: 200)
     data = JSON.parse(response.body)
     [data["result"]["id"], data["result"]["value"]]
   end
 
   def delete_token(token_id)
-    @connection.delete(path: "/client/v4/user/tokens/#{token_id}", expects: [200, 404]).status
+    @connection.delete(path: "#{path}/#{token_id}", expects: [200, 404]).status
+  end
+
+  private
+
+  def path
+    frag = Config.github_cache_blob_storage_use_account_token ? "accounts/#{Config.github_cache_blob_storage_account_id}" : "user"
+    "/client/v4/#{frag}/tokens"
   end
 end
