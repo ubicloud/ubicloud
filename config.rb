@@ -122,7 +122,7 @@ module Config
   override :spdk_version, "v23.09-ubi-0.3"
 
   # Vhost Block Backend
-  override :vhost_block_backend_version, "v0.2.0"
+  override :vhost_block_backend_version, "v0.2.1"
 
   # Boot Images
   override :default_boot_image_name, "ubuntu-jammy", string
