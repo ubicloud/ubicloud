@@ -532,7 +532,7 @@ class Prog::Vm::Nexus < Prog::Base
 
     unless host.nil?
       begin
-        host.sshable.cmd("sudo timeout 10s systemctl stop #{q_vm}")
+        host.sshable.cmd("sudo systemctl stop #{q_vm}", timeout: 10)
       rescue Sshable::SshError => ex
         raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
       end
