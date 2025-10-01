@@ -188,7 +188,8 @@ class Clover
 
         r.post "pay" do
           no_audit_log
-          next unless invoice.payable?
+          handle_validation_failure("project/billing")
+          raise_web_error("Invoice is not payable") unless invoice.payable?
           bi = invoice.project.billing_info
           checkout = Stripe::Checkout::Session.create(
             payment_method_types: ["card"],
@@ -221,9 +222,15 @@ class Clover
 
         r.get "success" do
           handle_validation_failure("project/billing")
-          checkout_session = Stripe::Checkout::Session.retrieve(typecast_params.str!("session_id"))
+          session_id = typecast_params.str!("session_id")
+          begin
+            checkout_session = Stripe::Checkout::Session.retrieve(session_id)
+          rescue Stripe::InvalidRequestError => e
+            Clog.emit("invalid invoice payment") { {unsuccessful_invoice_payment: {invoice_ubid: invoice.ubid, session_id:, message: e.message}} }
+            raise_web_error("We couldn't validate your payment. If you think this is a mistake, please reach out to our support team at support@ubicloud")
+          end
           unless checkout_session["customer"] == @project.billing_info.stripe_id && checkout_session["metadata"]["invoice"] == invoice.ubid && checkout_session["payment_status"] == "paid"
-            Clog.emit("Invoice payment was not successful") { {unsuccessful_invoice_payment: {invoice_ubid: invoice.ubid, session_id: checkout_session["id"]}} }
+            Clog.emit("unsuccessful invoice payment") { {unsuccessful_invoice_payment: {invoice_ubid: invoice.ubid, session_id:}} }
             raise_web_error("Invoice payment was not successful")
           end
           invoice.update(status: "paid")
