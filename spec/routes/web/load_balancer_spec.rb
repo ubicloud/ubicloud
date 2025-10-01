@@ -176,6 +176,48 @@ RSpec.describe Clover, "load balancer" do
         expect(page.title).to eq("Ubicloud - #{lb.name}")
         expect(page).to have_content lb.name
         expect(page).to have_content "Round Robin"
+        expect(page.all("dt,dd").map(&:text)).to eq [
+          "ID", lb.ubid,
+          "Name", "dummy-lb-1",
+          "Connection String", lb.hostname,
+          "Private Subnet", lb.private_subnet.name,
+          "Algorithm", "Round Robin",
+          "Stack", "dual",
+          "Load Balancer Port", "80",
+          "Application Port", "8080",
+          "Health Check Protocol", "HTTP",
+          "HTTP Health Check Endpoint", "/up"
+        ]
+        expect(page).to have_no_content "How to fetch the SSL certificate?"
+      end
+
+      it "can show load balancer details for an HTTPS enabled load balancer without a certificate, yet" do
+        lb
+        visit "#{project.path}/load-balancer"
+
+        expect(page.title).to eq("Ubicloud - Load Balancers")
+        expect(page).to have_content lb.name
+        expect(page).to have_content lb.hostname
+        lb.update(health_check_protocol: "https")
+        click_link lb.name, href: "#{project.path}#{lb.path}"
+
+        expect(page.title).to eq("Ubicloud - #{lb.name}")
+        expect(page).to have_content lb.name
+        expect(page).to have_content "Round Robin"
+        expect(page.all("dt,dd").map(&:text)).to eq [
+          "ID", lb.ubid,
+          "Name", "dummy-lb-1",
+          "Connection String", lb.hostname,
+          "Private Subnet", lb.private_subnet.name,
+          "Algorithm", "Round Robin",
+          "Stack", "dual",
+          "Load Balancer Port", "80",
+          "Application Port", "8080",
+          "Health Check Protocol", "HTTPS",
+          "HTTP Health Check Endpoint", "/up",
+          "SSL Certificate Status", "Creating"
+        ]
+        expect(page).to have_content "How to fetch the SSL certificate?"
       end
 
       it "raises forbidden when does not have permissions" do
@@ -208,7 +250,7 @@ RSpec.describe Clover, "load balancer" do
 
       it "can attach vm" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
-        lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000, algorithm: "hash_based").subject
+        lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000, algorithm: "hash_based", health_check_protocol: "https").subject
         dz = DnsZone.create(name: "test-dns-zone", project_id: project.id)
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
         cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
@@ -234,8 +276,9 @@ RSpec.describe Clover, "load balancer" do
           "Stack", "dual",
           "Load Balancer Port", "80",
           "Application Port", "8000",
-          "Health Check Protocol", "HTTP",
-          "HTTP Health Check Endpoint", "/up"
+          "Health Check Protocol", "HTTPS",
+          "HTTP Health Check Endpoint", "/up",
+          "SSL Certificate Status", "Available"
         ]
 
         lb.update(health_check_protocol: "tcp")
