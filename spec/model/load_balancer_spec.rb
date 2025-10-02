@@ -130,6 +130,7 @@ RSpec.describe LoadBalancer do
     end
 
     it "increments update_load_balancer and does not create a strand for removing cert server" do
+      lb.update(cert_enabled: false)
       expect(lb).to receive(:incr_update_load_balancer)
       expect(Strand).not_to receive(:create) do |args|
         expect(args[:prog]).to eq("Vnet::CertServer")
@@ -218,10 +219,8 @@ RSpec.describe LoadBalancer do
       expect(lb.need_certificates?).to be(true)
     end
 
-    it "returns false if health_check_protocol is not https" do
-      lb.update(health_check_protocol: "http")
-      expect(lb.need_certificates?).to be(false)
-      lb.update(health_check_protocol: "tcp")
+    it "returns false if cert_enabled is false" do
+      lb.update(cert_enabled: false)
       expect(lb.need_certificates?).to be(false)
     end
   end

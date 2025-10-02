@@ -79,10 +79,12 @@ class Clover
           authorize("LoadBalancer:edit", lb)
           algorithm, health_check_endpoint = typecast_params.nonempty_str!(%w[algorithm health_check_endpoint])
           src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port])
+          cert_enabled = typecast_params.bool("cert_enabled")
           vm_ids = typecast_params.array(:ubid_uuid, "vms")
+          cert_changed = lb.cert_enabled != cert_enabled
 
           DB.transaction do
-            lb.update(algorithm:, health_check_endpoint:)
+            lb.update(algorithm:, health_check_endpoint:, cert_enabled:)
             lb.ports.first.update(src_port: Validation.validate_port(:src_port, src_port),
               dst_port: Validation.validate_port(:dst_port, dst_port))
 
@@ -107,6 +109,8 @@ class Clover
             end
 
             lb.incr_update_load_balancer
+            lb.enable_cert_server if cert_changed && cert_enabled
+            lb.disable_cert_server if cert_changed && !cert_enabled
             audit_log(lb, "update")
           end
           Serializers::LoadBalancer.serialize(lb.reload, {detailed: true})

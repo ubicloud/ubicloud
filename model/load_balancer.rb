@@ -83,15 +83,24 @@ class LoadBalancer < Sequel::Model
       ports.each { |port|
         LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: load_balancer_vm.id)
       }
-      Strand.create(prog: "Vnet::CertServer", label: "setup_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id) if cert_enabled
+      setup_cert_server(vm.id) if cert_enabled
       incr_rewrite_dns_records
     end
+  end
+
+  def enable_cert_server
+    vms.each { |vm| setup_cert_server(vm.id) }
+  end
+
+  def disable_cert_server
+    vms.each { |vm| remove_cert_server(vm.id) }
+    certs.each(&:incr_destroy)
   end
 
   def detach_vm(vm)
     DB.transaction do
       vm_ports_by_vm_and_state(vm, ["up", "down", "evacuating"]).update(state: "detaching")
-      remove_cert_server(vm.id)
+      remove_cert_server(vm.id) if cert_enabled
       incr_update_load_balancer
     end
   end
@@ -99,14 +108,18 @@ class LoadBalancer < Sequel::Model
   def evacuate_vm(vm)
     DB.transaction do
       vm_ports_by_vm_and_state(vm, ["up", "down"]).update(state: "evacuating")
-      remove_cert_server(vm.id)
+      remove_cert_server(vm.id) if cert_enabled
       incr_update_load_balancer
       incr_rewrite_dns_records
     end
   end
 
   def remove_cert_server(vm_id)
-    Strand.create(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id:}], parent_id: id) if cert_enabled
+    Strand.create(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id:}], parent_id: id)
+  end
+
+  def setup_cert_server(vm_id)
+    Strand.create(prog: "Vnet::CertServer", label: "setup_cert_server", stack: [{subject_id: id, vm_id:}], parent_id: id)
   end
 
   def remove_vm(vm)

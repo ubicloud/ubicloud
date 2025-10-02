@@ -322,6 +322,7 @@ Options:
     -e, --check-endpoint=path        set the health check endpoint (default: /up)
     -p, --check-protocol=proto       set the health check protocol
     -s, --stack=stack                set the stack
+    -c, --cert-enabled=cert_enabled  set the certificate enabled
 
 Allowed Option Values:
     Algorithm: round_robin hash_based

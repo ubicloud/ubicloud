@@ -624,6 +624,9 @@ paths:
                   type: array
                   items:
                     type: string
+                cert_enabled:
+                  description: Whether SSL certificates are enabled for the Load Balancer
+                  type: boolean
               additionalProperties: false
               required:
                 - algorithm
@@ -631,6 +634,7 @@ paths:
                 - health_check_endpoint
                 - src_port
                 - vms
+                - cert_enabled
       responses:
         '200':
           $ref: '#/components/responses/LoadBalancer'
@@ -669,6 +673,9 @@ paths:
                 src_port:
                   description: Source port for the Load Balancer
                   type: integer
+                cert_enabled:
+                  description: Whether SSL certificates are enabled for the Load Balancer
+                  type: boolean
               additionalProperties: false
               required:
                 - algorithm
@@ -2121,6 +2128,9 @@ components:
         src_port:
           description: Source port for the Load Balancer
           type: integer
+        cert_enabled:
+          description: Whether SSL certificate is enabled
+          type: boolean
       additionalProperties: false
       required:
         - algorithm
@@ -2131,6 +2141,7 @@ components:
         - id
         - name
         - src_port
+        - cert_enabled
     Nic:
       type: object
       properties:
