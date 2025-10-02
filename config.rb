@@ -8,6 +8,10 @@ rescue LoadError
   # .env.rb is optional
 end
 
+# :nocov:
+$stdout.sync = $stderr.sync = true if ENV["SYNC"] == "1"
+# :nocov:
+
 # Adapted from
 # https://github.com/interagent/pliny/blob/fcc8f3b103ec5296bd754898fdefeb2fda2ab292/lib/template/config/config.rb.
 #
