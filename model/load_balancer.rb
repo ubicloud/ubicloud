@@ -83,7 +83,7 @@ class LoadBalancer < Sequel::Model
       ports.each { |port|
         LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: load_balancer_vm.id)
       }
-      Strand.create(prog: "Vnet::CertServer", label: "setup_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id) if cert_enabled_lb?
+      Strand.create(prog: "Vnet::CertServer", label: "setup_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id) if cert_enabled
       incr_rewrite_dns_records
     end
   end
@@ -106,7 +106,7 @@ class LoadBalancer < Sequel::Model
   end
 
   def remove_cert_server(vm_id)
-    Strand.create(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id:}], parent_id: id) if cert_enabled_lb?
+    Strand.create(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id:}], parent_id: id) if cert_enabled
   end
 
   def remove_vm(vm)
@@ -135,12 +135,8 @@ class LoadBalancer < Sequel::Model
     custom_hostname_dns_zone || DnsZone[project_id: Config.load_balancer_service_project_id, name: Config.load_balancer_service_hostname]
   end
 
-  def cert_enabled_lb?
-    health_check_protocol == "https"
-  end
-
   def need_certificates?
-    return false unless cert_enabled_lb?
+    return false unless cert_enabled
 
     certs_dataset.with_cert.needing_recert.empty?
   end

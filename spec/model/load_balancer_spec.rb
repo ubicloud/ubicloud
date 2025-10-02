@@ -4,7 +4,7 @@ require_relative "spec_helper"
 
 RSpec.describe LoadBalancer do
   subject(:lb) {
-    Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080, health_check_protocol: "https").subject
+    Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080, health_check_protocol: "https", cert_enabled: true).subject
   }
 
   let(:project) { Project.create(name: "test-prj") }
@@ -131,7 +131,6 @@ RSpec.describe LoadBalancer do
 
     it "increments update_load_balancer and does not create a strand for removing cert server" do
       expect(lb).to receive(:incr_update_load_balancer)
-      expect(lb).to receive(:cert_enabled_lb?).and_return(false)
       expect(Strand).not_to receive(:create) do |args|
         expect(args[:prog]).to eq("Vnet::CertServer")
         expect(args[:label]).to eq("remove_cert_server")
@@ -186,13 +185,6 @@ RSpec.describe LoadBalancer do
       lb.reload
       expect(lb.vm_ports.count).to eq(0)
       expect(lb.load_balancer_vms.count).to eq(0)
-    end
-  end
-
-  describe "cert_enabled_lb?" do
-    it "returns false when healthcheck protocol is not https" do
-      lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080, health_check_protocol: "http").subject
-      expect(lb.cert_enabled_lb?).to equal(false)
     end
   end
 
