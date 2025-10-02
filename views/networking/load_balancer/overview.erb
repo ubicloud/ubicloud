@@ -15,10 +15,10 @@
     ["Application Port", @lb.dst_port],
     ["HTTP Health Check Endpoint", @lb.health_check_endpoint],
     ["Health Check Protocol", @lb.health_check_protocol.upcase],
-    ["SSL Certificate Status", @lb.cert_enabled_lb? ? (@lb.active_cert&.cert ? "Available" : "Creating") : "SSL Certificates are not enabled for this load balancer"]
+    ["SSL Certificate Status", @lb.cert_enabled ? (@lb.active_cert&.cert ? "Available" : "Creating") : "SSL Certificates are not enabled for this load balancer"]
   ]
 ) %>
-<% if @lb.cert_enabled_lb? %>
+<% if @lb.cert_enabled %>
   <div class="p-1 overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200 mt-4 px-4 py-5 sm:flex sm:items-center">
     <div>
       <h3 class="text-base font-semibold leading-6 text-gray-900">How to fetch the SSL certificate?</h3>
