@@ -17,6 +17,7 @@ class Clover
 
     algorithm, health_check_protocol, stack = typecast_params.nonempty_str!(%w[algorithm health_check_protocol stack])
     src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port])
+    cert_enabled = typecast_params.bool("ssl_certificate")
     health_check_endpoint = typecast_params.nonempty_str("health_check_endpoint") || Prog::Vnet::LoadBalancerNexus::DEFAULT_HEALTH_CHECK_ENDPOINT
 
     unless (ps = authorized_private_subnet)
@@ -33,7 +34,8 @@ class Clover
         src_port: Validation.validate_port(:src_port, src_port),
         dst_port: Validation.validate_port(:dst_port, dst_port),
         health_check_endpoint:,
-        health_check_protocol:
+        health_check_protocol:,
+        cert_enabled:
       ).subject
       audit_log(lb, "create")
     end
@@ -57,6 +59,7 @@ class Clover
     options.add_option(name: "dst_port")
     options.add_option(name: "health_check_endpoint")
     options.add_option(name: "health_check_protocol", values: ["http", "https", "tcp"].map { {value: it, display_name: it.upcase} })
+    options.add_option(name: "ssl_certificate", values: ["1"])
     options.serialize
   end
 end
