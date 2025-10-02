@@ -232,7 +232,7 @@ RSpec.describe Prog::Test::HetznerServer do
     it "doesn't fail if no bdevs or vhost controllers" do
       expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo /opt/spdk-1.0/scripts/rpc.py -s /home/spdk/spdk-1.0.sock bdev_get_bdevs").and_return("[]")
       expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo /opt/spdk-1.0/scripts/rpc.py -s /home/spdk/spdk-1.0.sock vhost_get_controllers").and_return("[]")
-      expect { hs_test.verify_spdk_artifacts_purged }.to hop("destroy")
+      expect { hs_test.verify_spdk_artifacts_purged }.to hop("destroy_vm_host")
     end
 
     it "fails if bdevs are present" do
@@ -249,16 +249,16 @@ RSpec.describe Prog::Test::HetznerServer do
     end
   end
 
-  describe "#destroy" do
+  describe "#destroy_vm_host" do
     it "does not delete key and vm host if existing vm host used" do
       expect(hs_test).to receive(:frame).and_return({"destroy" => false})
-      expect { hs_test.destroy }.to hop("finish")
+      expect { hs_test.destroy_vm_host }.to hop("finish")
     end
 
     it "deletes vm host" do
       expect(hs_test).to receive(:frame).and_return({"setup_host" => true})
       expect(vm_host).to receive(:incr_destroy)
-      expect { hs_test.destroy }.to hop("wait_vm_host_destroyed")
+      expect { hs_test.destroy_vm_host }.to hop("wait_vm_host_destroyed")
     end
   end
 

@@ -175,10 +175,10 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     vhost_controllers = JSON.parse(sshable.cmd("sudo #{rpc_py} -s #{rpc_sock} vhost_get_controllers")).map { it["ctrlr"] }
     fail_test "SPDK vhost controllers not empty: #{vhost_controllers}" unless vhost_controllers.empty?
 
-    hop_destroy
+    hop_destroy_vm_host
   end
 
-  label def destroy
+  label def destroy_vm_host
     # don't destroy the vm_host if we didn't set it up.
     hop_finish unless frame["setup_host"]
 
