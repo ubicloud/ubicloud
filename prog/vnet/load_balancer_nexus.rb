@@ -11,7 +11,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   def self.assemble_with_multiple_ports(private_subnet_id, ports:, name: nil, algorithm: "round_robin",
     health_check_endpoint: DEFAULT_HEALTH_CHECK_ENDPOINT, health_check_interval: 30, health_check_timeout: 15,
     health_check_up_threshold: 3, health_check_down_threshold: 2, health_check_protocol: "http",
-    custom_hostname_prefix: nil, custom_hostname_dns_zone_id: nil, stack: LoadBalancer::Stack::DUAL)
+    custom_hostname_prefix: nil, custom_hostname_dns_zone_id: nil, stack: LoadBalancer::Stack::DUAL, cert_enabled: false)
 
     unless (ps = PrivateSubnet[private_subnet_id])
       fail "Given subnet doesn't exist with the id #{private_subnet_id}"
@@ -36,7 +36,8 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
         health_check_timeout: health_check_timeout,
         health_check_up_threshold: health_check_up_threshold,
         health_check_down_threshold: health_check_down_threshold,
-        health_check_protocol: health_check_protocol
+        health_check_protocol: health_check_protocol,
+        cert_enabled:
       )
       ports.each { |src_port, dst_port| LoadBalancerPort.create(load_balancer_id: lb.id, src_port:, dst_port:) }
       Strand.create_with_id(lb.id, prog: "Vnet::LoadBalancerNexus", label: "wait")
@@ -46,10 +47,10 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   def self.assemble(private_subnet_id, name: nil, algorithm: "round_robin",
     health_check_endpoint: DEFAULT_HEALTH_CHECK_ENDPOINT, health_check_interval: 30, health_check_timeout: 15,
     health_check_up_threshold: 3, health_check_down_threshold: 2, health_check_protocol: "http", src_port: nil, dst_port: nil,
-    custom_hostname_prefix: nil, custom_hostname_dns_zone_id: nil, stack: LoadBalancer::Stack::DUAL)
+    custom_hostname_prefix: nil, custom_hostname_dns_zone_id: nil, stack: LoadBalancer::Stack::DUAL, cert_enabled: false)
 
     assemble_with_multiple_ports(private_subnet_id, name:, algorithm:, health_check_endpoint:, health_check_interval:, health_check_timeout:,
-      health_check_up_threshold:, health_check_down_threshold:, health_check_protocol:, ports: [[src_port, dst_port]], custom_hostname_prefix:, custom_hostname_dns_zone_id:, stack:)
+      health_check_up_threshold:, health_check_down_threshold:, health_check_protocol:, ports: [[src_port, dst_port]], custom_hostname_prefix:, custom_hostname_dns_zone_id:, stack:, cert_enabled:)
   end
 
   def before_run

@@ -34,7 +34,8 @@ class Prog::Ai::InferenceRouterNexus < Prog::Base
         subnet_s.id, name: ubid.to_s, src_port: 443, dst_port: 8443, health_check_endpoint: "/up",
         health_check_protocol: "https", health_check_down_threshold: 3,
         health_check_up_threshold: 1, custom_hostname_prefix: custom_hostname_prefix,
-        custom_hostname_dns_zone_id: custom_dns_zone&.id, stack: LoadBalancer::Stack::DUAL
+        custom_hostname_dns_zone_id: custom_dns_zone&.id, stack: LoadBalancer::Stack::DUAL,
+        cert_enabled: true
       )
 
       inference_router = InferenceRouter.create(
