@@ -78,6 +78,8 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       Clog.emit(vm_host.sshable.cmd("ls -lah /var/storage/images").strip.tr("\n", "\t")) if vm_host.strand.label == "wait_download_boot_images"
       nap 15
     end
+    update_stack({"used_cores" => vm_host.used_cores, "used_hugepages_1g" => vm_host.used_hugepages_1g, "available_storage_gib" => vm_host.available_storage_gib})
+
     hop_install_integration_specs
   end
 
@@ -178,6 +180,15 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     vhost_controllers = JSON.parse(sshable.cmd("sudo #{rpc_py} -s #{rpc_sock} vhost_get_controllers")).map { it["ctrlr"] }
     fail_test "SPDK vhost controllers not empty: #{vhost_controllers}" unless vhost_controllers.empty?
 
+    hop_verify_resources_reclaimed
+  end
+
+  label def verify_resources_reclaimed
+    ["used_cores", "used_hugepages_1g", "available_storage_gib"].each do |key|
+      expected = frame[key]
+      actual = vm_host.send(key)
+      fail_test "#{key} not reclaimed expected: #{expected} actual: #{actual}" unless expected == actual
+    end
     hop_destroy
   end
 
