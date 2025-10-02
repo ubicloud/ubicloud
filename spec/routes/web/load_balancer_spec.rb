@@ -199,7 +199,7 @@ RSpec.describe Clover, "load balancer" do
         expect(page.title).to eq("Ubicloud - Load Balancers")
         expect(page).to have_content lb.name
         expect(page).to have_content lb.hostname
-        lb.update(health_check_protocol: "https")
+        lb.update(health_check_protocol: "https", cert_enabled: true)
         click_link lb.name, href: "#{project.path}#{lb.path}"
 
         expect(page.title).to eq("Ubicloud - #{lb.name}")
