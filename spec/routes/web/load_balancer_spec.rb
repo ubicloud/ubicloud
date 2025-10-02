@@ -251,7 +251,7 @@ RSpec.describe Clover, "load balancer" do
 
       it "can attach vm" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
-        lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000, algorithm: "hash_based", health_check_protocol: "https").subject
+        lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000, algorithm: "hash_based", health_check_protocol: "https", cert_enabled: true).subject
         dz = DnsZone.create(name: "test-dns-zone", project_id: project.id)
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
         cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
