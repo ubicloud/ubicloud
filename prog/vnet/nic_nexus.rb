@@ -27,12 +27,6 @@ class Prog::Vnet::NicNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      hop_destroy unless ["destroy", "wait_aws_nic_destroyed"].include?(strand.label)
-    end
-  end
-
   label def create_aws_nic
     nap 2 unless nic.private_subnet.strand.label == "wait"
     NicAwsResource.create_with_id(nic.id)

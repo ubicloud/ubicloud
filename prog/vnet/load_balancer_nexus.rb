@@ -52,12 +52,6 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
       health_check_up_threshold:, health_check_down_threshold:, health_check_protocol:, ports: [[src_port, dst_port]], custom_hostname_prefix:, custom_hostname_dns_zone_id:, stack:)
   end
 
-  def before_run
-    when_destroy_set? do
-      hop_destroy unless %w[destroy wait_destroy].include?(strand.label)
-    end
-  end
-
   label def wait
     when_update_load_balancer_set? do
       hop_update_vm_load_balancers

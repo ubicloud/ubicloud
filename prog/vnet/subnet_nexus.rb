@@ -51,15 +51,6 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      unless ["destroy", "wait_aws_vpc_destroyed"].include?(strand.label)
-        register_deadline(nil, 10 * 60)
-        hop_destroy
-      end
-    end
-  end
-
   label def start
     if private_subnet.location.aws?
       PrivateSubnetAwsResource.create_with_id(private_subnet.id) unless private_subnet.private_subnet_aws_resource
@@ -182,6 +173,8 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def destroy
+    register_deadline(nil, 10 * 60)
+
     if private_subnet.nics.any? { |n| !n.vm_id.nil? }
       register_deadline(nil, 10 * 60, allow_extension: true) if private_subnet.nics.any? { |n| n.vm&.prevent_destroy_set? }
 
