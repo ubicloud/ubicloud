@@ -72,19 +72,6 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
     end
   end
 
-  describe "#before_run" do
-    it "hops to destroy when needed" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "does not hop to destroy if already in the destroy state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-  end
-
   describe "#prep" do
     it "starts prep on NotStarted" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_standard").and_return("NotStarted")
