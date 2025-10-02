@@ -8,17 +8,6 @@ GIT
       rodauth (~> 2.36)
 
 GIT
-  remote: https://github.com/jeremyevans/autoforme.git
-  revision: 42d883177970cc6bd66b70239e21a425b335a379
-  ref: 42d883177970cc6bd66b70239e21a425b335a379
-  specs:
-    autoforme (1.13.0)
-      enum_csv
-      forme (>= 2.0.0)
-      rack
-      sequel (>= 3.0.0)
-
-GIT
   remote: https://github.com/jeremyevans/rodauth.git
   revision: f01bab524499eef21a21d83a9883a60a41dc0aeb
   ref: f01bab524499eef21a21d83a9883a60a41dc0aeb
@@ -71,6 +60,11 @@ GEM
     argon2-kdf (0.3.1)
       fiddle
     ast (2.4.3)
+    autoforme (1.14.0)
+      enum_csv
+      forme (>= 2.0.0)
+      rack
+      sequel (>= 3.0.0)
     awesome_print (1.9.2)
     aws-eventstream (1.3.2)
     aws-partitions (1.1067.0)
@@ -484,7 +478,7 @@ DEPENDENCIES
   acme-client
   argon2
   argon2-kdf
-  autoforme!
+  autoforme (>= 1.14)
   awesome_print
   aws-sdk-ec2 (~> 1.512)
   aws-sdk-iam
