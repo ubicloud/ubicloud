@@ -181,6 +181,7 @@ end
 #  stack                       | lb_stack                 | NOT NULL DEFAULT 'dual'::lb_stack
 #  project_id                  | uuid                     | NOT NULL
 #  created_at                  | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  cert_enabled                | boolean                  | DEFAULT false
 # Indexes:
 #  load_balancer_pkey                        | PRIMARY KEY btree (id)
 #  load_balancer_custom_hostname_key         | UNIQUE btree (custom_hostname)
