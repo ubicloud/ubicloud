@@ -234,6 +234,7 @@ class Clover
             raise_web_error("Invoice payment was not successful")
           end
           invoice.update(status: "paid")
+          invoice.send_success_email
           flash["notice"] = "Invoice #{invoice.invoice_number} paid successfully"
 
           r.redirect billing_path
