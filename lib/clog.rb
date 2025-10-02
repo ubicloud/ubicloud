@@ -32,6 +32,7 @@ class Clog
     end
 
     return if Config.test?
+
     out[:message] = message
     out[:time] = Time.now
 

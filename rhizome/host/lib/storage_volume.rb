@@ -66,6 +66,7 @@ class StorageVolume
 
     if @image_path.nil?
       fail "bdev_ubi requires a base image" if @use_bdev_ubi
+
       create_empty_disk_file
       return
     end

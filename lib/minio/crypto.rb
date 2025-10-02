@@ -61,6 +61,7 @@ class Minio::Crypto
     pos += 1
 
     raise "Unsupported cipher ID: #{cipher_id}" unless cipher_id.zero?
+
     cipher_provider = AesGcmCipherProvider
 
     nonce = payload.byteslice(pos, NONCE_LEN)

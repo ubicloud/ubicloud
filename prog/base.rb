@@ -267,6 +267,7 @@ end
   private def dynamic_hop(label)
     fail "BUG: #hop only accepts a symbol" unless label.is_a? Symbol
     fail "BUG: not valid hop target" unless self.class.labels.include? label
+
     label = label.to_s
     fail Hop.new(@strand.prog, @strand.label, {label: label, retval: nil})
   end

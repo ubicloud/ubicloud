@@ -18,6 +18,7 @@ class AccessControlEntry < Sequel::Model
     if project_id
       {subject_id:, action_id:, object_id:}.each do |field, value|
         next unless value
+
         ubid = UBID.from_uuidish(value).to_s
 
         model = case field

@@ -84,6 +84,7 @@ class VmHost < Sequel::Model
   # for delegation to a VM.
   def ip6_random_vm_network
     return nil unless net6
+
     prefix = host_prefix + 15
     # We generate 2 bytes of entropy for the lower bits
     # and append them to the host's network. This way,
@@ -205,6 +206,7 @@ class VmHost < Sequel::Model
           if Sshable.where(host: source_host_ip).count == 0
             fail "BUG: source host #{source_host_ip} isn't added to the database"
           end
+
           adr = Address.create(cidr: ip_addr, routed_to_host_id: id, is_failover_ip: is_failover_ip)
         end
 
@@ -234,6 +236,7 @@ class VmHost < Sequel::Model
     version, sha256 = (arch == "x64") ? [version_x64, sha256_x64] : [version_arm64, sha256_arm64]
     fail ArgumentError, "No version provided" if version.nil?
     fail ArgumentError, "No SHA-256 digest provided" if sha256.nil?
+
     Strand.create(prog: "DownloadFirmware", label: "start", stack: [{subject_id: id, version: version, sha256: sha256}])
   end
 
@@ -247,6 +250,7 @@ class VmHost < Sequel::Model
       fail "BUG: unexpected architecture"
     end
     fail ArgumentError, "No version provided" if version.nil?
+
     Strand.create(prog: "DownloadCloudHypervisor", label: "start", stack: [{subject_id: id, version: version, sha256_ch_bin: sha256_ch_bin, sha256_ch_remote: sha256_ch_remote}])
   end
 

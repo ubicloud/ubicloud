@@ -14,6 +14,7 @@ class Prog::DownloadFirmware < Prog::Base
   label def start
     fail "Version is required" if version.nil?
     fail "SHA-256 digest is required" if sha256.nil?
+
     hop_download
   end
 

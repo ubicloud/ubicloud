@@ -68,6 +68,7 @@ class VmPath
     # Method producing a shell-quoted path, e.g. #q_user_data.
     quoted_method_name = "q_" + method_name
     fail "BUG" if method_defined?(quoted_method_name)
+
     define_method quoted_method_name do
       home(file_name).shellescape
     end
@@ -77,6 +78,7 @@ class VmPath
     # Trailing newlines are removed.
     read_method_name = "read_" + method_name
     fail "BUG" if method_defined?(read_method_name)
+
     define_method read_method_name do
       read(home(file_name))
     end
@@ -84,6 +86,7 @@ class VmPath
     # Method overwriting the file's contents, e.g. #write_user_data
     write_method_name = "write_" + method_name
     fail "BUG" if method_defined?(write_method_name)
+
     define_method write_method_name do |s|
       write(home(file_name), s)
     end

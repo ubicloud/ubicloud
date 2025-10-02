@@ -83,6 +83,7 @@ module Csi
       def remove_loop_device(backing_file, req_id:)
         loop_device = find_loop_device(backing_file, req_id:)
         return unless loop_device
+
         output, ok = run_cmd("losetup", "-d", loop_device, req_id:)
         unless ok
           raise "Could not remove loop device: #{output}"
@@ -103,6 +104,7 @@ module Csi
         unless ok
           raise "Failed to get the loop device filesystem status: #{output}"
         end
+
         output.strip
       end
 
@@ -139,6 +141,7 @@ module Csi
           unless ok
             raise GRPC::ResourceExhausted.new("Failed to allocate backing file: #{output}")
           end
+
           output, ok = run_cmd("fallocate", "--punch-hole", "--keep-size", "-o", "0", "-l", size_bytes.to_s, backing_file, req_id:)
           unless ok
             raise GRPC::ResourceExhausted.new("Failed to punch hole in backing file: #{output}")
@@ -195,6 +198,7 @@ module Csi
         if old_pv_name.nil?
           return
         end
+
         pv = client.get_pv(old_pv_name)
         if pv.dig("spec", "persistentVolumeReclaimPolicy") == "Retain"
           pv["spec"]["persistentVolumeReclaimPolicy"] = "Delete"
@@ -276,6 +280,7 @@ module Csi
           if old_pvc_object.empty?
             raise
           end
+
           pvc = YAML.load(Base64.decode64(old_pvc_object))
         end
         log_with_id(req_id, "Found matching PVC for PV #{pv_name}: #{pvc}")

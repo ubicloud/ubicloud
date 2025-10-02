@@ -30,6 +30,7 @@ class Clover
 
   def check_signature(signature, body)
     return false unless signature
+
     method, actual_digest = signature.split("=")
     expected_digest = OpenSSL::HMAC.hexdigest(method, Config.github_app_webhook_secret, body)
     Rack::Utils.secure_compare(actual_digest, expected_digest)
@@ -42,6 +43,7 @@ class Clover
       unless installation
         return error("Unregistered installation")
       end
+
       Prog::Github::DestroyGithubInstallation.assemble(installation)
       return success("GithubInstallation[#{installation.ubid}] deleted")
     end

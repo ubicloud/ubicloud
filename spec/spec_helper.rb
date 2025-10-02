@@ -65,6 +65,7 @@ RSpec.configure do |config|
     unless @skip_leaked_thread_check
       Thread.list.each do
         next if leaked_threads[it]
+
         p [:leaked_thread, it]
         leaked_threads[it] = true
       end

@@ -10,6 +10,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
   subject_is :inference_router_replica
 
   extend Forwardable
+
   def_delegators :inference_router_replica, :vm, :inference_router, :load_balancer_vm_port
 
   def self.assemble(inference_router_id)
@@ -315,9 +316,11 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       resource_family = model[billing_resource_key.to_sym]
       rate = BillingRate.from_resource_properties("InferenceTokens", resource_family, "global")
       next if rate["unit_price"].zero?
+
       rate_id = rate["id"]
       tokens = usage[usage_key]
       next if tokens.zero?
+
       project = Project[id: UBID.to_uuid(usage["ubid"])]
 
       begin

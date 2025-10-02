@@ -218,6 +218,7 @@ RSpec.describe Scheduling::Dispatcher do
       t = Time.now
       until exited
         raise "no apoptosis within 1 second" if Time.now - t > 1
+
         sleep 0.1
       end
       expect(exited).to be true
@@ -236,6 +237,7 @@ RSpec.describe Scheduling::Dispatcher do
       t = Time.now
       until exited
         raise "no apoptosis within 1 second" if Time.now - t > 1
+
         sleep 0.1
       end
       expect(exited).to be true

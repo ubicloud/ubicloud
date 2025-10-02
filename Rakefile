@@ -14,6 +14,7 @@ end
 loaded_environment = nil
 load_db = lambda do |env|
   raise "cannot load #{env} environment, already loaded #{loaded_environment} environment" if loaded_environment && loaded_environment != env
+
   loaded_environment = env
   ENV["RACK_ENV"] = env
   require "bundler"
@@ -25,6 +26,7 @@ end
 ncpu = nil
 nproc = lambda do
   return ncpu if ncpu
+
   require "etc"
   # Limit to 10 processes, as higher number results in more time
   ncpu = Etc.nprocessors.clamp(1, 10).to_s
@@ -159,8 +161,10 @@ end
 desc "Setup database"
 task :setup_database, [:env, :parallel] do |_, args|
   raise "env must be test or development" unless ["test", "development"].include?(args[:env])
+
   parallel = args[:parallel] && args[:parallel] != "false"
   raise "parallel can only be used in test" if parallel && args[:env] != "test"
+
   File.binwrite(auto_parallel_tests_file, "1") if parallel && !File.file?(auto_parallel_tests_file)
 
   database_name = "clover_#{args[:env]}"
