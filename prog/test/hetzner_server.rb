@@ -80,7 +80,10 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       Clog.emit(vm_host.sshable.cmd("ls -lah /var/storage/images").strip.tr("\n", "\t")) if vm_host.strand.label == "wait_download_boot_images"
       nap 15
     end
+    hop_install_integration_specs
+  end
 
+  label def install_integration_specs
     if retval&.dig("msg") == "installed rhizome"
       verify_specs_installation(installed: true)
 
