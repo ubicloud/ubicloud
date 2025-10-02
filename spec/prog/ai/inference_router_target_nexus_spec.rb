@@ -86,6 +86,7 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
 
       it "hops to destroy if not already destroying" do
         expect(nexus.strand).to receive(:label).twice.and_return("active")
+        expect(nexus).to receive(:incr_destroying)
         expect { nexus.before_run }.to hop("destroy")
       end
 
