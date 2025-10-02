@@ -70,6 +70,20 @@ RSpec.describe Prog::Vm::HostNexus do
 
       described_class.assemble("127.0.0.1", provider_name: HostProvider::HETZNER_PROVIDER_NAME, server_identifier: "1")
     end
+
+    it "checks whether both spdk and vhost_block_backend version is set" do
+      expect { described_class.assemble("127.0.0.1", vhost_block_backend_version: "someversion") }.to raise_error("SPDK and VhostBlockBackend cannot be set simultaneously")
+    end
+
+    it "checks that both spdk and vhost_block_backend version is set although one is nil" do
+      st = described_class.assemble("127.0.0.1", spdk_version: nil, vhost_block_backend_version: "someversion")
+      expect(st.stack.first["spdk_version"]).to be_nil
+      expect(st.stack.first["vhost_block_backend_version"]).to eq("someversion")
+
+      st = described_class.assemble("1.2.3.4")
+      expect(st.stack.first["spdk_version"]).to eq(Config.spdk_version)
+      expect(st.stack.first["vhost_block_backend_version"]).to be_nil
+    end
   end
 
   describe "#before_run" do
@@ -251,19 +265,29 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "hops once SetupHugepages has returned" do
       nx.strand.retval = {"msg" => "hugepages installed"}
-      expect { nx.setup_hugepages }.to hop("setup_spdk")
+      expect { nx.setup_hugepages }.to hop("setup_storage_backend")
     end
   end
 
-  describe "#setup_spdk" do
-    it "pushes the spdk program" do
+  describe "#setup_storage_backend" do
+    it "pushes the spdk program by default" do
       expect(nx).to receive(:push).with(Prog::Storage::SetupSpdk,
         {
           "version" => Config.spdk_version,
           "start_service" => false,
           "allocation_weight" => 100
         }).and_call_original
-      expect { nx.setup_spdk }.to hop("start", "Storage::SetupSpdk")
+      expect { nx.setup_storage_backend }.to hop("start", "Storage::SetupSpdk")
+    end
+
+    it "pushes the vhost_block_backend program when spdk is not set and vhost_block_backend is set" do
+      nx = described_class.new(described_class.assemble("1.2.3.4", spdk_version: nil, vhost_block_backend_version: "someversion"))
+      expect(nx).to receive(:push).with(Prog::Storage::SetupVhostBlockBackend,
+        {
+          "version" => "someversion",
+          "allocation_weight" => 100
+        }).and_call_original
+      expect { nx.setup_storage_backend }.to hop("start", "Storage::SetupVhostBlockBackend")
     end
 
     it "hops once SetupSpdk has returned" do
@@ -277,7 +301,12 @@ RSpec.describe Prog::Vm::HostNexus do
       )
       allow(nx).to receive(:vm_host).and_return(vmh)
       expect(vmh).to receive(:update).with({used_cores: 2})
-      expect { nx.setup_spdk }.to hop("download_boot_images")
+      expect { nx.setup_storage_backend }.to hop("download_boot_images")
+    end
+
+    it "hops once SetupVhostBlockBackend has returned" do
+      nx.strand.retval = {"msg" => "VhostBlockBackend was setup"}
+      expect { nx.setup_storage_backend }.to hop("download_boot_images")
     end
   end
 
@@ -453,6 +482,16 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(vm_host).to receive(:update).with(last_boot_id: "pqr")
 
       expect { nx.reboot }.to hop("verify_spdk")
+    end
+
+    it "reboot updates last_boot_id and hops to verify_hugepages when spdk is not instaled" do
+      expect(nx).to receive(:frame).and_return({"spdk_version" => nil, "vhost_block_backend_version" => "version"}).at_least(:once)
+      expect(sshable).to receive(:available?).and_return(true)
+      expect(vm_host).to receive(:last_boot_id).and_return("xyz")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/reboot-host xyz").and_return "pqr\n"
+      expect(vm_host).to receive(:update).with(last_boot_id: "pqr")
+
+      expect { nx.reboot }.to hop("verify_hugepages")
     end
 
     it "verify_spdk hops to verify_hugepages if spdk started" do

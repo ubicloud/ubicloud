@@ -3,10 +3,14 @@
 class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
 
-  def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, spdk_version: Config.spdk_version, default_boot_images: [])
+  def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, spdk_version: Config.spdk_version, vhost_block_backend_version: nil, default_boot_images: [])
     DB.transaction do
       unless Location[location_id]
         raise "No existing Location"
+      end
+
+      if spdk_version && vhost_block_backend_version
+        raise "SPDK and VhostBlockBackend cannot be set simultaneously"
       end
 
       id = VmHost.generate_uuid
@@ -34,7 +38,7 @@ class Prog::Vm::HostNexus < Prog::Base
       Strand.create_with_id(id,
         prog: "Vm::HostNexus",
         label: "start",
-        stack: [{"spdk_version" => spdk_version, "default_boot_images" => default_boot_images}])
+        stack: [{"spdk_version" => spdk_version, "vhost_block_backend_version" => vhost_block_backend_version, "default_boot_images" => default_boot_images}])
     end
   end
 
@@ -128,25 +132,35 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def setup_hugepages
-    hop_setup_spdk if retval&.dig("msg") == "hugepages installed"
+    hop_setup_storage_backend if retval&.dig("msg") == "hugepages installed"
 
     push Prog::SetupHugepages
   end
 
-  label def setup_spdk
-    if retval&.dig("msg") == "SPDK was setup"
+  label def setup_storage_backend
+    case retval&.dig("msg")
+    when "SPDK was setup"
       spdk_installation = vm_host.spdk_installations.first
       spdk_cores = (spdk_installation.cpu_count * vm_host.total_cores) / vm_host.total_cpus
       vm_host.update(used_cores: spdk_cores)
 
       hop_download_boot_images
+    when "VhostBlockBackend was setup"
+      hop_download_boot_images
     end
 
-    push Prog::Storage::SetupSpdk, {
-      "version" => frame["spdk_version"],
-      "start_service" => false,
-      "allocation_weight" => 100
-    }
+    if frame["spdk_version"]
+      push Prog::Storage::SetupSpdk, {
+        "version" => frame["spdk_version"],
+        "start_service" => false,
+        "allocation_weight" => 100
+      }
+    else
+      push Prog::Storage::SetupVhostBlockBackend, {
+        "version" => frame["vhost_block_backend_version"],
+        "allocation_weight" => 100
+      }
+    end
   end
 
   label def download_boot_images
@@ -189,7 +203,8 @@ class Prog::Vm::HostNexus < Prog::Base
     nap 30 if new_boot_id.length == 0
 
     vm_host.update(last_boot_id: new_boot_id)
-    hop_verify_spdk
+    hop_verify_spdk if frame["spdk_version"]
+    hop_verify_hugepages
   end
 
   label def prep_hardware_reset
