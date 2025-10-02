@@ -202,7 +202,7 @@ RSpec.describe Prog::Test::HetznerServer do
     it "succeeds if /var/storage and /var/storage/vhost are empty" do
       expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage").and_return("vhost\nimages\n")
       expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage/vhost").and_return("")
-      expect { hs_test.verify_storage_files_purged }.to hop("destroy")
+      expect { hs_test.verify_storage_files_purged }.to hop("verify_resources_reclaimed")
     end
 
     it "fails if /var/storage has disks" do
@@ -216,6 +216,35 @@ RSpec.describe Prog::Test::HetznerServer do
       expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage/vhost").and_return("file1\nfile2\n")
       expect(hs_test.strand).to receive(:update).with(exitval: {msg: "vhost directory not empty: [\"file1\", \"file2\"]"})
       expect { hs_test.verify_storage_files_purged }.to hop("failed")
+    end
+  end
+
+  describe "#verify_resources_reclaimed" do
+    before {
+      vm_host.add_storage_device(name: "DEFAULT", total_storage_gib: 6800, available_storage_gib: 860)
+    }
+
+    it "fails if used_cores not reclaimed" do
+      vm_host.update(used_cores: 10)
+      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "used_cores is expected to be zero, actual: 10"})
+      expect { hs_test.verify_resources_reclaimed }.to hop("failed")
+    end
+
+    it "fails if used_hugepages_1g not reclaimed" do
+      vm_host.update(used_cores: 0, total_hugepages_1g: 384, used_hugepages_1g: 70)
+      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "used_hugepages_1g is expected to be zero, actual: 70"})
+      expect { hs_test.verify_resources_reclaimed }.to hop("failed")
+    end
+
+    it "fails if available_storage_gib not reclaimed" do
+      expect(hs_test).to receive(:frame).and_return({"available_storage_gib" => 500}).at_least(:once)
+      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "available_storage_gib was not reclaimed as expected: 500, actual: 860"})
+      expect { hs_test.verify_resources_reclaimed }.to hop("failed")
+    end
+
+    it "hops to destroy after resource verified" do
+      expect(hs_test).to receive(:frame).and_return({"available_storage_gib" => 860}).at_least(:once)
+      expect { hs_test.verify_resources_reclaimed }.to hop("destroy")
     end
   end
 

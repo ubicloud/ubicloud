@@ -80,6 +80,8 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       Clog.emit(vm_host.sshable.cmd("ls -lah /var/storage/images").strip.tr("\n", "\t")) if vm_host.strand.label == "wait_download_boot_images"
       nap 15
     end
+    update_stack({"available_storage_gib" => vm_host.available_storage_gib})
+
     hop_install_integration_specs
   end
 
@@ -155,6 +157,14 @@ class Prog::Test::HetznerServer < Prog::Test::Base
 
     vhost_dir_content = sshable.cmd("sudo ls -1 /var/storage/vhost").split("\n")
     fail_test "vhost directory not empty: #{vhost_dir_content}" unless vhost_dir_content.empty?
+    hop_verify_resources_reclaimed
+  end
+
+  label def verify_resources_reclaimed
+    fail_test "used_cores is expected to be zero, actual: #{vm_host.used_cores}" unless vm_host.used_cores.zero?
+    fail_test "used_hugepages_1g is expected to be zero, actual: #{vm_host.used_hugepages_1g}" unless vm_host.used_hugepages_1g.zero?
+    fail_test "available_storage_gib was not reclaimed as expected: #{frame["available_storage_gib"]}, actual: #{vm_host.available_storage_gib}" unless frame["available_storage_gib"] == vm_host.available_storage_gib
+
     hop_destroy
   end
 
