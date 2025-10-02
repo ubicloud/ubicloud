@@ -267,7 +267,36 @@ RSpec.describe Prog::Test::HetznerServer do
 
     it "hops to destroy if the vm host destroyed" do
       vm_host.spdk_installations.first.destroy
-      expect { hs_test.wait_spdk_destroyed }.to hop("destroy")
+      expect { hs_test.wait_spdk_destroyed }.to hop("verify_resources_reclaimed")
+    end
+  end
+
+  describe "#verify_resources_reclaimed" do
+    before {
+      vm_host.add_storage_device(name: "DEFAULT", total_storage_gib: 6800, available_storage_gib: 860)
+    }
+
+    it "fails if used_cores not reclaimed" do
+      vm_host.update(used_cores: 10)
+      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "used_cores is expected to be zero, actual: 10"})
+      expect { hs_test.verify_resources_reclaimed }.to hop("failed")
+    end
+
+    it "fails if used_hugepages_1g not reclaimed" do
+      vm_host.update(used_cores: 0, total_hugepages_1g: 384, used_hugepages_1g: 70)
+      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "used_hugepages_1g is expected to be zero, actual: 70"})
+      expect { hs_test.verify_resources_reclaimed }.to hop("failed")
+    end
+
+    it "fails if available_storage_gib not reclaimed" do
+      expect(hs_test).to receive(:frame).and_return({"available_storage_gib" => 500}).at_least(:once)
+      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "available_storage_gib was not reclaimed as expected: 500, actual: 860"})
+      expect { hs_test.verify_resources_reclaimed }.to hop("failed")
+    end
+
+    it "hops to destroy after resource verified" do
+      expect(hs_test).to receive(:frame).and_return({"available_storage_gib" => 860}).at_least(:once)
+      expect { hs_test.verify_resources_reclaimed }.to hop("destroy")
     end
   end
 
