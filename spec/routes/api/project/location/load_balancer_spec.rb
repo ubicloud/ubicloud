@@ -92,7 +92,8 @@ RSpec.describe Clover, "load-balancer" do
           stack: LoadBalancer::Stack::IPV4,
           src_port: "80", dst_port: "8080",
           health_check_endpoint: "/up", algorithm: "round_robin",
-          health_check_protocol: "http"
+          health_check_protocol: "http",
+          cert_enabled: false
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -105,7 +106,8 @@ RSpec.describe Clover, "load-balancer" do
           stack: LoadBalancer::Stack::IPV6,
           src_port: "80", dst_port: "8080",
           health_check_endpoint: "/up", algorithm: "round_robin",
-          health_check_protocol: "http"
+          health_check_protocol: "http",
+          cert_enabled: false
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id")
@@ -147,7 +149,7 @@ RSpec.describe Clover, "load-balancer" do
       it "success" do
         patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
           src_port: "80", dst_port: "8080",
-          health_check_endpoint: "/up", algorithm: "round_robin", vms: []
+          health_check_endpoint: "/up", algorithm: "round_robin", vms: [], cert_enabled: true
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -157,7 +159,7 @@ RSpec.describe Clover, "load-balancer" do
       it "not found" do
         patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/invalid", {
           src_port: "80", dst_port: "8080",
-          health_check_endpoint: "/up", algorithm: "round_robin", vms: []
+          health_check_endpoint: "/up", algorithm: "round_robin", vms: [], cert_enabled: false
         }.to_json
 
         expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
@@ -169,20 +171,23 @@ RSpec.describe Clover, "load-balancer" do
         end.to raise_error(Committee::InvalidRequest, /missing required parameters: algorithm, dst_port, health_check_endpoint, src_port, vms/)
       end
 
-      it "updates vms" do
+      it "updates vms and switches cert enabled off" do
+        lb.update(cert_enabled: true)
         patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
-          src_port: "80", dst_port: "8080", health_check_endpoint: "/up", algorithm: "round_robin", vms: [vm.ubid]
+          src_port: "80", dst_port: "8080", health_check_endpoint: "/up", algorithm: "round_robin", vms: [vm.ubid], cert_enabled: false
         }.to_json
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["vms"].length).to eq(1)
+        expect(lb.reload.cert_enabled).to be_falsey
       end
 
       it "detaches vms" do
         lb.add_vm(vm)
 
         patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
-          src_port: "80", dst_port: "8080", health_check_endpoint: "/up", algorithm: "round_robin", vms: []
+          src_port: "80", dst_port: "8080", health_check_endpoint: "/up", algorithm: "round_robin", vms: [],
+          cert_enabled: false
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -192,7 +197,7 @@ RSpec.describe Clover, "load-balancer" do
 
       it "invalid vm" do
         patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
-          src_port: "80", dst_port: "80", health_check_endpoint: "/up", algorithm: "round_robin", vms: ["invalid"]
+          src_port: "80", dst_port: "80", health_check_endpoint: "/up", algorithm: "round_robin", vms: ["invalid"], cert_enabled: false
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: vms")
@@ -206,7 +211,7 @@ RSpec.describe Clover, "load-balancer" do
         lb2.add_vm(vm)
 
         patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
-          src_port: "80", dst_port: "8080", health_check_endpoint: "/up", algorithm: "round_robin", vms: [vm.ubid]
+          src_port: "80", dst_port: "8080", health_check_endpoint: "/up", algorithm: "round_robin", vms: [vm.ubid], cert_enabled: false
         }.to_json
 
         expect(last_response).to have_api_error(400)
@@ -216,7 +221,7 @@ RSpec.describe Clover, "load-balancer" do
         lb.add_vm(vm)
 
         patch "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
-          src_port: "80", dst_port: "8080", health_check_endpoint: "/up", algorithm: "round_robin", vms: [vm.ubid]
+          src_port: "80", dst_port: "8080", health_check_endpoint: "/up", algorithm: "round_robin", vms: [vm.ubid], cert_enabled: false
         }.to_json
 
         expect(last_response.status).to eq(200)
