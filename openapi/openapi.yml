@@ -1836,6 +1836,79 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
+  '/project/{project_id}/vm-init-script':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: getVmInitScripts
+      summary: Return the list of VM init scripts in the project
+      responses:
+        '200':
+          $ref: '#/components/responses/VmInitScripts'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - VM Init Script
+    post:
+      operationId: registerVmInitScript
+      summary: Register a VM init script
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VmInitScriptCreate'
+      responses:
+        '200':
+          $ref: '#/components/responses/VmInitScript'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - VM Init Script
+  '/project/{project_id}/vm-init-script/{vm_init_script_reference}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/vm_init_script_reference'
+    get:
+      operationId: getVmInitScript
+      summary: Get a specific VM init script
+      responses:
+        '200':
+          $ref: '#/components/responses/VmInitScript'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - VM Init Script
+    post:
+      operationId: updateVmInitScript
+      summary: Update VM init script information
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VmInitScriptUpdate'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmInitScript'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - VM Init Script
+    delete:
+      operationId: deleteVmInitScript
+      summary: Delete a specific VM init script
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - VM Init Script
 components:
   parameters:
     firewall_reference:
@@ -2023,6 +2096,18 @@ components:
       required: false
       schema:
         type: string
+    vm_init_script_reference:
+      description: VM init script ID or name
+      examples:
+        id:
+          value: 1nn30gjk1d1e2jj34v9x0dq4rp
+        name:
+          value: vm-init-script-name
+      in: path
+      name: vm_init_script_reference
+      required: true
+      schema:
+        $ref: '#/components/schemas/Reference'
     vm_reference:
       description: Virtual machine ID or name
       examples:
@@ -2081,6 +2166,35 @@ components:
       required:
         - pg_config
         - pgbouncer_config
+    VmInitScriptCreate:
+      type: object
+      properties:
+        name:
+          type: string
+        script:
+          type: string
+      additionalProperties: false
+      required:
+        - name
+        - script
+    VmInitScriptUpdate:
+      anyOf:
+        - type: object
+          properties:
+            name:
+              type: string
+            script:
+              type: string
+          additionalProperties: false
+          required:
+            - name
+        - type: object
+          properties:
+            script:
+              type: string
+          additionalProperties: false
+          required:
+            - script
     SshPublicKeyCreate:
       type: object
       properties:
@@ -2239,6 +2353,24 @@ components:
           type: string
         public_key:
           description: SSH public key data
+          type: string
+      additionalProperties: false
+      required:
+        - id
+        - name
+    VmInitScript:
+      type: object
+      properties:
+        id:
+          description: ID of the VM init script
+          type: string
+          example: 1naz0q3vbrpa7pkg7zbmah9csn
+          pattern: '^1n[0-9a-hj-km-np-tv-z]{24}$'
+        name:
+          description: Name of the VM init script
+          type: string
+        script:
+          description: VM init script contents
           type: string
       additionalProperties: false
       required:
@@ -2792,6 +2924,26 @@ components:
             additionalProperties: false
             required:
               - items
+    VmInitScript:
+      description: A virtual machine init script
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/VmInitScript'
+    VmInitScripts:
+      description: A list of virtual machine init scripts
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VmInitScript'
+            additionalProperties: false
+            required:
+              - items
     InferenceApiKey:
       description: An Inference API Key
       content:
@@ -3140,5 +3292,7 @@ tags:
     name: Kubernetes Cluster
   - description: SSH Public Key Operations
     name: SSH Public Key
+  - description: Virtual Machine Init Script Operations
+    name: VM Init Script
 security:
   - BearerAuth: []
