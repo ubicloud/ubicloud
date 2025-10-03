@@ -96,6 +96,7 @@ class Clover < Roda
   %w[
     ActionTag
     ApiKey
+    DetachableVolume
     Firewall
     KubernetesCluster
     KubernetesNodepool
