@@ -1593,6 +1593,9 @@ paths:
                 boot_image:
                   description: Boot image of the VM
                   type: string
+                init_script:
+                  description: VM init script
+                  type: string
                 enable_ip4:
                   description: Enable IPv4
                   type: boolean
