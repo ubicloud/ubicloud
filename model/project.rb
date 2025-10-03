@@ -22,6 +22,7 @@ class Project < Sequel::Model
   one_to_many :inference_endpoints
   one_to_many :kubernetes_clusters
   one_to_many :ssh_public_keys, order: :name
+  one_to_many :vm_init_scripts, order: :name
 
   RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners]
   RESOURCE_ASSOCIATION_DATASET_METHODS = RESOURCE_ASSOCIATIONS.map { :"#{it}_dataset" }
@@ -57,6 +58,7 @@ class Project < Sequel::Model
     locations: :destroy,
     object_tags: :destroy,
     ssh_public_keys: :destroy,
+    vm_init_scripts: :destroy,
     subject_tags: :destroy
 
   plugin ResourceMethods
