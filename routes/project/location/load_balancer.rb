@@ -123,6 +123,15 @@ class Clover
         lb.incr_refresh_cert
       end
 
+      r.post "enable-cert" do
+        authorize("LoadBalancer:edit", lb)
+        cert_enabled = typecast_params.bool!("cert_enabled")
+        cert_enabled ? lb.enable_cert_server : lb.disable_cert_server
+        audit_log(lb, "update")
+        flash["notice"] = "SSL certificates #{cert_enabled ? "enabled" : "disabled"}"
+        r.redirect lb, "/settings"
+      end
+
       r.show_object(lb, actions: %w[overview vms settings], perm: "LoadBalancer:view", template: "networking/load_balancer/show")
     end
   end
