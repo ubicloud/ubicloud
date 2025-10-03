@@ -357,4 +357,5 @@ end
 #  pci_device                 | pci_device_vm_id_fkey                 | (vm_id) REFERENCES vm(id)
 #  postgres_server            | postgres_server_vm_id_fkey            | (vm_id) REFERENCES vm(id)
 #  victoria_metrics_server    | victoria_metrics_server_vm_id_fkey    | (vm_id) REFERENCES vm(id)
+#  vm_init_script             | vm_init_script_id_fkey                | (id) REFERENCES vm(id)
 #  vm_storage_volume          | vm_storage_volume_vm_id_fkey          | (vm_id) REFERENCES vm(id)
