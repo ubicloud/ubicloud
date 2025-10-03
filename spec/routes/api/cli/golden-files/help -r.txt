@@ -17,6 +17,7 @@ Commands:
     ps         Manage private subnets
     sk         Manage SSH public keys
     version    Display CLI program version
+    vi         Manage virtual machine init scripts
     vm         Manage virtual machines
 
 
@@ -812,6 +813,71 @@ Display CLI program version
 
 Usage:
     ubi version
+
+
+Manage virtual machine init scripts
+
+Usage:
+    ubi vi command [...]
+    ubi vi (vi-name | vi-id) post-command [...]
+
+Commands:
+    list       List virtual machine init scripts
+
+Post Commands:
+    create     Register a virtual machine init script
+    destroy    Destroy a virtual machine init script
+    rename     Rename a virtual machine init script
+    show       Show details for a virtual machine init script
+    update     Update a virtual machine init script
+
+
+List virtual machine init scripts
+
+Usage:
+    ubi vi list [options]
+
+Options:
+    -N, --no-headers                 do not show headers
+
+
+Register a virtual machine init script
+
+Usage:
+    ubi vi vi-name create script
+
+Examples:
+    ubi vi my-script-name create "$(cat path/to/script)"
+
+
+Destroy a virtual machine init script
+
+Usage:
+    ubi vi (vi-name | vi-id) destroy [options]
+
+Options:
+    -f, --force                      do not require confirmation
+
+
+Rename a virtual machine init script
+
+Usage:
+    ubi vi (vi-id | vi-name) rename new-name
+
+
+Show details for a virtual machine init script
+
+Usage:
+    ubi vi (vi-id | vi-name) show
+
+
+Update a virtual machine init script
+
+Usage:
+    ubi vi (vi-id | vi-name) update script
+
+Examples:
+    ubi vi my-script-name update "$(cat /path/to/script)"
 
 
 Manage virtual machines

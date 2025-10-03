@@ -17,4 +17,5 @@ Commands:
     ps         Manage private subnets
     sk         Manage SSH public keys
     version    Display CLI program version
+    vi         Manage virtual machine init scripts
     vm         Manage virtual machines

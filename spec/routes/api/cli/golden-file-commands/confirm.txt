@@ -5,4 +5,5 @@ lb eu-central-h1/test-lb destroy
 pg eu-central-h1/test-pg destroy
 ps eu-central-h1/test-ps destroy
 sk spk destroy
+vi vis destroy
 vm eu-central-h1/test-vm destroy
