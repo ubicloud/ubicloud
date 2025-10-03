@@ -20,6 +20,7 @@ class Vm < Sequel::Model
   many_to_one :vm_host_slice
   many_to_one :location
   one_to_one :aws_instance, key: :id
+  one_to_one :init_script, class: :VmInitScript, key: :id
 
   many_through_many :private_subnet_firewalls,
     [
@@ -29,7 +30,7 @@ class Vm < Sequel::Model
     class: :Firewall
   many_to_many :vm_firewalls, class: :Firewall, join_table: :firewalls_vms, right_key: :firewall_id
 
-  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancer_vm: :destroy
+  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancer_vm: :destroy, init_script: :destroy
 
   dataset_module Pagination
 
