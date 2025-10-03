@@ -77,6 +77,7 @@ jobs:
       env:
         BASE_URL: https://${{ secrets.CLOUDFLARED_ADDRESS }}
         CLOVER_DATABASE_URL: postgres:///clover_test?user=clover
+        DATABASE_LOGGER_LEVEL: debug
         RACK_ENV: production
         IS_E2E: "true"
         DISPATCHER_MAX_THREADS: 16
