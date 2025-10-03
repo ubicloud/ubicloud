@@ -57,9 +57,10 @@ class VmSetup
 
   def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology,
     mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices,
-    boot_image, dns_ipv4, slice_name, cpu_percent_limit, cpu_burst_percent_limit, ipv6_disabled)
+    boot_image, dns_ipv4, slice_name, cpu_percent_limit, cpu_burst_percent_limit,
+    init_script, ipv6_disabled)
 
-    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled: ipv6_disabled)
+    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled: ipv6_disabled, init_script: init_script)
     network_thread = Thread.new do
       setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: max_vcpus > 1)
     end
@@ -482,7 +483,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     r "ip netns exec #{q_vm} nft -f #{vp.q_nftables_conf}"
   end
 
-  def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled:)
+  def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled:, init_script: nil)
     vp.write_meta_data(<<EOS)
 instance-id: #{yq(@vm_name)}
 local-hostname: #{yq(@vm_name)}
@@ -563,7 +564,7 @@ ethernets:
 #{ethernets}
 EOS
 
-    write_user_data(unix_user, public_keys, swap_size_bytes, boot_image)
+    write_user_data(unix_user, public_keys, swap_size_bytes, boot_image, init_script: init_script)
 
     FileUtils.rm_rf(vp.cloudinit_img)
     r "mkdosfs -n CIDATA -C #{vp.q_cloudinit_img} 128"
@@ -584,7 +585,7 @@ EOS
     SWAP_CONFIG
   end
 
-  def write_user_data(unix_user, public_keys, swap_size_bytes, boot_image)
+  def write_user_data(unix_user, public_keys, swap_size_bytes, boot_image, init_script: nil)
     install_cmd = if boot_image.include?("almalinux")
       "  - [dnf, install, '-y', nftables]\n"
     elsif boot_image.include?("debian")
@@ -601,6 +602,8 @@ YAML
   - [nft, add, rule, ip6, filter, output, ip6, daddr, 'fd00:0b1c:100d:5AFE::/64', meta, skuid, "!=", 0, tcp, flags, syn, reject, with, tcp, reset]
 NFT_ADD_COMMS
 
+    init_script_cmd = "  - #{yq(init_script)}\n" if init_script
+
     vp.write_user_data(<<EOS)
 #cloud-config
 users:
@@ -615,6 +618,7 @@ ssh_pwauth: False
 runcmd:
   - [systemctl, daemon-reload]
 #{install_cmd}
+#{init_script_cmd}
 
 bootcmd:
 #{nft_safe_sudo_allow}
