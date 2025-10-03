@@ -6,7 +6,7 @@ module Ubicloud
 
     set_fragment "load-balancer"
 
-    set_columns :id, :name, :location, :hostname, :algorithm, :stack, :health_check_endpoint, :health_check_protocol, :src_port, :dst_port, :subnet, :vms
+    set_columns :id, :name, :location, :hostname, :algorithm, :stack, :health_check_endpoint, :health_check_protocol, :src_port, :dst_port, :subnet, :vms, :cert_enabled
 
     set_associations do
       {

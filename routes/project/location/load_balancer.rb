@@ -80,6 +80,8 @@ class Clover
           algorithm, health_check_endpoint = typecast_params.nonempty_str!(%w[algorithm health_check_endpoint])
           src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port])
           vm_ids = typecast_params.array(:ubid_uuid, "vms")
+          cert_enabled = typecast_params.bool("cert_enabled")
+          cert_enablement_changed = cert_enabled.nil? ? false : lb.cert_enabled != cert_enabled
 
           DB.transaction do
             lb.update(algorithm:, health_check_endpoint:)
@@ -107,6 +109,9 @@ class Clover
             end
 
             lb.incr_update_load_balancer
+            if cert_enablement_changed
+              cert_enabled ? lb.enable_cert_server : lb.disable_cert_server
+            end
             audit_log(lb, "update")
           end
           Serializers::LoadBalancer.serialize(lb.reload, {detailed: true})
@@ -116,6 +121,15 @@ class Clover
       r.rename lb, perm: "LoadBalancer:edit", serializer: Serializers::LoadBalancer, template_prefix: "networking/load_balancer" do
         lb.incr_rewrite_dns_records
         lb.incr_refresh_cert
+      end
+
+      r.post "enable-cert" do
+        authorize("LoadBalancer:edit", lb)
+        cert_enabled = typecast_params.bool!("cert_enabled")
+        cert_enabled ? lb.enable_cert_server : lb.disable_cert_server
+        audit_log(lb, "update")
+        flash["notice"] = "SSL certificates #{cert_enabled ? "enabled" : "disabled"}"
+        r.redirect lb, "/settings"
       end
 
       r.show_object(lb, actions: %w[overview vms settings], perm: "LoadBalancer:view", template: "networking/load_balancer/show")
