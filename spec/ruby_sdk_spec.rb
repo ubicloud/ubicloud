@@ -192,6 +192,18 @@ RSpec.describe Ubicloud do
     expect(spk.check_exists).to be_nil
   end
 
+  it "VmInitScript.new raises if given bad values" do
+    expect { ubi.vm_init_script.new("a/b") }.to raise_error(Ubicloud::Error, "invalid VM Init Script id format")
+    expect { ubi.vm_init_script.new({}) }.to raise_error(Ubicloud::Error, "hash must have :id or :name key")
+    expect { ubi.vm_init_script.new([]) }.to raise_error(Ubicloud::Error, "unsupported value initializing Ubicloud::VmInitScript: []")
+  end
+
+  it "VmInitScript#check_exists" do
+    spk = ubi.vm_init_script.new("vmi")
+    expect(Clover).to receive(:call).and_return([404, {"content-type" => "application/json"}, ["{}"]])
+    expect(spk.check_exists).to be_nil
+  end
+
   it "Vm.create converts LF to CRLF in public_keys" do
     public_key = nil
     expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
