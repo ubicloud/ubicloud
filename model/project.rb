@@ -232,3 +232,4 @@ end
 #  usage_alert               | usage_alert_project_id_fkey               | (project_id) REFERENCES project(id)
 #  victoria_metrics_resource | victoria_metrics_resource_project_id_fkey | (project_id) REFERENCES project(id)
 #  vm                        | vm_project_id_fkey                        | (project_id) REFERENCES project(id)
+#  vm_init_script            | vm_init_script_project_id_fkey            | (project_id) REFERENCES project(id)
