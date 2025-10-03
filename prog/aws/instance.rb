@@ -133,9 +133,10 @@ class Prog::Aws::Instance < Prog::Base
       end
     end
 
+    families = [vm.family] + (frame["alternative_families"] || [])
     params = {
       image_id: vm.boot_image, # AMI ID
-      instance_type: Option.aws_instance_type_name(vm.family, vm.vcpus),
+      instance_type: families.map { Option.aws_instance_type_name(it, vm.vcpus) },
       block_device_mappings: [
         {
           device_name: "/dev/sda1",
@@ -202,7 +203,7 @@ class Prog::Aws::Instance < Prog::Base
     public_ipv6 = instance_response.dig(:network_interfaces, 0, :ipv_6_addresses, 0, :ipv_6_address)
     AssignedVmAddress.create(dst_vm_id: vm.id, ip: public_ipv4)
     vm.sshable&.update(host: public_ipv4)
-    vm.update(cores: vm.vcpus / 2, allocated_at: Time.now, ephemeral_net6: public_ipv6)
+    vm.update(cores: vm.vcpus / 2, allocated_at: Time.now, ephemeral_net6: public_ipv6, family: instance_response[:instance_type])
 
     pop "vm created"
   end
