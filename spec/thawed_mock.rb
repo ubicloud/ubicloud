@@ -87,6 +87,7 @@ module ThawedMock
   allow_mocking(UsageAlert, :where)
   allow_mocking(VmHost, :[], :where)
   allow_mocking(Vm, :[], :where, :generate_ubid)
+  allow_mocking(VmInitScript, :generate_uuid)
   allow_mocking(VmPool, :[], :where)
   allow_mocking(VmHostCpu, :create)
   allow_mocking(VmHostSlice, :[], :dataset)

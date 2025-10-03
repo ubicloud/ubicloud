@@ -84,6 +84,14 @@ ubi sk (sk-id | sk-name) rename new-name
 ubi sk (sk-id | sk-name) show
 ubi sk (sk-id | sk-name) update public-key
 ubi version
+ubi vi command [...]
+ubi vi (vi-name | vi-id) post-command [...]
+ubi vi list [options]
+ubi vi vi-name create script
+ubi vi (vi-name | vi-id) destroy [options]
+ubi vi (vi-id | vi-name) rename new-name
+ubi vi (vi-id | vi-name) show
+ubi vi (vi-id | vi-name) update script
 ubi vm command [...]
 ubi vm (location/vm-name | vm-id) [post-options] post-command [...]
 ubi vm list [options]

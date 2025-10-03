@@ -1,0 +1,2 @@
+Destroying this virtual machine init script is not recoverable.
+Enter the following to confirm destruction of the virtual machine init script: vis
