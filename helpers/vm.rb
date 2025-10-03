@@ -32,8 +32,14 @@ class Clover
       end
     end
 
+    init_script = if (init_script_id = typecast_params.ubid_uuid("init_script"))
+      project.vm_init_scripts_dataset.first(id: init_script_id)
+    elsif (init_script_name = typecast_params.nonempty_str("init_script"))
+      project.vm_init_scripts_dataset.first(name: init_script_name)
+    end
+
     assemble_params = typecast_params.convert!(symbolize: true) do |tp|
-      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu"])
+      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu", "init_script_args"])
       tp.pos_int("storage_size")
       tp.bool("enable_ip4")
     end
@@ -91,6 +97,7 @@ class Clover
         project.id,
         name:,
         location_id: @location.id,
+        init_script_id: init_script&.id,
         **assemble_params
       ).subject
       audit_log(vm, "create")
