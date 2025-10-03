@@ -261,6 +261,7 @@ class Vm < Sequel::Model
       ch_version:,
       firmware_version:,
       hugepages:,
+      init_script: init_script&.script || "",
       ipv6_disabled: project.get_ff_ipv6_disabled || false
     )
   end
