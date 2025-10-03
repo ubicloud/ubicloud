@@ -314,7 +314,7 @@ RSpec.describe Vm do
     expect(vm.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
   end
 
-  it "includes init_script and init_script_args in params_json if set" do
+  it "includes init_script in params_json if set" do
     project_id = Project.create(name: "test").id
     vm = Prog::Vm::Nexus.assemble("a a", project_id).subject
     expect(vm).to receive(:vm_host).and_return(instance_double(
@@ -325,10 +325,9 @@ RSpec.describe Vm do
       total_sockets: 1,
       ndp_needed: false
     )).at_least(:once)
-    expect(JSON.parse(vm.params_json).values_at("init_script", "init_script_args")).to eq ["", ""]
-    vm.init_script = VmInitScript.create(name: "a", script: "b", project_id:)
-    vm.init_script_args = "c"
-    expect(JSON.parse(vm.params_json).values_at("init_script", "init_script_args")).to eq ["b", "c"]
+    expect(JSON.parse(vm.params_json)["init_script"]).to eq ""
+    VmInitScript.create_with_id(vm.id, script: "b")
+    expect(JSON.parse(vm.reload.params_json)["init_script"]).to eq "b"
   end
 
   it "returns storage volumes hash list" do

@@ -15,6 +15,7 @@ RSpec.describe Clover, "cli vm create" do
     expect(ps).to be_a PrivateSubnet
     expect(vm.name).to eq "test-vm"
     expect(vm.public_key).to eq "a a"
+    expect(vm.init_script).to be_nil
     expect(vm.display_location).to eq "eu-central-h1"
     expect(vm.display_size).to eq "standard-2"
     expect(vm.boot_image).to eq Config.default_boot_image_name
@@ -24,11 +25,11 @@ RSpec.describe Clover, "cli vm create" do
     expect(body).to eq "VM created with id: #{vm.ubid}\n"
   end
 
-  it "creates vm registered SSH public key" do
+  it "creates vm with registered SSH public key and init script" do
     expect(Vm.count).to eq 0
     expect(PrivateSubnet.count).to eq 0
     cli(%w[sk spk create] << "a a")
-    body = cli(%w[vm eu-central-h1/test-vm create spk])
+    body = cli(%w[vm eu-central-h1/test-vm create -i vis spk])
     expect(Vm.count).to eq 1
     expect(PrivateSubnet.count).to eq 1
     vm = Vm.first
@@ -37,6 +38,7 @@ RSpec.describe Clover, "cli vm create" do
     expect(ps).to be_a PrivateSubnet
     expect(vm.name).to eq "test-vm"
     expect(vm.public_key).to eq "a a"
+    expect(vm.init_script.script).to eq "vis"
     expect(vm.display_location).to eq "eu-central-h1"
     expect(vm.display_size).to eq "standard-2"
     expect(vm.boot_image).to eq Config.default_boot_image_name
@@ -56,6 +58,7 @@ RSpec.describe Clover, "cli vm create" do
     expect(vm).to be_a Vm
     expect(vm.name).to eq "test-vm2"
     expect(vm.public_key).to eq "b b"
+    expect(vm.init_script).to be_nil
     expect(vm.display_location).to eq "eu-north-h1"
     expect(vm.display_size).to eq "standard-4"
     expect(vm.boot_image).to eq "debian-12"

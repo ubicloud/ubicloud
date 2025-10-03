@@ -33,7 +33,7 @@ class Clover
     end
 
     assemble_params = typecast_params.convert!(symbolize: true) do |tp|
-      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu"])
+      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu", "init_script"])
       tp.pos_int("storage_size")
       tp.bool("enable_ip4")
     end

@@ -40,6 +40,7 @@ RSpec.describe Clover, "cli help" do
           ubi vm eu-central-h1/my-vm-name create "$(cat ~/.ssh/id_ed25519.pub)"
           ubi vm eu-central-h1/my-vm-name create "$(cat ~/.ssh/authorized_keys)"
           ubi vm eu-central-h1/my-vm-name create registered-ssh-public-key-name
+          ubi vm eu-central-h1/my-vm-name create -i "$(cat /path/to/init/script)" registered-ssh-public-key-name
 
       Options:
           -6, --ipv6-only                  do not enable IPv4
