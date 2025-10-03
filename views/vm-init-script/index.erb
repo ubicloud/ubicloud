@@ -1,0 +1,28 @@
+<% @page_title = "Virtual Machine Init Scripts" %>
+
+<%== part(
+  "components/page_header",
+  title: "Virtual Machine Init Scripts",
+  back: @project.path,
+  right_items: [part("components/button", text: "Register VM Init Script", link: "#{@project.path}/vm-init-script/register", extra_class: "mr-2")],
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project.name, @project.path],
+    ["Virtual Machine Init Scripts", "#"]
+  ]
+) %>
+
+<div class="grid gap-6">
+  <%== part(
+    "components/table_card",
+    headers: ["Name"],
+    rows: @project.vm_init_scripts.map do
+      [[[it.name, {link: path(it)}]]]
+    end,
+    empty_state: {
+      icon: "hero-server-stack",
+      title: "No Virtual Machine Init Scripts Registered",
+      description: "Use the Register VM Init Script button to register an init script."
+    }
+  ) %>
+</div>

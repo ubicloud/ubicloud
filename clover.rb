@@ -108,6 +108,7 @@ class Clover < Roda
     SshPublicKey
     SubjectTag
     Vm
+    VmInitScript
   ].each { path(it, class_name: true, &under_project_path) }
 
   path("Project", class_name: true, &:path)

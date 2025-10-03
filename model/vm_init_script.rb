@@ -3,6 +3,23 @@
 require_relative "../model"
 
 class VmInitScript < Sequel::Model
+  plugin ResourceMethods
+
+  one_to_many :vms, key: :init_script_id
+  plugin :association_dependencies, vms: :nullify
+
+  dataset_module do
+    order :by_name, :name
+  end
+
+  def path
+    "/vm-init-script/#{ubid}"
+  end
+
+  def validate
+    super
+    validates_format(Validation::ALLOWED_NAME_PATTERN, :name, message: "must only contain lowercase letters, numbers, and hyphens and have max length 63.", allow_nil: true)
+  end
 end
 
 # Table: vm_init_script
