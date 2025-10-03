@@ -1526,6 +1526,12 @@ paths:
                 boot_image:
                   description: Boot image of the VM
                   type: string
+                init_script:
+                  description: Name or ID of registered VM init script
+                  type: string
+                init_script_args:
+                  description: Arguments to pass to init script
+                  type: string
                 enable_ip4:
                   description: Enable IPv4
                   type: boolean

@@ -13,6 +13,9 @@ Examples:
 Options:
     -6, --ipv6-only                  do not enable IPv4
     -b, --boot-image=image_name      boot image
+    -iscript-name-or-id,             use registered init script
+        --init-script
+    -I, --init-script-args=args      pass given args to init script
     -p, --private-subnet-id=ps-id    place VM into specific private subnet (also accepts ps-name)
     -s, --size=size                  server size
     -S, --storage-size=size          storage size
