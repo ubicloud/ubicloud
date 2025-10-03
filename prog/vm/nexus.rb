@@ -18,7 +18,7 @@ class Prog::Vm::Nexus < Prog::Base
     distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0, gpu_device: nil,
     hugepages: true, hypervisor: nil, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil,
     exclude_availability_zones: [], availability_zone: nil, alternative_families: [],
-    allow_private_subnet_in_other_project: false)
+    allow_private_subnet_in_other_project: false, init_script: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -121,6 +121,10 @@ class Prog::Vm::Nexus < Prog::Base
         project_id:
       ) { it.id = ubid.to_uuid }
       nic.update(vm_id: vm.id)
+
+      if init_script && !init_script.empty?
+        VmInitScript.create_with_id(vm.id, script: init_script)
+      end
 
       if vm_size.family == "standard-gpu"
         gpu_count = 1

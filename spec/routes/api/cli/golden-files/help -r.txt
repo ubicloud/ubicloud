@@ -892,10 +892,12 @@ Examples:
     ubi vm eu-central-h1/my-vm-name create "$(cat ~/.ssh/id_ed25519.pub)"
     ubi vm eu-central-h1/my-vm-name create "$(cat ~/.ssh/authorized_keys)"
     ubi vm eu-central-h1/my-vm-name create registered-ssh-public-key-name
+    ubi vm eu-central-h1/my-vm-name create -i "$(cat /path/to/init/script)" registered-ssh-public-key-name
 
 Options:
     -6, --ipv6-only                  do not enable IPv4
     -b, --boot-image=image_name      boot image
+    -i, --init-script=script         use given init script
     -p, --private-subnet-id=ps-id    place VM into specific private subnet (also accepts ps-name)
     -s, --size=size                  server size
     -S, --storage-size=size          storage size
