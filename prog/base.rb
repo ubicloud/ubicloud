@@ -73,9 +73,19 @@ end
 
   def before_run
     if defined?(hop_destroy)
-      hop_destroy if @snap.set?(:destroy) && !@snap.set?(:destroying)
+      if @snap.set?(:destroy)
+        if !@snap.set?(:destroying)
+          hop_destroy
+        elsif strand.stack.count > 1
+          # When a strand has multiple frames in its stack, and it is destroyed, the top
+          # frame destroys the associated entities and pops. Then next frame continues to
+          # work, but fails because the entities are already destroyed. This is fixed by
+          # first popping all frames but the last one, and then switching to the destroy
+          # label to handle cleanup.
+          pop "operation is cancelled due to the destruction"
+        end
+      end
     end
-
   end
 
   def nap(seconds = 30)

@@ -37,16 +37,6 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      if strand.label != "destroy"
-        hop_destroy
-      elsif strand.stack.count > 1
-        pop "operation is cancelled due to the destruction of the VictoriaMetrics server"
-      end
-    end
-  end
-
   label def start
     nap 5 unless vm.strand.label == "wait"
     victoria_metrics_server.incr_initial_provisioning
