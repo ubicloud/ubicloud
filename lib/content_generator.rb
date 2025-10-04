@@ -9,6 +9,7 @@ module ContentGenerator
     def self.ssh_public_key(ssh_public_key)
       ssh_public_key.name
     end
+    singleton_class.alias_method :init_script, :ssh_public_key
 
     def self.private_subnet(location, private_subnet)
       private_subnet[:display_name]

@@ -1,0 +1,4 @@
+id: 1nnha52xhzjy1p1dqc550pasfd
+name: vis
+script:
+cmd arg1 arg2

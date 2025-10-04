@@ -68,6 +68,8 @@ begin
   slice_name = params.fetch("slice_name", "system.slice")
   cpu_percent_limit = params.fetch("cpu_percent_limit", 0)
   cpu_burst_percent_limit = params.fetch("cpu_burst_percent_limit", 0)
+  init_script = params.fetch("init_script", "")
+  init_script_args = params.fetch("init_script_args", "")
   ipv6_disabled = params.fetch("ipv6_disabled", false)
 rescue KeyError => e
   puts "Needed #{e.key} in parameters json"
@@ -86,7 +88,8 @@ when "prep"
     local_ip4, max_vcpus, cpu_topology, mem_gib,
     ndp_needed, storage_volumes, storage_secrets, swap_size_bytes,
     pci_devices, boot_image, dns_ipv4,
-    slice_name, cpu_percent_limit, cpu_burst_percent_limit, ipv6_disabled)
+    slice_name, cpu_percent_limit, cpu_burst_percent_limit,
+    init_script, init_script_args, ipv6_disabled)
 when "recreate-unpersisted"
   secrets = JSON.parse($stdin.read)
   unless (storage_secrets = secrets["storage"])

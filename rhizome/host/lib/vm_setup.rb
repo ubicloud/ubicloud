@@ -57,9 +57,10 @@ class VmSetup
 
   def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology,
     mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices,
-    boot_image, dns_ipv4, slice_name, cpu_percent_limit, cpu_burst_percent_limit, ipv6_disabled)
+    boot_image, dns_ipv4, slice_name, cpu_percent_limit, cpu_burst_percent_limit,
+    init_script, init_script_args, ipv6_disabled)
 
-    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled: ipv6_disabled)
+    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled: ipv6_disabled, init_script: init_script, init_script_args: init_script_args)
     network_thread = Thread.new do
       setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: max_vcpus > 1)
     end
@@ -480,7 +481,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     r "ip netns exec #{q_vm} nft -f #{vp.q_nftables_conf}"
   end
 
-  def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled:)
+  def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled:, init_script: nil, init_script_args: nil)
     vp.write_meta_data(<<EOS)
 instance-id: #{yq(@vm_name)}
 local-hostname: #{yq(@vm_name)}
@@ -561,7 +562,7 @@ ethernets:
 #{ethernets}
 EOS
 
-    write_user_data(unix_user, public_keys, swap_size_bytes, boot_image)
+    write_user_data(unix_user, public_keys, swap_size_bytes, boot_image, init_script: init_script, init_script_args: init_script_args)
 
     FileUtils.rm_rf(vp.cloudinit_img)
     r "mkdosfs -n CIDATA -C #{vp.q_cloudinit_img} 128"
@@ -582,7 +583,7 @@ EOS
     SWAP_CONFIG
   end
 
-  def write_user_data(unix_user, public_keys, swap_size_bytes, boot_image)
+  def write_user_data(unix_user, public_keys, swap_size_bytes, boot_image, init_script: nil, init_script_args: nil)
     install_cmd = if boot_image.include?("almalinux")
       "  - [dnf, install, '-y', nftables]\n"
     elsif boot_image.include?("debian")
@@ -613,6 +614,7 @@ ssh_pwauth: False
 runcmd:
   - [systemctl, daemon-reload]
 #{install_cmd}
+  - [bash, -c, #{yq(init_script)}, #{init_script_args.shellsplit.map { |arg| yq(arg) }.unshift("bash").join(", ")}]
 
 bootcmd:
 #{nft_safe_sudo_allow}

@@ -68,7 +68,7 @@ class Clover < Roda
   symbol_matcher(:ubid_uuid, /([a-tv-z0-9]{26})/) do |s|
     UBID.to_uuid(s)
   end
-  [Firewall, KubernetesCluster, KubernetesNodepool, LoadBalancer, PostgresResource, PrivateSubnet, SshPublicKey, Vm].each do |model|
+  [Firewall, KubernetesCluster, KubernetesNodepool, LoadBalancer, PostgresResource, PrivateSubnet, SshPublicKey, Vm, VmInitScript].each do |model|
     sym = :"#{model.table_name}_ubid_uuid"
     symbol_matcher(sym, /(#{model.ubid_type}[a-tv-z0-9]{24})/) do |ubid|
       if (uuid = UBID.to_uuid(ubid))
@@ -108,6 +108,7 @@ class Clover < Roda
     SshPublicKey
     SubjectTag
     Vm
+    VmInitScript
   ].each { path(it, class_name: true, &under_project_path) }
 
   path("Project", class_name: true, &:path)
