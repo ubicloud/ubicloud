@@ -78,7 +78,12 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       Clog.emit(vm_host.sshable.cmd("ls -lah /var/storage/images").strip.tr("\n", "\t")) if vm_host.strand.label == "wait_download_boot_images"
       nap 15
     end
+    update_stack({"available_storage_gib" => vm_host.available_storage_gib})
 
+    hop_install_integration_specs
+  end
+
+  label def install_integration_specs
     if retval&.dig("msg") == "installed rhizome"
       verify_specs_installation(installed: true)
 
@@ -174,6 +179,24 @@ class Prog::Test::HetznerServer < Prog::Test::Base
 
     vhost_controllers = JSON.parse(sshable.cmd("sudo #{rpc_py} -s #{rpc_sock} vhost_get_controllers")).map { it["ctrlr"] }
     fail_test "SPDK vhost controllers not empty: #{vhost_controllers}" unless vhost_controllers.empty?
+
+    hop_destroy_spdk
+  end
+
+  label def destroy_spdk
+    Prog::Storage::RemoveSpdk.assemble(vm_host.spdk_installations.first.id)
+    hop_wait_spdk_destroyed
+  end
+
+  label def wait_spdk_destroyed
+    nap 5 unless vm_host.spdk_installations_dataset.empty?
+    hop_verify_resources_reclaimed
+  end
+
+  label def verify_resources_reclaimed
+    fail_test "used_cores is expected to be zero, actual: #{vm_host.used_cores}" unless vm_host.used_cores.zero?
+    fail_test "used_hugepages_1g is expected to be zero, actual: #{vm_host.used_hugepages_1g}" unless vm_host.used_hugepages_1g.zero?
+    fail_test "available_storage_gib was not reclaimed as expected: #{frame["available_storage_gib"]}, actual: #{vm_host.available_storage_gib}" unless frame["available_storage_gib"] == vm_host.available_storage_gib
 
     hop_destroy
   end

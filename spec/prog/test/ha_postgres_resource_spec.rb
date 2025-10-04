@@ -128,7 +128,20 @@ RSpec.describe Prog::Test::HaPostgresResource do
       expect(minio_cluster).to receive(:incr_destroy)
 
       expect(pgr_test).to receive(:frame).exactly(2).and_return({})
-      expect { pgr_test.destroy_postgres }.to hop("destroy")
+      expect { pgr_test.destroy_postgres }.to hop("wait_resources_destroyed")
+    end
+  end
+
+  describe "#wait_resources_destroyed" do
+    it "naps if the postgres resource isn't deleted yet" do
+      expect(pgr_test).to receive(:postgres_resource).and_return(instance_double(PostgresResource))
+      expect { pgr_test.wait_resources_destroyed }.to nap(5)
+    end
+
+    it "hops to destroy if the postgres resource destroyed" do
+      expect(pgr_test).to receive(:postgres_resource).and_return(nil)
+      expect(pgr_test).to receive(:minio_cluster).and_return(nil)
+      expect { pgr_test.wait_resources_destroyed }.to hop("destroy")
     end
   end
 

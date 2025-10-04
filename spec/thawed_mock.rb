@@ -106,6 +106,7 @@ module ThawedMock
   allow_mocking(Prog::Postgres::PostgresResourceNexus, :assemble)
   allow_mocking(Prog::Postgres::PostgresServerNexus, :assemble)
   allow_mocking(Prog::Postgres::PostgresTimelineNexus, :assemble)
+  allow_mocking(Prog::Storage::RemoveSpdk, :assemble)
   allow_mocking(Prog::Vm::GithubRunner, :assemble)
   allow_mocking(Prog::Vm::HostNexus, :assemble)
   allow_mocking(Prog::Vm::Nexus, :assemble, :assemble_with_sshable)
