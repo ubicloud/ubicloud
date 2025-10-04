@@ -236,7 +236,7 @@ RSpec.describe Prog::Test::HetznerServer do
     it "doesn't fail if no bdevs or vhost controllers" do
       expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo /opt/spdk-1.0/scripts/rpc.py -s /home/spdk/spdk-1.0.sock bdev_get_bdevs").and_return("[]")
       expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo /opt/spdk-1.0/scripts/rpc.py -s /home/spdk/spdk-1.0.sock vhost_get_controllers").and_return("[]")
-      expect { hs_test.verify_spdk_artifacts_purged }.to hop("destroy")
+      expect { hs_test.verify_spdk_artifacts_purged }.to hop("destroy_spdk")
     end
 
     it "fails if bdevs are present" do
@@ -250,6 +250,24 @@ RSpec.describe Prog::Test::HetznerServer do
       expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo /opt/spdk-1.0/scripts/rpc.py -s /home/spdk/spdk-1.0.sock vhost_get_controllers").and_return("[{\"ctrlr\": \"ctrlr1\", \"scsi_target_num\": 0}]")
       expect(hs_test.strand).to receive(:update).with(exitval: {msg: "SPDK vhost controllers not empty: [\"ctrlr1\"]"})
       expect { hs_test.verify_spdk_artifacts_purged }.to hop("failed")
+    end
+  end
+
+  describe "#destroy_spdk" do
+    it "hops to wait_spdk_destroyed after trigger SPDK removal" do
+      expect(Prog::Storage::RemoveSpdk).to receive(:assemble).with(vm_host.spdk_installations.first.id)
+      expect { hs_test.destroy_spdk }.to hop("wait_spdk_destroyed")
+    end
+  end
+
+  describe "#wait_spdk_destroyed" do
+    it "naps if the SPDK installation isn't deleted yet" do
+      expect { hs_test.wait_spdk_destroyed }.to nap(5)
+    end
+
+    it "hops to destroy if the vm host destroyed" do
+      vm_host.spdk_installations.first.destroy
+      expect { hs_test.wait_spdk_destroyed }.to hop("destroy")
     end
   end
 
