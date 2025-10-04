@@ -67,6 +67,7 @@ current_usage = @project.current_resource_usage("VmVCpu")
   end
 
   form_elements.push(public_key_params)
+  form_elements.push({name: "init_script", type: "textarea", label: "Init Script", placeholder: "(optional)", opening_tag: "<div id='init-script-wrapper' class='col-span-full'>"})
 
   if @project.get_ff_gpu_vm
     form_elements << {name: "show_gpu", type: "hidden", value: @show_gpu}
