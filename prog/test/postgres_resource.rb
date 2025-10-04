@@ -54,6 +54,11 @@ class Prog::Test::PostgresResource < Prog::Test::Base
 
   label def destroy_postgres
     postgres_resource.incr_destroy
+    hop_wait_resources_destroyed
+  end
+
+  label def wait_resources_destroyed
+    nap 5 if postgres_resource
     hop_destroy
   end
 
