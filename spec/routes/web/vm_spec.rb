@@ -215,6 +215,28 @@ RSpec.describe Clover, "vm" do
         expect(Vm.first.public_key).to eq "a a"
       end
 
+      it "can create new virtual machine using init script" do
+        visit "#{project.path}/vm/create"
+
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+        name = "dummy-vm"
+        fill_in "Name", with: name
+        fill_in "SSH Public Key", with: "a a"
+        fill_in "Init Script", with: "foo bar"
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "ubuntu-jammy"
+        choose option: "standard-2"
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
+        expect(Vm.count).to eq(1)
+        expect(Vm.first.project_id).to eq(project.id)
+        expect(Vm.first.private_subnets.first.id).not_to be_nil
+        expect(Vm.first.init_script.script).to eq "foo bar"
+      end
+
       it "can create new virtual machine with public ipv4" do
         project
 
