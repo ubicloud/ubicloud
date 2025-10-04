@@ -66,6 +66,11 @@
 
   form_elements.push(public_key_params)
 
+  unless @project.vm_init_scripts.empty?
+    form_elements.push({name: "init_script", type: "select", label: "Registered Init Script", placeholder: "None", content_generator: ContentGenerator::Vm.method(:init_script), opening_tag: "<div class='sm:col-span-3'>"})
+    form_elements.push({name: "init_script_args", type: "text", label: "Init Script Arguments", opening_tag: "<div class='sm:col-span-3' id='init-script-args-wrapper'>"})
+  end
+
   if @project.get_ff_gpu_vm
     form_elements << {name: "show_gpu", type: "hidden", value: @show_gpu}
   end
