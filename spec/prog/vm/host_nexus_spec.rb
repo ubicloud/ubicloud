@@ -18,7 +18,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
   let(:vms) { [instance_double(Vm, memory_gib: 1), instance_double(Vm, memory_gib: 2)] }
   let(:spdk_installations) { [instance_double(SpdkInstallation, cpu_count: 4, hugepages: 4)] }
-  let(:vm_host_slices) { [instance_double(VmHostSlice, name: "standard1"), instance_double(VmHostSlice, name: "standard2")] }
+  let(:vm_host_slices) { [instance_double(VmHostSlice, name: "standard1", total_memory_gib: 2), instance_double(VmHostSlice, name: "standard2", total_memory_gib: 3)] }
   let(:vm_host) { instance_double(VmHost, spdk_installations: spdk_installations, vms: vms, slices: vm_host_slices, id: "1d422893-2955-4c2c-b41c-f2ec70bcd60d", spdk_cpu_count: 2) }
   let(:sshable) { instance_double(Sshable, raw_private_key_1: "bogus") }
 
@@ -606,6 +606,7 @@ RSpec.describe Prog::Vm::HostNexus do
     it "fails if not enough hugepages for VMs" do
       expect(sshable).to receive(:cmd).with("cat /proc/meminfo")
         .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 5\nHugePages_Free: 2")
+      expect(vm_host).to receive(:accepts_slices).and_return(false)
       expect { nx.verify_hugepages }.to raise_error RuntimeError, "Not enough hugepages for VMs"
     end
 
@@ -615,11 +616,21 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.verify_hugepages }.to raise_error RuntimeError, "Used hugepages exceed SPDK hugepages"
     end
 
+    it "calculates used memory for slices and hops" do
+      expect(sshable).to receive(:cmd).with("cat /proc/meminfo")
+        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 8")
+      expect(vm_host).to receive(:update)
+        .with(total_hugepages_1g: 10, used_hugepages_1g: 9)
+      expect(vm_host).to receive(:accepts_slices).and_return(true)
+      expect { nx.verify_hugepages }.to hop("start_slices")
+    end
+
     it "updates vm_host with hugepage stats and hops" do
       expect(sshable).to receive(:cmd).with("cat /proc/meminfo")
         .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 8")
       expect(vm_host).to receive(:update)
         .with(total_hugepages_1g: 10, used_hugepages_1g: 7)
+      expect(vm_host).to receive(:accepts_slices).and_return(false)
       expect { nx.verify_hugepages }.to hop("start_slices")
     end
   end

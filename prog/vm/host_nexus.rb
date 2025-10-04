@@ -260,10 +260,14 @@ class Prog::Vm::HostNexus < Prog::Base
     total_hugepages = Integer(total_hugepages_match.captures.first)
     free_hugepages = Integer(free_hugepages_match.captures.first)
 
-    spdk_hugepages = vm_host.spdk_installations.sum { |i| i.hugepages }
+    spdk_hugepages = vm_host.spdk_installations.sum(&:hugepages)
     fail "Used hugepages exceed SPDK hugepages" unless total_hugepages - free_hugepages <= spdk_hugepages
 
-    total_vm_mem_gib = vm_host.vms.sum { |vm| vm.memory_gib }
+    total_vm_mem_gib = if vm_host.accepts_slices
+      vm_host.slices.sum(&:total_memory_gib)
+    else
+      vm_host.vms.sum(&:memory_gib)
+    end
     fail "Not enough hugepages for VMs" unless total_hugepages - spdk_hugepages >= total_vm_mem_gib
 
     vm_host.update(
