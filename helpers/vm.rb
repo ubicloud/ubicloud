@@ -211,6 +211,8 @@ class Clover
     options.add_option(name: "unix_user")
     options.add_option(name: "ssh_public_key", values: @project.ssh_public_keys)
     options.add_option(name: "public_key")
+    options.add_option(name: "init_script", values: @project.vm_init_scripts)
+    options.add_option(name: "init_script_args")
 
     options.serialize
   end

@@ -46,4 +46,8 @@
   &:has(select#ssh_public_key option[value^=sk]:checked) #public-key-wrapper {
     display: none;
   }
+
+  &:has(select#init_script option[value=""]:checked) #init-script-args-wrapper {
+    display: none;
+  }
 }
