@@ -15,7 +15,6 @@ RSpec.describe Prog::Test::HetznerServer do
                                                "server_id" => "1234",
                                                "additional_boot_images" => [],
                                                "setup_host" => true}, hetzner_api: hetzner_api, vm_host: vm_host)
-    SpdkInstallation.create_with_id(vm_host.id, version: "1.0", vm_host_id: vm_host.id, allocation_weight: 100)
   }
 
   describe "#assemble" do
@@ -141,22 +140,10 @@ RSpec.describe Prog::Test::HetznerServer do
       expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo mkdir -p #{tmp_dir}")
       expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo chmod a+rw #{tmp_dir}")
       expect(hs_test.vm_host.sshable).to receive(:cmd).with(
-        "sudo RUN_E2E_TESTS=1 SPDK_TESTS_TMP_DIR=#{tmp_dir} bundle exec rspec host/e2e"
+        "sudo RUN_E2E_TESTS=1 bundle exec rspec host/e2e"
       )
       expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo rm -rf #{tmp_dir}")
-      expect { hs_test.run_integration_specs }.to hop("install_vhost_backend")
-    end
-  end
-
-  describe "#install_vhost_backend" do
-    it "hops to wait if vhost_backend is installed" do
-      expect(hs_test).to receive(:retval).and_return({"msg" => "VhostBlockBackend was setup"})
-      expect { hs_test.install_vhost_backend }.to hop("wait")
-    end
-
-    it "pushes SetupVhostBlockBackend if not installed" do
-      expect(hs_test).to receive(:retval).and_return(nil)
-      expect { hs_test.install_vhost_backend }.to hop("start", "Storage::SetupVhostBlockBackend")
+      expect { hs_test.run_integration_specs }.to hop("wait")
     end
   end
 
@@ -211,7 +198,7 @@ RSpec.describe Prog::Test::HetznerServer do
     it "succeeds if /var/storage and /var/storage/vhost are empty" do
       expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage").and_return("vhost\nimages\n")
       expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage/vhost").and_return("")
-      expect { hs_test.verify_storage_files_purged }.to hop("verify_spdk_artifacts_purged")
+      expect { hs_test.verify_storage_files_purged }.to hop("destroy")
     end
 
     it "fails if /var/storage has disks" do
@@ -225,27 +212,6 @@ RSpec.describe Prog::Test::HetznerServer do
       expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage/vhost").and_return("file1\nfile2\n")
       expect(hs_test.strand).to receive(:update).with(exitval: {msg: "vhost directory not empty: [\"file1\", \"file2\"]"})
       expect { hs_test.verify_storage_files_purged }.to hop("failed")
-    end
-  end
-
-  describe "#verify_spdk_artifacts_purged" do
-    it "doesn't fail if no bdevs or vhost controllers" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo /opt/spdk-1.0/scripts/rpc.py -s /home/spdk/spdk-1.0.sock bdev_get_bdevs").and_return("[]")
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo /opt/spdk-1.0/scripts/rpc.py -s /home/spdk/spdk-1.0.sock vhost_get_controllers").and_return("[]")
-      expect { hs_test.verify_spdk_artifacts_purged }.to hop("destroy")
-    end
-
-    it "fails if bdevs are present" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo /opt/spdk-1.0/scripts/rpc.py -s /home/spdk/spdk-1.0.sock bdev_get_bdevs").and_return("[{\"name\": \"bdev1\", \"size\": 100}]")
-      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "SPDK bdevs not empty: [\"bdev1\"]"})
-      expect { hs_test.verify_spdk_artifacts_purged }.to hop("failed")
-    end
-
-    it "fails if vhost controllers are present" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo /opt/spdk-1.0/scripts/rpc.py -s /home/spdk/spdk-1.0.sock bdev_get_bdevs").and_return("[]")
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo /opt/spdk-1.0/scripts/rpc.py -s /home/spdk/spdk-1.0.sock vhost_get_controllers").and_return("[{\"ctrlr\": \"ctrlr1\", \"scsi_target_num\": 0}]")
-      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "SPDK vhost controllers not empty: [\"ctrlr1\"]"})
-      expect { hs_test.verify_spdk_artifacts_purged }.to hop("failed")
     end
   end
 
