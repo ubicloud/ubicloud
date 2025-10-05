@@ -99,13 +99,13 @@ RSpec.describe Prog::Test::VmGroup do
         slices: [instance_double(VmHostSlice, cores: 1)],
         cpus: [])
       expect(vg_test).to receive_messages(vm_host: vm_host, frame: {"verify_host_capacity" => true})
-      expect { vg_test.verify_host_capacity }.to hop("verify_storage_backends")
+      expect { vg_test.verify_host_capacity }.to hop("verify_vm_host_slices")
     end
 
     it "skips if verify_host_capacity is not set" do
       expect(vg_test).to receive(:frame).and_return({"verify_host_capacity" => false})
       expect(vg_test).not_to receive(:vm_host)
-      expect { vg_test.verify_host_capacity }.to hop("verify_storage_backends")
+      expect { vg_test.verify_host_capacity }.to hop("verify_vm_host_slices")
     end
 
     it "fails if used cores do not match allocated VMs" do
@@ -120,41 +120,9 @@ RSpec.describe Prog::Test::VmGroup do
 
       strand = instance_double(Strand)
       allow(vg_test).to receive_messages(strand: strand)
-      expect(strand).to receive(:update).with(exitval: {msg: "Host used cores does not match the allocated VMs cores (vm_cores=2, slice_cores=1, spdk_cores=0, used_cores=5)"})
+      expect(strand).to receive(:update).with(exitval: {msg: "Host used cores does not match the allocated VMs cores (vm_cores=2, slice_cores=1, used_cores=5)"})
 
       expect { vg_test.verify_host_capacity }.to hop("failed")
-    end
-  end
-
-  describe "#verify_storage_backends" do
-    it "fails if no vhost block backends" do
-      vm_host = instance_double(VmHost, vhost_block_backends: [])
-      expect(vg_test).to receive_messages(vm_host: vm_host)
-      expect { vg_test.verify_storage_backends }.to hop("failed")
-    end
-
-    it "checks that no SPDK volumes are present if vhost block backends exist" do
-      sshable = instance_double(Sshable)
-      vm_host = instance_double(VmHost,
-        vhost_block_backends: [instance_double(VhostBlockBackend)],
-        spdk_installations: [instance_double(SpdkInstallation, version: "23.09")],
-        sshable: sshable)
-      expect(vg_test).to receive_messages(vm_host: vm_host)
-      expect(sshable).to receive(:cmd).with("sudo /opt/spdk-23.09/scripts/rpc.py -s /home/spdk/spdk-23.09.sock bdev_get_bdevs").and_return("[]\n")
-
-      expect { vg_test.verify_storage_backends }.to hop("verify_vm_host_slices")
-    end
-
-    it "fails if SPDK volumes are present while vhost block backends exist" do
-      sshable = instance_double(Sshable)
-      vm_host = instance_double(VmHost,
-        vhost_block_backends: [instance_double(VhostBlockBackend)],
-        spdk_installations: [instance_double(SpdkInstallation, version: "23.09")],
-        sshable: sshable)
-      expect(vg_test).to receive_messages(vm_host: vm_host)
-      expect(sshable).to receive(:cmd).with("sudo /opt/spdk-23.09/scripts/rpc.py -s /home/spdk/spdk-23.09.sock bdev_get_bdevs").and_return('[{"name": "spdk_volume"}]')
-
-      expect { vg_test.verify_storage_backends }.to hop("failed")
     end
   end
 
