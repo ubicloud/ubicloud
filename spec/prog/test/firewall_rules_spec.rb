@@ -14,13 +14,13 @@ RSpec.describe Prog::Test::FirewallRules do
 
   let(:private_subnet_1) {
     nic = instance_double(Nic, private_ipv6: NetAddr::IPv6Net.parse("fd01:0db8:85a1::/64"), private_ipv4: NetAddr::IPv4Net.parse("192.168.0.1/32"))
-    vm_1 = instance_double(Vm, id: "vm_1", sshable: sshable, boot_image: "ubuntu-noble", ephemeral_net4: "1.1.1.1", ephemeral_net6: NetAddr::IPv6Net.parse("2001:0db8:85a1::/64"), inhost_name: "vm1", nics: [nic], private_ipv6: NetAddr::IPv6.parse("fd01:0db8:85a1::2"))
-    vm_2 = instance_double(Vm, id: "vm_2", sshable: sshable, boot_image: "almalinux-9", ephemeral_net4: "1.1.1.2", ephemeral_net6: NetAddr::IPv6Net.parse("2001:0db8:85a2::/64"), inhost_name: "vm2", nics: [nic], private_ipv6: NetAddr::IPv6.parse("fd01:0db8:85a2::2"))
+    vm_1 = instance_double(Vm, id: "vm_1", sshable: sshable, boot_image: "ubuntu-noble", ip4: "1.1.1.1", ip6: NetAddr::IPv6.parse("2001:0db8:85a1::2"), inhost_name: "vm1", nics: [nic], private_ipv6: NetAddr::IPv6.parse("fd01:0db8:85a1::2"))
+    vm_2 = instance_double(Vm, id: "vm_2", sshable: sshable, boot_image: "almalinux-9", ip4: "1.1.1.2", ip6: NetAddr::IPv6.parse("2001:0db8:85a2::2"), inhost_name: "vm2", nics: [nic], private_ipv6: NetAddr::IPv6.parse("fd01:0db8:85a2::2"))
     instance_double(PrivateSubnet, id: "subnet_1", vms: [vm_1, vm_2])
   }
 
   let(:vm_outside) {
-    instance_double(Vm, id: "vm_outside", sshable: sshable, boot_image: "debian-12", ephemeral_net4: "1.1.1.3", ephemeral_net6: NetAddr::IPv6Net.parse("2001:0db8:85a3::/64"), inhost_name: "vm_outside")
+    instance_double(Vm, id: "vm_outside", sshable: sshable, boot_image: "debian-12", ip4: "1.1.1.3", ip6: NetAddr::IPv6.parse("2001:0db8:85a3::2"), inhost_name: "vm_outside")
   }
 
   before do
@@ -206,7 +206,7 @@ ExecStart=nc -l 8080 -6
 
       expect(sshable).to receive(:cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_return("success!").at_least(:once)
 
-      vm_outside = instance_double(Vm, ephemeral_net4: "1.1.1.3", inhost_name: "vm_outside", sshable: sshable)
+      vm_outside = instance_double(Vm, ip4: "1.1.1.3", inhost_name: "vm_outside", sshable: sshable)
       expect(firewall_test).to receive(:vm_outside).and_return(vm_outside).at_least(:once)
       expect(firewall_test.strand).to receive(:update).with(exitval: {msg: "vm_outside should not be able to connect to vm1 on port 8080"})
       expect { firewall_test.perform_tests_public_ipv4 }.to hop("failed")
@@ -223,7 +223,7 @@ ExecStart=nc -l 8080 -6
 
       expect(sshable).to receive(:cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_return("success!").once
 
-      vm_outside = instance_double(Vm, ephemeral_net4: "1.1.1.3", inhost_name: "vm_outside", sshable: sshable)
+      vm_outside = instance_double(Vm, ip4: "1.1.1.3", inhost_name: "vm_outside", sshable: sshable)
       expect(firewall_test).to receive(:vm_outside).and_return(vm_outside).at_least(:once)
       expect(sshable).to receive(:cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_raise("nc: connect to 1.1.1.1 port 8080 (tcp) timed out")
 

@@ -15,8 +15,8 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
     instance_double(Vm,
       id: "vm-id",
       sshable: instance_double(Sshable),
-      ephemeral_net4: "1.1.1.1",
-      ephemeral_net6: IPAddr.new("2001:db8::1"),
+      ip4: "1.1.1.1",
+      ip6: IPAddr.new("2001:db8::1"),
       strand: instance_double(Strand, label: "wait"))
   }
 
@@ -342,7 +342,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
 
     it "adds IP SAN if running in development or E2E environment" do
       allow(Config).to receive(:development?).and_return(true)
-      expect(victoria_metrics_server.vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
+      expect(victoria_metrics_server.vm).to receive(:ip4).and_return("1.1.1.1")
       expect(victoria_metrics_server.vm).to receive(:ip6).and_return(NetAddr::IPv6Net.parse("2a01:4f8:10a:128b:814c::/79").nth(2))
 
       expect(Util).to receive(:create_certificate).with(

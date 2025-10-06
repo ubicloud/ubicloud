@@ -351,7 +351,7 @@ class Prog::Vm::Nexus < Prog::Base
       # to reduce the amount of load on the control plane unnecessarily.
       nap 6
     end
-    addr = vm.ephemeral_net4
+    addr = vm.ip4
     hop_create_billing_record unless addr
 
     begin

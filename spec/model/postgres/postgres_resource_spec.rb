@@ -26,7 +26,7 @@ RSpec.describe PostgresResource do
   end
 
   it "returns connection string with ip address if config is not set" do
-    expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, vm: instance_double(Vm, ephemeral_net4: "1.2.3.4"))).at_least(:once)
+    expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, vm: instance_double(Vm, ip4: "1.2.3.4"))).at_least(:once)
     expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@1.2.3.4:5432/postgres?sslmode=require")
   end
 

@@ -261,7 +261,7 @@ module Scheduling::Allocator
       update_args[:family] = vm_host.family if vm.family != "burstable"
       vm.update(**update_args)
       AssignedVmAddress.create(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id) if ip4
-      vm.sshable&.update(host: vm.ephemeral_net4 || NetAddr.parse_net(vm.ephemeral_net6).nth(2))
+      vm.sshable&.update(host: vm.ip4.to_s || vm.ip6.to_s)
     end
 
     def initialize(candidate_host, request)

@@ -12,7 +12,7 @@ class Serializers::Vm < Serializers::Base
       storage_size_gib: vm.storage_size_gib,
       ip6: vm.ip6,
       ip4_enabled: vm.ip4_enabled,
-      ip4: vm.ephemeral_net4
+      ip4: vm.ip4
     }
 
     if options[:detailed]

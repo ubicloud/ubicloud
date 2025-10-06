@@ -32,7 +32,7 @@ RSpec.describe MinioServer do
   }
 
   before do
-    allow(ms.vm).to receive(:ephemeral_net4).and_return("1.2.3.4")
+    allow(ms.vm).to receive(:ip4).and_return("1.2.3.4")
   end
 
   it "returns hostname properly" do
@@ -89,7 +89,7 @@ RSpec.describe MinioServer do
       minio_client: Minio::Client.new(endpoint: "https://1.2.3.4:9000", access_key: "dummy-key", secret_key: "dummy-secret", ssl_ca_data: "data")
     }
 
-    expect(ms.vm).to receive(:ephemeral_net4).and_return("1.2.3.4").at_least(:once)
+    expect(ms.vm).to receive(:ip4).and_return("1.2.3.4").at_least(:once)
     expect(ms).not_to receive(:incr_checkup)
     ms.pool.update(server_count: 2)
 
@@ -112,7 +112,7 @@ RSpec.describe MinioServer do
       minio_client: Minio::Client.new(endpoint: "https://1.2.3.4:9000", access_key: "dummy-key", secret_key: "dummy-secret", ssl_ca_data: "data")
     }
 
-    expect(ms.vm).not_to receive(:ephemeral_net4)
+    expect(ms.vm).not_to receive(:ip4)
     expect(ms).not_to receive(:incr_checkup)
 
     stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok"}]}]}))
@@ -137,7 +137,7 @@ RSpec.describe MinioServer do
   end
 
   it "returns endpoint properly" do
-    expect(ms.vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
+    expect(ms.vm).to receive(:ip4).and_return("1.1.1.1")
     expect(ms.endpoint).to eq("1.1.1.1:9000")
 
     expect(ms.cluster).to receive(:dns_zone).and_return("something")
@@ -168,7 +168,7 @@ RSpec.describe MinioServer do
     end
 
     it "returns ip address when dns zone is not found" do
-      expect(ms.vm).to receive(:ephemeral_net4).and_return("10.10.10.10")
+      expect(ms.vm).to receive(:ip4).and_return("10.10.10.10")
       expect(ms.server_url).to eq("https://10.10.10.10:9000")
     end
   end

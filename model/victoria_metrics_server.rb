@@ -28,7 +28,7 @@ class VictoriaMetricsServer < Sequel::Model
   end
 
   def init_health_monitor_session
-    socket_path = File.join(Dir.pwd, "var", "health_monitor_sockets", "vn_#{vm.ephemeral_net6.nth(2)}")
+    socket_path = File.join(Dir.pwd, "var", "health_monitor_sockets", "vn_#{vm.ip6}")
     FileUtils.rm_rf(socket_path)
     FileUtils.mkdir_p(socket_path)
 

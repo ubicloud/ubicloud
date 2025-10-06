@@ -55,12 +55,8 @@ class Vm < Sequel::Model
     "/location/#{display_location}/vm/#{name}"
   end
 
-  def ephemeral_net4
-    assigned_vm_address&.ip&.network
-  end
-
   def ip4
-    assigned_vm_address&.ip
+    ephemeral_net4&.nth(0)
   end
 
   def ip6
@@ -281,6 +277,12 @@ class Vm < Sequel::Model
   end
 
   include Validation::PublicKeyValidation
+
+  private
+
+  def ephemeral_net4
+    assigned_vm_address&.ip
+  end
 end
 
 # Table: vm

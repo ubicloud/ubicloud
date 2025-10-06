@@ -39,7 +39,7 @@ RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
   before do
     lb.add_vm(vm)
     allow(nx).to receive_messages(vm: vm, load_balancer: lb)
-    allow(vm).to receive_messages(ephemeral_net4: NetAddr::IPv4Net.parse("100.100.100.100/32"), ephemeral_net6: NetAddr::IPv6Net.parse("2a02:a464:deb2:a000::/64"))
+    allow(vm).to receive_messages(ip4: NetAddr::IPv4.parse("100.100.100.100"), ip6: NetAddr::IPv6.parse("2a02:a464:deb2:a000::2"))
     allow(vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: instance_double(Sshable)))
   end
 
@@ -95,8 +95,8 @@ table inet nat {
 
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
-ip daddr 100.100.100.100/32 tcp dport 80 meta mark set 0x00B1C100D
-ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8080 }
+ip daddr 100.100.100.100 tcp dport 80 meta mark set 0x00B1C100D
+ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8080 }
 ip daddr 192.168.1.0 tcp dport 80 ct state established,related,new counter dnat to 192.168.1.0:8080
 
 ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 meta mark set 0x00B1C100D
@@ -105,7 +105,7 @@ ip6 daddr fd10:9b0b:6b4b:8fbb::2 tcp dport 80 ct state established,related,new c
 
 
     # Basic NAT for public IPv4 to private IPv4
-    ip daddr 100.100.100.100/32 dnat to 192.168.1.0
+    ip daddr 100.100.100.100 dnat to 192.168.1.0
   }
 
   chain postrouting {
@@ -114,8 +114,8 @@ ip daddr @neighbor_ips_v4 tcp dport 80 ct state established,related,new counter 
 ip6 daddr @neighbor_ips_v6 tcp dport 80 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
 
     # Basic NAT for private IPv4 to public IPv4
-    ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
-    ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
+    ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100
+    ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100
   }
 }
 LOAD_BALANCER
@@ -142,14 +142,14 @@ table inet nat {
 
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
-ip daddr 100.100.100.100/32 tcp dport 80 meta mark set 0x00B1C100D
-ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8080 }
+ip daddr 100.100.100.100 tcp dport 80 meta mark set 0x00B1C100D
+ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8080 }
 ip daddr 192.168.1.0 tcp dport 80 ct state established,related,new counter dnat to 192.168.1.0:8080
 
 
 
     # Basic NAT for public IPv4 to private IPv4
-    ip daddr 100.100.100.100/32 dnat to 192.168.1.0
+    ip daddr 100.100.100.100 dnat to 192.168.1.0
   }
 
   chain postrouting {
@@ -158,8 +158,8 @@ ip daddr @neighbor_ips_v4 tcp dport 80 ct state established,related,new counter 
 
 
     # Basic NAT for private IPv4 to public IPv4
-    ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
-    ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
+    ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100
+    ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100
   }
 }
 LOAD_BALANCER
@@ -189,12 +189,12 @@ table inet nat {
 
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
-ip daddr 100.100.100.100/32 tcp dport 80 meta mark set 0x00B1C100D
-ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8080 }
+ip daddr 100.100.100.100 tcp dport 80 meta mark set 0x00B1C100D
+ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8080 }
 ip daddr 192.168.1.0 tcp dport 80 ct state established,related,new counter dnat to 192.168.1.0:8080
 
-ip daddr 100.100.100.100/32 tcp dport 443 meta mark set 0x00B1C100D
-ip daddr 100.100.100.100/32 tcp dport 443 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8443 }
+ip daddr 100.100.100.100 tcp dport 443 meta mark set 0x00B1C100D
+ip daddr 100.100.100.100 tcp dport 443 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8443 }
 ip daddr 192.168.1.0 tcp dport 443 ct state established,related,new counter dnat to 192.168.1.0:8443
 
 ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 meta mark set 0x00B1C100D
@@ -207,7 +207,7 @@ ip6 daddr fd10:9b0b:6b4b:8fbb::2 tcp dport 443 ct state established,related,new 
 
 
     # Basic NAT for public IPv4 to private IPv4
-    ip daddr 100.100.100.100/32 dnat to 192.168.1.0
+    ip daddr 100.100.100.100 dnat to 192.168.1.0
   }
 
   chain postrouting {
@@ -218,8 +218,8 @@ ip6 daddr @neighbor_ips_v6 tcp dport 80 ct state established,related,new counter
 ip6 daddr @neighbor_ips_v6 tcp dport 443 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
 
     # Basic NAT for private IPv4 to public IPv4
-    ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
-    ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
+    ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100
+    ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100
   }
 }
 LOAD_BALANCER
@@ -246,8 +246,8 @@ table inet nat {
 
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
-ip daddr 100.100.100.100/32 tcp dport 80 meta mark set 0x00B1C100D
-ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to jhash ip saddr . tcp sport . ip daddr . tcp dport mod 1 map { 0 : 192.168.1.0 . 8080 }
+ip daddr 100.100.100.100 tcp dport 80 meta mark set 0x00B1C100D
+ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to jhash ip saddr . tcp sport . ip daddr . tcp dport mod 1 map { 0 : 192.168.1.0 . 8080 }
 ip daddr 192.168.1.0 tcp dport 80 ct state established,related,new counter dnat to 192.168.1.0:8080
 
 ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 meta mark set 0x00B1C100D
@@ -256,7 +256,7 @@ ip6 daddr fd10:9b0b:6b4b:8fbb::2 tcp dport 80 ct state established,related,new c
 
 
     # Basic NAT for public IPv4 to private IPv4
-    ip daddr 100.100.100.100/32 dnat to 192.168.1.0
+    ip daddr 100.100.100.100 dnat to 192.168.1.0
   }
 
   chain postrouting {
@@ -265,8 +265,8 @@ ip daddr @neighbor_ips_v4 tcp dport 80 ct state established,related,new counter 
 ip6 daddr @neighbor_ips_v6 tcp dport 80 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
 
     # Basic NAT for private IPv4 to public IPv4
-    ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
-    ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
+    ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100
+    ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100
   }
 }
 LOAD_BALANCER
@@ -299,8 +299,8 @@ elements = {fd10:9b0b:6b4b:aaa::2}
 
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
-ip daddr 100.100.100.100/32 tcp dport 80 meta mark set 0x00B1C100D
-ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : 172.10.1.0 . 80, 1 : 192.168.1.0 . 8080 }
+ip daddr 100.100.100.100 tcp dport 80 meta mark set 0x00B1C100D
+ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : 172.10.1.0 . 80, 1 : 192.168.1.0 . 8080 }
 ip daddr 192.168.1.0 tcp dport 80 ct state established,related,new counter dnat to 192.168.1.0:8080
 
 ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 meta mark set 0x00B1C100D
@@ -309,7 +309,7 @@ ip6 daddr fd10:9b0b:6b4b:8fbb::2 tcp dport 80 ct state established,related,new c
 
 
     # Basic NAT for public IPv4 to private IPv4
-    ip daddr 100.100.100.100/32 dnat to 192.168.1.0
+    ip daddr 100.100.100.100 dnat to 192.168.1.0
   }
 
   chain postrouting {
@@ -318,8 +318,8 @@ ip daddr @neighbor_ips_v4 tcp dport 80 ct state established,related,new counter 
 ip6 daddr @neighbor_ips_v6 tcp dport 80 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
 
     # Basic NAT for private IPv4 to public IPv4
-    ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
-    ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
+    ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100
+    ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100
   }
 }
 LOAD_BALANCER
@@ -354,7 +354,7 @@ ip6 daddr fd10:9b0b:6b4b:8fbb::2 tcp dport 80 ct state established,related,new c
 
 
     # Basic NAT for public IPv4 to private IPv4
-    ip daddr 100.100.100.100/32 dnat to 192.168.1.0
+    ip daddr 100.100.100.100 dnat to 192.168.1.0
   }
 
   chain postrouting {
@@ -363,8 +363,8 @@ ip6 daddr fd10:9b0b:6b4b:8fbb::2 tcp dport 80 ct state established,related,new c
 ip6 daddr @neighbor_ips_v6 tcp dport 80 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
 
     # Basic NAT for private IPv4 to public IPv4
-    ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
-    ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
+    ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100
+    ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100
   }
 }
 LOAD_BALANCER
@@ -392,8 +392,8 @@ elements = {fd10:9b0b:6b4b:aaa::2}
 
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
-ip daddr 100.100.100.100/32 tcp dport 80 meta mark set 0x00B1C100D
-ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 172.10.1.0 . 80 }
+ip daddr 100.100.100.100 tcp dport 80 meta mark set 0x00B1C100D
+ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 172.10.1.0 . 80 }
 ip daddr 192.168.1.0 tcp dport 80 ct state established,related,new counter dnat to 192.168.1.0:8080
 
 ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 meta mark set 0x00B1C100D
@@ -402,7 +402,7 @@ ip6 daddr fd10:9b0b:6b4b:8fbb::2 tcp dport 80 ct state established,related,new c
 
 
     # Basic NAT for public IPv4 to private IPv4
-    ip daddr 100.100.100.100/32 dnat to 192.168.1.0
+    ip daddr 100.100.100.100 dnat to 192.168.1.0
   }
 
   chain postrouting {
@@ -411,8 +411,8 @@ ip daddr @neighbor_ips_v4 tcp dport 80 ct state established,related,new counter 
 ip6 daddr @neighbor_ips_v6 tcp dport 80 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
 
     # Basic NAT for private IPv4 to public IPv4
-    ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
-    ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
+    ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100
+    ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100
   }
 }
 LOAD_BALANCER
@@ -440,8 +440,8 @@ table inet nat {
 
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
-ip daddr 100.100.100.100/32 tcp dport 80 meta mark set 0x00B1C100D
-ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8080 }
+ip daddr 100.100.100.100 tcp dport 80 meta mark set 0x00B1C100D
+ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8080 }
 ip daddr 192.168.1.0 tcp dport 80 ct state established,related,new counter dnat to 192.168.1.0:8080
 
 ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 meta mark set 0x00B1C100D
@@ -450,7 +450,7 @@ ip6 daddr fd10:9b0b:6b4b:8fbb::2 tcp dport 80 ct state established,related,new c
 
 
     # Basic NAT for public IPv4 to private IPv4
-    ip daddr 100.100.100.100/32 dnat to 192.168.1.0
+    ip daddr 100.100.100.100 dnat to 192.168.1.0
   }
 
   chain postrouting {
@@ -459,8 +459,8 @@ ip daddr @neighbor_ips_v4 tcp dport 80 ct state established,related,new counter 
 ip6 daddr @neighbor_ips_v6 tcp dport 80 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
 
     # Basic NAT for private IPv4 to public IPv4
-    ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
-    ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
+    ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100
+    ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100
   }
 }
 LOAD_BALANCER
@@ -485,12 +485,12 @@ delete table inet nat;
 table ip nat {
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
-    ip daddr 100.100.100.100/32 dnat to 192.168.1.0
+    ip daddr 100.100.100.100 dnat to 192.168.1.0
   }
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
-    ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
-    ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
+    ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100
+    ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100
   }
 }
 REMOVE_LOAD_BALANCER

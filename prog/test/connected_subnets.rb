@@ -57,7 +57,7 @@ ExecStart=nc -l 8080 -6
     end
 
     start_listening(ipv4: true)
-    test_connection(vm_to_be_connected.ephemeral_net4, vm_to_connect_outside, should_fail: true, ipv4: true)
+    test_connection(vm_to_be_connected.ip4, vm_to_connect_outside, should_fail: true, ipv4: true)
     hop_perform_tests_private_ipv4
   end
 

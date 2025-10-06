@@ -101,7 +101,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   label def refresh_dns_record
     decr_refresh_dns_record
 
-    type, data = postgres_resource.location.aws? ? ["CNAME", representative_server.vm.aws_instance.ipv4_dns_name + "."] : ["A", representative_server.vm.ephemeral_net4.to_s]
+    type, data = postgres_resource.location.aws? ? ["CNAME", representative_server.vm.aws_instance.ipv4_dns_name + "."] : ["A", representative_server.vm.ip4.to_s]
 
     if postgres_resource.dns_zone
       postgres_resource.dns_zone.delete_record(record_name: postgres_resource.hostname)
