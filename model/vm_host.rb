@@ -161,9 +161,9 @@ class VmHost < Sequel::Model
   APIPA_MASK = NetAddr::Mask32.new(32).freeze
 
   def veth_pair_random_ip4_addr
-    ips = vms_dataset.select_map(:local_vetho_ip)
+    ips_string = vms_dataset.select_map(:local_vetho_ip).map { it.network.to_s }
     ip = APIPA_RANGE.nth(2 * SecureRandom.random_number(APIPA_LEN))
-    ip = ip.next.next while ips.include?(ip.to_s)
+    ip = ip.next.next while ips_string.include?(ip.to_s)
     NetAddr::IPv4Net.new(ip, APIPA_MASK)
   end
 
