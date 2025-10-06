@@ -181,7 +181,15 @@ class Prog::Aws::Instance < Prog::Base
       raise
     rescue Aws::EC2::Errors::InsufficientInstanceCapacity => e
       if is_runner? && (runner = GithubRunner[vm_id: vm.id])
-        Clog.emit("insufficient instance capacity") { {insufficient_instance_capacity: {vm:, message: e.message}} }
+        next_family = if (families = frame["alternative_families"])
+          index = families.index(vm.family) || -1
+          families[index + 1]
+        end
+        Clog.emit("insufficient instance capacity") { {insufficient_instance_capacity: {vm:, next_family:, message: e.message}} }
+        if next_family
+          vm.update(family: next_family)
+          nap 0
+        end
         runner.provision_spare_runner
         runner.incr_destroy
         pop "exiting due to insufficient instance capacity"

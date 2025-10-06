@@ -16,7 +16,8 @@ class Prog::Vm::Nexus < Prog::Base
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
     enable_ip4: false, pool_id: nil, arch: "x64", swap_size_bytes: nil,
     distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0, gpu_device: nil,
-    hugepages: true, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil, exclude_availability_zones: [], availability_zone: nil)
+    hugepages: true, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil, exclude_availability_zones: [], availability_zone: nil,
+    alternative_families: [])
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -158,7 +159,8 @@ class Prog::Vm::Nexus < Prog::Base
           "gpu_device" => gpu_device,
           "hugepages" => hugepages,
           "ch_version" => ch_version,
-          "firmware_version" => firmware_version
+          "firmware_version" => firmware_version,
+          "alternative_families" => alternative_families
         }]
       ) { it.id = vm.id }
     end
@@ -211,7 +213,7 @@ class Prog::Vm::Nexus < Prog::Base
 
   label def start_aws
     nap 1 unless vm.nics.all? { |nic| nic.strand.label == "wait" }
-    bud Prog::Aws::Instance, {"subject_id" => vm.id}, :start
+    bud Prog::Aws::Instance, {"subject_id" => vm.id, "alternative_families" => frame["alternative_families"]}, :start
     hop_wait_aws_vm_started
   end
 

@@ -120,6 +120,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(picked_vm.family).to eq("m7a")
       expect(picked_vm.location.aws?).to be(true)
       expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2204_aws_ami_version)
+      expect(picked_vm.strand.stack.first["alternative_families"]).to eq(["m7i", "m6a"])
     end
   end
 
