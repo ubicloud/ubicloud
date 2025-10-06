@@ -111,7 +111,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(picked_vm.pool_id).to be_nil
     end
 
-    it "uses alien vms if enabled" do
+    it "uses alien vms by given ratio" do
       project.set_ff_aws_alien_runners_ratio(0.5)
       expect(nx).to receive(:rand).and_return(0.4)
       location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
@@ -121,6 +121,16 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(picked_vm.location.aws?).to be(true)
       expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2204_aws_ami_version)
       expect(picked_vm.strand.stack.first["alternative_families"]).to eq(["m7i", "m6a"])
+    end
+
+    it "uses alien vms if spilled over" do
+      runner.incr_spill_over
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      picked_vm = nx.pick_vm
+      expect(picked_vm.family).to eq("m7a")
+      expect(picked_vm.location.aws?).to be(true)
+      expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2204_aws_ami_version)
     end
   end
 
@@ -331,6 +341,14 @@ RSpec.describe Prog::Vm::GithubRunner do
       it "waits if standard utilization is high" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         expect { nx.wait_concurrency_limit }.to nap
+      end
+
+      it "allocates if utilization is high but spill over enabled" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        project.set_ff_spill_to_alien_runners(true)
+
+        expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+        expect(runner.spill_over_set?).to be(true)
       end
 
       it "allocates if standard utilization is low" do
