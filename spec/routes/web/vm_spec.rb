@@ -11,7 +11,7 @@ RSpec.describe Clover, "vm" do
 
   let(:vm) do
     vm = Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "dummy-vm-1").subject
-    vm.update(ephemeral_net6: "2a01:4f8:173:1ed3:aa7c::/79")
+    vm.update(ephemeral_net6: NetAddr::IPv6Net.parse("2a01:4f8:173:1ed3:aa7c::/79"))
     vm.reload # without reload ephemeral_net6 is string and can't call .network
   end
 

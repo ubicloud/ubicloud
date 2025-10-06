@@ -115,7 +115,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(OpenSSL::PKey::EC).to receive(:new).with("root_cert_key_1").and_return(key_1)
 
       expect(Config).to receive(:development?).and_return(true)
-      expect(vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
+      expect(vm).to receive(:ip4).and_return("1.1.1.1")
       create_certificate_payload[:extensions] = ["subjectAltName=DNS:minio-cluster-name.minio.ubicloud.com,DNS:minio-cluster-name0.minio.ubicloud.com,IP:1.1.1.1", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"]
       expect(Util).to receive(:create_certificate).with(create_certificate_payload).and_return([instance_double(OpenSSL::X509::Certificate, to_pem: "cert"), instance_double(OpenSSL::PKey::EC, to_pem: "cert_key")])
 
@@ -132,7 +132,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(nx.minio_server.cluster).to receive(:dns_zone).and_return(dz).at_least(:once)
       vm = nx.minio_server.vm
       vm.strand.update(label: "wait")
-      expect(vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
+      expect(vm).to receive(:ip4).and_return("1.1.1.1")
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
       expect(nx.minio_server.cluster.dns_zone).to receive(:insert_record).with(record_name: nx.cluster.hostname, type: "A", ttl: 10, data: "1.1.1.1")
       expect(nx).to receive(:register_deadline)
@@ -377,7 +377,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(nx.minio_server.vm.sshable).to receive(:destroy)
       expect(nx.minio_server.vm.nics.first).to receive(:incr_destroy)
       expect(nx.minio_server.vm).to receive(:incr_destroy)
-      expect(nx.minio_server.vm).to receive(:ephemeral_net4).and_return("10.10.10.10")
+      expect(nx.minio_server.vm).to receive(:ip4).and_return("10.10.10.10")
       expect(nx.minio_server).to receive(:destroy)
       expect(nx.minio_server.cluster.dns_zone).to receive(:delete_record).with(record_name: nx.cluster.hostname, type: "A", data: "10.10.10.10")
       expect { nx.destroy }.to exit({"msg" => "minio server destroyed"})
@@ -425,13 +425,13 @@ RSpec.describe Prog::Minio::MinioServerNexus do
     end
 
     it "returns true if health check is successful" do
-      expect(nx.minio_server.vm).to receive(:ephemeral_net4).and_return("1.2.3.4")
+      expect(nx.minio_server.vm).to receive(:ip4).and_return("1.2.3.4")
       stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok"}]}]}))
       expect(nx.available?).to be(true)
     end
 
     it "returns false if health check is unsuccessful" do
-      expect(nx.minio_server.vm).to receive(:ephemeral_net4).and_return("1.2.3.4")
+      expect(nx.minio_server.vm).to receive(:ip4).and_return("1.2.3.4")
       stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "offline", endpoint: "1.2.3.4:9000"}]}))
       expect(nx.available?).to be(false)
     end

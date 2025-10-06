@@ -733,7 +733,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "naps if not sshable" do
-      expect(vm).to receive(:ephemeral_net4).and_return("10.0.0.1")
+      expect(vm).to receive(:ip4).and_return(NetAddr::IPv4.parse("10.0.0.1"))
       expect(vm).to receive(:update_firewall_rules_set?).and_return(true)
       expect(vm).not_to receive(:incr_update_firewall_rules)
       expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1).and_raise Errno::ECONNREFUSED
@@ -751,7 +751,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "skips a check if ipv4 is not enabled" do
       expect(vm).to receive(:update_firewall_rules_set?).and_return(true)
-      expect(vm.ephemeral_net4).to be_nil
+      expect(vm.ip4).to be_nil
       expect(vm).not_to receive(:ephemeral_net6)
       expect { nx.wait_sshable }.to hop("create_billing_record")
     end

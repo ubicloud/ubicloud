@@ -107,8 +107,8 @@ class Prog::Test::Vm < Prog::Test::Base
   label def ping_vms_in_subnet
     vms_with_same_subnet.each { |x|
       # ping public IPs
-      sshable.cmd("ping -c 2 #{x.ephemeral_net4}")
-      sshable.cmd("ping -c 2 #{x.ephemeral_net6.nth(2)}")
+      sshable.cmd("ping -c 2 #{x.ip4}")
+      sshable.cmd("ping -c 2 #{x.ip6}")
 
       # ping private IPs
       nic = x.nics.first
@@ -124,8 +124,8 @@ class Prog::Test::Vm < Prog::Test::Base
   label def ping_vms_not_in_subnet
     vms_with_different_subnet.each { |x|
       # ping public IPs should work
-      sshable.cmd("ping -c 2 #{x.ephemeral_net4}")
-      sshable.cmd("ping -c 2 #{x.ephemeral_net6.nth(2)}")
+      sshable.cmd("ping -c 2 #{x.ip4}")
+      sshable.cmd("ping -c 2 #{x.ip6}")
 
       # ping private IPs shouldn't work
       nic = x.nics.first

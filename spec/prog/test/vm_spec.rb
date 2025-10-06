@@ -24,8 +24,8 @@ RSpec.describe Prog::Test::Vm do
       private_ipv4: NetAddr::IPv4Net.parse("192.168.0.1/32"))
     vm1 = instance_double(Vm, id: "vm1",
       private_subnets: [subnet1],
-      ephemeral_net4: "1.1.1.1",
-      ephemeral_net6: NetAddr::IPv6Net.parse("2001:0db8:85a1::/64"),
+      ip4: "1.1.1.1",
+      ip6: "2001:db8:85a1::2",
       nics: [nic1],
       vm_storage_volumes: [main_storage_volume, extra_storage_volume])
 
@@ -34,8 +34,8 @@ RSpec.describe Prog::Test::Vm do
       private_ipv4: NetAddr::IPv4Net.parse("192.168.0.2/32"))
     vm2 = instance_double(Vm, id: "vm2",
       private_subnets: [subnet1],
-      ephemeral_net4: "1.1.1.2",
-      ephemeral_net6: NetAddr::IPv6Net.parse("2001:0db8:85a2::/64"),
+      ip4: "1.1.1.2",
+      ip6: "2001:db8:85a2::2",
       nics: [nic2])
 
     nic3 = instance_double(Nic,
@@ -43,8 +43,8 @@ RSpec.describe Prog::Test::Vm do
       private_ipv4: NetAddr::IPv4Net.parse("192.168.0.3/32"))
     vm3 = instance_double(Vm, id: "vm3",
       private_subnets: [subnet2],
-      ephemeral_net4: "1.1.1.3",
-      ephemeral_net6: NetAddr::IPv6Net.parse("2001:0db8:85a3::/64"),
+      ip4: "1.1.1.3",
+      ip6: "2001:db8:85a3::2",
       nics: [nic3])
 
     project = Project.create(name: "default")
@@ -210,7 +210,7 @@ RSpec.describe Prog::Test::Vm do
   end
 
   describe "#ping_vms_in_subnet" do
-    it "pings vm in same subnect and hops to next step" do
+    it "pings vm in same subnet and hops to next step" do
       expect(sshable).to receive(:cmd).with("ping -c 2 1.1.1.2")
       expect(sshable).to receive(:cmd).with("ping -c 2 192.168.0.2")
       expect(sshable).to receive(:cmd).with("ping -c 2 2001:db8:85a2::2")

@@ -35,7 +35,7 @@ RSpec.describe Prog::Test::ConnectedSubnets do
       expect(connected_subnets_test).to receive(:update_firewall_rules).with(ps_single, ps_multiple, config: :perform_tests_public_blocked)
       expect(connected_subnets_test).to receive(:update_firewall_rules).with(ps_multiple, ps_single, config: :perform_tests_public_blocked)
       expect(connected_subnets_test).to receive(:ps_multiple).and_return(ps_multiple).at_least(:once)
-      vm1 = instance_double(Vm, id: "1ae5f1c2-2f48-4eac-84e3-cfe35b2a9865", sshable: sshable, ephemeral_net4: NetAddr::IPv4Net.parse("0.0.0.0"), boot_image: "debian-12")
+      vm1 = instance_double(Vm, id: "1ae5f1c2-2f48-4eac-84e3-cfe35b2a9865", sshable: sshable, ip4: NetAddr::IPv4.parse("0.0.0.0"), boot_image: "debian-12")
       vm2 = instance_double(Vm, id: "3f2f4ed0-88b1-49c6-b66a-0d2ed4910ad0", sshable: sshable, boot_image: "almalinux-9")
       expect(ps_multiple).to receive(:vms).and_return([vm1, vm2]).at_least(:once)
       expect(sshable).to receive(:cmd).with("sudo yum install -y nc")
@@ -77,14 +77,14 @@ ExecStart=nc -l 8080 -6
     it "tests connection between the two subnets and fails" do
       expect(connected_subnets_test).to receive(:ps_multiple).and_return(ps_multiple).at_least(:once)
       expect(connected_subnets_test).to receive(:ps_single).and_return(ps_single).at_least(:once)
-      vm1 = instance_double(Vm, sshable: sshable, ephemeral_net4: NetAddr::IPv4Net.parse("0.0.0.0"))
+      vm1 = instance_double(Vm, sshable: sshable, ip4: NetAddr::IPv4.parse("0.0.0.0"))
       vm2 = instance_double(Vm, sshable: sshable)
       expect(ps_multiple).to receive(:vms).and_return([vm1, vm2]).at_least(:once)
       expect(ps_single).to receive(:vms).and_return([vm2]).at_least(:once)
       expect(sshable).to receive(:cmd).with("ping -c 2 google.com").at_least(:once)
       expect(sshable).to receive(:cmd).with("sudo systemctl start listening_ipv4.service")
       expect(sshable).to receive(:cmd).with("sudo systemctl stop listening_ipv6.service")
-      expect(connected_subnets_test).to receive(:test_connection).with(vm1.ephemeral_net4, vm2, should_fail: true, ipv4: true)
+      expect(connected_subnets_test).to receive(:test_connection).with(vm1.ip4, vm2, should_fail: true, ipv4: true)
 
       expect { connected_subnets_test.perform_tests_public_blocked }.to hop("perform_tests_private_ipv4")
     end

@@ -47,7 +47,7 @@ RSpec.describe MinioCluster do
   end
 
   it "returns connection strings properly" do
-    expect(mc.servers.first.vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
+    expect(mc.servers.first.vm).to receive(:ip4).and_return("1.1.1.1")
     expect(mc.ip4_urls).to eq(["https://1.1.1.1:9000"])
   end
 end

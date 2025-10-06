@@ -90,8 +90,8 @@ table ip6 pod_access {
   chain ingress_egress_control {
     type filter hook forward priority filter; policy drop;
     # allow access to the vm itself in order to not break the normal functionality of Clover and SSH
-    ip6 daddr #{vm.ephemeral_net6.nth(2)} ct state established,related,new counter accept
-    ip6 saddr #{vm.ephemeral_net6.nth(2)} ct state established,related,new counter accept
+    ip6 daddr #{vm.ip6} ct state established,related,new counter accept
+    ip6 saddr #{vm.ip6} ct state established,related,new counter accept
 
     # not allow new connections from internet but allow new connections from inside
     ip6 daddr #{vm.ephemeral_net6} ct state established,related counter accept
@@ -135,7 +135,7 @@ TEMPLATE
         private_subnet_cidr4: kubernetes_cluster.private_subnet.net4,
         private_subnet_cidr6: kubernetes_cluster.private_subnet.net6,
         node_ipv4: vm.private_ipv4,
-        node_ipv6: vm.ephemeral_net6.nth(2),
+        node_ipv6: vm.ip6,
         service_subnet_cidr6: random_ula_cidr
       }
       vm.sshable.d_run("init_kubernetes_cluster", "/home/ubi/kubernetes/bin/init-cluster", stdin: JSON.generate(params), log: false)
@@ -165,7 +165,7 @@ TEMPLATE
         certificate_key: cp_sshable.cmd("sudo kubeadm init phase upload-certs --upload-certs", log: false)[/certificate key:\n(.*)/, 1],
         discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command", log: false)[/discovery-token-ca-cert-hash (\S+)/, 1],
         node_ipv4: vm.private_ipv4,
-        node_ipv6: vm.ephemeral_net6.nth(2)
+        node_ipv6: vm.ip6
       }
       vm.sshable.d_run("join_control_plane", "kubernetes/bin/join-node", stdin: JSON.generate(params), log: false)
       nap 15
@@ -193,7 +193,7 @@ TEMPLATE
         join_token: cp_sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).tr("\n", ""),
         discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command", log: false)[/discovery-token-ca-cert-hash (\S+)/, 1],
         node_ipv4: vm.private_ipv4,
-        node_ipv6: vm.ephemeral_net6.nth(2)
+        node_ipv6: vm.ip6
       }
       vm.sshable.d_run("join_worker", "kubernetes/bin/join-node", stdin: JSON.generate(params), log: false)
       nap 15
