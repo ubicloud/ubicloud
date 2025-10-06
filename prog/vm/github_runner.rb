@@ -26,21 +26,24 @@ class Prog::Vm::GithubRunner < Prog::Base
   def pick_vm
     label_data = github_runner.label_data
     installation = github_runner.installation
+    skip_pool = installation.project.get_ff_skip_runner_pool || github_runner.spill_over_set?
 
     vm_size = if installation.premium_runner_enabled? || installation.free_runner_upgrade?
       "premium-#{label_data["vcpus"]}"
     else
       label_data["vm_size"]
     end
-    pool = installation.project.get_ff_skip_runner_pool ? nil : VmPool.where(
-      vm_size:,
-      boot_image: label_data["boot_image"],
-      location_id: Location::GITHUB_RUNNERS_ID,
-      storage_size_gib: label_data["storage_size_gib"],
-      storage_encrypted: true,
-      storage_skip_sync: true,
-      arch: label_data["arch"]
-    ).first
+    pool = unless skip_pool
+      VmPool.where(
+        vm_size:,
+        boot_image: label_data["boot_image"],
+        location_id: Location::GITHUB_RUNNERS_ID,
+        storage_size_gib: label_data["storage_size_gib"],
+        storage_encrypted: true,
+        storage_skip_sync: true,
+        arch: label_data["arch"]
+      ).first
+    end
 
     if (picked_vm = pool&.pick_vm)
       return picked_vm
@@ -52,7 +55,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     exclude_availability_zones = []
     alternative_families = []
     alien_ratio = github_runner.installation.project.get_ff_aws_alien_runners_ratio || 0
-    if x64? && rand < alien_ratio
+    if github_runner.spill_over_set? || (x64? && rand < alien_ratio)
       boot_image = Config.send(:"#{boot_image.tr("-", "_")}_aws_ami_version")
       location_id = Config.github_runner_aws_location_id
       size = Option.aws_instance_type_name("m7a", label_data["vcpus"])
@@ -204,6 +207,13 @@ class Prog::Vm::GithubRunner < Prog::Base
     end
 
     if is_high_util
+      should_spill_over = x64? && github_runner.installation.project.get_ff_spill_to_alien_runners
+      if should_spill_over
+        Clog.emit("spilled over runner") { {spilled_over_runner: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
+        github_runner.incr_spill_over
+        hop_allocate_vm
+      end
+
       Clog.emit("not allowed because of high utilization") { {reached_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
       nap rand(5..15)
     end
