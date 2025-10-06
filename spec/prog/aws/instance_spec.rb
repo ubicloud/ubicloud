@@ -341,16 +341,48 @@ usermod -L ubuntu
       expect { nx.create_instance }.to hop("wait_instance_created")
     end
 
-    it "recreates runner when encountering insufficient capacity error" do
-      client.stub_responses(:run_instances, Aws::EC2::Errors::InsufficientInstanceCapacity.new(nil, "Insufficient capacity for instance type"))
-      vm.update(unix_user: "runneradmin")
-      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
-      GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
-      expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
-      expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
-      expect(Clog).to receive(:emit).with("insufficient instance capacity").and_call_original
-      expect(Prog::Vm::GithubRunner).to receive(:assemble).and_call_original
-      expect { nx.create_instance }.to exit({"msg" => "exiting due to insufficient instance capacity"})
+    describe "when insufficient capacity error" do
+      before do
+        client.stub_responses(:run_instances, Aws::EC2::Errors::InsufficientInstanceCapacity.new(nil, "Insufficient capacity for instance type"))
+        vm.update(unix_user: "runneradmin")
+        installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
+        GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
+        expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
+        expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
+        expect(Clog).to receive(:emit).with("insufficient instance capacity").and_call_original
+      end
+
+      it "recreates runner when alternative_families is not set" do
+        expect(nx).to receive(:frame).and_return({}).at_least(:once)
+        expect(Prog::Vm::GithubRunner).to receive(:assemble).and_call_original
+        expect { nx.create_instance }.to exit({"msg" => "exiting due to insufficient instance capacity"})
+      end
+
+      it "recreates runner when alternative_families is empty" do
+        expect(nx).to receive(:frame).and_return({"alternative_families" => []}).at_least(:once)
+        expect(Prog::Vm::GithubRunner).to receive(:assemble).and_call_original
+        expect { nx.create_instance }.to exit({"msg" => "exiting due to insufficient instance capacity"})
+      end
+
+      it "creates runner with the first alternative when current_family is the initial family" do
+        expect(nx).to receive(:frame).and_return({"alternative_families" => ["m7i", "m6a"]}).at_least(:once)
+        expect { nx.create_instance }.to nap(0)
+        expect(vm.family).to eq("m7i")
+      end
+
+      it "creates runner with the next alternative when current_family is the first family" do
+        vm.update(family: "m7i")
+        expect(nx).to receive(:frame).and_return({"alternative_families" => ["m7i", "m6a"]}).at_least(:once)
+        expect { nx.create_instance }.to nap(0)
+        expect(vm.family).to eq("m6a")
+      end
+
+      it "recreates runner when current_family is the last family" do
+        vm.update(family: "m6a")
+        expect(nx).to receive(:frame).and_return({"alternative_families" => ["m7i", "m6a"]}).at_least(:once)
+        expect(Prog::Vm::GithubRunner).to receive(:assemble).and_call_original
+        expect { nx.create_instance }.to exit({"msg" => "exiting due to insufficient instance capacity"})
+      end
     end
 
     it "fails if not runner when encountering insufficient capacity error" do

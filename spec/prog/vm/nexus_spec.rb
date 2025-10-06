@@ -240,8 +240,9 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "hops to wait_aws_vm_started if vm nics are in wait state" do
+      expect(nx).to receive(:frame).and_return("alternative_families" => ["m7i", "m6a"])
       expect(nx).to receive(:vm).and_return(instance_double(Vm, id: "vm_id", nics: [instance_double(Nic, strand: instance_double(Strand, label: "wait"))])).at_least(:once)
-      expect(nx).to receive(:bud).with(Prog::Aws::Instance, {"subject_id" => "vm_id"}, :start)
+      expect(nx).to receive(:bud).with(Prog::Aws::Instance, {"subject_id" => "vm_id", "alternative_families" => ["m7i", "m6a"]}, :start)
       expect { nx.start_aws }.to hop("wait_aws_vm_started")
     end
   end
