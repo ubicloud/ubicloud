@@ -293,7 +293,7 @@ end
 #  display_state           | vm_display_state         | NOT NULL DEFAULT 'creating'::vm_display_state
 #  name                    | text                     | NOT NULL
 #  boot_image              | text                     | NOT NULL
-#  local_vetho_ip          | text                     |
+#  local_vetho_ip          | cidr                     |
 #  ip4_enabled             | boolean                  | NOT NULL DEFAULT false
 #  family                  | text                     | NOT NULL
 #  cores                   | integer                  | NOT NULL
