@@ -255,7 +255,7 @@ module Scheduling::Allocator
       update_args = {
         vm_host_id: vm_host.id,
         ephemeral_net6: vm_host.ip6_random_vm_network.to_s,
-        local_vetho_ip: vm_host.veth_pair_random_ip4_addr.to_s,
+        local_vetho_ip: vm_host.veth_pair_random_ip4_addr,
         allocated_at: Time.now
       }
       update_args[:family] = vm_host.family if vm.family != "burstable"

@@ -299,7 +299,7 @@ RSpec.describe Prog::Vm::Nexus do
         vm.ephemeral_net6 = "fe80::/64"
         vm.unix_user = "test_user"
         vm.public_key = "test_ssh_key"
-        vm.local_vetho_ip = "169.254.0.0"
+        vm.local_vetho_ip = NetAddr::IPv4Net.parse("169.254.0.0/32")
         ps = instance_double(PrivateSubnet, location_id: Location::HETZNER_FSN1_ID, net4: NetAddr::IPv4Net.parse("10.0.0.0/26"), random_private_ipv6: "fd10:9b0b:6b4b:8fbb::/64")
         nic = Nic.new(private_ipv6: "fd10:9b0b:6b4b:8fbb::/64", private_ipv4: "10.0.0.3/32", mac: "5a:0f:75:80:c3:64")
         pci = PciDevice.new(slot: "01:00.0", iommu_group: 23)
@@ -329,7 +329,7 @@ RSpec.describe Prog::Vm::Nexus do
             "max_vcpus" => 2,
             "cpu_topology" => "2:1:1:1",
             "mem_gib" => 8,
-            "local_ipv4" => "169.254.0.0",
+            "local_ipv4" => "169.254.0.0/32",
             "nics" => [["fd10:9b0b:6b4b:8fbb::/64", "10.0.0.3/32", "tap4ncdd56m", "5a:0f:75:80:c3:64", "10.0.0.1/26"]],
             "swap_size_bytes" => nil,
             "pci_devices" => [["01:00.0", 23]],
