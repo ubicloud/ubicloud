@@ -200,6 +200,7 @@ class Project < Sequel::Model
     :postgres_lantern,
     :private_locations,
     :skip_runner_pool,
+    :spill_to_alien_runners,
     :visible_locations,
     :vm_public_ssh_keys
   )
