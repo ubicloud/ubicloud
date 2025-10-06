@@ -45,7 +45,7 @@ else
     PostgresServer,
     Vm.where(~Sshable.where(id: Sequel[:vm][:id]).exists),
     MinioServer,
-    GithubRunner,
+    GithubRunner.exclude(ready_at: nil),
     VmHostSlice,
     LoadBalancerVmPort,
     KubernetesCluster,
