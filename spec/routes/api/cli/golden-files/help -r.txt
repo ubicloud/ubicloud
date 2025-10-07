@@ -762,7 +762,7 @@ Post Commands:
 List SSH public keys
 
 Usage:
-    ubi sk (sk-name | sk-id) list [options]
+    ubi sk list [options]
 
 Options:
     -N, --no-headers                 do not show headers
