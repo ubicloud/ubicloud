@@ -77,7 +77,7 @@ ubi ps (location/ps-name | ps-id) rename new-name
 ubi ps (location/ps-name | ps-id) show [options]
 ubi sk command [...]
 ubi sk (sk-name | sk-id) post-command [...]
-ubi sk (sk-name | sk-id) list [options]
+ubi sk list [options]
 ubi sk sk-name create public-key
 ubi sk (sk-name | sk-id) destroy [options]
 ubi sk (sk-id | sk-name) rename new-name
