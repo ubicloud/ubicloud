@@ -14,7 +14,7 @@ RSpec.describe Clover do
 
   it "can navigate to management page from project page" do
     visit project.path
-    click_link "Manage"
+    click_link "Manage SSH Public Keys"
     expect(page.title).to eq "Ubicloud - SSH Public Keys"
   end
 
