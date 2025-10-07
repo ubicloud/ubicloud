@@ -1,0 +1,50 @@
+<% if @vm_init_script.new?
+  action_type = "Register"
+  action = "#{@project.path}/vm-init-script"
+else
+  action_type = "Update"
+  if @vm_init_script.errors.empty?
+    right_items = [part("components/delete_button", confirmation: @vm_init_script.name, url: path(@vm_init_script), redirect: "#{@project.path}/vm-init-script")]
+  end
+end
+@page_title = "#{action_type} VM Init Script"
+back = "#{@project.path}/vm-init-script" %>
+
+<%== part(
+  "components/page_header",
+  title: @page_title,
+  back:,
+  right_items:,
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project.name, @project.path],
+    ["VM Init Scripts", back],
+    %W[#{action_type} #]
+  ]
+) %>
+
+<% form(action:, method: :post) do |f| %>
+  <div class="grid gap-6">
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="space-y-12">
+          <div class="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+            <div class="col-span-full">
+              <%== part("components/form/text", name: "name", label: "Name", value: @vm_init_script.name, attributes: {placeholder: "vm-init-script-name", required: true}) %>
+            </div>
+
+            <div class="col-span-full">
+              <%== part("components/form/textarea", name: "script", label: "Script", value: @vm_init_script.script, attributes: {placeholder: "init script contents", required: true}) %>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="px-4 py-5 sm:p-6">
+        <div class="flex items-center justify-end gap-x-6">
+          <a href="<%= @project.path %>/vm-init-script" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+          <%== part("components/form/submit_button", text: action_type) %>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>

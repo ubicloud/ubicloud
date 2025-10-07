@@ -5,8 +5,10 @@
 --confirm foo lb eu-central-h1/test-lb destroy
 --confirm foo pg eu-central-h1/test-pg destroy
 --confirm foo ps eu-central-h1/test-ps destroy
+--confirm 1nnha52xhzjy1p1dqc550pasfd vi 1nnha52xhzjy1p1dqc550pasfd destroy
 --confirm sk684jk5sa027g4mmr3rrwmakr sk sk684jk5sa027g4mmr3rrwmakr destroy
 --confirm foo sk spk destroy
+--confirm foo vi vis destroy
 --confirm foo vm eu-central-h1/test-vm destroy
 ai api-key badc0j48r8kj4nharh6yagf3eb show
 fw eu-central-h1/default-eu-central-h1-default add-rule foo

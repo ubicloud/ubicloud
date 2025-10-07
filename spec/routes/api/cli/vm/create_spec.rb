@@ -15,6 +15,8 @@ RSpec.describe Clover, "cli vm create" do
     expect(ps).to be_a PrivateSubnet
     expect(vm.name).to eq "test-vm"
     expect(vm.public_key).to eq "a a"
+    expect(vm.init_script_id).to be_nil
+    expect(vm.init_script_args).to be_nil
     expect(vm.display_location).to eq "eu-central-h1"
     expect(vm.display_size).to eq "standard-2"
     expect(vm.boot_image).to eq Config.default_boot_image_name
@@ -24,11 +26,12 @@ RSpec.describe Clover, "cli vm create" do
     expect(body).to eq "VM created with id: #{vm.ubid}\n"
   end
 
-  it "creates vm registered SSH public key" do
+  it "creates vm with registered SSH public key and init script" do
     expect(Vm.count).to eq 0
     expect(PrivateSubnet.count).to eq 0
     cli(%w[sk spk create] << "a a")
-    body = cli(%w[vm eu-central-h1/test-vm create spk])
+    cli(%w[vi vis create] << 'cmd "$1"')
+    body = cli(%w[vm eu-central-h1/test-vm create -i vis -I arg1 spk])
     expect(Vm.count).to eq 1
     expect(PrivateSubnet.count).to eq 1
     vm = Vm.first
@@ -37,6 +40,8 @@ RSpec.describe Clover, "cli vm create" do
     expect(ps).to be_a PrivateSubnet
     expect(vm.name).to eq "test-vm"
     expect(vm.public_key).to eq "a a"
+    expect(vm.init_script_id).to eq VmInitScript.first.id
+    expect(vm.init_script_args).to eq "arg1"
     expect(vm.display_location).to eq "eu-central-h1"
     expect(vm.display_size).to eq "standard-2"
     expect(vm.boot_image).to eq Config.default_boot_image_name
@@ -46,16 +51,20 @@ RSpec.describe Clover, "cli vm create" do
     expect(body).to eq "VM created with id: #{vm.ubid}\n"
   end
 
-  it "creates vm with all options, specifying private subnet by id" do
+  it "creates vm with all options, specifying private subnet and init script by id" do
     expect(Vm.count).to eq 0
     ps = PrivateSubnet.create(project_id: @project.id, name: "test-ps", location_id: Location[name: "hetzner-hel1"].id, net6: "fe80::/64", net4: "192.168.0.0/24")
-    body = cli(%W[vm eu-north-h1/test-vm2 create -6 -b debian-12 -u foo -s standard-4 -S 80 -p #{ps.ubid}] << "b b")
+    cli(%w[vi vis create] << 'cmd "$1"')
+    init_script = VmInitScript.first
+    body = cli(%W[vm eu-north-h1/test-vm2 create -6 -b debian-12 -u foo -s standard-4 -S 80 -p #{ps.ubid} -i #{init_script.ubid}] << "b b")
     vm = Vm.first
     expect(Vm.count).to eq 1
     expect(PrivateSubnet.count).to eq 1
     expect(vm).to be_a Vm
     expect(vm.name).to eq "test-vm2"
     expect(vm.public_key).to eq "b b"
+    expect(vm.init_script_id).to eq init_script.id
+    expect(vm.init_script_args).to be_nil
     expect(vm.display_location).to eq "eu-north-h1"
     expect(vm.display_size).to eq "standard-4"
     expect(vm.boot_image).to eq "debian-12"
