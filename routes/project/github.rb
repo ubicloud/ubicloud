@@ -28,7 +28,7 @@ class Clover
     end
 
     r.on :ubid_uuid do |id|
-      next unless (@installation = GithubInstallation[id:, project_id: @project.id])
+      next unless (@installation = @project.github_installations_dataset.with_pk(id))
 
       r.get web?, "setting" do
         view "github/setting"
@@ -64,7 +64,7 @@ class Clover
         end
 
         r.delete :ubid_uuid do |id|
-          next unless (runner = GithubRunner[id:, installation_id: GithubInstallation.select(:id).where(project_id: @project.id)])
+          next unless (runner = @installation.runners_dataset.with_pk(id))
 
           DB.transaction do
             runner.incr_skip_deregistration
@@ -91,7 +91,7 @@ class Clover
         end
 
         r.delete :ubid_uuid do |id|
-          next unless (entry = GithubCacheEntry[id:, repository_id: GithubRepository.select(:id).where(installation_id: GithubInstallation.select(:id).where(project_id: @project.id))])
+          next unless (entry = @installation.cache_entries_dataset.with_pk(id))
 
           DB.transaction do
             entry.destroy
