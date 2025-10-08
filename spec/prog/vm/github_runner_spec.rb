@@ -351,6 +351,17 @@ RSpec.describe Prog::Vm::GithubRunner do
         expect(runner.spill_over_set?).to be(false)
       end
 
+      it "waits if utilization is high, spill over enabled, and waited enough but spill vcpus limit exceeded" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        project.set_ff_spill_to_alien_runners(true)
+        runner.update(created_at: now - 40)
+        expect(Config).to receive(:github_runner_aws_spill_vcpu_capacity).and_return(10)
+        create_vm(vcpus: 16, boot_image: Config.github_ubuntu_2204_aws_ami_version)
+
+        expect { nx.wait_concurrency_limit }.to nap
+        expect(runner.spill_over_set?).to be(false)
+      end
+
       it "allocates if utilization is high but spill over enabled and waited enough" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         project.set_ff_spill_to_alien_runners(true)
