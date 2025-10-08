@@ -138,15 +138,6 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(nx).to receive(:register_deadline)
       expect(nx).to receive(:incr_install_metrics_server)
       expect(nx).to receive(:incr_sync_worker_mesh)
-      expect(nx).not_to receive(:incr_install_csi)
-      expect { nx.start }.to hop("create_load_balancers")
-    end
-
-    it "also increments install_csi when its feature flag is set" do
-      customer_project.set_ff_install_csi(true)
-      expect(nx).to receive(:register_deadline)
-      expect(nx).to receive(:incr_install_metrics_server)
-      expect(nx).to receive(:incr_sync_worker_mesh)
       expect(nx).to receive(:incr_install_csi)
       expect { nx.start }.to hop("create_load_balancers")
     end
