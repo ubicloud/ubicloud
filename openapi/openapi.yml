@@ -86,6 +86,103 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
+  '/project/{project_id}/github':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: getGithubInstallations
+      summary: Return the list of GitHub installations in the project
+      responses:
+        '200':
+          $ref: '#/components/responses/GithubInstallations'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - GitHub
+  '/project/{project_id}/github/{github_installation_reference}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/github_installation_reference'
+    get:
+      operationId: getGithubInstallation
+      summary: Return information for a single GitHub installation
+      responses:
+        '200':
+          $ref: '#/components/responses/GithubInstallation'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - GitHub
+  '/project/{project_id}/github/{github_installation_reference}/repository':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/github_installation_reference'
+    get:
+      operationId: getGithubInstallationRepositories
+      summary: Return repositories for a single GitHub installation in the project
+      responses:
+        '200':
+          $ref: '#/components/responses/GithubRepositories'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - GitHub
+  '/project/{project_id}/github/{github_installation_reference}/repository/{github_repository_reference}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/github_installation_reference'
+      - $ref: '#/components/parameters/github_repository_reference'
+    get:
+      operationId: getGithubRepository
+      summary: Return information for a single GitHub repository for an installation in the project
+      responses:
+        '200':
+          $ref: '#/components/responses/GithubRepository'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - GitHub
+  '/project/{project_id}/github/{github_installation_reference}/repository/{github_repository_reference}/cache':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/github_installation_reference'
+      - $ref: '#/components/parameters/github_repository_reference'
+    get:
+      operationId: getGithubCacheEntries
+      summary: Return information for a all cache entries for a GitHub repository for an installation in the project
+      responses:
+        '200':
+          $ref: '#/components/responses/GithubCacheEntries'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - GitHub
+  '/project/{project_id}/github/{github_installation_reference}/repository/{github_repository_reference}/cache/{github_cache_entry_id}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/github_installation_reference'
+      - $ref: '#/components/parameters/github_repository_reference'
+      - $ref: '#/components/parameters/github_cache_entry_id'
+    get:
+      operationId: getGithubCacheEntry
+      summary: Return information for a single cache entry for a GitHub repository for an installation in the project
+      responses:
+        '200':
+          $ref: '#/components/responses/GithubCacheEntry'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - GitHub
+    delete:
+      operationId: deleteGithubCacheEntry
+      summary: Delete a cache entry for a GitHub repository for an installation in the project
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - GitHub
   '/project/{project_id}/inference-api-key':
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -1889,6 +1986,42 @@ components:
         type: string
         example: fraz0q3vbrpa7pkg7zbmah9csn
         pattern: '^fr[0-9a-hj-km-np-tv-z]{24}$'
+    github_cache_entry_id:
+      description: GitHub cache entry ID
+      examples:
+        id:
+          value: gen30gjk1d1e2jj34v9x0dq4rp
+        name:
+          value: github-repository-name
+      in: path
+      name: github_cache_entry_id
+      required: true
+      schema:
+        $ref: '#/components/schemas/Reference'
+    github_installation_reference:
+      description: GitHub installation ID or name
+      examples:
+        id:
+          value: gin30gjk1d1e2jj34v9x0dq4rp
+        name:
+          value: github-installation-name
+      in: path
+      name: github_installation_reference
+      required: true
+      schema:
+        $ref: '#/components/schemas/Reference'
+    github_repository_reference:
+      description: GitHub repository ID or name
+      examples:
+        id:
+          value: gpn30gjk1d1e2jj34v9x0dq4rp
+        name:
+          value: github-repository-name
+      in: path
+      name: github_repository_reference
+      required: true
+      schema:
+        $ref: '#/components/schemas/Reference'
     inference_api_key_id:
       description: ID of the inference API key
       in: path
@@ -2237,6 +2370,67 @@ components:
         - provider
         - path
         - ui_name
+    GithubCacheEntry:
+      type: object
+      properties:
+        installation_name:
+          description: name of the GitHub installation containing the repository containing the cache entry
+          type: string
+        repository_name:
+          description: name of the GitHub repository containing the cache entry
+          type: string
+        id:
+          description: ID of the GitHub cache entry
+          type: string
+          example: gefg7td83em22qfw9pq5xyfqb7
+          pattern: '^ge[0-9a-hj-km-np-tv-z]{24}$'
+        key:
+          description: GitHub cache entry key
+          type: string
+        size:
+          description: Size of the GitHub cache entry in bytes
+          type: integer
+      additionalProperties: false
+      required:
+        - id
+        - installation_name
+        - repository_name
+        - key
+        - size
+    GithubRepository:
+      type: object
+      properties:
+        installation_name:
+          description: Name of the GitHub installation containing the repository
+          type: string
+        id:
+          description: ID of the GitHub repository
+          type: string
+          example: gpfg7td83em22qfw9pq5xyfqb7
+          pattern: '^gp[0-9a-hj-km-np-tv-z]{24}$'
+        name:
+          description: Name of the GitHub repository
+          type: string
+      additionalProperties: false
+      required:
+        - id
+        - installation_name
+        - name
+    GithubInstallation:
+      type: object
+      properties:
+        id:
+          description: ID of the GitHub installation
+          type: string
+          example: g1fg7td83em22qfw9pq5xyfqb7
+          pattern: '^g1[0-9a-hj-km-np-tv-z]{24}$'
+        name:
+          description: Name of the GitHub installation (GitHub user/organization name)
+          type: string
+      additionalProperties: false
+      required:
+        - id
+        - name
     Firewall:
       type: object
       properties:
@@ -2845,6 +3039,75 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/FirewallRule'
+    GithubCacheEntries:
+      description: A list of GitHub Cache Entries
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GithubCacheEntry'
+            additionalProperties: false
+            required:
+              - count
+              - items
+    GithubCacheEntry:
+      description: A GitHub Cache Entry
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GithubCacheEntry'
+    GithubRepositories:
+      description: A list of GitHub Repositories
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GithubRepository'
+            additionalProperties: false
+            required:
+              - count
+              - items
+    GithubRepository:
+      description: A GitHub Repository
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GithubRepository'
+    GithubInstallation:
+      description: A GitHub Installation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GithubInstallation'
+    GithubInstallations:
+      description: A list of GitHub Installations
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GithubInstallation'
+            additionalProperties: false
+            required:
+              - count
+              - items
     SshPublicKey:
       description: An SSH Public Key
       content:
@@ -3246,5 +3509,7 @@ tags:
     name: Kubernetes Cluster
   - description: SSH Public Key Operations
     name: SSH Public Key
+  - description: GitHub Operations
+    name: GitHub
 security:
   - BearerAuth: []

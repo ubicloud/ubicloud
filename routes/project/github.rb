@@ -10,11 +10,17 @@ class Clover
 
     authorize("Project:github", @project)
 
-    r.get web? do
-      if (installation = @project.github_installations_dataset.first)
-        r.redirect installation, "/runner"
+    r.get true do
+      ds = @project.github_installations_dataset
+
+      if api?
+        paginated_result(ds, Serializers::GithubInstallation)
+      else
+        if (installation = ds.first)
+          r.redirect installation, "/runner"
+        end
+        view "github/index"
       end
-      view "github/index"
     end
 
     r.get web?, "create" do
@@ -27,8 +33,18 @@ class Clover
       r.redirect "https://github.com/apps/#{Config.github_app_name}/installations/new", 302
     end
 
-    r.on :ubid_uuid do |id|
-      next unless (@installation = @project.github_installations_dataset.with_pk(id))
+    r.on GITHUB_INSTALLATION_NAME_OR_UBID do |installation_name, installation_id|
+      installation = if installation_name
+        @project.github_installations_dataset.first(name: installation_name)
+      else
+        @project.github_installations_dataset.with_pk(installation_id)
+      end
+      check_found_object(installation)
+      @installation = installation
+
+      r.get api? do
+        Serializers::GithubInstallation.serialize(installation)
+      end
 
       r.get web?, "setting" do
         view "github/setting"
@@ -76,29 +92,59 @@ class Clover
         end
       end
 
-      r.on web?, "cache" do
-        r.get true do
-          @entries_by_repo = @installation
-            .cache_entries_dataset
-            .exclude(committed_at: nil)
-            .eager(:repository)
-            .reverse(:created_at)
-            .all
-            .group_by { it.repository.ubid }
-          @quota_per_repo = "#{@installation.cache_storage_gib} GB"
+      r.get web?, "cache" do
+        @entries_by_repo = @installation
+          .cache_entries_dataset
+          .exclude(committed_at: nil)
+          .eager(:repository)
+          .reverse(:created_at)
+          .all
+          .group_by { it.repository.ubid }
 
-          view "github/cache"
+        @quota_per_repo = "#{@installation.cache_storage_gib} GB"
+        view "github/cache"
+      end
+
+      r.on "repository" do
+        r.get api? do
+          paginated_result(installation.repositories_dataset.order(:name), Serializers::GithubRepository, installation:)
         end
 
-        r.delete :ubid_uuid do |id|
-          next unless (entry = @installation.cache_entries_dataset.with_pk(id))
-
-          DB.transaction do
-            entry.destroy
-            audit_log(entry, "destroy")
+        r.on GITHUB_REPOSITORY_NAME_OR_UBID do |repository_name, repository_id|
+          repository = if repository_name
+            installation.repositories_dataset.first(name: "#{installation.name}/#{repository_name}")
+          else
+            installation.repositories_dataset.with_pk(repository_id)
           end
-          flash["notice"] = "Cache '#{entry.key}' deleted."
-          204
+          check_found_object(repository)
+
+          r.get api? do
+            Serializers::GithubRepository.serialize(repository, installation:)
+          end
+
+          r.on "cache" do
+            r.get api? do
+              paginated_result(repository.cache_entries_dataset.order(:id), Serializers::GithubCacheEntry, installation:, repository:)
+            end
+
+            r.is :ubid_uuid do |id|
+              entry = repository.cache_entries_dataset.with_pk(id)
+              check_found_object(entry)
+
+              r.get api? do
+                Serializers::GithubCacheEntry.serialize(entry, installation:, repository:)
+              end
+
+              r.delete do
+                DB.transaction do
+                  entry.destroy
+                  audit_log(entry, "destroy")
+                end
+                flash["notice"] = "Cache '#{entry.key}' deleted." if web?
+                204
+              end
+            end
+          end
         end
       end
     end

@@ -8,7 +8,7 @@ RSpec.describe Clover, "github" do
   let(:project) { user.create_project_with_default_policy("project-1") }
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
   let(:installation) { GithubInstallation.create(installation_id: 123, name: "test-user", type: "User", project_id: project.id, created_at: Time.now - 10 * 24 * 60 * 60) }
-  let(:repository) { GithubRepository.create(name: "test-repo", installation_id: installation.id) }
+  let(:repository) { GithubRepository.create(name: "test-user/test-repo", installation_id: installation.id) }
 
   before do
     login(user.email)
@@ -328,7 +328,7 @@ RSpec.describe Clover, "github" do
 
       btn = find "#entry-#{entry.ubid} .delete-btn"
       page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-      expect(page.status_code).to eq(404)
+      expect(page.status_code).to eq(204)
     end
   end
 end
