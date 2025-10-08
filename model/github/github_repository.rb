@@ -14,10 +14,15 @@ class GithubRepository < Sequel::Model
 
   plugin ResourceMethods, encrypted_columns: :secret_key
   plugin SemaphoreMethods, :destroy
+  dataset_module Pagination
 
   CACHE_SIZE_LIMIT = 10 * 1024 * 1024 * 1024 # 10GB
 
   alias_method :bucket_name, :ubid
+
+  def repository_name
+    name.split("/", 2).last
+  end
 
   def blob_storage_client
     @blob_storage_client ||= s3_client(access_key, secret_key)
