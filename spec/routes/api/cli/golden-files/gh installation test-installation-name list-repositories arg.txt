@@ -1,0 +1,9 @@
+! Invalid number of arguments for gh installation list-repositories subcommand (requires: 0, given: 1)
+
+List GitHub repositories for an installation
+
+Usage:
+    ubi gh installation installation-name list-repositories [options]
+
+Options:
+    -N, --no-headers                 do not show headers
