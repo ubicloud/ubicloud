@@ -83,12 +83,12 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     return false unless load_balancer.dns_zone
 
     load_balancer.vms_to_dns.each do |vm|
-      if load_balancer.ipv4_enabled? && vm.ip4
-        return true unless load_balancer.dns_zone.records_dataset.find { it.name == load_balancer.hostname + "." && it.type == "A" && it.data == vm.ip4.to_s }
+      if load_balancer.ipv4_enabled? && vm.ip4_string
+        return true unless load_balancer.dns_zone.records_dataset.find { it.name == load_balancer.hostname + "." && it.type == "A" && it.data == vm.ip4_string }
       end
 
       if load_balancer.ipv6_enabled?
-        return true unless load_balancer.dns_zone.records_dataset.find { it.name == load_balancer.hostname + "." && it.type == "AAAA" && it.data == vm.ip6.to_s }
+        return true unless load_balancer.dns_zone.records_dataset.find { it.name == load_balancer.hostname + "." && it.type == "AAAA" && it.data == vm.ip6_string }
       end
     end
 
@@ -170,12 +170,12 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
     load_balancer.vms_to_dns.each do |vm|
       # Insert IPv4 record if stack is ipv4 or dual, and vm has IPv4
-      if load_balancer.ipv4_enabled? && vm.ip4
+      if load_balancer.ipv4_enabled? && vm.ip4_string
         load_balancer.dns_zone&.insert_record(
           record_name: load_balancer.hostname,
           type: "A",
           ttl: 10,
-          data: vm.ip4.to_s
+          data: vm.ip4_string
         )
       end
 
@@ -185,7 +185,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
           record_name: load_balancer.hostname,
           type: "AAAA",
           ttl: 10,
-          data: vm.ip6.to_s
+          data: vm.ip6_string
         )
       end
     end

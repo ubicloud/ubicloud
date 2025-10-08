@@ -60,7 +60,7 @@ class PostgresResource < Sequel::Model
       return "#{name}.#{hostname_suffix}" if hostname_version == "v1"
       "#{name}.#{ubid}.#{hostname_suffix}"
     else
-      representative_server&.vm&.ip4&.to_s
+      representative_server&.vm&.ip4_string
     end
   end
 

@@ -58,7 +58,7 @@ ExecStart=nc -l 8080 -6
     vm2.sshable.cmd("ping -c 2 google.com")
 
     vm1.sshable.cmd("sudo systemctl start listening_ipv4.service")
-    test_connection(vm1.ip4, vm2, should_fail: true, ipv4: true, hop_method_symbol: :hop_perform_tests_public_ipv4)
+    test_connection(vm1.ip4_string, vm2, should_fail: true, ipv4: true, hop_method_symbol: :hop_perform_tests_public_ipv4)
     fail_test "#{vm2.inhost_name} should not be able to connect to #{vm1.inhost_name} on port 8080"
   end
 
@@ -72,8 +72,8 @@ ExecStart=nc -l 8080 -6
       nap 5
     end
 
-    test_connection(vm1.ip4, vm2, should_fail: false, ipv4: true, hop_method_symbol: nil)
-    test_connection(vm1.ip4, vm_outside, should_fail: true, ipv4: true, hop_method_symbol: :hop_perform_tests_public_ipv6)
+    test_connection(vm1.ip4_string, vm2, should_fail: false, ipv4: true, hop_method_symbol: nil)
+    test_connection(vm1.ip4_string, vm_outside, should_fail: true, ipv4: true, hop_method_symbol: :hop_perform_tests_public_ipv6)
 
     fail_test "#{vm_outside.inhost_name} should not be able to connect to #{vm1.inhost_name} on port 8080"
   end
@@ -90,9 +90,9 @@ ExecStart=nc -l 8080 -6
 
     vm1.sshable.cmd("sudo systemctl stop listening_ipv4.service")
     vm1.sshable.cmd("sudo systemctl start listening_ipv6.service")
-    test_connection(vm1.ip6, vm2, should_fail: false, ipv4: false, hop_method_symbol: nil)
-    test_connection(vm1.ip6, vm_outside, should_fail: true, ipv4: false, hop_method_symbol: :hop_perform_tests_private_ipv4)
-    fail_test "#{vm_outside.inhost_name} should not be able to connect to #{vm1.ip6} on port 8080"
+    test_connection(vm1.ip6_string, vm2, should_fail: false, ipv4: false, hop_method_symbol: nil)
+    test_connection(vm1.ip6_string, vm_outside, should_fail: true, ipv4: false, hop_method_symbol: :hop_perform_tests_private_ipv4)
+    fail_test "#{vm_outside.inhost_name} should not be able to connect to #{vm1.ip6_string} on port 8080"
   end
 
   label def perform_tests_private_ipv4
@@ -108,7 +108,7 @@ ExecStart=nc -l 8080 -6
     vm1.sshable.cmd("sudo systemctl stop listening_ipv6.service")
     vm1.sshable.cmd("sudo systemctl start listening_ipv4.service")
     test_connection(vm1.nics.first.private_ipv4.nth(0), vm2, should_fail: false, ipv4: true, hop_method_symbol: nil)
-    test_connection(vm1.ip4, vm_outside, should_fail: true, ipv4: true, hop_method_symbol: :hop_perform_tests_private_ipv6)
+    test_connection(vm1.ip4_string, vm_outside, should_fail: true, ipv4: true, hop_method_symbol: :hop_perform_tests_private_ipv6)
     fail_test "#{vm_outside.inhost_name} should not be able to connect to #{vm1.nics.first.private_ipv4.nth(0)} on port 8080"
   end
 
@@ -124,9 +124,9 @@ ExecStart=nc -l 8080 -6
 
     vm1.sshable.cmd("sudo systemctl stop listening_ipv4.service")
     vm1.sshable.cmd("sudo systemctl start listening_ipv6.service")
-    test_connection(vm1.private_ipv6, vm2, should_fail: false, ipv4: false, hop_method_symbol: nil)
-    test_connection(vm1.ip6, vm2, should_fail: true, ipv4: false, hop_method_symbol: :hop_finish)
-    fail_test "#{vm2.inhost_name} should not be able to connect to #{vm1.ip6} on port 8080"
+    test_connection(vm1.private_ipv6.to_s, vm2, should_fail: false, ipv4: false, hop_method_symbol: nil)
+    test_connection(vm1.ip6_string, vm2, should_fail: true, ipv4: false, hop_method_symbol: :hop_finish)
+    fail_test "#{vm2.inhost_name} should not be able to connect to #{vm1.ip6_string} on port 8080"
   end
 
   label def finish
@@ -147,9 +147,9 @@ ExecStart=nc -l 8080 -6
     when :perform_tests_none
       nil
     when :perform_tests_public_ipv4
-      {cidr: vm2.ip4.to_s, port_range: Sequel.pg_range(8080..8080)}
+      {cidr: vm2.ip4_string, port_range: Sequel.pg_range(8080..8080)}
     when :perform_tests_public_ipv6
-      {cidr: vm2.ip6.to_s, port_range: Sequel.pg_range(8080..8080)}
+      {cidr: vm2.ip6_string, port_range: Sequel.pg_range(8080..8080)}
     when :perform_tests_private_ipv4
       {cidr: vm2.nics.first.private_ipv4.to_s, port_range: Sequel.pg_range(8080..8080)}
     when :perform_tests_private_ipv6

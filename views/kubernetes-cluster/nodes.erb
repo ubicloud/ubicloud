@@ -2,7 +2,7 @@
 
 @nodes +=
   @kc.cp_vms.map do |vm|
-    { name: vm.name, role: "Control Plane", state: vm.display_state, hostname: vm.ip4.to_s }
+    { name: vm.name, role: "Control Plane", state: vm.display_state, hostname: vm.ip4_string }
   end
 
 @nodes +=
@@ -10,7 +10,7 @@
     .nodepools_dataset
     .eager(:vms)
     .flat_map do |np|
-      np.vms.map { |vm| { name: vm.name, role: "Worker", state: vm.display_state, hostname: vm.ip4.to_s } }
+      np.vms.map { |vm| { name: vm.name, role: "Worker", state: vm.display_state, hostname: vm.ip4_string } }
     end %>
 
 <div class="p-6">

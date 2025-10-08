@@ -243,7 +243,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
   describe "#rewrite_dns_records" do
     it "rewrites the dns records" do
-      vms = [instance_double(Vm, ip4: NetAddr::IPv4.parse("192.168.1.0"), ip6: NetAddr::IPv6.parse("fd10:9b0b:6b4b:8fb0::2"))]
+      vms = [instance_double(Vm, ip4_string: "192.168.1.0", ip6_string: "fd10:9b0b:6b4b:8fb0::2")]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
@@ -261,14 +261,14 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     end
 
     it "does not rewrite dns records if no dns zone" do
-      vms = [instance_double(Vm, ip4: NetAddr::IPv4.parse("192.168.1.0"), ip6: NetAddr::IPv6.parse("fd10:9b0b:6b4b:8fb0::2"))]
+      vms = [instance_double(Vm, ip4_string: "192.168.1.0", ip6_string: "fd10:9b0b:6b4b:8fb0::2")]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(DnsRecord).not_to receive(:create)
       expect { nx.rewrite_dns_records }.to hop("wait")
     end
 
     it "does not create dns record if ephemeral_net4 doesn't exist" do
-      vms = [instance_double(Vm, ip4: nil, ip6: NetAddr::IPv6.parse("fd10:9b0b:6b4b:8fb0::2"))]
+      vms = [instance_double(Vm, ip4_string: nil, ip6_string: "fd10:9b0b:6b4b:8fb0::2")]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
@@ -279,7 +279,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
     it "does not create ipv4 dns record if stack is ipv6" do
       nx.load_balancer.update(stack: "ipv6")
-      vms = [instance_double(Vm, ip4: nil, ip6: NetAddr::IPv6.parse("fd10:9b0b:6b4b:8fb0::2"))]
+      vms = [instance_double(Vm, ip4_string: nil, ip6_string: "fd10:9b0b:6b4b:8fb0::2")]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
@@ -290,7 +290,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
     it "does not create ipv6 dns record if stack is ipv4" do
       nx.load_balancer.update(stack: "ipv4")
-      vms = [instance_double(Vm, ip4: NetAddr::IPv4.parse("192.168.1.0"), ip6: nil)]
+      vms = [instance_double(Vm, ip4_string: "192.168.1.0", ip6: nil)]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
@@ -302,21 +302,21 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
   describe ".need_to_rewrite_dns_records?" do
     it "returns true if dns record is missing for ipv4" do
-      vms = [instance_double(Vm, ip4: NetAddr::IPv4.parse("192.168.1.0"), ip6: nil)]
+      vms = [instance_double(Vm, ip4_string: "192.168.1.0")]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(nx.need_to_rewrite_dns_records?).to be true
     end
 
     it "returns true if dns record is missing for ipv6" do
-      vms = [instance_double(Vm, ip4: nil, ip6: NetAddr::IPv6.parse("fd10:9b0b:6b4b:8fb0::2"))]
+      vms = [instance_double(Vm, ip4_string: nil, ip6_string: "fd10:9b0b:6b4b:8fb0::2")]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(nx.need_to_rewrite_dns_records?).to be true
     end
 
     it "returns false if dns record is present for ipv4 and lb is not ipv6 enabled" do
-      vms = [instance_double(Vm, ip4: NetAddr::IPv4.parse("192.168.1.0"), ip6: nil)]
+      vms = [instance_double(Vm, ip4: "192.168.1.0", ip4_string: "192.168.1.0", ip6: nil, ip6_string: nil)]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(nx.load_balancer).to receive(:ipv6_enabled?).and_return(false)
@@ -326,7 +326,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     end
 
     it "returns false if dns record is present for ipv6 and lb is not ipv4 enabled" do
-      vms = [instance_double(Vm, ip4: nil, ip6: NetAddr::IPv6.parse("fd10:9b0b:6b4b:8fb0::2"))]
+      vms = [instance_double(Vm, ip4: nil, ip6_string: "fd10:9b0b:6b4b:8fb0::2")]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(nx.load_balancer).to receive(:ipv4_enabled?).and_return(false)

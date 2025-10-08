@@ -12,7 +12,7 @@ class VictoriaMetricsServer < Sequel::Model
   include HealthMonitorMethods
 
   def public_ipv6_address
-    vm.ip6.to_s
+    vm.ip6_string
   end
 
   def private_ipv4_address
