@@ -8,7 +8,7 @@ RSpec.describe Prog::Test::Kubernetes do
   }
 
   let(:kubernetes_service_project_id) { "546a1ed8-53e5-86d2-966c-fb782d2ae3aa" }
-  let(:kubernetes_test_project) { Project.create(name: "Kubernetes-Test-Project", feature_flags: {"install_csi" => true}) }
+  let(:kubernetes_test_project) { Project.create(name: "Kubernetes-Test-Project") }
   let(:kubernetes_service_project) { Project.create_with_id(kubernetes_service_project_id, name: "Ubicloud-Kubernetes-Resources") }
   let(:private_subnet) { PrivateSubnet.create(name: "test-subnet", location_id: Location::HETZNER_FSN1_ID, project_id: kubernetes_test_project.id, net6: "fe80::/64", net4: "192.168.0.0/24") }
   let(:kubernetes_cluster) {

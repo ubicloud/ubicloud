@@ -8,7 +8,7 @@ class Prog::Test::Kubernetes < Prog::Test::Base
   MIGRATION_TRIES = 3
 
   def self.assemble
-    kubernetes_test_project = Project.create(name: "Kubernetes-Test-Project", feature_flags: {"install_csi" => true})
+    kubernetes_test_project = Project.create(name: "Kubernetes-Test-Project")
     kubernetes_service_project = Project.create_with_id(Config.kubernetes_service_project_id, name: "Ubicloud-Kubernetes-Resources")
 
     Strand.create(
