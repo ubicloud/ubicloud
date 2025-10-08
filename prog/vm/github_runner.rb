@@ -208,9 +208,15 @@ class Prog::Vm::GithubRunner < Prog::Base
       if x64? &&
           github_runner.installation.project.get_ff_spill_to_alien_runners &&
           Time.now - github_runner.created_at > Config.github_runner_aws_spill_threshold_seconds
-        Clog.emit("spilled over runner") { {spilled_over_runner: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
-        github_runner.incr_spill_over
-        hop_allocate_vm
+
+        spilled_vcpus = Vm.where(boot_image: [Config.github_ubuntu_2204_aws_ami_version, Config.github_ubuntu_2404_aws_ami_version]).sum(:vcpus) || 0
+        if spilled_vcpus < Config.github_runner_aws_spill_vcpu_capacity
+          Clog.emit("spilled over runner") { {spilled_over_runner: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
+          github_runner.incr_spill_over
+          hop_allocate_vm
+        end
+
+        Clog.emit("not allowed because of high utilization and spill capacity exceeded") { {exceeded_spill_capacity: {family_utilization:, spilled_vcpus:, label: github_runner.label, repository_name: github_runner.repository_name}} }
       end
 
       Clog.emit("not allowed because of high utilization") { {reached_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
