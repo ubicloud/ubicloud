@@ -343,9 +343,18 @@ RSpec.describe Prog::Vm::GithubRunner do
         expect { nx.wait_concurrency_limit }.to nap
       end
 
-      it "allocates if utilization is high but spill over enabled" do
+      it "waits if utilization is high and spill over enabled but not waited enough" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         project.set_ff_spill_to_alien_runners(true)
+
+        expect { nx.wait_concurrency_limit }.to nap
+        expect(runner.spill_over_set?).to be(false)
+      end
+
+      it "allocates if utilization is high but spill over enabled and waited enough" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        project.set_ff_spill_to_alien_runners(true)
+        runner.update(created_at: now - 40)
 
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
         expect(runner.spill_over_set?).to be(true)

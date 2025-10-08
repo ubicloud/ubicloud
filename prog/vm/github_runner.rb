@@ -205,7 +205,9 @@ class Prog::Vm::GithubRunner < Prog::Base
     end
 
     if is_high_util
-      if x64? && github_runner.installation.project.get_ff_spill_to_alien_runners
+      if x64? &&
+          github_runner.installation.project.get_ff_spill_to_alien_runners &&
+          Time.now - github_runner.created_at > Config.github_runner_aws_spill_threshold_seconds
         Clog.emit("spilled over runner") { {spilled_over_runner: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
         github_runner.incr_spill_over
         hop_allocate_vm
