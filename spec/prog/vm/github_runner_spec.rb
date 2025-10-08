@@ -6,9 +6,7 @@ require "octokit"
 
 RSpec.describe Prog::Vm::GithubRunner do
   subject(:nx) {
-    described_class.new(Strand.new).tap {
-      it.instance_variable_set(:@github_runner, runner)
-    }
+    described_class.new(runner.strand).tap { it.instance_variable_set(:@github_runner, runner) }
   }
 
   let(:runner) do
@@ -17,7 +15,9 @@ RSpec.describe Prog::Vm::GithubRunner do
     installation_id = GithubInstallation.create(installation_id: 123, project_id: customer_project.id, name: "ubicloud", type: "Organization", created_at: now - 8 * 24 * 60 * 60).id
     vm_id = create_vm(location_id: Location::GITHUB_RUNNERS_ID, project_id: runner_project.id, boot_image: "github-ubuntu-2204").id
     Sshable.create_with_id(vm_id)
-    GithubRunner.create(installation_id:, vm_id:, repository_name: "test-repo", label: "ubicloud-standard-4", created_at: now, allocated_at: now + 10, ready_at: now + 20, workflow_job: {"id" => 123})
+    runner = GithubRunner.create(installation_id:, vm_id:, repository_name: "test-repo", label: "ubicloud-standard-4", created_at: now, allocated_at: now + 10, ready_at: now + 20, workflow_job: {"id" => 123})
+    Strand.create_with_id(runner.id, prog: "Vm::GithubRunner", label: "start")
+    runner
   end
   let(:vm) { runner.vm }
   let(:installation) { runner.installation }
@@ -351,15 +351,15 @@ RSpec.describe Prog::Vm::GithubRunner do
       it "allocates if standard utilization is high but premium utilization is low" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         VmHost[arch: "x64", family: "premium"].update(used_cores: 8)
-        expect(runner).not_to receive(:incr_not_upgrade_premium)
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+        expect(runner.not_upgrade_premium_set?).to be(false)
       end
 
       it "allocates without upgrade if premium utilization is high but standard utilization is low" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
-        expect(runner).to receive(:incr_not_upgrade_premium)
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+        expect(runner.not_upgrade_premium_set?).to be(true)
       end
 
       it "allocates arm64 runners without checking premium utilization" do
@@ -402,15 +402,15 @@ RSpec.describe Prog::Vm::GithubRunner do
       it "allocates if premium utilization is low than 50" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         VmHost.where(arch: "x64").update(used_cores: 4)
-        expect(runner).not_to receive(:incr_not_upgrade_premium)
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+        expect(runner.not_upgrade_premium_set?).to be(false)
       end
 
       it "allocates without upgrade if premium utilization is higher than 50" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         VmHost.where(arch: "x64").update(used_cores: 10)
-        expect(runner).to receive(:incr_not_upgrade_premium)
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+        expect(runner.not_upgrade_premium_set?).to be(true)
       end
     end
   end
@@ -578,53 +578,54 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(client).to receive(:get).and_return({busy: true})
       expect(vm.sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(nx).not_to receive(:register_deadline).with(nil, 7200)
-      expect(runner).not_to receive(:incr_destroy)
 
       expect { nx.wait }.to nap(60)
+      expect(runner.destroy_set?).to be(false)
     end
 
     it "destroys runner if it does not pick a job in five minutes and not busy" do
       runner.update(ready_at: now - 6 * 60, workflow_job: nil)
       expect(client).to receive(:get).and_return({busy: false})
       expect(vm.sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
-      expect(runner).to receive(:incr_destroy)
       expect(nx).to receive(:register_deadline).twice
       expect(Clog).to receive(:emit).with("The runner did not pick a job").and_call_original
 
       expect { nx.wait }.to nap(0)
+      expect(runner.destroy_set?).to be(true)
     end
 
     it "destroys runner if it does not pick a job in five minutes and already deleted" do
       runner.update(ready_at: now - 6 * 60, workflow_job: nil)
       expect(client).to receive(:get).and_raise(Octokit::NotFound)
       expect(vm.sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
-      expect(runner).to receive(:incr_destroy)
       expect(nx).to receive(:register_deadline).twice
       expect(Clog).to receive(:emit).with("The runner did not pick a job").and_call_original
 
       expect { nx.wait }.to nap(0)
+      expect(runner.destroy_set?).to be(true)
     end
 
     it "does not destroy runner if it doesn not pick a job but two minutes not pass yet" do
       runner.update(ready_at: now - 60, workflow_job: nil)
       expect(vm.sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
-      expect(runner).not_to receive(:incr_destroy)
 
       expect { nx.wait }.to nap(60)
+      expect(runner.destroy_set?).to be(false)
     end
 
     it "destroys the runner if the runner-script is succeeded" do
       expect(vm.sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("exited")
-      expect(runner).to receive(:incr_destroy)
 
       expect { nx.wait }.to nap(15)
+      expect(runner.destroy_set?).to be(true)
     end
 
     it "provisions a spare runner and destroys the current one if the runner-script is failed" do
       expect(vm.sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("failed")
       expect(runner).to receive(:provision_spare_runner)
-      expect(runner).to receive(:incr_destroy)
+
       expect { nx.wait }.to nap(0)
+      expect(runner.destroy_set?).to be(true)
     end
 
     it "naps if the runner-script is running" do
