@@ -205,7 +205,7 @@ class Clover < Roda
     hash
   end
 
-  def humanize_size(bytes)
+  def self.humanize_size(bytes)
     return nil if bytes.nil? || bytes.zero?
 
     units = %w[B KB MB GB]
@@ -215,6 +215,10 @@ class Clover < Roda
     return "%d %s" % [bytes.to_f / 1024**exp, units[exp]] if exp == 0
 
     "%.1f %s" % [bytes.to_f / 1024**exp, units[exp]]
+  end
+
+  def humanize_size(bytes)
+    Clover.humanize_size(bytes)
   end
 
   def humanize_time(time)

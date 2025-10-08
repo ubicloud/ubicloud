@@ -10,6 +10,7 @@ Examples:
 Commands:
     ai         Manage AI features
     fw         Manage firewalls
+    gh         Manage GitHub integration
     help       Get command help
     kc         Manage Kubernetes clusters
     lb         Manage load balancers
@@ -190,6 +191,66 @@ Allowed Option Values:
     Nic Fields: id name private-ipv4 private-ipv6 vm-name
     Private Subnet Fields: id name state location net4 net6 nics
     Firewall Rule Fields: id cidr port-range
+
+
+Manage GitHub integration
+
+Usage:
+    ubi gh command [...]
+    ubi gh (installation-name/repository-name) post-command [...]
+
+Commands:
+    installation          Manage GitHub installations
+
+Post Commands:
+    list-cache-entries    List cache entries for a GitHub repository
+    remove-cache-entry    Remove cache entry for a GitHub repository
+
+
+Manage GitHub installations
+
+Usage:
+    ubi gh installation command [...]
+    ubi gh installation installation-name post-command [...]
+
+Commands:
+    list                 List GitHub installations
+
+Post Commands:
+    list-repositories    List GitHub repositories for an installation
+
+
+List GitHub installations
+
+Usage:
+    ubi gh installation list [options]
+
+Options:
+    -N, --no-headers                 do not show headers
+
+
+List GitHub repositories for an installation
+
+Usage:
+    ubi gh installation installation-name list-repositories [options]
+
+Options:
+    -N, --no-headers                 do not show headers
+
+
+List cache entries for a GitHub repository
+
+Usage:
+    ubi gh installation-name/repository-name list-cache-entries [options]
+
+Options:
+    -N, --no-headers                 do not show headers
+
+
+Remove cache entry for a GitHub repository
+
+Usage:
+    ubi gh installation-name/repository-name remove-cache-entry cache-entry-id
 
 
 Get command help
