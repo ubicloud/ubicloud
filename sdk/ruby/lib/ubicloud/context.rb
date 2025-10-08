@@ -8,6 +8,9 @@ module Ubicloud
   # return instances of Ubicloud::ModelAdapter, for the related model.
   #
   # +firewall+ :: Ubicloud::Firewall
+  # +github_cache_entry+ :: Ubicloud::GithubCacheEntry
+  # +github_installation+ :: Ubicloud::GithubInstallation
+  # +github_repository+ :: Ubicloud::GithubRepository
   # +inference_api_key+ :: Ubicloud::InferenceApiKey
   # +kubernetes_cluster+ :: Ubicloud::KubernetesCluster
   # +load_balancer+ :: Ubicloud::LoadBalancer
@@ -27,6 +30,9 @@ module Ubicloud
       firewall: Firewall,
       private_subnet: PrivateSubnet,
       load_balancer: LoadBalancer,
+      github_cache_entry: GithubCacheEntry,
+      github_installation: GithubInstallation,
+      github_repository: GithubRepository,
       inference_api_key: InferenceApiKey,
       kubernetes_cluster: KubernetesCluster,
       ssh_public_key: SshPublicKey
@@ -40,6 +46,9 @@ module Ubicloud
       "fw" => Firewall,
       "ps" => PrivateSubnet,
       "1b" => LoadBalancer,
+      "ge" => GithubCacheEntry,
+      "g1" => GithubInstallation,
+      "gp" => GithubRepository,
       "ak" => InferenceApiKey,
       "kc" => KubernetesCluster,
       "sk" => SshPublicKey
