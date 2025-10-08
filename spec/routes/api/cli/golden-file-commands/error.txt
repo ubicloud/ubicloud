@@ -21,6 +21,14 @@ fw eu-central-h1/test2-fw create invalid
 fw eu-central-h1/test-ps-default destroy invalid
 fw list -f invalid
 fw list invalid
+gh installation list arg
+gh installation test-installation-name list-repositories arg
+gh installation test-installation-name/test-repository-name list-repositories
+gh test-installation-name/test-repository-name list-cache-entries arg
+gh test-installation-name list-cache-entries
+gh test-installation-name/test-repository-name/extra list-cache-entries
+gh test-installation-name/test-repository-name remove-cache-entry
+gh test-installation-name/test-repository-name remove-cache-entry gejszqw0k8z24k4bzt4ynyctg2 arg
 help invalid
 invalid
 kc eu-central-h1/test-kc destroy invalid

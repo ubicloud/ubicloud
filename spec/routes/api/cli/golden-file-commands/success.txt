@@ -37,6 +37,10 @@ fw list -l eu-north-h1
 fw list -l eu-north-h1 -f name,id
 fw list -l eu-north-h1 -N -f name,id
 fw list -N
+gh installation list
+gh installation test-installation-name list-repositories
+gh test-installation-name/test-repository-name list-cache-entries
+gh list-cache-entries test-installation-name/test-repository-name
 help
 help help
 help -r

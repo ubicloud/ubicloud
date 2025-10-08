@@ -1,0 +1,14 @@
+! Invalid gh reference ("test-installation-name/test-repository-name/extra"), should be in installation-name/repository-name format
+
+Manage GitHub integration
+
+Usage:
+    ubi gh command [...]
+    ubi gh (installation-name/repository-name) post-command [...]
+
+Commands:
+    installation          Manage GitHub installations
+
+Post Commands:
+    list-cache-entries    List cache entries for a GitHub repository
+    remove-cache-entry    Remove cache entry for a GitHub repository

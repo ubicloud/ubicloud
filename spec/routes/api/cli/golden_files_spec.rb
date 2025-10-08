@@ -13,6 +13,7 @@ RSpec.describe Clover, "cli" do
     postgres_project = Project.create(name: "postgres")
     expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
     expect(Config).to receive(:kubernetes_service_project_id).and_return(postgres_project.id).at_least(:once)
+    expect(Config).to receive(:github_app_name).and_return("test-app").at_least(:once)
     expect(Vm).to receive(:generate_ubid).and_return(UBID.parse("vmdzyppz6j166jh5e9t2dwrfas"), UBID.parse("vmc9b4yf8r424nna257b3ck3j3"))
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("psfzm9e26xky5m9ggetw4dpqe2"))
     expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("nc69z0cda8jt0g5b120hamn4vf"), UBID.parse("nchfcq5bmsae7mc7bm6nx82d2n"))
@@ -28,6 +29,10 @@ RSpec.describe Clover, "cli" do
     @ps = PrivateSubnet.first
     @ps.update(net4: "172.27.99.128/26", net6: "fdd9:1ea7:125d:5fa4::/64")
     Prog::Vm::Nexus.assemble("some_ssh key", postgres_project.id, private_subnet_id: @ps.id, allow_private_subnet_in_other_project: true)
+
+    gi = GithubInstallation.create_with_id("6e3ae4a8-5474-8a01-b485-3b02ac649c5f", project_id: @project.id, installation_id: 12345678, name: "test-installation-name", type: "user")
+    gp = GithubRepository.create_with_id("a58006b6-0879-8616-936a-62234e244f2f", installation_id: gi.id, name: "test-installation-name/test-repository-name")
+    GithubCacheEntry.create_with_id("967f7e02-68f8-8a0e-9917-fd13d5f33501", repository_id: gp.id, key: "test-key", version: "test-version", scope: "test-scope", size: 10987654321, created_by: gp.id)
 
     expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
     expect(Vm).to receive(:generate_ubid).and_return(UBID.parse("vma9rnygexga6jns6x3yj9a6b2"))
