@@ -156,6 +156,121 @@ RSpec.describe Ubicloud do
     expect(ubi.new("vm345678901234567890123456")).to be_a(Ubicloud::Vm)
   end
 
+  it "GithubInstallation.new supports id strings and performs appropriate lookups" do
+    ubid = GithubInstallation.generate_ubid.to_s
+    gi = ubi.github_installation.new(ubid)
+    expect(gi[:id]).to eq ubid
+
+    expected_segment = ubid
+    expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
+      expect(env["PATH_INFO"]).to eq "/project/#{project_id}/github/#{expected_segment}"
+      [200, {"content-type" => "application/json"}, [{id: ubid, name: "foo"}.to_json]]
+    end)
+
+    expect(gi.name).to eq "foo"
+
+    expected_segment = "foo"
+    gi.values.delete(:id)
+    expect(gi.check_exists).to eq gi
+    expect(gi.id).to eq ubid
+  end
+
+  it "GithubInstallation#repositories caches lookups unless reload keyword argument is given" do
+    ubid = GithubInstallation.generate_ubid.to_s
+    gi = ubi.github_installation.new(ubid)
+    repo_ubid = GithubRepository.generate_ubid.to_s
+
+    expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
+      expect(env["PATH_INFO"]).to eq "/project/#{project_id}/github/#{ubid}/repository"
+      [200, {"content-type" => "application/json"}, [{items: [{id: repo_ubid, installation_name: "bar", name: "bar/foo"}], count: 1}.to_json]]
+    end)
+
+    repos = gi.repositories
+    expect(repos.length).to eq 1
+    repo = repos[0]
+    expect(repo.id).to eq repo_ubid
+    expect(repo.installation_name).to eq "bar"
+    expect(repo.name).to eq "bar/foo"
+    expect(gi.repositories).to be repos
+    expect(gi.repositories(reload: true)).not_to be repos
+  end
+
+  it "GithubInstallation.new raises for invalid arguments" do
+    expect(Clover).not_to receive(:call)
+    expect { ubi.github_installation.new([]) }.to raise_error(Ubicloud::Error, "unsupported value initializing Ubicloud::GithubInstallation: []")
+    expect { ubi.github_installation.new(foo: 1) }.to raise_error(Ubicloud::Error, "hash must have :id or :name key")
+  end
+
+  it "GithubRepository performs appropriate lookups" do
+    ubid = GithubRepository.generate_ubid.to_s
+    gp = ubi.github_repository.new(installation_name: "foo", id: ubid)
+    expect(gp[:id]).to eq ubid
+
+    expected_segment = ubid
+    expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
+      expect(env["PATH_INFO"]).to eq "/project/#{project_id}/github/foo/repository/#{expected_segment}"
+      [200, {"content-type" => "application/json"}, [{id: ubid, installation_name: "foo", name: "bar"}.to_json]]
+    end)
+
+    expect(gp.name).to eq "bar"
+
+    expected_segment = "bar"
+    gp.values.delete(:id)
+    expect(gp.check_exists).to eq gp
+    expect(gp.id).to eq ubid
+  end
+
+  it "GithubRepository.new raises for invalid arguments" do
+    expect(Clover).not_to receive(:call)
+    expect { ubi.github_repository.new([]) }.to raise_error(Ubicloud::Error, "unsupported value initializing Ubicloud::GithubRepository: []")
+    expect { ubi.github_repository.new(installation_name: "foo") }.to raise_error(Ubicloud::Error, "hash must have :installation_name key and either :id or :name keys")
+    expect { ubi.github_repository.new(name: "foo") }.to raise_error(Ubicloud::Error, "hash must have :installation_name key and either :id or :name keys")
+  end
+
+  it "GithubRepository#cache_entries caches lookups unless reload keyword argument is given" do
+    ubid = GithubRepository.generate_ubid.to_s
+    gp = ubi.github_repository.new(installation_name: "foo", id: ubid)
+    ce_ubid = GithubCacheEntry.generate_ubid.to_s
+
+    expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
+      expect(env["PATH_INFO"]).to eq "/project/#{project_id}/github/foo/repository/#{ubid}/cache"
+      [200, {"content-type" => "application/json"}, [{items: [{id: ce_ubid, installation_name: "bar", repository_name: "bar/foo", key: "baz", size: "10 MB"}], count: 1}.to_json]]
+    end)
+
+    entries = gp.cache_entries
+    expect(entries.length).to eq 1
+    entry = entries[0]
+    expect(entry.id).to eq ce_ubid
+    expect(entry.installation_name).to eq "bar"
+    expect(entry.repository_name).to eq "bar/foo"
+    expect(entry.key).to eq "baz"
+    expect(entry.size).to eq "10 MB"
+    expect(gp.cache_entries).to be entries
+    expect(gp.cache_entries(reload: true)).not_to be entries
+  end
+
+  it "GithubCache#check_exists checks whether the cache key exists" do
+    ubid = GithubRepository.generate_ubid.to_s
+    ge = ubi.github_cache_entry.new(installation_name: "foo", repository_name: "bar", id: ubid)
+    expect(ge[:id]).to eq ubid
+
+    expect(Clover).to receive(:call).and_invoke(proc do |env|
+      expect(env["PATH_INFO"]).to eq "/project/#{project_id}/github/foo/repository/bar/cache/#{ubid}"
+      [200, {"content-type" => "application/json"}, [{id: ubid, installation_name: "foo", repository_name: "bar", key: "baz"}.to_json]]
+    end)
+
+    expect(ge.check_exists).to eq ge
+    expect(ge.key).to eq "baz"
+  end
+
+  it "GithubCacheEntry.new raises for invalid arguments" do
+    expect(Clover).not_to receive(:call)
+    expect { ubi.github_cache_entry.new([]) }.to raise_error(Ubicloud::Error, "unsupported value initializing Ubicloud::GithubCacheEntry: []")
+    expect { ubi.github_cache_entry.new(id: GithubCacheEntry.generate_ubid.to_s, installation_name: "foo") }.to raise_error(Ubicloud::Error, "hash must have :id, :repository_name, and :installation_name keys")
+    expect { ubi.github_cache_entry.new(id: GithubCacheEntry.generate_ubid.to_s, repository_name: "foo") }.to raise_error(Ubicloud::Error, "hash must have :id, :repository_name, and :installation_name keys")
+    expect { ubi.github_cache_entry.new(repository_name: "bar", installation_name: "foo") }.to raise_error(Ubicloud::Error, "hash must have :id, :repository_name, and :installation_name keys")
+  end
+
   it "Firewall#attach/detach_subnet supports PrivateSubnet instances" do
     fw = ubi.firewall.new("eu-central-h1/test-fw")
     ps = ubi.private_subnet.new("ps345678901234567890123456")
