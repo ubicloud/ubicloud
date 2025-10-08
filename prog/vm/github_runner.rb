@@ -212,6 +212,12 @@ class Prog::Vm::GithubRunner < Prog::Base
         Time.now - github_runner.created_at > Config.github_runner_aws_spill_threshold_seconds
 
       if should_spill_over
+        spilled_vcpus = Vm.where(boot_image: [Config.github_ubuntu_2204_aws_ami_version, Config.github_ubuntu_2404_aws_ami_version]).sum(:vcpus) || 0
+        if spilled_vcpus >= Config.github_runner_aws_spill_vcpu_capacity
+          Clog.emit("not allowed because of high utilization and spill capacity exceeded") { {exceeded_spill_capacity: {family_utilization:, spilled_vcpus:, label: github_runner.label, repository_name: github_runner.repository_name}} }
+          nap rand(5..15)
+        end
+
         Clog.emit("spilled over runner") { {spilled_over_runner: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
         github_runner.incr_spill_over
         hop_allocate_vm
