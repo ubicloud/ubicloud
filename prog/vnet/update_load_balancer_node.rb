@@ -25,7 +25,7 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
   end
 
   label def remove_load_balancer
-    vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: generate_nat_rules(vm.ip4.to_s, vm.private_ipv4.to_s))
+    vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: generate_nat_rules(vm.ip4_string, vm.private_ipv4.to_s))
 
     pop "load balancer is removed"
   end
@@ -34,8 +34,8 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
     active_vm_ports_uniq_by_port = load_balancer.active_vm_ports { |ds| ds.eager(:load_balancer_port, load_balancer_vm: {vm: :nics}) }
       .uniq(&:load_balancer_port_id)
       .sort_by { |vm_port| vm_port.load_balancer_port.src_port }
-    public_ipv4 = vm.ip4.to_s
-    public_ipv6 = vm.ip6.to_s
+    public_ipv4 = vm.ip4_string
+    public_ipv6 = vm.ip6_string
     private_ipv4 = vm.private_ipv4
     private_ipv6 = vm.private_ipv6
     neighbor_vms = load_balancer.active_vm_ports.reject { it.load_balancer_vm.vm_id == vm.id }.uniq { |row| row.load_balancer_vm.id }.map(&:vm)

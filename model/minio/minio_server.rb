@@ -31,7 +31,7 @@ class MinioServer < Sequel::Model
   end
 
   def public_ipv4_address
-    vm.ip4.to_s
+    vm.ip4_string
   end
 
   def minio_volumes

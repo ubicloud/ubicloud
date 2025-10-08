@@ -167,7 +167,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   describe "#refresh_dns_record" do
     before do
       allow(postgres_resource).to receive(:location).and_return(instance_double(Location, aws?: false))
-      allow(postgres_resource.representative_server.vm).to receive(:ip4).and_return("1.1.1.1")
+      allow(postgres_resource.representative_server.vm).to receive(:ip4_string).and_return("1.1.1.1")
     end
 
     it "creates dns records and hops" do
