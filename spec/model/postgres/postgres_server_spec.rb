@@ -241,14 +241,14 @@ RSpec.describe PostgresServer do
     it "returns the storage size in GiB" do
       volume_dataset = instance_double(Sequel::Dataset)
       expect(volume_dataset).to receive(:reject).and_return([instance_double(VmStorageVolume, boot: false, size_gib: 64)])
-      expect(vm).to receive(:vm_storage_volumes_dataset).and_return(volume_dataset)
+      expect(vm).to receive(:vm_storage_volumes).and_return(volume_dataset)
       expect(postgres_server.storage_size_gib).to eq(64)
     end
 
     it "returns nil if there is no storage volume" do
       volume_dataset = instance_double(Sequel::Dataset)
       expect(volume_dataset).to receive(:reject).and_return([])
-      expect(vm).to receive(:vm_storage_volumes_dataset).and_return(volume_dataset)
+      expect(vm).to receive(:vm_storage_volumes).and_return(volume_dataset)
       expect(postgres_server.storage_size_gib).to be_zero
     end
   end
