@@ -7,22 +7,36 @@ RSpec.describe MetricsTargetResource do
   let(:resource) { described_class.new(postgres_server) }
 
   describe "#initialize" do
+    before do
+      allow(Config).to receive(:victoria_metrics_service_project_id).and_return("4d8f9896-26a3-4784-8f52-2ed5d5e55c0e")
+    end
+
     it "initializes with a resource and nil tsdb client when VictoriaMetrics is not found" do
       expect(Config).to receive(:postgres_service_project_id).and_return("4d8f9896-26a3-4784-8f52-2ed5d5e55c0e")
       expect(resource.instance_variable_get(:@resource)).to eq(postgres_server)
+      expect(resource.instance_variable_get(:@tsdb_client)).to be_nil
     end
 
-    %i[postgres_service_project_id victoria_metrics_service_project_id].each do |config_key|
-      it "initializes with a resource and a tsdb client when VictoriaMetrics is found using #{config_key}" do
-        expect(Config).to receive(config_key).at_least(:once).and_return("4d8f9896-26a3-4784-8f52-2ed5d5e55c0e")
-        prj = Project.create_with_id(Config.send(config_key), name: "pg-project")
-        vmr = instance_double(VictoriaMetricsResource, project_id: prj.id)
-        expect(VictoriaMetricsResource).to receive(:first).with(project_id: prj.id).and_return(vmr)
-        expect(vmr).to receive(:servers).and_return([instance_double(VictoriaMetricsServer, client: "tsdb_client")])
+    it "initializes with a resource and a tsdb client when VictoriaMetrics is found using postgres_service_project_id" do
+      expect(Config).to receive(:postgres_service_project_id).at_least(:once).and_return("c147571a-661e-4de1-8631-73d2425343c0")
+      prj = Project.create_with_id(Config.send(:postgres_service_project_id), name: "pg-project")
+      vmr = instance_double(VictoriaMetricsResource, project_id: prj.id)
+      expect(VictoriaMetricsResource).to receive(:first).with(project_id: prj.id).and_return(vmr)
+      expect(vmr).to receive(:servers).and_return([instance_double(VictoriaMetricsServer, client: "tsdb_client")])
 
-        expect(resource.instance_variable_get(:@resource)).to eq(postgres_server)
-        expect(resource.instance_variable_get(:@tsdb_client)).to eq("tsdb_client")
-      end
+      expect(resource.instance_variable_get(:@resource)).to eq(postgres_server)
+      expect(resource.instance_variable_get(:@tsdb_client)).to eq("tsdb_client")
+    end
+
+    it "initializes with a resource and a tsdb client when VictoriaMetrics is found using victoria_metrics_service_project_id" do
+      expect(Config).to receive(:postgres_service_project_id).at_least(:once).and_return(nil)
+      prj = Project.create_with_id(Config.send(:victoria_metrics_service_project_id), name: "pg-project")
+      vmr = instance_double(VictoriaMetricsResource, project_id: prj.id)
+      expect(VictoriaMetricsResource).to receive(:first).with(project_id: prj.id).and_return(vmr)
+      expect(vmr).to receive(:servers).and_return([instance_double(VictoriaMetricsServer, client: "tsdb_client")])
+
+      expect(resource.instance_variable_get(:@resource)).to eq(postgres_server)
+      expect(resource.instance_variable_get(:@tsdb_client)).to eq("tsdb_client")
     end
 
     it "initializes with a resource and a tsdb client when VictoriaMetrics is not found in development" do
