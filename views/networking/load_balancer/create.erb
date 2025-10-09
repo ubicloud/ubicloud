@@ -22,7 +22,9 @@
     {name: "dst_port", type: "number", label: "Application Port", required: "required", placeholder: "80", opening_tag: "<div class='col-span-6 col-start-1 md:col-start-3 md:col-end-5 xl:col-start-2 xl:col-end-3'>"},
     {name: "monitoring", type: "section", label: "Monitoring", content: "The health check endpoint is used in combination with the Application Port. Make sure it returns 200.", separator: true},
     {name: "health_check_endpoint", type: "text", label: "HTTP Health Check Endpoint", placeholder: "/up", opening_tag: "<div id='health-check-endpoint-wrapper' class='col-span-6 col-start-1 md:col-end-3'>"},
-    {name: "health_check_protocol", type: "select", label: "Health Check Protocol", required: "required", content_generator: ContentGenerator::LoadBalancer.method(:select_option), opening_tag: "<div class='col-span-6 col-start-1 md:col-start-3 md:col-end-5'>"}
+    {name: "health_check_protocol", type: "select", label: "Health Check Protocol", required: "required", content_generator: ContentGenerator::LoadBalancer.method(:select_option), opening_tag: "<div class='col-span-6 col-start-1 md:col-start-3 md:col-end-5'>"},
+    {name: "ssl_certificate_notice", type: "section", label: "SSL Certificate", content: "Ubicloud automatically provides a free SSL certificate for your load balancer. To enable it, check the box.", separator: true},
+    {name: "cert_enabled", type: "checkbox", content_generator: ContentGenerator::LoadBalancer.method(:enable_ssl_certificate)}
   ]
 
   action = "#{@project.path}/load-balancer"

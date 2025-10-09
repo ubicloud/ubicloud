@@ -151,6 +151,10 @@ module ContentGenerator
     def self.select_option(select_option)
       select_option[:display_name]
     end
+
+    def self.enable_ssl_certificate(ssl_certificate)
+      "Enable SSL Certificate"
+    end
   end
 
   module KubernetesCluster
