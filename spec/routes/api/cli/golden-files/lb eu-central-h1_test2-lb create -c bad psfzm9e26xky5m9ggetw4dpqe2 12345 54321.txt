@@ -1,4 +1,4 @@
-! Invalid argument: -a bad
+! Invalid cert-enabled argument: "bad"
 
 Create a load balancer
 
