@@ -184,10 +184,25 @@ class Project < Sequel::Model
     end
   end
 
-  feature_flag :vm_public_ssh_keys, :location_latitude_fra, :access_all_cache_scopes, :allocator_diagnostics
-  feature_flag :private_locations, :enable_c6gd, :enable_m6gd, :enable_m8gd, :enable_i8g
-  feature_flag :free_runner_upgrade_until, :gpu_vm, :postgres_lantern, :aws_cloudwatch_logs
-  feature_flag :aws_alien_runners_ratio, :ipv6_disabled, :skip_runner_pool, :postgres_hostname_override
+  feature_flag(
+    :access_all_cache_scopes,
+    :allocator_diagnostics,
+    :aws_alien_runners_ratio,
+    :aws_cloudwatch_logs,
+    :enable_c6gd,
+    :enable_i8g,
+    :enable_m6gd,
+    :enable_m8gd,
+    :free_runner_upgrade_until,
+    :gpu_vm,
+    :ipv6_disabled,
+    :location_latitude_fra,
+    :postgres_hostname_override,
+    :postgres_lantern,
+    :private_locations,
+    :skip_runner_pool,
+    :vm_public_ssh_keys
+  )
 end
 
 # Table: project
