@@ -3,7 +3,7 @@
 class Clover
   hash_branch(:project_prefix, "inference-playground") do |r|
     r.get web? do
-      @inference_models = [inference_router_model_ds, inference_endpoint_ds.eager(:location)].flat_map do |ds|
+      @inference_models = [inference_router_model_ds.eager(inference_router: {load_balancer: :private_subnet}), inference_endpoint_ds.eager(:location, load_balancer: :private_subnet)].flat_map do |ds|
         ds.where(Sequel.pg_jsonb_op(:tags).get_text("capability") => "Text Generation").all
       end
 

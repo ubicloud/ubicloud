@@ -1,6 +1,7 @@
 <% @connected_subnets = @ps.connected_subnets
 @connectable_subnets = @ps.project.private_subnets_dataset.exclude(id: @ps.connected_subnets.map(&:id)).all
 
+@ps.firewalls(eager: :location)
 perm_checks = {
   "Firewall:view" => Firewall.where(id: @ps.firewalls.map(&:id)),
   "PrivateSubnet:view" => PrivateSubnet.where(id: @connected_subnets.map(&:id))
