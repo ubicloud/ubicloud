@@ -79,28 +79,28 @@ class Clover
 
           r.post do
             DB.transaction do
-              typecast_params.array!(:Hash, "aces").each do
-                ubid, deleted, action_id, object_id = it.values_at("ubid", "deleted", "action", "object")
-                action_id = nil if action_id == ""
-                object_id = nil if object_id == ""
+              DB.ignore_duplicate_queries do
+                typecast_params.array!(:Hash, "aces").each do
+                  ubid, deleted, action_id, object_id = it.values_at("ubid", "deleted", "action", "object")
+                  action_id = nil if action_id == ""
+                  object_id = nil if object_id == ""
 
-                if ubid == "template"
-                  next if deleted == "true" || (action_id.nil? && object_id.nil?)
-
-                  ace = AccessControlEntry.new(project_id: @project.id, subject_id: token.id)
-                  audit_action = "create"
-                else
-                  next unless (ace = AccessControlEntry[project_id: @project.id, subject_id: token.id, id: UBID.to_uuid(ubid)])
-
-                  if deleted == "true"
-                    ace.destroy
-                    audit_log(ace, "destroy")
-                    next
+                  if ubid == "template"
+                    next if deleted == "true" || (action_id.nil? && object_id.nil?)
+                    ace = AccessControlEntry.new(project_id: @project.id, subject_id: token.id)
+                    audit_action = "create"
+                  else
+                    next unless (ace = AccessControlEntry[project_id: @project.id, subject_id: token.id, id: UBID.to_uuid(ubid)])
+                    if deleted == "true"
+                      ace.destroy
+                      audit_log(ace, "destroy")
+                      next
+                    end
+                    audit_action = "update"
                   end
-                  audit_action = "update"
+                  ace.update_from_ubids(action_id:, object_id:)
+                  audit_log(ace, audit_action, [token, action_id, object_id])
                 end
-                ace.update_from_ubids(action_id:, object_id:)
-                audit_log(ace, audit_action, [token, action_id, object_id])
               end
             end
 

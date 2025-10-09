@@ -91,12 +91,16 @@ class LoadBalancer < Sequel::Model
 
   def enable_cert_server
     update(cert_enabled: true)
-    vms.each { |vm| setup_cert_server(vm.id) }
+    DB.ignore_duplicate_queries do
+      vms.each { |vm| setup_cert_server(vm.id) }
+    end
   end
 
   def disable_cert_server
     update(cert_enabled: false)
-    vms.each { |vm| remove_cert_server(vm.id) }
+    DB.ignore_duplicate_queries do
+      vms.each { |vm| remove_cert_server(vm.id) }
+    end
     certs.each(&:incr_destroy)
   end
 

@@ -20,8 +20,10 @@ perm_checks = {
 ps_path = path(@ps)
 
 viewable_fws, viewable_subnets, disconnectable_subnets =
-  perm_checks.map do |perm, ds|
-    dataset_authorize(ds, perm).select_hash(:id, Sequel.as(true, :v))
+  DB.ignore_duplicate_queries do
+    perm_checks.map do |perm, ds|
+      dataset_authorize(ds, perm).select_hash(:id, Sequel.as(true, :v))
+    end
   end %>
 
 <div class="p-6">
