@@ -3,7 +3,9 @@
   @flavor = PostgresResource::Flavor::STANDARD unless Option::POSTGRES_FLAVOR_OPTIONS.any? { |k,| k == @flavor }
   @prices = fetch_location_based_prices("PostgresVCpu", "PostgresStorage")
   @has_valid_payment_method = @project.has_valid_payment_method?
-  @enabled_postgres_sizes = Option::VmSizes.select { @project.quota_available?("PostgresVCpu", it.vcpus) }.map(&:name)
+  effective_quota = @project.effective_quota_value("PostgresVCpu")
+  current_usage = @project.current_resource_usage("PostgresVCpu")
+  @enabled_postgres_sizes = Option::VmSizes.select { effective_quota >= current_usage + it.vcpus }.map(&:name)
   @option_tree, @option_parents = generate_postgres_options(flavor: @flavor)
 
   @page_title, logo = postgres_flavors[@flavor].yield_self { ["Create #{it.title}", "logo-#{it.brand}.png"] }
