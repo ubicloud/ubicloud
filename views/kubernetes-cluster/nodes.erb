@@ -1,14 +1,15 @@
 <% @nodes = []
+eager = [:assigned_vm_address, :strand, :semaphores]
 
 @nodes +=
-  @kc.cp_vms.map do |vm|
+  @kc.cp_vms(eager:).map do |vm|
     { name: vm.name, role: "Control Plane", state: vm.display_state, hostname: vm.ephemeral_net4.to_s }
   end
 
 @nodes +=
   @kc
     .nodepools_dataset
-    .eager(:vms)
+    .eager(vms: eager)
     .flat_map do |np|
       np.vms.map { |vm| { name: vm.name, role: "Worker", state: vm.display_state, hostname: vm.ephemeral_net4.to_s } }
     end %>

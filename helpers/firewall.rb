@@ -11,7 +11,7 @@ class Clover
 
   def firewall_list_api_response(dataset)
     dataset = dataset.where(location_id: @location.id) if @location
-    paginated_result(dataset.eager(:firewall_rules), Serializers::Firewall)
+    paginated_result(dataset.eager(:firewall_rules, :location), Serializers::Firewall)
   end
 
   def firewall_post(firewall_name)
