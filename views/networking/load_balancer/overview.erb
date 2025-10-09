@@ -15,13 +15,13 @@
 ]
 
 unless @lb.health_check_protocol == "tcp"
-  data << ["HTTP Health Check Endpoint", @lb.health_check_endpoint]
-  data << ["SSL Certificate Status", @lb.active_cert&.cert ? "Available" : "Creating"] if @lb.health_check_protocol == "https"
+  data << ["#{@lb.health_check_protocol.upcase} Health Check Endpoint", @lb.health_check_endpoint]
 end
+data << ["SSL Certificate Status", @lb.active_cert&.cert ? "Available" : "Creating"] if @lb.cert_enabled
 %>
 
 <%== part("components/kv_data_card", data:) %>
-<% if @lb.health_check_protocol == "https" %>
+<% if @lb.cert_enabled %>
   <div class="p-1 overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200 mt-4 px-4 py-5 sm:flex sm:items-center">
     <div>
       <h3 class="text-base font-semibold leading-6 text-gray-900">How to fetch the SSL certificate?</h3>
