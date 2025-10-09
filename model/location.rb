@@ -27,13 +27,13 @@ class Location < Sequel::Model
       where(Sequel[project_id:] | {project_id: nil})
     end
 
-    def visible_or_for_project(project_id)
-      where(Sequel[project_id:] | {project_id: nil, visible: true})
+    def visible_or_for_project(project_id, project_ff_visible_locations)
+      where(Sequel.|([project_id:], {project_id: nil, visible: true}, name: project_ff_visible_locations || []))
     end
   end
 
-  def visible_or_for_project?(proj_id)
-    (visible && project_id.nil?) || project_id == proj_id
+  def visible_or_for_project?(proj_id, project_ff_visible_locations)
+    (visible && project_id.nil?) || project_id == proj_id || project_ff_visible_locations&.include?(name)
   end
 
   def path
