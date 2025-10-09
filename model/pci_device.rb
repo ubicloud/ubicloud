@@ -7,12 +7,14 @@ class PciDevice < Sequel::Model
   many_to_one :vm
 
   def self.device_name(device_id)
-    # https://download.nvidia.com/XFree86/Linux-x86_64/535.98/README/supportedchips.html
+    # https://download.nvidia.com/XFree86/Linux-x86_64/580.95.05/README/supportedchips.html
     case device_id
     when "20b5"
       "NVIDIA A100 80GB PCIe"
     when "27b0"
       "NVIDIA RTX 4000 SFF Ada Generation"
+    when "2901"
+      "NVIDIA B200"
     else
       "PCI device"
     end
