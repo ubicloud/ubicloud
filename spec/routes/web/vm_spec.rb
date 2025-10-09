@@ -421,6 +421,31 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content "Burstable"
       end
 
+      it "shows invisible locations if feature flag is enabled" do
+        project
+        project.set_ff_gpu_vm(true)
+        project.set_ff_visible_locations(["latitude-ai"])
+        vmh = Prog::Vm::HostNexus.assemble("::1", location_id: Location[name: "latitude-ai"].id).subject
+        pci = PciDevice.new_with_id(
+          vm_host_id: vmh.id,
+          slot: "01:00.0",
+          device_class: "0300",
+          vendor: "10de",
+          device: "20b5",
+          numa_node: nil,
+          iommu_group: 0
+        )
+        vmh.save_changes
+        pci.save_changes
+
+        visit "#{project.path}/vm"
+        click_link "Create GPU Virtual Machine"
+
+        expect(page.title).to eq("Ubicloud - Create GPU Virtual Machine")
+        expect(page).to have_content "GPU"
+        expect(page).to have_content "latitude-ai"
+      end
+
       it "cannot create a virtual machine with gpu if feature switch is disabled" do
         project
         vmh = Prog::Vm::HostNexus.assemble("::1", location_id: Location::HETZNER_FSN1_ID).subject

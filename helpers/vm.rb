@@ -115,10 +115,12 @@ class Clover
     # nil: Show GPU options, but also show options not valid for GPU configurations
 
     if @show_gpu != false
+      ff_visible_locations = @project.get_ff_visible_locations || []
       available_gpus = DB[:pci_device]
         .join(:vm_host, id: :vm_host_id)
         .join(:location, id: :location_id)
-        .where(device_class: ["0300", "0302"], vm_id: nil, visible: true)
+        .where(device_class: ["0300", "0302"], vm_id: nil)
+        .where(Sequel.|([:visible], name: ff_visible_locations))
         .group_and_count(:vm_host_id, :name, :device)
         .from_self
         .select_group { [name.as(:location_name), device] }
