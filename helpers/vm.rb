@@ -202,7 +202,9 @@ class Clover
       end
     end
 
-    options.add_option(name: "boot_image", values: Option::BootImages.map(&:name))
+    boot_images = Option::BootImages.map(&:name)
+    boot_images.reject! { |name| name == "gpu-ubuntu-noble" } unless @show_gpu != false
+    options.add_option(name: "boot_image", values: boot_images)
     options.add_option(name: "unix_user")
     options.add_option(name: "ssh_public_key", values: @project.ssh_public_keys)
     options.add_option(name: "public_key")

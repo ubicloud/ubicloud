@@ -15,7 +15,7 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   def download_from_blob_storage?
-    image_name.start_with?("github", "postgres", "ai-", "kubernetes") || Config.production?
+    image_name.start_with?("github", "postgres", "ai-", "kubernetes", "gpu") || Config.production?
   end
 
   def default_boot_image_version(image_name)
@@ -41,7 +41,8 @@ class Prog::DownloadBootImage < Prog::Base
           "almalinux" => "qcow2",
           "debian" => "raw",
           "ai" => "raw",
-          "kubernetes" => "raw"
+          "kubernetes" => "raw",
+          "gpu" => "raw"
         }
         image_family = image_name.split("-").first
         suffix = suffixes.fetch(image_family, nil)
@@ -121,7 +122,8 @@ class Prog::DownloadBootImage < Prog::Base
     ["ai-model-mistral-small-3", "x64", "20250217.1.0"] => "01ce8d1d0b7b0f717c51c26590234f4cb7971a9a5276de92b6cb4dc2c7a085e5",
     ["kubernetes-v1_32", "x64", "20250320.1.0"] => "369c7c869bba690771a1dcbbae52159defaa3fd3540f008ba6feea291e7a220a",
     ["kubernetes-v1_33", "x64", "20250506.1.0"] => "35ca03c19385227117fa6579f58c73a362970359fa9486024ca393b134a698d4",
-    ["kubernetes-v1_34", "x64", "20250828.1.0"] => "3a29122a3836109df78778df24899f864bc8beff7d92d86dc4ab8b99314f520c"
+    ["kubernetes-v1_34", "x64", "20250828.1.0"] => "3a29122a3836109df78778df24899f864bc8beff7d92d86dc4ab8b99314f520c",
+    ["gpu-ubuntu-noble", "x64", "20251008.1.0"] => "b7bdfaadc0493a79d7fc9731c18c98a22ac93f3d39e7c22f9013db2a1a217c5d"
   }.freeze
   BOOT_IMAGE_SHA256.each_key(&:freeze)
 
