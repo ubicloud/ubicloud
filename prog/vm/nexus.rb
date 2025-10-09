@@ -236,7 +236,7 @@ class Prog::Vm::Nexus < Prog::Base
           installation = runner&.installation
           prefs = installation&.allocator_preferences || {}
 
-          runner_family_filter = if runner&.not_upgrade_premium_set? || vm.family == "premium"
+          runner_family_filter = if runner&.not_upgrade_premium_set? || vm.family == "premium" || vm.family == "standard-gpu"
             [vm.family]
           elsif installation&.free_runner_upgrade?
             prefs["family_filter"] || [vm.family, "premium"]
