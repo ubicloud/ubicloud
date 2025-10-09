@@ -196,11 +196,11 @@ class Project < Sequel::Model
     :free_runner_upgrade_until,
     :gpu_vm,
     :ipv6_disabled,
-    :location_latitude_fra,
     :postgres_hostname_override,
     :postgres_lantern,
     :private_locations,
     :skip_runner_pool,
+    :visible_locations,
     :vm_public_ssh_keys
   )
 end
