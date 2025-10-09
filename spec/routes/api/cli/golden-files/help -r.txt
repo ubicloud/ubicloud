@@ -414,6 +414,8 @@ Post Commands:
     show                               Show details for a PostgreSQL database
     show-config                        Show configuration for a PostgreSQL database
     show-pgbouncer-config              Show pgbouncer configuration for a PostgreSQL database
+    show-upgrade-status                Show the status of a major version upgrade of the PostgreSQL database
+    upgrade                            Schedule a major version upgrade of the PostgreSQL database
 
 Post Options:
     -d, --dbname=name                override database name
@@ -640,6 +642,12 @@ Usage:
     ubi pg (location/pg-name | pg-id) show-pgbouncer-config
 
 
+Show the status of a major version upgrade of the PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) show-upgrade-status
+
+
 Show details for a PostgreSQL database
 
 Usage:
@@ -650,10 +658,16 @@ Options:
 
 Allowed Option Values:
     Fields: id name state location vm-size target-vm-size storage-size-gib
-            target-storage-size-gib version ha-type flavor connection-string
-            primary earliest-restore-time maintenance-window-start-at
-            read-replica parent tags firewall-rules metric-destinations
-            read-replicas ca-certificates
+            target-storage-size-gib version target-version ha-type flavor
+            connection-string primary earliest-restore-time
+            maintenance-window-start-at read-replica parent tags firewall-rules
+            metric-destinations read-replicas ca-certificates
+
+
+Schedule a major version upgrade of the PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) upgrade
 
 
 Manage private subnets

@@ -179,6 +179,20 @@ class PostgresResource < Sequel::Model
     end
   end
 
+  def upgrade_stage
+    strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first&.label
+  end
+
+  def upgrade_status
+    if upgrade_stage == "upgrade_failed"
+      "failed"
+    elsif target_version != version
+      "running"
+    else
+      "not_running"
+    end
+  end
+
   module HaType
     NONE = "none"
     ASYNC = "async"
@@ -192,6 +206,7 @@ class PostgresResource < Sequel::Model
   end
 
   DEFAULT_VERSION = "17"
+  LATEST_VERSION = "17"
 
   MAINTENANCE_DURATION_IN_HOURS = 2
 

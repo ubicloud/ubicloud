@@ -65,7 +65,9 @@ ubi pg (location/pg-name | pg-id) restore new-db-name restore-time
 ubi pg (location/pg-name | pg-id) set-maintenance-window start-hour
 ubi pg (location/pg-name | pg-id) show-config
 ubi pg (location/pg-name | pg-id) show-pgbouncer-config
+ubi pg (location/pg-name | pg-id) show-upgrade-status
 ubi pg (location/pg-name | pg-id) show [options]
+ubi pg (location/pg-name | pg-id) upgrade
 ubi ps command [...]
 ubi ps (location/ps-name | ps-id) post-command [...]
 ubi ps list [options]
