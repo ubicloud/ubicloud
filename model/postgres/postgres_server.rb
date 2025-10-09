@@ -154,7 +154,7 @@ class PostgresServer < Sequel::Model
   end
 
   def storage_size_gib
-    vm.vm_storage_volumes_dataset.reject(&:boot).sum(&:size_gib)
+    vm.vm_storage_volumes.reject(&:boot).sum(&:size_gib)
   end
 
   def needs_recycling?

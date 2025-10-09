@@ -11,7 +11,7 @@ class Clover
 
   def vm_list_api_response(dataset)
     dataset = dataset.where(location_id: @location.id) if @location
-    paginated_result(dataset, Serializers::Vm)
+    paginated_result(dataset.eager(:assigned_vm_address, :vm_storage_volumes, :location, :semaphores, :strand), Serializers::Vm)
   end
 
   def vm_post(name)

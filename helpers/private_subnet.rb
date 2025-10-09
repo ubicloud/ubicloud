@@ -10,9 +10,9 @@ class Clover
 
     if api?
       dataset = dataset.where(location: @location) if @location
-      paginated_result(dataset.eager(nics: :private_subnet), Serializers::PrivateSubnet)
+      paginated_result(dataset.eager(:location, firewalls: [:location, :firewall_rules], nics: :private_subnet), Serializers::PrivateSubnet)
     else
-      @pss = dataset.all
+      @pss = dataset.eager(:location).all
       view "networking/private_subnet/index"
     end
   end
