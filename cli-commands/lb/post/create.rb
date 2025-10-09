@@ -11,6 +11,7 @@ UbiCli.on("lb").run_on("create") do
     on("-e", "--check-endpoint=path", "set the health check endpoint (default: #{Prog::Vnet::LoadBalancerNexus::DEFAULT_HEALTH_CHECK_ENDPOINT})")
     on("-p", "--check-protocol=proto", health_check_protocols, "set the health check protocol")
     on("-s", "--stack=stack", stacks, "set the stack")
+    on("-c", "--cert-enabled=bool", "SSL certificate enabled")
   end
   help_option_values("Algorithm:", algorithms)
   help_option_values("Health Check Protocol:", health_check_protocols)
@@ -28,6 +29,7 @@ UbiCli.on("lb").run_on("create") do
     params[:private_subnet_id] = private_subnet_id
     params[:src_port] = need_integer_arg(src_port, "src-port", cmd)
     params[:dst_port] = need_integer_arg(dst_port, "dst-port", cmd)
+    need_boolean_arg(params[:cert_enabled], "cert-enabled", cmd) if params[:cert_enabled]
     id = sdk.load_balancer.create(location: @location, name: @name, **params).id
     response("Load balancer created with id: #{id}")
   end

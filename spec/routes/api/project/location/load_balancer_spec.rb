@@ -92,11 +92,27 @@ RSpec.describe Clover, "load-balancer" do
           stack: LoadBalancer::Stack::IPV4,
           src_port: "80", dst_port: "8080",
           health_check_endpoint: "/up", algorithm: "round_robin",
+          health_check_protocol: "http",
+          cert_enabled: false
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["name"]).to eq("lb1")
+      end
+
+      it "success without cert_enabled" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location_id: Location[display_name: TEST_LOCATION].id).subject
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/lb1", {
+          private_subnet_id: ps.ubid,
+          stack: LoadBalancer::Stack::IPV4,
+          src_port: "80", dst_port: "8080",
+          health_check_endpoint: "/up", algorithm: "round_robin",
           health_check_protocol: "http"
         }.to_json
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq("lb1")
+        expect(JSON.parse(last_response.body)["cert_enabled"]).to be false
       end
 
       it "invalid private_subnet_id" do
@@ -105,7 +121,8 @@ RSpec.describe Clover, "load-balancer" do
           stack: LoadBalancer::Stack::IPV6,
           src_port: "80", dst_port: "8080",
           health_check_endpoint: "/up", algorithm: "round_robin",
-          health_check_protocol: "http"
+          health_check_protocol: "http",
+          cert_enabled: false
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id")
