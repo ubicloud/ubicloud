@@ -15,7 +15,7 @@ class Serializers::Firewall < Serializers::Base
     end
 
     if options[:detailed]
-      base[:private_subnets] = Serializers::PrivateSubnet.serialize(firewall.private_subnets)
+      base[:private_subnets] = Serializers::PrivateSubnet.serialize(firewall.private_subnets(eager: [:location, :nics, firewalls: [:location, :firewall_rules]]))
     end
 
     base
