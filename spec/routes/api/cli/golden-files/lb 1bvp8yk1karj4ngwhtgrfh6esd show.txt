@@ -12,3 +12,4 @@ dst_port: 54321
 subnet: default-eu-central-h1
 vms:
   vmdzyppz6j166jh5e9t2dwrfas
+cert_enabled: false
