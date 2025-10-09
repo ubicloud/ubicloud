@@ -32,6 +32,7 @@ lb list -N=1 invalid
 lb list invalid
 lb eu-central-h1/test2-lb create psfzm9e26xky5m9ggetw4dpqe2 a 54321
 lb eu-central-h1/test2-lb create psfzm9e26xky5m9ggetw4dpqe2 54321 a
+lb eu-central-h1/test2-lb create -c bad psfzm9e26xky5m9ggetw4dpqe2 12345 54321
 lb eu-central-h1/test2-lb create -a bad psfzm9e26xky5m9ggetw4dpqe2 12345 54321
 lb eu-central-h1/test2-lb create -p bad psfzm9e26xky5m9ggetw4dpqe2 12345 54321
 lb eu-central-h1/test2-lb create -s bad psfzm9e26xky5m9ggetw4dpqe2 12345 54321
