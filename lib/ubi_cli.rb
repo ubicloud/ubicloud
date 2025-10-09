@@ -304,6 +304,11 @@ class UbiCli
     i
   end
 
+  def need_boolean_arg(v, arg_name, cmd)
+    raise Rodish::CommandFailure.new("invalid #{arg_name} argument: #{v.inspect}", cmd) unless v == "true" || v == "false"
+    v == "true"
+  end
+
   def execute_argv(argv, **headers)
     headers["ubi-command-execute"] = argv.shift
     response(argv.join("\0"), headers:)

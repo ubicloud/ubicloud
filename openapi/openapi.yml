@@ -653,6 +653,10 @@ paths:
                   type: array
                   items:
                     type: string
+                cert_enabled:
+                  description: Whether SSL certificates are enabled for the Load Balancer
+                  type: boolean
+                  nullable: true
               additionalProperties: false
               required:
                 - algorithm
@@ -698,6 +702,9 @@ paths:
                 src_port:
                   description: Source port for the Load Balancer
                   type: integer
+                cert_enabled:
+                  description: Whether SSL certificates are enabled for the Load Balancer
+                  type: boolean
               additionalProperties: false
               required:
                 - algorithm
@@ -2323,6 +2330,9 @@ components:
         src_port:
           description: Source port for the Load Balancer
           type: integer
+        cert_enabled:
+          description: Whether SSL certificate is enabled
+          type: boolean
       additionalProperties: false
       required:
         - algorithm
