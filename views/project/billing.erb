@@ -4,7 +4,7 @@ if @project.billing_info
   @invoices = @project.invoices.prepend(@project.current_invoice)
 end
 
-@usage_alerts = @project.usage_alerts_dataset.eager(:user) %>
+@usage_alerts = @project.usage_alerts_dataset.eager(:user).all %>
 
 <% if billing_info = @project.billing_info %>
   <%== part(
