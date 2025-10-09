@@ -52,7 +52,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     exclude_availability_zones = []
     alternative_families = []
     alien_ratio = github_runner.installation.project.get_ff_aws_alien_runners_ratio || 0
-    if label_data["arch"] == "x64" && rand < alien_ratio
+    if x64? && rand < alien_ratio
       boot_image = Config.send(:"#{boot_image.tr("-", "_")}_aws_ami_version")
       location_id = Config.github_runner_aws_location_id
       size = Option.aws_instance_type_name("m7a", label_data["vcpus"])
@@ -154,6 +154,10 @@ class Prog::Vm::GithubRunner < Prog::Base
   rescue Octokit::NotFound
   end
 
+  def x64?
+    github_runner.label_data["arch"] == "x64"
+  end
+
   def before_run
     when_destroy_set? do
       unless ["destroy", "wait_vm_destroy"].include?(strand.label)
@@ -189,7 +193,7 @@ class Prog::Vm::GithubRunner < Prog::Base
         .select_append { round(sum(:used_cores) * 100.0 / sum(:total_cores), 2).cast(:float).as(:utilization) }
         .to_hash(:family, :utilization)
 
-      not_allow = if github_runner.label_data["arch"] == "x64" && github_runner.label_data["family"] == "standard" && github_runner.installation.premium_runner_enabled?
+      not_allow = if x64? && github_runner.label_data["family"] == "standard" && github_runner.installation.premium_runner_enabled?
         family_utilization["premium"] > 75 && family_utilization["standard"] > 80
       else
         family_utilization.fetch(github_runner.label_data["family"], 0) > 80
@@ -200,7 +204,7 @@ class Prog::Vm::GithubRunner < Prog::Base
         nap rand(5..15)
       end
 
-      if github_runner.label_data["arch"] == "x64" && ((family_utilization["premium"] > 75) || (github_runner.installation.free_runner_upgrade? && family_utilization["premium"] > 50))
+      if x64? && ((family_utilization["premium"] > 75) || (github_runner.installation.free_runner_upgrade? && family_utilization["premium"] > 50))
         github_runner.incr_not_upgrade_premium
       end
       Clog.emit("allowed because of low utilization") { {exceeded_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
