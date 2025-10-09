@@ -69,13 +69,13 @@ RSpec.describe Prog::Vnet::LoadBalancerRemoveVm do
 
   describe "#initiate_cert_server_removal" do
     it "removes the certificate server and hops to wait_for_cert_server_removal" do
-      expect(lb).to receive(:cert_enabled_lb?).and_return(true)
+      expect(lb).to receive(:cert_enabled).and_return(true)
       expect(nx).to receive(:bud).with(Prog::Vnet::CertServer, {subject_id: lb.id, vm_id: vm.id}, :remove_cert_server)
       expect { nx.initiate_cert_server_removal }.to hop("wait_for_cert_server_removal")
     end
 
-    it "hops to wait_for_cert_server_removal if cert_enabled_lb? is false" do
-      expect(lb).to receive(:cert_enabled_lb?).and_return(false)
+    it "hops to wait_for_cert_server_removal if cert_enabled is false" do
+      expect(lb).to receive(:cert_enabled).and_return(false)
       expect(nx).not_to receive(:bud)
       expect { nx.initiate_cert_server_removal }.to hop("wait_for_cert_server_removal")
     end
