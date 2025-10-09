@@ -55,9 +55,20 @@ RSpec.configure do |config|
     error_response_matcher(expected_state, expected_message, expected_details, false)
   end
 
+  RACK_TEST_APP = if ENV["CLOVER_FREEZE"] == "1"
+    Clover.app
+  else
+    backtrace_filter = %r{\A#{Regexp.escape(Dir.pwd)}/(?!spec/)}
+    lambda do |env|
+      DB.detect_duplicate_queries(backtrace_filter:) do
+        Clover.app.call(env)
+      end
+    end
+  end
+
   config.include(Module.new do
     def app
-      Clover.app
+      RACK_TEST_APP
     end
 
     def last_response

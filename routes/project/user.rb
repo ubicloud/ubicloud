@@ -220,34 +220,33 @@ class Clover
             authorize("Project:editaccess", @project)
 
             DB.transaction do
-              typecast_params.array!(:Hash, "aces").each do
-                ubid, deleted, subject_id, action_id, object_id = it.values_at("ubid", "deleted", "subject", "action", "object")
-                subject_id = nil if subject_id == ""
-                action_id = nil if action_id == ""
-                object_id = nil if object_id == ""
+              DB.ignore_duplicate_queries do
+                typecast_params.array!(:Hash, "aces").each do
+                  ubid, deleted, subject_id, action_id, object_id = it.values_at("ubid", "deleted", "subject", "action", "object")
+                  subject_id = nil if subject_id == ""
+                  action_id = nil if action_id == ""
+                  object_id = nil if object_id == ""
 
-                next unless subject_id
+                  next unless subject_id
+                  check_ace_subject(UBID.to_uuid(subject_id)) unless deleted
 
-                check_ace_subject(UBID.to_uuid(subject_id)) unless deleted
-
-                if ubid == "template"
-                  next if deleted == "true"
-
-                  ace = AccessControlEntry.new(project_id: @project.id)
-                  audit_action = "create"
-                else
-                  next unless (ace = AccessControlEntry[project_id: @project.id, id: UBID.to_uuid(ubid)])
-
-                  check_ace_subject(ace.subject_id)
-                  if deleted == "true"
-                    ace.destroy
-                    audit_log(ace, "destroy")
-                    next
+                  if ubid == "template"
+                    next if deleted == "true"
+                    ace = AccessControlEntry.new(project_id: @project.id)
+                    audit_action = "create"
+                  else
+                    next unless (ace = AccessControlEntry[project_id: @project.id, id: UBID.to_uuid(ubid)])
+                    check_ace_subject(ace.subject_id)
+                    if deleted == "true"
+                      ace.destroy
+                      audit_log(ace, "destroy")
+                      next
+                    end
+                    audit_action = "update"
                   end
-                  audit_action = "update"
+                  ace.update_from_ubids(subject_id:, action_id:, object_id:)
+                  audit_log(ace, audit_action, [subject_id, action_id, object_id])
                 end
-                ace.update_from_ubids(subject_id:, action_id:, object_id:)
-                audit_log(ace, audit_action, [subject_id, action_id, object_id])
               end
             end
 

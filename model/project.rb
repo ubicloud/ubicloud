@@ -96,13 +96,15 @@ class Project < Sequel::Model
   def soft_delete
     DB.transaction do
       DB[:access_tag].where(project_id: id).delete
-      access_control_entries_dataset.destroy
-      %w[subject action object].each do |tag_type|
-        dataset = send(:"#{tag_type}_tags_dataset")
-        DB[:"applied_#{tag_type}_tag"].where(tag_id: dataset.select(:id)).delete
-        dataset.destroy
+      DB.ignore_duplicate_queries do
+        access_control_entries_dataset.destroy
+        %w[subject action object].each do |tag_type|
+          dataset = send(:"#{tag_type}_tags_dataset")
+          DB[:"applied_#{tag_type}_tag"].where(tag_id: dataset.select(:id)).delete
+          dataset.destroy
+        end
+        github_installations.each { Prog::Github::DestroyGithubInstallation.assemble(it) }
       end
-      github_installations.each { Prog::Github::DestroyGithubInstallation.assemble(it) }
 
       # We still keep the project object for billing purposes.
       # These need to be cleaned up manually once in a while.
@@ -148,9 +150,11 @@ class Project < Sequel::Model
   end
 
   def effective_quota_value(resource_type)
-    default_quota = ProjectQuota.default_quotas[resource_type]
-    override_quota_value = quotas_dataset.first(quota_id: default_quota["id"])&.value
-    override_quota_value || default_quota["#{reputation}_value"]
+    DB.ignore_duplicate_queries do
+      default_quota = ProjectQuota.default_quotas[resource_type]
+      override_quota_value = quotas_dataset.first(quota_id: default_quota["id"])&.value
+      override_quota_value || default_quota["#{reputation}_value"]
+    end
   end
 
   def quota_available?(resource_type, requested_additional_usage)

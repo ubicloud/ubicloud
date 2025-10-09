@@ -20,16 +20,8 @@ end
 
 Gem.suffix_pattern
 
-Capybara.app = Clover.app
+Capybara.app = RACK_TEST_APP
 Capybara.exact = true
-
-module RackTestPlus
-  include Rack::Test::Methods
-
-  def app
-    Capybara.app
-  end
-end
 
 # Work around Middleware should not call #each error.
 # Fix bugs with cookies, because the default behavior
@@ -42,7 +34,7 @@ class Capybara::RackTest::Browser
 end
 
 RSpec.configure do |config|
-  config.include RackTestPlus
+  config.include Rack::Test::Methods
   config.include Capybara::DSL
   config.after do
     Capybara.reset_sessions!

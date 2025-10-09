@@ -829,6 +829,7 @@ class Clover < Roda
     recovery_codes_route "account/multifactor/recovery-codes"
     recovery_codes_view { view "account/multifactor/recovery_codes", "My Account" }
     recovery_codes_link_text "View"
+    add_recovery_code { DB.ignore_duplicate_queries { super() } }
     add_recovery_codes_view { view "account/multifactor/recovery_codes", "My Account" }
     auto_add_recovery_codes? true
     auto_remove_recovery_codes? true
