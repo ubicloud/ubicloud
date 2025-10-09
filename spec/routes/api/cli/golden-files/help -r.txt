@@ -288,7 +288,7 @@ Usage:
     ubi lb (location/lb-name | lb-id) post-command [...]
 
 Commands:
-    list         List load balancers
+    list                      List load balancers
 
 Post Commands:
     attach-vm    Attach a virtual machine to a load balancer
