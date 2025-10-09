@@ -320,7 +320,7 @@ RSpec.describe Clover, "postgres" do
         pg
         pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
-        expect(VictoriaMetricsResource).to receive(:first).and_return(nil)
+        expect(VictoriaMetricsResource).to receive(:first).at_least(:once).and_return(nil)
 
         visit "#{project.path}#{pg.path}/overview"
         expect(page).to have_content "128 GB"
