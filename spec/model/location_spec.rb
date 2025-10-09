@@ -21,16 +21,20 @@ RSpec.describe Location do
   it ".visible_or_for_project filters dataset to given project and visible non-project-specific locations" do
     p1_loc
     p2_loc
-    expect(described_class.visible_or_for_project(p1_id).select_order_map(:name)).to eq ["hetzner-fsn1", "hetzner-hel1", "l1", "leaseweb-wdc02"]
-    expect(described_class.visible_or_for_project(p2_id).select_order_map(:name)).to eq ["hetzner-fsn1", "hetzner-hel1", "l2", "leaseweb-wdc02"]
+    expect(described_class.visible_or_for_project(p1_id, []).select_order_map(:name)).to eq ["hetzner-fsn1", "hetzner-hel1", "l1", "leaseweb-wdc02"]
+    expect(described_class.visible_or_for_project(p2_id, []).select_order_map(:name)).to eq ["hetzner-fsn1", "hetzner-hel1", "l2", "leaseweb-wdc02"]
+    expect(described_class.visible_or_for_project(p1_id, []).select_order_map(:name)).to eq ["hetzner-fsn1", "hetzner-hel1", "l1", "leaseweb-wdc02"]
+    expect(described_class.visible_or_for_project(p1_id, ["latitude-ai"]).select_order_map(:name)).to eq ["hetzner-fsn1", "hetzner-hel1", "l1", "latitude-ai", "leaseweb-wdc02"]
   end
 
   it "#visible_or_for_project? returns whether the location is visible or related to the given project" do
-    expect(p1_loc.visible_or_for_project?(p1_id)).to be true
-    expect(p1_loc.visible_or_for_project?(p2_id)).to be false
-    expect(p2_loc.visible_or_for_project?(p2_id)).to be true
-    expect(p2_loc.visible_or_for_project?(p1_id)).to be false
-    expect(described_class[name: "hetzner-fsn1"].visible_or_for_project?(p1_id)).to be true
-    expect(described_class[name: "github-runners"].visible_or_for_project?(p1_id)).to be false
+    expect(p1_loc.visible_or_for_project?(p1_id, [])).to be true
+    expect(p1_loc.visible_or_for_project?(p2_id, [])).to be false
+    expect(p2_loc.visible_or_for_project?(p2_id, [])).to be true
+    expect(p2_loc.visible_or_for_project?(p1_id, [])).to be false
+    expect(described_class[name: "hetzner-fsn1"].visible_or_for_project?(p1_id, [])).to be true
+    expect(described_class[name: "github-runners"].visible_or_for_project?(p1_id, [])).to be false
+    expect(described_class[name: "latitude-ai"].visible_or_for_project?(p1_id, [])).to be false
+    expect(described_class[name: "latitude-ai"].visible_or_for_project?(p1_id, ["latitude-ai"])).to be true
   end
 end
