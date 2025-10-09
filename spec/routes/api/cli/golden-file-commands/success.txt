@@ -75,8 +75,10 @@ lb eu-central-h1/test-lb show -f stack,health-check-endpoint,health-check-protoc
 lb eu-central-h1/test-lb show -f src-port,dst-port,subnet,vms
 lb eu-central-h1/test-lb destroy -f
 lb eu-central-h1/test-lb detach-vm vmdzyppz6j166jh5e9t2dwrfas
-lb eu-central-h1/test-lb update hash_based 1234 54321 /up2
-lb eu-central-h1/test-lb update hash_based 1234 54321 /up2 vmdzyppz6j166jh5e9t2dwrfas
+lb eu-central-h1/test-lb update hash_based 1234 54321 /up2 true
+lb eu-central-h1/test-lb update hash_based 1234 54321 /up2 false vmdzyppz6j166jh5e9t2dwrfas
+lb eu-central-h1/test-lb toggle-ssl-certificate -c true
+lb eu-central-h1/test-lb toggle-ssl-certificate -c false
 lb list
 lb list -f src-port,dst-port,hostname
 lb list -l eu-central-h1

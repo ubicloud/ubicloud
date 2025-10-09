@@ -88,6 +88,17 @@ class LoadBalancer < Sequel::Model
     end
   end
 
+  def enable_cert_server
+    update(cert_enabled: true)
+    vms.each { |vm| setup_cert_server(vm.id) }
+  end
+
+  def disable_cert_server
+    update(cert_enabled: false)
+    vms.each { |vm| remove_cert_server(vm.id) }
+    certs.each(&:incr_destroy)
+  end
+
   def detach_vm(vm)
     DB.transaction do
       vm_ports_by_vm_and_state(vm, ["up", "down", "evacuating"]).update(state: "detaching")
