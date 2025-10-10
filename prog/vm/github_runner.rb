@@ -209,7 +209,6 @@ class Prog::Vm::GithubRunner < Prog::Base
       end
       Clog.emit("allowed because of low utilization") { {exceeded_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
     end
-    github_runner.log_duration("runner_capacity_waited", Time.now - github_runner.created_at)
     hop_allocate_vm
   end
 
