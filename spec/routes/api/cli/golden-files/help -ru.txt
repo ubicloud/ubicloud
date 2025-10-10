@@ -34,9 +34,10 @@ ubi lb (location/lb-name | lb-id) attach-vm (vm-name | vm-id)
 ubi lb location/lb-name create [options] (ps-name | ps-id) src-port dst-port
 ubi lb (location/lb-name | lb-id) destroy [options]
 ubi lb (location/lb-name | lb-id) detach-vm (vm-name | vm-id)
+ubi lb (location/lb-name | lb-id) disable-ssl-certificate
+ubi lb (location/lb-name | lb-id) enable-ssl-certificate
 ubi lb (location/lb-name | lb-id) rename new-name
 ubi lb (location/lb-name | lb-id) show [options]
-ubi lb (location/lb-name | lb-id) toggle-ssl-certificate [--cert-enabled bool]
 ubi lb (location/lb-name | lb-id) update algorithm src-port dst-port health-check-endpoint cert-enabled [(vm-name | vm-id) [...]]
 ubi pg command [...]
 ubi pg (location/pg-name | pg-id) [post-options] post-command [...]
