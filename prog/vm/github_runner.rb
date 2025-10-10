@@ -26,13 +26,14 @@ class Prog::Vm::GithubRunner < Prog::Base
   def pick_vm
     label_data = github_runner.label_data
     installation = github_runner.installation
+    skip_pool = installation.project.get_ff_skip_runner_pool || github_runner.spill_over_set?
 
     vm_size = if installation.premium_runner_enabled? || installation.free_runner_upgrade?
       "premium-#{label_data["vcpus"]}"
     else
       label_data["vm_size"]
     end
-    pool = installation.project.get_ff_skip_runner_pool ? nil : VmPool.where(
+    pool = skip_pool ? nil : VmPool.where(
       vm_size:,
       boot_image: label_data["boot_image"],
       location_id: Location::GITHUB_RUNNERS_ID,
@@ -52,7 +53,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     exclude_availability_zones = []
     alternative_families = []
     alien_ratio = github_runner.installation.project.get_ff_aws_alien_runners_ratio || 0
-    if label_data["arch"] == "x64" && rand < alien_ratio
+    if github_runner.spill_over_set? || (x64? && rand < alien_ratio)
       boot_image = Config.send(:"#{boot_image.tr("-", "_")}_aws_ami_version")
       location_id = Config.github_runner_aws_location_id
       size = Option.aws_instance_type_name("m7a", label_data["vcpus"])
@@ -154,6 +155,10 @@ class Prog::Vm::GithubRunner < Prog::Base
   rescue Octokit::NotFound
   end
 
+  def x64?
+    github_runner.label_data["arch"] == "x64"
+  end
+
   def before_run
     when_destroy_set? do
       unless ["destroy", "wait_vm_destroy"].include?(strand.label)
@@ -182,30 +187,46 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def wait_concurrency_limit
-    unless quota_available?
-      # check utilization, if it's high, wait for it to go down
-      family_utilization = VmHost.where(allocation_state: "accepting", arch: github_runner.label_data["arch"])
-        .select_group(:family)
-        .select_append { round(sum(:used_cores) * 100.0 / sum(:total_cores), 2).cast(:float).as(:utilization) }
-        .to_hash(:family, :utilization)
+    hop_allocate_vm if quota_available?
 
-      not_allow = if github_runner.label_data["arch"] == "x64" && github_runner.label_data["family"] == "standard" && github_runner.installation.premium_runner_enabled?
-        family_utilization["premium"] > 75 && family_utilization["standard"] > 80
-      else
-        family_utilization.fetch(github_runner.label_data["family"], 0) > 80
-      end
+    # check utilization, if it's high, wait for it to go down
+    family_utilization = VmHost.where(allocation_state: "accepting", arch: github_runner.label_data["arch"])
+      .select_group(:family)
+      .select_append { round(sum(:used_cores) * 100.0 / sum(:total_cores), 2).cast(:float).as(:utilization) }
+      .to_hash(:family, :utilization)
 
-      if not_allow
-        Clog.emit("not allowed because of high utilization") { {reached_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
-        nap rand(5..15)
-      end
+    std_util = family_utilization["standard"]
+    prem_util = family_utilization["premium"]
 
-      if github_runner.label_data["arch"] == "x64" && ((family_utilization["premium"] > 75) || (github_runner.installation.free_runner_upgrade? && family_utilization["premium"] > 50))
-        github_runner.incr_not_upgrade_premium
-      end
-      Clog.emit("allowed because of low utilization") { {exceeded_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
+    is_high_util = if x64? && github_runner.label_data["family"] == "standard" && github_runner.installation.premium_runner_enabled?
+      prem_util > 75 && std_util > 80
+    else
+      family_utilization.fetch(github_runner.label_data["family"], 0) > 80
     end
-    github_runner.log_duration("runner_capacity_waited", Time.now - github_runner.created_at)
+
+    if is_high_util
+      if x64? &&
+          github_runner.installation.project.get_ff_spill_to_alien_runners &&
+          Time.now - github_runner.created_at > Config.github_runner_aws_spill_threshold_seconds
+
+        spilled_vcpus = Vm.where(boot_image: [Config.github_ubuntu_2204_aws_ami_version, Config.github_ubuntu_2404_aws_ami_version]).sum(:vcpus) || 0
+        if spilled_vcpus < Config.github_runner_aws_spill_vcpu_capacity
+          Clog.emit("spilled over runner") { {spilled_over_runner: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
+          github_runner.incr_spill_over
+          hop_allocate_vm
+        end
+
+        Clog.emit("not allowed because of high utilization and spill capacity exceeded") { {exceeded_spill_capacity: {family_utilization:, spilled_vcpus:, label: github_runner.label, repository_name: github_runner.repository_name}} }
+      end
+
+      Clog.emit("not allowed because of high utilization") { {reached_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
+      nap rand(5..15)
+    end
+
+    if x64? && ((prem_util > 75) || (github_runner.installation.free_runner_upgrade? && prem_util > 50))
+      github_runner.incr_not_upgrade_premium
+    end
+    Clog.emit("allowed because of low utilization") { {exceeded_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
     hop_allocate_vm
   end
 

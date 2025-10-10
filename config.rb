@@ -103,6 +103,8 @@ module Config
   optional :github_runner_aws_location_id, string
   override :github_runner_aws_spot_instance_enabled, false, bool
   optional :github_runner_aws_spot_instance_max_price_per_vcpu, float
+  override :github_runner_aws_spill_threshold_seconds, 30, int
+  override :github_runner_aws_spill_vcpu_capacity, 100, int
 
   # GitHub Cache
   optional :github_cache_blob_storage_endpoint, string

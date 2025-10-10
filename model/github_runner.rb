@@ -11,7 +11,7 @@ class GithubRunner < Sequel::Model
   one_through_one :project, join_table: :github_installation, left_key: :id, left_primary_key: :installation_id, read_only: true
 
   plugin ResourceMethods, redacted_columns: :workflow_job
-  plugin SemaphoreMethods, :destroy, :skip_deregistration, :not_upgrade_premium
+  plugin SemaphoreMethods, :destroy, :skip_deregistration, :not_upgrade_premium, :spill_over
   include HealthMonitorMethods
 
   dataset_module do
