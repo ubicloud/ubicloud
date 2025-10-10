@@ -1,5 +1,5 @@
 <% @page_title = @project.name
-@quotas = ["VmVCpu", "PostgresVCpu"].map {
+@quotas = ["VmVCpu", "PostgresVCpu", "KubernetesVCpu"].map {
   {
     resource_type: it,
     current_resource_usage: @project.current_resource_usage(it),
