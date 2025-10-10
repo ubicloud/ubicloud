@@ -3,7 +3,7 @@
 source "https://rubygems.org"
 
 # Update ruby version in Dockerfile and .tool_versions when updating this
-ruby "3.4.6"
+ruby "3.4.7"
 
 gem "acme-client"
 gem "argon2"
