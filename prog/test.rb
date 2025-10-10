@@ -80,6 +80,10 @@ class Prog::Test < Prog::Base
     fail "failure"
   end
 
+  label def short_napper
+    nap(12)
+  end
+
   label def napper
     nap(123)
   end
@@ -94,6 +98,21 @@ class Prog::Test < Prog::Base
 
   label def invalid_hop_target
     dynamic_hop :black_hole
+  end
+
+  label def bud_short_napper
+    bud self.class, frame, :short_napper
+    hop_reaper
+  end
+
+  label def bud_short_nappers
+    2.times { bud self.class, frame, :short_napper }
+    hop_reaper
+  end
+
+  label def bud_napper
+    bud self.class, frame, :napper
+    hop_reaper
   end
 
   label def budder
