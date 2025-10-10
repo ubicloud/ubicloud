@@ -43,6 +43,10 @@ module Ubicloud
       vm_action(vm, "/detach-vm")
     end
 
+    def toggle_ssl_certificate(cert_enabled:)
+      merge_into_values(adapter.post(_path("/toggle-ssl-certificate"), cert_enabled:))
+    end
+
     private
 
     # Internals of attach_vm/detach_vm

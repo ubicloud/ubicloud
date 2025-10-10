@@ -429,6 +429,32 @@ RSpec.describe Clover, "load balancer" do
       end
     end
 
+    describe "toggle-ssl-certificate" do
+      it "can enable cert" do
+        lb.update(cert_enabled: false)
+        visit "#{project.path}#{lb.path}/settings"
+        within("form#cert_enabled_toggle") do
+          _csrf = find("input[name='_csrf']", visible: false).value
+          page.driver.post "#{project.path}#{lb.path}/toggle-ssl-certificate", {cert_enabled: true, _csrf:}
+        end
+
+        expect(page.status_code).to eq(302)
+        expect(lb.reload.cert_enabled).to be true
+      end
+
+      it "can disable cert" do
+        lb.update(cert_enabled: true)
+        visit "#{project.path}#{lb.path}/settings"
+        within("form#cert_enabled_toggle") do
+          _csrf = find("input[name='_csrf']", visible: false).value
+          page.driver.post "#{project.path}#{lb.path}/toggle-ssl-certificate", {cert_enabled: false, _csrf:}
+        end
+
+        expect(page.status_code).to eq(302)
+        expect(lb.reload.cert_enabled).to be false
+      end
+    end
+
     describe "delete" do
       it "can delete load balancer" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
