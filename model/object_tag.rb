@@ -8,9 +8,11 @@ class ObjectTag < Sequel::Model
 
   module Cleanup
     def before_destroy
-      AccessControlEntry.where(object_id: id).destroy
-      DB[:applied_object_tag].where(object_id: id).delete
-      super
+      DB.ignore_duplicate_queries do
+        AccessControlEntry.where(object_id: id).destroy
+        DB[:applied_object_tag].where(object_id: id).delete
+        super
+      end
     end
   end
 

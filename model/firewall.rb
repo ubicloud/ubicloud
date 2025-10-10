@@ -35,8 +35,10 @@ class Firewall < Sequel::Model
 
   def replace_firewall_rules(new_firewall_rules)
     firewall_rules.each(&:destroy)
-    new_firewall_rules.each do
-      add_firewall_rule(it)
+    DB.ignore_duplicate_queries do
+      new_firewall_rules.each do
+        add_firewall_rule(it)
+      end
     end
 
     update_private_subnet_firewall_rules

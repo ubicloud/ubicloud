@@ -26,6 +26,14 @@ end
 DB.extension :pg_array, :pg_json, :pg_auto_parameterize, :pg_auto_parameterize_in_array, :pg_timestamptz, :pg_range, :pg_enum
 Sequel.extension :pg_range_ops, :pg_json_ops
 
+if Config.development? || (Config.test? && ENV["CLOVER_FREEZE"] != "1")
+  DB.extension :pg_auto_parameterize_duplicate_query_detection
+else
+  def DB.ignore_duplicate_queries
+    yield
+  end
+end
+
 # Replace dangerous (for cidrs) Ruby IPAddr type that is otherwise
 # used by sequel_pg.  Has come up more than once in the bug tracker:
 #
