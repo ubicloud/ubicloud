@@ -803,6 +803,34 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
+  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_reference}/toggle-ssl-certificate':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/load_balancer_reference'
+    post:
+      operationId: toggleSslCertificateLoadBalancer
+      summary: Toggle the SSL certificate for a load balancer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cert_enabled:
+                  description: Whether SSL certificates are enabled for the Load Balancer
+                  type: boolean
+              additionalProperties: false
+              required:
+                - cert_enabled
+      responses:
+        '200':
+          $ref: '#/components/responses/LoadBalancer'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
   '/project/{project_id}/location/{location}/postgres':
     get:
       operationId: listLocationPostgresDatabases

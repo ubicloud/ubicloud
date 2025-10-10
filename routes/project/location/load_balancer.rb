@@ -123,6 +123,28 @@ class Clover
         lb.incr_refresh_cert
       end
 
+      r.post "toggle-ssl-certificate" do
+        authorize("LoadBalancer:edit", lb)
+        cert_enabled = typecast_params.bool("cert_enabled")
+
+        # check if certificates are getting enabled or they were already enabled
+        if lb.cert_enabled != cert_enabled
+          DB.transaction do
+            cert_enabled ? lb.enable_cert_server : lb.disable_cert_server
+            audit_log(lb, "update")
+          end
+        else
+          no_audit_log
+        end
+
+        if api?
+          Serializers::LoadBalancer.serialize(lb, {detailed: true})
+        else
+          flash["notice"] = "SSL certificates #{cert_enabled ? "enabled" : "disabled"}"
+          r.redirect lb, "/settings"
+        end
+      end
+
       r.show_object(lb, actions: %w[overview vms settings], perm: "LoadBalancer:view", template: "networking/load_balancer/show")
     end
   end

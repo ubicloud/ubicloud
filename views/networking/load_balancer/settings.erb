@@ -17,6 +17,26 @@ delete_perm = has_permission?("LoadBalancer:delete", @lb) %>
             <%== part("components/rename_object_input", object: @lb, type: "load balancer", text: "Renaming a load balancer changes the DNS name used, so configuration changes may be required if the load balancer is renamed. You will also need to renew the SSL certificate in the virtual machines attached to this load balancer.") %>
           <% end %>
         </div>
+        <div class="px-4 py-5 sm:p-6">
+          <div class="sm:flex sm:items-center sm:justify-between">
+            <div>
+              <h3 class="text-base font-semibold leading-6 text-gray-900">SSL Certificate</h3>
+              <div class="mt-2 text-sm text-gray-500">
+                <p>Ubicloud automatically provides a free SSL certificate for your load balancer. To enable it, toggle
+                  the switch.</p>
+                <p>Learn more about Ubicloud SSL certificates in the
+                  <a
+                    href="https://www.ubicloud.com/docs/networking/load-balancer#ssl-certificates"
+                    class="text-orange-600 hover:text-orange-700"
+                    target="_blank"
+                  >documentation</a>.</p>
+              </div>
+            </div>
+            <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+              <%== part("components/form/toggle_form", name: "cert_enabled", action: "#{path(@lb)}/toggle-ssl-certificate", active: @lb.cert_enabled) %>
+            </div>
+          </div>
+        </div>
       <% end %>
       <% if delete_perm %>
         <div class="px-4 py-5 sm:p-6">
