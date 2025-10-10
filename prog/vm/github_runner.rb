@@ -194,18 +194,21 @@ class Prog::Vm::GithubRunner < Prog::Base
       .select_append { round(sum(:used_cores) * 100.0 / sum(:total_cores), 2).cast(:float).as(:utilization) }
       .to_hash(:family, :utilization)
 
-    not_allow = if x64? && github_runner.label_data["family"] == "standard" && github_runner.installation.premium_runner_enabled?
-      family_utilization["premium"] > 75 && family_utilization["standard"] > 80
+    std_util = family_utilization["standard"]
+    prem_util = family_utilization["premium"]
+
+    is_high_util = if x64? && github_runner.label_data["family"] == "standard" && github_runner.installation.premium_runner_enabled?
+      prem_util > 75 && std_util > 80
     else
       family_utilization.fetch(github_runner.label_data["family"], 0) > 80
     end
 
-    if not_allow
+    if is_high_util
       Clog.emit("not allowed because of high utilization") { {reached_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
       nap rand(5..15)
     end
 
-    if x64? && ((family_utilization["premium"] > 75) || (github_runner.installation.free_runner_upgrade? && family_utilization["premium"] > 50))
+    if x64? && ((prem_util > 75) || (github_runner.installation.free_runner_upgrade? && prem_util > 50))
       github_runner.incr_not_upgrade_premium
     end
     Clog.emit("allowed because of low utilization") { {exceeded_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
