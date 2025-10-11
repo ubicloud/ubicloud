@@ -5,6 +5,33 @@ class Clover
     authorized_object(association: :private_subnets, key:, perm:, location_id:, id:)
   end
 
+  def private_subnet_connection_action(type, id)
+    authorize("PrivateSubnet:#{type}", @ps.id)
+    handle_validation_failure("networking/private_subnet/show") { @page = "networking" }
+
+    if type == "connect" && id == @ps.id
+      raise CloverError.new(400, "InvalidRequest", "Cannot connect private subnet to itself")
+    end
+
+    if (subnet = authorized_private_subnet(perm: "PrivateSubnet:#{type}", location_id: @location.id, id:))
+      name = subnet.name
+    else
+      raise CloverError.new(400, "InvalidRequest", "Subnet to be #{type}ed not found")
+    end
+
+    DB.transaction do
+      @ps.send(:"#{type}_subnet", subnet)
+      audit_log(@ps, type, subnet)
+    end
+
+    if api?
+      Serializers::PrivateSubnet.serialize(@ps)
+    else
+      flash["notice"] = "#{name} will be #{type}ed in a few seconds"
+      request.redirect @ps, "/networking"
+    end
+  end
+
   def private_subnet_list
     dataset = dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view")
 
