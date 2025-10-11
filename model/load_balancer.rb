@@ -83,15 +83,26 @@ class LoadBalancer < Sequel::Model
       ports.each { |port|
         LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: load_balancer_vm.id)
       }
-      Strand.create(prog: "Vnet::CertServer", label: "setup_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id) if cert_enabled_lb?
+      setup_cert_server(vm.id) if cert_enabled
       incr_rewrite_dns_records
     end
+  end
+
+  def enable_cert_server
+    update(cert_enabled: true)
+    vms.each { |vm| setup_cert_server(vm.id) }
+  end
+
+  def disable_cert_server
+    update(cert_enabled: false)
+    vms.each { |vm| remove_cert_server(vm.id) }
+    certs.each(&:incr_destroy)
   end
 
   def detach_vm(vm)
     DB.transaction do
       vm_ports_by_vm_and_state(vm, ["up", "down", "evacuating"]).update(state: "detaching")
-      remove_cert_server(vm.id)
+      remove_cert_server(vm.id) if cert_enabled
       incr_update_load_balancer
     end
   end
@@ -99,14 +110,18 @@ class LoadBalancer < Sequel::Model
   def evacuate_vm(vm)
     DB.transaction do
       vm_ports_by_vm_and_state(vm, ["up", "down"]).update(state: "evacuating")
-      remove_cert_server(vm.id)
+      remove_cert_server(vm.id) if cert_enabled
       incr_update_load_balancer
       incr_rewrite_dns_records
     end
   end
 
   def remove_cert_server(vm_id)
-    Strand.create(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id:}], parent_id: id) if cert_enabled_lb?
+    Strand.create(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id:}], parent_id: id)
+  end
+
+  def setup_cert_server(vm_id)
+    Strand.create(prog: "Vnet::CertServer", label: "setup_cert_server", stack: [{subject_id: id, vm_id:}], parent_id: id)
   end
 
   def remove_vm(vm)
@@ -135,12 +150,8 @@ class LoadBalancer < Sequel::Model
     custom_hostname_dns_zone || DnsZone[project_id: Config.load_balancer_service_project_id, name: Config.load_balancer_service_hostname]
   end
 
-  def cert_enabled_lb?
-    health_check_protocol == "https"
-  end
-
   def need_certificates?
-    return false unless cert_enabled_lb?
+    return false unless cert_enabled
 
     certs_dataset.with_cert.needing_recert.empty?
   end
@@ -181,6 +192,7 @@ end
 #  stack                       | lb_stack                 | NOT NULL DEFAULT 'dual'::lb_stack
 #  project_id                  | uuid                     | NOT NULL
 #  created_at                  | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  cert_enabled                | boolean                  | DEFAULT false
 # Indexes:
 #  load_balancer_pkey                        | PRIMARY KEY btree (id)
 #  load_balancer_custom_hostname_key         | UNIQUE btree (custom_hostname)

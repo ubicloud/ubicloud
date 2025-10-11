@@ -14,6 +14,7 @@ RSpec.describe Serializers::LoadBalancer do
       expect(lb).to receive(:stack).and_return("dual")
       expect(lb).to receive(:health_check_endpoint).and_return("/")
       expect(lb).to receive(:health_check_protocol).and_return("tcp")
+      expect(lb).to receive(:cert_enabled).and_return(false)
 
       expected_result = {
         id: "1234",
@@ -25,7 +26,8 @@ RSpec.describe Serializers::LoadBalancer do
         health_check_endpoint: "/",
         health_check_protocol: "tcp",
         src_port: 1,
-        dst_port: 5
+        dst_port: 5,
+        cert_enabled: false
       }
 
       expect(described_class.serialize_internal(lb)).to eq(expected_result)
@@ -52,7 +54,8 @@ RSpec.describe Serializers::LoadBalancer do
         health_check_endpoint: "/",
         health_check_protocol: "tcp",
         src_port: nil,
-        dst_port: nil
+        dst_port: nil,
+        cert_enabled: nil
       }
 
       expect(described_class.serialize_internal(lb)).to eq(expected_result)

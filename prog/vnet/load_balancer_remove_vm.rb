@@ -27,7 +27,7 @@ class Prog::Vnet::LoadBalancerRemoveVm < Prog::Base
   end
 
   label def initiate_cert_server_removal
-    bud Prog::Vnet::CertServer, {subject_id: load_balancer.id, vm_id: vm.id}, :remove_cert_server if load_balancer.cert_enabled_lb?
+    bud Prog::Vnet::CertServer, {subject_id: load_balancer.id, vm_id: vm.id}, :remove_cert_server if load_balancer.cert_enabled
     hop_wait_for_cert_server_removal
   end
 

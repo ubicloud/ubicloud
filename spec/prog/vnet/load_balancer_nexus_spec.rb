@@ -7,7 +7,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
   let(:st) {
     cert = Prog::Vnet::CertNexus.assemble("test-host-name", dns_zone.id).subject
-    lb = described_class.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080, health_check_protocol: "https").subject
+    lb = described_class.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080, health_check_protocol: "https", cert_enabled: true).subject
     lb.add_cert(cert)
     lb.strand
   }

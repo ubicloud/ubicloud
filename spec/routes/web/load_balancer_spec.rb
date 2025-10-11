@@ -164,7 +164,7 @@ RSpec.describe Clover, "load balancer" do
 
     describe "show" do
       it "can show load balancer details" do
-        lb
+        lb.update(health_check_protocol: "http")
         visit "#{project.path}/load-balancer"
 
         expect(page.title).to eq("Ubicloud - Load Balancers")
@@ -198,7 +198,7 @@ RSpec.describe Clover, "load balancer" do
         expect(page.title).to eq("Ubicloud - Load Balancers")
         expect(page).to have_content lb.name
         expect(page).to have_content lb.hostname
-        lb.update(health_check_protocol: "https")
+        lb.update(health_check_protocol: "https", cert_enabled: true)
         click_link lb.name, href: "#{project.path}#{lb.path}"
 
         expect(page.title).to eq("Ubicloud - #{lb.name}")
@@ -214,7 +214,7 @@ RSpec.describe Clover, "load balancer" do
           "Load Balancer Port", "80",
           "Application Port", "8080",
           "Health Check Protocol", "HTTPS",
-          "HTTP Health Check Endpoint", "/up",
+          "HTTPS Health Check Endpoint", "/up",
           "SSL Certificate Status", "Creating"
         ]
         expect(page).to have_content "How to fetch the SSL certificate?"
@@ -277,7 +277,7 @@ RSpec.describe Clover, "load balancer" do
           "Load Balancer Port", "80",
           "Application Port", "8000",
           "Health Check Protocol", "HTTPS",
-          "HTTP Health Check Endpoint", "/up",
+          "HTTPS Health Check Endpoint", "/up",
           "SSL Certificate Status", "Available"
         ]
 
@@ -292,7 +292,8 @@ RSpec.describe Clover, "load balancer" do
           "Stack", "dual",
           "Load Balancer Port", "80",
           "Application Port", "8000",
-          "Health Check Protocol", "TCP"
+          "Health Check Protocol", "TCP",
+          "SSL Certificate Status", "Available"
         ]
 
         visit "#{project.path}#{lb.path}/vms"
@@ -425,6 +426,32 @@ RSpec.describe Clover, "load balancer" do
         expect(page.title).to eq "Ubicloud - dummy-lb-2"
         expect(page).to have_no_content("Rename")
         find ".delete-btn"
+      end
+    end
+
+    describe "toggle-ssl-certificate" do
+      it "can enable cert" do
+        lb.update(cert_enabled: false)
+        visit "#{project.path}#{lb.path}/settings"
+        within("form#cert_enabled_toggle") do
+          _csrf = find("input[name='_csrf']", visible: false).value
+          page.driver.post "#{project.path}#{lb.path}/toggle-ssl-certificate", {cert_enabled: true, _csrf:}
+        end
+
+        expect(page.status_code).to eq(302)
+        expect(lb.reload.cert_enabled).to be true
+      end
+
+      it "can disable cert" do
+        lb.update(cert_enabled: true)
+        visit "#{project.path}#{lb.path}/settings"
+        within("form#cert_enabled_toggle") do
+          _csrf = find("input[name='_csrf']", visible: false).value
+          page.driver.post "#{project.path}#{lb.path}/toggle-ssl-certificate", {cert_enabled: false, _csrf:}
+        end
+
+        expect(page.status_code).to eq(302)
+        expect(lb.reload.cert_enabled).to be false
       end
     end
 
