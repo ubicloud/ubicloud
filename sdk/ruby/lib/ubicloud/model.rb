@@ -81,11 +81,10 @@ module Ubicloud
         columns.each do |column|
           next if method_defined?(column)
           define_method(column) do
-            unless (value = @values[column])
+            @values.fetch(column) do
               info
-              value = @values[column]
+              @values[column]
             end
-            value
           end
         end
       end

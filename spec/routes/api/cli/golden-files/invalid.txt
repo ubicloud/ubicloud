@@ -12,6 +12,7 @@ Examples:
 Commands:
     ai         Manage AI features
     fw         Manage firewalls
+    gh         Manage GitHub integration
     help       Get command help
     kc         Manage Kubernetes clusters
     lb         Manage load balancers
