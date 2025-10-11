@@ -240,7 +240,34 @@ end
         nap(nap)
       else
         active_children.each do |child|
-          nap 0 if child.run
+          if (result = child.run)
+            if result.is_a?(Nap)
+              seconds = if active_children.length == 1
+                # For a single active child napping, parent can nap for as long as the child naps,
+                # since the expectation is there will not be anything to do until then.
+                result.seconds
+              else
+                # For multiple active children, if a single child is napping, it's possible the
+                # other children are immediately runnable. However, you don't want to busy
+                # wait on multiple children. Nap until the time of the earliest scheduled child
+                # that isn't currently running. If all children are running, nap for 120 seconds
+                strand.children_dataset
+                  .where(Sequel[:lease] < Sequel::CURRENT_TIMESTAMP)
+                  .min(Sequel.extract(:epoch, Sequel[:schedule] - Sequel::CURRENT_TIMESTAMP)) || 121
+              end
+
+              # Remove a 10th of a second so it is likely the parent will run the child.
+              seconds -= 0.1
+
+              # Nap for a minimum of 0.1 seconds and a maximum of 120 seconds in any case.
+              # The 0.1 seconds is to avoid busy waiting.
+              nap(seconds.clamp(0.1, 120))
+            else
+              # A non-nap (e.g. Exit or Hop) happened, so the state changed, and
+              # it makes sense to rerun the strand immediately.
+              nap 0
+            end
+          end
         end
 
         schedule = strand.schedule

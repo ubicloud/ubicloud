@@ -19,6 +19,50 @@ RSpec.describe Prog::Base do
     expect(failer.this.get(:exitval)).to be_nil
   end
 
+  it "parent reap naps for 0.1 seconds less than child if single child naps" do
+    parent = Strand.create(prog: "Test", label: "bud_short_napper")
+    hop = parent.unsynchronized_run
+    expect(hop).to be_a Prog::Base::Hop
+    expect(hop.new_label).to eq "reaper"
+
+    nap = parent.unsynchronized_run
+    expect(nap).to be_a Prog::Base::Nap
+    expect(nap.seconds).to eq 11.9
+  end
+
+  it "parent reap naps for at most 120 seconds if single child naps more than 120 seconds" do
+    parent = Strand.create(prog: "Test", label: "bud_napper")
+    hop = parent.unsynchronized_run
+    expect(hop).to be_a Prog::Base::Hop
+    expect(hop.new_label).to eq "reaper"
+
+    nap = parent.unsynchronized_run
+    expect(nap).to be_a Prog::Base::Nap
+    expect(nap.seconds).to eq 120
+  end
+
+  it "parent reap naps until 0.1 less than earliest scheduled child if multiple children, and at least 0.1 seconds and at most 120 seconds" do
+    parent = Strand.create(prog: "Test", label: "bud_short_nappers")
+    hop = parent.unsynchronized_run
+    expect(hop).to be_a Prog::Base::Hop
+    expect(hop.new_label).to eq "reaper"
+
+    nap = parent.unsynchronized_run
+    expect(nap).to be_a Prog::Base::Nap
+    expect(nap.seconds).to eq 0.1
+
+    nap = parent.unsynchronized_run
+    expect(nap).to be_a Prog::Base::Nap
+    expect(nap.seconds).to eq 11.9
+
+    child1, child2 = parent.children
+    child1.this.update(label: "napper", schedule: Sequel::CURRENT_TIMESTAMP + Sequel.cast("123 seconds", :interval))
+    child2.this.update(lease: Sequel::CURRENT_TIMESTAMP + Sequel.cast("1 second", :interval))
+    nap = parent.unsynchronized_run
+    expect(nap).to be_a Prog::Base::Nap
+    expect(nap.seconds).to eq 120
+  end
+
   it "can bud and reap" do
     parent = Strand.create(prog: "Test", label: "budder")
     expect {
