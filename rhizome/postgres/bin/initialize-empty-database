@@ -46,7 +46,7 @@ database_init_queries = <<~DATABASE_INIT
 
   /**
     * The "get_auth" function is used by pgbouncer to authenticate users.
-    * See: http://www.pgbouncer.org/config.html#auth_query
+    * See: https://www.pgbouncer.org/config.html#auth_query
     */
   CREATE OR REPLACE FUNCTION pgbouncer.get_auth (
     INOUT p_user     name,
