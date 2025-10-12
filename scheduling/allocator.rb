@@ -165,7 +165,10 @@ module Scheduling::Allocator
           .select_group(:vm_host_id)
           .select_append { count.function.*.as(num_gpus) }
           .select_append { sum(Sequel.case({{vm_id: nil} => 1}, 0)).as(available_gpus) }
-          .select_append { array_remove(array_agg(Sequel.case({{vm_id: nil} => :iommu_group}, nil)), nil).as(available_iommu_groups) }
+          .select_append do
+                       gpu = Sequel.function(:jsonb_build_object, Sequel.lit("'iommu_group'"), :iommu_group, Sequel.lit("'numa_node'"), :numa_node)
+                       Sequel.function(:array_agg, gpu).filter(vm_id: nil).as(:available_iommu_groups)
+                     end
           .where(device_class: ["0300", "0302"])
           .where { (device =~ request.gpu_device) | request.gpu_device.nil? })
         .with(:vm_provisioning, DB[:vm]
@@ -510,7 +513,7 @@ module Scheduling::Allocator
       @used = candidate_host[:num_gpus] - candidate_host[:available_gpus]
       @total = candidate_host[:num_gpus]
       @requested = request.gpu_count
-      @iommu_groups = candidate_host[:available_iommu_groups].take(@requested)
+      @iommu_groups = select_iommu_groups(candidate_host[:available_iommu_groups], @requested)
     end
 
     def is_valid
@@ -528,6 +531,12 @@ module Scheduling::Allocator
         .where(vm_id: nil)
         .where(iommu_group: @iommu_groups)
         .update(vm_id: vm.id) < @requested
+    end
+
+    def select_iommu_groups(gpus, n)
+      by_numa = gpus.group_by { |h| h["numa_node"] }
+      chosen_group = by_numa.values.select { |arr| arr.size >= n }.min_by(&:size)
+      (chosen_group || gpus).take(n).map { |h| h["iommu_group"] }
     end
   end
 
