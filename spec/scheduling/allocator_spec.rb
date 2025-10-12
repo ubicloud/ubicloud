@@ -374,7 +374,10 @@ RSpec.describe Al do
       cand = Al::Allocation.candidate_hosts(req)
       expect(cand.size).to eq(1)
       expect(cand.first[:vm_host_id]).to eq(vmh2.id)
-      expect(cand.first[:available_iommu_groups].sort).to eq([3, 9])
+      expect(cand.first[:available_iommu_groups].map(&:to_h)).to contain_exactly(
+        a_hash_including("iommu_group" => 3, "numa_node" => 0),
+        a_hash_including("iommu_group" => 9, "numa_node" => 0)
+      )
     end
 
     it "retrieves candidates with gpu if gpu_count is zero but host is forced" do
@@ -394,7 +397,10 @@ RSpec.describe Al do
       cand = Al::Allocation.candidate_hosts(req)
       expect(cand.size).to eq(1)
       expect(cand.first[:vm_host_id]).to eq(vmh2.id)
-      expect(cand.first[:available_iommu_groups].sort).to eq([3, 9])
+      expect(cand.first[:available_iommu_groups].map(&:to_h)).to contain_exactly(
+        a_hash_including("iommu_group" => 3, "numa_node" => 0),
+        a_hash_including("iommu_group" => 9, "numa_node" => 0)
+      )
     end
   end
 
@@ -688,6 +694,48 @@ RSpec.describe Al do
       expect(used_hugepages_1g + vm.memory_gib).to eq(vmh.used_hugepages_1g)
       expect(available_storage - 180).to eq(vmh.storage_devices.sum { it.available_storage_gib })
       expect(vmh.pci_devices.map { it.vm_id }).to eq([vm.id, vm.id])
+    end
+
+    it "prefers gpus on single numa node" do
+      vm = create_vm
+      vmh = VmHost.first
+      PciDevice.create(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 1)
+      PciDevice.create(vm_host_id: vmh.id, slot: "02:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 1, iommu_group: 2)
+      PciDevice.create(vm_host_id: vmh.id, slot: "03:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 1, iommu_group: 3)
+      PciDevice.create(vm_host_id: vmh.id, slot: "04:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 2, iommu_group: 4)
+      PciDevice.create(vm_host_id: vmh.id, slot: "05:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: nil, iommu_group: 5)
+      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}], gpu_count: 2)
+      vmh.reload
+      expect(vm.pci_devices.map(&:iommu_group)).to contain_exactly(2, 3)
+    end
+
+    it "can allocate gpus across numa nodes" do
+      vm = create_vm
+      vmh = VmHost.first
+      PciDevice.create(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 1)
+      PciDevice.create(vm_host_id: vmh.id, slot: "02:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 1, iommu_group: 2)
+      PciDevice.create(vm_host_id: vmh.id, slot: "03:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 1, iommu_group: 3)
+      PciDevice.create(vm_host_id: vmh.id, slot: "04:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 2, iommu_group: 4)
+      PciDevice.create(vm_host_id: vmh.id, slot: "05:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: nil, iommu_group: 5)
+      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}], gpu_count: 5)
+      vmh.reload
+      expect(vm.pci_devices.map(&:iommu_group)).to contain_exactly(1, 2, 3, 4, 5)
+    end
+
+    it "allocates gpus to best fitting numa node" do
+      vm = create_vm
+      vmh = VmHost.first
+      PciDevice.create(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 1)
+      PciDevice.create(vm_host_id: vmh.id, slot: "02:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 1, iommu_group: 2)
+      PciDevice.create(vm_host_id: vmh.id, slot: "03:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
+      PciDevice.create(vm_host_id: vmh.id, slot: "04:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 1, iommu_group: 4)
+      PciDevice.create(vm_host_id: vmh.id, slot: "05:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 1, iommu_group: 5)
+      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}], gpu_count: 2)
+      vmh.reload
+      expect(vm.pci_devices.map(&:iommu_group)).to contain_exactly(1, 3)
     end
 
     it "allows concurrent allocations" do
