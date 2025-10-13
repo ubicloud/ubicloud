@@ -5,7 +5,7 @@ require "net/ssh"
 class Prog::Vm::GithubRunner < Prog::Base
   subject_is :github_runner
 
-  def self.assemble(installation, repository_name:, label:, default_branch: nil)
+  def self.assemble(installation, repository_name:, label:, actual_label: nil, default_branch: nil)
     unless Github.runner_labels[label]
       fail "Invalid GitHub runner label: #{label}"
     end
@@ -16,7 +16,8 @@ class Prog::Vm::GithubRunner < Prog::Base
         installation_id: installation.id,
         repository_name: repository_name,
         repository_id: repository.id,
-        label: label
+        label:,
+        actual_label: actual_label || label
       )
 
       Strand.create_with_id(github_runner.id, prog: "Vm::GithubRunner", label: "start")
@@ -174,6 +175,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   label def start
     pop "Could not provision a runner for inactive project" unless github_runner.installation.project.active?
     hop_wait_concurrency_limit unless quota_available?
+    hop_apply_custom_label_quota if github_runner.custom_label
     hop_allocate_vm
   end
 
@@ -189,7 +191,10 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def wait_concurrency_limit
-    hop_allocate_vm if quota_available?
+    if quota_available?
+      hop_apply_custom_label_quota if github_runner.custom_label
+      hop_allocate_vm
+    end
 
     # check utilization, if it's high, wait for it to go down
     family_utilization = VmHost.where(allocation_state: "accepting", arch: github_runner.label_data["arch"])
@@ -231,6 +236,25 @@ class Prog::Vm::GithubRunner < Prog::Base
       github_runner.incr_not_upgrade_premium
     end
     Clog.emit("allowed because of low utilization") { {exceeded_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}} }
+
+    hop_apply_custom_label_quota if github_runner.custom_label
+    hop_allocate_vm
+  end
+
+  label def apply_custom_label_quota
+    custom_label = github_runner.custom_label
+    hop_allocate_vm unless custom_label.concurrent_runner_count_limit
+
+    new_allocated_runner_count = Sequel[:allocated_runner_count] + 1
+    updated_rows = GithubCustomLabel
+      .where(name: github_runner.actual_label, installation_id: github_runner.installation_id)
+      .where(new_allocated_runner_count <= Sequel[:concurrent_runner_count_limit])
+      .update(allocated_runner_count: new_allocated_runner_count)
+
+    if updated_rows != 1
+      Clog.emit("hit custom label concurrency limit") { {custom_label_concurrency_limit: {actual_label: github_runner.actual_label, label: github_runner.label, installation_id: github_runner.installation_id, repository_name: github_runner.repository_name}} }
+      nap rand(5..15)
+    end
     hop_allocate_vm
   end
 
@@ -314,7 +338,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     # We use generate-jitconfig instead of registration-token because it's
     # recommended by GitHub for security reasons.
     # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-just-in-time-runners
-    data = {name: github_runner.ubid.to_s, labels: [github_runner.label], runner_group_id: 1, work_folder: "/home/runner/work"}
+    data = {name: github_runner.ubid.to_s, labels: [github_runner.actual_label || github_runner.label], runner_group_id: 1, work_folder: "/home/runner/work"}
     response = github_client.post("/repos/#{github_runner.repository_name}/actions/runners/generate-jitconfig", data)
     github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
     vm.sshable.cmd(<<~COMMAND, stdin: response[:encoded_jit_config])
@@ -457,6 +481,17 @@ class Prog::Vm::GithubRunner < Prog::Base
       vm.incr_destroy
     end
 
+    if github_runner.custom_label
+      new_runner_count = Sequel[:allocated_runner_count] - 1
+      updated_rows = GithubCustomLabel
+        .where(name: github_runner.actual_label, installation_id: github_runner.installation_id)
+        .where(new_runner_count >= 0)
+        .update(allocated_runner_count: new_runner_count)
+
+      if updated_rows != 1
+        Clog.emit("failed to decrement custom label allocated runner count") { {failed_decrement_custom_label_allocated_runner_count: {actual_label: github_runner.actual_label, label: github_runner.label, installation_id: github_runner.installation_id, repository_name: github_runner.repository_name}} }
+      end
+    end
     hop_wait_vm_destroy
   end
 

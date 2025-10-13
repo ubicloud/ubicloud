@@ -75,6 +75,10 @@ class GithubRunner < Sequel::Model
     end
     aggregate_readings(previous_pulse: previous_pulse, reading: reading, data: {available_memory: available_memory})
   end
+
+  def custom_label
+    GithubCustomLabel.first(name: actual_label, installation_id: installation_id)
+  end
 end
 
 # Table: github_runner
@@ -91,6 +95,7 @@ end
 #  repository_id   | uuid                     |
 #  allocated_at    | timestamp with time zone |
 #  billed_vm_size  | text                     |
+#  actual_label    | text                     |
 # Indexes:
 #  github_runner_pkey      | PRIMARY KEY btree (id)
 #  github_runner_vm_id_key | UNIQUE btree (vm_id)
