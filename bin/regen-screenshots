@@ -143,7 +143,8 @@ class RegenScreenshots
       target_vm_size: "standard-2",
       target_storage_size_gib: 10,
       superuser_password: "1",
-      project_id: project.id
+      project_id: project.id,
+      target_version: "16"
     ) do |pg|
       pg.id = UBID.parse("pgmjy3v4ef1y7gdpzv6b3fchef").to_uuid
     end
@@ -174,7 +175,8 @@ class RegenScreenshots
     pg_server = PostgresServer.create(
       resource_id: pg_resource.id,
       vm_id: pg_vm.id,
-      timeline_id: pg_timeline.id
+      timeline_id: pg_timeline.id,
+      version: "16"
     ) do |server|
       server.id = UBID.parse("pvmjy3v4ef1y7gdpzv6b3fchef").to_uuid
     end
@@ -187,6 +189,8 @@ class RegenScreenshots
     PostgresResource.define_method(:representative_server) { pg_server }
     PostgresResource.define_method(:user_config) { {"max_connections" => 1000, "work_mem" => "64MB"} }
     PostgresResource.define_method(:pgbouncer_user_config) { {"default_pool_size" => 50} }
+    PostgresResource.define_method(:upgrade_stage) { "upgrade_standby" }
+    PostgresResource.define_method(:version) { "16" }
     Authorization.define_singleton_method(:authorize) { |*| }
     PostgresServer.define_method(:storage_size_gib) { 128 }
 
@@ -286,6 +290,15 @@ class RegenScreenshots
     resize(1200, width: 1600)
     click_link "Resize"
     screenshot "managed-postgresql/resizing-screenshot.png"
+
+    resize(900, width: 1200)
+    click_link "Upgrade"
+    screenshot "managed-postgresql/upgrade-screenshot.png"
+
+    pg_resource.update(target_version: "17")
+    resize(900, width: 1200)
+    click_link "Upgrade"
+    screenshot "managed-postgresql/upgrade-progress-screenshot.png"
 
     resize(850, width: 1600)
     click_link "Configuration"
