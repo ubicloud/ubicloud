@@ -699,7 +699,12 @@ DNSMASQ_SERVICE
     vhost_user_block_requires = vhost_user_block_services.map { |s| "Requires=#{s}" }.join("\n")
 
     net_params = nics.map { "--net mac=#{_1.mac},tap=#{_1.tap},ip=,mask=,num_queues=#{max_vcpus * 2 + 1}" }
-    pci_device_params = pci_devices.map { " --device path=/sys/bus/pci/devices/0000:#{_1[0]}/" }.join
+    pci_device_params =
+      if Gem::Version.new(@ch_version.version) >= Gem::Version.new("36")
+        pci_devices.empty? ? "" : " --device #{pci_devices.map { |dev| "path=/sys/bus/pci/devices/0000:#{dev[0]}/" }.join(" ")}"
+      else
+        pci_devices.map { |dev| " --device path=/sys/bus/pci/devices/0000:#{dev[0]}/" }.join
+      end
     limit_memlock = pci_devices.empty? ? "" : "LimitMEMLOCK=#{mem_gib * 1073741824}"
     cpu_quota = (cpu_percent_limit == 0) ? "" : "CPUQuota=#{cpu_percent_limit}%"
 
