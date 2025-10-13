@@ -53,14 +53,16 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
 
       jobs.each do |job|
         next if job[:status] != "queued"
-        next unless (label = job[:labels].find { Github.runner_labels.key?(it) })
-
-        queued_labels[label] += 1
+        if (label = job[:labels].find { Github.runner_labels.key?(it) })
+          queued_labels[[label, label]] += 1 # Actual label is the same as the label for predefined labels
+        elsif (custom_label = GithubCustomLabel.first(installation_id: github_repository.installation.id, name: job[:labels]))
+          queued_labels[[custom_label.name, custom_label.alias_for]] += 1
+        end
       end
     end
 
-    queued_labels.each do |label, count|
-      idle_runner_count = github_repository.runners_dataset.where(label: label, workflow_job: nil).count
+    queued_labels.each do |(actual_label, label), count|
+      idle_runner_count = github_repository.runners_dataset.where(actual_label:, workflow_job: nil).count
       # The calculation of the required_runner_count isn't atomic because it
       # requires multiple API calls and database queries. However, it will
       # eventually settle on the correct value. If we create more runners than
@@ -69,13 +71,14 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
       # will generate more in the next cycle.
       next if (required_runner_count = count - idle_runner_count) && required_runner_count <= 0
 
-      Clog.emit("extra runner needed") { {needed_extra_runner: {repository_name: github_repository.name, label: label, count: required_runner_count}} }
+      Clog.emit("extra runner needed") { {needed_extra_runner: {repository_name: github_repository.name, label: label, actual_label: actual_label, count: required_runner_count}} }
 
       required_runner_count.times do
         Prog::Vm::GithubRunner.assemble(
           github_repository.installation,
           repository_name: github_repository.name,
-          label: label
+          label:,
+          actual_label:
         )
       end
     end
