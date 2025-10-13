@@ -15,7 +15,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     installation_id = GithubInstallation.create(installation_id: 123, project_id: customer_project.id, name: "ubicloud", type: "Organization", created_at: now - 8 * 24 * 60 * 60).id
     vm_id = create_vm(location_id: Location::GITHUB_RUNNERS_ID, project_id: runner_project.id, boot_image: "github-ubuntu-2204").id
     Sshable.create_with_id(vm_id)
-    runner = GithubRunner.create(installation_id:, vm_id:, repository_name: "test-repo", label: "ubicloud-standard-4", created_at: now, allocated_at: now + 10, ready_at: now + 20, workflow_job: {"id" => 123})
+    runner = GithubRunner.create(installation_id:, vm_id:, repository_name: "test-repo", label: "ubicloud-standard-4", actual_label: "ubicloud-standard-4", created_at: now, allocated_at: now + 10, ready_at: now + 20, workflow_job: {"id" => 123})
     Strand.create_with_id(runner.id, prog: "Vm::GithubRunner", label: "start")
     runner
   end
@@ -313,6 +313,15 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect { nx.start }.to hop("allocate_vm")
     end
 
+    it "hops to apply_custom_label if there is capacity and the label is a custom label" do
+      GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
+      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
+      expect(project).to receive(:active?).and_return(true)
+      expect(runner).to receive(:actual_label).and_return("custom-label-1")
+
+      expect { nx.start }.to hop("apply_custom_label_quota")
+    end
+
     it "pops if the project is not active" do
       expect(project).to receive(:active?).and_return(false)
 
@@ -335,6 +344,14 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "hops to allocate_vm when customer concurrency limit frees up" do
       expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
       expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+    end
+
+    it "hops to apply_custom_label_quota when the label is a custom label" do
+      GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
+      expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
+      expect(runner).to receive(:actual_label).and_return("custom-label-1")
+
+      expect { nx.wait_concurrency_limit }.to hop("apply_custom_label_quota")
     end
 
     context "when standard runner" do
@@ -375,6 +392,14 @@ RSpec.describe Prog::Vm::GithubRunner do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+      end
+
+      it "hops to apply_custom_label_quota if standard utilization is low and the label is a custom label" do
+        GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
+        expect(runner).to receive(:actual_label).and_return("custom-label-1")
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
+        expect { nx.wait_concurrency_limit }.to hop("apply_custom_label_quota")
       end
     end
 
@@ -450,6 +475,30 @@ RSpec.describe Prog::Vm::GithubRunner do
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
         expect(runner.not_upgrade_premium_set?).to be(true)
       end
+    end
+  end
+
+  describe "#apply_custom_label_quota" do
+    it "hops to allocate_vm if custom label exists and has concurrency limit available" do
+      GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
+      expect(runner).to receive(:actual_label).and_return("custom-label-1").twice
+      expect(runner).to receive(:installation_id).and_return(installation.id).twice
+      expect { nx.apply_custom_label_quota }.to hop("allocate_vm")
+    end
+
+    it "hops to allocate_vm if custom label exists and concurrency limit is not set" do
+      GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4")
+      expect(runner).to receive(:actual_label).and_return("custom-label-1")
+      expect(runner).to receive(:installation_id).and_return(installation.id)
+      expect { nx.apply_custom_label_quota }.to hop("allocate_vm")
+    end
+
+    it "naps if custom label exists and concurrency limit is not available" do
+      GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 10)
+      expect(runner).to receive(:actual_label).and_return("custom-label-1").exactly(3).times
+      expect(runner).to receive(:installation_id).and_return(installation.id).exactly(3).times
+      expect(Clog).to receive(:emit).with("hit custom label concurrency limit").and_call_original
+      expect { nx.apply_custom_label_quota }.to nap
     end
   end
 
@@ -559,7 +608,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "deletes the runner if the generate request fails due to 'already exists with the same name' error and the runner script does not start yet." do
       expect(client).to receive(:post)
-        .with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.label]))
+        .with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.actual_label]))
         .and_raise(Octokit::Conflict.new({body: "409 - Already exists - A runner with the name *** already exists."}))
       expect(client).to receive(:paginate)
         .and_yield({runners: [{name: runner.ubid.to_s, id: 123}]}, instance_double(Sawyer::Response, data: {runners: []}))
@@ -875,6 +924,29 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(client).not_to receive(:delete)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
+    it "updates custom label allocated runner count" do
+      custom_label = GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 5)
+      expect(runner).to receive(:skip_deregistration_set?).and_return(true)
+      expect(runner).to receive(:actual_label).and_return("custom-label-1").twice
+      expect(runner).to receive(:installation_id).and_return(installation.id).twice
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+      custom_label.reload
+      expect(custom_label.allocated_runner_count).to eq(4)
+    end
+
+    it "does not decrement custom label allocated runner count when already zero" do
+      custom_label = GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
+      expect(runner).to receive(:skip_deregistration_set?).and_return(true)
+      expect(runner).to receive(:actual_label).and_return("custom-label-1").exactly(3).times
+      expect(runner).to receive(:installation_id).and_return(installation.id).exactly(3).times
+      expect(Clog).to receive(:emit).with("failed to decrement custom label allocated runner count").and_call_original
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+      custom_label.reload
+      expect(custom_label.allocated_runner_count).to eq(0)
     end
   end
 
