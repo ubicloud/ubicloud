@@ -367,6 +367,21 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#unavailable" do
+    it "hops to prep_graceful_reboot when needed" do
+      expect(nx).to receive(:when_graceful_reboot_set?).and_yield
+      expect { nx.unavailable }.to hop("prep_graceful_reboot")
+    end
+
+    it "hops to prep_reboot when needed" do
+      expect(nx).to receive(:when_reboot_set?).and_yield
+      expect { nx.unavailable }.to hop("prep_reboot")
+    end
+
+    it "hops to prep_hardware_reset when needed" do
+      expect(nx).to receive(:when_hardware_reset_set?).and_yield
+      expect { nx.unavailable }.to hop("prep_hardware_reset")
+    end
+
     it "registers a short deadline if host is unavailable" do
       expect(nx).to receive(:register_deadline).with("wait", 45)
       expect(nx).to receive(:available?).and_return(false)
@@ -459,6 +474,11 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(vms).to all receive(:update).with(display_state: "rebooting")
       expect(nx).to receive(:decr_reboot)
       expect { nx.prep_reboot }.to hop("reboot")
+    end
+
+    it "hops to prep_hardware_reset when needed, before checking other semaphores" do
+      expect(nx).to receive(:when_hardware_reset_set?).and_yield
+      expect { nx.reboot }.to hop("prep_hardware_reset")
     end
 
     it "reboot naps if host sshable is not available" do
