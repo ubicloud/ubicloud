@@ -193,6 +193,10 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def reboot
+    when_hardware_reset_set? do
+      hop_prep_hardware_reset
+    end
+
     nap 30 unless sshable.available?
 
     q_last_boot_id = vm_host.last_boot_id.shellescape
@@ -361,17 +365,7 @@ TIMER
   end
 
   label def wait
-    when_graceful_reboot_set? do
-      hop_prep_graceful_reboot
-    end
-
-    when_reboot_set? do
-      hop_prep_reboot
-    end
-
-    when_hardware_reset_set? do
-      hop_prep_hardware_reset
-    end
+    hardware_reset_and_reboot_checks
 
     when_checkup_set? do
       hop_unavailable if !available?
@@ -387,6 +381,8 @@ TIMER
   end
 
   label def unavailable
+    hardware_reset_and_reboot_checks
+
     if available?
       decr_checkup
       hop_wait
@@ -417,6 +413,20 @@ TIMER
 
   def get_boot_id
     sshable.cmd("cat /proc/sys/kernel/random/boot_id").strip
+  end
+
+  def hardware_reset_and_reboot_checks
+    when_graceful_reboot_set? do
+      hop_prep_graceful_reboot
+    end
+
+    when_reboot_set? do
+      hop_prep_reboot
+    end
+
+    when_hardware_reset_set? do
+      hop_prep_hardware_reset
+    end
   end
 
   def available?
