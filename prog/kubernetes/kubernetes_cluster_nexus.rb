@@ -277,6 +277,11 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     reap do
       decr_destroy
 
+      kubernetes_cluster.private_subnet.incr_destroy_if_only_used_internally(
+        ubid: kubernetes_cluster.ubid,
+        vm_ids: kubernetes_cluster.cp_vms.map(&:id) + kubernetes_cluster.nodes.map(&:vm_id)
+      )
+
       kubernetes_cluster.nodes.each(&:incr_destroy)
       kubernetes_cluster.nodepools.each(&:incr_destroy)
       nap 5 unless kubernetes_cluster.nodepools.empty?
@@ -287,7 +292,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
         services_lb.incr_destroy
       end
       kubernetes_cluster.api_server_lb&.incr_destroy
-      kubernetes_cluster.private_subnet.incr_destroy
+
       kubernetes_cluster.destroy
       pop "kubernetes cluster is deleted"
     end
