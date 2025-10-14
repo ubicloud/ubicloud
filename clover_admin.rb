@@ -99,6 +99,16 @@ class CloverAdmin < Roda
     password
   end
 
+  def linkify_ubids(body)
+    h(body).gsub(/\b[a-tv-z0-9]{26}\b/) do
+      if (klass = UBID.class_for_ubid(it))
+        "<a href=\"/model/#{klass}/#{it}\">#{it}</a>"
+      else
+        it
+      end
+    end
+  end
+
   plugin :rodauth, route_csrf: true do
     enable :argon2, :login, :logout, :webauthn, :change_password
     accounts_table :admin_account
