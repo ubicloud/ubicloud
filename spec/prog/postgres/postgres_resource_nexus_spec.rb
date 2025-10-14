@@ -21,6 +21,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       parent: nil,
       servers: [instance_double(
         PostgresServer,
+        vm_id: Vm.generate_uuid,
         vm: instance_double(
           Vm,
           family: "standard",
@@ -39,7 +40,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
           private_subnets: [instance_double(PrivateSubnet, id: "627a23ee-c1fb-86d9-a261-21cc48415916")]
         )
       ),
-      private_subnet: instance_double(PrivateSubnet, firewalls: [instance_double(Firewall)])
+      private_subnet: instance_double(PrivateSubnet)
     ).as_null_object
   }
 
@@ -395,22 +396,27 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       dns_zone = instance_double(DnsZone)
       expect(postgres_resource).to receive(:dns_zone).and_return(dns_zone)
 
-      expect(postgres_resource.private_subnet.firewalls).to all(receive(:destroy))
-      expect(postgres_resource.private_subnet).to receive(:incr_destroy)
       expect(postgres_resource.servers).to all(receive(:incr_destroy))
 
       expect(postgres_resource).to receive(:hostname)
       expect(dns_zone).to receive(:delete_record)
       expect(postgres_resource).to receive(:destroy)
 
+      expect(postgres_resource.private_subnet).to receive(:incr_destroy_if_only_used_internally).with(
+        ubid: postgres_resource.ubid,
+        vm_ids: [postgres_resource.servers.first.vm_id]
+      )
+
       expect { nx.destroy }.to exit({"msg" => "postgres resource is deleted"})
     end
 
     it "completes destroy even if dns zone is not configured" do
       expect(postgres_resource).to receive(:dns_zone).and_return(nil)
-      expect(postgres_resource.private_subnet.firewalls).to all(receive(:destroy))
-      expect(postgres_resource.private_subnet).to receive(:incr_destroy)
-      expect(postgres_resource).to receive(:servers).and_return([])
+      expect(postgres_resource).to receive(:servers).and_return([]).at_least(:once)
+      expect(postgres_resource.private_subnet).to receive(:incr_destroy_if_only_used_internally).with(
+        ubid: postgres_resource.ubid,
+        vm_ids: []
+      )
 
       expect { nx.destroy }.to exit({"msg" => "postgres resource is deleted"})
     end
