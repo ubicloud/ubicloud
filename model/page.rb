@@ -76,7 +76,7 @@ class Page < Sequel::Model
   def trigger
     return unless Config.pagerduty_key
 
-    links = []
+    links = [{href: "https://admin.ubicloud.com/model/Page/#{ubid}", text: "Admin Page"}]
     details.fetch("related_resources", []).each do |ubid|
       links << {href: Config.pagerduty_log_link.gsub("<ubid>", ubid), text: "View #{ubid} Logs"} if Config.pagerduty_log_link
     end
