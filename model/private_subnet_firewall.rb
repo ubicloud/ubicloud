@@ -3,7 +3,6 @@
 require_relative "../model"
 
 class PrivateSubnetFirewall < Sequel::Model(:firewalls_private_subnets)
-  plugin ResourceMethods, etc_type: true
 end
 
 # Table: firewalls_private_subnets
