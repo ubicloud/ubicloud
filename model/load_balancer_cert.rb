@@ -5,8 +5,6 @@ require_relative "../model"
 class LoadBalancerCert < Sequel::Model(:certs_load_balancers)
   many_to_one :cert
 
-  plugin ResourceMethods, etc_type: true
-
   def before_destroy
     cert.incr_destroy
     super

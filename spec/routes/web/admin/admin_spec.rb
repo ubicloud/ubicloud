@@ -68,6 +68,15 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
   end
 
+  it "allows browsing all classes" do
+    classes = Sequel::Model.subclasses.map { [it, it.subclasses] }.flatten.select { it < ResourceMethods::InstanceMethods }.sort_by(&:name)
+    classes.each do |cls|
+      visit "/model/#{cls.name}"
+      expect(page.status_code).to eq 200
+      expect(page.title).to eq "Ubicloud Admin - #{cls.name}"
+    end
+  end
+
   it "allows browsing by class when using Autoforme" do
     project = Project.create(name: "Default")
     vm = Prog::Vm::Nexus.assemble("dummy key", project.id, name: "my-vm").subject
