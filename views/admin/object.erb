@@ -47,7 +47,7 @@
         <% if v.is_a?(String) && v.bytesize == 26 && (column_class = UBID.class_for_ubid(v)) && column_class.method_defined?(:ubid) && (obj = UBID.decode(v)) %>
           <a href="/model/<%= column_class %>/<%= v %>"><%= obj.admin_label %></a>
         <% else %>
-          <%= v %>
+          <%== linkify_ubids(v.to_s) %>
         <% end %>
       </td>
     </tr>

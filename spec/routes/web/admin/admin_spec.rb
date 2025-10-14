@@ -242,6 +242,17 @@ RSpec.describe CloverAdmin do
     expect(page).to have_no_content "Strand"
   end
 
+  it "converts ubids to link" do
+    p = Page.create(summary: "test", tag: "a", details: {"related_resources" => [vm_pool.ubid, "cc489f465gqa5pzq04gch3162h"]})
+    fill_in "UBID", with: p.ubid
+    click_button "Show Object"
+
+    expect(page.title).to eq "Ubicloud Admin - Page #{p.ubid}"
+
+    click_link vm_pool.ubid
+    expect(page.title).to eq "Ubicloud Admin - VmPool #{vm_pool.ubid}"
+  end
+
   it "shows sshable information for object, if any" do
     vm_host = Prog::Vm::HostNexus.assemble("1.2.3.4").subject
     fill_in "UBID", with: vm_host.ubid
