@@ -541,6 +541,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
       expect(kubernetes_cluster.nodes).to all(receive(:incr_destroy))
       expect(kubernetes_cluster.nodepools).to all(receive(:incr_destroy))
+
       expect(kubernetes_cluster).not_to receive(:destroy)
 
       expect { nx.destroy }.to nap(5)
@@ -563,7 +564,11 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster.nodepools).to be_empty
       expect(kubernetes_cluster.api_server_lb).to receive(:incr_destroy)
       expect(kubernetes_cluster.services_lb).to receive(:incr_destroy)
-      expect(kubernetes_cluster.private_subnet).to receive(:incr_destroy)
+
+      expect(kubernetes_cluster.private_subnet).to receive(:incr_destroy_if_only_used_internally).with(
+        ubid: kubernetes_cluster.ubid,
+        vm_ids: kubernetes_cluster.cp_vms.map(&:id) + kubernetes_cluster.nodes.map(&:vm_id)
+      )
 
       expect { nx.destroy }.to exit({"msg" => "kubernetes cluster is deleted"})
     end
