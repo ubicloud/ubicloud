@@ -158,6 +158,22 @@ class PrivateSubnet < Sequel::Model
     location.aws? && net4.netmask.prefix_len == DEFAULT_SUBNET_PREFIX_LEN
   end
 
+  def incr_destroy_if_only_used_internally(ubid:, vm_ids:)
+    firewalls_dataset = self.firewalls_dataset
+
+    # Destroy customer firewall if it isn't used in other private subnets
+    # and hasn't been renamed.
+    firewalls_dataset
+      .where(name: "#{ubid}-firewall")
+      .exclude(id: DB[:firewalls_private_subnets].select(:firewall_id).exclude(private_subnet_id: id))
+      .destroy
+
+    # Destroy private subnet if it hasn't been renamed and it has no other VMs or firewalls
+    if name == "#{ubid}-subnet" && nics_dataset.exclude(vm_id: vm_ids).exclude(vm_id: nil).empty? && firewalls_dataset.empty?
+      incr_destroy
+    end
+  end
+
   private
 
   def subnet_hash(subnet)

@@ -245,8 +245,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     decr_destroy
 
     strand.children.each { it.destroy }
-    postgres_resource.private_subnet.firewalls.each(&:destroy)
-    postgres_resource.private_subnet.incr_destroy
+
+    postgres_resource.private_subnet.incr_destroy_if_only_used_internally(
+      ubid: postgres_resource.ubid,
+      vm_ids: servers.map(&:vm_id)
+    )
+
     servers.each(&:incr_destroy)
 
     postgres_resource.dns_zone&.delete_record(record_name: postgres_resource.hostname)

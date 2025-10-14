@@ -169,6 +169,125 @@ RSpec.describe PrivateSubnet do
     end
   end
 
+  describe "incr_destroy_if_only_used_internally" do
+    let(:prj) { Project.create(name: "test-prj") }
+
+    let(:ps) { Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps1", location_id: Location::HETZNER_FSN1_ID).subject }
+
+    it "destroys associated firewalls in any project if name matches and firewall is not related to other subnets" do
+      ubid = described_class.generate_ubid
+      ps.firewalls.first.update(name: "#{ubid}-firewall")
+
+      ps.incr_destroy_if_only_used_internally(
+        ubid:,
+        vm_ids: []
+      )
+      expect(ps.firewalls_dataset.all).to be_empty
+    end
+
+    it "does not destroy associated firewalls if name does match" do
+      ps.incr_destroy_if_only_used_internally(
+        ubid: described_class.generate_ubid,
+        vm_ids: []
+      )
+      expect(ps.firewalls_dataset.count).to eq 1
+    end
+
+    it "does not destroy associated firewalls associated to other private subnets" do
+      ubid = described_class.generate_ubid
+      fw = ps.firewalls.first
+      fw.update(name: "#{ubid}-firewall")
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location_id: Location::HETZNER_FSN1_ID).subject
+      fw.associate_with_private_subnet(ps2)
+
+      ps.incr_destroy_if_only_used_internally(
+        ubid:,
+        vm_ids: []
+      )
+      expect(ps.firewalls_dataset.count).to eq 1
+    end
+
+    it "incr_destroys private subnet if name matches, and it does not have any firewalls or vms" do
+      ubid = described_class.generate_ubid
+      fw = ps.firewalls.first
+      fw.update(name: "#{ubid}-firewall")
+      ps.update(name: "#{ubid}-subnet")
+
+      ps.incr_destroy_if_only_used_internally(
+        ubid:,
+        vm_ids: []
+      )
+      expect(ps.semaphores_dataset.select_order_map(:name)).to eq ["destroy", "update_firewall_rules"]
+    end
+
+    it "incr_destroys private subnet if name matches, and it does not have any firewalls or vms other the ones given in vm_ids" do
+      ubid = described_class.generate_ubid
+      fw = ps.firewalls.first
+      fw.update(name: "#{ubid}-firewall")
+      ps.update(name: "#{ubid}-subnet")
+      vm = Prog::Vm::Nexus.assemble("some_ssh key", prj.id, private_subnet_id: ps.id).subject
+
+      ps.incr_destroy_if_only_used_internally(
+        ubid:,
+        vm_ids: [vm.id]
+      )
+      expect(ps.semaphores_dataset.select_order_map(:name)).to eq ["destroy", "update_firewall_rules"]
+    end
+
+    it "does not incr_destroy private subnet if name does not match" do
+      ubid = described_class.generate_ubid
+      fw = ps.firewalls.first
+      fw.update(name: "#{ubid}-firewall")
+      ps.update(name: "#{ubid}-subnet2")
+
+      ps.incr_destroy_if_only_used_internally(
+        ubid:,
+        vm_ids: []
+      )
+      expect(ps.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules"]
+    end
+
+    it "does not incr_destroy private subnet if firewalls remain" do
+      ubid = described_class.generate_ubid
+      ps.update(name: "#{ubid}-subnet")
+
+      ps.incr_destroy_if_only_used_internally(
+        ubid:,
+        vm_ids: []
+      )
+      expect(ps.semaphores_dataset.select_map(:name)).to eq []
+    end
+
+    it "does not incr_destroy private subnet if it contains vms not listed in vm_ids" do
+      ubid = described_class.generate_ubid
+      fw = ps.firewalls.first
+      fw.update(name: "#{ubid}-firewall")
+      ps.update(name: "#{ubid}-subnet")
+      Prog::Vm::Nexus.assemble("some_ssh key", prj.id, private_subnet_id: ps.id)
+
+      ps.incr_destroy_if_only_used_internally(
+        ubid:,
+        vm_ids: []
+      )
+      expect(ps.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules"]
+    end
+
+    it "incr_destroys private subnet if it only contains nics with nil vm_id" do
+      ubid = described_class.generate_ubid
+      fw = ps.firewalls.first
+      fw.update(name: "#{ubid}-firewall")
+      ps.update(name: "#{ubid}-subnet")
+      vm = Prog::Vm::Nexus.assemble("some_ssh key", prj.id, private_subnet_id: ps.id).subject
+      vm.nic.update(vm_id: nil)
+
+      ps.incr_destroy_if_only_used_internally(
+        ubid:,
+        vm_ids: []
+      )
+      expect(ps.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules", "destroy"]
+    end
+  end
+
   describe "connected subnets related methods" do
     let(:prj) {
       Project.create(name: "test-prj")
