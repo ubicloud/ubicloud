@@ -147,6 +147,9 @@ class CloverAdmin < Roda
     "GithubRunner" => {
       "provision" => object_action("Provision Spare Runner", "Spare runner provisioned", &:provision_spare_runner)
     },
+    "Page" => {
+      "resolve" => object_action("Resolve", "Resolve scheduled for Page", &:incr_resolve)
+    },
     "PostgresResource" => {
       "restart" => object_action("Restart", "Restart scheduled for PostgresResource", &:incr_restart)
     },

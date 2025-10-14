@@ -485,4 +485,19 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
     expect(account.reload.suspended_at).not_to be_nil
   end
+
+  it "supports resolving Pages" do
+    p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], "XYZ").subject
+
+    fill_in "UBID", with: p.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - Page #{p.ubid}"
+
+    expect(p.semaphores_dataset.select_map(:name)).to eq []
+    click_link "Resolve"
+    click_button "Resolve"
+    expect(page).to have_flash_notice("Resolve scheduled for Page")
+    expect(page.title).to eq "Ubicloud Admin - Page #{p.ubid}"
+    expect(p.semaphores_dataset.select_map(:name)).to eq ["resolve"]
+  end
 end
