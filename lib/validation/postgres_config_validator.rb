@@ -100,8 +100,34 @@ module Validation
     end
 
     def validate_string(value, pattern)
-      return nil if pattern.nil? || value.match?(Regexp.new(pattern))
-      "must match pattern: #{pattern}"
+      # Check pattern validation first if pattern is specified
+      if pattern && !value.match?(Regexp.new(pattern))
+        return "must match pattern: #{pattern}"
+      end
+
+      # Check if string value needs quoting and is properly quoted
+      quoting_error = validate_string_quoting(value)
+      return quoting_error if quoting_error
+
+      nil
+    end
+
+    def validate_string_quoting(value)
+      # Ref: https://www.postgresql.org/docs/9.3/config-setting.html#CONFIG-SETTING-CONFIGURATION-FILE
+      is_quoted = value.start_with?("'") && value.end_with?("'")
+
+      if is_quoted
+        inner_value = value[1...-1]
+
+        # Single quotes inside should be escaped as '' or '\
+        escaped_quotes_removed = inner_value.gsub("''", "").gsub("\\'", "")
+
+        if escaped_quotes_removed.include?("'")
+          "contains unescaped single quotes - single quotes must be doubled ('') inside quoted strings"
+        end
+      elsif !value.match?(/\A[a-zA-Z0-9_]+\z/)
+        "must be wrapped in single quotes (e.g., '#{value.gsub("'", "''")}') because it contains special characters"
+      end
     end
 
     def validate_bool(value)

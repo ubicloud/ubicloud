@@ -40,8 +40,33 @@ RSpec.describe Validation::PostgresConfigValidator do
         expect { validator.validate(config) }.not_to raise_error
       end
 
-      it "returns no errors for setting a string with no validation" do
-        config = {"archive_command" => "foo bar"}
+      it "returns no errors for properly quoted string with spaces" do
+        config = {"archive_command" => "'foo bar'"}
+        expect { validator.validate(config) }.not_to raise_error
+      end
+
+      it "returns no errors for simple string without special characters" do
+        config = {"application_name" => "my_app0001"}
+        expect { validator.validate(config) }.not_to raise_error
+      end
+
+      it "returns no errors for string with path characters" do
+        config = {"ssl_ca_file" => "'/etc/ssl/certs/ca.crt'"}
+        expect { validator.validate(config) }.not_to raise_error
+      end
+
+      it "returns no errors for properly quoted string with comma" do
+        config = {"shared_preload_libraries" => "'pg_cron,pg_stat_statements'"}
+        expect { validator.validate(config) }.not_to raise_error
+      end
+
+      it "returns no errors for properly quoted string with two escaped quotes" do
+        config = {"application_name" => "'my''app'"}
+        expect { validator.validate(config) }.not_to raise_error
+      end
+
+      it "returns no errors for properly quoted string with escaped backslash" do
+        config = {"application_name" => "'my\\'app'"}
         expect { validator.validate(config) }.not_to raise_error
       end
 
@@ -99,6 +124,26 @@ RSpec.describe Validation::PostgresConfigValidator do
 
       it "returns error for empty value" do
         config = {"max_connections" => ""}
+        expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed)
+      end
+
+      it "returns error for unquoted string with spaces" do
+        config = {"archive_command" => "foo bar"}
+        expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed)
+      end
+
+      it "returns error for unquoted string with comma" do
+        config = {"shared_preload_libraries" => "pg_cron,pg_stat_statements"}
+        expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed)
+      end
+
+      it "returns error for quoted string with unescaped quotes" do
+        config = {"application_name" => "'my'app'"}
+        expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed)
+      end
+
+      it "returns error for unquoted string with special characters" do
+        config = {"archive_command" => "/usr/bin/test && echo 'done'"}
         expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed)
       end
     end
