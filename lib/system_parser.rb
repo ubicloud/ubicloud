@@ -62,10 +62,12 @@ class SystemParser
   def self.extract_disk_info_from_df(df_output)
     s = StringScanner.new(df_output)
     fail "BUG: df header parse failed" unless s.scan(/\AFilesystem\s+Mounted on\s+1B-blocks\s+Avail\n/)
+
     out = []
 
     until s.eos?
       fail "BUG: df data parse failed" unless s.scan(/(.*?)\s(.*?)\s+(\d+)\s+(\d+)\s*\n/)
+
       optional_name = if s.captures[1] =~ %r{/var/storage/devices/(.*)?}
         $1
       end

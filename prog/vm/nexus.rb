@@ -90,6 +90,7 @@ class Prog::Vm::Nexus < Prog::Base
           subnet = PrivateSubnet[private_subnet_id]
           raise "Given subnet doesn't exist with the id #{private_subnet_id}" unless subnet
           raise "Given subnet is not available in the given project" unless project.private_subnets.any? { |ps| ps.id == subnet.id }
+
           subnet
         elsif new_private_subnet_name
           Prog::Vnet::SubnetNexus.assemble(project_id, name: new_private_subnet_name, location_id:).subject
@@ -564,6 +565,7 @@ class Prog::Vm::Nexus < Prog::Base
       )
     elsif host
       fail "BUG: Number of cores cannot be zero when VM is runing without a slice" if vm.cores == 0
+
       # If there is no slice, we need to update the host utilization directly
       VmHost.dataset.where(id: vm.vm_host_id).update(
         used_cores: Sequel[:used_cores] - vm.cores,

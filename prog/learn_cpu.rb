@@ -7,6 +7,7 @@ class Prog::LearnCpu < Prog::Base
   def get_arch
     arch = sshable.cmd("common/bin/arch").strip
     fail "BUG: unexpected CPU architecture" unless ["arm64", "x64"].include?(arch)
+
     arch
   end
 

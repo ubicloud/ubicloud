@@ -213,6 +213,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       cluster_minor_version = kubernetes_cluster.version.match(/^v\d+\.(\d+)$/)&.captures&.first&.to_i
 
       next false unless node_minor_version && cluster_minor_version
+
       node_minor_version == cluster_minor_version - 1
     end
 

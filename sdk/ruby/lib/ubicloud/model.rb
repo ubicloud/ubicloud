@@ -37,6 +37,7 @@ module Ubicloud
       def list(adapter, location: nil)
         path = if location
           raise Error, "invalid location: #{location.inspect}" if location.include?("/")
+
           "location/#{location}/#{fragment}"
         else
           fragment
@@ -80,6 +81,7 @@ module Ubicloud
       def set_columns(*columns)
         columns.each do |column|
           next if method_defined?(column)
+
           define_method(column) do
             unless (value = @values[column])
               info
@@ -124,12 +126,14 @@ module Ubicloud
         else
           location, name, extra = values.split("/", 3)
           raise Error, "invalid #{self.class.fragment} location/name: #{values.inspect}" if extra || !name
+
           {location:, name:}
         end
       when Hash
         if !values[:id] && !(values[:location] && values[:name])
           raise Error, "hash must have :id key or :location and :name keys"
         end
+
         @values = {}
         merge_into_values(values)
       else

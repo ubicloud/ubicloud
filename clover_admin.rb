@@ -63,6 +63,7 @@ class CloverAdmin < Roda
 
   plugin :not_found do
     raise "admin route not handled: #{request.path}" if Config.test? && !ENV["DONT_RAISE_ADMIN_ERRORS"]
+
     @page_title = "File Not Found"
     view(content: "")
   end
@@ -75,6 +76,7 @@ class CloverAdmin < Roda
 
   plugin :error_handler do |e|
     raise e if Config.test? && !ENV["DONT_RAISE_ADMIN_ERRORS"]
+
     Clog.emit("admin route exception") { Util.exception_to_hash(e) }
     @page_title = "Internal Server Error"
     view(content: "")
@@ -196,6 +198,7 @@ class CloverAdmin < Roda
 
     link = lambda do |obj|
       return "" unless obj
+
       "<a href=\"/model/#{obj.class}/#{obj.ubid}\">#{Erubi.h(obj.name)}</a>"
     end
 

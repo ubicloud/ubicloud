@@ -168,6 +168,7 @@ class UBID
   def self.generate_vanity(type, prefix, suffix)
     raise "prefix over length 2" if prefix && prefix.length != 2
     raise "suffix over length 7" unless suffix.length <= 7
+
     full = "#{"0" if prefix}#{prefix}0#{suffix}".rjust(11, "z")
     from_parts(UBID.to_base32_n("zzzzzzzz") * 256, type, 0, UBID.to_base32_n(full) * 16)
   end
@@ -198,6 +199,7 @@ class UBID
       (ubid.start_with?("et") && assume_et_is_api_key) ? ApiKey : class_for_ubid(ubid)
     end.each do |model, model_uuids|
       next unless model
+
       model.where(id: model_uuids).each do
         uuids[it.id] = it
       end
@@ -265,6 +267,7 @@ class UBID
 
     top_bits_with_parity = to_base32_n(s[2..12])
     fail UBIDParseError.new("Invalid top bits parity") unless parity(top_bits_with_parity) == 0
+
     top_bits = (top_bits_with_parity >> 1)
     unix_ts_ms = get_bits(top_bits, 6, 53)
     version = get_bits(top_bits, 2, 5)
@@ -272,6 +275,7 @@ class UBID
 
     bottom_bits_with_parity = to_base32_n(s[13..])
     fail UBIDParseError.new("Invalid bottom bits parity") unless parity(bottom_bits_with_parity) == 0
+
     bottom_bits = (bottom_bits_with_parity >> 1)
     variant = get_bits(bottom_bits, 62, 63)
     rand_b = get_bits(bottom_bits, 0, 61)
@@ -382,6 +386,7 @@ class UBID
 
   def self.from_base32(num)
     fail UBIDParseError.new("Invalid base32 number: #{num}") if num < 0 || num >= 32
+
     BASE32_DATA[num][0].downcase
   end
 

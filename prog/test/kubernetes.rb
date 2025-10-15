@@ -226,6 +226,7 @@ STS
 
   def vm_ready?(vm)
     return false unless vm
+
     vm.sshable.cmd("uptime")
     true
   rescue

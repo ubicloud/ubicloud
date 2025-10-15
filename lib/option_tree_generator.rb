@@ -16,6 +16,7 @@ class OptionTreeGenerator
     subtree = {}
     Array(option[:values]).each do |value|
       next if option[:check] && !option[:check].call(*path, value)
+
       child_options = @options.select { |opt| opt[:parent] == option[:name] }
       subtree[value] = child_options.map do |child_option|
         @parents[child_option[:name]] = @parents[option[:name]] + [option[:name]]

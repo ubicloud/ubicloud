@@ -100,6 +100,7 @@ module Csi
             if existing[:parameters] != req.parameters.to_h
               raise GRPC::FailedPrecondition.new("Volume with same name but different parameters exists", GRPC::Core::StatusCodes::FAILED_PRECONDITION)
             end
+
             existing_capabilities = existing[:capabilities].sort_by(&:to_json)
             new_capabilities = req.volume_capabilities.map(&:to_h).sort_by(&:to_json)
             if existing_capabilities != new_capabilities

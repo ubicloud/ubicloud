@@ -15,6 +15,7 @@ class RunpodClient
 
     response = @connection.post(path: "v1/pods", body: config.to_json)
     fail "Failed to create pod: #{response.status} #{response.body}" unless response.status == 201
+
     pod = JSON.parse(response.body)
     pod["id"]
   end

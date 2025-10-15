@@ -14,8 +14,10 @@ RSpec.describe "Database" do
   it "has no encrypted columns that are not redacted" do
     Sequel::Model.subclasses.each do |mod|
       next unless (md = mod.instance_variable_get(:@column_encryption_metadata))
+
       keys = md.keys
       next if keys.empty?
+
       expect(mod.redacted_columns & keys).to eq keys
     end
   end
@@ -23,8 +25,10 @@ RSpec.describe "Database" do
   it "has unique redacted columns" do
     Sequel::Model.subclasses.each do |mod|
       next unless (md = mod.instance_variable_get(:@column_encryption_metadata))
+
       keys = md.keys
       next if keys.empty?
+
       expect(mod.redacted_columns.uniq).to eq mod.redacted_columns
     end
   end

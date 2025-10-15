@@ -20,6 +20,7 @@ class Strand < Sequel::Model
 
   def subject
     return @subject if defined?(@subject) && @subject != :reload
+
     @subject = UBID.decode(ubid)
   end
 
@@ -96,6 +97,7 @@ SQL
     affected = TAKE_LEASE_PS.call(id:)
     lease_checked!(affected)
     return false unless affected
+
     lease_time = affected.fetch(:lease)
 
     # Also operate as reload query
@@ -255,6 +257,7 @@ SQL
 
   def run(seconds = 0)
     fail "already deleted" if @deleted
+
     deadline = Time.now + seconds
     take_lease_and_reload do
       loop do

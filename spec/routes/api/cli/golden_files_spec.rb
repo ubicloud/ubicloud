@@ -117,6 +117,7 @@ RSpec.describe Clover, "cli" do
       if (other_cmd = cli_commands_hash[lowercase_cmd])
         raise "Golden file commands differ only in case and would break on case insensitive file systems:\n#{cmd}\n#{other_cmd}"
       end
+
       cli_commands_hash[lowercase_cmd] = cmd
       body = DB.transaction(savepoint: true, rollback: :always) do
         cli(cmd.shellsplit, **kws)

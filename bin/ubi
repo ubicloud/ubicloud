@@ -21,6 +21,7 @@ allowed_progs = (ssh_progs + pg_progs).freeze
 
 get_prog = lambda do |prog|
   return unless allowed_progs.include?(prog)
+
   ENV["UBI_#{prog.upcase}"] || prog
 end
 

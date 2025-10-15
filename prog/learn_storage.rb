@@ -18,6 +18,7 @@ class Prog::LearnStorage < Prog::Base
 
     devices.each do |rec|
       next unless (name = rec.optional_name)
+
       sds << StorageDevice.new(
         vm_host_id: vm_host.id, name: name,
         available_storage_gib: rec.avail_gib,
@@ -36,6 +37,7 @@ class Prog::LearnStorage < Prog::Base
 
   def find_underlying_unix_device_names(unix_device)
     return [unix_device.delete_prefix("/dev/")] unless unix_device.start_with?("/dev/md")
+
     SystemParser.extract_underlying_raid_devices_from_mdstat(sshable.cmd("cat /proc/mdstat"), unix_device)
   end
 

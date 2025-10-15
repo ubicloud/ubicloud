@@ -14,6 +14,7 @@ class SliceSetup
 
   def prep(allowed_cpus)
     fail "BUG: invalid cpuset" unless valid_cpuset?(allowed_cpus)
+
     install_systemd_unit(allowed_cpus)
     start_systemd_unit
   end
@@ -52,6 +53,7 @@ SLICE_CONFIG
 
   def valid_cpuset?(str)
     return false if str.nil? || str.empty?
+
     str.split(",").all? do |part|
       if part.include?("-")
         r = part.split("-")

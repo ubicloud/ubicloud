@@ -8,6 +8,7 @@ class Prog::LearnMemory < Prog::Base
       next unless line =~ /\A\s*Size: (\d+) (\w+)/
       # Fail noisily if unit is not in gigabytes
       fail "BUG: unexpected dmidecode unit" unless $2 == "GB"
+
       Integer($1)
     end.sum
   end

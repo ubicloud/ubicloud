@@ -19,6 +19,7 @@ class Prog::DownloadCloudHypervisor < Prog::Base
     fail "Version is required" if version.nil?
     fail "SHA-256 digest of cloud-hypervisor is required" if sha256_ch_bin.nil?
     fail "SHA-256 digest of ch-remote is required" if sha256_ch_remote.nil?
+
     hop_download
   end
 

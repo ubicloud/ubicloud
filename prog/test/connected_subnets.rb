@@ -211,6 +211,7 @@ ExecStart=nc -l 8080 -6
     fail_test "#{connecting.inhost_name} should not be able to connect to #{to_connect_ip} on port 8080" if should_fail
   rescue
     return 0 if should_fail
+
     fail_test "#{connecting.inhost_name} should be able to connect to #{to_connect_ip} on port 8080"
   end
 

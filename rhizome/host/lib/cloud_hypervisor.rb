@@ -28,6 +28,7 @@ module CloudHypervisor
 
     def download
       return if downloaded?
+
       FileUtils.mkdir_p(firmware_root)
 
       safe_write_to_file(path) do |f|
@@ -93,6 +94,7 @@ module CloudHypervisor
 
     def download_file(url, path, sha256)
       return if File.exist?(path)
+
       FileUtils.mkdir_p(dir)
 
       safe_write_to_file(path) do |f|

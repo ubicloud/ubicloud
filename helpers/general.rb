@@ -252,6 +252,7 @@ class Clover < Roda
 
   def current_account
     return @current_account if defined?(@current_account)
+
     @current_account = Account[rodauth.session_value]
   end
 

@@ -45,6 +45,7 @@ class OidcProvider < Sequel::Model
 
       registration_info = JSON.parse(response.body)
       raise "Unable to register with oidc provider: #{response.status} #{registration_info.inspect}" unless response.status == 201
+
       client_id = registration_info.fetch("client_id")
       client_secret = registration_info.fetch("client_secret")
       registration_client_uri = registration_info["registration_client_uri"]

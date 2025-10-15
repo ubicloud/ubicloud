@@ -26,6 +26,7 @@ module Serializers
   class Base
     def self.serialize(object, options = {})
       return if object.nil?
+
       if object.respond_to?(:map) && !object.is_a?(Hash)
         object.map { |item| serialize_internal(item, options) }
       else

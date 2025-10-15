@@ -117,6 +117,7 @@ RSpec.describe Clover do
       from, path = tuple
 
       next if visited[path]
+
       visited[path] = true
       visit path
 

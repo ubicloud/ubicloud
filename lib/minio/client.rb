@@ -145,6 +145,7 @@ class Minio::Client
   def set_lifecycle_policy(bucket_name, policy_id, expiration_days)
     raise "Error: policy_id must be all alphanumeric with the length between 5 and 32" unless /\A[a-z0-9]{5,32}\z/.match?(policy_id)
     raise "Error: expiration_days must be an integer between 0 and 999" unless expiration_days.is_a?(Integer) && expiration_days >= 0 && expiration_days <= 999
+
     policy = <<~LIFECYCLE_CONFIGURATION
 <LifecycleConfiguration>
   <Rule>
