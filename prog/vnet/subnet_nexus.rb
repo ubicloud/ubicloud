@@ -3,7 +3,7 @@
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
 
-  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil)
+  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, firewall_name: nil)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -33,16 +33,19 @@ class Prog::Vnet::SubnetNexus < Prog::Base
         end
       else
         port_range = allow_only_ssh ? 22..22 : 0..65535
-        fw_name = "#{name[0, 55]}-default"
-        # As is typical when checking before inserting, there is a race condition here with
-        # a user concurrently manually creating a firewall with the same name.  However,
-        # the worst case scenario is a bogus error message, and the user could try creating
-        # the private subnet again.
-        unless firewall_dataset.where(Sequel[:firewall][:name] => fw_name).empty?
-          fw_name = "#{name[0, 47]}-default-#{Array.new(7) { UBID.from_base32(rand(32)) }.join}"
+
+        unless firewall_name
+          firewall_name = "#{name[0, 55]}-default"
+          # As is typical when checking before inserting, there is a race condition here with
+          # a user concurrently manually creating a firewall with the same name.  However,
+          # the worst case scenario is a bogus error message, and the user could try creating
+          # the private subnet again.
+          unless firewall_dataset.where(Sequel[:firewall][:name] => firewall_name).empty?
+            firewall_name = "#{name[0, 47]}-default-#{Array.new(7) { UBID.from_base32(rand(32)) }.join}"
+          end
         end
 
-        firewall = Firewall.create(name: fw_name, location_id: location.id, project_id:)
+        firewall = Firewall.create(name: firewall_name, location_id: location.id, project_id:)
         DB.ignore_duplicate_queries do
           ["0.0.0.0/0", "::/0"].each { |cidr| FirewallRule.create(firewall_id: firewall.id, cidr: cidr, port_range: Sequel.pg_range(port_range)) }
         end
