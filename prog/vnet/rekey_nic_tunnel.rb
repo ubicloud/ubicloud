@@ -106,7 +106,7 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
       begin
         @nic.vm.vm_host.sshable.cmd("sudo -- xargs -I {} -- ip -n #{@namespace} xfrm state add " \
           "src #{src} dst #{dst} proto esp spi #{spi} reqid #{@reqid} mode tunnel " \
-          "aead 'rfc4106(gcm(aes))' {} 128 #{is_ipv4 ? "sel src 0.0.0.0/0 dst 0.0.0.0/0" : ""}", stdin: key)
+          "aead 'rfc4106(gcm(aes))' {} 128 #{"sel src 0.0.0.0/0 dst 0.0.0.0/0" if is_ipv4}", stdin: key)
       rescue Sshable::SshError => e
         raise unless e.stderr.include?("File exists")
       end

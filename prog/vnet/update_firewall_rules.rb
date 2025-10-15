@@ -56,25 +56,25 @@ table inet fw_table {
   set allowed_ipv4_port_tuple {
     type ipv4_addr . inet_service;
     flags interval;
-#{allowed_ingress_ip4_port_set.empty? ? "" : "elements = {#{allowed_ingress_ip4_port_set}}"}
+#{"elements = {#{allowed_ingress_ip4_port_set}}" unless allowed_ingress_ip4_port_set.empty?}
   }
 
   set allowed_ipv4_lb_dest_set {
     type ipv4_addr . inet_service;
     flags interval;
-#{allowed_ingress_ip4_lb_dest_set.empty? ? "" : "elements = {#{allowed_ingress_ip4_lb_dest_set}}"}
+#{"elements = {#{allowed_ingress_ip4_lb_dest_set}}" unless allowed_ingress_ip4_lb_dest_set.empty?}
   }
 
   set allowed_ipv6_port_tuple {
     type ipv6_addr . inet_service;
     flags interval;
-#{allowed_ingress_ip6_port_set.empty? ? "" : "elements = {#{allowed_ingress_ip6_port_set}}"}
+#{"elements = {#{allowed_ingress_ip6_port_set}}" unless allowed_ingress_ip6_port_set.empty?}
   }
 
   set allowed_ipv6_lb_dest_set {
     type ipv6_addr . inet_service;
     flags interval;
-#{allowed_ingress_ip6_lb_dest_set.empty? ? "" : "elements = {#{allowed_ingress_ip6_lb_dest_set}}"}
+#{"elements = {#{allowed_ingress_ip6_lb_dest_set}}" unless allowed_ingress_ip6_lb_dest_set.empty?}
   }
 
   set private_ipv4_cidrs {
@@ -94,13 +94,13 @@ table inet fw_table {
   set globally_blocked_ipv4s {
     type ipv4_addr;
     flags interval;
-#{globally_blocked_ipv4s.empty? ? "" : "elements = {#{globally_blocked_ipv4s}}"}
+#{"elements = {#{globally_blocked_ipv4s}}" unless globally_blocked_ipv4s.empty?}
   }
 
   set globally_blocked_ipv6s {
     type ipv6_addr;
     flags interval;
-#{globally_blocked_ipv6s.empty? ? "" : "elements = {#{globally_blocked_ipv6s}}"}
+#{"elements = {#{globally_blocked_ipv6s}}" unless globally_blocked_ipv6s.empty?}
   }
 
   chain forward_ingress {
