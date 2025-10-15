@@ -21,11 +21,13 @@ class Vm < Sequel::Model
   many_to_one :location
   one_to_one :aws_instance, key: :id
 
-  many_through_many :firewalls,
+  many_through_many :private_subnet_firewalls,
     [
       [:nic, :vm_id, :private_subnet_id],
       [:firewalls_private_subnets, :private_subnet_id, :firewall_id]
-    ]
+    ],
+    class: :Firewall
+  many_to_many :vm_firewalls, class: :Firewall, join_table: :firewalls_vms, right_key: :firewall_id
 
   plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancer_vm: :destroy
 
@@ -82,6 +84,10 @@ class Vm < Sequel::Model
 
   def private_ipv6
     nic.private_ipv6.nth(2)
+  end
+
+  def firewalls(opts = {})
+    private_subnet_firewalls(opts) + vm_firewalls(opts)
   end
 
   def runtime_token
