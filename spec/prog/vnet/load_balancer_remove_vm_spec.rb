@@ -47,7 +47,7 @@ RSpec.describe Prog::Vnet::LoadBalancerRemoveVm do
     it "removes the vm from load balancer and hops to wait_for_node_update" do
       expect(lb).to receive(:vm_ports_by_vm).with(vm).and_return(instance_double(LoadBalancerPort, destroy: nil)).at_least(:once)
       expect(lb.vm_ports_by_vm(vm)).to receive(:destroy)
-      expect(nx).to receive(:bud).with(Prog::Vnet::UpdateLoadBalancerNode, {subject_id: vm.id, load_balancer_id: lb.id}, :update_load_balancer)
+      expect(nx).to receive(:bud).with(Prog::Vnet::UpdateLoadBalancerNode, {"subject_id" => vm.id, "load_balancer_id" => lb.id}, :update_load_balancer)
       expect { nx.destroy_vm_ports_and_update_node }.to hop("wait_for_node_update")
     end
   end
@@ -70,7 +70,7 @@ RSpec.describe Prog::Vnet::LoadBalancerRemoveVm do
   describe "#initiate_cert_server_removal" do
     it "removes the certificate server and hops to wait_for_cert_server_removal" do
       expect(lb).to receive(:cert_enabled).and_return(true)
-      expect(nx).to receive(:bud).with(Prog::Vnet::CertServer, {subject_id: lb.id, vm_id: vm.id}, :remove_cert_server)
+      expect(nx).to receive(:bud).with(Prog::Vnet::CertServer, {"subject_id" => lb.id, "vm_id" => vm.id}, :remove_cert_server)
       expect { nx.initiate_cert_server_removal }.to hop("wait_for_cert_server_removal")
     end
 

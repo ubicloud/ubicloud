@@ -145,7 +145,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     decr_destroy
     strand.children.map { it.destroy }
     load_balancer.vms.each do |vm|
-      bud Prog::Vnet::LoadBalancerRemoveVm, {subject_id: vm.id, load_balancer_id: load_balancer.id}, :destroy_vm_ports_and_update_node
+      bud Prog::Vnet::LoadBalancerRemoveVm, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :destroy_vm_ports_and_update_node
     end
     hop_wait_all_vms_removed
   end
