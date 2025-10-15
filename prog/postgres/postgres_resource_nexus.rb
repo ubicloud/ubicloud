@@ -8,6 +8,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   subject_is :postgres_resource
 
   extend Forwardable
+
   def_delegators :postgres_resource, :servers, :representative_server
 
   def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,

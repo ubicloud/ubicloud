@@ -7,6 +7,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   subject_is :postgres_timeline
 
   extend Forwardable
+
   def_delegators :postgres_timeline, :blob_storage_client
 
   def self.assemble(location_id:, parent_id: nil)

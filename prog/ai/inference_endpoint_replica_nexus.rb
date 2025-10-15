@@ -9,6 +9,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
   subject_is :inference_endpoint_replica
 
   extend Forwardable
+
   def_delegators :inference_endpoint_replica, :vm, :inference_endpoint, :load_balancer_vm_port
 
   def self.assemble(inference_endpoint_id)

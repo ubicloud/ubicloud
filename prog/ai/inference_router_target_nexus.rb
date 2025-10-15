@@ -10,6 +10,7 @@ class Prog::Ai::InferenceRouterTargetNexus < Prog::Base
   subject_is :inference_router_target
 
   extend Forwardable
+
   def_delegators :inference_router_target, :inference_router, :inference_router_model
 
   def self.assemble(inference_router_id:, inference_router_model_id:, name:, priority:, inflight_limit:, type: "manual", host: "", enabled: false, config: {}, extra_configs: {}, api_key: SecureRandom.alphanumeric(32))

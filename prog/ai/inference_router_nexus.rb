@@ -8,6 +8,7 @@ class Prog::Ai::InferenceRouterNexus < Prog::Base
   subject_is :inference_router
 
   extend Forwardable
+
   def_delegators :inference_router, :replicas, :load_balancer, :private_subnet, :project
 
   def self.assemble(project_id:, location_id:, name: "api", vm_size: "standard-2", replica_count: 1)
