@@ -1,4 +1,8 @@
-<% viewable_vm_map = dataset_authorize(Vm.where(id: @ps.nics_dataset.select(:vm_id)), "Vm:view").select_hash(:id, Sequel.as(true, :v)) %>
+<% vm_ds = @ps.vms_dataset.where(project_id: @ps.project_id)
+viewable_vm_ds = dataset_authorize(vm_ds, "Vm:view")
+displayable_vm_map, linkable_vm_map = [vm_ds, viewable_vm_ds].map! do
+  it.select_hash(Sequel[:vm][:id], Sequel.as(true, :v))
+end %>
 
 <div id="private-subnet-nics" class="p-6">
   <%== part(
@@ -7,12 +11,12 @@
     headers: ["VM", "Private IPv4", "Private IPv6"],
     empty_state: "No VM attached",
     rows:
-      @ps.nics(eager: :vm).map do |nic|
+      @ps.nics(eager: :vm).select { it.vm_id.nil? || displayable_vm_map[it.vm_id] }.map! do |nic|
         [
           [
             (
               if nic.vm
-                if viewable_vm_map[nic.vm_id]
+                if linkable_vm_map[nic.vm_id]
                   [nic.vm.name, { link: path(nic.vm) }]
                 else
                   [nic.vm.name, {}]
