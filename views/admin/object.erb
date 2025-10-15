@@ -55,6 +55,8 @@
 </tbody>
 </table>
 
+<%== part("extras/#{@klass.name}", obj: @obj) if OBJECTS_WITH_EXTRAS[@klass.name] %>
+
 <h2 id="associations-header">Associations</h2>
 <div class="associations">
   <% @klass.associations.sort.each do |assoc| %>

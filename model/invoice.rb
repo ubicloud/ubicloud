@@ -14,6 +14,8 @@ class Invoice < Sequel::Model
 
   plugin ResourceMethods
 
+  alias_method :admin_label, :invoice_number
+
   def path_id
     id ? ubid : "current"
   end
@@ -295,6 +297,15 @@ class Invoice < Sequel::Model
       content_type: "application/pdf",
       if_none_match: "*"
     )
+  end
+
+  def generate_download_link
+    Aws::S3::Presigner.new(client: Invoice.blob_storage_client).presigned_url(:get_object,
+      bucket: Config.invoices_bucket_name,
+      key: blob_key,
+      expires_in: 60 * 60)
+  rescue
+    nil
   end
 
   def self.blob_storage_client
