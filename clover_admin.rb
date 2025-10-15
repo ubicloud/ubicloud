@@ -26,6 +26,7 @@ class CloverAdmin < Roda
     extract_fixed_locals: true
   }
 
+  plugin :part
   plugin :public
   plugin :flash
   plugin :h
@@ -190,6 +191,11 @@ class CloverAdmin < Roda
     }
   }.freeze
   OBJECT_ACTIONS.each_value(&:freeze)
+
+  OBJECTS_WITH_EXTRAS = Dir["views/admin/extras/*.erb"]
+    .map { File.basename(it, ".erb") }
+    .each_with_object({}) { |name, h| h[name] = true }
+    .freeze
 
   plugin :autoforme do
     # :nocov:

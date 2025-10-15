@@ -271,6 +271,38 @@ RSpec.describe CloverAdmin do
     expect(page).to have_no_content "Strand"
   end
 
+  it "renders extra details for object, if any" do
+    billing_info = BillingInfo.create(stripe_id: "cus_test123")
+
+    visit "/model/BillingInfo/#{billing_info.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - BillingInfo #{billing_info.ubid}"
+    expect(page).to have_content "Stripe Data"
+
+    invoice = Invoice.create(
+      project: Project.create(name: "stuff"),
+      invoice_number: "invoice-number-378",
+      content: {foo: "bar", billing_info: {country: "NL"}},
+      begin_time: "2024-11-01 00:00:00",
+      end_time: "2024-12-01 00:00:00"
+    )
+
+    # No download link if download link generation fails
+    expect(Invoice).to receive(:blob_storage_client).and_raise("Simulated failure")
+    visit "/model/Invoice/#{invoice.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - Invoice #{invoice.ubid}"
+    expect(page).to have_no_content "Download PDF"
+
+    # Shows download link if it's generated
+    presigner = instance_double(Aws::S3::Presigner)
+    expect(Invoice).to receive(:blob_storage_client).and_return(instance_double(Aws::S3::Client))
+    expect(Aws::S3::Presigner).to receive(:new).and_return(presigner)
+    expect(presigner).to receive(:presigned_url).and_return("https://ubicloud.com/download/invoice/link.pdf")
+
+    visit "/model/Invoice/#{invoice.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - Invoice #{invoice.ubid}"
+    expect(page).to have_content "Download PDF"
+  end
+
   it "converts ubids to link" do
     p = Page.create(summary: "test", tag: "a", details: {"related_resources" => [vm_pool.ubid, "cc489f465gqa5pzq04gch3162h"]})
     fill_in "UBID or UUID", with: p.ubid

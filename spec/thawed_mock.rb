@@ -63,6 +63,7 @@ module ThawedMock
   allow_mocking(Github, :app_client, :failed_deliveries, :installation_client, :oauth_client, :redeliver_failed_deliveries)
   allow_mocking(GithubRunner, :[], :any?, :first, :join)
   allow_mocking(HostProvider, :create)
+  allow_mocking(Invoice, :blob_storage_client)
   allow_mocking(IpsecTunnel, :[], :create)
   allow_mocking(KubernetesCluster, :[], :kubeconfig, :generate_ubid)
   allow_mocking(KubernetesNodepool, :generate_uuid)
