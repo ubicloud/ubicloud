@@ -8,6 +8,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
   subject_is :victoria_metrics_server
 
   extend Forwardable
+
   def_delegators :victoria_metrics_server, :vm, :resource
 
   def self.assemble(victoria_metrics_resource_id)

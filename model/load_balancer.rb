@@ -21,6 +21,7 @@ class LoadBalancer < Sequel::Model
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy, :update_load_balancer, :rewrite_dns_records, :refresh_cert
   include ObjectTag::Cleanup
+
   dataset_module Pagination
 
   def display_location
