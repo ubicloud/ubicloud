@@ -141,6 +141,7 @@ class Sshable < Sequel::Model
     end
 
     fail (exit_code ? SshError : SshTimeout).new(cmd, stdout_str, stderr_str, exit_code, exit_signal) unless exit_code&.zero?
+
     stdout_str
   end
 

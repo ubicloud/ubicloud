@@ -86,16 +86,19 @@ module Validation
 
     def validate_integer_range(value, min, max)
       return nil if value.between?(min, max)
+
       "must be between #{min} and #{max}"
     end
 
     def validate_float_range(value, min, max)
       return nil if value.between?(min, max)
+
       "must be between #{min} and #{max}"
     end
 
     def validate_enum(value, allowed_values)
       return nil if allowed_values.include?(value)
+
       "must be one of: #{allowed_values.join(", ")}"
     end
 
@@ -132,6 +135,7 @@ module Validation
 
     def validate_bool(value)
       return nil if ["on", "of", "off", "t", "tr", "tru", "true", "f", "fa", "fal", "fals", "false", "1", "0"].include?(value.downcase)
+
       "must be 'on' or 'off' or 'true' or 'false' or '1' or '0' or any unambiguous prefix of these values (case-insensitive)"
     end
   end

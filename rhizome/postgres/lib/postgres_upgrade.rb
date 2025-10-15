@@ -67,6 +67,7 @@ class PostgresUpgrade
       break
     rescue
       raise "Postgres failed to start" if Time.now > deadline
+
       sleep 1
     end
   end

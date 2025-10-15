@@ -47,6 +47,7 @@ class Clover < Roda
 
   def handle_validation_failure(template, &block)
     return unless web?
+
     @validation_failure_template = template
     @validation_failure_block = block
   end
@@ -122,6 +123,7 @@ class Clover < Roda
       next -1 unless a.last
       next 1 unless b.last
       # :nocov:
+
       # Label sorting by subject, action, object for remaining ACEs
       a_tags = a[1]
       b_tags = b[1]
@@ -131,6 +133,7 @@ class Clover < Roda
         break unless x.nil? || x.zero?
       end
       next x unless x.nil? || x.zero?
+
       # Tie break using ubid
       a[0] <=> b[0]
     end
@@ -204,11 +207,13 @@ class Clover < Roda
 
   def humanize_size(bytes)
     return nil if bytes.nil? || bytes.zero?
+
     units = %w[B KB MB GB]
     exp = (Math.log(bytes) / Math.log(1024)).to_i
     exp = [exp, units.size - 1].min
 
     return "%d %s" % [bytes.to_f / 1024**exp, units[exp]] if exp == 0
+
     "%.1f %s" % [bytes.to_f / 1024**exp, units[exp]]
   end
 
@@ -217,6 +222,7 @@ class Clover < Roda
     return "just now" if seconds < 60
     return "#{(seconds / 60).to_i} minutes ago" if seconds < 3600
     return "#{(seconds / 3600).to_i} hours ago" if seconds < 86400
+
     "#{(seconds / 86400).to_i} days ago"
   end
 

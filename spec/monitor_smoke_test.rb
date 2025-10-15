@@ -64,6 +64,7 @@ possible_ranges = required_ranges + [
 ranges = output.scan(/"range":"([-0-9a-f]+)\.\.\.?([-0-9a-f]+)"/)
 ranges.each do
   next if possible_ranges.include?(it)
+
   warn "unexpected monitor repartition range: #{it}"
   exit 1
 end
@@ -82,6 +83,7 @@ up, down, evloop, mc2 = resources = %w[vp down evloop mc2].map { UBID.generate_v
 lines = {}
 output.split("\n").each do |line|
   next if line.include?("monitor_repartition")
+
   resource = resources.find { line.include?(it) } || :other
   begin
     data = JSON.parse(line)

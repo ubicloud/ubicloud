@@ -49,6 +49,7 @@ class Prog::Aws::Vpc < Prog::Base
 
       private_subnet.firewalls.flat_map(&:firewall_rules).each do |firewall_rule|
         next if firewall_rule.ip6?
+
         begin
           client.authorize_security_group_ingress({
             group_id: security_group_response.group_id,

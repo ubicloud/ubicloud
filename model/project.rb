@@ -64,6 +64,7 @@ class Project < Sequel::Model
   def has_valid_payment_method?
     return true unless Config.stripe_secret_key
     return true if discount == 100
+
     !!billing_info&.payment_methods&.any? || (!!billing_info && credit > 0)
   end
 

@@ -12,6 +12,7 @@ class Prog::SetupGrafana < Prog::Base
     unless (sshable = Sshable[sshable_id])
       fail "Sshable does not exist"
     end
+
     Strand.create(prog: "SetupGrafana", label: "start", stack: [{subject_id: sshable.id, domain: grafana_domain, cert_email: certificate_owner_email}])
   end
 

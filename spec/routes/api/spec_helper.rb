@@ -27,6 +27,7 @@ RSpec.configure do |config|
 
   config.before do |example|
     next unless example.metadata[:clover_api]
+
     header "Host", "api.ubicloud.com"
     header "Content-Type", "application/json"
     header "Accept", "application/json"

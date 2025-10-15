@@ -22,16 +22,19 @@ if (disk_limit_gb_env = ENV["DISK_LIMIT_GB"])
   if disk_limit_gb <= 0
     raise "DISK_LIMIT_GB environment variable ('#{disk_limit_gb_env}') must be a positive integer."
   end
+
   logger.info("Maximum volume size is configured to #{disk_limit_gb}GB via DISK_LIMIT_GB env var.")
 end
 
 endpoint = ENV["CSI_ENDPOINT"].dup
 raise "CSI_ENDPOINT environment variable is not set" if endpoint.nil?
+
 endpoint.strip!
 raise "CSI_ENDPOINT must have unix:// prefix" unless endpoint.start_with?("unix://")
 
 node_id = ENV["NODE_ID"].dup
 raise "NODE_ID environment variable is not set" if node_id.nil?
+
 node_id.strip!
 raise "NODE_ID cannot be nil" if node_id.empty?
 

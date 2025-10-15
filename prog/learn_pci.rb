@@ -11,6 +11,7 @@ class Prog::LearnPci < Prog::Base
         dev_h = dev_str.split("\n").map { |e| e.split(":\t") }.to_h
         fail "BUG: lspci parse failed" unless REQUIRED_KEYS.all? { |s| dev_h.key? s }
         next unless dev_h.key? "IOMMUGroup"
+
         out << PciDeviceRecord.new(dev_h["Slot"], dev_h["Class"], dev_h["Vendor"], dev_h["Device"], dev_h["NUMANode"], dev_h["IOMMUGroup"])
       end
       out.freeze

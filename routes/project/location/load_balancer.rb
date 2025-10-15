@@ -38,6 +38,7 @@ class Clover
             if vm.load_balancer
               fail Validation::ValidationFailed.new("vm_id" => "VM is already attached to a load balancer")
             end
+
             lb.add_vm(vm)
             audit_log(lb, "attach_vm", vm)
             actioned = "attached to"
@@ -97,6 +98,7 @@ class Clover
             new_vms.each do |vm|
               if (lb_id = vm.load_balancer&.id)
                 next if lb_id == lb.id
+
                 fail Validation::ValidationFailed.new("vms" => "VM is already attached to a load balancer")
               end
               lb.add_vm(vm)
@@ -104,6 +106,7 @@ class Clover
 
             lb.vms.each do |vm|
               next if new_vms.any? { it.id == vm.id }
+
               lb.evacuate_vm(vm)
               lb.remove_vm(vm)
             end

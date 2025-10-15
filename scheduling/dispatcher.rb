@@ -420,6 +420,7 @@ class Scheduling::Dispatcher
   # the process if the pop times out.
   def apoptosis_run(timeout, start_queue, finish_queue)
     return unless (strand_ubid = start_queue.pop)
+
     Thread.current.name = "apoptosis:#{strand_ubid}"
     unless finish_queue.pop(timeout:)
       apoptosis_failure
@@ -475,6 +476,7 @@ class Scheduling::Dispatcher
     cause = ex
     loop do
       break unless (cause = cause.cause)
+
       Clog.emit("nested exception") { Util.exception_to_hash(cause) }
     end
     ex
@@ -510,6 +512,7 @@ class Scheduling::Dispatcher
     current_strands = @current_strands
     strands.each do |strand|
       break if @shutting_down
+
       @mutex.synchronize { current_strands[strand.id] = true }
       strand_queue.push(strand)
     rescue ClosedQueueError

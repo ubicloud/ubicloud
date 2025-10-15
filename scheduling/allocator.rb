@@ -255,6 +255,7 @@ module Scheduling::Allocator
     def self.update_vm(vm_host, vm)
       ip4, address = vm_host.ip4_random_vm_network if vm.ip4_enabled
       fail "no ip4 addresses left" if vm.ip4_enabled && !ip4
+
       update_args = {
         vm_host_id: vm_host.id,
         ephemeral_net6: vm_host.ip6_random_vm_network.to_s,
@@ -341,6 +342,7 @@ module Scheduling::Allocator
     attr_reader :total, :used, :requested
     def initialize(column, total, used, requested)
       fail "resource '#{column}' uses more than is available: #{used} > #{total}" if used > total
+
       @column = column
       @total = total
       @used = used
@@ -596,12 +598,14 @@ module Scheduling::Allocator
 
     def map_volumes_to_devices
       return false if @candidate_host[:available_storage_gib] < @request.storage_gib
+
       @storage_device_allocations = @candidate_host[:storage_devices].map { StorageDeviceAllocation.new(it["id"], it["available_storage_gib"]) }
 
       @volume_to_device_map = {}
       @request.storage_volumes.each do |vol_id, vol|
         dev = @storage_device_allocations.detect { |dev| dev.available_storage_gib >= vol["size_gib"] && !(@request.distinct_storage_devices && dev.allocated_storage_gib > 0) }
         return false if dev.nil?
+
         @volume_to_device_map[vol_id] = dev.id
         dev.allocate(vol["size_gib"])
       end

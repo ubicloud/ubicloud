@@ -114,6 +114,7 @@ class Hosting::HetznerApis
       # Aggregate single-ip addresses.
       result[:ips].filter_map do |ip|
         next unless ip["active_server_ip"] == host_address
+
         IpInfo.new(
           ip_address: "#{ip["ip"]}/32",
           source_host_ip: ip["server_ip"],

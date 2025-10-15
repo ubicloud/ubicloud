@@ -73,6 +73,7 @@ class Clover
         unless ps_name.match(Validation::ALLOWED_NAME_PATTERN)
           fail Validation::ValidationFailed.new({new_private_subnet_name: "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."})
         end
+
         assemble_params[:new_private_subnet_name] = ps_name
       elsif (ps = authorized_private_subnet(location_id: @location.id))
         assemble_params[:private_subnet_id] = ps.id
@@ -174,6 +175,7 @@ class Clover
 
     options.add_option(name: "family", values: Option.families.map(&:name), parent: "location") do |location, family|
       next false if location_family_check&.call(location, family)
+
       !!BillingRate.from_resource_properties("VmVCpu", family, location.name)
     end
 

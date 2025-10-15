@@ -54,6 +54,7 @@ RSpec.configure do |config|
     def self.flash_message_matcher(expected_type, expected_message)
       match do |page|
         next false unless page.has_css?("#flash-#{expected_type}")
+
         actual_message = page.find_by_id("flash-#{expected_type}").text
         if expected_message.is_a?(String)
           actual_message == expected_message

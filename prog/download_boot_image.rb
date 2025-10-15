@@ -21,6 +21,7 @@ class Prog::DownloadBootImage < Prog::Base
   def default_boot_image_version(image_name)
     config_name = image_name.tr("-", "_") + "_version"
     fail "Unknown boot image: #{image_name}" unless Config.respond_to?(config_name)
+
     Config.send(config_name)
   end
 

@@ -98,6 +98,7 @@ class RegenScreenshots
     unless (match = %r{(/verify-account\?key=[^"]+)"}.match(body))
       raise "no verify link in email"
     end
+
     visit match[1]
 
     click_button "Verify Account"

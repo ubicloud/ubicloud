@@ -17,13 +17,16 @@ class Prog::Ai::InferenceRouterNexus < Prog::Base
 
     Validation.validate_name(name)
     fail "Invalid replica count" unless replica_count.is_a?(Integer) && (1..9).cover?(replica_count)
+
     ubid = InferenceRouter.generate_ubid
 
     DB.transaction do
       internal_project = Project[Config.inference_endpoint_service_project_id]
       fail "No project configured for inference routers" unless internal_project
+
       firewall = internal_project.firewalls_dataset.where(location_id:).where(Sequel[:firewall][:name] => "inference-router-firewall").first
       fail "No firewall named 'inference-router-firewall' configured for inference routers in #{Location[location_id].name}" unless firewall
+
       subnet_s = Prog::Vnet::SubnetNexus.assemble(internal_project.id, name: ubid.to_s, location_id:, firewall_id: firewall.id)
 
       custom_dns_zone = DnsZone.where(

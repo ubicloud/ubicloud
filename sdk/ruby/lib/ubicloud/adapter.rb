@@ -59,6 +59,7 @@ module Ubicloud
         end
       else
         return if code == 404 && missing.nil?
+
         raise Error.new("unsuccessful response", code:, body:)
       end
     end

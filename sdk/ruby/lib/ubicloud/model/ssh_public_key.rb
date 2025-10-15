@@ -38,6 +38,7 @@ module Ubicloud
         unless values[:id] || values[:name]
           raise Error, "hash must have :id or :name key"
         end
+
         @values = {}
         merge_into_values(values)
       else

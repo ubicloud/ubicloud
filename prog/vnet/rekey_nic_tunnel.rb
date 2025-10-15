@@ -45,6 +45,7 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
     new_spis = [nic.rekey_payload["spi4"], nic.rekey_payload["spi6"]]
     new_spis += nic.dst_ipsec_tunnels.map do |tunnel|
       next unless tunnel.src_nic.rekey_payload
+
       [tunnel.src_nic.rekey_payload["spi4"], tunnel.src_nic.rekey_payload["spi6"]]
     end.flatten
 

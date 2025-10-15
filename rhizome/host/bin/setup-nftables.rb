@@ -42,6 +42,7 @@ SETUP_ADDITIONAL_IP_BLOCKING
 File.open("/etc/nftables.conf", File::APPEND | File::RDWR) do |f|
   # Necessary to keep this idempotent
   break if f.each_line.any? { |line| line.include?("include \"/etc/nftables.d/*.conf") }
+
   f.write("include \"/etc/nftables.d/*.conf\"\n")
 end
 

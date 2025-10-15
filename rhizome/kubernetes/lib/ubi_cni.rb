@@ -197,6 +197,7 @@ options ndots:5
       available_ips = generate_all_usable_ips(subnet)
       available_ips.reject! { |ip| unavailable_ips.include?(ip.to_s) }
       raise "No available IPs in subnet #{subnet}" if available_ips.empty?
+
       available_ips.sample
     else
       max_retries = 100

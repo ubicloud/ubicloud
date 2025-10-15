@@ -212,6 +212,7 @@ TEMPLATE
     # Remove existing rules that aren't in our current rules list
     permissions_to_revoke = security_group.ip_permissions.filter_map do |permission|
       next unless permission.ip_protocol == "tcp"
+
       ip_ranges_to_revoke = permission.ip_ranges.select do |ip_range|
         ip4_rules.none? { |r| r.cidr.to_s == ip_range.cidr_ip && r.port_range.begin == permission.from_port && r.port_range.end - 1 == permission.to_port }
       end

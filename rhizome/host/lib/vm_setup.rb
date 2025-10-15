@@ -211,6 +211,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
   def unmount_hugepages
     return unless @hugepages
+
     r "umount #{vp.q_hugepages}"
   rescue CommandFail => ex
     raise unless /(no mount point specified)|(not mounted)|(No such file or directory)/.match?(ex.stderr)
@@ -218,6 +219,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
   def hugepages(mem_gib)
     return unless @hugepages
+
     FileUtils.mkdir_p vp.hugepages
     FileUtils.chown @vm_name, @vm_name, vp.hugepages
     r "mount -t hugetlbfs -o uid=#{q_vm},size=#{mem_gib}G nodev #{vp.q_hugepages}"
@@ -712,6 +714,7 @@ DNSMASQ_SERVICE
     # rules and write a routine for it.  Banning suspicious strings
     # from VmPath is also a good idea.
     fail "BUG" if /["'\s]/.match?(cpu_setting)
+
     vp.write_systemd_service <<SERVICE
 [Unit]
 Description=#{@vm_name}

@@ -83,6 +83,7 @@ module Validation
     fail ValidationFailed.new({server_count: "Minio per pool server count < 1"}) if per_pool_server_count < 1
     fail ValidationFailed.new({drive_count: "Minio per pool drive count < 1"}) if per_pool_drive_count < 1
     fail ValidationFailed.new({storage_size_gib: "Minio per pool storage size < 1"}) if per_pool_storage_size < 1
+
     [per_pool_server_count, per_pool_drive_count, per_pool_storage_size]
   end
 
@@ -91,6 +92,7 @@ module Validation
     unless (vm_size = available_vm_sizes.find { it.name == size && it.arch == arch })
       fail ValidationFailed.new({size: "\"#{size}\" is not a valid virtual machine size. Available sizes: #{available_vm_sizes.map(&:name)}"})
     end
+
     vm_size
   end
 
@@ -98,6 +100,7 @@ module Validation
     storage_size = storage_size.to_i
     vm_size = validate_vm_size(size, arch)
     fail ValidationFailed.new({storage_size: "Storage size must be one of the following: #{vm_size.storage_size_options.join(", ")}"}) unless vm_size.storage_size_options.include?(storage_size)
+
     storage_size
   end
 
@@ -130,6 +133,7 @@ module Validation
     unless [LoadBalancer::Stack::IPV4, LoadBalancer::Stack::IPV6, LoadBalancer::Stack::DUAL].include?(stack)
       fail ValidationFailed.new({stack: "\"#{stack}\" is not a valid load balancer stack option. Available options: #{LoadBalancer::Stack::IPV4}, #{LoadBalancer::Stack::IPV6}, #{LoadBalancer::Stack::DUAL}"})
     end
+
     stack
   end
 
@@ -148,6 +152,7 @@ module Validation
     if boot_disk_index < 0 || boot_disk_index >= storage_volumes.length
       fail ValidationFailed.new({boot_disk_index: "Boot disk index must be between 0 and #{storage_volumes.length - 1}"})
     end
+
     storage_volumes.each { |volume|
       volume.each_key { |key|
         fail ValidationFailed.new({storage_volumes: "Invalid key: #{key}"}) unless allowed_keys.include?(key)
@@ -202,6 +207,7 @@ module Validation
     return [0, 65535] if port_range.nil?
 
     fail ValidationFailed.new({port_range: "Invalid port range"}) unless (match = port_range.match(ALLOWED_PORT_RANGE_PATTERN))
+
     start_port = match[1].to_i
 
     if match[2]
@@ -219,6 +225,7 @@ module Validation
   def self.validate_port(port_name, port)
     fail ValidationFailed.new({port_name => "Port must be an integer"}) unless port.to_i.to_s == port.to_s
     fail ValidationFailed.new({port_name => "Port must be between 0 to 65535"}) unless (0..65535).cover?(port.to_i)
+
     port.to_i
   end
 
@@ -233,6 +240,7 @@ module Validation
         if seen_ports.include?(port)
           fail ValidationFailed.new({port: "Port conflict detected: #{port} is already in use"})
         end
+
         seen_ports << port
       end
     end
@@ -306,6 +314,7 @@ module Validation
     storage_size = storage_size.to_i
 
     fail ValidationFailed.new({storage_size: "VictoriaMetrics storage must be between #{min_storage_size}GiB and #{max_storage_size}GiB"}) unless storage_size.between?(min_storage_size, max_storage_size)
+
     storage_size
   end
 
