@@ -2184,12 +2184,14 @@ components:
                 max_connections: '100'
               additionalProperties:
                 type: string
+                nullable: true
             pgbouncer_config:
               type: object
               example:
                 max_client_conn: '100'
               additionalProperties:
                 type: string
+                nullable: true
           additionalProperties: false
           required:
             - pg_config
@@ -2201,6 +2203,7 @@ components:
                 max_client_conn: '100'
               additionalProperties:
                 type: string
+                nullable: true
           additionalProperties: false
           required:
             - pgbouncer_config
