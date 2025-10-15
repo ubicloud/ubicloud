@@ -10,7 +10,7 @@ class Serializers::PrivateSubnet < Serializers::Base
       net4: ps.net4.to_s,
       net6: ps.net6.to_s,
       firewalls: Serializers::Firewall.serialize(ps.firewalls),
-      nics: Serializers::Nic.serialize(ps.nics)
+      nics: Serializers::Nic.serialize(ps.nics(eager: :vm).select { !it.vm || it.vm.project_id == ps.project_id })
     }
   end
 end
