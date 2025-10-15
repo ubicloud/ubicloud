@@ -37,7 +37,7 @@ module Validation
   # - Not start or end with a hyphen
   # Adapted from https://stackoverflow.com/a/7933253
   # Do not allow uppercase letters to not deal with case sensitivity
-  ALLOWED_NAME_PATTERN = %r{\A[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\z}
+  ALLOWED_NAME_PATTERN = %r{\A[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\z}
 
   # Different operating systems have different conventions.
   # Below are reasonable restrictions that works for most (all?) systems.
@@ -56,7 +56,7 @@ module Validation
 
   # - Max length 63
   # - Alphanumeric, hyphen, underscore, space, parantheses, exclamation, question mark, star
-  ALLOWED_SHORT_TEXT_PATTERN = %r{\A[a-zA-Z0-9_\-!?\*\(\) ]{1,63}\z}
+  ALLOWED_SHORT_TEXT_PATTERN = %r{\A[a-zA-Z0-9_\-!?*() ]{1,63}\z}
 
   # - Max length 63
   # - Unicode letters, numbers, hyphen, space
@@ -64,7 +64,7 @@ module Validation
 
   # Allow Kubernetes Names
   # - Same with regular name pattern, but shorter (40 chars)
-  ALLOWED_KUBERNETES_NAME_PATTERN = %r{\A[a-z0-9](?:[a-z0-9\-]{0,38}[a-z0-9])?\z}
+  ALLOWED_KUBERNETES_NAME_PATTERN = %r{\A[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?\z}
 
   def self.validate_name(name)
     msg = "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."

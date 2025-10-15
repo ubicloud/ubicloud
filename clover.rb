@@ -76,7 +76,7 @@ class Clover < Roda
         [nil, uuid]
       end
     end
-    const_set(:"#{model.table_name.upcase}_NAME_OR_UBID", [sym, /([a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?)/])
+    const_set(:"#{model.table_name.upcase}_NAME_OR_UBID", [sym, /([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)/])
   end
 
   plugin :response_content_type,
