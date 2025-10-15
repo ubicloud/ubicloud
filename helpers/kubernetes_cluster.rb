@@ -63,7 +63,7 @@ class Clover
       vm_size = Option::VmSizes.find { it.display_name == size && it.arch == "x64" }
       vm_size.family == "standard"
     end
-    options.add_option(name: "worker_nodes", values: (1..10).map { {value: it, display_name: "#{it} Node#{(it == 1) ? "" : "s"}"} }, parent: "worker_size")
+    options.add_option(name: "worker_nodes", values: (1..10).map { {value: it, display_name: "#{it} Node#{"s" unless (it == 1)}"} }, parent: "worker_size")
 
     options.serialize
   end
