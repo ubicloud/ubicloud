@@ -118,7 +118,7 @@ module ThawedMock
   allow_mocking(BillingRate, :from_resource_properties)
   allow_mocking(Clog, :emit)
   allow_mocking(CloudflareClient, :new)
-  allow_mocking(Clover, :call, :authorized_project)
+  allow_mocking(Clover, :ips_v4, :call, :authorized_project)
   allow_mocking(EmailRenderer, :sendmail)
   allow_mocking(Hosting::Apis, :pull_data_center, :pull_ips, :reimage_server, :hardware_reset_server, :set_server_name)
   allow_mocking(InvoiceGenerator, :new)
@@ -133,7 +133,7 @@ module ThawedMock
   allow_mocking(Serializers::Vm, :serialize_internal)
   allow_mocking(SshKey, :generate)
   allow_mocking(ThreadPrinter, :puts, :run)
-  allow_mocking(Util, :create_certificate, :create_root_certificate, :rootish_ssh, :send_email)
+  allow_mocking(Util, :calculate_ips_v4, :create_certificate, :create_root_certificate, :rootish_ssh, :send_email)
   allow_mocking(UBID, :class_match?)
   allow_mocking(VictoriaMetrics::Client, :new)
 end

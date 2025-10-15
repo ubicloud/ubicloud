@@ -99,4 +99,14 @@ module Util
   def self.monitor_process?
     ENV["MONITOR_PROCESS"] == "1"
   end
+
+  def self.calculate_ips_v4
+    Address
+      .select { set_masklen(:cidr, 16).as(:masked) }
+      .where { (family(:cidr) =~ 4) & (masklen(:cidr) !~ 32) }
+      .distinct
+      .order(:masked)
+      .map(:masked)
+      .join("\n")
+  end
 end

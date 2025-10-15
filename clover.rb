@@ -21,6 +21,9 @@ class Clover < Roda
   SCHEMA = Committee::Drivers::OpenAPI3::Driver.new.parse(OPENAPI)
   SCHEMA_ROUTER = SCHEMA.build_router(schema: SCHEMA, strict: true)
 
+  @ips_v4 = Util.calculate_ips_v4
+  singleton_class.attr_reader :ips_v4
+
   opts[:check_dynamic_arity] = false
   opts[:check_arity] = :warn
 
@@ -989,6 +992,12 @@ class Clover < Roda
           content_security_policy.add_form_action(uri.to_s)
           view "auth/oidc_login"
         end
+      end
+
+      r.get "ips-v4" do
+        response.content_type = :text
+        response.cache_control public: true, max_age: 86400
+        self.class.ips_v4
       end
 
       check_csrf!
