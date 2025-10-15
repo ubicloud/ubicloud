@@ -64,8 +64,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         project_id: user_project.id,
         location_id: Location::HETZNER_FSN1_ID,
         name: "pg-name",
-        target_vm_size: "standard-2",
-        target_storage_size_gib: 128,
+        target_vm_size: "burstable-2",
+        target_storage_size_gib: 64,
         superuser_password: "dummy-password",
         target_version: "16"
       )
