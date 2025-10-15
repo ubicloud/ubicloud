@@ -117,12 +117,12 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   def destroy_aws_s3
-    iam_client.list_attached_user_policies(user_name: postgres_timeline.ubid).attached_policies.each do |it|
+    iam_client.list_attached_user_policies(user_name: postgres_timeline.ubid).attached_policies.each do
       iam_client.detach_user_policy(user_name: postgres_timeline.ubid, policy_arn: it.policy_arn)
       iam_client.delete_policy(policy_arn: it.policy_arn)
     end
 
-    iam_client.list_access_keys(user_name: postgres_timeline.ubid).access_key_metadata.each do |it|
+    iam_client.list_access_keys(user_name: postgres_timeline.ubid).access_key_metadata.each do
       iam_client.delete_access_key(user_name: postgres_timeline.ubid, access_key_id: it.access_key_id)
     end
     iam_client.delete_user(user_name: postgres_timeline.ubid)
@@ -147,7 +147,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   def aws_access_key_is_available?
-    iam_client.list_access_keys(user_name: postgres_timeline.ubid).access_key_metadata.any? { |it| it.access_key_id == postgres_timeline.access_key }
+    iam_client.list_access_keys(user_name: postgres_timeline.ubid).access_key_metadata.any? { it.access_key_id == postgres_timeline.access_key }
   end
 
   def iam_client
