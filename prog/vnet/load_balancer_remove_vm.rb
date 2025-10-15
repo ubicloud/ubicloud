@@ -13,7 +13,7 @@ class Prog::Vnet::LoadBalancerRemoveVm < Prog::Base
 
   label def destroy_vm_ports_and_update_node
     load_balancer.vm_ports_by_vm(vm).destroy
-    bud Prog::Vnet::UpdateLoadBalancerNode, {subject_id: vm.id, load_balancer_id: load_balancer.id}, :update_load_balancer
+    bud Prog::Vnet::UpdateLoadBalancerNode, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :update_load_balancer
     hop_wait_for_node_update
   end
 
@@ -27,7 +27,7 @@ class Prog::Vnet::LoadBalancerRemoveVm < Prog::Base
   end
 
   label def initiate_cert_server_removal
-    bud Prog::Vnet::CertServer, {subject_id: load_balancer.id, vm_id: vm.id}, :remove_cert_server if load_balancer.cert_enabled
+    bud Prog::Vnet::CertServer, {"subject_id" => load_balancer.id, "vm_id" => vm.id}, :remove_cert_server if load_balancer.cert_enabled
     hop_wait_for_cert_server_removal
   end
 
