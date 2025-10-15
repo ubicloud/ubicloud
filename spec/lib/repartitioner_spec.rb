@@ -3,7 +3,7 @@
 require_relative "../spec_helper"
 
 RSpec.describe Repartitioner do
-  let(:channel) { :"monitor_#{object_id}" }
+  let(:channel) { :"monitor_#{object_id}_#{rand}" }
 
   def repartitioner(**)
     described_class.new(partition_number: 1, channel:, max_partition: 8, listen_timeout: 1, recheck_seconds: 18, stale_seconds: 40, **)
@@ -48,28 +48,30 @@ RSpec.describe Repartitioner do
 
     it "repartitions when it receives a notification about a new partition" do
       @mp = mp = repartitioner(listen_timeout: 0.01, recheck_seconds: 2)
-      q = Queue.new
+      expect(mp.strand_id_range).to eq("00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff")
+      notify_q = Queue.new
       mp.define_singleton_method(:notify) do
         super()
-        q.push nil
-      end
-      mp.define_singleton_method(:repartition) do |n|
-        super(n)
-        q.push nil if n == 2
+        notify_q.push true
       end
       @th = Thread.new { mp.listen }
 
-      q.pop(timeout: 1)
-      expect(mp).to receive(:repartition).with(2).and_call_original
-      expect(mp.strand_id_range).to eq("00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff")
+      # Ensure mp is already listening (#listen calls #notify after LISTEN)
+      expect(notify_q.pop(timeout: 1)).to be true
+
+      repartition_q = Queue.new
+      mp.define_singleton_method(:repartition) do |n|
+        super(n)
+        repartition_q.push true if n == 2
+      end
       Thread.new { repartitioner(partition_number: 2).notify }.join(1)
 
-      q.pop(timeout: 1)
+      expect(repartition_q.pop(timeout: 1)).to be true
       expect(mp.strand_id_range).to eq("00000000-0000-0000-0000-000000000000"..."80000000-0000-0000-0000-000000000000")
     end
 
     it "repartitions when an existing partition goes stale" do
-      @mp = mp = repartitioner(listen_timeout: 0.01, recheck_seconds: 0.01)
+      @mp = mp = repartitioner(listen_timeout: 0.01, recheck_seconds: 0.03)
       notify_q = Queue.new
       repartition_3q = Queue.new
       repartition_2q = Queue.new
