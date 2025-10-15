@@ -26,6 +26,7 @@ class CloverAdmin < Roda
     extract_fixed_locals: true
   }
 
+  plugin :part
   plugin :public
   plugin :flash
   plugin :h
