@@ -84,3 +84,4 @@ end
 # Referenced By:
 #  firewall_rule             | firewall_rule_firewall_id_fkey             | (firewall_id) REFERENCES firewall(id)
 #  firewalls_private_subnets | firewalls_private_subnets_firewall_id_fkey | (firewall_id) REFERENCES firewall(id)
+#  firewalls_vms             | firewalls_vms_firewall_id_fkey             | (firewall_id) REFERENCES firewall(id) ON DELETE CASCADE
