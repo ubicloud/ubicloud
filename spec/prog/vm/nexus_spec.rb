@@ -178,6 +178,13 @@ RSpec.describe Prog::Vm::Nexus do
       }.to raise_error RuntimeError, "Given subnet is not available in the given project"
     end
 
+    it "allows if subnet belongs to another project and allow_private_subnet_in_other_project argument is given" do
+      expect(PrivateSubnet).to receive(:[]).with(ps.id).and_return(ps).at_least(:once)
+      expect(Project).to receive(:[]).with(prj.id).and_return(prj)
+      vm = described_class.assemble("some_ssh key", prj.id, private_subnet_id: ps.id, allow_private_subnet_in_other_project: true).subject
+      expect(vm.private_subnets.map(&:id)).to eq [ps.id]
+    end
+
     it "creates arm64 vm with double core count and 3.2GB memory per core" do
       st = described_class.assemble("some_ssh key", prj.id, size: "standard-4", arch: "arm64")
       expect(st.subject.vcpus).to eq(4)
