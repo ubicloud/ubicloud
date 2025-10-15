@@ -207,6 +207,13 @@ RSpec.describe Clover, "private subnet" do
         expect(page).to have_content "dummy-vm"
         expect(page.all("#private-subnet-nics a").to_a).to eq []
       end
+
+      it "does not show nics for vms in other projects" do
+        Prog::Vm::Nexus.assemble("some_ssh key", Project.create(name: "other").id, private_subnet_id: private_subnet.id, allow_private_subnet_in_other_project: true, name: "other-vm")
+        visit "#{project.path}#{private_subnet.path}/vms"
+        expect(page).to have_no_content "other-vm"
+        expect(page.all("#private-subnet-nics a").to_a).to eq []
+      end
     end
 
     describe "show firewalls" do
