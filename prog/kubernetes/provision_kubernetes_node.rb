@@ -8,7 +8,8 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   end
 
   def kubernetes_nodepool
-    @kubernetes_nodepool ||= KubernetesNodepool[frame["nodepool_id"]]
+    return @kubernetes_nodepool if defined?(@kubernetes_nodepool)
+    @kubernetes_nodepool = KubernetesNodepool[frame["nodepool_id"]]
   end
 
   def vm
