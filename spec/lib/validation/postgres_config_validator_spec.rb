@@ -14,6 +14,7 @@ RSpec.describe Validation::PostgresConfigValidator do
       it "returns a validator instance" do
         expect { described_class.new("16") }.not_to raise_error
         expect { described_class.new("pgbouncer") }.not_to raise_error
+        expect { described_class.new("18") }.not_to raise_error
       end
     end
   end

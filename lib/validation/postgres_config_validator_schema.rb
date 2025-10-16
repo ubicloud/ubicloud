@@ -2392,5 +2392,172 @@ module Validation
       removed.each { |key| schema.delete(key) }
       schema.merge!(added_or_modified)
     end.freeze
+
+    PG_18_CONFIG_SCHEMA = begin
+      removed = ["ssl_ecdh_curve"]
+      added_or_modified = {
+        "autovacuum_vacuum_max_threshold" => {
+          description: "Minimum number of tuple updates or deletes prior to vacuum.",
+          type: :integer,
+          default: 100000000,
+          min: -1,
+          max: 2147483647
+        },
+        "autovacuum_worker_slots" => {
+          description: "Sets the number of autovacuum worker slots.",
+          type: :integer,
+          default: 16,
+          min: 1,
+          max: 2147483647
+        },
+        "effective_io_concurrency" => {
+          description: "Number of simultaneous requests that can be handled efficiently by the disk subsystem.",
+          type: :integer,
+          min: 0,
+          max: 1000,
+          default: 16
+        },
+        "enable_distinct_reordering" => {
+          description: "Enables the planner's ability to reorder DISTINCT keys to match the input path's pathkeys.",
+          type: :bool,
+          default: "on"
+        },
+        "enable_self_join_elimination" => {
+          description: "Enables the planner's optimization which analyses the query tree and replaces self joins with semantically equivalent single scans.",
+          type: :bool,
+          default: "on"
+        },
+        "extension_control_path" => {
+          description: "Sets the path for extension control files.",
+          type: :string,
+          default: "$system"
+        },
+        "file_copy_method" => {
+          description: "Specifies the method used to copy files.",
+          type: :enum,
+          allowed_values: ["copy", "clone"],
+          default: "copy"
+        },
+        "idle_replication_slot_timeout" => {
+          description: "Sets the duration a replication slot can remain idle before it is invalidated.",
+          type: :string,
+          pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+          default: "0"
+        },
+        "io_combine_limit" => {
+          description: "Limit on the size of data reads and writes.",
+          type: :string,
+          pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+          default: "128kB"
+        },
+        "io_max_combine_limit" => {
+          description: "Controls the largest I/O size in operations that combine I/O.",
+          type: :integer,
+          default: 16,
+          min: 1,
+          max: 128
+        },
+        "io_method" => {
+          description: "Selects the method for executing asynchronous I/O.",
+          type: :enum,
+          allowed_values: ["sync", "worker", "io_uring"],
+          default: "worker"
+        },
+        "io_workers" => {
+          description: "Number of IO worker processes, for io_method=worker.",
+          type: :integer,
+          default: 3,
+          min: 1,
+          max: 32
+        },
+        "log_connections" => {
+          description: "Logs information about connections. Options: receipt, authentication, authorization, setup_durations, all.",
+          type: :string,
+          default: ""
+        },
+        "log_line_prefix" => {
+          description: "Controls information prefixed to each log line. Supports %L for local server IP address.",
+          type: :string,
+          default: "%m [%p] %q%u@%d "
+        },
+        "log_lock_failures" => {
+          description: "Controls whether a detailed log message is produced when a lock acquisition fails.",
+          type: :bool,
+          default: "off"
+        },
+        "log_rotation_size" => {
+          description: "Sets the maximum size a log file can reach before being rotated. Maximum 2TB.",
+          type: :string,
+          pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+          default: "10MB"
+        },
+        "maintenance_io_concurrency" => {
+          description: 'A variant of "effective_io_concurrency" that is used for maintenance work.',
+          type: :integer,
+          min: 0,
+          max: 1000,
+          default: 16
+        },
+        "max_active_replication_origins" => {
+          description: "Sets the maximum number of active replication origins.",
+          type: :integer,
+          default: 10,
+          min: 0,
+          max: 262143
+        },
+        "max_files_per_process" => {
+          description: "Sets the maximum number of simultaneously open files for each server process.",
+          type: :integer,
+          min: 64,
+          max: 2147483647,
+          default: 1000
+        },
+        "md5_password_warnings" => {
+          description: "Controls whether a WARNING about MD5 password deprecation is produced when a CREATE ROLE or ALTER ROLE statement sets an MD5-encrypted password.",
+          type: :bool,
+          default: "on"
+        },
+        "oauth_validator_libraries" => {
+          description: "Lists libraries that may be called to validate OAuth v2 bearer tokens.",
+          type: :string,
+          default: ""
+        },
+        "ssl_groups" => {
+          description: "Sets the group(s) to use for Diffie-Hellman key exchange.",
+          type: :string,
+          default: "X25519:prime256v1"
+        },
+        "ssl_tls13_ciphers" => {
+          description: "Sets the list of allowed TLSv1.3 cipher suites.",
+          type: :string
+        },
+        "track_cost_delay_timing" => {
+          description: "Enables timing of cost-based vacuum delay.",
+          type: :bool,
+          default: "off"
+        },
+        "track_wal_io_timing" => {
+          description: "Collects timing statistics for WAL I/O activity. Information available via pg_stat_io.",
+          type: :bool,
+          default: "off"
+        },
+        "vacuum_max_eager_freeze_failure_rate" => {
+          description: "Fraction of pages in a relation vacuum can scan and fail to freeze before disabling eager scanning.",
+          type: :float,
+          default: 0.03,
+          min: 0.0,
+          max: 1.0
+        },
+        "vacuum_truncate" => {
+          description: "Enables vacuum to truncate empty pages at the end of the table.",
+          type: :bool,
+          default: "on"
+        }
+      }
+
+      schema = PG_17_CONFIG_SCHEMA.dup
+      removed.each { |key| schema.delete(key) }
+      schema.merge!(added_or_modified)
+    end.freeze
   end
 end
