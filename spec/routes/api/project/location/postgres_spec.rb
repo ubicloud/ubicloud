@@ -266,11 +266,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "read-replica" do
-        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
-        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
-        expect(Project).to receive(:[]).and_return(Project[Config.postgres_service_project_id]).thrice
-        expect(project).to receive(:quota_available?).and_return(true)
-        expect(pg.timeline).to receive(:earliest_restore_time).and_return(true)
+        expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
 
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
           name: "my-read-replica"
