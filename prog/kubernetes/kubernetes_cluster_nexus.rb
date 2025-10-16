@@ -18,16 +18,37 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
       ubid = KubernetesCluster.generate_ubid
       subnet = if private_subnet_id
-        PrivateSubnet[id: private_subnet_id, project_id: Config.kubernetes_service_project_id] || fail("Given subnet is not available in the k8s project")
+        PrivateSubnet[id: private_subnet_id, project_id: project_id] || fail("Given subnet is not available in the project")
       else
+        # Will create customer private subnet with customer firewall
         Prog::Vnet::SubnetNexus.assemble(
-          Config.kubernetes_service_project_id,
+          project_id,
           name: "#{ubid}-subnet",
           location_id:,
           firewall_name: "#{ubid}-firewall",
           ipv4_range: Prog::Vnet::SubnetNexus.random_private_ipv4(Location[location_id], project, 18).to_s
         ).subject
       end
+
+      # Internal control plane node firewall, will be directly attached to kubernetes control plane VMs
+      internal_cp_vm_firewall = Firewall.create(name: "#{ubid}-cp-vm-firewall", location_id:, description: "Kubernetes control plane node internal firewall", project_id: Config.kubernetes_service_project_id)
+      internal_cp_vm_firewall.replace_firewall_rules([
+        {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)},
+        {cidr: "::/0", port_range: Sequel.pg_range(22..22)},
+        {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(443..443)},
+        {cidr: "::/0", port_range: Sequel.pg_range(443..443)},
+        {cidr: subnet.net4.to_s, port_range: Sequel.pg_range(10250..10250)},
+        {cidr: subnet.net6.to_s, port_range: Sequel.pg_range(10250..10250)}
+      ])
+
+      # Internal worker node firewall, will be directly attached to kubernetes worker VMs
+      internal_worker_vm_firewall = Firewall.create(name: "#{ubid}-worker-vm-firewall", location_id:, description: "Kubernetes worker node internal firewall", project_id: Config.kubernetes_service_project_id)
+      internal_worker_vm_firewall.replace_firewall_rules([
+        {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)},
+        {cidr: "::/0", port_range: Sequel.pg_range(22..22)},
+        {cidr: subnet.net4.to_s, port_range: Sequel.pg_range(10250..10250)},
+        {cidr: subnet.net6.to_s, port_range: Sequel.pg_range(10250..10250)}
+      ])
 
       # TODO: Validate location
       # TODO: Validate node count
@@ -284,6 +305,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
       kubernetes_cluster.nodes.each(&:incr_destroy)
       kubernetes_cluster.nodepools.each(&:incr_destroy)
+
       nap 5 unless kubernetes_cluster.nodepools.empty?
       nap 5 unless kubernetes_cluster.nodes.empty?
 
@@ -292,6 +314,10 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
         services_lb.incr_destroy
       end
       kubernetes_cluster.api_server_lb&.incr_destroy
+
+      # Temporarily, not all kubernetes clusters will have internal firewalls, so need &.
+      kubernetes_cluster.internal_cp_vm_firewall&.destroy
+      kubernetes_cluster.internal_worker_vm_firewall&.destroy
 
       kubernetes_cluster.destroy
       pop "kubernetes cluster is deleted"
