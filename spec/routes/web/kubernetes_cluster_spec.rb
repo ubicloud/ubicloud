@@ -14,7 +14,7 @@ RSpec.describe Clover, "Kubernetes" do
       name: "myk8s",
       version: Option.kubernetes_versions.first,
       project_id: project.id,
-      private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "mysubnet", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id).id,
+      private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "mysubnet", location_id: Location::HETZNER_FSN1_ID, project_id: project.id).id,
       location_id: Location::HETZNER_FSN1_ID
     ).subject
 
@@ -47,7 +47,7 @@ RSpec.describe Clover, "Kubernetes" do
       name: "not-my-k8s",
       version: Option.kubernetes_versions.first,
       project_id: project_wo_permissions.id,
-      private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "othersubnet", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id).id,
+      private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "othersubnet", location_id: Location::HETZNER_FSN1_ID, project_id: project_wo_permissions.id).id,
       location_id: Location::HETZNER_FSN1_ID
     ).subject
   end

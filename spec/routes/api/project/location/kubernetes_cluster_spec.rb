@@ -7,7 +7,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
 
   let(:project) { project_with_default_policy(user) }
   let(:k8s_project) { Project.create(name: "UbicloudKubernetesService") }
-  let(:subnet) { PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: k8s_project.id) }
+  let(:subnet) { PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: project.id) }
   let(:kc) {
     Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "cluster",

@@ -8,7 +8,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   let(:st) { Strand.new(id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77") }
 
   let(:customer_project) { Project.create(name: "default") }
-  let(:subnet) { PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id) }
+  let(:subnet) { PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: customer_project.id) }
 
   let(:kubernetes_cluster) {
     kc = KubernetesCluster.create(
@@ -84,8 +84,8 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       p = Project.create(name: "another")
       subnet.update(project_id: p.id)
       expect {
-        described_class.assemble(name: "normalname", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
-      }.to raise_error RuntimeError, "Given subnet is not available in the k8s project"
+        described_class.assemble(name: "normalname", project_id: Project.create(name: "t").id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
+      }.to raise_error RuntimeError, "Given subnet is not available in the project"
     end
 
     it "creates a kubernetes cluster" do
@@ -102,6 +102,26 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kc.strand.label).to eq "start"
       expect(kc.target_node_size).to eq "standard-8"
       expect(kc.target_node_storage_size_gib).to eq 100
+
+      internal_firewall = kc.internal_cp_vm_firewall
+      expect(internal_firewall.project_id).to eq Config.kubernetes_service_project_id
+      expect(internal_firewall.firewall_rules.map { "#{it.cidr}:#{it.port_range.to_range}" }.sort).to eq [
+        "0.0.0.0/0:22...23",
+        "0.0.0.0/0:443...444",
+        "#{kc.private_subnet.net4}:10250...10251",
+        "::/0:22...23",
+        "::/0:443...444",
+        "#{kc.private_subnet.net6}:10250...10251"
+      ]
+
+      internal_firewall = kc.internal_worker_vm_firewall
+      expect(internal_firewall.project_id).to eq Config.kubernetes_service_project_id
+      expect(internal_firewall.firewall_rules.map { "#{it.cidr}:#{it.port_range.to_range}" }.sort).to eq [
+        "0.0.0.0/0:22...23",
+        "#{kc.private_subnet.net4}:10250...10251",
+        "::/0:22...23",
+        "#{kc.private_subnet.net6}:10250...10251"
+      ]
     end
 
     it "has defaults for node size, storage size, version and subnet" do
@@ -114,6 +134,14 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kc.private_subnet.firewalls.first.name).to eq kc.ubid.to_s + "-firewall"
       expect(kc.target_node_size).to eq "standard-2"
       expect(kc.target_node_storage_size_gib).to be_nil
+
+      customer_firewall = Firewall.first(name: "#{kc.ubid}-firewall", project_id: customer_project.id)
+      expect(kc.private_subnet.firewalls).to eq [customer_firewall]
+      expect(customer_firewall.project_id).to eq customer_project.id
+      expect(customer_firewall.firewall_rules.map { "#{it.cidr}:#{it.port_range.to_range}" }.sort).to eq [
+        "0.0.0.0/0:0...65536",
+        "::/0:0...65536"
+      ]
     end
   end
 
@@ -558,19 +586,24 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
     it "triggers deletion of associated resources and completes destroy when nodepools are gone" do
       st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
-      kubernetes_cluster.nodepools_dataset.destroy
-      kubernetes_cluster.nodes_dataset.destroy
-      expect(kubernetes_cluster.nodes).to be_empty
-      expect(kubernetes_cluster.nodepools).to be_empty
+      kubernetes_cluster.nodepools.first.destroy
+      kubernetes_cluster.nodes.map(&:destroy)
+      kubernetes_cluster.reload
+
       expect(kubernetes_cluster.api_server_lb).to receive(:incr_destroy)
       expect(kubernetes_cluster.services_lb).to receive(:incr_destroy)
+      expect(kubernetes_cluster.cp_vms).to all(receive(:incr_destroy))
+      expect(kubernetes_cluster.nodes).to all(receive(:incr_destroy))
 
-      expect(kubernetes_cluster.private_subnet).to receive(:incr_destroy_if_only_used_internally).with(
-        ubid: kubernetes_cluster.ubid,
-        vm_ids: kubernetes_cluster.cp_vms.map(&:id) + kubernetes_cluster.nodes.map(&:vm_id)
-      )
+      expect(kubernetes_cluster.nodepools).to be_empty
+
+      internal_cp_vm_firewall = Firewall.create(name: "#{kubernetes_cluster.ubid}-cp-vm-firewall", location_id: kubernetes_cluster.location_id, description: "Kubernetes control plane node internal firewall", project_id: Config.kubernetes_service_project_id)
+      internal_worker_vm_firewall = Firewall.create(name: "#{kubernetes_cluster.ubid}-worker-vm-firewall", location_id: kubernetes_cluster.location_id, description: "Kubernetes worker node internal firewall", project_id: Config.kubernetes_service_project_id)
 
       expect { nx.destroy }.to exit({"msg" => "kubernetes cluster is deleted"})
+
+      expect(internal_cp_vm_firewall.exists?).to be false
+      expect(internal_worker_vm_firewall.exists?).to be false
     end
 
     it "deletes the sub-subdomain DNS record if the DNS zone exists" do

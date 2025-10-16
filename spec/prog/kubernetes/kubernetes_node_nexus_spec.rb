@@ -46,6 +46,19 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       expect(kd.kubernetes_cluster_id).to eq kc.id
       expect(st.label).to eq "start"
     end
+
+    it "attaches internal cp vm firewall to control plane node" do
+      internal_cp_vm_firewall = Firewall.create(name: "#{kc.ubid}-cp-vm-firewall", location_id: kc.location_id, description: "Kubernetes control plane node internal firewall", project_id: Config.kubernetes_service_project_id)
+      node = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "vm2", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: subnet.id, enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: nil).subject
+      expect(node.vm.vm_firewalls).to eq [internal_cp_vm_firewall]
+    end
+
+    it "attaches internal worker vm firewall to nodepool node" do
+      internal_worker_vm_firewall = Firewall.create(name: "#{kc.ubid}-worker-vm-firewall", location_id: kc.location_id, description: "Kubernetes worker node internal firewall", project_id: Config.kubernetes_service_project_id)
+      kn = KubernetesNodepool.create(name: "np", node_count: 1, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
+      node = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "vm2", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: subnet.id, enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id).subject
+      expect(node.vm.vm_firewalls).to eq [internal_worker_vm_firewall]
+    end
   end
 
   describe "#before_run" do

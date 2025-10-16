@@ -56,8 +56,8 @@ RSpec.describe Clover, "cli" do
 
     expect(KubernetesCluster).to receive(:generate_ubid).and_return(UBID.parse("kcnzrctjjg4j4g6eqvdsvzthwp"))
     expect(KubernetesNodepool).to receive(:generate_uuid).and_return("2432784b-3c9e-8a75-900d-df23880643ec")
-    expect(Firewall).to receive(:generate_uuid).and_return("850f5687-1a76-8dfc-8949-a115826d20e7")
-    expect(FirewallRule).to receive(:generate_uuid).and_return("d5889073-4aed-89f8-8894-1c376ebea8f6", "0803b040-d565-81f8-b2ed-f4d28df19f7c")
+    expect(Firewall).to receive(:generate_uuid).and_return("850f5687-1a76-8dfc-8949-a115826d20e7", "f26fd163-5a81-8dfc-a7f7-0802917b40c2", "0ec68714-d66c-81fc-ab4d-33235e8daea3")
+    expect(FirewallRule).to receive(:generate_uuid).and_return("d5889073-4aed-89f8-8894-1c376ebea8f6", "0803b040-d565-81f8-b2ed-f4d28df19f7c", "753678ce-8c3c-8dfc-83ce-00abd4f0f3fe", "45b6f212-bedb-8dfc-b8f2-0bcbe963d5bb", "04dd799d-ef69-8dfc-b58a-1bef3dd69f86", "0acdc686-2462-85fc-9adb-cbd713cb33dd", "b62d8f1b-2c71-89fc-a087-fa4193dcd90b", "4fed0d91-99a9-8dfc-b392-36ad164bd580", "17bd4390-d26e-85fc-a2df-b22a6a0bb697", "32e35994-9dde-89fc-861a-44582c6528be", "ab1ceb1f-faec-81fc-8b4f-a17d15e17da0", "ffbcca2e-550e-81fc-a60d-b39e665c6aeb")
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("ps788q81w5w26h900k13ad8bkx"))
     cli(%W[kc eu-central-h1/test-kc create -c 1 -z standard-2 -w 1 -v #{Option.kubernetes_versions.first}])
 
@@ -74,9 +74,11 @@ RSpec.describe Clover, "cli" do
         storage_volumes: [{encrypted: true, size_gib: kubernetes_cluster.target_node_storage_size_gib}],
         boot_image: "kubernetes-#{kubernetes_cluster.version.tr(".", "_")}",
         private_subnet_id: kubernetes_cluster.private_subnet_id,
+        allow_private_subnet_in_other_project: true,
         enable_ip4: true
       ).subject
     end
+    PrivateSubnet.first(name: "#{kubernetes_cluster.ubid}-subnet").update(net4: "10.147.206.0/26", net6: "fdab:de77:9a94:fa71::/64")
     vms[0].update(ephemeral_net6: "ccab:de77:9a94:fa69::/64")
     vms[1].update(ephemeral_net6: "bbab:de77:9a94:fa69::/64")
     add_ipv4_to_vm(vms[0], "129.0.0.2")
