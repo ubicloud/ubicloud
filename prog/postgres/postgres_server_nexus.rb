@@ -44,6 +44,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         private_subnet_id: postgres_resource.private_subnet_id,
         enable_ip4: true,
         arch: arch,
+        allow_private_subnet_in_other_project: true,
         exclude_host_ids: exclude_host_ids,
         exclude_availability_zones: exclude_availability_zones,
         availability_zone: availability_zone,
@@ -61,6 +62,12 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         vm_id: vm_st.id,
         version: postgres_resource.version
       )
+
+      # Add postgres resource internal firewall directly to related VM, if it exists.
+      # Existing postgres resources may temporarily not have an attached internal firewall.
+      if (internal_firewall = postgres_resource.internal_firewall)
+        vm_st.subject.add_vm_firewall(internal_firewall)
+      end
 
       Strand.create_with_id(postgres_server.id, prog: "Postgres::PostgresServerNexus", label: "start")
     end
