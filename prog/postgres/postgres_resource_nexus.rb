@@ -55,10 +55,22 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         parent_id: parent_id, restore_target: restore_target, hostname_version: "v2"
       )
 
-      firewall = Firewall.create(name: "#{postgres_resource.ubid}-firewall", location_id: location.id, description: "Postgres default firewall", project_id: Config.postgres_service_project_id)
-
-      private_subnet_id = Prog::Vnet::SubnetNexus.assemble(Config.postgres_service_project_id, name: "#{postgres_resource.ubid}-subnet", location_id: location.id, firewall_id: firewall.id).id
+      # Customer firewall, will be attached to created customer subnet
+      firewall = Firewall.create(name: "#{postgres_resource.ubid}-firewall", location_id: location.id, description: "Firewall for PostgreSQL database #{postgres_resource.name}", project_id:)
+      private_subnet = Prog::Vnet::SubnetNexus.assemble(project_id, name: "#{postgres_resource.ubid}-subnet", location_id: location.id, firewall_id: firewall.id).subject
+      private_subnet_id = private_subnet.id
       postgres_resource.update(private_subnet_id: private_subnet_id)
+
+      # Internal firewall, will be directly attached to postgres server VMs
+      internal_firewall = Firewall.create(name: "#{postgres_resource.ubid}-internal-firewall", location_id: location.id, description: "Postgres default firewall", project_id: Config.postgres_service_project_id)
+      internal_firewall.replace_firewall_rules([
+        {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)},
+        {cidr: "::/0", port_range: Sequel.pg_range(22..22)},
+        {cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(5432..5432)},
+        {cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(6432..6432)},
+        {cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(5432..5432)},
+        {cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(6432..6432)}
+      ])
 
       if with_firewall_rules
         PostgresFirewallRule.create(postgres_resource_id: postgres_resource.id, cidr: "0.0.0.0/0")
@@ -250,6 +262,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       ubid: postgres_resource.ubid,
       vm_ids: servers.map(&:vm_id)
     )
+
+    # Temporarily, not all postgres resources will have internal firewalls, so need &.
+    postgres_resource.internal_firewall&.destroy
 
     servers.each(&:incr_destroy)
 
