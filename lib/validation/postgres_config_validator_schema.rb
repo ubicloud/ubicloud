@@ -56,7 +56,7 @@ module Validation
       "archive_timeout" => {
         description: "Sets the amount of time to wait before forcing a switch to the next WAL file.",
         type: :string,
-        pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+        pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
         default: "1min"
       },
       "array_nulls" => {
@@ -67,7 +67,7 @@ module Validation
       "authentication_timeout" => {
         description: "Sets the maximum allowed time to complete client authentication.",
         type: :string,
-        pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+        pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
         default: "1min"
       },
       "autovacuum" => {
@@ -113,13 +113,13 @@ module Validation
       "autovacuum_naptime" => {
         description: "Time to sleep between autovacuum runs.",
         type: :string,
-        pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+        pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
         default: "1min"
       },
       "autovacuum_vacuum_cost_delay" => {
         description: "Vacuum cost delay in milliseconds, for autovacuum.",
         type: :string,
-        pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+        pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
         default: "2ms"
       },
       "autovacuum_vacuum_cost_limit" => {
@@ -158,7 +158,7 @@ module Validation
       "autovacuum_work_mem" => {
         description: "Sets the maximum memory to be used by each autovacuum worker process.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "-1"
       },
       "backend_flush_after" => {
@@ -181,13 +181,13 @@ module Validation
       "bgwriter_delay" => {
         description: "Background writer sleep time between rounds.",
         type: :string,
-        pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+        pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
         default: "200ms"
       },
       "bgwriter_flush_after" => {
         description: "Number of pages after which previously performed writes are flushed to disk.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "512kB"
       },
       "bgwriter_lru_maxpages" => {
@@ -234,19 +234,19 @@ module Validation
       "checkpoint_flush_after" => {
         description: "Number of pages after which previously performed writes are flushed to disk.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "256kB"
       },
       "checkpoint_timeout" => {
         description: "Sets the maximum time between automatic WAL checkpoints.",
         type: :string,
-        pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+        pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
         default: "5min"
       },
       "checkpoint_warning" => {
         description: "Sets the maximum time before warning if checkpoints triggered by WAL volume happen too frequently.",
         type: :string,
-        pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+        pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
         default: "30s"
       },
       "client_connection_check_interval" => {
@@ -395,7 +395,7 @@ module Validation
       "deadlock_timeout" => {
         description: "Sets the time to wait on a lock before checking for deadlock.",
         type: :string,
-        pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+        pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
         default: "1s"
       },
       "debug_discard_caches" => {
@@ -498,7 +498,7 @@ module Validation
       "effective_cache_size" => {
         description: "Sets the planner's assumption about the total size of the data caches.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "(75% of total memory)"
       },
       "effective_io_concurrency" => {
@@ -676,7 +676,7 @@ module Validation
       "geqo_pool_size" => {
         description: "GEQO: number of individuals in the population.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "0"
       },
       "geqo_seed" => {
@@ -708,7 +708,7 @@ module Validation
       "gin_pending_list_limit" => {
         description: "Sets the maximum size of the pending list for GIN index.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "4MB"
       },
       "gss_accept_delegation" => {
@@ -719,7 +719,7 @@ module Validation
       "hash_mem_multiplier" => {
         description: 'Multiple of "work_mem" to use for hash tables.',
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "2"
       },
       "hot_standby" => {
@@ -735,7 +735,7 @@ module Validation
       "huge_page_size" => {
         description: "The size of huge page that should be requested.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "0"
       },
       "huge_pages" => {
@@ -894,7 +894,7 @@ module Validation
       "log_autovacuum_min_duration" => {
         description: "Sets the minimum execution time above which autovacuum actions will be logged.",
         type: :string,
-        pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+        pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
         default: "10min"
       },
       "log_checkpoints" => {
@@ -1028,19 +1028,19 @@ module Validation
       "log_rotation_age" => {
         description: "Sets the amount of time to wait before forcing log file rotation.",
         type: :string,
-        pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+        pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
         default: "1d"
       },
       "log_rotation_size" => {
         description: "Sets the maximum size a log file can reach before being rotated.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "10MB"
       },
       "log_startup_progress_interval" => {
         description: "Time between progress updates for long-running startup operations.",
         type: :string,
-        pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+        pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
         default: "10s"
       },
       "log_statement" => {
@@ -1093,7 +1093,7 @@ module Validation
       "logical_decoding_work_mem" => {
         description: "Sets the maximum memory to be used for logical decoding.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "64MB"
       },
       "maintenance_io_concurrency" => {
@@ -1106,7 +1106,7 @@ module Validation
       "maintenance_work_mem" => {
         description: "Sets the maximum memory to be used for maintenance operations.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "(8.25% of total memory)"
       },
       "max_connections" => {
@@ -1203,25 +1203,25 @@ module Validation
       "max_slot_wal_keep_size" => {
         description: "Sets the maximum WAL size that can be reserved by replication slots.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "-1"
       },
       "max_stack_depth" => {
         description: "Sets the maximum stack depth, in kilobytes.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "2MB"
       },
       "max_standby_archive_delay" => {
         description: "Sets the maximum delay before canceling queries when a hot standby server is processing archived WAL data.",
         type: :string,
-        pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+        pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
         default: "30s"
       },
       "max_standby_streaming_delay" => {
         description: "Sets the maximum delay before canceling queries when a hot standby server is processing streamed WAL data.",
         type: :string,
-        pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+        pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
         default: "30s"
       },
       "max_sync_workers_per_subscription" => {
@@ -1241,7 +1241,7 @@ module Validation
       "max_wal_size" => {
         description: "Sets the WAL size that triggers a checkpoint.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "5GB"
       },
       "max_worker_processes" => {
@@ -1254,25 +1254,25 @@ module Validation
       "min_dynamic_shared_memory" => {
         description: "Amount of dynamic shared memory reserved at startup.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "0"
       },
       "min_parallel_index_scan_size" => {
         description: "Sets the minimum amount of index data for a parallel scan.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "512kB"
       },
       "min_parallel_table_scan_size" => {
         description: "Sets the minimum amount of table data for a parallel scan.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "8MB"
       },
       "min_wal_size" => {
         description: "Sets the minimum size to shrink the WAL to.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "80MB"
       },
       "old_snapshot_threshold" => {
@@ -1522,7 +1522,7 @@ module Validation
       "shared_buffers" => {
         description: "Sets the number of shared memory buffers used by the server.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "(25% of total memory)"
       },
       "shared_memory_type" => {
@@ -1612,7 +1612,7 @@ module Validation
       "statement_timeout" => {
         description: "Sets the maximum allowed duration of any statement.",
         type: :string,
-        pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+        pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
         default: "0"
       },
       "stats_fetch_consistency" => {
@@ -1695,7 +1695,7 @@ module Validation
       "temp_buffers" => {
         description: "Sets the maximum number of temporary buffers used by each session.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "8MB"
       },
       "temp_file_limit" => {
@@ -1735,7 +1735,7 @@ module Validation
       "track_activity_query_size" => {
         description: "Sets the size reserved for pg_stat_activity.query, in bytes.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "1kB"
       },
       "track_commit_timestamp" => {
@@ -1809,7 +1809,7 @@ module Validation
       "vacuum_buffer_usage_limit" => {
         description: "Sets the buffer pool size for VACUUM, ANALYZE, and autovacuum.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "2MB"
       },
       "vacuum_cost_delay" => {
@@ -1890,7 +1890,7 @@ module Validation
       "wal_buffers" => {
         description: "Sets the number of disk-page buffers in shared memory for WAL.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "16MB"
       },
       "wal_compression" => {
@@ -1906,7 +1906,7 @@ module Validation
       "wal_decode_buffer_size" => {
         description: "Buffer size for reading ahead in the WAL during recovery.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "512kB"
       },
       "wal_init_zero" => {
@@ -1917,7 +1917,7 @@ module Validation
       "wal_keep_size" => {
         description: "Sets the size of WAL files held for standby servers.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "0"
       },
       "wal_level" => {
@@ -1939,13 +1939,13 @@ module Validation
       "wal_receiver_status_interval" => {
         description: "Sets the maximum interval between WAL receiver status reports to the sending server.",
         type: :string,
-        pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+        pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
         default: "10s"
       },
       "wal_receiver_timeout" => {
         description: "Sets the maximum wait time to receive data from the sending server.",
         type: :string,
-        pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+        pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
         default: "1min"
       },
       "wal_recycle" => {
@@ -1956,19 +1956,19 @@ module Validation
       "wal_retrieve_retry_interval" => {
         description: "Sets the time to wait before retrying to retrieve WAL after a failed attempt.",
         type: :string,
-        pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+        pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
         default: "5s"
       },
       "wal_sender_timeout" => {
         description: "Sets the maximum time to wait for WAL replication.",
         type: :string,
-        pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+        pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
         default: "1min"
       },
       "wal_skip_threshold" => {
         description: "Minimum size of new file to fsync instead of writing WAL.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "2MB"
       },
       "wal_sync_method" => {
@@ -1980,19 +1980,19 @@ module Validation
       "wal_writer_delay" => {
         description: "Time between WAL flushes performed in the WAL writer.",
         type: :string,
-        pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+        pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
         default: "200ms"
       },
       "wal_writer_flush_after" => {
         description: "Amount of WAL written out by WAL writer that triggers a flush.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "1MB"
       },
       "work_mem" => {
         description: "Sets the maximum memory to be used for query workspaces.",
         type: :string,
-        pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "(12.5% of total memory)"
       },
       "xmlbinary" => {
@@ -2292,7 +2292,7 @@ module Validation
         "commit_timestamp_buffers" => {
           description: "Sets the size of the dedicated buffer pool used for the commit timestamp cache.",
           type: :string,
-          pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+          pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
           default: "4MB"
         },
         "enable_group_by_reordering" => {
@@ -2308,7 +2308,7 @@ module Validation
         "io_combine_limit" => {
           description: "Limit on the size of data reads and writes.",
           type: :string,
-          pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+          pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
           default: "128kB"
         },
         "max_notify_queue_pages" => {
@@ -2321,31 +2321,31 @@ module Validation
         "multixact_member_buffers" => {
           description: "Sets the size of the dedicated buffer pool used for the MultiXact member cache.",
           type: :string,
-          pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+          pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
           default: "256kB"
         },
         "multixact_offset_buffers" => {
           description: "Sets the size of the dedicated buffer pool used for the MultiXact offset cache.",
           type: :string,
-          pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+          pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
           default: "128kB"
         },
         "notify_buffers" => {
           description: "Sets the size of the dedicated buffer pool used for the LISTEN/NOTIFY message cache.",
           type: :string,
-          pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+          pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
           default: "128kB"
         },
         "serializable_buffers" => {
           description: "Sets the size of the dedicated buffer pool used for the serializable transaction cache.",
           type: :string,
-          pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+          pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
           default: "256kB"
         },
         "subtransaction_buffers" => {
           description: "Sets the size of the dedicated buffer pool used for the subtransaction cache.",
           type: :string,
-          pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+          pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
           default: "4MB"
         },
         "summarize_wal" => {
@@ -2370,7 +2370,7 @@ module Validation
         "transaction_buffers" => {
           description: "Sets the size of the dedicated buffer pool used for the transaction status cache.",
           type: :string,
-          pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+          pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
           default: "4MB"
         },
         "transaction_timeout" => {
@@ -2383,7 +2383,7 @@ module Validation
         "wal_summary_keep_time" => {
           description: "Time for which WAL summary files should be kept.",
           type: :string,
-          pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+          pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
           default: "10d"
         }
       }

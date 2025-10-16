@@ -919,7 +919,7 @@ RSpec.describe Clover, "postgres" do
         click_button "Save"
 
         expect(page).to have_flash_error "Validation failed for following fields: pg_config.work_mem"
-        expect(page).to have_content "must match pattern: ^[0-9]+(kB|MB|GB|TB)?$"
+        expect(page).to have_content "must match pattern: [0-9]+(kB|MB|GB|TB)?"
         expect(pg.reload.user_config).to eq({"max_connections" => "120"})
       end
     end
