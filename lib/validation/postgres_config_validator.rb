@@ -104,8 +104,8 @@ module Validation
 
     def validate_string(value, pattern)
       # Check pattern validation first if pattern is specified
-      if pattern && !value.match?(Regexp.new(pattern))
-        return "must match pattern: #{pattern}"
+      if pattern && !pattern.match?(value)
+        return "must match pattern: #{pattern.source.gsub(/[\\Az]/, "")}"
       end
 
       # Check if string value needs quoting and is properly quoted
