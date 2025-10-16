@@ -536,71 +536,61 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.destroy }.to nap(120)
     end
 
-    it "triggers deletion of associated resources and naps until all nodepools are gone" do
+    it "naps until all nodepools are gone" do
       st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
-      expect(kubernetes_cluster.api_server_lb).to receive(:incr_destroy)
-      expect(kubernetes_cluster.services_lb).to receive(:incr_destroy)
-
       expect(kubernetes_cluster.nodes).to all(receive(:incr_destroy))
-      expect(kubernetes_cluster.cp_vms).to all(receive(:incr_destroy))
       expect(kubernetes_cluster.nodepools).to all(receive(:incr_destroy))
-      expect(kubernetes_cluster.private_subnet).to receive(:incr_destroy)
-
       expect(kubernetes_cluster).not_to receive(:destroy)
+
       expect { nx.destroy }.to nap(5)
     end
 
-    it "triggers deletion of associated resources and naps until all control plane nodes are gone" do
+    it "naps until all control plane nodes are gone" do
       st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
-      kubernetes_cluster.nodepools.first.destroy
-      kubernetes_cluster.reload
-
-      expect(kubernetes_cluster.api_server_lb).to receive(:incr_destroy)
-      expect(kubernetes_cluster.services_lb).to receive(:incr_destroy)
+      kubernetes_cluster.nodepools_dataset.destroy
       expect(kubernetes_cluster.nodes).to all(receive(:incr_destroy))
-
       expect(kubernetes_cluster.nodepools).to be_empty
 
       expect { nx.destroy }.to nap(5)
     end
 
-    it "completes destroy when nodepools are gone" do
+    it "triggers deletion of associated resources and completes destroy when nodepools are gone" do
       st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
-      kubernetes_cluster.nodepools.first.destroy
-      kubernetes_cluster.nodes.map(&:destroy)
-      kubernetes_cluster.reload
-
+      kubernetes_cluster.nodepools_dataset.destroy
+      kubernetes_cluster.nodes_dataset.destroy
+      expect(kubernetes_cluster.nodes).to be_empty
+      expect(kubernetes_cluster.nodepools).to be_empty
       expect(kubernetes_cluster.api_server_lb).to receive(:incr_destroy)
       expect(kubernetes_cluster.services_lb).to receive(:incr_destroy)
-      expect(kubernetes_cluster.cp_vms).to all(receive(:incr_destroy))
-      expect(kubernetes_cluster.nodes).to all(receive(:incr_destroy))
-
-      expect(kubernetes_cluster.nodepools).to be_empty
+      expect(kubernetes_cluster.private_subnet).to receive(:incr_destroy)
 
       expect { nx.destroy }.to exit({"msg" => "kubernetes cluster is deleted"})
     end
 
     it "deletes the sub-subdomain DNS record if the DNS zone exists" do
+      kubernetes_cluster.nodepools_dataset.destroy
+      kubernetes_cluster.nodes_dataset.destroy
       dns_zone = DnsZone.create(project_id: Project.first.id, name: "k8s.ubicloud.com", last_purged_at: Time.now)
       kubernetes_cluster.services_lb.update(custom_hostname_dns_zone_id: dns_zone.id)
 
       dns_zone.insert_record(record_name: "*.#{kubernetes_cluster.services_lb.hostname}.", type: "CNAME", ttl: 123, data: "whatever.")
       expect(DnsRecord[name: "*.#{kubernetes_cluster.services_lb.hostname}.", tombstoned: false]).not_to be_nil
 
-      expect { nx.destroy }.to nap(5)
+      expect { nx.destroy }.to exit({"msg" => "kubernetes cluster is deleted"})
       expect(DnsRecord[name: "*.#{kubernetes_cluster.services_lb.hostname}.", tombstoned: true]).not_to be_nil
     end
 
     it "does not attempt to delete if dns zone does not exist" do
+      kubernetes_cluster.nodepools_dataset.destroy
+      kubernetes_cluster.nodes_dataset.destroy
       kubernetes_cluster.services_lb.update(custom_hostname_dns_zone_id: nil)
-      expect { nx.destroy }.to nap(5)
+      expect { nx.destroy }.to exit({"msg" => "kubernetes cluster is deleted"})
     end
 
     it "completes the destroy process even if the load balancers do not exist" do
       kubernetes_cluster.update(api_server_lb_id: nil, services_lb_id: nil)
-      kubernetes_cluster.nodepools.first.destroy
-      kubernetes_cluster.nodes.map(&:destroy)
-      kubernetes_cluster.reload
+      kubernetes_cluster.nodepools_dataset.destroy
+      kubernetes_cluster.nodes_dataset.destroy
       expect { nx.destroy }.to exit({"msg" => "kubernetes cluster is deleted"})
     end
   end
