@@ -2961,6 +2961,18 @@ components:
                     description: Connection string to the Postgres database
                     type: string
                     nullable: true
+                  username:
+                    description: Username for the Postgres database
+                    type: string
+                    nullable: true
+                  password:
+                    description: Password for the Postgres database
+                    type: string
+                    nullable: true
+                  hostname:
+                    description: Hostname for the Postgres database
+                    type: string
+                    nullable: true
                   earliest_restore_time:
                     description: Earliest restore time (if primary)
                     type: string
@@ -2986,6 +2998,9 @@ components:
                       $ref: '#/components/schemas/PostgresTag'
                 required:
                   - connection_string
+                  - username
+                  - password
+                  - hostname
                   - earliest_restore_time
                   - firewall_rules
                   - latest_restore_time

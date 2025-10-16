@@ -25,6 +25,9 @@ class Serializers::Postgres < Serializers::Base
     if options[:detailed]
       base.merge!(
         connection_string: pg.connection_string,
+        username: "postgres",
+        password: pg.superuser_password,
+        hostname: pg.hostname,
         primary: pg.representative_server&.primary?,
         firewall_rules: Serializers::PostgresFirewallRule.serialize(pg.firewall_rules.sort_by { |fwr| fwr.cidr.version && fwr.cidr.to_s }),
         metric_destinations: pg.metric_destinations.map { {id: it.ubid, username: it.username, url: it.url} },
