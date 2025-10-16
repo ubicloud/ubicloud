@@ -246,11 +246,12 @@ end
 #  user_config                 | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 #  pgbouncer_user_config       | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 #  tags                        | jsonb                    | NOT NULL DEFAULT '[]'::jsonb
-#  target_version              | postgres_version         | NOT NULL
+#  target_version              | text                     | NOT NULL
 # Indexes:
 #  postgres_server_pkey                               | PRIMARY KEY btree (id)
 #  postgres_resource_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
 # Check constraints:
+#  target_version_check               | (target_version = ANY (ARRAY['16'::text, '17'::text]))
 #  valid_maintenance_windows_start_at | (maintenance_window_start_at >= 0 AND maintenance_window_start_at <= 23)
 # Foreign key constraints:
 #  postgres_resource_location_id_fkey | (location_id) REFERENCES location(id)
