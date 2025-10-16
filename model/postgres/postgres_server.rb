@@ -342,10 +342,12 @@ end
 #  timeline_access        | timeline_access          | NOT NULL DEFAULT 'push'::timeline_access
 #  representative_at      | timestamp with time zone |
 #  synchronization_status | synchronization_status   | NOT NULL DEFAULT 'ready'::synchronization_status
-#  version                | postgres_version         | NOT NULL
+#  version                | text                     | NOT NULL
 # Indexes:
 #  postgres_server_pkey1             | PRIMARY KEY btree (id)
 #  postgres_server_resource_id_index | UNIQUE btree (resource_id) WHERE representative_at IS NOT NULL
+# Check constraints:
+#  version_check | (version = ANY (ARRAY['16'::text, '17'::text]))
 # Foreign key constraints:
 #  postgres_server_timeline_id_fkey | (timeline_id) REFERENCES postgres_timeline(id)
 #  postgres_server_vm_id_fkey       | (vm_id) REFERENCES vm(id)
