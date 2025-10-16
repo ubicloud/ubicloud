@@ -2,3 +2,4 @@ location
 eu-central-h1
 eu-central-h1
 eu-central-h1
+eu-central-h1

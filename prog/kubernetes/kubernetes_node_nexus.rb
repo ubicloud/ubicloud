@@ -7,8 +7,17 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
     DB.transaction do
       id = KubernetesNode.generate_uuid
       vm = Prog::Vm::Nexus.assemble_with_sshable(project_id, sshable_unix_user:, name:, location_id:,
-        size:, storage_volumes:, boot_image:, private_subnet_id:, enable_ip4:).subject
-      KubernetesNode.create_with_id(id, vm_id: vm.id, kubernetes_cluster_id:, kubernetes_nodepool_id:)
+        size:, storage_volumes:, boot_image:, private_subnet_id:, enable_ip4:,
+        allow_private_subnet_in_other_project: true).subject
+
+      node = KubernetesNode.create_with_id(id, vm_id: vm.id, kubernetes_cluster_id:, kubernetes_nodepool_id:)
+      cluster = node.kubernetes_cluster
+
+      internal_firewall = kubernetes_nodepool_id ? cluster.internal_worker_vm_firewall : cluster.internal_cp_vm_firewall
+      # Add appropriate internal firewall directly to related VM, if it exists.
+      # Existing kubernetes clusters may temporarily not have internal firewalls.
+      vm.add_vm_firewall(internal_firewall) if internal_firewall
+
       Strand.create_with_id(id, prog: "Kubernetes::KubernetesNodeNexus", label: "start")
     end
   end
