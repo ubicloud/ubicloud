@@ -8,6 +8,8 @@ module Validation
         @config_schema = Validation::PostgresConfigValidatorSchema::PG_17_CONFIG_SCHEMA
       when "16"
         @config_schema = Validation::PostgresConfigValidatorSchema::PG_16_CONFIG_SCHEMA
+      when "18"
+        @config_schema = Validation::PostgresConfigValidatorSchema::PG_18_CONFIG_SCHEMA
       when "pgbouncer"
         @config_schema = Validation::PostgresConfigValidatorSchema::PGBOUNCER_CONFIG_SCHEMA
       else
