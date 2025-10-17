@@ -117,11 +117,11 @@ module Option
   POSTGRES_FAMILY_OPTIONS = [
     ["standard", "Dedicated CPU"],
     ["burstable", "Shared CPU"],
+    ["m8gd", "General Purpose, Graviton3"],
+    ["i8g", "Storage Optimized, Graviton4"],
     ["c6gd", "Compute Optimized, Graviton2"],
     ["m6id", "General Purpose, Intel Xeon"],
-    ["m6gd", "General Purpose, Graviton2"],
-    ["m8gd", "General Purpose, Graviton3"],
-    ["i8g", "Storage Optimized, Graviton4"]
+    ["m6gd", "General Purpose, Graviton2"]
   ].map { |args| [args[0], PostgresFamilyOption.new(*args)] }.to_h.freeze
 
   PostgresSizeOption = Data.define(:name, :family, :vcpu_count, :memory_gib)
