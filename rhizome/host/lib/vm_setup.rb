@@ -192,8 +192,8 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def purge_storage
-    # prep.json doesn't exist, nothing more to do
-    return if !File.exist?(vp.prep_json)
+    # prep.json doesn't exist or empty, nothing more to do
+    return if !File.exist?(vp.prep_json) || File.empty?(vp.prep_json)
 
     storage_roots = []
 
