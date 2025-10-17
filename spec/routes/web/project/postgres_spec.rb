@@ -163,9 +163,8 @@ RSpec.describe Clover, "postgres" do
         Location[Location::HETZNER_FSN1_ID].destroy
 
         click_button "Create"
-        expect(page.title).to eq("Ubicloud - ResourceNotFound")
-        expect(page.status_code).to eq(404)
-        expect(page).to have_content "ResourceNotFound"
+        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
+        expect(page).to have_flash_error("Validation failed for following fields: location")
       end
 
       it "can create new ParadeDB PostgreSQL database" do
