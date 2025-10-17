@@ -16,8 +16,9 @@ class Prog::Vm::Nexus < Prog::Base
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
     enable_ip4: false, pool_id: nil, arch: "x64", swap_size_bytes: nil,
     distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0, gpu_device: nil,
-    hugepages: true, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil, exclude_availability_zones: [], availability_zone: nil,
-    alternative_families: [])
+    hugepages: true, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil,
+    exclude_availability_zones: [], availability_zone: nil, alternative_families: [],
+    allow_private_subnet_in_other_project: false)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -89,7 +90,9 @@ class Prog::Vm::Nexus < Prog::Base
         subnet = if private_subnet_id
           subnet = PrivateSubnet[private_subnet_id]
           raise "Given subnet doesn't exist with the id #{private_subnet_id}" unless subnet
-          raise "Given subnet is not available in the given project" unless project.private_subnets.any? { |ps| ps.id == subnet.id }
+          unless allow_private_subnet_in_other_project
+            raise "Given subnet is not available in the given project" unless project.private_subnets.any? { |ps| ps.id == subnet.id }
+          end
 
           subnet
         elsif new_private_subnet_name
