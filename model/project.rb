@@ -195,6 +195,7 @@ class Project < Sequel::Model
     :aws_alien_runners_ratio,
     :aws_cloudwatch_logs,
     :enable_c6gd,
+    :enable_m6id,
     :enable_m6gd,
     :free_runner_upgrade_until,
     :gpu_vm,
