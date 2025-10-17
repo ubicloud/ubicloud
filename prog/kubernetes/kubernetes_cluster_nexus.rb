@@ -24,6 +24,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
           Config.kubernetes_service_project_id,
           name: "#{ubid}-subnet",
           location_id:,
+          firewall_name: "#{ubid}-firewall",
           ipv4_range: Prog::Vnet::SubnetNexus.random_private_ipv4(Location[location_id], project, 18).to_s
         ).subject
       end

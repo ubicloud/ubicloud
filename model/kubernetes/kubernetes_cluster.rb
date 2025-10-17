@@ -21,6 +21,19 @@ class KubernetesCluster < Sequel::Model
   plugin SemaphoreMethods, :destroy, :sync_kubernetes_services, :upgrade, :install_metrics_server, :sync_worker_mesh, :install_csi, :update_billing_records
   include HealthMonitorMethods
 
+  # :nocov:
+  # Remove after firewall names fixed
+  def self.fix_firewall_names
+    DB.transaction do
+      all do |kc|
+        # Will fail if there are multiple firewalls
+        Firewall.where(id: kc.private_subnet.firewalls_dataset.select { firewall[:id] })
+          .update(name: "#{kc.ubid}-firewall")
+      end
+    end
+  end
+  # :nocov:
+
   def validate
     super
     errors.add(:cp_node_count, "must be a positive integer") unless cp_node_count.is_a?(Integer) && cp_node_count > 0
