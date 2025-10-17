@@ -208,6 +208,7 @@ end
   def reap(hop = nil, reaper: nil, nap: nil, fallthrough: false)
     children = strand
       .children_dataset
+      .order(:schedule)
       .select_append(Sequel.lit("lease < now() AND exitval IS NOT NULL").as(:reapable))
       .all
 
