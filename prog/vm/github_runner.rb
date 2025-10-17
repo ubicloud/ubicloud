@@ -356,7 +356,22 @@ class Prog::Vm::GithubRunner < Prog::Base
 
   label def wait
     register_deadline(nil, 5 * 24 * 60 * 60)
-    case vm.sshable.cmd("systemctl show -p SubState --value runner-script").chomp
+    substate = begin
+      vm.sshable.cmd("systemctl show -p SubState --value runner-script").chomp
+    rescue *Sshable::SSH_CONNECTION_ERRORS
+      if vm.location.aws? && vm.aws_instance
+        instance_id = vm.aws_instance.instance_id
+        instance_response = vm.location.location_credential.client.describe_instances({filters: [{name: "instance-id", values: [instance_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).reservations.first&.instances&.first
+        if instance_response && instance_response.dig(:state, :name) == "terminated" && instance_response.dig(:state_reason, :code) == "Server.SpotInstanceTermination"
+          Clog.emit("Spot instance interrupted") { [github_runner, {interrupted_runner: {instance_id:}}] }
+          github_runner.incr_destroy
+          nap 0
+        end
+      end
+      raise
+    end
+
+    case substate
     when "exited"
       github_runner.incr_destroy
       nap 15
