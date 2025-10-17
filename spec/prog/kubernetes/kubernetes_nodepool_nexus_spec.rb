@@ -232,17 +232,14 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kn.cluster.id, kubernetes_nodepool_id: kn.id)
       st.update(prog: "Kubernetes::KubernetesNodepoolNexus", label: "destroy", stack: [{}])
       expect(kn.nodes).to all(receive(:incr_destroy))
-      expect(kn.vms).to all(receive(:incr_destroy))
 
       expect { nx.destroy }.to nap(5)
     end
 
     it "destroys the nodepool and its nodes" do
-      kn.nodes.map(&:destroy)
-      kn.reload
+      kn.nodes_dataset.destroy
 
       expect(kn.nodes).to all(receive(:incr_destroy))
-      expect(kn.vms).to all(receive(:incr_destroy))
       expect(kn).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "kubernetes nodepool is deleted"})
     end
