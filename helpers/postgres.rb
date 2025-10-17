@@ -98,7 +98,7 @@ class Clover
 
     options.add_option(name: "family", values: Option::POSTGRES_FAMILY_OPTIONS.keys, parent: "location") do |flavor, location, family|
       if location.aws?
-        family == "m6id" || (Option::AWS_FAMILY_OPTIONS.include?(family) && @project.send(:"get_ff_enable_#{family}"))
+        ["m8gd", "i8g"].include?(family) || (Option::AWS_FAMILY_OPTIONS.include?(family) && @project.send(:"get_ff_enable_#{family}"))
       else
         family == "standard" || family == "burstable"
       end
@@ -133,7 +133,9 @@ class Clover
   end
 
   def postgres_locations
-    Location.where(name: ["hetzner-fsn1", "leaseweb-wdc02"]).all + @project.locations
+    Location.where(name: ["hetzner-fsn1", "leaseweb-wdc02"])
+      .or(provider: "aws", project_id: nil)
+      .all + @project.locations
   end
 
   def validate_postgres_input(name, postgres_params)

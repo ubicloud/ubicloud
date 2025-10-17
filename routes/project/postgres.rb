@@ -9,7 +9,7 @@ class Clover
     r.web do
       r.post true do
         handle_validation_failure("postgres/create")
-        check_visible_location
+        @location ||= Location[typecast_params.ubid_uuid("location")]
         postgres_post(typecast_params.nonempty_str("name"))
       end
 
