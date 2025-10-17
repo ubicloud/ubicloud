@@ -55,6 +55,8 @@
 </tbody>
 </table>
 
+<%== part("extras/#{@klass.name}", obj: @obj) if File.exist?("views/admin/extras/#{@klass.name}.erb") %>
+
 <h2 id="associations-header">Associations</h2>
 <div class="associations">
   <% @klass.associations.sort.each do |assoc| %>

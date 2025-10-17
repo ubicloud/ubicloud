@@ -209,4 +209,21 @@ RSpec.describe Invoice do
       invoice.persist(pdf)
     end
   end
+
+  describe ".generate_download_link" do
+    it "generates a presigned URL for PDF" do
+      allow(Config).to receive(:invoices_bucket_name).and_return("invoices-bucket")
+      url_presigner = instance_double(Aws::S3::Presigner)
+      allow(Aws::S3::Presigner).to receive(:new).with(client:).and_return(url_presigner)
+
+      url = "https://ubicloud-invoices.something.eu.r2.cloudflare.com/presigned_url"
+      expect(url_presigner).to receive(:presigned_url).with(:get_object, {
+        bucket: Config.invoices_bucket_name,
+        expires_in: 3600,
+        key: invoice.blob_key
+      }).and_return(url)
+
+      expect(invoice.generate_download_link).to eq(url)
+    end
+  end
 end
