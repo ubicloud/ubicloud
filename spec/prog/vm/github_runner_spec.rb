@@ -671,6 +671,45 @@ RSpec.describe Prog::Vm::GithubRunner do
 
       expect { nx.wait }.to nap(60)
     end
+
+    it "raises ssh exception again for non-aws instance" do
+      expect(vm.sshable).to receive(:cmd).and_raise(Errno::ECONNRESET.new("connection failed"))
+
+      expect { nx.wait }.to raise_error(Errno::ECONNRESET)
+    end
+
+    it "raises ssh exception again if aws instance not terminated due to interruption" do
+      location_id = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true).id
+      LocationCredential.create_with_id(location_id, access_key: "key", secret_key: "secret")
+      vm.update(location_id:)
+      AwsInstance.create_with_id(vm.id, instance_id: "i-0123456789abcdefg")
+      client = Aws::EC2::Client.new(stub_responses: true)
+      expect(Aws::EC2::Client).to receive(:new).and_return(client).at_least(:once)
+      expect(vm.sshable).to receive(:cmd).and_raise(Errno::ECONNRESET.new("connection failed")).at_least(:once)
+
+      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Client.UserInitiatedShutdown"}}]}])
+      expect { nx.wait }.to raise_error(Errno::ECONNRESET)
+
+      client.stub_responses(:describe_instances, reservations: [{instances: []}])
+      expect { nx.wait }.to raise_error(Errno::ECONNRESET)
+
+      client.stub_responses(:describe_instances, reservations: [])
+      expect { nx.wait }.to raise_error(Errno::ECONNRESET)
+    end
+
+    it "logs when aws instance terminated due to interruption" do
+      location_id = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true).id
+      LocationCredential.create_with_id(location_id, access_key: "key", secret_key: "secret")
+      vm.update(location_id:)
+      AwsInstance.create_with_id(vm.id, instance_id: "i-0123456789abcdefg")
+      client = Aws::EC2::Client.new(stub_responses: true)
+      expect(Aws::EC2::Client).to receive(:new).and_return(client)
+      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Server.SpotInstanceTermination"}}]}])
+      expect(vm.sshable).to receive(:cmd).and_raise(Errno::ECONNRESET.new("connection failed"))
+      expect(Clog).to receive(:emit).with("Spot instance interrupted").and_call_original
+      expect { nx.wait }.to nap
+      expect(runner.destroy_set?).to be(true)
+    end
   end
 
   describe ".collect_final_telemetry" do
