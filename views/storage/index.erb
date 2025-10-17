@@ -1,0 +1,38 @@
+<% @page_title = "Data Disks" %>
+<div class="auto-refresh hidden" data-interval="10"></div>
+
+<% right_items = []
+   if has_project_permission("DetachableVolume:create")
+     right_items << part("components/button", text: "Create Data Disk", link: "detachable-volume/create")
+   end %>
+
+<%== part(
+  "components/page_header",
+  breadcrumbs: [%w[Projects /project], [@project.name, @project.path], ["Data Disks", "#"]],
+  right_items: right_items
+) %>
+
+<div class="grid gap-6">
+  <%== part(
+    "components/table_card",
+    headers: ["Name", "Size", "Encryption", "Attached VM", "State"],
+    rows: @detachable_volumes.map do |dv|
+      [
+        [
+          [dv.name, {link: path(dv)}],
+          "#{dv.size_gib} GB",
+          dv.encrypted? ? "Encrypted" : "Unencrypted",
+          dv.vm ? [dv.vm.name, {link: path(dv.vm)}] : "-",
+          ["dv_state_label", {component: {state: dv.display_state}}]
+        ],
+        {id: "detachable-volume-#{dv.ubid}"}
+      ]
+    end,
+    empty_state: {
+      icon: "hero-circle-stack",
+      title: "No data disks",
+      description: has_project_permission("DetachableVolume:create") ? "Get started by creating a new data disk." : "You don't have permission to create data disks.",
+      buttons: has_project_permission("DetachableVolume:create") ? {"Create Data Disk" => "#{@project.path}/detachable-volume/create"} : {}
+    }
+  ) %>
+</div>

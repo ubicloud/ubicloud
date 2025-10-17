@@ -22,8 +22,9 @@ class Project < Sequel::Model
   one_to_many :inference_endpoints
   one_to_many :kubernetes_clusters
   one_to_many :ssh_public_keys, order: :name
+  one_to_many :detachable_volumes
 
-  RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners]
+  RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters detachable_volumes github_runners]
   RESOURCE_ASSOCIATION_DATASET_METHODS = RESOURCE_ASSOCIATIONS.map { :"#{it}_dataset" }
 
   one_to_many :invoices, order: Sequel.desc(:created_at)

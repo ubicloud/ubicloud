@@ -8,6 +8,7 @@ class Vm < Sequel::Model
   many_to_one :vm_host
   many_to_one :project
   one_to_many :nics
+  one_to_many :detachable_volumes
   many_to_many :private_subnets, join_table: :nic
   one_to_one :sshable, key: :id
   one_to_one :assigned_vm_address, key: :dst_vm_id
@@ -27,7 +28,7 @@ class Vm < Sequel::Model
       [:firewalls_private_subnets, :private_subnet_id, :firewall_id]
     ]
 
-  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancer_vm: :destroy
+  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancer_vm: :destroy, detachable_volumes: :nullify
 
   dataset_module Pagination
 
@@ -188,7 +189,7 @@ class Vm < Sequel::Model
   end
 
   def storage_size_gib
-    vm_storage_volumes.map { it.size_gib }.sum
+    vm_storage_volumes.map { it.size_gib }.sum + detachable_volumes.map { it.size_gib }.sum
   end
 
   def init_health_monitor_session
@@ -241,7 +242,7 @@ class Vm < Sequel::Model
       cpu_topology: topo.to_s,
       mem_gib: memory_gib,
       ndp_needed: vm_host.ndp_needed,
-      storage_volumes:,
+      storage_volumes: storage_volumes + detachable_volumes_hash,
       swap_size_bytes:,
       pci_devices: pci_devices.map { [it.slot, it.iommu_group] },
       slice_name: vm_host_slice&.inhost_name || "system.slice",
@@ -252,6 +253,21 @@ class Vm < Sequel::Model
       hugepages:,
       ipv6_disabled: project.get_ff_ipv6_disabled || false
     )
+  end
+
+  def detachable_volumes_hash
+    detachable_volumes.map { |dv|
+      {
+        "name" => dv.name,
+        "size_gib" => dv.size_gib,
+        "max_read_mbytes_per_sec" => dv.max_read_mbytes_per_sec,
+        "max_write_mbytes_per_sec" => dv.max_write_mbytes_per_sec,
+        "num_queues" => dv.vring_workers || 1,
+        "device_id" => dv.device_id,
+        "vhost_block_backend_version" => dv.target_vhost_block_backend&.version,
+        "detachable" => true
+      }
+    }
   end
 
   def storage_volumes
@@ -336,6 +352,7 @@ end
 #  vm_vm_host_slice_id_fkey | (vm_host_slice_id) REFERENCES vm_host_slice(id)
 # Referenced By:
 #  assigned_vm_address        | assigned_vm_address_dst_vm_id_fkey    | (dst_vm_id) REFERENCES vm(id)
+#  detachable_volume          | detachable_volume_vm_id_fkey          | (vm_id) REFERENCES vm(id)
 #  dns_servers_vms            | dns_servers_vms_vm_id_fkey            | (vm_id) REFERENCES vm(id)
 #  inference_endpoint_replica | inference_endpoint_replica_vm_id_fkey | (vm_id) REFERENCES vm(id)
 #  inference_router_replica   | inference_router_replica_vm_id_fkey   | (vm_id) REFERENCES vm(id)

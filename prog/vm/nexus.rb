@@ -17,7 +17,7 @@ class Prog::Vm::Nexus < Prog::Base
     enable_ip4: false, pool_id: nil, arch: "x64", swap_size_bytes: nil,
     distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0, gpu_device: nil,
     hugepages: true, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil, exclude_availability_zones: [], availability_zone: nil,
-    alternative_families: [])
+    alternative_families: [], detachable_volume_ids: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -118,6 +118,14 @@ class Prog::Vm::Nexus < Prog::Base
         project_id:
       ) { it.id = ubid.to_uuid }
       nic.update(vm_id: vm.id)
+
+      detachable_volume_ids&.each do |dv_id|
+        dv = DetachableVolume[dv_id]
+        raise "Detachable volume #{dv_id} doesn't exist" unless dv
+        raise "Detachable volume #{dv_id} is not available in the given project" unless project.detachable_volumes.any? { |v| v.id == dv.id }
+        raise "Detachable volume #{dv_id} is already attached to a VM" if dv.vm_id
+        dv.update(vm_id: vm.id)
+      end
 
       if vm_size.family == "standard-gpu"
         gpu_count = 1
