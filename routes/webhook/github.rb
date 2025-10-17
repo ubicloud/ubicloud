@@ -61,15 +61,23 @@ class Clover
       return error("No workflow_job in the payload")
     end
 
-    unless (label = job.fetch("labels").find { Github.runner_labels.key?(it) })
-      return error("Unmatched label")
+    job_labels = job.fetch("labels")
+
+    if (label = job_labels.find { Github.runner_labels.key?(it) })
+      actual_label = label
+    elsif (custom_label = GithubCustomLabel.first(installation_id: installation.id, name: job_labels))
+      actual_label = custom_label.name
+      label = custom_label.alias_for
     end
+
+    return error("Unmatched label") unless label
 
     if data["action"] == "queued"
       st = Prog::Vm::GithubRunner.assemble(
         installation,
         repository_name: data["repository"]["full_name"],
-        label: label,
+        label:,
+        actual_label:,
         default_branch: data["repository"]["default_branch"]
       )
       runner = GithubRunner[st.id]
