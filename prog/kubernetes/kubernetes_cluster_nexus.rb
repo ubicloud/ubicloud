@@ -300,7 +300,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
       kubernetes_cluster.private_subnet.incr_destroy_if_only_used_internally(
         ubid: kubernetes_cluster.ubid,
-        vm_ids: kubernetes_cluster.cp_vms.map(&:id) + kubernetes_cluster.nodes.map(&:vm_id)
+        vm_ids: kubernetes_cluster.all_nodes.map(&:vm_id)
       )
 
       kubernetes_cluster.nodes.each(&:incr_destroy)

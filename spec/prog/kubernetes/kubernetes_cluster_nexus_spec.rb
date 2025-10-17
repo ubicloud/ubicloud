@@ -8,22 +8,22 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   let(:st) { Strand.new(id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77") }
 
   let(:customer_project) { Project.create(name: "default") }
-  let(:subnet) { PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: customer_project.id) }
+  let(:subnet) { kubernetes_cluster.private_subnet }
 
   let(:kubernetes_cluster) {
-    kc = KubernetesCluster.create(
+    kc = described_class.assemble(
       name: "k8scluster",
       version: Option.kubernetes_versions.first,
       cp_node_count: 3,
-      private_subnet_id: subnet.id,
       location_id: Location::HETZNER_FSN1_ID,
       project_id: customer_project.id,
       target_node_size: "standard-2"
-    )
+    ).subject
     KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
 
     dns_zone = DnsZone.create(project_id: Project.first.id, name: "somezone", last_purged_at: Time.now)
 
+    subnet = kc.private_subnet
     apiserver_lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", health_check_endpoint: "/foo", project_id: Config.kubernetes_service_project_id)
     LoadBalancerPort.create(load_balancer_id: apiserver_lb.id, src_port: 123, dst_port: 456)
     [create_vm, create_vm].each do |vm|
@@ -567,12 +567,28 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
     it "naps until all nodepools are gone" do
       st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
+      kubernetes_nodepool = kubernetes_cluster.nodepools.first
+      Prog::Kubernetes::KubernetesNodeNexus.assemble(
+        Config.kubernetes_service_project_id,
+        sshable_unix_user: "ubi",
+        name: "t3",
+        location_id: kubernetes_cluster.location_id,
+        size: kubernetes_nodepool.target_node_size,
+        storage_volumes: [{encrypted: true, size_gib: kubernetes_nodepool.target_node_storage_size_gib}],
+        boot_image: "kubernetes-#{kubernetes_cluster.version.tr(".", "_")}",
+        private_subnet_id: kubernetes_cluster.private_subnet_id,
+        enable_ip4: true,
+        kubernetes_cluster_id: kubernetes_cluster.id,
+        kubernetes_nodepool_id: kubernetes_nodepool.id
+      ).subject
       expect(kubernetes_cluster.nodes).to all(receive(:incr_destroy))
       expect(kubernetes_cluster.nodepools).to all(receive(:incr_destroy))
 
       expect(kubernetes_cluster).not_to receive(:destroy)
 
+      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq []
       expect { nx.destroy }.to nap(5)
+      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules", "destroy"]
     end
 
     it "naps until all control plane nodes are gone" do
@@ -581,7 +597,23 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster.nodes).to all(receive(:incr_destroy))
       expect(kubernetes_cluster.nodepools).to be_empty
 
+      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq []
       expect { nx.destroy }.to nap(5)
+      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules", "destroy"]
+    end
+
+    it "does not incr_destroy private_subnet with other resources" do
+      st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
+      kubernetes_cluster.nodepools_dataset.destroy
+      expect(kubernetes_cluster.nodes).to all(receive(:incr_destroy))
+      expect(kubernetes_cluster.nodepools).to be_empty
+
+      Firewall.create(name: "t", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID)
+        .associate_with_private_subnet(kubernetes_cluster.private_subnet, apply_firewalls: false)
+
+      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq []
+      expect { nx.destroy }.to nap(5)
+      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules"]
     end
 
     it "triggers deletion of associated resources and completes destroy when nodepools are gone" do
@@ -597,13 +629,15 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
       expect(kubernetes_cluster.nodepools).to be_empty
 
-      internal_cp_vm_firewall = Firewall.create(name: "#{kubernetes_cluster.ubid}-cp-vm-firewall", location_id: kubernetes_cluster.location_id, description: "Kubernetes control plane node internal firewall", project_id: Config.kubernetes_service_project_id)
-      internal_worker_vm_firewall = Firewall.create(name: "#{kubernetes_cluster.ubid}-worker-vm-firewall", location_id: kubernetes_cluster.location_id, description: "Kubernetes worker node internal firewall", project_id: Config.kubernetes_service_project_id)
+      expect(kubernetes_cluster.internal_cp_vm_firewall.exists?).to be true
+      expect(kubernetes_cluster.internal_worker_vm_firewall.exists?).to be true
 
+      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq []
       expect { nx.destroy }.to exit({"msg" => "kubernetes cluster is deleted"})
+      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules", "destroy"]
 
-      expect(internal_cp_vm_firewall.exists?).to be false
-      expect(internal_worker_vm_firewall.exists?).to be false
+      expect(kubernetes_cluster.internal_cp_vm_firewall).to be_nil
+      expect(kubernetes_cluster.internal_worker_vm_firewall).to be_nil
     end
 
     it "deletes the sub-subdomain DNS record if the DNS zone exists" do
@@ -630,6 +664,11 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       kubernetes_cluster.update(api_server_lb_id: nil, services_lb_id: nil)
       kubernetes_cluster.nodepools_dataset.destroy
       kubernetes_cluster.nodes_dataset.destroy
+
+      # Temporarily Test case where cluster was created before internal firewalls were added
+      kubernetes_cluster.internal_cp_vm_firewall.destroy
+      kubernetes_cluster.internal_worker_vm_firewall.destroy
+
       expect { nx.destroy }.to exit({"msg" => "kubernetes cluster is deleted"})
     end
   end
