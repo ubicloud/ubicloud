@@ -249,7 +249,7 @@ class Clover
         Validation.validate_name(name)
 
         Validation.validate_vcpu_quota(@project, "PostgresVCpu", Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size].vcpu_count)
-        if pg.timeline.earliest_restore_time.nil?
+        if PostgresTimeline.earliest_restore_time(pg.timeline).nil?
           error_msg = "Parent server is not ready for read replicas. There are no backups, yet."
           fail CloverError.new(400, "InvalidRequest", error_msg)
         end

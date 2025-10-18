@@ -116,6 +116,35 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
       described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name-2", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, restore_target: restore_target)
     end
+
+    it "creates internal firewall and customer private subnet and firewall" do
+      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
+      pg = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+
+      private_subnet = pg.private_subnet
+      expect(private_subnet.project_id).to eq customer_project.id
+
+      customer_firewall = pg.customer_firewall
+      expect(pg.private_subnet.firewalls).to eq [customer_firewall]
+      expect(customer_firewall.project_id).to eq customer_project.id
+      expect(customer_firewall.firewall_rules.map { "#{it.cidr}:#{it.port_range.to_range}" }.sort).to eq [
+        "0.0.0.0/0:5432...5433",
+        "0.0.0.0/0:6432...6433",
+        "::/0:5432...5433",
+        "::/0:6432...6433"
+      ]
+
+      internal_firewall = pg.internal_firewall
+      expect(internal_firewall.project_id).to eq postgres_project.id
+      expect(internal_firewall.firewall_rules.map { "#{it.cidr}:#{it.port_range.to_range}" }.sort).to eq [
+        "0.0.0.0/0:22...23",
+        "#{private_subnet.net4}:5432...5433",
+        "#{private_subnet.net4}:6432...6433",
+        "::/0:22...23",
+        "#{private_subnet.net6}:5432...5433",
+        "#{private_subnet.net6}:6432...6433"
+      ]
+    end
   end
 
   describe "#before_run" do
@@ -397,6 +426,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(postgres_resource).to receive(:dns_zone).and_return(dns_zone)
 
       expect(postgres_resource.servers).to all(receive(:incr_destroy))
+      expect(postgres_resource.internal_firewall).to receive(:destroy)
 
       expect(postgres_resource).to receive(:hostname)
       expect(dns_zone).to receive(:delete_record)
@@ -411,6 +441,9 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "completes destroy even if dns zone is not configured" do
+      # Temporarily test for destruction without internal firewall
+      expect(postgres_resource).to receive(:internal_firewall).and_return(nil)
+
       expect(postgres_resource).to receive(:dns_zone).and_return(nil)
       expect(postgres_resource).to receive(:servers).and_return([]).at_least(:once)
       expect(postgres_resource.private_subnet).to receive(:incr_destroy_if_only_used_internally).with(

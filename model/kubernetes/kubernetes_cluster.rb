@@ -79,6 +79,16 @@ class KubernetesCluster < Sequel::Model
     self.class.kubeconfig(cp_vms.first)
   end
 
+  # Temporarily, kubernetes may not have internal firewalls, if they were
+  # created before the customer firewall/internal firewalls split.
+  def internal_cp_vm_firewall
+    Firewall.first(project_id: Config.kubernetes_service_project_id, name: "#{ubid}-cp-vm-firewall")
+  end
+
+  def internal_worker_vm_firewall
+    Firewall.first(project_id: Config.kubernetes_service_project_id, name: "#{ubid}-worker-vm-firewall")
+  end
+
   def vm_diff_for_lb(load_balancer)
     worker_vms = nodepools.flat_map(&:vms)
     worker_vm_ids = worker_vms.map(&:id).to_set
