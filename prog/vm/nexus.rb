@@ -274,12 +274,12 @@ class Prog::Vm::Nexus < Prog::Base
       raise unless ex.message.include?("no space left on any eligible host")
 
       incr_waiting_for_capacity unless vm.waiting_for_capacity_set?
-      queued_vms = queued_vms.all
-      utilization = VmHost.where(allocation_state: "accepting", arch: vm.arch).select_map { sum(:used_cores) * 100.0 / sum(:total_cores) }.first.to_f
+
       Clog.emit("No capacity left") { {lack_of_capacity: {location: Location[vm.location_id].name, arch: vm.arch, family: vm.family, queue_size: queued_vms.count}} }
 
       unless Location[vm.location_id].name == "github-runners" && vm.created_at > Time.now - 60 * 60
-        Prog::PageNexus.assemble("No capacity left at #{Location[vm.location_id].display_name} for #{vm.family} family of #{vm.arch}", ["NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family], queued_vms.first(25).map(&:ubid), extra_data: {queue_size: queued_vms.count, utilization: utilization})
+        utilization = VmHost.where(allocation_state: "accepting", arch: vm.arch).select_map { sum(:used_cores) * 100.0 / sum(:total_cores) }.first.to_f
+        Prog::PageNexus.assemble("No capacity left at #{Location[vm.location_id].display_name} for #{vm.family} family of #{vm.arch}", ["NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family], queued_vms.limit(25).select_map(Sequel[:vm][:id]).map { UBID.from_uuidish(it).to_s }, extra_data: {queue_size: queued_vms.count, utilization: utilization})
       end
 
       nap 30
