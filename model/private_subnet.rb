@@ -169,7 +169,7 @@ class PrivateSubnet < Sequel::Model
       .destroy
 
     # Destroy private subnet if it hasn't been renamed and it has no other VMs or firewalls
-    if name == "#{ubid}-subnet" && nics_dataset.exclude(vm_id: vm_ids).empty? && firewalls_dataset.empty?
+    if name == "#{ubid}-subnet" && nics_dataset.exclude(vm_id: vm_ids).exclude(vm_id: nil).empty? && firewalls_dataset.empty?
       incr_destroy
     end
   end
