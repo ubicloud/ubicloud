@@ -145,6 +145,7 @@ module Config
   optional :postgres_monitor_database_root_certs, string
   optional :postgres_paradedb_notification_email, string
   optional :postgres_lantern_notification_email, string
+  override :postgres_allow_servers_in_same_data_center, false, bool
 
   # Logging
   optional :database_logger_level, string
