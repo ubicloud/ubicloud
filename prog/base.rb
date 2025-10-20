@@ -205,7 +205,7 @@ end
   # * If fallthrough is given: returns nil
   # * If nap is given: naps for given time
   # * Otherwise, donates to run a child process
-  def reap(hop = nil, reaper: nil, nap: nil, fallthrough: false)
+  def reap(hop = nil, reaper: nil, nap: nil, fallthrough: false, strand: self.strand)
     children = strand
       .children_dataset
       .order(:schedule)
@@ -215,6 +215,11 @@ end
     reapable_children, active_children = children.partition { it.values.delete(:reapable) }
 
     reapable_children.each do |child|
+      # In case the child strand has its own child strand that needs to be
+      # reaped, it should be reaped here, otherwise the child.destroy
+      # later results in a foreign key violation.
+      reap(fallthrough: true, strand: child)
+
       # Clear any semaphores that get added to a exited Strand prog,
       # since incr is entitled to be run at *any time* (including
       # after exitval is set, though it doesn't do anything) and any

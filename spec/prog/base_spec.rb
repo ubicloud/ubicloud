@@ -19,6 +19,16 @@ RSpec.describe Prog::Base do
     expect(failer.this.get(:exitval)).to be_nil
   end
 
+  it "reap works if child strand has child strand that needs to be reaped" do
+    parent = Strand.create(prog: "Test", label: "reap_exit_no_children")
+    child = Strand.create(parent_id: parent.id, prog: "Test", label: "popper", exitval: {"msg" => "child exit"})
+    grandchild = Strand.create(parent_id: child.id, prog: "Test", label: "failer", exitval: {"msg" => "grandchild exit"})
+    parent.run
+    expect(parent.exists?).to be false
+    expect(child.exists?).to be false
+    expect(grandchild.exists?).to be false
+  end
+
   it "parent reap naps for 0.1 seconds less than child if single child naps" do
     parent = Strand.create(prog: "Test", label: "bud_short_napper")
     hop = parent.unsynchronized_run
