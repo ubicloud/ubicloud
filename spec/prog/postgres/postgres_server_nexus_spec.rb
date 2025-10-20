@@ -361,6 +361,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "pushes certificates to vm and hops to configure_prometheus during initial provisioning" do
+      expect(postgres_server.resource).to receive(:trusted_ca_certs).and_return(nil)
       expect(sshable).to receive(:cmd).with("sudo tee /etc/ssl/certs/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
       expect(sshable).to receive(:cmd).with("sudo tee /etc/ssl/certs/server.crt > /dev/null", stdin: "server_cert")
       expect(sshable).to receive(:cmd).with("sudo tee /etc/ssl/certs/server.key > /dev/null", stdin: "server_cert_key")
@@ -375,6 +376,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "hops to wait at times other than the initial provisioning" do
+      expect(postgres_server.resource).to receive(:trusted_ca_certs).and_return(nil)
       expect(sshable).to receive(:cmd).with("sudo tee /etc/ssl/certs/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
       expect(sshable).to receive(:cmd).with("sudo tee /etc/ssl/certs/server.crt > /dev/null", stdin: "server_cert")
       expect(sshable).to receive(:cmd).with("sudo tee /etc/ssl/certs/server.key > /dev/null", stdin: "server_cert_key")
