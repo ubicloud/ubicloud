@@ -115,6 +115,7 @@ class PostgresServer < Sequel::Model
           net6: it.net6.to_s
         }
       },
+      cert_auth_users: resource.cert_auth_users,
       identity: resource.identity,
       hosts: "#{resource.representative_server.vm.private_ipv4} #{resource.identity}",
       pgbouncer_instances: (vm.vcpus / 2.0).ceil.clamp(1, 8),
