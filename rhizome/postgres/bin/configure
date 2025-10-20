@@ -41,6 +41,10 @@ private_subnets = configure_hash["private_subnets"].flat_map {
   ]
 }.join("\n")
 
+cert_auth_users = configure_hash["cert_auth_users"].map {
+  "hostssl all             #{_1}           all                     cert"
+}.join("\n")
+
 pg_hba_entries = <<-PG_HBA
 # PostgreSQL Client Authentication Configuration File
 # ===================================================
@@ -79,6 +83,9 @@ host    replication     all             ::1/128                 scram-sha-256
 # Allow replication connection using special replication user for
 # HA standbys
 hostssl replication     ubi_replication all                     cert map=standby2replication
+
+# Allow certificate authentication for specific users
+#{cert_auth_users}
 
 # Allow connections from public internet with md5 authentication
 # Note that if the password is encrypted as scram-sha-256, PostgreSQL

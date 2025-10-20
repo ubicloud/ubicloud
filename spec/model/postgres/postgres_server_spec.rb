@@ -50,7 +50,7 @@ RSpec.describe PostgresServer do
   describe "#configure" do
     before do
       allow(postgres_server).to receive_messages(timeline: instance_double(PostgresTimeline, blob_storage: "dummy-blob-storage", aws?: false), read_replica?: false)
-      allow(resource).to receive(:flavor).and_return(PostgresResource::Flavor::STANDARD)
+      allow(resource).to receive_messages(flavor: PostgresResource::Flavor::STANDARD, cert_auth_users: [])
     end
 
     it "does not set archival related configs if blob storage is not configured" do
