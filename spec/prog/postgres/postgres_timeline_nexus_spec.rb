@@ -55,6 +55,19 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       postgres_timeline = PostgresTimeline[st.id]
       expect(postgres_timeline.blob_storage_id).to eq(mc.id)
     end
+
+    it "works correctly with MinioCluster in Minio project" do
+      minio_project = Project.create(name: "mc-project")
+      pg_project = Project.create(name: "mc-project")
+      expect(Config).to receive(:minio_service_project_id).and_return(minio_project.id).at_least(:once)
+      expect(Config).to receive(:postgres_service_project_id).and_return(pg_project.id)
+      mc = Prog::Minio::MinioClusterNexus.assemble(minio_project.id, "minio", Location::HETZNER_FSN1_ID, "minio-admin", 100, 1, 1, 1, "standard-2").subject
+
+      st = described_class.assemble(location_id: Location::HETZNER_FSN1_ID)
+
+      postgres_timeline = PostgresTimeline[st.id]
+      expect(postgres_timeline.blob_storage_id).to eq(mc.id)
+    end
   end
 
   describe "#before_run" do

@@ -19,12 +19,14 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
       fail "No existing location"
     end
 
+    minio_cluster = MinioCluster.first(project_id: Config.postgres_service_project_id, location_id: location.id) ||
+      MinioCluster.first(project_id: Config.minio_service_project_id, location_id: location.id)
     DB.transaction do
       postgres_timeline = PostgresTimeline.create(
         parent_id: parent_id,
         access_key: SecureRandom.hex(16),
         secret_key: SecureRandom.hex(32),
-        blob_storage_id: MinioCluster.first(project_id: Config.postgres_service_project_id, location_id: location.id)&.id,
+        blob_storage_id: minio_cluster&.id,
         location_id: location.id
       )
       Strand.create_with_id(postgres_timeline.id, prog: "Postgres::PostgresTimelineNexus", label: "start")
