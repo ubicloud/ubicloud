@@ -56,6 +56,13 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.provision_servers }.to nap
     end
 
+    it "provisions a new server without excluding hosts when Config.postgres_allow_servers_in_same_data_center is true" do
+      allow(Config).to receive(:postgres_allow_servers_in_same_data_center).and_return(true)
+      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::HETZNER_PROVIDER_NAME).at_least(:once)
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: []))
+      expect { nx.provision_servers }.to nap
+    end
+
     it "provisions a new server but excludes currently used data centers" do
       expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::HETZNER_PROVIDER_NAME).at_least(:once)
       allow(postgres_resource.servers[0]).to receive(:vm).and_return(instance_double(Vm, vm_host: instance_double(VmHost, data_center: "dc1")))
