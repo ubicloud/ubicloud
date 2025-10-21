@@ -21,68 +21,6 @@ class KubernetesCluster < Sequel::Model
   plugin SemaphoreMethods, :destroy, :sync_kubernetes_services, :upgrade, :install_metrics_server, :sync_worker_mesh, :install_csi, :update_billing_records
   include HealthMonitorMethods
 
-  # :nocov:
-  def self.add_internal_firewalls
-    # Do not use transaction around the update of all resources, to avoid blocking
-    all do |kc|
-      next if kc.internal_cp_vm_firewall
-
-      ubid = kc.ubid
-      print "Adding internal firewalls for #{ubid}..."
-      subnet = kc.private_subnet
-      location_id = kc.location_id
-
-      # Use transaction around the changes to each single postgres resource, because
-      # we don't want a state where the internal firewall is created but not added
-      # to the VMs, or where the preexisting firewall and private subnets do not both
-      # get converted to the customer's project.
-      DB.transaction do
-        internal_cp_vm_firewall = Firewall.create(name: "#{ubid}-cp-vm-firewall", location_id:, description: "Kubernetes control plane node internal firewall", project_id: Config.kubernetes_service_project_id)
-        internal_cp_vm_firewall.replace_firewall_rules([
-          {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)},
-          {cidr: "::/0", port_range: Sequel.pg_range(22..22)},
-          {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(443..443)},
-          {cidr: "::/0", port_range: Sequel.pg_range(443..443)},
-          {cidr: subnet.net4.to_s, port_range: Sequel.pg_range(10250..10250)},
-          {cidr: subnet.net6.to_s, port_range: Sequel.pg_range(10250..10250)}
-        ])
-
-        # Internal worker node firewall, will be directly attached to kubernetes worker VMs
-        internal_worker_vm_firewall = Firewall.create(name: "#{ubid}-worker-vm-firewall", location_id:, description: "Kubernetes worker node internal firewall", project_id: Config.kubernetes_service_project_id)
-        internal_worker_vm_firewall.replace_firewall_rules([
-          {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)},
-          {cidr: "::/0", port_range: Sequel.pg_range(22..22)},
-          {cidr: subnet.net4.to_s, port_range: Sequel.pg_range(10250..10250)},
-          {cidr: subnet.net6.to_s, port_range: Sequel.pg_range(10250..10250)}
-        ])
-
-        # Not strictly necessary to refresh the rules at this point,
-        # since the rules in the existing firewall allow all traffic.
-        # However, since the rules are different (even though traffic
-        # allowed by the internal rules is allowed by the existing
-        # firewall rules), probably best to refresh them.
-
-        kc.cp_vms.each do |vm|
-          vm.add_vm_firewall(internal_cp_vm_firewall)
-          vm.incr_update_firewall_rules
-        end
-
-        kc.worker_vms.each do |vm|
-          vm.add_vm_firewall(internal_worker_vm_firewall)
-          vm.incr_update_firewall_rules
-        end
-
-        subnet.firewalls.each do |fw|
-          fw.update(project_id: kc.project_id)
-        end
-        subnet.update(project_id: kc.project_id)
-
-        puts "done"
-      end
-    end
-  end
-  # :nocov:
-
   def validate
     super
     errors.add(:cp_node_count, "must be a positive integer") unless cp_node_count.is_a?(Integer) && cp_node_count > 0
