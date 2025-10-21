@@ -140,7 +140,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         project_id: user_project.id
       )
       expect(postgres_resource).to receive(:location).and_return(loc).at_least(:once)
-      expect(postgres_resource).to receive(:version).and_return("18").at_least(:once)
+      expect(postgres_resource).to receive(:version).and_return("19").at_least(:once)
       expect {
         described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
       }.to raise_error NoMethodError, "undefined method 'aws_ami_id' for nil"
