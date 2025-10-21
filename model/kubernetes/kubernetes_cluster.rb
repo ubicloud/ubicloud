@@ -79,8 +79,6 @@ class KubernetesCluster < Sequel::Model
     self.class.kubeconfig(cp_vms.first)
   end
 
-  # Temporarily, kubernetes may not have internal firewalls, if they were
-  # created before the customer firewall/internal firewalls split.
   def internal_cp_vm_firewall
     Firewall.first(project_id: Config.kubernetes_service_project_id, name: "#{ubid}-cp-vm-firewall")
   end
