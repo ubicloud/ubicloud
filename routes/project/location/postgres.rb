@@ -131,6 +131,7 @@ class Clover
         r.is do
           r.get api? do
             authorize("Postgres:view", pg)
+            postgres_require_customer_firewall!
             {
               items: Serializers::PostgresFirewallRule.serialize(pg.firewall_rules),
               count: pg.firewall_rules.count
@@ -140,6 +141,7 @@ class Clover
           r.post do
             authorize("Postgres:edit", pg)
             handle_validation_failure("postgres/show") { @page = "networking" }
+            postgres_require_customer_firewall!
 
             parsed_cidr = Validation.validate_cidr(typecast_params.nonempty_str!("cidr"))
 
@@ -165,6 +167,7 @@ class Clover
 
         r.is :ubid_uuid do |id|
           authorize("Postgres:edit", pg)
+          postgres_require_customer_firewall!
           fwr = pg.firewall_rules_dataset[id:]
           check_found_object(fwr)
 
