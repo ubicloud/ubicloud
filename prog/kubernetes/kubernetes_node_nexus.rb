@@ -14,9 +14,7 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
       cluster = node.kubernetes_cluster
 
       internal_firewall = kubernetes_nodepool_id ? cluster.internal_worker_vm_firewall : cluster.internal_cp_vm_firewall
-      # Add appropriate internal firewall directly to related VM, if it exists.
-      # Existing kubernetes clusters may temporarily not have internal firewalls.
-      vm.add_vm_firewall(internal_firewall) if internal_firewall
+      vm.add_vm_firewall(internal_firewall)
 
       Strand.create_with_id(id, prog: "Kubernetes::KubernetesNodeNexus", label: "start")
     end
