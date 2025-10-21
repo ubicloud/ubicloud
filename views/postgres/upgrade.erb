@@ -1,13 +1,13 @@
 <% upgrade_stages = [
   # [stage, description, database_available?]
-  ["start", "Start", true],
-  ["provision_servers", "Wait for standby to be ready", true],
-  ["wait_for_maintenance_window", "Wait for maintenance window", true],
-  ["wait_fence_primary", "Wait to fence primary", false],
-  ["upgrade_standby", "Upgrade standby", false],
-  ["update_metadata", "Update metadata", false],
-  ["recycle_representative_server", "Wait for takeover", false],
-  ["prune_servers", "Prune old servers", true]
+  [["start"], "Start", true],
+  [["provision_servers", "wait_servers_to_be_ready"], "Wait for standby to be ready", true],
+  [["wait_for_maintenance_window"], "Wait for maintenance window", true],
+  [["wait_fence_primary"], "Wait to fence primary", false],
+  [["upgrade_standby"], "Upgrade standby", false],
+  [["update_metadata", "wait_upgrade_candidate"], "Update metadata", false],
+  [["recycle_representative_server"], "Wait for takeover", false],
+  [["prune_servers"], "Prune old servers", true]
 ]
 
 current_stage = @pg.upgrade_stage || "start"
@@ -17,7 +17,7 @@ upgrade_progress = upgrade_stages.map do |stage, description, database_available
   if stage_status == "running"
     stage_status = "pending"
   end
-  if stage == current_stage
+  if stage.include?(current_stage)
     stage_status = "running"
   end
 
@@ -37,7 +37,7 @@ upgrade_progress = upgrade_stages.map do |stage, description, database_available
     ""
   end
 
-  [stage, description, database_availability_icon, stage_status_icon]
+  [stage.first, description, database_availability_icon, stage_status_icon]
 end %>
 
 <div class="p-6">
