@@ -665,10 +665,6 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       kubernetes_cluster.nodepools_dataset.destroy
       kubernetes_cluster.nodes_dataset.destroy
 
-      # Temporarily Test case where cluster was created before internal firewalls were added
-      kubernetes_cluster.internal_cp_vm_firewall.destroy
-      kubernetes_cluster.internal_worker_vm_firewall.destroy
-
       expect { nx.destroy }.to exit({"msg" => "kubernetes cluster is deleted"})
     end
   end
