@@ -282,4 +282,18 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.upgrade_status).to eq("running")
     end
   end
+
+  describe "#can_upgrade?" do
+    it "returns true if the postgres resource can be upgraded" do
+      expect(postgres_resource).to receive(:target_version).and_return("17")
+      expect(postgres_resource).to receive(:flavor).and_return(PostgresResource::Flavor::STANDARD)
+      expect(postgres_resource.can_upgrade?).to be true
+    end
+
+    it "returns false if the postgres resource cannot be upgraded" do
+      expect(postgres_resource).to receive(:flavor).and_return(PostgresResource::Flavor::LANTERN)
+      expect(postgres_resource).to receive(:target_version).and_return("17")
+      expect(postgres_resource.can_upgrade?).to be false
+    end
+  end
 end

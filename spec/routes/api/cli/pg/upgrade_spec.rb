@@ -23,8 +23,8 @@ RSpec.describe Clover, "cli pg upgrade" do
   end
 
   it "fails to upgrade when database cannot be upgraded" do
-    @pg.representative_server.update(version: "17")
-    @pg.update(target_version: "17")
+    @pg.representative_server.update(version: PostgresResource::LATEST_VERSION)
+    @pg.update(target_version: PostgresResource::LATEST_VERSION)
 
     expect(cli(%W[pg #{@ref} upgrade], status: 400)).to match(/Database is already at the latest version/)
   end

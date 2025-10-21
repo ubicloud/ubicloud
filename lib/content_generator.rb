@@ -108,7 +108,7 @@ module ContentGenerator
       ]
     end
 
-    def self.version(version)
+    def self.version(flavor, version)
       "Postgres #{version}"
     end
 

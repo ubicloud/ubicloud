@@ -516,7 +516,7 @@ Allowed Option Values:
           m8gd.16xlarge i8g.large i8g.xlarge i8g.2xlarge i8g.4xlarge i8g.8xlarge
           i8g.16xlarge
     Storage Size: 16 32 64 128 256 512 1024 2048 4096
-    Version: 17 16
+    Version: 18 17 16
 
 
 Delete a PostgreSQL firewall rule
