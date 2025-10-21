@@ -59,6 +59,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe ".assemble" do
     let(:user_project) { Project.create(name: "default") }
+    let(:firewall) {
+      Firewall.create(name: "#{postgres_resource.ubid}-internal-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: Config.postgres_service_project_id)
+    }
     let(:postgres_resource) {
       PostgresResource.create(
         project_id: user_project.id,
@@ -75,6 +78,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       postgres_timeline = PostgresTimeline.create
       postgres_project = Project.create(name: "default")
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
+      firewall
 
       st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now)
       postgres_server = PostgresServer[st.id]
@@ -87,12 +91,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "attaches internal firewall to underlying VM, if postgres resource has internal firewall" do
-      postgres_timeline = PostgresTimeline.create
       postgres_project = Project.create(name: "default")
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
-
-      pv = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now).subject
-      expect(pv.vm.vm_firewalls).to be_empty
 
       pg = Prog::Postgres::PostgresResourceNexus.assemble(project_id: user_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name-2", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
       pv = pg.servers.first
@@ -102,7 +102,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "picks correct base image for Lantern" do
       expect(PostgresResource).to receive(:[]).and_return(postgres_resource)
       expect(postgres_resource).to receive(:flavor).and_return(PostgresResource::Flavor::LANTERN).at_least(:once)
-      expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).with(anything, hash_including(boot_image: "postgres16-lantern-ubuntu-2204")).and_return(instance_double(Strand, id: "62c62ddb-5b5a-4e9e-b534-e73c16f86bcb"))
+      expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).with(anything, hash_including(boot_image: "postgres16-lantern-ubuntu-2204")).and_return(instance_double(Strand, id: "62c62ddb-5b5a-4e9e-b534-e73c16f86bcb", subject: instance_double(Vm, add_vm_firewall: nil)))
       expect(PostgresServer).to receive(:create_with_id).and_return(instance_double(PostgresServer, id: "5c13fd6a-25c2-4fa4-be48-2846f127526a"))
       described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
     end
@@ -119,7 +119,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       )
       expect(postgres_resource).to receive(:location).and_return(loc).at_least(:once)
       expect(postgres_resource).to receive(:version).and_return("16").at_least(:once)
-      expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).and_return(instance_double(Strand, id: "62c62ddb-5b5a-4e9e-b534-e73c16f86bcb"))
+      expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).and_return(instance_double(Strand, id: "62c62ddb-5b5a-4e9e-b534-e73c16f86bcb", subject: instance_double(Vm, add_vm_firewall: nil)))
       expect(PostgresServer).to receive(:create_with_id).and_return(instance_double(PostgresServer, id: "5c13fd6a-25c2-4fa4-be48-2846f127526a"))
       described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
     end
@@ -137,7 +137,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_resource).to receive(:version).and_return("17").at_least(:once)
       expect(postgres_resource).to receive(:location).and_return(loc).at_least(:once)
       expect(postgres_resource).to receive(:location_id).and_return(loc.id).at_least(:once)
-      expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).and_return(instance_double(Strand, id: "62c62ddb-5b5a-4e9e-b534-e73c16f86bcb"))
+      expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).and_return(instance_double(Strand, id: "62c62ddb-5b5a-4e9e-b534-e73c16f86bcb", subject: instance_double(Vm, add_vm_firewall: nil)))
       expect(PostgresServer).to receive(:create_with_id).and_return(instance_double(PostgresServer, id: "5c13fd6a-25c2-4fa4-be48-2846f127526a"))
       described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
     end

@@ -140,32 +140,15 @@ class PostgresResource < Sequel::Model
 
     vm_firewall_rules = firewall_rules.map { {cidr: it.cidr.to_s, port_range: Sequel.pg_range(5432..5432), description: it.description} }
     vm_firewall_rules.concat(firewall_rules.map { {cidr: it.cidr.to_s, port_range: Sequel.pg_range(6432..6432), description: it.description} })
-
-    unless internal_firewall
-      # If the postgres resource does not yet have an internal firewall, add the necessary
-      # internal firewall rules to the subnet. If the postgres resource already has an internal
-      # firewall, these rules are already present on the internal firewall, so they don't need
-      # to be added.
-      vm_firewall_rules.push({cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)})
-      vm_firewall_rules.push({cidr: "::/0", port_range: Sequel.pg_range(22..22)})
-      vm_firewall_rules.push({cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(5432..5432)})
-      vm_firewall_rules.push({cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(6432..6432)})
-      vm_firewall_rules.push({cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(5432..5432)})
-      vm_firewall_rules.push({cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(6432..6432)})
-    end
-
     customer_firewall.replace_firewall_rules(vm_firewall_rules)
   end
 
-  # Temporarily, this firewall might actually be in the postgres project
-  # and not the customer project, if the postgres resource was created
-  # before there was a customer firewall/internal firewall split.
+  # This may return nil if the customer has destroyed the firewall or
+  # detached it from the private subnet.
   def customer_firewall
     private_subnet.firewalls_dataset.first(name: "#{ubid}-firewall")
   end
 
-  # Temporarily, postgres resources may not have an internal firewall, if they were
-  # created before the customer firewall/internal firewall split.
   def internal_firewall
     Firewall.first(project_id: Config.postgres_service_project_id, name: "#{ubid}-internal-firewall")
   end
