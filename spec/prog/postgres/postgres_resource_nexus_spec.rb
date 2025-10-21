@@ -441,9 +441,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "completes destroy even if dns zone is not configured" do
-      # Temporarily test for destruction without internal firewall
-      expect(postgres_resource).to receive(:internal_firewall).and_return(nil)
-
       expect(postgres_resource).to receive(:dns_zone).and_return(nil)
       expect(postgres_resource).to receive(:servers).and_return([]).at_least(:once)
       expect(postgres_resource.private_subnet).to receive(:incr_destroy_if_only_used_internally).with(

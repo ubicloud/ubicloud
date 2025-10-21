@@ -263,8 +263,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       vm_ids: servers.map(&:vm_id)
     )
 
-    # Temporarily, not all postgres resources will have internal firewalls, so need &.
-    postgres_resource.internal_firewall&.destroy
+    postgres_resource.internal_firewall.destroy
 
     servers.each(&:incr_destroy)
 

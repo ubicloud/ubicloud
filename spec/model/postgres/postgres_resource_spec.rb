@@ -220,13 +220,7 @@ RSpec.describe PostgresResource do
     expect(postgres_resource).to receive(:firewall_rules).exactly(2).and_return([instance_double(PostgresFirewallRule, cidr: "0.0.0.0/0", description: "foo")])
     expect(firewall).to receive(:replace_firewall_rules).with([
       {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(5432..5432), description: "foo"},
-      {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(6432..6432), description: "foo"},
-      {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)},
-      {cidr: "::/0", port_range: Sequel.pg_range(22..22)},
-      {cidr: "10.238.50.0/26", port_range: Sequel.pg_range(5432..5432)},
-      {cidr: "10.238.50.0/26", port_range: Sequel.pg_range(6432..6432)},
-      {cidr: "fd19:9c92:e9b9:a1a::/64", port_range: Sequel.pg_range(5432..5432)},
-      {cidr: "fd19:9c92:e9b9:a1a::/64", port_range: Sequel.pg_range(6432..6432)}
+      {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(6432..6432), description: "foo"}
     ])
     postgres_resource.set_firewall_rules
   end
