@@ -1,0 +1,15 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/storage_volume"
+
+params = JSON.parse($stdin.read)
+begin
+  %w[vm_name device disk_index vhost_block_backend_version slice max_read_mbytes_per_sec max_write_mbytes_per_sec encrypted].each { |key| params.fetch(key) }
+rescue KeyError => e
+  puts "Needed #{e.key} in parameters"
+  exit 1
+end
+
+vm_name = params.fetch("vm_name")
+StorageVolume.new(vm_name, params).vhost_backend_create_service_file
