@@ -1,0 +1,33 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/storage_volume"
+
+unless (action = ARGV.shift)
+  puts "expected action as argument"
+  exit 1
+end
+
+params = JSON.parse($stdin.read)
+begin
+  %w[vm_name device disk_index vhost_block_backend_version slice max_read_mbytes_per_sec max_write_mbytes_per_sec encrypted].each { |key| params.fetch(key) }
+rescue KeyError => e
+  puts "Needed #{e.key} in parameters"
+  exit 1
+end
+
+if action == "create-vhost-backend-service-file"
+  vm_name = params.fetch("vm_name")
+  StorageVolume.new(vm_name, params).vhost_backend_create_service_file
+
+elsif action == "remove-spdk-controller"
+  vm_name = params.fetch("vm_name")
+  disk_index = params.fetch("disk_index")
+  client_rpc = SpdkRpc.new(SpdkPath.rpc_sock("v23.09-ubi-0.3"))
+  vhost_controller = SpdkPath.vhost_controller(vm_name, disk_index)
+  client_rpc.vhost_delete_controller(vhost_controller)
+
+else
+  puts "Unknown action: #{action}"
+  exit 1
+end
