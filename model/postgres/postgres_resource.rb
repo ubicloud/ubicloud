@@ -133,6 +133,11 @@ class PostgresResource < Sequel::Model
   end
 
   def set_firewall_rules
+    # If customer has deleted the related firewall, then they need to manage
+    # their firewall rules via their own firewall and not via postgres-specific
+    # firewall rules.
+    return unless (customer_firewall = self.customer_firewall)
+
     vm_firewall_rules = firewall_rules.map { {cidr: it.cidr.to_s, port_range: Sequel.pg_range(5432..5432), description: it.description} }
     vm_firewall_rules.concat(firewall_rules.map { {cidr: it.cidr.to_s, port_range: Sequel.pg_range(6432..6432), description: it.description} })
 

@@ -724,6 +724,34 @@ RSpec.describe Clover, "postgres" do
 
         expect(SemSnap.new(pg.id).set?("update_firewall_rules")).not_to be true
       end
+
+      it "shows link to private subnet networking page if customer firewall was destroyed" do
+        fw = pg.customer_firewall
+        fw.remove_all_private_subnets
+        fw.destroy
+        visit "#{project.path}#{pg.path}/networking"
+
+        expect(page).to have_content "Firewall Rules"
+        expect(page).to have_no_content "0.0.0.0/0"
+        expect(page).to have_no_content "5432"
+        expect(page).to have_content "PostgreSQL firewall was deleted, manage firewall rules using an appropriate firewall on the private subnet."
+      end
+
+      it "shows error if attempting to modify postgres networking rules after customer firewall was destroyed" do
+        visit "#{project.path}#{pg.path}/networking"
+
+        fw = pg.customer_firewall
+        fw.remove_all_private_subnets
+        fw.destroy
+
+        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
+        url = btn["data-url"]
+        _csrf = btn["data-csrf"]
+        page.driver.submit :patch, url, {cidr: "0.0.0.0/1", description: "dummy-description", _csrf:}
+
+        expect(JSON.parse(page.driver.response.body).dig("error", "message")).to eq "PostgreSQL firewall was deleted, manage firewall rules using an appropriate firewall on the #{pg.private_subnet.name} private subnet (id: #{pg.private_subnet.ubid})"
+        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be false
+      end
     end
 
     describe "metric-destination" do
