@@ -519,8 +519,7 @@ RSpec.describe Validation do
         described_class.validate_postgres_upgrade(
           instance_double(
             PostgresResource,
-            version: "16",
-            target_version: "16",
+            can_upgrade?: true,
             needs_convergence?: false,
             ongoing_failover?: false,
             read_replica?: false,
@@ -576,19 +575,32 @@ RSpec.describe Validation do
       }.to raise_error described_class::ValidationFailed
     end
 
-    it "invalidates postgres upgrade when version is latest" do
+    it "invalidates postgres upgrade when it cannot be upgraded" do
       expect {
         described_class.validate_postgres_upgrade(
           instance_double(
             PostgresResource,
-            version: PostgresResource::LATEST_VERSION,
-            target_version: PostgresResource::LATEST_VERSION,
+            can_upgrade?: false,
             needs_convergence?: false,
             ongoing_failover?: false,
             read_replica?: false,
             flavor: PostgresResource::Flavor::STANDARD
           )
         )
+      }.to raise_error described_class::ValidationFailed
+    end
+  end
+
+  describe "#validate_postgres_version" do
+    it "validates postgres version" do
+      expect {
+        described_class.validate_postgres_version("16", PostgresResource::Flavor::STANDARD)
+      }.not_to raise_error
+    end
+
+    it "invalidates postgres version" do
+      expect {
+        described_class.validate_postgres_version("18", PostgresResource::Flavor::LANTERN)
       }.to raise_error described_class::ValidationFailed
     end
   end

@@ -176,7 +176,11 @@ module Option
 
   POSTGRES_STORAGE_SIZE_OPTIONS = ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096"].freeze
 
-  POSTGRES_VERSION_OPTIONS = ["17", "16"].freeze
+  POSTGRES_VERSION_OPTIONS = {
+    PostgresResource::Flavor::STANDARD => ["18", "17", "16"],
+    PostgresResource::Flavor::PARADEDB => ["17", "16"],
+    PostgresResource::Flavor::LANTERN => ["17", "16"]
+  }
 
   PostgresHaOption = Data.define(:name, :standby_count, :description)
   POSTGRES_HA_OPTIONS = [

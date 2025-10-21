@@ -77,9 +77,7 @@ end %>
       ]
     end %>
     <%== part("components/table_card", title: "", headers: ["Stage", "Database Availability", "Status"], rows: upgrade_progress_rows) %>
-  <% elsif @pg.version == PostgresResource::LATEST_VERSION %>
-    <p>Your database is already on the latest version.</p>
-  <% else %>
+  <% elsif @pg.can_upgrade? %>
     <p>Your database can be upgraded to Postgres
       <%= @pg.version.to_i + 1 %>.</p>
 
@@ -110,5 +108,7 @@ end %>
         <%== part("components/form/submit_button", text: "Start Upgrade", extra_class: "") if @edit_perm %>
       </div>
     <% end %>
+  <% else %>
+    <p>Your database is already on the latest version.</p>
   <% end %>
 </div>

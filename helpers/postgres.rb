@@ -121,7 +121,9 @@ class Clover
       end
     end
 
-    options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS)
+    options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS.values.flatten.uniq, parent: "flavor") do |flavor, version|
+      Option::POSTGRES_VERSION_OPTIONS[flavor].include?(version)
+    end
 
     options.add_option(name: "ha_type", values: Option::POSTGRES_HA_OPTIONS.keys, parent: "storage_size")
 
@@ -150,5 +152,7 @@ class Clover
 
       raise e
     end
+
+    Validation.validate_postgres_version(postgres_params["version"], postgres_params["flavor"])
   end
 end

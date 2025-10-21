@@ -196,6 +196,10 @@ class PostgresResource < Sequel::Model
     end
   end
 
+  def can_upgrade?
+    target_version.to_i < Option::POSTGRES_VERSION_OPTIONS[flavor].map(&:to_i).max
+  end
+
   module HaType
     NONE = "none"
     ASYNC = "async"
@@ -209,12 +213,13 @@ class PostgresResource < Sequel::Model
   end
 
   DEFAULT_VERSION = "17"
-  LATEST_VERSION = "17"
+  LATEST_VERSION = "18"
 
   MAINTENANCE_DURATION_IN_HOURS = 2
 
   UPGRADE_IMAGE_MIN_VERSIONS = {
-    "17" => "20240801"
+    "17" => "20240801",
+    "18" => "20251021"
   }
 end
 
