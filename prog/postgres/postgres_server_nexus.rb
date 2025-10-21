@@ -63,11 +63,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         version: postgres_resource.version
       )
 
-      # Add postgres resource internal firewall directly to related VM, if it exists.
-      # Existing postgres resources may temporarily not have an attached internal firewall.
-      if (internal_firewall = postgres_resource.internal_firewall)
-        vm_st.subject.add_vm_firewall(internal_firewall)
-      end
+      vm_st.subject.add_vm_firewall(postgres_resource.internal_firewall)
 
       Strand.create_with_id(postgres_server.id, prog: "Postgres::PostgresServerNexus", label: "start")
     end
