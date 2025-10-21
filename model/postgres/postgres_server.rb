@@ -347,7 +347,7 @@ end
 #  postgres_server_pkey1             | PRIMARY KEY btree (id)
 #  postgres_server_resource_id_index | UNIQUE btree (resource_id) WHERE representative_at IS NOT NULL
 # Check constraints:
-#  version_check | (version = ANY (ARRAY['16'::text, '17'::text]))
+#  version_check | (version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
 # Foreign key constraints:
 #  postgres_server_timeline_id_fkey | (timeline_id) REFERENCES postgres_timeline(id)
 #  postgres_server_vm_id_fkey       | (vm_id) REFERENCES vm(id)
