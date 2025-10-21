@@ -24,47 +24,6 @@ class PostgresResource < Sequel::Model
   plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records, :destroy, :promote, :refresh_certificates, :use_different_az
   include ObjectTag::Cleanup
 
-  # :nocov:
-  def self.add_internal_firewalls
-    # Do not use transaction around the update of all resources, to avoid blocking
-    all do |pg|
-      next if pg.internal_firewall
-
-      print "Adding internal firewall for #{pg.ubid}..."
-      private_subnet = pg.private_subnet
-
-      # Use transaction around the changes to each single postgres resource, because
-      # we don't want a state where the internal firewall is created but not added
-      # to the VMs, or where the preexisting firewall and private subnets do not both
-      # get converted to the customer's project.
-      DB.transaction do
-        internal_firewall = Firewall.create(name: "#{pg.ubid}-internal-firewall", location_id: pg.location_id, description: "Postgres default firewall", project_id: Config.postgres_service_project_id)
-        internal_firewall.replace_firewall_rules([
-          {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)},
-          {cidr: "::/0", port_range: Sequel.pg_range(22..22)},
-          {cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(5432..5432)},
-          {cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(6432..6432)},
-          {cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(5432..5432)},
-          {cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(6432..6432)}
-        ])
-
-        pg.servers.each do |server|
-          # No need to refresh the firewall rules, since the internal firewall
-          # has the same rules as the customer firewall at this point.
-          server.vm&.add_vm_firewall(internal_firewall)
-        end
-
-        # The customer firewall will also contain a copy of the internal firewall
-        # rules, but that should be fine to leave.
-        pg.customer_firewall.update(project_id: pg.project_id)
-        private_subnet.update(project_id: pg.project_id)
-
-        puts "done"
-      end
-    end
-  end
-  # :nocov:
-
   def display_location
     location.display_name
   end
