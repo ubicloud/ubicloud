@@ -28,6 +28,7 @@ end
 
 vm_setup = VmSetup.new(vm_name,
   hugepages: params.fetch("hugepages", true),
+  hypervisor: params.fetch("hypervisor", "ch"),
   ch_version: params["ch_version"],
   firmware_version: params["firmware_version"])
 
