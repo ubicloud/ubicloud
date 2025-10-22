@@ -332,12 +332,13 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "firewall-rule edit" do
-        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/#{pg.firewall_rules.first.ubid}", {
+        fwr = pg.pg_firewall_rules.first
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/#{fwr.ubid}", {
           cidr: "0.0.0.0/1",
           description: "Updated rule"
         }.to_json
 
-        expect(pg.firewall_rules.first.reload.description).to eq("Updated rule")
+        expect(fwr.reload.cidr.to_s).to eq("0.0.0.0/1")
         expect(last_response.status).to eq(200)
       end
 
@@ -728,19 +729,19 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "firewall-rule" do
-        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/#{pg.firewall_rules.first.ubid}"
+        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/#{pg.pg_firewall_rules.first.ubid}"
 
         expect(last_response.status).to eq(204)
       end
 
       it "firewall-rule ubid" do
-        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/firewall-rule/#{pg.firewall_rules.first.ubid}"
+        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/firewall-rule/#{pg.pg_firewall_rules.first.ubid}"
 
         expect(last_response.status).to eq(204)
       end
 
       it "firewall-rule not exist" do
-        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/pf000000000000000000000000"
+        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/fr000000000000000000000000"
 
         expect(last_response.status).to eq(204)
       end

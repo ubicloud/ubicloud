@@ -5,7 +5,7 @@ class Serializers::PostgresFirewallRule < Serializers::Base
     {
       id: firewall_rule.ubid,
       cidr: firewall_rule.cidr,
-      port: firewall_rule.is_a?(PostgresFirewallRule) ? 5432 : firewall_rule.port_range.begin,
+      port: firewall_rule.port_range.begin,
       description: firewall_rule.description || ""
     }
   end

@@ -60,8 +60,6 @@ class Firewall < Sequel::Model
     private_subnet.incr_update_firewall_rules if apply_firewalls
   end
 
-  private
-
   def update_private_subnet_firewall_rules
     private_subnets.each(&:incr_update_firewall_rules)
   end
