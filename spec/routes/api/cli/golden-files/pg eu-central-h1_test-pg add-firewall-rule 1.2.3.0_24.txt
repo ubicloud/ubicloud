@@ -1,4 +1,4 @@
 Firewall rule added to PostgreSQL database.
-  rule id: pfdnkmmcf1r66ppp3cenvbe8ra
+  rule id: fr5mf40qkedy0hm80v7pp95qwp
   cidr: 1.2.3.0/24
   description: ""
