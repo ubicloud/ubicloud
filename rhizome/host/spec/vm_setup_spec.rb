@@ -190,6 +190,122 @@ RSpec.describe VmSetup do
     end
   end
 
+  describe "#install_systemd_unit" do
+    let(:args) { [2, "1:1:1:2", 2, [], [VmSetup::Nic.new("fd00::/64", "10.0.0.1/32", "tap0", "02:aa:bb:cc:dd:01", "10.0.0.254/32")], [], "system.slice", 0] }
+
+    it "uses cloud-hypervisor by default" do
+      vps = instance_spy(VmPath)
+      allow(vs).to receive(:vp).and_return(vps)
+      expect(vs).to receive(:build_ch_service).and_return("CH_SERVICE")
+      expect(vs).to receive(:r).with("systemctl daemon-reload")
+
+      vs.send(:install_systemd_unit, *args)
+
+      expect(vps).to have_received(:write_systemd_service).with("CH_SERVICE")
+    end
+
+    it "uses QEMU when requested" do
+      vs.instance_variable_set(:@hypervisor, "qemu")
+
+      vps = instance_spy(VmPath)
+      allow(vs).to receive(:vp).and_return(vps)
+      expect(vs).to receive(:build_qemu_service).and_return("QEMU_SERVICE")
+      expect(vs).to receive(:r).with("systemctl daemon-reload")
+
+      vs.send(:install_systemd_unit, *args)
+
+      expect(vps).to have_received(:write_systemd_service).with("QEMU_SERVICE")
+    end
+
+    it "can write a cloud-hypervisor systemd unit" do
+      vps = instance_spy(VmPath,
+        ch_api_sock: "/tmp/ch.sock",
+        serial_log: "/vm/test/serial.log",
+        cloudinit_img: "/vm/test/cloudinit.img")
+      allow(vs).to receive(:vp).and_return(vps)
+
+      vs.instance_variable_set(:@ch_version,
+        CloudHypervisor::Version.new("35.1", "sha256_ch_bin", "sha256_ch_remote"))
+
+      vs.instance_variable_set(:@firmware_version,
+        CloudHypervisor::Firmware.new("202311", "sha256"))
+
+      expect(vs).to receive(:r).with("systemctl daemon-reload")
+      vs.send(:install_systemd_unit, *args)
+
+      expect(vps).to have_received(:write_systemd_service) { |content|
+        expect(content).to include("[Service]")
+        expect(content).to include("Slice=system.slice")
+        expect(content).to include("NetworkNamespacePath=/var/run/netns/test")
+
+        expect(content).to include("ExecStart=/opt/cloud-hypervisor/v35.1/cloud-hypervisor -v")
+        %w[
+          --api-socket path=/tmp/ch.sock \
+          --kernel /opt/fw/CLOUDHV-202311.fd \
+          --disk path=/vm/test/cloudinit.img \
+          --console off --serial file=/vm/test/serial.log \
+          --cpus boot=2,topology=1:1:1:2 \
+          --memory size=2G,hugepages=on,hugepage_size=1G \
+          --net mac=02:aa:bb:cc:dd:01,tap=tap0,ip=,mask=,num_queues=5
+        ].each { |frag| expect(content).to include(frag) }
+
+        expect(content).to include("ExecStop=/opt/cloud-hypervisor/v35.1/ch-remote --api-socket /tmp/ch.sock shutdown-vmm")
+        expect(content).to include("Restart=no")
+        expect(content).to include("User=test")
+        expect(content).to include("Group=test")
+        expect(content).to include("LimitNOFILE=500000")
+      }
+    end
+
+    it "can write a QEMU systemd unit" do
+      vs.instance_variable_set(:@hypervisor, "qemu")
+
+      vps = instance_spy(VmPath,
+        serial_log: "/vm/test/serial.log",
+        cloudinit_img: "/vm/test/cloudinit.img")
+      allow(vs).to receive(:vp).and_return(vps)
+
+      vs.instance_variable_set(:@firmware_version,
+        CloudHypervisor::Firmware.new("202311", "sha256"))
+
+      expect(vs).to receive(:r).with("systemctl daemon-reload")
+      vs.send(:install_systemd_unit, *args)
+
+      expect(vps).to have_received(:write_systemd_service) { |content|
+        expect(content).to include("[Service]")
+        expect(content).to include("Slice=system.slice")
+        expect(content).to include("NetworkNamespacePath=/var/run/netns/test")
+
+        expect(content).to include("ExecStart=/usr/bin/qemu-system-#{Arch.render(x64: "x86_64", arm64: "aarch64")}")
+        %w[
+          -bios /opt/fw/CLOUDHV-202311.fd
+          -object memory-backend-memfd,id=mem0,size=2G,hugetlb=on,hugetlbsize=1G,prealloc=on,share=on
+          -numa node,memdev=mem0
+          -m 2G
+          -smp cpus=2,maxcpus=2,threads=1,cores=1,dies=1,sockets=2
+          -cpu host
+          -enable-kvm
+          -machine accel=kvm,type=q35
+          -drive if=none,file=/vm/test/cloudinit.img,format=raw,readonly=on,id=cidrive
+          -device virtio-blk-pci,drive=cidrive
+          -netdev tap,id=net0,ifname=tap0,script=no,downscript=no,queues=5,vhost=on
+          -device virtio-net-pci,mac=02:aa:bb:cc:dd:01,netdev=net0,mq=on
+          -serial file:/vm/test/serial.log
+          -display none
+          -no-reboot
+        ].each { |frag| expect(content).to include(frag) }
+
+        expect(content).to include("ExecStop=/bin/kill -TERM $MAINPID")
+        expect(content).to include("KillSignal=SIGTERM")
+        expect(content).to include("TimeoutStopSec=30s")
+        expect(content).to include("Restart=no")
+        expect(content).to include("User=test")
+        expect(content).to include("Group=test")
+        expect(content).to include("LimitNOFILE=500000")
+      }
+    end
+  end
+
   describe "#restart" do
     it "can restart a VM" do
       expect(vs).to receive(:restart_systemd_unit)

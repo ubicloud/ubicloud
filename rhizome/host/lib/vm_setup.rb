@@ -16,9 +16,10 @@ require_relative "storage_volume"
 class VmSetup
   Nic = Struct.new(:net6, :net4, :tap, :mac, :private_ipv4_gateway)
 
-  def initialize(vm_name, hugepages: true, ch_version: nil, firmware_version: nil)
+  def initialize(vm_name, hugepages: true, hypervisor: "ch", ch_version: nil, firmware_version: nil)
     @vm_name = vm_name
     @hugepages = hugepages
+    @hypervisor = hypervisor
     @ch_version = CloudHypervisor::Version[ch_version] || no_valid_ch_version
     @firmware_version = CloudHypervisor::Firmware[firmware_version] || no_valid_firmware_version
   end
@@ -653,7 +654,7 @@ EOS
   end
 
   def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
-    cpu_setting = "boot=#{max_vcpus},topology=#{cpu_topology}"
+    fail "BUG" if /["'\s]/.match?(cpu_topology)
 
     tapnames = nics.map { "-i #{_1.tap}" }.join(" ")
 
@@ -681,21 +682,6 @@ DNSMASQ_SERVICE
 
     storage_volumes = storage_params.map { |params| StorageVolume.new(@vm_name, params) }
 
-    disk_params = storage_volumes.map { |volume|
-      if volume.read_only
-        "path=#{volume.image_path},readonly=on"
-      else
-        "vhost_user=true,socket=#{volume.vhost_sock},num_queues=#{volume.num_queues},queue_size=#{volume.queue_size}"
-      end
-    }
-    disk_params << "path=#{vp.cloudinit_img}"
-
-    disk_args = if Gem::Version.new(@ch_version.version) >= Gem::Version.new("36")
-      "--disk #{disk_params.join(" ")}"
-    else
-      disk_params.map { |x| "--disk #{x}" }.join(" ")
-    end
-
     spdk_services = storage_volumes.filter_map { |volume| volume.spdk_service }.uniq
     spdk_after = spdk_services.map { |s| "After=#{s}" }.join("\n")
     spdk_requires = spdk_services.map { |s| "Requires=#{s}" }.join("\n")
@@ -704,56 +690,57 @@ DNSMASQ_SERVICE
     vhost_user_block_after = vhost_user_block_services.map { |s| "After=#{s}" }.join("\n")
     vhost_user_block_requires = vhost_user_block_services.map { |s| "Requires=#{s}" }.join("\n")
 
-    net_params = nics.map { "--net mac=#{_1.mac},tap=#{_1.tap},ip=,mask=,num_queues=#{max_vcpus * 2 + 1}" }
-    pci_device_params =
-      if Gem::Version.new(@ch_version.version) >= Gem::Version.new("36")
-        pci_devices.empty? ? "" : " --device #{pci_devices.map { |dev| "path=/sys/bus/pci/devices/0000:#{dev[0]}/" }.join(" ")}"
-      else
-        pci_devices.map { |dev| " --device path=/sys/bus/pci/devices/0000:#{dev[0]}/" }.join
-      end
-    limit_memlock = pci_devices.empty? ? "" : "LimitMEMLOCK=#{mem_gib * 1073741824}"
+    # PCI passthrough requires locking guest memory. Set MEMLOCK to vm memory
+    # with ~25% headroom to cover overhead and prevent QEMU startup failures.
+    limit_memlock = pci_devices.empty? ? "" : "LimitMEMLOCK=#{(mem_gib * 1.25 * 1073741824).to_i}"
     cpu_quota = (cpu_percent_limit == 0) ? "" : "CPUQuota=#{cpu_percent_limit}%"
 
-    # YYY: Do something about systemd escaping, i.e. research the
-    # rules and write a routine for it.  Banning suspicious strings
-    # from VmPath is also a good idea.
-    fail "BUG" if /["'\s]/.match?(cpu_setting)
+    vm_header = <<~VM_HEADER
+      [Unit]
+      Description=#{@vm_name}
+      After=network.target
+      #{spdk_after}
+      #{vhost_user_block_after}
+      After=#{@vm_name}-dnsmasq.service
+      #{spdk_requires}
+      #{vhost_user_block_requires}
+      Wants=#{@vm_name}-dnsmasq.service
+    VM_HEADER
 
-    vp.write_systemd_service <<SERVICE
-[Unit]
-Description=#{@vm_name}
-After=network.target
-#{spdk_after}
-#{vhost_user_block_after}
-After=#{@vm_name}-dnsmasq.service
-#{spdk_requires}
-#{vhost_user_block_requires}
-Wants=#{@vm_name}-dnsmasq.service
+    vm_footer = <<~VM_FOOTER
+      Restart=no
+      User=#{@vm_name}
+      Group=#{@vm_name}
 
-[Service]
-Slice=#{slice_name}
-NetworkNamespacePath=/var/run/netns/#{@vm_name}
-ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
+      LimitNOFILE=500000
+      #{limit_memlock}
+      #{cpu_quota}
+    VM_FOOTER
 
-ExecStart=#{@ch_version.bin} -v \
---api-socket path=#{vp.ch_api_sock} \
---kernel #{@firmware_version.path} \
-#{disk_args} \
---console off --serial file=#{vp.serial_log} \
---cpus #{cpu_setting} \
---memory size=#{mem_gib}G,#{@hugepages ? "hugepages=on,hugepage_size=1G" : "shared=on"} \
-#{pci_device_params} \
-#{net_params.join(" \\\n")}
+    vm_service_builder = case @hypervisor
+    when "ch"
+      method(:build_ch_service)
+    when "qemu"
+      method(:build_qemu_service)
+    else
+      fail "unsupported hypervisor #{@hypervisor}"
+    end
 
-ExecStop=#{@ch_version.ch_remote_bin} --api-socket #{vp.ch_api_sock} shutdown-vmm
-Restart=no
-User=#{@vm_name}
-Group=#{@vm_name}
+    vm_service = vm_service_builder.call(
+      header: vm_header,
+      footer: vm_footer,
+      slice_name: slice_name,
+      mem_gib: mem_gib,
+      max_vcpus: max_vcpus,
+      cpu_topology: cpu_topology,
+      storage_volumes: storage_volumes,
+      storage_params: storage_params,
+      nics: nics,
+      pci_devices: pci_devices
+    )
 
-LimitNOFILE=500000
-#{limit_memlock}
-#{cpu_quota}
-SERVICE
+    vp.write_systemd_service(vm_service)
+
     r "systemctl daemon-reload"
   end
 
@@ -773,5 +760,149 @@ SERVICE
 
   def restart_systemd_unit
     r "systemctl restart #{q_vm}"
+  end
+
+  def build_ch_service(header:, footer:, slice_name:, mem_gib:, max_vcpus:, cpu_topology:, storage_volumes:, storage_params:, nics:, pci_devices:)
+    disk_params = storage_volumes.map { |volume|
+      if volume.read_only
+        "path=#{volume.image_path},readonly=on"
+      else
+        "vhost_user=true,socket=#{volume.vhost_sock},num_queues=#{volume.num_queues},queue_size=#{volume.queue_size}"
+      end
+    }
+    disk_params << "path=#{vp.cloudinit_img}"
+
+    disk_args =
+      if Gem::Version.new(@ch_version.version) >= Gem::Version.new("36")
+        "--disk #{disk_params.join(" ")}"
+      else
+        disk_params.map { |x| "--disk #{x}" }.join(" ")
+      end
+
+    net_params = nics.map { "--net mac=#{_1.mac},tap=#{_1.tap},ip=,mask=,num_queues=#{max_vcpus * 2 + 1}" }
+    pci_device_params =
+      if pci_devices.empty?
+        nil
+      elsif Gem::Version.new(@ch_version.version) >= Gem::Version.new("36")
+        "--device #{pci_devices.map { |dev| "path=/sys/bus/pci/devices/0000:#{dev[0]}/" }.join(" ")}"
+      else
+        pci_devices.map { |dev| "--device path=/sys/bus/pci/devices/0000:#{dev[0]}/" }.join(" ")
+      end
+
+    exec_start_cmd = [
+      "#{@ch_version.bin} -v",
+      "--api-socket path=#{vp.ch_api_sock}",
+      "--kernel #{@firmware_version.path}",
+      disk_args,
+      "--console off --serial file=#{vp.serial_log}",
+      "--cpus boot=#{max_vcpus},topology=#{cpu_topology}",
+      "--memory size=#{mem_gib}G,#{@hugepages ? "hugepages=on,hugepage_size=1G" : "shared=on"}",
+      net_params.join(" "),
+      pci_device_params
+    ].compact.join(" \\\n")
+
+    <<~SERVICE
+  #{header}
+  [Service]
+  Slice=#{slice_name}
+  NetworkNamespacePath=/var/run/netns/#{@vm_name}
+  ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
+
+  ExecStart=#{exec_start_cmd}
+
+  ExecStop=#{@ch_version.ch_remote_bin} --api-socket #{vp.ch_api_sock} shutdown-vmm
+  #{footer}
+    SERVICE
+  end
+
+  def build_qemu_service(header:, footer:, slice_name:, mem_gib:, max_vcpus:, cpu_topology:, storage_volumes:, storage_params:, nics:, pci_devices:)
+    disk_parts = storage_volumes.each_with_index.flat_map do |vol, i|
+      if vol.read_only
+        [
+          "-drive if=none,file=#{vol.image_path},format=raw,readonly=on,id=disk#{i}",
+          "-device virtio-blk-pci,drive=disk#{i}"
+        ]
+      else
+        [
+          "-chardev socket,id=vhostblk#{i},path=#{vol.vhost_sock},server=off",
+          "-device vhost-user-blk-pci,chardev=vhostblk#{i},num-queues=#{vol.num_queues},queue-size=#{vol.queue_size}"
+        ]
+      end
+    end
+    disk_parts += [
+      "-drive if=none,file=#{vp.cloudinit_img},format=raw,readonly=on,id=cidrive",
+      "-device virtio-blk-pci,drive=cidrive"
+    ]
+
+    mem_parts =
+      if @hugepages
+        size = "#{mem_gib}G"
+        [
+          "-object memory-backend-memfd,id=mem0,size=#{size},hugetlb=on,hugetlbsize=1G,prealloc=on,share=on",
+          "-numa node,memdev=mem0",
+          "-m #{size}"
+        ]
+      else
+        ["-m #{mem_gib}G"]
+      end
+
+    cpu_parts = [
+      qemu_smp(cpu_topology, max_vcpus),
+      "-cpu host",
+      "-enable-kvm",
+      "-machine accel=kvm,type=q35"
+    ]
+
+    net_parts = nics.each_with_index.flat_map { |nic, i|
+      [
+        "-netdev tap,id=net#{i},ifname=#{nic.tap},script=no,downscript=no,queues=#{max_vcpus * 2 + 1},vhost=on",
+        "-device virtio-net-pci,mac=#{nic.mac},netdev=net#{i},mq=on"
+      ]
+    }
+
+    pci_parts = if pci_devices.any?
+      pci_devices.map.with_index(1) do |dev, i|
+        "-device pcie-root-port,id=rp#{i},slot=#{i},chassis=#{i},hotplug=off -device vfio-pci,host=0000:#{dev[0]},bus=rp#{i}"
+      end
+    else
+      []
+    end
+
+    serial_parts = [
+      "-serial file:#{vp.serial_log}",
+      "-display none",
+      "-no-reboot"
+    ]
+
+    kernel_parts = [
+      "-bios #{@firmware_version.path}"
+    ]
+
+    <<~SERVICE
+  #{header}
+  [Service]
+  Slice=#{slice_name}
+  NetworkNamespacePath=/var/run/netns/#{@vm_name}
+
+  ExecStart=/usr/bin/qemu-system-#{Arch.render(x64: "x86_64", arm64: "aarch64")} \\
+  #{(kernel_parts + mem_parts + cpu_parts + disk_parts + net_parts + pci_parts + serial_parts).join(" \\\n")}
+
+  ExecStop=/bin/kill -TERM $MAINPID
+  KillSignal=SIGTERM
+  TimeoutStopSec=30s
+
+  #{footer}
+    SERVICE
+  end
+
+  def qemu_smp(cpu_topology, max_vcpus)
+    t, c, d, p = cpu_topology.split(":").map(&:to_i)
+    product = t * c * d * p
+
+    if product != max_vcpus
+      warn "Warning: max_vcpus=#{max_vcpus} does not match topology product=#{product}"
+    end
+
+    "-smp cpus=#{max_vcpus},maxcpus=#{max_vcpus},threads=#{t},cores=#{c},dies=#{d},sockets=#{p}"
   end
 end
