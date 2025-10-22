@@ -2021,8 +2021,8 @@ components:
       required: true
       schema:
         type: string
-        example: pfmjgkgbktw62k53005jpx8tt7
-        pattern: '^pf[0-9a-hj-km-np-tv-z]{24}$'
+        example: frmjgkgbktw62k53005jpx8tt7
+        pattern: '^(fr|pf)[0-9a-hj-km-np-tv-z]{24}$'
     private_location_name:
       description: Name of the private location
       in: path
@@ -2583,8 +2583,11 @@ components:
         id:
           description: ID of the Postgres firewall rule
           type: string
-          example: pfmjgkgbktw62k53005jpx8tt7
-          pattern: '^pf[0-9a-hj-km-np-tv-z]{24}$'
+          example: frmjgkgbktw62k53005jpx8tt7
+          pattern: '^(fr|pf)[0-9a-hj-km-np-tv-z]{24}$'
+        port:
+          description: Port for the Postgres firewall rule
+          type: integer
       additionalProperties: false
       required:
         - cidr
