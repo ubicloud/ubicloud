@@ -144,6 +144,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
 
   label def cleanup_temporary_images
     vm.vm_host.sshable.cmd("sudo rm #{root_dir_path}unencrypted-spdk-disk.raw #{root_dir_path}unencrypted-ubiblk-disk.raw")
+    vm.vm_host.sshable.cmd("sudo chown #{vm.inhost_name}:#{vm.inhost_name} #{root_dir_path}disk.raw")
     hop_create_ubiblk_systemd_unit
   end
 
