@@ -16,7 +16,7 @@ class Prog::Vm::Nexus < Prog::Base
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
     enable_ip4: false, pool_id: nil, arch: "x64", swap_size_bytes: nil,
     distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0, gpu_device: nil,
-    hugepages: true, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil,
+    hugepages: true, hypervisor: nil, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil,
     exclude_availability_zones: [], availability_zone: nil, alternative_families: [],
     allow_private_subnet_in_other_project: false)
 
@@ -162,6 +162,7 @@ class Prog::Vm::Nexus < Prog::Base
           "gpu_count" => gpu_count,
           "gpu_device" => gpu_device,
           "hugepages" => hugepages,
+          "hypervisor" => hypervisor,
           "ch_version" => ch_version,
           "firmware_version" => firmware_version,
           "alternative_families" => alternative_families
@@ -346,7 +347,7 @@ class Prog::Vm::Nexus < Prog::Base
 
   def write_params_json
     host.sshable.cmd("sudo -u #{q_vm} tee #{params_path.shellescape} > /dev/null",
-      stdin: vm.params_json(**frame.slice("swap_size_bytes", "hugepages", "ch_version", "firmware_version").transform_keys!(&:to_sym)))
+      stdin: vm.params_json(**frame.slice("swap_size_bytes", "hugepages", "hypervisor", "ch_version", "firmware_version").transform_keys!(&:to_sym)))
   end
 
   label def wait_sshable
