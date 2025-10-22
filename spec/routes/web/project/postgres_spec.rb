@@ -379,9 +379,6 @@ RSpec.describe Clover, "postgres" do
         pg
         pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
 
-        visit "#{project.path}#{pg.path}/networking"
-        expect(page).to have_css(".firewall-rule-create-button")
-
         visit "#{project.path}#{pg.path}/read-replica"
         expect(page).to have_css(".pg-read-replica-create-btn")
 
@@ -390,9 +387,6 @@ RSpec.describe Clover, "postgres" do
 
         AccessControlEntry.dataset.destroy
         AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
-
-        visit "#{project.path}#{pg.path}/networking"
-        expect(page).to have_no_css(".firewall-rule-create-button")
 
         visit "#{project.path}#{pg.path}/read-replica"
         expect(page).to have_no_css(".pg-read-replica-create-btn")
@@ -610,119 +604,15 @@ RSpec.describe Clover, "postgres" do
     end
 
     describe "firewall" do
-      it "can show default firewall rules" do
-        pg
+      it "shows link to firewall networking page if customer firewall exists" do
         visit "#{project.path}#{pg.path}/networking"
 
         expect(page).to have_content "Firewall Rules"
-        expect(page).to have_content "0.0.0.0/0"
-        expect(page).to have_content "5432"
-      end
-
-      it "can delete firewall rules" do
-        pg
-        visit "#{project.path}#{pg.path}/networking"
-
-        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
-        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
-      end
-
-      it "can not delete firewall rules when does not have permissions" do
-        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
-
-        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/networking"
-        expect(page.title).to eq "Ubicloud - pg-without-permission"
-
-        expect { find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .delete-btn" }.to raise_error Capybara::ElementNotFound
-      end
-
-      it "does not show create firewall rule when does not have permissions" do
-        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
-
-        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/networking"
-        expect(page.title).to eq "Ubicloud - pg-without-permission"
-
-        expect { find_by_id "fwr-create" }.to raise_error Capybara::ElementNotFound
-      end
-
-      it "can create firewall rule" do
-        visit "#{project.path}#{pg.path}/networking"
-        find(".firewall-rule-create-button").click
-        expect(page).to have_flash_error "empty string provided for parameter cidr"
-
-        find('input[name="cidr"][form="form-pg-fwr-create"]').set("1.1.1.2")
-        find(".firewall-rule-create-button").click
-        expect(page).to have_flash_notice "Firewall rule is created"
-        expect(page).to have_content "1.1.1.2/32"
-        expect(page).to have_content "5432"
-
-        find('input[name="cidr"][form="form-pg-fwr-create"]').set("12.12.12.0/26")
-        find(".firewall-rule-create-button").click
-        expect(page).to have_flash_notice "Firewall rule is created"
-
-        find('input[name="cidr"][form="form-pg-fwr-create"]').set("fd00::/64")
-        find('input[name="description"][form="form-pg-fwr-create"]').set("test description - new firewall rule")
-        find(".firewall-rule-create-button").click
-        expect(page).to have_flash_notice "Firewall rule is created"
-        expect(page.status_code).to eq(200)
-        expect(page).to have_content "fd00::/64"
-        expect(page).to have_content "test description - new firewall rule"
-
-        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
-      end
-
-      it "can update firewall rule" do
-        pg
-        visit "#{project.path}#{pg.path}/networking"
-
-        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
-        url = btn["data-url"]
-        _csrf = btn["data-csrf"]
-        page.driver.submit :patch, url, {cidr: "0.0.0.0/1", description: "dummy-description", _csrf:}
-
-        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
-      end
-
-      it "can set nil description for firewall rule" do
-        pg
-        visit "#{project.path}#{pg.path}/networking"
-
-        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
-        url = btn["data-url"]
-        _csrf = btn["data-csrf"]
-        page.driver.submit :patch, url, {cidr: "0.0.0.0/1", description: nil, _csrf:}
-
-        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
-      end
-
-      it "doesn't increment update_firewall_rules semaphore if cidr is same" do
-        pg
-        visit "#{project.path}#{pg.path}/networking"
-
-        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
-        url = btn["data-url"]
-        _csrf = btn["data-csrf"]
-        page.driver.submit :patch, url, {cidr: "0.0.0.0/0", description: "test", _csrf:}
-
-        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be false
-      end
-
-      it "cannot delete firewall rule if it doesn't exist" do
-        pg
-        visit "#{project.path}#{pg.path}/networking"
-
-        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
-        url = btn["data-url"]
-        _csrf = btn["data-csrf"]
-
-        fwr = pg.firewall_rules.first
-        fwr.update(cidr: "0.0.0.0/1", postgres_resource_id: pg_wo_permission.id)
-
-        page.driver.submit :patch, url, {cidr: "0.0.0.0/2", description: "dummy-description", _csrf:}
-
-        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).not_to be true
+        expect(page).to have_no_content "0.0.0.0/0"
+        expect(page).to have_no_content "5432"
+        expect(page).to have_content "You can manage firewall rules using the firewall for this PostgreSQL database"
+        click_link "manage firewall rules using the firewall for this PostgreSQL database"
+        expect(page.title).to eq "Ubicloud - #{pg.ubid}-firewall"
       end
 
       it "shows link to private subnet networking page if customer firewall was destroyed" do
@@ -734,23 +624,9 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "Firewall Rules"
         expect(page).to have_no_content "0.0.0.0/0"
         expect(page).to have_no_content "5432"
-        expect(page).to have_content "PostgreSQL firewall was deleted, manage firewall rules using an appropriate firewall on the private subnet."
-      end
-
-      it "shows error if attempting to modify postgres networking rules after customer firewall was destroyed" do
-        visit "#{project.path}#{pg.path}/networking"
-
-        fw = pg.customer_firewall
-        fw.remove_all_private_subnets
-        fw.destroy
-
-        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
-        url = btn["data-url"]
-        _csrf = btn["data-csrf"]
-        page.driver.submit :patch, url, {cidr: "0.0.0.0/1", description: "dummy-description", _csrf:}
-
-        expect(JSON.parse(page.driver.response.body).dig("error", "message")).to eq "PostgreSQL firewall was deleted, manage firewall rules using an appropriate firewall on the #{pg.private_subnet.name} private subnet (id: #{pg.private_subnet.ubid})"
-        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be false
+        expect(page).to have_content "The firewall related to this PostgreSQL database was deleted or detached from the related private subnet"
+        click_link "private subnet"
+        expect(page.title).to eq "Ubicloud - #{pg.ubid}-subnet"
       end
     end
 
