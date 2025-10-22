@@ -631,13 +631,60 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
       end
 
+      it "returns error for firewall rules if customer firewall was deleted or detached" do
+        pg.customer_firewall.remove_all_private_subnets
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/firewall-rule"
+
+        expect(last_response).to have_api_error(400, "PostgreSQL firewall was deleted, manage firewall rules using an appropriate firewall on the #{pg.ubid}-subnet private subnet (id: #{pg.private_subnet.ubid})")
+      end
+
       it "show firewall" do
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/firewall-rule"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["items"][0]["cidr"]).to eq("0.0.0.0/0")
-        expect(JSON.parse(last_response.body)["items"][1]["cidr"]).to eq("::/0")
-        expect(JSON.parse(last_response.body)["count"]).to eq(2)
+        expect(JSON.parse(last_response.body)["items"][1]["cidr"]).to eq("0.0.0.0/0")
+        expect(JSON.parse(last_response.body)["items"][2]["cidr"]).to eq("::/0")
+        expect(JSON.parse(last_response.body)["items"][3]["cidr"]).to eq("::/0")
+        expect(JSON.parse(last_response.body)["items"][0]["port"]).to eq 5432
+        expect(JSON.parse(last_response.body)["items"][1]["port"]).to eq 6432
+        expect(JSON.parse(last_response.body)["items"][2]["port"]).to eq 5432
+        expect(JSON.parse(last_response.body)["items"][3]["port"]).to eq 6432
+        expect(JSON.parse(last_response.body)["items"][0]["description"]).to eq("")
+        expect(JSON.parse(last_response.body)["items"][1]["description"]).to eq("")
+        expect(JSON.parse(last_response.body)["items"][2]["description"]).to eq("")
+        expect(JSON.parse(last_response.body)["items"][3]["description"]).to eq("")
+        expect(JSON.parse(last_response.body)["count"]).to eq(4)
+      end
+
+      it "does not include firewall rules for port ranges other than only 5432 or only 6432" do
+        pg.customer_firewall.add_firewall_rule(cidr: "1.2.3.4/32", port_range: 22..22)
+        pg.customer_firewall.add_firewall_rule(cidr: "2.2.3.4/32", port_range: 5432..6432)
+        pg.customer_firewall.add_firewall_rule(cidr: "3.2.3.4/32", port_range: 6432..16432)
+        pg.customer_firewall.add_firewall_rule(cidr: "4.2.3.4/32", port_range: 5432..5432, description: "my-host")
+        pg.customer_firewall.add_firewall_rule(cidr: "5.2.3.4/32", port_range: 6432..6432)
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/firewall-rule"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["items"][0]["cidr"]).to eq("0.0.0.0/0")
+        expect(JSON.parse(last_response.body)["items"][1]["cidr"]).to eq("0.0.0.0/0")
+        expect(JSON.parse(last_response.body)["items"][2]["cidr"]).to eq("4.2.3.4/32")
+        expect(JSON.parse(last_response.body)["items"][3]["cidr"]).to eq("5.2.3.4/32")
+        expect(JSON.parse(last_response.body)["items"][4]["cidr"]).to eq("::/0")
+        expect(JSON.parse(last_response.body)["items"][5]["cidr"]).to eq("::/0")
+        expect(JSON.parse(last_response.body)["items"][0]["port"]).to eq 5432
+        expect(JSON.parse(last_response.body)["items"][1]["port"]).to eq 6432
+        expect(JSON.parse(last_response.body)["items"][2]["port"]).to eq 5432
+        expect(JSON.parse(last_response.body)["items"][3]["port"]).to eq 6432
+        expect(JSON.parse(last_response.body)["items"][4]["port"]).to eq 5432
+        expect(JSON.parse(last_response.body)["items"][5]["port"]).to eq 6432
+        expect(JSON.parse(last_response.body)["items"][0]["description"]).to eq("")
+        expect(JSON.parse(last_response.body)["items"][1]["description"]).to eq("")
+        expect(JSON.parse(last_response.body)["items"][2]["description"]).to eq("my-host")
+        expect(JSON.parse(last_response.body)["items"][3]["description"]).to eq("")
+        expect(JSON.parse(last_response.body)["items"][4]["description"]).to eq("")
+        expect(JSON.parse(last_response.body)["items"][5]["description"]).to eq("")
+        expect(JSON.parse(last_response.body)["count"]).to eq(6)
       end
     end
 

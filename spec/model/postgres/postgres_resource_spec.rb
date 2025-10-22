@@ -165,6 +165,11 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.needs_convergence?).to be(true)
   end
 
+  it "#pg_firewall_rules returns empty array when there is no customer firewall" do
+    expect(postgres_resource).to receive(:customer_firewall).and_return(nil)
+    expect(postgres_resource.pg_firewall_rules).to eq []
+  end
+
   describe "display_state" do
     it "returns 'deleting' when strand label is 'destroy'" do
       expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "destroy")).at_least(:once)

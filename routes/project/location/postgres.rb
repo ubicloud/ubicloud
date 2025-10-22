@@ -131,10 +131,12 @@ class Clover
         r.is do
           r.get do
             authorize("Postgres:view", pg)
-            postgres_require_customer_firewall!
+            fw = postgres_require_customer_firewall!
+            rules = pg.pg_firewall_rules(fw)
+
             {
-              items: Serializers::PostgresFirewallRule.serialize(pg.firewall_rules),
-              count: pg.firewall_rules.count
+              items: Serializers::PostgresFirewallRule.serialize(rules),
+              count: rules.count
             }
           end
 
