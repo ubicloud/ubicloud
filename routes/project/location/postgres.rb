@@ -131,8 +131,8 @@ class Clover
         r.is do
           r.get do
             authorize("Postgres:view", pg)
-            fw = postgres_require_customer_firewall!
-            rules = pg.pg_firewall_rules(fw)
+            firewall = postgres_require_customer_firewall!
+            rules = pg.pg_firewall_rules(firewall:)
 
             {
               items: Serializers::PostgresFirewallRule.serialize(rules),
@@ -162,8 +162,8 @@ class Clover
 
         r.is :ubid_uuid do |id|
           authorize("Postgres:edit", pg)
-          postgres_require_customer_firewall!
-          fwr = pg.firewall_rules_dataset[id:]
+          firewall = postgres_require_customer_firewall!
+          fwr = pg.pg_firewall_rule(id, firewall:)
           check_found_object(fwr)
 
           r.patch do
@@ -176,7 +176,7 @@ class Clover
                 cidr: new_cidr,
                 description:
               )
-              pg.incr_update_firewall_rules if current_cidr != new_cidr
+              firewall.update_private_subnet_firewall_rules if current_cidr != new_cidr
               audit_log(fwr, "update")
             end
 
@@ -186,7 +186,7 @@ class Clover
           r.delete do
             DB.transaction do
               fwr.destroy
-              pg.incr_update_firewall_rules
+              firewall.update_private_subnet_firewall_rules
               audit_log(fwr, "destroy")
             end
 

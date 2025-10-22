@@ -154,13 +154,20 @@ class PostgresResource < Sequel::Model
   end
 
   PG_FIREWALL_RULE_PORT_RANGES = [Sequel.pg_range(5432..5432), Sequel.pg_range(6432..6432)].freeze
-  def pg_firewall_rules(fw = customer_firewall)
-    return [] unless fw
+  def pg_firewall_rules(firewall: customer_firewall)
+    return [] unless firewall
 
-    fw.firewall_rules_dataset
+    pg_firewall_rules_dataset(firewall:).all
+  end
+
+  def pg_firewall_rule(id, firewall: customer_firewall)
+    pg_firewall_rules_dataset(firewall:).first(id:)
+  end
+
+  def pg_firewall_rules_dataset(firewall: customer_firewall)
+    firewall.firewall_rules_dataset
       .where(port_range: PG_FIREWALL_RULE_PORT_RANGES)
       .order(:cidr, :port_range)
-      .all
   end
 
   def ca_certificates
