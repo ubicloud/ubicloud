@@ -127,9 +127,9 @@ class Clover
         end
       end
 
-      r.on "firewall-rule" do
+      r.on api?, "firewall-rule" do
         r.is do
-          r.get api? do
+          r.get do
             authorize("Postgres:view", pg)
             postgres_require_customer_firewall!
             {
@@ -140,7 +140,6 @@ class Clover
 
           r.post do
             authorize("Postgres:edit", pg)
-            handle_validation_failure("postgres/show") { @page = "networking" }
             postgres_require_customer_firewall!
 
             parsed_cidr = Validation.validate_cidr(typecast_params.nonempty_str!("cidr"))
@@ -156,12 +155,7 @@ class Clover
               audit_log(firewall_rule, "create", pg)
             end
 
-            if api?
-              Serializers::PostgresFirewallRule.serialize(firewall_rule)
-            else
-              flash["notice"] = "Firewall rule is created"
-              r.redirect pg, "/networking"
-            end
+            Serializers::PostgresFirewallRule.serialize(firewall_rule)
           end
         end
 
@@ -185,11 +179,7 @@ class Clover
               audit_log(fwr, "update")
             end
 
-            if api?
-              Serializers::PostgresFirewallRule.serialize(fwr)
-            else
-              204
-            end
+            Serializers::PostgresFirewallRule.serialize(fwr)
           end
 
           r.delete do
