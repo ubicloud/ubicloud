@@ -1,0 +1,17 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/storage_volume"
+
+params = JSON.parse($stdin.read)
+begin
+  vm_name = params.fetch("vm_name")
+  disk_index = params.fetch("vm_name")
+rescue KeyError => e
+  puts "Needed #{e.key} in parameters"
+  exit 1
+end
+
+client_rpc = SpdkRpc.new(SpdkPath.rpc_sock("v23.09-ubi-0.3"))
+vhost_controller = SpdkPath.vhost_controller(vm_name, disk_index)
+client_rpc.vhost_delete_controller(vhost_controller)

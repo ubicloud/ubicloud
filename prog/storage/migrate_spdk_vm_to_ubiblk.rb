@@ -45,10 +45,11 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   end
 
   label def remove_spdk_controller
-    disk_index = 0
-    client_rpc = SpdkRpc.new(SpdkPath.rpc_sock("v23.09-ubi-0.3"))
-    vhost_controller = SpdkPath.vhost_controller(vm.inhost_name, disk_index)
-    client_rpc.vhost_delete_controller(vhost_controller)
+    params = {
+      "vm_name" => vm.inhost_name,
+      "disk_index" => 0
+    }
+    vm.vm_host.sshable.cmd("sudo host/bin/remove-spdk-controller", stdin: params.to_json)
     hop_ready_migration
   end
 
