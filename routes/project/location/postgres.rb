@@ -142,19 +142,18 @@ class Clover
 
           r.post do
             authorize("Postgres:edit", pg)
-            postgres_require_customer_firewall!
+            fw = postgres_require_customer_firewall!
 
-            parsed_cidr = Validation.validate_cidr(typecast_params.nonempty_str!("cidr"))
+            parsed_cidr = Validation.validate_cidr(typecast_params.nonempty_str!("cidr")).to_s
+            description = typecast_params.str("description")&.strip
 
             firewall_rule = nil
             DB.transaction do
-              pg.incr_update_firewall_rules
-              firewall_rule = PostgresFirewallRule.create(
-                postgres_resource_id: pg.id,
-                cidr: parsed_cidr.to_s,
-                description: typecast_params.str("description")&.strip
-              )
-              audit_log(firewall_rule, "create", pg)
+              firewall_rule = fw.insert_firewall_rule(parsed_cidr, Sequel.pg_range(5432..5432), description:)
+              audit_log(firewall_rule, "create", [fw, pg])
+
+              firewall_rule2 = fw.insert_firewall_rule(parsed_cidr, Sequel.pg_range(6432..6432), description:)
+              audit_log(firewall_rule2, "create", [fw, pg])
             end
 
             Serializers::PostgresFirewallRule.serialize(firewall_rule)
