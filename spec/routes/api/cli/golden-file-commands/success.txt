@@ -95,7 +95,7 @@ pg eu-central-h1/test2-pg create -s standard-4 -S 128
 pg eu-central-h1/test2-pg create -s standard-2 -S 64 -v 17
 pg eu-central-h1/test-pg add-firewall-rule 1.2.3.0/24
 pg eu-central-h1/test-pg add-metric-destination foo bar https://md.example.com
-pg eu-central-h1/test-pg delete-firewall-rule pfb9g14e5ndt6qf59wfk8109bg
+pg eu-central-h1/test-pg delete-firewall-rule frpqgkgjd09y4pnjaq2pkeacam
 pg eu-central-h1/test-pg delete-metric-destination et2t1bswsqz21m7j7njfjbp901
 pg eu-central-h1/test-pg destroy -f
 pg eu-central-h1/test-pg reset-superuser-password foo123BAR456
