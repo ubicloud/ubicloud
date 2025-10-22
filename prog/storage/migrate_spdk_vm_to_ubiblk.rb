@@ -94,8 +94,8 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       vm.vm_host.sshable.d_clean(unit_name)
       hop_migrate_from_spdk_to_ubiblk
     when "NotStarted"
-      write_kek_pipe
       vm.vm_host.sshable.d_run(unit_name, "/tmp/xts", "--kek", kek_file_path, "--config", vhost_conf_path, "--action", "decode", "#{root_dir_path}disk.raw.bk", "#{root_dir_path}unencrypted-spdk-disk.raw")
+      write_kek_pipe
       nap 15
     when "InProgress"
       nap 15
@@ -131,8 +131,8 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       vm.vm_host.sshable.d_clean(unit_name)
       hop_cleanup_temporary_images
     when "NotStarted"
-      write_kek_pipe
       vm.vm_host.sshable.d_run(unit_name, "/tmp/xts", "--kek", kek_file_path, "--config", vhost_conf_path, "--action", "encode", "#{root_dir_path}unencrypted-ubiblk-disk.raw", "#{root_dir_path}disk.raw")
+      write_kek_pipe
       nap 15
     when "InProgress"
       nap 15
@@ -159,15 +159,15 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       "max_write_mbytes_per_sec" => vm.vm_storage_volumes.first.max_write_mbytes_per_sec
     }
     vm.vm_host.sshable.cmd("sudo host/bin/setup-vhost-backend-systemd-unit", stdin: params.to_json)
-    hop_wait
+    hop_start_ubiblk_systemd_unit
   end
 
   label def start_ubiblk_systemd_unit
-    write_kek_pipe
-
-    unit_name = StorageVolume.new(vm.inhost_name, storage_volume_params).vhost_user_block_service
+    disk_index = 0
+    unit_name = "#{vm.inhost_name}-#{disk_index}-storage.service"
     vm.vm_host.sshable.cmd("sudo systemctl enable #{unit_name}")
     vm.vm_host.sshable.cmd("sudo systemctl start #{unit_name}")
+    write_kek_pipe
     hop_start_vm
   end
 
@@ -194,13 +194,13 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
 
   def write_kek_pipe
     vm_storage_volume = vm.vm_storage_volumes.first
-    {
+    kek_data = {
       "key" => vm_storage_volume.key_encryption_key_1.key.strip,
       "init_vector" => vm_storage_volume.key_encryption_key_1.init_vector.strip,
       "method" => "aes256-gcm",
       "auth_data" => Base64.strict_encode64(vm_storage_volume.key_encryption_key_1.auth_data)
     }
-    vm.vm_host.sshable.cmd("sudo tee #{kek_file_path}", stdin: kek_data.to_yaml)
+    vm.vm_host.sshable.cmd("sudo tee #{kek_file_path} > /dev/null", stdin: kek_data.to_yaml, log: false)
   end
 
   def storage_volume_params
