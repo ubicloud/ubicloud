@@ -226,10 +226,13 @@ class Vm < Sequel::Model
     incr_update_spdk_dependency
   end
 
-  def params_json(swap_size_bytes: nil, ch_version: nil, firmware_version: nil, hugepages: nil)
+  def params_json(swap_size_bytes: nil, hypervisor: nil, ch_version: nil, firmware_version: nil, hugepages: nil)
     topo = cloud_hypervisor_cpu_topology
 
     project_public_keys = project.get_ff_vm_public_ssh_keys || []
+
+    # B200 GPUs require QEMU
+    hypervisor ||= (pci_devices.any? { |pci| pci.device == "2901" }) ? "qemu" : "ch"
 
     # we don't write secrets to params_json, because it
     # shouldn't be stored in the host for security reasons.
@@ -253,6 +256,7 @@ class Vm < Sequel::Model
       slice_name: vm_host_slice&.inhost_name || "system.slice",
       cpu_percent_limit: cpu_percent_limit || 0,
       cpu_burst_percent_limit: cpu_burst_percent_limit || 0,
+      hypervisor:,
       ch_version:,
       firmware_version:,
       hugepages:,

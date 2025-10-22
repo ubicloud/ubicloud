@@ -298,7 +298,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     [
       {"swap_size_bytes" => nil},
-      {"swap_size_bytes" => nil, "hugepages" => false, "ch_version" => "46.0", "firmware_version" => "202311"}
+      {"swap_size_bytes" => nil, "hugepages" => false, "hypervisor" => "ch", "ch_version" => "46.0", "firmware_version" => "202311"}
     ].each do |frame_update|
       it "generates and passes a params json if prep command is not started yet (with frame opts: #{frame_update.inspect})" do
         nx.strand.stack.first.update(frame_update)
