@@ -153,6 +153,16 @@ class PostgresResource < Sequel::Model
     Firewall.first(project_id: Config.postgres_service_project_id, name: "#{ubid}-internal-firewall")
   end
 
+  PG_FIREWALL_RULE_PORT_RANGES = [Sequel.pg_range(5432..5432), Sequel.pg_range(6432..6432)].freeze
+  def pg_firewall_rules(fw = customer_firewall)
+    return [] unless fw
+
+    fw.firewall_rules_dataset
+      .where(port_range: PG_FIREWALL_RULE_PORT_RANGES)
+      .order(:cidr, :port_range)
+      .all
+  end
+
   def ca_certificates
     [root_cert_1, root_cert_2].join("\n") if root_cert_1 && root_cert_2
   end
