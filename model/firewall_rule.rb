@@ -22,6 +22,7 @@ end
 #  cidr        | cidr      |
 #  port_range  | int4range | DEFAULT '[0,65536)'::int4range
 #  firewall_id | uuid      | NOT NULL
+#  description | text      |
 # Indexes:
 #  firewall_rule_pkey                            | PRIMARY KEY btree (id)
 #  firewall_rule_cidr_port_range_firewall_id_key | UNIQUE btree (cidr, port_range, firewall_id)
