@@ -338,6 +338,9 @@ paths:
                 port_range:
                   description: Port range of the firewall rule
                   type: string
+                description:
+                  description: Description of the firewall rule
+                  type: string
                 project_id:
                   type: string
               additionalProperties: false
@@ -2288,11 +2291,15 @@ components:
         port_range:
           description: Port range of the firewall rule
           type: string
+        description:
+          description: Description of the firewall rule
+          type: string
       additionalProperties: false
       required:
         - cidr
         - id
         - port_range
+        - description
     SshPublicKey:
       type: object
       properties:
