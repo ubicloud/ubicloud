@@ -318,7 +318,7 @@ class Prog::Vm::Nexus < Prog::Base
 
     host.sshable.cmd(command)
 
-    hop_prep
+    hop_create_billing_record
   end
 
   label def prep
@@ -357,25 +357,24 @@ class Prog::Vm::Nexus < Prog::Base
       # to reduce the amount of load on the control plane unnecessarily.
       nap 6
     end
-    addr = vm.ip4
-    hop_create_billing_record unless addr
 
-    begin
-      Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
-    rescue SystemCallError
-      nap 1
+    if (addr = vm.ip4_string)
+      begin
+        Socket.tcp(addr, 22, connect_timeout: 1) {}
+      rescue SystemCallError
+        nap 1
+      end
     end
 
-    hop_create_billing_record
+    vm.update(display_state: "running", provisioned_at: Time.now)
+    Clog.emit("vm provisioned") { [vm, {provision: {vm_ubid: vm.ubid, vm_host_ubid: host&.ubid, duration: (Time.now - vm.allocated_at).round(3)}}] }
+
+    hop_wait
   end
 
   label def create_billing_record
-    vm.update(display_state: "running", provisioned_at: Time.now)
-
-    Clog.emit("vm provisioned") { [vm, {provision: {vm_ubid: vm.ubid, vm_host_ubid: host&.ubid, duration: (Time.now - vm.allocated_at).round(3)}}] }
-
     project = vm.project
-    hop_wait unless project.billable
+    hop_prep unless project.billable
 
     BillingRecord.create(
       project_id: project.id,
@@ -420,7 +419,7 @@ class Prog::Vm::Nexus < Prog::Base
       end
     end
 
-    hop_wait
+    hop_prep
   end
 
   label def wait
