@@ -26,6 +26,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
         <tr>
           <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">CIDR</th>
           <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Port range</th>
+          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Description</th>
           <% if edit_perm %>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
           <% end %>
@@ -36,6 +37,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
           <tr>
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr.cidr %></td>
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr.display_port_range %></td>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr.description %></td>
             <% if edit_perm %>
               <td
                 id="fwr-delete-<%= fwr.ubid %>"
@@ -65,6 +67,15 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
                 name: "port_range",
                 attributes: {
                   placeholder: "0..65536",
+                  form: "form-fw-create-rule-#{@firewall.ubid}"
+                }
+              ) %>
+            </td>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+              <%== part(
+                "components/form/text",
+                name: "description",
+                attributes: {
                   form: "form-fw-create-rule-#{@firewall.ubid}"
                 }
               ) %>
