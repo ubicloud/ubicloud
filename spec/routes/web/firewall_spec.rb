@@ -299,7 +299,7 @@ RSpec.describe Clover, "firewall" do
       it "can add" do
         visit "#{project.path}#{firewall.path}/networking"
 
-        fill_in "cidr", with: "1.1.1.1/8"
+        fill_in "cidr", with: "1.1.1.1/32"
         fill_in "port_range", with: "80"
 
         click_button "Create"
@@ -307,6 +307,32 @@ RSpec.describe Clover, "firewall" do
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
         expect(page).to have_flash_notice("Firewall rule is created")
         expect(firewall.firewall_rules_dataset.count).to eq(1)
+        rule = firewall.firewall_rules_dataset.first
+        expect(rule.firewall_id).to eq firewall.id
+        expect(rule.cidr.to_s).to eq "1.1.1.1/32"
+        expect(rule.port_range.to_range).to eq 80...81
+        expect(rule.description).to be_nil
+      end
+
+      it "can add with description" do
+        visit "#{project.path}#{firewall.path}/networking"
+
+        fill_in "cidr", with: "1.1.1.1/32"
+        fill_in "port_range", with: "80"
+        fill_in "description", with: "my desc"
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - #{firewall.name}")
+        expect(page).to have_flash_notice("Firewall rule is created")
+        expect(page).to have_content("my desc")
+
+        expect(firewall.firewall_rules_dataset.count).to eq(1)
+        rule = firewall.firewall_rules_dataset.first
+        expect(rule.firewall_id).to eq firewall.id
+        expect(rule.cidr.to_s).to eq "1.1.1.1/32"
+        expect(rule.port_range.to_range).to eq 80...81
+        expect(rule.description).to eq "my desc"
       end
 
       it "can not add rule when it is invalid" do
