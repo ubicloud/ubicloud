@@ -20,8 +20,10 @@ module Ubicloud
     # * If neither +start_port+ and +end_port+ are given, all ports are allowed.
     #
     # Returns a hash for the firewall rule.
-    def add_rule(cidr, start_port: nil, end_port: nil)
-      rule = adapter.post(_path("/firewall-rule"), cidr:, port_range: "#{start_port || 0}..#{end_port || start_port || 65535}")
+    def add_rule(cidr, start_port: nil, end_port: nil, description: nil)
+      hash = {cidr:, port_range: "#{start_port || 0}..#{end_port || start_port || 65535}"}
+      hash[:description] = description if description
+      rule = adapter.post(_path("/firewall-rule"), **hash)
 
       self[:firewall_rules]&.<<(rule)
 
