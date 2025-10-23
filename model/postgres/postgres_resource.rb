@@ -10,19 +10,23 @@ class PostgresResource < Sequel::Model
   one_to_many :servers, class: :PostgresServer, key: :resource_id
   one_to_one :representative_server, class: :PostgresServer, key: :resource_id, conditions: Sequel.~(representative_at: nil)
   one_through_one :timeline, class: :PostgresTimeline, join_table: :postgres_server, left_key: :resource_id, right_key: :timeline_id
-  one_to_many :firewall_rules, class: :PostgresFirewallRule, key: :postgres_resource_id
   one_to_many :metric_destinations, class: :PostgresMetricDestination, key: :postgres_resource_id
   many_to_one :private_subnet
   many_to_one :location, key: :location_id, class: :Location
   one_to_many :read_replicas, class: :PostgresResource, key: :parent_id, conditions: {restore_target: nil}
 
-  plugin :association_dependencies, firewall_rules: :destroy, metric_destinations: :destroy
+  plugin :association_dependencies, metric_destinations: :destroy
   dataset_module Pagination
 
   plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2, :server_cert],
     encrypted_columns: [:superuser_password, :root_cert_key_1, :root_cert_key_2, :server_cert_key]
   plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records, :destroy, :promote, :refresh_certificates, :use_different_az
   include ObjectTag::Cleanup
+
+  def before_destroy
+    DB[:postgres_firewall_rule].where(postgres_resource_id: id).delete
+    super
+  end
 
   def display_location
     location.display_name
@@ -130,17 +134,6 @@ class PostgresResource < Sequel::Model
 
   def in_maintenance_window?
     maintenance_window_start_at.nil? || (Time.now.utc.hour - maintenance_window_start_at) % 24 < MAINTENANCE_DURATION_IN_HOURS
-  end
-
-  def set_firewall_rules
-    # If customer has deleted the related firewall, then they need to manage
-    # their firewall rules via their own firewall and not via postgres-specific
-    # firewall rules.
-    return unless (customer_firewall = self.customer_firewall)
-
-    vm_firewall_rules = firewall_rules.map { {cidr: it.cidr.to_s, port_range: Sequel.pg_range(5432..5432), description: it.description} }
-    vm_firewall_rules.concat(firewall_rules.map { {cidr: it.cidr.to_s, port_range: Sequel.pg_range(6432..6432), description: it.description} })
-    customer_firewall.replace_firewall_rules(vm_firewall_rules)
   end
 
   # This may return nil if the customer has destroyed the firewall or

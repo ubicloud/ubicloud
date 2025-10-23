@@ -74,7 +74,6 @@ module ThawedMock
   allow_mocking(PgAwsAmi, :where)
   allow_mocking(PrivateSubnet, :[], :random_subnet, :generate_ubid)
   allow_mocking(PrivateSubnetFirewall, :where)
-  allow_mocking(PostgresFirewallRule, :generate_uuid)
   allow_mocking(PostgresLsnMonitor, :new)
   allow_mocking(PostgresMetricDestination, :generate_uuid)
   allow_mocking(PostgresResource, :[], :generate_uuid)

@@ -20,7 +20,7 @@ RSpec.describe Clover, "cli pg create" do
     expect(pg.ha_type).to eq "none"
     expect(pg.version).to eq "17"
     expect(pg.flavor).to eq "standard"
-    expect(PostgresFirewallRule.count).to eq 2
+    expect(pg.pg_firewall_rules_dataset.count).to eq 4
     expect(pg.tags).to eq([])
     expect(body).to eq "PostgreSQL database created with id: #{pg.ubid}\n"
   end
@@ -38,7 +38,7 @@ RSpec.describe Clover, "cli pg create" do
     expect(pg.ha_type).to eq "async"
     expect(pg.version).to eq "17"
     expect(pg.flavor).to eq "paradedb"
-    expect(PostgresFirewallRule.count).to eq 0
+    expect(pg.pg_firewall_rules_dataset.count).to eq 0
     expect(pg.tags).to eq([{"key" => "foo", "value" => "bar"}, {"key" => "baz", "value" => "quux"}])
     expect(body).to eq "PostgreSQL database created with id: #{pg.ubid}\n"
   end
