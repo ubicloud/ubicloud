@@ -133,8 +133,8 @@ class PostgresResource < Sequel::Model
   end
 
   def set_firewall_rules
-    vm_firewall_rules = firewall_rules.map { {cidr: it.cidr.to_s, port_range: Sequel.pg_range(5432..5432)} }
-    vm_firewall_rules.concat(firewall_rules.map { {cidr: it.cidr.to_s, port_range: Sequel.pg_range(6432..6432)} })
+    vm_firewall_rules = firewall_rules.map { {cidr: it.cidr.to_s, port_range: Sequel.pg_range(5432..5432), description: it.description} }
+    vm_firewall_rules.concat(firewall_rules.map { {cidr: it.cidr.to_s, port_range: Sequel.pg_range(6432..6432), description: it.description} })
     vm_firewall_rules.push({cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)})
     vm_firewall_rules.push({cidr: "::/0", port_range: Sequel.pg_range(22..22)})
     vm_firewall_rules.push({cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(5432..5432)})
