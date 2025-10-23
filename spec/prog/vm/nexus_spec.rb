@@ -283,7 +283,7 @@ RSpec.describe Prog::Vm::Nexus do
         sudo usermod -a -G kvm #{nx.vm_name}
       COMMAND
 
-      expect { nx.create_unix_user }.to hop("prep")
+      expect { nx.create_unix_user }.to hop("create_billing_record")
     end
   end
 
@@ -769,39 +769,44 @@ RSpec.describe Prog::Vm::Nexus do
       expect { nx.wait_sshable }.to nap(1)
     end
 
-    it "hops to create_billing_record if sshable" do
+    it "hops to wait if sshable and billing record created" do
       expect(vm).to receive(:update_firewall_rules_set?).and_return(true)
       expect(vm).not_to receive(:incr_update_firewall_rules)
       vm_addr = instance_double(AssignedVmAddress, id: "46ca6ded-b056-4723-bd91-612959f52f6f", ip: NetAddr::IPv4Net.parse("10.0.0.1"))
       expect(vm).to receive(:assigned_vm_address).and_return(vm_addr).at_least(:once)
       expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
-      expect { nx.wait_sshable }.to hop("create_billing_record")
+      now = Time.now
+      expect(Time).to receive(:now).and_return(now).at_least(:once)
+      expect(vm).to receive(:update).with(display_state: "running", provisioned_at: now).and_return(true)
+      expect(Clog).to receive(:emit).with("vm provisioned").and_yield
+      allow(vm).to receive(:allocated_at).and_return(now - 100)
+      nx.strand.stack[-1]["create_billing_record_done"] = true
+      expect { nx.wait_sshable }.to hop("wait")
     end
 
     it "skips a check if ipv4 is not enabled" do
       expect(vm).to receive(:update_firewall_rules_set?).and_return(true)
       expect(vm.ip4).to be_nil
       expect(vm).not_to receive(:ephemeral_net6)
+      host = VmHost.new.tap { it.id = "46ca6ded-b056-4723-bd91-612959f52f6f" }
+      allow(nx).to receive(:host).and_return(host)
+      now = Time.now
+      expect(Time).to receive(:now).and_return(now).at_least(:once)
+      expect(vm).to receive(:update).with(display_state: "running", provisioned_at: now).and_return(true)
+      expect(Clog).to receive(:emit).with("vm provisioned").and_yield
+      allow(vm).to receive(:allocated_at).and_return(now - 100)
       expect { nx.wait_sshable }.to hop("create_billing_record")
     end
   end
 
   describe "#create_billing_record" do
-    before do
-      now = Time.now
-      expect(Time).to receive(:now).and_return(now).at_least(:once)
-      allow(vm).to receive(:allocated_at).and_return(now - 100)
-      expect(vm).to receive(:update).with(display_state: "running", provisioned_at: now).and_return(true)
-      expect(Clog).to receive(:emit).with("vm provisioned").and_yield
-    end
-
     it "creates billing records when ip4 is enabled" do
       vm_addr = instance_double(AssignedVmAddress, id: "46ca6ded-b056-4723-bd91-612959f52f6f", ip: NetAddr::IPv4Net.parse("10.0.0.1"))
       expect(vm).to receive(:assigned_vm_address).and_return(vm_addr).at_least(:once)
       expect(vm).to receive(:ip4_enabled).and_return(true)
       expect(BillingRecord).to receive(:create).exactly(4).times
       expect(vm).to receive(:project).and_return(prj).at_least(:once)
-      expect { nx.create_billing_record }.to hop("wait")
+      expect { nx.create_billing_record }.to hop("prep")
     end
 
     it "creates billing records when gpu is present" do
@@ -809,13 +814,14 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm).to receive(:pci_devices).and_return([PciDevice.new(slot: "01:00.0", iommu_group: 23, device_class: "0302", vendor: "10de", device: "20b5")]).at_least(:once)
       expect(BillingRecord).to receive(:create).exactly(4).times
       expect(vm).to receive(:project).and_return(prj).at_least(:once)
-      expect { nx.create_billing_record }.to hop("wait")
+      expect { nx.create_billing_record }.to hop("prep")
     end
 
     it "creates billing records when ip4 is not enabled" do
       expect(vm).to receive(:ip4_enabled).and_return(false)
       expect(BillingRecord).to receive(:create).exactly(3).times
       expect(vm).to receive(:project).and_return(prj).at_least(:once)
+      nx.strand.stack[-1]["prep_done"] = true
       expect { nx.create_billing_record }.to hop("wait")
     end
 
@@ -823,7 +829,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm).to receive(:project).and_return(prj).at_least(:once)
       expect(prj).to receive(:billable).and_return(false)
       expect(BillingRecord).not_to receive(:create)
-      expect { nx.create_billing_record }.to hop("wait")
+      expect { nx.create_billing_record }.to hop("prep")
     end
 
     it "doesn't create billing records for storage volumes, ip4 and pci devices if the location provider is aws" do
@@ -834,27 +840,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm).not_to receive(:pci_devices)
       expect(vm).not_to receive(:storage_volumes)
       expect(BillingRecord).to receive(:create).once
-      expect { nx.create_billing_record }.to hop("wait")
-    end
-
-    it "creates a billing record when host is nil, too" do
-      vm.vm_host = nil
-      vm.location.provider = "aws"
-      expect(BillingRecord).to receive(:create).once
-      expect(vm).to receive(:project).and_return(prj).at_least(:once)
-
-      expect { nx.create_billing_record }.to hop("wait")
-    end
-
-    it "create a billing record when host is not nil, too" do
-      host = VmHost.new.tap { it.id = "46ca6ded-b056-4723-bd91-612959f52f6f" }
-      allow(nx).to receive(:host).and_return(host)
-      vm.vm_host = host
-      vm.location.provider = "aws"
-      expect(BillingRecord).to receive(:create).once
-      expect(vm).to receive(:project).and_return(prj).at_least(:once)
-
-      expect { nx.create_billing_record }.to hop("wait")
+      expect { nx.create_billing_record }.to hop("prep")
     end
   end
 
