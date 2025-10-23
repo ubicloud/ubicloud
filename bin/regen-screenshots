@@ -138,6 +138,12 @@ class RegenScreenshots
     screenshot "managed-postgresql/create-screenshot.png"
     screenshot "quick-start/using-kamal-with-ubicloud-3-screenshot.png"
 
+    pg_private_subnet = PrivateSubnet.create_with_id(UBID.parse("psdkk2ssb6cy4j31yx1cjn2jqm").to_uuid,
+      project_id: project.id,
+      location_id: Location::HETZNER_FSN1_ID,
+      name: "subnet",
+      net4: "5.4.3.0/24",
+      net6: "5432::/16")
     pg_resource = PostgresResource.create(
       name: "postgresql-demo",
       location_id: Location::HETZNER_FSN1_ID,
@@ -145,10 +151,12 @@ class RegenScreenshots
       target_storage_size_gib: 10,
       superuser_password: "1",
       project_id: project.id,
+      private_subnet_id: pg_private_subnet.id,
       target_version: "16"
     ) do |pg|
       pg.id = UBID.parse("pgmjy3v4ef1y7gdpzv6b3fchef").to_uuid
     end
+    pg_private_subnet.update(name: "#{pg_resource.ubid}-subnet")
     Project.define_method(:postgres_resources_dataset) do |*a|
       super(*a).with_extend do
         define_method(:all) { [pg_resource] }
@@ -182,8 +190,14 @@ class RegenScreenshots
       server.id = UBID.parse("pvmjy3v4ef1y7gdpzv6b3fchef").to_uuid
     end
     PostgresResource.define_method(:display_state) { "running" }
-    # Add default firewall rule to the postgres instance
-    PostgresFirewallRule.create(postgres_resource_id: pg_resource.id, cidr: "0.0.0.0/0")
+    pg_firewall = Firewall.create_with_id(UBID.parse("fw63akem7s0j5kz48083j3k5fq").to_uuid,
+      project_id: project.id,
+      location_id: Location::HETZNER_FSN1_ID,
+      name: "#{pg_resource.ubid}-firewall")
+    FirewallRule.create_with_id(UBID.parse("fre795gq2vmt7gatmc53mt6rgj").to_uuid,
+      firewall_id: pg_firewall.id,
+      cidr: "0.0.0.0/0",
+      port_range: 5432..5432)
 
     PostgresResource.define_method(:connection_string) { "sample-connection-string" }
     PostgresResource.define_method(:ca_certificates) { "certs" }
@@ -362,6 +376,16 @@ class RegenScreenshots
 
     # Associate the load balancer with the Kubernetes cluster
     k8s_cluster.update(services_lb_id: services_lb.id)
+
+    Config.define_singleton_method(:kubernetes_service_project_id) { project.id }
+    Firewall.create_with_id(UBID.parse("fwfzd1vb5r1t6p1xye9w346v9s").to_uuid,
+      project_id: project.id,
+      location_id: Location::HETZNER_FSN1_ID,
+      name: "#{k8s_cluster.ubid}-cp-vm-firewall")
+    Firewall.create_with_id(UBID.parse("fwp092jypnmt2h29wgxst8qwp0").to_uuid,
+      project_id: project.id,
+      location_id: Location::HETZNER_FSN1_ID,
+      name: "#{k8s_cluster.ubid}-worker-vm-firewall")
 
     ["le9ec", "e12en", "zd3ka"].each do |suffix|
       Prog::Kubernetes::KubernetesNodeNexus.assemble(

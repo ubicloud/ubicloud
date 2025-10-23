@@ -399,7 +399,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
     it "calls set_firewall_rules method of the postgres resource when update_firewall_rules is set" do
       expect(nx).to receive(:when_update_firewall_rules_set?).and_yield
-      expect(postgres_resource).to receive(:set_firewall_rules)
+      expect(nx).to receive(:decr_update_firewall_rules)
       expect { nx.wait }.to nap(30)
     end
 
