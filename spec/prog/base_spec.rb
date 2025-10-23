@@ -6,13 +6,8 @@ RSpec.describe Prog::Base do
   it "does not allow failure of one child strand inside donate to affect other strands" do
     parent = Strand.create(prog: "Test", label: "reap_exit_no_children")
     popper = Strand.create(parent_id: parent.id, prog: "Test", label: "popper")
-    failer = Strand.create(parent_id: parent.id, prog: "Test", label: "failer")
+    failer = Strand.create(parent_id: parent.id, prog: "Test", label: "failer", schedule: Time.now + 5)
     Strand.create(parent_id: parent.id, prog: "Test", label: "napper", lease: Time.now + 10)
-
-    expect(parent).to receive(:children_dataset).twice.and_wrap_original do
-      # Force popper before failer
-      it.call.order(Sequel.case({"popper" => 1}, 2, :label))
-    end
 
     expect { parent.run(10) }.to raise_error(RuntimeError)
     expect(popper.this.get(:exitval)).to eq("msg" => "popped")
