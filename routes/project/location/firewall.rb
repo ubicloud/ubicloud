@@ -89,11 +89,12 @@ class Clover
 
           parsed_cidr = Validation.validate_cidr(typecast_params.str!("cidr"))
           port_range = Validation.validate_port_range(typecast_params.str("port_range"))
+          description = typecast_params.nonempty_str("description")
           pg_range = Sequel.pg_range(port_range.first..port_range.last)
 
           firewall_rule = nil
           DB.transaction do
-            firewall_rule = firewall.insert_firewall_rule(parsed_cidr.to_s, pg_range)
+            firewall_rule = firewall.insert_firewall_rule(parsed_cidr.to_s, pg_range, description:)
             audit_log(firewall_rule, "create", firewall)
           end
 
