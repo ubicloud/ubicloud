@@ -8,14 +8,14 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
 
   let(:st) { Strand.create(prog: "Prog::Ai::InferenceRouterReplicaNexus", label: "start") }
   let(:project) { Project.create(name: "test") }
-  let(:private_subnet) { PrivateSubnet.create(project_id: project.id, name: "test", location_id: Location::HETZNER_HEL1_ID, net6: "fe80::/64", net4: "192.168.0.0/24") }
+  let(:private_subnet) { PrivateSubnet.create(project_id: project.id, name: "test", location_id: Location::LEASEWEB_WDC02_ID, net6: "fe80::/64", net4: "192.168.0.0/24") }
   let(:load_balancer) { Prog::Vnet::LoadBalancerNexus.assemble(private_subnet.id, name: "test", src_port: 443, dst_port: 8443).subject }
   let(:dns_zone) { DnsZone.create(name: "test-dns-zone", project_id: project.id) }
   let(:cert) { Prog::Vnet::CertNexus.assemble(load_balancer.hostname, dns_zone.id).subject }
   let(:inference_router) {
     InferenceRouter.create(
       name: "ir-name",
-      location: Location[name: "hetzner-ai"],
+      location: Location[Location::LEASEWEB_WDC02_ID],
       vm_size: "standard-2",
       replica_count: 2,
       project_id: project.id,
@@ -371,6 +371,48 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       expect(nx).to receive(:update_billing_records).with(
         usage, "completion_billing_resource", "completion_token_count"
       )
+
+      nx.ping_inference_router
+    end
+
+    it "for private routers (non-visible location) only includes projects with matching visible_locations" do
+      inference_router.update(location_id: Location[name: "tr-ist-u1-tom"].id)
+
+      p_allowed = Project.create(name: "allowed")
+      p_blocked = Project.create(name: "blocked")
+      ApiKey.create_inference_api_key(p_allowed)
+      ApiKey.create_inference_api_key(p_blocked)
+
+      p_allowed.set_ff_visible_locations ["tr-ist-u1-tom"]
+
+      expect(sshable).to receive(:cmd).with(
+        "md5sum /ir/workdir/config.json | awk '{ print $1 }'"
+      ).and_return("dummy_md5sum")
+
+      expect(sshable).to receive(:cmd).with(
+        "sudo mkdir -p /ir/workdir && sudo tee /ir/workdir/config.json > /dev/null",
+        hash_including(stdin: a_string_matching(/"projects":/))
+      ) do |_, options|
+        json_sent = JSON.parse(options[:stdin])
+
+        # Collect sent project UBIDs for comparison
+        sent_projects = json_sent["projects"]
+        expect(sent_projects.size).to eq(1)
+
+        expect(sent_projects.first["ubid"]).to eq(p_allowed.ubid)
+        expect(sent_projects.first["api_keys"]).to eq(
+          [Digest::SHA2.hexdigest(p_allowed.api_keys.first.key)]
+        )
+
+        ubids = sent_projects.map { |pr| pr["ubid"] }
+        expect(ubids).not_to include(p_blocked.ubid)
+      end
+
+      expect(sshable).to receive(:cmd).with("sudo pkill -f -HUP inference-router")
+
+      expect(sshable).to receive(:cmd)
+        .with("curl -k -m 10 --no-progress-meter https://localhost:8080/usage")
+        .and_return("[]")
 
       nx.ping_inference_router
     end
