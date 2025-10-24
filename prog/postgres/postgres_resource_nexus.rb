@@ -73,10 +73,13 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       ])
 
       if with_firewall_rules
-        PostgresFirewallRule.create(postgres_resource_id: postgres_resource.id, cidr: "0.0.0.0/0")
-        PostgresFirewallRule.create(postgres_resource_id: postgres_resource.id, cidr: "::/0")
+        firewall.replace_firewall_rules([
+          {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(5432..5432)},
+          {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(6432..6432)},
+          {cidr: "::/0", port_range: Sequel.pg_range(5432..5432)},
+          {cidr: "::/0", port_range: Sequel.pg_range(6432..6432)}
+        ])
       end
-      postgres_resource.set_firewall_rules
 
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: timeline_id, timeline_access: timeline_access, representative_at: Time.now)
 
@@ -237,7 +240,6 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     when_update_firewall_rules_set? do
       decr_update_firewall_rules
-      postgres_resource.set_firewall_rules
     end
 
     when_promote_set? do

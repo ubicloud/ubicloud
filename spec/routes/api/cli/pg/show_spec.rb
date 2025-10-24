@@ -21,6 +21,8 @@ RSpec.describe Clover, "cli pg show" do
     @pg.add_metric_destination(username: "md-user", password: "1", url: "https://md.example.com")
     @pg.update(root_cert_1: "a", root_cert_2: "b")
     @pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 64, disk_index: 0)
+    rules = @pg.pg_firewall_rules
+    rules[0].update(description: "my fwr desc")
 
     expect(cli(%W[pg #{@ref} show])).to eq <<~END
       id: #{@pg.ubid}
@@ -43,8 +45,10 @@ RSpec.describe Clover, "cli pg show" do
       parent: 
       tags:
       firewall rules:
-        1: #{@pg.firewall_rules[0].ubid}  0.0.0.0/0
-        2: #{@pg.firewall_rules[1].ubid}  ::/0
+        1: #{rules[0].ubid}  0.0.0.0/0  5432  my fwr desc
+        2: #{rules[1].ubid}  0.0.0.0/0  6432  
+        3: #{rules[2].ubid}  ::/0  5432  
+        4: #{rules[3].ubid}  ::/0  6432  
       metric destinations:
         1: #{@pg.metric_destinations[0].ubid}  md-user  https://md.example.com
       read replicas:
@@ -75,8 +79,10 @@ RSpec.describe Clover, "cli pg show" do
       parent: eu-central-h1/test-pg
       tags:
       firewall rules:
-        1: #{@pg.firewall_rules[0].ubid}  0.0.0.0/0
-        2: #{@pg.firewall_rules[1].ubid}  ::/0
+        1: #{rules[0].ubid}  0.0.0.0/0  5432  my fwr desc
+        2: #{rules[1].ubid}  0.0.0.0/0  6432  
+        3: #{rules[2].ubid}  ::/0  5432  
+        4: #{rules[3].ubid}  ::/0  6432  
       metric destinations:
         1: #{@pg.metric_destinations[0].ubid}  md-user  https://md.example.com
       read replicas:

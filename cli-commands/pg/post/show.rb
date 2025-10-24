@@ -33,7 +33,7 @@ UbiCli.on("pg").run_on("show") do
       when :firewall_rules
         body << "firewall rules:\n"
         data[key].each_with_index do |rule, i|
-          body << "  " << (i + 1).to_s << ": " << rule[:id] << "  " << rule[:cidr].to_s << "\n"
+          body << "  " << (i + 1).to_s << ": " << rule[:id] << "  " << rule[:cidr].to_s << "  " << rule[:port].to_s << "  " << rule[:description].to_s << "\n"
         end
       when :metric_destinations
         body << "metric destinations:\n"

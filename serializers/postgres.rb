@@ -29,7 +29,7 @@ class Serializers::Postgres < Serializers::Base
         password: pg.superuser_password,
         hostname: pg.hostname,
         primary: pg.representative_server&.primary?,
-        firewall_rules: Serializers::PostgresFirewallRule.serialize(pg.firewall_rules.sort_by { |fwr| fwr.cidr.version && fwr.cidr.to_s }),
+        firewall_rules: Serializers::PostgresFirewallRule.serialize(pg.pg_firewall_rules),
         metric_destinations: pg.metric_destinations.map { {id: it.ubid, username: it.username, url: it.url} },
         read_replicas: Serializers::Postgres.serialize(pg.read_replicas, {include_path: true})
       )
