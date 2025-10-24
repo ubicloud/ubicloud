@@ -315,7 +315,6 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       model = InferenceRouterModel.from_model_name(usage["model_name"])
       resource_family = model[billing_resource_key.to_sym]
       rate = BillingRate.from_resource_properties("InferenceTokens", resource_family, "global")
-      next if rate["unit_price"].zero?
 
       rate_id = rate["id"]
       tokens = usage[usage_key]
