@@ -15,6 +15,8 @@ class Clover
         view "account/settings"
       end
 
+      r.rename current_account, perm: nil, serializer: Serializers::Account, template_prefix: "account"
+
       r.on "login-method" do
         r.get true do
           no_authorization_needed
