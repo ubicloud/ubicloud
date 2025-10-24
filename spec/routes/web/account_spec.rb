@@ -207,5 +207,19 @@ RSpec.describe Clover, "account" do
       click_button "Remove All Multifactor Authentication Methods"
       expect(page).to have_flash_notice "All multifactor authentication methods have been disabled"
     end
+
+    it "allows renaming account" do
+      visit "/account/rename"
+
+      fill_in "name", with: "Invalid Name !@#"
+      click_button "Rename"
+      expect(page).to have_flash_error "Validation failed for following fields: name"
+
+      fill_in "name", with: "New Name"
+      click_button "Rename"
+
+      expect(page).to have_flash_notice "Name updated"
+      expect(Account.first.name).to eq "New Name"
+    end
   end
 end

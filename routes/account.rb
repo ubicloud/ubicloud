@@ -8,6 +8,13 @@ class Clover
         r.redirect "/account/multifactor-manage"
       end
 
+      r.get "rename" do
+        no_authorization_needed
+        view "account/rename"
+      end
+
+      r.rename current_account, perm: nil, serializer: Serializers::Account, template: "account/rename", page: "rename"
+
       r.on "login-method" do
         r.get true do
           no_authorization_needed

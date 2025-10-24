@@ -37,6 +37,8 @@ class Clover < Roda
           else
             if object.is_a?(KubernetesCluster)
               Validation.validate_kubernetes_name(name)
+            elsif object.is_a?(Account)
+              Validation.validate_account_name(name)
             else
               Validation.validate_name(name)
             end
