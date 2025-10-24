@@ -75,11 +75,13 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     end
 
     it "hops to update vm load balancers" do
+      expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
       expect(nx).to receive(:when_update_load_balancer_set?).and_yield
       expect { nx.wait }.to hop("update_vm_load_balancers")
     end
 
     it "rewrites dns records" do
+      expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
       expect(nx).to receive(:when_rewrite_dns_records_set?).and_yield
       expect { nx.wait }.to hop("rewrite_dns_records")
     end
