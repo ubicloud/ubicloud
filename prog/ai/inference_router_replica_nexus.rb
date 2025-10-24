@@ -255,7 +255,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       }
     end
 
-    targets = InferenceRouterTarget.order(:created_at).all.group_by(&:inference_router_model)
+    targets = inference_router.targets.group_by(&:inference_router_model)
     routes = targets.map do |inference_router_model, targets_for_model|
       {
         model_name: inference_router_model.model_name,

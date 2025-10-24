@@ -6,6 +6,7 @@ class InferenceRouter < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :project
   one_to_many :replicas, class: :InferenceRouterReplica, key: :inference_router_id
+  one_to_many :targets, class: :InferenceRouterTarget, key: :inference_router_id
   many_to_one :load_balancer
   many_to_one :private_subnet
   many_to_one :location
