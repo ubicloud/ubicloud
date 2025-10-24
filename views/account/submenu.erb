@@ -4,8 +4,7 @@
       [
         ["Multifactor Auth", "/account/multifactor-manage", "hero-lock-closed"],
         ["Login Methods", "/account/login-method", "hero-finger-print", disallow_login_methods],
-        ["#{rodauth.has_password? ? "Change" : "Create"} Password", "/account/change-password", "hero-key", disallow_login_methods],
-        ["Change Email", "/account/change-login", "hero-envelope", disallow_login_methods],
+        ["Settings", "/account/settings", "hero-cog-8-tooth"],
         ["Close Account", "/account/close-account", "hero-x-circle"]
       ].each do |label, url, icon, disallowed| %>
       <% next if disallowed %>

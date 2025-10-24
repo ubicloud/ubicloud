@@ -1,4 +1,4 @@
-<% @page_title = "Change Email" %>
+<% @page_title = "Settings" %>
 
 <%== part("components/page_header", title: "My Account") %>
 
@@ -25,6 +25,29 @@
                 <% end %>
                 <div class="col-span-6">
                   <%== part("components/form/submit_button", text: "Change Email") %>
+                </div>
+              </div>
+            <% end %>
+          </div>
+          <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
+            <% password_action = rodauth.has_password? ? "Change" : "Create" %>
+            <h2 class="text-lg font-medium leading-6 text-gray-900"><%= password_action %>
+              Password</h2>
+            <% form(action: rodauth.change_password_path, method: :post) do %>
+              <div class="mt-6 grid grid-cols-6 gap-6">
+                <% if rodauth.change_password_requires_password? %>
+                  <div class="col-span-6 sm:col-span-3 xl:col-span-2">
+                    <%== part("components/rodauth/password_field", label: "Current Password") %>
+                  </div>
+                <% end %>
+                <div class="col-span-6 sm:col-span-3 xl:col-span-2">
+                  <%== part("components/rodauth/password_field", label: "#{rodauth.new_password_label}#{rodauth.input_field_label_suffix}", name: rodauth.new_password_param, autocomplete: "new-password") %>
+                </div>
+                <div class="col-span-6 sm:col-span-3 xl:col-span-2">
+                  <%== part("components/rodauth/password_field", label: "New Password Confirmation", confirm: true) %>
+                </div>
+                <div class="col-span-6">
+                  <%== part("components/form/submit_button", text: "#{password_action} Password") %>
                 </div>
               </div>
             <% end %>
