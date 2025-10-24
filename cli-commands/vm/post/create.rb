@@ -10,6 +10,7 @@ UbiCli.on("vm").run_on("create") do
   options("ubi vm location/vm-name create [options] public-key", key: :vm_create) do
     on("-6", "--ipv6-only", "do not enable IPv4")
     on("-b", "--boot-image=image_name", Option::BootImages.map(&:name), "boot image")
+    on("-i", "--init-script=script", "use given init script")
     on("-p", "--private-subnet-id=ps-id", "place VM into specific private subnet (also accepts ps-name)")
     on("-s", "--size=size", server_sizes, "server size")
     on("-S", "--storage-size=size", storage_sizes, "storage size")
@@ -22,6 +23,7 @@ UbiCli.on("vm").run_on("create") do
   help_example 'ubi vm eu-central-h1/my-vm-name create "$(cat ~/.ssh/id_ed25519.pub)"'
   help_example 'ubi vm eu-central-h1/my-vm-name create "$(cat ~/.ssh/authorized_keys)"'
   help_example "ubi vm eu-central-h1/my-vm-name create registered-ssh-public-key-name"
+  help_example 'ubi vm eu-central-h1/my-vm-name create -i "$(cat /path/to/init/script)" registered-ssh-public-key-name'
 
   args 1
 

@@ -33,7 +33,7 @@ class Clover
     end
 
     assemble_params = typecast_params.convert!(symbolize: true) do |tp|
-      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu"])
+      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu", "init_script"])
       tp.pos_int("storage_size")
       tp.bool("enable_ip4")
     end
@@ -210,6 +210,7 @@ class Clover
     options.add_option(name: "unix_user")
     options.add_option(name: "ssh_public_key", values: @project.ssh_public_keys)
     options.add_option(name: "public_key")
+    options.add_option(name: "init_script")
 
     options.serialize
   end
