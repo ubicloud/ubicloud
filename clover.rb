@@ -111,6 +111,7 @@ class Clover < Roda
   ].each { path(it, class_name: true, &under_project_path) }
 
   path("Project", class_name: true, &:path)
+  path("Account", class_name: true) { |_| "/account" }
   path("GithubInstallation", class_name: true) { "#{it.project.path}/github/#{it.ubid}" }
   path("Invoice", class_name: true) { "#{it.project.path}/billing#{it.path}" }
 
