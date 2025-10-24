@@ -233,15 +233,25 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       owner_id: Sequel[:project][:id]
     ).exists
 
-    eligible_projects_ds = Project.where(api_key_ds).order(:id)
     free_quota_exhausted_projects_ds = FreeQuota.get_exhausted_projects("inference-tokens")
     valid_payment_method_ds = DB[:payment_method]
       .where(fraud: false)
       .select_group(:billing_info_id)
       .select_append { Sequel.as(Sequel.lit("1"), :valid_payment_method) }
-    eligible_projects_ds = eligible_projects_ds
-      .left_outer_join(valid_payment_method_ds, [:billing_info_id])
-      .exclude(valid_payment_method: nil, credit: 0.0, id: free_quota_exhausted_projects_ds)
+
+    eligible_projects_ds =
+      Project.where(api_key_ds).then do |ds|
+        if inference_router.location.visible
+          ds
+            .left_outer_join(valid_payment_method_ds, billing_info_id: :billing_info_id)
+            .exclude(valid_payment_method: nil, credit: 0.0, id: free_quota_exhausted_projects_ds)
+        else
+          ds.where(
+            Sequel.pg_jsonb_op(:feature_flags)["visible_locations"]
+                  .contains([inference_router.location.name])
+          )
+        end
+      end.order(:id)
 
     eligible_projects = eligible_projects_ds.all
       .select(&:active?)
