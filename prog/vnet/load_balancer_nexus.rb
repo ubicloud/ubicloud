@@ -60,17 +60,17 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   end
 
   label def wait
+    if load_balancer.need_certificates?
+      load_balancer.incr_refresh_cert
+      hop_create_new_cert
+    end
+
     when_update_load_balancer_set? do
       hop_update_vm_load_balancers
     end
 
     when_rewrite_dns_records_set? do
       hop_rewrite_dns_records
-    end
-
-    if load_balancer.need_certificates?
-      load_balancer.incr_refresh_cert
-      hop_create_new_cert
     end
 
     if need_to_rewrite_dns_records?
