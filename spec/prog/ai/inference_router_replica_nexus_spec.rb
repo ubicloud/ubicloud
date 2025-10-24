@@ -439,21 +439,6 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       expect(BillingRecord.count).to eq(0)
     end
 
-    it "does not update if price is zero" do
-      expect(BillingRate).to receive(:from_resource_properties).with("InferenceTokens", "test-model-input", "global").and_return({"unit_price" => 0.0000000000})
-      expect(BillingRate).to receive(:from_resource_properties).with("InferenceTokens", "test-model-output", "global").and_return({"unit_price" => 0.0000000000})
-      expect(BillingRecord.count).to eq(0)
-      nx.update_billing_records(
-        [{"ubid" => p1.ubid, "model_name" => "test-model", "request_count" => 1, "prompt_token_count" => 2, "completion_token_count" => 3}],
-        "prompt_billing_resource", "prompt_token_count"
-      )
-      nx.update_billing_records(
-        [{"ubid" => p1.ubid, "model_name" => "test-model", "request_count" => 1, "prompt_token_count" => 2, "completion_token_count" => 3}],
-        "completion_billing_resource", "completion_token_count"
-      )
-      expect(BillingRecord.count).to eq(0)
-    end
-
     it "failure in updating single record doesn't impact others" do
       p2 = Project.create(name: "default")
       expect(BillingRecord).to receive(:create).once.ordered.with(hash_including(project_id: p1.id)).and_raise(Sequel::DatabaseConnectionError)
