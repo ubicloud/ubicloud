@@ -24,7 +24,11 @@ class Clover < Roda
     def rename(object, perm:, serializer:, template_prefix:)
       post "rename" do
         scope.instance_exec do
-          authorize(perm, object)
+          if perm
+            authorize(perm, object)
+          else
+            no_authorization_needed
+          end
           handle_validation_failure("#{template_prefix}/show") { @page = "settings" }
           name = typecast_body_params.nonempty_str!("name")
 
