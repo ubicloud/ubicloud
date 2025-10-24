@@ -134,6 +134,9 @@ class Clover < Roda
     return unless LOGGED_ACTIONS.include?(action) || Config.test?
     # :nocov:
 
+    # log only if we have a project context
+    return unless @project
+
     project_id = @project.id
     subject_id = current_account.id
     ubid_type = object.class.ubid_type
