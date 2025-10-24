@@ -24,47 +24,6 @@ class PostgresResource < Sequel::Model
   plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records, :destroy, :promote, :refresh_certificates, :use_different_az
   include ObjectTag::Cleanup
 
-  # :nocov:
-  def self.add_internal_firewalls
-    # Do not use transaction around the update of all resources, to avoid blocking
-    all do |pg|
-      next if pg.internal_firewall
-
-      print "Adding internal firewall for #{pg.ubid}..."
-      private_subnet = pg.private_subnet
-
-      # Use transaction around the changes to each single postgres resource, because
-      # we don't want a state where the internal firewall is created but not added
-      # to the VMs, or where the preexisting firewall and private subnets do not both
-      # get converted to the customer's project.
-      DB.transaction do
-        internal_firewall = Firewall.create(name: "#{pg.ubid}-internal-firewall", location_id: pg.location_id, description: "Postgres default firewall", project_id: Config.postgres_service_project_id)
-        internal_firewall.replace_firewall_rules([
-          {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)},
-          {cidr: "::/0", port_range: Sequel.pg_range(22..22)},
-          {cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(5432..5432)},
-          {cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(6432..6432)},
-          {cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(5432..5432)},
-          {cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(6432..6432)}
-        ])
-
-        pg.servers.each do |server|
-          # No need to refresh the firewall rules, since the internal firewall
-          # has the same rules as the customer firewall at this point.
-          server.vm&.add_vm_firewall(internal_firewall)
-        end
-
-        # The customer firewall will also contain a copy of the internal firewall
-        # rules, but that should be fine to leave.
-        pg.customer_firewall.update(project_id: pg.project_id)
-        private_subnet.update(project_id: pg.project_id)
-
-        puts "done"
-      end
-    end
-  end
-  # :nocov:
-
   def display_location
     location.display_name
   end
@@ -181,32 +140,15 @@ class PostgresResource < Sequel::Model
 
     vm_firewall_rules = firewall_rules.map { {cidr: it.cidr.to_s, port_range: Sequel.pg_range(5432..5432), description: it.description} }
     vm_firewall_rules.concat(firewall_rules.map { {cidr: it.cidr.to_s, port_range: Sequel.pg_range(6432..6432), description: it.description} })
-
-    unless internal_firewall
-      # If the postgres resource does not yet have an internal firewall, add the necessary
-      # internal firewall rules to the subnet. If the postgres resource already has an internal
-      # firewall, these rules are already present on the internal firewall, so they don't need
-      # to be added.
-      vm_firewall_rules.push({cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)})
-      vm_firewall_rules.push({cidr: "::/0", port_range: Sequel.pg_range(22..22)})
-      vm_firewall_rules.push({cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(5432..5432)})
-      vm_firewall_rules.push({cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(6432..6432)})
-      vm_firewall_rules.push({cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(5432..5432)})
-      vm_firewall_rules.push({cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(6432..6432)})
-    end
-
     customer_firewall.replace_firewall_rules(vm_firewall_rules)
   end
 
-  # Temporarily, this firewall might actually be in the postgres project
-  # and not the customer project, if the postgres resource was created
-  # before there was a customer firewall/internal firewall split.
+  # This may return nil if the customer has destroyed the firewall or
+  # detached it from the private subnet.
   def customer_firewall
     private_subnet.firewalls_dataset.first(name: "#{ubid}-firewall")
   end
 
-  # Temporarily, postgres resources may not have an internal firewall, if they were
-  # created before the customer firewall/internal firewall split.
   def internal_firewall
     Firewall.first(project_id: Config.postgres_service_project_id, name: "#{ubid}-internal-firewall")
   end

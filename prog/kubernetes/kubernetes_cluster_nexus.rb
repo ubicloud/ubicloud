@@ -315,9 +315,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       end
       kubernetes_cluster.api_server_lb&.incr_destroy
 
-      # Temporarily, not all kubernetes clusters will have internal firewalls, so need &.
-      kubernetes_cluster.internal_cp_vm_firewall&.destroy
-      kubernetes_cluster.internal_worker_vm_firewall&.destroy
+      kubernetes_cluster.internal_cp_vm_firewall.destroy
+      kubernetes_cluster.internal_worker_vm_firewall.destroy
 
       kubernetes_cluster.destroy
       pop "kubernetes cluster is deleted"
