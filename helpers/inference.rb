@@ -3,7 +3,8 @@
 class Clover
   def visible_capable_models(dataset)
     dataset
-      .where(visible: true)
+      .where(Sequel.|([:visible],
+        Sequel.pg_jsonb_op(:tags)["visible_projects"].contains([@project.id])))
       .where(Sequel.pg_jsonb_op(:tags).get_text("capability") => ["Text Generation", "Embeddings"])
       .order(:model_name)
   end
