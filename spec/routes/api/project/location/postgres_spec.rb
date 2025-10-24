@@ -732,32 +732,32 @@ RSpec.describe Clover, "postgres" do
       it "full update" do
         pg.update(user_config: {"max_connections" => "100"}, pgbouncer_user_config: {"max_client_conn" => "100"})
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
-          pg_config: {"huge_pages" => "on"},
+          pg_config: {"archive_mode" => "on"},
           pgbouncer_config: {"admin_users" => "postgres"}
         }.to_json
 
         expect(last_response.status).to eq(200)
         response_body = JSON.parse(last_response.body)
-        expect(response_body["pg_config"]).to eq({"huge_pages" => "on"})
+        expect(response_body["pg_config"]).to eq({"archive_mode" => "on"})
         expect(response_body["pgbouncer_config"]).to eq({"admin_users" => "postgres"})
 
-        expect(pg.reload.user_config).to eq({"huge_pages" => "on"})
+        expect(pg.reload.user_config).to eq({"archive_mode" => "on"})
         expect(pg.reload.pgbouncer_user_config).to eq({"admin_users" => "postgres"})
       end
 
       it "partial update" do
-        pg.update(user_config: {"max_connections" => "100", "default_transaction_isolation" => "serializable", "shared_buffers" => "128MB"}, pgbouncer_user_config: {"max_client_conn" => "100", "pool_mode" => "session"})
+        pg.update(user_config: {"max_connections" => "100", "default_transaction_isolation" => "serializable", "archive_mode" => "on"}, pgbouncer_user_config: {"max_client_conn" => "100", "pool_mode" => "session"})
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
-          pg_config: {"huge_pages" => "on", "max_connections" => "120", "default_transaction_isolation" => nil},
+          pg_config: {"archive_mode" => "on", "max_connections" => "120", "default_transaction_isolation" => nil},
           pgbouncer_config: {"admin_users" => "postgres", "pool_mode" => nil}
         }.to_json
 
         expect(last_response.status).to eq(200)
         response_body = JSON.parse(last_response.body)
-        expect(response_body["pg_config"]).to eq({"max_connections" => "120", "huge_pages" => "on", "shared_buffers" => "128MB"})
+        expect(response_body["pg_config"]).to eq({"max_connections" => "120", "archive_mode" => "on"})
         expect(response_body["pgbouncer_config"]).to eq({"max_client_conn" => "100", "admin_users" => "postgres"})
 
-        expect(pg.reload.user_config).to eq({"max_connections" => "120", "huge_pages" => "on", "shared_buffers" => "128MB"})
+        expect(pg.reload.user_config).to eq({"max_connections" => "120", "archive_mode" => "on"})
         expect(pg.reload.pgbouncer_user_config).to eq({"max_client_conn" => "100", "admin_users" => "postgres"})
       end
     end
