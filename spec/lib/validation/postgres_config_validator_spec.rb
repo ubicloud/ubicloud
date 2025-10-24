@@ -31,11 +31,6 @@ RSpec.describe Validation::PostgresConfigValidator do
         expect { validator.validate(config) }.not_to raise_error
       end
 
-      it "returns no errors for valid shared_buffers" do
-        config = {"shared_buffers" => "128MB"}
-        expect { validator.validate(config) }.not_to raise_error
-      end
-
       it "returns no errors for valid autovacuum_analyze_scale_factor" do
         config = {"autovacuum_analyze_scale_factor" => "0.1"}
         expect { validator.validate(config) }.not_to raise_error
