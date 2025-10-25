@@ -63,6 +63,11 @@ PGHOST=/var/run/postgresql
     backup.key.delete_prefix("basebackups_005/").delete_suffix("_backup_stop_sentinel.json")
   end
 
+  # To allow overriding in specs
+  def self.earliest_restore_time(timeline)
+    timeline.earliest_restore_time
+  end
+
   def earliest_restore_time
     # Check if we have cached earliest backup time, if not, calculate it.
     # The cached time is valid if its within BACKUP_BUCKET_EXPIRATION_DAYS.

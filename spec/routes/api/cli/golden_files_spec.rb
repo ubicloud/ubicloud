@@ -16,7 +16,7 @@ RSpec.describe Clover, "cli" do
     expect(Vm).to receive(:generate_ubid).and_return(UBID.parse("vmdzyppz6j166jh5e9t2dwrfas"), UBID.parse("vmc9b4yf8r424nna257b3ck3j3"))
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("psfzm9e26xky5m9ggetw4dpqe2"))
     expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("nc69z0cda8jt0g5b120hamn4vf"), UBID.parse("nchfcq5bmsae7mc7bm6nx82d2n"))
-    expect(Firewall).to receive(:generate_uuid).and_return("24242d92-217b-85fc-b891-7046af3c1150")
+    expect(Firewall).to receive(:generate_uuid).and_return("24242d92-217b-85fc-b891-7046af3c1150", "f6965763-2e93-8dfc-83fa-abe25e328716")
     expect(FirewallRule).to receive(:generate_uuid).and_return("51e5bc7d-245b-8df8-bf91-7c5d150cb160", "3b367895-7f18-89f8-a295-ff247e9d5192", "305d838d-a3cd-85f8-aa08-9a66e71a5877", "5aa5b086-37bd-81f8-8d03-dd4b0e09a436", "20c360fa-bc06-8df8-b067-33f4a1ebdbbd", "2b628450-25bd-8df8-8b42-fb5cc5d01ad1", "da42e2ef-b5f1-8df8-966d-1387afb1b2f4", "bc9b093a-0e00-89f8-991a-5e0cd15a7942", "b5e13849-a04f-89f8-b564-ab8ad37298aa", "e46b8b76-88e2-89f8-972b-692232699d16", "e0804078-98cf-85f8-bf74-702ec92c91e8", "d62c8465-7f9b-85f8-a548-5a8772352988", "ff48a299-529c-8df8-993a-ddb0450be4a4", "ce327a30-12cb-8df8-86c3-d2db53a4b837")
     expect(PostgresResource).to receive(:generate_uuid).and_return("dd0375a6-1c66-82d0-a5e8-af1e8527a8a2")
     expect(PostgresFirewallRule).to receive(:generate_uuid).and_return("5a601238-b56e-8ecf-bbca-9e3e680812b8", "02d5082e-e75c-82cf-af6f-5f8f5aa89a52")
@@ -43,6 +43,7 @@ RSpec.describe Clover, "cli" do
     pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 64, disk_index: 0)
     cli(%w[pg eu-central-h1/test-pg reset-superuser-password bar456FOO123])
     cli(%w[pg eu-central-h1/test-pg add-metric-destination foo bar https://baz.example.com])
+    PrivateSubnet.first(name: "#{pg.ubid}-subnet").update(net4: "10.147.205.0/26", net6: "fdab:de77:9a94:fa70::/64")
 
     expect(Firewall).to receive(:generate_uuid).and_return("e9843761-3af7-85fc-ba6a-1709852cf736")
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("pshfgpzvs0t20gpezmz2kkk8e4"))
@@ -55,8 +56,8 @@ RSpec.describe Clover, "cli" do
 
     expect(KubernetesCluster).to receive(:generate_ubid).and_return(UBID.parse("kcnzrctjjg4j4g6eqvdsvzthwp"))
     expect(KubernetesNodepool).to receive(:generate_uuid).and_return("2432784b-3c9e-8a75-900d-df23880643ec")
-    expect(Firewall).to receive(:generate_uuid).and_return("850f5687-1a76-8dfc-8949-a115826d20e7")
-    expect(FirewallRule).to receive(:generate_uuid).and_return("d5889073-4aed-89f8-8894-1c376ebea8f6", "0803b040-d565-81f8-b2ed-f4d28df19f7c")
+    expect(Firewall).to receive(:generate_uuid).and_return("850f5687-1a76-8dfc-8949-a115826d20e7", "f26fd163-5a81-8dfc-a7f7-0802917b40c2", "0ec68714-d66c-81fc-ab4d-33235e8daea3")
+    expect(FirewallRule).to receive(:generate_uuid).and_return("d5889073-4aed-89f8-8894-1c376ebea8f6", "0803b040-d565-81f8-b2ed-f4d28df19f7c", "753678ce-8c3c-8dfc-83ce-00abd4f0f3fe", "45b6f212-bedb-8dfc-b8f2-0bcbe963d5bb", "04dd799d-ef69-8dfc-b58a-1bef3dd69f86", "0acdc686-2462-85fc-9adb-cbd713cb33dd", "b62d8f1b-2c71-89fc-a087-fa4193dcd90b", "4fed0d91-99a9-8dfc-b392-36ad164bd580", "17bd4390-d26e-85fc-a2df-b22a6a0bb697", "32e35994-9dde-89fc-861a-44582c6528be", "ab1ceb1f-faec-81fc-8b4f-a17d15e17da0", "ffbcca2e-550e-81fc-a60d-b39e665c6aeb")
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("ps788q81w5w26h900k13ad8bkx"))
     cli(%W[kc eu-central-h1/test-kc create -c 1 -z standard-2 -w 1 -v #{Option.kubernetes_versions.first}])
 
@@ -73,9 +74,11 @@ RSpec.describe Clover, "cli" do
         storage_volumes: [{encrypted: true, size_gib: kubernetes_cluster.target_node_storage_size_gib}],
         boot_image: "kubernetes-#{kubernetes_cluster.version.tr(".", "_")}",
         private_subnet_id: kubernetes_cluster.private_subnet_id,
+        allow_private_subnet_in_other_project: true,
         enable_ip4: true
       ).subject
     end
+    PrivateSubnet.first(name: "#{kubernetes_cluster.ubid}-subnet").update(net4: "10.147.206.0/26", net6: "fdab:de77:9a94:fa71::/64")
     vms[0].update(ephemeral_net6: "ccab:de77:9a94:fa69::/64")
     vms[1].update(ephemeral_net6: "bbab:de77:9a94:fa69::/64")
     add_ipv4_to_vm(vms[0], "129.0.0.2")

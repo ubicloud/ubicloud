@@ -213,9 +213,10 @@ RSpec.describe PostgresResource do
     (0..2).each { expect(postgres_resource.target_server_count).to eq(it + 1) }
   end
 
-  it "sets firewall rules" do
+  it "#set_firewall_rules sets firewall rules if there is a customer firewall" do
     firewall = instance_double(Firewall, name: "#{postgres_resource.ubid}-firewall")
     expect(postgres_resource).to receive(:private_subnet).exactly(2).and_return(instance_double(PrivateSubnet, firewalls: [firewall], net4: "10.238.50.0/26", net6: "fd19:9c92:e9b9:a1a::/64")).at_least(:once)
+    expect(postgres_resource.private_subnet).to receive(:firewalls_dataset).and_return(instance_double(Firewall.dataset.class, first: firewall))
     expect(postgres_resource).to receive(:firewall_rules).exactly(2).and_return([instance_double(PostgresFirewallRule, cidr: "0.0.0.0/0", description: "foo")])
     expect(firewall).to receive(:replace_firewall_rules).with([
       {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(5432..5432), description: "foo"},
@@ -227,6 +228,13 @@ RSpec.describe PostgresResource do
       {cidr: "fd19:9c92:e9b9:a1a::/64", port_range: Sequel.pg_range(5432..5432)},
       {cidr: "fd19:9c92:e9b9:a1a::/64", port_range: Sequel.pg_range(6432..6432)}
     ])
+    postgres_resource.set_firewall_rules
+  end
+
+  it "#set_firewall_rules does nothing if there is no customer firewall" do
+    expect(postgres_resource).to receive(:private_subnet).exactly(2).and_return(instance_double(PrivateSubnet, net4: "10.238.50.0/26", net6: "fd19:9c92:e9b9:a1a::/64")).at_least(:once)
+    expect(postgres_resource.private_subnet).to receive(:firewalls_dataset).and_return(instance_double(Firewall.dataset.class, first: nil))
+    expect(postgres_resource).not_to receive(:firewall_rules)
     postgres_resource.set_firewall_rules
   end
 
