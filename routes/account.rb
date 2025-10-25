@@ -8,6 +8,15 @@ class Clover
         r.redirect "/account/multifactor-manage"
       end
 
+      r.get "settings" do
+        no_authorization_needed
+        handle_validation_failure("account/settings")
+
+        view "account/settings"
+      end
+
+      r.rename current_account, perm: nil, serializer: Serializers::Account, template_prefix: "account"
+
       r.on "login-method" do
         r.get true do
           no_authorization_needed

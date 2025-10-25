@@ -15,6 +15,10 @@ class Account < Sequel::Model(:accounts)
 
   alias_method :admin_label, :email
 
+  def path
+    "/account"
+  end
+
   def provider_names
     identities.map(&:provider).join(", ")
   end

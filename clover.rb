@@ -111,6 +111,7 @@ class Clover < Roda
   ].each { path(it, class_name: true, &under_project_path) }
 
   path("Project", class_name: true, &:path)
+  path("Account", class_name: true, &:path)
   path("GithubInstallation", class_name: true) { "#{it.project.path}/github/#{it.ubid}" }
   path("Invoice", class_name: true) { "#{it.project.path}/billing#{it.path}" }
 
@@ -645,9 +646,9 @@ class Clover < Roda
     end
 
     before_change_password { check_locked_domain(account[:email], "Changing passwords", redirect: "/") }
-    change_password_redirect "/account/change-password"
+    change_password_redirect "/account/settings"
     change_password_route "account/change-password"
-    change_password_view { view "account/change_password", "My Account" }
+    change_password_view { redirect "/account/settings" }
     after_change_password do
       remove_all_active_sessions_except_current
     end
@@ -664,9 +665,9 @@ class Clover < Roda
       check_locked_domain(account[:email], "Changing email addresses", redirect: "/")
       check_locked_domain(param("login"), "Changing email addresses", redirect: "/")
     end
-    change_login_redirect "/account/change-login"
+    change_login_redirect "/account/settings"
     change_login_route "account/change-login"
-    change_login_view { view "account/change_login", "My Account" }
+    change_login_view { redirect "/account/settings" }
 
     before_verify_login_change do
       check_locked_domain(account[:email], "Changing email addresses", redirect: "/")
