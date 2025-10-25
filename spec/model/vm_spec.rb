@@ -353,4 +353,43 @@ RSpec.describe Vm do
        "copy_on_read" => false, "slice_name" => "system.slice"}
     ])
   end
+
+  describe "#params_json" do
+    before do
+      allow(vm).to receive_messages(
+        cloud_hypervisor_cpu_topology: Vm::CloudHypervisorCpuTopo.new(1, 1, 1, 1),
+        project: instance_double(Project, get_ff_vm_public_ssh_keys: [], get_ff_ipv6_disabled: true),
+        nic: instance_double(
+          Nic,
+          private_subnet: instance_double(
+            PrivateSubnet,
+            net4: NetAddr::IPv4Net.parse("10.0.0.0/24"),
+            random_private_ipv6: NetAddr::IPv6Net.parse("fd00::/64")
+          )
+        ),
+        vm_host: instance_double(VmHost, ndp_needed: false)
+      )
+    end
+
+    it "sets hypervisor to 'qemu' when a B200 GPU (device 2901) is present" do
+      allow(vm).to receive(:pci_devices).and_return([instance_double(PciDevice, device: "2901", slot: "0000:00:00.0", iommu_group: "0")])
+
+      json = JSON.parse(vm.params_json)
+      expect(json["hypervisor"]).to eq("qemu")
+    end
+
+    it "defaults hypervisor to 'ch' when no B200 GPU is present" do
+      allow(vm).to receive(:pci_devices).and_return([instance_double(PciDevice, device: "1234", slot: "0000:00:00.0", iommu_group: "0")])
+
+      json = JSON.parse(vm.params_json)
+      expect(json["hypervisor"]).to eq("ch")
+    end
+
+    it "respects an explicit hypervisor argument even if a B200 GPU is present" do
+      allow(vm).to receive(:pci_devices).and_return([instance_double(PciDevice, device: "2901", slot: "0000:00:00.0", iommu_group: "0")])
+
+      json = JSON.parse(vm.params_json(hypervisor: "ch"))
+      expect(json["hypervisor"]).to eq("ch")
+    end
+  end
 end
