@@ -330,6 +330,8 @@ class Prog::Vm::Nexus < Prog::Base
     case host.sshable.cmd("common/bin/daemonizer --check prep_#{q_vm}")
     when "Succeeded"
       vm.nics.each(&:incr_setup_nic)
+      strand.stack[-1]["prep_done"] = true
+      strand.modified!(:stack)
       hop_clean_prep
     when "NotStarted", "Failed"
       secrets_json = JSON.generate({
@@ -380,6 +382,8 @@ class Prog::Vm::Nexus < Prog::Base
     Clog.emit("vm provisioned") { [vm, {provision: {vm_ubid: vm.ubid, vm_host_ubid: host&.ubid, instance_id: vm.aws_instance&.instance_id, duration: (Time.now - vm.allocated_at).round(3)}}] }
 
     project = vm.project
+    strand.stack[-1]["create_billing_record_done"] = true
+    strand.modified!(:stack)
     hop_wait unless project.billable
 
     BillingRecord.create(
