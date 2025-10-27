@@ -780,7 +780,6 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm).to receive(:update).with(display_state: "running", provisioned_at: now).and_return(true)
       expect(Clog).to receive(:emit).with("vm provisioned").and_yield
       allow(vm).to receive(:allocated_at).and_return(now - 100)
-      nx.strand.stack[-1]["create_billing_record_done"] = true
       expect { nx.wait_sshable }.to hop("wait")
     end
 
@@ -795,7 +794,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm).to receive(:update).with(display_state: "running", provisioned_at: now).and_return(true)
       expect(Clog).to receive(:emit).with("vm provisioned").and_yield
       allow(vm).to receive(:allocated_at).and_return(now - 100)
-      expect { nx.wait_sshable }.to hop("create_billing_record")
+      expect { nx.wait_sshable }.to hop("wait")
     end
   end
 
@@ -821,8 +820,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm).to receive(:ip4_enabled).and_return(false)
       expect(BillingRecord).to receive(:create).exactly(3).times
       expect(vm).to receive(:project).and_return(prj).at_least(:once)
-      nx.strand.stack[-1]["prep_done"] = true
-      expect { nx.create_billing_record }.to hop("wait")
+      expect { nx.create_billing_record }.to hop("prep")
     end
 
     it "not create billing records when the project is not billable" do
