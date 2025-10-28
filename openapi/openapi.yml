@@ -86,32 +86,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-    post:
-      operationId: createFirewall
-      summary: Create a new firewall
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                description:
-                  description: Description of the firewall
-                  type: string
-                name:
-                  description: Name of the firewall
-                  type: string
-              additionalProperties: false
-              required:
-                - name
-      responses:
-        '200':
-          $ref: '#/components/responses/Firewall'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Firewall
   '/project/{project_id}/inference-api-key':
     parameters:
       - $ref: '#/components/parameters/project_id'

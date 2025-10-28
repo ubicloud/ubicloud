@@ -13,16 +13,20 @@ unnecessary_paths = []
 
 # Run all api specs with one path deleted. If there is not a failure,
 # the path isn't actually needed and should be removed.
-paths.keys.each do |path|
-  value = paths.delete(path)
-  File.write(file, YAML.dump(openapi))
-  print "#{path}..."
-  if system("rake api_spec >/dev/null 2>&1")
-    unnecessary_paths << path
-    puts "NOT NEEDED"
-  else
-    puts "needed"
-    paths[path] = value
+paths.each do |path, methods|
+  methods.keys.each do |meth|
+    next if meth == "parameters"
+    value = methods.delete(meth)
+    File.write(file, YAML.dump(openapi))
+    method_path = "#{meth.upcase} #{path}"
+    print "#{method_path}..."
+    if system("rake api_spec >/dev/null 2>&1")
+      unnecessary_paths << method_path
+      puts "NOT NEEDED"
+    else
+      puts "needed"
+      methods[meth] = value
+    end
   end
 end
 
