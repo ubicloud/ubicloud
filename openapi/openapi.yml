@@ -331,15 +331,15 @@ paths:
               type: object
               properties:
                 cidr:
-                  description: CIDR of the firewall rule
+                  description: CIDR or private subnet id or name to allow
                   type: string
                 firewall_id:
                   type: string
                 port_range:
-                  description: Port range of the firewall rule
+                  description: Port range to allow
                   type: string
                 description:
-                  description: Description of the firewall rule
+                  description: Description to use for the firewall rule
                   type: string
                 project_id:
                   type: string
@@ -348,7 +348,7 @@ paths:
                 - cidr
       responses:
         '200':
-          $ref: '#/components/responses/FirewallRule'
+          $ref: '#/components/responses/FirewallRuleOrRules'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -2871,6 +2871,16 @@ components:
             required:
               - count
               - items
+    FirewallRuleOrRules:
+      description: A Firewall Rule or array of them
+      content:
+        application/json:
+          schema:
+            anyOf:
+              - $ref: '#/components/schemas/FirewallRule'
+              - type: array
+                items:
+                  $ref: '#/components/schemas/FirewallRule'
     FirewallRule:
       description: A Firewall Rule
       content:

@@ -56,4 +56,40 @@ RSpec.describe Clover, "cli fw add-rule" do
     expect(fwr.description).to be_nil
     expect(fwr.firewall_id).to eq @fw.id
   end
+
+  it "adds rule to firewall using subnet name" do
+    expect(FirewallRule.count).to eq 0
+    cli(%W[ps eu-central-h1/test-ps create -f test-fw])
+    body = cli(%W[fw eu-central-h1/test-fw add-rule test-ps])
+    expect(FirewallRule.count).to eq 2
+    ps = PrivateSubnet.first
+    fwr1, fwr2 = FirewallRule.order(:cidr).all
+    expect(body).to eq "Added firewall rules with ids: #{fwr1.ubid} #{fwr2.ubid}\n"
+    expect(fwr1.cidr.to_s).to eq ps.net4.to_s
+    expect(fwr1.port_range.to_range).to eq(0...65536)
+    expect(fwr1.description).to be_nil
+    expect(fwr1.firewall_id).to eq @fw.id
+    expect(fwr2.cidr.to_s).to eq ps.net6.to_s
+    expect(fwr2.port_range.to_range).to eq(0...65536)
+    expect(fwr2.description).to be_nil
+    expect(fwr2.firewall_id).to eq @fw.id
+  end
+
+  it "adds rule to firewall using subnet id" do
+    expect(FirewallRule.count).to eq 0
+    cli(%W[ps eu-central-h1/test-ps create -f test-fw])
+    body = cli(%W[fw eu-central-h1/test-fw add-rule -s 1 -e 2 -d my-desc #{PrivateSubnet.first.ubid}])
+    expect(FirewallRule.count).to eq 2
+    ps = PrivateSubnet.first
+    fwr1, fwr2 = FirewallRule.order(:cidr).all
+    expect(body).to eq "Added firewall rules with ids: #{fwr1.ubid} #{fwr2.ubid}\n"
+    expect(fwr1.cidr.to_s).to eq ps.net4.to_s
+    expect(fwr1.port_range.to_range).to eq(1...3)
+    expect(fwr1.description).to eq "my-desc"
+    expect(fwr1.firewall_id).to eq @fw.id
+    expect(fwr2.cidr.to_s).to eq ps.net6.to_s
+    expect(fwr2.port_range.to_range).to eq(1...3)
+    expect(fwr2.description).to eq "my-desc"
+    expect(fwr2.firewall_id).to eq @fw.id
+  end
 end
