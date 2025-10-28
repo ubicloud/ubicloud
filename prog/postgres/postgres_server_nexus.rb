@@ -656,6 +656,9 @@ SQL
 
   label def restart
     decr_restart
+
+    register_deadline("wait", 10 * 60)
+
     vm.sshable.cmd("sudo postgres/bin/restart #{postgres_server.version}")
     vm.sshable.cmd("sudo systemctl restart pgbouncer@*.service")
     pop "postgres server is restarted"

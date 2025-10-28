@@ -1032,9 +1032,10 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#restart" do
-    it "restarts and exits" do
+    it "sets deadline, restarts and exits" do
       expect(sshable).to receive(:cmd).with("sudo postgres/bin/restart 16")
       expect(sshable).to receive(:cmd).with("sudo systemctl restart pgbouncer@*.service")
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
       expect { nx.restart }.to exit({"msg" => "postgres server is restarted"})
     end
   end
