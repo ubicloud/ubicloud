@@ -11,6 +11,16 @@ class Clover < Roda
       env["HTTP_ACCEPT"]&.include?("application/json")
     end
 
+    # Accept PATCH for API, but POST for web, so web requests to the
+    # path are not forced to use javascript.
+    def api_patch_web_post(...)
+      if api?
+        patch(true, ...)
+      else
+        post("patch", ...)
+      end
+    end
+
     def rename(object, perm:, serializer:, template_prefix:)
       post "rename" do
         scope.instance_exec do

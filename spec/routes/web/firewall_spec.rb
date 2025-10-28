@@ -325,7 +325,7 @@ RSpec.describe Clover, "firewall" do
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
         expect(page).to have_flash_notice("Firewall rule is created")
-        expect(page).to have_content("my desc")
+        expect(page.body).to include("my desc")
 
         expect(firewall.firewall_rules_dataset.count).to eq(1)
         rule = firewall.firewall_rules_dataset.first
@@ -354,6 +354,35 @@ RSpec.describe Clover, "firewall" do
         expect(page).to have_content "Invalid port range"
 
         expect(firewall.firewall_rules_dataset.count).to eq(0)
+      end
+
+      it "can edit rule" do
+        firewall.insert_firewall_rule("1.0.0.0/8", Sequel.pg_range(80..80))
+        rule = firewall.firewall_rules_dataset.first
+        ubid = rule.ubid
+
+        visit "#{project.path}#{firewall.path}/networking"
+
+        fill_in "cidr-#{ubid}", with: "1.1.1.1/32"
+        fill_in "port_range-#{ubid}", with: "a"
+        fill_in "description-#{ubid}", with: "my desc"
+        click_button "submit-#{ubid}"
+        expect(page).to have_flash_error("Validation failed for following fields: port_range")
+        expect(page).to have_content("Invalid port range")
+
+        fill_in "port_range-#{ubid}", with: "8080"
+        click_button "submit-#{ubid}"
+        expect(page.title).to eq("Ubicloud - #{firewall.name}")
+        expect(page).to have_flash_notice("Firewall rule updated")
+        expect(page.body).to include("1.1.1.1/32")
+        expect(page.body).to include("8080..8080")
+        expect(page.body).to include("my desc")
+
+        expect(firewall.firewall_rules_dataset.count).to eq(1)
+        rule.refresh
+        expect(rule.cidr.to_s).to eq "1.1.1.1/32"
+        expect(rule.port_range.to_range).to eq 8080...8081
+        expect(rule.description).to eq "my desc"
       end
 
       it "can delete rule" do
@@ -392,8 +421,8 @@ RSpec.describe Clover, "firewall" do
         expect(page.body).to include "fwr-delete"
         expect(page.body).to include "fw-attach"
 
-        expect(page).to have_content "1.0.0.0/8"
-        expect(page).to have_content "0..65535"
+        expect(page.body).to include "1.0.0.0/8"
+        expect(page.body).to include "0..65535"
 
         expect(firewall.firewall_rules_dataset.count).to eq(1)
       end
