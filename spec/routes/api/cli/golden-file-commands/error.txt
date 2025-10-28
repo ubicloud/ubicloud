@@ -12,6 +12,7 @@ ai api-key badc0j48r8kj4nharh6yagf3eb show
 fw eu-central-h1/default-eu-central-h1-default add-rule foo
 fw eu-central-h1/default-eu-central-h1-default add-rule -s a 10.10.10.0
 fw eu-central-h1/default-eu-central-h1-default add-rule -e a 10.10.10.0
+fw eu-central-h1/default-eu-central-h1-default modify-rule fra7jvrz94be7qy8qrq8n1jrp1
 fw eu-central-h1/default-eu-central-h1-default show -f bad
 fw eu-central-h1/default-eu-central-h1-default show -n bad
 fw eu-central-h1/default-eu-central-h1-default show -p bad

@@ -30,6 +30,34 @@ module Ubicloud
       rule
     end
 
+    # Modify the firewall rule with the given id. At least one keyword argument is required.
+    #
+    # * If +start_port+ and +end_port+ are both given, they specify the updated port range.
+    # * If only +start_port+ is given, the rule is updated to allow only that single port.
+    # * If only +end_port+ is given, the rule is updated to allow all ports up to that port.
+    # * If neither +start_port+ and +end_port+ are given, the port range is left unchanged.
+    #
+    # Returns a hash for the updated firewall rule.
+    def modify_rule(rule_id, cidr: nil, start_port: nil, end_port: nil, description: nil)
+      check_no_slash(rule_id, "invalid rule id format")
+
+      hash = {cidr:, description:}
+      hash.compact!
+      if start_port || end_port
+        hash[:port_range] = "#{start_port || 0}..#{end_port || start_port}"
+      end
+
+      if hash.empty?
+        raise Error, "must provide at least one keyword argument"
+      end
+
+      rule = adapter.patch(_path("/firewall-rule/#{rule_id}"), **hash)
+
+      self[:firewall_rules]&.find { it[:id] == rule_id }&.merge!(rule)
+
+      rule
+    end
+
     # Delete the firewall rule with the given id.  Returns nil.
     def delete_rule(rule_id)
       check_no_slash(rule_id, "invalid rule id format")

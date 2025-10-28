@@ -85,7 +85,10 @@ class Clover
       r.on "firewall-rule" do
         r.post true do
           authorize("Firewall:edit", firewall)
-          handle_validation_failure("networking/firewall/show") { @page = "networking" }
+          handle_validation_failure("networking/firewall/show") do
+            @fwr_id = :create
+            @page = "networking"
+          end
 
           parsed_cidr = Validation.validate_cidr(typecast_params.str!("cidr"))
           port_range = Validation.validate_port_range(typecast_params.str("port_range"))
@@ -106,11 +109,50 @@ class Clover
           end
         end
 
-        r.is :ubid_uuid do |id|
+        r.on :ubid_uuid do |id|
           firewall_rule = firewall.firewall_rules_dataset[id:]
           check_found_object(firewall_rule)
 
-          r.delete do
+          r.api_patch_web_post do
+            authorize("Firewall:edit", firewall)
+            handle_validation_failure("networking/firewall/show") do
+              @fwr_id = firewall_rule.id
+              @page = "networking"
+            end
+
+            current_cidr = firewall_rule.cidr.to_s
+            current_port_range = firewall_rule.display_port_range
+
+            cidr, port_range, description = typecast_params.str(%w[cidr port_range description])
+
+            if cidr
+              firewall_rule.cidr = Validation.validate_cidr(cidr).to_s
+            end
+            if port_range
+              port_range = Validation.validate_port_range(port_range)
+              firewall_rule.port_range = Sequel.pg_range(port_range.first..port_range.last)
+            end
+            if description
+              firewall_rule.description = description.strip
+            end
+
+            DB.transaction do
+              firewall_rule.save_changes
+              if current_cidr != firewall_rule.cidr.to_s || current_port_range != firewall_rule.display_port_range
+                firewall.update_private_subnet_firewall_rules
+              end
+              audit_log(firewall_rule, "update")
+            end
+
+            if api?
+              Serializers::FirewallRule.serialize(firewall_rule)
+            else
+              flash["notice"] = "Firewall rule updated"
+              r.redirect firewall, "/networking"
+            end
+          end
+
+          r.delete true do
             authorize("Firewall:edit", firewall)
             DB.transaction do
               firewall.remove_firewall_rule(firewall_rule)

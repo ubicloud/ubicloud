@@ -206,8 +206,8 @@ RSpec.describe Ubicloud do
     expect(public_key).to be_nil
   end
 
-  it "Firewall#add_rule and #delete_rule work without firewall rules loaded" do
-    expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
+  it "Firewall#add_rule, #modify_rule, and #delete_rule work without firewall rules loaded" do
+    expect(Clover).to receive(:call).thrice.and_invoke(proc do |env|
       [200, {"content-type" => "application/json"}, ["{}"]]
     end)
 
@@ -215,8 +215,15 @@ RSpec.describe Ubicloud do
     expect(fw.values[:firewall_rules]).to be_nil
     fw.add_rule("1.2.3.0/24")
     expect(fw.values[:firewall_rules]).to be_nil
+    fw.modify_rule("fr345678901234567890123456", cidr: "1.2.4.0/24")
+    expect(fw.values[:firewall_rules]).to be_nil
     fw.delete_rule("fr345678901234567890123456")
     expect(fw.values[:firewall_rules]).to be_nil
+  end
+
+  it "Firewall##modify_rule raises if no options are given" do
+    fw = ubi.firewall.new("foo/bar")
+    expect { fw.modify_rule("fr345678901234567890123456") }.to raise_error(Ubicloud::Error, "must provide at least one keyword argument")
   end
 
   it "Postgres\#{add,delete,modify}_firewall_rule work without firewall rules loaded" do
@@ -260,16 +267,21 @@ RSpec.describe Ubicloud do
     expect(pg.values[:metric_destinations]).to be_nil
   end
 
-  it "Firewall#add_rule and #delete_rule modify firewall rules if loaded" do
-    expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
-      [200, {"content-type" => "application/json"}, ["{\"id\": \"fr345678901234567890123456\"}"]]
+  it "Firewall#add_rule, #modify_rule, and #delete_rule modify firewall rules if loaded" do
+    id = "fr345678901234567890123456"
+    hash = {id:}
+    body = hash.to_json
+    expect(Clover).to receive(:call).thrice.and_invoke(proc do |env|
+      [200, {"content-type" => "application/json"}, [body]]
     end)
 
     fw = ubi.firewall.new(location: "foo", name: "bar", firewall_rules: [])
     expect(fw.values[:firewall_rules]).to eq([])
     fw.add_rule("1.2.3.0/24")
-    expect(fw.values[:firewall_rules]).to eq([{id: "fr345678901234567890123456"}])
-    fw.delete_rule("fr345678901234567890123456")
+    expect(fw.values[:firewall_rules]).to eq([hash])
+    fw.modify_rule(id, cidr: "1.2.4.0/24")
+    expect(fw.values[:firewall_rules]).to eq([hash])
+    fw.delete_rule(id)
     expect(fw.values[:firewall_rules]).to eq([])
   end
 

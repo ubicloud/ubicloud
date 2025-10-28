@@ -379,6 +379,22 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
+    patch:
+      operationId: modifyFirewallRule
+      summary: Modify a firewall rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FirewallRuleUpdate'
+      responses:
+        '200':
+          $ref: '#/components/responses/FirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
   '/project/{project_id}/location/{location}/firewall/{firewall_reference}/rename':
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -2132,6 +2148,41 @@ components:
       required:
         - name
         - public_key
+    FirewallRuleUpdate:
+      anyOf:
+        - type: object
+          properties:
+            cidr:
+              description: CIDR of the firewall rule
+              type: string
+            port_range:
+              description: Port range of the firewall rule
+              type: string
+            description:
+              description: Description of the firewall rule
+              type: string
+          additionalProperties: false
+          required:
+            - cidr
+        - type: object
+          properties:
+            port_range:
+              description: Port range of the firewall rule
+              type: string
+            description:
+              description: Description of the firewall rule
+              type: string
+          additionalProperties: false
+          required:
+            - port_range
+        - type: object
+          properties:
+            description:
+              description: Description of the firewall rule
+              type: string
+          additionalProperties: false
+          required:
+            - description
     SshPublicKeyUpdate:
       anyOf:
         - type: object

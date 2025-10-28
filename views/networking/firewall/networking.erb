@@ -35,25 +35,75 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
       <tbody class="divide-y divide-gray-200 bg-white">
         <% @firewall.firewall_rules.sort_by { [it.cidr.version, it.cidr.to_s] }.each do |fwr| %>
           <tr>
-            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr.cidr %></td>
-            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr.display_port_range %></td>
-            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr.description %></td>
+            <% if edit_perm %>
+              <% form = "form-fw-edit-rule-#{fwr.ubid}" %>
+              <% handle_params_and_errors = @fwr_id == fwr.id %>
+              <% ubid = fwr.ubid %>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                <%== part(
+                  "components/form/text",
+                  name: "cidr",
+                  id: "cidr-#{ubid}",
+                  value: fwr.cidr.to_s,
+                  handle_params_and_errors:,
+                  attributes: {
+                    placeholder: "0.0.0.0/0",
+                    required: true,
+                    form:
+                  }
+                ) %>
+              </td>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                <%== part(
+                  "components/form/text",
+                  name: "port_range",
+                  id: "port_range-#{ubid}",
+                  value: fwr.display_port_range,
+                  handle_params_and_errors:,
+                  attributes: {
+                    placeholder: "0..65536",
+                    form:
+                  }
+                ) %>
+              </td>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                <%== part(
+                  "components/form/text",
+                  name: "description",
+                  id: "description-#{ubid}",
+                  value: fwr.description,
+                  handle_params_and_errors:,
+                  attributes: {
+                    form:
+                  }
+                ) %>
+              </td>
+            <% else %>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr.cidr %></td>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr.display_port_range %></td>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr.description %></td>
+            <% end %>
             <% if edit_perm %>
               <td
-                id="fwr-delete-<%= fwr.ubid %>"
+                id="fwr-delete-<%= ubid %>"
                 class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
               >
-                <%== part("components/delete_button", url: "#{firewall_path}/firewall-rule/#{fwr.ubid}", text: "") %>
+                <% form(action: "#{firewall_path}/firewall-rule/#{ubid}/patch", method: :post, id: form, class: " inline-flex items-center justify-center") do %>
+                  <%== part("components/form/submit_button", icon: "hero-pencil", attributes: {id: "submit-#{ubid}"}) %>
+                <% end %>
+                <%== part("components/delete_button", url: "#{firewall_path}/firewall-rule/#{ubid}", text: "") %>
               </td>
             <% end %>
           </tr>
         <% end %>
         <% if edit_perm %>
+          <% handle_params_and_errors = @fwr_id == :create %>
           <tr>
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
               <%== part(
                 "components/form/text",
                 name: "cidr",
+                handle_params_and_errors:,
                 attributes: {
                   placeholder: "0.0.0.0/0",
                   required: true,
@@ -65,6 +115,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
               <%== part(
                 "components/form/text",
                 name: "port_range",
+                handle_params_and_errors:,
                 attributes: {
                   placeholder: "0..65536",
                   form: "form-fw-create-rule-#{@firewall.ubid}"
@@ -74,6 +125,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
               <%== part(
                 "components/form/text",
+                handle_params_and_errors:,
                 name: "description",
                 attributes: {
                   form: "form-fw-create-rule-#{@firewall.ubid}"
