@@ -379,36 +379,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
-    post:
-      operationId: createLocationFirewallFirewallRule
-      summary: Create a new firewall rule
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                cidr:
-                  description: CIDR of the firewall rule
-                  type: string
-                firewall_id:
-                  type: string
-                port_range:
-                  description: Port range of the firewall rule
-                  type: string
-                project_id:
-                  type: string
-              additionalProperties: false
-              required:
-                - cidr
-      responses:
-        '200':
-          $ref: '#/components/responses/FirewallRule'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Firewall Rule
   '/project/{project_id}/location/{location}/firewall/{firewall_reference}/rename':
     parameters:
       - $ref: '#/components/parameters/project_id'
