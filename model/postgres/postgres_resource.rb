@@ -23,11 +23,6 @@ class PostgresResource < Sequel::Model
   plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records, :destroy, :promote, :refresh_certificates, :use_different_az
   include ObjectTag::Cleanup
 
-  def before_destroy
-    DB[:postgres_firewall_rule].where(postgres_resource_id: id).delete
-    super
-  end
-
   def display_location
     location.display_name
   end

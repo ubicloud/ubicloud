@@ -170,13 +170,6 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.pg_firewall_rules).to eq []
   end
 
-  it "#destroy works if there are left over postgres_firewall_rules referencing resource" do
-    postgres_resource.update(project_id: Project.create(name: "t").id, target_vm_size: "standard-2", target_storage_size_gib: 64, location_id: Location::HETZNER_FSN1_ID)
-    DB[:postgres_firewall_rule].insert(id: postgres_resource.id, postgres_resource_id: postgres_resource.id, cidr: "::/0")
-    postgres_resource.destroy
-    expect(DB[:postgres_firewall_rule].count).to eq 0
-  end
-
   describe "display_state" do
     it "returns 'deleting' when strand label is 'destroy'" do
       expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "destroy")).at_least(:once)
