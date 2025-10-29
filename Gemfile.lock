@@ -48,11 +48,12 @@ GEM
     awesome_print (1.9.2)
     aws-eventstream (1.3.2)
     aws-partitions (1.1067.0)
-    aws-sdk-core (3.225.0)
+    aws-sdk-core (3.235.0)
       aws-eventstream (~> 1, >= 1.3.0)
       aws-partitions (~> 1, >= 1.992.0)
       aws-sigv4 (~> 1.9)
       base64
+      bigdecimal
       jmespath (~> 1, >= 1.6.1)
       logger
     aws-sdk-ec2 (1.512.0)
@@ -63,6 +64,9 @@ GEM
       aws-sigv4 (~> 1.5)
     aws-sdk-kms (1.99.0)
       aws-sdk-core (~> 3, >= 3.216.0)
+      aws-sigv4 (~> 1.5)
+    aws-sdk-rds (1.297.0)
+      aws-sdk-core (~> 3, >= 3.234.0)
       aws-sigv4 (~> 1.5)
     aws-sdk-s3 (1.182.0)
       aws-sdk-core (~> 3, >= 3.216.0)
@@ -440,6 +444,7 @@ DEPENDENCIES
   awesome_print
   aws-sdk-ec2 (~> 1.512)
   aws-sdk-iam
+  aws-sdk-rds (~> 1.297)
   aws-sdk-s3
   bcrypt_pbkdf
   brakeman

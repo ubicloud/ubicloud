@@ -40,6 +40,7 @@ module Config
 
   # Mandatory -- exception is raised for these variables when missing.
   mandatory :clover_database_url, string, clear: true
+  override :clover_database_auth_type, :password, symbol # allowed values are :password and :aws_rds_iam
   mandatory :clover_column_encryption_key, base64, clear: true
   mandatory :clover_session_secret, base64, clear: true
   mandatory :rack_env, string

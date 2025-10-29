@@ -87,3 +87,5 @@ end
 group :test, :development do
   gem "sequel-annotate"
 end
+
+gem "aws-sdk-rds", "~> 1.297"
