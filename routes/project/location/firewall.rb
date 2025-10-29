@@ -90,7 +90,8 @@ class Clover
             @page = "networking"
           end
 
-          cidr = typecast_params.str!("cidr")
+          cidr = typecast_params.nonempty_str("fw_rule_private_subnet_id") if web?
+          cidr ||= typecast_params.str!("cidr")
           unless cidr.include?(".") || cidr.include?(":")
             if PrivateSubnet.ubid_format.match?(cidr)
               key = :id
@@ -124,7 +125,11 @@ class Clover
             cidrs = cidrs[0] if cidrs.length == 1
             Serializers::FirewallRule.serialize(cidrs)
           else
-            flash["notice"] = "Firewall rule is created"
+            flash["notice"] = if cidrs.length == 1
+              "Firewall rule is created"
+            else
+              "Firewall rules are created"
+            end
             r.redirect firewall, "/networking"
           end
         end
