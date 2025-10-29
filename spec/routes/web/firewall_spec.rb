@@ -335,6 +335,32 @@ RSpec.describe Clover, "firewall" do
         expect(rule.description).to eq "my desc"
       end
 
+      it "can add using private subnet" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
+        visit "#{project.path}#{firewall.path}/networking"
+
+        select "dummy-ps-1", from: "fw_rule_private_subnet_id"
+        fill_in "port_range", with: "80"
+        fill_in "description", with: "my desc"
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - #{firewall.name}")
+        expect(page).to have_flash_notice("Firewall rules are created")
+        expect(page.body).to match(/my desc.*my desc/m)
+
+        expect(firewall.firewall_rules_dataset.count).to eq(2)
+        rule1, rule2 = firewall.firewall_rules_dataset.order(:cidr).all
+        expect(rule1.firewall_id).to eq firewall.id
+        expect(rule1.cidr.to_s).to eq ps.net4.to_s
+        expect(rule1.port_range.to_range).to eq 80...81
+        expect(rule1.description).to eq "my desc"
+        expect(rule2.firewall_id).to eq firewall.id
+        expect(rule2.cidr.to_s).to eq ps.net6.to_s
+        expect(rule2.port_range.to_range).to eq 80...81
+        expect(rule2.description).to eq "my desc"
+      end
+
       it "can not add rule when it is invalid" do
         visit "#{project.path}#{firewall.path}/networking"
 
