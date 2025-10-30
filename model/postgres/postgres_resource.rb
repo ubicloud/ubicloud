@@ -277,5 +277,4 @@ end
 # Foreign key constraints:
 #  postgres_resource_location_id_fkey | (location_id) REFERENCES location(id)
 # Referenced By:
-#  postgres_firewall_rule      | postgres_firewall_rule_postgres_resource_id_fkey      | (postgres_resource_id) REFERENCES postgres_resource(id)
 #  postgres_metric_destination | postgres_metric_destination_postgres_resource_id_fkey | (postgres_resource_id) REFERENCES postgres_resource(id)
