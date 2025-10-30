@@ -1,4 +1,4 @@
-<%# locals: (name:, label:, options:, attributes:) %>
+<%# locals: (name:, label:, options:, additional_element: nil, description_html: nil, attributes:) %>
 <% selected = typecast_body_params.str(name) || selected
 error = flash.dig("errors", name)
 is_content_array = options[0][1].is_a?(Array) %>
@@ -33,9 +33,11 @@ is_content_array = options[0][1].is_a?(Array) %>
           <% end %>
         </label>
       <% end %>
+      <%== additional_element %>
     </div>
   </fieldset>
   <% if error %>
     <p class="text-sm text-red-600 leading-6" id="<%= name %>-error"><%= error %></p>
   <% end %>
+  <%== description_html %>
 </div>
