@@ -370,6 +370,60 @@ RSpec.describe Vm do
     ])
   end
 
+  describe "#save_with_ephemeral_net6_error_retrying" do
+    let(:project) { Project.create(name: "test") }
+    let(:vm) { Prog::Vm::Nexus.assemble("a a", project.id).subject }
+    let(:vm2) { Prog::Vm::Nexus.assemble("a a", project.id).subject }
+
+    let(:vm_host) {
+      instance_double(
+        VmHost,
+        total_cpus: 12,
+        total_cores: 12,
+        total_dies: 1,
+        total_sockets: 1,
+        ndp_needed: false,
+        ip6_random_vm_network: "fd80:1:2:3::/64"
+      )
+    }
+
+    it "saves object if there are no exceptions raised" do
+      vm.ephemeral_net6 = vm_host.ip6_random_vm_network.to_s
+      expect(vm_host).not_to receive(:ip6_random_vm_network)
+      vm.save_with_ephemeral_net6_error_retrying(vm_host)
+      expect(vm.reload.ephemeral_net6.to_s).to eq "fd80:1:2:3::/64"
+    end
+
+    it "retries if there is an Sequel::ValidationFailed exceptions where the only error is for ephemeral_net6" do
+      vm2.ephemeral_net6 = vm.ephemeral_net6 = vm_host.ip6_random_vm_network.to_s
+      vm2.save_changes
+      expect(vm_host).to receive(:ip6_random_vm_network).and_return("fd80:1:2:4::/64")
+      vm.save_with_ephemeral_net6_error_retrying(vm_host)
+      expect(vm.reload.ephemeral_net6.to_s).to eq "fd80:1:2:4::/64"
+    end
+
+    it "raises for non-Sequel::ValidationFailed exceptions" do
+      vm.ephemeral_net6 = vm_host.ip6_random_vm_network.to_s
+      expect(vm_host).not_to receive(:ip6_random_vm_network)
+      DB[:nic].where(vm_id: vm.id).delete
+      DB[:vm].where(id: vm.id).delete
+      expect { vm.save_with_ephemeral_net6_error_retrying(vm_host) }.to raise_error(Sequel::NoExistingObject)
+    end
+
+    it "raises for Sequel::ValidationFailed exceptions for other columns" do
+      vm.project_id = nil
+      expect(vm_host).not_to receive(:ip6_random_vm_network)
+      expect { vm.save_with_ephemeral_net6_error_retrying(vm_host) }.to raise_error(Sequel::ValidationFailed)
+    end
+
+    it "raises instead of retrying more than max_retries times" do
+      vm2.ephemeral_net6 = vm.ephemeral_net6 = vm_host.ip6_random_vm_network.to_s
+      vm2.save_changes
+      expect(vm_host).not_to receive(:ip6_random_vm_network)
+      expect { vm.save_with_ephemeral_net6_error_retrying(vm_host, max_retries: 0) }.to raise_error(Sequel::ValidationFailed)
+    end
+  end
+
   describe "#params_json" do
     before do
       allow(vm).to receive_messages(

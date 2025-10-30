@@ -300,6 +300,17 @@ class Vm < Sequel::Model
     }.to_h
   end
 
+  def save_with_ephemeral_net6_error_retrying(vm_host, max_retries: 2)
+    save_changes
+  rescue Sequel::ValidationFailed
+    if errors.keys == [:ephemeral_net6] && max_retries > 0
+      max_retries -= 1
+      self.ephemeral_net6 = vm_host.ip6_random_vm_network.to_s
+      retry
+    end
+    raise
+  end
+
   include Validation::PublicKeyValidation
 
   private
