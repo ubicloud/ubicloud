@@ -263,7 +263,8 @@ module Scheduling::Allocator
         allocated_at: Time.now
       }
       update_args[:family] = vm_host.family if vm.family != "burstable"
-      vm.update(**update_args)
+      vm.set(**update_args)
+      vm.save_with_ephemeral_net6_error_retrying(vm_host)
       AssignedVmAddress.create(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id) if ip4
       vm.sshable&.update(host: vm.ip4_string || vm.ip6_string)
     end
