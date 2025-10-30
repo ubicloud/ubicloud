@@ -63,7 +63,7 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
 
     case type
     when "radio_small_cards"
-      locals = {name:, label:, options:, attributes:}
+      locals = {name:, label:, options:, attributes:, description_html: element[:description_html], additional_element: element[:additional_element]}
     when "select"
       locals = {name:, label:, options:, placeholder:, attributes:, description_html: element[:description_html]}
     when "checkbox"
