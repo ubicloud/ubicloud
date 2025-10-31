@@ -100,7 +100,7 @@ class Clover
         end
       end
 
-      r.rename pg, perm: "Postgres:edit", serializer: Serializers::Postgres, template_prefix: "postgres" do
+      r.rename pg, perm: "Postgres:edit", serializer: Serializers::Postgres, template: "postgres/show" do
         pg.incr_refresh_dns_record
         pg.incr_refresh_certificates
       end

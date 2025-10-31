@@ -43,7 +43,7 @@ class Clover
         end
       end
 
-      r.rename kc, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesCluster, template_prefix: "kubernetes-cluster"
+      r.rename kc, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesCluster, template: "kubernetes-cluster/show"
 
       r.show_object(kc, actions: %w[overview nodes settings], perm: "KubernetesCluster:view", template: "kubernetes-cluster/show")
 
