@@ -2,7 +2,10 @@
 viewable_vm_ds = dataset_authorize(vm_ds, "Vm:view")
 displayable_vm_map, linkable_vm_map = [vm_ds, viewable_vm_ds].map! do
   it.select_hash(Sequel[:vm][:id], Sequel.as(true, :v))
-end %>
+end
+pg_resources = dataset_authorize(@project.postgres_resources_dataset.where(private_subnet_id: @ps.id), "Postgres:view").all
+kcs = dataset_authorize(@project.kubernetes_clusters_dataset.where(private_subnet_id: @ps.id), "KubernetesCluster:view").all
+other_resources = pg_resources + kcs %>
 
 <div id="private-subnet-nics" class="p-6">
   <%== part(
@@ -32,4 +35,25 @@ end %>
         ]
       end
   ) %>
+
+  <% unless other_resources.empty? %>
+    <div class="pt-4">
+      <%== part(
+        "components/table_card",
+        title: "Other Attached Resources",
+        headers: ["Type", "Name", "ID"],
+        rows:
+          other_resources.map! do |resource|
+            link = path(resource)
+            [
+              [
+                [resource.is_a?(PostgresResource) ? "PostgreSQL Database" : "Kubernetes Cluster"],
+                [resource.name, {link:}],
+                [resource.ubid, {link:}]
+              ],
+            ]
+          end
+      ) %>
+    </div>
+  <% end %>
 </div>

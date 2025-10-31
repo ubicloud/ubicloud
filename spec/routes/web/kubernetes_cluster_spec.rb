@@ -273,6 +273,15 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page.body).to include "auto-refresh hidden"
       end
 
+      it "shows up on customer private subnet vms page" do
+        visit "#{project.path}/location/#{kc.display_location}/private-subnet/#{kc.private_subnet.ubid}/vms"
+        expect(page.title).to eq "Ubicloud - mysubnet"
+        expect(page.all("#private-subnet-nics h3").map(&:text)).to eq ["Attached VMs", "Other Attached Resources"]
+        expect(page.all("#private-subnet-nics td").map(&:text)).to eq ["No VM attached", "Kubernetes Cluster", kc.name, kc.ubid]
+        click_link kc.name
+        expect(page.title).to eq "Ubicloud - #{kc.name}"
+      end
+
       it "works with ubid" do
         visit "#{project.path}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}"
 

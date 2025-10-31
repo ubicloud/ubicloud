@@ -283,6 +283,15 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content pg.name
       end
 
+      it "shows up on customer private subnet vms page" do
+        visit "#{project.path}/location/#{pg.display_location}/private-subnet/#{pg.private_subnet.ubid}/vms"
+        expect(page.title).to eq "Ubicloud - #{pg.ubid}-subnet"
+        expect(page.all("#private-subnet-nics h3").map(&:text)).to eq ["Attached VMs", "Other Attached Resources"]
+        expect(page.all("#private-subnet-nics td").map(&:text)).to eq ["No VM attached", "PostgreSQL Database", pg.name, pg.ubid]
+        click_link pg.name
+        expect(page.title).to eq "Ubicloud - #{pg.name}"
+      end
+
       it "can show PostgreSQL database details even when no subpage is specified" do
         pg
         visit "#{project.path}#{pg.path}"
