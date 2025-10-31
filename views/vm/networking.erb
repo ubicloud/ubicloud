@@ -14,7 +14,7 @@ viewable_fws =
     rows:
       @vm.firewalls.flat_map do |fw|
         view_perm = viewable_fws[fw.ubid]
-        (fw.firewall_rules || []).map do |fwr|
+        fw.firewall_rules.map do |fwr|
           [
             [[fw.name, view_perm ? { link: path(fw)} : {}], fwr.cidr, fwr.display_port_range],
             { id: "firewall-rule-#{fwr.ubid}" }
