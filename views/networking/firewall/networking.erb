@@ -106,7 +106,6 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
                 handle_params_and_errors:,
                 attributes: {
                   placeholder: "0.0.0.0/0",
-                  required: true,
                   form: "form-fw-create-rule-#{@firewall.ubid}"
                 }
               ) %>
@@ -136,6 +135,24 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
               <% form(action: "#{firewall_path}/firewall-rule", method: :post, id: "form-fw-create-rule-#{@firewall.ubid}") do %>
                 <%== part("components/form/submit_button", text: "Create") %>
               <% end %>
+            </td>
+          </tr>
+          <tr class="!border-t-white">
+            <td colspan="4" class="p-6 pt-0">
+              <%== part(
+                "components/form/select",
+                name: "fw_rule_private_subnet_id",
+                placeholder: "or select private subnet instead of using CIDR",
+                options: @project
+                  .private_subnets_dataset
+                  .where(location_id: @firewall.location_id)
+                  .order(:name)
+                  .select_map([:id, :name])
+                  .each { it[0] = UBID.from_uuidish(it[0]).to_s },
+                attributes: {
+                  form: "form-fw-create-rule-#{@firewall.ubid}"
+                }
+              ) %>
             </td>
           </tr>
         <% end %>
