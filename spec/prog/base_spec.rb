@@ -361,7 +361,7 @@ RSpec.describe Prog::Base do
     end
 
     it "can create pages for progs that are not on the top of the stack" do
-      st = Strand.create(prog: "Test2", label: "pusher1")
+      st = Strand.create(prog: "Test::Test2", label: "pusher1")
       st.stack.first["deadline_target"] = "t1"
       st.stack.first["deadline_at"] = Time.now + 1
       st.unsynchronized_run
@@ -374,7 +374,7 @@ RSpec.describe Prog::Base do
       }.to change { Page.active.count }.from(0).to(2)
 
       expect(Page.all.map(&:summary)).to include(
-        "#{st.ubid} has an expired deadline! Test2.pusher2 did not reach t1 on time",
+        "#{st.ubid} has an expired deadline! Test::Test2.pusher2 did not reach t1 on time",
         "#{st.ubid} has an expired deadline! Test.pusher2 did not reach t2 on time"
       )
     end
