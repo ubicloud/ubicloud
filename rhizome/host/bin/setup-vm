@@ -16,7 +16,7 @@ end
 
 params = begin
   JSON.parse(File.read(VmPath.new(vm_name).prep_json))
-rescue Errno::ENOENT
+rescue Errno::ENOENT, JSON::ParserError
   if action.start_with?("delete")
     # Params were not historically needed for the delete actions,
     # so handle case where prep file has already been deleted.
