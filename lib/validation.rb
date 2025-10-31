@@ -60,7 +60,7 @@ module Validation
 
   # - Max length 63
   # - Unicode letters, numbers, hyphen, space
-  ALLOWED_ACCOUNT_NAME = %r{\A\p{L}[\p{L}0-9\- ]{1,62}\z}
+  ALLOWED_ACCOUNT_NAME = %r{\A\p{L}[\p{L}0-9\- ]{1,61}[\p{L}0-9]\z}
 
   # Allow Kubernetes Names
   # - Same with regular name pattern, but shorter (40 chars)
