@@ -170,7 +170,7 @@ class Prog::Test < Prog::Base
   def find_current_prog
     Base.current_prog
   end
-end
 
-class Prog::Test2 < Prog::Test
+  class Test2 < self
+  end
 end
