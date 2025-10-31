@@ -64,7 +64,8 @@ class LoadBalancer < Sequel::Model
     DB.transaction do
       port = super(src_port:, dst_port:)
       load_balancer_vms.each do |lb_vm|
-        LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: lb_vm.id)
+        LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: lb_vm.id, stack: "ipv4") if ipv4_enabled?
+        LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: lb_vm.id, stack: "ipv6") if ipv6_enabled?
       end
       incr_update_load_balancer
     end
@@ -82,7 +83,8 @@ class LoadBalancer < Sequel::Model
     DB.transaction do
       load_balancer_vm = LoadBalancerVm.create(load_balancer_id: id, vm_id: vm.id)
       ports.each { |port|
-        LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: load_balancer_vm.id)
+        LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: load_balancer_vm.id, stack: "ipv4") if ipv4_enabled?
+        LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: load_balancer_vm.id, stack: "ipv6") if ipv6_enabled?
       }
       setup_cert_server(vm.id) if cert_enabled
       incr_rewrite_dns_records
