@@ -59,6 +59,16 @@ RSpec.describe Clover, "web shell" do
     expect(page.html).to include ">#{ps.ubid}</a>"
   end
 
+  it "handles ubid-like output that are not valid ubids" do
+    fill_in "cli", with: "ps eu-central-h1/vm78zgv9w9et4mg6pba1frsz8m create"
+    click_button "Run"
+    ps = PrivateSubnet.first
+    fill_in "cli", with: "ps list"
+    click_button "Run"
+    expect(page.html).to include " vm78zgv9w9et4mg6pba1frsz8m "
+    expect(page.html).to include ">#{ps.ubid}</a>"
+  end
+
   it "supports version" do
     fill_in "cli", with: "version"
     click_button "Run"
