@@ -58,7 +58,11 @@ class Clover
             h("$ #{body.split("\0").prepend(@ubi_command_execute).shelljoin}")
           else
             ubids = {}
-            body.scan(UbiCli::OBJECT_INFO_REGEXP) { ubids[UBID.to_uuid(it[0])] ||= nil }
+            body.scan(UbiCli::OBJECT_INFO_REGEXP) do
+              if (uuid = UBID.to_uuid(it[0]))
+                ubids[uuid] ||= nil
+              end
+            end
             UBID.resolve_map(ubids)
             h(body).gsub(UbiCli::OBJECT_INFO_REGEXP) do
               if (obj = ubids[UBID.to_uuid(it)]) && obj.respond_to?(:path)
