@@ -322,6 +322,7 @@ RSpec.describe Validation do
         nil,
         "",
         " John Doe",
+        "John Doe ",
         "1john Doe",
         ".john Doe",
         "https://example.com",
