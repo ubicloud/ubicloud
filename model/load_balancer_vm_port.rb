@@ -22,13 +22,6 @@ class LoadBalancerVmPort < Sequel::Model
     }
   end
 
-  def health_check(session:)
-    [
-      check_probe(session, :ipv4),
-      check_probe(session, :ipv6)
-    ]
-  end
-
   def check_probe(session, type)
     if type == :ipv4
       return "up" unless load_balancer.ipv4_enabled?
@@ -58,13 +51,19 @@ class LoadBalancerVmPort < Sequel::Model
   end
 
   def check_pulse(session:, previous_pulse:)
-    reading_ipv4, reading_ipv6 = health_check(session:)
-    reading = (reading_ipv4 == "up" && reading_ipv6 == "up") ? "up" : "down"
-    pulse = aggregate_readings(previous_pulse:, reading:, data: {ipv4: reading_ipv4, ipv6: reading_ipv6})
+    reading = check_probe(session, (stack == "ipv4") ? :ipv4 : :ipv6)
+    pulse = aggregate_readings(previous_pulse:, reading:)
 
-    time_passed_health_check_interval = Time.now - pulse[:reading_chg] > load_balancer.health_check_interval
+    time_passed_health_check_interval = true
 
+    puts "pulse: #{pulse.inspect}"
+    puts "state: #{state}"
+    puts "reading: #{pulse[:reading]}"
+    puts "reading_rpt: #{pulse[:reading_rpt]}"
+    puts "time_passed_health_check_interval: #{time_passed_health_check_interval}"
+    puts "update_load_balancer_set: #{load_balancer.reload.update_load_balancer_set?}"
     if state == "up" && pulse[:reading] == "down" && pulse[:reading_rpt] > load_balancer.health_check_down_threshold && time_passed_health_check_interval && !load_balancer.reload.update_load_balancer_set?
+      puts "up to down"
       update(state: "down")
       load_balancer.incr_update_load_balancer
     end
@@ -85,9 +84,10 @@ end
 #  load_balancer_port_id | uuid                     | NOT NULL
 #  state                 | lb_node_state            | NOT NULL DEFAULT 'down'::lb_node_state
 #  last_checked_at       | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  stack                 | lb_stack                 | NOT NULL DEFAULT 'ipv4'::lb_stack
 # Indexes:
-#  load_balancer_vm_port_pkey | PRIMARY KEY btree (id)
-#  lb_vm_port_unique_index    | UNIQUE btree (load_balancer_port_id, load_balancer_vm_id)
+#  load_balancer_vm_port_pkey    | PRIMARY KEY btree (id)
+#  lb_vm_port_stack_unique_index | UNIQUE btree (load_balancer_port_id, load_balancer_vm_id, stack)
 # Foreign key constraints:
 #  load_balancer_vm_port_load_balancer_port_id_fkey | (load_balancer_port_id) REFERENCES load_balancer_port(id)
 #  load_balancer_vm_port_load_balancer_vm_id_fkey   | (load_balancer_vm_id) REFERENCES load_balancers_vms(id) ON DELETE CASCADE

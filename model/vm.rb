@@ -51,7 +51,7 @@ class Vm < Sequel::Model
   end
 
   def load_balancer_state
-    load_balancer_vm_ports.first&.state
+    load_balancer_vm_ports.map(&:state).join(", ")
   end
 
   def path
