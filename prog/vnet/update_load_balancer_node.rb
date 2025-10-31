@@ -16,10 +16,6 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
       load_balancer.remove_vm_port(load_balancer_vm_port)
     end
 
-    # if there is literally no up resources to balance for, we simply not do
-    # load balancing.
-    hop_remove_load_balancer if load_balancer.active_vm_ports.count == 0
-
     vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: generate_lb_based_nat_rules)
     pop "load balancer is updated"
   end
@@ -30,15 +26,23 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
     pop "load balancer is removed"
   end
 
-  def generate_lb_based_nat_rules
-    active_vm_ports_uniq_by_port = load_balancer.active_vm_ports { |ds| ds.eager(:load_balancer_port, load_balancer_vm: {vm: :nics}) }
-      .uniq(&:load_balancer_port_id)
+  def load_balancer_ports_to_work_on
+    active_vm_ports = load_balancer.active_vm_ports { |ds| ds.eager(:load_balancer_port, load_balancer_vm: {vm: :nics}) }
       .sort_by { |vm_port| vm_port.load_balancer_port.src_port }
+
+    if active_vm_ports.empty?
+      return load_balancer.vm_ports { |ds| ds.eager(:load_balancer_port, load_balancer_vm: {vm: :nics}) }.sort_by { |vm_port| vm_port.load_balancer_port.src_port }
+    end
+    active_vm_ports
+  end
+
+  def generate_lb_based_nat_rules
+    active_vm_ports_uniq_by_port = load_balancer_ports_to_work_on
     public_ipv4 = vm.ip4_string
     public_ipv6 = vm.ip6_string
     private_ipv4 = vm.private_ipv4
     private_ipv6 = vm.private_ipv6
-    neighbor_vms = load_balancer.active_vm_ports.reject { it.load_balancer_vm.vm_id == vm.id }.uniq { |row| row.load_balancer_vm.id }.map(&:vm)
+    neighbor_vms = active_vm_ports_uniq_by_port.reject { it.load_balancer_vm.vm_id == vm.id }.uniq { |row| row.load_balancer_vm.id }.map(&:vm)
     neighbor_ips_v4_set, neighbor_ips_v6_set = generate_lb_ip_set_definition(neighbor_vms)
 
     balance_mode_ip4, balance_mode_ip6 = if load_balancer.algorithm == "round_robin"
@@ -133,8 +137,15 @@ TEMPLATE
       "elements = {#{neighbor_vms.map(&:private_ipv6).join(", ")}}"]
   end
 
+  def active_vm_ports
+    if load_balancer.active_vm_ports.empty?
+      return load_balancer.vm_ports
+    end
+    load_balancer.active_vm_ports
+  end
+
   def generate_lb_map_defs(current_port)
-    items = load_balancer.active_vm_ports
+    items = active_vm_ports
       .select { |vm_port| vm_port.load_balancer_port.dst_port == current_port.dst_port }
       .map do |vm_port|
         address = yield vm_port
