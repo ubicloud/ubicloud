@@ -1,9 +1,9 @@
 <%# locals: (title:, icon:, description:, button_link: nil, button_title: nil, buttons: nil) %>
 
 <div class="text-center empty-state">
-  <%== part("components/icon", name: icon, classes: "mx-auto h-12 w-12 text-gray-400") %>
-  <h3 class="mt-2 text-sm font-semibold text-gray-900"><%= title %></h3>
-  <p class="mt-1 text-sm text-gray-500"><%= description %></p>
+  <%== part("components/icon", name: icon, classes: "empty-state-icon") %>
+  <h3 class="empty-state-title"><%= title %></h3>
+  <p class="mt-1 help-text"><%= description %></p>
   <div class="mt-6">
     <% if buttons %>
       <% buttons.each do |text, link| %>

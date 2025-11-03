@@ -14,7 +14,7 @@
   breadcrumbs: [%w[Projects /project], [@project.name, @project.path], %w[Settings #]]
 ) %>
 
-<div class="grid gap-6">
+<div class="content-grid">
   <!-- Detail Card -->
   <% form(action: @project.path, method: :post) do %>
     <%== part(
@@ -51,10 +51,10 @@
     ) %>
   <% end %>
   <!-- Quota Card -->
-  <div class="table-wrapper border-b-gray-200">
+  <div class="table-card">
     <div class="card-body">
-      <h3 class="text-base font-semibold text-gray-900">Quotas</h3>
-      <div class="mt-2 text-sm text-gray-500">
+      <h3 class="subsection-heading">Quotas</h3>
+      <div class="description-text">
         <p>If you want to increase your quota, please get in touch at
           <a href="mailto:support@ubicloud.com" class="font-semibold text-orange-500">support@ubicloud.com</a>.</p>
       </div>
@@ -76,16 +76,16 @@
   </div>
   <!-- Delete Card -->
   <% if has_permission?("Project:delete", @project) %>
-    <div class="table-wrapper border-b-gray-200">
+    <div class="table-card">
       <div class="card-body">
-        <div class="sm:flex sm:items-center sm:justify-between">
+        <div class="flex-header-sm">
           <div>
-            <h3 class="text-base font-semibold text-gray-900">Delete project</h3>
-            <div class="mt-2 text-sm text-gray-500">
+            <h3 class="subsection-heading">Delete project</h3>
+            <div class="description-text">
               <p>This action will permanently delete this project. Deleted data cannot be recovered. Use it carefully.</p>
             </div>
           </div>
-          <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:shrink-0 sm:items-center">
+          <div class="actions-right">
             <%== part("components/delete_button", confirmation: @project.name, redirect: "/project") %>
           </div>
         </div>

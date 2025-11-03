@@ -1,15 +1,15 @@
 <div class="p-6">
-  <div class="md:flex md:items-center md:justify-between">
-    <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">Firewall Rules</h3>
+  <div class="flex-header">
+    <div class="flex-title">
+      <h3 class="section-heading">Firewall Rules</h3>
       <p class="text-gray-500 mt-2">
       <% if firewall = @pg.customer_firewall %>
           You can 
-          <a class="text-orange-600" href="<%= path(firewall) %>/networking">manage firewall rules using the firewall for this PostgreSQL database</a>.
+          <a class="link-primary" href="<%= path(firewall) %>/networking">manage firewall rules using the firewall for this PostgreSQL database</a>.
       <% else %>
           The firewall related to this PostgreSQL database was deleted or detached from the related private subnet,
           you can manage firewall rules using an appropriate firewall on the
-          <a class="text-orange-600" href="<%= path(@pg.private_subnet) %>/networking">private subnet</a>.
+          <a class="link-primary" href="<%= path(@pg.private_subnet) %>/networking">private subnet</a>.
       <% end %>
       </p>
     </div>

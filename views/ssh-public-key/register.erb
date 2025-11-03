@@ -24,23 +24,23 @@ back = "#{@project.path}/ssh-public-key" %>
 ) %>
 
 <% form(action:, method: :post) do |f| %>
-  <div class="grid gap-6">
+  <div class="content-grid">
     <div class="card">
       <div class="card-body">
         <div class="form-group2">
           <div class="mt-2 grid grid-cols-1 gap-6 gap-8 sm:grid-cols-6">
-            <div class="col-span-full">
+            <div class="form-col-full">
               <%== part("components/form/text", name: "name", label: "Name", value: @ssh_public_key.name, attributes: {placeholder: "ssh-key-set-name", required: true}) %>
             </div>
 
-            <div class="col-span-full">
+            <div class="form-col-full">
               <%== part("components/form/textarea", name: "public_key", label: "Public Key", value: @ssh_public_key.public_key, attributes: {placeholder: "ssh-ed25519 ...\nssh-rsa ...", required: true}) %>
             </div>
           </div>
         </div>
       </div>
       <div class="card-body">
-        <div class="flex items-center justify-end gap-6">
+        <div class="form-actions">
           <a href="<%= @project.path %>/ssh-public-key" class="text-sm font-semibold text-gray-900">Cancel</a>
           <%== part("components/form/submit_button", text: action_type) %>
         </div>

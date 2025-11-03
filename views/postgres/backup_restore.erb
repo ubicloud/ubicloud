@@ -6,12 +6,12 @@ max_date = @pg.timeline.latest_restore_time %>
     <% form(action: "#{path(@pg)}/restore", method: :post) do %>
       <div class="form-group">
         <div>
-          <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">Fork PostgreSQL database</h3>
+          <h3 class="section-heading">Fork PostgreSQL database</h3>
           <p class="mt-1 text-sm text-gray-500">
             When you fork your existing PostgreSQL database, a new server will be provisioned.
           </p>
         </div>
-        <div class="grid grid-cols-12 gap-6">
+        <div class="grid-12col">
           <div class="col-span-12 sm:col-span-5">
             <%== part("components/form/text", label: "New server name", name: "name", attributes: { placeholder: @pg.name + "-fork", required: true }) %>
           </div>
@@ -36,13 +36,13 @@ max_date = @pg.timeline.latest_restore_time %>
 <% backups = @pg.timeline.backups %>
 <% if backups.count > 0 %>
   <div class="p-6">
-    <div class="md:flex md:items-center md:justify-between">
-      <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">Backups</h3>
+    <div class="flex-header">
+      <div class="flex-title">
+        <h3 class="section-heading">Backups</h3>
       </div>
     </div>
 
-    <div class="table-wrapper border-b-gray-200">
+    <div class="table-card">
       <table class="table">
         <thead class="bg-gray-50">
           <tr>

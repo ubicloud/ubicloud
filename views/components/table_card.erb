@@ -2,21 +2,21 @@
 
 <div>
   <% if title || right_items %>
-    <div class="md:flex md:items-center md:justify-between">
-      <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">
+    <div class="flex-header">
+      <div class="flex-title">
+        <h3 class="section-heading">
           <%= title %>
         </h3>
       </div>
       <% if right_items %>
-        <div class="mt-4 flex md:ml-4 md:mt-0">
+        <div class="action-buttons">
           <%== right_items.join %>
         </div>
       <% end %>
     </div>
   <% end %>
 
-  <div class="table-wrapper border-b-gray-200">
+  <div class="table-card">
     <table class="table">
       <% unless headers.empty? || rows.empty? %>
         <thead class="bg-gray-50">
@@ -25,11 +25,11 @@
               <th
                 scope="col"
                 <% if i == 0 %>
-                class="pl-4 pr-3 sm:pl-6 py-3.5 text-left text-sm font-semibold text-gray-900"
+                class="table-header-first"
                 <% elsif i + 1 == headers.length %>
-                class="pl-3 pr-4 sm:pr-6 py-3.5 text-left text-sm font-semibold text-gray-900"
+                class="table-header-last"
                 <% else %>
-               
+
                 <% end %>
               >
                 <%= name %>
@@ -57,22 +57,22 @@
                 <% col_opts ||= {} %>
                 <td
                   <% if i == 0
-                      cls="pl-4 pr-3 sm:pl-6 py-4 text-gray-900 font-medium whitespace-nowrap text-sm"
+                      cls="table-cell-first"
                     elsif i + 1 == columns.length
-                      cls="pl-3 pr-4 sm:pr-6 py-4 text-gray-500 whitespace-nowrap text-sm"
+                      cls="table-cell-last"
                     else
-                      cls="px-3 py-4 text-gray-500 whitespace-nowrap text-sm"
+                      cls="table-cell"
                     end
                   %>
                   class="<%= cls %> <%= col_opts[:extra_class] %>"
                 >
                   <% if value.is_a?(Array) %>
                     <% (first_value, first_opts), (second_value, second_opts) = value %>
-                    <div class="font-medium text-gray-900">
+                    <div class="table-text-primary">
                       <%== part("components/value_content", content: first_value, opts: first_opts) %>
                     </div>
                     <% if second_value %>
-                      <div class="mt-1 text-gray-500 text-xs">
+                      <div class="table-text-secondary">
                         <%== part("components/value_content", content: second_value, opts: second_opts) %>
                       </div>
                     <% end %>

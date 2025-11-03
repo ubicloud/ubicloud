@@ -1,10 +1,10 @@
-<div class="table-wrapper border-b-gray-200">
+<div class="table-card">
   <% form(action: "#{@project.path}/discount-code", method: :post) do %>
     <div class="card-body">
       <div class="form-group2">
         <div>
           <div class="grid grid-cols-1 gap-6 gap-8 sm:grid-cols-8">
-            <div class="sm:col-span-4">
+            <div class="form-col-4">
               <%== part(
                 "components/form/text",
                 name: "discount_code",

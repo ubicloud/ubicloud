@@ -5,14 +5,14 @@ load_balancer_path = "#{@project.path}#{@lb.path}"
 edit_perm = has_permission?("LoadBalancer:edit", @lb) %>
 
 <div class="p-6">
-  <div class="md:flex md:items-center md:justify-between">
-    <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">
+  <div class="flex-header">
+    <div class="flex-title">
+      <h3 class="section-heading">
         Attached VMs
       </h3>
     </div>
   </div>
-  <div class="table-wrapper border-b-gray-200">
+  <div class="table-card">
     <table class="table">
       <thead class="bg-gray-50">
         <tr>
@@ -27,7 +27,7 @@ edit_perm = has_permission?("LoadBalancer:edit", @lb) %>
         <% @lb.vms(eager: :load_balancer_vm_ports).each do |vm| %>
           <tr>
             <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <a href="<%= path(vm) %>" class="text-orange-600"><%= vm.name %></a>
+              <a href="<%= path(vm) %>" class="link-primary"><%= vm.name %></a>
             </td>
             <td class="px-3 py-3.5 whitespace-nowrap text-sm text-gray-900">
               <%= vm.load_balancer_state %>

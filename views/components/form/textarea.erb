@@ -14,7 +14,7 @@ error = flash.dig("errors", name) %>
     <%== html_attrs(attributes) %>
   ><%= value %></textarea>
   <% if description %>
-    <p class="text-sm text-gray-500" id="<%= name %>-description"><%== escaped_description %></p>
+    <p class="help-text" id="<%= name %>-description"><%== escaped_description %></p>
   <% end %>
   <%== part("components/form/error", name:, error:) if error %>
 </div>

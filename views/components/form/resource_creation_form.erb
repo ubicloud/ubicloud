@@ -9,19 +9,19 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
 </script>
 
 <div>
-  <div class="grid gap-6">
+  <div class="content-grid">
     <% form(action:, method:, id: "creation-form", class: method) do %>
-      <% container_class = (mode == "create") ? "overflow-hidden rounded-lg shadow border: 1px solid rgb(0 0 0 / 0.05); bg-white" : "" %>
+      <% container_class = (mode == "create") ? "form-card" : "" %>
       <div class="<%= container_class %>">
         <div class="card-body">
           <div class="form-group2">
             <div>
-              <div class="mt-2 grid grid-cols-1 gap-6 gap-8 sm:grid-cols-6">
+              <div class="form-grid">
                 <% selected_options = {}
   pre_selected_values.each { |k, v| selected_options[k] = v.to_s }
 
   form_elements.each do |element|
-    container_opening_tag = element[:opening_tag] || "<div class='col-span-full'>"
+    container_opening_tag = element[:opening_tag] || "<div class='form-col-full'>"
     container_closing_tag = element[:closing_tag] || "</div>"
 
     name, type, label, required, placeholder, content_generator = element.values_at(:name, :type, :label, :required, :placeholder, :content_generator)
@@ -98,9 +98,9 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
           </div>
         </div>
         <div class="card-body">
-          <div class="flex items-center justify-end gap-6">
+          <div class="form-actions">
             <% if mode == "create" %>
-              <a href="<%= action %>" class="text-sm font-semibold text-gray-900">Cancel</a>
+              <a href="<%= action %>" class="link-bold">Cancel</a>
               <%== part("components/form/submit_button", text: "Create") %>
             <% else %>
               <%== part("components/form/submit_button", text: "Update") %>

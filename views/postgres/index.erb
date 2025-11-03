@@ -13,8 +13,8 @@
             <<-ITEM
             <div class="py-1 transition-colors" role="none">
               <a href="#{@project.path}/postgres/create?flavor=#{it.name}" class="block px-4 py-3 ">
-                <h3 class="text-base font-semibold text-gray-900">#{it.title}</h3>
-                <p class="mt-1 text-sm text-gray-500">#{it.description}</p>
+                <h3 class="subsection-heading">#{it.title}</h3>
+                <p class="mt-1 help-text">#{it.description}</p>
               </a>
             </div>
             ITEM
@@ -24,7 +24,7 @@
     DROPDOWN
   ) %>
 
-  <div class="grid gap-6">
+  <div class="content-grid">
     <%== part(
       "components/table_card",
       headers: ["Name", "Compute", "Storage", "Version", "Parent", "Location", "State"],
@@ -51,23 +51,23 @@
     breadcrumbs: [%w[Projects /project], [@project.name, @project.path], ["PostgreSQL Databases", "#"]]
   ) %>
 
-  <div class="grid gap-6">
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-10">
+  <div class="content-grid">
+    <div class="card-grid">
       <% postgres_flavors.values.each do %>
-        <div class="rounded-lg shadow group relative bg-white p-6">
+        <div class="feature-card">
           <div>
             <span class="inline-flex rounded-lg overflow-hidden w-12 h-12">
               <img src="/icons/pg-<%= it.brand.downcase %>.png" class="object-cover"/>
             </span>
           </div>
           <div class="mt-4">
-            <h3 class="text-base font-semibold text-gray-900">
+            <h3 class="subsection-heading">
               <a href="<%= @project.path %>/postgres/create?flavor=<%= it.name %>">
                 <span class="absolute inset-0" aria-hidden="true"></span>
                 Create <%= it.title %>
               </a>
             </h3>
-            <p class="mt-2 text-sm text-gray-500"><%= it.description %></p>
+            <p class="description-text"><%= it.description %></p>
           </div>
           <span class="pointer-events-none absolute right-6 top-6 text-gray-300 group-hover:text-gray-400">
             <%== part("components/icon", name: "hero-arrow-up-right") %>

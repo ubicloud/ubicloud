@@ -18,13 +18,13 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
   ) %>
 </div>
 
-<div class="grid gap-6">
+<div class="content-grid">
   <div>
-    <div class="table-wrapper border-b-gray-200">
+    <div class="table-card">
       <% if modification_allowed %>
         <div class="px-4 py-5 sm:p-6 form-group">
           <h3 class="text-lg font-medium text-gray-900"><%= "Create #{@display_tag_type} Tag" %></h3>
-          <p class="text-sm text-gray-500">
+          <p class="help-text">
             <% case @tag_type
            when "subject" %>
               Subject tags in Ubicloud are similar to roles or user groups. Instead of creating separate access control

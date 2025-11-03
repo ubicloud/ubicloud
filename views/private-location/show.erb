@@ -7,7 +7,7 @@
   breadcrumbs: [%w[AWS\ Regions /private-location], [@location.ui_name, @location.path]]
 ) %>
 
-<div class="grid gap-6">
+<div class="content-grid">
   <!-- Detail Card -->
   <% form(action: path(@location), method: :post) do %>
     <%== part(
@@ -35,24 +35,24 @@
   <!-- Danger Zone -->
   <% if has_permission?("Location:delete", @project) %>
     <div>
-      <div class="md:flex md:items-center md:justify-between">
-        <div class="min-w-0 flex-1">
-          <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">
+      <div class="flex-header">
+        <div class="flex-title">
+          <h3 class="section-heading">
             Danger Zone
           </h3>
         </div>
       </div>
-      <div class="table-wrapper border-b-gray-200">
+      <div class="table-card">
         <!-- Delete Card -->
         <div class="card-body">
-          <div class="sm:flex sm:items-center sm:justify-between">
+          <div class="flex-header-sm">
             <div>
-              <h3 class="text-base font-semibold text-gray-900">Delete region</h3>
-              <div class="mt-2 text-sm text-gray-500">
+              <h3 class="subsection-heading">Delete region</h3>
+              <div class="description-text">
                 <p>This action will permanently delete this region. Deleted data cannot be recovered. Use it carefully.</p>
               </div>
             </div>
-            <div id="region-delete-<%=@location.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:shrink-0 sm:items-center">
+            <div id="region-delete-<%=@location.ubid%>" class="actions-right">
               <%== part("components/delete_button", confirmation: @location.ui_name, redirect: "#{@project.path}/private-location") %>
             </div>
           </div>

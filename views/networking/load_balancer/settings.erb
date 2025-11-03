@@ -3,14 +3,14 @@ delete_perm = has_permission?("LoadBalancer:delete", @lb) %>
 
 <% if edit_perm || delete_perm %>
   <div class="p-6">
-    <div class="md:flex md:items-center md:justify-between">
-      <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">
+    <div class="flex-header">
+      <div class="flex-title">
+        <h3 class="section-heading">
           Danger Zone
         </h3>
       </div>
     </div>
-    <div class="table-wrapper border-b-gray-200">
+    <div class="table-card">
       <% if edit_perm %>
         <div class="card-body">
           <% form(action: "#{path(@lb)}/rename", method: :post) do %>
@@ -18,21 +18,21 @@ delete_perm = has_permission?("LoadBalancer:delete", @lb) %>
           <% end %>
         </div>
         <div class="card-body">
-          <div class="sm:flex sm:items-center sm:justify-between">
+          <div class="flex-header-sm">
             <div>
-              <h3 class="text-base font-semibold text-gray-900">SSL Certificate</h3>
-              <div class="mt-2 text-sm text-gray-500">
+              <h3 class="subsection-heading">SSL Certificate</h3>
+              <div class="description-text">
                 <p>Ubicloud automatically provides a free SSL certificate for your load balancer. To enable it, toggle
                   the switch.</p>
                 <p>Learn more about Ubicloud SSL certificates in the
                   <a
                     href="https://www.ubicloud.com/docs/networking/load-balancer#ssl-certificates"
-                    class="text-orange-600"
+                    class="link-primary"
                     target="_blank"
                   >documentation</a>.</p>
               </div>
             </div>
-            <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:shrink-0 sm:items-center">
+            <div class="actions-right">
               <%== part("components/form/toggle_form", name: "cert_enabled", action: "#{path(@lb)}/toggle-ssl-certificate", active: @lb.cert_enabled) %>
             </div>
           </div>
@@ -40,15 +40,15 @@ delete_perm = has_permission?("LoadBalancer:delete", @lb) %>
       <% end %>
       <% if delete_perm %>
         <div class="card-body">
-          <div class="sm:flex sm:items-center sm:justify-between">
+          <div class="flex-header-sm">
             <div>
-              <h3 class="text-base font-semibold text-gray-900">Delete load balancer</h3>
-              <div class="mt-2 text-sm text-gray-500">
+              <h3 class="subsection-heading">Delete load balancer</h3>
+              <div class="description-text">
                 <p>This action will permanently delete this load balancer. Deleted load balancer cannot be recovered.
                   Use it carefully.</p>
               </div>
             </div>
-            <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:shrink-0 sm:items-center">
+            <div class="actions-right">
               <%== part("components/delete_button", url: path(@lb), confirmation: @lb.name, redirect: "#{@project.path}/load-balancer") %>
             </div>
           </div>

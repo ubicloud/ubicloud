@@ -2,13 +2,13 @@
 
 <%== part("components/page_header", breadcrumbs: [%w[Projects /project], %w[Create #]]) %>
 
-<div class="grid gap-6">
+<div class="content-grid">
   <% form(action: "/project", method: :post) do %>
     <!-- Create Card -->
-    <div class="table-wrapper border-b-gray-200">
+    <div class="table-card">
       <div class="card-body">
         <div class="grid grid-cols-1 gap-6 gap-8 sm:grid-cols-6">
-          <div class="sm:col-span-3">
+          <div class="form-col-3">
             <%== part(
               "components/form/text",
               name: "name",
@@ -23,7 +23,7 @@
 
       </div>
       <div class="card-body">
-        <div class="flex items-center justify-end gap-6">
+        <div class="form-actions">
           <a href="/project" class="text-sm font-semibold text-gray-900">Cancel</a>
           <%== part("components/form/submit_button", text: "Create") %>
         </div>

@@ -13,17 +13,17 @@
   breadcrumbs: [%w[Projects /project], [@project.name, @project.path], %w[Users #]]
 ) %>
 
-<div class="grid gap-6">
+<div class="content-grid">
   <!-- Invite user -->
   <div>
     <div class="md:flex md:items-center md:justify-between lg:pb-2">
-      <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">
+      <div class="flex-title">
+        <h3 class="section-heading">
           Invite a new user
         </h3>
       </div>
     </div>
-    <div class="table-wrapper border-b-gray-200">
+    <div class="table-card">
       <div class="card-body">
         <% form(action: user_path, method: :post) do %>
           <div class="form-group">
@@ -52,13 +52,13 @@
   <div>
     <% form(action: "#{user_path}/policy/managed", method: :post, id: "managed-policy") do %>
       <div class="md:flex md:items-center md:justify-between lg:pb-2">
-        <div class="min-w-0 flex-1">
-          <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">
+        <div class="flex-title">
+          <h3 class="section-heading">
             Users
           </h3>
         </div>
       </div>
-      <div class="table-wrapper border-b-gray-200">
+      <div class="table-card">
         <table class="table">
           <thead class="bg-gray-50">
             <tr>

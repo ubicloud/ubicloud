@@ -13,14 +13,14 @@ firewall_path = path(@firewall)
 edit_perm = has_permission?("Firewall:edit", @firewall) %>
 
 <div class="p-6 grid gap-6">
-  <div class="md:flex md:items-center md:justify-between">
-    <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">
+  <div class="flex-header">
+    <div class="flex-title">
+      <h3 class="section-heading">
         Firewall Rules
       </h3>
     </div>
   </div>
-  <div class="table-wrapper border-b-gray-200">
+  <div class="table-card">
     <table class="table">
       <thead class="bg-gray-50">
         <tr>
@@ -142,14 +142,14 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
       </tbody>
     </table>
   </div>
-  <div class="md:flex md:items-center md:justify-between">
-    <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">
+  <div class="flex-header">
+    <div class="flex-title">
+      <h3 class="section-heading">
         Attached Private Subnets
       </h3>
     </div>
   </div>
-  <div id="fw-private-subnets" class="table-wrapper border-b-gray-200">
+  <div id="fw-private-subnets" class="table-card">
     <table class="table">
       <thead class="bg-gray-50">
         <tr>
@@ -164,7 +164,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
           <tr>
             <td scope="row">
               <% if viewable_subnet_map[ps.id] %>
-                <a href="<%= path(ps) %>" class="text-orange-600"><%= ps.name %></a>
+                <a href="<%= path(ps) %>" class="link-primary"><%= ps.name %></a>
               <% else %>
                 <%= ps.name %>
               <% end %>

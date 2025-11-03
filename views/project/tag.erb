@@ -54,9 +54,9 @@ current_members.sort! %>
   ) %>
 </div>
 
-<div class="grid gap-6">
+<div class="content-grid">
   <% if editable %>
-    <div class="table-wrapper border-b-gray-200">
+    <div class="table-card">
       <div class="px-4 py-5 sm:p-6 form-group">
         <h3 class="text-lg font-medium text-gray-900"><%= "Update #{@display_tag_type} Tag" %></h3>
         <% form(action: path(@tag), method: :post) do %>
@@ -88,12 +88,12 @@ current_members.sort! %>
       </div>
     <% else %>
       <div class="md:flex md:items-center md:justify-between lg:pb-2">
-        <div class="min-w-0 flex-1">
-          <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">Current Members</h3>
+        <div class="flex-title">
+          <h3 class="section-heading">Current Members</h3>
         </div>
       </div>
       <% form(action: disassociate_path, method: :post) do %>
-        <div class="table-wrapper border-b-gray-200">
+        <div class="table-card">
           <table id="tag-membership-remove" class="table">
             <thead class="bg-gray-50">
               <tr>
@@ -134,12 +134,12 @@ current_members.sort! %>
   <div>
     <% if addition_allowed && !add_groups.all? { _2.empty? } %>
       <div class="md:flex md:items-center md:justify-between lg:pb-2">
-        <div class="min-w-0 flex-1">
-          <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">Add Members</h3>
+        <div class="flex-title">
+          <h3 class="section-heading">Add Members</h3>
         </div>
       </div>
       <% form(action: associate_path, method: :post) do %>
-        <div class="table-wrapper border-b-gray-200">
+        <div class="table-card">
           <table id="tag-membership-add" class="table">
             <thead class="bg-gray-50">
               <tr>

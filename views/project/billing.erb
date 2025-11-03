@@ -12,46 +12,46 @@ end
     breadcrumbs: [%w[Projects /project], [@project.name, @project.path], %w[Billing #]]
   ) %>
 
-  <div class="grid gap-6">
+  <div class="content-grid">
     <!-- Summary -->
     <div>
       <dl class="grid grid-cols-2 gap-5 <%= (@project.discount > 0) ? "sm:grid-cols-4" : "sm:grid-cols-3" %>">
         <div class="card-body">
-          <dt class="truncate text-sm font-medium text-gray-500">Current Usage</dt>
-          <dd class="mt-1 text-3xl font-semibold text-gray-900"><%= money(@invoices.first.subtotal) %></dd>
+          <dt class="stat-label truncate">Current Usage</dt>
+          <dd class="stat-value"><%= money(@invoices.first.subtotal) %></dd>
         </div>
         <div class="card-body">
-          <dt class="truncate text-sm font-medium text-gray-500">Last Month</dt>
-          <dd class="mt-1 text-3xl font-semibold text-gray-900"><%= (@invoices.count > 1) ? money(@invoices[1].subtotal) : "-" %></dd>
+          <dt class="stat-label truncate">Last Month</dt>
+          <dd class="stat-value"><%= (@invoices.count > 1) ? money(@invoices[1].subtotal) : "-" %></dd>
         </div>
         <div class="card-body">
-          <dt class="truncate text-sm font-medium text-gray-500">Remaining Credit</dt>
-          <dd class="mt-1 text-3xl font-semibold text-gray-900"><%= money(@project.credit.to_f) %></dd>
+          <dt class="stat-label truncate">Remaining Credit</dt>
+          <dd class="stat-value"><%= money(@project.credit.to_f) %></dd>
         </div>
         <% if @project.discount > 0 %>
           <div class="card-body">
-            <dt class="truncate text-sm font-medium text-gray-500">Discount</dt>
-            <dd class="mt-1 text-3xl font-semibold text-gray-900"><%= @project.discount %>%</dd>
+            <dt class="stat-label truncate">Discount</dt>
+            <dd class="stat-value"><%= @project.discount %>%</dd>
           </div>
         <% end %>
       </dl>
     </div>
     <!-- Billing Info Update Card -->
     <% stripe_data = billing_info.stripe_data %>
-    <div class="md:flex md:items-center md:justify-between lg:pb-2">
-      <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">
+    <div class="flex-header lg:pb-2">
+      <div class="flex-title">
+        <h3 class="section-heading">
           Billing Details
         </h3>
       </div>
     </div>
-    <div class="table-wrapper border-b-gray-200">
+    <div class="table-card">
       <% form(action: billing_path, method: :post) do %>
         <div class="card-body">
           <div class="form-group2">
             <div>
               <div class="mt-6 grid grid-cols-1 gap-6 gap-8 sm:grid-cols-8">
-                <div class="sm:col-span-4">
+                <div class="form-col-4">
                   <%== part(
                     "components/form/text",
                     name: "name",
@@ -62,7 +62,7 @@ end
                     }
                   ) %>
                 </div>
-                <div class="sm:col-span-4">
+                <div class="form-col-4">
                   <%== part(
                     "components/form/text",
                     name: "email",
@@ -102,7 +102,7 @@ end
                 <div class="sm:col-span-4 md:col-span-2">
                   <%== part("components/form/text", name: "postal_code", label: "Postal Code", value: stripe_data["postal_code"]) %>
                 </div>
-                <div class="col-span-full">
+                <div class="form-col-full">
                   <%== part(
                     "components/form/textarea",
                     name: "address",
@@ -113,7 +113,7 @@ end
                     }
                   ) %>
                 </div>
-                <div class="sm:col-span-4">
+                <div class="form-col-4">
                   <%== part(
                     "components/form/text",
                     name: "tax_id",
@@ -121,7 +121,7 @@ end
                     value: stripe_data["tax_id"]
                   ) %>
                   <% if billing_info.country&.in_eu_vat? %>
-                    <div class="mt-2 text-sm text-gray-500">
+                    <div class="description-text">
                       <% if billing_info.country.alpha2 == "NL" %>
                         21% VAT is collected from customers located in the Netherlands.
                       <% elsif stripe_data["tax_id"].to_s.strip.empty? %>
@@ -132,10 +132,10 @@ end
                     </div>
                   <% end %>
                 </div>
-                <div class="sm:col-span-4">
+                <div class="form-col-4">
                   <%== part("components/form/text", name: "company_name", label: "Company Name", value: stripe_data["company_name"]) %>
                 </div>
-                <div class="col-span-full">
+                <div class="form-col-full">
                   <%== part(
                     "components/form/textarea",
                     name: "note",
@@ -152,7 +152,7 @@ end
         </div>
 
         <div class="card-body">
-          <div class="flex items-center justify-end gap-6">
+          <div class="form-actions">
             <%== part("components/form/submit_button", text: "Update") %>
           </div>
         </div>
@@ -192,14 +192,14 @@ end
     <%== part("components/discount_code") %>
     <!-- Invoices -->
     <div>
-      <div class="md:flex md:items-center md:justify-between lg:pb-2">
-        <div class="min-w-0 flex-1">
-          <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">
+      <div class="flex-header lg:pb-2">
+        <div class="flex-title">
+          <h3 class="section-heading">
             Invoices
           </h3>
         </div>
       </div>
-      <div class="table-wrapper border-b-gray-200">
+      <div class="table-card">
         <table class="table">
           <thead class="bg-gray-50">
             <tr>
@@ -212,7 +212,7 @@ end
             <% @invoices.each do |inv| %>
               <tr id="invoice-<%= inv.path_id %>">
                 <td scope="row">
-                  <a href="<%= path(inv) %>" target="_blank" class="text-orange-600">
+                  <a href="<%= path(inv) %>" target="_blank" class="link-primary">
                     <%= inv.name %>
                   </a>
                   <span class="text-xs text-gray-400 italic">
@@ -268,22 +268,22 @@ end
 <br/>
 <!-- Usage alerts -->
 <div>
-  <div class="md:flex md:items-center md:justify-between lg:pb-2">
-    <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">
+  <div class="flex-header lg:pb-2">
+    <div class="flex-title">
+      <h3 class="section-heading">
         Usage Alerts
       </h3>
     </div>
   </div>
-  <div class="grid gap-6">
-    <div class="table-wrapper border-b-gray-200">
+  <div class="content-grid">
+    <div class="table-card">
       <!-- Add usage alert -->
       <div class="card-body">
         <% form(action: "#{@project.path}/usage-alert", method: :post) do %>
           <div class="form-group">
             <div>
               <h2 class="text-lg font-medium text-gray-900">Add new usage alert</h2>
-              <p class="mt-1 text-sm text-gray-500">
+              <p class="mt-1 help-text">
                 Usage alerts will be sent to your email address. If you want to send alerts to specific email
                 addresses, you need to log in with that email address.
                 <br/>
@@ -291,7 +291,7 @@ end
                 Please note that alerts are only for informational purposes and no action is taken automatically.
               </p>
             </div>
-            <div class="grid grid-cols-12 gap-6">
+            <div class="grid-12col">
               <div class="col-span-5 sm:col-span-3">
                 <%== part(
                   "components/form/text",

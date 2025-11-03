@@ -4,22 +4,22 @@
   <% unless breadcrumbs.empty? %>
     <div>
       <nav class="sm:hidden" aria-label="Back">
-        <a href="<%= back %>" class="flex items-center text-sm font-medium text-gray-500 transition-colors no-underline">
+        <a href="<%= back %>" class="flex-center breadcrumb-link no-underline">
           <%== part("components/icon", name: "hero-chevron-left", classes: "icon-sm shrink-0 text-gray-400 -ml-1 mr-1") %>
           Back
         </a>
       </nav>
       <nav class="breadcrumb hidden sm:flex" aria-label="Breadcrumb">
-        <ol role="list" class="flex items-center gap-4">
+        <ol role="list" class="flex-center gap-4">
           <% breadcrumbs.each_with_index do |(name, url), index| %>
             <li>
-              <div class="flex items-center">
+              <div class="flex-center">
                 <% if index > 0 %>
                   <span class="mr-4">
                     <%== part("components/icon", name: "hero-chevron-right", classes: "icon-sm shrink-0 text-gray-400") %>
                   </span>
                 <% end %>
-                <a href="<%= url %>" class="text-sm font-medium text-gray-500 transition-colors"><%= name %></a>
+                <a href="<%= url %>" class="breadcrumb-link"><%= name %></a>
               </div>
             </li>
           <% end %>
@@ -28,12 +28,12 @@
     </div>
   <% end %>
 
-  <div class="md:flex md:items-center md:justify-between pb-4">
+  <div class="flex-header pb-4">
     <div class="min-w-0">
-      <h2 class="text-2xl font-bold text-gray-900 sm:text-3xl sm:tracking-tight"><%= title %></h2>
+      <h2 class="page-heading-lg"><%= title %></h2>
     </div>
     <% if right_items %>
-      <div class="mt-4 flex md:ml-4 md:mt-0">
+      <div class="action-buttons">
         <%== right_items.join %>
       </div>
     <% end %>

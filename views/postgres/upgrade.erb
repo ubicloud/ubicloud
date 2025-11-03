@@ -41,7 +41,7 @@ upgrade_progress = upgrade_stages.map do |stage, description, database_available
 end %>
 
 <div class="p-6">
-  <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">Upgrade</h3>
+  <h3 class="section-heading">Upgrade</h3>
 
   <% if @pg.display_state == "creating" %>
     <p class="text-gray-500 mt-2">Upgrade operation is not available while the database is being created.</p>

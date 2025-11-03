@@ -3,7 +3,7 @@
 <% if opts[:copyable] && content %>
   <%== part("components/copyable_content", content:, revealable: opts[:revealable]) %>
 <% elsif opts[:link] %>
-  <a href="<%= opts[:link] %>" class="font-medium text-orange-600">
+  <a href="<%= opts[:link] %>" class="link-bold">
     <%= content %>
   </a>
 <% elsif opts[:component] %>

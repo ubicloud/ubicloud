@@ -1,11 +1,11 @@
 <%# locals: (icon:, text:, subtext:) %>
 
-<div class="flex gap-3 items-center">
+<div class="flex-gap-3">
     <div>
         <%== part("components/icon", name: icon, classes: "text-orange-600 h-8 w-8") %>
     </div>
     <div>
-        <div class="font-bold text-gray-900"><%== text %></div>
-        <div class="text-gray-600"><%== subtext %></div>
+        <div class="icon-label-bold"><%== text %></div>
+        <div class="icon-sublabel"><%== subtext %></div>
     </div>
 </div>

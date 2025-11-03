@@ -5,15 +5,15 @@
   </div>
 
   <div class="p-6">
-    <div class="md:flex md:items-center md:justify-between">
-      <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">
+    <div class="flex-header">
+      <div class="flex-title">
+        <h3 class="section-heading">
           Resize Worker Node Pool
         </h3>
       </div>
     </div>
 
-    <div class="table-wrapper border-b-gray-200">
+    <div class="table-card">
       <div class="card-body">
         <% form(action: "#{path(np)}/resize", method: :post) do %>
           <div class="gap-6 sm:flex sm:items-center sm:justify-between">
@@ -28,7 +28,7 @@
                 }
               ) %>
             </div>
-            <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:shrink-0 sm:items-center">
+            <div class="actions-right">
               <%== part("components/button", text: "Resize") %>
             </div>
           </div>
@@ -40,24 +40,24 @@
 
 <% if has_permission?("KubernetesCluster:delete", @kc) %>
   <div class="p-6">
-    <div class="md:flex md:items-center md:justify-between">
-      <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">
+    <div class="flex-header">
+      <div class="flex-title">
+        <h3 class="section-heading">
           Danger Zone
         </h3>
       </div>
     </div>
-    <div class="table-wrapper border-b-gray-200">
+    <div class="table-card">
       <!-- Delete Card -->
       <div class="card-body">
-        <div class="sm:flex sm:items-center sm:justify-between">
+        <div class="flex-header-sm">
           <div>
-            <h3 class="text-base font-semibold text-gray-900">Delete Kubernetes Cluster</h3>
-            <div class="mt-2 text-sm text-gray-500">
+            <h3 class="subsection-heading">Delete Kubernetes Cluster</h3>
+            <div class="description-text">
               <p>This action will permanently delete this cluster. Deleted data cannot be recovered. Use it carefully.</p>
             </div>
           </div>
-          <div id="kc-delete-<%=@kc.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:shrink-0 sm:items-center">
+          <div id="kc-delete-<%=@kc.ubid%>" class="actions-right">
             <%== part("components/delete_button", url: path(@kc), confirmation: @kc.name, redirect: "#{@project.path}/kubernetes-cluster") %>
           </div>
         </div>

@@ -2,7 +2,7 @@
 vm = @pg.representative_server.vm
 %>
 
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 database-overview">
+<div class="overview-grid database-overview">
   <%
     if (tsdb_client = PostgresServer.victoria_metrics_client)
       query = Metrics::POSTGRES_METRICS[:disk_usage].series[0].query.gsub("$ubicloud_resource_id", @pg.ubid)
@@ -50,17 +50,17 @@ vm = @pg.representative_server.vm
 <% @enable_echarts = true %>
 
 <div id="metrics-container" class="p-6" data-metrics-url="<%= path(@pg) %>">
-  <div class="md:flex md:items-center md:justify-between">
-    <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">Metrics Summary</h3>
+  <div class="flex-header">
+    <div class="flex-title">
+      <h3 class="section-heading">Metrics Summary</h3>
     </div>
   </div>
   <% if @pg.display_state != "creating" %>
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 border-t-0">
       <% Metrics::POSTGRES_METRICS.slice(:cpu_usage, :disk_usage).each do |key, metric| %>
-        <div class="p-4 bg-gray-50 rounded-lg border border-gray-100">
-          <h4 class="text-sm font-medium text-gray-900 mb-2"><%= metric.name %></h4>
-          <p class="text-xs text-gray-500 mt-2"><%= metric.description %></p>
+        <div class="metric-card">
+          <h4 class="chart-title"><%= metric.name %></h4>
+          <p class="text-xs help-text mt-2"><%= metric.description %></p>
           <div
             class="metric-chart h-64 w-full"
             id="<%= key %>-chart"

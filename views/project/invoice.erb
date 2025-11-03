@@ -28,9 +28,9 @@
   end.join
 %>
 
-<div class="grid gap-6">
+<div class="content-grid">
   <div class="md:flex md:items-center md:justify-between text-2xl">
-    <div class="min-w-0 flex-1">This invoice will be finalized on the first day of next month</div>
+    <div class="flex-title">This invoice will be finalized on the first day of next month</div>
     <div class="text-right"><%= @invoice_data.begin_time %> to <%= @invoice_data.end_time %></div>
   </div>
 
