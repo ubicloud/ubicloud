@@ -28,7 +28,7 @@ jobs:
       uses: ./.github/actions/setup-clover
 
     - name: Set up Node.js
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@v6
       with:
          node-version-file: "package.json"
 
@@ -78,7 +78,7 @@ jobs:
 
     - name: Archive code coverage results
       if: failure()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: code-coverage-report-${{ matrix.runs-on }}
         path: coverage/

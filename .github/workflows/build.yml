@@ -77,7 +77,7 @@ jobs:
 
       - name: Upload digest
         if: ${{ inputs.push_image }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: digests-${{ matrix.runner }}
           path: /tmp/digests/*
@@ -91,7 +91,7 @@ jobs:
       - docker
     steps:
       - name: Download digests
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           pattern: digests-*
           merge-multiple: true
