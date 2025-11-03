@@ -164,12 +164,12 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
 
   describe "#wait_router_up" do
     it "naps if vm is not up" do
-      LoadBalancerVmPort.first.update(state: "down")
+      LoadBalancerVmPort.all.each { |lvp| lvp.update(state: "down") }
       expect { nx.wait_router_up }.to nap(5)
     end
 
     it "sets hops to wait when vm is in active set of load balancer" do
-      LoadBalancerVmPort.first.update(state: "up")
+      LoadBalancerVmPort.all.each { |lvp| lvp.update(state: "up") }
       expect { nx.wait_router_up }.to hop("wait")
     end
   end
@@ -189,14 +189,14 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
 
   describe "#unavailable" do
     it "creates a page if replica is unavailable" do
-      LoadBalancerVmPort.first.update(state: "down")
+      LoadBalancerVmPort.all.each { |lvp| lvp.update(state: "down") }
       expect(Prog::PageNexus).to receive(:assemble)
       expect(inference_router).to receive(:maintenance_set?).and_return(false)
       expect { nx.unavailable }.to nap(30)
     end
 
     it "does not create a page if replica is in maintenance mode" do
-      LoadBalancerVmPort.first.update(state: "down")
+      LoadBalancerVmPort.all.each { |lvp| lvp.update(state: "down") }
       expect(Prog::PageNexus).not_to receive(:assemble)
       expect(inference_router).to receive(:maintenance_set?).and_return(true)
       expect { nx.unavailable }.to nap(30)

@@ -47,11 +47,23 @@ RSpec.describe LoadBalancer do
 
     it "adds the new port and increments update_load_balancer" do
       expect(lb).to receive(:incr_update_load_balancer)
-      expect(lb.vm_ports.count).to eq(1)
+      expect(lb.vm_ports.count).to eq(2)
       lb.add_port(443, 8443)
       lb.reload
-      expect(lb.vm_ports.count).to eq(2)
+      expect(lb.vm_ports.count).to eq(4)
       expect(lb.ports.count).to eq(2)
+    end
+
+    it "adds the new port and increments update_load_balancer for ipv6 load balancer" do
+      lb.update(stack: "ipv6")
+      expect(lb).to receive(:incr_update_load_balancer)
+      expect(lb.vm_ports.count).to eq(2)
+      lb.add_port(443, 8443)
+      lb.reload
+      expect(lb.vm_ports.count).to eq(3)
+      expect(lb.ports.count).to eq(2)
+      expect(lb.vm_ports.count { |vm_port| vm_port.stack == "ipv4" }).to eq(1)
+      expect(lb.vm_ports.count { |vm_port| vm_port.stack == "ipv6" }).to eq(2)
     end
   end
 
@@ -68,13 +80,13 @@ RSpec.describe LoadBalancer do
       expect(lb).to receive(:incr_update_load_balancer).twice
       lb.add_port(443, 8443)
       lb.reload
-      expect(lb.vm_ports.count).to eq(2)
+      expect(lb.vm_ports.count).to eq(4)
       expect(lb.ports.count).to eq(2)
 
       lb.remove_port(lb.ports[1])
       lb.reload
       expect(lb.ports.count).to eq(1)
-      expect(lb.vm_ports.count).to eq(1)
+      expect(lb.vm_ports.count).to eq(2)
     end
   end
 
@@ -172,17 +184,18 @@ RSpec.describe LoadBalancer do
 
     it "deletes the load_balancer_vm_port" do
       new_port = LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 443, dst_port: 8443)
-      LoadBalancerVmPort.create(load_balancer_port_id: new_port.id, load_balancer_vm_id: lb.load_balancer_vms.first.id)
+      LoadBalancerVmPort.create(load_balancer_port_id: new_port.id, load_balancer_vm_id: lb.load_balancer_vms.first.id, stack: "ipv4")
+      LoadBalancerVmPort.create(load_balancer_port_id: new_port.id, load_balancer_vm_id: lb.load_balancer_vms.first.id, stack: "ipv6")
       lb.reload
-      expect(lb.vm_ports.count).to eq(2)
+      expect(lb.vm_ports.count).to eq(4)
       lb.remove_vm_port(lb.vm_ports.first)
       lb.reload
-      expect(lb.vm_ports.count).to eq(1)
+      expect(lb.vm_ports.count).to eq(3)
       expect(lb.load_balancer_vms.count).to eq(1)
     end
 
     it "deletes the load_balancer_vm_port also deletes load_balancer_vms if the deleted vm_port was the last one" do
-      lb.remove_vm_port(lb.vm_ports.first)
+      lb.vm_ports.each { lb.remove_vm_port(it) }
       lb.reload
       expect(lb.vm_ports.count).to eq(0)
       expect(lb.load_balancer_vms.count).to eq(0)
