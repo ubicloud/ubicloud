@@ -51,7 +51,7 @@
     ) %>
   <% end %>
   <!-- Quota Card -->
-  <div class="table-wrapper" style="border-bottom: 1px solid var(--gray-200);"">
+  <div class="table-wrapper" class="border-b-gray-200"">
     <div class="card-body">
       <h3 class="text-base font-semibold text-gray-900">Quotas</h3>
       <div class="mt-2 text-sm text-gray-500">
@@ -76,7 +76,7 @@
   </div>
   <!-- Delete Card -->
   <% if has_permission?("Project:delete", @project) %>
-    <div class="table-wrapper" style="border-bottom: 1px solid var(--gray-200);"">
+    <div class="table-wrapper" class="border-b-gray-200"">
       <div class="card-body">
         <div class="sm:flex sm:items-center sm:justify-between">
           <div>

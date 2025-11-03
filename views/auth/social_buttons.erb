@@ -5,15 +5,14 @@
         <div class="w-full border-t border-gray-200"></div>
       </div>
       <div class="relative flex justify-center text-sm font-medium">
-        <span style="background-color: white; padding-inline: var(--spacing-6); color: var(--gray-900);">Or continue with</span>
+        <span class="divider-text">Or continue with</span>
       </div>
     </div>
     <div class="mt-4 grid sm:grid-cols-<%= omniauth_providers.length %> gap-4">
       <% omniauth_providers.each do |provider, name| %>
         <% form(action: rodauth.omniauth_request_path(provider), method: :post, class: :grow) do %>
           <button
-            class="btn"
-            style="width: 100%; background-color: white; color: var(--gray-900); box-shadow: 0 0 0 1px var(--gray-300) inset; justify-content: center; gap: var(--spacing-3);"
+            class="btn social-login-button"
             type="submit"
           >
             <%== part("components/icon", name: provider.to_s) %>

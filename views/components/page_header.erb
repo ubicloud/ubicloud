@@ -4,10 +4,8 @@
   <% unless breadcrumbs.empty? %>
     <div>
       <nav class="sm:hidden" aria-label="Back">
-        <a href="<%= back %>" class="flex items-center text-sm font-medium text-gray-500 transition-colors" style="text-decoration: none;">
-          <div class="shrink-0 text-gray-400" style="margin-left: -0.25rem; margin-right: 0.25rem;">
-            <%== part("components/icon", name: "hero-chevron-left", style: "width: 1.25rem; height: 1.25rem;") %>
-          </div>
+        <a href="<%= back %>" class="flex items-center text-sm font-medium text-gray-500 transition-colors no-underline">
+          <%== part("components/icon", name: "hero-chevron-left", classes: "icon-sm shrink-0 text-gray-400 -ml-1 mr-1") %>
           Back
         </a>
       </nav>
@@ -17,7 +15,9 @@
             <li>
               <div class="flex items-center">
                 <% if index > 0 %>
-                  <%== part("components/icon", name: "hero-chevron-right", classes: "shrink-0 text-gray-400", style: "width: 1.25rem; height: 1.25rem; margin-right: var(--spacing-4);") %>
+                  <span class="mr-4">
+                    <%== part("components/icon", name: "hero-chevron-right", classes: "icon-sm shrink-0 text-gray-400") %>
+                  </span>
                 <% end %>
                 <a href="<%= url %>" class="text-sm font-medium text-gray-500 transition-colors"><%= name %></a>
               </div>
@@ -28,7 +28,7 @@
     </div>
   <% end %>
 
-  <div class="md:flex md:items-center md:justify-between" style="padding-bottom: var(--spacing-4);">
+  <div class="md:flex md:items-center md:justify-between pb-4">
     <div class="min-w-0">
       <h2 class="text-2xl font-bold text-gray-900 sm:text-3xl sm:tracking-tight"><%= title %></h2>
     </div>

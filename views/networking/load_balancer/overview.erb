@@ -22,7 +22,7 @@ data << ["SSL Certificate Status", @lb.active_cert&.cert ? "Available" : "Creati
 
 <%== part("components/kv_data_card", data:) %>
 <% if @lb.cert_enabled %>
-  <div class="p-1 overflow-hidden rounded-lg shadow border: 1px solid rgb(0 0 0 / 0.05); bg-white style="border-bottom: 1px solid var(--gray-200);" mt-4 px-4 py-5 sm:flex sm:items-center">
+  <div class="p-1 overflow-hidden rounded-lg shadow border border-gray-100 bg-white border-b-gray-200 mt-4 px-4 py-5 sm:flex sm:items-center">
     <div>
       <h3 class="text-base font-semibold text-gray-900">How to fetch the SSL certificate?</h3>
       <div class="mt-2 text-sm text-gray-500">

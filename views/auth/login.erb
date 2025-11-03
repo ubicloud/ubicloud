@@ -17,7 +17,7 @@
     <% identities = AccountIdentity.where(account_id: rodauth.account_id).all %>
     <% unless identities.empty? %>
       <div class="relative flex justify-center text-sm font-medium">
-        <span style="background-color: white; padding-inline: var(--spacing-6); color: var(--gray-900);"><%= rodauth.has_password? ? "Or login" : "Login" %>
+        <span class="divider-text"><%= rodauth.has_password? ? "Or login" : "Login" %>
           with:</span>
       </div>
     <% end %>
@@ -30,8 +30,7 @@
       <% end %>
       <% form(action: rodauth.omniauth_request_path(identity.provider), method: :post, class: "grow") do %>
         <button
-          class="btn"
-          style="width: 100%; background-color: white; color: var(--gray-900); box-shadow: 0 0 0 1px var(--gray-300) inset; justify-content: center; gap: var(--spacing-3);"
+          class="btn social-login-button"
           type="submit"
         >
           <%== part("components/icon", name: identity.provider.to_s) unless provider_name %>

@@ -3,12 +3,12 @@
 <%== part("components/page_header", title: "My Account") %>
 
 <main>
-  <div style="max-width: 1280px; padding-bottom: var(--spacing-6);">
+  <div class="account-container">
     <div class="card">
-      <div style="border-bottom: 1px solid var(--gray-200);" class="lg:grid lg:grid-cols-12">
+      <div class="border-b-gray-200 lg:grid lg:grid-cols-12">
         <%== render("account/submenu") %>
-        <div style="border-top: 1px solid var(--gray-200); padding-bottom: 2.5rem;" class="lg:col-span-8 xl:col-span-9 2xl:col-span-10">
-          <div class="px-4 py-6 sm:p-6" style="display: flex; flex-direction: column; gap: var(--spacing-4);">
+        <div class="border-t-gray-200 pb-10 lg:col-span-8 xl:col-span-9 2xl:col-span-10">
+          <div class="px-4 py-6 sm:p-6 account-section">
             <h2 class="text-lg font-medium text-gray-900">Change Email Address</h2>
             <% form(action: rodauth.change_login_path, method: :post) do %>
               <div class="mt-6 grid grid-cols-6 gap-6">

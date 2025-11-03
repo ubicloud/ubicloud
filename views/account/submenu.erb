@@ -1,5 +1,5 @@
 <aside class="py-6 lg:col-span-4 xl:col-span-3 2xl:col-span-2">
-  <nav style="display: flex; flex-direction: column; gap: var(--spacing-1);">
+  <nav class="account-nav">
     <% disallow_login_methods = rodauth.locked_domain_for(current_account.email)
       [
         ["Multifactor Auth", "/account/multifactor-manage", "hero-lock-closed"],
@@ -12,25 +12,22 @@
       <% if request.path == url %>
         <a
           href="<%= url %>"
-          class="group flex items-center px-3 py-2 text-sm font-medium"
-          style="border-left: 4px solid var(--orange-600); background-color: var(--orange-50); color: var(--orange-600);"
+          class="account-nav-item account-nav-item-active"
           aria-current="page"
         >
           <%== part(
             "components/icon",
             name: icon,
-            classes: "shrink-0",
-            style: "color: var(--orange-600); margin-left: -0.25rem; margin-right: var(--spacing-3); width: 1.5rem; height: 1.5rem;"
+            classes: "account-nav-icon account-nav-icon-active"
           ) %>
           <span class="truncate"><%= label %></span>
         </a>
       <% else %>
         <a
           href="<%= url %>"
-          class="group flex items-center px-3 py-2 text-sm font-medium text-gray-900 transition-colors"
-          style="border-left: 4px solid transparent;"
+          class="account-nav-item"
         >
-          <%== part("components/icon", name: icon, classes: "text-gray-400 group-transition-colors shrink-0", style: "margin-left: -0.25rem; margin-right: var(--spacing-3); width: 1.5rem; height: 1.5rem;") %>
+          <%== part("components/icon", name: icon, classes: "account-nav-icon") %>
           <span class="truncate"><%= label %></span>
         </a>
       <% end %>

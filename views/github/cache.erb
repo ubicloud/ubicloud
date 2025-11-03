@@ -3,9 +3,9 @@
 <%== render("github/tabbar") %>
 
 <div class="grid gap-6">
-  <div class="table-wrapper" style="border-bottom: 1px solid var(--gray-200);"">
+  <div class="table-wrapper" class="border-b-gray-200"">
     <table class="table">
-      <tbody style="border-bottom: 1px solid var(--gray-200);" bg-white">
+      <tbody class="border-b-gray-200" bg-white">
         <% if @entries_by_repo.count > 0 %>
           <% @entries_by_repo.each do |repository_id, entries| %>
             <tr class="cache-group-row cursor-pointer group" data-repository="<%= repository_id %>">

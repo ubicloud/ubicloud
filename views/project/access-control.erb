@@ -53,7 +53,7 @@ end
     <% end %>
 
     <% form(action: form_action, method: :post, id: "access-control-form") do %>
-      <div class="table-wrapper" style="border-bottom: 1px solid var(--gray-200);"">
+      <div class="table-wrapper" class="border-b-gray-200"">
         <table id="access-control-entries" class="min-w-full divide-y divide-gray-300 group">
           <thead class="bg-gray-50 <% if @token %> hidden group-[&:has(tr:nth-child(n+3))]:table-header-group <% end %>">
             <tr>
@@ -76,7 +76,7 @@ end
               <% end %>
             </tr>
           </thead>
-          <tbody style="border-bottom: 1px solid var(--gray-200);" bg-white">
+          <tbody class="border-b-gray-200" bg-white">
             <% @aces.append(["template", [], true]).each do |ubid, tags, editable| %>
               <% editable &&= edit_perm %>
               <tr id="ace-<%= ubid %>" class="<%= "existing-aces#{"-view" unless editable}" unless ubid == "template" %>">
@@ -135,7 +135,7 @@ end
     <% end %>
   <% end %>
   <% if @token %>
-    <div class="table-wrapper" style="border-bottom: 1px solid var(--gray-200);"">
+    <div class="table-wrapper" class="border-b-gray-200"">
       <div class="card-body">
         <% form(action: restriction_path, method: :post) do %>
           <div class="sm:flex sm:items-center sm:justify-between">

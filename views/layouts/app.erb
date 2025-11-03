@@ -58,7 +58,7 @@
         <%== render("layouts/sidebar/mobile") %>
         <div class="main-content">
           <%== render("layouts/topbar") %>
-          <main style="padding-block: 2.5rem;">
+          <main class="py-10">
             <div class="content-container">
               <div class="content-inner">
                 <%== render("components/flash_message") %>
@@ -82,7 +82,7 @@
 
         <div class="auth-container">
           <div class="auth-card">
-            <div style="padding-top: var(--spacing-4);" class="empty:hidden"><%== render("components/flash_message") %></div>
+            <div class="pt-4 empty:hidden"><%== render("components/flash_message") %></div>
             <%== yield %>
           </div>
         </div>

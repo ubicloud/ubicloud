@@ -5,7 +5,7 @@
     <h3 class="text-lg font-medium text-gray-900"><%= title %></h3>
   </div>
 
-  <div style="border-bottom: 1px solid var(--gray-200);" w-full max-h-64 overflow-y-auto">
+  <div class="border-b-gray-200 w-full max-h-64 overflow-y-auto">
     <% config.each_with_index do |(key, value), index| %>
       <% error = errors[name + "." + key] %>
       <% next if key.empty? && value.empty? %>

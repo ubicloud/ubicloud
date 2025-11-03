@@ -16,7 +16,7 @@
     </div>
   <% end %>
 
-  <div class="table-wrapper" style="border-bottom: 1px solid var(--gray-200);"">
+  <div class="table-wrapper border-b-gray-200">
     <table class="table">
       <% unless headers.empty? || rows.empty? %>
         <thead class="bg-gray-50">
@@ -38,7 +38,7 @@
           </tr>
         </thead>
       <% end %>
-      <tbody style="border-bottom: 1px solid var(--gray-200);" bg-white">
+      <tbody class="border-b-gray-200 bg-white">
         <% if rows.empty? %>
           <tr>
             <td colspan="<%= headers.length %>" class="text-center py-4 px-8 lg:px-32">

@@ -3,11 +3,11 @@
 <%== part("components/page_header", title: "My Account") %>
 
 <main>
-  <div style="max-width: 1280px;" pb-6 style="padding-bottom: var(--spacing-6);"">
+  <div class="account-container">
     <div class="card">
-      <div style="border-bottom: 1px solid var(--gray-200);" lg:grid lg:grid-cols-12 ">
+      <div class="border-b-gray-200 lg:grid lg:grid-cols-12">
         <%== render("account/submenu") %>
-        <div style="border-bottom: 1px solid var(--gray-200);" lg:col-span-8 xl:col-span-9 2xl:col-span-10">
+        <div class="border-b-gray-200 lg:col-span-8 xl:col-span-9 2xl:col-span-10">
           <% if rodauth.two_factor_modifications_require_password? %>
             <div class="px-4 py-6 sm:p-6 form-group">
               <h2 class="text-lg font-medium text-gray-900">Recovery Codes</h2>

@@ -7,11 +7,11 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
 <%== part("components/page_header", title: "My Account") %>
 
 <main>
-  <div style="max-width: 1280px;" pb-6 style="padding-bottom: var(--spacing-6);"">
+  <div class="account-container">
     <div class="card">
-      <div style="border-bottom: 1px solid var(--gray-200);" lg:grid lg:grid-cols-12 ">
+      <div class="border-b-gray-200 lg:grid lg:grid-cols-12">
         <%== render("account/submenu") %>
-        <div style="border-bottom: 1px solid var(--gray-200);" lg:col-span-8 xl:col-span-9 2xl:col-span-10">
+        <div class="border-b-gray-200 lg:col-span-8 xl:col-span-9 2xl:col-span-10">
           <% omniauth_providers.each do |provider, name| %>
             <div id="login-method-<%= provider %>" class="px-4 py-6 sm:p-6 form-group">
               <div class="mt-6 grid grid-cols-6 gap-6">
@@ -22,7 +22,7 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
                     <%= name %>
                     to log in to your Ubicloud account</p>
                 </div>
-                <div class="col-span-6 sm:col-span-2" style="text-align: right; display: flex; flex-direction: column; gap: var(--spacing-1);">
+                <div class="col-span-6 sm:col-span-2 text-right flex flex-col gap-1">
                   <% if uid = @identities[provider.to_s] %>
                     <% form(action: "/account/login-method/disconnect", method: :post, class: :grow) do %>
                       <%== hidden_inputs(provider:, uid:) %>
@@ -49,7 +49,7 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
                     <%= display_name %>
                     account to log in to your Ubicloud account using OIDC</p>
                 </div>
-                <div class="col-span-6 sm:col-span-2" style="text-align: right; display: flex; flex-direction: column; gap: var(--spacing-1);">
+                <div class="col-span-6 sm:col-span-2 text-right flex flex-col gap-1">
                   <% form(action: "/account/login-method/disconnect", method: :post, class: :grow) do %>
                     <%== hidden_inputs(provider:, uid:) %>
                     <%== part("components/button", text: "Disconnect", type: "danger") %>
@@ -87,7 +87,7 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
                   <% end %>
                 </p>
               </div>
-              <div class="col-span-6 sm:col-span-2" style="text-align: right; display: flex; flex-direction: column; gap: var(--spacing-1);">
+              <div class="col-span-6 sm:col-span-2 text-right flex flex-col gap-1">
                 <%== part("components/button", text: rodauth.has_password? ? "Change" : "Create", link: "/account/change-password") %>
                 <% if rodauth.has_password? %>
                   <% form(action: "/account/login-method/disconnect", method: :post, class: :grow) do %>
