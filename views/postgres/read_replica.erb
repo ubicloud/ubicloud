@@ -5,7 +5,7 @@
         <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">Read Replicas</h3>
       </div>
     </div>
-    <div class="table-wrapper" class="border-b-gray-200"">
+    <div class="table-wrapper border-b-gray-200">
       <table class="table">
         <thead class="bg-gray-50">
           <tr>
@@ -13,7 +13,7 @@
             <th scope="col">State</th>
           </tr>
         </thead>
-        <tbody class="border-b-gray-200" bg-white">
+        <tbody class="border-b-gray-200 bg-white">
           <% @pg.read_replicas.each do |read_replica| %>
             <tr>
               <td>

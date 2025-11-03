@@ -23,7 +23,7 @@
         </h3>
       </div>
     </div>
-    <div class="table-wrapper" class="border-b-gray-200"">
+    <div class="table-wrapper border-b-gray-200">
       <div class="card-body">
         <% form(action: user_path, method: :post) do %>
           <div class="form-group">
@@ -58,7 +58,7 @@
           </h3>
         </div>
       </div>
-      <div class="table-wrapper" class="border-b-gray-200"">
+      <div class="table-wrapper border-b-gray-200">
         <table class="table">
           <thead class="bg-gray-50">
             <tr>
@@ -67,7 +67,7 @@
               <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-6 text-left text-sm font-semibold text-gray-900"></th>
             </tr>
           </thead>
-          <tbody class="border-b-gray-200" bg-white">
+          <tbody class="border-b-gray-200 bg-white">
             <% @users.each do |user| %>
               <tr id="user-<%= user.ubid %>">
                 <td scope="row">

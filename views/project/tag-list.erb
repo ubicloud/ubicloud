@@ -20,7 +20,7 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
 
 <div class="grid gap-6">
   <div>
-    <div class="table-wrapper" class="border-b-gray-200"">
+    <div class="table-wrapper border-b-gray-200">
       <% if modification_allowed %>
         <div class="px-4 py-5 sm:p-6 form-group">
           <h3 class="text-lg font-medium text-gray-900"><%= "Create #{@display_tag_type} Tag" %></h3>
@@ -66,7 +66,7 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
               <th scope="col" class="pl-3 pr-4 sm:pr-6 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
             </tr>
           </thead>
-          <tbody class="border-b-gray-200" bg-white">
+          <tbody class="border-b-gray-200 bg-white">
             <% @tags.each do |tag| %>
               <% editable = !(@tag_type == "subject" && tag.name == "Admin") && modification_allowed %>
               <tr id="<%= tag.ubid %>">

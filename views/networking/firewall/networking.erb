@@ -20,7 +20,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
       </h3>
     </div>
   </div>
-  <div class="table-wrapper" class="border-b-gray-200"">
+  <div class="table-wrapper border-b-gray-200">
     <table class="table">
       <thead class="bg-gray-50">
         <tr>
@@ -32,7 +32,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
           <% end %>
         </tr>
       </thead>
-      <tbody class="border-b-gray-200" bg-white">
+      <tbody class="border-b-gray-200 bg-white">
         <% @firewall.firewall_rules.sort_by { [it.cidr.version, it.cidr.to_s] }.each do |fwr| %>
           <tr>
             <% if edit_perm %>
@@ -149,7 +149,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
       </h3>
     </div>
   </div>
-  <div id="fw-private-subnets" class="table-wrapper" class="border-b-gray-200"">
+  <div id="fw-private-subnets" class="table-wrapper border-b-gray-200">
     <table class="table">
       <thead class="bg-gray-50">
         <tr>
@@ -159,7 +159,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
           <% end %>
         </tr>
       </thead>
-      <tbody class="border-b-gray-200" bg-white">
+      <tbody class="border-b-gray-200 bg-white">
         <% @firewall.private_subnets.each do |ps| %>
           <tr>
             <td scope="row">

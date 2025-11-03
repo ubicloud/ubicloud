@@ -10,7 +10,7 @@ delete_perm = has_permission?("LoadBalancer:delete", @lb) %>
         </h3>
       </div>
     </div>
-    <div class="table-wrapper" class="border-b-gray-200"">
+    <div class="table-wrapper border-b-gray-200">
       <% if edit_perm %>
         <div class="card-body">
           <% form(action: "#{path(@lb)}/rename", method: :post) do %>

@@ -56,7 +56,7 @@ current_members.sort! %>
 
 <div class="grid gap-6">
   <% if editable %>
-    <div class="table-wrapper" class="border-b-gray-200"">
+    <div class="table-wrapper border-b-gray-200">
       <div class="px-4 py-5 sm:p-6 form-group">
         <h3 class="text-lg font-medium text-gray-900"><%= "Update #{@display_tag_type} Tag" %></h3>
         <% form(action: path(@tag), method: :post) do %>
@@ -93,7 +93,7 @@ current_members.sort! %>
         </div>
       </div>
       <% form(action: disassociate_path, method: :post) do %>
-        <div class="table-wrapper" class="border-b-gray-200"">
+        <div class="table-wrapper border-b-gray-200">
           <table id="tag-membership-remove" class="table">
             <thead class="bg-gray-50">
               <tr>
@@ -103,7 +103,7 @@ current_members.sort! %>
                 <% end %>
               </tr>
             </thead>
-            <tbody class="border-b-gray-200" bg-white">
+            <tbody class="border-b-gray-200 bg-white">
               <% current_members.each do |label, ubid| %>
                 <tr id="<%= ubid %>" class="cursor-pointer">
                   <td scope="row">
@@ -139,7 +139,7 @@ current_members.sort! %>
         </div>
       </div>
       <% form(action: associate_path, method: :post) do %>
-        <div class="table-wrapper" class="border-b-gray-200"">
+        <div class="table-wrapper border-b-gray-200">
           <table id="tag-membership-add" class="table">
             <thead class="bg-gray-50">
               <tr>
@@ -147,7 +147,7 @@ current_members.sort! %>
                 <th scope="col">Add?</th>
               </tr>
             </thead>
-            <tbody class="border-b-gray-200" bg-white">
+            <tbody class="border-b-gray-200 bg-white">
               <% add_groups.each do |name, available_to_add| %>
                 <% name = name["label"] if name.is_a?(Hash) %>
                 <tr>
