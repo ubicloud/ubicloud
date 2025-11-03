@@ -51,6 +51,12 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
 
   label def remove_spdk_controller
     vm.vm_host.sshable.cmd("sudo host/bin/spdk-migration-helper remove-spdk-controller", stdin: migration_script_params)
+    hop_generate_vhost_backend_conf
+  end
+
+  label def generate_vhost_backend_conf
+    vm.vm_host.sshable.cmd("sudo host/bin/convert-encrypted-dek-to-vhost-backend-conf --encrypted-dek-file #{root_dir_path}data_encryption_key.json --kek-file /dev/stdin --vhost-conf-output-file #{vhost_conf_path} --vm-name #{vm.inhost_name} --device #{vm.vm_storage_volumes.first.storage_device.name}", stdin: vm.storage_secrets.to_json)
+    vm.vm_host.sshable.cmd("sudo chown #{vm.inhost_name}:#{vm.inhost_name} #{vhost_conf_path}")
     hop_ready_migration
   end
 
@@ -62,12 +68,6 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
     vm.vm_host.sshable.cmd("sudo mkfifo #{kek_file_path}")
     vm.vm_host.sshable.cmd("sudo chown #{vm.inhost_name}:#{vm.inhost_name} #{kek_file_path}")
 
-    hop_generate_vhost_backend_conf
-  end
-
-  label def generate_vhost_backend_conf
-    vm.vm_host.sshable.cmd("sudo host/bin/convert-encrypted-dek-to-vhost-backend-conf --encrypted-dek-file #{root_dir_path}data_encryption_key.json --kek-file /dev/stdin --vhost-conf-output-file #{vhost_conf_path} --vm-name #{vm.inhost_name}", stdin: vm.storage_secrets.to_json)
-    vm.vm_host.sshable.cmd("sudo chown #{vm.inhost_name}:#{vm.inhost_name} #{vhost_conf_path}")
     hop_download_migration_binaries
   end
 
