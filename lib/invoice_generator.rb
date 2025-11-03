@@ -21,32 +21,23 @@ class InvoiceGenerator
     DB.transaction do
       active_billing_records.group_by { |br| br[:project] }.each do |project, project_records|
         project_content = {}
-
         project_content[:project_id] = project.id
         project_content[:project_name] = project.name
-        country = project.billing_info&.country
-        project_content[:billing_info] = project.billing_info&.stripe_data&.merge({
-          "id" => project.billing_info.id,
-          "ubid" => project.billing_info.ubid,
-          "in_eu_vat" => !!country&.in_eu_vat?
+        bi = project.billing_info
+        country = bi&.country
+        is_eu = country&.in_eu_vat?
+        project_content[:billing_info] = bi&.stripe_data&.merge({
+          "id" => bi.id,
+          "ubid" => bi.ubid,
+          "in_eu_vat" => !!is_eu
         })
-
         # Invoices are issued by Ubicloud Inc. for non-EU customers without VAT applied.
         # Invoices are issued by Ubicloud B.V. for EU customers.
         #   - If the customer has provided a VAT number from the Netherlands, we charge 21% VAT.
         #   - If the customer has provided a VAT number from another European country, we include a reverse charge notice along with 0% VAT.
         #   - If the customer hasn't provided a VAT number, we charge 21% VAT until non-Dutch EU sales exceed annual threshold, than we charge local VAT.
-        issuer = {
-          name: "Ubicloud Inc.",
-          address: "310 Santa Ana Avenue",
-          country: "US",
-          city: "San Francisco",
-          state: "CA",
-          postal_code: "94127"
-        }
-        vat_info = nil
-        if country&.in_eu_vat?
-          issuer = {
+        project_content[:issuer_info] = if is_eu
+          {
             name: "Ubicloud B.V.",
             address: "Turfschip 267",
             country: "NL",
@@ -56,13 +47,23 @@ class InvoiceGenerator
             trade_id: "88492729",
             in_eu_vat: true
           }
-          vat_info = if (tax_id = project_content[:billing_info]["tax_id"]) && !tax_id.empty? && country.alpha2 != "NL"
+        else
+          {
+            name: "Ubicloud Inc.",
+            address: "310 Santa Ana Avenue",
+            country: "US",
+            city: "San Francisco",
+            state: "CA",
+            postal_code: "94127"
+          }
+        end
+        vat_info = if is_eu
+          if (tax_id = project_content[:billing_info]["tax_id"]) && !tax_id.empty? && country.alpha2 != "NL"
             {rate: 0, reversed: true}
           else
             {rate: Config.annual_non_dutch_eu_sales_exceed_threshold ? country.vat_rates["standard"] : 21, reversed: false, eur_rate: @eur_rate}
           end
         end
-        project_content[:issuer_info] = issuer
         project_content[:resources] = []
         project_content[:subtotal] = 0
         project_records.group_by { |pr| [pr[:resource_id], pr[:resource_name]] }.each do |(resource_id, resource_name), line_items|
