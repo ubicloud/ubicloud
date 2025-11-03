@@ -246,6 +246,8 @@ RSpec.describe Kubernetes::Client do
         "items" => ["metadata" => {"name" => "svc", "namespace" => "default", "creationTimestamp" => "2024-01-03T00:00:00Z"}]
       }.to_json
       allow(kubernetes_client).to receive(:kubectl).with("get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(@response)
+      expect(kubernetes_client.instance_variable_get(:@kubernetes_cluster)).to receive(:reload).at_least(:once)
+      expect(kubernetes_client.instance_variable_get(:@load_balancer)).to receive(:reload).at_least(:once)
     end
 
     it "returns true early since there are no LoadBalancer services but there is a port" do
