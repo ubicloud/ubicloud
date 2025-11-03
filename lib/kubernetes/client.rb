@@ -81,6 +81,7 @@ class Kubernetes::Client
     k8s_svc_raw = kubectl("get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson")
     svc_list = JSON.parse(k8s_svc_raw)["items"]
     @load_balancer.reload
+    @kubernetes_cluster.reload
 
     return true if svc_list.empty? && !@load_balancer.ports.empty?
 
