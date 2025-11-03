@@ -3,13 +3,13 @@
 <%== part("components/page_header", title: "My Account") %>
 
 <main>
-  <div class="max-w-screen-xl pb-6 lg:pb-16">
-    <div class="overflow-hidden rounded-lg bg-white shadow">
-      <div class="divide-y divide-gray-200 lg:grid lg:grid-cols-12 lg:divide-x lg:divide-y-0">
+  <div style="max-width: 1280px;" pb-6 style="padding-bottom: var(--spacing-6);"">
+    <div class="card">
+      <div style="border-bottom: 1px solid var(--gray-200);" lg:grid lg:grid-cols-12 ">
         <%== render("account/submenu") %>
-        <div class="divide-y divide-gray-200 lg:col-span-8 xl:col-span-9 2xl:col-span-10 pb-10">
-          <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
-            <h2 class="text-lg font-medium leading-6 text-gray-900">Remove Security Key</h2>
+        <div style="border-bottom: 1px solid var(--gray-200);" lg:col-span-8 xl:col-span-9 2xl:col-span-10">
+          <div class="px-4 py-6 sm:p-6 form-group">
+            <h2 class="text-lg font-medium text-gray-900">Remove Security Key</h2>
             <% form(action: rodauth.webauthn_remove_path, method: :post, id: "webauthn-remove-form") do %>
               <%== rodauth.webauthn_remove_additional_form_tags %>
               <div class="mt-6 grid grid-cols-6 gap-6">
@@ -20,7 +20,7 @@
                 <% end %>
                 <div class="col-span-6 sm:col-span-6">
                   <fieldset>
-                    <div class="space-y-5">
+                    <div class="form-group">
                       <% (usage = DB[rodauth.webauthn_keys_table]
                           .where(rodauth.webauthn_keys_account_id_column => rodauth.session_value)
                           .select_hash(rodauth.webauthn_keys_webauthn_id_column, [rodauth.webauthn_keys_last_use_column, :name])
@@ -32,11 +32,11 @@
                               name="<%= rodauth.webauthn_remove_param %>"
                               value="<%= id %>"
                               type="radio"
-                              class="h-4 w-4 border-gray-300 text-orange-600 focus:ring-orange-600"
+                              class="h-4 w-4  text-orange-600"
                               required
                             >
                           </div>
-                          <div class="ml-3 text-sm leading-6">
+                          <div class="ml-3 text-sm">
                             <label for="webauthn-remove-<%= id %>" class="font-medium text-gray-900"><%= name %></label>
                             <span id="webauthn-remove-<%= id %>-description" class="text-gray-500">
                               (Last Usage:
@@ -48,7 +48,7 @@
                     </div>
                   </fieldset>
                   <% if error = rodauth.field_error(rodauth.webauthn_remove_param) %>
-                    <p class="mt-2 text-sm text-red-600 leading-6" id="<%= rodauth.webauthn_remove_param %>-error"><%= error %></p>
+                    <p class="mt-2 text-sm text-red-600" id="<%= rodauth.webauthn_remove_param %>-error"><%= error %></p>
                   <% end %>
                 </div>
                 <div class="col-span-6">

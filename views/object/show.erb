@@ -15,17 +15,17 @@
   <div class="flex rounded-lg bg-white shadow divide-x p-8">
     <div class="flex-none pr-8">
       <aside class="lg:col-span-4 xl:col-span-3 2xl:col-span-2">
-        <nav id="<%= type %>-submenu" class="space-y-1">
+        <nav id="<%= type %>-submenu" class="form-group">
           <% tabs.each do |label, page, icon| %>
             <% if @page == page
-               url_class = "border-orange-600 bg-orange-50 text-orange-600 hover:bg-orange-50 hover:text-orange-700 group flex items-center border-l-4 px-3 py-2 text-sm font-medium"
+               url_class = "border-orange-600 bg-orange-50 text-orange-600 hover:bg-orange-50 group flex items-center border-l-4 px-3 py-2 text-sm font-medium"
                icon_class = "text-orange-600 group-hover:text-orange-600"
        else
-               url_class = "border-transparent text-gray-900 hover:bg-gray-50 hover:text-gray-900 group flex items-center border-l-4 px-3 py-2 text-sm font-medium"
-               icon_class = "text-gray-400 group-hover:text-gray-500"
+               url_class = "border-transparent text-gray-900 transition-colors hover:text-gray-900 group flex items-center border-l-4 px-3 py-2 text-sm font-medium"
+               icon_class = "text-gray-400 group-transition-colors"
             end %>
             <a href="<%= "#{path(object)}/#{page}" %>" class="<%= url_class %>">
-              <%== part("components/icon", name: icon, classes: icon_class + " -ml-1 mr-3 h-6 w-6 flex-shrink-0") %>
+              <%== part("components/icon", name: icon, classes: icon_class + "  shrink-0") %>
               <span class="truncate"><%= label %></span>
             </a>
           <% end %>
@@ -36,7 +36,7 @@
       <div class="divide-y">
         <div class="pb-6 flex items-center justify-between">
           <div>
-            <span class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:tracking-tight"><%= object.name %></span>
+            <span class="text-2xl font-bold  text-gray-900 sm:text-3xl sm:tracking-tight"><%= object.name %></span>
             <span>(id:
               <%= object.ubid %>)</span>
           </div>

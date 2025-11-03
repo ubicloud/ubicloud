@@ -2,7 +2,7 @@
   <div>
     <button
       type="button"
-      class="inline-flex w-full items-center gap-x-4 px-6 py-3 text-md font-semibold leading-6 text-white bg-orange-700 hover:bg-orange-800"
+      class="inline-flex w-full items-center gap-4 px-6 py-3 text-md font-semibold text-white bg-orange-700 hover:bg-orange-800"
       id="menu-button"
     >
       <%== part("components/icon", name: "hero-folder-open", classes: "h-8 w-8 rounded-full") %>
@@ -11,7 +11,7 @@
     </button>
   </div>
   <div
-    class="hidden opacity-0 scale-95 group-[.active]:block group-[.active]:opacity-100 group-[.active]:scale-100 transition ease-out duration-100 absolute bottom-12 left-12 z-10 mt-2 w-64 origin-bottom divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none text-gray-800"
+    class="hidden opacity: 0; transform: scale(0.95); group-active:block group-active:opacity-100 transition absolute bottom: 3rem; left: 3rem; z-10 mt-2 w-64 transform-origin: bottom; divide-y border-color: var(--gray-100); rounded-md bg-white  border: 1px solid rgb(0 0 0 / 0.05);  text-gray-800"
     role="menu"
     tabindex="-1"
   >
@@ -19,7 +19,7 @@
       <% current_account.projects.each do |p| %>
         <a
           href="<%= p.path %>/dashboard"
-          class="block px-4 py-2 hover:bg-gray-100 hover:text-gray-900 <% if p.id == @project&.id %> bg-orange-50 text-orange-600 hover:bg-orange-50 hover:text-orange-700 <% end %>"
+          class="block px-4 py-2 hover:bg-gray-100 hover:text-gray-900 <% if p.id == @project&.id %> bg-orange-50 text-orange-600 hover:bg-orange-50 <% end %>"
           role="menuitem"
           tabindex="-1"
         ><%= p.name %></a>
@@ -32,7 +32,7 @@
         role="menuitem"
         tabindex="-1"
       >
-        <div class="mr-2 text-gray-400 group-hover:text-gray-500">
+        <div class="mr-2 text-gray-400 group-transition-colors">
           <%== part("components/icon", name: "hero-plus", classes: "h-5 w-5 stroke-[2.5px]") %>
         </div>
         Create Project

@@ -1,37 +1,37 @@
 <div class="p-6">
   <% if @pg.timeline.earliest_restore_time %>
-    <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+    <div class="md:flex md:items-center md:justify-between">
       <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Read Replicas</h3>
+        <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">Read Replicas</h3>
       </div>
     </div>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <table class="min-w-full divide-y divide-gray-300">
+    <div class="table-wrapper" style="border-bottom: 1px solid var(--gray-200);"">
+      <table class="table">
         <thead class="bg-gray-50">
           <tr>
-            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">State</th>
+            <th scope="col">Name</th>
+            <th scope="col">State</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-200 bg-white">
+        <tbody style="border-bottom: 1px solid var(--gray-200);" bg-white">
           <% @pg.read_replicas.each do |read_replica| %>
             <tr>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-                <a href="<%= path(read_replica) %>/overview" class="text-orange-600 hover:text-orange-700">
+              <td>
+                <a href="<%= path(read_replica) %>/overview" class="text-orange-600">
                   <%= read_replica.name %>
                 </a>
               </td>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+              <td>
                 <%== part("components/pg_state_label", state: read_replica.display_state, extra_class: "text-md") %>
               </td>
             </tr>
           <% end %>
           <% if @edit_perm %>
             <tr>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+              <td>
                 <%== part("components/form/text", name: "name", attributes: { placeholder: @pg.name + "-read-replica", required: true, form: "form-pg-read-replica-create" }) %>
               </td>
-              <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+              <td>
                 <% form(action: "#{path(@pg)}/read-replica", method: :post, id: "form-pg-read-replica-create") do %>
                   <%== part("components/form/submit_button", text: "Create", extra_class: "pg-read-replica-create-btn") %>
                 <% end %>

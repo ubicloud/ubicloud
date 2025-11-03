@@ -2,8 +2,8 @@
 
 <% @page_message = "Sign in to your account" %>
 
-<div class="space-y-6">
-  <% form(class: "rodauth space-y-6", method: :post, id: "login-form") do %>
+<div class="form-group">
+  <% form(class: "rodauth form-group", method: :post, id: "login-form") do %>
 
     <%== render("components/rodauth/login_field") %>
     <% if rodauth.valid_login_entered? %>
@@ -16,8 +16,8 @@
   <% if rodauth.valid_login_entered? %>
     <% identities = AccountIdentity.where(account_id: rodauth.account_id).all %>
     <% unless identities.empty? %>
-      <div class="relative flex justify-center text-sm font-medium leading-6">
-        <span class="bg-white px-6 text-gray-900"><%= rodauth.has_password? ? "Or login" : "Login" %>
+      <div class="relative flex justify-center text-sm font-medium">
+        <span style="background-color: white; padding-inline: var(--spacing-6); color: var(--gray-900);"><%= rodauth.has_password? ? "Or login" : "Login" %>
           with:</span>
       </div>
     <% end %>
@@ -30,11 +30,12 @@
       <% end %>
       <% form(action: rodauth.omniauth_request_path(identity.provider), method: :post, class: "grow") do %>
         <button
-          class="flex w-full items-center justify-center gap-3 rounded-md bg-white px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+          class="btn"
+          style="width: 100%; background-color: white; color: var(--gray-900); box-shadow: 0 0 0 1px var(--gray-300) inset; justify-content: center; gap: var(--spacing-3);"
           type="submit"
         >
           <%== part("components/icon", name: identity.provider.to_s) unless provider_name %>
-          <span class="text-sm font-semibold leading-6"><%= provider_name || identity.provider.capitalize %></span>
+          <span class="text-sm font-semibold"><%= provider_name || identity.provider.capitalize %></span>
         </button>
       <% end %>
     <% end %>
@@ -47,16 +48,16 @@
           id="remember-me"
           name="remember-me"
           type="checkbox"
-          class="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-600"
+          class="form-checkbox"
           form="login-form"
         >
-        <label for="remember-me" class="ml-2 block text-sm text-gray-900">Remember me</label>
+        <label for="remember-me" class="ml-2 text-sm text-gray-900">Remember me</label>
       </div>
 
       <div class="text-sm">
         <a
           href="/reset-password-request?login=<%= Rack::Utils.escape(rodauth.param("login")) %>"
-          class="font-medium text-orange-600 hover:text-orange-700"
+          class="link-primary font-medium"
         >Forgot your password?</a>
       </div>
     </div>
@@ -67,7 +68,7 @@
       <%== part("components/form/submit_button", text: "Sign in", attributes: {form: "login-form"}) %>
     <% end %>
     <% unless rodauth.valid_login_entered? %>
-      <a href="/create-account" class="mt-2 text-sm font-semibold leading-6 text-gray-900">Create a new account</a>
+      <a href="/create-account" class="mt-2 text-sm font-semibold text-gray-900">Create a new account</a>
     <% end %>
   </div>
 </div>

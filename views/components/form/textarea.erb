@@ -3,18 +3,18 @@
 escaped_description = escape_description ? h(description) : description
 error = flash.dig("errors", name) %>
 
-<div class="space-y-2">
+<div class="form-group">
   <% if label %>
-    <label for="<%= name %>" class="block text-sm font-medium leading-6 text-gray-900"><%= label %></label>
+    <label for="<%= name %>" class="block text-sm font-medium text-gray-900"><%= label %></label>
   <% end %>
   <textarea
     id="<%= name %>"
     name="<%= name %>"
-    class="block w-full rounded-md border-0 py-1.5 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset text-sm sm:leading-6 <%= error ? "text-red-900 ring-red-300 placeholder:text-red-300 focus:ring-red-500" : "text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-orange-600" %>"
+    class="block w-full rounded-md border-0 py-1.5  ring-1 box-shadow: inset focus:box-shadow: inset text-sm  <%= error ? "text-red-900 ring-red-300 placeholder:text-red-300 focus:ring-red-500" : "text-gray-900 ring-gray-300 placeholder:text-gray-400" %>"
     <%== html_attrs(attributes) %>
   ><%= value %></textarea>
   <% if description %>
-    <p class="text-sm text-gray-500 leading-6" id="<%= name %>-description"><%== escaped_description %></p>
+    <p class="text-sm text-gray-500" id="<%= name %>-description"><%== escaped_description %></p>
   <% end %>
   <%== part("components/form/error", name:, error:) if error %>
 </div>

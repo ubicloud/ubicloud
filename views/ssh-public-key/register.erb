@@ -25,10 +25,10 @@ back = "#{@project.path}/ssh-public-key" %>
 
 <% form(action:, method: :post) do |f| %>
   <div class="grid gap-6">
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
-      <div class="px-4 py-5 sm:p-6">
-        <div class="space-y-12">
-          <div class="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+    <div class="card"">
+      <div class="card-body">
+        <div class="form-group2">
+          <div class="mt-2 grid grid-cols-1 gap-6 gap-8 sm:grid-cols-6">
             <div class="col-span-full">
               <%== part("components/form/text", name: "name", label: "Name", value: @ssh_public_key.name, attributes: {placeholder: "ssh-key-set-name", required: true}) %>
             </div>
@@ -39,9 +39,9 @@ back = "#{@project.path}/ssh-public-key" %>
           </div>
         </div>
       </div>
-      <div class="px-4 py-5 sm:p-6">
-        <div class="flex items-center justify-end gap-x-6">
-          <a href="<%= @project.path %>/ssh-public-key" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+      <div class="card-body">
+        <div class="flex items-center justify-end gap-6">
+          <a href="<%= @project.path %>/ssh-public-key" class="text-sm font-semibold text-gray-900">Cancel</a>
           <%== part("components/form/submit_button", text: action_type) %>
         </div>
       </div>

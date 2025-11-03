@@ -3,18 +3,18 @@
 <%== part("components/page_header", title: "My Account") %>
 
 <main>
-  <div class="max-w-screen-xl pb-6 lg:pb-16">
-    <div class="overflow-hidden rounded-lg bg-white shadow">
-      <div class="divide-y divide-gray-200 lg:grid lg:grid-cols-12 lg:divide-x lg:divide-y-0">
+  <div style="max-width: 1280px;" pb-6 style="padding-bottom: var(--spacing-6);"">
+    <div class="card">
+      <div style="border-bottom: 1px solid var(--gray-200);" lg:grid lg:grid-cols-12 ">
         <%== render("account/submenu") %>
-        <div class="divide-y divide-gray-200 lg:col-span-8 xl:col-span-9 2xl:col-span-10 pb-10">
-          <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
+        <div style="border-bottom: 1px solid var(--gray-200);" lg:col-span-8 xl:col-span-9 2xl:col-span-10">
+          <div class="px-4 py-6 sm:p-6 form-group">
             <div class="mt-6 grid grid-cols-6 gap-6">
               <div class="col-span-6 sm:col-span-4">
-                <div class="text-lg font-medium leading-6 text-gray-900">One-Time Password Generator</div>
+                <div class="text-lg font-medium text-gray-900">One-Time Password Generator</div>
                 <p class="mt-1 text-sm text-gray-500">Connect an authenticator app that generates verification codes.</p>
               </div>
-              <div class="col-span-6 sm:col-span-2 text-right space-y-1">
+              <div class="col-span-6 sm:col-span-2" style="text-align: right; display: flex; flex-direction: column; gap: var(--spacing-1);">
                 <% if rodauth.otp_exists? %>
                   <%== part("components/button", text: rodauth.otp_disable_link_text, link: rodauth.otp_disable_path, type: "danger") %>
                 <% else %>
@@ -23,13 +23,13 @@
               </div>
             </div>
           </div>
-          <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
+          <div class="px-4 py-6 sm:p-6 form-group">
             <div class="mt-6 grid grid-cols-6 gap-6">
               <div class="col-span-6 sm:col-span-4">
-                <div class="text-lg font-medium leading-6 text-gray-900">Security Keys</div>
+                <div class="text-lg font-medium text-gray-900">Security Keys</div>
                 <p class="mt-1 text-sm text-gray-500">Connect a security key to your account.</p>
               </div>
-              <div class="col-span-6 sm:col-span-2 text-right space-y-1">
+              <div class="col-span-6 sm:col-span-2" style="text-align: right; display: flex; flex-direction: column; gap: var(--spacing-1);">
                 <%== part("components/button", text: rodauth.webauthn_setup_link_text, link: rodauth.webauthn_setup_path) %>
                 <% if rodauth.webauthn_setup? %>
                   <%== part("components/button", text: rodauth.webauthn_remove_link_text, link: rodauth.webauthn_remove_path, type: "danger") %>
@@ -38,10 +38,10 @@
             </div>
           </div>
           <% if rodauth.uses_two_factor_authentication? %>
-            <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
+            <div class="px-4 py-6 sm:p-6 form-group">
               <div class="mt-6 grid grid-cols-6 gap-6">
                 <div class="col-span-6 sm:col-span-4">
-                  <div class="text-lg font-medium leading-6 text-gray-900">Recovery Codes</div>
+                  <div class="text-lg font-medium text-gray-900">Recovery Codes</div>
                   <p class="mt-1 text-sm text-gray-500">Single-use recovery codes for your account.</p>
                 </div>
                 <div class="col-span-6 sm:col-span-2 text-right">
@@ -51,7 +51,7 @@
             </div>
           <% end %>
           <% if rodauth.two_factor_remove_links.length > 1 %>
-            <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
+            <div class="px-4 py-6 sm:p-6 form-group">
               <%== part(
                 "components/button",
                 text: rodauth.two_factor_disable_link_text,

@@ -3,13 +3,13 @@
 <%== part("components/page_header", title: "My Account") %>
 
 <main>
-  <div class="max-w-screen-xl pb-6 lg:pb-16">
-    <div class="overflow-hidden rounded-lg bg-white shadow">
-      <div class="divide-y divide-gray-200 lg:grid lg:grid-cols-12 lg:divide-x lg:divide-y-0">
+  <div style="max-width: 1280px; padding-bottom: var(--spacing-6);">
+    <div class="card">
+      <div style="border-bottom: 1px solid var(--gray-200);" class="lg:grid lg:grid-cols-12">
         <%== render("account/submenu") %>
-        <div class="divide-y divide-gray-200 lg:col-span-8 xl:col-span-9 2xl:col-span-10 pb-10">
-          <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
-            <h2 class="text-lg font-medium leading-6 text-gray-900">Close Account</h2>
+        <div style="border-top: 1px solid var(--gray-200); padding-bottom: 2.5rem;" class="lg:col-span-8 xl:col-span-9 2xl:col-span-10">
+          <div class="px-4 py-6 sm:p-6" style="display: flex; flex-direction: column; gap: var(--spacing-4);">
+            <h2 class="text-lg font-medium text-gray-900">Close Account</h2>
             <p class="mt-1 text-sm text-gray-500">This action will permanently delete this account. Deleted data cannot be recovered. Use it carefully.</p>
             <% form(action: rodauth.close_account_path, method: :post) do %>
               <div class="mt-6 grid grid-cols-6 gap-6">

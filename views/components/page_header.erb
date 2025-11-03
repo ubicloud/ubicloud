@@ -1,25 +1,25 @@
 <%# locals: (title: @page_title, breadcrumbs: [], right_items: nil, back: breadcrumbs.dig(-2, 1) || "#") %>
 
-<div class="space-y-1 sticky -mx-10 mb-0.5 px-10 top-[2.9rem] bg-gray-50 z-30">
+<div class="page-header">
   <% unless breadcrumbs.empty? %>
     <div>
       <nav class="sm:hidden" aria-label="Back">
-        <a href="<%= back %>" class="flex items-center text-sm font-medium text-gray-500 hover:text-gray-700">
-          <div class="-ml-1 mr-1 flex-shrink-0 text-gray-400">
-            <%== part("components/icon", name: "hero-chevron-left", classes: "w-5 h-5") %>
+        <a href="<%= back %>" class="flex items-center text-sm font-medium text-gray-500 transition-colors" style="text-decoration: none;">
+          <div class="shrink-0 text-gray-400" style="margin-left: -0.25rem; margin-right: 0.25rem;">
+            <%== part("components/icon", name: "hero-chevron-left", style: "width: 1.25rem; height: 1.25rem;") %>
           </div>
           Back
         </a>
       </nav>
-      <nav class="hidden sm:flex" aria-label="Breadcrumb">
-        <ol role="list" class="flex items-center space-x-4">
+      <nav class="breadcrumb hidden sm:flex" aria-label="Breadcrumb">
+        <ol role="list" class="flex items-center gap-4">
           <% breadcrumbs.each_with_index do |(name, url), index| %>
             <li>
               <div class="flex items-center">
                 <% if index > 0 %>
-                  <%== part("components/icon", name: "hero-chevron-right", classes: "w-5 h-5 flex-shrink-0 text-gray-400 mr-4") %>
+                  <%== part("components/icon", name: "hero-chevron-right", classes: "shrink-0 text-gray-400", style: "width: 1.25rem; height: 1.25rem; margin-right: var(--spacing-4);") %>
                 <% end %>
-                <a href="<%= url %>" class="text-sm font-medium text-gray-500 hover:text-gray-700"><%= name %></a>
+                <a href="<%= url %>" class="text-sm font-medium text-gray-500 transition-colors"><%= name %></a>
               </div>
             </li>
           <% end %>
@@ -28,9 +28,9 @@
     </div>
   <% end %>
 
-  <div class="md:flex md:items-center md:justify-between pb-4">
+  <div class="md:flex md:items-center md:justify-between" style="padding-bottom: var(--spacing-4);">
     <div class="min-w-0">
-      <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:tracking-tight"><%= title %></h2>
+      <h2 class="text-2xl font-bold text-gray-900 sm:text-3xl sm:tracking-tight"><%= title %></h2>
     </div>
     <% if right_items %>
       <div class="mt-4 flex md:ml-4 md:mt-0">

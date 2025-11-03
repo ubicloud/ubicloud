@@ -11,12 +11,12 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
 <div>
   <div class="grid gap-6">
     <% form(action:, method:, id: "creation-form", class: method) do %>
-      <% container_class = (mode == "create") ? "overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white" : "" %>
+      <% container_class = (mode == "create") ? "overflow-hidden rounded-lg shadow border: 1px solid rgb(0 0 0 / 0.05); bg-white" : "" %>
       <div class="<%= container_class %>">
-        <div class="px-4 py-5 sm:p-6">
-          <div class="space-y-12">
+        <div class="card-body">
+          <div class="form-group2">
             <div>
-              <div class="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+              <div class="mt-2 grid grid-cols-1 gap-6 gap-8 sm:grid-cols-6">
                 <% selected_options = {}
   pre_selected_values.each { |k, v| selected_options[k] = v.to_s }
 
@@ -97,10 +97,10 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
             </div>
           </div>
         </div>
-        <div class="px-4 py-5 sm:p-6">
-          <div class="flex items-center justify-end gap-x-6">
+        <div class="card-body">
+          <div class="flex items-center justify-end gap-6">
             <% if mode == "create" %>
-              <a href="<%= action %>" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+              <a href="<%= action %>" class="text-sm font-semibold text-gray-900">Cancel</a>
               <%== part("components/form/submit_button", text: "Create") %>
             <% else %>
               <%== part("components/form/submit_button", text: "Update") %>

@@ -7,22 +7,22 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
 <%== part("components/page_header", title: "My Account") %>
 
 <main>
-  <div class="max-w-screen-xl pb-6 lg:pb-16">
-    <div class="overflow-hidden rounded-lg bg-white shadow">
-      <div class="divide-y divide-gray-200 lg:grid lg:grid-cols-12 lg:divide-x lg:divide-y-0">
+  <div style="max-width: 1280px;" pb-6 style="padding-bottom: var(--spacing-6);"">
+    <div class="card">
+      <div style="border-bottom: 1px solid var(--gray-200);" lg:grid lg:grid-cols-12 ">
         <%== render("account/submenu") %>
-        <div class="divide-y divide-gray-200 lg:col-span-8 xl:col-span-9 2xl:col-span-10 pb-10">
+        <div style="border-bottom: 1px solid var(--gray-200);" lg:col-span-8 xl:col-span-9 2xl:col-span-10">
           <% omniauth_providers.each do |provider, name| %>
-            <div id="login-method-<%= provider %>" class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
+            <div id="login-method-<%= provider %>" class="px-4 py-6 sm:p-6 form-group">
               <div class="mt-6 grid grid-cols-6 gap-6">
                 <div class="col-span-6 sm:col-span-4">
-                  <div class="text-lg font-medium leading-6 text-gray-900">Login with
+                  <div class="text-lg font-medium text-gray-900">Login with
                     <%= name %></div>
                   <p class="mt-1 text-sm text-gray-500">Connect your
                     <%= name %>
                     to log in to your Ubicloud account</p>
                 </div>
-                <div class="col-span-6 sm:col-span-2 text-right space-y-1">
+                <div class="col-span-6 sm:col-span-2" style="text-align: right; display: flex; flex-direction: column; gap: var(--spacing-1);">
                   <% if uid = @identities[provider.to_s] %>
                     <% form(action: "/account/login-method/disconnect", method: :post, class: :grow) do %>
                       <%== hidden_inputs(provider:, uid:) %>
@@ -40,16 +40,16 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
 
           <% @oidc_identities.each do |provider, uid| %>
             <% display_name = @oidc_identity_names[UBID.to_uuid(provider)] %>
-            <div id="login-method-disconnect-oidc-<%= provider %>" class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
+            <div id="login-method-disconnect-oidc-<%= provider %>" class="px-4 py-6 sm:p-6 form-group">
               <div class="mt-6 grid grid-cols-6 gap-6">
                 <div class="col-span-6 sm:col-span-4">
-                  <div class="text-lg font-medium leading-6 text-gray-900">Login with
+                  <div class="text-lg font-medium text-gray-900">Login with
                     <%= display_name %></div>
                   <p class="mt-1 text-sm text-gray-500">You currently allow your
                     <%= display_name %>
                     account to log in to your Ubicloud account using OIDC</p>
                 </div>
-                <div class="col-span-6 sm:col-span-2 text-right space-y-1">
+                <div class="col-span-6 sm:col-span-2" style="text-align: right; display: flex; flex-direction: column; gap: var(--spacing-1);">
                   <% form(action: "/account/login-method/disconnect", method: :post, class: :grow) do %>
                     <%== hidden_inputs(provider:, uid:) %>
                     <%== part("components/button", text: "Disconnect", type: "danger") %>
@@ -59,25 +59,25 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
             </div>
           <% end %>
 
-          <div id="login-method-connect-oidc" class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
+          <div id="login-method-connect-oidc" class="px-4 py-6 sm:p-6 form-group">
             <form action="/account/login-method/oidc" method="GET" class="grow">
               <div class="mt-6 grid grid-cols-6 gap-6">
                 <div class="col-span-6 sm:col-span-4">
-                  <div class="text-lg font-medium leading-6 text-gray-900">Login using an OIDC provider</div>
+                  <div class="text-lg font-medium text-gray-900">Login using an OIDC provider</div>
                   <p class="mt-1 text-sm text-gray-500 mb-2">Allow logging into your Ubicloud account using an OIDC provider</p>
                   <%== part("components/form/text", name: "provider", label: "OIDC Provider ID", attributes: {placeholder: "0p..."}) %>
                 </div>
-                <div class="col-span-6 sm:col-span-2 text-right space-y-1 mt-8">
+                <div class="col-span-6 sm:col-span-2 text-right form-group mt-8">
                   <%== part("components/button", text: "Connect") %>
                 </div>
               </div>
             </form>
           </div>
 
-          <div id="login-method-password" class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
+          <div id="login-method-password" class="px-4 py-6 sm:p-6 form-group">
             <div class="mt-6 grid grid-cols-6 gap-6">
               <div class="col-span-6 sm:col-span-4">
-                <div class="text-lg font-medium leading-6 text-gray-900">Login with Password</div>
+                <div class="text-lg font-medium text-gray-900">Login with Password</div>
                 <p class="mt-1 text-sm text-gray-500">
                   <% if rodauth.has_password? %>
                     Change or delete your password. If you delete your password, you can only log in with other
@@ -87,7 +87,7 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
                   <% end %>
                 </p>
               </div>
-              <div class="col-span-6 sm:col-span-2 text-right space-y-2">
+              <div class="col-span-6 sm:col-span-2" style="text-align: right; display: flex; flex-direction: column; gap: var(--spacing-1);">
                 <%== part("components/button", text: rodauth.has_password? ? "Change" : "Create", link: "/account/change-password") %>
                 <% if rodauth.has_password? %>
                   <% form(action: "/account/login-method/disconnect", method: :post, class: :grow) do %>

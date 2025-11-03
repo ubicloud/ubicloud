@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html class="h-full bg-gray-50">
+<html class="h-full">
   <head>
     <meta charset="UTF-8">
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
@@ -56,11 +56,11 @@
       <div>
         <%== render("layouts/sidebar/desktop") %>
         <%== render("layouts/sidebar/mobile") %>
-        <div class="lg:pl-72">
+        <div class="main-content">
           <%== render("layouts/topbar") %>
-          <main class="py-10">
-            <div class="px-4 sm:px-6 lg:px-8">
-              <div class="px-2 sm:px-3 lg:px-4">
+          <main style="padding-block: 2.5rem;">
+            <div class="content-container">
+              <div class="content-inner">
                 <%== render("components/flash_message") %>
                 <%== yield %>
               </div>
@@ -72,36 +72,36 @@
     <% elsif @direct_body_yield %>
       <%== yield %>
     <% else %>
-      <div class="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
-        <div class="sm:mx-auto sm:w-full sm:max-w-md">
-          <div class="flex shrink-0 items-center px-10 py-4">
-            <img class="" src="/logo-primary.png" alt="Ubicloud">
+      <div class="auth-layout">
+        <div class="auth-container">
+          <div class="auth-logo">
+            <img src="/logo-primary.png" alt="Ubicloud">
           </div>
-          <h2 class="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900"><%= @page_message %></h2>
+          <h2 class="auth-title"><%= @page_message %></h2>
         </div>
 
-        <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-          <div class="bg-white px-4 py-8 shadow sm:rounded-lg sm:px-10">
-            <div class="pt-4 empty:hidden"><%== render("components/flash_message") %></div>
+        <div class="auth-container">
+          <div class="auth-card">
+            <div style="padding-top: var(--spacing-4);" class="empty:hidden"><%== render("components/flash_message") %></div>
             <%== yield %>
           </div>
         </div>
-        <div class="mt-10 flex justify-center space-x-5">
-          <a href="https://github.com/ubicloud/ubicloud" target="_blank" class="text-gray-400 hover:text-gray-500">
+        <div class="auth-footer">
+          <a href="https://github.com/ubicloud/ubicloud" target="_blank" class="text-gray-400">
             <span class="sr-only">GitHub</span>
             <%== part("components/icon", name: "github") %>
           </a>
-          <a href="mailto:support@ubicloud.com" class="text-gray-400 hover:text-gray-500">
+          <a href="mailto:support@ubicloud.com" class="text-gray-400">
             <span class="sr-only">Support</span>
             <%== part("components/icon", name: "hero-envelope") %>
           </a>
         </div>
         <% if Config.managed_service %>
-          <div class="text-sm text-gray-500 text-center mt-10 w-full">
+          <div class="auth-links">
             By using Ubicloud console you agree to our
             <a
               href="https://www.ubicloud.com/docs/about/terms-of-service"
-              class="font-medium text-orange-500 hover:text-orange-600"
+              class="link-primary font-medium"
               target="_blank"
             >
               terms of service
@@ -109,7 +109,7 @@
             and
             <a
               href="https://www.ubicloud.com/docs/about/privacy-policy"
-              class="font-medium text-orange-500 hover:text-orange-600"
+              class="link-primary font-medium"
               target="_blank"
             >
               privacy policy

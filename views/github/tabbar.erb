@@ -10,13 +10,13 @@
   right_items: [<<-DROPDOWN]
     <div class="group dropdown relative inline-block text-left">
       <div>#{part("components/button", text: @installation.name, icon: "github", right_icon: "hero-chevron-down")}</div>
-      <div class="hidden opacity-0 scale-95 group-[.active]:block group-[.active]:opacity-100 group-[.active]:scale-100 transition ease-out duration-100 absolute -right-2 z-10 mt-2 w-72 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" role="menu" tabindex="-1">
+      <div class="hidden opacity: 0; transform: scale(0.95); group-active:block group-active:opacity-100 transition absolute; right: -0.5rem; z-10 mt-2 w-72 transform-origin: top right; divide-y border-color: var(--gray-100); rounded-md bg-white  border: 1px solid rgb(0 0 0 / 0.05); " role="menu" tabindex="-1">
         <div>
           #{@project.github_installations.map do |ins|
             <<-ITEM
-            <div class="hover:bg-gray-50" role="none">
-              <a href="#{path(ins)}/runner" class="flex items-center px-4 py-3 text-sm leading-6 text-gray-700">
-                <img src="https://github.com/#{ins.name}.png?size=64" alt="" class="mr-2 size-6 shrink-0 rounded-lg drop-shadow-sm">
+            <div class="transition-colors" role="none">
+              <a href="#{path(ins)}/runner" class="flex items-center px-4 py-3 text-sm text-gray-700">
+                <img src="https://github.com/#{ins.name}.png?size=64" alt="" class="mr-2 size-6 shrink-0 rounded-lg drop-">
                 <span class="#{"font-semibold" if ins.id == @installation.id}">#{ins.name}</span>
               </a>
             </div>
@@ -24,9 +24,9 @@
           end.join}
         </div>
         <div>
-          <div class="hover:bg-gray-50">
-            <a href="#{@project.path}/github/create" class="flex items-center px-4 py-3 text-sm leading-6 text-gray-700">
-              <div class="mr-2 size-6 shrink-0 rounded-lg bg-gray-400 flex items-center justify-center drop-shadow-sm">
+          <div class="transition-colors">
+            <a href="#{@project.path}/github/create" class="flex items-center px-4 py-3 text-sm text-gray-700">
+              <div class="mr-2 size-6 shrink-0 rounded-lg bg-gray-400 flex items-center justify-center drop-">
                 #{part("components/icon", name: "github", classes: "size-4 text-white")}
               </div>
               Connect New Account

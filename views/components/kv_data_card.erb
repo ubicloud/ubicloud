@@ -1,7 +1,7 @@
 <%# locals: (data:) %>
-<div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+<div class="table-wrapper" style="border-bottom: 1px solid var(--gray-200);"">
   <div class="px-4 py-5 sm:p-0">
-    <dl class="sm:divide-y sm:divide-gray-200">
+    <dl class=" ">
       <% data.reject { !it }.each do |name, value, opts| %>
         <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
           <dt class="text-sm font-medium text-gray-500"><%= name %></dt>

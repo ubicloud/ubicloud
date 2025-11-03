@@ -1,5 +1,5 @@
 <div
-  class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8"
+  class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-4  sm:gap-6 sm:px-6 lg:px-8"
 >
   <button type="button" class="toggle-mobile-menu -m-2.5 p-2.5 text-gray-700 lg:hidden">
     <span class="sr-only">Open sidebar</span>
@@ -10,10 +10,10 @@
   <a href="<%= @project_permissions ? "#{@project.path}/dashboard" : "/project" %>">
     <img class="h-5 w-auto lg:hidden" src="/logo-primary.png" alt="Ubicloud">
   </a>
-  <div class="flex flex-1 gap-x-4 self-stretch justify-end lg:gap-x-6">
-    <div class="flex items-center gap-x-4 lg:gap-x-6">
+  <div class="flex flex-1 gap-4 self-stretch justify-end lg:gap-6">
+    <div class="flex items-center gap-4 lg:gap-6">
       <!-- Profile dropdown -->
-      <div class="relative group dropdown text-sm leading-6 text-gray-900">
+      <div class="relative group dropdown text-sm text-gray-900">
         <button type="button" class="-m-1.5 flex items-center p-1.5" title="<%= current_account.email %>">
           <%== part("components/icon", name: "hero-user-circle", classes: "h-8 w-8 rounded-full bg-gray-50") %>
           <span class="hidden lg:flex lg:items-center">
@@ -22,7 +22,7 @@
           </span>
         </button>
         <div
-          class="hidden group-[.active]:block absolute right-0 z-10 mt-2.5 w-48 origin-top-right rounded-md bg-white pb-2 shadow-lg ring-1 ring-gray-900/5 focus:outline-none divide-y divide-gray-100"
+          class="hidden group-[.active]:block absolute right-0 z-10 style="margin-top: 0.625rem;" w-48 transform-origin: top right; rounded-md bg-white pb-2  ring-1 border: 1px solid rgb(17 24 39 / 0.05);  divide-y border-color: var(--gray-100);"
           role="menu"
           tabindex="-1"
         >

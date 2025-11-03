@@ -4,10 +4,10 @@
 
 <div class="grid gap-6">
   <!-- Premium runners -->
-  <div class="overflow-hidden rounded-lg ring-1 ring-black ring-opacity-5 bg-white lg:flex shadow">
+  <div class="card" style="border: 1px solid rgb(0 0 0 / 0.05); background-color: white; lg:flex shadow">
     <div class="p-8 sm:p-10 lg:flex-auto">
       <div class="flex items-center">
-        <h3 class="text-3xl font-semibold tracking-tight text-gray-900 whitespace-nowrap">
+        <h3 class="text-3xl font-semibold text-gray-900 whitespace-nowrap">
           Premium Runners
         </h3>
         <% if @installation.premium_runner_enabled? %>
@@ -29,7 +29,7 @@
         capacity's full, you seamlessly fall back to standard runners with no extra wait time. You always get billed by
         the minute and for the runner type you're using.
       </p>
-      <div class="mt-6 flex items-center gap-x-4">
+      <div class="mt-6 flex items-center gap-4">
         <h4 class="flex-none text-sm/6 font-semibold text-orange-600">What’s different</h4>
         <div class="h-px flex-auto bg-gray-100"></div>
       </div>
@@ -40,7 +40,7 @@
           "10x better price-performance",
           "100GB free cache storage",
         ].each do |text| %>
-          <li class="flex gap-x-3">
+          <li class="flex gap-3">
             <%== part("components/icon", name: "hero-check", classes: "h-6 w-5 flex-none text-orange-600") %>
             <%= text %>
           </li>
@@ -49,11 +49,11 @@
     </div>
     <div class="-mt-2 p-2 lg:mt-0 lg:w-full lg:max-w-sm lg:shrink-0">
       <div
-        class="rounded-lg h-full bg-gray-50 py-10 text-center ring-1 ring-inset ring-gray-900/5 lg:flex lg:flex-col lg:justify-center lg:py-16"
+        class="rounded-lg h-full bg-gray-50 py-10 text-center ring-1 box-shadow: inset border: 1px solid rgb(17 24 39 / 0.05); lg:flex lg:flex-col lg:justify-center"
       >
-        <div class="mx-auto max-w-sm px-8 space-y-8">
-          <p class="flex items-baseline justify-center gap-x-2">
-            <span class="text-4xl font-semibold tracking-tight text-gray-900">Boost your builds</span>
+        <div class="mx-auto max-w-sm px-8 form-group">
+          <p class="flex items-baseline justify-center gap-2">
+            <span class="text-4xl font-semibold text-gray-900">Boost your builds</span>
           </p>
           <%== part("components/form/toggle_form", name: "premium_runner_enabled", action: "#{@project.path}/github/#{@installation.ubid}", active: @installation.premium_runner_enabled?) %>
           <div class="mt-6 text-sm/5 text-gray-600 italic">
@@ -65,13 +65,13 @@
     </div>
   </div>
   <div>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div class="table-wrapper" style="border-bottom: 1px solid var(--gray-200);"">
       <!-- Transparent Cache Card -->
-      <div class="px-4 py-5 sm:p-6">
+      <div class="card-body">
         <div class="sm:flex sm:items-center sm:justify-between">
           <div>
             <div class="flex items-center">
-              <h3 class="text-base font-semibold leading-6 text-gray-900">Ubicloud Transparent Cache</h3>
+              <h3 class="text-base font-semibold text-gray-900">Ubicloud Transparent Cache</h3>
               <% if @installation.cache_enabled %>
                 <span class="rounded-full bg-orange-600/10 px-2.5 py-1 text-xs font-semibold text-orange-600 ml-2">
                   Enabled
@@ -85,7 +85,7 @@
                 for information.</p>
             </div>
           </div>
-          <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+          <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:shrink-0 sm:items-center">
             <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
               <%== part("components/form/toggle_form", name: "cache_enabled", action: "#{@project.path}/github/#{@installation.ubid}", active: @installation.cache_enabled) %>
             </div>
@@ -93,15 +93,15 @@
         </div>
       </div>
       <!-- Configure Repositories -->
-      <div class="px-4 py-5 sm:p-6">
+      <div class="card-body">
         <div class="sm:flex sm:items-center sm:justify-between">
           <div>
-            <h3 class="text-base font-semibold leading-6 text-gray-900">Repository Access</h3>
+            <h3 class="text-base font-semibold text-gray-900">Repository Access</h3>
             <div class="mt-2 text-sm text-gray-500">
               <p>Configure the list of repositories that Ubicloud can access on GitHub's UI.</p>
             </div>
           </div>
-          <div id="configure-<%=@installation.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+          <div id="configure-<%=@installation.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:shrink-0 sm:items-center">
             <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
               <%== part("components/button", text: "Configure", link: "https://github.com/apps/#{Config.github_app_name}/installations/#{@installation.installation_id}") %>
             </div>

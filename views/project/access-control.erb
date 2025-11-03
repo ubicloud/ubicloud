@@ -30,7 +30,7 @@ end
 
 <%== render("project/user-tabbar") unless @token %>
 
-<div class="space-y-1">
+<div class="form-group">
   <%== part(
     "components/page_header",
     title: page_header,
@@ -53,18 +53,18 @@ end
     <% end %>
 
     <% form(action: form_action, method: :post, id: "access-control-form") do %>
-      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="table-wrapper" style="border-bottom: 1px solid var(--gray-200);"">
         <table id="access-control-entries" class="min-w-full divide-y divide-gray-300 group">
           <thead class="bg-gray-50 <% if @token %> hidden group-[&:has(tr:nth-child(n+3))]:table-header-group <% end %>">
             <tr>
               <% table_headers.each do |type| %>
-                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                <th scope="col">
                   <%= type %>
                   <% unless @token %>
                     <a
                       id="<%= type.downcase %>-tags-link"
                       href="<%= "#{@project.path}/user/access-control/tag/#{type.downcase}" %>"
-                      class="text-orange-600 hover:text-orange-700 text-xs"
+                      class="text-orange-600 text-xs"
                     >
                       (Tags)
                     </a>
@@ -72,11 +72,11 @@ end
                 </th>
               <% end %>
               <% if edit_perm %>
-                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
+                <th scope="col"></th>
               <% end %>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-200 bg-white">
+          <tbody style="border-bottom: 1px solid var(--gray-200);" bg-white">
             <% @aces.append(["template", [], true]).each do |ubid, tags, editable| %>
               <% editable &&= edit_perm %>
               <tr id="ace-<%= ubid %>" class="<%= "existing-aces#{"-view" unless editable}" unless ubid == "template" %>">
@@ -135,12 +135,12 @@ end
     <% end %>
   <% end %>
   <% if @token %>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <div class="px-4 py-5 sm:p-6">
+    <div class="table-wrapper" style="border-bottom: 1px solid var(--gray-200);"">
+      <div class="card-body">
         <% form(action: restriction_path, method: :post) do %>
           <div class="sm:flex sm:items-center sm:justify-between">
             <div>
-              <h3 class="text-base font-semibold leading-6 text-gray-900"><%= restriction_title %>
+              <h3 class="text-base font-semibold text-gray-900"><%= restriction_title %>
                 Personal Access Token</h3>
               <div class="mt-2 text-sm text-gray-500">
                 <p>
@@ -158,7 +158,7 @@ end
                 </p>
               </div>
             </div>
-            <div id="restrict-<%=@token.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+            <div id="restrict-<%=@token.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:shrink-0 sm:items-center">
               <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
                 <%== part("components/form/submit_button", text: "#{restriction_title} Token Access") %>
               </div>

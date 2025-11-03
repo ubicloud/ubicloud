@@ -2,7 +2,7 @@
 
 <% @page_message = "Create a new account" %>
 
-<% form(class: "rodauth space-y-6", method: :post) do %>
+<% form(class: "rodauth form-group", method: :post) do %>
 
   <%== part(
     "components/form/text",
@@ -21,7 +21,7 @@
 
   <div class="flex flex-col text-center">
     <%== part("components/form/submit_button", text: "Create Account") %>
-    <a href="/login" class="mt-2 text-sm font-semibold leading-6 text-gray-900">Sign in to existing account</a>
+    <a href="/login" class="mt-2 text-sm font-semibold text-gray-900">Sign in to existing account</a>
   </div>
 <% end %>
 

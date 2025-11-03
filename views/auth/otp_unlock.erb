@@ -1,6 +1,6 @@
 <% @page_message = "Your one-time password authentication has been locked out, and must be unlocked to be used." %>
 
-<% form(method: :post, class: "rodauth space-y-6") do %>
+<% form(method: :post, class: "rodauth form-group") do %>
 
   <p><%= rodauth.otp_unlock_consecutive_successes_label %>: <%= rodauth.otp_unlock_num_successes %></p>
   <p><%= rodauth.otp_unlock_required_consecutive_successes_label %>: <%= rodauth.otp_unlock_auths_required %></p>
@@ -13,9 +13,9 @@
     <p class="mt-10 text-center text-sm text-gray-400">
       Can't access your authentication app?
       <br>
-      <a href="<%= rodauth.recovery_auth_path %>" class="font-semibold leading-6 text-orange-500 hover:text-orange-700">Enter a recovery code</a>
+      <a href="<%= rodauth.recovery_auth_path %>" class="link-primary font-semibold">Enter a recovery code</a>
       or
-      <a href="mailto:support@ubicloud.com" class="font-semibold leading-6 text-orange-500 hover:text-orange-700">contact support</a>
+      <a href="mailto:support@ubicloud.com" class="link-primary font-semibold">contact support</a>
     </p>
   </div>
 <% end %>

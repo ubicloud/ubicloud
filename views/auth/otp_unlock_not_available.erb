@@ -1,6 +1,6 @@
 <% @page_message = "Your one-time password authentication has been locked out, and you must wait to unlock it." %>
 
-<div class="space-y-6">
+<div class="form-group">
   <p><%= rodauth.otp_unlock_consecutive_successes_label %>: <%= rodauth.otp_unlock_num_successes %></p>
   <p><%= rodauth.otp_unlock_required_consecutive_successes_label %>: <%= rodauth.otp_unlock_auths_required %></p>
   <p><%= rodauth.otp_unlock_next_auth_deadline_label %>: <%= (rodauth.otp_unlock_deadline - Time.now).to_i %> seconds</p>

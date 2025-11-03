@@ -16,17 +16,17 @@
 <div class="grid gap-6">
   <!-- Invite user -->
   <div>
-    <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
+    <div class="md:flex md:items-center md:justify-between lg:pb-2">
       <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+        <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">
           Invite a new user
         </h3>
       </div>
     </div>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <div class="px-4 py-5 sm:p-6">
+    <div class="table-wrapper" style="border-bottom: 1px solid var(--gray-200);"">
+      <div class="card-body">
         <% form(action: user_path, method: :post) do %>
-          <div class="space-y-4">
+          <div class="form-group">
             <div>
               <p class="mt-1 text-sm text-gray-500">
                 You can invite a new user to your project, adding them to the given subject tag (role).
@@ -51,26 +51,26 @@
   <!-- User List -->
   <div>
     <% form(action: "#{user_path}/policy/managed", method: :post, id: "managed-policy") do %>
-      <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
+      <div class="md:flex md:items-center md:justify-between lg:pb-2">
         <div class="min-w-0 flex-1">
-          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+          <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">
             Users
           </h3>
         </div>
       </div>
-      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-        <table class="min-w-full divide-y divide-gray-300">
+      <div class="table-wrapper" style="border-bottom: 1px solid var(--gray-200);"">
+        <table class="table">
           <thead class="bg-gray-50">
             <tr>
-              <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Email</th>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Subject Tag</th>
+              <th scope="col">Email</th>
+              <th scope="col">Subject Tag</th>
               <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-6 text-left text-sm font-semibold text-gray-900"></th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-200 bg-white">
+          <tbody style="border-bottom: 1px solid var(--gray-200);" bg-white">
             <% @users.each do |user| %>
               <tr id="user-<%= user.ubid %>">
-                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                <td scope="row">
                   <%= user.email %>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
@@ -103,7 +103,7 @@
             <% end %>
             <% @invitations.each do |invitation| %>
               <tr id="invitation-<%= invitation.email.gsub(/\W+/, "") %>">
-                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                <td scope="row">
                   <%= invitation[:email] %>
                   <span
                     class="inline-flex items-baseline rounded-full ml-1 px-2 text-xs font-semibold leading-5 bg-yellow-100 text-yellow-800"
@@ -127,7 +127,7 @@
             <% end %>
           </tbody>
         </table>
-        <div class="px-4 py-5 sm:p-6">
+        <div class="card-body">
           <%== part("components/form/submit_button", text: "Update") %>
         </div>
       </div>

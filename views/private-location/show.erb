@@ -35,24 +35,24 @@
   <!-- Danger Zone -->
   <% if has_permission?("Location:delete", @project) %>
     <div>
-      <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+      <div class="md:flex md:items-center md:justify-between">
         <div class="min-w-0 flex-1">
-          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+          <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">
             Danger Zone
           </h3>
         </div>
       </div>
-      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="table-wrapper" style="border-bottom: 1px solid var(--gray-200);"">
         <!-- Delete Card -->
-        <div class="px-4 py-5 sm:p-6">
+        <div class="card-body">
           <div class="sm:flex sm:items-center sm:justify-between">
             <div>
-              <h3 class="text-base font-semibold leading-6 text-gray-900">Delete region</h3>
+              <h3 class="text-base font-semibold text-gray-900">Delete region</h3>
               <div class="mt-2 text-sm text-gray-500">
                 <p>This action will permanently delete this region. Deleted data cannot be recovered. Use it carefully.</p>
               </div>
             </div>
-            <div id="region-delete-<%=@location.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+            <div id="region-delete-<%=@location.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:shrink-0 sm:items-center">
               <%== part("components/delete_button", confirmation: @location.ui_name, redirect: "#{@project.path}/private-location") %>
             </div>
           </div>

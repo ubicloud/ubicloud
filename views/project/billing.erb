@@ -16,41 +16,41 @@ end
     <!-- Summary -->
     <div>
       <dl class="grid grid-cols-2 gap-5 <%= (@project.discount > 0) ? "sm:grid-cols-4" : "sm:grid-cols-3" %>">
-        <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
+        <div class="card-body">
           <dt class="truncate text-sm font-medium text-gray-500">Current Usage</dt>
-          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= money(@invoices.first.subtotal) %></dd>
+          <dd class="mt-1 text-3xl font-semibold text-gray-900"><%= money(@invoices.first.subtotal) %></dd>
         </div>
-        <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
+        <div class="card-body">
           <dt class="truncate text-sm font-medium text-gray-500">Last Month</dt>
-          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= (@invoices.count > 1) ? money(@invoices[1].subtotal) : "-" %></dd>
+          <dd class="mt-1 text-3xl font-semibold text-gray-900"><%= (@invoices.count > 1) ? money(@invoices[1].subtotal) : "-" %></dd>
         </div>
-        <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
+        <div class="card-body">
           <dt class="truncate text-sm font-medium text-gray-500">Remaining Credit</dt>
-          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= money(@project.credit.to_f) %></dd>
+          <dd class="mt-1 text-3xl font-semibold text-gray-900"><%= money(@project.credit.to_f) %></dd>
         </div>
         <% if @project.discount > 0 %>
-          <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
+          <div class="card-body">
             <dt class="truncate text-sm font-medium text-gray-500">Discount</dt>
-            <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= @project.discount %>%</dd>
+            <dd class="mt-1 text-3xl font-semibold text-gray-900"><%= @project.discount %>%</dd>
           </div>
         <% end %>
       </dl>
     </div>
     <!-- Billing Info Update Card -->
     <% stripe_data = billing_info.stripe_data %>
-    <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
+    <div class="md:flex md:items-center md:justify-between lg:pb-2">
       <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+        <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">
           Billing Details
         </h3>
       </div>
     </div>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div class="table-wrapper" style="border-bottom: 1px solid var(--gray-200);"">
       <% form(action: billing_path, method: :post) do %>
-        <div class="px-4 py-5 sm:p-6">
-          <div class="space-y-12">
+        <div class="card-body">
+          <div class="form-group2">
             <div>
-              <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-8">
+              <div class="mt-6 grid grid-cols-1 gap-6 gap-8 sm:grid-cols-8">
                 <div class="sm:col-span-4">
                   <%== part(
                     "components/form/text",
@@ -151,8 +151,8 @@ end
           </div>
         </div>
 
-        <div class="px-4 py-5 sm:p-6">
-          <div class="flex items-center justify-end gap-x-6">
+        <div class="card-body">
+          <div class="flex items-center justify-end gap-6">
             <%== part("components/form/submit_button", text: "Update") %>
           </div>
         </div>
@@ -192,27 +192,27 @@ end
     <%== part("components/discount_code") %>
     <!-- Invoices -->
     <div>
-      <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
+      <div class="md:flex md:items-center md:justify-between lg:pb-2">
         <div class="min-w-0 flex-1">
-          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+          <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">
             Invoices
           </h3>
         </div>
       </div>
-      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-        <table class="min-w-full divide-y divide-gray-300">
+      <div class="table-wrapper" style="border-bottom: 1px solid var(--gray-200);"">
+        <table class="table">
           <thead class="bg-gray-50">
             <tr>
-              <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Invoice</th>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Amount</th>
+              <th scope="col">Invoice</th>
+              <th scope="col">Amount</th>
               <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-6 text-left text-sm font-semibold text-gray-900">Status</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-200 bg-white">
+          <tbody style="border-bottom: 1px solid var(--gray-200);" bg-white">
             <% @invoices.each do |inv| %>
               <tr id="invoice-<%= inv.path_id %>">
-                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <a href="<%= path(inv) %>" target="_blank" class="text-orange-600 hover:text-orange-700">
+                <td scope="row">
+                  <a href="<%= path(inv) %>" target="_blank" class="text-orange-600">
                     <%= inv.name %>
                   </a>
                   <span class="text-xs text-gray-400 italic">
@@ -268,21 +268,21 @@ end
 <br/>
 <!-- Usage alerts -->
 <div>
-  <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
+  <div class="md:flex md:items-center md:justify-between lg:pb-2">
     <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+      <h3 class="text-2xl font-bold text-gray-900 sm:text-2xl sm:truncate sm:tracking-tight">
         Usage Alerts
       </h3>
     </div>
   </div>
   <div class="grid gap-6">
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div class="table-wrapper" style="border-bottom: 1px solid var(--gray-200);"">
       <!-- Add usage alert -->
-      <div class="px-4 py-5 sm:p-6">
+      <div class="card-body">
         <% form(action: "#{@project.path}/usage-alert", method: :post) do %>
-          <div class="space-y-4">
+          <div class="form-group">
             <div>
-              <h2 class="text-lg font-medium leading-6 text-gray-900">Add new usage alert</h2>
+              <h2 class="text-lg font-medium text-gray-900">Add new usage alert</h2>
               <p class="mt-1 text-sm text-gray-500">
                 Usage alerts will be sent to your email address. If you want to send alerts to specific email
                 addresses, you need to log in with that email address.
@@ -327,7 +327,7 @@ end
       </div>
       <!-- List alerts -->
       <% if @usage_alerts.count > 0 %>
-        <table class="min-w-full divide-y divide-gray-300">
+        <table class="table">
           <thead class="bg-gray-50">
             <tr>
               <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">Name</th>
@@ -338,7 +338,7 @@ end
               </th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-200 bg-white">
+          <tbody style="border-bottom: 1px solid var(--gray-200);" bg-white">
             <% @usage_alerts.each do |alert| %>
               <tr id="alert-<%= alert.ubid %>" class="whitespace-nowrap text-sm font-medium">
                 <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.name %></td>

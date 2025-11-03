@@ -2,7 +2,7 @@
 
 <% @page_message = "Select a two-factor authentication method" %>
 
-<div class="rodauth space-y-6 flex flex-col text-center">
+<div class="rodauth form-group flex flex-col text-center">
   <%== part("components/button", text: rodauth.otp_auth_link_text, link: rodauth.otp_auth_path) %>
   <%== part("components/button", text: rodauth.webauthn_auth_link_text, link: rodauth.webauthn_auth_path) %>
 </div>

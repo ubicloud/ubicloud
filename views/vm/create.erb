@@ -21,7 +21,7 @@ current_usage = @project.current_resource_usage("VmVCpu")
 ) %>
 
 <%
-  ps_description = "<p class='mt-1 text-sm leading-6 text-gray-600'>We recommend using the default subnet for most use-cases. If you'd like to learn more about private subnets, please visit <a href='https://www.ubicloud.com/docs/networking/private-subnet' class='text-orange-600 hover:text-orange-700'>Private Subnets</a> page.</p>"
+  ps_description = "<p class='mt-1 text-sm text-gray-600'>We recommend using the default subnet for most use-cases. If you'd like to learn more about private subnets, please visit <a href='https://www.ubicloud.com/docs/networking/private-subnet' class='text-orange-600'>Private Subnets</a> page.</p>"
 
   form_elements = [
     {name: "name", type: "text", label: "Name", placeholder: "Enter name", required: "required", opening_tag: "<div class='sm:col-span-3'>"},
@@ -59,7 +59,7 @@ current_usage = @project.current_resource_usage("VmVCpu")
     public_key_params[:required] = "required"
     public_key_params[:description] = "SSH keys are a more secure method of logging into a server."
     if has_project_permission("Project:edit")
-      public_key_params[:description] += " You can <a class='text-orange-600 hover:text-orange-700' href='#{h @project.path}/ssh-public-key'>register SSH keys for this project</a> to avoid having to reenter the same key multiple times."
+      public_key_params[:description] += " You can <a class='text-orange-600' href='#{h @project.path}/ssh-public-key'>register SSH keys for this project</a> to avoid having to reenter the same key multiple times."
       public_key_params[:escape_description] = false
     end
   else

@@ -1,13 +1,13 @@
-<div class="flex grow flex-col gap-y-5 overflow-y-auto bg-orange-600 px-6">
+<div class="flex grow flex-col gap-5 overflow-y-auto bg-orange-600 px-6">
   <div class="flex h-16 shrink-0 items-center">
     <a href="<%= @project_permissions ? "#{@project.path}/dashboard" : "/project" %>">
       <img class="h-6 w-auto" src="/logo-white.png" alt="Ubicloud">
     </a>
   </div>
   <nav class="flex flex-1 flex-col">
-    <ul role="list" class="flex flex-1 flex-col gap-y-7">
+    <ul role="list" class="flex flex-1 flex-col gap-7">
       <li>
-        <ul role="list" class="-mx-2 space-y-1">
+        <ul role="list" class="-mx-2 form-group">
           <% if @project_permissions %>
             <%== part(
               "layouts/sidebar/item",
@@ -81,8 +81,8 @@
       </li>
       <% if @project_permissions && has_project_permission(["Project:user", "Project:billing", "Project:view", "Project:viewaccess", "Project:token"]) %>
         <li>
-          <div class="text-xs font-semibold leading-6 text-orange-200">Project Details</div>
-          <ul role="list" class="-mx-2 mt-2 space-y-1">
+          <div class="text-xs font-semibold text-orange-200">Project Details</div>
+          <ul role="list" class="-mx-2 mt-2 form-group">
             <%== if has_project_permission("Project:user")
                    users_url = "#{@project.path}/user"
                    users_label = "Users"
@@ -142,8 +142,8 @@
       <% end %>
       <% if @project_permissions && has_project_permission("Project:github") && Config.github_app_name %>
         <li>
-          <div class="text-xs font-semibold leading-6 text-orange-200">Integrations</div>
-          <ul role="list" class="-mx-2 mt-2 space-y-1">
+          <div class="text-xs font-semibold text-orange-200">Integrations</div>
+          <ul role="list" class="-mx-2 mt-2 form-group">
             <%== part(
               "layouts/sidebar/item",
               name: "GitHub Runners",

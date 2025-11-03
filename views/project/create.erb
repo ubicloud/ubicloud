@@ -5,9 +5,9 @@
 <div class="grid gap-6">
   <% form(action: "/project", method: :post) do %>
     <!-- Create Card -->
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <div class="px-4 py-5 sm:p-6">
-        <div class="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+    <div class="table-wrapper" style="border-bottom: 1px solid var(--gray-200);"">
+      <div class="card-body">
+        <div class="grid grid-cols-1 gap-6 gap-8 sm:grid-cols-6">
           <div class="sm:col-span-3">
             <%== part(
               "components/form/text",
@@ -22,9 +22,9 @@
         </div>
 
       </div>
-      <div class="px-4 py-5 sm:p-6">
-        <div class="flex items-center justify-end gap-x-6">
-          <a href="/project" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+      <div class="card-body">
+        <div class="flex items-center justify-end gap-6">
+          <a href="/project" class="text-sm font-semibold text-gray-900">Cancel</a>
           <%== part("components/form/submit_button", text: "Create") %>
         </div>
       </div>

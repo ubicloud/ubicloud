@@ -4,9 +4,9 @@ value = typecast_body_params.str(name) || value if name
 error = rodauth.field_error(name) || flash.dig("errors", name)
 end %>
 
-<div class="space-y-2 text-gray-900">
+<div class="form-group text-gray-900">
   <% if label %>
-    <label for="<%= name %>" class="block text-sm font-medium leading-6"><%= label %></label>
+    <label for="<%= name %>" class="block text-sm font-medium"><%= label %></label>
   <% end %>
   <div class="flex">
     <% if prefix %>
@@ -21,7 +21,7 @@ end %>
       <% if value %>
       value="<%= value %>"
       <% end %>
-      class="block w-full border-0 py-1.5 pl-3 pr-3 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 <%= error ? "text-red-900 ring-red-300 placeholder:text-red-300 focus:ring-red-500" : "text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-orange-600"%> <%= prefix ? "rounded-r-md" : "rounded-md" %> <%= extra_class %>"
+      class="block w-full border-0 py-1.5 pl-3 pr-3  ring-1 box-shadow: inset focus:box-shadow: inset sm:text-sm  <%= error ? "text-red-900 ring-red-300 placeholder:text-red-300 focus:ring-red-500" : "text-gray-900 ring-gray-300 placeholder:text-gray-400"%> <%= prefix ? "rounded-r-md" : "rounded-md" %> <%= extra_class %>"
       <%== html_attrs(attributes) %>
     >
     <% if button_title %>

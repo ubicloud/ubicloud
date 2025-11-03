@@ -32,7 +32,7 @@ curl #{ie.load_balancer.health_check_url(path:)} \\
     #{curl_message}   }'</span>
   CURL
     %>
-  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white p-4">
+  <div class="card" p-4">
     <h2 class="text-lg font-bold mb-4 text-gray-800 line-clamp-1"><%= ie.tags["display_name"] || ie.model_name %></h2>
     <div class="grid sm:grid-cols-2 gap-4">
       <div>

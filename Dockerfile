@@ -1,11 +1,7 @@
 FROM docker.io/library/node:24.6-alpine3.21 AS frontend-builder
 WORKDIR /app
-COPY tailwind.config.js package.json package-lock.json ./
-COPY views/ ./views/
-COPY assets/ ./assets/
-COPY helpers/web.rb ./helpers/web.rb
+COPY package.json package-lock.json ./
 RUN npm ci
-RUN npm run prod
 
 
 FROM docker.io/library/ruby:3.4.7-alpine3.21 AS bundler

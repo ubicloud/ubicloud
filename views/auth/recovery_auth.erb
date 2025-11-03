@@ -2,7 +2,7 @@
 
 <% @page_message = "Verify your sign in" %>
 
-<% form(action: rodauth.recovery_auth_path, method: :post, class: "rodauth space-y-6") do %>
+<% form(action: rodauth.recovery_auth_path, method: :post, class: "rodauth form-group") do %>
 
   <%== part(
     "components/form/text",
@@ -19,7 +19,7 @@
     <p class="mt-10 text-center text-sm text-gray-400">
       Can't access your recovery codes?
       <br>
-      <a href="mailto:support@ubicloud.com" class="font-semibold leading-6 text-orange-500 hover:text-orange-700">contact support</a>
+      <a href="mailto:support@ubicloud.com" class="link-primary font-semibold">contact support</a>
     </p>
   </div>
 <% end %>

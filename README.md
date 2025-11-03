@@ -135,8 +135,8 @@ using SSH, via the library [net-ssh](https://github.com/net-ssh/net-ssh). For ou
 tests, we use [RSpec](https://rspec.info/).
 
 * Cloud console: Server-side web app served by the Roda framework. For the visual
-design, we use [Tailwind CSS](https://tailwindcss.com) with components from
-[Tailwind UI](https://tailwindui.com). We also use jQuery for interactivity.
+design, we use modern CSS with semantic component classes. We also use jQuery
+for interactivity.
 
 If you’d like to start hacking with Ubicloud, any method of obtaining
 Ruby and Postgres versions is acceptable. If you have no opinion on

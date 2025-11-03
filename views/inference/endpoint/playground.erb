@@ -2,7 +2,7 @@
 <%== render("components/free_quota") %>
 <% @enable_marked = true %>
 <%== render("inference/tabbar") %>
-<div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+<div class="table-wrapper" style="border-bottom: 1px solid var(--gray-200);"">
   <div class="px-4 py-5 sm:p-6 grid gap-6">
     <div class="grid sm:grid-cols-2 gap-6 text-gray-900">
       <%== render(
@@ -97,7 +97,7 @@
       ) %>
     </div>
     <div>
-      <div class="block text-sm font-medium leading-6 text-gray-900 mb-2">Previous Messages</div>
+      <div class="block text-sm font-medium text-gray-900 mb-2">Previous Messages</div>
       <div id="inference_previous_empty" class="text-sm text-gray-500">There are no messages yet.</div>
       <div id="inference_previous">
       </div>

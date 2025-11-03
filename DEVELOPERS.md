@@ -24,9 +24,8 @@ Tests are written using [RSpec](https://rspec.info/).
 Code is automatically linted and formatted with
 [RuboCop](https://rubocop.org/).
 
-The web console is designed with [Tailwind
-CSS](https://tailwindcss.com), based on components from [Tailwind
-UI](https://tailwindui.com), and uses jQuery for interactivity.
+The web console is designed with modern CSS using semantic component classes
+and uses jQuery for interactivity.
 
 ## Development Environment
 
@@ -449,11 +448,9 @@ Assuredly, there is all this and more in other editor environments.
 
 ### Running Web Console
 
-Web Console is designed with Tailwind CSS. Tailwind CSS works by scanning
-all of your HTML files, JavaScript components, and any other templates
-for class names, generating the corresponding styles and then writing
-them to a static CSS file. You need to generate CSS file before running
-web console if you do not want to see HTML files without any style.
+The web console uses modern CSS with semantic component classes defined in
+`assets/css/app.css`. The CSS file is committed to the repository, so no
+build step is required for styling.
 
 We manage node module versions through [npm](https://www.npmjs.com). It's
 installed with `nodejs` package.
@@ -463,30 +460,15 @@ $ which npm
 /home/youruser/.local/share/mise/installs/node/23.6.0/bin/npm
 $ npm install
 [...]
-added 46 packages, removed 19 packages, changed 41 packages, and audited 527 packages in 1s
+added 440 packages in 21s
 
-14 packages are looking for funding
+121 packages are looking for funding
     run `npm fund` for details
 
 found 0 vulnerabilities
 ```
 
-Now we can build CSS file. If you do development on UI, you can run
-`npm run watch` on separate terminal window to see changes realtime.
-
-```sh
-$ npm run prod
-> prod
-> npx tailwindcss -o assets/css/app.css --minify
-
-Rebuilding...
-
-Done in 767ms.
-```
-
-`assets/css/app.css` should be updated.
-
-After that, start up the web server.
+Now you can start up the web server.
 
 ```sh
 $ bundle exec rackup

@@ -2,20 +2,20 @@
   <div class="group <%= items.compact.map { it[2] }.any? ? "active" : "" %>">
     <button
       type="button"
-      class="toggle-parent-to-active w-full text-orange-100 hover:text-white hover:bg-orange-700 flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold"
+      class="toggle-parent-to-active w-full text-orange-100 hover:text-white flex gap-3 rounded-md p-2 text-sm font-semibold"
     >
-      <%== part("components/icon", name: icon, classes: "text-white h-6 w-6 shrink-0") %>
+      <%== part("components/icon", name: icon, classes: "text-white shrink-0") %>
       <%= name %>
       <div class="ml-auto shrink-0 group-[.active]:rotate-90">
         <%== part("components/icon", name: "hero-chevron-right") %>
       </div>
     </button>
-    <ul class="mt-1 px-2 hidden group-[.active]:block space-y-1">
+    <ul class="mt-1 px-2 hidden group-[.active]:block form-group">
       <% items.compact.each do |item_name, item_url, item_is_active| %>
         <li>
           <a
             href="<%= item_url %>"
-            class="<%= item_is_active ? "bg-orange-700 text-white" : "text-orange-100 hover:text-white hover:bg-orange-700" %> block rounded-md py-2 pr-2 pl-9 text-sm leading-6"
+            class="<%= item_is_active ? "bg-orange-700 text-white" : "text-orange-100 hover:text-white" %> block rounded-md py-2 pr-2 pl-9 text-sm"
           >
             <%= item_name %>
           </a>

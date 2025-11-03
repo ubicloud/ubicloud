@@ -3,8 +3,8 @@
 error = flash.dig("errors", name)
 is_content_array = options[0][1].is_a?(Array) %>
 
-<div class="space-y-2">
-  <label class="text-sm font-medium leading-6 text-gray-900"><%= label %></label>
+<div class="form-group">
+  <label class="text-sm font-medium text-gray-900"><%= label %></label>
   <fieldset class="radio-small-cards">
     <legend class="sr-only"><%= label %></legend>
     <div class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(285px,1fr))]">
@@ -37,7 +37,7 @@ is_content_array = options[0][1].is_a?(Array) %>
     </div>
   </fieldset>
   <% if error %>
-    <p class="text-sm text-red-600 leading-6" id="<%= name %>-error"><%= error %></p>
+    <p class="text-sm text-red-600" id="<%= name %>-error"><%= error %></p>
   <% end %>
   <%== description_html %>
 </div>

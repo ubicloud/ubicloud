@@ -1,5 +1,5 @@
 <aside class="py-6 lg:col-span-4 xl:col-span-3 2xl:col-span-2">
-  <nav class="space-y-1">
+  <nav style="display: flex; flex-direction: column; gap: var(--spacing-1);">
     <% disallow_login_methods = rodauth.locked_domain_for(current_account.email)
       [
         ["Multifactor Auth", "/account/multifactor-manage", "hero-lock-closed"],
@@ -12,22 +12,25 @@
       <% if request.path == url %>
         <a
           href="<%= url %>"
-          class="border-orange-600 bg-orange-50 text-orange-600 hover:bg-orange-50 hover:text-orange-700 group flex items-center border-l-4 px-3 py-2 text-sm font-medium"
+          class="group flex items-center px-3 py-2 text-sm font-medium"
+          style="border-left: 4px solid var(--orange-600); background-color: var(--orange-50); color: var(--orange-600);"
           aria-current="page"
         >
           <%== part(
             "components/icon",
             name: icon,
-            classes: "text-orange-600 group-hover:text-orange-600 -ml-1 mr-3 h-6 w-6 flex-shrink-0"
+            classes: "shrink-0",
+            style: "color: var(--orange-600); margin-left: -0.25rem; margin-right: var(--spacing-3); width: 1.5rem; height: 1.5rem;"
           ) %>
           <span class="truncate"><%= label %></span>
         </a>
       <% else %>
         <a
           href="<%= url %>"
-          class="border-transparent text-gray-900 hover:bg-gray-50 hover:text-gray-900 group flex items-center border-l-4 px-3 py-2 text-sm font-medium"
+          class="group flex items-center px-3 py-2 text-sm font-medium text-gray-900 transition-colors"
+          style="border-left: 4px solid transparent;"
         >
-          <%== part("components/icon", name: icon, classes: "text-gray-400 group-hover:text-gray-500 -ml-1 mr-3 h-6 w-6 flex-shrink-0") %>
+          <%== part("components/icon", name: icon, classes: "text-gray-400 group-transition-colors shrink-0", style: "margin-left: -0.25rem; margin-right: var(--spacing-3); width: 1.5rem; height: 1.5rem;") %>
           <span class="truncate"><%= label %></span>
         </a>
       <% end %>
