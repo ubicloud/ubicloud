@@ -102,11 +102,9 @@ module Util
 
   def self.calculate_ips_v4
     Address
-      .select { set_masklen(:cidr, 16).as(:masked) }
       .where { (family(:cidr) =~ 4) & (masklen(:cidr) !~ 32) }
       .distinct
-      .order(:masked)
-      .map(:masked)
+      .select_order_map { set_masklen(:cidr, 16).as(:masked) }
       .join("\n")
   end
 end
