@@ -5,7 +5,7 @@ require "json"
 require "yaml"
 require "optparse"
 require "openssl"
-require "base64"
+require_relative "../lib/storage_volume"
 
 def validate_encrypted_dek_file(data)
   unless data.key?("cipher") && data["cipher"].is_a?(String)
@@ -84,7 +84,8 @@ def wrap_key_b64(key_bytes, kek_data)
   Base64.strict_encode64(wrapped_key).strip
 end
 
-def generate_vhost_conf(plain_keys, kek_data, vm_name)
+def generate_vhost_conf(plain_keys, kek_data, vm_name, device)
+  write_through = StorageVolume.new(vm_name, {"storage_device" => device, "disk_index" => 0}).write_through_device?
   config = {
     "socket" => "/var/storage/#{vm_name}/0/vhost.sock",
     "path" => "/var/storage/#{vm_name}/0/disk.raw",
@@ -96,7 +97,7 @@ def generate_vhost_conf(plain_keys, kek_data, vm_name)
     "poll_queue_timeout_us" => 1000,
     "device_id" => "#{vm_name}_0",
     "skip_sync" => false,
-    "write_through" => false
+    "write_through" => write_through
   }
   key1 = [plain_keys["key"]].pack("H*")
   key2 = [plain_keys["key2"]].pack("H*")
@@ -119,13 +120,13 @@ def write_vhost_conf(output_file, conf)
   File.write(output_file, yaml)
 end
 
-def convert(dek_data, kek_data, output_file, vm_name)
+def convert(dek_data, kek_data, output_file, vm_name, device)
   decrypted_keys = {}
   ["key", "key2"].each do |key_field|
     encrypted_key = dek_data[key_field]
     decrypted_keys[key_field] = unwrap_key(encrypted_key, kek_data["#{vm_name}_0"])
   end
-  vhost_conf = generate_vhost_conf(decrypted_keys, kek_data["#{vm_name}_0"], vm_name)
+  vhost_conf = generate_vhost_conf(decrypted_keys, kek_data["#{vm_name}_0"], vm_name, device)
   write_vhost_conf(output_file, vhost_conf)
 
   puts "Successfully converted SPDK DEK to vhost conf format. Output written to #{output_file}"
@@ -145,6 +146,9 @@ parser = OptionParser.new do |opts|
   end
   opts.on("--vhost-conf-output-file PATH", "Path to vhost conf output file") do |path|
     options[:output_file] = path
+  end
+  opts.on("--device NAME", "Name of the underlying device which holds the disk") do |name|
+    options[:device] = name
   end
   opts.on("-h", "--help", "Show this help message") do
     puts opts

@@ -100,7 +100,7 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
   describe "#remove_spdk_controller" do
     it "stops the spdk controller" do
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo host/bin/spdk-migration-helper remove-spdk-controller", stdin: prog.migration_script_params)
-      expect { prog.remove_spdk_controller }.to hop("ready_migration")
+      expect { prog.remove_spdk_controller }.to hop("generate_vhost_backend_conf")
     end
   end
 
@@ -110,15 +110,15 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo rm /var/storage/#{vm.inhost_name}/0/vhost.sock")
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo mkfifo /var/storage/#{vm.inhost_name}/0/kek.pipe")
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo chown #{vm.inhost_name}:#{vm.inhost_name} /var/storage/#{vm.inhost_name}/0/kek.pipe")
-      expect { prog.ready_migration }.to hop("generate_vhost_backend_conf")
+      expect { prog.ready_migration }.to hop("download_migration_binaries")
     end
   end
 
   describe "#generate_vhost_backend_conf" do
     it "generates the vhost backend conf" do
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo host/bin/convert-encrypted-dek-to-vhost-backend-conf --encrypted-dek-file /var/storage/#{vm.inhost_name}/0/data_encryption_key.json --kek-file /dev/stdin --vhost-conf-output-file /var/storage/#{vm.inhost_name}/0/vhost-backend.conf --vm-name #{vm.inhost_name}", stdin: vm.storage_secrets.to_json)
+      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo host/bin/convert-encrypted-dek-to-vhost-backend-conf --encrypted-dek-file /var/storage/#{vm.inhost_name}/0/data_encryption_key.json --kek-file /dev/stdin --vhost-conf-output-file /var/storage/#{vm.inhost_name}/0/vhost-backend.conf --vm-name #{vm.inhost_name} --device nvme0", stdin: vm.storage_secrets.to_json)
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo chown #{vm.inhost_name}:#{vm.inhost_name} /var/storage/#{vm.inhost_name}/0/vhost-backend.conf")
-      expect { prog.generate_vhost_backend_conf }.to hop("download_migration_binaries")
+      expect { prog.generate_vhost_backend_conf }.to hop("ready_migration")
     end
   end
 
