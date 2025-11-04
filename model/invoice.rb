@@ -83,7 +83,7 @@ class Invoice < Sequel::Model
     if amount < Config.minimum_invoice_charge_threshold
       update(status: "below_minimum_threshold")
       Clog.emit("Invoice cost is less than minimum charge cost.") { {invoice_below_threshold: {ubid: ubid, cost: amount}} }
-      send_success_email(below_threshold: true)
+      send_success_email
       return true
     end
 
@@ -135,7 +135,7 @@ class Invoice < Sequel::Model
     false
   end
 
-  def send_success_email(below_threshold: false)
+  def send_success_email
     data = Serializers::Invoice.serialize(self)
     pdf = generate_pdf(data)
     unless data.billing_email
@@ -143,10 +143,13 @@ class Invoice < Sequel::Model
       return
     end
     persist(pdf)
-    messages = if below_threshold
+    messages = case status
+    when "below_minimum_threshold"
       ["Since the invoice total of #{data.total} is below our minimum charge threshold, there will be no charges for this month."]
-    else
+    when "paid"
       ["The invoice amount of #{data.total} will be debited from your credit card on file."]
+    else
+      fail "BUG: unexpected invoice status #{status}"
     end
     github_usage = data.items.select { it.description.include?("GitHub Runner") }.sum(&:cost)
     saved_amount = 9 * github_usage

@@ -3,7 +3,7 @@
 require_relative "spec_helper"
 
 RSpec.describe Invoice do
-  subject(:invoice) { described_class.create(project_id: project.id, begin_time: Time.utc(2025, 3), end_time: Time.utc(2025, 4), invoice_number: "2503-4ddfa430e8-0006", created_at: Time.now, content: {"cost" => 10, "subtotal" => 11, "credit" => 1, "discount" => 0, "resources" => [], "billing_info" => {"country" => "NL"}}, status: "unpaid") }
+  subject(:invoice) { described_class.create(project_id: project.id, begin_time: Time.utc(2025, 3), end_time: Time.utc(2025, 4), invoice_number: "2503-4ddfa430e8-0006", created_at: Time.now, content: {"cost" => 10, "subtotal" => 11, "credit" => 1, "discount" => 0, "resources" => [], "billing_info" => {"email" => "billing@example.com", "country" => "NL"}}, status: "unpaid") }
 
   let(:billing_info) { BillingInfo.create(stripe_id: "cs_1234567890") }
   let(:client) { instance_double(Aws::S3::Client) }
@@ -63,9 +63,16 @@ RSpec.describe Invoice do
 
   describe ".send_success_email" do
     it "does not send the invoice if it has no billing information" do
-      update_content(resources: [], subtotal: 0.0, credit: 0.0, discount: 0.0, cost: 0.0)
+      update_content(billing_info: nil, resources: [], subtotal: 0.0, credit: 0.0, discount: 0.0, cost: 0.0)
       expect(Clog).to receive(:emit).with("Couldn't send the invoice because it has no billing information").and_call_original
       invoice.send_success_email
+      expect(Mail::TestMailer.deliveries.length).to eq 0
+    end
+
+    it "fails if the status is unexpected" do
+      invoice.update(status: "fraud")
+      expect(invoice).to receive(:persist)
+      expect { invoice.send_success_email }.to raise_error(RuntimeError, "BUG: unexpected invoice status fraud")
       expect(Mail::TestMailer.deliveries.length).to eq 0
     end
   end
