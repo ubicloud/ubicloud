@@ -62,6 +62,14 @@ RSpec.describe Invoice do
   end
 
   describe ".send_success_email" do
+    it "sends email for waiting transfers" do
+      invoice.update(status: "waiting_transfer")
+      expect(invoice).to receive(:persist)
+      invoice.send_success_email
+      expect(Mail::TestMailer.deliveries.length).to eq 1
+      expect(Mail::TestMailer.deliveries.first.html_part.body).to include("Please follow the bank transfer instructions at the bottom of the invoice to complete the payment.")
+    end
+
     it "does not send the invoice if it has no billing information" do
       update_content(billing_info: nil, resources: [], subtotal: 0.0, credit: 0.0, discount: 0.0, cost: 0.0)
       expect(Clog).to receive(:emit).with("Couldn't send the invoice because it has no billing information").and_call_original
@@ -104,10 +112,12 @@ RSpec.describe Invoice do
       expect(invoice.charge).to be false
     end
 
-    it "not charge if no payment methods" do
-      update_content(billing_info: {"id" => billing_info.id})
-      expect(Clog).to receive(:emit).with("Invoice doesn't have billing info.").and_call_original
-      expect(invoice.charge).to be false
+    it "not charge and wait for transfer if no payment methods" do
+      update_content(bank_transfer_info: {"Beneficiary" => "Ubicloud B.V."}, billing_info: {"id" => billing_info.id, "email" => "customer@example.com"})
+      expect(Clog).to receive(:emit).with("Invoice is waiting for transfer.").and_call_original
+      expect(invoice).to receive(:persist)
+      expect(invoice.charge).to be true
+      expect(invoice.status).to eq("waiting_transfer")
     end
 
     it "not charge if all payment methods fails" do
