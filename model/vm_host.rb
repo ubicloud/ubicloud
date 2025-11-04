@@ -348,6 +348,17 @@ class VmHost < Sequel::Model
     error_count.empty?
   end
 
+  def check_last_boot_id(ssh_session)
+    return unless Config.slack_webhook_host_crash_url
+
+    current_boot_id = sshable.cmd("cat /proc/sys/kernel/random/boot_id").strip
+    if current_boot_id != last_boot_id
+      Clog.emit("recorded last_boot_id in database differs from the actual boot_id")
+
+      Excon.post(Config.slack_webhook_host_crash_url, headers: {"Content-Type" => "application/json"}, body: {text: "VmHost #{ubid} has a different last_boot_id than the one recorded in the database."}.to_json, expects: 200)
+    end
+  end
+
   def init_health_monitor_session
     {
       ssh_session: sshable.start_fresh_session

@@ -432,6 +432,7 @@ TIMER
 
   def available?
     vm_host.perform_health_checks(sshable.connect)
+    vm_host.check_last_boot_id
   rescue
     false
   end

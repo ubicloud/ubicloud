@@ -138,6 +138,9 @@ module Config
   optional :pagerduty_key, string, clear: true
   optional :pagerduty_log_link, string
 
+  # VmHost Monitroing
+  optional :slack_webhook_host_crash_url, string
+
   # Postgres
   optional :postgres_service_project_id, string
   override :postgres_service_hostname, "postgres.ubicloud.com", string
