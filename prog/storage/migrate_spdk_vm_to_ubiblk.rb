@@ -135,11 +135,16 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       vm.strand.update(label: "wait")
       vm.vm_storage_volumes.first.update(use_bdev_ubi: false, vhost_block_backend_id: vm_host_vhost_block_backend.id, vring_workers: 1, spdk_installation_id: nil)
     end
-    hop_create_prep_json_file
+
+    hop_update_prep_json_file
   end
 
-  label def create_prep_json_file
-    vm.vm_host.sshable.cmd("sudo tee /vm/#{vm.inhost_name}/prep.json >/dev/null", stdin: vm.params_json)
+  label def update_prep_json_file
+    prep_json = JSON.parse(vm.vm_host.sshable.cmd("sudo cat /vm/#{vm.inhost_name}/prep.json"))
+    prep_json["storage_volumes"][0]["vhost_block_backend_version"] = Config.vhost_block_backend_version
+    prep_json["storage_volumes"][0]["spdk_version"] = nil
+    vm.vm_host.sshable.cmd("sudo tee /vm/#{vm.inhost_name}/prep.json >/dev/null", stdin: JSON.pretty_generate(prep_json))
+
     pop "Vm successfully migrated to ubiblk"
   end
 
