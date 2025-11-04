@@ -40,7 +40,7 @@ end
     <% stripe_data = billing_info.stripe_data %>
     <div class="flex-header-with-bottom-padding">
       <div class="flex-title">
-        <h3 class="section-heading">
+        <h3>
           Billing Details
         </h3>
       </div>
@@ -180,7 +180,7 @@ end
                     csrf_url: path(pm),
                     confirmation: pm.stripe_data["last4"]
                   },
-                  extra_class: "flex justify-end"
+                  extra_class: "flex-items-center justify-end"
                 }
               ]
             ],
@@ -194,7 +194,7 @@ end
     <div>
       <div class="flex-header-with-bottom-padding">
         <div class="flex-title">
-          <h3 class="section-heading">
+          <h3>
             Invoices
           </h3>
         </div>
@@ -215,7 +215,7 @@ end
                   <a href="<%= path(inv) %>" target="_blank" class="link-primary">
                     <%= inv.name %>
                   </a>
-                  <span class="text-xs text-gray-400 italic">
+                  <span class="text-xs text-muted italic">
                     <% if inv.invoice_number %>
                       #<%= inv.invoice_number %>
                     <% else %>
@@ -270,7 +270,7 @@ end
 <div>
   <div class="flex-header lg:pb-2">
     <div class="flex-title">
-      <h3 class="section-heading">
+      <h3>
         Usage Alerts
       </h3>
     </div>
@@ -283,7 +283,7 @@ end
           <div class="form-group">
             <div>
               <h2 class="card-heading">Add new usage alert</h2>
-              <p class="mt-1 help-text">
+              <p class="text-help-sm help-text">
                 Usage alerts will be sent to your email address. If you want to send alerts to specific email
                 addresses, you need to log in with that email address.
                 <br/>

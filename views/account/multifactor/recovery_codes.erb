@@ -16,7 +16,7 @@
                   <div class="form-field-small">
                     <%== render("components/rodauth/password_field") %>
                   </div>
-                  <div class="col-span-6">
+                  <div class="grid-col-6">
                     <%== part("components/form/submit_button", text: rodauth.view_recovery_codes_button) %>
                   </div>
                 </div>
@@ -53,7 +53,7 @@
                 <h2 class="card-heading"><%== rodauth.add_recovery_codes_heading %></h2>
                 <% form(action: rodauth.recovery_codes_path, method: :post) do %>
                   <div class="form-grid-6">
-                    <div class="col-span-6">
+                    <div class="grid-col-6">
                       <%== part("components/form/submit_button", text: rodauth.add_recovery_codes_button, name: rodauth.add_recovery_codes_param) %>
                     </div>
                   </div>

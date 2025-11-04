@@ -6,7 +6,7 @@ max_date = @pg.timeline.latest_restore_time %>
     <% form(action: "#{path(@pg)}/restore", method: :post) do %>
       <div class="form-group">
         <div>
-          <h3 class="section-heading">Fork PostgreSQL database</h3>
+          <h3>Fork PostgreSQL database</h3>
           <p class="form-help-text">
             When you fork your existing PostgreSQL database, a new server will be provisioned.
           </p>
@@ -38,7 +38,7 @@ max_date = @pg.timeline.latest_restore_time %>
   <div class="section-padded">
     <div class="flex-header">
       <div class="flex-title">
-        <h3 class="section-heading">Backups</h3>
+        <h3>Backups</h3>
       </div>
     </div>
 

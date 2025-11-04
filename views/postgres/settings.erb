@@ -4,7 +4,7 @@
   <div class="section-padded">
     <div class="flex-header">
       <div class="flex-title">
-        <h3 class="section-heading">
+        <h3>
           Maintenance Window
         </h3>
       </div>
@@ -42,7 +42,7 @@
   <div class="section-padded">
     <div class="flex-header">
       <div class="flex-title">
-        <h3 class="section-heading">
+        <h3>
           Danger Zone
         </h3>
       </div>
@@ -54,7 +54,7 @@
           <% form(action: "#{path(@pg)}/promote", method: :post) do %>
             <div class="flex-header-sm">
               <div>
-                <h3 class="subsection-heading">Promote PostgreSQL read replica database</h3>
+                <h3>Promote PostgreSQL read replica database</h3>
                 <div class="description-text">
                   <p>This action will promote and restart the PostgreSQL database. The database will stop replicating
                     permanently. It will be offline momentarily, and all connections will be dropped.</p>
@@ -75,7 +75,7 @@
           <% form(action: "#{path(@pg)}/reset-superuser-password", method: :post) do %>
             <div class="form-group">
               <div>
-                <h3 class="subsection-heading">Reset superuser password</h3>
+                <h3>Reset superuser password</h3>
               </div>
               <div class="grid-12col">
                 <div class="form-field-large">
@@ -116,7 +116,7 @@
           <% form(action: "#{path(@pg)}/restart", method: :post) do %>
             <div class="flex-header-sm">
               <div>
-                <h3 class="subsection-heading">Restart PostgreSQL database</h3>
+                <h3>Restart PostgreSQL database</h3>
                 <div class="description-text">
                   <p>This action will restart the PostgreSQL database. The database will be offline momentarily, and all
                     connections will be dropped.</p>
@@ -141,7 +141,7 @@
         <div class="card-body">
           <div class="flex-header-sm">
             <div>
-              <h3 class="subsection-heading">Delete PostgreSQL database</h3>
+              <h3>Delete PostgreSQL database</h3>
               <div class="description-text">
                 <p>This action will permanently delete this PostgreSQL database.</p>
               </div>

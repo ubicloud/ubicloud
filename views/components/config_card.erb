@@ -1,11 +1,11 @@
 <%# locals: (title:, config:, extra_class:, name:, errors:) %>
 
-<div class="bg-white rounded-lg shadow overflow-hidden mb-6 <%= extra_class %>">
-  <div class="px-6 py-4 border-b border-gray-200">
-    <h3 class="card-heading"><%= title %></h3>
+<div class="bg-white rounded-lg shadow overflow-hidden spaced-bottom-lg <%= extra_class %>">
+  <div class="card-header-bordered">
+    <h3><%= title %></h3>
   </div>
 
-  <div class="border-b-gray-200 w-full max-h-64 overflow-y-auto">
+  <div class="border-b-gray-200 width-full max-height-64 overflow-y-auto">
     <% config.each_with_index do |(key, value), index| %>
       <% error = errors[name + "." + key] %>
       <% next if key.empty? && value.empty? %>
@@ -14,7 +14,7 @@
           <div class="flex flex-wrap items-center config-entry">
             <input
               type="text"
-              class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500 mr-2 <%= (error && !error.is_a?(Array)) ? "border-red-500" : "" %>"
+              class="input-focus-blue spaced-right-sm <%= (error && !error.is_a?(Array)) ? "border-red-500" : "" %>"
               value="<%= key %>"
               name="<%= name %>_keys[]"
               required
@@ -22,11 +22,11 @@
             <input
               type="text"
               value="<%= value %>"
-              class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500 <%= error ? "border-red-500" : "" %>"
+              class="input-focus-blue <%= error ? "border-red-500" : "" %>"
               name="<%= name %>_values[]"
             />
             <% if error %>
-              <span class="error inline-block h-8 w-54 py-2 px-2 max-w-54 text-xs text-red-600 bg-red-100 rounded" aria-live="polite">
+              <span class="error alert-error-inline" aria-live="polite">
                 <% if error.is_a?(Array) %>
                   <% error.each do |error| %>
                     <%= error %><br/>
@@ -44,12 +44,12 @@
       </div>
     <% end %>
     <!-- Hidden row for generating new entries -->
-    <div class="px-6 py-2 transition-colors group config-placeholder-group font-mono hidden" data-config-id="">
+    <div class="px-6 py-2 transition-colors group config-placeholder-group text-code hidden" data-config-id="">
       <div class="flex-between">
         <div class="flex flex-wrap items-center config-entry">
           <input
             type="text"
-            class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500 mr-2"
+            class="input-focus-blue spaced-right-sm"
             value=""
             name="<%= name %>_keys[]"
             disabled
@@ -61,7 +61,7 @@
             name="<%= name %>_values[]"
             disabled
           />
-          <span class="error inline-block h-8 w-54 py-2 px-2 max-w-54 text-xs text-red-600 hidden bg-red-100 rounded" aria-live="polite"></span>
+          <span class="error alert-error-inline hidden" aria-live="polite"></span>
         </div>
         <div class="config-actions-cell">
           <%== part("components/button", type: "danger", text: "", icon: "hero-trash", extra_class: "delete-config-btn") %>
@@ -70,12 +70,12 @@
     </div>
     <!-- Empty row for new configuration -->
     <% if @edit_perm %>
-      <div class="px-6 py-2 transition-colors group new-config font-mono">
+      <div class="px-6 py-2 transition-colors group new-config text-code">
         <div class="flex-between">
           <div class="flex flex-wrap items-center">
             <input
               type="text"
-              class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500 mr-2"
+              class="input-focus-blue spaced-right-sm"
               placeholder="New Key"
               name="<%= name %>_keys[]"
             />
@@ -85,7 +85,7 @@
               class="config-input"
               name="<%= name %>_values[]"
             />
-            <span class="error inline-block h-8 w-54 py-2 px-2 max-w-54 text-xs text-red-600 hidden bg-red-100 rounded" aria-live="polite"></span>
+            <span class="error alert-error-inline hidden" aria-live="polite"></span>
           </div>
           <div class="config-actions-cell">
             <%== part("components/button", text: "", type: "safe", icon: "hero-plus", extra_class: "add-config-btn") %>

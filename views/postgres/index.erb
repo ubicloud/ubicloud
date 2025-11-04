@@ -13,7 +13,7 @@
             <<-ITEM
             <div class="py-1 transition-colors" role="none">
               <a href="#{@project.path}/postgres/create?flavor=#{it.name}" class="block px-4 py-3 ">
-                <h3 class="subsection-heading">#{it.title}</h3>
+                <h3>#{it.title}</h3>
                 <p class="mt-1 help-text">#{it.description}</p>
               </a>
             </div>
@@ -56,12 +56,12 @@
       <% postgres_flavors.values.each do %>
         <div class="feature-card">
           <div>
-            <span class="inline-flex rounded-lg overflow-hidden w-12 h-12">
+            <span class="inline-flex rounded-lg overflow-hidden icon-xl">
               <img src="/icons/pg-<%= it.brand.downcase %>.png" class="object-cover"/>
             </span>
           </div>
-          <div class="mt-4">
-            <h3 class="subsection-heading">
+          <div class="spaced-top-md">
+            <h3>
               <a href="<%= @project.path %>/postgres/create?flavor=<%= it.name %>">
                 <span class="absolute inset-0" aria-hidden="true"></span>
                 Create <%= it.title %>

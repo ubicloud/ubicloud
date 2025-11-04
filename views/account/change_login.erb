@@ -7,13 +7,13 @@
     <div class="card">
       <div class="account-layout-grid">
         <%== render("account/submenu") %>
-        <div class="account-content border-t-gray-200 pb-10">
+        <div class="account-content content-section-bordered-top">
           <div class="form-section-padded account-section">
             <h2 class="card-heading">Change Email Address</h2>
             <% form(action: rodauth.change_login_path, method: :post) do %>
               <div class="form-grid-6">
                 <div class="form-field-small">
-                  <%== part("components/form/text", label: "Current Email", value: current_account.email, extra_class: "bg-gray-50 text-gray-500 ring-gray-200 ", attributes: {disabled: true}) %>
+                  <%== part("components/form/text", label: "Current Email", value: current_account.email, extra_class: "bg-gray-50 text-muted ring-gray-200 ", attributes: {disabled: true}) %>
                 </div>
                 <div class="form-field-small">
                   <%== part("components/rodauth/login_field", label: "New Email Address") %>
@@ -23,7 +23,7 @@
                     <%== render("components/rodauth/password_field") %>
                   </div>
                 <% end %>
-                <div class="col-span-6">
+                <div class="grid-col-6">
                   <%== part("components/form/submit_button", text: "Change Email") %>
                 </div>
               </div>

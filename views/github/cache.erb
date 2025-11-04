@@ -11,7 +11,7 @@
             <tr class="cache-group-row group" data-repository="<%= repository_id %>">
               <th scope="colgroup" class="table-cell-full-width table-header-semibold table-header-group-active">
                 <div class="flex">
-                  <%== part("components/icon", name: "hero-chevron-right", classes: "w-5 h-5 group-[.active]:rotate-90") %>
+                  <%== part("components/icon", name: "hero-chevron-right", classes: "icon-md group-[.active]:rotate-90") %>
                   <%= entries.first.repository.name %>
                 </div>
               </th>
@@ -28,15 +28,15 @@
                   <div class="label-medium"><%= entry.key %></div>
                   <div class="cache-created-time">created <span title="<%= entry.created_at.strftime("%Y-%m-%d %H:%M UTC") %>"><%= humanize_time(entry.created_at) %></span></div>
                 </td>
-                <td class="table-cell-normal text-gray-500">
+                <td class="table-cell-normal text-muted">
                   <div><%= entry.scope %></div>
                 </td>
-                <td class="table-cell-normal text-gray-500 whitespace-nowrap">
+                <td class="table-cell-normal text-muted whitespace-nowrap">
                   <div class="cache-size-badge" title="<%= entry.size %> bytes">
                     <%= humanize_size(entry.size) %>
                   </div>
                 </td>
-                <td class="table-cell-normal text-gray-500 whitespace-nowrap">
+                <td class="table-cell-normal text-muted whitespace-nowrap">
                   <% if entry.last_accessed_at %>
                     <div>Last used</div>
                     <div title="<%= entry.last_accessed_at.strftime("%Y-%m-%d %H:%M UTC") %>"> <%= humanize_time(entry.last_accessed_at) %></div>

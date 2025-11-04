@@ -21,7 +21,7 @@ current_usage = @project.current_resource_usage("VmVCpu")
 ) %>
 
 <%
-  ps_description = "<p class='mt-1 text-sm text-gray-600'>We recommend using the default subnet for most use-cases. If you'd like to learn more about private subnets, please visit <a href='https://www.ubicloud.com/docs/networking/private-subnet' class='text-orange-600'>Private Subnets</a> page.</p>"
+  ps_description = "<p class='text-help-sm text-gray-600'>We recommend using the default subnet for most use-cases. If you'd like to learn more about private subnets, please visit <a href='https://www.ubicloud.com/docs/networking/private-subnet' class='link-orange-underline'>Private Subnets</a> page.</p>"
 
   form_elements = [
     {name: "name", type: "text", label: "Name", placeholder: "Enter name", required: "required", opening_tag: "<div class='form-col-3'>"},
@@ -53,13 +53,13 @@ current_usage = @project.current_resource_usage("VmVCpu")
     {name: "unix_user", type: "text", label: "Username", placeholder: "ubi", value: "ubi", required: "required", opening_tag: "<div class='form-col-2'>"}
   )
 
-  public_key_params = {name: "public_key", type: "textarea", label: "SSH Public Key", placeholder: "ssh-ed25519 AAAA...", opening_tag: "<div id='public-key-wrapper' class='col-span-full'>"}
+  public_key_params = {name: "public_key", type: "textarea", label: "SSH Public Key", placeholder: "ssh-ed25519 AAAA...", opening_tag: "<div id='public-key-wrapper' class='grid-col-full'>"}
 
   if @project.ssh_public_keys.empty?
     public_key_params[:required] = "required"
     public_key_params[:description] = "SSH keys are a more secure method of logging into a server."
     if has_project_permission("Project:edit")
-      public_key_params[:description] += " You can <a class='text-orange-600' href='#{h @project.path}/ssh-public-key'>register SSH keys for this project</a> to avoid having to reenter the same key multiple times."
+      public_key_params[:description] += " You can <a class='link-orange-underline' href='#{h @project.path}/ssh-public-key'>register SSH keys for this project</a> to avoid having to reenter the same key multiple times."
       public_key_params[:escape_description] = false
     end
   else
@@ -67,7 +67,7 @@ current_usage = @project.current_resource_usage("VmVCpu")
   end
 
   form_elements.push(public_key_params)
-  form_elements.push({name: "init_script", type: "textarea", label: "Init Script", placeholder: "(optional)", opening_tag: "<div id='init-script-wrapper' class='col-span-full'>"})
+  form_elements.push({name: "init_script", type: "textarea", label: "Init Script", placeholder: "(optional)", opening_tag: "<div id='init-script-wrapper' class='grid-col-full'>"})
 
   if @project.get_ff_gpu_vm
     form_elements << {name: "show_gpu", type: "hidden", value: @show_gpu}

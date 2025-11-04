@@ -36,7 +36,7 @@ end %>
 
   <% form(action: request.path_info, method: :post) do %>
     <div class="header-with-actions">
-      <div class="font-mono flex-1">
+      <div class="text-code flex-1">
         <% if multi %>
           <%== part("components/form/textarea", name: "multi-cli", attributes: {cols: 80, rows: 6, placeholder: "Multiple commands, one per line", autofocus: true, required: true}) %>
         <% else %>
@@ -47,7 +47,7 @@ end %>
     </div>
 
     <div
-      class="table-card" <%= (multi && !@cli) ? "hidden" : ""%>"
+      class="table-card <%= (multi && !@cli) ? "hidden" : ""%>"
     >
       <div class="form-section-padded form-group">
         <% if @clis && !@clis.empty? %>
@@ -91,7 +91,7 @@ end %>
                 <dt><code>help -r</code></dt>
                 <dd class="command-example-desc">Show full help for all supported commands</dd>
                 <dt><code>vm list</code></dt>
-                <dd class="inline-block ml-6">List all virtual machines</dd>
+                <dd class="inline-container ml-6">List all virtual machines</dd>
               </dl>
             </div>
 

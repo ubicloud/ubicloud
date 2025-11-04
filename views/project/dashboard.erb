@@ -112,7 +112,7 @@ cards = [
 <%== part("components/page_header", title: "Hi, #{current_account.name}") %>
 
 <div id="tiles" class="content-grid">
-  <div class="mb-5 dashboard-tiles">
+  <div class="spaced-bottom-md dashboard-tiles">
     <% tiles.each do |title, count, link, perm| %>
       <% if perm %>
         <a href="<%= link %>">
@@ -127,7 +127,7 @@ cards = [
     <% end %>
   </div>
 
-  <h2 class="section-heading">Getting Started with your Project</h2>
+  <h2>Getting Started with your Project</h2>
 
   <div id="cards" class="card-grid-4col">
     <% cards.each do |icon, title, description, link| %>
@@ -137,8 +137,8 @@ cards = [
             <%== part("components/icon", name: icon) %>
           </span>
         </div>
-        <div class="mt-8">
-          <h3 class="subsection-heading">
+        <div class="spaced-top-lg">
+          <h3>
             <a href="<%= link %>">
               <!-- Extend touch target to entire panel -->
               <span class="absolute inset-0" aria-hidden="true"></span>

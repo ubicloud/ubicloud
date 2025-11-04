@@ -15,7 +15,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
 <div class="p-6 grid gap-6">
   <div class="flex-header">
     <div class="flex-title">
-      <h3 class="section-heading">
+      <h3>
         Firewall Rules
       </h3>
     </div>
@@ -88,7 +88,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
                 id="fwr-delete-<%= ubid %>"
                
               >
-                <% form(action: "#{firewall_path}/firewall-rule/#{ubid}/patch", method: :post, id: form, class: " inline-flex items-center justify-center") do %>
+                <% form(action: "#{firewall_path}/firewall-rule/#{ubid}/patch", method: :post, id: form, class: " inline-flex flex-items-center justify-center") do %>
                   <%== part("components/form/submit_button", icon: "hero-pencil", attributes: {id: "submit-#{ubid}"}) %>
                 <% end %>
                 <%== part("components/delete_button", url: "#{firewall_path}/firewall-rule/#{ubid}", text: "") %>
@@ -144,7 +144,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
   </div>
   <div class="flex-header">
     <div class="flex-title">
-      <h3 class="section-heading">
+      <h3>
         Attached Private Subnets
       </h3>
     </div>

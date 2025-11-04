@@ -18,14 +18,14 @@
         <nav id="<%= type %>-submenu" class="form-group">
           <% tabs.each do |label, page, icon| %>
             <% if @page == page
-               url_class = "border-orange-600 bg-orange-50 text-orange-600 hover:bg-orange-50 group flex items-center border-l-4 px-3 py-2 text-sm font-medium"
-               icon_class = "text-orange-600 group-hover:text-orange-600"
+               url_class = "sidebar-item-active"
+               icon_class = "icon-orange"
        else
-               url_class = "border-transparent text-gray-900 transition-colors hover:text-gray-900 group flex items-center border-l-4 px-3 py-2 text-sm font-medium"
-               icon_class = "text-gray-400 group-transition-colors"
+               url_class = "border-transparent text-primary transition-colors hover:text-primary group flex items-center border-l-4 px-3 py-2 text-sm font-medium"
+               icon_class = "text-muted group-transition-colors"
             end %>
             <a href="<%= "#{path(object)}/#{page}" %>" class="<%= url_class %>">
-              <%== part("components/icon", name: icon, classes: icon_class + "  shrink-0") %>
+              <%== part("components/icon", name: icon, classes: icon_class + "  no-shrink") %>
               <span class="truncate"><%= label %></span>
             </a>
           <% end %>

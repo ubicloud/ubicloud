@@ -41,10 +41,10 @@ upgrade_progress = upgrade_stages.map do |stage, description, database_available
 end %>
 
 <div class="section-padded">
-  <h3 class="section-heading">Upgrade</h3>
+  <h3>Upgrade</h3>
 
   <% if @pg.display_state == "creating" %>
-    <p class="text-gray-500 mt-2">Upgrade operation is not available while the database is being created.</p>
+    <p class="text-muted-spaced">Upgrade operation is not available while the database is being created.</p>
   <% elsif @pg.target_version != @pg.version %>
     <% if @pg.upgrade_stage == "upgrade_failed" %>
       <p>Database upgrade failed. We have reverted the database to the previous version, and it is now available again.</p>
@@ -81,7 +81,7 @@ end %>
     <p>Your database can be upgraded to Postgres
       <%= @pg.version.to_i + 1 %>.</p>
 
-    <% form(action: "#{path(@pg)}/restore", method: :post, class: "min-w-2/3 pg-config mt-6") do %>
+    <% form(action: "#{path(@pg)}/restore", method: :post, class: "min-w-2/3 pg-config spaced-top-lg") do %>
       <%== part("components/form/section", label: "Preparing for an Upgrade",
       content: "Before starting an upgrade, make sure to test the upgrade on a
       staging database along with your application to ensure compatibility. 
@@ -91,12 +91,12 @@ end %>
 
       <%== part("components/form/hidden", name: "#{@pg.name}-upgrade-test") %>
       <%== part("components/form/hidden", restore_target: @pg.timeline.latest_restore_time.to_s) %>
-      <div class="flex justify-end mt-6">
+      <div class="button-row-end">
         <%== part("components/form/submit_button", text: "Create a test fork") if @edit_perm %>
       </div>
     <% end %>
 
-    <% form(action: "#{path(@pg)}/upgrade", method: :post, class: "min-w-2/3 pg-config mt-6") do %>
+    <% form(action: "#{path(@pg)}/upgrade", method: :post, class: "min-w-2/3 pg-config spaced-top-lg") do %>
       <%== part("components/form/section", label: "Upgrade Process",
       content: "During the upgrade, your database will be unavailable for a short period.
       If a maintenance window is configured, the upgrade will take place during
@@ -104,7 +104,7 @@ end %>
       Otherwise, the upgrade will take place as soon as the new server becomes
       ready.") %>
 
-      <div class="flex justify-end mt-6">
+      <div class="button-row-end">
         <%== part("components/form/submit_button", text: "Start Upgrade", extra_class: "") if @edit_perm %>
       </div>
     <% end %>

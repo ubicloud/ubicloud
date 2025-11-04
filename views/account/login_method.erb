@@ -64,10 +64,10 @@ social_login_providers = omniauth_providers.map { |provider,| provider.to_s }
               <div class="form-grid-6">
                 <div class="form-field-medium">
                   <div class="card-heading">Login using an OIDC provider</div>
-                  <p class="mt-1 text-sm text-gray-500 mb-2">Allow logging into your Ubicloud account using an OIDC provider</p>
+                  <p class="text-help-sm spaced-bottom-sm">Allow logging into your Ubicloud account using an OIDC provider</p>
                   <%== part("components/form/text", name: "provider", label: "OIDC Provider ID", attributes: {placeholder: "0p..."}) %>
                 </div>
-                <div class="form-actions-column mt-8">
+                <div class="form-actions-column spaced-top-lg">
                   <%== part("components/button", text: "Connect") %>
                 </div>
               </div>

@@ -4,7 +4,7 @@
 <%== render("inference/tabbar") %>
 <div class="table-card">
   <div class="form-section-padded content-grid">
-    <div class="overview-grid text-gray-900">
+    <div class="overview-grid text-primary">
       <%== render(
         "components/form/select",
         locals: {
@@ -38,7 +38,7 @@
       options: [["show_advanced", "Show advanced settings", nil, nil]]
     ) %>
     <div class="inference-config-section" id="inference_config_advanced_settings">
-      <div class="overview-grid text-gray-900">
+      <div class="overview-grid text-primary">
         <%== render(
           "components/form/text",
           locals: {

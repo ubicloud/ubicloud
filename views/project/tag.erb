@@ -89,7 +89,7 @@ current_members.sort! %>
     <% else %>
       <div class="flex-header-with-bottom-padding">
         <div class="flex-title">
-          <h3 class="section-heading">Current Members</h3>
+          <h3>Current Members</h3>
         </div>
       </div>
       <% form(action: disassociate_path, method: :post) do %>
@@ -135,7 +135,7 @@ current_members.sort! %>
     <% if addition_allowed && !add_groups.all? { _2.empty? } %>
       <div class="flex-header-with-bottom-padding">
         <div class="flex-title">
-          <h3 class="section-heading">Add Members</h3>
+          <h3>Add Members</h3>
         </div>
       </div>
       <% form(action: associate_path, method: :post) do %>

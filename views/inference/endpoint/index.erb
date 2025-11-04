@@ -41,13 +41,13 @@ curl #{ie.load_balancer.health_check_url(path:)} \\
           <%if hf_model = ie.tags["hf_model"]%>
           <a target="_blank" rel="noreferrer" href="https://huggingface.co/<%= hf_model %>" class="text-orange-600 line-clamp-2">🤗 <%= hf_model %></a>
           <%else%>
-          <p class="text-gray-500">Not available</p>
+          <p class="text-muted">Not available</p>
           <%end%>
         </div>
       </div>
       <div>
         <h3 class="section-label">Price</h3>
-        <p class="text-gray-500">
+        <p class="text-muted">
           Input: $<%= "%0.02f" % million_token_price(ie.prompt_billing_resource) %> / 1M tokens
           <br>
           Output: $<%= "%0.02f" % million_token_price(ie.completion_billing_resource) %> / 1M tokens
@@ -56,23 +56,23 @@ curl #{ie.load_balancer.health_check_url(path:)} \\
       <div>
         <h3 class="section-label">Capability</h3>
         <div class="icon-text-pair">
-          <%== part("components/icon", name: model_icon, classes: "w-5 h-5 text-gray-400") %>
+          <%== part("components/icon", name: model_icon, classes: "icon-md text-muted") %>
           <%= ie.tags["capability"] %>
         </div>
       </div>
       <div>
         <h3 class="section-label">Context length</h3>
-        <p class="text-gray-500"><%= ie.tags.fetch("context_length", "Full") %></p>
+        <p class="text-muted"><%= ie.tags.fetch("context_length", "Full") %></p>
       </div>
-      <div class="col-span-2">
+      <div class="grid-col-2">
         <h3 class="section-label">URL</h3>
-        <div class="text-gray-500"><%== part("components/copyable_content", content: ie.load_balancer.health_check_url, message: "Copied URL") %></div>
+        <div class="text-muted"><%== part("components/copyable_content", content: ie.load_balancer.health_check_url, message: "Copied URL") %></div>
       </div>
-      <div class="col-span-2">
+      <div class="grid-col-2">
         <h3 class="section-label">
           CURL usage example
         </h3>
-        <div class="mt-2">
+        <div class="spaced-top-sm">
           <pre class="code-block-dark"><%== curl_snippet %></pre>
         </div>
       </div>

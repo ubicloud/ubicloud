@@ -2,7 +2,7 @@
 
 <div id="metrics-container" class="section-padded" data-metrics-url="<%= path(@pg) %>">
   <% if @pg.display_state != "creating" %>
-    <div class="mb-4 flex-end gap-2">
+    <div class="spaced-bottom-md flex-end gap-2">
       <select
         id="time-range"
         class="py-1.5 rounded-md   "
@@ -24,9 +24,9 @@
       <% Metrics::POSTGRES_METRICS.each do |key, metric| %>
         <div class="metric-card">
           <h4 class="chart-title"><%= metric.name %></h4>
-          <p class="text-xs text-gray-500 mt-2"><%= metric.description %></p>
+          <p class="text-muted-spaced-sm"><%= metric.description %></p>
           <div
-            class="metric-chart h-64 w-full"
+            class="metric-chart chart-container"
             id="<%= key %>-chart"
             data-metric-key="<%= key %>"
             data-metric-unit="<%= metric.unit %>"
@@ -38,7 +38,7 @@
   <% else %>
     <div class="empty-state-centered">
       <h2 class="empty-state-heading">No metrics available</h2>
-      <p class="text-gray-500 mt-2">Metrics will be available once the database is running.</p>
+      <p class="text-muted-spaced">Metrics will be available once the database is running.</p>
     </div>
   <% end %>
 </div>
@@ -46,7 +46,7 @@
 <div class="section-padded">
   <div class="flex-header">
     <div class="flex-title">
-      <h3 class="section-heading">
+      <h3>
         Metric Destinations
       </h3>
     </div>

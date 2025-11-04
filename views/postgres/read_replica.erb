@@ -2,7 +2,7 @@
   <% if @pg.timeline.earliest_restore_time %>
     <div class="flex-header">
       <div class="flex-title">
-        <h3 class="section-heading">Read Replicas</h3>
+        <h3>Read Replicas</h3>
       </div>
     </div>
     <div class="table-card">
@@ -42,7 +42,7 @@
       </table>
     </div>
   <% else %>
-    <div class="text-gray-500">
+    <div class="text-muted">
       Server is not ready for read replicas. There are no backups, yet.
     </div>
   <% end %>

@@ -18,7 +18,7 @@
                     <%== render("components/rodauth/password_field") %>
                   </div>
                 <% end %>
-                <div class="col-span-6">
+                <div class="grid-col-6">
                   <fieldset>
                     <div class="form-group">
                       <% (usage = DB[rodauth.webauthn_keys_table]
@@ -32,13 +32,13 @@
                               name="<%= rodauth.webauthn_remove_param %>"
                               value="<%= id %>"
                               type="radio"
-                              class="h-4 w-4  text-orange-600"
+                              class="icon-sm icon-orange"
                               required
                             >
                           </div>
                           <div class="checkbox-label">
                             <label for="webauthn-remove-<%= id %>" class="label-medium"><%= name %></label>
-                            <span id="webauthn-remove-<%= id %>-description" class="text-gray-500">
+                            <span id="webauthn-remove-<%= id %>-description" class="text-muted">
                               (Last Usage:
                               <%= last_use.strftime("%F %T") %>)
                             </span>
@@ -48,10 +48,10 @@
                     </div>
                   </fieldset>
                   <% if error = rodauth.field_error(rodauth.webauthn_remove_param) %>
-                    <p class="mt-2 text-sm text-red-600" id="<%= rodauth.webauthn_remove_param %>-error"><%= error %></p>
+                    <p class="spaced-top-sm text-error-sm" id="<%= rodauth.webauthn_remove_param %>-error"><%= error %></p>
                   <% end %>
                 </div>
-                <div class="col-span-6">
+                <div class="grid-col-6">
                   <%== part("components/form/submit_button", text: rodauth.webauthn_remove_button) %>
                 </div>
               </div>

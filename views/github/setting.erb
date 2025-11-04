@@ -41,7 +41,7 @@
           "100GB free cache storage",
         ].each do |text| %>
           <li class="flex-gap-3">
-            <%== part("components/icon", name: "hero-check", classes: "h-6 w-5 flex-none text-orange-600") %>
+            <%== part("components/icon", name: "hero-check", classes: "icon-md flex-none icon-orange") %>
             <%= text %>
           </li>
         <% end %>
@@ -71,7 +71,7 @@
         <div class="flex-header-sm">
           <div>
             <div class="flex-center">
-              <h3 class="subsection-heading">Ubicloud Transparent Cache</h3>
+              <h3>Ubicloud Transparent Cache</h3>
               <% if @installation.cache_enabled %>
                 <span class="promo-badge">
                   Enabled
@@ -96,7 +96,7 @@
       <div class="card-body">
         <div class="flex-header-sm">
           <div>
-            <h3 class="subsection-heading">Repository Access</h3>
+            <h3>Repository Access</h3>
             <div class="description-text">
               <p>Configure the list of repositories that Ubicloud can access on GitHub's UI.</p>
             </div>

@@ -22,12 +22,12 @@
     ["PostgreSQL Databases", "#{@project.path}/postgres"],
     %w[Create #]
   ],
-  right_items: [logo ? "<img src=\"/#{logo}\" class=\"h-6 object-contain\"/>" : nil]
+  right_items: [logo ? "<img src=\"/#{logo}\" class=\"icon-md object-contain\"/>" : nil]
 ) %>
 
 <%
-  byoc_description_html = "<p class='mt-1 text-sm text-gray-600'>To run Ubicloud Postgres in your own AWS account using <a href='https://www.ubicloud.com/postgresql-on-aws-high-iops' class='text-orange-600'>BYOC (AWS)</a>, email us at <a href='mailto:support@ubicloud.com' class='text-orange-600'>support@ubicloud.com</a></p>"
-  additional_element = "<label class=\"form_flavor form_flavor_standard cursor-not-allowed\"><input type='radio' name='byoc' value='byoc' class='peer sr-only' disabled><span class=\"radio-small-card justify-center p-3 text-sm font-semibold pointer-events-none bg-gray-100 text-gray-500\">Your Own AWS Account</span></label>"
+  byoc_description_html = "<p class='text-help-sm text-muted'>To run Ubicloud Postgres in your own AWS account using <a href='https://www.ubicloud.com/postgresql-on-aws-high-iops' class='link-orange-underline'>BYOC (AWS)</a>, email us at <a href='mailto:support@ubicloud.com' class='link-orange-underline'>support@ubicloud.com</a></p>"
+  additional_element = "<label class=\"form_flavor form_flavor_standard cursor-not-allowed\"><input type='radio' name='byoc' value='byoc' class='peer sr-only' disabled><span class=\"radio-small-card justify-center p-3 text-sm font-semibold pointer-events-none bg-gray-100 text-muted\">Your Own AWS Account</span></label>"
 
   form_elements = [
     {name: "flavor", type: "hidden", value: @flavor},

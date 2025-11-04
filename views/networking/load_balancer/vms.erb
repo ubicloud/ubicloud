@@ -7,7 +7,7 @@ edit_perm = has_permission?("LoadBalancer:edit", @lb) %>
 <div class="section-padded">
   <div class="flex-header">
     <div class="flex-title">
-      <h3 class="section-heading">
+      <h3>
         Attached VMs
       </h3>
     </div>
@@ -29,7 +29,7 @@ edit_perm = has_permission?("LoadBalancer:edit", @lb) %>
             <td class="table-cell-standard" scope="row">
               <a href="<%= path(vm) %>" class="link-primary"><%= vm.name %></a>
             </td>
-            <td class="px-3 py-3.5 whitespace-nowrap text-sm text-gray-900">
+            <td class="px-3 py-3.5 whitespace-nowrap text-sm text-primary">
               <%= vm.load_balancer_state %>
             </td>
             <td>

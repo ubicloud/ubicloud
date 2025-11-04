@@ -64,7 +64,7 @@ end
                     <a
                       id="<%= type.downcase %>-tags-link"
                       href="<%= "#{@project.path}/user/access-control/tag/#{type.downcase}" %>"
-                      class="text-orange-600 text-xs"
+                      class="icon-orange text-xs"
                     >
                       (Tags)
                     </a>
@@ -83,7 +83,7 @@ end
                 <% if editable %>
                   <% ace_options.each_with_index do | (name, options), index| %>
                     <% attributes = (!@token && index == 0 && ubid != "template") ? { required: "required" } : {} %>
-                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    <td class="table-cell-muted">
                       <%== part(
                         "components/form/select",
                         id: "ace-#{ubid}-#{index}",
@@ -101,7 +101,7 @@ end
                   </td>
                 <% else %>
                   <% tags.each do |tag| %>
-                    <td class="values whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    <td class="values table-cell-muted">
                       <%= ace_label(tag) %>
                     </td>
                   <% end %>
@@ -114,7 +114,7 @@ end
             <% if @aces.count == 1 %>
               <tr class="group-[&:has(tr:nth-child(n+3))]:hidden">
                 <td colspan="3" class="py-4 px-8">
-                  <p class="mb-4">Currently, this token has no access to the project.</p>
+                  <p class="spaced-bottom-md">Currently, this token has no access to the project.</p>
                   <p>You should grant the token the access you think the token should have. Be aware that the token can
                     never have more access to the project than your account has. Each access control entry has a single
                     action and object. Access is allowed if there is an access control entry allowing the token to take
@@ -140,7 +140,7 @@ end
         <% form(action: restriction_path, method: :post) do %>
           <div class="flex-header-sm">
             <div>
-              <h3 class="subsection-heading"><%= restriction_title %>
+              <h3><%= restriction_title %>
                 Personal Access Token</h3>
               <div class="description-text">
                 <p>

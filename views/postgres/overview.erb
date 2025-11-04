@@ -18,7 +18,7 @@ vm = @pg.representative_server.vm
         subtext = "#{disk_usage_gib.round(2)} GB is used (#{disk_usage_percentage.round(2)}%)"
 
         if disk_usage_percentage > 80
-          subtext = "<span class='text-red-600'>#{subtext}</span>"
+          subtext = "<span class='text-error'>#{subtext}</span>"
         end
 
         subtext
@@ -52,7 +52,7 @@ vm = @pg.representative_server.vm
 <div id="metrics-container" class="section-padded" data-metrics-url="<%= path(@pg) %>">
   <div class="flex-header">
     <div class="flex-title">
-      <h3 class="section-heading">Metrics Summary</h3>
+      <h3>Metrics Summary</h3>
     </div>
   </div>
   <% if @pg.display_state != "creating" %>
@@ -60,9 +60,9 @@ vm = @pg.representative_server.vm
       <% Metrics::POSTGRES_METRICS.slice(:cpu_usage, :disk_usage).each do |key, metric| %>
         <div class="metric-card">
           <h4 class="chart-title"><%= metric.name %></h4>
-          <p class="text-xs help-text mt-2"><%= metric.description %></p>
+          <p class="text-muted-spaced-sm help-text"><%= metric.description %></p>
           <div
-            class="metric-chart h-64 w-full"
+            class="metric-chart chart-container"
             id="<%= key %>-chart"
             data-metric-key="<%= key %>"
             data-metric-unit="<%= metric.unit %>"
@@ -74,7 +74,7 @@ vm = @pg.representative_server.vm
   <% else %>
     <div class="empty-state-centered">
       <h2 class="empty-state-heading">No metrics available</h2>
-      <p class="text-gray-500 mt-2">Metrics will be available once the database is running.</p>
+      <p class="text-muted-spaced">Metrics will be available once the database is running.</p>
     </div>
   <% end %>
 </div>

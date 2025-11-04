@@ -1,5 +1,5 @@
 <%# locals: (tabs:) %>
-<div class="sm:block mb-6">
+<div class="sm:block spaced-bottom-lg">
   <nav class="tabbar" aria-label="Tabs">
     <% tabs.each_with_index do |(label, url, active), i| %>
       <% active = (request.path == url) if active.nil? %>

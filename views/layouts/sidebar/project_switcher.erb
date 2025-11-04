@@ -5,9 +5,9 @@
       class="sidebar-project-button sidebar-project-switcher"
       id="menu-button"
     >
-      <%== part("components/icon", name: "hero-folder-open", classes: "h-8 w-8 rounded-full") %>
+      <%== part("components/icon", name: "hero-folder-open", classes: "icon-lg rounded-full") %>
       <span><%= @project ? @project[:name] : "Global" %></span>
-      <%== part("components/icon", name: "hero-chevron-up-down", classes: "h-8 w-8 ml-auto") %>
+      <%== part("components/icon", name: "hero-chevron-up-down", classes: "icon-lg ml-auto") %>
     </button>
   </div>
   <div
@@ -32,8 +32,8 @@
         role="menuitem"
         tabindex="-1"
       >
-        <div class="mr-2 text-gray-400 group-transition-colors">
-          <%== part("components/icon", name: "hero-plus", classes: "h-5 w-5 stroke-[2.5px]") %>
+        <div class="mr-2 text-muted group-transition-colors">
+          <%== part("components/icon", name: "hero-plus", classes: "icon-md stroke-[2.5px]") %>
         </div>
         Create Project
       </a>
