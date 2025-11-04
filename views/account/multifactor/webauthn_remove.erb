@@ -5,28 +5,28 @@
 <main>
   <div class="account-container">
     <div class="card">
-      <div class="border-b-gray-200 lg:grid lg:grid-cols-12">
+      <div class="account-layout-grid">
         <%== render("account/submenu") %>
-        <div class="border-b-gray-200 lg:col-span-8 xl:col-span-9 2xl:col-span-10">
-          <div class="px-4 py-6 sm:p-6 form-group">
+        <div class="account-content table-body-bg">
+          <div class="form-section-padded form-group">
             <h2 class="text-lg font-medium text-gray-900">Remove Security Key</h2>
             <% form(action: rodauth.webauthn_remove_path, method: :post, id: "webauthn-remove-form") do %>
               <%== rodauth.webauthn_remove_additional_form_tags %>
-              <div class="mt-6 grid grid-cols-6 gap-6">
+              <div class="form-grid-6">
                 <% if rodauth.two_factor_modifications_require_password? %>
-                  <div class="col-span-6 sm:col-span-3 xl:col-span-2">
+                  <div class="form-field-small">
                     <%== render("components/rodauth/password_field") %>
                   </div>
                 <% end %>
-                <div class="col-span-6 sm:col-span-6">
+                <div class="col-span-6">
                   <fieldset>
                     <div class="form-group">
                       <% (usage = DB[rodauth.webauthn_keys_table]
                           .where(rodauth.webauthn_keys_account_id_column => rodauth.session_value)
                           .select_hash(rodauth.webauthn_keys_webauthn_id_column, [rodauth.webauthn_keys_last_use_column, :name])
                         ).map do |id, (last_use, name)| %>
-                        <div class="relative flex items-start">
-                          <div class="flex h-6 items-center">
+                        <div class="checkbox-wrapper">
+                          <div class="checkbox-input-wrapper">
                             <input
                               id="webauthn-remove-<%= id %>"
                               name="<%= rodauth.webauthn_remove_param %>"
@@ -36,7 +36,7 @@
                               required
                             >
                           </div>
-                          <div class="ml-3 text-sm">
+                          <div class="checkbox-label">
                             <label for="webauthn-remove-<%= id %>" class="font-medium text-gray-900"><%= name %></label>
                             <span id="webauthn-remove-<%= id %>-description" class="text-gray-500">
                               (Last Usage:

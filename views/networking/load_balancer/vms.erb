@@ -14,7 +14,7 @@ edit_perm = has_permission?("LoadBalancer:edit", @lb) %>
   </div>
   <div class="table-card">
     <table class="table">
-      <thead class="bg-gray-50">
+      <thead class="table-header-bg">
         <tr>
           <th scope="col">VM</th>
           <th scope="col">Application State</th>
@@ -23,7 +23,7 @@ edit_perm = has_permission?("LoadBalancer:edit", @lb) %>
           <% end %>
         </tr>
       </thead>
-      <tbody class="border-b-gray-200 bg-white" id="lb-vms">
+      <tbody class="table-body-bg" id="lb-vms">
         <% @lb.vms(eager: :load_balancer_vm_ports).each do |vm| %>
           <tr>
             <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">

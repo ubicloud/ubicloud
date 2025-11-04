@@ -51,7 +51,7 @@
       CA Certificates: <%== part("components/download_button", link: "#{path(@pg)}/ca-certificates")%>
     </div>
   <% else %>
-    <div class="flex flex-col items-center justify-center h-full">
+    <div class="empty-state-centered">
       <h2 class="text-2xl font-semibold text-gray-900">No connection information available</h2>
       <p class="text-gray-500 mt-2">Connection information will be available once the database is running.</p>
     </div>

@@ -60,7 +60,7 @@ current_members.sort! %>
       <div class="px-4 py-5 sm:p-6 form-group">
         <h3 class="text-lg font-medium text-gray-900"><%= "Update #{@display_tag_type} Tag" %></h3>
         <% form(action: path(@tag), method: :post) do %>
-          <div class="grid grid-cols-12 gap-3">
+          <div class="grid-3col" style="grid-template-columns: repeat(12, minmax(0, 1fr));">
             <div class="col-span-12 md:col-span-5">
               <%== part(
                 "components/form/text",
@@ -81,13 +81,13 @@ current_members.sort! %>
   <% end %>
   <div>
     <% if current_members.empty? %>
-      <div class="md:flex md:items-center md:justify-between lg:pb-2">
+      <div class="flex-header-with-bottom-padding">
         No current members of
         <%= @tag_type %>
         tag.
       </div>
     <% else %>
-      <div class="md:flex md:items-center md:justify-between lg:pb-2">
+      <div class="flex-header-with-bottom-padding">
         <div class="flex-title">
           <h3 class="section-heading">Current Members</h3>
         </div>
@@ -95,7 +95,7 @@ current_members.sort! %>
       <% form(action: disassociate_path, method: :post) do %>
         <div class="table-card">
           <table id="tag-membership-remove" class="table">
-            <thead class="bg-gray-50">
+            <thead class="table-header-bg">
               <tr>
                 <th scope="col">Name</th>
                 <% if removal_allowed %>
@@ -103,7 +103,7 @@ current_members.sort! %>
                 <% end %>
               </tr>
             </thead>
-            <tbody class="border-b-gray-200 bg-white">
+            <tbody class="table-body-bg">
               <% current_members.each do |label, ubid| %>
                 <tr id="<%= ubid %>" class="cursor-pointer">
                   <td scope="row">
@@ -133,7 +133,7 @@ current_members.sort! %>
   </div>
   <div>
     <% if addition_allowed && !add_groups.all? { _2.empty? } %>
-      <div class="md:flex md:items-center md:justify-between lg:pb-2">
+      <div class="flex-header-with-bottom-padding">
         <div class="flex-title">
           <h3 class="section-heading">Add Members</h3>
         </div>
@@ -141,13 +141,13 @@ current_members.sort! %>
       <% form(action: associate_path, method: :post) do %>
         <div class="table-card">
           <table id="tag-membership-add" class="table">
-            <thead class="bg-gray-50">
+            <thead class="table-header-bg">
               <tr>
                 <th scope="col">Name</th>
                 <th scope="col">Add?</th>
               </tr>
             </thead>
-            <tbody class="border-b-gray-200 bg-white">
+            <tbody class="table-body-bg">
               <% add_groups.each do |name, available_to_add| %>
                 <% name = name["label"] if name.is_a?(Hash) %>
                 <tr>

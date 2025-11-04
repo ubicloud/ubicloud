@@ -2,7 +2,7 @@
 <%== render("components/free_quota") %>
 <%== render("inference/tabbar") %>
 
-<div class="grid xl:grid-cols-2 2xl:grid-cols-3 gap-4">
+<div class="inference-grid">
   <% @inference_models.each_with_index do | ie, index |
     path, model_icon, curl_message = case ie.tags["capability"]
       when "Text Generation"
@@ -34,7 +34,7 @@ curl #{ie.load_balancer.health_check_url(path:)} \\
     %>
   <div class="card" p-4">
     <h2 class="text-lg font-bold mb-4 text-gray-800 line-clamp-1"><%= ie.tags["display_name"] || ie.model_name %></h2>
-    <div class="grid sm:grid-cols-2 gap-4">
+    <div class="overview-grid">
       <div>
         <h3 class="text-sm font-semibold text-gray-900">Model card</h3>
         <div class="flex items-center gap-1 text-gray-500">
@@ -64,11 +64,11 @@ curl #{ie.load_balancer.health_check_url(path:)} \\
         <h3 class="text-sm font-semibold text-gray-900">Context length</h3>
         <p class="text-gray-500"><%= ie.tags.fetch("context_length", "Full") %></p>
       </div>
-      <div class="sm:col-span-2">
+      <div class="col-span-2">
         <h3 class="text-sm font-semibold text-gray-900">URL</h3>
         <div class="text-gray-500"><%== part("components/copyable_content", content: ie.load_balancer.health_check_url, message: "Copied URL") %></div>
       </div>
-      <div class="sm:col-span-2">
+      <div class="col-span-2">
         <h3 class="text-sm font-semibold text-gray-900">
           CURL usage example
         </h3>

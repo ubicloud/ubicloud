@@ -46,7 +46,7 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
           </p>
 
           <% form(action: "#{@project.path}/user/access-control/tag/#{@tag_type}", method: :post) do %>
-            <div class="grid grid-cols-12 gap-3">
+            <div class="grid-3col" style="grid-template-columns: repeat(12, minmax(0, 1fr));">
               <div class="col-span-12 md:col-span-5">
                 <%== part("components/form/text", name: "name", button_title: "Create", attributes: { required: true, placeholder: "Name" }) %>
               </div>
@@ -60,13 +60,13 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
         </div>
       <% else %>
         <table id="tag-list" class="table">
-          <thead class="bg-gray-50">
+          <thead class="table-header-bg">
             <tr>
               <th scope="col" class="pl-4 pr-3 sm:pl-6 py-3.5 text-left text-sm font-semibold text-gray-900">Name</th>
               <th scope="col" class="pl-3 pr-4 sm:pr-6 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
             </tr>
           </thead>
-          <tbody class="border-b-gray-200 bg-white">
+          <tbody class="table-body-bg">
             <% @tags.each do |tag| %>
               <% editable = !(@tag_type == "subject" && tag.name == "Admin") && modification_allowed %>
               <tr id="<%= tag.ubid %>">

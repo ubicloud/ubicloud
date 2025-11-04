@@ -19,7 +19,7 @@
   <div class="table-card">
     <table class="table">
       <% unless headers.empty? || rows.empty? %>
-        <thead class="bg-gray-50">
+        <thead class="table-header-bg">
           <tr>
             <% headers.each_with_index do |name, i| %>
               <th
@@ -38,7 +38,7 @@
           </tr>
         </thead>
       <% end %>
-      <tbody class="border-b-gray-200 bg-white">
+      <tbody class="table-body-bg">
         <% if rows.empty? %>
           <tr>
             <td colspan="<%= headers.length %>" class="text-center py-4 px-8 lg:px-32">

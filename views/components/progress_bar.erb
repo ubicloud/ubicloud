@@ -2,11 +2,11 @@
 <% progress = [100, denominator.zero? ? 100 : 100 * numerator / denominator].min
 color = (progress < 60) ? "bg-blue-500" : (progress < 80) ? "bg-yellow-500" : "bg-red-500" %>
 
-<div class="flex justify-between mb-1">
+<div class="progress-bar-header">
   <span class="text-base font-medium"><%= title %></span>
   <span class="text-sm font-medium"><%= numerator %>/<%= denominator %>
     (<%= progress %>%)</span>
 </div>
-<div class="w-full bg-gray-200 rounded-full h-3">
+<div class="progress-bar-track">
   <div class="<%= color %> h-3 rounded-full w-[<%= progress %>%]"></div>
 </div>

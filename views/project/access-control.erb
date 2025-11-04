@@ -76,7 +76,7 @@ end
               <% end %>
             </tr>
           </thead>
-          <tbody class="border-b-gray-200 bg-white">
+          <tbody class="table-body-bg">
             <% @aces.append(["template", [], true]).each do |ubid, tags, editable| %>
               <% editable &&= edit_perm %>
               <tr id="ace-<%= ubid %>" class="<%= "existing-aces#{"-view" unless editable}" unless ubid == "template" %>">
@@ -159,7 +159,7 @@ end
               </div>
             </div>
             <div id="restrict-<%=@token.ubid%>" class="actions-right">
-              <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+              <div class="action-button-column">
                 <%== part("components/form/submit_button", text: "#{restriction_title} Token Access") %>
               </div>
             </div>

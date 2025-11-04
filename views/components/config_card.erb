@@ -10,7 +10,7 @@
       <% error = errors[name + "." + key] %>
       <% next if key.empty? && value.empty? %>
       <div class="px-6 py-2 transition-colors config-group group font-mono" data-config-id="<%= index %>">
-        <div class="flex items-center justify-between">
+        <div class="flex-between">
           <div class="flex flex-wrap items-center config-entry">
             <input
               type="text"
@@ -45,7 +45,7 @@
     <% end %>
     <!-- Hidden row for generating new entries -->
     <div class="px-6 py-2 transition-colors group config-placeholder-group font-mono hidden" data-config-id="">
-      <div class="flex items-center justify-between">
+      <div class="flex-between">
         <div class="flex flex-wrap items-center config-entry">
           <input
             type="text"
@@ -71,7 +71,7 @@
     <!-- Empty row for new configuration -->
     <% if @edit_perm %>
       <div class="px-6 py-2 transition-colors group new-config font-mono">
-        <div class="flex items-center justify-between">
+        <div class="flex-between">
           <div class="flex flex-wrap items-center">
             <input
               type="text"

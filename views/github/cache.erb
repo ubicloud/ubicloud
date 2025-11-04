@@ -5,7 +5,7 @@
 <div class="content-grid">
   <div class="table-card">
     <table class="table">
-      <tbody class="border-b-gray-200 bg-white">
+      <tbody class="table-body-bg">
         <% if @entries_by_repo.count > 0 %>
           <% @entries_by_repo.each do |repository_id, entries| %>
             <tr class="cache-group-row cursor-pointer group" data-repository="<%= repository_id %>">

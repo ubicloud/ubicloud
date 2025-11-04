@@ -3,9 +3,9 @@
   <div class="px-4 py-5 sm:p-0">
     <dl class=" ">
       <% data.reject { !it }.each do |name, value, opts| %>
-        <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
+        <div class="kv-row">
           <dt class="stat-label"><%= name %></dt>
-          <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
+          <dd class="kv-value">
             <%== part("components/value_content", content: value, opts:) %>
           </dd>
         </div>

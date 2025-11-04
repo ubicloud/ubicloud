@@ -20,7 +20,7 @@
     ["Total", @invoice_data.total]
   ].compact.map do |name, value|
     <<~CONTENT
-      <dl class="grid grid-cols-3 gap-3 #{"text-2xl" if name == "Total"}">
+      <dl class="grid-3col #{"text-2xl" if name == "Total"}">
         <dt class="text-right font-semibold text-gray-800 col-span-2">#{name}:</dt>
         <dd class="text-gray-500" id="invoice-#{name.downcase.tr(" ", "-")}">#{value}</dd>
       </dl>
@@ -29,7 +29,7 @@
 %>
 
 <div class="content-grid">
-  <div class="md:flex md:items-center md:justify-between text-2xl">
+  <div class="flex-header-with-bottom-padding text-2xl">
     <div class="flex-title">This invoice will be finalized on the first day of next month</div>
     <div class="text-right"><%= @invoice_data.begin_time %> to <%= @invoice_data.end_time %></div>
   </div>

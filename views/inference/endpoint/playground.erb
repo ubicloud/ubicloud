@@ -3,8 +3,8 @@
 <% @enable_marked = true %>
 <%== render("inference/tabbar") %>
 <div class="table-card">
-  <div class="px-4 py-5 sm:p-6 grid gap-6">
-    <div class="grid sm:grid-cols-2 gap-6 text-gray-900">
+  <div class="form-section-padded content-grid">
+    <div class="overview-grid text-gray-900">
       <%== render(
         "components/form/select",
         locals: {
@@ -38,7 +38,7 @@
       options: [["show_advanced", "Show advanced settings", nil, nil]]
     ) %>
     <div class="hidden grid gap-6" id="inference_config_advanced_settings">
-      <div class="grid sm:grid-cols-2 gap-6 text-gray-900">
+      <div class="overview-grid text-gray-900">
         <%== render(
           "components/form/text",
           locals: {
@@ -83,7 +83,7 @@
       </div>
     </div>
   </div>
-  <div class="px-4 py-5 sm:p-6 grid gap-6">
+  <div class="form-section-padded content-grid">
     <div>
       <%== render(
         "components/button",
@@ -115,7 +115,7 @@
           },
         }
       ) %>
-      <div class="grid grid-cols-2 gap-6 text-gray-900 flex pt-4">
+      <div class="flex gap-6 text-gray-900 pt-4" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));">
         <div class="flex flex-row items-center">
           <input
             type="file"

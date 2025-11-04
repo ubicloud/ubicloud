@@ -5,16 +5,16 @@
 <main>
   <div class="account-container">
     <div class="card">
-      <div class="border-b-gray-200 lg:grid lg:grid-cols-12">
+      <div class="account-layout-grid">
         <%== render("account/submenu") %>
-        <div class="border-b-gray-200 lg:col-span-8 xl:col-span-9 2xl:col-span-10">
-          <div class="px-4 py-6 sm:p-6 form-group">
+        <div class="account-content table-body-bg">
+          <div class="form-section-padded form-group">
             <h2 class="text-lg font-medium text-gray-900">Disable One-Time Password Authentication</h2>
             <% form(action: rodauth.otp_disable_path, method: :post) do %>
               <%== rodauth.otp_disable_additional_form_tags %>
-              <div class="mt-6 grid grid-cols-6 gap-6">
+              <div class="form-grid-6">
                 <% if rodauth.two_factor_modifications_require_password? %>
-                  <div class="col-span-6 sm:col-span-3 xl:col-span-2">
+                  <div class="form-field-small">
                     <%== render("components/rodauth/password_field") %>
                   </div>
                 <% end %>

@@ -13,7 +13,7 @@
 
 <%
   form_elements = [
-    {name: "name", type: "text", label: "Name", required: "required", placeholder: "Enter name", opening_tag: "<div class='sm:col-span-3'>"},
+    {name: "name", type: "text", label: "Name", required: "required", placeholder: "Enter name", opening_tag: "<div class='form-col-3'>"},
     {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::Vm.method(:location)},
   ]
 

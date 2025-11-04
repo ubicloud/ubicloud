@@ -50,7 +50,7 @@ viewable_fws, viewable_subnets, disconnectable_subnets =
       end
   ) %>
   <!-- Connected Private Subnets List -->
-  <div class="mt-6 md:flex md:items-center md:justify-between">
+  <div class="flex-header-with-bottom-padding mt-6">
     <div class="flex-title">
       <h3 class="section-heading">
         Connected Subnets
@@ -59,13 +59,13 @@ viewable_fws, viewable_subnets, disconnectable_subnets =
   </div>
   <div class="table-card">
     <table class="table">
-      <thead class="bg-gray-50">
+      <thead class="table-header-bg">
         <tr>
           <th scope="col">Name</th>
           <th scope="col"></th>
         </tr>
       </thead>
-      <tbody class="border-b-gray-200 bg-white">
+      <tbody class="table-body-bg">
         <% connected_subnets.each do |subnet| %>
           <%
             viewable = viewable_subnets[subnet.id]

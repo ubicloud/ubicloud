@@ -31,7 +31,7 @@
 
   form_elements = [
     {name: "flavor", type: "hidden", value: @flavor},
-    {name: "name", type: "text", label: "Name", required: "required", placeholder: "Enter name", opening_tag: "<div class='sm:col-span-3'>"},
+    {name: "name", type: "text", label: "Name", required: "required", placeholder: "Enter name", opening_tag: "<div class='form-col-3'>"},
     {name: "location", type: "radio_small_cards", label: "Location", required: "required", additional_element:, description_html: byoc_description_html, content_generator: ContentGenerator::Postgres.method(:location)},
     {name: "family", type: "radio_small_cards", label: "Server family", required: "required", content_generator: ContentGenerator::Postgres.method(:family)},
     {name: "size", type: "radio_small_cards", label: "Server size", required: "required", content_generator: ContentGenerator::Postgres.method(:size)},

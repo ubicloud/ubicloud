@@ -1,11 +1,11 @@
-<div class="flex grow flex-col gap-5 overflow-y-auto bg-orange-600 px-6">
-  <div class="flex h-16 shrink-0 items-center">
+<div class="sidebar-content">
+  <div class="sidebar-header">
     <a href="<%= @project_permissions ? "#{@project.path}/dashboard" : "/project" %>">
       <img class="h-6 w-auto" src="/logo-white.png" alt="Ubicloud">
     </a>
   </div>
   <nav class="flex flex-1 flex-col">
-    <ul role="list" class="flex flex-1 flex-col gap-7">
+    <ul role="list" class="sidebar-nav-list">
       <li>
         <ul role="list" class="-mx-2 form-group">
           <% if @project_permissions %>

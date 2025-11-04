@@ -16,7 +16,7 @@
 <div class="content-grid">
   <!-- Invite user -->
   <div>
-    <div class="md:flex md:items-center md:justify-between lg:pb-2">
+    <div class="flex-header-with-bottom-padding">
       <div class="flex-title">
         <h3 class="section-heading">
           Invite a new user
@@ -32,14 +32,14 @@
                 You can invite a new user to your project, adding them to the given subject tag (role).
               </p>
             </div>
-            <div class="grid grid-cols-12 gap-3">
-              <div class="col-span-12 sm:col-span-5">
+            <div class="grid-3col" style="grid-template-columns: repeat(12, minmax(0, 1fr));">
+              <div class="col-12-5">
                 <%== part("components/form/text", name: "email", type: "email", attributes: { required: true, placeholder: "Email" }) %>
               </div>
-              <div class="col-span-12 sm:col-span-3">
+              <div class="col-12-3">
                 <%== part("components/form/policy_select", name: "policy", selected: "Member", id: "invited-user-policy") %>
               </div>
-              <div class="col-span-3 sm:col-span-2">
+              <div class="col-3-2">
                 <%== part("components/form/submit_button", text: "Invite") %>
               </div>
             </div>
@@ -51,7 +51,7 @@
   <!-- User List -->
   <div>
     <% form(action: "#{user_path}/policy/managed", method: :post, id: "managed-policy") do %>
-      <div class="md:flex md:items-center md:justify-between lg:pb-2">
+      <div class="flex-header-with-bottom-padding">
         <div class="flex-title">
           <h3 class="section-heading">
             Users
@@ -60,14 +60,14 @@
       </div>
       <div class="table-card">
         <table class="table">
-          <thead class="bg-gray-50">
+          <thead class="table-header-bg">
             <tr>
               <th scope="col">Email</th>
               <th scope="col">Subject Tag</th>
               <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-6 text-left text-sm font-semibold text-gray-900"></th>
             </tr>
           </thead>
-          <tbody class="border-b-gray-200 bg-white">
+          <tbody class="table-body-bg">
             <% @users.each do |user| %>
               <tr id="user-<%= user.ubid %>">
                 <td scope="row">

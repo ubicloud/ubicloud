@@ -16,7 +16,7 @@
   <% if rodauth.valid_login_entered? %>
     <% identities = AccountIdentity.where(account_id: rodauth.account_id).all %>
     <% unless identities.empty? %>
-      <div class="relative flex justify-center text-sm font-medium">
+      <div class="divider-label">
         <span class="divider-text"><%= rodauth.has_password? ? "Or login" : "Login" %>
           with:</span>
       </div>
@@ -41,7 +41,7 @@
   <% end %>
 
   <% if !rodauth.valid_login_entered? || rodauth.has_password? %>
-    <div class="flex items-center justify-between">
+    <div class="flex-between">
       <div class="flex items-center">
         <input
           id="remember-me"

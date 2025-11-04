@@ -33,7 +33,7 @@
         <h4 class="flex-none text-sm/6 font-semibold text-orange-600">What’s different</h4>
         <div class="h-px flex-auto bg-gray-100"></div>
       </div>
-      <ul role="list" class="mt-4 grid grid-cols-1 gap-4 text-sm/6 text-gray-600 sm:grid-cols-2">
+      <ul role="list" class="overview-grid mt-4 text-sm/6 text-gray-600">
         <% [
           "Twice as fast",
           "One fifth the cost",
@@ -86,7 +86,7 @@
             </div>
           </div>
           <div class="actions-right">
-            <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+            <div class="action-button-column">
               <%== part("components/form/toggle_form", name: "cache_enabled", action: "#{@project.path}/github/#{@installation.ubid}", active: @installation.cache_enabled) %>
             </div>
           </div>
@@ -102,7 +102,7 @@
             </div>
           </div>
           <div id="configure-<%=@installation.ubid%>" class="actions-right">
-            <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+            <div class="action-button-column">
               <%== part("components/button", text: "Configure", link: "https://github.com/apps/#{Config.github_app_name}/installations/#{@installation.installation_id}") %>
             </div>
           </div>

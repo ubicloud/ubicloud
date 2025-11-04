@@ -5,24 +5,24 @@
 <main>
   <div class="account-container">
     <div class="card">
-      <div class="border-b-gray-200 lg:grid lg:grid-cols-12">
+      <div class="account-layout-grid">
         <%== render("account/submenu") %>
-        <div class="border-b-gray-200 lg:col-span-8 xl:col-span-9 2xl:col-span-10">
-          <div class="px-4 py-6 sm:p-6 form-group">
+        <div class="account-content table-body-bg">
+          <div class="form-section-padded form-group">
             <h2 class="text-lg font-medium text-gray-900">Setup One-Time Password Authentication</h2>
             <% form(action: rodauth.otp_setup_path, method: :post) do %>
               <%== rodauth.otp_setup_additional_form_tags %>
               <input type="hidden" id="otp-key" name="<%= rodauth.otp_setup_param %>" value="<%= rodauth.otp_user_key %>"/>
               <input type="hidden" id="otp-hmac-secretkey" name="<%= rodauth.otp_setup_raw_param %>" value="<%= rodauth.otp_key %>"/>
-              <div class="mt-6 grid grid-cols-6 gap-6">
-                <div class="col-span-6 md:col-span-3">
+              <div class="form-grid-6">
+                <div class="form-field-half">
                   <%== rodauth.otp_qr_code %>
                   <p class="mt-2 text-sm text-gray-500 text-center">
                     If you can't scan the QR code, please enter the following secret in your authenticator app manually: <br>
                     <span id="otp-secret" class="font-bold break-words"><%= rodauth.otp_user_key %></span>
                   </p>
                 </div>
-                <div class="col-span-6 md:col-span-3 form-group">
+                <div class="form-field-half form-group">
                   <%== render("components/rodauth/otp_auth_code_field") %>
                   <% if rodauth.two_factor_modifications_require_password? %>
                     <%== render("components/rodauth/password_field") %>

@@ -28,7 +28,7 @@ back = "#{@project.path}/ssh-public-key" %>
     <div class="card">
       <div class="card-body">
         <div class="form-group2">
-          <div class="mt-2 grid grid-cols-1 gap-6 gap-8 sm:grid-cols-6">
+          <div class="form-grid">
             <div class="form-col-full">
               <%== part("components/form/text", name: "name", label: "Name", value: @ssh_public_key.name, attributes: {placeholder: "ssh-key-set-name", required: true}) %>
             </div>

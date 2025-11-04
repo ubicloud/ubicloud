@@ -21,7 +21,7 @@
     {name: "version", type: "radio_small_cards", label: "Version", required: "required", content_generator: ContentGenerator::KubernetesCluster.method(:version)},
     {name: "cp_nodes", type: "radio_small_cards", label: "Control Plane", required: "required", content_generator: ContentGenerator::KubernetesCluster.method(:cp_nodes)},
     {name: "worker_size", type: "radio_small_cards", label: "Worker size", required: "required", content_generator: ContentGenerator::KubernetesCluster.method(:worker_size)},
-    {name: "worker_nodes", type: "select", label: "Worker Nodes", required: "required", placeholder: "Select number of worker nodes", content_generator: ContentGenerator::KubernetesCluster.method(:worker_nodes), opening_tag: "<div class='sm:col-span-3'>"},
+    {name: "worker_nodes", type: "select", label: "Worker Nodes", required: "required", placeholder: "Select number of worker nodes", content_generator: ContentGenerator::KubernetesCluster.method(:worker_nodes), opening_tag: "<div class='form-col-3'>"},
   ]
 
   action = "#{@project.path}/kubernetes-cluster"

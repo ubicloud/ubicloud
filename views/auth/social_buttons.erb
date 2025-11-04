@@ -1,14 +1,14 @@
 <% unless omniauth_providers.empty? %>
   <div class="mt-4">
-    <div class="relative">
-      <div class="absolute inset-0 flex items-center" aria-hidden="true">
-        <div class="w-full border-t border-gray-200"></div>
+    <div class="divider-wrapper">
+      <div class="divider-line" aria-hidden="true">
+        <div></div>
       </div>
-      <div class="relative flex justify-center text-sm font-medium">
+      <div class="divider-label">
         <span class="divider-text">Or continue with</span>
       </div>
     </div>
-    <div class="mt-4 grid sm:grid-cols-<%= omniauth_providers.length %> gap-4">
+    <div class="social-login-grid" style="grid-template-columns: repeat(<%= omniauth_providers.length %>, minmax(0, 1fr));">
       <% omniauth_providers.each do |provider, name| %>
         <% form(action: rodauth.omniauth_request_path(provider), method: :post, class: :grow) do %>
           <button

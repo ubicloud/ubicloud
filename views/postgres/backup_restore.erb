@@ -12,13 +12,13 @@ max_date = @pg.timeline.latest_restore_time %>
           </p>
         </div>
         <div class="grid-12col">
-          <div class="col-span-12 sm:col-span-5">
+          <div class="form-field-large">
             <%== part("components/form/text", label: "New server name", name: "name", attributes: { placeholder: @pg.name + "-fork", required: true }) %>
           </div>
-          <div class="col-span-12 sm:col-span-5">
+          <div class="form-field-large">
             <%== part("components/form/datepicker", label: "Target Time (UTC)", name: "restore_target", default_date: max_date, max_date:, min_date:) %>
           </div>
-          <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+          <div class="action-button-column">
             <%== part("components/form/submit_button", text: "Fork") %>
           </div>
         </div>
@@ -44,14 +44,14 @@ max_date = @pg.timeline.latest_restore_time %>
 
     <div class="table-card">
       <table class="table">
-        <thead class="bg-gray-50">
+        <thead class="table-header-bg">
           <tr>
             <th scope="col">Backup Time</th>
             <th scope="col" class="py-3.5 text-left text-sm font-semibold text-gray-900">Type</th>
             <th scope="col" class="py-3.5 text-left text-sm font-semibold text-gray-900">Fork</th>
           </tr>
         </thead>
-        <tbody class="border-b-gray-200 bg-white">
+        <tbody class="table-body-bg">
           <% backups.each do %>
             <tr>
               <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6"><%= it.last_modified %></td>
