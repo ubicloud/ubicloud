@@ -87,9 +87,16 @@ class Invoice < Sequel::Model
       return true
     end
 
-    if (billing_info = BillingInfo[content.dig("billing_info", "id")]).nil? || billing_info.payment_methods.empty?
+    unless (billing_info = BillingInfo[content.dig("billing_info", "id")])
       Clog.emit("Invoice doesn't have billing info.") { {invoice_no_billing: {ubid: ubid}} }
       return false
+    end
+
+    if content["bank_transfer_info"]
+      update(status: "waiting_transfer")
+      Clog.emit("Invoice is waiting for transfer.") { {invoice_waiting_transfer: {ubid: ubid, cost: amount}} }
+      send_success_email
+      return true
     end
 
     errors = []
@@ -146,6 +153,8 @@ class Invoice < Sequel::Model
     messages = case status
     when "below_minimum_threshold"
       ["Since the invoice total of #{data.total} is below our minimum charge threshold, there will be no charges for this month."]
+    when "waiting_transfer"
+      ["The invoice amount of #{data.total} is pending payment via bank transfer. Please follow the bank transfer instructions at the bottom of the invoice to complete the payment."]
     when "paid"
       ["The invoice amount of #{data.total} will be debited from your credit card on file."]
     else
