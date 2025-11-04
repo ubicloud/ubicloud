@@ -15,7 +15,7 @@ eager = [:assigned_vm_address, :strand, :semaphores]
       np.vms.map { |vm| { name: vm.name, role: "Worker", state: vm.display_state, hostname: vm.ip4_string } }
     end %>
 
-<div class="p-6">
+<div class="section-padded">
   <%== part(
     "components/table_card",
     title: "Nodes",

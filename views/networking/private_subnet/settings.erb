@@ -1,11 +1,11 @@
 <% if has_permission?("PrivateSubnet:edit", @ps) %>
-  <div class="p-6">
+  <div class="section-padded">
     <%== part("components/rename_object", object: @ps, type: "private subnet") %>
   </div>
 <% end %>
 
 <% if has_permission?("PrivateSubnet:delete", @ps) %>
-  <div class="p-6">
+  <div class="section-padded">
     <div class="flex-header">
       <div class="flex-title">
         <h3 class="section-heading">

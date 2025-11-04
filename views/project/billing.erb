@@ -205,7 +205,7 @@ end
             <tr>
               <th scope="col">Invoice</th>
               <th scope="col">Amount</th>
-              <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-6 text-left text-sm font-semibold text-gray-900">Status</th>
+              <th scope="col" class="table-header-cell">Status</th>
             </tr>
           </thead>
           <tbody class="table-body-bg">
@@ -223,13 +223,13 @@ end
                     <% end %>
                   </span>
                 </td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                <td class="table-cell-data">
                   <%= money(inv.cost) %>
                   <% if inv.cost != inv.subtotal %>
                     <span class="text-xs italic">(<%= money(inv.subtotal) %>)</span>
                   <% end %>
                 </td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 flex items-center gap-2 justify-between">
+                <td class="table-cell-status">
                   <%= inv.status %>
                   <% if inv.payable? %>
                     <% form(action: "#{path(inv)}/pay", method: :post) do %>
@@ -282,7 +282,7 @@ end
         <% form(action: "#{@project.path}/usage-alert", method: :post) do %>
           <div class="form-group">
             <div>
-              <h2 class="text-lg font-medium text-gray-900">Add new usage alert</h2>
+              <h2 class="card-heading">Add new usage alert</h2>
               <p class="mt-1 help-text">
                 Usage alerts will be sent to your email address. If you want to send alerts to specific email
                 addresses, you need to log in with that email address.
@@ -330,9 +330,9 @@ end
         <table class="table">
           <thead class="table-header-bg">
             <tr>
-              <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">Name</th>
-              <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">Limit</th>
-              <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">E-mail</th>
+              <th scope="col" class="table-header-cell-left">Name</th>
+              <th scope="col" class="table-header-cell-left">Limit</th>
+              <th scope="col" class="table-header-cell-left">E-mail</th>
               <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-4">
                 <span class="sr-only">Remove</span>
               </th>
@@ -340,10 +340,10 @@ end
           </thead>
           <tbody class="table-body-bg">
             <% @usage_alerts.each do |alert| %>
-              <tr id="alert-<%= alert.ubid %>" class="whitespace-nowrap text-sm font-medium">
-                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.name %></td>
-                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.limit %></td>
-                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.user.email %></td>
+              <tr id="alert-<%= alert.ubid %>" class="table-row-medium">
+                <td class="table-cell-primary" scope="row"><%= alert.name %></td>
+                <td class="table-cell-primary" scope="row"><%= alert.limit %></td>
+                <td class="table-cell-primary" scope="row"><%= alert.user.email %></td>
                 <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
                   <%== part(
                     "components/delete_button",

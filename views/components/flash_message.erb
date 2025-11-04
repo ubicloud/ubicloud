@@ -6,11 +6,11 @@
     <% next unless flash[type] %>
     <div class="alert <%= alert_class %>">
       <div class="flex">
-        <div class="shrink-0">
+        <div class="alert-icon-container">
           <%== part("components/icon", name: icon, classes: "icon-sm") %>
         </div>
-        <div class="ml-3">
-          <h3 id="flash-<%= type %>" class="text-sm font-medium"><%= flash[type] %></h3>
+        <div class="alert-content">
+          <h3 id="flash-<%= type %>" class="alert-header"><%= flash[type] %></h3>
         </div>
       </div>
     </div>

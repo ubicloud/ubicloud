@@ -19,9 +19,9 @@
   <%== part("components/rodauth/password_field", confirm: true) %>
   <%== render("components/form/cloudflare_turnstile") %>
 
-  <div class="flex flex-col text-center">
+  <div class="auth-centered-content">
     <%== part("components/form/submit_button", text: "Create Account") %>
-    <a href="/login" class="mt-2 text-sm font-semibold text-gray-900">Sign in to existing account</a>
+    <a href="/login" class="auth-secondary-link">Sign in to existing account</a>
   </div>
 <% end %>
 

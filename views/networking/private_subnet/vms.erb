@@ -4,7 +4,7 @@ displayable_vm_map, linkable_vm_map = [vm_ds, viewable_vm_ds].map! do
   it.select_hash(Sequel[:vm][:id], Sequel.as(true, :v))
 end %>
 
-<div id="private-subnet-nics" class="p-6">
+<div id="private-subnet-nics" class="section-padded">
   <%== part(
     "components/table_card",
     title: "Attached VMs",

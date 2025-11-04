@@ -33,11 +33,11 @@ curl #{ie.load_balancer.health_check_url(path:)} \\
   CURL
     %>
   <div class="card" p-4">
-    <h2 class="text-lg font-bold mb-4 text-gray-800 line-clamp-1"><%= ie.tags["display_name"] || ie.model_name %></h2>
+    <h2 class="model-card-heading"><%= ie.tags["display_name"] || ie.model_name %></h2>
     <div class="overview-grid">
       <div>
-        <h3 class="text-sm font-semibold text-gray-900">Model card</h3>
-        <div class="flex items-center gap-1 text-gray-500">
+        <h3 class="section-label">Model card</h3>
+        <div class="icon-text-pair">
           <%if hf_model = ie.tags["hf_model"]%>
           <a target="_blank" rel="noreferrer" href="https://huggingface.co/<%= hf_model %>" class="text-orange-600 line-clamp-2">🤗 <%= hf_model %></a>
           <%else%>
@@ -46,7 +46,7 @@ curl #{ie.load_balancer.health_check_url(path:)} \\
         </div>
       </div>
       <div>
-        <h3 class="text-sm font-semibold text-gray-900">Price</h3>
+        <h3 class="section-label">Price</h3>
         <p class="text-gray-500">
           Input: $<%= "%0.02f" % million_token_price(ie.prompt_billing_resource) %> / 1M tokens
           <br>
@@ -54,26 +54,26 @@ curl #{ie.load_balancer.health_check_url(path:)} \\
         </p>
       </div>
       <div>
-        <h3 class="text-sm font-semibold text-gray-900">Capability</h3>
-        <div class="flex items-center gap-1 text-gray-500">
+        <h3 class="section-label">Capability</h3>
+        <div class="icon-text-pair">
           <%== part("components/icon", name: model_icon, classes: "w-5 h-5 text-gray-400") %>
           <%= ie.tags["capability"] %>
         </div>
       </div>
       <div>
-        <h3 class="text-sm font-semibold text-gray-900">Context length</h3>
+        <h3 class="section-label">Context length</h3>
         <p class="text-gray-500"><%= ie.tags.fetch("context_length", "Full") %></p>
       </div>
       <div class="col-span-2">
-        <h3 class="text-sm font-semibold text-gray-900">URL</h3>
+        <h3 class="section-label">URL</h3>
         <div class="text-gray-500"><%== part("components/copyable_content", content: ie.load_balancer.health_check_url, message: "Copied URL") %></div>
       </div>
       <div class="col-span-2">
-        <h3 class="text-sm font-semibold text-gray-900">
+        <h3 class="section-label">
           CURL usage example
         </h3>
         <div class="mt-2">
-          <pre class="text-sm bg-gray-800 text-white p-2 rounded-lg overflow-scroll"><%== curl_snippet %></pre>
+          <pre class="code-block-dark"><%== curl_snippet %></pre>
         </div>
       </div>
       <% if ie.tags["capability"] == "Text Generation" %>

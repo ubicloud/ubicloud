@@ -3,8 +3,8 @@
 <div class="text-center empty-state">
   <%== part("components/icon", name: icon, classes: "empty-state-icon") %>
   <h3 class="empty-state-title"><%= title %></h3>
-  <p class="mt-1 help-text"><%= description %></p>
-  <div class="mt-6">
+  <p class="empty-state-description"><%= description %></p>
+  <div class="empty-state-actions">
     <% if buttons %>
       <% buttons.each do |text, link| %>
         <%== part("components/button", link:, text:) %>
@@ -12,7 +12,7 @@
     <% elsif button_link %>
       <%== part("components/button", link: button_link, text: button_title) %>
     <% elsif button_title %>
-      <div class="flex justify-center">
+      <div class="button-container-center">
         <%== part("components/button", text: button_title, attributes: { type: "submit" }) %>
       </div>
     <% end %>

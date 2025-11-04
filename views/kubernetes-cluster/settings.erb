@@ -1,10 +1,10 @@
 <% if has_permission?("KubernetesCluster:edit", @kc) %>
   <% np = @kc.nodepools.first %>
-  <div class="p-6">
+  <div class="section-padded">
     <%== part("components/rename_object", object: @kc, type: "Kubernetes Cluster") %>
   </div>
 
-  <div class="p-6">
+  <div class="section-padded">
     <div class="flex-header">
       <div class="flex-title">
         <h3 class="section-heading">
@@ -16,7 +16,7 @@
     <div class="table-card">
       <div class="card-body">
         <% form(action: "#{path(np)}/resize", method: :post) do %>
-          <div class="gap-6 sm:flex sm:items-center sm:justify-between">
+          <div class="settings-row">
             <div class="flex-grow">
               <%== part(
                 "components/form/select",
@@ -39,7 +39,7 @@
 <% end %>
 
 <% if has_permission?("KubernetesCluster:delete", @kc) %>
-  <div class="p-6">
+  <div class="section-padded">
     <div class="flex-header">
       <div class="flex-title">
         <h3 class="section-heading">

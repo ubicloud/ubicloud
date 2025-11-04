@@ -5,12 +5,12 @@ error = flash.dig("errors", name) %>
 
 <div class="form-group">
   <% if label %>
-    <label for="<%= name %>" class="block text-sm font-medium text-gray-900"><%= label %></label>
+    <label for="<%= name %>" class="form-label-block"><%= label %></label>
   <% end %>
   <textarea
     id="<%= name %>"
     name="<%= name %>"
-    class="block w-full rounded-md border-0 py-1.5  ring-1 box-shadow: inset focus:box-shadow: inset text-sm  <%= error ? "text-red-900 ring-red-300 placeholder:text-red-300 focus:ring-red-500" : "text-gray-900 ring-gray-300 placeholder:text-gray-400" %>"
+    class="<%= error ? "textarea-field-error" : "textarea-field" %>"
     <%== html_attrs(attributes) %>
   ><%= value %></textarea>
   <% if description %>

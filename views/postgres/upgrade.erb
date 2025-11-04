@@ -40,7 +40,7 @@ upgrade_progress = upgrade_stages.map do |stage, description, database_available
   [stage.first, description, database_availability_icon, stage_status_icon]
 end %>
 
-<div class="p-6">
+<div class="section-padded">
   <h3 class="section-heading">Upgrade</h3>
 
   <% if @pg.display_state == "creating" %>

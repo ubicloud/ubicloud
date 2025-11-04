@@ -28,7 +28,7 @@
         <% form(action: user_path, method: :post) do %>
           <div class="form-group">
             <div>
-              <p class="mt-1 text-sm text-gray-500">
+              <p class="form-help-text">
                 You can invite a new user to your project, adding them to the given subject tag (role).
               </p>
             </div>
@@ -64,7 +64,7 @@
             <tr>
               <th scope="col">Email</th>
               <th scope="col">Subject Tag</th>
-              <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-6 text-left text-sm font-semibold text-gray-900"></th>
+              <th scope="col" class="table-header-cell"></th>
             </tr>
           </thead>
           <tbody class="table-body-bg">
@@ -73,7 +73,7 @@
                 <td scope="row">
                   <%= user.email %>
                 </td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                <td class="table-cell-data">
                   <% if (tags = @subject_tag_map[user.id]) && tags.length >= 2 %>
                     <span title="You can manage this user's policies from the Access Control tab.">
                       <%= tags.join(", ") %>
@@ -91,7 +91,7 @@
                     ) %>
                   <% end %>
                 </td>
-                <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
+                <td class="table-cell-actions">
                   <%== part(
                     "components/delete_button",
                     text: "Remove",
@@ -106,16 +106,16 @@
                 <td scope="row">
                   <%= invitation[:email] %>
                   <span
-                    class="inline-flex items-baseline rounded-full ml-1 px-2 text-xs font-semibold leading-5 bg-yellow-100 text-yellow-800"
+                    class="badge-warning"
                   >
                     Invitation expires on
                     <%= invitation.expires_at.strftime("%B %d, %Y") %>
                   </span>
                 </td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                <td class="table-cell-data">
                   <%== part("components/form/policy_select", name: "invitation_policies[#{invitation.email}]", selected: invitation.policy) %>
                 </td>
-                <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
+                <td class="table-cell-actions">
                   <%== part(
                     "components/delete_button",
                     text: "Remove",

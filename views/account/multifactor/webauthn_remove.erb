@@ -9,7 +9,7 @@
         <%== render("account/submenu") %>
         <div class="account-content table-body-bg">
           <div class="form-section-padded form-group">
-            <h2 class="text-lg font-medium text-gray-900">Remove Security Key</h2>
+            <h2 class="card-heading">Remove Security Key</h2>
             <% form(action: rodauth.webauthn_remove_path, method: :post, id: "webauthn-remove-form") do %>
               <%== rodauth.webauthn_remove_additional_form_tags %>
               <div class="form-grid-6">
@@ -37,7 +37,7 @@
                             >
                           </div>
                           <div class="checkbox-label">
-                            <label for="webauthn-remove-<%= id %>" class="font-medium text-gray-900"><%= name %></label>
+                            <label for="webauthn-remove-<%= id %>" class="label-medium"><%= name %></label>
                             <span id="webauthn-remove-<%= id %>-description" class="text-gray-500">
                               (Last Usage:
                               <%= last_use.strftime("%F %T") %>)

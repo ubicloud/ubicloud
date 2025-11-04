@@ -26,7 +26,7 @@ viewable_fws, viewable_subnets, disconnectable_subnets =
     end
   end %>
 
-<div class="p-6">
+<div class="section-padded">
   <%== part(
     "components/table_card",
     title: "Attached Firewalls",
@@ -72,7 +72,7 @@ viewable_fws, viewable_subnets, disconnectable_subnets =
             show_delete = disconnectable_subnets[subnet.id]
           %>
           <tr>
-            <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+            <td class="table-cell-standard" scope="row">
               <% if viewable %>
                 <a href="<%= path(subnet) %>" class="link-primary"><%= subnet.name %></a>
               <% else %>

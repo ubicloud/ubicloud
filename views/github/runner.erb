@@ -9,9 +9,9 @@
     free_upgrade_badge = if @installation.free_runner_upgrade?
       <<~CONTENT
         <a href="#{path(@installation)}/setting">
-          <span class="rounded-full bg-green-600/10 px-2.5 py-1 text-xs/5 font-medium text-green-600">
-            You’re eligible for an exclusive <span class="font-semibold">50% off</span> premium runners until
-            <span class="font-semibold">#{@installation.free_runner_upgrade_expires_at.strftime("%B %d, %Y")}</span>
+          <span class="badge-success">
+            You're eligible for an exclusive <span class="text-semibold">50% off</span> premium runners until
+            <span class="text-semibold">#{@installation.free_runner_upgrade_expires_at.strftime("%B %d, %Y")}</span>
           </span>
         </a>
       CONTENT
@@ -35,10 +35,10 @@
               [runner.ubid, {link: runner.runner_url}],
               [<<~CONTENT, {escape: false}],
                 <div class="flex gap-1">
-                  <div class="rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800">#{runner.label_data["vcpus"]} vCPU</div>
-                  <div class="rounded-md px-2 text-xs font-medium leading-5 #{(family == "premium") ? "bg-orange-100 text-orange-600" : "bg-slate-100 text-slate-800"}">#{family}</div>
-                  <div class="rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800">#{runner.label_data["arch"]}</div>
-                  <div class="rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800">#{os}</div>
+                  <div class="badge-neutral">#{runner.label_data["vcpus"]} vCPU</div>
+                  <div class="runner-label-badge"  # Keep dynamic(family == "premium") ? "bg-orange-100 text-orange-600" : "bg-slate-100 text-slate-800"}">#{family}</div>
+                  <div class="badge-neutral">#{runner.label_data["arch"]}</div>
+                  <div class="badge-neutral">#{os}</div>
                 </div>
               CONTENT
             ], {}],
@@ -104,17 +104,17 @@
         ]
       end,
     empty_state: <<~EMPTY
-      <div class="flex flex-col gap-3">
-        <h3 class="text-xl  font-medium">No active runners</h3>
+      <div class="model-card-list-wrapper">
+        <h3 class="no-runners-heading">No active runners</h3>
         <p>
           To use Ubicloud runners, you need to change
-          <span class="text-rose-500 text-sm font-medium bg-slate-100 py-0.5 px-2 rounded font-mono whitespace-nowrap">runs-on: ...</span>
+          <span class="code-snippet-highlight">runs-on: ...</span>
           line to one of our labels such as
-          <span class="text-rose-500 text-sm font-medium bg-slate-100 py-0.5 px-2 rounded font-mono whitespace-nowrap">runs-on: ubicloud-standard-2</span>
+          <span class="code-snippet-highlight">runs-on: ubicloud-standard-2</span>
           in your workflow file. Then, trigger your workflow to start a runner.
           <br>
           Check out
-          <a href="https://www.ubicloud.com/docs/github-actions-integration/quickstart" class="text-orange-500 font-medium">our documentation</a>
+          <a href="https://www.ubicloud.com/docs/github-actions-integration/quickstart" class="link-orange">our documentation</a>
           for using larger runners, using arm64, enabling GPU.
         </p>
         #{free_upgrade_badge}

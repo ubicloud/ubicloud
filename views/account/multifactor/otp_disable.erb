@@ -9,7 +9,7 @@
         <%== render("account/submenu") %>
         <div class="account-content table-body-bg">
           <div class="form-section-padded form-group">
-            <h2 class="text-lg font-medium text-gray-900">Disable One-Time Password Authentication</h2>
+            <h2 class="card-heading">Disable One-Time Password Authentication</h2>
             <% form(action: rodauth.otp_disable_path, method: :post) do %>
               <%== rodauth.otp_disable_additional_form_tags %>
               <div class="form-grid-6">

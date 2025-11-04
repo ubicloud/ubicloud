@@ -2,12 +2,12 @@
 max_date = @pg.timeline.latest_restore_time %>
 
 <% if min_date && max_date > min_date %>
-  <div class="p-6">
+  <div class="section-padded">
     <% form(action: "#{path(@pg)}/restore", method: :post) do %>
       <div class="form-group">
         <div>
           <h3 class="section-heading">Fork PostgreSQL database</h3>
-          <p class="mt-1 text-sm text-gray-500">
+          <p class="form-help-text">
             When you fork your existing PostgreSQL database, a new server will be provisioned.
           </p>
         </div>
@@ -26,8 +26,8 @@ max_date = @pg.timeline.latest_restore_time %>
     <% end %>
   </div>
 <% else %>
-  <div class="p-6">
-    <div class="text-gray-500">
+  <div class="section-padded">
+    <div class="text-muted">
       No backups available for this PostgreSQL database.
     </div>
   </div>
@@ -35,7 +35,7 @@ max_date = @pg.timeline.latest_restore_time %>
 
 <% backups = @pg.timeline.backups %>
 <% if backups.count > 0 %>
-  <div class="p-6">
+  <div class="section-padded">
     <div class="flex-header">
       <div class="flex-title">
         <h3 class="section-heading">Backups</h3>
@@ -47,18 +47,18 @@ max_date = @pg.timeline.latest_restore_time %>
         <thead class="table-header-bg">
           <tr>
             <th scope="col">Backup Time</th>
-            <th scope="col" class="py-3.5 text-left text-sm font-semibold text-gray-900">Type</th>
-            <th scope="col" class="py-3.5 text-left text-sm font-semibold text-gray-900">Fork</th>
+            <th scope="col" class="table-header-cell">Type</th>
+            <th scope="col" class="table-header-cell">Fork</th>
           </tr>
         </thead>
         <tbody class="table-body-bg">
           <% backups.each do %>
             <tr>
-              <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6"><%= it.last_modified %></td>
-              <td class="py-4 text-sm font-medium text-gray-900">Full Backup</td>
-              <td class="py-4 text-sm font-medium text-gray-900">
-                <div class="cursor-pointer fork-icon" data-target-datetime="<%= it.last_modified %>">
-                  <%== part("components/icon", name: "fork", classes: "text-black-600") %>
+              <td class="table-cell-first"><%= it.last_modified %></td>
+              <td class="table-cell-base">Full Backup</td>
+              <td class="table-cell-base">
+                <div class="clickable-icon fork-icon" data-target-datetime="<%= it.last_modified %>">
+                  <%== part("components/icon", name: "fork", classes: "text-emphasis-dark") %>
                 </div>
               </td>
             </tr>

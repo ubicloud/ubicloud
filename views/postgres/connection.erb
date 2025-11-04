@@ -17,10 +17,10 @@
 
 %>
 
-<div class="p-6">
+<div class="section-padded">
   <% if @pg.display_state != "creating" %>
-    <div class="flex items-center gap-6 connection-info-format-selector">
-      <div class="flex items-center gap-2">
+    <div class="flex-center connection-info-format-selector">
+      <div class="inline-actions">
         Format:
         <div>
           <%== part(
@@ -42,18 +42,18 @@
       connection_infos.each_with_index do |(key, value), index|
       hidden_class = index == 0 ? "" : "hidden"
     %>
-      <div class="bg-gray-200 rounded-md p-6 mt-5 connection-info-box connection-info-box-<%= key %> <%= hidden_class %>">
+      <div class="connection-info-container connection-info-box connection-info-box-<%= key %> <%= hidden_class %>">
       <%== part("components/copyable_content", content: value, revealable: true, classes: "!flex justify-between") %>
       </div>
     <% end %>
 
-    <div class="mt-5 flex items-center gap-2">
+    <div class="connection-info-section">
       CA Certificates: <%== part("components/download_button", link: "#{path(@pg)}/ca-certificates")%>
     </div>
   <% else %>
     <div class="empty-state-centered">
-      <h2 class="text-2xl font-semibold text-gray-900">No connection information available</h2>
-      <p class="text-gray-500 mt-2">Connection information will be available once the database is running.</p>
+      <h2 class="empty-state-heading">No connection information available</h2>
+      <p class="connection-description">Connection information will be available once the database is running.</p>
     </div>
   <% end %>
 </div>

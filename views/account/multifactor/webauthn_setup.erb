@@ -9,7 +9,7 @@
         <%== render("account/submenu") %>
         <div class="account-content table-body-bg">
           <div class="form-section-padded form-group">
-            <h2 class="text-lg font-medium text-gray-900">Setup Security Key</h2>
+            <h2 class="card-heading">Setup Security Key</h2>
             <% form(:action => rodauth.webauthn_setup_path, :method => :post, :id => "webauthn-setup-form", "data-credential-options" => (cred = rodauth.new_webauthn_credential).as_json.to_json) do %>
               <%== rodauth.webauthn_setup_additional_form_tags %>
               <%== hidden_inputs(rodauth.webauthn_setup_challenge_param => cred.challenge, rodauth.webauthn_setup_challenge_hmac_param => rodauth.compute_hmac(cred.challenge)) %>

@@ -10,13 +10,13 @@
   right_items: [<<-DROPDOWN]
     <div class="group dropdown relative inline-block text-left">
       <div>#{part("components/button", text: @installation.name, icon: "github", right_icon: "hero-chevron-down")}</div>
-      <div class="hidden group-active:block group-active:opacity-100 opacity-0 transition scale-95 absolute -right-2 z-10 mt-2 w-72 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5" role="menu" tabindex="-1">
+      <div class="github-installation-dropdown" role="menu" tabindex="-1">
         <div>
           #{@project.github_installations.map do |ins|
             <<-ITEM
             <div class="transition-colors" role="none">
-              <a href="#{path(ins)}/runner" class="flex items-center px-4 py-3 text-sm text-gray-700">
-                <img src="https://github.com/#{ins.name}.png?size=64" alt="" class="mr-2 size-6 shrink-0 rounded-lg drop-shadow-sm">
+              <a href="#{path(ins)}/runner" class="dropdown-item">
+                <img src="https://github.com/#{ins.name}.png?size=64" alt="" class="installation-avatar">
                 <span class="#{"font-semibold" if ins.id == @installation.id}">#{ins.name}</span>
               </a>
             </div>
@@ -25,8 +25,8 @@
         </div>
         <div>
           <div class="transition-colors">
-            <a href="#{@project.path}/github/create" class="flex items-center px-4 py-3 text-sm text-gray-700">
-              <div class="mr-2 size-6 shrink-0 rounded-lg bg-gray-400 flex items-center justify-center drop-shadow-sm">
+            <a href="#{@project.path}/github/create" class="dropdown-item">
+              <div class="installation-placeholder">
                 #{part("components/icon", name: "github", classes: "size-4 text-white")}
               </div>
               Connect New Account

@@ -5,7 +5,7 @@ viewable_fws =
     .select_hash(:id, Sequel.as(true, :v))
     .transform_keys! { UBID.from_uuidish(it).to_s } %>
 
-<div id="vm-firewall-rules" class="p-6">
+<div id="vm-firewall-rules" class="section-padded">
   <%== part(
     "components/table_card",
     title: "Applied Firewall Rules",

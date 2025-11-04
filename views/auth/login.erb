@@ -34,7 +34,7 @@
           type="submit"
         >
           <%== part("components/icon", name: identity.provider.to_s) unless provider_name %>
-          <span class="text-sm font-semibold"><%= provider_name || identity.provider.capitalize %></span>
+          <span class="social-login-text"><%= provider_name || identity.provider.capitalize %></span>
         </button>
       <% end %>
     <% end %>
@@ -42,7 +42,7 @@
 
   <% if !rodauth.valid_login_entered? || rodauth.has_password? %>
     <div class="flex-between">
-      <div class="flex items-center">
+      <div class="flex-center">
         <input
           id="remember-me"
           name="remember-me"
@@ -50,24 +50,24 @@
           class="form-checkbox"
           form="login-form"
         >
-        <label for="remember-me" class="ml-2 text-sm text-gray-900">Remember me</label>
+        <label for="remember-me" class="remember-me-label">Remember me</label>
       </div>
 
       <div class="text-sm">
         <a
           href="/reset-password-request?login=<%= Rack::Utils.escape(rodauth.param("login")) %>"
-          class="link-primary font-medium"
+          class="forgot-password-link"
         >Forgot your password?</a>
       </div>
     </div>
   <% end %>
 
-  <div class="flex flex-col text-center">
+  <div class="auth-centered-content">
     <% if !rodauth.valid_login_entered? || rodauth.has_password? %>
       <%== part("components/form/submit_button", text: "Sign in", attributes: {form: "login-form"}) %>
     <% end %>
     <% unless rodauth.valid_login_entered? %>
-      <a href="/create-account" class="mt-2 text-sm font-semibold text-gray-900">Create a new account</a>
+      <a href="/create-account" class="auth-secondary-link">Create a new account</a>
     <% end %>
   </div>
 </div>

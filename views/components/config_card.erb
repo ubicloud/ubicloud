@@ -2,14 +2,14 @@
 
 <div class="bg-white rounded-lg shadow overflow-hidden mb-6 <%= extra_class %>">
   <div class="px-6 py-4 border-b border-gray-200">
-    <h3 class="text-lg font-medium text-gray-900"><%= title %></h3>
+    <h3 class="card-heading"><%= title %></h3>
   </div>
 
   <div class="border-b-gray-200 w-full max-h-64 overflow-y-auto">
     <% config.each_with_index do |(key, value), index| %>
       <% error = errors[name + "." + key] %>
       <% next if key.empty? && value.empty? %>
-      <div class="px-6 py-2 transition-colors config-group group font-mono" data-config-id="<%= index %>">
+      <div class="config-entry" data-config-id="<%= index %>">
         <div class="flex-between">
           <div class="flex flex-wrap items-center config-entry">
             <input
@@ -37,7 +37,7 @@
               </span>
             <% end %>
           </div>
-          <div class="min-w-16 flex items-center ml-2">
+          <div class="config-actions-cell">
             <%== part("components/button", type: "danger", text: "", icon: "hero-trash", extra_class: "delete-config-btn") if @edit_perm %>
           </div>
         </div>
@@ -57,13 +57,13 @@
           <input
             type="text"
             value=""
-            class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500"
+            class="config-input"
             name="<%= name %>_values[]"
             disabled
           />
           <span class="error inline-block h-8 w-54 py-2 px-2 max-w-54 text-xs text-red-600 hidden bg-red-100 rounded" aria-live="polite"></span>
         </div>
-        <div class="min-w-16 flex items-center ml-2">
+        <div class="config-actions-cell">
           <%== part("components/button", type: "danger", text: "", icon: "hero-trash", extra_class: "delete-config-btn") %>
         </div>
       </div>
@@ -82,12 +82,12 @@
             <input
               type="text"
               placeholder="New Value"
-              class="border rounded py-1 focus:ring-blue-500 focus:border-blue-500"
+              class="config-input"
               name="<%= name %>_values[]"
             />
             <span class="error inline-block h-8 w-54 py-2 px-2 max-w-54 text-xs text-red-600 hidden bg-red-100 rounded" aria-live="polite"></span>
           </div>
-          <div class="min-w-16 flex items-center ml-2">
+          <div class="config-actions-cell">
             <%== part("components/button", text: "", type: "safe", icon: "hero-plus", extra_class: "add-config-btn") %>
           </div>
         </div>

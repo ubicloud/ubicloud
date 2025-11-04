@@ -1,41 +1,41 @@
 <div class="app-topbar">
-  <button type="button" class="toggle-mobile-menu -m-2.5 p-2.5 text-gray-700 lg:hidden">
+  <button type="button" class="toggle-mobile-menu topbar-menu-button">
     <span class="sr-only">Open sidebar</span>
     <%== part("components/icon", name: "hero-bars-3") %>
   </button>
   <!-- Separator -->
-  <div class="h-6 w-px bg-gray-900/10 lg:hidden"></div>
+  <div class="topbar-separator"></div>
   <a href="<%= @project_permissions ? "#{@project.path}/dashboard" : "/project" %>">
-    <img class="h-5 w-auto lg:hidden" src="/logo-primary.png" alt="Ubicloud">
+    <img class="topbar-logo" src="/logo-primary.png" alt="Ubicloud">
   </a>
-  <div class="flex flex-1 gap-4 self-stretch justify-end lg:gap-6">
-    <div class="flex items-center gap-4 lg:gap-6">
+  <div class="topbar-right-section">
+    <div class="topbar-actions">
       <!-- Profile dropdown -->
-      <div class="relative group dropdown text-sm text-gray-900">
-        <button type="button" class="-m-1.5 flex items-center p-1.5" title="<%= current_account.email %>">
-          <%== part("components/icon", name: "hero-user-circle", classes: "h-8 w-8 rounded-full bg-gray-50") %>
-          <span class="hidden lg:flex lg:items-center">
-            <span class="ml-3 font-semibold" aria-hidden="true"><%= current_account.name %></span>
-            <%== part("components/icon", name: "hero-chevron-down", classes: "h-5 w-5 ml-2 text-gray-400") %>
+      <div class="topbar-profile-dropdown">
+        <button type="button" class="topbar-profile-button" title="<%= current_account.email %>">
+          <%== part("components/icon", name: "hero-user-circle", classes: "topbar-profile-icon") %>
+          <span class="topbar-profile-info">
+            <span class="topbar-profile-name" aria-hidden="true"><%= current_account.name %></span>
+            <%== part("components/icon", name: "hero-chevron-down", classes: "topbar-chevron-icon") %>
           </span>
         </button>
         <div
-          class="hidden group-[.active]:block absolute right-0 z-10 mt-2 w-48 rounded-md bg-white pb-2 ring-1 border border-gray-100 divide-y"
+          class="topbar-profile-menu"
           role="menu"
           tabindex="-1"
         >
-          <div class="px-3 py-2">
+          <div class="topbar-profile-header">
             <p class="text-sm">Signed in as</p>
-            <p class="truncate text-sm font-medium text-gray-900">
+            <p class="topbar-profile-email">
               <%= current_account.email %></p>
           </div>
           <div>
-            <a href="/account" class="block px-3 py-1 hover:bg-gray-100" role="menuitem" tabindex="-1">My Account</a>
-            <a href="/project" class="block px-3 py-1 hover:bg-gray-100" role="menuitem" tabindex="-1">Projects</a>
+            <a href="/account" class="dropdown-menu-link" role="menuitem" tabindex="-1">My Account</a>
+            <a href="/project" class="dropdown-menu-link" role="menuitem" tabindex="-1">Projects</a>
           </div>
           <div>
             <% form(action: "/logout", method: :post) do %>
-              <button type="submit" class="block px-3 py-1 hover:bg-gray-100 w-full text-left" role="menuitem" tabindex="-1">Log out</button>
+              <button type="submit" class="topbar-logout-button" role="menuitem" tabindex="-1">Log out</button>
             <% end %>
           </div>
         </div>

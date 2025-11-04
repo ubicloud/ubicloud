@@ -11,8 +11,8 @@
           <div class="form-section-padded form-group">
             <div class="form-grid-6">
               <div class="form-field-medium">
-                <div class="text-lg font-medium text-gray-900">One-Time Password Generator</div>
-                <p class="mt-1 text-sm text-gray-500">Connect an authenticator app that generates verification codes.</p>
+                <div class="card-heading">One-Time Password Generator</div>
+                <p class="form-help-text">Connect an authenticator app that generates verification codes.</p>
               </div>
               <div class="form-actions-column">
                 <% if rodauth.otp_exists? %>
@@ -26,8 +26,8 @@
           <div class="form-section-padded form-group">
             <div class="form-grid-6">
               <div class="form-field-medium">
-                <div class="text-lg font-medium text-gray-900">Security Keys</div>
-                <p class="mt-1 text-sm text-gray-500">Connect a security key to your account.</p>
+                <div class="card-heading">Security Keys</div>
+                <p class="form-help-text">Connect a security key to your account.</p>
               </div>
               <div class="form-actions-column">
                 <%== part("components/button", text: rodauth.webauthn_setup_link_text, link: rodauth.webauthn_setup_path) %>
@@ -41,8 +41,8 @@
             <div class="form-section-padded form-group">
               <div class="form-grid-6">
                 <div class="form-field-medium">
-                  <div class="text-lg font-medium text-gray-900">Recovery Codes</div>
-                  <p class="mt-1 text-sm text-gray-500">Single-use recovery codes for your account.</p>
+                  <div class="card-heading">Recovery Codes</div>
+                  <p class="form-help-text">Single-use recovery codes for your account.</p>
                 </div>
                 <div class="form-actions-column">
                   <%== part("components/button", text: rodauth.recovery_codes_link_text, link: rodauth.recovery_codes_path) %>

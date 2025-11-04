@@ -2,7 +2,7 @@
   <div class="group <%= items.compact.map { it[2] }.any? ? "active" : "" %>">
     <button
       type="button"
-      class="toggle-parent-to-active w-full text-orange-100 hover:text-white flex gap-3 rounded-md p-2 text-sm font-semibold"
+      class="sidebar-group-toggle"
     >
       <%== part("components/icon", name: icon, classes: "text-white shrink-0") %>
       <%= name %>

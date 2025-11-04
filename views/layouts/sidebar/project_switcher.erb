@@ -2,7 +2,7 @@
   <div>
     <button
       type="button"
-      class="sidebar-project-switcher w-full px-6 py-3 text-md font-semibold text-white bg-orange-700 hover:bg-orange-800"
+      class="sidebar-project-button sidebar-project-switcher"
       id="menu-button"
     >
       <%== part("components/icon", name: "hero-folder-open", classes: "h-8 w-8 rounded-full") %>
@@ -11,7 +11,7 @@
     </button>
   </div>
   <div
-    class="hidden group-active:block group-active:opacity-100 opacity-0 transition scale-95 absolute bottom-12 left-12 z-10 mt-2 w-64 origin-bottom divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 text-gray-800"
+    class="sidebar-project-menu"
     role="menu"
     tabindex="-1"
   >
@@ -19,7 +19,7 @@
       <% current_account.projects.each do |p| %>
         <a
           href="<%= p.path %>/dashboard"
-          class="block px-4 py-2 hover:bg-gray-100 hover:text-gray-900 <% if p.id == @project&.id %> bg-orange-50 text-orange-600 hover:bg-orange-50 <% end %>"
+          class="sidebar-project-menu-item <% if p.id == @project&.id %>sidebar-project-menu-item-active<% end %>"
           role="menuitem"
           tabindex="-1"
         ><%= p.name %></a>
@@ -28,7 +28,7 @@
     <div class="py-1" role="none">
       <a
         href="/project/create"
-        class="group flex items-center px-4 py-2 hover:bg-gray-100 hover:text-gray-900"
+        class="sidebar-project-menu-create group"
         role="menuitem"
         tabindex="-1"
       >

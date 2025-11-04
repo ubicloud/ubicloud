@@ -8,7 +8,7 @@
       <div class="group dropdown relative inline-block text-left">
         <div>#{part("components/button", text: "Create PostgreSQL Database", right_icon: "hero-chevron-down")}
         </div>
-        <div class="hidden group-active:block group-active:opacity-100 opacity-0 transition scale-95 absolute -right-2 z-10 mt-2 w-72 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5" role="menu" tabindex="-1">
+        <div class="github-installation-dropdown" role="menu" tabindex="-1">
           #{postgres_flavors.values.map do
             <<-ITEM
             <div class="py-1 transition-colors" role="none">
@@ -69,7 +69,7 @@
             </h3>
             <p class="description-text"><%= it.description %></p>
           </div>
-          <span class="pointer-events-none absolute right-6 top-6 text-gray-300 group-hover:text-gray-400">
+          <span class="card-icon-decoration">
             <%== part("components/icon", name: "hero-arrow-up-right") %>
           </span>
         </div>

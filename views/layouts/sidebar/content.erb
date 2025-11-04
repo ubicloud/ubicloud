@@ -81,7 +81,7 @@
       </li>
       <% if @project_permissions && has_project_permission(["Project:user", "Project:billing", "Project:view", "Project:viewaccess", "Project:token"]) %>
         <li>
-          <div class="text-xs font-semibold text-orange-200">Project Details</div>
+          <div class="sidebar-section-header">Project Details</div>
           <ul role="list" class="-mx-2 mt-2 form-group">
             <%== if has_project_permission("Project:user")
                    users_url = "#{@project.path}/user"
@@ -142,7 +142,7 @@
       <% end %>
       <% if @project_permissions && has_project_permission("Project:github") && Config.github_app_name %>
         <li>
-          <div class="text-xs font-semibold text-orange-200">Integrations</div>
+          <div class="sidebar-section-header">Integrations</div>
           <ul role="list" class="-mx-2 mt-2 form-group">
             <%== part(
               "layouts/sidebar/item",

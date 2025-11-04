@@ -22,8 +22,8 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
   <div>
     <div class="table-card">
       <% if modification_allowed %>
-        <div class="px-4 py-5 sm:p-6 form-group">
-          <h3 class="text-lg font-medium text-gray-900"><%= "Create #{@display_tag_type} Tag" %></h3>
+        <div class="form-section-padded form-group">
+          <h3 class="card-heading"><%= "Create #{@display_tag_type} Tag" %></h3>
           <p class="help-text">
             <% case @tag_type
            when "subject" %>
@@ -55,15 +55,15 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
         </div>
       <% end %>
       <% if @tags.empty? %>
-        <div class="text-center py-4 px-8 lg:px-32">
-          <h3 class="text-xl  font-medium mb-2"><%= "No managable #{@tag_type} tags to display" %></h3>
+        <div class="empty-section-centered">
+          <h3 class="tag-list-heading"><%= "No managable #{@tag_type} tags to display" %></h3>
         </div>
       <% else %>
         <table id="tag-list" class="table">
           <thead class="table-header-bg">
             <tr>
-              <th scope="col" class="pl-4 pr-3 sm:pl-6 py-3.5 text-left text-sm font-semibold text-gray-900">Name</th>
-              <th scope="col" class="pl-3 pr-4 sm:pr-6 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
+              <th scope="col" class="table-header-cell-left">Name</th>
+              <th scope="col" class="table-header-cell"></th>
             </tr>
           </thead>
           <tbody class="table-body-bg">
@@ -73,7 +73,7 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
                 <td class="pl-4 pr-3 sm:pl-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   <%= tag.name %>
                 </td>
-                <td class="pl-3 pr-4 sm:pr-6 py-4 flex items-center gap-2 justify-end">
+                <td class="table-cell-actions">
                   <%== part(
                     "components/button",
                     text: "Manage",

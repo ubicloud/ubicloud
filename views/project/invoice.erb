@@ -21,7 +21,7 @@
   ].compact.map do |name, value|
     <<~CONTENT
       <dl class="grid-3col #{"text-2xl" if name == "Total"}">
-        <dt class="text-right font-semibold text-gray-800 col-span-2">#{name}:</dt>
+        <dt class="text-right-semibold col-span-2">#{name}:</dt>
         <dd class="text-gray-500" id="invoice-#{name.downcase.tr(" ", "-")}">#{value}</dd>
       </dl>
     CONTENT

@@ -41,7 +41,7 @@
       <tbody class="table-body-bg">
         <% if rows.empty? %>
           <tr>
-            <td colspan="<%= headers.length %>" class="text-center py-4 px-8 lg:px-32">
+            <td colspan="<%= headers.length %>" class="empty-section-centered">
               <% if empty_state.is_a?(Hash) %>
                 <%== part("components/empty_state", **empty_state) %>
               <% else %>

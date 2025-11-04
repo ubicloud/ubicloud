@@ -6,9 +6,9 @@
 
   <%== render("components/rodauth/otp_auth_code_field") %>
 
-  <div class="flex flex-col text-center">
+  <div class="auth-centered-content">
     <%== part("components/form/submit_button", text: rodauth.otp_auth_button) %>
-    <p class="mt-10 text-center text-sm text-gray-400">
+    <p class="auth-footer-text">
       Can't access your authentication app?
       <br>
       <a href="<%= rodauth.recovery_auth_path %>" class="link-primary font-semibold">Enter a recovery code</a>

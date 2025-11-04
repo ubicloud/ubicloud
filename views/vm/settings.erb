@@ -1,12 +1,12 @@
 <% edit_perm = has_permission?("Vm:edit", @vm) %>
 
 <% if edit_perm %>
-  <div class="p-6">
+  <div class="section-padded">
     <%== part("components/rename_object", object: @vm, type: "virtual machine") %>
   </div>
 <% end %>
 
-<div class="p-6">
+<div class="section-padded">
   <div class="flex-header">
     <div class="flex-title">
       <h3 class="section-heading">

@@ -10,7 +10,7 @@
           <%== render("account/submenu") %>
           <div class="account-content border-t-gray-200 pb-10">
             <div class="form-section-padded account-section">
-              <h2 class="text-lg font-medium text-gray-900">Verify New Email</h2>
+              <h2 class="card-heading">Verify New Email</h2>
               <% form(method: :post) do %>
                 <div class="form-grid-6">
                   <div class="col-span-6">
@@ -28,9 +28,9 @@
   <% @page_message = "Verify your new email" %>
 
   <% form(method: :post, class: "rodauth form-group") do %>
-    <div class="flex flex-col text-center">
+    <div class="auth-centered-content">
       <%== part("components/form/submit_button", text: "Click to Verify New Email") %>
-      <a href="/login" class="mt-2 text-sm font-semibold text-gray-900">Sign in to another account</a>
+      <a href="/login" class="auth-secondary-link">Sign in to another account</a>
     </div>
   <% end %>
 <% end %>

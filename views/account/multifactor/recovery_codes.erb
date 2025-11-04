@@ -10,7 +10,7 @@
         <div class="account-content table-body-bg">
           <% if rodauth.two_factor_modifications_require_password? %>
             <div class="form-section-padded form-group">
-              <h2 class="text-lg font-medium text-gray-900">Recovery Codes</h2>
+              <h2 class="card-heading">Recovery Codes</h2>
               <% form(action: rodauth.recovery_codes_path, method: :post) do %>
                 <div class="form-grid-6">
                   <div class="form-field-small">
@@ -24,11 +24,11 @@
             </div>
           <% else %>
             <div class="form-section-padded form-group">
-              <h2 class="text-lg font-medium text-gray-900">Recovery Codes</h2>
-              <p class="mt-1 text-sm text-gray-500">
+              <h2 class="card-heading">Recovery Codes</h2>
+              <p class="form-help-text">
                 Copy these recovery codes to a safe location. You can also download them
                 <a
-                  class="font-medium text-orange-500 underline underline-offset-2"
+                  class="link-orange-underline"
                   href="data:text/plain;base64,<%= Base64.encode64(rodauth.recovery_codes.join("\n")) %>"
                   download="ubicloud-recovery-codes.txt"
                 >here</a>.
@@ -38,7 +38,7 @@
                   <% if rodauth.recovery_codes.any? %>
                     <div
                       id="recovery-codes-text"
-                      class="w-fit text-sm xl:text-base whitespace-nowrap border p-3 bg-slate-100 text-rose-500 font-mono rounded"
+                      class="recovery-code"
                     >
                       <% rodauth.recovery_codes.each do |code| %>
                         <div><%= code %></div>
@@ -50,7 +50,7 @@
             </div>
             <% if rodauth.can_add_recovery_codes? %>
               <div class="form-section-padded form-group">
-                <h2 class="text-lg font-medium text-gray-900"><%== rodauth.add_recovery_codes_heading %></h2>
+                <h2 class="card-heading"><%== rodauth.add_recovery_codes_heading %></h2>
                 <% form(action: rodauth.recovery_codes_path, method: :post) do %>
                   <div class="form-grid-6">
                     <div class="col-span-6">

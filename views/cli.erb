@@ -35,7 +35,7 @@ end %>
   <% end %>
 
   <% form(action: request.path_info, method: :post) do %>
-    <div class="flex gap-2 justify-between mb-6">
+    <div class="header-with-actions">
       <div class="font-mono flex-1">
         <% if multi %>
           <%== part("components/form/textarea", name: "multi-cli", attributes: {cols: 80, rows: 6, placeholder: "Multiple commands, one per line", autofocus: true, required: true}) %>
@@ -49,10 +49,10 @@ end %>
     <div
       class="table-card" <%= (multi && !@cli) ? "hidden" : ""%>"
     >
-      <div class="px-4 py-5 sm:p-6 form-group">
+      <div class="form-section-padded form-group">
         <% if @clis && !@clis.empty? %>
           <div class="form-group">
-            <p class="text-xl font-semibold">Remaining commands:</p>
+            <p class="heading-xl-semibold">Remaining commands:</p>
             <div class="code-block">
               <% @clis.each do %>
                 <pre class="whitespace-pre-wrap"><code class="next-clis"><%= it %></code></pre>
@@ -64,14 +64,14 @@ end %>
 
         <% if @last_cli %>
           <div class="form-group">
-            <p class="text-xl font-semibold">Ran command:</p>
+            <p class="heading-xl-semibold">Ran command:</p>
             <div class="code-block">
               <pre class="whitespace-pre-wrap"><code id="cli-executed"><%= @last_cli %></code></pre>
             </div>
           </div>
 
           <div class="form-group">
-            <p class="text-xl font-semibold"><%= @ubi_command_execute ? "Would execute" : "Output" %>:</p>
+            <p class="heading-xl-semibold"><%= @ubi_command_execute ? "Would execute" : "Output" %>:</p>
             <div class="code-block">
               <pre class="whitespace-pre-wrap"><code id="cli-output"><%== @output %></code></pre>
             </div>
@@ -84,12 +84,12 @@ end %>
         <% if !@last_cli && !@cli %>
           <% unless multi %>
             <div class="form-group">
-              <h2 class="text-xl font-semibold">Examples</h2>
+              <h2 class="heading-xl-semibold">Examples</h2>
               <dl class="code-block">
                 <dt><code>help -ru</code></dt>
-                <dd class="inline-block ml-6 mb-4">Display the syntax for all supported commands</dd>
+                <dd class="command-example-desc">Display the syntax for all supported commands</dd>
                 <dt><code>help -r</code></dt>
-                <dd class="inline-block ml-6 mb-4">Show full help for all supported commands</dd>
+                <dd class="command-example-desc">Show full help for all supported commands</dd>
                 <dt><code>vm list</code></dt>
                 <dd class="inline-block ml-6">List all virtual machines</dd>
               </dl>

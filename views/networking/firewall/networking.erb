@@ -181,7 +181,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
         <% end %>
         <% if edit_perm %>
           <tr>
-            <td class="whitespace-nowrap py-4 pl-2 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+            <td class="table-cell-compact" scope="row">
               <%== part(
                 "components/form/select",
                 name: "private_subnet_id",

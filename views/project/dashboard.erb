@@ -133,7 +133,7 @@ cards = [
     <% cards.each do |icon, title, description, link| %>
       <div class="feature-card">
         <div>
-          <span class="inline-flex rounded-lg p-3 bg-orange-50 text-orange-700 ring-4 ring-white">
+          <span class="feature-icon-wrapper">
             <%== part("components/icon", name: icon) %>
           </span>
         </div>
@@ -147,7 +147,7 @@ cards = [
           </h3>
           <p class="description-text"><%= description %></p>
         </div>
-        <span class="pointer-events-none absolute right-6 top-6 text-gray-300 group-hover:text-gray-400">
+        <span class="card-icon-decoration">
           <%== part("components/icon", name: "hero-arrow-up-right") %>
         </span>
       </div>

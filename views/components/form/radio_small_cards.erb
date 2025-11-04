@@ -4,7 +4,7 @@ error = flash.dig("errors", name)
 is_content_array = options[0][1].is_a?(Array) %>
 
 <div class="form-group">
-  <label class="text-sm font-medium text-gray-900"><%= label %></label>
+  <label class="table-cell-header"><%= label %></label>
   <fieldset class="radio-small-cards">
     <legend class="sr-only"><%= label %></legend>
     <div class="radio-cards-grid">
@@ -20,7 +20,7 @@ is_content_array = options[0][1].is_a?(Array) %>
           <% if is_content_array %>
             <span class="radio-small-card justify-between p-4">
               <span class="flex flex-col">
-                <span class="text-md font-semibold"><%= opt_text[0] %></span>
+                <span class="radio-card-label"><%= opt_text[0] %></span>
                 <span class="text-sm opacity-80"><span class="block sm:inline"><%= opt_text[1] %></span></span>
               </span>
               <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
@@ -29,7 +29,7 @@ is_content_array = options[0][1].is_a?(Array) %>
               </span>
             </span>
           <% else %>
-            <span class="radio-small-card justify-center p-3 text-sm font-semibold"><%= opt_text %></span>
+            <span class="radio-small-card radio-card-text"><%= opt_text %></span>
           <% end %>
         </label>
       <% end %>

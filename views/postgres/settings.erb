@@ -1,7 +1,7 @@
 <% delete_perm = has_permission?("Postgres:delete", @pg) %>
 
 <% if @edit_perm %>
-  <div class="p-6">
+  <div class="section-padded">
     <div class="flex-header">
       <div class="flex-title">
         <h3 class="section-heading">
@@ -39,7 +39,7 @@
 <% end %>
 <!-- Danger Zone -->
 <% if @edit_perm || delete_perm %>
-  <div class="p-6">
+  <div class="section-padded">
     <div class="flex-header">
       <div class="flex-title">
         <h3 class="section-heading">

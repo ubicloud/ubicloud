@@ -4,60 +4,60 @@
 
 <div class="content-grid">
   <!-- Premium runners -->
-  <div class="card border border-gray-100 bg-white lg:flex shadow">
-    <div class="p-8 sm:p-10 lg:flex-auto">
-      <div class="flex items-center">
-        <h3 class="text-3xl font-semibold text-gray-900 whitespace-nowrap">
+  <div class="github-settings-card">
+    <div class="pricing-content-wrapper">
+      <div class="flex-center">
+        <h3 class="page-title-large">
           Premium Runners
         </h3>
         <% if @installation.premium_runner_enabled? %>
-          <span class="rounded-full bg-orange-600/10 px-2.5 py-1 text-xs/5 font-semibold text-orange-600 ml-2">
+          <span class="promo-badge">
             Enabled
           </span>
         <% end %>
       </div>
       <% if @installation.free_runner_upgrade? %>
-        <span class="rounded-full bg-green-600/10 px-2.5 py-1 text-xs/5 font-medium text-green-600">
-          You’re eligible for an exclusive
-          <span class="font-semibold">50% off</span>
+        <span class="badge-success">
+          You're eligible for an exclusive
+          <span class="text-semibold">50% off</span>
           premium runners until
-          <span class="font-semibold"><%= @installation.free_runner_upgrade_expires_at.strftime("%B %d, %Y") %></span>
+          <span class="text-semibold"><%= @installation.free_runner_upgrade_expires_at.strftime("%B %d, %Y") %></span>
         </span>
       <% end %>
-      <p class="mt-4 text-base/7 text-gray-600">
+      <p class="section-description">
         Speed up your builds with cutting edge gaming CPUs! We automatically route your jobs to premium machines. If
         capacity's full, you seamlessly fall back to standard runners with no extra wait time. You always get billed by
         the minute and for the runner type you're using.
       </p>
-      <div class="mt-6 flex items-center gap-4">
-        <h4 class="flex-none text-sm/6 font-semibold text-orange-600">What’s different</h4>
-        <div class="h-px flex-auto bg-gray-100"></div>
+      <div class="pricing-divider-section">
+        <h4 class="pricing-divider-title">What’s different</h4>
+        <div class="pricing-divider-line"></div>
       </div>
-      <ul role="list" class="overview-grid mt-4 text-sm/6 text-gray-600">
+      <ul role="list" class="overview-grid">
         <% [
           "Twice as fast",
           "One fifth the cost",
           "10x better price-performance",
           "100GB free cache storage",
         ].each do |text| %>
-          <li class="flex gap-3">
+          <li class="flex-gap-3">
             <%== part("components/icon", name: "hero-check", classes: "h-6 w-5 flex-none text-orange-600") %>
             <%= text %>
           </li>
         <% end %>
       </ul>
     </div>
-    <div class="-mt-2 p-2 lg:mt-0 lg:w-full lg:max-w-sm lg:shrink-0">
+    <div class="pricing-card-wrapper">
       <div
-        class="rounded-lg h-full bg-gray-50 py-10 text-center ring-1 ring-inset ring-gray-900/5 lg:flex lg:flex-col lg:justify-center"
+        class="pricing-card"
       >
-        <div class="mx-auto max-w-sm px-8 form-group">
-          <p class="flex items-baseline justify-center gap-2">
-            <span class="text-4xl font-semibold text-gray-900">Boost your builds</span>
+        <div class="github-settings-form-wrapper form-group">
+          <p class="github-settings-price-section">
+            <span class="pricing-headline">Boost your builds</span>
           </p>
           <%== part("components/form/toggle_form", name: "premium_runner_enabled", action: "#{@project.path}/github/#{@installation.ubid}", active: @installation.premium_runner_enabled?) %>
-          <div class="mt-6 text-sm/5 text-gray-600 italic">
-            <p class="font-semibold">1/5th the cost of GitHub runners</p>
+          <div class="pricing-note">
+            <p class="text-semibold">1/5th the cost of GitHub runners</p>
             <p>For example, 2 gaming vCPUs, 8GB of RAM, 80GB of NVMe storage comes at $0.0016/min.</p>
           </div>
         </div>
@@ -70,18 +70,18 @@
       <div class="card-body">
         <div class="flex-header-sm">
           <div>
-            <div class="flex items-center">
+            <div class="flex-center">
               <h3 class="subsection-heading">Ubicloud Transparent Cache</h3>
               <% if @installation.cache_enabled %>
-                <span class="rounded-full bg-orange-600/10 px-2.5 py-1 text-xs font-semibold text-orange-600 ml-2">
+                <span class="promo-badge">
                   Enabled
                 </span>
               <% end %>
             </div>
             <div class="description-text">
-              <p>Transparent cache allows you to use Ubicloud’s cache service without modifying your workflow files.
+              <p>Transparent cache allows you to use Ubicloud's cache service without modifying your workflow files.
                 Check out
-                <a href="https://www.ubicloud.com/docs/github-actions-integration/ubicloud-cache" class="text-orange-500 font-medium">our documentation</a>
+                <a href="https://www.ubicloud.com/docs/github-actions-integration/ubicloud-cache" class="text-emphasis">our documentation</a>
                 for information.</p>
             </div>
           </div>

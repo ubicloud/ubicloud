@@ -1,10 +1,10 @@
 <% if has_permission?("Firewall:edit", @firewall) %>
-  <div class="p-6">
+  <div class="section-padded">
     <%== part("components/rename_object", object: @firewall, type: "firewall") %>
   </div>
 <% end %>
 
-<div class="p-6">
+<div class="section-padded">
   <div class="flex-header">
     <div class="flex-title">
       <h3 class="section-heading">

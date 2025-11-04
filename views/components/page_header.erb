@@ -5,18 +5,18 @@
     <div>
       <nav class="sm:hidden" aria-label="Back">
         <a href="<%= back %>" class="flex-center breadcrumb-link no-underline">
-          <%== part("components/icon", name: "hero-chevron-left", classes: "icon-sm shrink-0 text-gray-400 -ml-1 mr-1") %>
+          <%== part("components/icon", name: "hero-chevron-left", classes: "breadcrumb-icon") %>
           Back
         </a>
       </nav>
       <nav class="breadcrumb hidden sm:flex" aria-label="Breadcrumb">
-        <ol role="list" class="flex-center gap-4">
+        <ol role="list" class="breadcrumb-list">
           <% breadcrumbs.each_with_index do |(name, url), index| %>
             <li>
               <div class="flex-center">
                 <% if index > 0 %>
-                  <span class="mr-4">
-                    <%== part("components/icon", name: "hero-chevron-right", classes: "icon-sm shrink-0 text-gray-400") %>
+                  <span class="breadcrumb-separator">
+                    <%== part("components/icon", name: "hero-chevron-right", classes: "breadcrumb-icon") %>
                   </span>
                 <% end %>
                 <a href="<%= url %>" class="breadcrumb-link"><%= name %></a>
