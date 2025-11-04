@@ -7,7 +7,7 @@ class Serializers::Invoice < Serializers::Base
     :free_inference_tokens_credit, :discount, :total, :status, :invoice_number, :billing_name,
     :billing_email, :billing_address, :billing_country, :billing_city, :billing_state, :billing_postal_code,
     :billing_in_eu_vat, :tax_id, :company_name, :note, :issuer_name, :issuer_address, :issuer_country,
-    :issuer_city, :issuer_state, :issuer_postal_code, :issuer_tax_id, :issuer_trade_id, :issuer_in_eu_vat,
+    :issuer_city, :issuer_state, :issuer_postal_code, :issuer_tax_id, :issuer_trade_id, :issuer_in_eu_vat, :bank_transfer_info,
     :vat_rate, :vat_amount, :vat_amount_eur, :vat_reversed, :items)
 
   ItemData = Data.define(:name, :description, :duration, :amount, :cost, :cost_humanized, :resource_type, :resource_family, :usage)
@@ -47,6 +47,7 @@ class Serializers::Invoice < Serializers::Base
       issuer_tax_id: inv.content.dig("issuer_info", "tax_id"),
       issuer_trade_id: inv.content.dig("issuer_info", "trade_id"),
       issuer_in_eu_vat: inv.content.dig("issuer_info", "in_eu_vat"),
+      bank_transfer_info: inv.content.dig("bank_transfer_info"),
       vat_rate: inv.content.dig("vat_info", "rate"),
       vat_amount: "$%0.02f" % (inv.content.dig("vat_info", "amount") || 0),
       vat_amount_eur: "€%0.02f" % ((inv.content.dig("vat_info", "amount") || 0) * (inv.content.dig("vat_info", "eur_rate") || 0)),
