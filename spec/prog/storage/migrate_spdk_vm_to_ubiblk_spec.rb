@@ -199,15 +199,15 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
       expect(vm).to receive(:strand).and_return(st)
       expect(st).to receive(:update).with(label: "wait")
       expect(vm.vm_storage_volumes.first).to receive(:update).with(use_bdev_ubi: false, vhost_block_backend_id: vm_host.vhost_block_backends.first.id, vring_workers: 1, spdk_installation_id: nil)
-      expect { prog.update_vm_model }.to hop("create_prep_json_file")
+      expect { prog.update_vm_model }.to hop("update_prep_json_file")
     end
   end
 
-  describe "#create_prep_json_file" do
-    it "creates the prep json file for proper cleanup of vm later" do
-      expect(vm).to receive(:params_json).and_return("{}")
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo tee /vm/#{vm.inhost_name}/prep.json >/dev/null", stdin: "{}")
-      expect { prog.create_prep_json_file }.to exit({"msg" => "Vm successfully migrated to ubiblk"})
+  describe "#update_prep_json_file" do
+    it "update the prep json file for proper cleanup of the vm later" do
+      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo cat /vm/#{vm.inhost_name}/prep.json").and_return({"storage_volumes" => [{"vhost_block_backend_version" => nil, "spdk_version" => "v.0.1.2"}]}.to_json)
+      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo tee /vm/#{vm.inhost_name}/prep.json >/dev/null", stdin: JSON.pretty_generate({"storage_volumes" => [{"vhost_block_backend_version" => "v0.2.1", "spdk_version" => nil}]}))
+      expect { prog.update_prep_json_file }.to exit({"msg" => "Vm successfully migrated to ubiblk"})
     end
   end
 end
