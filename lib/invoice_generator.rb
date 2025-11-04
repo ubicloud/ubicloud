@@ -33,6 +33,7 @@ class InvoiceGenerator
         })
 
         project_content[:bank_transfer_info] = if bi && bi.payment_methods.empty?
+          project_content[:due_date] = (Date.today + 30).to_s
           if is_eu
             {
               "Beneficiary" => "Ubicloud B.V.",

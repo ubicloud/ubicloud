@@ -632,6 +632,8 @@ RSpec.describe Clover, "billing" do
         text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
         expect(text).not_to include("We kindly request you to remit the amount to")
         expect(text).not_to include("Beneficiary Ubicloud B.V.")
+        expect(text).to include("Invoice date: #{invoice.created_at.strftime("%B %d, %Y")}")
+        expect(text).to include("Due date: #{invoice.created_at.strftime("%B %d, %Y")}")
       end
 
       it "show finalized invoice as PDF with bank transfer info" do
@@ -646,6 +648,8 @@ RSpec.describe Clover, "billing" do
         text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
         expect(text).to include("We kindly request you to remit the amount to")
         expect(text).to include("Beneficiary Ubicloud B.V.")
+        expect(text).to include("Invoice date: #{invoice.created_at.strftime("%B %d, %Y")}")
+        expect(text).to include("Due date: #{(invoice.created_at + 30 * 24 * 60 * 60).strftime("%B %d, %Y")}")
       end
 
       it "show finalized invoice as PDF with old issuer info" do

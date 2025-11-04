@@ -240,7 +240,7 @@ class Invoice < Sequel::Model
 
     # Row 2, Right Column: Invoice dates and note
     pdf.bounding_box([right_column_x, row_y], width: column_width) do
-      right_data = [["Invoice date:", data.date], ["Due date:", data.date]]
+      right_data = [["Invoice date:", data.date], ["Due date:", data.due_date]]
       right_data << ["Note:", data.note] if data.note
       pdf.table(right_data, position: :right) do
         style(row(0..2).columns(0..2), padding: [2, 5, 2, 5], borders: [])

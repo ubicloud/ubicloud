@@ -3,7 +3,7 @@
 require "countries"
 
 class Serializers::Invoice < Serializers::Base
-  InvoiceData = Data.define(:ubid, :path, :name, :date, :begin_time, :end_time, :subtotal, :credit,
+  InvoiceData = Data.define(:ubid, :path, :name, :date, :due_date, :begin_time, :end_time, :subtotal, :credit,
     :free_inference_tokens_credit, :discount, :total, :status, :invoice_number, :billing_name,
     :billing_email, :billing_address, :billing_country, :billing_city, :billing_state, :billing_postal_code,
     :billing_in_eu_vat, :tax_id, :company_name, :note, :issuer_name, :issuer_address, :issuer_country,
@@ -18,6 +18,7 @@ class Serializers::Invoice < Serializers::Base
       path: inv.path,
       name: inv.name,
       date: inv.created_at.strftime("%B %d, %Y"),
+      due_date: (inv.content["due_date"] ? Date.parse(inv.content["due_date"]) : inv.created_at).strftime("%B %d, %Y"),
       begin_time: inv.begin_time.strftime("%b %d, %Y"),
       end_time: inv.end_time.strftime("%b %d, %Y"),
       subtotal: "$%0.02f" % inv.content["subtotal"],
