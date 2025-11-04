@@ -31,6 +31,29 @@ class InvoiceGenerator
           "ubid" => bi.ubid,
           "in_eu_vat" => !!is_eu
         })
+
+        project_content[:bank_transfer_info] = if bi && bi.payment_methods.empty?
+          if is_eu
+            {
+              "Beneficiary" => "Ubicloud B.V.",
+              "IBAN" => "NL30REVO6759811127",
+              "BIC" => "REVONL22",
+              "Intermediary BIC" => "CHASGB2L",
+              "Beneficiary address" => "Turfschip, 267, 1186XK, Amstelveen, Netherlands",
+              "Bank/Payment institution" => "Revolut Bank UAB",
+              "Bank address" => "Barbara Strozzilaan 201, 1083 HN, Amsterdam, Netherlands"
+            }
+          else
+            {
+              "Beneficiary" => "Ubicloud Inc.",
+              "Beneficiary address" => "310 Santa Ana Ave, San Francisco, CA 94127",
+              "ABA/Routing number" => "121145349",
+              "Account number" => "974842159957503",
+              "Bank/Payment institution" => "Column NA - Brex",
+              "Bank address" => "1 Letterman Drive Building A, Suite A4-700, San Francisco, CA 94129"
+            }
+          end
+        end
         # Invoices are issued by Ubicloud Inc. for non-EU customers without VAT applied.
         # Invoices are issued by Ubicloud B.V. for EU customers.
         #   - If the customer has provided a VAT number from the Netherlands, we charge 21% VAT.
@@ -185,7 +208,7 @@ class InvoiceGenerator
   end
 
   def active_billing_records
-    active_billing_records = BillingRecord.eager(project: [:billing_info, :invoices])
+    active_billing_records = BillingRecord.eager(project: [:invoices, billing_info: :payment_methods])
       .where { |br| Sequel.pg_range(br.span).overlaps(Sequel.pg_range(@begin_time...@end_time)) }
     active_billing_records = active_billing_records.where(project_id: @project_ids) unless @project_ids.empty?
     active_billing_records.all.map do |br|
