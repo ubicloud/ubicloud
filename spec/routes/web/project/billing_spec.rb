@@ -618,6 +618,36 @@ RSpec.describe Clover, "billing" do
         expect(text).to include("VAT subject to reverse charge")
       end
 
+      it "show finalized invoice as PDF without bank transfer info" do
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "DE"}, "metadata" => {"tax_id" => "123123123"}}).at_least(:once)
+        expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return(stripe_object("card" => {"brand" => "visa"}))
+
+        bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
+
+        visit "#{project.path}/billing"
+        click_link invoice.name
+
+        expect(page.status_code).to eq(200)
+        text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
+        expect(text).not_to include("We kindly request you to remit the amount to")
+        expect(text).not_to include("Beneficiary Ubicloud B.V.")
+      end
+
+      it "show finalized invoice as PDF with bank transfer info" do
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "DE"}, "metadata" => {"tax_id" => "123123123"}}).at_least(:once)
+        bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
+
+        visit "#{project.path}/billing"
+        click_link invoice.name
+
+        expect(page.status_code).to eq(200)
+        text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
+        expect(text).to include("We kindly request you to remit the amount to")
+        expect(text).to include("Beneficiary Ubicloud B.V.")
+      end
+
       it "show finalized invoice as PDF with old issuer info" do
         expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {"tax_id" => "123123123"}}).at_least(:once)
         bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))

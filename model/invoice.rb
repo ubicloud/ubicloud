@@ -286,6 +286,20 @@ class Invoice < Sequel::Model
       style(column(1), align: :right)
     end
 
+    if data.bank_transfer_info
+      pdf.move_down 60
+      bank_transfer_info = [
+        [{content: "We kindly request you to remit the amount to:", colspan: 2, font_style: :semibold}],
+        *data.bank_transfer_info.to_a
+      ]
+      pdf.table(bank_transfer_info, position: :left) do
+        style(row(0..-1).columns(0..1), padding: [2, 5, 2, 5], borders: [])
+        style(column(0), align: :right, font_style: :semibold, text_color: dark_gray)
+        style(column(1), align: :left)
+        style(row(0), align: :left)
+      end
+    end
+
     pdf.render
   end
 
