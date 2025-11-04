@@ -95,7 +95,7 @@ end
                       ) %>
                     </td>
                   <% end %>
-                  <td class="py-4 px-3 text-right">
+                  <td class="access-control-cell">
                     <%== hidden_inputs("aces[][ubid]" => ubid) %>
                     <%== part("components/form/checkbox", id_prefix: "ace-#{ubid}-", name: "aces[][deleted]", options: [%w[true Delete]]) %>
                   </td>
@@ -106,14 +106,14 @@ end
                     </td>
                   <% end %>
                   <% if edit_perm %>
-                    <td class="py-4 px-3 text-right"></td>
+                    <td class="access-control-cell"></td>
                   <% end %>
                 <% end %>
               </tr>
             <% end %>
             <% if @aces.count == 1 %>
               <tr class="group-[&:has(tr:nth-child(n+3))]:hidden">
-                <td colspan="3" class="py-4 px-8">
+                <td colspan="3" class="access-control-empty-cell">
                   <p class="spaced-bottom-md">Currently, this token has no access to the project.</p>
                   <p>You should grant the token the access you think the token should have. Be aware that the token can
                     never have more access to the project than your account has. Each access control entry has a single
@@ -126,7 +126,7 @@ end
           </tbody>
         </table>
         <% if edit_perm %>
-          <div class="px-3 py-4 flex justify-between">
+          <div class="access-control-footer">
             <%== part("components/button", icon: "hero-plus", text: "New Access Control Entry", attributes: { id: "new-ace-btn" }) %>
             <%== part("components/button", text: "Save All") %>
           </div>

@@ -11,8 +11,8 @@
         <div class="github-installation-dropdown" role="menu" tabindex="-1">
           #{postgres_flavors.values.map do
             <<-ITEM
-            <div class="py-1 transition-colors" role="none">
-              <a href="#{@project.path}/postgres/create?flavor=#{it.name}" class="block px-4 py-3 ">
+            <div class="postgres-menu-item" role="none">
+              <a href="#{@project.path}/postgres/create?flavor=#{it.name}" class="postgres-menu-link">
                 <h3>#{it.title}</h3>
                 <p class="mt-1 help-text">#{it.description}</p>
               </a>

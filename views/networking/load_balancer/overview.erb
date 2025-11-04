@@ -22,12 +22,12 @@ data << ["SSL Certificate Status", @lb.active_cert&.cert ? "Available" : "Creati
 
 <%== part("components/kv_data_card", data:) %>
 <% if @lb.cert_enabled %>
-  <div class="p-1 overflow-hidden rounded-lg with-shadow border border-gray-100 bg-white border-b-gray-200 content-section-spaced sm:flex sm:items-center">
+  <div class="lb-cert-instructions with-shadow content-section-spaced">
     <div>
       <h3>How to fetch the SSL certificate?</h3>
       <div class="description-text">
         <p>Run the following commands on your attached virtual machines:</p>
-          <div class="px-4 py-3">
+          <div class="lb-cert-code-block">
             <p><code>sudo curl [FD00:0B1C:100D:5AFE:CE::]/load-balancer/cert.pem</code></p>
             <p><code>sudo curl [FD00:0B1C:100D:5AFE:CE::]/load-balancer/key.pem</code></p>
           </div>

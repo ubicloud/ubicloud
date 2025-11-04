@@ -333,7 +333,7 @@ end
               <th scope="col" class="table-header-cell-left">Name</th>
               <th scope="col" class="table-header-cell-left">Limit</th>
               <th scope="col" class="table-header-cell-left">E-mail</th>
-              <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-4">
+              <th scope="col" class="billing-table-header-cell">
                 <span class="sr-only">Remove</span>
               </th>
             </tr>
@@ -344,7 +344,7 @@ end
                 <td class="table-cell-primary" scope="row"><%= alert.name %></td>
                 <td class="table-cell-primary" scope="row"><%= alert.limit %></td>
                 <td class="table-cell-primary" scope="row"><%= alert.user.email %></td>
-                <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
+                <td class="billing-table-cell">
                   <%== part(
                     "components/delete_button",
                     text: "Remove",

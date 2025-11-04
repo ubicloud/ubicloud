@@ -3,13 +3,13 @@
 <div class="page-header">
   <% unless breadcrumbs.empty? %>
     <div>
-      <nav class="sm:hidden" aria-label="Back">
+      <nav class="page-nav-back" aria-label="Back">
         <a href="<%= back %>" class="flex-center breadcrumb-link no-underline">
           <%== part("components/icon", name: "hero-chevron-left", classes: "breadcrumb-icon") %>
           Back
         </a>
       </nav>
-      <nav class="breadcrumb hidden sm:flex" aria-label="Breadcrumb">
+      <nav class="breadcrumb page-nav-breadcrumb" aria-label="Breadcrumb">
         <ol role="list" class="breadcrumb-list">
           <% breadcrumbs.each_with_index do |(name, url), index| %>
             <li>

@@ -18,14 +18,14 @@ is_content_array = options[0][1].is_a?(Array) %>
             <%== html_attrs(**attributes, **opt_attrs) %>
           >
           <% if is_content_array %>
-            <span class="radio-small-card justify-between p-4">
+            <span class="radio-small-card radio-card-content">
               <span class="flex-col">
                 <span class="radio-card-label"><%= opt_text[0] %></span>
                 <span class="text-sm opacity-80"><span class="block sm:inline"><%= opt_text[1] %></span></span>
               </span>
-              <span class="spaced-top-sm flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
+              <span class="radio-card-pricing">
                 <span class="font-medium"><%= opt_text[2] %></span>
-                <span class="ml-1 opacity-50 sm:ml-0"><%= opt_text[3] %></span>
+                <span class="radio-card-price-amount opacity-50"><%= opt_text[3] %></span>
               </span>
             </span>
           <% else %>

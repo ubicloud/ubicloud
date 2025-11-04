@@ -13,7 +13,7 @@
 
 <main>
   <div class="split-view-container">
-    <div class="flex-none pr-8">
+    <div class="split-view-sidebar">
       <aside class="account-sidebar">
         <nav id="<%= type %>-submenu" class="form-group">
           <% tabs.each do |label, page, icon| %>
@@ -21,7 +21,7 @@
                url_class = "sidebar-item-active"
                icon_class = "icon-orange"
        else
-               url_class = "border-transparent text-primary transition-colors hover:text-primary group flex items-center border-l-4 px-3 py-2 text-sm font-medium"
+               url_class = "sidebar-nav-link-inactive group"
                icon_class = "text-muted group-transition-colors"
             end %>
             <a href="<%= "#{path(object)}/#{page}" %>" class="<%= url_class %>">
@@ -32,7 +32,7 @@
         </nav>
       </aside>
     </div>
-    <div class="flex-auto pl-8">
+    <div class="split-view-content">
       <div class="divide-y">
         <div class="pb-6 flex-between">
           <div>

@@ -1,12 +1,12 @@
 <%# locals: (content:) %>
 <div class="revealable-content group flex-grow">
-  <div class="shadow-content justify-between flex-items-center flex-spaced group-[.active]:hidden">
+  <div class="revealable-shadow-content shadow-content">
     ●●●●●●
     <img src="/icons/hero-eye.svg" width="18px" class="revealable-button inline-container cursor-pointer ms1"/>
   </div>
   <div class="revealed-content">
-    <div class="flex-spaced items-center justify-between">
-      <div class="revealed-content-text whitespace-pre-line"><%= content %></div>
+    <div class="revealed-content-wrapper flex-spaced">
+      <div class="revealed-content-text"><%= content %></div>
       <img src="/icons/hero-eye-slash.svg" width="18px" class="revealable-button inline-container cursor-pointer ms1"/>
     </div>
   </div>

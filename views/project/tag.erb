@@ -151,7 +151,7 @@ current_members.sort! %>
               <% add_groups.each do |name, available_to_add| %>
                 <% name = name["label"] if name.is_a?(Hash) %>
                 <tr>
-                  <th colspan="2" class="text-left px-3 py-3.5 bg-gray-50"><%= name %></th>
+                  <th colspan="2" class="tag-group-header"><%= name %></th>
                 </tr>
                 <% available_to_add.each do |label, ubid| %>
                   <tr id="<%= ubid %>" class="cursor-pointer">

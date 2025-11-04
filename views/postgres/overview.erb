@@ -56,7 +56,7 @@ vm = @pg.representative_server.vm
     </div>
   </div>
   <% if @pg.display_state != "creating" %>
-    <div class="chart-grid border-t-0">
+    <div class="chart-grid chart-grid-no-border-top">
       <% Metrics::POSTGRES_METRICS.slice(:cpu_usage, :disk_usage).each do |key, metric| %>
         <div class="metric-card">
           <h4 class="chart-title"><%= metric.name %></h4>

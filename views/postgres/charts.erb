@@ -20,7 +20,7 @@
       </select>
       <%== part("components/button", attributes: {id: "refresh-button"}, text: "  Refresh", type: "primary", icon: "hero-refresh") %>
     </div>
-    <div class="chart-grid border-t-0">
+    <div class="chart-grid chart-grid-no-border-top">
       <% Metrics::POSTGRES_METRICS.each do |key, metric| %>
         <div class="metric-card">
           <h4 class="chart-title"><%= metric.name %></h4>

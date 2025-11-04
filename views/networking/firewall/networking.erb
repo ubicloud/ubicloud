@@ -12,7 +12,7 @@ viewable_subnet_map = dataset_authorize(@firewall.private_subnets_dataset, "Priv
 firewall_path = path(@firewall)
 edit_perm = has_permission?("Firewall:edit", @firewall) %>
 
-<div class="p-6 grid gap-6">
+<div class="firewall-rules-container">
   <div class="flex-header">
     <div class="flex-title">
       <h3>

@@ -18,7 +18,7 @@
       ["IPv6", @vm.ip6, { copyable: true }],
       [
         "SSH Command",
-        "<span class='bg-slate-100 text-rose-500 text-code px-2 py-1 rounded'>#{h("ssh -i <PRIVATE_KEY_PATH> #{@vm.unix_user}@#{@vm.ip4 || @vm.ip6}")}</span>",
+        "<span class='inline-code-snippet'>#{h("ssh -i <PRIVATE_KEY_PATH> #{@vm.unix_user}@#{@vm.ip4 || @vm.ip6}")}</span>",
         { escape: false }
       ],
       ["Private IPv4", @vm.private_ipv4, { copyable: true }],

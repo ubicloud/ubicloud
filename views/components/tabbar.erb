@@ -1,11 +1,14 @@
 <%# locals: (tabs:) %>
-<div class="sm:block spaced-bottom-lg">
+<div class="tabbar-responsive spaced-bottom-lg">
   <nav class="tabbar" aria-label="Tabs">
     <% tabs.each_with_index do |(label, url, active), i| %>
       <% active = (request.path == url) if active.nil? %>
+      <% first_class = (i == 0) ? "tab-item-first" : "" %>
+      <% last_class = (i == tabs.size - 1) ? "tab-item-last" : "" %>
+      <% active_class = active ? "tab-active" : "tab-inactive" %>
       <a
         href="<%= url %>"
-        class="tab-item <%= (i == 0) ? "rounded-l-lg" : ((i == tabs.size - 1) ? "rounded-r-lg" : "") %> <%= active ? "tab-active" : "tab-inactive" %>"
+        class="tab-item <%= first_class %> <%= last_class %> <%= active_class %>"
       >
         <span><%= label %></span>
       </a>
