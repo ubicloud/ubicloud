@@ -281,7 +281,7 @@ RSpec.describe Clover, "load balancer" do
           "SSL Certificate Status", "Available"
         ]
 
-        lb.update(health_check_protocol: "tcp")
+        lb.update(health_check_protocol: "tcp", stack: "ipv4")
         page.refresh
         expect(page.all("dt,dd").map(&:text)).to eq [
           "ID", lb.ubid,
@@ -289,7 +289,7 @@ RSpec.describe Clover, "load balancer" do
           "Connection String", "dummy-lb-3.#{ps.ubid[-5...]}.lb.ubicloud.com",
           "Private Subnet", "dummy-ps-1",
           "Algorithm", "Hash Based",
-          "Stack", "dual",
+          "Stack", "IPv4",
           "Load Balancer Port", "80",
           "Application Port", "8000",
           "Health Check Protocol", "TCP",

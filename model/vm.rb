@@ -51,7 +51,12 @@ class Vm < Sequel::Model
   end
 
   def load_balancer_state
-    load_balancer_vm_ports.first&.state
+    return nil unless load_balancer
+    if load_balancer.stack == "dual"
+      [load_balancer_vm_ports.find { |vm_port| vm_port.stack == "ipv4" }.state, load_balancer_vm_ports.find { |vm_port| vm_port.stack == "ipv6" }.state]
+    else
+      [load_balancer_vm_ports.first.state]
+    end
   end
 
   def path
