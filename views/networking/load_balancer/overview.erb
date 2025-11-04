@@ -4,7 +4,7 @@
   ["Connection String", @lb.hostname, { copyable: true }],
   [
     "Private Subnet",
-    "<a href='#{path(@lb.private_subnet)}' class='text-rose-500 hover:underline'>#{@lb.private_subnet.name}</a>",
+    "<a href='#{path(@lb.private_subnet)}' class='link-error'>#{@lb.private_subnet.name}</a>",
     { escape: false }
   ],
   ["Algorithm", (@lb.algorithm == "round_robin") ? "Round Robin" : "Hash Based"],

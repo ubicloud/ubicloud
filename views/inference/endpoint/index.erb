@@ -25,9 +25,9 @@ MSG
 
     curl_snippet = <<-CURL
 curl #{ie.load_balancer.health_check_url(path:)} \\
-  -H <span class="text-green-400">"Content-Type: application/json"</span> \\
-  -H <span class="text-green-400">"Authorization: Bearer <span class="text-orange-500">$INFERENCE_API_KEY</span>"</span> \\
-  -d <span class="text-green-400">'{
+  -H <span class="syntax-string">"Content-Type: application/json"</span> \\
+  -H <span class="syntax-string">"Authorization: Bearer <span class="syntax-variable">$INFERENCE_API_KEY</span>"</span> \\
+  -d <span class="syntax-string">'{
     "model": "#{ie.model_name}",
     #{curl_message}   }'</span>
   CURL
@@ -39,7 +39,7 @@ curl #{ie.load_balancer.health_check_url(path:)} \\
         <h3 class="section-label">Model card</h3>
         <div class="icon-text-pair">
           <%if hf_model = ie.tags["hf_model"]%>
-          <a target="_blank" rel="noreferrer" href="https://huggingface.co/<%= hf_model %>" class="text-orange-600 line-clamp-2">🤗 <%= hf_model %></a>
+          <a target="_blank" rel="noreferrer" href="https://huggingface.co/<%= hf_model %>" class="link-huggingface">🤗 <%= hf_model %></a>
           <%else%>
           <p class="text-muted">Not available</p>
           <%end%>

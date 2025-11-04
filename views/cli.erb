@@ -36,7 +36,7 @@ end %>
 
   <% form(action: request.path_info, method: :post) do %>
     <div class="header-with-actions">
-      <div class="text-code flex-1">
+      <div class="text-code flex-grow">
         <% if multi %>
           <%== part("components/form/textarea", name: "multi-cli", attributes: {cols: 80, rows: 6, placeholder: "Multiple commands, one per line", autofocus: true, required: true}) %>
         <% else %>

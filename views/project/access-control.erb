@@ -55,7 +55,7 @@ end
     <% form(action: form_action, method: :post, id: "access-control-form") do %>
       <div class="table-card">
         <table id="access-control-entries" class="min-w-full divide-y divide-gray-300 group">
-          <thead class="bg-gray-50 <% if @token %> hidden group-[&:has(tr:nth-child(n+3))]:table-header-group <% end %>">
+          <thead class="table-header-conditional <% if @token %> hidden group-[&:has(tr:nth-child(n+3))]:table-header-group <% end %>">
             <tr>
               <% table_headers.each do |type| %>
                 <th scope="col">

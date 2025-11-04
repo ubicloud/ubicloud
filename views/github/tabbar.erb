@@ -8,7 +8,7 @@
     [@page_title, "#"]
   ],
   right_items: [<<-DROPDOWN]
-    <div class="group dropdown relative inline-block text-left">
+    <div class="group dropdown dropdown-inline">
       <div>#{part("components/button", text: @installation.name, icon: "github", right_icon: "hero-chevron-down")}</div>
       <div class="github-installation-dropdown" role="menu" tabindex="-1">
         <div>
@@ -27,7 +27,7 @@
           <div class="transition-colors">
             <a href="#{@project.path}/github/create" class="dropdown-item">
               <div class="installation-placeholder">
-                #{part("components/icon", name: "github", classes: "size-4 text-white")}
+                #{part("components/icon", name: "github", classes: "icon-sm icon-white")}
               </div>
               Connect New Account
             </a>

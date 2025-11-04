@@ -5,7 +5,7 @@
     "components/page_header",
     breadcrumbs: [%w[Projects /project], [@project.name, @project.path], ["PostgreSQL Databases", "#"]],
     right_items: [<<-DROPDOWN]
-      <div class="group dropdown relative inline-block text-left">
+      <div class="group dropdown dropdown-inline">
         <div>#{part("components/button", text: "Create PostgreSQL Database", right_icon: "hero-chevron-down")}
         </div>
         <div class="github-installation-dropdown" role="menu" tabindex="-1">

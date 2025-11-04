@@ -13,7 +13,7 @@
             <% form(action: rodauth.change_login_path, method: :post) do %>
               <div class="form-grid-6">
                 <div class="form-field-small">
-                  <%== part("components/form/text", label: "Current Email", value: current_account.email, extra_class: "bg-gray-50 text-muted ring-gray-200 ", attributes: {disabled: true}) %>
+                  <%== part("components/form/text", label: "Current Email", value: current_account.email, extra_class: "form-field-disabled", attributes: {disabled: true}) %>
                 </div>
                 <div class="form-field-small">
                   <%== part("components/rodauth/login_field", label: "New Email Address") %>

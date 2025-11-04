@@ -6,16 +6,16 @@
     >
       <%== part("components/icon", name: icon, classes: "text-white shrink-0") %>
       <%= name %>
-      <div class="ml-auto shrink-0 group-[.active]:rotate-90">
+      <div class="ml-auto shrink-0 sidebar-chevron-rotate">
         <%== part("components/icon", name: "hero-chevron-right") %>
       </div>
     </button>
-    <ul class="spaced-top-sm px-2 hidden group-[.active]:block form-group">
+    <ul class="spaced-top-sm sidebar-submenu form-group">
       <% items.compact.each do |item_name, item_url, item_is_active| %>
         <li>
           <a
             href="<%= item_url %>"
-            class="<%= item_is_active ? "bg-orange-700 text-white" : "text-orange-100 hover:text-white" %> block rounded-md py-2 pr-2 pl-9 text-sm"
+            class="sidebar-nav-item <%= item_is_active ? "sidebar-nav-item-active" : "sidebar-nav-item-inactive" %>"
           >
             <%= item_name %>
           </a>

@@ -1,6 +1,6 @@
 <%# locals: (numerator:, denominator:, title:) %>
 <% progress = [100, denominator.zero? ? 100 : 100 * numerator / denominator].min
-color = (progress < 60) ? "bg-blue-500" : (progress < 80) ? "bg-yellow-500" : "bg-red-500" %>
+color = (progress < 60) ? "progress-low" : (progress < 80) ? "progress-medium" : "progress-high" %>
 
 <div class="progress-bar-header">
   <span class="progress-title"><%= title %></span>

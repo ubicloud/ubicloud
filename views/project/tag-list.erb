@@ -70,7 +70,7 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
             <% @tags.each do |tag| %>
               <% editable = !(@tag_type == "subject" && tag.name == "Admin") && modification_allowed %>
               <tr id="<%= tag.ubid %>">
-                <td class="pl-4 pr-3 sm:pl-6 py-4 whitespace-nowrap text-sm text-muted">
+                <td class="table-cell-responsive text-muted">
                   <%= tag.name %>
                 </td>
                 <td class="table-cell-actions">

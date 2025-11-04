@@ -580,9 +580,6 @@ body {
   margin-block: auto;
 }
 
-.-m-1 {
-  margin: calc(-1 * var(--spacing-1));
-}
 
 .-m-1\.5 {
   margin: calc(-1 * var(--spacing-1-5));
@@ -632,13 +629,7 @@ body {
   margin-top: auto;
 }
 
-.-mt-2 {
-  margin-top: calc(-1 * var(--spacing-2));
-}
 
-.-mt-6 {
-  margin-top: calc(-1 * var(--spacing-6));
-}
 
 .mb-0\.5 {
   margin-bottom: var(--spacing-0-5);
@@ -696,9 +687,6 @@ body {
   margin-left: auto;
 }
 
-.-ml-1 {
-  margin-left: calc(-1 * var(--spacing-1));
-}
 
 .mr-1 {
   margin-right: var(--spacing-1);
@@ -720,21 +708,9 @@ body {
   margin-right: var(--spacing-16);
 }
 
-.-mr-1 {
-  margin-right: calc(-1 * var(--spacing-1));
-}
 
-.-mx-2 {
-  margin-inline: calc(-1 * var(--spacing-2));
-}
 
-.-mx-6 {
-  margin-inline: calc(-1 * var(--spacing-6));
-}
 
-.-mx-10 {
-  margin-inline: -2.5rem;
-}
 
 .mt-n-6 {
   margin-top: -1.5rem;
@@ -1489,9 +1465,6 @@ body {
 
 
 
-.-outline-offset-1 {
-  outline-offset: -1px;
-}
 
 /* ========================================
    SHADOWS
@@ -1588,9 +1561,6 @@ body {
   right: 0;
 }
 
-.-right-2 {
-  right: calc(-1 * var(--spacing-2));
-}
 
 .right-6 {
   right: var(--spacing-6);
@@ -1657,9 +1627,6 @@ body {
   --transform-translate-x: 0;
 }
 
-.-translate-x-full {
-  transform: translateX(-100%);
-}
 
 .translate-y-2 {
   transform: translateY(var(--spacing-2));
@@ -1824,9 +1791,6 @@ body {
   margin-bottom: var(--spacing-2);
 }
 
-.form-input,
-.form-select,
-
 .form-checkbox {
   width: 1rem;
   height: 1rem;
@@ -1971,30 +1935,10 @@ body {
   line-height: 1.25rem;
 }
 
-.state-label-gray {
-  background-color: var(--gray-100);
-  color: var(--gray-700);
-}
 
-.state-label-green {
-  background-color: rgb(22 163 74 / 0.1);
-  color: var(--green-600);
-}
 
-.state-label-red {
-  background-color: var(--red-100);
-  color: var(--red-700);
-}
 
-.state-label-yellow {
-  background-color: var(--yellow-100);
-  color: var(--yellow-800);
-}
 
-.state-label-orange {
-  background-color: var(--orange-50);
-  color: var(--orange-700);
-}
 
 /* ========================================
    COMPONENT: NAVIGATION
@@ -3646,12 +3590,6 @@ body {
 }
 
 /* Horizontal Rule / Divider */
-.hr-divider {
-  height: 1px;
-  margin-bottom: var(--spacing-8);
-  background-color: var(--gray-200);
-  border: 0;
-}
 
 /* Table Backgrounds */
 .table-header-bg {
@@ -3751,16 +3689,6 @@ body {
   font-style: italic;
 }
 
-.object-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--gray-900);
-
-  @media (min-width: 640px) {
-    font-size: 1.875rem;
-    letter-spacing: -0.025em;
-  }
-}
 
 .empty-state-heading {
   font-size: 1.5rem;
@@ -3932,11 +3860,6 @@ body {
   margin-left: var(--spacing-2);
 }
 
-.scrollable-container {
-  width: 100%;
-  max-height: 16rem;
-  overflow-y: auto;
-}
 
 /* ========================================
    FINAL SEMANTIC CLASSES - DROPDOWNS
@@ -5363,15 +5286,6 @@ a {
 
     &:hover {
       color: var(--orange-700);
-    }
-  }
-
-  &.link-secondary {
-    color: var(--gray-600);
-    transition: var(--transition-colors);
-
-    &:hover {
-      color: var(--gray-700);
     }
   }
 }

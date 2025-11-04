@@ -1,4 +1,4 @@
-<div class="group dropdown inline-block w-full">
+<div class="group dropdown dropdown-inline-full">
   <div>
     <button
       type="button"
@@ -15,7 +15,7 @@
     role="menu"
     tabindex="-1"
   >
-    <div class="py-1 max-h-64 overflow-y-auto" role="none">
+    <div class="project-switcher-menu" role="none">
       <% current_account.projects.each do |p| %>
         <a
           href="<%= p.path %>/dashboard"
@@ -25,7 +25,7 @@
         ><%= p.name %></a>
       <% end %>
     </div>
-    <div class="py-1" role="none">
+    <div class="project-switcher-actions" role="none">
       <a
         href="/project/create"
         class="sidebar-project-menu-create group"

@@ -31,12 +31,12 @@
                 <td class="table-cell-normal text-muted">
                   <div><%= entry.scope %></div>
                 </td>
-                <td class="table-cell-normal text-muted whitespace-nowrap">
+                <td class="table-cell-normal table-cell-nowrap text-muted">
                   <div class="cache-size-badge" title="<%= entry.size %> bytes">
                     <%= humanize_size(entry.size) %>
                   </div>
                 </td>
-                <td class="table-cell-normal text-muted whitespace-nowrap">
+                <td class="table-cell-normal table-cell-nowrap text-muted">
                   <% if entry.last_accessed_at %>
                     <div>Last used</div>
                     <div title="<%= entry.last_accessed_at.strftime("%Y-%m-%d %H:%M UTC") %>"> <%= humanize_time(entry.last_accessed_at) %></div>

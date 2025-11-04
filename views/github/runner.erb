@@ -36,7 +36,7 @@
               [<<~CONTENT, {escape: false}],
                 <div class="flex gap-1">
                   <div class="badge-neutral">#{runner.label_data["vcpus"]} vCPU</div>
-                  <div class="runner-label-badge"  # Keep dynamic(family == "premium") ? "bg-orange-100 text-orange-600" : "bg-slate-100 text-slate-800"}">#{family}</div>
+                  <div class="runner-label-badge #{(family == "premium") ? "badge-premium" : "badge-standard"}">#{family}</div>
                   <div class="badge-neutral">#{runner.label_data["arch"]}</div>
                   <div class="badge-neutral">#{os}</div>
                 </div>
