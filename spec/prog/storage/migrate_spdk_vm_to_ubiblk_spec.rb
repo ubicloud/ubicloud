@@ -182,22 +182,12 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
       unit_name = "#{vm.inhost_name}-0-storage.service"
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo systemctl start #{unit_name}")
       expect(prog).to receive(:write_kek_pipe)
-      expect { prog.start_ubiblk_systemd_unit }.to hop("start_vm")
-    end
-  end
-
-  describe "#start_vm" do
-    it "starts the vm" do
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo systemctl start #{vm.inhost_name}")
-      expect { prog.start_vm }.to hop("update_vm_model")
+      expect { prog.start_ubiblk_systemd_unit }.to hop("update_vm_model")
     end
   end
 
   describe "#update_vm_model" do
     it "updates the vm to be identified as a ubiblk vm" do
-      st = instance_double(Strand)
-      expect(vm).to receive(:strand).and_return(st)
-      expect(st).to receive(:update).with(label: "wait")
       expect(vm.vm_storage_volumes.first).to receive(:update).with(use_bdev_ubi: false, vhost_block_backend_id: vm_host.vhost_block_backends.first.id, vring_workers: 1, spdk_installation_id: nil)
       expect { prog.update_vm_model }.to hop("update_prep_json_file")
     end
@@ -207,7 +197,17 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
     it "update the prep json file for proper cleanup of the vm later" do
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo cat /vm/#{vm.inhost_name}/prep.json").and_return({"storage_volumes" => [{"vhost_block_backend_version" => nil, "spdk_version" => "v.0.1.2"}]}.to_json)
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo tee /vm/#{vm.inhost_name}/prep.json >/dev/null", stdin: JSON.pretty_generate({"storage_volumes" => [{"vhost_block_backend_version" => "v0.2.1", "spdk_version" => nil}]}))
-      expect { prog.update_prep_json_file }.to exit({"msg" => "Vm successfully migrated to ubiblk"})
+      expect { prog.update_prep_json_file }.to hop("start_vm")
+    end
+  end
+
+  describe "#start_vm" do
+    it "starts the vm and exits" do
+      st = instance_double(Strand)
+      expect(vm).to receive(:strand).and_return(st)
+      expect(st).to receive(:update).with(label: "wait")
+      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo systemctl start #{vm.inhost_name}")
+      expect { prog.start_vm }.to exit({"msg" => "Vm successfully migrated to ubiblk"})
     end
   end
 end
