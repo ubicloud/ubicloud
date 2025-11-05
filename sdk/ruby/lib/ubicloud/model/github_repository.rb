@@ -54,6 +54,11 @@ module Ubicloud
       GithubCacheEntry.new(adapter, id:, installation_name:, repository_name: name).destroy
     end
 
+    # Remove all cache entries for the repository.
+    def remove_all_cache_entries
+      adapter.delete(_path("/cache"))
+    end
+
     private
 
     def load_object_info_from_id(missing: :raise)

@@ -157,6 +157,16 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - GitHub
+    delete:
+      operationId: deleteAllGithubCacheEntries
+      summary: Delete all cache entries for a GitHub repository for an installation in the project
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - GitHub
   '/project/{project_id}/github/{github_installation_reference}/repository/{github_repository_reference}/cache/{github_cache_entry_id}':
     parameters:
       - $ref: '#/components/parameters/project_id'

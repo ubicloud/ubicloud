@@ -330,5 +330,28 @@ RSpec.describe Clover, "github" do
       page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
       expect(page.status_code).to eq(204)
     end
+
+    it "can delete all cache entries for a repository" do
+      entry1 = create_cache_entry(key: "cache-1")
+      entry2 = create_cache_entry(key: "cache-2")
+      entry3 = create_cache_entry(key: "cache-3")
+      client = instance_double(Aws::S3::Client)
+      expect(Aws::S3::Client).to receive(:new).and_return(client).exactly(3).times
+      expect(client).to receive(:delete_object).with(bucket: repository.bucket_name, key: entry1.blob_key)
+      expect(client).to receive(:delete_object).with(bucket: repository.bucket_name, key: entry2.blob_key)
+      expect(client).to receive(:delete_object).with(bucket: repository.bucket_name, key: entry3.blob_key)
+
+      visit "#{project.path}/github/#{installation.ubid}/cache"
+
+      expect(page.status_code).to eq(200)
+      expect(page).to have_content "3 cache entries"
+
+      btn = find ".cache-group-row[data-repository='#{repository.ubid}'] .delete-btn"
+      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+      expect(page.status_code).to eq(204)
+
+      visit "#{project.path}/github/#{installation.ubid}/cache"
+      expect(page).to have_flash_notice("All cache entries deleted.")
+    end
   end
 end
