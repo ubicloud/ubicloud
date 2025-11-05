@@ -330,44 +330,72 @@ RSpec.describe Vm do
     expect(JSON.parse(vm.reload.params_json)["init_script"]).to eq "b"
   end
 
-  it "returns storage volumes hash list" do
-    boot_image = instance_double(BootImage, name: "boot_image", version: "1")
-    storage_device = instance_double(StorageDevice, name: "default")
-    volumes = [
-      instance_double(VmStorageVolume, disk_index: 0, device_id: "dev1",
-        size_gib: 1, boot: true, boot_image: boot_image,
-        key_encryption_key_1: "key", spdk_version: "spdk1",
-        use_bdev_ubi: false, skip_sync: false,
-        storage_device: storage_device,
-        max_read_mbytes_per_sec: nil, max_write_mbytes_per_sec: nil,
-        vhost_block_backend_version: nil, num_queues: 1, queue_size: 256),
-      instance_double(VmStorageVolume, disk_index: 1, device_id: "dev2",
-        size_gib: 100, boot: false, boot_image: nil,
-        key_encryption_key_1: nil, spdk_version: "spdk2",
-        use_bdev_ubi: true, skip_sync: true,
-        storage_device: storage_device,
-        max_read_mbytes_per_sec: 200, max_write_mbytes_per_sec: 300,
-        vhost_block_backend_version: "v0.1-5", num_queues: 4, queue_size: 64)
-    ]
-    expect(vm).to receive(:vm_storage_volumes).and_return(volumes)
-    expect(vm.storage_volumes).to eq([
-      {"boot" => true, "image" => "boot_image", "image_version" => "1", "size_gib" => 1,
-       "device_id" => "dev1", "disk_index" => 0, "encrypted" => true,
-       "spdk_version" => "spdk1", "use_bdev_ubi" => false, "skip_sync" => false,
-       "storage_device" => "default", "read_only" => false,
-       "max_read_mbytes_per_sec" => nil,
-       "max_write_mbytes_per_sec" => nil,
-       "vhost_block_backend_version" => nil, "num_queues" => 1, "queue_size" => 256,
-       "copy_on_read" => false, "slice_name" => "system.slice"},
-      {"boot" => false, "image" => nil, "image_version" => nil, "size_gib" => 100,
-       "device_id" => "dev2", "disk_index" => 1, "encrypted" => false,
-       "spdk_version" => "spdk2", "use_bdev_ubi" => true, "skip_sync" => true,
-       "storage_device" => "default", "read_only" => false,
-       "max_read_mbytes_per_sec" => 200,
-       "max_write_mbytes_per_sec" => 300,
-       "vhost_block_backend_version" => "v0.1-5", "num_queues" => 4, "queue_size" => 64,
-       "copy_on_read" => false, "slice_name" => "system.slice"}
-    ])
+  describe "#storage_volumes" do
+    let(:volumes) {
+      boot_image = instance_double(BootImage, name: "boot_image", version: "1")
+      storage_device = instance_double(StorageDevice, name: "default")
+      [
+        instance_double(VmStorageVolume, disk_index: 0, device_id: "dev1",
+          size_gib: 1, boot: true, boot_image: boot_image,
+          key_encryption_key_1: "key", spdk_version: "spdk1",
+          use_bdev_ubi: false, skip_sync: false,
+          storage_device: storage_device,
+          max_read_mbytes_per_sec: nil, max_write_mbytes_per_sec: nil,
+          vhost_block_backend_version: nil, num_queues: 1, queue_size: 256),
+        instance_double(VmStorageVolume, disk_index: 1, device_id: "dev2",
+          size_gib: 100, boot: false, boot_image: nil,
+          key_encryption_key_1: nil, spdk_version: "spdk1",
+          use_bdev_ubi: true, skip_sync: true,
+          storage_device: storage_device,
+          max_read_mbytes_per_sec: 200, max_write_mbytes_per_sec: 300,
+          vhost_block_backend_version: "v0.1-5", num_queues: 4, queue_size: 64)
+      ]
+    }
+    let(:total_cpus) { 16 }
+    let(:vm_host) { create_vm_host(accepts_slices: true, total_cpus:, total_cores: 8, total_dies: 4, total_sockets: 2) }
+    let(:vm) { create_vm(vm_host_id: vm_host.id) }
+
+    before do
+      expect(vm).to receive(:vm_storage_volumes).and_return(volumes).at_least(:once)
+
+      SpdkInstallation.create_with_id(vm_host.id, vm_host_id: vm_host.id, version: "v1", allocation_weight: 100, cpu_count: 2)
+      (0..total_cpus - 1).each do |cpu|
+        VmHostCpu.create(
+          vm_host_id: vm_host.id,
+          cpu_number: cpu,
+          spdk: cpu < vm_host.spdk_cpu_count
+        )
+      end
+    end
+
+    it "returns storage volumes hash list" do
+      expect(vm.storage_volumes).to eq([
+        {"boot" => true, "image" => "boot_image", "image_version" => "1", "size_gib" => 1,
+         "device_id" => "dev1", "disk_index" => 0, "encrypted" => true,
+         "spdk_version" => "spdk1", "use_bdev_ubi" => false, "skip_sync" => false,
+         "storage_device" => "default", "read_only" => false,
+         "max_read_mbytes_per_sec" => nil,
+         "max_write_mbytes_per_sec" => nil,
+         "vhost_block_backend_version" => nil, "num_queues" => 1, "queue_size" => 256,
+         "copy_on_read" => false, "slice_name" => "system.slice"},
+        {"boot" => false, "image" => nil, "image_version" => nil, "size_gib" => 100,
+         "device_id" => "dev2", "disk_index" => 1, "encrypted" => false,
+         "spdk_version" => "spdk1", "use_bdev_ubi" => true, "skip_sync" => true,
+         "storage_device" => "default", "read_only" => false,
+         "max_read_mbytes_per_sec" => 200,
+         "max_write_mbytes_per_sec" => 300,
+         "vhost_block_backend_version" => "v0.1-5", "num_queues" => 4, "queue_size" => 64,
+         "copy_on_read" => false, "slice_name" => "system.slice"}
+      ])
+    end
+
+    it "adds the cpus field to the params json when needed" do
+      vm_host.update(accepts_slices: false)
+      vm_host.spdk_installations.first.destroy
+      storage_volumes = vm.storage_volumes
+      expect(storage_volumes[0]["cpus"].count).to eq(1)
+      expect(storage_volumes[1]["cpus"].sort).to eq([0, 1])
+    end
   end
 
   describe "#save_with_ephemeral_net6_error_retrying" do
