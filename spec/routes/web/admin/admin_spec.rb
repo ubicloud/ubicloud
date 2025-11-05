@@ -35,7 +35,7 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin"
 
     account = create_account
-    fill_in "UBID", with: account.ubid
+    fill_in "UBID or UUID", with: account.ubid
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
     expect(object_data).to eq(email: "user@example.com", name: "", status_id: "2", suspended_at: "")
@@ -53,6 +53,20 @@ RSpec.describe CloverAdmin do
     # Column Link
     click_link project.name
     expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
+  end
+
+  it "allows searching by uuid" do
+    expect(page.title).to eq "Ubicloud Admin"
+
+    account = create_account
+    fill_in "UBID or UUID", with: account.id
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
+    expect(object_data).to eq(email: "user@example.com", name: "", status_id: "2", suspended_at: "")
+
+    fill_in "UBID or UUID", with: "fed39539-ffe4-417d-9b8a-9a41ff7d4ad2"
+    click_button "Show Object"
+    expect(page).to have_flash_error "Invalid ubid/uuid provided"
   end
 
   it "allows browsing by class" do
@@ -221,7 +235,7 @@ RSpec.describe CloverAdmin do
   end
 
   it "shows semaphores set on the object, if any" do
-    fill_in "UBID", with: vm_pool.ubid
+    fill_in "UBID or UUID", with: vm_pool.ubid
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - VmPool #{vm_pool.ubid}"
     expect(page).to have_no_content "Semaphores Set:"
@@ -232,7 +246,7 @@ RSpec.describe CloverAdmin do
   end
 
   it "shows object's strand, if any" do
-    fill_in "UBID", with: vm_pool.ubid
+    fill_in "UBID or UUID", with: vm_pool.ubid
     click_button "Show Object"
     path = page.current_path
     expect(page.title).to eq "Ubicloud Admin - VmPool #{vm_pool.ubid}"
@@ -253,7 +267,7 @@ RSpec.describe CloverAdmin do
 
   it "converts ubids to link" do
     p = Page.create(summary: "test", tag: "a", details: {"related_resources" => [vm_pool.ubid, "cc489f465gqa5pzq04gch3162h"]})
-    fill_in "UBID", with: p.ubid
+    fill_in "UBID or UUID", with: p.ubid
     click_button "Show Object"
 
     expect(page.title).to eq "Ubicloud Admin - Page #{p.ubid}"
@@ -264,13 +278,13 @@ RSpec.describe CloverAdmin do
 
   it "shows sshable information for object, if any" do
     vm_host = Prog::Vm::HostNexus.assemble("1.2.3.4").subject
-    fill_in "UBID", with: vm_host.ubid
+    fill_in "UBID or UUID", with: vm_host.ubid
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vm_host.ubid}"
     expect(page).to have_content "SSH Command: ssh root@1.2.3.4"
 
     visit "/"
-    fill_in "UBID", with: vm_pool.ubid
+    fill_in "UBID or UUID", with: vm_pool.ubid
     click_button "Show Object"
     expect(page).to have_no_content "SSH Command"
   end
@@ -317,12 +331,12 @@ RSpec.describe CloverAdmin do
   end
 
   it "handles request for invalid ubid" do
-    fill_in "UBID", with: "foo"
+    fill_in "UBID or UUID", with: "foo"
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin"
-    expect(page).to have_flash_error("Invalid ubid provided")
+    expect(page).to have_flash_error("Invalid ubid/uuid provided")
 
-    fill_in "UBID", with: "ts1cyaqvp5ha6j5jt8ypbyagw9"
+    fill_in "UBID or UUID", with: "ts1cyaqvp5ha6j5jt8ypbyagw9"
     expect { click_button "Show Object" }.to raise_error(RuntimeError, "admin route not handled: /model/SubjectTag/ts1cyaqvp5ha6j5jt8ypbyagw9")
   end
 
@@ -362,7 +376,7 @@ RSpec.describe CloverAdmin do
   it "handles incorrect/missing CSRF tokens" do
     schedule = Time.now + 10
     st = Strand.create(prog: "Test", label: "hop_entry", schedule:)
-    fill_in "UBID", with: st.ubid
+    fill_in "UBID or UUID", with: st.ubid
     click_button "Show Object"
 
     find("#strand-info input[name=_csrf]", visible: false).set("")
@@ -381,7 +395,7 @@ RSpec.describe CloverAdmin do
   it "supports scheduling strands to run immediately" do
     schedule = Time.now + 10
     st = Strand.create(prog: "Test", label: "hop_entry", schedule:)
-    fill_in "UBID", with: st.ubid
+    fill_in "UBID or UUID", with: st.ubid
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - Strand #{st.ubid}"
 
@@ -393,7 +407,7 @@ RSpec.describe CloverAdmin do
 
   it "supports restarting Vms" do
     vm = Prog::Vm::Nexus.assemble("dummy-public key", Project.create(name: "Default").id, name: "dummy-vm-1").subject
-    fill_in "UBID", with: vm.ubid
+    fill_in "UBID or UUID", with: vm.ubid
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
 
@@ -415,7 +429,7 @@ RSpec.describe CloverAdmin do
       target_vm_size: "standard-2",
       target_storage_size_gib: 64
     ).subject
-    fill_in "UBID", with: pg.ubid
+    fill_in "UBID or UUID", with: pg.ubid
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - PostgresResource #{pg.ubid}"
 
@@ -429,7 +443,7 @@ RSpec.describe CloverAdmin do
 
   it "supports moving VmHost to draining/accepting state" do
     vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
-    fill_in "UBID", with: vmh.ubid
+    fill_in "UBID or UUID", with: vmh.ubid
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
     expect(vmh.allocation_state).to eq "unprepared"
@@ -449,7 +463,7 @@ RSpec.describe CloverAdmin do
 
   it "supports rebooting VmHosts" do
     vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
-    fill_in "UBID", with: vmh.ubid
+    fill_in "UBID or UUID", with: vmh.ubid
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
 
@@ -463,7 +477,7 @@ RSpec.describe CloverAdmin do
 
   it "supports hardware reseting VmHosts" do
     vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
-    fill_in "UBID", with: vmh.ubid
+    fill_in "UBID or UUID", with: vmh.ubid
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
 
@@ -479,7 +493,7 @@ RSpec.describe CloverAdmin do
     ins = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
     ghr = GithubRunner.create(repository_name: "test-repo", label: "ubicloud", installation_id: ins.id)
 
-    fill_in "UBID", with: ghr.ubid
+    fill_in "UBID or UUID", with: ghr.ubid
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - GithubRunner #{ghr.ubid}"
 
@@ -494,7 +508,7 @@ RSpec.describe CloverAdmin do
 
   it "supports suspending Accounts" do
     account = create_account(with_project: false)
-    fill_in "UBID", with: account.ubid
+    fill_in "UBID or UUID", with: account.ubid
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
 
@@ -509,7 +523,7 @@ RSpec.describe CloverAdmin do
   it "supports resolving Pages" do
     p = Prog::PageNexus.assemble("XYZ has an expired deadline!", ["Deadline"], "XYZ").subject
 
-    fill_in "UBID", with: p.ubid
+    fill_in "UBID or UUID", with: p.ubid
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - Page #{p.ubid}"
 
