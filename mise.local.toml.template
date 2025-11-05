@@ -1,2 +1,2 @@
 [tools]
-postgres = "15.8"
+postgres = "17"
