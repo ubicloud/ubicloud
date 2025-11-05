@@ -204,7 +204,7 @@ these dependencies are active:
     $ which ruby
     /home/youruser/.local/share/mise/installs/ruby/3.2.8/bin/ruby
     $ which postgres
-    /home/youruser/.local/share/mise/installs/postgres/15.8/bin/postgres
+    /home/youruser/.local/share/mise/installs/postgres/17.6/bin/postgres
     $ which node
     /home/youruser/.local/share/mise/installs/node/23.6.0/bin/node
     $ which go
@@ -220,9 +220,9 @@ some of them are useful to know. You can see them in shell format with
 $ mise env
 set -gx GOBIN /home/youruser/.local/share/mise/installs/go/1.24.0/bin
 set -gx GOROOT /home/youruser/.local/share/mise/installs/go/1.24.0
-set -gx LD_LIBRARY_PATH /home/youruser/.local/share/mise/installs/postgres/15.8/lib
-set -gx PATH '/home/youruser/.local/share/mise/installs/ruby/3.2.8/bin:/home/youruser/.local/share/mise/installs/postgres/15.8/bin:/home/youruser/.local/share/mise/installs/node/23.6.0/bin:/home/youruser/.local/share/mise/installs/go/1.24.0/bin:/home/youruser/.local/share/mise/installs/direnv/2.35.0:/home/youruser/.local/share/mise/installs/yq/4.44.2:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin'
-set -gx PGDATA /home/youruser/.local/share/mise/installs/postgres/15.8/data
+set -gx LD_LIBRARY_PATH /home/youruser/.local/share/mise/installs/postgres/17.6/lib
+set -gx PATH '/home/youruser/.local/share/mise/installs/ruby/3.2.8/bin:/home/youruser/.local/share/mise/installs/postgres/17.6/bin:/home/youruser/.local/share/mise/installs/node/23.6.0/bin:/home/youruser/.local/share/mise/installs/go/1.24.0/bin:/home/youruser/.local/share/mise/installs/direnv/2.35.0:/home/youruser/.local/share/mise/installs/yq/4.44.2:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin'
+set -gx PGDATA /home/youruser/.local/share/mise/installs/postgres/17.6/data
 ```
 
 ### Installing Postgres
