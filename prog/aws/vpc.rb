@@ -49,20 +49,12 @@ class Prog::Aws::Vpc < Prog::Base
 
       private_subnet.firewalls.flat_map(&:firewall_rules).each do |firewall_rule|
         next if firewall_rule.ip6?
-
-        begin
-          client.authorize_security_group_ingress({
-            group_id: security_group_response.group_id,
-            ip_permissions: [{
-              ip_protocol: "tcp",
-              from_port: firewall_rule.port_range.first,
-              to_port: firewall_rule.port_range.last - 1,
-              ip_ranges: [{cidr_ip: firewall_rule.cidr.to_s}]
-            }]
-          })
-        rescue Aws::EC2::Errors::InvalidPermissionDuplicate
-        end
+        allow_ingress(security_group_response.group_id, firewall_rule.port_range.first, firewall_rule.port_range.last - 1, firewall_rule.cidr.to_s)
       end
+
+      # Allow SSH ingress from the internet so that the controlplane can verify
+      # that the VM is running.
+      allow_ingress(security_group_response.group_id, 22, 22, "0.0.0.0/0")
       hop_create_route_table
     end
     nap 1
@@ -148,5 +140,18 @@ class Prog::Aws::Vpc < Prog::Base
 
   def client
     @client ||= location.location_credential.client
+  end
+
+  def allow_ingress(group_id, from_port, to_port, cidr)
+    client.authorize_security_group_ingress({
+      group_id: group_id,
+      ip_permissions: [{
+        ip_protocol: "tcp",
+        from_port: from_port,
+        to_port: to_port,
+        ip_ranges: [{cidr_ip: cidr}]
+      }]
+    })
+  rescue Aws::EC2::Errors::InvalidPermissionDuplicate
   end
 end

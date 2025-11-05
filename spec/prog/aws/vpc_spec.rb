@@ -71,6 +71,7 @@ RSpec.describe Prog::Aws::Vpc do
       ps.reload
       expect(ps.private_subnet_aws_resource).to receive(:vpc_id).and_return("vpc-0123456789abcdefg").at_least(:once)
       expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-0123456789abcdefg", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 80, ip_ranges: [{cidr_ip: "0.0.0.1/32"}]}]}).and_call_original
+      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-0123456789abcdefg", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ip_ranges: [{cidr_ip: "0.0.0.0/0"}]}]}).and_call_original
       expect { nx.wait_vpc_created }.to hop("create_route_table")
     end
 
@@ -88,7 +89,7 @@ RSpec.describe Prog::Aws::Vpc do
 
     it "skips security group ingress rule if it already exists" do
       client.stub_responses(:describe_vpcs, vpcs: [{state: "available", vpc_id: "vpc-0123456789abcdefg"}])
-      client.stub_responses(:authorize_security_group_ingress, Aws::EC2::Errors::InvalidPermissionDuplicate.new(nil, nil))
+      client.stub_responses(:authorize_security_group_ingress, Aws::EC2::Errors::InvalidPermissionDuplicate.new(nil, nil), Aws::EC2::Errors::InvalidPermissionDuplicate.new(nil, nil))
 
       ps.firewalls.map { it.firewall_rules.map { |fw| fw.destroy } }
       FirewallRule.create(firewall_id: ps.firewalls.first.id, cidr: "0.0.0.1/32", port_range: 22..80)
