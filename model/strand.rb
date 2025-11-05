@@ -24,6 +24,8 @@ class Strand < Sequel::Model
     @subject = UBID.decode(ubid)
   end
 
+  alias_method :name, :ubid
+
   RespirateMetrics = Struct.new(:scheduled, :scan_picked_up, :worker_started, :lease_checked, :lease_acquired, :queue_size, :available_workers, :old_strand, :lease_expired) do
     def scan_delay
       scan_picked_up - scheduled

@@ -271,6 +271,18 @@ class CloverAdmin < Roda
       end
     end
 
+    model Strand do
+      order Sequel.desc(:try)
+      columns do |type_symbol, request|
+        if type_symbol == :search_form
+          [:prog, :label, :try]
+        else
+          [:name, :prog, :label, :schedule, :try]
+        end
+      end
+      column_options try: {type: "number", value: nil}
+    end
+
     model Vm do
       order Sequel.desc(:created_at)
       eager [:location, :vm_host]

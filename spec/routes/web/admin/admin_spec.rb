@@ -147,8 +147,7 @@ RSpec.describe CloverAdmin do
     click_link "hetzner-fsn1"
     expect(page.title).to eq "Ubicloud Admin - Location #{Location::HETZNER_FSN1_UBID}"
 
-    sshable = Sshable.create_with_id(VmHost.generate_uuid, host: "1.1.0.0")
-    vmh = VmHost.create_with_id(sshable.id, location_id: Location::HETZNER_FSN1_ID, family: "standard")
+    vmh = Prog::Vm::HostNexus.assemble("1.1.0.0", location_id: Location::HETZNER_FSN1_ID, family: "standard").subject
     click_link "Ubicloud Admin"
     click_link "VmHost"
     click_link "Search"
@@ -158,7 +157,7 @@ RSpec.describe CloverAdmin do
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [vmh.ubid, "1.1.0.0", "unprepared", "", "hetzner-fsn1", "", "standard", "", "0"]
 
-    vm = Vm.create(unix_user: "ubi", public_key: "k y", name: "vm1", location_id: Location::HETZNER_FSN1_ID, boot_image: "github-ubuntu-2204", family: "standard", arch: "x64", cores: 2, vcpus: 2, memory_gib: 8, project_id: project.id)
+    vm = Prog::Vm::Nexus.assemble("k y", project.id, unix_user: "ubi", name: "vm1", location_id: Location::HETZNER_FSN1_ID, boot_image: "github-ubuntu-2204", size: "standard-2", arch: "x64").subject
     click_link "Ubicloud Admin"
     click_link "Vm"
     click_link "Search"
@@ -208,6 +207,13 @@ RSpec.describe CloverAdmin do
     select "False", from: "Suspended"
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq ["", "user@example.com", "2", "github", account.created_at.to_s, ""]
+
+    click_link "Ubicloud Admin"
+    click_link "Strand"
+    click_link "Search"
+    fill_in "Prog", with: "Vm::Nexus"
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [vm.ubid, "Vm::Nexus", "start", vm.strand.schedule.to_s, "0"]
   end
 
   it "handles basic pagination when browsing by class" do
