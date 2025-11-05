@@ -39,6 +39,7 @@ class StorageVolume
     @queue_size = params.fetch("queue_size", 256)
     @copy_on_read = params.fetch("copy_on_read", false)
     @stripe_sector_count_shift = Integer(params.fetch("stripe_sector_count_shift", 11))
+    @cpus = params["cpus"]
   end
 
   def vp
@@ -263,6 +264,11 @@ class StorageVolume
       key1_wrapped_b64 = wrap_key_b64(key_encryption, encryption_key[:key])
       key2_wrapped_b64 = wrap_key_b64(key_encryption, encryption_key[:key2])
       config["encryption_key"] = [key1_wrapped_b64, key2_wrapped_b64]
+    end
+
+    if @cpus
+      config["cpus"] = @cpus
+      config["num_queues"] = @cpus.count
     end
 
     config

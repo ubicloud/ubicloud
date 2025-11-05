@@ -267,7 +267,13 @@ class Vm < Sequel::Model
   end
 
   def storage_volumes
+    add_cpus = vm_host.spdk_installations.empty? && !vm_host.accepts_slices
+
     vm_storage_volumes.map { |s|
+      if add_cpus
+        spdk_cpus = vm_host.cpus.filter(&:spdk).map(&:cpu_number)
+        cpus = spdk_cpus.shuffle.take(s.num_queues)
+      end
       {
         "boot" => s.boot,
         "image" => s.boot_image&.name,
@@ -288,7 +294,7 @@ class Vm < Sequel::Model
         "num_queues" => s.num_queues,
         "queue_size" => s.queue_size,
         "copy_on_read" => false
-      }
+      }.tap { |v| v["cpus"] = cpus if add_cpus }
     }
   end
 
