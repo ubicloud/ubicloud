@@ -48,9 +48,14 @@ class CloverAdmin < Roda
   plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
   plugin :typecast_params do
     ubid_regexp = /\A[a-tv-z0-9]{26}\z/
+    uuid_regexp = /\A[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\z/i
 
     handle_type(:ubid) do
       it if ubid_regexp.match?(it)
+    end
+
+    handle_type(:uuid) do
+      it if uuid_regexp.match?(it)
     end
 
     handle_type(:ubid_uuid) do
@@ -376,10 +381,12 @@ class CloverAdmin < Roda
     end
 
     r.root do
-      if (ubid = typecast_params.ubid("ubid")) && (klass = UBID.class_for_ubid(ubid))
+      if (ubid = typecast_params.ubid("id")) && (klass = UBID.class_for_ubid(ubid))
         r.redirect("/model/#{klass.name}/#{ubid}")
-      elsif typecast_params.nonempty_str("ubid")
-        flash.now["error"] = "Invalid ubid provided"
+      elsif (uuid = typecast_params.uuid("id")) && (ubid = UBID.from_uuidish(uuid).to_s) && (klass = UBID.class_for_ubid(ubid))
+        r.redirect("/model/#{klass.name}/#{ubid}")
+      elsif typecast_params.nonempty_str("id")
+        flash.now["error"] = "Invalid ubid/uuid provided"
       end
 
       @grouped_pages = Page.active.reverse(:created_at, :summary).group_by_vm_host

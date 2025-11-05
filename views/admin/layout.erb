@@ -16,7 +16,7 @@
         <a class="navbar-brand" href="/">Ubicloud Admin</a>
         <% if rodauth.logged_in? %>
           <% form(id: "ubid_form", action: "/") do |f| %>
-            <%== f.input("text", key: "ubid", placeholder: "UBID", attr: {pattern: "[a-tv-z0-9]{26}", title: "UBID format: [a-tv-z0-9]{26}"}) %>
+            <%== f.input("text", key: "id", placeholder: "UBID or UUID", attr: {pattern: "[a-tv-z0-9]{26}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}", title: "UBID format: [a-tv-z0-9]{26} UUID format: [a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}"}) %>
             <%== f.button("Show Object") %>
           <% end %>
           <% form(action: "/logout", method: :post, id: :logout_form) do |f| %>
