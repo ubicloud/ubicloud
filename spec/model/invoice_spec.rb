@@ -3,16 +3,21 @@
 require_relative "spec_helper"
 
 RSpec.describe Invoice do
-  subject(:invoice) { described_class.new(id: "50d5aae4-311c-843b-b500-77fbc7778050", begin_time: Time.utc(2025, 3), end_time: Time.utc(2025, 4), invoice_number: "2503-4ddfa430e8-0006", created_at: Time.now, content: {"cost" => 10, "subtotal" => 11, "credit" => 1, "discount" => 0, "resources" => [], "billing_info" => {"country" => "NL"}}, status: "unpaid") }
+  subject(:invoice) { described_class.create(project_id: project.id, begin_time: Time.utc(2025, 3), end_time: Time.utc(2025, 4), invoice_number: "2503-4ddfa430e8-0006", created_at: Time.now, content: {"cost" => 10, "subtotal" => 11, "credit" => 1, "discount" => 0, "resources" => [], "billing_info" => {"country" => "NL"}}, status: "unpaid") }
 
   let(:billing_info) { BillingInfo.create(stripe_id: "cs_1234567890") }
   let(:client) { instance_double(Aws::S3::Client) }
+  let(:project) { Project.create(name: "test") }
 
   before do
-    allow(invoice).to receive(:reload)
-    allow(invoice).to receive(:project).and_return(instance_double(Project, path: "/project/p1", accounts: []))
     allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
     allow(Aws::S3::Client).to receive(:new).and_return(client)
+  end
+
+  def update_content(new_content)
+    invoice.content.merge!(new_content.transform_keys(&:to_s))
+    invoice.modified!(:content)
+    invoice.save_changes
   end
 
   describe ".blob_key" do
@@ -22,59 +27,43 @@ RSpec.describe Invoice do
     end
 
     it "returns path with eu_vat_reversed group when VAT info is present and has reversed set to true" do
-      invoice.content["vat_info"] = {"reversed" => true}
+      update_content(vat_info: {"reversed" => true})
       expect(invoice.blob_key).to eq("2025/03/eu_vat_reversed/Ubicloud-2025-03-2503-4ddfa430e8-0006.pdf")
     end
 
     it "returns path with nl billing country is Netherlands" do
-      invoice.content["billing_info"] = {"country" => "NL"}
+      update_content(billing_info: {"country" => "NL"})
       expect(invoice.blob_key).to eq("2025/03/nl/Ubicloud-2025-03-2503-4ddfa430e8-0006.pdf")
     end
 
     it "returns path with eu group when country is in EU VAT area but not NL" do
-      invoice.content["billing_info"] = {"country" => "DE"}
+      update_content(billing_info: {"country" => "DE"})
       expect(invoice.blob_key).to eq("2025/03/eu/Ubicloud-2025-03-2503-4ddfa430e8-0006.pdf")
     end
 
     it "returns path with non_eu group when country is not in EU VAT area" do
-      invoice.content["billing_info"] = {"country" => "US"}
+      update_content(billing_info: {"country" => "US"})
       expect(invoice.blob_key).to eq("2025/03/non_eu/Ubicloud-2025-03-2503-4ddfa430e8-0006.pdf")
     end
   end
 
   describe ".send_failure_email" do
     it "sends failure email to accounts with billing permissions in addition to the provided billing email" do
-      project = Project.create(name: "cool-project")
-      accounts = (0..2).map { Account.create(email: "account#{it}@example.com").tap { |a| a.add_project(project) } }
-      AccessControlEntry.create(project_id: project.id, subject_id: accounts[0].id)
-      AccessControlEntry.create(project_id: project.id, subject_id: accounts[1].id, action_id: ActionType::NAME_MAP["Vm:view"])
-      AccessControlEntry.create(project_id: project.id, subject_id: accounts[2].id, action_id: ActionType::NAME_MAP["Project:billing"])
-
-      invoice = described_class.create(project_id: project.id, invoice_number: "001", begin_time: Time.now, end_time: Time.now, content: {
-        "billing_info" => {"email" => "billing@example.com"},
-        "resources" => [],
-        "subtotal" => 0.0,
-        "credit" => 0.0,
-        "discount" => 0.0,
-        "cost" => 0.0
-      })
-
+      accounts = [nil, ActionType::NAME_MAP["Vm:view"], ActionType::NAME_MAP["Project:billing"]].each_with_index.map do |action_id, index|
+        Account.create(email: "account#{index}@example.com").tap do |account|
+          account.add_project(project)
+          AccessControlEntry.create(project_id: project.id, subject_id: account.id, action_id:)
+        end
+      end
+      update_content(billing_info: {"email" => "billing@example.com"}, resources: [], subtotal: 0.0, credit: 0.0, discount: 0.0, cost: 0.0)
       invoice.send_failure_email([])
-
       expect(Mail::TestMailer.deliveries.first.to).to contain_exactly("billing@example.com", accounts[0].email, accounts[2].email)
     end
   end
 
   describe ".send_success_email" do
     it "does not send the invoice if it has no billing information" do
-      project = Project.create(name: "cool-project")
-      invoice = described_class.create(project_id: project.id, invoice_number: "001", begin_time: Time.now, end_time: Time.now, content: {
-        "resources" => [],
-        "subtotal" => 0.0,
-        "credit" => 0.0,
-        "discount" => 0.0,
-        "cost" => 0.0
-      })
+      update_content(resources: [], subtotal: 0.0, credit: 0.0, discount: 0.0, cost: 0.0)
       expect(Clog).to receive(:emit).with("Couldn't send the invoice because it has no billing information").and_call_original
       invoice.send_success_email
       expect(Mail::TestMailer.deliveries.length).to eq 0
@@ -90,17 +79,16 @@ RSpec.describe Invoice do
 
     it "not charge if already charged" do
       expect(Clog).to receive(:emit).with("Invoice already charged.").and_call_original
-      invoice.status = "paid"
+      invoice.update(status: "paid")
       expect(invoice.charge).to be true
     end
 
     it "not charge if less than minimum charge threshold" do
-      invoice.content["billing_info"] = {"id" => billing_info.id, "email" => "customer@example.com"}
-      invoice.content["cost"] = 0.4
-      expect(invoice).to receive(:update).with(status: "below_minimum_threshold")
+      update_content(billing_info: {"id" => billing_info.id, "email" => "customer@example.com"}, cost: 0.4)
       expect(Clog).to receive(:emit).with("Invoice cost is less than minimum charge cost.").and_call_original
       expect(invoice).to receive(:persist)
       expect(invoice.charge).to be true
+      expect(invoice.status).to eq("below_minimum_threshold")
       expect(Mail::TestMailer.deliveries.length).to eq 1
     end
 
@@ -110,13 +98,13 @@ RSpec.describe Invoice do
     end
 
     it "not charge if no payment methods" do
-      invoice.content["billing_info"] = {"id" => billing_info.id}
+      update_content(billing_info: {"id" => billing_info.id})
       expect(Clog).to receive(:emit).with("Invoice doesn't have billing info.").and_call_original
       expect(invoice.charge).to be false
     end
 
     it "not charge if all payment methods fails" do
-      invoice.content["billing_info"] = {"id" => billing_info.id, "email" => "foo@example.com"}
+      update_content(billing_info: {"id" => billing_info.id, "email" => "foo@example.com"})
       payment_method1 = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1", order: 1)
       payment_method2 = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_2", order: 2)
 
@@ -133,7 +121,7 @@ RSpec.describe Invoice do
     end
 
     it "fails if PaymentIntent does not raise an exception in case of failure" do
-      invoice.content["billing_info"] = {"id" => billing_info.id}
+      update_content(billing_info: {"id" => billing_info.id})
       payment_method = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1", order: 1)
 
       # rubocop:disable RSpec/VerifiedDoubles
@@ -146,8 +134,7 @@ RSpec.describe Invoice do
     end
 
     it "can charge from a correct payment method even some of them are not working" do
-      invoice.content["billing_info"] = {"id" => billing_info.id, "email" => "customer@example.com"}
-      invoice.content["resources"] = [{"cost" => 4.3384, "line_items" => [{"cost" => 4.3384, "amount" => 5423.0, "duration" => 1, "location" => "global", "description" => "standard-2 GitHub Runner", "resource_type" => "GitHubRunnerMinutes", "resource_family" => "standard-2"}], "resource_id" => "ed0b26bf-53c4-82d2-9a00-21e5f05dc364", "resource_name" => "Daily Usage 2024-02-26"}]
+      update_content(billing_info: {"id" => billing_info.id, "email" => "customer@example.com"}, resources: [{"cost" => 4.3384, "line_items" => [{"cost" => 4.3384, "amount" => 5423.0, "duration" => 1, "location" => "global", "description" => "standard-2 GitHub Runner", "resource_type" => "GitHubRunnerMinutes", "resource_family" => "standard-2"}], "resource_id" => "ed0b26bf-53c4-82d2-9a00-21e5f05dc364", "resource_name" => "Daily Usage 2024-02-26"}])
       payment_method1 = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1", created_at: Time.now + 20)
       payment_method2 = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_2", created_at: Time.now + 10)
       payment_method3 = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_3", created_at: Time.now)
@@ -158,15 +145,12 @@ RSpec.describe Invoice do
         .and_return(double(Stripe::PaymentIntent, status: "succeeded", id: "pi_1234567890"))
       expect(Stripe::PaymentIntent).not_to receive(:create).with(hash_including(payment_method: payment_method3.stripe_id))
       # rubocop:enable RSpec/VerifiedDoubles
-      expect(invoice).to receive(:save).with(columns: [:status, :content])
       expect(Clog).to receive(:emit).with("Invoice couldn't charged.").and_call_original
       expect(Clog).to receive(:emit).with("Invoice charged.").and_call_original
-      project = instance_double(Project)
-      expect(project).to receive(:update).with(reputation: "verified")
-      expect(invoice).to receive(:project).and_return(project)
       expect(invoice).to receive(:persist)
       expect(invoice.charge).to be true
       expect(invoice.status).to eq("paid")
+      expect(project.reload.reputation).to eq("verified")
       expect(invoice.content["payment_method"]["id"]).to eq(payment_method2.id)
       expect(invoice.content["payment_intent"]).to eq("pi_1234567890")
       expect(Mail::TestMailer.deliveries.length).to eq 1
@@ -174,28 +158,25 @@ RSpec.describe Invoice do
     end
 
     it "does not update project reputation if cost is less than 5" do
-      invoice.content["cost"] = 4
-      invoice.content["billing_info"] = {"id" => billing_info.id}
+      update_content(billing_info: {"id" => billing_info.id}, cost: 4)
       PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1", order: 1)
       # rubocop:disable RSpec/VerifiedDoubles
       expect(Stripe::PaymentIntent).to receive(:create).and_return(double(Stripe::PaymentIntent, status: "succeeded", id: "pi_1234567890"))
       # rubocop:enable RSpec/VerifiedDoubles
-      expect(invoice).to receive(:save).with(columns: [:status, :content])
       expect(invoice).to receive(:send_success_email)
-      expect(invoice).not_to receive(:project)
       expect(invoice.charge).to be true
+      expect(invoice.status).to eq("paid")
+      expect(project.reload.reputation).to eq("new")
     end
   end
 
   describe ".after_destroy" do
     it "deletes the invoice" do
-      invoice.update(project_id: Project.create(name: "test").id)
       expect(client).to receive(:delete_object).with(bucket: Config.invoices_bucket_name, key: invoice.blob_key)
       invoice.destroy
     end
 
     it "ignores if the invoice already deleted" do
-      invoice.update(project_id: Project.create(name: "test").id)
       expect(client).to receive(:delete_object).and_raise(Aws::S3::Errors::NoSuchKey.new(nil, nil))
       invoice.destroy
     end
@@ -203,7 +184,6 @@ RSpec.describe Invoice do
 
   describe ".persist" do
     it "uploads the invoice" do
-      invoice.update(project_id: Project.create(name: "test").id)
       pdf = invoice.generate_pdf
       expect(client).to receive(:put_object).with(bucket: Config.invoices_bucket_name, key: invoice.blob_key, content_type: "application/pdf", if_none_match: "*", body: pdf)
       invoice.persist(pdf)
