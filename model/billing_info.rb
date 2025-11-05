@@ -9,7 +9,7 @@ class BillingInfo < Sequel::Model
   one_to_many :payment_methods, order: Sequel.desc(:created_at)
   one_to_one :project
 
-  plugin ResourceMethods, etc_type: true
+  plugin ResourceMethods
 
   def stripe_data
     if (Stripe.api_key = Config.stripe_secret_key)
