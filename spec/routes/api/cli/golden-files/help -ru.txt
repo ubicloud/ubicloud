@@ -25,6 +25,7 @@ ubi gh installation installation-name post-command [...]
 ubi gh installation list [options]
 ubi gh installation installation-name list-repositories [options]
 ubi gh installation-name/repository-name list-cache-entries [options]
+ubi gh installation-name/repository-name remove-all-cache-entries
 ubi gh installation-name/repository-name remove-cache-entry cache-entry-id
 ubi help [options] [command [subcommand]]
 ubi kc command [...]

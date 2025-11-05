@@ -127,10 +127,19 @@ class Clover
               paginated_result(repository.cache_entries_dataset.order(:id), Serializers::GithubCacheEntry, installation:, repository:)
             end
 
-            r.delete do
+            r.delete true do
               DB.transaction do
-                repository.cache_entries_dataset.each(&:destroy)
-                audit_log(repository, "destroy_all_cache_entries")
+                cache_entries = repository.cache_entries_dataset.all
+
+                if cache_entries.empty?
+                  no_audit_log
+                else
+                  DB.ignore_duplicate_queries do
+                    cache_entries.each(&:destroy)
+                  end
+                  cache_entry = cache_entries.shift
+                  audit_log(cache_entry, "destroy", cache_entries)
+                end
               end
               flash["notice"] = "All cache entries deleted." if web?
               204

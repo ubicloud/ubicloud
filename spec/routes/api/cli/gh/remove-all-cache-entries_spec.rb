@@ -19,9 +19,17 @@ RSpec.describe Clover, "cli gh remove-all-cache-entries" do
     expect(client).to receive(:delete_object).with(bucket: gp.bucket_name, key: ge3.blob_key)
     expect(client).to receive(:abort_multipart_upload).with(bucket: gp.bucket_name, key: ge3.blob_key, upload_id: nil)
 
-    cli(%w[gh test-installation-name/test-repository-name remove-all-cache-entries])
+    expect(cli(%w[gh test-installation-name/test-repository-name remove-all-cache-entries])).to eq "All cache entries, if they exist, are now scheduled for destruction\n"
     expect(ge1.exists?).to be false
     expect(ge2.exists?).to be false
     expect(ge3.exists?).to be false
+  end
+
+  it "handles case where there are no cache entries" do
+    expect(Config).to receive(:github_app_name).and_return("test-app").at_least(:once)
+    gi = GithubInstallation.create_with_id("6e3ae4a8-5474-8a01-b485-3b02ac649c5f", project_id: @project.id, installation_id: 12345678, name: "test-installation-name", type: "user")
+    GithubRepository.create_with_id("a58006b6-0879-8616-936a-62234e244f2f", installation_id: gi.id, name: "test-installation-name/test-repository-name")
+
+    expect(cli(%w[gh test-installation-name/test-repository-name remove-all-cache-entries])).to eq "All cache entries, if they exist, are now scheduled for destruction\n"
   end
 end
