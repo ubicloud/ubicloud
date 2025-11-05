@@ -183,22 +183,12 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo systemctl enable #{unit_name}")
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo systemctl start #{unit_name}")
       expect(prog).to receive(:write_kek_pipe)
-      expect { prog.start_ubiblk_systemd_unit }.to hop("start_vm")
-    end
-  end
-
-  describe "#start_vm" do
-    it "starts the vm" do
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo systemctl start #{vm.inhost_name}")
-      expect { prog.start_vm }.to hop("update_vm_model")
+      expect { prog.start_ubiblk_systemd_unit }.to hop("update_vm_model")
     end
   end
 
   describe "#update_vm_model" do
     it "updates the vm to be identified as a ubiblk vm" do
-      st = instance_double(Strand)
-      expect(vm).to receive(:strand).and_return(st)
-      expect(st).to receive(:update).with(label: "wait")
       expect(vm.vm_storage_volumes.first).to receive(:update).with(use_bdev_ubi: false, vhost_block_backend_id: vm_host.vhost_block_backends.first.id, vring_workers: 1, spdk_installation_id: nil)
       expect { prog.update_vm_model }.to hop("update_prep_json_file")
     end

@@ -123,19 +123,16 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
     # We do not want to store the KEK permenantly on the disk since it defeats the purpose,
     # so we write it to a pipe and ubiblk systemd unit will read its content once and the kek is gone.
     write_kek_pipe
-    hop_start_vm
-  end
-
-  label def start_vm
-    vm.vm_host.sshable.cmd("sudo systemctl start #{vm.inhost_name}")
     hop_update_vm_model
   end
 
   label def update_vm_model
-    DB.transaction do
-      vm.strand.update(label: "wait")
-      vm.vm_storage_volumes.first.update(use_bdev_ubi: false, vhost_block_backend_id: vm_host_vhost_block_backend.id, vring_workers: 1, spdk_installation_id: nil)
-    end
+    vm.vm_storage_volumes.first.update(
+      use_bdev_ubi: false,
+      vhost_block_backend_id: vm_host_vhost_block_backend.id,
+      vring_workers: [1, vm.vcpus / 2].max,
+      spdk_installation_id: nil
+    )
 
     hop_update_prep_json_file
   end
