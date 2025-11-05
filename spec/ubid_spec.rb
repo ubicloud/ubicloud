@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 RSpec.describe UBID do
-  let(:all_types) { described_class.constants.select { it.start_with?("TYPE_") }.map { described_class.const_get(it) } }
+  let(:type_constants) { described_class.constants.select { it.start_with?("TYPE_") } }
+  let(:all_types) { type_constants.map { described_class.const_get(it) } }
 
   it ".generate_vanity_action_type supports creating vanity ubids for action types" do
     expect(described_class.generate_vanity_action_type("Project:view").to_s).to eq "ttzzzzzzzz021gzzz0pj0v1ew0"
@@ -220,6 +221,14 @@ RSpec.describe UBID do
       ubid = described_class.generate(type).to_s
       expect(ubid).to start_with type
     }
+  end
+
+  it "types have correct ubid_type defined" do
+    (type_constants - [:TYPE_ETC, :TYPE_OBJECT_METATAG]).each do |t|
+      klass_name = t.to_s.sub(/^TYPE_/, "").split("_").map(&:capitalize).join
+      klass = Object.const_get(klass_name)
+      expect(klass.ubid_type).to eq(described_class.const_get(t))
+    end
   end
 
   it "has unique type identifiers" do
