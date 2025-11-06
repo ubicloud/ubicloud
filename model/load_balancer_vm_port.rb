@@ -22,18 +22,11 @@ class LoadBalancerVmPort < Sequel::Model
     }
   end
 
-  def health_check(session:)
-    [
-      check_probe(session, :ipv4),
-      check_probe(session, :ipv6)
-    ]
-  end
-
   def check_probe(session, type)
     if type == :ipv4
-      return "up" unless load_balancer.ipv4_enabled?
+      raise "This entity should not exist: #{ubid}" unless load_balancer.ipv4_enabled?
     elsif type == :ipv6
-      return "up" unless load_balancer.ipv6_enabled?
+      raise "This entity should not exist: #{ubid}" unless load_balancer.ipv6_enabled?
     else
       raise "Invalid type: #{type}"
     end
@@ -58,9 +51,8 @@ class LoadBalancerVmPort < Sequel::Model
   end
 
   def check_pulse(session:, previous_pulse:)
-    reading_ipv4, reading_ipv6 = health_check(session:)
-    reading = (reading_ipv4 == "up" && reading_ipv6 == "up") ? "up" : "down"
-    pulse = aggregate_readings(previous_pulse:, reading:, data: {ipv4: reading_ipv4, ipv6: reading_ipv6})
+    reading = check_probe(session, stack.to_sym)
+    pulse = aggregate_readings(previous_pulse:, reading:)
 
     time_passed_health_check_interval = Time.now - pulse[:reading_chg] > load_balancer.health_check_interval
 

@@ -12,7 +12,7 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
   end
 
   label def update_load_balancer
-    vm.load_balancer_vm_ports.select { |lvp| lvp.state == "detaching" }.each do |load_balancer_vm_port|
+    vm.load_balancer_vm_ports.select { |lvp| lvp.state == "detaching" }.sort_by(&:stack).each do |load_balancer_vm_port|
       load_balancer.remove_vm_port(load_balancer_vm_port)
     end
 
