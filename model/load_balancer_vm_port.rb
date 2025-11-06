@@ -77,7 +77,7 @@ end
 #  load_balancer_port_id | uuid                     | NOT NULL
 #  state                 | lb_node_state            | NOT NULL DEFAULT 'down'::lb_node_state
 #  last_checked_at       | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
-#  stack                 | text                     |
+#  stack                 | text                     | NOT NULL
 # Indexes:
 #  load_balancer_vm_port_pkey    | PRIMARY KEY btree (id)
 #  lb_vm_port_stack_unique_index | UNIQUE btree (load_balancer_port_id, load_balancer_vm_id, stack)
