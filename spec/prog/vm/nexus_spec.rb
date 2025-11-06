@@ -324,7 +324,7 @@ RSpec.describe Prog::Vm::Nexus do
         sshable = instance_double(Sshable)
         expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("NotStarted")
         vmh = instance_double(VmHost, sshable: sshable,
-          total_cpus: 80, total_cores: 80, total_sockets: 10, ndp_needed: false, arch: "arm64")
+          total_cpus: 80, total_cores: 80, total_sockets: 10, ndp_needed: false, arch: "arm64", spdk_installations: [], accepts_slices: true)
         expect(vm).to receive(:vm_host).and_return(vmh).at_least(:once)
         expect(sshable).to receive(:cmd).with(/sudo -u vm[0-9a-z]+ tee/, stdin: String) do |**kwargs|
           require "json"
@@ -791,6 +791,7 @@ RSpec.describe Prog::Vm::Nexus do
       now = Time.now
       expect(Time).to receive(:now).and_return(now).at_least(:once)
       allow(vm).to receive(:allocated_at).and_return(now - 100)
+      vm.update(vm_host_id: create_vm_host.id, project_id: prj.id)
       expect(vm).to receive(:update).with(display_state: "running", provisioned_at: now).and_return(true)
       expect(Clog).to receive(:emit).with("vm provisioned").and_yield
     end
@@ -838,18 +839,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "creates a billing record when host is nil, too" do
-      vm.vm_host = nil
-      vm.location.provider = "aws"
-      expect(BillingRecord).to receive(:create).once
-      expect(vm).to receive(:project).and_return(prj).at_least(:once)
-
-      expect { nx.create_billing_record }.to hop("wait")
-    end
-
-    it "create a billing record when host is not nil, too" do
-      host = VmHost.new.tap { it.id = "46ca6ded-b056-4723-bd91-612959f52f6f" }
-      allow(nx).to receive(:host).and_return(host)
-      vm.vm_host = host
+      expect(vm).to receive(:vm_host).and_return(nil)
       vm.location.provider = "aws"
       expect(BillingRecord).to receive(:create).once
       expect(vm).to receive(:project).and_return(prj).at_least(:once)

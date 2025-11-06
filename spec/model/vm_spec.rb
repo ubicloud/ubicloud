@@ -323,7 +323,9 @@ RSpec.describe Vm do
       total_cores: 12,
       total_dies: 1,
       total_sockets: 1,
-      ndp_needed: false
+      ndp_needed: false,
+      spdk_installations: [],
+      accepts_slices: true
     )).at_least(:once)
     expect(JSON.parse(vm.params_json)["init_script"]).to eq ""
     VmInitScript.create_with_id(vm.id, script: "b")
@@ -465,7 +467,7 @@ RSpec.describe Vm do
             random_private_ipv6: NetAddr::IPv6Net.parse("fd00::/64")
           )
         ),
-        vm_host: instance_double(VmHost, ndp_needed: false)
+        vm_host: instance_double(VmHost, ndp_needed: false, spdk_installations: [], accepts_slices: true)
       )
     end
 
