@@ -144,13 +144,13 @@ class CloverAdmin < Roda
     end
   end
 
-  ObjectAction = Data.define(:label, :flash, :action) do
-    def self.define(*, &action)
-      new(*, action)
+  ObjectAction = Data.define(:label, :flash, :params, :action) do
+    def self.define(label, flash, params = {}, &action)
+      new(label, flash, params.dup.freeze, action)
     end
 
-    def call(obj)
-      action.call(obj)
+    def call(...)
+      action.call(...)
     end
   end
 
@@ -381,11 +381,13 @@ class CloverAdmin < Roda
 
             r.get do
               @label = action.label
+              @params = action.params
               view("object_action")
             end
 
             r.post do
-              action.call(@obj)
+              params = action.params.map { |k, v| typecast_params.send(v, k.to_s) }
+              action.call(@obj, *params)
               flash["notice"] = action.flash
               r.redirect("/model/#{@obj.class}/#{ubid}")
             end
