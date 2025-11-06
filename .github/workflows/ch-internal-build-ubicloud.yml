@@ -1,0 +1,47 @@
+name: Build Push UbiCloud Images
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+on:
+  push:
+    branches:
+      - clickhouse
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+    branches:
+      - clickhouse
+  workflow_dispatch:
+    inputs: {}
+
+jobs:
+  # add tests or custom stuff?
+  generateVersion:
+    uses: ./.github/workflows/ch-internal-reusable-generate-version.yml
+    with:
+      major-version: '2'
+
+  build-and-push:
+    needs: [generateVersion]
+    uses: ./.github/workflows/ch-internal-reusable-build-and-push.yml
+    permissions: write-all
+    with:
+      role-to-assume: ${{ vars.ECR_PUSH_ROLE_ARN }}
+      role-session-name: ubicloud-internal
+      aws-region: ${{ vars.ECR_REGION }}
+      tags: clikgres-ubicloud:${{needs.generateVersion.outputs.VERSION_TAG}}
+      file: ./Dockerfile
+      sha: ${{ github.sha }}
+      context: .
+      build-args: |
+        SERVICE_VERSION=${{needs.generateVersion.outputs.VERSION_TAG}}
+      depot-project-id: ${{ vars.DEPOT_PROJECT_ID }}
+    secrets: inherit
+
+  tagVersion:
+    permissions: write-all
+    needs: [generateVersion, build-and-push]
+    uses: ./.github/workflows/ch-internal-reusable-tag-version.yml
+    with:
+      tag: ubicloud-ubicloud-${{needs.generateVersion.outputs.VERSION_TAG}}
+  # TODO(kg): call internal action that a tag was created

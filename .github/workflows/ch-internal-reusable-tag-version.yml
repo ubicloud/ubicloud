@@ -1,0 +1,53 @@
+name: Tag Version on Git
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: "Tag to use for the git tag"
+        required: true
+        type: string
+      sha:
+        description: "SHA to use for the git tag"
+        required: false
+        type: string
+
+jobs:
+  tagVersion:
+    runs-on: k8s-nano
+    steps:
+      - name: Tag version
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const ref = 'refs/tags/${{ inputs.tag }}';
+            const sha = '${{ inputs.sha }}' || context.sha;
+
+            try {
+              // Try to create the reference first
+              await github.rest.git.createRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: ref,
+                sha: sha
+              });
+              console.log('Successfully created new tag reference: ${{ inputs.tag }}');
+            }
+            catch (error) {
+              // If reference already exists, update it instead
+              if (error.status === 422 && error.message.includes('Reference already exists')) {
+                console.log('Reference already exists, updating instead: ${{ inputs.tag }}');
+                await github.rest.git.updateRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: ref.replace('refs/', ''), // updateRef expects ref without 'refs/' prefix
+                  sha: sha,
+                  force: true
+                });
+                console.log('Successfully updated existing tag reference: ${{ inputs.tag }}');
+              } else {
+                throw error;
+              }
+            }
+      - name: Generate Summary
+        run: echo '### Tagged version ${{ inputs.tag }}' >> $GITHUB_STEP_SUMMARY

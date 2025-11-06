@@ -1,0 +1,42 @@
+name: Generate version
+
+on:
+  workflow_call:
+    inputs:
+      major-version:
+        required: false
+        type: string
+        default: "1"
+    outputs:
+      VERSION_TAG:
+        value: ${{ jobs.generateVersion.outputs.VERSION_TAG }}
+      BUILD_DATE:
+        value: ${{ jobs.generateVersion.outputs.BUILD_DATE }}
+jobs:
+  generateVersion:
+    runs-on: k8s-nano
+    outputs:
+      VERSION_TAG: ${{ steps.image-version-tag.outputs.VERSION_TAG }}
+      BUILD_DATE: ${{ steps.image-version-tag.outputs.BUILD_DATE}}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set outputs
+        id: sha_short
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - name: Generate version tag used for images and helm chart from main branch
+        id: image-version-tag
+        env:
+          RUN_NUMBER: ${{github.run_number}}
+          PR_NUMBER: ${{github.event.pull_request.number}}
+        run: |
+          VERSION_TAG="${{inputs.major-version}}.$RUN_NUMBER"
+          if [ -n "$PR_NUMBER" ]; then
+            VERSION_TAG="$VERSION_TAG.0"
+            # VERSION_TAG="$VERSION_TAG.0-pr-$PR_NUMBER"
+          else
+            VERSION_TAG="$VERSION_TAG.1"
+          fi
+          # VERSION_TAG="${VERSION_TAG}-sha.${{ steps.sha_short.outputs.sha_short }}"
+          echo "VERSION_TAG=$VERSION_TAG" | tee -a $GITHUB_OUTPUT
+          echo "BUILD_DATE=$(date)" | tee -a $GITHUB_OUTPUT
+          echo 'Generated new version as `'$VERSION_TAG'`' >> $GITHUB_STEP_SUMMARY
