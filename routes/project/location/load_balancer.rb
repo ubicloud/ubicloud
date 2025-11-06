@@ -86,8 +86,7 @@ class Clover
 
           DB.transaction do
             lb.update(algorithm:, health_check_endpoint:)
-            lb.ports.first.update(src_port: Validation.validate_port(:src_port, src_port),
-              dst_port: Validation.validate_port(:dst_port, dst_port))
+            lb.ports_dataset.update(src_port: Validation.validate_port(:src_port, src_port), dst_port: Validation.validate_port(:dst_port, dst_port))
 
             new_vms = dataset_authorize(@project.vms_dataset, "Vm:view").eager(:load_balancer).where(id: vm_ids).all
 

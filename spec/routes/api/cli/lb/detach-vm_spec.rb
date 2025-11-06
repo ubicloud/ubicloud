@@ -14,14 +14,14 @@ RSpec.describe Clover, "cli lb attach-vm" do
   end
 
   it "detaches VM from load balancer by id" do
-    expect(@lb.vm_ports_dataset.select_map(:state)).to eq ["down"]
+    expect(@lb.vm_ports_dataset.select_map(:state)).to eq ["down", "down"]
     expect(cli(%W[lb eu-central-h1/test-lb detach-vm #{@vm.ubid}])).to eq "Detached VM #{@vm.ubid} from load balancer with id #{@lb.ubid}\n"
-    expect(@lb.vm_ports_dataset.select_map(:state)).to eq ["detaching"]
+    expect(@lb.vm_ports_dataset.select_map(:state)).to eq ["detaching", "detaching"]
   end
 
   it "detaches VM from load balancer by name" do
-    expect(@lb.vm_ports_dataset.select_map(:state)).to eq ["down"]
+    expect(@lb.vm_ports_dataset.select_map(:state)).to eq ["down", "down"]
     expect(cli(%W[lb eu-central-h1/test-lb detach-vm test-vm])).to eq "Detached VM test-vm from load balancer with id #{@lb.ubid}\n"
-    expect(@lb.vm_ports_dataset.select_map(:state)).to eq ["detaching"]
+    expect(@lb.vm_ports_dataset.select_map(:state)).to eq ["detaching", "detaching"]
   end
 end

@@ -64,10 +64,15 @@ class LoadBalancer < Sequel::Model
     DB.transaction do
       port = super(src_port:, dst_port:)
       load_balancer_vms.each do |lb_vm|
-        LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: lb_vm.id)
+        add_port_with_stack(port, lb_vm.id)
       end
       incr_update_load_balancer
     end
+  end
+
+  def add_port_with_stack(port, lb_vm_id)
+    LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: lb_vm_id, stack: "ipv4") if ipv4_enabled?
+    LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: lb_vm_id, stack: "ipv6") if ipv6_enabled?
   end
 
   def remove_port(port)
@@ -82,7 +87,7 @@ class LoadBalancer < Sequel::Model
     DB.transaction do
       load_balancer_vm = LoadBalancerVm.create(load_balancer_id: id, vm_id: vm.id)
       ports.each { |port|
-        LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: load_balancer_vm.id)
+        add_port_with_stack(port, load_balancer_vm.id)
       }
       setup_cert_server(vm.id) if cert_enabled
       incr_rewrite_dns_records
@@ -131,7 +136,9 @@ class LoadBalancer < Sequel::Model
 
   def remove_vm(vm)
     DB.transaction do
-      vm_ports_by_vm(vm).destroy
+      DB.ignore_duplicate_queries do
+        vm_ports_by_vm(vm).destroy
+      end
       load_balancer_vms_dataset[vm_id: vm.id].destroy
       incr_rewrite_dns_records
     end
@@ -139,7 +146,9 @@ class LoadBalancer < Sequel::Model
 
   def remove_vm_port(vm_port)
     DB.transaction do
-      vm_ports_dataset.where(Sequel[:load_balancer_vm_port][:id] => vm_port.id).destroy
+      DB.ignore_duplicate_queries do
+        vm_ports_dataset.where(Sequel[:load_balancer_vm_port][:id] => vm_port.id).destroy
+      end
       if vm_ports_dataset.where(load_balancer_vm_id: vm_port.load_balancer_vm_id).count.zero?
         load_balancer_vms_dataset[id: vm_port.load_balancer_vm_id].destroy
       end
