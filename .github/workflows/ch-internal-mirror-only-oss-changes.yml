@@ -1,0 +1,33 @@
+name: ch-internal-mirror-only-oss-changes.yml
+on:
+  push:
+    branches:
+      - clickhouse
+
+env:
+  OSS_CHANGES_BRANCH: oss-changes
+
+jobs:
+  mirror-only-oss-changes:
+    runs-on: k8s-nano
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Checkout oss-changes
+        uses: actions/checkout@v5
+        with:
+          ref: main
+          path: oss-changes
+      - name: Move to correct place
+        run: mv oss-changes ../oss-changes
+      - name: Install rsync
+        run: sudo apt update && sudo apt install -y rsync
+      - name: Mirror only oss changes
+        run: |
+          set -eo pipefail
+          .github/scripts/mirror.sh ../oss-changes
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${{ env.OSS_CHANGES_BRANCH }}"
+          |[ -z "$(git status --porcelain)" ] || \
+          ( git add . && git commit -m "chore: changes pending upstream merge" && git push -u origin "${{ env.OSS_CHANGES_BRANCH }}" --force )

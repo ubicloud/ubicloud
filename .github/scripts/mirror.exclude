@@ -1,0 +1,5 @@
+.github/workflows/ch-internal-**
+.github/scripts/mirror.sh
+.github/scripts/mirror.include
+.github/scripts/mirror.exclude
+
