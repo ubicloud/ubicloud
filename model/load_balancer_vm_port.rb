@@ -80,14 +80,17 @@ end
 
 # Table: load_balancer_vm_port
 # Columns:
-#  id                    | uuid                     | PRIMARY KEY
+#  id                    | uuid                     | PRIMARY KEY DEFAULT gen_random_ubid_uuid(55)
 #  load_balancer_vm_id   | uuid                     | NOT NULL
 #  load_balancer_port_id | uuid                     | NOT NULL
 #  state                 | lb_node_state            | NOT NULL DEFAULT 'down'::lb_node_state
 #  last_checked_at       | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  stack                 | text                     |
 # Indexes:
-#  load_balancer_vm_port_pkey | PRIMARY KEY btree (id)
-#  lb_vm_port_unique_index    | UNIQUE btree (load_balancer_port_id, load_balancer_vm_id)
+#  load_balancer_vm_port_pkey    | PRIMARY KEY btree (id)
+#  lb_vm_port_stack_unique_index | UNIQUE btree (load_balancer_port_id, load_balancer_vm_id, stack)
+# Check constraints:
+#  stack_check | (stack = ANY (ARRAY['ipv4'::text, 'ipv6'::text]))
 # Foreign key constraints:
 #  load_balancer_vm_port_load_balancer_port_id_fkey | (load_balancer_port_id) REFERENCES load_balancer_port(id)
 #  load_balancer_vm_port_load_balancer_vm_id_fkey   | (load_balancer_vm_id) REFERENCES load_balancers_vms(id) ON DELETE CASCADE
