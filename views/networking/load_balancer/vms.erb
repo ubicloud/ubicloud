@@ -17,7 +17,13 @@ edit_perm = has_permission?("LoadBalancer:edit", @lb) %>
       <thead class="bg-gray-50">
         <tr>
           <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">VM</th>
-          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Application State</th>
+          <% if @lb.stack == "dual" %>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Application State (IPv4)</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Application State (IPv6)</th>
+          <% else %>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Application State</th>
+          <% end %>
+
           <% if edit_perm %>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
           <% end %>
@@ -30,8 +36,13 @@ edit_perm = has_permission?("LoadBalancer:edit", @lb) %>
               <a href="<%= path(vm) %>" class="text-orange-600 hover:text-orange-700"><%= vm.name %></a>
             </td>
             <td class="px-3 py-3.5 whitespace-nowrap text-sm text-gray-900">
-              <%= vm.load_balancer_state %>
+              <%= vm.load_balancer_state.first %>
             </td>
+            <% if @lb.stack == "dual" %>
+              <td class="px-3 py-3.5 whitespace-nowrap text-sm text-gray-900">
+                <%= vm.load_balancer_state.last %>
+              </td>
+            <% end %>
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
               <% form(action: "#{load_balancer_path}/detach-vm", method: :post) do %>
                 <input type="hidden" name="vm_id" value="<%= vm.ubid %>">
@@ -54,8 +65,8 @@ edit_perm = has_permission?("LoadBalancer:edit", @lb) %>
                 }
               ) %>
             </td>
-            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-            </td>
+            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"></td>
+            <% if @lb.stack == "dual" %><td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"></td><% end %>
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
               <% form(action: "#{load_balancer_path}/attach-vm", method: :post, id: "form-lb-#{@lb.ubid}") do %>
                 <%== part("components/form/submit_button", text: "Attach") %>
