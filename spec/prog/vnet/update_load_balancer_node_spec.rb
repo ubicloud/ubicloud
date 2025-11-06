@@ -65,8 +65,9 @@ RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
       end
 
       it "removes the VM from load balancer if the VM is detaching" do
-        LoadBalancerVmPort.where(id: lb.vm_ports_dataset.map(&:id)).update(state: "detaching")
-        expect(lb).to receive(:remove_vm_port).with(lb.vm_ports_dataset.first)
+        LoadBalancerVmPort.dataset.update(state: "detaching")
+        expect(lb).to receive(:remove_vm_port).with(lb.vm_ports_dataset.find { |lvp| lvp.stack == "ipv4" })
+        expect(lb).to receive(:remove_vm_port).with(lb.vm_ports_dataset.find { |lvp| lvp.stack == "ipv6" })
         expect { nx.update_load_balancer }.to hop("remove_load_balancer")
       end
     end
@@ -96,11 +97,11 @@ table inet nat {
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
 ip daddr 100.100.100.100 tcp dport 80 meta mark set 0x00B1C100D
-ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8080 }
+ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : 192.168.1.0 . 8080, 1 : 192.168.1.0 . 8080 }
 ip daddr 192.168.1.0 tcp dport 80 ct state established,related,new counter dnat to 192.168.1.0:8080
 
 ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 meta mark set 0x00B1C100D
-ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 2a02:a464:deb2:a000::2 . 8080 }
+ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : 2a02:a464:deb2:a000::2 . 8080, 1 : 2a02:a464:deb2:a000::2 . 8080 }
 ip6 daddr fd10:9b0b:6b4b:8fbb::2 tcp dport 80 ct state established,related,new counter dnat to [2a02:a464:deb2:a000::2]:8080
 
 
@@ -143,7 +144,7 @@ table inet nat {
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
 ip daddr 100.100.100.100 tcp dport 80 meta mark set 0x00B1C100D
-ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8080 }
+ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : 192.168.1.0 . 8080, 1 : 192.168.1.0 . 8080 }
 ip daddr 192.168.1.0 tcp dport 80 ct state established,related,new counter dnat to 192.168.1.0:8080
 
 
@@ -190,19 +191,19 @@ table inet nat {
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
 ip daddr 100.100.100.100 tcp dport 80 meta mark set 0x00B1C100D
-ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8080 }
+ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : 192.168.1.0 . 8080, 1 : 192.168.1.0 . 8080 }
 ip daddr 192.168.1.0 tcp dport 80 ct state established,related,new counter dnat to 192.168.1.0:8080
 
 ip daddr 100.100.100.100 tcp dport 443 meta mark set 0x00B1C100D
-ip daddr 100.100.100.100 tcp dport 443 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8443 }
+ip daddr 100.100.100.100 tcp dport 443 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : 192.168.1.0 . 8443, 1 : 192.168.1.0 . 8443 }
 ip daddr 192.168.1.0 tcp dport 443 ct state established,related,new counter dnat to 192.168.1.0:8443
 
 ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 meta mark set 0x00B1C100D
-ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 2a02:a464:deb2:a000::2 . 8080 }
+ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : 2a02:a464:deb2:a000::2 . 8080, 1 : 2a02:a464:deb2:a000::2 . 8080 }
 ip6 daddr fd10:9b0b:6b4b:8fbb::2 tcp dport 80 ct state established,related,new counter dnat to [2a02:a464:deb2:a000::2]:8080
 
 ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 443 meta mark set 0x00B1C100D
-ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 443 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 2a02:a464:deb2:a000::2 . 8443 }
+ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 443 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : 2a02:a464:deb2:a000::2 . 8443, 1 : 2a02:a464:deb2:a000::2 . 8443 }
 ip6 daddr fd10:9b0b:6b4b:8fbb::2 tcp dport 443 ct state established,related,new counter dnat to [2a02:a464:deb2:a000::2]:8443
 
 
@@ -247,11 +248,11 @@ table inet nat {
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
 ip daddr 100.100.100.100 tcp dport 80 meta mark set 0x00B1C100D
-ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to jhash ip saddr . tcp sport . ip daddr . tcp dport mod 1 map { 0 : 192.168.1.0 . 8080 }
+ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to jhash ip saddr . tcp sport . ip daddr . tcp dport mod 2 map { 0 : 192.168.1.0 . 8080, 1 : 192.168.1.0 . 8080 }
 ip daddr 192.168.1.0 tcp dport 80 ct state established,related,new counter dnat to 192.168.1.0:8080
 
 ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 meta mark set 0x00B1C100D
-ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to jhash ip6 saddr . tcp sport . ip6 daddr . tcp dport mod 1 map { 0 : 2a02:a464:deb2:a000::2 . 8080 }
+ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to jhash ip6 saddr . tcp sport . ip6 daddr . tcp dport mod 2 map { 0 : 2a02:a464:deb2:a000::2 . 8080, 1 : 2a02:a464:deb2:a000::2 . 8080 }
 ip6 daddr fd10:9b0b:6b4b:8fbb::2 tcp dport 80 ct state established,related,new counter dnat to [2a02:a464:deb2:a000::2]:8080
 
 
@@ -300,11 +301,11 @@ elements = {fd10:9b0b:6b4b:aaa::2}
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
 ip daddr 100.100.100.100 tcp dport 80 meta mark set 0x00B1C100D
-ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : 172.10.1.0 . 80, 1 : 192.168.1.0 . 8080 }
+ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 4 map { 0 : 172.10.1.0 . 80, 1 : 172.10.1.0 . 80, 2 : 192.168.1.0 . 8080, 3 : 192.168.1.0 . 8080 }
 ip daddr 192.168.1.0 tcp dport 80 ct state established,related,new counter dnat to 192.168.1.0:8080
 
 ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 meta mark set 0x00B1C100D
-ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : 2a02:a464:deb2:a000::2 . 8080, 1 : fd10:9b0b:6b4b:aaa::2 . 80 }
+ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 4 map { 0 : 2a02:a464:deb2:a000::2 . 8080, 1 : 2a02:a464:deb2:a000::2 . 8080, 2 : fd10:9b0b:6b4b:aaa::2 . 80, 3 : fd10:9b0b:6b4b:aaa::2 . 80 }
 ip6 daddr fd10:9b0b:6b4b:8fbb::2 tcp dport 80 ct state established,related,new counter dnat to [2a02:a464:deb2:a000::2]:8080
 
 
@@ -329,6 +330,7 @@ LOAD_BALANCER
 
       it "creates load balancing with multiple vms if all active ipv6 only" do
         lb.update(stack: "ipv6")
+        LoadBalancerVmPort.where(stack: "ipv4").destroy
         expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
@@ -393,11 +395,11 @@ elements = {fd10:9b0b:6b4b:aaa::2}
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
 ip daddr 100.100.100.100 tcp dport 80 meta mark set 0x00B1C100D
-ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 172.10.1.0 . 80 }
+ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : 172.10.1.0 . 80, 1 : 172.10.1.0 . 80 }
 ip daddr 192.168.1.0 tcp dport 80 ct state established,related,new counter dnat to 192.168.1.0:8080
 
 ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 meta mark set 0x00B1C100D
-ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : fd10:9b0b:6b4b:aaa::2 . 80 }
+ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : fd10:9b0b:6b4b:aaa::2 . 80, 1 : fd10:9b0b:6b4b:aaa::2 . 80 }
 ip6 daddr fd10:9b0b:6b4b:8fbb::2 tcp dport 80 ct state established,related,new counter dnat to [2a02:a464:deb2:a000::2]:8080
 
 
@@ -441,11 +443,11 @@ table inet nat {
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
 ip daddr 100.100.100.100 tcp dport 80 meta mark set 0x00B1C100D
-ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8080 }
+ip daddr 100.100.100.100 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : 192.168.1.0 . 8080, 1 : 192.168.1.0 . 8080 }
 ip daddr 192.168.1.0 tcp dport 80 ct state established,related,new counter dnat to 192.168.1.0:8080
 
 ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 meta mark set 0x00B1C100D
-ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 2a02:a464:deb2:a000::2 . 8080 }
+ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : 2a02:a464:deb2:a000::2 . 8080, 1 : 2a02:a464:deb2:a000::2 . 8080 }
 ip6 daddr fd10:9b0b:6b4b:8fbb::2 tcp dport 80 ct state established,related,new counter dnat to [2a02:a464:deb2:a000::2]:8080
 
 

@@ -169,7 +169,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
     end
 
     it "sets hops to wait when vm is in active set of load balancer" do
-      LoadBalancerVmPort.first.update(state: "up")
+      LoadBalancerVmPort.dataset.update(state: "up")
       expect { nx.wait_router_up }.to hop("wait")
     end
   end
