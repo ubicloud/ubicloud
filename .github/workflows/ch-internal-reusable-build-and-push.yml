@@ -43,6 +43,10 @@ on:
         description: "SHA to use for the build"
         required: false
         type: string
+      push:
+        description: "Push the image"
+        required: false
+        type: boolean
 
 jobs:
   build-and-push:
@@ -79,4 +83,6 @@ jobs:
           file: ${{ inputs.file }}
           build-args: ${{ inputs.build-args }}
           platforms: linux/amd64, linux/arm64
-          push: true
+          push: ${{ inputs.push }}
+          labels: |
+            version=${{ inputs.tags }}

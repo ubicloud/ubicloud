@@ -11,6 +11,10 @@ on:
         description: "SHA to use for the git tag"
         required: false
         type: string
+      release:
+        description: "Release the tag"
+        required: false
+        type: boolean
 
 jobs:
   tagVersion:
@@ -49,5 +53,10 @@ jobs:
                 throw error;
               }
             }
+      - if: inputs.release
+        name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
       - name: Generate Summary
         run: echo '### Tagged version ${{ inputs.tag }}' >> $GITHUB_STEP_SUMMARY

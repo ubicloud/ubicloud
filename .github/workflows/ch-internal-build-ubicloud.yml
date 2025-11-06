@@ -12,7 +12,7 @@ on:
     branches:
       - clickhouse
   workflow_dispatch:
-    inputs: {}
+    inputs: { }
 
 jobs:
   # add tests or custom stuff?
@@ -22,7 +22,7 @@ jobs:
       major-version: '2'
 
   build-and-push:
-    needs: [generateVersion]
+    needs: [ generateVersion ]
     uses: ./.github/workflows/ch-internal-reusable-build-and-push.yml
     permissions: write-all
     with:
@@ -36,12 +36,38 @@ jobs:
       build-args: |
         SERVICE_VERSION=${{needs.generateVersion.outputs.VERSION_TAG}}
       depot-project-id: ${{ vars.DEPOT_PROJECT_ID }}
+      push: ${{ github.actor != 'dependabot[bot]' }}
     secrets: inherit
 
   tagVersion:
+    if: ${{ github.event_name == 'push' }}
     permissions: write-all
-    needs: [generateVersion, build-and-push]
+    needs: [ generateVersion, build-and-push ]
     uses: ./.github/workflows/ch-internal-reusable-tag-version.yml
     with:
-      tag: ubicloud-ubicloud-${{needs.generateVersion.outputs.VERSION_TAG}}
-  # TODO(kg): call internal action that a tag was created
+      tag: clickgres-ubicloud-${{needs.generateVersion.outputs.VERSION_TAG}}
+      release: ${{ github.event_name == 'push' }}
+  callClickgresBuilds:
+    if: ${{ github.event_name == 'push' }}
+    needs: [ generateVersion, tagVersion ]
+    strategy:
+      matrix:
+        service:
+          - api
+          - workers
+    runs-on: k8s-nano
+    steps:
+      - name: Generate Token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.WORKFLOW_AUTH_APP_ID }}
+          private-key: ${{ secrets.WORKFLOW_AUTH_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            ${{ secrets.CLICKGRES_REPO }}
+      - name: Call workflow via gh
+        env:
+          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: |
+          gh workflow run --repo ClickHouse/${{ secrets.CLICKGRES_REPO }} clickgres-${{ matrix.service }}.yml -f ubicloud-version=${{needs.generateVersion.outputs.VERSION_TAG}}
