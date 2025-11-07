@@ -572,4 +572,19 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Page #{p.ubid}"
     expect(p.semaphores_dataset.select_map(:name)).to eq ["resolve"]
   end
+
+  it "supports adding credit to Projects" do
+    p = Project.create(name: "Default", credit: 2)
+
+    fill_in "UBID or UUID", with: p.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
+
+    click_link "Add credit"
+    fill_in "credit", with: "50.0"
+    expect { click_button "Add credit" }.to change { p.reload.credit }.from(2).to(52)
+
+    expect(page).to have_flash_notice("Added credit")
+    expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
+  end
 end
