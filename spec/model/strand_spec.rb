@@ -90,9 +90,11 @@ RSpec.describe Strand do
   end
 
   it "logs end of strand if it took long" do
+    now = Time.now
     st.label = "napper"
     st.save_changes
-    expect(Time).to receive(:now).and_return(Time.now - 10, Time.now, Time.now)
+    expect(Time).to receive(:now).and_return(now - 10)
+    expect(Time).to receive(:now).and_return(now).at_least(:once)
     expect(Clog).to receive(:emit).with("finished strand").and_call_original
     st.unsynchronized_run
   end
