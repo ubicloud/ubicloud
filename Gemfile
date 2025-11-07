@@ -12,6 +12,7 @@ gem "autoforme", ">= 1.14"
 gem "aws-sdk-ec2", "~> 1.512"
 gem "aws-sdk-iam"
 gem "aws-sdk-s3"
+gem "aws-sdk-sts", "~> 1.12"
 gem "bcrypt_pbkdf"
 gem "committee", ">= 5.5.4"
 gem "countries"
@@ -88,3 +89,4 @@ end
 group :test, :development do
   gem "sequel-annotate"
 end
+

@@ -48,7 +48,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   label def setup_bucket
-    nap 1 if postgres_timeline.aws? && !aws_access_key_is_available?
+    nap 1 if postgres_timeline.aws? && !Config.aws_postgres_iam_access && !aws_access_key_is_available?
 
     # Create bucket for the timeline
     postgres_timeline.create_bucket
@@ -116,13 +116,8 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   def destroy_aws_s3
-    if postgres_timeline.leader.vm.aws_instance.iam_role
-      iam_client.list_attached_role_policies(role_name: postgres_timeline.leader.vm.aws_instance.iam_role).attached_policies.each.filter {
-        it.policy_name == aws_s3_policy_name
-      }.each do
-        iam_client.detach_role_policy(role_name: postgres_timeline.leader.vm.aws_instance.iam_role, policy_arn: it.policy_arn)
-        iam_client.delete_policy(policy_arn: it.policy_arn)
-      end
+    if Config.aws_postgres_iam_access
+      iam_client.delete_policy(policy_arn: s3_policy_arn)
     else
       iam_client.list_attached_user_policies(user_name: postgres_timeline.ubid).attached_policies.each do
         iam_client.detach_user_policy(user_name: postgres_timeline.ubid, policy_arn: it.policy_arn)
@@ -136,6 +131,14 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     end
   end
 
+  def get_account_id
+    sts_client.get_caller_identity.account
+  end
+
+  def s3_policy_arn
+    "arn:aws:iam::#{get_account_id}:policy/#{aws_s3_policy_name}"
+  end
+
   def setup_blob_storage
     return setup_aws_s3 if postgres_timeline.aws?
 
@@ -146,27 +149,29 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   def setup_aws_s3
-    policy_name = postgres_timeline.leader.vm.aws_instance.iam_role ? aws_s3_policy_name : postgres_timeline.ubid
-    policy = iam_client.create_policy(policy_name:, policy_document: postgres_timeline.blob_storage_policy.to_json)
-    if postgres_timeline.leader.vm.aws_instance.iam_role # attach the policy to the existing VM role
-      iam_client.attach_role_policy(role_name: postgres_timeline.leader.vm.aws_instance.iam_role, policy_arn: policy.policy.arn)
-    else
+    policy_name = aws_s3_policy_name
+    policy = iam_client.create_policy(policy_name: policy_name, policy_document: postgres_timeline.blob_storage_policy.to_json)
+    unless Config.aws_postgres_iam_access
       iam_client.create_user(user_name: postgres_timeline.ubid)
       iam_client.attach_user_policy(user_name: postgres_timeline.ubid, policy_arn: policy.policy.arn)
       response = iam_client.create_access_key(user_name: postgres_timeline.ubid)
       postgres_timeline.update(access_key: response.access_key.access_key_id, secret_key: response.access_key.secret_access_key)
       postgres_timeline.leader.incr_refresh_walg_credentials
-    end
+    end # the policy is later attached at the postgres_server level
   end
 
   def aws_access_key_is_available?
-    !!postgres_timeline.leader.vm.aws_instance.iam_role ||
-      iam_client.list_access_keys(user_name: postgres_timeline.ubid).access_key_metadata.any? { it.access_key_id == postgres_timeline.access_key }
+    iam_client.list_access_keys(user_name: postgres_timeline.ubid).access_key_metadata.any? { it.access_key_id == postgres_timeline.access_key }
   end
 
   def iam_client
     postgres_timeline.location.location_credential.iam_client
   end
+
+  def sts_client
+    postgres_timeline.location.location_credential.sts_client
+  end
+
 
   def admin_client
     @admin_client ||= Minio::Client.new(
@@ -178,6 +183,6 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   def aws_s3_policy_name
-    "pg-s3-#{postgres_timeline.ubid}-policy"
+    postgres_timeline.aws_s3_policy_name
   end
 end

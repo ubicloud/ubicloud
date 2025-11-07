@@ -139,6 +139,9 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def configure_walg_credentials
+    if postgres_server.needs_s3_policy_attachment?
+      postgres_server.attach_s3_policy
+    end
     postgres_server.refresh_walg_credentials
     hop_initialize_empty_database if postgres_server.primary?
     hop_initialize_database_from_backup

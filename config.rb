@@ -148,6 +148,7 @@ module Config
   optional :postgres_paradedb_notification_email, string
   optional :postgres_lantern_notification_email, string
   override :postgres_allow_servers_in_same_data_center, false, bool
+  override :aws_postgres_iam_access, false, bool
 
   # Logging
   optional :database_logger_level, string

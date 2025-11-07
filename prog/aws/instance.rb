@@ -254,6 +254,14 @@ class Prog::Aws::Instance < Prog::Base
       end
     end
 
+    iam_client.list_attached_role_policies(role_name:).attached_policies.tap {
+      Clog.emit("Found additional #{it.length} policies, detaching") if it.length > 0
+    }.each do |policy|
+      ignore_invalid_entity do
+        iam_client.detach_role_policy(role_name:, policy_arn: policy.policy_arn)
+      end
+    end
+
     ignore_invalid_entity do
       iam_client.delete_role({role_name:})
     end

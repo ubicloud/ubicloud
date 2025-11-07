@@ -177,6 +177,10 @@ PGHOST=/var/run/postgresql
       })
     : blob_storage_client.set_lifecycle_policy(ubid, ubid, BACKUP_BUCKET_EXPIRATION_DAYS)
   end
+
+  def aws_s3_policy_name
+    ubid
+  end
 end
 
 # Table: postgres_timeline
