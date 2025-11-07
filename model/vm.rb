@@ -16,7 +16,7 @@ class Vm < Sequel::Model
   one_to_many :pci_devices
   one_through_one :load_balancer
   one_to_one :load_balancer_vm
-  many_to_many :load_balancer_vm_ports, join_table: :load_balancers_vms, right_key: :id, right_primary_key: :load_balancer_vm_id, read_only: true, sort: :stack
+  many_to_many :load_balancer_vm_ports, join_table: :load_balancers_vms, right_key: :id, right_primary_key: :load_balancer_vm_id, read_only: true
   many_to_one :vm_host_slice
   many_to_one :location
   one_to_one :aws_instance, key: :id
