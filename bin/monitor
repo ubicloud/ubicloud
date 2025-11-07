@@ -47,7 +47,7 @@ else
     MinioServer,
     GithubRunner.exclude(ready_at: nil),
     VmHostSlice,
-    LoadBalancerVmPort.where(stack: ["ipv4", "ipv6"]),
+    LoadBalancerVmPort,
     KubernetesCluster,
     VictoriaMetricsServer
   ]
