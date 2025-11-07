@@ -414,13 +414,14 @@ class CloverAdmin < Roda
         flash.now["error"] = "Invalid ubid/uuid provided"
       end
 
-      @grouped_pages = Page.active.reverse(:created_at, :summary).group_by_vm_host
+      @grouped_pages = Page.active.reverse(:created_at, :summary).exclude(severity: "info").group_by_vm_host
       @classes = Sequel::Model
         .subclasses
         .map { [it, it.subclasses] }
         .flatten
         .select { it < ResourceMethods::InstanceMethods }
         .sort_by(&:name)
+      @info_pages = Page.where(severity: "info").reverse(:created_at).all
 
       view("index")
     end

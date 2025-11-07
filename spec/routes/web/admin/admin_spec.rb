@@ -604,4 +604,62 @@ RSpec.describe CloverAdmin do
     expect(page).to have_flash_notice("Added credit")
     expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
   end
+
+  it "lists multiple info pages with proper links and content in table format" do
+    info_pages = [["first", "tag1", Time.now], ["second", "tag2", Time.now - 1], ["third", "tag3", Time.now - 2]].map do |summary, tag, created_at|
+      Page.create(summary:, tag:, severity: "info", created_at:)
+    end
+
+    visit "/"
+    expect(page).to have_table(class: "info-page-table")
+    rows = page.all("table.info-page-table tbody tr")
+    expect(rows.size).to eq(info_pages.size)
+
+    rows.each_with_index do |row, index|
+      cells = row.all("td")
+      expect(cells.size).to eq(3) # Summary, Related Resources, Created At
+      description_cell = cells[0]
+      link = description_cell.find("a")
+      info_page = info_pages[index]
+      expect(link[:href]).to eq("/model/Page/#{info_page.ubid}")
+      expect(link.text).to eq(info_page.summary)
+      related_resources_cell = cells[1]
+      expect(related_resources_cell).to have_content("No related resources")
+      created_at_cell = cells[2]
+      expect(created_at_cell).to have_content(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)
+    end
+  end
+
+  it "does not render the info pages section when there are none" do
+    visit "/"
+    expect(page).to have_no_table(class: "info-page-table")
+    expect(page).to have_no_css("h2", text: "Info Pages")
+  end
+
+  it "lists info pages with related resources as links in table format" do
+    vm = create_vm
+    info_page = Page.create(
+      summary: "Test info page with related resources",
+      tag: "tag1",
+      details: {"related_resources" => [vm.ubid]},
+      severity: "info"
+    )
+
+    visit "/"
+    expect(page).to have_table(class: "info-page-table")
+    rows = page.all("table.info-page-table tbody tr")
+    expect(rows.size).to eq(1)
+
+    row = rows.first
+    cells = row.all("td")
+    expect(cells.size).to eq(3) # Description, Related Resources, Created At
+    summary_cell = cells[0]
+    link = summary_cell.find("a")
+    expect(link[:href]).to eq("/model/Page/#{info_page.ubid}")
+    expect(link.text).to eq(info_page.summary)
+    related_resources_cell = cells[1]
+    expect(related_resources_cell).to have_link(vm.ubid, href: "/model/Vm/#{vm.ubid}")
+    created_at_cell = cells[2]
+    expect(created_at_cell).to have_content(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)
+  end
 end
