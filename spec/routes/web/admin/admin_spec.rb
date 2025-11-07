@@ -587,4 +587,61 @@ RSpec.describe CloverAdmin do
     expect(page).to have_flash_notice("Added credit")
     expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
   end
+
+  it "lists multiple annotations with proper links and content in table format" do
+    annotations_with_timestamps = [["first", Time.now], ["second", Time.now - 1], ["third", Time.now - 2]]
+    annotations = annotations_with_timestamps.map do |description, created_at|
+      Annotation.create(description:, created_at:)
+    end
+
+    visit "/"
+    expect(page).to have_table(class: "annotation-table")
+    rows = page.all("table.annotation-table tbody tr")
+    expect(rows.size).to eq(annotations.size)
+
+    rows.each_with_index do |row, index|
+      cells = row.all("td")
+      expect(cells.size).to eq(3) # Description, Related Resources, CreatedAt
+      description_cell = cells[0]
+      link = description_cell.find("a")
+      annotation = annotations[index]
+      expect(link[:href]).to eq("/model/Annotation/#{annotation.ubid}")
+      expect(link.text).to eq(annotation.description)
+      related_resources_cell = cells[1]
+      expect(related_resources_cell).to have_content("No related resources")
+      created_at_cell = cells[2]
+      expect(created_at_cell).to have_content(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)
+    end
+  end
+
+  it "does not render the annotations section when there are no annotations" do
+    visit "/"
+    expect(page).to have_no_table(class: "annotation-table")
+    expect(page).to have_no_css("h2", text: "Annotations")
+  end
+
+  it "lists annotations with related resources as links in table format" do
+    vm = create_vm
+    annotation = Annotation.create(
+      description: "Test annotation with related resources",
+      related_resources: [vm.id]
+    )
+
+    visit "/"
+    expect(page).to have_table(class: "annotation-table")
+    rows = page.all("table.annotation-table tbody tr")
+    expect(rows.size).to eq(1)
+
+    row = rows.first
+    cells = row.all("td")
+    expect(cells.size).to eq(3) # Description, Related Resources, CreatedAt
+    description_cell = cells[0]
+    link = description_cell.find("a")
+    expect(link[:href]).to eq("/model/Annotation/#{annotation.ubid}")
+    expect(link.text).to eq(annotation.description)
+    related_resources_cell = cells[1]
+    expect(related_resources_cell).to have_link(vm.ubid, href: "/model/Vm/#{vm.ubid}")
+    created_at_cell = cells[2]
+    expect(created_at_cell).to have_content(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)
+  end
 end

@@ -421,6 +421,7 @@ class CloverAdmin < Roda
         .flatten
         .select { it < ResourceMethods::InstanceMethods }
         .sort_by(&:name)
+      @annotations = Annotation.order(Sequel.desc(:created_at)).all
 
       view("index")
     end

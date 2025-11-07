@@ -52,4 +52,36 @@
     <li><a href="/change-password">Change Password</a></li>
     <li><a href="/multifactor-manage">Manage Multifactor Authentication</a></li>
   </ul>
+
+  <% if @annotations.any? %>
+    <h2>Annotations</h2>
+    <table class="annotation-table">
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th>Related Resources</th>
+          <th>CreatedAt</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @annotations.each do |annotation| %>
+          <tr>
+            <td><a href="/model/Annotation/<%= annotation.ubid %>"><%= annotation.description %></a></td>
+            <td>
+              <% if annotation.related_resources&.any? %>
+                <% annotation.related_resources.each do |resource_id| %>
+                  <% ubid = UBID.from_uuidish(resource_id) %>
+                  <% ubid_class = UBID.class_for_ubid(ubid.to_s).name %>
+                  <a href="/model/<%= ubid_class %>/<%= ubid %>"><%= ubid %></a><br>
+                <% end %>
+              <% else %>
+                <em>No related resources</em>
+              <% end %>
+            </td>
+            <td><%= annotation.created_at.strftime("%F %T") %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
 </div>
