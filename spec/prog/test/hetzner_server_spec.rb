@@ -57,7 +57,7 @@ RSpec.describe Prog::Test::HetznerServer do
 
   describe "#reimage" do
     it "can reimage" do
-      expect(hetzner_api).to receive(:reimage).with("1234", dist: "Ubuntu 24.04 LTS base")
+      expect(hetzner_api).to receive(:reimage).with("1234", dist: "Debian 13 base")
       expect { hs_test.reimage }.to hop("wait_reimage")
     end
   end
