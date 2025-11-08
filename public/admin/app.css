@@ -138,6 +138,13 @@ code {
   }
 }
 
+#action-form {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 10px;
+}
+
 .rodauth {
   div { margin-bottom: 10px; }
   label { min-width: 100px; }
