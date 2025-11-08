@@ -1,5 +1,11 @@
 name: 'Setup Clover'
 
+inputs:
+  working-directory:
+    description: "The working directory to run the action in"
+    required: true
+    default: './'
+
 runs:
   using: "composite"
   steps:
@@ -25,14 +31,17 @@ runs:
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: .tool-versions
+        working-directory: ${{ inputs.working-directory }}
         bundler-cache: true
 
     - name: Create .env.rb file
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       run: "bundle exec rake overwrite_envrb && echo '$stdout.sync = true' >> .env.rb"
 
     - name: Setup clover database
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       run: |
         createuser -U postgres clover
         createuser -U postgres clover_password
@@ -40,4 +49,5 @@ runs:
 
     - name: Install CSI gems
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       run: "cd kubernetes/csi && bundle install"
