@@ -70,4 +70,16 @@ RSpec.describe ResourceMethods do
     expect(Sshable["sh1lawjdkcj25gq7hhb8tj3v6p"]).to be_nil
     expect { Sshable["sh4oc37mce4p3nsdy34qa0n9j8"] }.to raise_error(Sequel::DatabaseError)
   end
+
+  it "dataset.destroy avoids duplicate query warnings" do
+    sa1 = Sshable.create(host: "test1.localhost", raw_private_key_1: SshKey.generate.keypair)
+    sa2 = Sshable.create(host: "test2.localhost", raw_private_key_1: SshKey.generate.keypair)
+
+    l = proc { Sshable.where(id: [sa1.id, sa2.id]).destroy }
+    if ENV["CLOVER_FREEZE"] == "1"
+      expect(l.call).to eq 2
+    else
+      expect(DB.detect_duplicate_queries(&l)).to eq 2
+    end
+  end
 end
