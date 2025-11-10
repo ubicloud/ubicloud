@@ -23,6 +23,25 @@ class PostgresResource < Sequel::Model
   plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records, :destroy, :promote, :refresh_certificates, :use_different_az
   include ObjectTag::Cleanup
 
+  # :nocov:
+  def self.remove_internal_firewall_rules
+    all do |pg|
+      next unless (firewall = pg.customer_firewall)
+
+      print "Removing internal firewall rules from customer firewall for #{pg.ubid}..."
+
+      ds = firewall.firewall_rules_dataset
+      ps = pg.private_subnet
+      ds.where(port_range: Sequel.pg_range(22..22), cidr: %w[0.0.0.0/0 ::/0]).destroy
+      ds.where(port_range: [Sequel.pg_range(5432..5432), Sequel.pg_range(6432..6432)], cidr: [ps.net4.to_s, ps.net6.to_s]).destroy
+
+      puts "done"
+    end
+
+    nil
+  end
+  # :nocov:
+
   def display_location
     location.display_name
   end
