@@ -14,6 +14,7 @@ class Vm < Sequel::Model
   one_to_many :vm_storage_volumes, order: Sequel.desc(:boot)
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, &:active
   one_to_many :pci_devices
+  one_to_one :gpu_partition
   one_through_one :load_balancer
   one_to_one :load_balancer_vm
   many_to_many :load_balancer_vm_ports, join_table: :load_balancers_vms, right_key: :id, right_primary_key: :load_balancer_vm_id, read_only: true
