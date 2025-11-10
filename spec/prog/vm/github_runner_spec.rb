@@ -326,6 +326,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(project).to receive(:active?).and_return(false)
 
       expect { nx.start }.to exit({"msg" => "Could not provision a runner for inactive project"})
+      expect(GithubRunner[runner.id]).to be_nil
     end
   end
 

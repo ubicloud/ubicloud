@@ -173,7 +173,10 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def start
-    pop "Could not provision a runner for inactive project" unless github_runner.installation.project.active?
+    unless github_runner.installation.project.active?
+      github_runner.destroy
+      pop "Could not provision a runner for inactive project"
+    end
     hop_wait_concurrency_limit unless quota_available?
     hop_apply_custom_label_quota if github_runner.custom_label
     hop_allocate_vm
