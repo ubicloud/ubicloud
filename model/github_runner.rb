@@ -51,6 +51,7 @@ class GithubRunner < Sequel::Model
         values[:vm_host_ubid] = vm.vm_host.ubid
         values[:data_center] = vm.vm_host.data_center
       end
+      values[:instance_id] = vm.aws_instance.instance_id if vm.aws_instance
       values[:vm_pool_ubid] = VmPool[vm.pool_id].ubid if vm.pool_id
     end
     Clog.emit(message) { {message => values} }
