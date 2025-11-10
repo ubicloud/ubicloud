@@ -61,11 +61,13 @@ RSpec.describe GithubRunner do
   it "can log duration when vm does not have vm_host" do
     github_runner.vm.update(vm_host_id: nil)
     vm = github_runner.vm
+    AwsInstance.create_with_id(vm.id, instance_id: "i-0123456789abcdefg")
     expect(clog_emit_hash).to eq({
       repository_name: "test-repo",
       ubid: github_runner.ubid,
       label: github_runner.label,
       duration: 10,
+      instance_id: "i-0123456789abcdefg",
       conclusion: nil,
       vm_ubid: vm.ubid,
       arch: vm.arch,

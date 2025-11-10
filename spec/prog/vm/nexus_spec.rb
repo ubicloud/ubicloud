@@ -841,6 +841,7 @@ RSpec.describe Prog::Vm::Nexus do
     it "creates a billing record when host is nil, too" do
       expect(vm).to receive(:vm_host).and_return(nil)
       vm.location.provider = "aws"
+      AwsInstance.create_with_id(vm.id, instance_id: "i-0123456789abcdefg")
       expect(BillingRecord).to receive(:create).once
       expect(vm).to receive(:project).and_return(prj).at_least(:once)
 
