@@ -96,13 +96,13 @@ class Project < Sequel::Model
   def soft_delete
     DB.transaction do
       DB[:access_tag].where(project_id: id).delete
+      access_control_entries_dataset.destroy
+      %w[subject action object].each do |tag_type|
+        dataset = send(:"#{tag_type}_tags_dataset")
+        DB[:"applied_#{tag_type}_tag"].where(tag_id: dataset.select(:id)).delete
+        dataset.destroy
+      end
       DB.ignore_duplicate_queries do
-        access_control_entries_dataset.destroy
-        %w[subject action object].each do |tag_type|
-          dataset = send(:"#{tag_type}_tags_dataset")
-          DB[:"applied_#{tag_type}_tag"].where(tag_id: dataset.select(:id)).delete
-          dataset.destroy
-        end
         github_installations.each { Prog::Github::DestroyGithubInstallation.assemble(it) }
       end
 
