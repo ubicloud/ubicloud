@@ -6,12 +6,24 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
   def self.assemble(project_id, sshable_unix_user:, name:, location_id:, size:, storage_volumes:, boot_image:, private_subnet_id:, enable_ip4:, kubernetes_cluster_id:, kubernetes_nodepool_id: nil)
     DB.transaction do
       id = KubernetesNode.generate_uuid
+      cluster = KubernetesCluster[kubernetes_cluster_id]
+
+      exclude_host_ids = if kubernetes_nodepool_id
+        []
+      else
+        cluster.cp_vms_dataset
+          .exclude(vm_host_id: nil)
+          .unordered
+          .distinct
+          .select_map(:vm_host_id)
+      end
+
       vm = Prog::Vm::Nexus.assemble_with_sshable(project_id, sshable_unix_user:, name:, location_id:,
         size:, storage_volumes:, boot_image:, private_subnet_id:, enable_ip4:,
-        allow_private_subnet_in_other_project: true).subject
+        allow_private_subnet_in_other_project: true,
+        exclude_host_ids:).subject
 
-      node = KubernetesNode.create_with_id(id, vm_id: vm.id, kubernetes_cluster_id:, kubernetes_nodepool_id:)
-      cluster = node.kubernetes_cluster
+      KubernetesNode.create_with_id(id, vm_id: vm.id, kubernetes_cluster_id:, kubernetes_nodepool_id:)
 
       internal_firewall = kubernetes_nodepool_id ? cluster.internal_worker_vm_firewall : cluster.internal_cp_vm_firewall
       vm.add_vm_firewall(internal_firewall)
