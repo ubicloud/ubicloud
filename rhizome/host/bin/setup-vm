@@ -64,6 +64,7 @@ begin
   storage_volumes = params.fetch("storage_volumes")
   swap_size_bytes = params["swap_size_bytes"]
   pci_devices = params.fetch("pci_devices", [])
+  gpu_partition_id = params["gpu_partition_id"]
   boot_image = params.fetch("boot_image")
   dns_ipv4 = params.fetch("dns_ipv4")
   slice_name = params.fetch("slice_name", "system.slice")
@@ -89,7 +90,7 @@ when "prep"
     ndp_needed, storage_volumes, storage_secrets, swap_size_bytes,
     pci_devices, boot_image, dns_ipv4,
     slice_name, cpu_percent_limit, cpu_burst_percent_limit,
-    init_script, ipv6_disabled)
+    init_script, ipv6_disabled, gpu_partition_id)
 when "recreate-unpersisted"
   secrets = JSON.parse($stdin.read)
   unless (storage_secrets = secrets["storage"])
@@ -100,7 +101,7 @@ when "recreate-unpersisted"
   vm_setup.recreate_unpersisted(
     gua, ip4, local_ip4, nics, mem_gib,
     ndp_needed, storage_volumes, storage_secrets, dns_ipv4,
-    pci_devices, slice_name, cpu_burst_percent_limit,
+    pci_devices, slice_name, cpu_burst_percent_limit, gpu_partition_id,
     multiqueue: max_vcpus > 1
   )
 when "reinstall-systemd-units"

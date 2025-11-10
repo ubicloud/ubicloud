@@ -59,7 +59,7 @@ class VmSetup
   def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology,
     mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices,
     boot_image, dns_ipv4, slice_name, cpu_percent_limit, cpu_burst_percent_limit,
-    init_script, ipv6_disabled)
+    init_script, ipv6_disabled, gpu_partition_id)
 
     cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled: ipv6_disabled, init_script: init_script)
     network_thread = Thread.new do
@@ -70,7 +70,7 @@ class VmSetup
     end
     [network_thread, storage_thread].each(&:join)
     hugepages(mem_gib)
-    prepare_pci_devices(pci_devices)
+    prepare_gpus(pci_devices, gpu_partition_id)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
     start_systemd_unit
     update_via_routes(nics)
@@ -79,12 +79,12 @@ class VmSetup
   end
 
   def recreate_unpersisted(gua, ip4, local_ip4, nics, mem_gib, ndp_needed, storage_params,
-    storage_secrets, dns_ipv4, pci_devices, slice_name, cpu_burst_percent_limit, multiqueue:)
+    storage_secrets, dns_ipv4, pci_devices, slice_name, cpu_burst_percent_limit, gpu_partition_id, multiqueue:)
 
     setup_networking(true, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: multiqueue)
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
-    prepare_pci_devices(pci_devices)
+    prepare_gpus(pci_devices, gpu_partition_id)
     start_systemd_unit
     update_via_routes(nics)
 
@@ -200,6 +200,11 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     storage_roots = []
 
     params = JSON.parse(File.read(vp.prep_json))
+
+    if (gpu_partition_id = params["gpu_partition_id"])
+      r("/usr/bin/fmpm -d #{gpu_partition_id}", expect: [0, 238])
+    end
+
     params["storage_volumes"].reject { _1["read_only"] }.each { |params|
       volume = StorageVolume.new(@vm_name, params)
       volume.purge_spdk_artifacts
@@ -646,11 +651,12 @@ EOS
     r("ip netns exec #{q_vm} sysctl -w net.ipv4.ip_forward=1")
   end
 
-  def prepare_pci_devices(pci_devices)
+  def prepare_gpus(pci_devices, gpu_partition_id)
     pci_devices.select { _1[0].end_with? ".0" }.each do |pci_dev|
       r("echo 1 > /sys/bus/pci/devices/0000:#{pci_dev[0]}/reset")
       r("chown #{@vm_name}:#{@vm_name} /sys/kernel/iommu_groups/#{pci_dev[1]} /dev/vfio/#{pci_dev[1]}")
     end
+    r("/usr/bin/fmpm -a #{gpu_partition_id}", expect: [0, 239]) if gpu_partition_id
   end
 
   def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)

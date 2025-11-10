@@ -260,6 +260,7 @@ class Vm < Sequel::Model
       storage_volumes:,
       swap_size_bytes:,
       pci_devices: pci_devices.map { [it.slot, it.iommu_group] },
+      gpu_partition_id: gpu_partition&.partition_id,
       slice_name: vm_host_slice&.inhost_name || "system.slice",
       cpu_percent_limit: cpu_percent_limit || 0,
       cpu_burst_percent_limit: cpu_burst_percent_limit || 0,
