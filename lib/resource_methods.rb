@@ -112,6 +112,14 @@ module ResourceMethods
     end
   end
 
+  module DatasetMethods
+    def destroy
+      DB.ignore_duplicate_queries do
+        super
+      end
+    end
+  end
+
   module ClassMethods
     attr_reader :ubid_format
 

@@ -220,6 +220,7 @@ def clover_freeze
     Prog::Vnet::RekeyNicTunnel::Xfrm,
     ResourceMethods,
     ResourceMethods::ClassMethods,
+    ResourceMethods::DatasetMethods,
     ResourceMethods::InstanceMethods,
     ResourceMethods::UbidTypeEtcMethods,
     Scheduling,
