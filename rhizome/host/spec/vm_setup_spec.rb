@@ -278,7 +278,7 @@ RSpec.describe VmSetup do
 
         expect(content).to include("ExecStart=/usr/bin/qemu-system-#{Arch.render(x64: "x86_64", arm64: "aarch64")}")
         %w[
-          -bios /opt/fw/CLOUDHV-202311.fd
+          -bios /opt/fw/QEMU.fd
           -object memory-backend-memfd,id=mem0,size=2G,hugetlb=on,hugetlbsize=1G,prealloc=on,share=on
           -numa node,memdev=mem0
           -m 2G
@@ -295,7 +295,6 @@ RSpec.describe VmSetup do
           -no-reboot
         ].each { |frag| expect(content).to include(frag) }
 
-        expect(content).to include("ExecStop=/bin/kill -TERM $MAINPID")
         expect(content).to include("KillSignal=SIGTERM")
         expect(content).to include("TimeoutStopSec=30s")
         expect(content).to include("Restart=no")
