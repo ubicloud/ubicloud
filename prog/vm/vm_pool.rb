@@ -18,7 +18,7 @@ class Prog::Vm::VmPool < Prog::Base
         storage_skip_sync:,
         arch:
       )
-      Strand.create_with_id(vm_pool.id, prog: "Vm::VmPool", label: "create_new_vm")
+      Strand.create_with_id(vm_pool, prog: "Vm::VmPool", label: "create_new_vm")
     end
   end
 

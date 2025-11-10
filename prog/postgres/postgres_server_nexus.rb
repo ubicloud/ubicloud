@@ -65,7 +65,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
       vm_st.subject.add_vm_firewall(postgres_resource.internal_firewall)
 
-      Strand.create_with_id(postgres_server.id, prog: "Postgres::PostgresServerNexus", label: "start")
+      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "start")
     end
   end
 

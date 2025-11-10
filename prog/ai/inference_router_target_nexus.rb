@@ -29,7 +29,7 @@ class Prog::Ai::InferenceRouterTargetNexus < Prog::Base
         enabled:
       )
 
-      Strand.create_with_id(target.id, prog: "Ai::InferenceRouterTargetNexus", label: "start")
+      Strand.create_with_id(target, prog: "Ai::InferenceRouterTargetNexus", label: "start")
     end
   end
 

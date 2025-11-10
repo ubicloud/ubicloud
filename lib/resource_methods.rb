@@ -155,7 +155,12 @@ module ResourceMethods
 
     def create_with_id(id, **)
       obj = new(**)
-      obj.id = id
+      obj.id = case id
+      when String, nil
+        id
+      else
+        id.id
+      end
       obj.save_changes
     end
 

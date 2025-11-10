@@ -20,7 +20,7 @@ class Prog::Vm::GithubRunner < Prog::Base
         actual_label: actual_label || label
       )
 
-      Strand.create_with_id(github_runner.id, prog: "Vm::GithubRunner", label: "start")
+      Strand.create_with_id(github_runner, prog: "Vm::GithubRunner", label: "start")
     end
   end
 

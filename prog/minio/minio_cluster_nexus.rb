@@ -48,7 +48,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
         Prog::Minio::MinioPoolNexus.assemble(minio_cluster.id, start_index, per_pool_server_count, per_pool_drive_count, per_pool_storage_size, vm_size)
       end
 
-      Strand.create_with_id(minio_cluster.id, prog: "Minio::MinioClusterNexus", label: "wait_pools")
+      Strand.create_with_id(minio_cluster, prog: "Minio::MinioClusterNexus", label: "wait_pools")
     end
   end
 

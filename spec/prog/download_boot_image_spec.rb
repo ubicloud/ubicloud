@@ -23,7 +23,7 @@ RSpec.describe Prog::DownloadBootImage do
     end
 
     it "exits if image already exists" do
-      BootImage.create_with_id(vm_host.id, vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 3)
+      BootImage.create_with_id(vm_host, vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 3)
       expect { dbi.start }.to exit({"msg" => "Image already exists on host"})
     end
 

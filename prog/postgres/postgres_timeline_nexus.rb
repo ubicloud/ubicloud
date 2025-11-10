@@ -29,7 +29,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
         blob_storage_id: minio_cluster&.id,
         location_id: location.id
       )
-      Strand.create_with_id(postgres_timeline.id, prog: "Postgres::PostgresTimelineNexus", label: "start")
+      Strand.create_with_id(postgres_timeline, prog: "Postgres::PostgresTimelineNexus", label: "start")
     end
   end
 
