@@ -862,7 +862,7 @@ DNSMASQ_SERVICE
 
     pci_parts = if pci_devices.any?
       pci_devices.map.with_index(1) do |dev, i|
-        "-device pcie-root-port,id=rp#{i},slot=#{i},chassis=#{i},hotplug=off -device vfio-pci,host=0000:#{dev[0]},bus=rp#{i}"
+        "-device pcie-root-port,id=rp#{i},slot=#{i},chassis=#{i},hotplug=off -device vfio-pci,host=0000:#{dev[0]},bus=rp#{i},x-no-mmap=true"
       end
     else
       []
@@ -875,7 +875,7 @@ DNSMASQ_SERVICE
     ]
 
     kernel_parts = [
-      "-bios #{@firmware_version.path}"
+      "-bios /opt/fw/QEMU.fd"
     ]
 
     <<~SERVICE
@@ -887,7 +887,6 @@ DNSMASQ_SERVICE
   ExecStart=/usr/bin/qemu-system-#{Arch.render(x64: "x86_64", arm64: "aarch64")} \\
   #{(kernel_parts + mem_parts + cpu_parts + disk_parts + net_parts + pci_parts + serial_parts).join(" \\\n")}
 
-  ExecStop=/bin/kill -TERM $MAINPID
   KillSignal=SIGTERM
   TimeoutStopSec=30s
 
