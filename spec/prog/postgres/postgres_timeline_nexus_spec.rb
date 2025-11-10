@@ -102,6 +102,39 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect { nx.setup_bucket }.to hop("wait_leader")
     end
 
+    it "attach policy to role when vm has iam_role" do
+      iam_client = Aws::IAM::Client.new(stub_responses: true)
+      iam_client.stub_responses(:create_policy, {policy: {arn: "policy-arn"}})
+      expect(postgres_timeline).to receive(:leader).and_return(instance_double(
+        PostgresServer,
+        strand: instance_double(Strand, label: "wait"),
+        vm: instance_double(Vm, aws_instance: instance_double(AwsInstance, iam_role: "vm-role"))
+      )).at_least(:once)
+      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, location_credential: instance_double(LocationCredential, iam_client:))).at_least(:once)
+      expect(iam_client).to receive(:attach_role_policy).with(role_name: "vm-role", policy_arn: "policy-arn")
+
+      nx.setup_aws_s3
+    end
+
+    it "#destroy_aws_s3 detach policy to vm role" do
+      iam_client = Aws::IAM::Client.new(stub_responses: true)
+      policies = iam_client.stub_data(:list_attached_role_policies, {attached_policies: [
+        {policy_name: "ignore-this-policy"},
+        {policy_name: nx.aws_s3_policy_name}
+      ]})
+      iam_client.stub_responses(:list_attached_role_policies, policies)
+      expect(postgres_timeline).to receive(:leader).and_return(instance_double(
+        PostgresServer,
+        strand: instance_double(Strand, label: "wait"),
+        vm: instance_double(Vm, aws_instance: instance_double(AwsInstance, iam_role: "vm-role"))
+      )).at_least(:once)
+      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, location_credential: instance_double(LocationCredential, iam_client:))).at_least(:once)
+      expect(iam_client).to receive(:detach_role_policy)
+      expect(iam_client).to receive(:delete_policy)
+
+      nx.destroy_aws_s3
+    end
+
     it "naps if aws and the key is not available" do
       iam_client = Aws::IAM::Client.new(stub_responses: true)
       expect(postgres_timeline).to receive(:aws?).and_return(true)

@@ -34,6 +34,29 @@ PGHOST=/var/run/postgresql
     expect(postgres_timeline.generate_walg_config).to eq(walg_config.sub("us-east-1", "us-east-2"))
   end
 
+  it "returns walg config without keys when vm has iam_role" do
+    expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
+
+    walg_config = <<-WALG_CONF
+WALG_S3_PREFIX=s3://#{postgres_timeline.ubid}
+AWS_ENDPOINT=https://blob-endpoint
+
+AWS_REGION=us-east-1
+AWS_S3_FORCE_PATH_STYLE=true
+PGHOST=/var/run/postgresql
+    WALG_CONF
+
+    expect(postgres_timeline).to receive(:leader).and_return(instance_double(
+      PostgresServer,
+      strand: instance_double(Strand, label: "wait"),
+      vm: instance_double(Vm, aws_instance: instance_double(AwsInstance, iam_role: "vm-role"))
+    )).at_least(:once)
+    expect(postgres_timeline.generate_walg_config).to eq(walg_config)
+    expect(postgres_timeline).to receive(:aws?).and_return(true)
+    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2"))
+    expect(postgres_timeline.generate_walg_config).to eq(walg_config.sub("us-east-1", "us-east-2"))
+  end
+
   describe "#need_backup?" do
     let(:sshable) { instance_double(Sshable) }
     let(:leader) {
