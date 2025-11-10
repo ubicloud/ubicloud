@@ -144,9 +144,9 @@ class CloverAdmin < Roda
     end
   end
 
-  ObjectAction = Data.define(:label, :flash, :params, :action) do
-    def self.define(label, flash, params = {}, &action)
-      new(label, flash, params.dup.freeze, action)
+  ObjectAction = Data.define(:label, :flash, :redirect, :params, :action) do
+    def self.define(label, flash, redirect = nil, params = {}, &action)
+      new(label, flash, redirect, params.dup.freeze, action)
     end
 
     def call(...)
@@ -172,7 +172,7 @@ class CloverAdmin < Roda
       "restart" => object_action("Restart", "Restart scheduled for PostgresResource", &:incr_restart)
     },
     "Project" => {
-      "add_credit" => object_action("Add credit", "Added credit", {credit: "float!"}) do |obj, credit|
+      "add_credit" => object_action("Add credit", "Added credit", nil, {credit: "float!"}) do |obj, credit|
         obj.this.update(credit: Sequel[:credit] + credit)
       end
     },
@@ -394,7 +394,8 @@ class CloverAdmin < Roda
               params = action.params.map { |k, v| typecast_params.send(v, k.to_s) }
               action.call(@obj, *params)
               flash["notice"] = action.flash
-              r.redirect("/model/#{@obj.class}/#{ubid}")
+              redirect_path = action.redirect.nil? ? "/model/#{@obj.class}/#{ubid}" : action.redirect
+              r.redirect(redirect_path)
             end
           end
         end
