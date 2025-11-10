@@ -20,9 +20,10 @@ end
 
 # Table: location_credential
 # Columns:
-#  access_key | text | NOT NULL
-#  secret_key | text | NOT NULL
-#  id         | uuid | PRIMARY KEY
+#  access_key  | text | NOT NULL
+#  secret_key  | text | NOT NULL
+#  id          | uuid | PRIMARY KEY
+#  assume_role | text |
 # Indexes:
 #  location_credential_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
