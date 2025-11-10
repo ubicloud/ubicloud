@@ -50,3 +50,5 @@ end
 # Foreign key constraints:
 #  pci_device_vm_host_id_fkey | (vm_host_id) REFERENCES vm_host(id)
 #  pci_device_vm_id_fkey      | (vm_id) REFERENCES vm(id)
+# Referenced By:
+#  gpu_partitions_pci_devices | gpu_partitions_pci_devices_pci_device_id_fkey | (pci_device_id) REFERENCES pci_device(id) ON DELETE CASCADE
