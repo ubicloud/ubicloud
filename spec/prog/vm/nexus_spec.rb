@@ -1104,6 +1104,16 @@ RSpec.describe Prog::Vm::Nexus do
       expect { nx.destroy }.to hop("destroy_slice")
     end
 
+    it "detaches from gpu partition" do
+      ds = instance_double(Sequel::Dataset)
+      expect(vm).to receive(:gpu_partition_dataset).and_return(ds)
+      expect(ds).to receive(:update).with(vm_id: nil)
+      expect(vm).to receive(:update).with(display_state: "deleting")
+      allow(vm).to receive(:vm_storage_volumes).and_return([])
+
+      expect { nx.destroy }.to hop("destroy_slice")
+    end
+
     it "updates slice" do
       vm_host_slice = instance_double(VmHostSlice)
       expect(vm).to receive(:vm_host_slice).and_return(vm_host_slice)

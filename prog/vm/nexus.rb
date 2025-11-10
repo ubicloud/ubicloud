@@ -582,6 +582,7 @@ class Prog::Vm::Nexus < Prog::Base
     end
 
     vm.pci_devices_dataset.update(vm_id: nil)
+    vm.gpu_partition_dataset.update(vm_id: nil)
 
     hop_remove_vm_from_load_balancer if vm.load_balancer
 
