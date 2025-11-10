@@ -329,6 +329,24 @@ class PostgresServer < Sequel::Model
     vm.sshable.cmd("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: timeline.blob_storage.root_certs) unless timeline.aws?
   end
 
+  def needs_s3_policy_attachment?
+    timeline.aws? and vm.aws_instance.iam_role
+  end
+
+  def attach_s3_policy_if_needed
+    if needs_s3_policy_attachment?
+      vm.location.location_credential.iam_client.attach_role_policy(role_name: vm.aws_instance.iam_role, policy_arn: s3_policy_arn)
+    end
+  end
+
+  def s3_policy_arn
+    "arn:aws:iam::#{get_account_id}:policy/#{timeline.aws_s3_policy_name}"
+  end
+
+  def get_account_id
+    vm.location.location_credential.get_account_id
+  end
+
   FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over"].freeze
 end
 

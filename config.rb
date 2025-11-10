@@ -80,6 +80,7 @@ module Config
   override :dispatcher_queue_size_ratio, 4, float
   override :recursive_tag_limit, 32, int
   override :root, File.expand_path(__dir__), string
+  override :hostname, "ubi", string
   optional :hetzner_user, string, clear: true
   optional :hetzner_password, string, clear: true
   override :hetzner_connection_string, "https://robot-ws.your-server.de", string
@@ -146,6 +147,8 @@ module Config
   optional :postgres_monitor_database_root_certs, string
   optional :postgres_paradedb_notification_email, string
   optional :postgres_lantern_notification_email, string
+  override :postgres_allow_servers_in_same_data_center, false, bool
+  override :aws_postgres_iam_access, false, bool
 
   # Logging
   optional :database_logger_level, string
@@ -238,4 +241,7 @@ module Config
 
   # Monitoring
   optional :monitoring_service_project_id, string
+
+  # Configuration files
+  override :default_quotas_file_path, "config/default_quotas.yml", string
 end

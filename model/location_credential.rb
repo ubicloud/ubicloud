@@ -3,18 +3,35 @@
 require_relative "../model"
 require "aws-sdk-ec2"
 require "aws-sdk-iam"
+require "aws-sdk-sts"
 
 class LocationCredential < Sequel::Model
   plugin ResourceMethods, encrypted_columns: [:access_key, :secret_key]
   many_to_one :project
   many_to_one :location, key: :id
 
+  def credentials
+    @credentials ||= if assume_role
+      Aws::AssumeRoleCredentials.new(role_arn: assume_role, role_session_name: Config.hostname)
+    else
+      Aws::Credentials.new(access_key, secret_key)
+    end
+  end
+
   def client
-    Aws::EC2::Client.new(access_key_id: access_key, secret_access_key: secret_key, region: location.name)
+    Aws::EC2::Client.new(region: location.name, credentials:)
   end
 
   def iam_client
-    Aws::IAM::Client.new(access_key_id: access_key, secret_access_key: secret_key, region: location.name)
+    Aws::IAM::Client.new(region: location.name, credentials:)
+  end
+
+  def sts_client
+    Aws::STS::Client.new(region: location.name, credentials:)
+  end
+
+  def get_account_id
+    @account_id ||= sts_client.get_caller_identity.account
   end
 end
 
