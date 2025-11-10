@@ -519,4 +519,28 @@ RSpec.describe PostgresServer do
       expect { postgres_server.refresh_walg_credentials }.not_to raise_error
     end
   end
+
+  if ENV["CLOVER_FREEZE"] != "1"
+    describe "#attach_s3_policy_if_needed" do
+      before do
+        allow(Config).to receive(:aws_postgres_iam_access).and_return(true)
+        AwsInstance.create_with_id(vm, iam_role: "role")
+      end
+
+      it "calls attach_role_policy when needs s3 policy attachment" do
+        location.update(provider: "aws")
+        iam_client = Aws::IAM::Client.new(stub_responses: true)
+        LocationCredential.create(location:, assume_role: "role")
+        expect(postgres_server.timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
+        expect(postgres_server.timeline.location.location_credential).to receive(:iam_client).and_return(iam_client)
+        expect(iam_client).to receive(:attach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.aws_s3_policy_arn)
+        postgres_server.attach_s3_policy_if_needed
+      end
+
+      it "does not call attach_role_policy when needs s3 policy attachment" do
+        expect(postgres_server).not_to receive(:vm)
+        postgres_server.attach_s3_policy_if_needed
+      end
+    end
+  end
 end
