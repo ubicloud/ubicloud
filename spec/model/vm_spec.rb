@@ -467,7 +467,8 @@ RSpec.describe Vm do
             random_private_ipv6: NetAddr::IPv6Net.parse("fd00::/64")
           )
         ),
-        vm_host: instance_double(VmHost, ndp_needed: false, spdk_installations: [], accepts_slices: true)
+        vm_host: instance_double(VmHost, ndp_needed: false, spdk_installations: [], accepts_slices: true),
+        gpu_partition: instance_double(GpuPartition, partition_id: 3)
       )
     end
 
@@ -490,6 +491,13 @@ RSpec.describe Vm do
 
       json = JSON.parse(vm.params_json(hypervisor: "ch"))
       expect(json["hypervisor"]).to eq("ch")
+    end
+
+    it "includes the gpu partition id" do
+      allow(vm).to receive(:pci_devices).and_return([instance_double(PciDevice, device: "2901", slot: "0000:00:00.0", iommu_group: "0")])
+
+      json = JSON.parse(vm.params_json)
+      expect(json["gpu_partition_id"]).to eq(3)
     end
   end
 end
