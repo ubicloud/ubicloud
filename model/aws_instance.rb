@@ -14,5 +14,6 @@ end
 #  instance_id   | text |
 #  az_id         | text |
 #  ipv4_dns_name | text |
+#  iam_role      | text |
 # Indexes:
 #  aws_instance_pkey | PRIMARY KEY btree (id)
