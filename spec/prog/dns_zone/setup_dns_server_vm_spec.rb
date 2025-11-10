@@ -16,7 +16,7 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
   let(:dzs) do
     build_zone = ->(name, neg_ttl) do
       dz = DnsZone.create(project_id: project.id, name: name, last_purged_at: Time.now, neg_ttl: neg_ttl)
-      Strand.create_with_id(dz.id, prog: "DnsZone::DnsZoneNexus", label: "wait")
+      Strand.create_with_id(dz, prog: "DnsZone::DnsZoneNexus", label: "wait")
       dz.add_dns_server ds
       3.times { dz.insert_record(record_name: "#{SecureRandom.alphanumeric(6)}.#{dz.name}", type: "A", ttl: 10, data: IPAddr.new(rand(2**32), Socket::AF_INET).to_s) }
       dz

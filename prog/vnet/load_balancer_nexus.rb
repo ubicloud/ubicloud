@@ -40,7 +40,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
         cert_enabled:
       )
       ports.each { |src_port, dst_port| LoadBalancerPort.create(load_balancer_id: lb.id, src_port:, dst_port:) }
-      Strand.create_with_id(lb.id, prog: "Vnet::LoadBalancerNexus", label: "wait")
+      Strand.create_with_id(lb, prog: "Vnet::LoadBalancerNexus", label: "wait")
     end
   end
 

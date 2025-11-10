@@ -203,7 +203,7 @@ class Prog::Aws::Instance < Prog::Base
     az_id = subnet_response.subnets.first.availability_zone_id
     ipv4_dns_name = instance.public_dns_name
 
-    AwsInstance.create_with_id(vm.id, instance_id:, az_id:, ipv4_dns_name:)
+    AwsInstance.create_with_id(vm, instance_id:, az_id:, ipv4_dns_name:)
 
     hop_wait_instance_created
   end

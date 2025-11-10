@@ -240,12 +240,12 @@ RSpec.describe UBID do
     expect(sshable.ubid).to start_with UBID::TYPE_SSHABLE
 
     host = create_vm_host
-    si = SpdkInstallation.create_with_id(host.id, version: "v1", allocation_weight: 100, vm_host_id: host.id)
+    si = SpdkInstallation.create_with_id(host, version: "v1", allocation_weight: 100, vm_host_id: host.id)
 
     vm = create_vm
     expect(vm.ubid).to start_with UBID::TYPE_VM
 
-    dev = StorageDevice.create_with_id(host.id, name: "x", available_storage_gib: 1, total_storage_gib: 1, vm_host_id: host.id)
+    dev = StorageDevice.create_with_id(host, name: "x", available_storage_gib: 1, total_storage_gib: 1, vm_host_id: host.id)
 
     sv = VmStorageVolume.create(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false, spdk_installation_id: si.id, storage_device_id: dev.id)
     expect(sv.ubid).to start_with UBID::TYPE_VM_STORAGE_VOLUME
@@ -315,9 +315,9 @@ RSpec.describe UBID do
   it "can decode ids" do
     sshable = Sshable.create
     host = create_vm_host
-    si = SpdkInstallation.create_with_id(host.id, version: "v1", allocation_weight: 100, vm_host_id: host.id)
+    si = SpdkInstallation.create_with_id(host, version: "v1", allocation_weight: 100, vm_host_id: host.id)
     vm = create_vm
-    dev = StorageDevice.create_with_id(host.id, name: "x", available_storage_gib: 1, total_storage_gib: 1, vm_host_id: host.id)
+    dev = StorageDevice.create_with_id(host, name: "x", available_storage_gib: 1, total_storage_gib: 1, vm_host_id: host.id)
     sv = VmStorageVolume.create(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false, spdk_installation_id: si.id, storage_device_id: dev.id)
     kek = StorageKeyEncryptionKey.create(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")
     account = Account.create(email: "x@y.net")

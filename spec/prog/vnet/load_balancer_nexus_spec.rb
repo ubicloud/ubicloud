@@ -17,7 +17,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
   }
   let(:dns_zone) {
     dz = DnsZone.create(project_id: ps.project_id, name: "lb.ubicloud.com")
-    Strand.create_with_id(dz.id, prog: "DnsZone::DnsZoneNexus", label: "wait")
+    Strand.create_with_id(dz, prog: "DnsZone::DnsZoneNexus", label: "wait")
     dz
   }
 

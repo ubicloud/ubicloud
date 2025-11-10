@@ -337,7 +337,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "shows AZ id for AWS PostgreSQL instance" do
-        AwsInstance.create_with_id(pg.representative_server.vm.id, instance_id: "i-0123456789abcdefg", az_id: "usw2-az2")
+        AwsInstance.create_with_id(pg.representative_server.vm, instance_id: "i-0123456789abcdefg", az_id: "usw2-az2")
 
         visit "#{project.path}#{pg.path}/overview"
         expect(page).to have_content "usw2-az2 (AWS)"

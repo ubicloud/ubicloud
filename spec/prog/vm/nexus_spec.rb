@@ -228,13 +228,14 @@ RSpec.describe Prog::Vm::Nexus do
     it "calls .assemble with generated ssh key" do
       st_id = "eb3dbcb3-2c90-8b74-8fb4-d62a244d7ae5"
       expect(SshKey).to receive(:generate).and_return(instance_double(SshKey, public_key: "public", keypair: "pair"))
+      st = Strand.new(id: st_id)
       expect(described_class).to receive(:assemble) do |public_key, project_id, **kwargs|
         expect(public_key).to eq("public")
         expect(project_id).to eq(prj.id)
         expect(kwargs[:name]).to be_nil
         expect(kwargs[:size]).to eq("new_size")
-      end.and_return(Strand.new(id: st_id))
-      expect(Sshable).to receive(:create_with_id).with(st_id, host: "temp_#{st_id}", raw_private_key_1: "pair", unix_user: "rhizome")
+      end.and_return(st)
+      expect(Sshable).to receive(:create_with_id).with(st, host: "temp_#{st_id}", raw_private_key_1: "pair", unix_user: "rhizome")
 
       described_class.assemble_with_sshable(prj.id, size: "new_size")
     end

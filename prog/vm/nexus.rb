@@ -123,7 +123,7 @@ class Prog::Vm::Nexus < Prog::Base
       nic.update(vm_id: vm.id)
 
       if init_script && !init_script.empty?
-        VmInitScript.create_with_id(vm.id, script: init_script)
+        VmInitScript.create_with_id(vm, script: init_script)
       end
 
       if vm_size.family == "standard-gpu"
@@ -178,7 +178,7 @@ class Prog::Vm::Nexus < Prog::Base
   def self.assemble_with_sshable(*, sshable_unix_user: "rhizome", **kwargs)
     ssh_key = SshKey.generate
     st = assemble(ssh_key.public_key, *, **kwargs)
-    Sshable.create_with_id(st.id, unix_user: sshable_unix_user, host: "temp_#{st.id}", raw_private_key_1: ssh_key.keypair)
+    Sshable.create_with_id(st, unix_user: sshable_unix_user, host: "temp_#{st.id}", raw_private_key_1: ssh_key.keypair)
     st
   end
 
