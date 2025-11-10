@@ -24,7 +24,7 @@ RSpec.describe Prog::Aws::Vpc do
 
   before do
     allow(nx).to receive(:private_subnet).and_return(ps)
-    allow(Aws::EC2::Client).to receive(:new).with(access_key_id: "test-access-key", secret_access_key: "test-secret-key", region: "us-west-2").and_return(client)
+    allow(Aws::EC2::Client).to receive(:new).with(credentials: anything, region: "us-west-2").and_return(client)
   end
 
   it "exits if destroy is set" do

@@ -50,8 +50,8 @@ usermod -L ubuntu
 
   before do
     allow(nx).to receive_messages(vm:, aws_instance:)
-    allow(Aws::EC2::Client).to receive(:new).with(access_key_id: "test-access-key", secret_access_key: "test-secret-key", region: "us-west-2").and_return(client)
-    allow(Aws::IAM::Client).to receive(:new).with(access_key_id: "test-access-key", secret_access_key: "test-secret-key", region: "us-west-2").and_return(iam_client)
+    allow(Aws::EC2::Client).to receive(:new).with(credentials: anything, region: "us-west-2").and_return(client)
+    allow(Aws::IAM::Client).to receive(:new).with(credentials: anything, region: "us-west-2").and_return(iam_client)
   end
 
   describe ".assemble" do
@@ -323,7 +323,7 @@ usermod -L ubuntu
         client_token: vm.id,
         instance_market_options: nil
       }).and_call_original
-      expect(AwsInstance).to receive(:create_with_id).with(vm, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
+      expect(AwsInstance).to receive(:create_with_id).with(vm, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
     end
 
@@ -334,7 +334,7 @@ usermod -L ubuntu
       expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
       expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
       expect(client).to receive(:run_instances).with(hash_not_including(:iam_instance_profile)).and_call_original
-      expect(AwsInstance).to receive(:create_with_id).with(vm, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
+      expect(AwsInstance).to receive(:create_with_id).with(vm, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
     end
 
@@ -363,7 +363,7 @@ usermod -L ubuntu
       new_data = user_data + "echo \"1.2.3.4 ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
       expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
       expect(client).to receive(:run_instances).with(hash_including(user_data: Base64.encode64(new_data))).and_call_original
-      expect(AwsInstance).to receive(:create_with_id).with(vm, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
+      expect(AwsInstance).to receive(:create_with_id).with(vm, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
     end
 
@@ -380,7 +380,7 @@ usermod -L ubuntu
         user_data: Base64.encode64(new_data),
         instance_market_options: {market_type: "spot", spot_options: {instance_interruption_behavior: "terminate", spot_instance_type: "one-time"}}
       )).and_call_original
-      expect(AwsInstance).to receive(:create_with_id).with(vm, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
+      expect(AwsInstance).to receive(:create_with_id).with(vm, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
     end
 
@@ -399,7 +399,7 @@ usermod -L ubuntu
         user_data: Base64.encode64(new_data),
         instance_market_options: {market_type: "spot", spot_options: {instance_interruption_behavior: "terminate", spot_instance_type: "one-time", max_price: "0.12"}}
       )).and_call_original
-      expect(AwsInstance).to receive(:create_with_id).with(vm, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
+      expect(AwsInstance).to receive(:create_with_id).with(vm, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
     end
 
@@ -594,12 +594,18 @@ usermod -L ubuntu
 
   describe "#cleanup_roles" do
     it "cleans up roles" do
+      allow(Config).to receive(:aws_postgres_iam_access).and_return(true)
       iam_client.stub_responses(:list_policies, policies: [{policy_name: "#{vm.name}-cw-agent-policy", arn: "arn:aws:iam::aws:policy/#{vm.name}-cw-agent-policy"}])
       iam_client.stub_responses(:remove_role_from_instance_profile, {})
       iam_client.stub_responses(:delete_instance_profile, {})
-      iam_client.stub_responses(:detach_role_policy, {})
       iam_client.stub_responses(:delete_policy, {})
       iam_client.stub_responses(:delete_role, {})
+      policies = iam_client.stub_data(:list_attached_role_policies, {attached_policies: [
+        {policy_name: "policy-name", policy_arn: "policy-arn"}
+      ]})
+      iam_client.stub_responses(:list_attached_role_policies, policies)
+      expect(iam_client).to receive(:detach_role_policy).with({policy_arn: "arn:aws:iam::aws:policy/testvm-cw-agent-policy", role_name: "testvm"})
+      expect(iam_client).to receive(:detach_role_policy).with({role_name: vm.name, policy_arn: "policy-arn"})
 
       expect { nx.cleanup_roles }.to exit({"msg" => "vm destroyed"})
     end

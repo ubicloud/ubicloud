@@ -80,6 +80,7 @@ module Config
   override :dispatcher_queue_size_ratio, 4, float
   override :recursive_tag_limit, 32, int
   override :root, File.expand_path(__dir__), string
+  override :aws_role_session_name, "ubi", string
   override :clover_database_rds_iam_auth_enabled, false, bool
   optional :hetzner_user, string, clear: true
   optional :hetzner_password, string, clear: true
@@ -148,6 +149,7 @@ module Config
   optional :postgres_monitor_database_root_certs, string
   optional :postgres_paradedb_notification_email, string
   optional :postgres_lantern_notification_email, string
+  override :aws_postgres_iam_access, false, bool
 
   # Logging
   optional :database_logger_level, string

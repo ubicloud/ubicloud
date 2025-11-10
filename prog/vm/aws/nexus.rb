@@ -210,7 +210,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     az_id = subnet_response.subnets.first.availability_zone_id
     ipv4_dns_name = instance.public_dns_name
 
-    AwsInstance.create_with_id(vm, instance_id:, az_id:, ipv4_dns_name:)
+    AwsInstance.create_with_id(vm, instance_id:, az_id:, ipv4_dns_name:, iam_role: role_name)
 
     hop_wait_instance_created
   end
@@ -334,6 +334,14 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
       ignore_invalid_entity do
         iam_client.delete_policy({policy_arn: cloudwatch_policy.arn})
+      end
+    end
+
+    if Config.aws_postgres_iam_access
+      iam_client.list_attached_role_policies(role_name:).attached_policies.each do |policy|
+        ignore_invalid_entity do
+          iam_client.detach_role_policy(role_name:, policy_arn: policy.policy_arn)
+        end
       end
     end
 
