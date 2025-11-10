@@ -13,7 +13,7 @@ class LocationCredential < Sequel::Model
     @credentials ||= if assume_role
       Aws::AssumeRoleCredentials.new(role_arn: assume_role, role_session_name: Config.hostname)
     else
-      Aws::Credentials.new(access_key_id: access_key, secret_access_key: secret_key)
+      Aws::Credentials.new(access_key, secret_key)
     end
   end
 

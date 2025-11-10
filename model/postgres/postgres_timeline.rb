@@ -19,13 +19,13 @@ class PostgresTimeline < Sequel::Model
   end
 
   def generate_walg_config
-    walg_credentials = if leader.vm.aws_instance.iam_role.empty?
+    walg_credentials = if leader.vm.aws_instance.iam_role
+      ""
+    else
       <<-WALG_CONF
 AWS_ACCESS_KEY_ID=#{access_key}
 AWS_SECRET_ACCESS_KEY=#{secret_key}
       WALG_CONF
-    else
-      ""
     end
     <<-WALG_CONF
 WALG_S3_PREFIX=s3://#{ubid}

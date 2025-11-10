@@ -47,8 +47,8 @@ usermod -L ubuntu
 
   before do
     allow(nx).to receive_messages(vm:, aws_instance:)
-    allow(Aws::EC2::Client).to receive(:new).with(access_key_id: "test-access-key", secret_access_key: "test-secret-key", region: "us-west-2").and_return(client)
-    allow(Aws::IAM::Client).to receive(:new).with(access_key_id: "test-access-key", secret_access_key: "test-secret-key", region: "us-west-2").and_return(iam_client)
+    allow(Aws::EC2::Client).to receive(:new).with(credentials: anything, region: "us-west-2").and_return(client)
+    allow(Aws::IAM::Client).to receive(:new).with(credentials: anything, region: "us-west-2").and_return(iam_client)
   end
 
   it "exits if destroy is set" do
@@ -261,7 +261,7 @@ usermod -L ubuntu
         client_token: vm.id,
         instance_market_options: nil
       }).and_call_original
-      expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
+      expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
     end
 
@@ -272,7 +272,7 @@ usermod -L ubuntu
       expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
       expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
       expect(client).to receive(:run_instances).with(hash_not_including(:iam_instance_profile)).and_call_original
-      expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
+      expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
     end
 
@@ -301,7 +301,7 @@ usermod -L ubuntu
       new_data = user_data + "echo \"1.2.3.4 ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
       expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
       expect(client).to receive(:run_instances).with(hash_including(user_data: Base64.encode64(new_data))).and_call_original
-      expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
+      expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
     end
 
@@ -318,7 +318,7 @@ usermod -L ubuntu
         user_data: Base64.encode64(new_data),
         instance_market_options: {market_type: "spot", spot_options: {instance_interruption_behavior: "terminate", spot_instance_type: "one-time"}}
       )).and_call_original
-      expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
+      expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
     end
 
@@ -337,7 +337,7 @@ usermod -L ubuntu
         user_data: Base64.encode64(new_data),
         instance_market_options: {market_type: "spot", spot_options: {instance_interruption_behavior: "terminate", spot_instance_type: "one-time", max_price: "0.12"}}
       )).and_call_original
-      expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
+      expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
     end
 

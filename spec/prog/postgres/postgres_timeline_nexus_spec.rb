@@ -74,16 +74,15 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
     describe "when blob storage is aws s3" do
       it "creates user and policies and hops" do
+        iam_client = Aws::IAM::Client.new(stub_responses: true)
         expect(postgres_timeline).to receive(:aws?).and_return(true)
-        expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-west-2", location_credential: instance_double(LocationCredential, access_key: "access-key", secret_key: "secret-key"))).at_least(:once)
-        client = Aws::IAM::Client.new(stub_responses: true)
-        expect(Aws::IAM::Client).to receive(:new).and_return(client)
-        client.stub_responses(:create_user)
-        client.stub_responses(:create_policy)
-        client.stub_responses(:attach_user_policy)
-        client.stub_responses(:create_access_key, access_key: {access_key_id: "access-key", secret_access_key: "secret-key", user_name: "username", status: "Active"})
+        expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-west-2", location_credential: instance_double(LocationCredential, access_key: "access-key", secret_key: "secret-key", iam_client:))).at_least(:once)
+        iam_client.stub_responses(:create_user)
+        iam_client.stub_responses(:create_policy)
+        iam_client.stub_responses(:attach_user_policy)
+        iam_client.stub_responses(:create_access_key, access_key: {access_key_id: "access-key", secret_access_key: "secret-key", user_name: "username", status: "Active"})
         expect(postgres_timeline).to receive(:update).with(access_key: "access-key", secret_key: "secret-key").and_return(postgres_timeline)
-        expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "wait"))).at_least(:once)
+        expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, vm: instance_double(Vm, aws_instance: instance_double(AwsInstance, iam_role: nil)), strand: instance_double(Strand, label: "wait"))).at_least(:once)
         expect(postgres_timeline.leader).to receive(:incr_refresh_walg_credentials)
         expect { nx.start }.to hop("setup_bucket")
       end
@@ -104,10 +103,10 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     end
 
     it "naps if aws and the key is not available" do
-      expect(postgres_timeline).to receive(:aws?).and_return(true)
-      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-west-2", location_credential: instance_double(LocationCredential, access_key: "access-key", secret_key: "secret-key"))).at_least(:once)
       iam_client = Aws::IAM::Client.new(stub_responses: true)
-      expect(Aws::IAM::Client).to receive(:new).and_return(iam_client)
+      expect(postgres_timeline).to receive(:aws?).and_return(true)
+      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-west-2", location_credential: instance_double(LocationCredential, access_key: "access-key", secret_key: "secret-key", iam_client:))).at_least(:once)
+      expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, vm: instance_double(Vm, aws_instance: instance_double(AwsInstance, iam_role: nil)), strand: instance_double(Strand, label: "start"))).once
       iam_client.stub_responses(:list_access_keys, access_key_metadata: [{access_key_id: "access-key"}])
       expect(postgres_timeline).to receive(:access_key).and_return("not-access-key")
       expect { nx.setup_bucket }.to nap(1)
@@ -124,12 +123,12 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
   describe "#wait_leader" do
     it "naps if leader not ready" do
-      expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "start"))).twice
+      expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, vm: instance_double(Vm, aws_instance: instance_double(AwsInstance, iam_role: nil)), strand: instance_double(Strand, label: "start"))).twice
       expect { nx.wait_leader }.to nap(5)
     end
 
     it "hops if leader is ready" do
-      expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "wait"))).twice
+      expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, vm: instance_double(Vm, aws_instance: instance_double(AwsInstance, iam_role: nil)), strand: instance_double(Strand, label: "wait"))).twice
       expect { nx.wait_leader }.to hop("wait")
     end
   end
@@ -242,13 +241,14 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       end
 
       it "destroys blob storage and postgres timeline" do
-        client = Aws::IAM::Client.new(stub_responses: true)
-        expect(Aws::IAM::Client).to receive(:new).and_return(client)
-        client.stub_responses(:delete_user)
-        client.stub_responses(:list_attached_user_policies, attached_policies: [{policy_arn: "arn:aws:iam::aws:policy/AmazonS3FullAccess"}])
-        client.stub_responses(:delete_policy)
-        client.stub_responses(:list_access_keys, access_key_metadata: [{access_key_id: "access-key"}])
-        client.stub_responses(:delete_access_key)
+        iam_client = Aws::IAM::Client.new(stub_responses: true)
+        iam_client.stub_responses(:delete_user)
+        iam_client.stub_responses(:list_attached_user_policies, attached_policies: [{policy_arn: "arn:aws:iam::aws:policy/AmazonS3FullAccess"}])
+        iam_client.stub_responses(:delete_policy)
+        iam_client.stub_responses(:list_access_keys, access_key_metadata: [{access_key_id: "access-key"}])
+        iam_client.stub_responses(:delete_access_key)
+        expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, vm: instance_double(Vm, aws_instance: instance_double(AwsInstance, iam_role: nil)), strand: instance_double(Strand, label: "start"))).once
+        expect(postgres_timeline.location.location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
         expect(postgres_timeline).to receive(:destroy)
         expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
       end
