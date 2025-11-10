@@ -59,6 +59,31 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       node = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "vm2", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: subnet.id, enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id).subject
       expect(node.vm.vm_firewalls).to eq [kc.internal_worker_vm_firewall]
     end
+
+    it "excludes hosts that already have other CP VMs" do
+      host = create_vm_host
+      vm = create_vm(vm_host: host)
+      KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kc.id)
+
+      # Two VMs, one doesn't have a host yet, but the prog still works
+      expect(kc.reload.nodes.count).to eq 2
+      expect(kd.vm.vm_host_id).to be_nil
+      existing_hosts = [vm.vm_host_id]
+
+      node = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "vm3", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: subnet.id, enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: nil).subject
+      expect(node.vm.strand.stack[0]["exclude_host_ids"]).to eq existing_hosts
+    end
+
+    it "doesn't exclude hosts when creating worker nodes" do
+      kn = KubernetesNodepool.create(name: "np", node_count: 3, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
+      host = create_vm_host
+      vm = create_vm(vm_host: host)
+      KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
+
+      node = described_class.assemble(Config.kubernetes_service_project_id, sshable_unix_user: "ubi", name: "vm3", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: subnet.id, enable_ip4: true, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id).subject
+      expect(node.kubernetes_nodepool).to eq kn
+      expect(node.vm.strand.stack[0]["exclude_host_ids"]).to eq []
+    end
   end
 
   describe "#before_run" do
