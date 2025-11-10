@@ -19,6 +19,12 @@
   <% end %>
 </div>
 
+<div id="annotation-info">
+  <% if @obj.is_a?(Annotation) %>
+    <%== form({action: "/model/Annotation/#{@obj.ubid}/destroy", method: :post}, button: "Destroy Annotation") %>
+  <% end %>
+</div>
+
 <% if @klass.associations.include?(:semaphores) && !(semaphores = @obj.semaphores_dataset.select_order_map(:name)).empty? %>
   <p>Semaphores Set: <%= semaphores.join(", ") %></p>
 <% end %>

@@ -193,6 +193,9 @@ class CloverAdmin < Roda
       end,
       "reset" => object_action("Hardware Reset", "Hardware reset scheduled for VmHost", &:incr_hardware_reset),
       "reboot" => object_action("Reboot", "Reboot scheduled for VmHost", &:incr_reboot)
+    },
+    "Annotation" => {
+      "destroy" => object_action("Destroy", "Destroyed the annotation", "/", &:destroy)
     }
   }.freeze
   OBJECT_ACTIONS.each_value(&:freeze)

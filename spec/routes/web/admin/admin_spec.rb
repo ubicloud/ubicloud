@@ -644,4 +644,13 @@ RSpec.describe CloverAdmin do
     created_at_cell = cells[2]
     expect(created_at_cell).to have_content(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)
   end
+
+  it "destroys the annotation when clicked on its button" do
+    annotation = Annotation.create(description: "test-annotation")
+    visit "/"
+    click_link annotation.description
+
+    click_button "Destroy Annotation"
+    expect { annotation.reload }.to raise_error(Sequel::NoExistingObject)
+  end
 end
