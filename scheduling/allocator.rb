@@ -124,6 +124,7 @@ module Scheduling::Allocator
         .join(:storage_devices, vm_host_id: Sequel[:vm_host][:id])
         .join(:available_ipv4, routed_to_host_id: Sequel[:vm_host][:id])
         .left_join(:gpus, vm_host_id: Sequel[:vm_host][:id])
+        .left_join(:gpu_partitions, vm_host_id: Sequel[:vm_host][:id])
         .left_join(:vm_provisioning, vm_host_id: Sequel[:vm_host][:id])
         .select(
           Sequel[:vm_host][:id].as(:vm_host_id),
@@ -140,6 +141,7 @@ module Scheduling::Allocator
           :ipv4_available,
           Sequel.function(:coalesce, :num_gpus, 0).as(:num_gpus),
           Sequel.function(:coalesce, :available_gpus, 0).as(:available_gpus),
+          Sequel.function(:coalesce, :use_gpu_partition, false).as(:use_gpu_partition),
           :available_iommu_groups,
           Sequel.function(:coalesce, :vm_provisioning_count, 0).as(:vm_provisioning_count),
           :accepts_slices,
@@ -171,6 +173,9 @@ module Scheduling::Allocator
                      end
           .where(device_class: ["0300", "0302"])
           .where { (device =~ request.gpu_device) | request.gpu_device.nil? })
+        .with(:gpu_partitions, DB[:gpu_partition]
+          .select_group(:vm_host_id)
+          .select_append { Sequel.function(:bool_or, enabled).as(:use_gpu_partition) })
         .with(:vm_provisioning, DB[:vm]
           .select_group(:vm_host_id)
           .select_append { count.function.*.as(vm_provisioning_count) }
@@ -516,11 +521,18 @@ module Scheduling::Allocator
       @used = candidate_host[:num_gpus] - candidate_host[:available_gpus]
       @total = candidate_host[:num_gpus]
       @requested = request.gpu_count
-      @iommu_groups = select_iommu_groups(candidate_host[:available_iommu_groups], @requested)
+      @use_partition = candidate_host[:use_gpu_partition]
+
+      if @use_partition
+        @partition = select_partition(candidate_host[:vm_host_id], @requested)
+        @iommu_groups = pci_iommu_groups_for_partition(@partition)
+      else
+        @iommu_groups = select_iommu_groups(candidate_host[:available_iommu_groups], @requested)
+      end
     end
 
     def is_valid
-      @used < @total
+      @used < @total && (!@use_partition || @partition)
     end
 
     def utilization
@@ -534,12 +546,57 @@ module Scheduling::Allocator
         .where(vm_id: nil)
         .where(iommu_group: @iommu_groups)
         .update(vm_id: vm.id) < @requested
+
+      if @partition
+        fail "concurrent GPU partition allocation" if
+        GpuPartition
+          .where(id: @partition, vm_host_id: vm_host.id, vm_id: nil)
+          .update(vm_id: vm.id) != 1
+      end
     end
 
     def select_iommu_groups(gpus, n)
       by_numa = gpus.group_by { |h| h["numa_node"] }
       chosen_group = by_numa.values.select { |arr| arr.size >= n }.min_by(&:size)
       (chosen_group || gpus).take(n).map { |h| h["iommu_group"] }
+    end
+
+    def select_partition(vm_host_id, gpu_count)
+      used_pci_device_ids =
+        DB[:gpu_partitions_pci_devices]
+          .where(
+            gpu_partition_id: GpuPartition
+              .where(vm_host_id:)
+              .exclude(vm_id: nil)
+              .select(:id)
+          )
+          .select(:pci_device_id)
+
+      blocked_partitions =
+        DB[:gpu_partitions_pci_devices]
+          .where(pci_device_id: used_pci_device_ids)
+          .join(:gpu_partition, id: :gpu_partition_id)
+          .where(vm_host_id:)
+          .select(:partition_id)
+
+      GpuPartition
+        .where(
+          vm_host_id:,
+          enabled: true,
+          vm_id: nil,
+          gpu_count:
+        )
+        .exclude(partition_id: blocked_partitions)
+        .order(:partition_id)
+        .select_map(:id)
+        .first
+    end
+
+    def pci_iommu_groups_for_partition(id)
+      PciDevice
+        .join(:gpu_partitions_pci_devices, pci_device_id: :id)
+        .where(gpu_partition_id: id)
+        .select_map(:iommu_group)
     end
   end
 

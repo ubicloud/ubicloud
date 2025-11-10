@@ -184,6 +184,7 @@ RSpec.describe Al do
                  vm_host_id: vmh.id,
                  ipv4_available: true,
                  num_gpus: 0,
+                 use_gpu_partition: false,
                  available_gpus: 0,
                  available_iommu_groups: nil,
                  vm_provisioning_count: 0,
@@ -214,6 +215,7 @@ RSpec.describe Al do
                  ipv4_available: true,
                  num_gpus: 0,
                  available_gpus: 0,
+                 use_gpu_partition: false,
                  available_iommu_groups: nil,
                  vm_provisioning_count: 2,
                  accepts_slices: false,
@@ -738,6 +740,71 @@ RSpec.describe Al do
       expect(vm.pci_devices.map(&:iommu_group)).to contain_exactly(1, 3)
     end
 
+    it "allocates a GPU partition" do
+      vm = create_vm
+      vmh = VmHost.first
+
+      pci_devices = (1..4).map do |i|
+        PciDevice.create(
+          vm_host_id: vmh.id,
+          slot: format("0%d:00.0", i),
+          device_class: "0302",
+          vendor: "vd",
+          device: "27b0",
+          numa_node: i - 1,
+          iommu_group: i
+        )
+      end
+
+      gp = GpuPartition.create(vm_host_id: vmh.id, vm_id: nil, partition_id: 1, gpu_count: 4)
+      pci_devices.each do |pci|
+        DB[:gpu_partitions_pci_devices].insert(gpu_partition_id: gp.id, pci_device_id: pci.id)
+      end
+
+      described_class.allocate(vm, [{"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}], gpu_count: 4)
+      vmh.reload
+      expect(vm.pci_devices.map(&:iommu_group)).to contain_exactly(1, 2, 3, 4)
+      expect(vm.gpu_partition.id).to eq(gp.id)
+    end
+
+    it "allocates to non-overlapping GPU partition" do
+      vm = create_vm
+      vmh = VmHost.first
+
+      pci_devices = (1..4).map do |i|
+        PciDevice.create(
+          vm_host_id: vmh.id,
+          slot: format("0%d:00.0", i),
+          device_class: "0302",
+          vendor: "vd",
+          device: "27b0",
+          numa_node: i - 1,
+          iommu_group: i
+        )
+      end
+
+      gp_4 = GpuPartition.create(vm_host_id: vmh.id, vm_id: nil, partition_id: 1, gpu_count: 4)
+      pci_devices.each.with_index(2) do |pci, idx|
+        gp_1 = GpuPartition.create(vm_host_id: vmh.id, vm_id: nil, partition_id: idx, gpu_count: 1)
+        DB[:gpu_partitions_pci_devices].insert(gpu_partition_id: gp_1.id, pci_device_id: pci.id)
+        DB[:gpu_partitions_pci_devices].insert(gpu_partition_id: gp_4.id, pci_device_id: pci.id)
+      end
+
+      vol = [{"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}]
+
+      expect {
+        described_class.allocate(vm, vol, gpu_count: 2)
+      }.to raise_error(RuntimeError, /no space left on any eligible host/)
+
+      described_class.allocate(vm, vol, gpu_count: 1)
+      vmh.reload
+      expect(vm.gpu_partition.id).not_to eq(gp_4.id)
+
+      expect {
+        described_class.allocate(vm, vol, gpu_count: 4)
+      }.to raise_error(RuntimeError, /no space left on any eligible host/)
+    end
+
     it "allows concurrent allocations" do
       vmh = VmHost.first
       used_cores = vmh.used_cores
@@ -796,6 +863,17 @@ RSpec.describe Al do
       al2 = Al::Allocation.best_allocation(create_req(vm, vol, gpu_count: 1))
       al1.update(vm1)
       expect { al2.update(vm2) }.to raise_error(RuntimeError, "concurrent GPU allocation")
+    end
+
+    it "fails concurrent allocations of gpu partitions" do
+      pci = PciDevice.create(vm_host_id: VmHost.first.id, slot: "01:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
+      gp = GpuPartition.create(vm_host_id: VmHost.first.id, vm_id: nil, partition_id: 1, gpu_count: 1)
+      DB[:gpu_partitions_pci_devices].insert(gpu_partition_id: gp.id, pci_device_id: pci.id)
+      vm1 = create_vm
+      vm2 = create_vm
+      al = Al::Allocation.best_allocation(create_req(vm1, vol, gpu_count: 1))
+      GpuPartition.where(id: gp.id).update(vm_id: vm2.id)
+      expect { al.update(vm1) }.to raise_error(RuntimeError, "concurrent GPU partition allocation")
     end
 
     it "creates volume without encryption key if storage is not encrypted" do
