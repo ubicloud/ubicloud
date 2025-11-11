@@ -8,7 +8,7 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
       id = KubernetesNode.generate_uuid
       cluster = KubernetesCluster[kubernetes_cluster_id]
 
-      exclude_host_ids = if kubernetes_nodepool_id
+      exclude_host_ids = if kubernetes_nodepool_id || Config.allow_unspread_servers
         []
       else
         cluster.cp_vms_dataset
