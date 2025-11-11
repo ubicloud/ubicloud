@@ -27,7 +27,7 @@ class LocationCredential < Sequel::Model
   end
 
   def sts_client
-    Aws::STS::Client.new(region: location.name, credentials: credentials)
+    Aws::STS::Client.new(region: location.name, credentials:)
   end
 end
 
