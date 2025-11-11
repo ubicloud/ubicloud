@@ -18,7 +18,7 @@ class PostgresResource < Sequel::Model
   plugin :association_dependencies, metric_destinations: :destroy
   dataset_module Pagination
 
-  plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2, :server_cert],
+  plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2, :server_cert, :trusted_ca_certs],
     encrypted_columns: [:superuser_password, :root_cert_key_1, :root_cert_key_2, :server_cert_key]
   plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records, :destroy, :promote, :refresh_certificates, :use_different_az
   include ObjectTag::Cleanup
