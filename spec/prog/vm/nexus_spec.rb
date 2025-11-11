@@ -12,23 +12,8 @@ RSpec.describe Prog::Vm::Nexus do
 
   let(:st) { Strand.new }
   let(:vm) {
-    kek = StorageKeyEncryptionKey.new(
-      algorithm: "aes-256-gcm", key: "key",
-      init_vector: "iv", auth_data: "somedata"
-    ) { it.id = "04a3fe32-4cf0-48f7-909e-e35822864413" }
-    si = SpdkInstallation.new(version: "v1") { it.id = SpdkInstallation.generate_uuid }
-    bi = BootImage.new(name: "my-image", version: "20230303") { it.id = "b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1" }
-    dev1 = StorageDevice.new(name: "nvme0") { it.id = StorageDevice.generate_uuid }
-    dev2 = StorageDevice.new(name: "DEFAULT") { it.id = StorageDevice.generate_uuid }
-    disk_1 = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, skip_sync: false)
-    disk_1.spdk_installation = si
-    disk_1.key_encryption_key_1 = kek
-    disk_1.storage_device = dev1
-    disk_2 = VmStorageVolume.new(boot: false, size_gib: 15, disk_index: 1, use_bdev_ubi: true, skip_sync: true)
-    disk_2.spdk_installation = si
-    disk_2.storage_device = dev2
-    disk_2.boot_image = bi
-    vm = Vm.new(
+    vm = Vm.create_with_id(
+      "2464de61-7501-8374-9ab0-416caebe31da",
       name: "dummy-vm",
       unix_user: "ubi",
       public_key: "ssh key",
@@ -41,20 +26,24 @@ RSpec.describe Prog::Vm::Nexus do
       memory_gib: 8,
       arch: "x64",
       location_id: Location::HETZNER_FSN1_ID,
-      created_at: Time.now
-    ).tap {
-      it.id = "2464de61-7501-8374-9ab0-416caebe31da"
-      it.vm_storage_volumes.append(disk_1)
-      it.vm_storage_volumes.append(disk_2)
-      disk_1.vm = it
-      disk_2.vm = it
-      allow(it).to receive(:active_billing_records).and_return([BillingRecord.new(
-        project_id: "50089dcf-b472-8ad2-9ca6-b3e70d12759d",
-        resource_name: it.name,
-        billing_rate_id: BillingRate.from_resource_properties("VmVCpu", it.family, "hetzner-fsn1")["id"],
-        amount: it.vcpus
-      )])
-    }
+      created_at: Time.now,
+      project_id: project.id
+    )
+    BillingRecord.create(
+      project_id: project.id,
+      resource_id: vm.id,
+      resource_name: vm.name,
+      billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
+      amount: vm.vcpus
+    )
+    kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "key", init_vector: "iv", auth_data: "somedata")
+    vmh = create_vm_host
+    si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: vmh.id)
+    bi = BootImage.create(name: "my-image", version: "20230303", size_gib: 15, vm_host_id: vmh.id)
+    dev1 = StorageDevice.create(name: "nvme0", total_storage_gib: 1000, available_storage_gib: 500)
+    dev2 = StorageDevice.create(name: "DEFAULT", total_storage_gib: 1000, available_storage_gib: 500)
+    VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, skip_sync: false, spdk_installation_id: si.id, storage_device_id: dev1.id, key_encryption_key_1_id: kek.id)
+    VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 15, disk_index: 1, use_bdev_ubi: true, skip_sync: true, spdk_installation_id: si.id, storage_device_id: dev2.id, boot_image_id: bi.id)
     vm
   }
   let(:project) { Project.create(name: "default") }
@@ -788,13 +777,18 @@ RSpec.describe Prog::Vm::Nexus do
   end
 
   describe "#create_billing_record" do
+    let(:now) { Time.now }
+
     before do
-      now = Time.now
       expect(Time).to receive(:now).and_return(now).at_least(:once)
       allow(vm).to receive(:allocated_at).and_return(now - 100)
       vm.update(vm_host_id: create_vm_host.id, project_id: project.id)
-      expect(vm).to receive(:update).with(display_state: "running", provisioned_at: now).and_return(true)
       expect(Clog).to receive(:emit).with("vm provisioned").and_yield
+    end
+
+    after do
+      expect(vm.display_state).to eq("running")
+      expect(vm.provisioned_at).to eq(now)
     end
 
     it "creates billing records when ip4 is enabled" do
@@ -807,7 +801,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "creates billing records when gpu is present" do
-      vm.location = Location[name: "latitude-ai"]
+      vm.location_id = Location[name: "latitude-ai"].id
       expect(vm).to receive(:pci_devices).and_return([PciDevice.new(slot: "01:00.0", iommu_group: 23, device_class: "0302", vendor: "10de", device: "20b5")]).at_least(:once)
       expect(BillingRecord).to receive(:create).exactly(4).times
       expect(vm).to receive(:project).and_return(project).at_least(:once)
