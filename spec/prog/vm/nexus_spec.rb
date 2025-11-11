@@ -57,12 +57,12 @@ RSpec.describe Prog::Vm::Nexus do
     }
     vm
   }
-  let(:prj) { Project.create(name: "default") }
+  let(:project) { Project.create(name: "default") }
 
   describe ".assemble" do
     let(:ps) {
       PrivateSubnet.create(name: "ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64",
-        net4: "1.1.1.0/26", state: "waiting", project_id: prj.id) { it.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
+        net4: "1.1.1.0/26", state: "waiting", project_id: project.id) { it.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
     }
     let(:nic) {
       Nic.new(private_subnet_id: ps.id,
@@ -81,13 +81,13 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "fails if location doesn't exist" do
       expect {
-        described_class.assemble("some_ssh key", prj.id, location_id: nil)
+        described_class.assemble("some_ssh key", project.id, location_id: nil)
       }.to raise_error RuntimeError, "No existing location"
     end
 
     it "creates Subnet and Nic if not passed" do
       expect {
-        described_class.assemble("some_ssh key", prj.id)
+        described_class.assemble("some_ssh key", project.id)
       }.to change(PrivateSubnet, :count).from(0).to(1)
         .and change(Nic, :count).from(0).to(1)
     end
@@ -97,10 +97,10 @@ RSpec.describe Prog::Vm::Nexus do
       nic_strand = instance_double(Strand, subject: nic)
       expect(Prog::Vnet::NicNexus).to receive(:assemble).and_return(nic_strand)
       expect(nic).to receive(:update).and_return(nic)
-      expect(Project).to receive(:[]).with(prj.id).and_return(prj)
-      expect(prj).to receive(:private_subnets).and_return([ps]).at_least(:once)
+      expect(Project).to receive(:[]).with(project.id).and_return(project)
+      expect(project).to receive(:private_subnets).and_return([ps]).at_least(:once)
 
-      described_class.assemble("some_ssh key", prj.id, private_subnet_id: ps.id)
+      described_class.assemble("some_ssh key", project.id, private_subnet_id: ps.id)
     end
 
     it "adds the VM to a private subnet if nic_id is passed" do
@@ -109,9 +109,9 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nic).to receive(:update).and_return(nic)
       expect(Prog::Vnet::SubnetNexus).not_to receive(:assemble)
       expect(Prog::Vnet::NicNexus).not_to receive(:assemble)
-      expect(Project).to receive(:[]).with(prj.id).and_return(prj)
-      expect(prj.private_subnets).to receive(:any?).and_return(true)
-      described_class.assemble("some_ssh key", prj.id, nic_id: nic.id, location_id: Location::HETZNER_FSN1_ID)
+      expect(Project).to receive(:[]).with(project.id).and_return(project)
+      expect(project.private_subnets).to receive(:any?).and_return(true)
+      described_class.assemble("some_ssh key", project.id, nic_id: nic.id, location_id: Location::HETZNER_FSN1_ID)
     end
 
     def requested_disk_size(st)
@@ -119,24 +119,24 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "creates with default storage size from vm size" do
-      st = described_class.assemble("some_ssh key", prj.id)
+      st = described_class.assemble("some_ssh key", project.id)
       expect(requested_disk_size(st)).to eq(Option::VmSizes.first.storage_size_options.first)
     end
 
     it "creates with custom storage size if provided" do
-      st = described_class.assemble("some_ssh key", prj.id, storage_volumes: [{size_gib: 40}])
+      st = described_class.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 40}])
       expect(requested_disk_size(st)).to eq(40)
     end
 
     it "fails if given nic_id is not valid" do
       expect {
-        described_class.assemble("some_ssh key", prj.id, nic_id: nic.id)
+        described_class.assemble("some_ssh key", project.id, nic_id: nic.id)
       }.to raise_error RuntimeError, "Given nic doesn't exist with the id 0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"
     end
 
     it "fails if given subnet_id is not valid" do
       expect {
-        described_class.assemble("some_ssh key", prj.id, private_subnet_id: nic.id)
+        described_class.assemble("some_ssh key", project.id, private_subnet_id: nic.id)
       }.to raise_error RuntimeError, "Given subnet doesn't exist with the id 0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"
     end
 
@@ -144,7 +144,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(Nic).to receive(:[]).with(nic.id).and_return(nic)
       expect(nic).to receive(:vm_id).and_return("57afa8a7-2357-4012-9632-07fbe13a3133")
       expect {
-        described_class.assemble("some_ssh key", prj.id, nic_id: nic.id)
+        described_class.assemble("some_ssh key", project.id, nic_id: nic.id)
       }.to raise_error RuntimeError, "Given nic is assigned to a VM already"
     end
 
@@ -153,73 +153,73 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nic).to receive(:private_subnet).and_return(ps)
       expect(ps).to receive(:location_id).and_return("hel2")
       expect {
-        described_class.assemble("some_ssh key", prj.id, nic_id: nic.id)
+        described_class.assemble("some_ssh key", project.id, nic_id: nic.id)
       }.to raise_error RuntimeError, "Given nic is created in a different location"
     end
 
     it "fails if subnet of nic belongs to another project" do
       expect(Nic).to receive(:[]).with(nic.id).and_return(nic)
       expect(nic).to receive(:private_subnet).and_return(ps)
-      expect(Project).to receive(:[]).with(prj.id).and_return(prj)
-      expect(prj).to receive(:private_subnets).and_return([ps]).at_least(:once)
-      expect(prj.private_subnets).to receive(:any?).and_return(false)
+      expect(Project).to receive(:[]).with(project.id).and_return(project)
+      expect(project).to receive(:private_subnets).and_return([ps]).at_least(:once)
+      expect(project.private_subnets).to receive(:any?).and_return(false)
       expect {
-        described_class.assemble("some_ssh key", prj.id, nic_id: nic.id)
+        described_class.assemble("some_ssh key", project.id, nic_id: nic.id)
       }.to raise_error RuntimeError, "Given nic is not available in the given project"
     end
 
     it "fails if subnet belongs to another project" do
       expect(PrivateSubnet).to receive(:[]).with(ps.id).and_return(ps)
-      expect(Project).to receive(:[]).with(prj.id).and_return(prj)
-      expect(prj).to receive(:private_subnets).and_return([ps]).at_least(:once)
-      expect(prj.private_subnets).to receive(:any?).and_return(false)
+      expect(Project).to receive(:[]).with(project.id).and_return(project)
+      expect(project).to receive(:private_subnets).and_return([ps]).at_least(:once)
+      expect(project.private_subnets).to receive(:any?).and_return(false)
       expect {
-        described_class.assemble("some_ssh key", prj.id, private_subnet_id: ps.id)
+        described_class.assemble("some_ssh key", project.id, private_subnet_id: ps.id)
       }.to raise_error RuntimeError, "Given subnet is not available in the given project"
     end
 
     it "allows if subnet belongs to another project and allow_private_subnet_in_other_project argument is given" do
       expect(PrivateSubnet).to receive(:[]).with(ps.id).and_return(ps).at_least(:once)
-      expect(Project).to receive(:[]).with(prj.id).and_return(prj)
-      vm = described_class.assemble("some_ssh key", prj.id, private_subnet_id: ps.id, allow_private_subnet_in_other_project: true).subject
+      expect(Project).to receive(:[]).with(project.id).and_return(project)
+      vm = described_class.assemble("some_ssh key", project.id, private_subnet_id: ps.id, allow_private_subnet_in_other_project: true).subject
       expect(vm.private_subnets.map(&:id)).to eq [ps.id]
     end
 
     it "creates arm64 vm with double core count and 3.2GB memory per core" do
-      st = described_class.assemble("some_ssh key", prj.id, size: "standard-4", arch: "arm64")
+      st = described_class.assemble("some_ssh key", project.id, size: "standard-4", arch: "arm64")
       expect(st.subject.vcpus).to eq(4)
       expect(st.subject.memory_gib).to eq(12)
     end
 
     it "requests as many gpus as specified" do
-      st = described_class.assemble("some_ssh key", prj.id, size: "standard-2", gpu_count: 2)
+      st = described_class.assemble("some_ssh key", project.id, size: "standard-2", gpu_count: 2)
       expect(st.stack[0]["gpu_count"]).to eq(2)
     end
 
     it "requests at least a single gpu for standard-gpu-6" do
-      st = described_class.assemble("some_ssh key", prj.id, size: "standard-gpu-6")
+      st = described_class.assemble("some_ssh key", project.id, size: "standard-gpu-6")
       expect(st.stack[0]["gpu_count"]).to eq(1)
     end
 
     it "requests no gpus by default" do
-      st = described_class.assemble("some_ssh key", prj.id, size: "standard-2")
+      st = described_class.assemble("some_ssh key", project.id, size: "standard-2")
       expect(st.stack[0]["gpu_count"]).to eq(0)
     end
 
     it "creates correct number of storage volumes for storage optimized instance types" do
-      loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
+      loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
       storage_volumes = [
         {encrypted: true, size_gib: 30},
         {encrypted: true, size_gib: 7500}
       ]
 
-      vm = described_class.assemble("some_ssh key", prj.id, location_id: loc.id, size: "i8g.8xlarge", arch: "arm64", storage_volumes:).subject
+      vm = described_class.assemble("some_ssh key", project.id, location_id: loc.id, size: "i8g.8xlarge", arch: "arm64", storage_volumes:).subject
       expect(vm.vm_storage_volumes.count).to eq(3)
     end
 
     it "hops to start_aws if location is aws" do
-      loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
-      st = described_class.assemble("some_ssh key", prj.id, location_id: loc.id)
+      loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
+      st = described_class.assemble("some_ssh key", project.id, location_id: loc.id)
       expect(st.label).to eq("start_aws")
     end
   end
@@ -231,13 +231,13 @@ RSpec.describe Prog::Vm::Nexus do
       st = Strand.new(id: st_id)
       expect(described_class).to receive(:assemble) do |public_key, project_id, **kwargs|
         expect(public_key).to eq("public")
-        expect(project_id).to eq(prj.id)
+        expect(project_id).to eq(project.id)
         expect(kwargs[:name]).to be_nil
         expect(kwargs[:size]).to eq("new_size")
       end.and_return(st)
       expect(Sshable).to receive(:create_with_id).with(st, host: "temp_#{st_id}", raw_private_key_1: "pair", unix_user: "rhizome")
 
-      described_class.assemble_with_sshable(prj.id, size: "new_size")
+      described_class.assemble_with_sshable(project.id, size: "new_size")
     end
   end
 
@@ -318,9 +318,9 @@ RSpec.describe Prog::Vm::Nexus do
         expect(vm).to receive(:cloud_hypervisor_cpu_topology).and_return(Vm::CloudHypervisorCpuTopo.new(2, 1, 1, 1))
         expect(vm).to receive(:pci_devices).and_return([pci]).at_least(:once)
 
-        prj.set_ff_vm_public_ssh_keys(["operator_ssh_key"])
-        expect(prj).to receive(:get_ff_ipv6_disabled).and_return(true).at_least(:once)
-        expect(vm).to receive(:project).and_return(prj).at_least(:once)
+        project.set_ff_vm_public_ssh_keys(["operator_ssh_key"])
+        expect(project).to receive(:get_ff_ipv6_disabled).and_return(true).at_least(:once)
+        expect(vm).to receive(:project).and_return(project).at_least(:once)
 
         sshable = instance_double(Sshable)
         expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("NotStarted")
@@ -505,7 +505,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "considers filtered locations for runners if set for the installation" do
-      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, created_at: Time.now - 8 * 24 * 60 * 60, allocator_preferences: {"location_filter" => [Location::GITHUB_RUNNERS_ID, Location::LEASEWEB_WDC02_ID]})
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: project.id, created_at: Time.now - 8 * 24 * 60 * 60, allocator_preferences: {"location_filter" => [Location::GITHUB_RUNNERS_ID, Location::LEASEWEB_WDC02_ID]})
       GithubRunner.create(vm_id: vm.id, repository_name: "ubicloud/test", label: "ubicloud", installation_id: installation.id)
       vm.location_id = Location::GITHUB_RUNNERS_ID
 
@@ -525,7 +525,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "considers preferred locations for runners if set for the installation" do
-      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, created_at: Time.now - 8 * 24 * 60 * 60, allocator_preferences: {
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: project.id, created_at: Time.now - 8 * 24 * 60 * 60, allocator_preferences: {
         "location_filter" => [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID, Location::LEASEWEB_WDC02_ID],
         "location_preference" => [Location::LEASEWEB_WDC02_ID]
       })
@@ -549,7 +549,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "considers preferred families for runners if set for the installation" do
       vm.location_id = Location::GITHUB_RUNNERS_ID
-      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, allocator_preferences: {"family_filter" => ["standard", "premium"]})
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: project.id, allocator_preferences: {"family_filter" => ["standard", "premium"]})
       GithubRunner.create(label: "ubicloud", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
@@ -569,9 +569,9 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "allows premium family allocation if free runner upgrade runner is enabled" do
       vm.location_id = Location::GITHUB_RUNNERS_ID
-      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id)
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: project.id)
       GithubRunner.create(label: "ubicloud", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
-      prj.set_ff_free_runner_upgrade_until(Time.now + 5 * 24 * 60 * 60)
+      project.set_ff_free_runner_upgrade_until(Time.now + 5 * 24 * 60 * 60)
       expect(Scheduling::Allocator).to receive(:allocate).with(
         vm, :storage_volumes,
         allocation_state_filter: ["accepting"],
@@ -590,7 +590,7 @@ RSpec.describe Prog::Vm::Nexus do
     it "do not downgrade the premium runner if it's explicitly requested" do
       vm.location_id = Location::GITHUB_RUNNERS_ID
       vm.family = "premium"
-      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, allocator_preferences: {"family_filter" => ["standard", "premium"]})
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: project.id, allocator_preferences: {"family_filter" => ["standard", "premium"]})
       GithubRunner.create(label: "ubicloud-premium-30", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
@@ -610,7 +610,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "do not upgrade to the premium runner if not allowed" do
       vm.location_id = Location::GITHUB_RUNNERS_ID
-      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, allocator_preferences: {"family_filter" => ["standard", "premium"]})
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: project.id, allocator_preferences: {"family_filter" => ["standard", "premium"]})
       runner = Prog::Vm::GithubRunner.assemble(installation, repository_name: "ubicloud/test", label: "ubicloud-standard-2").subject.update(vm_id: vm.id)
       runner.incr_not_upgrade_premium
       expect(Scheduling::Allocator).to receive(:allocate).with(
@@ -631,7 +631,7 @@ RSpec.describe Prog::Vm::Nexus do
     it "uses standard-gpu family even if premium enabled" do
       vm.location_id = Location::GITHUB_RUNNERS_ID
       vm.family = "standard-gpu"
-      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: prj.id, allocator_preferences: {"family_filter" => ["standard", "premium"]})
+      installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: project.id, allocator_preferences: {"family_filter" => ["standard", "premium"]})
       GithubRunner.create(label: "ubicloud-gpu", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
@@ -693,7 +693,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "fails if same host is forced and excluded" do
       expect {
-        described_class.assemble("some_ssh key", prj.id,
+        described_class.assemble("some_ssh key", project.id,
           force_host_id: "some-vm-host-id", exclude_host_ids: ["some-vm-host-id"])
       }.to raise_error RuntimeError, "Cannot force and exclude the same host"
     end
@@ -792,7 +792,7 @@ RSpec.describe Prog::Vm::Nexus do
       now = Time.now
       expect(Time).to receive(:now).and_return(now).at_least(:once)
       allow(vm).to receive(:allocated_at).and_return(now - 100)
-      vm.update(vm_host_id: create_vm_host.id, project_id: prj.id)
+      vm.update(vm_host_id: create_vm_host.id, project_id: project.id)
       expect(vm).to receive(:update).with(display_state: "running", provisioned_at: now).and_return(true)
       expect(Clog).to receive(:emit).with("vm provisioned").and_yield
     end
@@ -802,7 +802,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm).to receive(:assigned_vm_address).and_return(vm_addr).at_least(:once)
       expect(vm).to receive(:ip4_enabled).and_return(true)
       expect(BillingRecord).to receive(:create).exactly(4).times
-      expect(vm).to receive(:project).and_return(prj).at_least(:once)
+      expect(vm).to receive(:project).and_return(project).at_least(:once)
       expect { nx.create_billing_record }.to hop("wait")
     end
 
@@ -810,28 +810,28 @@ RSpec.describe Prog::Vm::Nexus do
       vm.location = Location[name: "latitude-ai"]
       expect(vm).to receive(:pci_devices).and_return([PciDevice.new(slot: "01:00.0", iommu_group: 23, device_class: "0302", vendor: "10de", device: "20b5")]).at_least(:once)
       expect(BillingRecord).to receive(:create).exactly(4).times
-      expect(vm).to receive(:project).and_return(prj).at_least(:once)
+      expect(vm).to receive(:project).and_return(project).at_least(:once)
       expect { nx.create_billing_record }.to hop("wait")
     end
 
     it "creates billing records when ip4 is not enabled" do
       expect(vm).to receive(:ip4_enabled).and_return(false)
       expect(BillingRecord).to receive(:create).exactly(3).times
-      expect(vm).to receive(:project).and_return(prj).at_least(:once)
+      expect(vm).to receive(:project).and_return(project).at_least(:once)
       expect { nx.create_billing_record }.to hop("wait")
     end
 
     it "not create billing records when the project is not billable" do
-      expect(vm).to receive(:project).and_return(prj).at_least(:once)
-      expect(prj).to receive(:billable).and_return(false)
+      expect(vm).to receive(:project).and_return(project).at_least(:once)
+      expect(project).to receive(:billable).and_return(false)
       expect(BillingRecord).not_to receive(:create)
       expect { nx.create_billing_record }.to hop("wait")
     end
 
     it "doesn't create billing records for storage volumes, ip4 and pci devices if the location provider is aws" do
-      loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
+      loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
       vm.location = loc
-      expect(vm).to receive(:project).and_return(prj).at_least(:once)
+      expect(vm).to receive(:project).and_return(project).at_least(:once)
       expect(vm).not_to receive(:ip4_enabled)
       expect(vm).not_to receive(:pci_devices)
       expect(vm).not_to receive(:storage_volumes)
@@ -844,7 +844,7 @@ RSpec.describe Prog::Vm::Nexus do
       vm.location.provider = "aws"
       AwsInstance.create_with_id(vm.id, instance_id: "i-0123456789abcdefg")
       expect(BillingRecord).to receive(:create).once
-      expect(vm).to receive(:project).and_return(prj).at_least(:once)
+      expect(vm).to receive(:project).and_return(project).at_least(:once)
 
       expect { nx.create_billing_record }.to hop("wait")
     end
@@ -1185,8 +1185,8 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "hops to wait_aws_vm_destroyed if vm is in aws" do
-      location_id = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true).id
-      vm.update(project_id: prj.id, location_id:)
+      location_id = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true).id
+      vm.update(project_id: project.id, location_id:)
       st.update(prog: "Vm::Nexus", label: "destroy", stack: [{}])
       child = Strand.create(parent_id: st.id, prog: "Aws::Instance", label: "start", stack: [{}])
       expect(nx).to receive(:bud).with(Prog::Aws::Instance, {"subject_id" => vm.id}, :destroy)
