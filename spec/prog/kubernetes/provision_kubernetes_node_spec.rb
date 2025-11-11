@@ -334,7 +334,16 @@ table ip6 pod_access {
       )
 
       expect(sshable).to receive(:cmd).with("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: /"type": "ubicni"/)
-      expect { prog.install_cni }.to exit({node_id: prog.node.id})
+      expect { prog.install_cni }.to hop("approve_new_csr")
+    end
+  end
+
+  describe "#approve_new_csr" do
+    it "approves the csr" do
+      sshable = instance_double(Sshable)
+      expect(kubernetes_cluster.functional_nodes.first).to receive(:sshable).and_return(sshable)
+      expect(sshable).to receive(:cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf get csr | awk '/Pending/ && /kubelet-serving/ && /'\"#{node.name}\"'/ {print $1}' | xargs -r sudo kubectl --kubeconfig /etc/kubernetes/admin.conf certificate approve")
+      expect { prog.approve_new_csr }.to exit({node_id: prog.node.id})
     end
   end
 end
