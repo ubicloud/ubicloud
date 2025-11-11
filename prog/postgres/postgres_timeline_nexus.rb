@@ -172,7 +172,6 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     postgres_timeline.location.location_credential.sts_client
   end
 
-
   def admin_client
     @admin_client ||= Minio::Client.new(
       endpoint: postgres_timeline.blob_storage_endpoint,

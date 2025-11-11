@@ -339,7 +339,6 @@ class PostgresServer < Sequel::Model
     end
   end
 
-
   def s3_policy_arn
     "arn:aws:iam::#{get_account_id}:policy/#{timeline.aws_s3_policy_name}"
   end
