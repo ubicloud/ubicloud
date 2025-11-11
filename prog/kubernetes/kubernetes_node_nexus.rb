@@ -9,7 +9,7 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
       cluster = KubernetesCluster[kubernetes_cluster_id]
       exclude_host_ids = []
 
-      unless kubernetes_nodepool_id
+      unless kubernetes_nodepool_id || Config.allow_unspread_servers
         exclude_host_ids = cluster.cp_vms_dataset
           .exclude(vm_host_id: nil)
           .order(nil)
