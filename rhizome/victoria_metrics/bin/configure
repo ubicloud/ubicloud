@@ -52,7 +52,16 @@ auth_config = <<-AUTH_CONFIG
 users:
   - username: "#{user}"
     password: "#{password}"
-    url_prefix: "http://127.0.0.1:8428"
+    url_map:
+      - src_paths:
+          - /health
+          - /api/v1/import/prometheus
+          - /api/v1/query
+          - /api/v1/query_range
+          - /api/v1/series
+          - /api/v1/labels
+          - /api/v1/label/.*/values
+        url_prefix: "http://127.0.0.1:8428"
 AUTH_CONFIG
 
 safe_write_to_file("/etc/victoria_metrics/auth-config.yml", auth_config)
