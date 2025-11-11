@@ -50,6 +50,30 @@ class Clover
 
       r.rename firewall, perm: "Firewall:edit", serializer: Serializers::Firewall, template_prefix: "networking/firewall"
 
+      r.post "update-description" do
+        authorize("Firewall:edit", firewall)
+        handle_validation_failure("networking/firewall/show") { @page = "settings" }
+        description = typecast_body_params.nonempty_str!("description")
+
+        if description == firewall.description
+          notice = "Description unchanged"
+          no_audit_log
+        else
+          notice = "Description updated"
+          DB.transaction do
+            firewall.update(description:)
+            audit_log(firewall, "update")
+          end
+        end
+
+        if api?
+          Serializers::Firewall.serialize(firewall)
+        else
+          flash["notice"] = notice
+          r.redirect firewall, "/settings"
+        end
+      end
+
       r.show_object(firewall, actions: %w[overview networking settings], perm: "Firewall:view", template: "networking/firewall/show")
 
       r.post %w[attach-subnet detach-subnet] do |action|
