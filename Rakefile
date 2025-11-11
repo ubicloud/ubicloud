@@ -486,7 +486,78 @@ namespace :linter do
     sh "npx @stoplight/spectral-cli lint openapi/openapi.yml --fail-severity=warn --ruleset openapi/.spectral.yml"
     sh "npx openapi-format openapi/openapi.yml --configFile openapi/openapi_format.yml"
   end
+
+  desc "Check for potentially unsafe <%== usage in ERB templates"
+  task :xss_check do
+    puts "Checking for potentially unsafe <%== usage in ERB templates..."
+
+    # Patterns that are considered safe (already escaped)
+    # Add additional patterns here as needed
+    safe_patterns = [
+      /@?[a-z_]+_(html|tag)( *)?\z/,
+      /rodauth\.[a-z_]+_(additional_form_tags|footer|explanatory_text)/,
+      "assets(",
+      "f.button(",
+      "f.input(",
+      "form(",
+      "hidden_inputs(",
+      "html_attrs(",
+      "linkify_ubids(",
+      "part(",
+      "render(",
+      "rodauth.add_recovery_codes_heading",
+      "rodauth.otp_qr_code",
+      "yield"
+    ]
+    safe_regexp = /\A\s*(?:#{Regexp.union(safe_patterns)})/m
+
+    findings = []
+    erb_files = Dir.glob("views/**/*.erb")
+
+    erb_files.each do |file|
+      content = File.read(file)
+      lines = content.lines
+
+      # Find all <%== occurrences (including multi-line)
+      content.scan(/<%==\s*(.+?)\s*%>/m) do |match|
+        tag_content = match[0]
+
+        next if safe_regexp.match?(tag_content)
+
+        # Find the line number where this tag starts
+        offset = Regexp.last_match.begin(0)
+        line_number = content[0...offset].count("\n") + 1
+
+        # Extract the line for display (handle multi-line by showing first line + ...)
+        display_content = tag_content.gsub(/\s+/, " ").strip
+        display_content = "#{display_content[0...100]}..." if display_content.length > 100
+
+        findings << {
+          file: file,
+          line: line_number,
+          content: display_content,
+          full_line: lines[line_number - 1].strip
+        }
+      end
+    end
+
+    if findings.empty?
+      puts "✓ No potentially unsafe <%== usage found"
+    else
+      puts "⚠ Found #{findings.size} potentially unsafe <%== usage(s):\n\n"
+
+      findings.each do |finding|
+        puts "#{finding[:file]}:#{finding[:line]}"
+        puts "  Content: #{finding[:content]}"
+        puts "  Line: #{finding[:full_line]}"
+        puts
+      end
+
+      puts "If any of these are safe (already escaped), add them to the safe_patterns array in the rake task."
+      exit 1
+    end
+  end
 end
 
 desc "Run all linters"
-task linter: ["rubocop", "brakeman", "erb_formatter", "openapi", "go"].map { "linter:#{it}" }
+task linter: ["rubocop", "brakeman", "erb_formatter", "openapi", "go", "xss_check"].map { "linter:#{it}" }
