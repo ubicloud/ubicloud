@@ -953,13 +953,20 @@ class Clover < Roda
           next "! Invalid request: No valid personal access token provided\n"
         elsif (session_id = env["clover.web_cli_session_id"])
           rodauth.instance_variable_set(:@session, rodauth.session_key.to_s => session_id)
-        else
+        elsif r.path_info != "/ips-v4"
           response.json = true
           fail CloverError.new(401, "MissingCredentials", "must include personal access token in Authorization header")
         end
       end
+
       response.json = true
       response.skip_content_security_policy!
+
+      r.get "ips-v4" do
+        response.content_type = :text
+        response.cache_control public: true, max_age: 86400
+        self.class.ips_v4
+      end
     elsif r.admin?
       r.run(CloverAdmin.app)
     else
@@ -992,12 +999,6 @@ class Clover < Roda
           content_security_policy.add_form_action(uri.to_s)
           view "auth/oidc_login"
         end
-      end
-
-      r.get "ips-v4" do
-        response.content_type = :text
-        response.cache_control public: true, max_age: 86400
-        self.class.ips_v4
       end
 
       check_csrf!
