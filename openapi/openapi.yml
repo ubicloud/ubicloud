@@ -494,6 +494,34 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
+  '/project/{project_id}/location/{location}/firewall/{firewall_reference}/update-description':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/firewall_reference'
+    post:
+      operationId: updateFirewallDescription
+      summary: Update a firewall description
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description:
+                  description: New description for firewall
+                  type: string
+              additionalProperties: false
+              required:
+                - description
+      responses:
+        '200':
+          $ref: '#/components/responses/Firewall'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
   '/project/{project_id}/location/{location}/kubernetes-cluster':
     get:
       operationId: listLocationKubernetesClusters
