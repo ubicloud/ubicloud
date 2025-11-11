@@ -767,6 +767,23 @@ RSpec.describe Prog::Vm::GithubRunner do
       vm.update(vm_host_id: create_vm_host(data_center: "FSN1-DC8").id)
     end
 
+    it "collects vm logs but not serial.log if vm host is nil" do
+      runner.update(workflow_job: nil)
+      vm.update(vm_host_id: nil)
+      expect(vm.sshable).to receive(:cmd).with("journalctl -u runner-script -t 'run-withenv.sh' -t 'systemd' --no-pager | grep -Fv Started")
+      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND, log: false)
+        TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
+        curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
+      COMMAND
+      expect(vm.sshable).to receive(:cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReceived request - method: GET urlPath: foo\nGetCacheEntry  request failed with status code: 204\n")
+
+      expect(Clog).to receive(:emit).with("Cache proxy log line counts") do |&blk|
+        expect(blk.call).to eq(cache_proxy_log_line_counts: {"Received request - method: GET urlPath: foo" => 2, "GetCacheEntry  request failed with status code: 204" => 1})
+      end
+
+      nx.collect_final_telemetry
+    end
+
     it "Logs journalctl, docker limits, and cache proxy log if workflow_job is not successful" do
       runner.update(workflow_job: {"conclusion" => "failure"})
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ln /vm/#{vm.inhost_name}/serial.log /var/log/ubicloud/serials/#{runner.ubid}_serial.log")
@@ -882,7 +899,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "destroys resources and hops if runner deregistered" do
-      vm.update(vm_host_id: create_vm_host.id)
+      vm.update(allocated_at: Time.now)
       expect(nx).to receive(:decr_destroy)
       expect(client).to receive(:get).and_raise(Octokit::NotFound)
       expect(client).not_to receive(:delete)
@@ -898,7 +915,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "skip deregistration and destroy vm immediately" do
-      vm.update(vm_host_id: create_vm_host.id)
+      vm.update(allocated_at: Time.now)
       expect(nx).to receive(:decr_destroy)
       expect(runner).to receive(:skip_deregistration_set?).and_return(true)
       expect(nx).to receive(:collect_final_telemetry)
