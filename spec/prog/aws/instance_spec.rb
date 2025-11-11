@@ -448,6 +448,10 @@ usermod -L ubuntu
       iam_client.stub_responses(:detach_role_policy, {})
       iam_client.stub_responses(:delete_policy, {})
       iam_client.stub_responses(:delete_role, {})
+      policies = iam_client.stub_data(:list_attached_role_policies, {attached_policies: [
+        {policy_name: "policy-name", policy_arn: "policy-arn"}
+      ]})
+      iam_client.stub_responses(:list_attached_role_policies, policies)
 
       expect { nx.cleanup_roles }.to exit({"msg" => "vm destroyed"})
     end
