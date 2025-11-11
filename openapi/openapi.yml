@@ -340,6 +340,29 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
+    patch:
+      operationId: updateFirewall
+      summary: Update a firewall
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description:
+                  description: New description for firewall
+                  type: string
+              additionalProperties: false
+              required:
+                - description
+      responses:
+        '200':
+          $ref: '#/components/responses/Firewall'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
   '/project/{project_id}/location/{location}/firewall/{firewall_reference}/attach-subnet':
     parameters:
       - $ref: '#/components/parameters/location'

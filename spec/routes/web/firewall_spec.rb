@@ -495,6 +495,28 @@ RSpec.describe Clover, "firewall" do
       end
     end
 
+    describe "update description" do
+      it "can update firewall description" do
+        visit "#{project.path}#{firewall.path}/settings"
+        fill_in "description", with: "new-description"
+        click_button "Update Description"
+        expect(page).to have_flash_notice("Description updated")
+        expect(firewall.reload.description).to eq "new-description"
+
+        # Test updating when description doesn't change
+        fill_in "description", with: "new-description"
+        click_button "Update Description"
+        expect(page).to have_flash_notice("Description unchanged")
+        expect(firewall.reload.description).to eq "new-description"
+      end
+
+      it "does not show update description option without permissions" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Firewall:view"])
+        visit "#{project_wo_permissions.path}#{fw_wo_permission.path}/settings"
+        expect(page).to have_no_content("Update Description")
+      end
+    end
+
     describe "delete" do
       it "can delete firewall" do
         visit "#{project.path}#{firewall.path}"

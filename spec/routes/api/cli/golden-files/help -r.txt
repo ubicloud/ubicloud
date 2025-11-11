@@ -82,18 +82,19 @@ Usage:
     ubi fw (location/fw-name | fw-id) post-command [...]
 
 Commands:
-    list             List firewalls
+    list                  List firewalls
 
 Post Commands:
-    add-rule         Add a firewall rule
-    attach-subnet    Attach a private subnet to a firewall
-    create           Create a firewall
-    delete-rule      Remove a firewall rule
-    destroy          Destroy a firewall
-    detach-subnet    Detch a private subnet from a firewall
-    modify-rule      Modify a firewall rule
-    rename           Rename a firewall
-    show             Show details for a firewall
+    add-rule              Add a firewall rule
+    attach-subnet         Attach a private subnet to a firewall
+    create                Create a firewall
+    delete-rule           Remove a firewall rule
+    destroy               Destroy a firewall
+    detach-subnet         Detch a private subnet from a firewall
+    modify-rule           Modify a firewall rule
+    rename                Rename a firewall
+    show                  Show details for a firewall
+    update-description    Update the description for a firewall
 
 
 List firewalls
@@ -191,6 +192,12 @@ Allowed Option Values:
     Nic Fields: id name private-ipv4 private-ipv6 vm-name
     Private Subnet Fields: id name state location net4 net6 nics
     Firewall Rule Fields: id cidr port-range
+
+
+Update the description for a firewall
+
+Usage:
+    ubi fw (location/fw-name | fw-id) update-description new-description
 
 
 Manage GitHub integration
