@@ -425,9 +425,10 @@ class Prog::Vm::GithubRunner < Prog::Base
     # If the runner is not assigned any job or job is not successful, we log
     # journalctl output to debug if there was any problem with the runner script.
     if (job = github_runner.workflow_job).nil? || job.fetch("conclusion") != "success"
-      serial_log_path = "/vm/#{vm.inhost_name}/serial.log"
-      vm.vm_host.sshable.cmd("sudo ln #{serial_log_path} /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
-
+      if vm.vm_host
+        serial_log_path = "/vm/#{vm.inhost_name}/serial.log"
+        vm.vm_host.sshable.cmd("sudo ln #{serial_log_path} /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
+      end
       # We grep only the lines related to 'run-withenv' and 'systemd'. Other
       # logs include outputs from subprocesses like php, sudo, etc., which
       # could contain sensitive data. 'run-withenv' is the main process,
@@ -491,7 +492,7 @@ class Prog::Vm::GithubRunner < Prog::Base
         subnet.incr_destroy
       end
 
-      collect_final_telemetry if vm.vm_host
+      collect_final_telemetry if vm.allocated_at
 
       vm.incr_destroy
     end
