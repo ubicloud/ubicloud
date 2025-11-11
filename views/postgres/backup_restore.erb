@@ -53,11 +53,12 @@ max_date = @pg.timeline.latest_restore_time %>
         </thead>
         <tbody class="divide-y divide-gray-200 bg-white">
           <% backups.each do %>
+            <% target_time = Time.at((it.last_modified.to_i / 60.0).ceil * 60) %>
             <tr>
-              <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6"><%= it.last_modified %></td>
+              <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6"><%= target_time %></td>
               <td class="py-4 text-sm font-medium text-gray-900">Full Backup</td>
               <td class="py-4 text-sm font-medium text-gray-900">
-                <div class="cursor-pointer fork-icon" data-target-datetime="<%= it.last_modified %>">
+                <div class="cursor-pointer fork-icon" data-target-datetime="<%= target_time %>">
                   <%== part("components/icon", name: "fork", classes: "text-black-600 h-6 w-6") %>
                 </div>
               </td>
