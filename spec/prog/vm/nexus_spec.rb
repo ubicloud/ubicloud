@@ -86,8 +86,6 @@ RSpec.describe Prog::Vm::Nexus do
       nic_strand = instance_double(Strand, subject: nic)
       expect(Prog::Vnet::NicNexus).to receive(:assemble).and_return(nic_strand)
       expect(nic).to receive(:update).and_return(nic)
-      expect(Project).to receive(:[]).with(project.id).and_return(project)
-      expect(project).to receive(:private_subnets).and_return([ps]).at_least(:once)
 
       described_class.assemble("some_ssh key", project.id, private_subnet_id: ps.id)
     end
@@ -98,8 +96,6 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nic).to receive(:update).and_return(nic)
       expect(Prog::Vnet::SubnetNexus).not_to receive(:assemble)
       expect(Prog::Vnet::NicNexus).not_to receive(:assemble)
-      expect(Project).to receive(:[]).with(project.id).and_return(project)
-      expect(project.private_subnets).to receive(:any?).and_return(true)
       described_class.assemble("some_ssh key", project.id, nic_id: nic.id, location_id: Location::HETZNER_FSN1_ID)
     end
 
@@ -147,21 +143,16 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "fails if subnet of nic belongs to another project" do
+      ps.update(project_id: Project.create(name: "project-2").id)
       expect(Nic).to receive(:[]).with(nic.id).and_return(nic)
       expect(nic).to receive(:private_subnet).and_return(ps)
-      expect(Project).to receive(:[]).with(project.id).and_return(project)
-      expect(project).to receive(:private_subnets).and_return([ps]).at_least(:once)
-      expect(project.private_subnets).to receive(:any?).and_return(false)
       expect {
         described_class.assemble("some_ssh key", project.id, nic_id: nic.id)
       }.to raise_error RuntimeError, "Given nic is not available in the given project"
     end
 
     it "fails if subnet belongs to another project" do
-      expect(PrivateSubnet).to receive(:[]).with(ps.id).and_return(ps)
-      expect(Project).to receive(:[]).with(project.id).and_return(project)
-      expect(project).to receive(:private_subnets).and_return([ps]).at_least(:once)
-      expect(project.private_subnets).to receive(:any?).and_return(false)
+      ps.update(project_id: Project.create(name: "project-2").id)
       expect {
         described_class.assemble("some_ssh key", project.id, private_subnet_id: ps.id)
       }.to raise_error RuntimeError, "Given subnet is not available in the given project"
@@ -169,7 +160,6 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "allows if subnet belongs to another project and allow_private_subnet_in_other_project argument is given" do
       expect(PrivateSubnet).to receive(:[]).with(ps.id).and_return(ps).at_least(:once)
-      expect(Project).to receive(:[]).with(project.id).and_return(project)
       vm = described_class.assemble("some_ssh key", project.id, private_subnet_id: ps.id, allow_private_subnet_in_other_project: true).subject
       expect(vm.private_subnets.map(&:id)).to eq [ps.id]
     end
@@ -308,8 +298,7 @@ RSpec.describe Prog::Vm::Nexus do
         expect(vm).to receive(:pci_devices).and_return([pci]).at_least(:once)
 
         project.set_ff_vm_public_ssh_keys(["operator_ssh_key"])
-        expect(project).to receive(:get_ff_ipv6_disabled).and_return(true).at_least(:once)
-        expect(vm).to receive(:project).and_return(project).at_least(:once)
+        project.set_ff_ipv6_disabled(true)
 
         sshable = instance_double(Sshable)
         expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("NotStarted")
@@ -796,7 +785,6 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm).to receive(:assigned_vm_address).and_return(vm_addr).at_least(:once)
       expect(vm).to receive(:ip4_enabled).and_return(true)
       expect(BillingRecord).to receive(:create).exactly(4).times
-      expect(vm).to receive(:project).and_return(project).at_least(:once)
       expect { nx.create_billing_record }.to hop("wait")
     end
 
@@ -804,20 +792,17 @@ RSpec.describe Prog::Vm::Nexus do
       vm.location_id = Location[name: "latitude-ai"].id
       expect(vm).to receive(:pci_devices).and_return([PciDevice.new(slot: "01:00.0", iommu_group: 23, device_class: "0302", vendor: "10de", device: "20b5")]).at_least(:once)
       expect(BillingRecord).to receive(:create).exactly(4).times
-      expect(vm).to receive(:project).and_return(project).at_least(:once)
       expect { nx.create_billing_record }.to hop("wait")
     end
 
     it "creates billing records when ip4 is not enabled" do
       expect(vm).to receive(:ip4_enabled).and_return(false)
       expect(BillingRecord).to receive(:create).exactly(3).times
-      expect(vm).to receive(:project).and_return(project).at_least(:once)
       expect { nx.create_billing_record }.to hop("wait")
     end
 
     it "not create billing records when the project is not billable" do
-      expect(vm).to receive(:project).and_return(project).at_least(:once)
-      expect(project).to receive(:billable).and_return(false)
+      project.update(billable: false)
       expect(BillingRecord).not_to receive(:create)
       expect { nx.create_billing_record }.to hop("wait")
     end
@@ -825,7 +810,6 @@ RSpec.describe Prog::Vm::Nexus do
     it "doesn't create billing records for storage volumes, ip4 and pci devices if the location provider is aws" do
       loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
       vm.location = loc
-      expect(vm).to receive(:project).and_return(project).at_least(:once)
       expect(vm).not_to receive(:ip4_enabled)
       expect(vm).not_to receive(:pci_devices)
       expect(vm).not_to receive(:storage_volumes)
@@ -838,7 +822,6 @@ RSpec.describe Prog::Vm::Nexus do
       vm.location.provider = "aws"
       AwsInstance.create_with_id(vm.id, instance_id: "i-0123456789abcdefg")
       expect(BillingRecord).to receive(:create).once
-      expect(vm).to receive(:project).and_return(project).at_least(:once)
 
       expect { nx.create_billing_record }.to hop("wait")
     end
