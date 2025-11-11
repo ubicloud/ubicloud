@@ -223,6 +223,11 @@ TEMPLATE
 }
 CONFIG
     vm.sshable.cmd("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
+    hop_approve_new_csr
+  end
+
+  label def approve_new_csr
+    kubernetes_cluster.sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf get csr | awk '/Pending/ && /kubelet-serving/ && /'\"#{node.name}\"'/ {print $1}' | xargs -r sudo kubectl --kubeconfig /etc/kubernetes/admin.conf certificate approve")
     pop({node_id: node.id})
   end
 end
