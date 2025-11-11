@@ -90,7 +90,7 @@ Post Commands:
     create                Create a firewall
     delete-rule           Remove a firewall rule
     destroy               Destroy a firewall
-    detach-subnet         Detch a private subnet from a firewall
+    detach-subnet         Detach a private subnet from a firewall
     modify-rule           Modify a firewall rule
     rename                Rename a firewall
     show                  Show details for a firewall
@@ -152,7 +152,7 @@ Options:
     -f, --force                      do not require confirmation
 
 
-Detch a private subnet from a firewall
+Detach a private subnet from a firewall
 
 Usage:
     ubi fw (location/fw-name | fw-id) detach-subnet (ps-name | ps-id)
