@@ -149,8 +149,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   def setup_aws_s3
-    policy_name = aws_s3_policy_name
-    policy = iam_client.create_policy(policy_name: policy_name, policy_document: postgres_timeline.blob_storage_policy.to_json)
+    policy = iam_client.create_policy(policy_name: aws_s3_policy_name, policy_document: postgres_timeline.blob_storage_policy.to_json)
     unless Config.aws_postgres_iam_access
       iam_client.create_user(user_name: postgres_timeline.ubid)
       iam_client.attach_user_policy(user_name: postgres_timeline.ubid, policy_arn: policy.policy.arn)

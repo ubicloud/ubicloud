@@ -298,6 +298,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "hops to initialize_empty_database if the server is primary" do
       expect(postgres_server).to receive(:refresh_walg_credentials)
       expect(postgres_server).to receive(:primary?).and_return(true)
+      expect(postgres_server).to receive(:needs_s3_policy_attachment?).and_return(false)
 
       expect { nx.configure_walg_credentials }.to hop("initialize_empty_database")
     end
@@ -305,7 +306,18 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "hops to initialize_database_from_backup if the server is not primary" do
       expect(postgres_server).to receive(:refresh_walg_credentials)
       expect(postgres_server).to receive(:primary?).and_return(false)
+      expect(postgres_server).to receive(:needs_s3_policy_attachment?).and_return(false)
+
       expect { nx.configure_walg_credentials }.to hop("initialize_database_from_backup")
+    end
+
+    it "calls attach_s3_policy when needs_s3_policy_attachment?" do
+      expect(postgres_server).to receive(:refresh_walg_credentials)
+      expect(postgres_server).to receive(:primary?).and_return(true)
+      expect(postgres_server).to receive(:needs_s3_policy_attachment?).and_return(true)
+      expect(postgres_server).to receive(:attach_s3_policy)
+
+      expect { nx.configure_walg_credentials }.to hop("initialize_empty_database")
     end
   end
 
