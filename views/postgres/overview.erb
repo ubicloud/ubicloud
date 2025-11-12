@@ -37,7 +37,7 @@ vm = @pg.representative_server.vm
       ["hero-cpu-chip", vm.display_size, "#{vm.vcpus} vCPU, #{vm.memory_gib} GB RAM"],
       ["hero-circle-stack", "#{@pg.representative_server.storage_size_gib} GB", disk_usage_subtext],
       ["hero-square-2-stack-modified", ha_option.description, ""],
-      ["hero-map-pin", @pg.location.display_name, "#{location_details} (#{provider})"],
+      ["hero-map-pin", @pg.location.display_name, h("#{location_details} (#{provider})")],
       ["postgres-logo", "Version #{@pg.version}", ""],
     ].each do |icon, text, subtext_html|
   %>
