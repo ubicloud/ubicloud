@@ -83,7 +83,7 @@
         <li>
           <div class="text-xs font-semibold leading-6 text-orange-200">Project Details</div>
           <ul role="list" class="-mx-2 mt-2 space-y-1">
-            <%== if has_project_permission("Project:user")
+            <% if has_project_permission("Project:user")
                    users_url = "#{@project.path}/user"
                    users_label = "Users"
                  elsif has_project_permission("Project:viewaccess")
@@ -91,15 +91,15 @@
                    users_label = "Access Control"
                  end
 
-                if users_url
-                  part(
+               if users_url %>
+                 <%== part(
                     "layouts/sidebar/item",
                     name: users_label,
                     url: users_url,
                     is_active: request.path.start_with?("#{@project.path}/user"),
                     icon: "hero-users",
-                  )
-                end %>
+                  ) %>
+               <% end %>
             <%== part(
               "layouts/sidebar/item",
               name: "Tokens",
