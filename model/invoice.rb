@@ -25,7 +25,7 @@ class Invoice < Sequel::Model
   end
 
   def filename
-    "Ubicloud-#{begin_time.strftime("%Y-%m")}-#{invoice_number}.pdf"
+    "Ubicloud-#{begin_time.utc.strftime("%Y-%m")}-#{invoice_number}.pdf"
   end
 
   %i[subtotal cost].each do |meth|
@@ -52,7 +52,7 @@ class Invoice < Sequel::Model
         "non_eu"
       end
     end
-    "#{begin_time.strftime("%Y/%m")}/#{group}/#{filename}"
+    "#{begin_time.utc.strftime("%Y/%m")}/#{group}/#{filename}"
   end
 
   def after_destroy
@@ -64,7 +64,7 @@ class Invoice < Sequel::Model
   end
 
   def name
-    begin_time.strftime("%B %Y")
+    begin_time.utc.strftime("%B %Y")
   end
 
   def charge
