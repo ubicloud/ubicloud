@@ -155,8 +155,18 @@ PGHOST=/var/run/postgresql
   end
 
   it "returns blob storage endpoint" do
-    expect(MinioCluster).to receive(:[]).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
+    expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
     expect(postgres_timeline.blob_storage_endpoint).to eq("https://blob-endpoint")
+  end
+
+  it "works correctly with MinioCluster in Minio project" do
+    minio_project = Project.create(name: "mc-project")
+    pg_project = Project.create(name: "mc-project")
+    expect(Config).to receive(:minio_service_project_id).and_return(minio_project.id).at_least(:once)
+    expect(Config).to receive(:postgres_service_project_id).and_return(pg_project.id)
+    mc = Prog::Minio::MinioClusterNexus.assemble(minio_project.id, "minio", Location::HETZNER_FSN1_ID, "minio-admin", 100, 1, 1, 1, "standard-2").subject
+
+    expect(postgres_timeline.blob_storage.id).to eq(mc.id)
   end
 
   it "returns blob storage client from cache" do

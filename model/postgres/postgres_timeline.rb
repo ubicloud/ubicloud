@@ -97,7 +97,11 @@ PGHOST=/var/run/postgresql
   S3BlobStorage = Struct.new(:url)
 
   def blob_storage
-    @blob_storage ||= MinioCluster[blob_storage_id] || (aws? ? S3BlobStorage.new("https://s3.#{location.name}.amazonaws.com") : nil)
+    @blob_storage ||= if aws?
+      S3BlobStorage.new("https://s3.#{location.name}.amazonaws.com")
+    else
+      MinioCluster.first(project_id: Config.postgres_service_project_id, location_id: location.id) || MinioCluster.first(project_id: Config.minio_service_project_id, location_id: location.id)
+    end
   end
 
   def blob_storage_endpoint
