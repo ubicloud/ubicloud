@@ -86,7 +86,7 @@ module Prog::VictoriaMetrics; end
 
 module Prog::Vm; end
 
-module Prog::Vnet; end
+module Prog::Vnet::Ubicloud; end
 
 module Scheduling; end
 
