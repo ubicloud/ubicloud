@@ -145,6 +145,7 @@ module Config
   override :postgres_service_hostname, "postgres.ubicloud.com", string
   override :postgres_monitor_database_url, Config.clover_database_url, string
   optional :postgres_monitor_database_root_certs, string
+  override :postgres_monitor_database_rds_iam_auth_enabled, false, bool
   optional :postgres_paradedb_notification_email, string
   optional :postgres_lantern_notification_email, string
   override :postgres_allow_servers_in_same_data_center, false, bool

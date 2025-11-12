@@ -5,7 +5,7 @@ require "sequel/core"
 require_relative "config"
 require_relative "lib/util"
 require_relative "lib/clog"
-require "pg/aws_rds_iam" if Config.clover_database_rds_iam_auth_enabled
+require "pg/aws_rds_iam" if Config.clover_database_rds_iam_auth_enabled || Config.postgres_monitor_database_rds_iam_auth_enabled
 
 db_ca_bundle_filename = File.join(Dir.pwd, "var", "ca_bundles", "db_ca_bundle.crt")
 Util.safe_write_to_file(db_ca_bundle_filename, Config.clover_database_root_certs)
@@ -17,10 +17,13 @@ DB = Sequel.connect(Config.clover_database_url, max_connections:, pool_timeout: 
 
 postgres_monitor_db_ca_bundle_filename = File.join(Dir.pwd, "var", "ca_bundles", "postgres_monitor_db.crt")
 Util.safe_write_to_file(postgres_monitor_db_ca_bundle_filename, Config.postgres_monitor_database_root_certs)
-begin
-  POSTGRES_MONITOR_DB = Sequel.connect(Config.postgres_monitor_database_url, max_connections: Config.db_pool_monitor, pool_timeout: Config.database_timeout, driver_options:) if Config.postgres_monitor_database_url
-rescue Sequel::DatabaseConnectionError => ex
-  Clog.emit("Failed to connect to Postgres Monitor database") { {database_connection_failed: {exception: Util.exception_to_hash(ex)}} }
+if Config.postgres_monitor_database_url
+  begin
+    driver_options = Config.postgres_monitor_database_rds_iam_auth_enabled ? {aws_rds_iam_auth_token_generator: "default"} : {}
+    POSTGRES_MONITOR_DB = Sequel.connect(Config.postgres_monitor_database_url, max_connections: Config.db_pool_monitor, pool_timeout: Config.database_timeout, driver_options:)
+  rescue Sequel::DatabaseConnectionError => ex
+    Clog.emit("Failed to connect to Postgres Monitor database") { {database_connection_failed: {exception: Util.exception_to_hash(ex)}} }
+  end
 end
 
 # Load Sequel Database/Global extensions here

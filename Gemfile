@@ -29,7 +29,6 @@ gem "octokit"
 gem "omniauth-github"
 gem "omniauth-google-oauth2"
 gem "pagerduty", ">= 4.0"
-gem "pg-aws_rds_iam", github: "haines/pg-aws_rds_iam", ref: "fb91b9232837e350aa9c8440b7340346adae845e"
 gem "prawn"
 gem "prawn-table"
 gem "pry"
@@ -51,6 +50,10 @@ gem "stripe"
 gem "tilt", ">= 2.6.1"
 gem "warning"
 gem "webauthn"
+
+group :aws_rds_iam do
+  gem "pg-aws_rds_iam", github: "haines/pg-aws_rds_iam", ref: "fb91b9232837e350aa9c8440b7340346adae845e"
+end
 
 group :development do
   gem "awesome_print"
