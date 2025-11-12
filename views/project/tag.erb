@@ -107,7 +107,7 @@ current_members.sort! %>
               <% current_members.each do |label, ubid| %>
                 <tr id="<%= ubid %>" class="cursor-pointer">
                   <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                    <%== label %>
+                    <%= label %>
                   </td>
                   <% if removal_allowed %>
                     <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
@@ -156,7 +156,7 @@ current_members.sort! %>
                 <% available_to_add.each do |label, ubid| %>
                   <tr id="<%= ubid %>" class="cursor-pointer">
                     <td class="whitespace-nowrap py-4 pl-5 pr-3 text-sm font-medium text-gray-900 sm:pl-7" scope="row">
-                      <%== label %>
+                      <%= label %>
                     </td>
                     <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
                       <%== part(
