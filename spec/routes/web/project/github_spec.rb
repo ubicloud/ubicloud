@@ -332,37 +332,32 @@ RSpec.describe Clover, "github" do
     end
 
     it "can delete all cache entries for a repository" do
-      entry1 = create_cache_entry(key: "cache-1")
-      entry2 = create_cache_entry(key: "cache-2")
-      entry3 = create_cache_entry(key: "cache-3")
-      client = instance_double(Aws::S3::Client)
-      expect(Aws::S3::Client).to receive(:new).and_return(client).exactly(3).times
-      expect(client).to receive(:delete_object).with(bucket: repository.bucket_name, key: entry1.blob_key)
-      expect(client).to receive(:delete_object).with(bucket: repository.bucket_name, key: entry2.blob_key)
-      expect(client).to receive(:delete_object).with(bucket: repository.bucket_name, key: entry3.blob_key)
-
+      entry = create_cache_entry(key: "cache-1")
       visit "#{project.path}/github/#{installation.ubid}/cache"
 
       expect(page.status_code).to eq(200)
-      expect(page).to have_content "3 cache entries"
+      expect(page).to have_content "1 cache entries"
 
       btn = find ".cache-group-row[data-repository='#{repository.ubid}'] .delete-btn"
       page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
       expect(page.status_code).to eq(204)
 
-      # Run the strand to completion
-      strand = Strand[repository.id]
-      expect(strand).not_to be_nil
-      expect(strand.prog).to eq("Github::DeleteCacheEntries")
-
-      # Run the strand until all entries are deleted
-      # Need to run 4 times: start + delete 3 entries
-      4.times do
-        expect(strand.run).not_to be_nil
-      end
+      st = Strand.first(prog: "Github::DeleteCacheEntries")
+      expect(st.label).to eq "delete_entries"
+      st.destroy
 
       visit "#{project.path}/github/#{installation.ubid}/cache"
-      expect(page).to have_flash_notice("Deleting all cache entries.")
+      expect(page).to have_flash_notice("Scheduled deletion of existing cache entries")
+
+      entry.this.delete(force: true)
+      btn = find ".cache-group-row[data-repository='#{repository.ubid}'] .delete-btn"
+      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+      expect(page.status_code).to eq(204)
+      visit "#{project.path}/github/#{installation.ubid}/cache"
+      expect(page).to have_flash_notice("No existing cache entries to delete")
+
+      st = Strand.first(prog: "Github::DeleteCacheEntries")
+      expect(st).to be_nil
     end
   end
 end
