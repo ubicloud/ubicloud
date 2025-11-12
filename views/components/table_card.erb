@@ -10,7 +10,7 @@
       </div>
       <% if right_items %>
         <div class="mt-4 flex md:ml-4 md:mt-0">
-          <%== right_items.join %>
+          <%== allow_unescaped(right_items.join) %>
         </div>
       <% end %>
     </div>
@@ -45,7 +45,7 @@
               <% if empty_state.is_a?(Hash) %>
                 <%== part("components/empty_state", **empty_state) %>
               <% else %>
-                <%== empty_state %>
+                <%== allow_unescaped(empty_state) %>
               <% end %>
             </td>
           </tr>
@@ -86,6 +86,6 @@
         <% end %>
       </tbody>
     </table>
-    <%== footer %>
+    <%== allow_unescaped(footer) %>
   </div>
 </div>

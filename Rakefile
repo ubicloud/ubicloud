@@ -496,6 +496,7 @@ namespace :linter do
     safe_patterns = [
       /@?[a-z_]+_(html|tag)( *)?\z/,
       /rodauth\.[a-z_]+_(additional_form_tags|footer|explanatory_text)/,
+      "allow_unescaped(",
       "assets(",
       "f.button(",
       "f.input(",

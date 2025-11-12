@@ -3,9 +3,9 @@
 content_security_policy.add_script_src [:nonce, nonce] %>
 
 <script nonce="<%==nonce%>">
-let option_tree = <%==JSON.generate(option_tree)%>
-let option_children = <%==JSON.generate(option_parents.each_with_object(Hash.new { |h, k| h[k] = [] }) { |(child, parents), h| h[parents.last] << child if parents.any? })%>
-let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_object(Hash.new { |h, k| h[k] = [] }) { |option, h| h[option] = typecast_body_params.str(option) || pre_selected_values[option] })%>
+let option_tree = <%== allow_unescaped(JSON.generate(option_tree)) %>
+let option_children = <%== allow_unescaped(JSON.generate(option_parents.each_with_object(Hash.new { |h, k| h[k] = [] }) { |(child, parents), h| h[parents.last] << child if parents.any? })) %>
+let option_dirty = <%== allow_unescaped(JSON.generate(form_elements.map { it[:name] }.each_with_object(Hash.new { |h, k| h[k] = [] }) { |option, h| h[option] = typecast_body_params.str(option) || pre_selected_values[option] })) %>
 </script>
 
 <div>
