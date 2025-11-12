@@ -63,7 +63,7 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
 
     case type
     when "radio_small_cards"
-      locals = {name:, label:, options:, attributes:, description_html: element[:description_html], additional_element: element[:additional_element]}
+      locals = {name:, label:, options:, attributes:, description_html: element[:description_html], additional_element_html: element[:additional_element_html]}
     when "select"
       locals = {name:, label:, options:, placeholder:, attributes:, description_html: element[:description_html]}
     when "checkbox"
@@ -80,8 +80,8 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
       locals = {name => element[:value]}
       container_opening_tag, container_closing_tag = "", ""
     when "partnership_notice"
-      description, tos_text = content_generator.call(@flavor)
-      locals = {description:, tos_text:}
+      description_html, tos_text = content_generator.call(@flavor)
+      locals = {description_html:, tos_text:}
     when "section"
       locals = {label:, content: element[:content], separator: element[:separator]}
     # :nocov:

@@ -23,7 +23,7 @@ MSG
     end
 
 
-    curl_snippet = <<-CURL
+    curl_snippet_html = <<-CURL
 curl #{ie.load_balancer.health_check_url(path:)} \\
   -H <span class="text-green-400">"Content-Type: application/json"</span> \\
   -H <span class="text-green-400">"Authorization: Bearer <span class="text-orange-500">$INFERENCE_API_KEY</span>"</span> \\
@@ -73,7 +73,7 @@ curl #{ie.load_balancer.health_check_url(path:)} \\
           CURL usage example
         </h3>
         <div class="mt-2">
-          <pre class="text-sm bg-gray-800 text-white p-2 rounded-lg overflow-scroll"><%== curl_snippet %></pre>
+          <pre class="text-sm bg-gray-800 text-white p-2 rounded-lg overflow-scroll"><%== curl_snippet_html %></pre>
         </div>
       </div>
       <% if ie.tags["capability"] == "Text Generation" %>

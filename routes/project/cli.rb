@@ -54,7 +54,7 @@ class Clover
           env["HTTP_HOST"] = host
 
           body = body.join
-          @output = if (@ubi_command_execute = headers["ubi-command-execute"])
+          @output_html = if (@ubi_command_execute = headers["ubi-command-execute"])
             h("$ #{body.split("\0").prepend(@ubi_command_execute).shelljoin}")
           else
             ubids = {}
