@@ -7,10 +7,13 @@ RSpec.describe Prog::Vm::Nexus do
   subject(:nx) {
     described_class.new(st).tap {
       it.instance_variable_set(:@vm, vm)
+      it.instance_variable_set(:@host, vm_host)
     }
   }
 
   let(:st) { Strand.new }
+  let(:vm_host) { create_vm_host(used_cores: 2, total_hugepages_1g: 375, used_hugepages_1g: 16) }
+  let(:sshable) { vm_host.sshable }
   let(:vm) {
     vm = Vm.create_with_id(
       "2464de61-7501-8374-9ab0-416caebe31da",
@@ -27,7 +30,8 @@ RSpec.describe Prog::Vm::Nexus do
       arch: "x64",
       location_id: Location::HETZNER_FSN1_ID,
       created_at: Time.now,
-      project_id: project.id
+      project_id: project.id,
+      vm_host_id: vm_host.id
     )
     BillingRecord.create(
       project_id: project.id,
@@ -37,9 +41,8 @@ RSpec.describe Prog::Vm::Nexus do
       amount: vm.vcpus
     )
     kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "key", init_vector: "iv", auth_data: "somedata")
-    vmh = create_vm_host
-    si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: vmh.id)
-    bi = BootImage.create(name: "my-image", version: "20230303", size_gib: 15, vm_host_id: vmh.id)
+    si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: vm_host.id)
+    bi = BootImage.create(name: "my-image", version: "20230303", size_gib: 15, vm_host_id: vm_host.id)
     dev1 = StorageDevice.create(name: "nvme0", total_storage_gib: 1000, available_storage_gib: 500)
     dev2 = StorageDevice.create(name: "DEFAULT", total_storage_gib: 1000, available_storage_gib: 500)
     VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, skip_sync: false, spdk_installation_id: si.id, storage_device_id: dev1.id, key_encryption_key_1_id: kek.id)
@@ -249,8 +252,6 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#create_unix_user" do
     it "runs adduser" do
-      sshable = instance_double(Sshable)
-      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: sshable))
       expect(nx).to receive(:rand).and_return(1111)
       expect(sshable).to receive(:cmd).with(<<~COMMAND)
         set -ueo pipefail
@@ -269,10 +270,7 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#prep" do
     it "hops to run if prep command is succeeded" do
-      sshable = instance_spy(Sshable)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("Succeeded")
-      vmh = instance_double(VmHost, sshable: sshable)
-      expect(vm).to receive(:vm_host).and_return(vmh)
       expect { nx.prep }.to hop("clean_prep")
     end
 
@@ -300,11 +298,7 @@ RSpec.describe Prog::Vm::Nexus do
         project.set_ff_vm_public_ssh_keys(["operator_ssh_key"])
         project.set_ff_ipv6_disabled(true)
 
-        sshable = instance_double(Sshable)
         expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("NotStarted")
-        vmh = instance_double(VmHost, sshable: sshable,
-          total_cpus: 80, total_cores: 80, total_sockets: 10, ndp_needed: false, arch: "arm64", spdk_installations: [], accepts_slices: true)
-        expect(vm).to receive(:vm_host).and_return(vmh).at_least(:once)
         expect(sshable).to receive(:cmd).with(/sudo -u vm[0-9a-z]+ tee/, stdin: String) do |**kwargs|
           require "json"
           params = JSON(kwargs.fetch(:stdin))
@@ -333,26 +327,19 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "naps if prep command is in progress" do
-      sshable = instance_spy(Sshable)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("InProgress")
-      vmh = instance_double(VmHost, sshable: sshable)
-      expect(vm).to receive(:vm_host).and_return(vmh)
       expect { nx.prep }.to nap(1)
     end
   end
 
   describe "#clean_prep" do
     it "cleans and hops" do
-      sshable = instance_double(Sshable)
       expect(sshable).to receive(:cmd).with(/common\/bin\/daemonizer --clean prep_/)
-      vmh = instance_double(VmHost, sshable: sshable)
-      expect(vm).to receive(:vm_host).and_return(vmh)
       expect { nx.clean_prep }.to hop("wait_sshable")
     end
   end
 
   describe "#start" do
-    let(:vmh_id) { "46ca6ded-b056-4723-bd91-612959f52f6f" }
     let(:storage_volumes) {
       [{
         "use_bdev_ubi" => false,
@@ -771,7 +758,6 @@ RSpec.describe Prog::Vm::Nexus do
     before do
       expect(Time).to receive(:now).and_return(now).at_least(:once)
       allow(vm).to receive(:allocated_at).and_return(now - 100)
-      vm.update(vm_host_id: create_vm_host.id, project_id: project.id)
       expect(Clog).to receive(:emit).with("vm provisioned").and_yield
     end
 
@@ -818,7 +804,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "creates a billing record when host is nil, too" do
-      expect(vm).to receive(:vm_host).and_return(nil)
+      expect(nx).to receive(:host).and_return(nil)
       vm.location.provider = "aws"
       AwsInstance.create_with_id(vm.id, instance_id: "i-0123456789abcdefg")
       expect(BillingRecord).to receive(:create).once
@@ -933,10 +919,6 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#update_spdk_dependency" do
     it "hops to wait after doing the work" do
-      sshable = instance_double(Sshable)
-      vm_host = instance_double(VmHost, sshable: sshable)
-      allow(vm).to receive(:vm_host).and_return(vm_host)
-
       expect(nx).to receive(:decr_update_spdk_dependency)
       expect(nx).to receive(:write_params_json)
       expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm reinstall-systemd-units #{vm.inhost_name}")
@@ -946,8 +928,6 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#restart" do
     it "hops to wait after restarting the vm" do
-      sshable = instance_double(Sshable)
-      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: sshable))
       expect(nx).to receive(:decr_restart)
       expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm restart #{vm.inhost_name}")
       expect { nx.restart }.to hop("wait")
@@ -956,9 +936,7 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#stopped" do
     it "naps after stopping the vm" do
-      sshable = instance_double(Sshable)
       expect(nx).to receive(:when_stop_set?).and_yield
-      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: sshable))
       expect(sshable).to receive(:cmd).with("sudo systemctl stop #{vm.inhost_name}")
       expect(nx).to receive(:decr_stop)
       expect { nx.stopped }.to nap(60 * 60)
@@ -998,178 +976,174 @@ RSpec.describe Prog::Vm::Nexus do
   end
 
   describe "#destroy" do
-    before do
-      st.stack.first["deadline_at"] = Time.now + 1
-    end
-
-    context "when has vm_host" do
-      let(:sshable) { instance_double(Sshable) }
-      let(:vm_host) { instance_double(VmHost, sshable: sshable) }
-
-      before do
-        allow(vm).to receive(:update).with(display_state: "deleting")
-        vol = instance_double(VmStorageVolume)
-        dev = instance_double(StorageDevice)
-        allow(Sequel).to receive(:[]).with(:available_storage_gib).and_return(100)
-        allow(Sequel).to receive(:[]).with(:used_cores).and_return(1)
-        allow(Sequel).to receive(:[]).with(:used_hugepages_1g).and_return(8)
-        allow(vol).to receive(:storage_device_dataset).and_return(dev)
-        allow(dev).to receive(:update).with(available_storage_gib: 105)
-        allow(vol).to receive_messages(storage_device: dev, size_gib: 5)
-        allow(vm).to receive_messages(vm_host: vm_host, vm_storage_volumes: [vol])
-      end
-
-      it "absorbs an already deleted errors as a success" do
-        expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10).and_raise(
-          Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
-        )
-        expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq").and_raise(
-          Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
-        )
-        expect(sshable).to receive(:cmd).with(/sudo.*bin\/setup-vm delete #{nx.vm_name}/)
-
-        expect { nx.destroy }.to hop("destroy_slice")
-      end
-
-      it "absorbs an already deleted errors as a success and hops to lb_expiry if vm is part of a load balancer" do
-        expect(vm).to receive(:load_balancer).and_return(instance_double(LoadBalancer)).at_least(:once)
-        expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10).and_raise(
-          Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
-        )
-        expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq").and_raise(
-          Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
-        )
-        expect(sshable).not_to receive(:cmd).with(/sudo.*bin\/setup-vm delete #{nx.vm_name}/)
-        expect { nx.destroy }.to hop("remove_vm_from_load_balancer")
-      end
-
-      it "raises other stop errors" do
-        ex = Sshable::SshError.new("stop", "", "unknown error", 1, nil)
-        expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10).and_raise(ex)
-
-        expect { nx.destroy }.to raise_error ex
-      end
-
-      it "raises other stop-dnsmasq errors" do
-        ex = Sshable::SshError.new("stop", "", "unknown error", 1, nil)
-        expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
-        expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq").and_raise(ex)
-        expect { nx.destroy }.to raise_error ex
-      end
-
-      it "deletes and pops when all commands are succeeded" do
-        expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
-        expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq")
-        expect(sshable).to receive(:cmd).with(/sudo.*bin\/setup-vm delete #{nx.vm_name}/)
-
-        expect { nx.destroy }.to hop("destroy_slice")
-      end
-    end
-
     it "prevents destroy if the semaphore set" do
       expect(nx).to receive(:when_prevent_destroy_set?).and_yield
       expect(Clog).to receive(:emit).with("Destroy prevented by the semaphore").and_call_original
       expect { nx.destroy }.to hop("prevent_destroy")
     end
 
-    it "detaches from pci devices" do
-      ds = instance_double(Sequel::Dataset)
-      expect(vm).to receive(:pci_devices_dataset).and_return(ds)
-      expect(ds).to receive(:update).with(vm_id: nil)
-      expect(vm).to receive(:update).with(display_state: "deleting")
-      allow(vm).to receive(:vm_storage_volumes).and_return([])
+    it "absorbs an already deleted errors as a success" do
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10).and_raise(
+        Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
+      )
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq").and_raise(
+        Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
+      )
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}")
 
       expect { nx.destroy }.to hop("destroy_slice")
+    end
+
+    it "raises unexpected vm stop errors" do
+      ex = Sshable::SshError.new("stop", "", "unknown error", 1, nil)
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10).and_raise(ex)
+
+      expect { nx.destroy }.to raise_error ex
+    end
+
+    it "raises unexpected dnsmasq stop errors" do
+      ex = Sshable::SshError.new("stop", "", "unknown error", 1, nil)
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq").and_raise(ex)
+      expect { nx.destroy }.to raise_error ex
+    end
+
+    it "hops when all commands are succeeded" do
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}")
+
+      expect { nx.destroy }.to hop("destroy_slice")
+      expect(vm.display_state).to eq("deleting")
+      vm_host.reload
+      expect(vm_host.used_cores).to eq(1)
+      expect(vm_host.used_hugepages_1g).to eq(8)
+    end
+
+    it "updates storage devices" do
+      dev = StorageDevice.create(name: "DEFAULT", total_storage_gib: 1000, available_storage_gib: 500)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, skip_sync: false, storage_device_id: dev.id)
+
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}")
+
+      expect { nx.destroy }.to hop("destroy_slice")
+        .and change { dev.reload.available_storage_gib }.from(500).to(520)
+    end
+
+    it "hops to lb_expiry if vm is part of a load balancer" do
+      expect(vm).to receive(:load_balancer).and_return(instance_double(LoadBalancer)).at_least(:once)
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm delete_keep_net #{nx.vm_name}")
+
+      expect { nx.destroy }.to hop("remove_vm_from_load_balancer")
+    end
+
+    it "detaches from pci devices" do
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}")
+
+      pci = PciDevice.create(vm_id: vm.id, vm_host_id: vm_host.id, slot: "01:00.0", device_class: "dc", vendor: "vd", device: "dv", numa_node: 0, iommu_group: 3)
+      expect(pci.vm).to eq(vm)
+      expect { nx.destroy }.to hop("destroy_slice")
+      expect(pci.reload.vm).to be_nil
     end
 
     it "detaches from gpu partition" do
-      ds = instance_double(Sequel::Dataset)
-      expect(vm).to receive(:gpu_partition_dataset).and_return(ds)
-      expect(ds).to receive(:update).with(vm_id: nil)
-      expect(vm).to receive(:update).with(display_state: "deleting")
-      allow(vm).to receive(:vm_storage_volumes).and_return([])
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}")
+
+      pci = PciDevice.create(vm_host_id: vm_host.id, slot: "01:00.0", device_class: "dc", vendor: "vd", device: "dv", numa_node: 0, iommu_group: 3)
+      gp = GpuPartition.create(vm_id: vm.id, vm_host_id: vm_host.id, partition_id: 1, gpu_count: 1)
+      DB[:gpu_partitions_pci_devices].insert(gpu_partition_id: gp.id, pci_device_id: pci.id)
 
       expect { nx.destroy }.to hop("destroy_slice")
+        .and change { gp.reload.vm_id }.from(vm.id).to(nil)
     end
 
     it "updates slice" do
-      vm_host_slice = instance_double(VmHostSlice)
-      expect(vm).to receive(:vm_host_slice).and_return(vm_host_slice)
-      expect(vm).to receive(:update).with(display_state: "deleting")
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}")
+
+      slice = VmHostSlice.create(vm_host_id: vm_host.id, name: "standard", family: "standard", cores: 1, total_cpu_percent: 200, used_cpu_percent: 200, total_memory_gib: 8, used_memory_gib: 8)
+      vm.update(vm_host_slice_id: slice.id)
+
       expect { nx.destroy }.to hop("destroy_slice")
+        .and change { [slice.reload.used_cpu_percent, slice.used_memory_gib] }.from([200, 8]).to([0, 0])
     end
 
     it "fails if VM cores is 0" do
-      sshable = instance_double(Sshable)
-      host = instance_double(VmHost, id: "46ca6ded-b056-4723-bd91-612959f52f6f", sshable: sshable)
-      allow(sshable).to receive(:cmd)
-      expect(vm).to receive(:update).with(display_state: "deleting")
-      allow(vm).to receive(:vm_storage_volumes).and_return([])
-      expect(vm).to receive(:vm_host_slice).and_return(nil)
-      expect(vm).to receive(:cores).and_return(0)
-      allow(nx).to receive(:host).and_return(host)
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}")
+
+      vm.cores = 0
+
       expect { nx.destroy }.to raise_error(RuntimeError, "BUG: Number of cores cannot be zero when VM is runing without a slice")
     end
 
     it "skips updating host if host is nil" do
-      allow(nx).to receive(:host).and_return(nil)
-      expect(vm).to receive(:update).with(display_state: "deleting")
-      expect(vm).not_to receive(:vm_host_id)
+      vm.update(vm_host_id: nil)
+      expect(nx).to receive(:host).and_return(nil).at_least(:once)
+
       expect { nx.destroy }.to hop("destroy_slice")
-    end
-
-    it "#destroy_slice when no slice" do
-      expect(vm).to receive(:destroy).and_return(true)
-      expect { nx.destroy_slice }.to exit({"msg" => "vm deleted"})
-    end
-
-    it "#destroy_slice with a slice" do
-      vm_host_slice = instance_double(VmHostSlice, id: "9d487886-d167-4d00-8787-a746be0d4d9a")
-      expect(vm).to receive(:vm_host_slice).and_return(vm_host_slice)
-      expect(vm_host_slice).to receive(:incr_destroy)
-      expect(vm).to receive(:destroy).and_return(true)
-
-      vhs_dataset = instance_double(VmHostSlice.dataset.class)
-      expect(vm_host_slice).to receive_messages(this: vhs_dataset)
-      expect(vhs_dataset).to receive(:where).and_return(vhs_dataset)
-      expect(vhs_dataset).to receive(:update).with(enabled: false).and_return(1)
-
-      expect { nx.destroy_slice }.to exit({"msg" => "vm deleted"})
-    end
-
-    it "skips destroy slice when slice already disabled" do
-      vm_host_slice = instance_double(VmHostSlice, id: "9d487886-d167-4d00-8787-a746be0d4d9a")
-      expect(vm).to receive(:vm_host_slice).and_return(vm_host_slice)
-      expect(vm).to receive(:destroy).and_return(true)
-
-      vhs_dataset = instance_double(VmHostSlice.dataset.class)
-      expect(vm_host_slice).to receive_messages(this: vhs_dataset)
-      expect(vhs_dataset).to receive_messages(where: vhs_dataset)
-      expect(vhs_dataset).to receive(:update).with(enabled: false).and_return(0)
-
-      expect { nx.destroy_slice }.to exit({"msg" => "vm deleted"})
-    end
-
-    it "detaches from nic" do
-      nic = instance_double(Nic)
-      expect(nic).to receive(:update).with(vm_id: nil)
-      expect(nic).to receive(:incr_destroy)
-      expect(vm).to receive(:nics).and_return([nic])
-      expect(vm).to receive(:destroy).and_return(true)
-      allow(vm).to receive(:vm_storage_volumes).and_return([])
-
-      expect { nx.destroy_slice }.to exit({"msg" => "vm deleted"})
     end
 
     it "hops to wait_aws_vm_destroyed if vm is in aws" do
       location_id = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true).id
-      vm.update(project_id: project.id, location_id:)
+      vm.update(location_id:)
       st.update(prog: "Vm::Nexus", label: "destroy", stack: [{}])
       child = Strand.create(parent_id: st.id, prog: "Aws::Instance", label: "start", stack: [{}])
       expect(nx).to receive(:bud).with(Prog::Aws::Instance, {"subject_id" => vm.id}, :destroy)
       expect { nx.destroy }.to hop("wait_aws_vm_destroyed")
       expect(Semaphore[strand_id: child.id, name: "destroy"]).not_to be_nil
       expect(vm.display_state).to eq("deleting")
+    end
+  end
+
+  describe "#destroy_slice" do
+    it "#destroy_slice when no slice" do
+      expect { nx.destroy_slice }.to exit({"msg" => "vm deleted"})
+      expect(Vm[vm.id]).to be_nil
+    end
+
+    it "#destroy_slice with a slice" do
+      vm_host_slice = VmHostSlice.create(vm_host_id: vm_host.id, enabled: true, name: "standard", family: "standard", cores: 1, total_cpu_percent: 200, used_cpu_percent: 0, total_memory_gib: 8, used_memory_gib: 0)
+      Strand.create_with_id(vm_host_slice.id, prog: "Vm::VmHostSliceNexus", label: "prep")
+      vm.update(vm_host_slice_id: vm_host_slice.id)
+
+      expect { nx.destroy_slice }.to exit({"msg" => "vm deleted"})
+      expect(vm_host_slice.reload.enabled).to be(false)
+      expect(Semaphore[strand_id: vm_host_slice.id, name: "destroy"]).not_to be_nil
+      expect(Vm[vm.id]).to be_nil
+    end
+
+    it "skips destroy slice when slice already disabled" do
+      vm_host_slice = VmHostSlice.create(vm_host_id: vm_host.id, enabled: false, name: "standard", family: "standard", cores: 1, total_cpu_percent: 200, used_cpu_percent: 0, total_memory_gib: 8, used_memory_gib: 0)
+      Strand.create_with_id(vm_host_slice.id, prog: "Vm::VmHostSliceNexus", label: "prep")
+      vm.update(vm_host_slice_id: vm_host_slice.id)
+
+      expect { nx.destroy_slice }.to exit({"msg" => "vm deleted"})
+      expect(vm_host_slice.reload.enabled).to be(false)
+      expect(Semaphore[strand_id: vm_host_slice.id, name: "destroy"]).to be_nil
+      expect(Vm[vm.id]).to be_nil
+    end
+  end
+
+  describe "#final_clean_up" do
+    it "detaches from nic" do
+      nic = instance_double(Nic)
+      expect(nic).to receive(:update).with(vm_id: nil)
+      expect(nic).to receive(:incr_destroy)
+      expect(vm).to receive(:nics).and_return([nic])
+
+      expect { nx.destroy_slice }.to exit({"msg" => "vm deleted"})
+      expect(Vm[vm.id]).to be_nil
     end
   end
 
@@ -1195,13 +1169,6 @@ RSpec.describe Prog::Vm::Nexus do
   end
 
   describe "#wait_vm_removal_from_load_balancer" do
-    let(:sshable) { instance_double(Sshable) }
-    let(:vm_host) { instance_double(VmHost, sshable: sshable) }
-
-    before do
-      allow(vm).to receive(:vm_host).and_return(vm_host)
-    end
-
     it "naps if vm is not removed" do
       st.update(prog: "Vm::Nexus", label: "wait_vm_removal_from_load_balancer", stack: [{}])
       Strand.create(parent_id: st.id, prog: "Vnet::LoadBalancerRemoveVm", label: "evacuate_vm", stack: [{}], lease: Time.now + 10)
@@ -1226,13 +1193,6 @@ RSpec.describe Prog::Vm::Nexus do
   end
 
   describe "#start_after_host_reboot" do
-    let(:sshable) { instance_double(Sshable) }
-    let(:vm_host) { instance_double(VmHost, sshable: sshable) }
-
-    before do
-      expect(vm).to receive(:vm_host).and_return(vm_host)
-    end
-
     it "can start a vm after reboot" do
       expect(sshable).to receive(:cmd).with(
         /sudo host\/bin\/setup-vm recreate-unpersisted #{nx.vm_name}/,
@@ -1247,9 +1207,7 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#available?" do
     it "returns the available status" do
-      vh = instance_double(VmHost, sshable: instance_double(Sshable))
-      expect(vh.sshable).to receive(:cmd).and_return("active\nactive\n")
-      expect(vm).to receive(:vm_host).and_return(vh)
+      expect(sshable).to receive(:cmd).and_return("active\nactive\n")
       expect(vm).to receive(:inhost_name).and_return("vmxxxx").at_least(:once)
       expect(nx.available?).to be true
     end
