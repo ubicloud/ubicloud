@@ -350,8 +350,19 @@ RSpec.describe Clover, "github" do
       page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
       expect(page.status_code).to eq(204)
 
+      # Run the strand to completion
+      strand = Strand[repository.id]
+      expect(strand).not_to be_nil
+      expect(strand.prog).to eq("Github::DeleteCacheEntries")
+
+      # Run the strand until all entries are deleted
+      # Need to run 4 times: start + delete 3 entries
+      4.times do
+        expect(strand.run).not_to be_nil
+      end
+
       visit "#{project.path}/github/#{installation.ubid}/cache"
-      expect(page).to have_flash_notice("All cache entries deleted.")
+      expect(page).to have_flash_notice("Deleting all cache entries.")
     end
   end
 end
