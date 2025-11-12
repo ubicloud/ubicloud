@@ -100,6 +100,7 @@ class Clover < Roda
     connect
     create
     create_replica
+    delete_all_cache_entries
     destroy
     destroy_invitation
     detach_vm

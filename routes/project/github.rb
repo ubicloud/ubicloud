@@ -129,19 +129,14 @@ class Clover
 
             r.delete true do
               DB.transaction do
-                cache_entries = repository.cache_entries_dataset.all
-
-                if cache_entries.empty?
+                if repository.cache_entries_dataset.empty?
                   no_audit_log
                 else
-                  DB.ignore_duplicate_queries do
-                    cache_entries.each(&:destroy)
-                  end
-                  cache_entry = cache_entries.shift
-                  audit_log(cache_entry, "destroy", cache_entries)
+                  Prog::Github::DeleteCacheEntries.assemble(repository.id)
+                  audit_log(repository, "delete_all_cache_entries")
                 end
               end
-              flash["notice"] = "All cache entries deleted." if web?
+              flash["notice"] = "Deleting all cache entries." if web?
               204
             end
 
