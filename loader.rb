@@ -86,6 +86,10 @@ module Prog::VictoriaMetrics; end
 
 module Prog::Vm; end
 
+module Prog::Vnet; end
+
+module Prog::Vnet::Aws; end
+
 module Prog::Vnet::Ubicloud; end
 
 module Scheduling; end
@@ -217,6 +221,8 @@ def clover_freeze
     Prog::VictoriaMetrics,
     Prog::Vm,
     Prog::Vnet,
+    Prog::Vnet::Aws,
+    Prog::Vnet::Ubicloud,
     Prog::Vnet::RekeyNicTunnel::Xfrm,
     ResourceMethods,
     ResourceMethods::ClassMethods,
