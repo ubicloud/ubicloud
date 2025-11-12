@@ -105,11 +105,15 @@ code {
     padding-top: 0;
     margin-top: 0;
   }
-  
+
   & ul {
     list-style-type: none;
     padding: 0;
   }
+}
+
+.extras {
+  padding: 15px 0px;
 }
 
 #model-class-list {

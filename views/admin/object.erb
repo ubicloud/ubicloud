@@ -55,7 +55,11 @@
 </tbody>
 </table>
 
-<%== part("extras/#{@klass.name}", obj: @obj) if OBJECTS_WITH_EXTRAS[@klass.name] %>
+<% if OBJECTS_WITH_EXTRAS[@klass.name] %>
+<div class="extras">
+  <%== part("extras/#{@klass.name}", obj: @obj) %>
+</div>
+<% end %>
 
 <h2 id="associations-header">Associations</h2>
 <div class="associations">
