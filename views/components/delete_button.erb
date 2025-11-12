@@ -1,6 +1,6 @@
 <%# locals: (url: request.path, csrf_url: url, text: "Delete", confirmation: nil, confirmation_message: nil, redirect: request.path, method: "DELETE") %>
 
-<% button = part(
+<% button_html = part(
   "components/button",
   text: text,
   icon: "hero-trash",
@@ -18,8 +18,8 @@
 
 <% if method == "POST" %>
   <% form(action: url, method: :post) do %>
-    <%== button %>
+    <%== button_html %>
   <% end %>
 <% else %>
-  <%== button %>
+  <%== button_html %>
 <% end %>

@@ -1,6 +1,6 @@
 <%# locals: (name:, value: nil, label: nil, description: nil, escape_description: true, attributes: {}) %>
 <% value = typecast_body_params.str(name) || value
-escaped_description = escape_description ? h(description) : description
+description_html = escape_description ? h(description) : description
 error = flash.dig("errors", name) %>
 
 <div class="space-y-2">
@@ -14,7 +14,7 @@ error = flash.dig("errors", name) %>
     <%== html_attrs(attributes) %>
   ><%= value %></textarea>
   <% if description %>
-    <p class="text-sm text-gray-500 leading-6" id="<%= name %>-description"><%== escaped_description %></p>
+    <p class="text-sm text-gray-500 leading-6" id="<%= name %>-description"><%== description_html %></p>
   <% end %>
   <%== part("components/form/error", name:, error:) if error %>
 </div>

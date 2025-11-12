@@ -39,9 +39,9 @@ vm = @pg.representative_server.vm
       ["hero-square-2-stack-modified", ha_option.description, ""],
       ["hero-map-pin", @pg.location.display_name, "#{location_details} (#{provider})"],
       ["postgres-logo", "Version #{@pg.version}", ""],
-    ].each do |icon, text, subtext|
+    ].each do |icon, text, subtext_html|
   %>
-  <%== part("components/icon_with_text", icon:, text:, subtext:) %>
+  <%== part("components/icon_with_text", icon:, text:, subtext_html:) %>
   <%
     end
   %>
