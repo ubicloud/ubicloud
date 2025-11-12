@@ -34,7 +34,7 @@
     </div>
     <% if right_items %>
       <div class="mt-4 flex md:ml-4 md:mt-0">
-        <%== right_items.join %>
+        <%== allow_unescaped(right_items.join) %>
       </div>
     <% end %>
   </div>
