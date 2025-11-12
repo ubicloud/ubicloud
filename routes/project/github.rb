@@ -128,15 +128,18 @@ class Clover
             end
 
             r.delete true do
-              DB.transaction do
-                if repository.cache_entries_dataset.empty?
-                  no_audit_log
-                else
+              if repository.cache_entries_dataset.empty?
+                no_audit_log
+                notice = "No existing cache entries to delete"
+              else
+                DB.transaction do
                   Prog::Github::DeleteCacheEntries.assemble(repository.id)
                   audit_log(repository, "delete_all_cache_entries")
                 end
+                notice = "Scheduled deletion of existing cache entries"
               end
-              flash["notice"] = "Deleting all cache entries." if web?
+
+              flash["notice"] = notice if web?
               204
             end
 
