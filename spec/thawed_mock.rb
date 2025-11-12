@@ -68,7 +68,7 @@ module ThawedMock
   allow_mocking(KubernetesCluster, :[], :kubeconfig, :generate_ubid)
   allow_mocking(KubernetesNodepool, :generate_uuid)
   allow_mocking(LoadBalancer, :[], :generate_uuid)
-  allow_mocking(MinioCluster, :[])
+  allow_mocking(MinioCluster, :[], :first)
   allow_mocking(Nic, :[], :create_with_id, :generate_ubid)
   allow_mocking(OidcProvider, :generate_uuid)
   allow_mocking(Page, :from_tag_parts)
