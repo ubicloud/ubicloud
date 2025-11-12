@@ -112,12 +112,10 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       nx.setup_aws_s3
     end
 
-    it "#destroy_aws_s3 detach policy to vm role" do
+    it "#destroy_aws_s3 detach policy to vm role when aws_postgres_iam_access configured" do
       expect(Config).to receive(:aws_postgres_iam_access).and_return(true)
       iam_client = Aws::IAM::Client.new(stub_responses: true)
-      sts_client = Aws::STS::Client.new(stub_responses: true)
-      sts_client.stub_responses(:get_caller_identity, {account: "account-id"})
-      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, location_credential: instance_double(LocationCredential, iam_client:, sts_client:))).at_least(:once)
+      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, location_credential: instance_double(LocationCredential, get_account_id: "account-id", iam_client:))).at_least(:once)
       expect(iam_client).to receive(:delete_policy)
 
       nx.destroy_aws_s3

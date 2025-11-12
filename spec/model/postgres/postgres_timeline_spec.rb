@@ -9,6 +9,10 @@ RSpec.describe PostgresTimeline do
     expect(postgres_timeline.bucket_name).to eq(postgres_timeline.ubid)
   end
 
+  it "returns ubid as aws s3 policy name" do
+    expect(postgres_timeline.aws_s3_policy_name).to eq(postgres_timeline.ubid)
+  end
+
   it "returns walg config" do
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
 

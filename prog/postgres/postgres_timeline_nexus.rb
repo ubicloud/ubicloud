@@ -132,7 +132,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   def get_account_id
-    sts_client.get_caller_identity.account
+    postgres_timeline.location.location_credential.get_account_id
   end
 
   def s3_policy_arn
@@ -165,10 +165,6 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
   def iam_client
     postgres_timeline.location.location_credential.iam_client
-  end
-
-  def sts_client
-    postgres_timeline.location.location_credential.sts_client
   end
 
   def admin_client

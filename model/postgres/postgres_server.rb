@@ -343,12 +343,8 @@ class PostgresServer < Sequel::Model
     "arn:aws:iam::#{get_account_id}:policy/#{timeline.aws_s3_policy_name}"
   end
 
-  def sts_client
-    vm.location.location_credential.sts_client
-  end
-
   def get_account_id
-    @account_id ||= sts_client.get_caller_identity.account
+    vm.location.location_credential.get_account_id
   end
 
   FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over"].freeze

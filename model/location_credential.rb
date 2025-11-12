@@ -29,6 +29,10 @@ class LocationCredential < Sequel::Model
   def sts_client
     Aws::STS::Client.new(region: location.name, credentials:)
   end
+
+  def get_account_id
+    @account_id ||= sts_client.get_caller_identity.account
+  end
 end
 
 # Table: location_credential
