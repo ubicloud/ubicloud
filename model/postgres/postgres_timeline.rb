@@ -182,7 +182,6 @@ end
 #  access_key                | text                     |
 #  secret_key                | text                     |
 #  latest_backup_started_at  | timestamp with time zone |
-#  blob_storage_id           | uuid                     |
 #  location_id               | uuid                     |
 #  cached_earliest_backup_at | timestamp with time zone |
 # Indexes:
