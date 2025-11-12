@@ -104,6 +104,7 @@ class UBID
   TYPE_VICTORIA_METRICS_SERVER = "vn"
   TYPE_SSH_PUBLIC_KEY = "sk"
   TYPE_GITHUB_CUSTOM_LABEL = "gc"
+  TYPE_ANNOTATION = "an"
   # TYPE_AUDIT_LOG = "a1"
 
   # Common entropy-based type for everything else
