@@ -6,7 +6,8 @@
   <% end %>
   <fieldset>
     <div class="space-y-5">
-      <% options.each_with_index do |(opt_val, opt_text, opt_classes, opt_attrs), idx| %>
+      <% options.each_with_index do |(opt_val, opt_text, opt_classes, opt_attrs, opt_options), idx| %>
+        <% opt_text = h(opt_text) if opt_text && (!opt_options || opt_options[:escape] != false) %>
         <% id = "#{id_prefix}#{name}-#{opt_val}-#{idx}" %>
         <div class="relative flex items-start <%= opt_classes %>">
           <div class="flex h-6 items-center">
