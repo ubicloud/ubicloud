@@ -7,6 +7,6 @@
         <p><%== desc_html %></p>
       <% end %>
     </div>
-    <%== part("components/form/checkbox", options: [["1", tos_text, {}, { required: true }]]) %>
+    <%== part("components/form/checkbox", options: [["1", tos_text, "", { required: true }, {escape: false}]]) %>
   </div>
 </div>
