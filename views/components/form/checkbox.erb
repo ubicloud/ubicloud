@@ -21,7 +21,7 @@
           </div>
           <% if opt_text %>
             <div class="ml-3 text-sm leading-6">
-              <label for="<%= id %>" class="font-medium text-gray-900"><%== opt_text %></label>
+              <label for="<%= id %>" class="font-medium text-gray-900"><%== allow_unescaped(opt_text) %></label>
             </div>
           <% end %>
         </div>
