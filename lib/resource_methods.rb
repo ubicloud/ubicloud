@@ -154,13 +154,10 @@ module ResourceMethods
     end
 
     def create_with_id(id, **)
+      raise "nil id passed to create_with_id" unless id
       obj = new(**)
-      obj.id = case id
-      when String, nil
-        id
-      else
-        id.id
-      end
+      id = id.id unless id.is_a?(String)
+      obj.id = id
       obj.save_changes
     end
 
