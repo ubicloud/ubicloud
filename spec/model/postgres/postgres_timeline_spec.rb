@@ -27,11 +27,6 @@ AWS_S3_FORCE_PATH_STYLE=true
 PGHOST=/var/run/postgresql
     WALG_CONF
 
-    expect(postgres_timeline).to receive(:leader).and_return(instance_double(
-      PostgresServer,
-      strand: instance_double(Strand, label: "wait"),
-      vm: instance_double(Vm, aws_instance: instance_double(AwsInstance, iam_role: nil))
-    )).at_least(:once)
     expect(postgres_timeline.generate_walg_config).to eq(walg_config)
     expect(postgres_timeline).to receive(:aws?).and_return(true)
     expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2"))
@@ -39,6 +34,7 @@ PGHOST=/var/run/postgresql
   end
 
   it "returns walg config without keys when vm has iam_role" do
+    postgres_timeline.update(access_key: nil, secret_key: nil)
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
 
     walg_config = <<-WALG_CONF
@@ -50,11 +46,6 @@ AWS_S3_FORCE_PATH_STYLE=true
 PGHOST=/var/run/postgresql
     WALG_CONF
 
-    expect(postgres_timeline).to receive(:leader).and_return(instance_double(
-      PostgresServer,
-      strand: instance_double(Strand, label: "wait"),
-      vm: instance_double(Vm, aws_instance: instance_double(AwsInstance, iam_role: "vm-role"))
-    )).at_least(:once)
     expect(postgres_timeline.generate_walg_config).to eq(walg_config)
     expect(postgres_timeline).to receive(:aws?).and_return(true)
     expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2"))
