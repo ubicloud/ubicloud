@@ -49,10 +49,6 @@ cluster_config = {
       {
         "name" => "bind-address",
         "value" => "::"
-      },
-      {
-        "name" => "advertise-address",
-        "value" => node_ipv4
       }
     ]
   },
