@@ -13,7 +13,7 @@ class ProjectQuota < Sequel::Model
   # :nocov:
 
   def self.default_quotas
-    @default_quotas ||= YAML.load_file("config/default_quotas.yml").each_with_object({}) do |item, hash|
+    @default_quotas ||= YAML.load_file(Config.default_quotas_file_path).each_with_object({}) do |item, hash|
       hash[item["resource_type"]] = item
     end
   end
