@@ -161,11 +161,10 @@ module ResourceMethods
       generate_ubid.to_uuid
     end
 
-    def create_with_id(id, **)
-      raise "nil id passed to create_with_id" unless id
+    def create_with_id(id_or_model_object, **)
+      raise "nil id passed to create_with_id" unless id_or_model_object
       obj = new(**)
-      id = id.id unless id.is_a?(String)
-      obj.id = id
+      obj.id = id_or_model_object.is_a?(String) ? id_or_model_object : id_or_model_object.id
       obj.save_changes
     end
 
