@@ -73,14 +73,8 @@ class Clover < Roda
   end
   [
     Firewall,
-    [GithubInstallation, /([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)/],
-    [GithubRepository, /([A-Za-z0-9\-_.]{1,100})/],
-    KubernetesCluster,
-    KubernetesNodepool,
-    LoadBalancer,
     PostgresResource,
     PrivateSubnet,
-    SshPublicKey,
     Vm
   ].each do |model, regexp|
     sym = :"#{model.table_name}_ubid_uuid"
@@ -111,22 +105,15 @@ class Clover < Roda
     ActionTag
     ApiKey
     Firewall
-    KubernetesCluster
-    KubernetesNodepool
-    LoadBalancer
     Location
     ObjectTag
-    PaymentMethod
     PostgresResource
     PrivateSubnet
-    SshPublicKey
     SubjectTag
     Vm
   ].each { path(it, class_name: true, &under_project_path) }
 
   path("Project", class_name: true, &:path)
-  path("GithubInstallation", class_name: true) { "#{it.project.path}/github/#{it.ubid}" }
-  path("Invoice", class_name: true) { "#{it.project.path}/billing#{it.path}" }
 
   # :nocov:
   if Config.test? && defined?(SimpleCov)

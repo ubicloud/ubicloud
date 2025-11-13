@@ -1,6 +1,0 @@
-! Invalid argument, does not include `=`: "key"
-
-Add pgbouncer configuration entries to a PostgreSQL database
-
-Usage:
-    ubi pg (location/pg-name | pg-id) add-pgbouncer-config-entries key=value [...]

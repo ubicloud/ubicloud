@@ -1,2 +1,0 @@
-Destroying this load balancer is not recoverable.
-Enter the following to confirm destruction of the load balancer: test-lb

@@ -1,1 +1,0 @@
-! Confirmation of private subnet name not successful.

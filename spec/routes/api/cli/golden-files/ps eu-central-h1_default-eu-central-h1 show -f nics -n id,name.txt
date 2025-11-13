@@ -1,3 +1,0 @@
-nic 1:
-  id: nc69z0cda8jt0g5b120hamn4vf
-  name: test-vm-nic

@@ -1,4 +1,0 @@
-firewall 1:
-  description: Default firewall
-  location: eu-central-h1
-  path: /location/eu-central-h1/firewall/default-eu-central-h1-default

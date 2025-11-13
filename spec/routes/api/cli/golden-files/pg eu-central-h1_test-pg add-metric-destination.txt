@@ -1,6 +1,0 @@
-! Invalid number of arguments for pg add-metric-destination subcommand (requires: 3, given: 0)
-
-Add a PostgreSQL metric destination
-
-Usage:
-    ubi pg (location/pg-name | pg-id) add-metric-destination username password url

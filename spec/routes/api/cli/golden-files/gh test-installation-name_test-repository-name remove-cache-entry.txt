@@ -1,6 +1,0 @@
-! Invalid number of arguments for gh remove-cache-entry subcommand (requires: 1, given: 0)
-
-Remove cache entry for a GitHub repository
-
-Usage:
-    ubi gh installation-name/repository-name remove-cache-entry cache-entry-id

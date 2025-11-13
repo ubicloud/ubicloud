@@ -1,7 +1,0 @@
-id: vmdzyppz6j166jh5e9t2dwrfas
-name: test-vm
-state: creating
-location: eu-central-h1
-size: standard-2
-unix_user: ubi
-storage_size_gib: 0

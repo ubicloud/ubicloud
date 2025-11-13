@@ -1,3 +1,0 @@
-! Unexpected response status: 400
-Details: Validation failed for following fields: pg_config.key
-  pg_config.key: Unknown configuration parameter

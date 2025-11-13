@@ -1,2 +1,0 @@
-Destroying this private subnet is not recoverable.
-Enter the following to confirm destruction of the private subnet: test-ps

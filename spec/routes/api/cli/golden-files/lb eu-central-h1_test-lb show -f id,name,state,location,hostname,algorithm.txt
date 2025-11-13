@@ -1,6 +1,0 @@
-id: 1bvp8yk1karj4ngwhtgrfh6esd
-name: test-lb
-state: 
-location: eu-central-h1
-hostname: test-lb.dpqe2.
-algorithm: round_robin

@@ -1,2 +1,0 @@
-name     id                          ip4        ip6
-test-vm  vmdzyppz6j166jh5e9t2dwrfas  128.0.0.1     

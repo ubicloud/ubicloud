@@ -1,2 +1,0 @@
-allow_in_place_tablespaces=on
-max_connections=1000

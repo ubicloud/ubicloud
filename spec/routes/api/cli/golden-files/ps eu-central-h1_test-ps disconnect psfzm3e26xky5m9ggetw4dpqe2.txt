@@ -1,2 +1,0 @@
-! Unexpected response status: 400
-Details: Subnet to be disconnected not found

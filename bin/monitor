@@ -41,20 +41,11 @@ if Config.test?
 else
   runner_args = {ignore_threads: 2}
   monitor_models = [
-    VmHost,
-    PostgresServer,
-    Vm.where(~Sshable.where(id: Sequel[:vm][:id]).exists),
-    MinioServer,
-    GithubRunner.exclude(ready_at: nil),
-    VmHostSlice,
-    LoadBalancerVmPort,
-    KubernetesCluster,
-    VictoriaMetricsServer
+    PostgresServer
   ]
 
   metric_export_models = [
-    PostgresServer,
-    VmHost
+    PostgresServer
   ]
 end
 

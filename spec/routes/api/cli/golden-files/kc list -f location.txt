@@ -1,2 +1,0 @@
-location     
-eu-central-h1

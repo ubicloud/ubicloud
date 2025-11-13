@@ -1,9 +1,0 @@
-! Invalid number of arguments for fw create subcommand (requires: 0, given: 1)
-
-Create a firewall
-
-Usage:
-    ubi fw location/fw-name create [options]
-
-Options:
-    -d, --description=desc           description for firewall

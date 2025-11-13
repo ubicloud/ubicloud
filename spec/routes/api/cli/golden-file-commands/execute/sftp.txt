@@ -1,5 +1,0 @@
-vm eu-central-h1/test-vm -4 sftp
-vm eu-central-h1/test-vm -6 sftp -A
-vm eu-central-h1/test-vm sftp -A
-vm eu-central-h1/test-vm sftp
-vm eu-central-h1/test-vm -u foo sftp

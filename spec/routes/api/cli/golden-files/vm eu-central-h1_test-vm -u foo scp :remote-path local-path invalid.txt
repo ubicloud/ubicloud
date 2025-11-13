@@ -1,1 +1,0 @@
-! Only one path should be remote (start with ':')

@@ -1,9 +1,0 @@
-! Invalid number of arguments for gh list-cache-entries subcommand (requires: 0, given: 1)
-
-List cache entries for a GitHub repository
-
-Usage:
-    ubi gh installation-name/repository-name list-cache-entries [options]
-
-Options:
-    -N, --no-headers                 do not show headers

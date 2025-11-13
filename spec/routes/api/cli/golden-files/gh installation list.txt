@@ -1,2 +1,0 @@
-id                          name                  
-g1drxe9a2mej5pj2kp0nccje5y  test-installation-name

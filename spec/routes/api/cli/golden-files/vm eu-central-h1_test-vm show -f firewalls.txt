@@ -1,9 +1,0 @@
-firewall 1:
-  id: fw4gj2v4h1fe3q28q0hnf7g8n1
-  name: default-eu-central-h1-default
-  description: Default firewall
-  location: eu-central-h1
-  path: /location/eu-central-h1/firewall/default-eu-central-h1-default
-  rules:
-    1: fra7jvrz94be7qy8qrq8n1jrp1  0.0.0.0/0  0..65535  
-    2: fr7cv7h5bz324maazy93ykn8s4  ::/0  0..65535  

@@ -1,9 +1,0 @@
-! Invalid number of arguments for fw destroy subcommand (requires: 0, given: 1)
-
-Destroy a firewall
-
-Usage:
-    ubi fw (location/fw-name | fw-id) destroy [options]
-
-Options:
-    -f, --force                      do not require confirmation

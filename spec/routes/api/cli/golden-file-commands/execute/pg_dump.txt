@@ -1,4 +1,0 @@
-pg eu-central-h1/test-pg -d foo pg_dump
-pg eu-central-h1/test-pg pg_dump -a
-pg eu-central-h1/test-pg pg_dump
-pg eu-central-h1/test-pg -U bar pg_dump

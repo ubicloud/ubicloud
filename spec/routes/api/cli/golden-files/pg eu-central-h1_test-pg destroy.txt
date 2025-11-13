@@ -1,2 +1,0 @@
-Destroying this PostgreSQL database is not recoverable.
-Enter the following to confirm destruction of the PostgreSQL database: test-pg

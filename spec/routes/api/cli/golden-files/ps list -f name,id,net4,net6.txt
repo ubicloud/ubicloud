@@ -1,5 +1,0 @@
-name                               id                          net4              net6                    
-kcnzrctjjg4j4g6eqvdsvzthwp-subnet  ps788q81w5w26h900k13ad8bkx  10.147.206.0/26   fdab:de77:9a94:fa71::/64
-default-eu-central-h1              psfzm9e26xky5m9ggetw4dpqe2  172.27.99.128/26  fdd9:1ea7:125d:5fa4::/64
-test-ps                            pshfgpzvs0t20gpezmz2kkk8e4  10.147.204.0/26   fdab:de77:9a94:fa69::/64
-pgvm1qb9gwct1mqmay7m54yma5-subnet  psnqtahcasrj1hn16kh1ygekmn  10.147.205.0/26   fdab:de77:9a94:fa70::/64

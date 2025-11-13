@@ -1,3 +1,0 @@
-! Unexpected response status: 400
-Details: Validation failed for following fields: vm_id
-  vm_id: VM is already attached to a load balancer

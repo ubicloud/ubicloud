@@ -1,8 +1,0 @@
-vm eu-central-h1/test-vm -4 ssh
-vm eu-central-h1/test-vm -6 ssh
-vm eu-central-h1/test-vm ssh -A -- cmd arg
-vm eu-central-h1/test-vm ssh -A --
-vm eu-central-h1/test-vm ssh cmd arg
-vm eu-central-h1/test-vm ssh cmd
-vm eu-central-h1/test-vm ssh
-vm eu-central-h1/test-vm -u foo ssh

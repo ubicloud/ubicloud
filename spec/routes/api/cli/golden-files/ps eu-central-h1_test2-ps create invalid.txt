@@ -1,9 +1,0 @@
-! Invalid number of arguments for ps create subcommand (requires: 0, given: 1)
-
-Create a private subnet
-
-Usage:
-    ubi ps location/ps-name create [options]
-
-Options:
-    -f, --firewall-id=fw-id-or-name  add to given firewall

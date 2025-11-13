@@ -1,6 +1,0 @@
-psql -U postgres -c "CREATE ROLE clover PASSWORD '${POSTGRES_PASSWORD}' LOGIN"
-psql -U postgres -c "CREATE ROLE clover_password PASSWORD '${POSTGRES_PASSWORD}' LOGIN"
-psql -U postgres -c "GRANT CREATE ON SCHEMA public TO clover" "${POSTGRES_DB}"
-psql -U postgres -c "GRANT CREATE ON SCHEMA public TO clover_password" "${POSTGRES_DB}"
-psql -U postgres -c "CREATE EXTENSION citext" "${POSTGRES_DB}"
-psql -U postgres -c "CREATE EXTENSION btree_gist" "${POSTGRES_DB}"

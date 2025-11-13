@@ -3,19 +3,8 @@
 require "yaml"
 
 module Option
-  ai_models = YAML.load_file("config/ai_models.yml")
-  AI_MODELS = ai_models.select { it["enabled"] }.freeze
-
   def self.locations(only_visible: true, feature_flags: {})
     Location.where(project_id: nil).all.select { |pl| !only_visible || (pl.visible || feature_flags["visible_locations"]&.include?(pl.name)) }
-  end
-
-  def self.kubernetes_locations
-    Location.where(name: ["hetzner-fsn1", "leaseweb-wdc02"]).all
-  end
-
-  def self.kubernetes_versions
-    ["v1.34", "v1.33"].freeze
   end
 
   def self.families

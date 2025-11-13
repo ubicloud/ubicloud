@@ -1,9 +1,0 @@
-! Invalid number of arguments for pg destroy subcommand (requires: 0, given: 1)
-
-Destroy a PostgreSQL database
-
-Usage:
-    ubi pg (location/pg-name | pg-id) destroy [options]
-
-Options:
-    -f, --force                      do not require confirmation

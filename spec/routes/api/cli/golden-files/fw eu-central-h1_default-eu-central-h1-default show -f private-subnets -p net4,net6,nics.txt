@@ -1,9 +1,0 @@
-private subnet 1:
-  net4: 172.27.99.128/26
-  net6: fdd9:1ea7:125d:5fa4::/64
-  nic 1:
-    id: nc69z0cda8jt0g5b120hamn4vf
-    name: test-vm-nic
-    private_ipv4: 10.67.141.133
-    private_ipv6: fda0:d79a:93e7:d4fd:1c2::2
-    vm_name: test-vm

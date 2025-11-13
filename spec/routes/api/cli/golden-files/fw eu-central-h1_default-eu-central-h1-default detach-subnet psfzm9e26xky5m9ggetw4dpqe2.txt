@@ -1,1 +1,0 @@
-Detached private subnet psfzm9e26xky5m9ggetw4dpqe2 from firewall with id fw4gj2v4h1fe3q28q0hnf7g8n1

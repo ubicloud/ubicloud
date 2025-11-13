@@ -1,2 +1,0 @@
-location       name     id                          display_state  version  cp_node_count
-eu-central-h1  test-kc  kcnzrctjjg4j4g6eqvdsvzthwp  creating       v1.34    1            

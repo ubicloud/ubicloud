@@ -1,8 +1,0 @@
-<% @page_title = "#{@klass.name} #{@obj.ubid}" %>
-
-<% form(method: :post, id: "action-button") do |f| %>
-  <% @params.keys.each do |name| %>
-    <%== f.input("text", key: name, label: name, required: true) %>
-  <% end %>
-  <%== f.button(@label) %>
-<% end %>

@@ -1,1 +1,0 @@
-Private subnet, if it exists, is now scheduled for destruction

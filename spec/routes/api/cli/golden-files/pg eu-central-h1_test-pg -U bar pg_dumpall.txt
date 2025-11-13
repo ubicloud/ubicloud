@@ -1,1 +1,0 @@
--dpostgres://bar@test-pg.pgvm1qb9gwct1mqmay7m54yma5.pg.example.com:5432/postgres?sslmode=require

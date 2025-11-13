@@ -1,2 +1,0 @@
-name     id                        
-test-vm  vmdzyppz6j166jh5e9t2dwrfas

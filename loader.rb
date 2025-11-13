@@ -58,12 +58,6 @@ autoload_normal = ->(subdirectory, include_first: false, flat: false) do
 end
 
 # Define empty modules instead of trying to have autoload_normal create them via metaprogramming
-module Hosting; end
-
-module Minio; end
-
-module Kubernetes; end
-
 module Prog; end
 
 module Prog::Ai; end
@@ -77,12 +71,6 @@ module Prog::Ubicloud; end
 module Prog::Ubicloud::Vnet; end
 
 module Prog::DnsZone; end
-
-module Prog::Github; end
-
-module Prog::Kubernetes; end
-
-module Prog::Minio; end
 
 module Prog::Postgres; end
 
@@ -206,14 +194,9 @@ def clover_freeze
     Authorization,
     Authorization::Unauthorized,
     HealthMonitorMethods,
-    Hosting,
-    Minio,
-    Minio::Client::Blob,
-    Minio::Crypto::AesGcmCipherProvider,
     PostgresResource::Flavor,
     PostgresResource::HaType,
     Prog,
-    Prog::Ai,
     Prog::Aws,
     Prog::Aws::Vnet,
     Prog::Base::Exit,
@@ -221,9 +204,6 @@ def clover_freeze
     Prog::Base::Hop,
     Prog::Base::Nap,
     Prog::DnsZone,
-    Prog::Github,
-    Prog::Kubernetes,
-    Prog::Minio,
     Prog::Postgres,
     Prog::Storage,
     Prog::Ubicloud,
@@ -238,15 +218,6 @@ def clover_freeze
     ResourceMethods::ClassMethods,
     ResourceMethods::InstanceMethods,
     ResourceMethods::UbidTypeEtcMethods,
-    Scheduling,
-    Scheduling::Allocator,
-    Scheduling::Allocator::Allocation,
-    Scheduling::Allocator::GpuAllocation,
-    Scheduling::Allocator::StorageAllocation,
-    Scheduling::Allocator::StorageAllocation::StorageDeviceAllocation,
-    Scheduling::Allocator::VmHostAllocation,
-    Scheduling::Allocator::VmHostCpuAllocation,
-    Scheduling::Allocator::VmHostSliceAllocation,
     SemaphoreMethods,
     SemaphoreMethods::ClassMethods,
     Sequel::Database,

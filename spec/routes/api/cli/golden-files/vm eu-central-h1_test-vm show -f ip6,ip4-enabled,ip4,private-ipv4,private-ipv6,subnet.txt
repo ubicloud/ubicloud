@@ -1,6 +1,0 @@
-ip6: 
-ip4_enabled: true
-ip4: 128.0.0.1
-private_ipv4: 10.67.141.133
-private_ipv6: fda0:d79a:93e7:d4fd:1c2::2
-subnet: default-eu-central-h1

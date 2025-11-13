@@ -1,1 +1,0 @@
-! Confirmation of firewall name not successful.

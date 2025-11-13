@@ -294,7 +294,3 @@ RSpec.configure do |config|
     end
   end)
 end
-
-# Autoload helper files that may have expensive startup.
-module Clec; end
-Unreloader.autoload("#{__dir__}/clec/cert.rb") { "Clec::Cert" }

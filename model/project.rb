@@ -8,27 +8,17 @@ class Project < Sequel::Model
   one_to_many :action_tags, order: :name
   one_to_many :object_tags, order: :name
   many_to_one :billing_info
-  one_to_many :usage_alerts
-  one_to_many :github_installations
-  many_to_many :github_runners, join_table: :github_installation, right_key: :id, right_primary_key: :installation_id
 
   many_to_many :accounts, join_table: :access_tag, right_key: :hyper_tag_id
   one_to_many :vms
-  one_to_many :minio_clusters
   one_to_many :private_subnets
   one_to_many :postgres_resources
   one_to_many :firewalls
-  one_to_many :load_balancers
-  one_to_many :inference_endpoints
-  one_to_many :kubernetes_clusters
-  one_to_many :ssh_public_keys, order: :name
 
-  RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners]
+  RESOURCE_ASSOCIATIONS = %i[vms private_subnets postgres_resources firewalls]
   RESOURCE_ASSOCIATION_DATASET_METHODS = RESOURCE_ASSOCIATIONS.map { :"#{it}_dataset" }
 
   one_to_many :invoices, order: Sequel.desc(:created_at)
-  one_to_many :quotas, class: :ProjectQuota
-  one_to_many :invitations, class: :ProjectInvitation
   one_to_many :api_keys, key: :owner_id, class: :ApiKey, conditions: {owner_table: "project"}
   one_to_many :locations
 
@@ -52,11 +42,8 @@ class Project < Sequel::Model
     accounts: :nullify,
     action_tags: :destroy,
     api_keys: :destroy,
-    billing_info: :destroy,
-    github_installations: :destroy,
     locations: :destroy,
     object_tags: :destroy,
-    ssh_public_keys: :destroy,
     subject_tags: :destroy
 
   plugin ResourceMethods

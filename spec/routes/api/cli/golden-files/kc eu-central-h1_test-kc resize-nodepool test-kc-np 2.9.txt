@@ -1,6 +1,0 @@
-! The node count must be a positive integer
-
-Resize a Kubernetes cluster nodepool
-
-Usage:
-    ubi kc (location/kc-name | kc-id) resize-nodepool (np-name | np-id) node-count

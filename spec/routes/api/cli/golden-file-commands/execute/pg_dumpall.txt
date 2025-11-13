@@ -1,4 +1,0 @@
-pg eu-central-h1/test-pg -d foo pg_dumpall
-pg eu-central-h1/test-pg pg_dumpall -a
-pg eu-central-h1/test-pg pg_dumpall
-pg eu-central-h1/test-pg -U bar pg_dumpall

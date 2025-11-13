@@ -1,1 +1,0 @@
-Virtual machine, if it exists, is now scheduled for destruction

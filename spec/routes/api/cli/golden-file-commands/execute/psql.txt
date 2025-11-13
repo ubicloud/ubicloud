@@ -1,4 +1,0 @@
-pg eu-central-h1/test-pg -d foo psql
-pg eu-central-h1/test-pg psql -a
-pg eu-central-h1/test-pg psql
-pg eu-central-h1/test-pg -U bar psql
