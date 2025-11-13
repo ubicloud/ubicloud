@@ -44,7 +44,7 @@ end
 # Columns:
 #  id                | uuid                     | PRIMARY KEY
 #  private_subnet_id | uuid                     | NOT NULL
-#  mac               | macaddr                  | NOT NULL
+#  mac               | macaddr                  |
 #  created_at        | timestamp with time zone | NOT NULL DEFAULT now()
 #  private_ipv4      | cidr                     | NOT NULL
 #  private_ipv6      | cidr                     | NOT NULL
