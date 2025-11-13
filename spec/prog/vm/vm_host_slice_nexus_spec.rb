@@ -189,13 +189,18 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
       expect(session).to receive(:exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.effective").and_return("2-3\n").once
     end
 
-    it "returns the available status" do
+    it "succeeds if the partition status is root" do
       expect(session).to receive(:exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.partition").and_return("root\n").once
       expect(nx.available?).to be true
     end
 
-    it "fails on the incorrect partition status" do
+    it "succeeds if the partition status is member" do
       expect(session).to receive(:exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.partition").and_return("member\n").once
+      expect(nx.available?).to be true
+    end
+
+    it "fails on the incorrect partition status" do
+      expect(session).to receive(:exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.partition").and_return("isolated\n").once
       expect(nx.available?).to be false
     end
   end
