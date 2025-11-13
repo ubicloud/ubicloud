@@ -48,7 +48,7 @@ SLICE_CONFIG
   def start_systemd_unit
     r "systemctl start #{@slice_name}"
     cpuset_path = File.join("/sys/fs/cgroup", @slice_name, "cpuset.cpus.partition")
-    File.write(cpuset_path, "root")
+    File.write(cpuset_path, "member")
   end
 
   def valid_cpuset?(str)

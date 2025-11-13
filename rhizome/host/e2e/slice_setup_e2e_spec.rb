@@ -20,8 +20,8 @@ RSpec.describe SliceSetup do
     # check that the slice is started
     expect(r("systemctl show -p ActiveState --value #{slice_name}")).to eq("active\n")
 
-    # check that the cpuset.cpus.partition file contains "root"
-    expect(File.read("/sys/fs/cgroup/#{slice_name}/cpuset.cpus.partition")).to eq("root\n")
+    # check that the cpuset.cpus.partition file contains "member"
+    expect(File.read("/sys/fs/cgroup/#{slice_name}/cpuset.cpus.partition")).to eq("member\n")
 
     # check allowed cpus
     expect(File.read("/sys/fs/cgroup/#{slice_name}/cpuset.cpus")).to eq("#{cpuset}\n")
