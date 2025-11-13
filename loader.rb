@@ -70,6 +70,12 @@ module Prog::Ai; end
 
 module Prog::Aws; end
 
+module Prog::Aws::Vnet; end
+
+module Prog::Ubicloud; end
+
+module Prog::Ubicloud::Vnet; end
+
 module Prog::DnsZone; end
 
 module Prog::Github; end
@@ -208,6 +214,8 @@ def clover_freeze
     PostgresResource::HaType,
     Prog,
     Prog::Ai,
+    Prog::Aws,
+    Prog::Aws::Vnet,
     Prog::Base::Exit,
     Prog::Base::FlowControl,
     Prog::Base::Hop,
@@ -218,6 +226,8 @@ def clover_freeze
     Prog::Minio,
     Prog::Postgres,
     Prog::Storage,
+    Prog::Ubicloud,
+    Prog::Ubicloud::Vnet,
     Prog::VictoriaMetrics,
     Prog::Vm,
     Prog::Vnet,
