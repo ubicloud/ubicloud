@@ -15,7 +15,7 @@ RSpec.describe Prog::Vm::Nexus do
   let(:vm_host) { create_vm_host(used_cores: 2, total_hugepages_1g: 375, used_hugepages_1g: 16) }
   let(:sshable) { vm_host.sshable }
   let(:vm) {
-    vm = Vm.create_with_id(
+    Vm.create_with_id(
       "2464de61-7501-8374-9ab0-416caebe31da",
       name: "dummy-vm",
       unix_user: "ubi",
@@ -33,21 +33,6 @@ RSpec.describe Prog::Vm::Nexus do
       project_id: project.id,
       vm_host_id: vm_host.id
     )
-    BillingRecord.create(
-      project_id: project.id,
-      resource_id: vm.id,
-      resource_name: vm.name,
-      billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
-      amount: vm.vcpus
-    )
-    kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "key", init_vector: "iv", auth_data: "somedata")
-    si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: vm_host.id)
-    bi = BootImage.create(name: "my-image", version: "20230303", size_gib: 15, vm_host_id: vm_host.id)
-    dev1 = StorageDevice.create(name: "nvme0", total_storage_gib: 1000, available_storage_gib: 500)
-    dev2 = StorageDevice.create(name: "DEFAULT", total_storage_gib: 1000, available_storage_gib: 500)
-    VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, skip_sync: false, spdk_installation_id: si.id, storage_device_id: dev1.id, key_encryption_key_1_id: kek.id)
-    VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 15, disk_index: 1, use_bdev_ubi: true, skip_sync: true, spdk_installation_id: si.id, storage_device_id: dev2.id, boot_image_id: bi.id)
-    vm
   }
   let(:project) { Project.create(name: "default") }
 
@@ -279,6 +264,14 @@ RSpec.describe Prog::Vm::Nexus do
       {"swap_size_bytes" => nil, "hugepages" => false, "hypervisor" => "ch", "ch_version" => "46.0", "firmware_version" => "202311"}
     ].each do |frame_update|
       it "generates and passes a params json if prep command is not started yet (with frame opts: #{frame_update.inspect})" do
+        kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "key", init_vector: "iv", auth_data: "somedata")
+        si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: vm_host.id)
+        bi = BootImage.create(name: "my-image", version: "20230303", size_gib: 15, vm_host_id: vm_host.id)
+        dev1 = StorageDevice.create(name: "nvme0", total_storage_gib: 1000, available_storage_gib: 500)
+        dev2 = StorageDevice.create(name: "DEFAULT", total_storage_gib: 1000, available_storage_gib: 500)
+        VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, skip_sync: false, spdk_installation_id: si.id, storage_device_id: dev1.id, key_encryption_key_1_id: kek.id)
+        VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 15, disk_index: 1, use_bdev_ubi: true, skip_sync: true, spdk_installation_id: si.id, storage_device_id: dev2.id, boot_image_id: bi.id)
+
         nx.strand.stack.first.update(frame_update)
         nx.instance_variable_set(:@frame, nil)
         vm = nx.vm
@@ -757,59 +750,72 @@ RSpec.describe Prog::Vm::Nexus do
 
     before do
       expect(Time).to receive(:now).and_return(now).at_least(:once)
-      allow(vm).to receive(:allocated_at).and_return(now - 100)
+      vm.update(allocated_at: now - 100)
       expect(Clog).to receive(:emit).with("vm provisioned").and_yield
-    end
-
-    after do
-      expect(vm.display_state).to eq("running")
-      expect(vm.provisioned_at).to eq(now)
-    end
-
-    it "creates billing records when ip4 is enabled" do
-      vm_addr = instance_double(AssignedVmAddress, id: "46ca6ded-b056-4723-bd91-612959f52f6f", ip: NetAddr::IPv4Net.parse("10.0.0.1"))
-      expect(vm).to receive(:assigned_vm_address).and_return(vm_addr).at_least(:once)
-      expect(vm).to receive(:ip4_enabled).and_return(true)
-      expect(BillingRecord).to receive(:create).exactly(4).times
-      expect { nx.create_billing_record }.to hop("wait")
-    end
-
-    it "creates billing records when gpu is present" do
-      vm.location_id = Location[name: "latitude-ai"].id
-      expect(vm).to receive(:pci_devices).and_return([PciDevice.new(slot: "01:00.0", iommu_group: 23, device_class: "0302", vendor: "10de", device: "20b5")]).at_least(:once)
-      expect(BillingRecord).to receive(:create).exactly(4).times
-      expect { nx.create_billing_record }.to hop("wait")
-    end
-
-    it "creates billing records when ip4 is not enabled" do
-      expect(vm).to receive(:ip4_enabled).and_return(false)
-      expect(BillingRecord).to receive(:create).exactly(3).times
-      expect { nx.create_billing_record }.to hop("wait")
     end
 
     it "not create billing records when the project is not billable" do
       project.update(billable: false)
-      expect(BillingRecord).not_to receive(:create)
       expect { nx.create_billing_record }.to hop("wait")
+      expect(BillingRecord.count).to eq(0)
     end
 
-    it "doesn't create billing records for storage volumes, ip4 and pci devices if the location provider is aws" do
-      loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
-      vm.location = loc
-      expect(vm).not_to receive(:ip4_enabled)
-      expect(vm).not_to receive(:pci_devices)
-      expect(vm).not_to receive(:storage_volumes)
-      expect(BillingRecord).to receive(:create).once
+    it "creates billing records for only vm" do
       expect { nx.create_billing_record }.to hop("wait")
+        .and change(BillingRecord, :count).from(0).to(1)
+      expect(vm.active_billing_records.first.billing_rate["resource_type"]).to eq("VmVCpu")
+      expect(vm.display_state).to eq("running")
+      expect(vm.provisioned_at).to eq(now)
     end
 
-    it "creates a billing record when host is nil, too" do
+    it "creates billing records when storage volumes are present" do
+      2.times {
+        dev = StorageDevice.create(name: "disk_#{it}", total_storage_gib: it * 1000, available_storage_gib: it * 500)
+        VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: it, use_bdev_ubi: false, skip_sync: false, storage_device_id: dev.id)
+      }
+
+      expect { nx.create_billing_record }.to hop("wait")
+        .and change(BillingRecord, :count).from(0).to(3)
+      expect(vm.active_billing_records.map { it.billing_rate["resource_type"] }.sort).to eq(["VmStorage", "VmStorage", "VmVCpu"])
+    end
+
+    it "creates billing records when ip4 is enabled" do
+      vm.ip4_enabled = true
+      adr = Address.create(cidr: "192.168.1.0/24", routed_to_host_id: vm_host.id)
+      AssignedVmAddress.create(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
+      expect { nx.create_billing_record }.to hop("wait")
+        .and change(BillingRecord, :count).from(0).to(2)
+      expect(vm.active_billing_records.map { it.billing_rate["resource_type"] }.sort).to eq(["IPAddress", "VmVCpu"])
+    end
+
+    it "creates billing records when gpu is present" do
+      vm.location_id = Location[name: "latitude-ai"].id
+      PciDevice.create(vm_id: vm.id, vm_host_id: vm_host.id, slot: "01:00.0", iommu_group: 23, device_class: "0302", vendor: "10de", device: "20b5")
+      expect { nx.create_billing_record }.to hop("wait")
+        .and change(BillingRecord, :count).from(0).to(2)
+      expect(vm.active_billing_records.map { it.billing_rate["resource_type"] }.sort).to eq(["Gpu", "VmVCpu"])
+    end
+
+    it "doesn't create additional billing records when the location provider is aws" do
+      vm.location.provider = "aws"
+      vm.ip4_enabled = true
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, skip_sync: false)
+      adr = Address.create(cidr: "192.168.1.0/24", routed_to_host_id: vm_host.id)
+      AssignedVmAddress.create(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
+      PciDevice.create(vm_id: vm.id, vm_host_id: vm_host.id, slot: "01:00.0", iommu_group: 23, device_class: "0302", vendor: "10de", device: "20b5")
+
+      expect { nx.create_billing_record }.to hop("wait")
+        .and change(BillingRecord, :count).from(0).to(1)
+      expect(vm.active_billing_records.first.billing_rate["resource_type"]).to eq("VmVCpu")
+    end
+
+    it "creates a billing record when host is nil" do
       expect(nx).to receive(:host).and_return(nil)
       vm.location.provider = "aws"
       AwsInstance.create_with_id(vm.id, instance_id: "i-0123456789abcdefg")
-      expect(BillingRecord).to receive(:create).once
 
       expect { nx.create_billing_record }.to hop("wait")
+        .and change(BillingRecord, :count).from(0).to(1)
     end
   end
 
@@ -832,28 +838,44 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "stops billing before hops to destroy" do
+      adr = Address.create(cidr: "192.168.1.0/24", routed_to_host_id: vm_host.id)
+      AssignedVmAddress.create(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
+
+      BillingRecord.create(
+        project_id: project.id,
+        resource_id: vm.id,
+        resource_name: vm.name,
+        billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
+        amount: vm.vcpus
+      )
+
+      BillingRecord.create(
+        project_id: project.id,
+        resource_id: vm.assigned_vm_address.id,
+        resource_name: vm.assigned_vm_address.ip,
+        billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location.name)["id"],
+        amount: 1
+      )
+
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(vm.active_billing_records.first).to receive(:finalize)
-      assigned_adr = instance_double(AssignedVmAddress)
-      expect(vm).to receive(:assigned_vm_address).and_return(assigned_adr)
-      expect(assigned_adr).to receive(:active_billing_record).and_return(instance_double(BillingRecord)).at_least(:once)
-      expect(assigned_adr.active_billing_record).to receive(:finalize)
+      vm.active_billing_records.each { expect(it).to receive(:finalize).and_call_original }
+      expect(vm.assigned_vm_address.active_billing_record).to receive(:finalize).and_call_original
       expect { nx.before_run }.to hop("destroy")
     end
 
     it "hops to destroy if billing record is not found" do
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(vm).to receive(:active_billing_records).and_return([])
-      expect(vm).to receive(:assigned_vm_address).and_return(nil)
+      expect(vm.active_billing_records).to be_empty
+      expect(vm.assigned_vm_address).to be_nil
       expect { nx.before_run }.to hop("destroy")
     end
 
     it "hops to destroy if billing record is not found for ipv4" do
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(vm.active_billing_records.first).to receive(:finalize)
-      assigned_adr = instance_double(AssignedVmAddress)
-      expect(vm).to receive(:assigned_vm_address).and_return(assigned_adr)
-      expect(assigned_adr).to receive(:active_billing_record).and_return(nil)
+      adr = Address.create(cidr: "192.168.1.0/24", routed_to_host_id: vm_host.id)
+      AssignedVmAddress.create(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
+      expect(vm.assigned_vm_address).not_to be_nil
+      expect(vm.assigned_vm_address.active_billing_record).to be_nil
 
       expect { nx.before_run }.to hop("destroy")
     end
@@ -1194,6 +1216,10 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#start_after_host_reboot" do
     it "can start a vm after reboot" do
+      kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "key", init_vector: "iv", auth_data: "somedata")
+      dev = StorageDevice.create(name: "nvme0", total_storage_gib: 1000, available_storage_gib: 500)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, skip_sync: false, storage_device_id: dev.id, key_encryption_key_1_id: kek.id)
+
       expect(sshable).to receive(:cmd).with(
         /sudo host\/bin\/setup-vm recreate-unpersisted #{nx.vm_name}/,
         {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/}
