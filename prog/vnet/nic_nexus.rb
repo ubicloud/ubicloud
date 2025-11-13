@@ -65,6 +65,16 @@ class Prog::Vnet::NicNexus < Prog::Base
   end
 
   label def wait
+    # :nocov:
+    when_migrate_to_separate_prog_set? do
+      if nic.private_subnet.location.aws?
+        strand.update(prog: "Aws::Vnet::NicNexus", label: "wait")
+      else
+        strand.update(prog: "Ubicloud::Vnet::NicNexus", label: "wait")
+      end
+    end
+    # :nocov:
+
     if nic.private_subnet.location.aws?
       nic.semaphores.each(&:destroy)
       nap 60 * 60 * 24 * 365
