@@ -342,6 +342,7 @@ table ip6 pod_access {
     it "approves the csr" do
       sshable = instance_double(Sshable)
       expect(kubernetes_cluster.functional_nodes.first).to receive(:sshable).and_return(sshable)
+      expect(kubernetes_cluster).to receive(:incr_sync_internal_dns_config)
       expect(sshable).to receive(:cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf get csr | awk '/Pending/ && /kubelet-serving/ && /'\"#{node.name}\"'/ {print $1}' | xargs -r sudo kubectl --kubeconfig /etc/kubernetes/admin.conf certificate approve")
       expect { prog.approve_new_csr }.to exit({node_id: prog.node.id})
     end

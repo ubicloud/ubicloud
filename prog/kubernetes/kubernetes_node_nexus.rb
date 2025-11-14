@@ -92,6 +92,7 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
   label def destroy
     kubernetes_node.vm.incr_destroy
     kubernetes_node.destroy
+    cluster.incr_sync_internal_dns_config
     pop "kubernetes node is deleted"
   end
 end

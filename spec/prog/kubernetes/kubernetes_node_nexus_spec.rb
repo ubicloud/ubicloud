@@ -166,6 +166,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
     it "destroys the vm and itself" do
       expect(kd.vm).to receive(:incr_destroy)
       expect(kd).to receive(:destroy)
+      expect(kd.kubernetes_cluster).to receive(:incr_sync_internal_dns_config)
       expect { nx.destroy }.to exit({"msg" => "kubernetes node is deleted"})
     end
   end
