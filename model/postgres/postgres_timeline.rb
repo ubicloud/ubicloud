@@ -24,7 +24,7 @@ WALG_S3_PREFIX=s3://#{ubid}
 AWS_ENDPOINT=#{blob_storage_endpoint}
 AWS_ACCESS_KEY_ID=#{access_key}
 AWS_SECRET_ACCESS_KEY=#{secret_key}
-AWS_REGION: #{aws? ? location.name : "us-east-1"}
+AWS_REGION: #{location.name}
 AWS_S3_FORCE_PATH_STYLE=true
 PGHOST=/var/run/postgresql
     WALG_CONF
@@ -90,36 +90,23 @@ PGHOST=/var/run/postgresql
     Time.now
   end
 
-  def aws?
-    location&.aws?
-  end
-
   S3BlobStorage = Struct.new(:url)
 
   def blob_storage
-    @blob_storage ||= if aws?
-      S3BlobStorage.new("https://s3.#{location.name}.amazonaws.com")
-    else
-      MinioCluster.first(project_id: Config.postgres_service_project_id, location_id: location.id) || MinioCluster.first(project_id: Config.minio_service_project_id, location_id: location.id)
-    end
+    @blob_storage ||= S3BlobStorage.new("https://s3.#{location.name}.amazonaws.com")
   end
 
   def blob_storage_endpoint
-    @blob_storage_endpoint ||= blob_storage.url || blob_storage.ip4_urls.sample
+    @blob_storage_endpoint ||= blob_storage.url
   end
 
   def blob_storage_client
-    @blob_storage_client ||= aws? ? Aws::S3::Client.new(
+    @blob_storage_client ||= Aws::S3::Client.new(
       region: location.name,
       access_key_id: access_key,
       secret_access_key: secret_key,
       endpoint: blob_storage_endpoint,
       force_path_style: true
-    ) : Minio::Client.new(
-      endpoint: blob_storage_endpoint,
-      access_key: access_key,
-      secret_key: secret_key,
-      ssl_ca_data: blob_storage.root_certs
     )
   end
 
@@ -128,12 +115,6 @@ PGHOST=/var/run/postgresql
   end
 
   def list_objects(prefix)
-    aws? ?
-    aws_list_objects(prefix)
-    : blob_storage_client.list_objects(ubid, prefix)
-  end
-
-  def aws_list_objects(prefix)
     response = blob_storage_client.list_objects_v2(bucket: ubid, prefix: prefix)
     objects = response.contents
     while response.is_truncated
@@ -144,32 +125,26 @@ PGHOST=/var/run/postgresql
   end
 
   def create_bucket
-    aws? ? aws_create_bucket : blob_storage_client.create_bucket(ubid)
-  end
-
-  def aws_create_bucket
     location_constraint = (location.name == "us-east-1") ? nil : {location_constraint: location.name}
     blob_storage_client.create_bucket(bucket: ubid, create_bucket_configuration: location_constraint)
   end
 
   def set_lifecycle_policy
-    aws? ?
-      blob_storage_client.put_bucket_lifecycle_configuration({
-        bucket: ubid,
-        lifecycle_configuration: {
-          rules: [
-            {
-              id: "DeleteOldBackups",
-              status: "Enabled",
-              expiration: {
-                days: BACKUP_BUCKET_EXPIRATION_DAYS
-              },
-              filter: {}
-            }
-          ]
-        }
-      })
-    : blob_storage_client.set_lifecycle_policy(ubid, ubid, BACKUP_BUCKET_EXPIRATION_DAYS)
+    blob_storage_client.put_bucket_lifecycle_configuration({
+      bucket: ubid,
+      lifecycle_configuration: {
+        rules: [
+          {
+            id: "DeleteOldBackups",
+            status: "Enabled",
+            expiration: {
+              days: BACKUP_BUCKET_EXPIRATION_DAYS
+            },
+            filter: {}
+          }
+        ]
+      }
+    })
   end
 end
 
