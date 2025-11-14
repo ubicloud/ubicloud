@@ -886,11 +886,15 @@ RSpec.describe Prog::Vm::Nexus do
   end
 
   describe "#update_firewall_rules" do
-    it "hops to wait_firewall_rules" do
-      vm.incr_update_firewall_rules
-      expect(nx).to receive(:push).with(Prog::Vnet::UpdateFirewallRules, {}, :update_firewall_rules)
-      expect { nx.update_firewall_rules }
-        .to change { vm.reload.update_firewall_rules_set? }.from(true).to(false)
+    ["Aws", "Metal"].each do |provider|
+      it "hops to wait_firewall_rules" do
+        vm.incr_update_firewall_rules
+        expect(vm).to receive(:location).and_return(instance_double(Location, aws?: provider == "Aws"))
+        prog = (provider == "Aws") ? Prog::Vnet::Aws::UpdateFirewallRules : Prog::Vnet::Metal::UpdateFirewallRules
+        expect(nx).to receive(:push).with(prog, {}, :update_firewall_rules)
+        expect { nx.update_firewall_rules }
+          .to change { vm.reload.update_firewall_rules_set? }.from(true).to(false)
+      end
     end
 
     it "hops to wait if firewall rules are applied" do

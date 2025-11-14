@@ -200,6 +200,12 @@ class Vm < Sequel::Model
     id.to_s[0..7]
   end
 
+  def update_firewall_rules_prog
+    prog = Prog::Vnet
+    prog = location.aws? ? prog::Aws : prog::Metal
+    prog::UpdateFirewallRules
+  end
+
   def inhost_name
     self.class.ubid_to_name(UBID.from_uuidish(id))
   end

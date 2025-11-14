@@ -475,7 +475,7 @@ class Prog::Vm::Nexus < Prog::Base
     end
 
     decr_update_firewall_rules
-    push Prog::Vnet::UpdateFirewallRules, {}, :update_firewall_rules
+    push vm.update_firewall_rules_prog, {}, :update_firewall_rules
   end
 
   label def update_spdk_dependency
