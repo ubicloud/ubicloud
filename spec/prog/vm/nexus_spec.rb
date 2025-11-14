@@ -5,17 +5,17 @@ require "netaddr"
 
 RSpec.describe Prog::Vm::Nexus do
   subject(:nx) {
-    described_class.new(st).tap {
+    described_class.new(vm.strand).tap {
       it.instance_variable_set(:@vm, vm)
       it.instance_variable_set(:@host, vm_host)
     }
   }
 
-  let(:st) { Strand.new }
+  let(:st) { vm.strand }
   let(:vm_host) { create_vm_host(used_cores: 2, total_hugepages_1g: 375, used_hugepages_1g: 16) }
   let(:sshable) { vm_host.sshable }
   let(:vm) {
-    Vm.create_with_id(
+    vm = Vm.create_with_id(
       "2464de61-7501-8374-9ab0-416caebe31da",
       name: "dummy-vm",
       unix_user: "ubi",
@@ -33,6 +33,8 @@ RSpec.describe Prog::Vm::Nexus do
       project_id: project.id,
       vm_host_id: vm_host.id
     )
+    Strand.create_with_id(vm.id, prog: "Vm::Nexus", label: "start")
+    vm
   }
   let(:project) { Project.create(name: "default") }
 
@@ -215,7 +217,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "hops to wait_aws_vm_started if vm nics are in wait state" do
-      expect(nx).to receive(:frame).and_return("alternative_families" => ["m7i", "m6a"])
+      st.stack = [{"alternative_families" => ["m7i", "m6a"]}]
       expect(nx).to receive(:vm).and_return(instance_double(Vm, id: "vm_id", nics: [instance_double(Nic, strand: instance_double(Strand, label: "wait"))])).at_least(:once)
       expect(nx).to receive(:bud).with(Prog::Aws::Instance, {"subject_id" => "vm_id", "alternative_families" => ["m7i", "m6a"]}, :start)
       expect { nx.start_aws }.to hop("wait_aws_vm_started")
@@ -224,13 +226,11 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#wait_aws_vm_started" do
     it "reaps and naps if not leaf" do
-      st.update(prog: "Vm::Nexus", label: "wait_aws_vm_started", stack: [{}])
       Strand.create(parent_id: st.id, prog: "Aws::Instance", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_aws_vm_started }.to nap(3)
     end
 
     it "hops to wait_sshable if leaf" do
-      st.update(prog: "Vm::Nexus", label: "wait_aws_vm_started", stack: [{}])
       expect { nx.wait_aws_vm_started }.to hop("wait_sshable")
     end
   end
@@ -272,9 +272,7 @@ RSpec.describe Prog::Vm::Nexus do
         VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, skip_sync: false, spdk_installation_id: si.id, storage_device_id: dev1.id, key_encryption_key_1_id: kek.id)
         VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 15, disk_index: 1, use_bdev_ubi: true, skip_sync: true, spdk_installation_id: si.id, storage_device_id: dev2.id, boot_image_id: bi.id)
 
-        nx.strand.stack.first.update(frame_update)
-        nx.instance_variable_set(:@frame, nil)
-        vm = nx.vm
+        st.stack = [frame_update]
         vm.ephemeral_net6 = "fe80::/64"
         vm.unix_user = "test_user"
         vm.public_key = "test_ssh_key"
@@ -343,21 +341,18 @@ RSpec.describe Prog::Vm::Nexus do
     }
 
     before do
-      allow(nx).to receive(:frame).and_return("storage_volumes" => :storage_volumes)
-      allow(nx).to receive(:clear_stack_storage_volumes)
-      allow(vm).to receive(:update)
+      st.stack = [{"storage_volumes" => storage_volumes}]
     end
 
     it "creates a page if no capacity left and naps" do
       expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host")).twice
-      expect(vm).to receive(:waiting_for_capacity_set?).and_return(false)
-      expect(nx).to receive(:incr_waiting_for_capacity)
+      expect(vm.waiting_for_capacity_set?).to be(false)
       expect { nx.start }.to nap(30)
+      expect(vm.reload.waiting_for_capacity_set?).to be(true)
       expect(Page.active.count).to eq(1)
       expect(Page.from_tag_parts("NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family)).not_to be_nil
 
       # Second run does not generate another page
-      expect(vm).to receive(:waiting_for_capacity_set?).and_return(true)
       expect(nx).not_to receive(:incr_waiting_for_capacity)
       expect { nx.start }.to nap(30)
       expect(Page.active.count).to eq(1)
@@ -365,8 +360,6 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "waits for a while before creating a page for github-runners" do
       expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host"))
-      expect(vm).to receive(:waiting_for_capacity_set?).and_return(false)
-      expect(nx).to receive(:incr_waiting_for_capacity)
 
       vm.created_at = Time.now - 10 * 60
       vm.location_id = Location[name: "github-runners"].id
@@ -377,21 +370,18 @@ RSpec.describe Prog::Vm::Nexus do
     it "resolves the page if no VM left in the queue after 15 minutes" do
       # First run creates the page
       expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host"))
-      expect(vm).to receive(:waiting_for_capacity_set?).and_return(false)
-      expect(nx).to receive(:incr_waiting_for_capacity)
       expect { nx.start }.to nap(30)
       expect(Page.active.count).to eq(1)
 
       # Second run is able to allocate, but there are still vms in the queue, so we don't resolve the page
       expect(Scheduling::Allocator).to receive(:allocate)
-      expect(nx).to receive(:decr_waiting_for_capacity)
       expect { nx.start }.to hop("create_unix_user")
+        .and change { vm.reload.waiting_for_capacity_set? }.from(true).to(false)
       expect(Page.active.count).to eq(1)
       expect(Page.active.first.resolve_set?).to be false
 
       # Third run is able to allocate and there are no vms left in the queue, but it's not 15 minutes yet, so we don't resolve the page
       expect(Scheduling::Allocator).to receive(:allocate)
-      expect(nx).to receive(:decr_waiting_for_capacity)
       expect { nx.start }.to hop("create_unix_user")
       expect(Page.active.count).to eq(1)
       expect(Page.active.first.resolve_set?).to be false
@@ -399,7 +389,6 @@ RSpec.describe Prog::Vm::Nexus do
       # Fourth run is able to allocate and there are no vms left in the queue after 15 minutes, so we resolve the page
       Page.active.first.update(created_at: Time.now - 16 * 60)
       expect(Scheduling::Allocator).to receive(:allocate)
-      expect(nx).to receive(:decr_waiting_for_capacity)
       expect { nx.start }.to hop("create_unix_user")
       expect(Page.active.count).to eq(1)
       expect(Page.active.first.resolve_set?).to be true
@@ -414,7 +403,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "allocates with expected parameters" do
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
+        vm, storage_volumes,
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -431,7 +420,7 @@ RSpec.describe Prog::Vm::Nexus do
     it "considers EU locations for github-runners" do
       vm.location_id = Location::GITHUB_RUNNERS_ID
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
+        vm, storage_volumes,
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -448,7 +437,7 @@ RSpec.describe Prog::Vm::Nexus do
     it "considers standard family for burstable virtual machines" do
       vm.family = "burstable"
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
+        vm, storage_volumes,
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -468,7 +457,7 @@ RSpec.describe Prog::Vm::Nexus do
       vm.location_id = Location::GITHUB_RUNNERS_ID
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
+        vm, storage_volumes,
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -491,7 +480,7 @@ RSpec.describe Prog::Vm::Nexus do
       vm.location_id = Location::GITHUB_RUNNERS_ID
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
+        vm, storage_volumes,
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -511,7 +500,7 @@ RSpec.describe Prog::Vm::Nexus do
       GithubRunner.create(label: "ubicloud", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
+        vm, storage_volumes,
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -531,7 +520,7 @@ RSpec.describe Prog::Vm::Nexus do
       GithubRunner.create(label: "ubicloud", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
       project.set_ff_free_runner_upgrade_until(Time.now + 5 * 24 * 60 * 60)
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
+        vm, storage_volumes,
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -552,7 +541,7 @@ RSpec.describe Prog::Vm::Nexus do
       GithubRunner.create(label: "ubicloud-premium-30", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
+        vm, storage_volumes,
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -572,7 +561,7 @@ RSpec.describe Prog::Vm::Nexus do
       runner = Prog::Vm::GithubRunner.assemble(installation, repository_name: "ubicloud/test", label: "ubicloud-standard-2").subject.update(vm_id: vm.id)
       runner.incr_not_upgrade_premium
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
+        vm, storage_volumes,
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -593,7 +582,7 @@ RSpec.describe Prog::Vm::Nexus do
       GithubRunner.create(label: "ubicloud-gpu", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
+        vm, storage_volumes,
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -608,16 +597,16 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "can force allocating a host" do
-      allow(nx).to receive(:frame).and_return({
-        "force_host_id" => :vm_host_id,
-        "storage_volumes" => :storage_volumes
-      })
+      st.stack = [{
+        "force_host_id" => vm_host.id,
+        "storage_volumes" => storage_volumes
+      }]
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
+        vm, storage_volumes,
         allocation_state_filter: [],
         distinct_storage_devices: false,
-        host_filter: [:vm_host_id],
+        host_filter: [vm_host.id],
         host_exclusion_filter: [],
         location_filter: [],
         location_preference: [],
@@ -629,17 +618,17 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "can exclude hosts" do
-      allow(nx).to receive(:frame).and_return({
-        "exclude_host_ids" => [:vm_host_id, "another-vm-host-id"],
-        "storage_volumes" => :storage_volumes
-      })
+      st.stack = [{
+        "exclude_host_ids" => [vm_host.id, "another-vm-host-id"],
+        "storage_volumes" => storage_volumes
+      }]
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
+        vm, storage_volumes,
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
-        host_exclusion_filter: [:vm_host_id, "another-vm-host-id"],
+        host_exclusion_filter: [vm_host.id, "another-vm-host-id"],
         location_filter: [Location::HETZNER_FSN1_ID],
         location_preference: [],
         gpu_count: 0,
@@ -657,14 +646,14 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "requests distinct storage devices" do
-      allow(nx).to receive(:frame).and_return({
+      st.stack = [{
         "distinct_storage_devices" => true,
-        "storage_volumes" => :storage_volumes,
+        "storage_volumes" => storage_volumes,
         "gpu_count" => 0
-      })
+      }]
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
+        vm, storage_volumes,
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: true,
         host_filter: [],
@@ -679,13 +668,13 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "requests gpus" do
-      allow(nx).to receive(:frame).and_return({
+      st.stack = [{
         "gpu_count" => 3,
-        "storage_volumes" => :storage_volumes
-      })
+        "storage_volumes" => storage_volumes
+      }]
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
+        vm, storage_volumes,
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
@@ -702,45 +691,35 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#clear_stack_storage_volumes" do
     it "removes storage volume info" do
-      strand = instance_double(Strand)
-      stack = [{"storage_volumes" => []}]
-      allow(nx).to receive(:strand).and_return(strand)
-      expect(strand).to receive(:stack).and_return(stack)
-      expect(strand).to receive(:modified!).with(:stack)
-      expect(strand).to receive(:save_changes)
-
-      expect { nx.clear_stack_storage_volumes }.not_to raise_error
+      st.update(stack: [{"storage_volumes" => [{"size_gib" => 11}]}])
+      expect { nx.clear_stack_storage_volumes }.to change { st.reload.stack.first["storage_volumes"] }.from([{"size_gib" => 11}]).to(nil)
     end
   end
 
   describe "#wait_sshable" do
     it "naps 6 seconds if it's the first time we execute wait_sshable" do
-      expect(vm).to receive(:update_firewall_rules_set?).and_return(false)
-      expect(vm).to receive(:incr_update_firewall_rules)
       expect { nx.wait_sshable }.to nap(6)
+        .and change { vm.reload.update_firewall_rules_set? }.from(false).to(true)
     end
 
     it "naps if not sshable" do
       expect(vm).to receive(:ip4).and_return(NetAddr::IPv4.parse("10.0.0.1"))
-      expect(vm).to receive(:update_firewall_rules_set?).and_return(true)
-      expect(vm).not_to receive(:incr_update_firewall_rules)
+      vm.incr_update_firewall_rules
       expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1).and_raise Errno::ECONNREFUSED
       expect { nx.wait_sshable }.to nap(1)
     end
 
     it "hops to create_billing_record if sshable" do
-      expect(vm).to receive(:update_firewall_rules_set?).and_return(true)
-      expect(vm).not_to receive(:incr_update_firewall_rules)
-      vm_addr = instance_double(AssignedVmAddress, id: "46ca6ded-b056-4723-bd91-612959f52f6f", ip: NetAddr::IPv4Net.parse("10.0.0.1"))
-      expect(vm).to receive(:assigned_vm_address).and_return(vm_addr).at_least(:once)
+      vm.incr_update_firewall_rules
+      adr = Address.create(cidr: "10.0.0.0/24", routed_to_host_id: vm_host.id)
+      AssignedVmAddress.create(ip: "10.0.0.1", address_id: adr.id, dst_vm_id: vm.id)
       expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
       expect { nx.wait_sshable }.to hop("create_billing_record")
     end
 
     it "skips a check if ipv4 is not enabled" do
-      expect(vm).to receive(:update_firewall_rules_set?).and_return(true)
+      vm.incr_update_firewall_rules
       expect(vm.ip4).to be_nil
-      expect(vm).not_to receive(:ephemeral_net6)
       expect { nx.wait_sshable }.to hop("create_billing_record")
     end
   end
@@ -821,20 +800,16 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#before_run" do
     it "hops to destroy when needed" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
+      vm.incr_destroy
       expect { nx.before_run }.to hop("destroy")
     end
 
     it "does not hop to destroy if already in the destroy state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield.at_least(:once)
-      expect(nx.strand).to receive(:label).and_return("destroy")
-      expect { nx.before_run }.not_to hop("destroy")
-
-      expect(nx.strand).to receive(:label).and_return("destroy_slice")
-      expect { nx.before_run }.not_to hop("destroy")
-
-      expect(nx.strand).to receive(:label).and_return("remove_vm_from_load_balancer")
-      expect { nx.before_run }.not_to hop("destroy")
+      ["destroy", "destroy_slice", "remove_vm_from_load_balancer"].each do |label|
+        vm.incr_destroy
+        st.label = label
+        expect { nx.before_run }.not_to hop("destroy")
+      end
     end
 
     it "stops billing before hops to destroy" do
@@ -857,21 +832,21 @@ RSpec.describe Prog::Vm::Nexus do
         amount: 1
       )
 
-      expect(nx).to receive(:when_destroy_set?).and_yield
+      vm.incr_destroy
       vm.active_billing_records.each { expect(it).to receive(:finalize).and_call_original }
       expect(vm.assigned_vm_address.active_billing_record).to receive(:finalize).and_call_original
       expect { nx.before_run }.to hop("destroy")
     end
 
     it "hops to destroy if billing record is not found" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
+      vm.incr_destroy
       expect(vm.active_billing_records).to be_empty
       expect(vm.assigned_vm_address).to be_nil
       expect { nx.before_run }.to hop("destroy")
     end
 
     it "hops to destroy if billing record is not found for ipv4" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
+      vm.incr_destroy
       adr = Address.create(cidr: "192.168.1.0/24", routed_to_host_id: vm_host.id)
       AssignedVmAddress.create(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
       expect(vm.assigned_vm_address).not_to be_nil
@@ -887,40 +862,40 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "hops to start_after_host_reboot when needed" do
-      expect(nx).to receive(:when_start_after_host_reboot_set?).and_yield
+      vm.incr_start_after_host_reboot
       expect { nx.wait }.to hop("start_after_host_reboot")
     end
 
     it "hops to update_spdk_dependency when needed" do
-      expect(nx).to receive(:when_update_spdk_dependency_set?).and_yield
+      vm.incr_update_spdk_dependency
       expect { nx.wait }.to hop("update_spdk_dependency")
     end
 
     it "hops to update_firewall_rules when needed" do
-      expect(nx).to receive(:when_update_firewall_rules_set?).and_yield
+      vm.incr_update_firewall_rules
       expect { nx.wait }.to hop("update_firewall_rules")
     end
 
     it "hops to restart when needed" do
-      expect(nx).to receive(:when_restart_set?).and_yield
+      vm.incr_restart
       expect { nx.wait }.to hop("restart")
     end
 
     it "hops to stopped when needed" do
-      expect(nx).to receive(:when_stop_set?).and_yield
+      vm.incr_stop
       expect { nx.wait }.to hop("stopped")
     end
 
     it "hops to unavailable based on the vm's available status" do
-      expect(nx).to receive(:when_checkup_set?).and_yield
+      vm.incr_checkup
       expect(nx).to receive(:available?).and_return(false)
       expect { nx.wait }.to hop("unavailable")
 
-      expect(nx).to receive(:when_checkup_set?).and_yield
+      vm.incr_checkup
       expect(nx).to receive(:available?).and_raise Sshable::SshError.new("ssh failed", "", "", nil, nil)
       expect { nx.wait }.to hop("unavailable")
 
-      expect(nx).to receive(:when_checkup_set?).and_yield
+      vm.incr_checkup
       expect(nx).to receive(:available?).and_return(true)
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
@@ -928,9 +903,10 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#update_firewall_rules" do
     it "hops to wait_firewall_rules" do
-      expect(nx).to receive(:decr_update_firewall_rules)
+      vm.incr_update_firewall_rules
       expect(nx).to receive(:push).with(Prog::Vnet::UpdateFirewallRules, {}, :update_firewall_rules)
-      nx.update_firewall_rules
+      expect { nx.update_firewall_rules }
+        .to change { vm.reload.update_firewall_rules_set? }.from(true).to(false)
     end
 
     it "hops to wait if firewall rules are applied" do
@@ -941,41 +917,42 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#update_spdk_dependency" do
     it "hops to wait after doing the work" do
-      expect(nx).to receive(:decr_update_spdk_dependency)
+      vm.incr_update_spdk_dependency
       expect(nx).to receive(:write_params_json)
       expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm reinstall-systemd-units #{vm.inhost_name}")
       expect { nx.update_spdk_dependency }.to hop("wait")
+        .and change { vm.reload.update_spdk_dependency_set? }.from(true).to(false)
     end
   end
 
   describe "#restart" do
     it "hops to wait after restarting the vm" do
-      expect(nx).to receive(:decr_restart)
+      vm.incr_restart
       expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm restart #{vm.inhost_name}")
       expect { nx.restart }.to hop("wait")
+        .and change { vm.reload.restart_set? }.from(true).to(false)
     end
   end
 
   describe "#stopped" do
     it "naps after stopping the vm" do
-      expect(nx).to receive(:when_stop_set?).and_yield
+      vm.incr_stop
       expect(sshable).to receive(:cmd).with("sudo systemctl stop #{vm.inhost_name}")
-      expect(nx).to receive(:decr_stop)
       expect { nx.stopped }.to nap(60 * 60)
+        .and change { vm.reload.stop_set? }.from(true).to(false)
     end
 
     it "does not stop if already stopped" do
-      expect(vm).not_to receive(:vm_host)
-      expect(nx).to receive(:decr_stop)
+      expect(vm.stop_set?).to be(false)
       expect { nx.stopped }.to nap(60 * 60)
     end
   end
 
   describe "#unavailable" do
     it "hops to start_after_host_reboot when needed" do
-      expect(nx).to receive(:when_start_after_host_reboot_set?).and_yield
-      expect(nx).to receive(:incr_checkup)
+      vm.incr_start_after_host_reboot
       expect { nx.unavailable }.to hop("start_after_host_reboot")
+        .and change { vm.reload.checkup_set? }.from(false).to(true)
     end
 
     it "register an immediate deadline if vm is unavailable" do
@@ -999,7 +976,7 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#destroy" do
     it "prevents destroy if the semaphore set" do
-      expect(nx).to receive(:when_prevent_destroy_set?).and_yield
+      vm.incr_prevent_destroy
       expect(Clog).to receive(:emit).with("Destroy prevented by the semaphore").and_call_original
       expect { nx.destroy }.to hop("prevent_destroy")
     end
