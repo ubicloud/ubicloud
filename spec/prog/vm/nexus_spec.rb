@@ -1164,17 +1164,14 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "hops to destroy_slice if vm is removed" do
       expect(nx).to receive(:reap).and_yield
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo host/bin/setup-vm delete_net #{vm.inhost_name}")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm delete_net #{vm.inhost_name}")
       expect { nx.wait_vm_removal_from_load_balancer }.to hop("destroy_slice")
     end
 
     it "handles the case when the vm_host is not set" do
-      expect(nx).to receive(:reap).and_yield.twice
+      expect(nx).to receive(:reap).and_yield
 
-      expect(vm.vm_host).to receive(:sshable).and_return(nil)
-      expect { nx.wait_vm_removal_from_load_balancer }.to hop("destroy_slice")
-
-      expect(vm).to receive(:vm_host).and_return(nil)
+      expect(nx).to receive(:host).and_return(nil).at_least(:once)
       expect { nx.wait_vm_removal_from_load_balancer }.to hop("destroy_slice")
     end
   end
