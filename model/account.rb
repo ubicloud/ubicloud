@@ -3,12 +3,11 @@
 require_relative "../model"
 
 class Account < Sequel::Model(:accounts)
-  one_to_many :usage_alerts, key: :user_id
   one_to_many :api_keys, key: :owner_id, conditions: {owner_table: "accounts"}
   one_to_many :identities, class: :AccountIdentity
   many_to_many :projects, join_table: :access_tag, left_key: :hyper_tag_id, right_key: :project_id
 
-  plugin :association_dependencies, usage_alerts: :destroy, projects: :nullify
+  plugin :association_dependencies, projects: :nullify
 
   plugin ResourceMethods
   include SubjectTag::Cleanup
