@@ -942,9 +942,16 @@ RSpec.describe Prog::Vm::Nexus do
   end
 
   describe "#update_firewall_rules" do
-    it "hops to wait_firewall_rules" do
+    it "pushes the update_firewall_rules program for metal" do
       expect(nx).to receive(:decr_update_firewall_rules)
-      expect(nx).to receive(:push).with(Prog::Vnet::UpdateFirewallRules, {}, :update_firewall_rules)
+      expect(nx).to receive(:push).with(Prog::Vnet::Metal::UpdateFirewallRules, {}, :update_firewall_rules)
+      nx.update_firewall_rules
+    end
+
+    it "pushes the update_firewall_rules program for aws" do
+      expect(vm.location).to receive(:aws?).and_return(true)
+      expect(nx).to receive(:decr_update_firewall_rules)
+      expect(nx).to receive(:push).with(Prog::Vnet::Aws::UpdateFirewallRules, {}, :update_firewall_rules)
       nx.update_firewall_rules
     end
 
