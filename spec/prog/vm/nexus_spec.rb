@@ -37,21 +37,20 @@ RSpec.describe Prog::Vm::Nexus do
     vm
   }
   let(:project) { Project.create(name: "default") }
+  let(:private_subnet) {
+    PrivateSubnet.create(name: "ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64",
+      net4: "1.1.1.0/26", state: "waiting", project_id: project.id)
+  }
+  let(:nic) {
+    Nic.create(private_subnet_id: private_subnet.id,
+      private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
+      private_ipv4: "10.0.0.1",
+      mac: "00:00:00:00:00:00",
+      encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579",
+      name: "default-nic")
+  }
 
   describe ".assemble" do
-    let(:ps) {
-      PrivateSubnet.create(name: "ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64",
-        net4: "1.1.1.0/26", state: "waiting", project_id: project.id) { it.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
-    }
-    let(:nic) {
-      Nic.new(private_subnet_id: ps.id,
-        private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
-        private_ipv4: "10.0.0.1",
-        mac: "00:00:00:00:00:00",
-        encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579",
-        name: "default-nic").tap { it.id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e" }
-    }
-
     it "fails if there is no project" do
       expect {
         described_class.assemble("some_ssh key", "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
@@ -72,86 +71,72 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "creates Nic if only subnet_id is passed" do
-      expect(PrivateSubnet).to receive(:[]).with(ps.id).and_return(ps)
-      nic_strand = instance_double(Strand, subject: nic)
-      expect(Prog::Vnet::NicNexus).to receive(:assemble).and_return(nic_strand)
-      expect(nic).to receive(:update).and_return(nic)
-
-      described_class.assemble("some_ssh key", project.id, private_subnet_id: ps.id)
+      expect {
+        described_class.assemble("some_ssh key", project.id, private_subnet_id: private_subnet.id)
+      }.to change(Nic, :count).from(0).to(1)
+      expect(PrivateSubnet.count).to eq(1)
     end
 
     it "adds the VM to a private subnet if nic_id is passed" do
-      expect(Nic).to receive(:[]).with(nic.id).and_return(nic)
-      expect(nic).to receive(:private_subnet).and_return(ps).at_least(:once)
-      expect(nic).to receive(:update).and_return(nic)
       expect(Prog::Vnet::SubnetNexus).not_to receive(:assemble)
       expect(Prog::Vnet::NicNexus).not_to receive(:assemble)
       described_class.assemble("some_ssh key", project.id, nic_id: nic.id, location_id: Location::HETZNER_FSN1_ID)
     end
 
-    def requested_disk_size(st)
-      st.stack.first["storage_volumes"].first["size_gib"]
-    end
-
     it "creates with default storage size from vm size" do
       st = described_class.assemble("some_ssh key", project.id)
-      expect(requested_disk_size(st)).to eq(Option::VmSizes.first.storage_size_options.first)
+      expect(st.stack.first["storage_volumes"].first["size_gib"]).to eq(Option::VmSizes.first.storage_size_options.first)
     end
 
     it "creates with custom storage size if provided" do
       st = described_class.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 40}])
-      expect(requested_disk_size(st)).to eq(40)
+      expect(st.stack.first["storage_volumes"].first["size_gib"]).to eq(40)
     end
 
     it "fails if given nic_id is not valid" do
       expect {
-        described_class.assemble("some_ssh key", project.id, nic_id: nic.id)
+        described_class.assemble("some_ssh key", project.id, nic_id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
       }.to raise_error RuntimeError, "Given nic doesn't exist with the id 0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"
     end
 
     it "fails if given subnet_id is not valid" do
       expect {
-        described_class.assemble("some_ssh key", project.id, private_subnet_id: nic.id)
+        described_class.assemble("some_ssh key", project.id, private_subnet_id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
       }.to raise_error RuntimeError, "Given subnet doesn't exist with the id 0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"
     end
 
     it "fails if nic is assigned to a different vm" do
-      expect(Nic).to receive(:[]).with(nic.id).and_return(nic)
-      expect(nic).to receive(:vm_id).and_return("57afa8a7-2357-4012-9632-07fbe13a3133")
+      nic.update(vm_id: vm.id)
       expect {
         described_class.assemble("some_ssh key", project.id, nic_id: nic.id)
       }.to raise_error RuntimeError, "Given nic is assigned to a VM already"
     end
 
     it "fails if nic subnet is in another location" do
-      expect(Nic).to receive(:[]).with(nic.id).and_return(nic)
-      expect(nic).to receive(:private_subnet).and_return(ps)
-      expect(ps).to receive(:location_id).and_return("hel2")
+      private_subnet.update(location_id: Location::LEASEWEB_WDC02_ID)
       expect {
         described_class.assemble("some_ssh key", project.id, nic_id: nic.id)
       }.to raise_error RuntimeError, "Given nic is created in a different location"
     end
 
     it "fails if subnet of nic belongs to another project" do
-      ps.update(project_id: Project.create(name: "project-2").id)
-      expect(Nic).to receive(:[]).with(nic.id).and_return(nic)
-      expect(nic).to receive(:private_subnet).and_return(ps)
+      private_subnet.update(project_id: Project.create(name: "project-2").id)
       expect {
         described_class.assemble("some_ssh key", project.id, nic_id: nic.id)
       }.to raise_error RuntimeError, "Given nic is not available in the given project"
     end
 
     it "fails if subnet belongs to another project" do
-      ps.update(project_id: Project.create(name: "project-2").id)
+      private_subnet.update(project_id: Project.create(name: "project-2").id)
       expect {
-        described_class.assemble("some_ssh key", project.id, private_subnet_id: ps.id)
+        described_class.assemble("some_ssh key", project.id, private_subnet_id: private_subnet.id)
       }.to raise_error RuntimeError, "Given subnet is not available in the given project"
     end
 
     it "allows if subnet belongs to another project and allow_private_subnet_in_other_project argument is given" do
-      expect(PrivateSubnet).to receive(:[]).with(ps.id).and_return(ps).at_least(:once)
-      vm = described_class.assemble("some_ssh key", project.id, private_subnet_id: ps.id, allow_private_subnet_in_other_project: true).subject
-      expect(vm.private_subnets.map(&:id)).to eq [ps.id]
+      private_subnet.update(project_id: Project.create(name: "project-2").id)
+      vm = described_class.assemble("some_ssh key", project.id, private_subnet_id: private_subnet.id, allow_private_subnet_in_other_project: true).subject
+      expect(vm.private_subnets.map(&:id)).to eq [private_subnet.id]
     end
 
     it "creates arm64 vm with double core count and 3.2GB memory per core" do
@@ -162,17 +147,17 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "requests as many gpus as specified" do
       st = described_class.assemble("some_ssh key", project.id, size: "standard-2", gpu_count: 2)
-      expect(st.stack[0]["gpu_count"]).to eq(2)
+      expect(st.stack.first["gpu_count"]).to eq(2)
     end
 
     it "requests at least a single gpu for standard-gpu-6" do
       st = described_class.assemble("some_ssh key", project.id, size: "standard-gpu-6")
-      expect(st.stack[0]["gpu_count"]).to eq(1)
+      expect(st.stack.first["gpu_count"]).to eq(1)
     end
 
     it "requests no gpus by default" do
       st = described_class.assemble("some_ssh key", project.id, size: "standard-2")
-      expect(st.stack[0]["gpu_count"]).to eq(0)
+      expect(st.stack.first["gpu_count"]).to eq(0)
     end
 
     it "creates correct number of storage volumes for storage optimized instance types" do
@@ -212,14 +197,16 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#start_aws" do
     it "naps if vm nics are not in wait state" do
-      expect(nx).to receive(:vm).and_return(instance_double(Vm, nics: [instance_double(Nic, strand: instance_double(Strand, label: "start"))]))
+      nic.update(vm_id: vm.id)
+      Strand.create_with_id(nic.id, prog: "Vnet::NicNexus", label: "start")
       expect { nx.start_aws }.to nap(1)
     end
 
     it "hops to wait_aws_vm_started if vm nics are in wait state" do
       st.stack = [{"alternative_families" => ["m7i", "m6a"]}]
-      expect(nx).to receive(:vm).and_return(instance_double(Vm, id: "vm_id", nics: [instance_double(Nic, strand: instance_double(Strand, label: "wait"))])).at_least(:once)
-      expect(nx).to receive(:bud).with(Prog::Aws::Instance, {"subject_id" => "vm_id", "alternative_families" => ["m7i", "m6a"]}, :start)
+      nic.update(vm_id: vm.id)
+      Strand.create_with_id(nic.id, prog: "Vnet::NicNexus", label: "wait")
+      expect(nx).to receive(:bud).with(Prog::Aws::Instance, {"subject_id" => vm.id, "alternative_families" => ["m7i", "m6a"]}, :start)
       expect { nx.start_aws }.to hop("wait_aws_vm_started")
     end
   end
@@ -277,14 +264,11 @@ RSpec.describe Prog::Vm::Nexus do
         vm.unix_user = "test_user"
         vm.public_key = "test_ssh_key"
         vm.local_vetho_ip = NetAddr::IPv4Net.parse("169.254.0.0/32")
-        ps = instance_double(PrivateSubnet, location_id: Location::HETZNER_FSN1_ID, net4: NetAddr::IPv4Net.parse("10.0.0.0/26"), random_private_ipv6: "fd10:9b0b:6b4b:8fbb::/64")
-        nic = Nic.new(private_ipv6: "fd10:9b0b:6b4b:8fbb::/64", private_ipv4: "10.0.0.3/32", mac: "5a:0f:75:80:c3:64")
-        pci = PciDevice.new(slot: "01:00.0", iommu_group: 23)
-        expect(nic).to receive(:ubid_to_tap_name).and_return("tap4ncdd56m")
-        expect(vm).to receive(:nics).and_return([nic]).at_least(:once)
-        expect(nic).to receive(:private_subnet).and_return(ps).at_least(:once)
+        private_subnet.update(net4: NetAddr::IPv4Net.parse("10.0.0.0/26"))
+        nic.update(vm_id: vm.id, private_ipv6: "fd10:9b0b:6b4b:8fbb::/64", private_ipv4: "10.0.0.3/32", mac: "5a:0f:75:80:c3:64")
+        expect(vm.nic.private_subnet).to receive(:random_private_ipv6).and_return("fd10:9b0b:6b4b:8fbb::/64")
+        PciDevice.create(vm_id: vm.id, vm_host_id: vm_host.id, slot: "01:00.0", device_class: "dc", vendor: "vd", device: "dv", numa_node: 0, iommu_group: 23)
         expect(vm).to receive(:cloud_hypervisor_cpu_topology).and_return(Vm::CloudHypervisorCpuTopo.new(2, 1, 1, 1))
-        expect(vm).to receive(:pci_devices).and_return([pci]).at_least(:once)
 
         project.set_ff_vm_public_ssh_keys(["operator_ssh_key"])
         project.set_ff_ipv6_disabled(true)
@@ -302,7 +286,7 @@ RSpec.describe Prog::Vm::Nexus do
             "cpu_topology" => "2:1:1:1",
             "mem_gib" => 8,
             "local_ipv4" => "169.254.0.0/32",
-            "nics" => [["fd10:9b0b:6b4b:8fbb::/64", "10.0.0.3/32", "tap4ncdd56m", "5a:0f:75:80:c3:64", "10.0.0.1/26"]],
+            "nics" => [["fd10:9b0b:6b4b:8fbb::/64", "10.0.0.3/32", nic.ubid_to_tap_name, "5a:0f:75:80:c3:64", "10.0.0.1/26"]],
             "swap_size_bytes" => nil,
             "pci_devices" => [["01:00.0", 23]],
             "slice_name" => "system.slice",
@@ -1136,12 +1120,12 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#final_clean_up" do
     it "detaches from nic" do
-      nic = instance_double(Nic)
-      expect(nic).to receive(:update).with(vm_id: nil)
-      expect(nic).to receive(:incr_destroy)
-      expect(vm).to receive(:nics).and_return([nic])
+      nic.update(vm_id: vm.id)
+      Strand.create_with_id(nic.id, prog: "Vnet::NicNexus", label: "start")
 
       expect { nx.destroy_slice }.to exit({"msg" => "vm deleted"})
+        .and change { nic.reload.destroy_set? }.from(false).to(true)
+        .and change(nic, :vm_id).from(vm.id).to(nil)
       expect(Vm[vm.id]).to be_nil
     end
   end
