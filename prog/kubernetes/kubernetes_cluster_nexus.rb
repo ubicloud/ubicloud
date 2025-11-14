@@ -216,6 +216,10 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       hop_update_billing_records
     end
 
+    when_sync_internal_dns_config_set? do
+      hop_sync_internal_dns_config
+    end
+
     nap 6 * 60 * 60
   end
 
@@ -291,6 +295,54 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def install_csi
     decr_install_csi
     kubernetes_cluster.client.kubectl("apply -f kubernetes/manifests/ubicsi")
+    hop_wait
+  end
+
+  # Dynamically injects static hosts DNS records for K8s nodes into CoreDNS Corefile after the kubernetes plugin block,
+  # then updates and replaces the kube-system/coredns ConfigMap to apply the changes.
+  label def sync_internal_dns_config
+    decr_sync_internal_dns_config
+
+    dns_records = kubernetes_cluster.all_functional_nodes.flat_map { |n| ["#{n.vm.ip4} #{n.name}", "#{n.vm.ip6} #{n.name}"] }
+
+    coredns_configmap = YAML.load(kubernetes_cluster.client.kubectl("-n kube-system get cm coredns -oyaml"))
+    corefile = coredns_configmap["data"]["Corefile"]
+
+    # Remove existing Ubicloud hosts block if present (matches full block with comments)
+    # Example matched block (with ~8-space indent for contents):
+    #     hosts {
+    #         # Ubicloud Hosts
+    #         178.63.152.192 kcg0zevswgsp6hqepg9de83wwq-nz1df
+    #         178.63.152.197 knbvkn6c55gt1mfhab6znfv4j5-ukgtf
+    #         # End Ubicloud Hosts
+    #         fallthrough
+    #     }
+    corefile.gsub!(/^\s*hosts\s*\{\s*\n(?:\s*# Ubicloud Hosts\n)?(?:\s*        .*\n)*?\s*(?:# End Ubicloud Hosts\n)?\s*        fallthrough\s*\n\s*\}\s*$/m, "")
+    lines = corefile.split("\n")
+
+    # The new block should be right after the kubernetes block, so we aim to find the block and insert
+    # after the block ends
+    kubernetes_block_start = lines.find_index { |l| l.strip.end_with?("{") && l.include?("kubernetes") }
+    fail "Kubernetes block not found." unless kubernetes_block_start
+
+    end_idx = lines[(kubernetes_block_start + 1)..].find_index { |l| l.strip.end_with?("}") }
+    fail "Closing brace not found." unless end_idx
+    kubernetes_block_end = kubernetes_block_start + 1 + end_idx
+
+    # Build new hosts block with comment markers for future idempotency (split records for proper indentation)
+    hosts_lines = <<~HOSTS
+    hosts {
+        # Ubicloud Hosts
+#{dns_records.map { |l| "        #{l}" }.join("\n")}
+        # End of Ubicloud Hosts
+        fallthrough
+    }
+    HOSTS
+    new_lines = lines[0...kubernetes_block_end + 1] + hosts_lines.split("\n") + lines[kubernetes_block_end + 1..]
+    new_corefile = new_lines.join("\n")
+    coredns_configmap["data"]["Corefile"] = new_corefile
+    kubernetes_cluster.sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf replace -f -", stdin: YAML.dump(coredns_configmap))
+
     hop_wait
   end
 
