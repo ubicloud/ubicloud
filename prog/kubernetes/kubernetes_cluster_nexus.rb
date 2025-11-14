@@ -78,6 +78,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     incr_install_metrics_server
     incr_sync_worker_mesh
     incr_install_csi
+    incr_sync_internal_dns_config
     hop_create_load_balancers
   end
 

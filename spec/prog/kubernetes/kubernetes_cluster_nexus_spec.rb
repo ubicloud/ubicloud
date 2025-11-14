@@ -167,6 +167,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(nx).to receive(:register_deadline)
       expect(nx).to receive(:incr_install_metrics_server)
       expect(nx).to receive(:incr_sync_worker_mesh)
+      expect(nx).to receive(:incr_sync_internal_dns_config)
       expect(nx).to receive(:incr_install_csi)
       expect { nx.start }.to hop("create_load_balancers")
     end
