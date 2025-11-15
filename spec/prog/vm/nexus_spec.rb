@@ -1092,7 +1092,7 @@ RSpec.describe Prog::Vm::Nexus do
   describe "#destroy_slice" do
     it "#destroy_slice when no slice" do
       expect { nx.destroy_slice }.to exit({"msg" => "vm deleted"})
-      expect(Vm[vm.id]).to be_nil
+      expect(vm.exists?).to be(false)
     end
 
     it "#destroy_slice with a slice" do
@@ -1103,7 +1103,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect { nx.destroy_slice }.to exit({"msg" => "vm deleted"})
       expect(vm_host_slice.reload.enabled).to be(false)
       expect(Semaphore[strand_id: vm_host_slice.id, name: "destroy"]).not_to be_nil
-      expect(Vm[vm.id]).to be_nil
+      expect(vm.exists?).to be(false)
     end
 
     it "skips destroy slice when slice already disabled" do
@@ -1114,7 +1114,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect { nx.destroy_slice }.to exit({"msg" => "vm deleted"})
       expect(vm_host_slice.reload.enabled).to be(false)
       expect(Semaphore[strand_id: vm_host_slice.id, name: "destroy"]).to be_nil
-      expect(Vm[vm.id]).to be_nil
+      expect(vm.exists?).to be(false)
     end
   end
 
@@ -1126,7 +1126,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect { nx.destroy_slice }.to exit({"msg" => "vm deleted"})
         .and change { nic.reload.destroy_set? }.from(false).to(true)
         .and change(nic, :vm_id).from(vm.id).to(nil)
-      expect(Vm[vm.id]).to be_nil
+      expect(vm.exists?).to be(false)
     end
   end
 
