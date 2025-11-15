@@ -89,6 +89,7 @@ module Config
   override :minimum_invoice_charge_threshold, 0.5, float
   optional :cloudflare_turnstile_site_key, string
   optional :cloudflare_turnstile_secret_key, string
+  override :allow_unspread_servers, !production?, bool
 
   # GitHub Runner App
   optional :github_app_name, string
@@ -145,7 +146,6 @@ module Config
   optional :postgres_monitor_database_root_certs, string
   optional :postgres_paradedb_notification_email, string
   optional :postgres_lantern_notification_email, string
-  override :postgres_allow_servers_in_same_data_center, false, bool
 
   # Logging
   optional :database_logger_level, string

@@ -17,7 +17,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       exclude_host_ids = []
       exclude_availability_zones = []
       availability_zone = nil
-      if !(Config.development? || Config.postgres_allow_servers_in_same_data_center) && postgres_resource.location.provider == HostProvider::HETZNER_PROVIDER_NAME
+      if !Config.allow_unspread_servers && postgres_resource.location.provider == HostProvider::HETZNER_PROVIDER_NAME
         used_data_centers = postgres_resource.servers.map { it.vm.vm_host.data_center }.uniq
         exclude_host_ids = VmHost.where(data_center: used_data_centers).map(&:id)
       end

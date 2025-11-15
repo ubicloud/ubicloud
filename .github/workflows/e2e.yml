@@ -79,7 +79,7 @@ jobs:
         CLOVER_DATABASE_URL: postgres:///clover_test?user=clover
         RACK_ENV: production
         IS_E2E: "true"
-        POSTGRES_ALLOW_SERVERS_IN_SAME_DATA_CENTER: "true"
+        ALLOW_UNSPREAD_SERVERS: "true"
         DISPATCHER_MAX_THREADS: 16
         E2E_HETZNER_SERVER_ID: ${{ secrets.E2E_HETZNER_SERVER_ID }}
         E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
