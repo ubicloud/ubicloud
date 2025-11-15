@@ -170,8 +170,8 @@ module Config
   override :github_ubuntu_2404_version, "20251105.1.0", string
   override :github_ubuntu_2204_version, "20251105.1.0", string
   override :github_gpu_ubuntu_2204_version, "20251017.1.0", string
-  override :github_ubuntu_2204_aws_ami_version, "ami-04b5534ef1aed6bde", string
-  override :github_ubuntu_2404_aws_ami_version, "ami-0908b850ff3e635a2", string
+  override :github_ubuntu_2204_aws_ami_version, "ami-04bc7dad89d25b5e9", string
+  override :github_ubuntu_2404_aws_ami_version, "ami-0ffdd9c00f7a2dba8", string
   override :postgres_ubuntu_2204_version, "20251007.1.0", string
   override :postgres16_ubuntu_2204_version, "20250425.1.1", string
   override :postgres17_ubuntu_2204_version, "20250425.1.1", string
