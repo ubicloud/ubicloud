@@ -68,7 +68,10 @@ table, thead, tbody, tr, th, td {
   padding: 2px;
 }
 table { margin-top: 1em; }
-th { padding: 5px; }
+th {
+  padding: 5px;
+  white-space: nowrap;
+}
 tbody tr {
   &:nth-child(6n+1), &:nth-child(6n+2), &:nth-child(6n+3) {
     background-color: #eee;
