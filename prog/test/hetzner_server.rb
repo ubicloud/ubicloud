@@ -45,7 +45,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   label def reimage
     hetzner_api.reimage(
       frame["server_id"],
-      dist: "Ubuntu 24.04 LTS base"
+      dist: "Debian 13 base"
     )
 
     hop_wait_reimage

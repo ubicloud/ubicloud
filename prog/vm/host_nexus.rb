@@ -3,7 +3,7 @@
 class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
 
-  def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, spdk_version: Config.spdk_version, vhost_block_backend_version: nil, default_boot_images: [])
+  def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, spdk_version: nil, vhost_block_backend_version: Config.vhost_block_backend_version, default_boot_images: [])
     DB.transaction do
       unless Location[location_id]
         raise "No existing Location"
@@ -149,18 +149,10 @@ class Prog::Vm::HostNexus < Prog::Base
       hop_download_boot_images
     end
 
-    if frame["spdk_version"]
-      push Prog::Storage::SetupSpdk, {
-        "version" => frame["spdk_version"],
-        "start_service" => false,
-        "allocation_weight" => 100
-      }
-    else
-      push Prog::Storage::SetupVhostBlockBackend, {
-        "version" => frame["vhost_block_backend_version"],
-        "allocation_weight" => 100
-      }
-    end
+    push Prog::Storage::SetupVhostBlockBackend, {
+           "version" => frame["vhost_block_backend_version"],
+           "allocation_weight" => 100
+         }
   end
 
   label def download_boot_images
