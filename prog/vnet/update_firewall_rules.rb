@@ -172,7 +172,7 @@ TEMPLATE
   end
 
   label def update_aws_firewall_rules
-    rules = vm.firewalls.flat_map(&:firewall_rules)
+    rules = vm.firewalls(eager: :firewall_rules).flat_map(&:firewall_rules)
     permissions = rules.select(&:port_range).map! do |rule|
       perm = {
         ip_protocol: "tcp",
