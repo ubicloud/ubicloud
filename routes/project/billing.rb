@@ -21,9 +21,9 @@ class Clover
       r.post true do
         if (billing_info = @project.billing_info)
           handle_validation_failure("project/billing")
-          current_tax_id = billing_info.stripe_data["tax_id"]
+          current_tax_id = billing_info.stripe_data["tax_id"].to_s
           tp = typecast_params
-          new_tax_id = tp.nonempty_str("tax_id")&.gsub(/[^a-zA-Z0-9]/, "")
+          new_tax_id = tp.str("tax_id").gsub(/[^a-zA-Z0-9]/, "")
           begin
             Stripe::Customer.update(billing_info.stripe_id, {
               name: tp.str!("name"),
@@ -38,14 +38,14 @@ class Clover
               },
               metadata: {
                 tax_id: new_tax_id,
-                company_name: tp.nonempty_str("company_name"),
-                note: tp.nonempty_str("note")
+                company_name: tp.str("company_name"),
+                note: tp.str("note")
               }
             })
             if new_tax_id != current_tax_id
               DB.transaction do
                 billing_info.update(valid_vat: nil)
-                if new_tax_id && billing_info.country&.in_eu_vat?
+                if !new_tax_id.empty? && billing_info.country&.in_eu_vat?
                   Strand.create(prog: "ValidateVat", label: "start", stack: [{subject_id: billing_info.id}])
                 end
               end
