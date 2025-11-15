@@ -197,6 +197,8 @@ module Config
   override :e2e_hetzner_server_id, string
   optional :e2e_github_installation_id, string
   override :is_e2e, false, bool
+  optional :e2e_aws_access_key, string, clear: true
+  optional :e2e_aws_secret_key, string, clear: true
 
   # Load Balancer
   optional :load_balancer_service_project_id, string
