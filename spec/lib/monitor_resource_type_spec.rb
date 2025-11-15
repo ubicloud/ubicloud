@@ -76,6 +76,22 @@ RSpec.describe MonitorResourceType do
       expect(@mr.resource).to receive(:respond_to?).with(:incr_checkup).and_return(false)
       @mrt.submit_queue.push(@mr)
     end
+
+    it "does not call incr_checkup if checkup is already set" do
+      @started_at = nil
+      @mrt = described_class.create(Object, :foo, 2, [[]]) do
+        @started_at = it.monitor_job_started_at
+        raise StandardError
+      end
+
+      resource = VmHost.new { it.id = "f9249e31-0a70-8f71-b08c-72d857c878d2" }
+      @mr = MonitorableResource.new(resource)
+
+      expect(resource).to receive(:checkup_set?).and_return(true)
+      expect(resource).not_to receive(:incr_checkup)
+
+      @mrt.submit_queue.push(@mr)
+    end
   end
 
   describe "#check_stuck_pulses" do
