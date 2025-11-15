@@ -53,6 +53,9 @@ jobs:
     - name: Run linter:openapi
       run: bundle exec rake linter:openapi
 
+    - name: Run linter:xss_check
+      run: bundle exec rake linter:xss_check
+
     - name: Run annotate
       run: bundle exec rake annotate
 

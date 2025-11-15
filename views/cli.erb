@@ -73,7 +73,7 @@ end %>
           <div class="space-y-2">
             <p class="text-xl font-semibold"><%= @ubi_command_execute ? "Would execute" : "Output" %>:</p>
             <div class="w-full text-sm border p-3 bg-slate-100 font-mono rounded">
-              <pre class="whitespace-pre-wrap"><code id="cli-output"><%== @output %></code></pre>
+              <pre class="whitespace-pre-wrap"><code id="cli-output"><%== @output_html %></code></pre>
             </div>
           </div>
           <% if @ubi_confirm %>
