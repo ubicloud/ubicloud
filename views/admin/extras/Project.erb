@@ -1,0 +1,25 @@
+<%# locals: (obj: nil) %>
+
+<table class="project-quota-table">
+  <caption>Quotas</caption>
+  <thead>
+    <tr>
+      <th>Resource</th>
+      <th>Quota</th>
+      <th>Usage</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% ["VmVCpu", "GithubRunnerVCpu", "PostgresVCpu", "KubernetesVCpu"].each do |type| %>
+      <tr>
+        <td><%= type %></td>
+        <td>
+          <%= obj.effective_quota_value(type) %>
+        </td>
+        <td>
+          <%= obj.current_resource_usage(type) %>
+        </td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>

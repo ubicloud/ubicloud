@@ -271,13 +271,15 @@ RSpec.describe CloverAdmin do
     expect(page).to have_no_content "Strand"
   end
 
-  it "renders extra details for object, if any" do
+  it "shows stripe data for billing info as extra" do
     billing_info = BillingInfo.create(stripe_id: "cus_test123")
 
     visit "/model/BillingInfo/#{billing_info.ubid}"
     expect(page.title).to eq "Ubicloud Admin - BillingInfo #{billing_info.ubid}"
     expect(page).to have_content "Stripe Data"
+  end
 
+  it "shows download PDF button for the invoice as extra" do
     invoice = Invoice.create(
       project: Project.create(name: "stuff"),
       invoice_number: "invoice-number-378",
@@ -301,6 +303,21 @@ RSpec.describe CloverAdmin do
     visit "/model/Invoice/#{invoice.ubid}"
     expect(page.title).to eq "Ubicloud Admin - Invoice #{invoice.ubid}"
     expect(page).to have_content "Download PDF"
+  end
+
+  it "shows quotas for project as extra" do
+    project = Project.create(name: "test")
+    project.add_quota(quota_id: ProjectQuota.default_quotas["GithubRunnerVCpu"]["id"], value: 400)
+    create_vm(project_id: project.id, vcpus: 16)
+
+    visit "/model/Project/#{project.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
+    expect(page.all(".project-quota-table tbody tr").map { it.all("td").map(&:text) }).to eq [
+      ["VmVCpu", "32", "16"],
+      ["GithubRunnerVCpu", "400", "0"],
+      ["PostgresVCpu", "128", "0"],
+      ["KubernetesVCpu", "32", "0"]
+    ]
   end
 
   it "converts ubids to link" do
