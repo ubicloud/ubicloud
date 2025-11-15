@@ -167,6 +167,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(nx).to receive(:register_deadline)
       expect(nx).to receive(:incr_install_metrics_server)
       expect(nx).to receive(:incr_sync_worker_mesh)
+      expect(nx).to receive(:incr_sync_worker_dns_config)
       expect(nx).to receive(:incr_install_csi)
       expect { nx.start }.to hop("create_load_balancers")
     end
@@ -407,6 +408,11 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.wait }.to hop("install_csi")
     end
 
+    it "hops to sync_worker_dns_config when its semaphore is set" do
+      expect(nx).to receive(:when_sync_worker_dns_config_set?).and_yield
+      expect { nx.wait }.to hop("sync_worker_dns_config")
+    end
+
     it "hops to update_billing_records" do
       expect(nx).to receive(:when_update_billing_records_set?).and_yield
       expect { nx.wait }.to hop("update_billing_records")
@@ -555,6 +561,34 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster).to receive(:client).and_return(client)
       expect(client).to receive(:kubectl).with("apply -f kubernetes/manifests/ubicsi")
       expect { nx.install_csi }.to hop("wait")
+    end
+  end
+
+  describe "#sync_worker_dns_config" do
+    let(:client) { instance_double(Kubernetes::Client) }
+    let(:sshable) { instance_double(Sshable) }
+    let(:node) { KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
+
+    before do
+      expect(kubernetes_cluster).to receive(:client).and_return(client)
+      allow(kubernetes_cluster).to receive(:sshable).and_return(sshable)
+    end
+
+    it "adds the ubicloud block and replaces the configmap" do
+      expect(client).to receive(:kubectl).with("-n kube-system get cm coredns -oyaml").and_return("apiVersion: v1\ndata:\n  Corefile: |-\n    .:53 {\n        errors\n        health {\n           lameduck 5s\n        }\n        ready\n        kubernetes cluster.local in-addr.arpa ip6.arpa {\n           pods insecure\n           fallthrough in-addr.arpa ip6.arpa\n           ttl 30\n        }\n        prometheus :9153\n        forward . /etc/resolv.conf {\n           max_concurrent 1000\n        }\n        cache 30 {\n           disable success cluster.local\n           disable denial cluster.local\n        }\n        loop\n        reload\n        loadbalance\n    }\nkind: ConfigMap\nmetadata:\n  name: coredns\n  namespace: kube-system")
+
+      expect(sshable).to receive(:cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf replace -f -", stdin: "---\napiVersion: v1\ndata:\n  Corefile: |-\n    .:53 {\n        errors\n        health {\n           lameduck 5s\n        }\n        ready\n        kubernetes cluster.local in-addr.arpa ip6.arpa {\n           pods insecure\n           fallthrough in-addr.arpa ip6.arpa\n           ttl 30\n        }\n        hosts {\n            # Ubicloud Hosts\n             test-vm\n             test-vm\n            # End of Ubicloud Hosts\n            fallthrough\n        }\n        prometheus :9153\n        forward . /etc/resolv.conf {\n           max_concurrent 1000\n        }\n        cache 30 {\n           disable success cluster.local\n           disable denial cluster.local\n        }\n        loop\n        reload\n        loadbalance\n    }\nkind: ConfigMap\nmetadata:\n  name: coredns\n  namespace: kube-system\n")
+      expect { nx.sync_worker_dns_config }.to hop("wait")
+    end
+
+    it "raises an error if kubernetes block start is not found" do
+      expect(client).to receive(:kubectl).with("-n kube-system get cm coredns -oyaml").and_return("apiVersion: v1\ndata:\n  Corefile: |-\n    .:53 {\n        errors\n        health {\n           lameduck 5s\n        }\n        ready\n        kuber cluster.local in-addr.arpa ip6.arpa {\n           pods insecure\n           fallthrough in-addr.arpa ip6.arpa\n           ttl 30\n        }\n        prometheus :9153\n        forward . /etc/resolv.conf {\n           max_concurrent 1000\n        }\n        cache 30 {\n           disable success cluster.local\n           disable denial cluster.local\n        }\n        loop\n        reload\n        loadbalance\n    }\nkind: ConfigMap\nmetadata:\n  name: coredns\n  namespace: kube-system")
+      expect { nx.sync_worker_dns_config }.to raise_error(RuntimeError, "Kubernetes block not found.")
+    end
+
+    it "raises an error if kubernetes block end is not found" do
+      expect(client).to receive(:kubectl).with("-n kube-system get cm coredns -oyaml").and_return("apiVersion: v1\ndata:\n  Corefile: |-\n    .:53 {\n        errors\n        health {\n           lameduck 5s\n        }\n        ready\n        kubernetes cluster.local in-addr.arpa ip6.arpa {\nkind: ConfigMap\nmetadata:\n  name: coredns2\n  namespace: kube-system")
+      expect { nx.sync_worker_dns_config }.to raise_error(RuntimeError, "Closing brace not found.")
     end
   end
 
