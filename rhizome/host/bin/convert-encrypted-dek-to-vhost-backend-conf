@@ -1,0 +1,188 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "yaml"
+require "optparse"
+require "openssl"
+require_relative "../lib/storage_volume"
+
+def validate_encrypted_dek_file(data)
+  unless data.key?("cipher") && data["cipher"].is_a?(String)
+    raise ArgumentError, "DEK file must contain 'cipher' field as a string"
+  end
+  unless data.key?("key") && data["key"].is_a?(Array) && data["key"].length == 2 && data["key"].all?(String)
+    raise ArgumentError, "DEK file must contain 'key' field as an array with exactly two strings"
+  end
+  unless data.key?("key2") && data["key2"].is_a?(Array) && data["key2"].length == 2 && data["key2"].all?(String)
+    raise ArgumentError, "DEK file must contain 'key2' field as an array with exactly two strings"
+  end
+end
+
+def validate_kek_file(data)
+  unless data.is_a?(Hash)
+    raise ArgumentError, "KEK file must be a hash"
+  end
+  data.each do |key, value|
+    unless key.is_a?(String)
+      raise ArgumentError, "KEK file keys must be strings"
+    end
+    unless value.is_a?(Hash)
+      raise ArgumentError, "KEK file values must be hashes"
+    end
+    required_fields = ["key", "init_vector", "auth_data", "algorithm"]
+    missing_fields = required_fields - value.keys
+    unless missing_fields.empty?
+      raise ArgumentError, "KEK entry '#{key}' is missing required fields: #{missing_fields.join(", ")}"
+    end
+    required_fields.each do |field|
+      unless value[field].is_a?(String)
+        raise ArgumentError, "KEK entry '#{key}' field '#{field}' must be a string"
+      end
+    end
+  end
+end
+
+def unwrap_key(encrypted_key, kek_data)
+  algorithm = kek_data["algorithm"]
+  fail "currently only aes-256-gcm is supported" unless algorithm == "aes-256-gcm"
+
+  decipher = OpenSSL::Cipher.new(algorithm)
+  decipher.decrypt
+  decipher.key = Base64.decode64(kek_data["key"])
+  decipher.iv = Base64.decode64(kek_data["init_vector"])
+  decipher.auth_data = kek_data["auth_data"]
+
+  auth_tag = encrypted_key[1]
+  decoded_auth_tag = Base64.decode64(auth_tag)
+
+  # We reject if auth_tag length is not within acceptable range for GCM
+  fail "Invalid auth_tag size: #{decoded_auth_tag.bytesize}" unless (12..24).cover?(decoded_auth_tag.bytesize)
+
+  decipher.auth_tag = decoded_auth_tag
+  decoded_encrypted_data = Base64.decode64(encrypted_key[0])
+  decipher.update(decoded_encrypted_data) + decipher.final
+end
+
+def wrap_key(key, kek_data)
+  algorithm = kek_data["algorithm"]
+  fail "currently only aes-256-gcm is supported" unless algorithm == "aes-256-gcm"
+
+  cipher = OpenSSL::Cipher.new(algorithm)
+  cipher.encrypt
+  cipher.key = Base64.decode64(kek_data["key"])
+  cipher.iv = Base64.decode64(kek_data["init_vector"])
+  cipher.auth_data = kek_data["auth_data"]
+  [
+    cipher.update(key) + cipher.final,
+    cipher.auth_tag
+  ]
+end
+
+def wrap_key_b64(key_bytes, kek_data)
+  wrapped_key = wrap_key(key_bytes, kek_data).join
+  Base64.strict_encode64(wrapped_key).strip
+end
+
+def generate_vhost_conf(plain_keys, kek_data, vm_name, device)
+  write_through = StorageVolume.new(vm_name, {"storage_device" => device, "disk_index" => 0}).write_through_device?
+  config = {
+    "socket" => "/var/storage/#{vm_name}/0/vhost.sock",
+    "path" => "/var/storage/#{vm_name}/0/disk.raw",
+    "num_queues" => 1,
+    "queue_size" => 256,
+    "seg_size_max" => 65536,
+    "seg_count_max" => 4,
+    "copy_on_read" => false,
+    "poll_queue_timeout_us" => 1000,
+    "device_id" => "#{vm_name}_0",
+    "skip_sync" => false,
+    "write_through" => write_through
+  }
+  key1 = [plain_keys["key"]].pack("H*")
+  key2 = [plain_keys["key2"]].pack("H*")
+  key1_wrapped_b64 = wrap_key_b64(key1, kek_data)
+  key2_wrapped_b64 = wrap_key_b64(key2, kek_data)
+  config["encryption_key"] = [key1_wrapped_b64, key2_wrapped_b64]
+  config
+end
+
+def write_vhost_conf(output_file, conf)
+  yaml = YAML.dump(conf)
+
+  # Sometimes key strings do not start with characters or numbers, as a result when
+  # encoded, they are wrapped in double quotes, breaking the migration binary because it
+  # expects it to have a certain length.
+  # The migration binary can be improved to address such encoding scenarios better but
+  # since it's C code and wanted to keep it minimal, I thought I can tweak it here.
+  # remove quotes around base64 strings in encryption_key
+  yaml.gsub!(/- "(.*?)"$/, '- \1')
+  File.write(output_file, yaml)
+end
+
+def convert(dek_data, kek_data, output_file, vm_name, device)
+  decrypted_keys = {}
+  ["key", "key2"].each do |key_field|
+    encrypted_key = dek_data[key_field]
+    decrypted_keys[key_field] = unwrap_key(encrypted_key, kek_data["#{vm_name}_0"])
+  end
+  vhost_conf = generate_vhost_conf(decrypted_keys, kek_data["#{vm_name}_0"], vm_name, device)
+  write_vhost_conf(output_file, vhost_conf)
+
+  puts "Successfully converted SPDK DEK to vhost conf format. Output written to #{output_file}"
+end
+
+options = {}
+parser = OptionParser.new do |opts|
+  opts.banner = "Usage: #{$0} [options]"
+  opts.on("--vm-name NAME", "Name of the VM") do |name|
+    options[:vm_name] = name
+  end
+  opts.on("--encrypted-dek-file PATH", "Path to encrypted data encryption key JSON file") do |path|
+    options[:encrypted_dek_file] = path
+  end
+  opts.on("--kek-file PATH", "Path to key encryption key file") do |path|
+    options[:kek_file] = path
+  end
+  opts.on("--vhost-conf-output-file PATH", "Path to vhost conf output file") do |path|
+    options[:output_file] = path
+  end
+  opts.on("--device NAME", "Name of the underlying device which holds the disk") do |name|
+    options[:device] = name
+  end
+  opts.on("-h", "--help", "Show this help message") do
+    puts opts
+    exit
+  end
+end
+
+begin
+  parser.parse!
+  unless options[:encrypted_dek_file] && options[:kek_file] && options[:output_file]
+    puts "Error: All three arguments are required."
+    puts parser
+    exit 1
+  end
+  unless File.exist?(options[:encrypted_dek_file])
+    raise ArgumentError, "Data encryption key file does not exist: #{options[:encrypted_dek_file]}"
+  end
+  unless File.exist?(options[:kek_file])
+    raise ArgumentError, "Key encryption key file does not exist: #{options[:kek_file]}"
+  end
+  dek_data = JSON.parse(File.read(options[:encrypted_dek_file]))
+  validate_encrypted_dek_file(dek_data)
+  kek_data = JSON.parse(File.read(options[:kek_file]))
+  validate_kek_file(kek_data)
+rescue JSON::ParserError => e
+  puts "Error parsing JSON: #{e.message}"
+  exit 1
+rescue ArgumentError => e
+  puts "Validation error: #{e.message}"
+  exit 1
+rescue => e
+  puts "Error: #{e.message}"
+  puts e.backtrace
+  exit 1
+end
+
+convert(dek_data, kek_data, options[:output_file], options[:vm_name])

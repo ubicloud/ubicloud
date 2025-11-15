@@ -930,6 +930,13 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm.stop_set?).to be(false)
       expect { nx.stopped }.to nap(60 * 60)
     end
+
+    it "hops to start_after_host_reboot when resume semaphore is set" do
+      expect(nx).to receive(:decr_stop)
+      expect(nx).to receive(:when_resume_set?).and_yield
+      expect(nx).to receive(:decr_resume)
+      expect { nx.stopped }.to hop("start_after_host_reboot")
+    end
   end
 
   describe "#unavailable" do

@@ -492,7 +492,10 @@ class Prog::Vm::Nexus < Prog::Base
       host.sshable.cmd("sudo systemctl stop #{q_vm}")
     end
     decr_stop
-
+    when_resume_set? do
+      decr_resume
+      hop_start_after_host_reboot
+    end
     nap 60 * 60
   end
 
