@@ -330,5 +330,34 @@ RSpec.describe Clover, "github" do
       page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
       expect(page.status_code).to eq(204)
     end
+
+    it "can delete all cache entries for a repository" do
+      entry = create_cache_entry(key: "cache-1")
+      visit "#{project.path}/github/#{installation.ubid}/cache"
+
+      expect(page.status_code).to eq(200)
+      expect(page).to have_content "1 cache entries"
+
+      btn = find ".cache-group-row[data-repository='#{repository.ubid}'] .delete-btn"
+      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+      expect(page.status_code).to eq(204)
+
+      st = Strand.first(prog: "Github::DeleteCacheEntries")
+      expect(st.label).to eq "delete_entries"
+      st.destroy
+
+      visit "#{project.path}/github/#{installation.ubid}/cache"
+      expect(page).to have_flash_notice("Scheduled deletion of existing cache entries")
+
+      entry.this.delete(force: true)
+      btn = find ".cache-group-row[data-repository='#{repository.ubid}'] .delete-btn"
+      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+      expect(page.status_code).to eq(204)
+      visit "#{project.path}/github/#{installation.ubid}/cache"
+      expect(page).to have_flash_notice("No existing cache entries to delete")
+
+      st = Strand.first(prog: "Github::DeleteCacheEntries")
+      expect(st).to be_nil
+    end
   end
 end

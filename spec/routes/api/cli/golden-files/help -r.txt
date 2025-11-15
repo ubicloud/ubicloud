@@ -200,11 +200,12 @@ Usage:
     ubi gh (installation-name/repository-name) post-command [...]
 
 Commands:
-    installation          Manage GitHub installations
+    installation                Manage GitHub installations
 
 Post Commands:
-    list-cache-entries    List cache entries for a GitHub repository
-    remove-cache-entry    Remove cache entry for a GitHub repository
+    list-cache-entries          List cache entries for a GitHub repository
+    remove-all-cache-entries    Remove all cache entries for a GitHub repository
+    remove-cache-entry          Remove cache entry for a GitHub repository
 
 
 Manage GitHub installations
@@ -245,6 +246,12 @@ Usage:
 
 Options:
     -N, --no-headers                 do not show headers
+
+
+Remove all cache entries for a GitHub repository
+
+Usage:
+    ubi gh installation-name/repository-name remove-all-cache-entries
 
 
 Remove cache entry for a GitHub repository

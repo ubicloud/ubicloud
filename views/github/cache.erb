@@ -18,8 +18,16 @@
               <th scope="colgroup" class="py-3.5 pl-3 pr-3 text-right text-sm font-semibold text-gray-900 whitespace-nowrap group-[.active]:bg-gray-50" colspan="2">
                 <%= entries.count %> cache entries
               </th>
-              <th scope="colgroup" class="py-3.5 pl-3 pr-4 text-right text-sm font-semibold text-gray-900 whitespace-nowrap group-[.active]:bg-gray-50" colspan="2">
+              <th scope="colgroup" class="py-3.5 pl-3 pr-3 text-right text-sm font-semibold text-gray-900 whitespace-nowrap group-[.active]:bg-gray-50">
                 <%= humanize_size(entries.sum { it.size.to_i }) %> used of <%= @quota_per_repo %>
+              </th>
+              <th scope="colgroup" class="py-3.5 pl-3 pr-4 text-right text-sm font-normal text-gray-900 whitespace-nowrap group-[.active]:bg-gray-50">
+                <%== part(
+                  "components/delete_button",
+                  url: "#{path(@installation)}/repository/#{repository_id}/cache",
+                  text: "Delete All",
+                  confirmation: "Are you sure you want to delete all cache entries for this repository?"
+                ) %>
               </th>
             </tr>
             <% entries.each do |entry| %>
