@@ -179,6 +179,26 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "Invalid size."})
       end
 
+      it "invalid config values" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
+          size: "standard-2",
+          storage_size: "64",
+          pg_config: {"wal_level" => "invalid"}
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: pg_config.wal_level")
+      end
+
+      it "valid config values" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
+          size: "standard-2",
+          storage_size: "64",
+          pg_config: {"wal_level" => "logical"}
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+      end
+
       it "can set and update tags" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
           size: "standard-2",
