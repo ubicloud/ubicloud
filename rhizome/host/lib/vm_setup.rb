@@ -866,17 +866,17 @@ DNSMASQ_SERVICE
       ]
     }
 
-    pci_parts = if pci_devices.any?
-      pci_devices.map.with_index(1) do |dev, i|
-        "-device pcie-root-port,id=rp#{i},slot=#{i},chassis=#{i},hotplug=off -device vfio-pci,host=0000:#{dev[0]},bus=rp#{i},x-no-mmap=true"
-      end
-    else
-      []
-    end
+    pci_parts = pci_devices.map.with_index(1) do |(bdf), i|
+      [
+        "-device pcie-root-port,id=rp#{i},slot=#{i},chassis=#{i},bus=pcie.0,hotplug=off",
+        "-device vfio-pci,host=0000:#{bdf},bus=rp#{i},addr=0x0,x-no-mmap=true,rombar=0"
+      ]
+    end.flatten
 
     serial_parts = [
       "-serial file:#{vp.serial_log}",
       "-display none",
+      "-vga none",
       "-no-reboot"
     ]
 
