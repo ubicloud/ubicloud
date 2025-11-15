@@ -971,6 +971,18 @@ paths:
                 restrict_by_default:
                   description: 'Whether to restrict access by default (if so, firewall rules must be added to access)'
                   type: boolean
+                pg_config:
+                  type: object
+                  example:
+                    max_connections: '100'
+                  additionalProperties:
+                    type: string
+                pgbouncer_config:
+                  type: object
+                  example:
+                    max_client_conn: '100'
+                  additionalProperties:
+                    type: string
                 tags:
                   description: Tags for the Postgres Database
                   type: array

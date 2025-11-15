@@ -115,6 +115,25 @@ RSpec.describe Clover, "postgres" do
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq("test-postgres-sync")
+
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-config", {
+          size: "standard-2",
+          storage_size: "64",
+          ha_type: "none",
+          pg_config: {"wal_level" => "logical"}
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["name"]).to eq("test-postgres-config")
+
+        get "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-config"
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["name"]).to eq("test-postgres-config")
+
+        get "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-config/config"
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["pg_config"]).to eq({"wal_level" => "logical"})
       end
 
       it "sends mail to partners" do
@@ -177,6 +196,26 @@ RSpec.describe Clover, "postgres" do
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "Invalid size."})
+      end
+
+      it "invalid config values" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
+          size: "standard-2",
+          storage_size: "64",
+          pg_config: {"wal_level" => "invalid"}
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: pg_config.wal_level")
+      end
+
+      it "valid config values" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
+          size: "standard-2",
+          storage_size: "64",
+          pg_config: {"wal_level" => "logical"}
+        }.to_json
+
+        expect(last_response.status).to eq(200)
       end
 
       it "can set and update tags" do

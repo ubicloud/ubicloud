@@ -251,16 +251,20 @@ class UbiCli
     response(body)
   end
 
-  def pg_tags_to_hash(params, cmd)
-    if params[:tags]
-      params[:tags] = params[:tags].split(",").to_h do
+  def params_to_hash(params, key, singular, cmd)
+    if params[key]
+      params[key] = params[key].split(",").to_h do
         if it.include?("=")
           it.split("=", 2)
         else
-          raise Rodish::CommandFailure.new("invalid tag, does not include `=`: #{it.inspect}", cmd)
+          raise Rodish::CommandFailure.new("invalid #{singular}, does not include `=`: #{it.inspect}", cmd)
         end
       end
     end
+  end
+
+  def pg_tags_to_hash(params, cmd)
+    params_to_hash(params, :tags, "tag", cmd)
   end
 
   def config_entries_to_hash(args, cmd)
