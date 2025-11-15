@@ -116,11 +116,11 @@ code {
 }
 
 #model-class-list {
-  columns: 5;
+  columns: 200px 5;
 }
 
 #object-list {
-  columns: 4;
+  columns: 200px 4;
 }
 
 #strand-info form {
