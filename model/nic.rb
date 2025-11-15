@@ -13,7 +13,8 @@ class Nic < Sequel::Model
 
   plugin ResourceMethods, encrypted_columns: :encryption_key
   plugin SemaphoreMethods, :destroy, :start_rekey, :trigger_outbound_update,
-    :old_state_drop_trigger, :setup_nic, :repopulate, :lock, :vm_allocated
+    :old_state_drop_trigger, :setup_nic, :repopulate, :lock, :vm_allocated,
+    :migrate_to_separate_prog
 
   def self.ubid_to_name(ubid)
     ubid.to_s[0..7]
@@ -44,7 +45,7 @@ end
 # Columns:
 #  id                | uuid                     | PRIMARY KEY
 #  private_subnet_id | uuid                     | NOT NULL
-#  mac               | macaddr                  | NOT NULL
+#  mac               | macaddr                  |
 #  created_at        | timestamp with time zone | NOT NULL DEFAULT now()
 #  private_ipv4      | cidr                     | NOT NULL
 #  private_ipv6      | cidr                     | NOT NULL

@@ -88,6 +88,10 @@ module Prog::Vm; end
 
 module Prog::Vnet; end
 
+module Prog::Vnet::Aws; end
+
+module Prog::Vnet::Metal; end
+
 module Scheduling; end
 
 module Serializers; end
@@ -204,6 +208,7 @@ def clover_freeze
     PostgresResource::HaType,
     Prog,
     Prog::Ai,
+    Prog::Aws,
     Prog::Base::Exit,
     Prog::Base::FlowControl,
     Prog::Base::Hop,
@@ -217,6 +222,8 @@ def clover_freeze
     Prog::VictoriaMetrics,
     Prog::Vm,
     Prog::Vnet,
+    Prog::Vnet::Aws,
+    Prog::Vnet::Metal,
     Prog::Vnet::RekeyNicTunnel::Xfrm,
     ResourceMethods,
     ResourceMethods::ClassMethods,
