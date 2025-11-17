@@ -278,8 +278,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def sync_worker_mesh
     decr_sync_worker_mesh
 
-    key_pairs = kubernetes_cluster.worker_vms.map do |vm|
-      {vm: vm, ssh_key: SshKey.generate}
+    key_pairs = kubernetes_cluster.worker_functional_nodes.map do |node|
+      {vm: node.vm, ssh_key: SshKey.generate}
     end
 
     public_keys = key_pairs.map { |kp| kp[:ssh_key].public_key }

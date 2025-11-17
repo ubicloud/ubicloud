@@ -139,6 +139,10 @@ class KubernetesCluster < Sequel::Model
   def worker_vms
     nodepools.flat_map(&:vms)
   end
+
+  def worker_functional_nodes
+    nodepools.flat_map(&:functional_nodes)
+  end
 end
 
 # Table: kubernetes_cluster
