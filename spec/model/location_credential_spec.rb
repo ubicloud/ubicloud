@@ -19,7 +19,7 @@ RSpec.describe LocationCredential do
 
   it "uses Aws::AssumeRoleCredentials when assume_role set" do
     creds = instance_double(Aws::AssumeRoleCredentials)
-    expect(Aws::AssumeRoleCredentials).to receive(:new).with(role_arn: "assume-role", role_session_name: Config.hostname).and_return(creds)
+    expect(Aws::AssumeRoleCredentials).to receive(:new).with(role_arn: "assume-role", role_session_name: Config.aws_role_session_name).and_return(creds)
     expect(location_credential.credentials).to be(creds)
   end
 
@@ -27,6 +27,6 @@ RSpec.describe LocationCredential do
     sts_client = Aws::STS::Client.new(stub_responses: true)
     expect(Aws::STS::Client).to receive(:new).and_return(sts_client).at_least(:once)
     sts_client.stub_responses(:get_caller_identity, {account: "account-id"})
-    expect(location_credential.get_account_id).to eq("account-id")
+    expect(location_credential.aws_iam_account_id).to eq("account-id")
   end
 end

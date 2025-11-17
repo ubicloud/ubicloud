@@ -80,7 +80,7 @@ module Config
   override :dispatcher_queue_size_ratio, 4, float
   override :recursive_tag_limit, 32, int
   override :root, File.expand_path(__dir__), string
-  override :hostname, "ubi", string
+  override :aws_role_session_name, "ubi", string
   optional :hetzner_user, string, clear: true
   optional :hetzner_password, string, clear: true
   override :hetzner_connection_string, "https://robot-ws.your-server.de", string
@@ -241,7 +241,4 @@ module Config
 
   # Monitoring
   optional :monitoring_service_project_id, string
-
-  # Configuration files
-  override :default_quotas_file_path, "config/default_quotas.yml", string
 end

@@ -117,7 +117,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
   def destroy_aws_s3
     if Config.aws_postgres_iam_access
-      iam_client.delete_policy(policy_arn: s3_policy_arn)
+      iam_client.delete_policy(policy_arn: "arn:aws:iam::#{postgres_timeline.location.location_credential.aws_iam_account_id}:policy/#{aws_s3_policy_name}")
     else
       iam_client.list_attached_user_policies(user_name: postgres_timeline.ubid).attached_policies.each do
         iam_client.detach_user_policy(user_name: postgres_timeline.ubid, policy_arn: it.policy_arn)
@@ -129,14 +129,6 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
       end
       iam_client.delete_user(user_name: postgres_timeline.ubid)
     end
-  end
-
-  def get_account_id
-    postgres_timeline.location.location_credential.get_account_id
-  end
-
-  def s3_policy_arn
-    "arn:aws:iam::#{get_account_id}:policy/#{aws_s3_policy_name}"
   end
 
   def setup_blob_storage

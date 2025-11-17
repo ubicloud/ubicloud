@@ -4,9 +4,7 @@ RSpec.describe Account do
   let(:account) { described_class.create(email: "test@example.com") }
 
   it "removes referencing access control entries and subject tag memberships" do
-    project_id = SecureRandom.uuid
-    project = account.create_project_with_default_policy("project-1", default_policy: false, project_id:)
-    expect(project.id).to eq(project_id)
+    project = account.create_project_with_default_policy("project-1", default_policy: false)
     tag = SubjectTag.create(project_id: project.id, name: "t")
     tag.add_member(account.id)
     ace = AccessControlEntry.create(project_id: project.id, subject_id: account.id)

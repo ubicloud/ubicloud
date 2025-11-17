@@ -19,10 +19,8 @@ class Account < Sequel::Model(:accounts)
     identities.map(&:provider).join(", ")
   end
 
-  def create_project_with_default_policy(name, default_policy: true, project_id: nil)
-    project = Project.new(name:)
-    project.id = project_id if project_id
-    project.save_changes
+  def create_project_with_default_policy(name, default_policy: true)
+    project = Project.create(name: name)
     add_project(project)
 
     if default_policy

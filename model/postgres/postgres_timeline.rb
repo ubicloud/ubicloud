@@ -24,8 +24,6 @@ class PostgresTimeline < Sequel::Model
 AWS_ACCESS_KEY_ID=#{access_key}
 AWS_SECRET_ACCESS_KEY=#{secret_key}
       WALG_CONF
-    else
-      ""
     end
     <<-WALG_CONF
 WALG_S3_PREFIX=s3://#{ubid}
@@ -178,9 +176,7 @@ PGHOST=/var/run/postgresql
     : blob_storage_client.set_lifecycle_policy(ubid, ubid, BACKUP_BUCKET_EXPIRATION_DAYS)
   end
 
-  def aws_s3_policy_name
-    ubid
-  end
+  alias_method :aws_s3_policy_name, :ubid
 end
 
 # Table: postgres_timeline

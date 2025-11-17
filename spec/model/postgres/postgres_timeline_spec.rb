@@ -9,10 +9,6 @@ RSpec.describe PostgresTimeline do
     expect(postgres_timeline.bucket_name).to eq(postgres_timeline.ubid)
   end
 
-  it "returns ubid as aws s3 policy name" do
-    expect(postgres_timeline.aws_s3_policy_name).to eq(postgres_timeline.ubid)
-  end
-
   it "returns walg config" do
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
 
@@ -28,8 +24,7 @@ PGHOST=/var/run/postgresql
     WALG_CONF
 
     expect(postgres_timeline.generate_walg_config).to eq(walg_config)
-    expect(postgres_timeline).to receive(:aws?).and_return(true)
-    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2"))
+    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2", aws?: true)).at_least(:once)
     expect(postgres_timeline.generate_walg_config).to eq(walg_config.sub("us-east-1", "us-east-2"))
   end
 
@@ -47,8 +42,7 @@ PGHOST=/var/run/postgresql
     WALG_CONF
 
     expect(postgres_timeline.generate_walg_config).to eq(walg_config)
-    expect(postgres_timeline).to receive(:aws?).and_return(true)
-    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2"))
+    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2", aws?: true)).at_least(:once)
     expect(postgres_timeline.generate_walg_config).to eq(walg_config.sub("us-east-1", "us-east-2"))
   end
 

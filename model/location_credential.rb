@@ -12,7 +12,7 @@ class LocationCredential < Sequel::Model
 
   def credentials
     @credentials ||= if assume_role
-      Aws::AssumeRoleCredentials.new(role_arn: assume_role, role_session_name: Config.hostname)
+      Aws::AssumeRoleCredentials.new(role_arn: assume_role, role_session_name: Config.aws_role_session_name)
     else
       Aws::Credentials.new(access_key, secret_key)
     end
@@ -26,12 +26,8 @@ class LocationCredential < Sequel::Model
     Aws::IAM::Client.new(region: location.name, credentials:)
   end
 
-  def sts_client
-    Aws::STS::Client.new(region: location.name, credentials:)
-  end
-
-  def get_account_id
-    @account_id ||= sts_client.get_caller_identity.account
+  def aws_iam_account_id
+    @account_id ||= Aws::STS::Client.new(region: location.name, credentials:).get_caller_identity.account
   end
 end
 

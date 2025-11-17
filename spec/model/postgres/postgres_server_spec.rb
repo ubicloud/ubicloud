@@ -470,16 +470,16 @@ RSpec.describe PostgresServer do
   end
 
   describe "#attach_s3_policy_if_needed" do
-    it "calls attach_role_policy when needs_s3_policy_attachment? true" do
+    it "calls attach_role_policy when needs s3 policy attachment" do
       iam_client = Aws::IAM::Client.new(stub_responses: true)
       expect(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, aws?: true, aws_s3_policy_name: "policy-name")).at_least(:once)
       expect(postgres_server.vm).to receive(:aws_instance).and_return(instance_double(AwsInstance, iam_role: "role")).at_least(:once)
-      expect(postgres_server.vm.location).to receive(:location_credential).and_return(instance_double(LocationCredential, get_account_id: "account-id", iam_client:)).at_least(:once)
+      expect(postgres_server.vm.location).to receive(:location_credential).and_return(instance_double(LocationCredential, aws_iam_account_id: "account-id", iam_client:)).at_least(:once)
       expect(iam_client).to receive(:attach_role_policy).with(role_name: "role", policy_arn: postgres_server.s3_policy_arn)
       postgres_server.attach_s3_policy_if_needed
     end
 
-    it "does not call attach_role_policy when needs_s3_policy_attachment? true" do
+    it "does not call attach_role_policy when needs s3 policy attachment" do
       expect(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, aws?: false)).at_least(:once)
       expect(postgres_server).not_to receive(:vm)
       postgres_server.attach_s3_policy_if_needed
