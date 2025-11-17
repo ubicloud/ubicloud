@@ -242,6 +242,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
           spi6: "0xe3af3a04",
           reqid: 86879
         }).and_return(true)
+      expect(nx).to receive(:update_stack_locked_nics).with([added_nic.id, nic_to_add.id]).and_return(true)
       expect { nx.add_new_nic }.to hop("wait_inbound_setup")
     end
 
@@ -293,6 +294,10 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       described_class.new(Strand.create(prog: "Vnet::SubnetNexus", label: "wait_inbound_setup", id: ps.id))
     }
 
+    before do
+      expect(nx).to receive(:get_locked_nics).and_return([nic])
+    end
+
     it "naps 5 if state creation is ongoing" do
       nic
       expect { nx.wait_inbound_setup }.to nap(5)
@@ -315,6 +320,10 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       described_class.new(Strand.create(prog: "Vnet::SubnetNexus", label: "wait_outbound_setup", id: ps.id))
     }
 
+    before do
+      expect(nx).to receive(:get_locked_nics).and_return([nic])
+    end
+
     it "donates if policy update is ongoing" do
       nic
       expect { nx.wait_outbound_setup }.to nap(5)
@@ -336,6 +345,10 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     let(:nx) {
       described_class.new(Strand.create(prog: "Vnet::SubnetNexus", label: "wait_old_state_drop", id: ps.id))
     }
+
+    before do
+      expect(nx).to receive(:get_locked_nics).and_return([nic])
+    end
 
     it "donates if policy update is ongoing" do
       nic
@@ -489,6 +502,30 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       st.update(prog: "Vnet::SubnetNexus", label: "wait_aws_vpc_destroyed", stack: [{}])
       Strand.create(parent_id: st.id, prog: "Aws::Vpc", label: "destroy", stack: [{}])
       expect { nx.wait_aws_vpc_destroyed }.to nap(10)
+    end
+  end
+
+  describe "locked_nics" do
+    it "updates the stack with the locked nics" do
+      ps1 = described_class.assemble(prj.id, name: "ps1").subject
+      expect(nx).to receive(:strand).and_return(ps1.strand).at_least(:once)
+      nx.update_stack_locked_nics(["hello"])
+      expect(ps1.strand.stack.first["locked_nics"]).to eq ["hello"]
+    end
+
+    it "updates the stack with nil if no nics are locked" do
+      ps1 = described_class.assemble(prj.id, name: "ps1").subject
+      expect(nx).to receive(:strand).and_return(ps1.strand).at_least(:once)
+      nx.update_stack_locked_nics(nil)
+      expect(ps1.strand.stack.first["locked_nics"]).to be_nil
+    end
+
+    it "returns the locked nics" do
+      ps1 = described_class.assemble(prj.id, name: "ps1").subject
+      expect(nx).to receive(:strand).and_return(ps1.strand).at_least(:once)
+      nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject
+      nx.update_stack_locked_nics([nic.id])
+      expect(nx.get_locked_nics.first.id).to eq nic.id
     end
   end
 end

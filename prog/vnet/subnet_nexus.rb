@@ -128,13 +128,16 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     register_deadline("wait", 3 * 60)
     nics_snap = nics_to_rekey
     nap 10 if nics_snap.any? { |nic| nic.lock_set? }
+    locked_nics = []
     nics_snap.each do |nic|
       nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
       nic.incr_start_rekey
       nic.incr_lock
+      locked_nics << nic.id
       private_subnet.create_tunnels(nics_snap, nic)
     end
 
+    update_stack_locked_nics(locked_nics)
     decr_add_new_nic
     hop_wait_inbound_setup
   end
@@ -143,17 +146,20 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     decr_refresh_keys
     nics = active_nics
     nap 10 if nics.any? { |nic| nic.lock_set? }
+    locked_nics = []
     nics.each do |nic|
       nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
       nic.incr_start_rekey
       nic.incr_lock
+      locked_nics << nic.id
     end
 
+    update_stack_locked_nics(locked_nics)
     hop_wait_inbound_setup
   end
 
   label def wait_inbound_setup
-    nics = rekeying_nics
+    nics = get_locked_nics
     if nics.all? { |nic| nic.strand.label == "wait_rekey_outbound_trigger" }
       nics.each(&:incr_trigger_outbound_update)
       hop_wait_outbound_setup
@@ -163,7 +169,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def wait_outbound_setup
-    nics = rekeying_nics
+    nics = get_locked_nics
     if nics.all? { |nic| nic.strand.label == "wait_rekey_old_state_drop_trigger" }
       nics.each(&:incr_old_state_drop_trigger)
       hop_wait_old_state_drop
@@ -173,13 +179,14 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def wait_old_state_drop
-    nics = rekeying_nics
+    nics = get_locked_nics
     if nics.all? { |nic| nic.strand.label == "wait" }
       private_subnet.update(state: "waiting", last_rekey_at: Time.now)
       nics.each do |nic|
         nic.update(encryption_key: nil, rekey_payload: nil)
         nic.unlock
       end
+      update_stack_locked_nics(nil)
       hop_wait
     end
 
@@ -263,8 +270,15 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     nics_with_strand_label(%w[wait wait_setup]).all
   end
 
-  def rekeying_nics
-    all_connected_nics.eager(:strand).exclude(rekey_payload: nil).all
+  def update_stack_locked_nics(locked_nics)
+    current_frame = strand.stack.first
+    current_frame["locked_nics"] = locked_nics
+    strand.modified!(:stack)
+    strand.save_changes
+  end
+
+  def get_locked_nics
+    Nic.where(id: strand.stack.first["locked_nics"]).eager(:strand).all
   end
 
   private
