@@ -533,23 +533,24 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
   describe "#sync_worker_mesh" do
     let(:first_vm) { Prog::Vm::Nexus.assemble_with_sshable(customer_project.id).subject }
-    let(:first_node) { KubernetesNode.create(vm_id: first_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
     let(:first_ssh_key) { SshKey.generate }
     let(:second_vm) { Prog::Vm::Nexus.assemble_with_sshable(customer_project.id).subject }
-    let(:second_node) { KubernetesNode.create(vm_id: second_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
     let(:second_ssh_key) { SshKey.generate }
 
     before do
-      expect(kubernetes_cluster).to receive(:worker_vms).and_return([first_node, second_node]).at_least(:once)
+      KubernetesNode.create(vm_id: first_vm.id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_cluster.nodepools.first.id)
+      KubernetesNode.create(vm_id: second_vm.id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_cluster.nodepools.first.id)
       expect(SshKey).to receive(:generate).and_return(first_ssh_key, second_ssh_key)
     end
 
     it "creates full mesh connectivity on cluster worker nodes" do
-      expect(kubernetes_cluster.worker_vms.first.sshable).to receive(:cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: first_ssh_key.private_key)
-      expect(kubernetes_cluster.worker_vms.first.sshable).to receive(:cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: [first_vm.sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n"))
+      expect(kubernetes_cluster.worker_functional_nodes.first.vm.sshable).to receive(:cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: first_ssh_key.private_key)
+      first_vm_authorized_keys = [first_vm.sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n")
+      expect(kubernetes_cluster.worker_functional_nodes.first.vm.sshable).to receive(:cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: first_vm_authorized_keys)
 
-      expect(kubernetes_cluster.worker_vms.last.sshable).to receive(:cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: second_ssh_key.private_key)
-      expect(kubernetes_cluster.worker_vms.last.sshable).to receive(:cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: [kubernetes_cluster.worker_vms.last.sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n"))
+      expect(kubernetes_cluster.worker_functional_nodes.last.vm.sshable).to receive(:cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: second_ssh_key.private_key)
+      second_vm_authorized_keys = [second_vm.sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n")
+      expect(kubernetes_cluster.worker_functional_nodes.last.vm.sshable).to receive(:cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: second_vm_authorized_keys)
 
       expect { nx.sync_worker_mesh }.to hop("wait")
     end
