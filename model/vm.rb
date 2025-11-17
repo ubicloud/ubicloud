@@ -97,6 +97,10 @@ class Vm < Sequel::Model
     private_subnet_firewalls(opts) + vm_firewalls(opts)
   end
 
+  def firewall_rules
+    firewalls(eager: :firewall_rules).flat_map(&:firewall_rules)
+  end
+
   def runtime_token
     JWT.encode({sub: ubid, iat: Time.now.to_i}, Config.clover_runtime_token_secret, "HS256")
   end
