@@ -9,7 +9,7 @@ class Prog::Vnet::Aws::UpdateFirewallRules < Prog::Base
 
   label def update_firewall_rules
     rules = vm.firewalls.flat_map(&:firewall_rules)
-    permissions = rules.select(&:port_range).map! do |rule|
+    rules.select(&:port_range).map! do |rule|
       perm = {
         ip_protocol: "tcp",
         from_port: rule.port_range.begin,
@@ -20,16 +20,15 @@ class Prog::Vnet::Aws::UpdateFirewallRules < Prog::Base
       else
         perm[:ip_ranges] = [{cidr_ip: rule.cidr.to_s}]
       end
-      perm
-    end
 
-    permissions.each do |perm|
-      aws_client.authorize_security_group_ingress({
-        group_id: vm.private_subnets.first.private_subnet_aws_resource.security_group_id,
-        ip_permissions: [perm]
-      })
-    rescue Aws::EC2::Errors::InvalidPermissionDuplicate
-      next
+      begin
+        aws_client.authorize_security_group_ingress({
+          group_id: vm.private_subnets.first.private_subnet_aws_resource.security_group_id,
+          ip_permissions: [perm]
+        })
+      rescue Aws::EC2::Errors::InvalidPermissionDuplicate
+        next
+      end
     end
 
     hop_remove_aws_old_rules
