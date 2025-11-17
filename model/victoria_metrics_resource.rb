@@ -14,6 +14,9 @@ class VictoriaMetricsResource < Sequel::Model
   plugin SemaphoreMethods, :destroy, :reconfigure
 
   def self.client_for_project(prj_id)
+    if Config.victoria_metrics_endpoint_override
+      return VictoriaMetrics::Client.new(endpoint: Config.victoria_metrics_endpoint_override)
+    end
     vmr = nil
     [prj_id, Config.victoria_metrics_service_project_id].each do |project_id|
       next unless project_id
