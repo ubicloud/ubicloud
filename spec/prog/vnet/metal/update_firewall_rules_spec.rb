@@ -34,7 +34,7 @@ RSpec.describe Prog::Vnet::Metal::UpdateFirewallRules do
     it "populates elements if there are fw rules" do
       GloballyBlockedDnsname.create(dns_name: "blockedhost.com", ip_list: ["123.123.123.123", "2a00:1450:400e:811::200e"])
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
-      expect(vm).to receive(:firewalls).and_return([instance_double(Firewall, name: "fw_table", firewall_rules: [
+      expect(vm).to receive(:firewall_rules).and_return([
         instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: nil),
         instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("1.1.1.1/32"), port_range: Sequel.pg_range(22..23)),
         instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("10.10.10.0/26"), port_range: Sequel.pg_range(80..10000)),
@@ -44,7 +44,7 @@ RSpec.describe Prog::Vnet::Metal::UpdateFirewallRules do
         instance_double(FirewallRule, ip6?: true, cidr: NetAddr::IPv6Net.parse("fd00::1/128"), port_range: Sequel.pg_range(8080..65536)),
         instance_double(FirewallRule, ip6?: true, cidr: NetAddr::IPv6Net.parse("fd00::1/64"), port_range: Sequel.pg_range(0..8081)),
         instance_double(FirewallRule, ip6?: true, cidr: NetAddr::IPv6Net.parse("fd00::2/64"), port_range: Sequel.pg_range(80..10000))
-      ])])
+      ])
 
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec x nft --file -", stdin: <<ADD_RULES)
 # An nftables idiom for idempotent re-create of a named entity: merge
@@ -174,7 +174,7 @@ ADD_RULES
     it "populates load balancer destination sets and adds related rules" do
       GloballyBlockedDnsname.create(dns_name: "blockedhost.com", ip_list: ["123.123.123.123", "2a00:1450:400e:811::200e"])
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
-      expect(vm).to receive(:firewalls).and_return([instance_double(Firewall, name: "fw_table", firewall_rules: [
+      expect(vm).to receive(:firewall_rules).and_return([
         instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: nil),
         instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("1.1.1.1/32"), port_range: Sequel.pg_range(22..23)),
         instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("10.10.10.0/26"), port_range: Sequel.pg_range(80..10000)),
@@ -184,7 +184,7 @@ ADD_RULES
         instance_double(FirewallRule, ip6?: true, cidr: NetAddr::IPv6Net.parse("fd00::1/128"), port_range: Sequel.pg_range(8080..65536)),
         instance_double(FirewallRule, ip6?: true, cidr: NetAddr::IPv6Net.parse("fd00::1/64"), port_range: Sequel.pg_range(0..8081)),
         instance_double(FirewallRule, ip6?: true, cidr: NetAddr::IPv6Net.parse("fd00::2/64"), port_range: Sequel.pg_range(80..10000))
-      ])])
+      ])
       expect(vm).to receive(:id).and_return(1).at_least(:once)
       vm2 = instance_double(Vm, id: 2, nics: [instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32"), private_ipv6: NetAddr::IPv6Net.parse("fd00::/124"))], private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32").network, private_ipv6: NetAddr::IPv6.parse("fd00::2"))
       port = instance_double(LoadBalancerPort, src_port: 443, dst_port: 8443)
@@ -327,7 +327,7 @@ ADD_RULES
     it "populates load balancer destination sets and adds related rules when there is a single load balancer vm" do
       GloballyBlockedDnsname.create(dns_name: "blockedhost.com", ip_list: ["123.123.123.123", "2a00:1450:400e:811::200e"])
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
-      expect(vm).to receive(:firewalls).and_return([instance_double(Firewall, name: "fw_table", firewall_rules: [
+      expect(vm).to receive(:firewall_rules).and_return([
         instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: nil),
         instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("1.1.1.1/32"), port_range: Sequel.pg_range(22..23)),
         instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("10.10.10.0/26"), port_range: Sequel.pg_range(80..10000)),
@@ -337,7 +337,7 @@ ADD_RULES
         instance_double(FirewallRule, ip6?: true, cidr: NetAddr::IPv6Net.parse("fd00::1/128"), port_range: Sequel.pg_range(8080..65536)),
         instance_double(FirewallRule, ip6?: true, cidr: NetAddr::IPv6Net.parse("fd00::1/64"), port_range: Sequel.pg_range(0..8081)),
         instance_double(FirewallRule, ip6?: true, cidr: NetAddr::IPv6Net.parse("fd00::2/64"), port_range: Sequel.pg_range(80..10000))
-      ])])
+      ])
       expect(vm).to receive(:id).and_return(1).at_least(:once)
       port = instance_double(LoadBalancerPort, src_port: 443, dst_port: 8443)
       lb = instance_double(LoadBalancer, name: "lb_table", ports: [port], vms: [vm])
@@ -482,7 +482,7 @@ ADD_RULES
       GloballyBlockedDnsname.create(dns_name: "blockedhost6.com", ip_list: ["2a00:1450:400e:811::200e"])
 
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
-      expect(vm).to receive(:firewalls).and_return([])
+      expect(vm).to receive(:firewall_rules).and_return([])
       expect(vm.project).to receive(:get_ff_ipv6_disabled).and_return(true).at_least(:once)
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec x nft --file -", stdin: <<ADD_RULES)
 # An nftables idiom for idempotent re-create of a named entity: merge

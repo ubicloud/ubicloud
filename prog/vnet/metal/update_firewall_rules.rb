@@ -10,7 +10,7 @@ class Prog::Vnet::Metal::UpdateFirewallRules < Prog::Base
   end
 
   label def update_firewall_rules
-    rules = vm.firewalls.map(&:firewall_rules).flatten
+    rules = vm.firewall_rules
     allowed_ingress_ip4_port_set, allowed_ingress_ip4_lb_dest_set = consolidate_rules(rules.select { !it.ip6? && it.port_range })
     allowed_ingress_ip6_port_set, allowed_ingress_ip6_lb_dest_set = vm.project.get_ff_ipv6_disabled ? [[], []] : consolidate_rules(rules.select { it.ip6? && it.port_range })
     guest_ephemeral, clover_ephemeral = vm.project.get_ff_ipv6_disabled ? ["::/0", "::/0"] : subdivide_network(vm.ephemeral_net6).map(&:to_s)

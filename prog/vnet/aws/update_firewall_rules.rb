@@ -8,7 +8,7 @@ class Prog::Vnet::Aws::UpdateFirewallRules < Prog::Base
   end
 
   label def update_firewall_rules
-    rules = vm.firewalls.flat_map(&:firewall_rules)
+    rules = vm.firewall_rules
     rules.select(&:port_range).map! do |rule|
       perm = {
         ip_protocol: "tcp",
@@ -35,9 +35,8 @@ class Prog::Vnet::Aws::UpdateFirewallRules < Prog::Base
   end
 
   label def remove_aws_old_rules
-    rules = vm.firewalls.map(&:firewall_rules).flatten
-    ip4_rules = rules.select { !it.ip6? && it.port_range }
-    ip6_rules = rules.select { it.ip6? && it.port_range }
+    rules = vm.firewall_rules
+    ip6_rules, ip4_rules = rules.select(&:port_range).partition(&:ip6?)
 
     # Fetch existing security group rules
     security_group = aws_client.describe_security_groups({
