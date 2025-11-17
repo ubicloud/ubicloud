@@ -13,7 +13,8 @@ RSpec.describe Prog::Aws::Vpc do
     prj = Project.create(name: "test-prj")
     loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
     LocationCredential.create_with_id(loc, access_key: "test-access-key", secret_key: "test-secret-key")
-    ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps", location_id: loc.id).subject
+    fw = Firewall.create(name: "test-fw", location_id: loc.id, project_id: prj.id)
+    ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps", location_id: loc.id, firewall_id: fw.id).subject
     PrivateSubnetAwsResource.create_with_id(ps)
     ps
   }

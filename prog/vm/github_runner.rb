@@ -64,10 +64,24 @@ class Prog::Vm::GithubRunner < Prog::Base
       exclude_availability_zones << "a" # eu-central-1a is usually give capacity errors
     end
 
+    # Create a firewall with SSH-only access for GitHub runners
+    project = Project[Config.github_runner_service_project_id]
+    location = Location[location_id]
+    firewall_name = "github-runner-#{location.name}-firewall"
+    firewall = project.firewalls_dataset.first(location_id:, name: firewall_name)
+    unless firewall
+      firewall = Firewall.create(name: firewall_name, location_id:, project_id: Config.github_runner_service_project_id)
+      DB.ignore_duplicate_queries do
+        ["0.0.0.0/0", "::/0"].each do |cidr|
+          FirewallRule.create(firewall_id: firewall.id, cidr: cidr, port_range: Sequel.pg_range(22..22))
+        end
+      end
+    end
+
     ps = Prog::Vnet::SubnetNexus.assemble(
       Config.github_runner_service_project_id,
       location_id:,
-      allow_only_ssh: true
+      firewall_id: firewall.id
     ).subject
 
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(

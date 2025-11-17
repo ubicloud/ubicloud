@@ -3,16 +3,13 @@
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
 
-  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, firewall_name: nil)
+  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, firewall_id: nil)
     unless (project = Project[project_id])
       fail "No existing project"
     end
 
     unless (location = Location[location_id])
       fail "No existing location"
-    end
-    if allow_only_ssh && firewall_id
-      fail "Cannot specify both allow_only_ssh and firewall_id"
     end
 
     ubid = PrivateSubnet.generate_ubid
@@ -31,26 +28,8 @@ class Prog::Vnet::SubnetNexus < Prog::Base
         unless (firewall = firewall_dataset.first(Sequel[:firewall][:id] => firewall_id))
           fail "Firewall with id #{firewall_id} and location #{location.name} does not exist"
         end
-      else
-        port_range = allow_only_ssh ? 22..22 : 0..65535
-
-        unless firewall_name
-          firewall_name = "#{name[0, 55]}-default"
-          # As is typical when checking before inserting, there is a race condition here with
-          # a user concurrently manually creating a firewall with the same name.  However,
-          # the worst case scenario is a bogus error message, and the user could try creating
-          # the private subnet again.
-          unless firewall_dataset.where(Sequel[:firewall][:name] => firewall_name).empty?
-            firewall_name = "#{name[0, 47]}-default-#{Array.new(7) { UBID.from_base32(rand(32)) }.join}"
-          end
-        end
-
-        firewall = Firewall.create(name: firewall_name, location_id: location.id, project_id:)
-        DB.ignore_duplicate_queries do
-          ["0.0.0.0/0", "::/0"].each { |cidr| FirewallRule.create(firewall_id: firewall.id, cidr: cidr, port_range: Sequel.pg_range(port_range)) }
-        end
+        firewall.associate_with_private_subnet(ps, apply_firewalls: false)
       end
-      firewall.associate_with_private_subnet(ps, apply_firewalls: false)
 
       Strand.create_with_id(id, prog: "Vnet::SubnetNexus", label: "start")
     end

@@ -152,9 +152,7 @@ RSpec.describe Clover, "private subnet" do
           ps.destroy
         end
 
-        expect(Firewall.where(name: "a123456789a123456789a123456789a123456789a123456789a1234-default")).not_to be_empty
-        expect(Firewall.count).to eq 2
-        expect(Firewall.get { sum(Sequel.char_length(:name)) }).to eq 126
+        expect(Firewall.count).to eq 0
       end
     end
 

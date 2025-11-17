@@ -6,9 +6,8 @@ RSpec.describe Clover, "cli fw attach-subnet" do
   before do
     cli(%w[ps eu-central-h1/test-ps create])
     @ps = PrivateSubnet.first
-    fw = Firewall.first
     cli(%w[fw eu-central-h1/test-fw create])
-    @fw = Firewall.exclude(id: fw.id).first
+    @fw = Firewall.first
   end
 
   it "attaches firewall to subnet by id" do
