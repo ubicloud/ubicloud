@@ -3,7 +3,11 @@
 class Prog::RedeliverGithubFailures < Prog::Base
   label def wait
     last_check_time = Time.parse(frame["last_check_at"])
-    redeliver_failed_deliveries(last_check_time)
+    failed = failed_deliveries(last_check_time).each do |delivery|
+      Clog.emit("redelivering failed delivery") { {delivery: delivery.to_h} }
+      client.post("/app/hook/deliveries/#{delivery[:id]}/attempts")
+    end.count
+    Clog.emit("redelivered failed deliveries") { {deliveries: {failed:}} }
     update_stack({"last_check_at" => Time.now})
 
     nap 2 * 60
@@ -11,14 +15,6 @@ class Prog::RedeliverGithubFailures < Prog::Base
 
   def client
     @client ||= Github.app_client
-  end
-
-  def redeliver_failed_deliveries(*)
-    failed = failed_deliveries(*).each do |delivery|
-      Clog.emit("redelivering failed delivery") { {delivery: delivery.to_h} }
-      client.post("/app/hook/deliveries/#{delivery[:id]}/attempts")
-    end.count
-    Clog.emit("redelivered failed deliveries") { {deliveries: {failed:}} }
   end
 
   def failed_deliveries(since, max_page = 50)
