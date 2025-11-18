@@ -61,45 +61,6 @@ class BillingInfo < Sequel::Model
       fail "Unexpected response from VAT service: #{status}"
     end
   end
-
-  # :nocov:
-  def self.fix_ids
-    DB.run "ALTER TABLE project ALTER CONSTRAINT project_billing_info_id_fkey DEFERRABLE INITIALLY IMMEDIATE"
-    DB.run "ALTER TABLE payment_method ALTER CONSTRAINT payment_method_billing_info_id_fkey DEFERRABLE INITIALLY IMMEDIATE"
-
-    # Find all BillingInfo records with ubids starting with "et" and change to "bi"
-    DB.transaction do
-      DB.run "SET CONSTRAINTS ALL DEFERRED"
-
-      # Iterate through all BillingInfo records and check if their ubid starts with "et"
-      all.each do |billing_info|
-        old_ubid = billing_info.ubid
-        next unless old_ubid.start_with?("et")
-
-        print "Fixing id for BillingInfo #{old_ubid}..."
-
-        old_id = billing_info.id
-        new_id = BillingInfo.generate_uuid
-
-        # Update the billing_info.id
-        DB[:billing_info].where(id: old_id).update(id: new_id)
-
-        # Update references in project table
-        DB[:project].where(billing_info_id: old_id).update(billing_info_id: new_id)
-
-        # Update references in payment_method table
-        DB[:payment_method].where(billing_info_id: old_id).update(billing_info_id: new_id)
-
-        puts "done, new_ubid: #{UBID.from_uuidish(new_id)}"
-      end
-    end
-
-    nil
-  ensure
-    DB.run "ALTER TABLE project ALTER CONSTRAINT project_billing_info_id_fkey NOT DEFERRABLE"
-    DB.run "ALTER TABLE payment_method ALTER CONSTRAINT payment_method_billing_info_id_fkey NOT DEFERRABLE"
-  end
-  # :nocov:
 end
 
 # Table: billing_info
