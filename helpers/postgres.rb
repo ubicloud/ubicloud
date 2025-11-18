@@ -11,6 +11,7 @@ class Clover
     ha_type = typecast_params.nonempty_str("ha_type", PostgresResource::HaType::NONE)
     version = typecast_params.nonempty_str("version", PostgresResource::DEFAULT_VERSION)
     user_config = typecast_params.Hash("pg_config", {})
+    pgbouncer_user_config = typecast_params.Hash("pgbouncer_config", {})
     tags = typecast_params.array(:Hash, "tags", [])
     with_firewall_rules = !typecast_params.bool("restrict_by_default")
 
@@ -31,13 +32,16 @@ class Clover
     requested_postgres_vcpu_count = (requested_standby_count + 1) * parsed_size.vcpu_count
     Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count)
 
-    if !user_config.empty?
-      pg_validator = Validation::PostgresConfigValidator.new(version)
-      pg_errors = pg_validator.validation_errors(user_config)
-      if pg_errors.any?
-        pg_errors = pg_errors.map { |key, value| ["pg_config.#{key}", value] }.to_h
-        raise Validation::ValidationFailed.new(pg_errors)
-      end
+    pg_validator = Validation::PostgresConfigValidator.new(version)
+    pg_errors = pg_validator.validation_errors(user_config)
+
+    pgbouncer_validator = Validation::PostgresConfigValidator.new("pgbouncer")
+    pgbouncer_errors = pgbouncer_validator.validation_errors(pgbouncer_user_config)
+
+    if pg_errors.any? || pgbouncer_errors.any?
+      pg_errors = pg_errors.map { |key, value| ["pg_config.#{key}", value] }.to_h
+      pgbouncer_errors = pgbouncer_errors.map { |key, value| ["pgbouncer_config.#{key}", value] }.to_h
+      raise Validation::ValidationFailed.new(pg_errors.merge(pgbouncer_errors))
     end
 
     pg = nil
@@ -52,7 +56,8 @@ class Clover
         ha_type:,
         with_firewall_rules:,
         flavor:,
-        user_config:
+        user_config:,
+        pgbouncer_user_config:
       ).subject
       pg.update(tags:)
       audit_log(pg, "create")
