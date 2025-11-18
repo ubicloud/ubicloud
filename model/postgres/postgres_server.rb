@@ -169,7 +169,7 @@ class PostgresServer < Sequel::Model
       resource.representative_server
     end
 
-    lsn_diff(parent_server&.current_lsn || current_lsn, current_lsn) < 80 * 1024 * 1024
+    !parent_server || lsn_diff(parent_server.current_lsn, current_lsn) < 80 * 1024 * 1024
   end
 
   def current_lsn
