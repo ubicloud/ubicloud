@@ -28,46 +28,50 @@ RSpec.describe Prog::RedeliverGithubFailures do
     end
 
     it "fetches failed deliveries" do
+      # page 1
       expect(app_client).to receive(:get).with("/app/hook/deliveries?per_page=100").and_return([
-        {guid: "1", status: "Fail", delivered_at: time + 5},
-        {guid: "2", status: "Fail", delivered_at: time + 4},
-        {guid: "3", status: "OK", delivered_at: time + 3}
+        {guid: "1", id: "11", status: "Fail", delivered_at: time + 5},
+        {guid: "2", id: "21", status: "Fail", delivered_at: time + 4},
+        {guid: "3", id: "31", status: "OK", delivered_at: time + 3}
       ])
+      # page 2
       next_url = "/app/hook/deliveries?per_page=100&cursor=next_page"
       expect(app_client).to receive(:last_response).and_return(instance_double(Sawyer::Response, rels: {next: instance_double(Sawyer::Relation, href: next_url)}))
-      expect(app_client).to receive(:last_response).and_return(instance_double(Sawyer::Response, rels: {next: nil}))
       expect(app_client).to receive(:get).with(next_url).and_return([
-        {guid: "2", status: "OK", delivered_at: time + 2},
-        {guid: "4", status: "Fail", delivered_at: time + 2},
-        {guid: "4", status: "Fail", delivered_at: time + 1},
-        {guid: "5", status: "Fail", delivered_at: time - 2},
-        {guid: "6", status: "OK", delivered_at: time - 3}
+        {guid: "2", id: "21", status: "OK", delivered_at: time + 2},
+        {guid: "4", id: "41", status: "Fail", delivered_at: time + 2},
+        {guid: "4", id: "42", status: "Fail", delivered_at: time + 1},
+        {guid: "5", id: "51", status: "Fail", delivered_at: time - 2},
+        {guid: "6", id: "61", status: "OK", delivered_at: time - 3}
       ])
+      # page 3
+      expect(app_client).to receive(:last_response).and_return(instance_double(Sawyer::Response, rels: {next: nil}))
 
-      failed_deliveries = rgf.failed_deliveries(time)
-      expect(failed_deliveries).to eq([
-        {guid: "1", status: "Fail", delivered_at: time + 5},
-        {guid: "4", status: "Fail", delivered_at: time + 2}
-      ])
+      # failed deliveries
+      expect(app_client).to receive(:post).with("/app/hook/deliveries/11/attempts")
+      expect(app_client).to receive(:post).with("/app/hook/deliveries/41/attempts")
+
+      rgf.redeliver_failed_deliveries(time)
     end
 
     it "fetches failed deliveries with max page" do
       expect(app_client).to receive(:get).with("/app/hook/deliveries?per_page=100").and_return([
-        {guid: "3", status: "Fail", delivered_at: time + 3}
+        {guid: "3", id: "31", status: "Fail", delivered_at: time + 3}
       ])
       expect(app_client).to receive(:last_response).and_return(instance_double(Sawyer::Response, rels: {next: instance_double(Sawyer::Relation, href: "next_url")}))
+      expect(Clog).to receive(:emit).with("redelivered failed deliveries").and_wrap_original do |&blk|
+        expect(blk.call).to eq(deliveries: {failed: 1})
+      end
       expect(Clog).to receive(:emit).with("failed deliveries page limit reached").and_call_original
-      expect(Clog).to receive(:emit).with("fetched deliveries").and_call_original
-      failed_deliveries = rgf.failed_deliveries(time, 1)
-      expect(failed_deliveries).to eq([{guid: "3", status: "Fail", delivered_at: time + 3}])
-    end
+      expect(Clog).to receive(:emit).with("redelivering failed delivery").and_wrap_original do |&blk|
+        expect(blk.call).to eq(delivery: {delivered_at: time + 3, guid: "3", id: "31", status: "Fail"})
+      end
+      expect(Clog).to receive(:emit).with("fetched deliveries").and_wrap_original do |&blk|
+        expect(blk.call).to eq(deliveries: {page: 0, since: time, total: 1})
+      end
+      expect(app_client).to receive(:post).with("/app/hook/deliveries/31/attempts")
 
-    it "redelivers failed deliveries" do
-      expect(rgf).to receive(:failed_deliveries).with(time).and_return([{id: "1"}, {id: "2"}])
-      expect(app_client).to receive(:post).with("/app/hook/deliveries/1/attempts")
-      expect(app_client).to receive(:post).with("/app/hook/deliveries/2/attempts")
-
-      rgf.redeliver_failed_deliveries(time)
+      rgf.redeliver_failed_deliveries(time, max_page: 1)
     end
   end
 end
