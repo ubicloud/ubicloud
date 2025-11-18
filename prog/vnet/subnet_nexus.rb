@@ -263,11 +263,11 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   def active_nics
-    nics_with_strand_label("wait").all
+    nics_with_state("active")
   end
 
   def nics_to_rekey
-    nics_with_strand_label(%w[wait wait_setup]).all
+    nics_with_state(%w[active creating]).all
   end
 
   def update_stack_locked_nics(locked_nics)
@@ -287,7 +287,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     private_subnet.find_all_connected_nics
   end
 
-  def nics_with_strand_label(label)
-    all_connected_nics.join(:strand, {id: :id, label:}).select_all(:nic)
+  def nics_with_state(state)
+    all_connected_nics.where(state:)
   end
 end
