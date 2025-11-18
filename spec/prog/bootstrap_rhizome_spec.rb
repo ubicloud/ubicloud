@@ -78,6 +78,12 @@ echo \#\ Supported\ HostKey\ algorithms\ by\ order\ of\ preference.'
 '\#\ Terminate\ sessions\ with\ clients\ that\ cannot\ return\ packets\ rapidly.'
 'ClientAliveInterval\ 2'
 'ClientAliveCountMax\ 4'
+''
+'\#\ Increase\ the\ maximum\ number\ of\ concurrent\ unauthenticated\ connections.'
+'MaxStartups\ 50:1:150'
+''
+'\#\ Reduce\ the\ time\ allowed\ for\ login.'
+'LoginGraceTime\ 20s'
 ' | sudo tee /etc/ssh/sshd_config.d/10-clover.conf > /dev/null
 echo test\ key | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
 sync
