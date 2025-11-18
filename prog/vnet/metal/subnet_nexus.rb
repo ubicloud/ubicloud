@@ -52,38 +52,43 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   end
 
   label def add_new_nic
-    register_deadline("wait", 3 * 60)
+    register_deadline("wait", 5 * 60)
     nics_snap = nics_to_rekey
     nap 10 if nics_snap.any?(&:lock_set?)
+    locked_nics = []
     nics_snap.each do |nic|
       nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
       nic.incr_start_rekey
       nic.incr_lock
+      locked_nics << nic.id
       private_subnet.create_tunnels(nics_snap, nic)
     end
 
+    update_stack_locked_nics(locked_nics)
     decr_add_new_nic
     hop_wait_inbound_setup
   end
 
   label def refresh_keys
-    register_deadline("wait", 5 * 60)
+    decr_refresh_keys
     nics = active_nics
     nap 10 if nics.any?(&:lock_set?)
+    locked_nics = []
     nics.each do |nic|
       nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
       nic.incr_start_rekey
       nic.incr_lock
+      locked_nics << nic.id
     end
 
-    decr_refresh_keys
+    update_stack_locked_nics(locked_nics)
     hop_wait_inbound_setup
   end
 
   label def wait_inbound_setup
-    nics = rekeying_nics
+    nics = get_locked_nics
     if nics.all? { |nic| nic.strand.label == "wait_rekey_outbound_trigger" }
-      Semaphore.incr(nics.map(&:id), "trigger_outbound_update")
+      nics.each(&:incr_trigger_outbound_update)
       hop_wait_outbound_setup
     end
 
@@ -91,9 +96,9 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   end
 
   label def wait_outbound_setup
-    nics = rekeying_nics
+    nics = get_locked_nics
     if nics.all? { |nic| nic.strand.label == "wait_rekey_old_state_drop_trigger" }
-      Semaphore.incr(nics.map(&:id), "old_state_drop_trigger")
+      nics.each(&:incr_old_state_drop_trigger)
       hop_wait_old_state_drop
     end
 
@@ -101,13 +106,12 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   end
 
   label def wait_old_state_drop
-    nics = rekeying_nics
+    nics = get_locked_nics
     if nics.all? { |nic| nic.strand.label == "wait" }
       private_subnet.update(state: "waiting", last_rekey_at: Time.now)
-
       all_connected_nics.exclude(rekey_payload: nil).update(encryption_key: nil, rekey_payload: nil)
       Semaphore.where(strand_id: nics.map(&:id), name: "lock").delete(force: true)
-
+      update_stack_locked_nics(nil)
       hop_wait
     end
 
@@ -143,15 +147,19 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   end
 
   def active_nics
-    nics_with_strand_label("wait").all
+    nics_with_state("active")
   end
 
   def nics_to_rekey
-    nics_with_strand_label(%w[wait wait_setup]).all
+    nics_with_state(%w[active creating]).all
   end
 
-  def rekeying_nics
-    all_connected_nics.eager(:strand).exclude(rekey_payload: nil).all
+  def update_stack_locked_nics(locked_nics)
+    update_stack({"locked_nics" => locked_nics})
+  end
+
+  def get_locked_nics
+    Nic.where(id: strand.stack.first["locked_nics"]).eager(:strand).all
   end
 
   private
@@ -160,7 +168,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     private_subnet.find_all_connected_nics
   end
 
-  def nics_with_strand_label(label)
-    all_connected_nics.join(:strand, {id: :id, label:}).select_all(:nic)
+  def nics_with_state(state)
+    all_connected_nics.where(state:)
   end
 end

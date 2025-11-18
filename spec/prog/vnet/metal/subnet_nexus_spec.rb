@@ -47,9 +47,9 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       nic1 = Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject
       nic2 = Prog::Vnet::NicNexus.assemble(ps.id, name: "b").subject
       expect(nx.nics_to_rekey).to eq([])
-      nic1.strand.update(label: "wait")
+      nic1.update(state: "creating")
       expect(nx.nics_to_rekey.map(&:name)).to eq(["a"])
-      nic2.strand.update(label: "wait_setup")
+      nic2.update(state: "active")
       expect(nx.nics_to_rekey.map(&:name).sort).to eq(["a", "b"])
     end
   end
@@ -140,6 +140,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
           spi6: "0xe3af3a04",
           reqid: 86879
         }).and_return(true)
+      expect(nx).to receive(:update_stack_locked_nics).with([added_nic.id, nic_to_add.id]).and_return(true)
       expect { nx.add_new_nic }.to hop("wait_inbound_setup")
     end
 
@@ -169,6 +170,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       expect(nx).to receive(:gen_encryption_key).and_return("0x0a0b0c0d0e0f10111213141516171819")
       expect(nic.start_rekey_set?).to be false
       expect(nic.lock_set?).to be false
+      nic.update(state: "active")
       expect { nx.refresh_keys }.to hop("wait_inbound_setup")
       nic.refresh
       expect(nic.encryption_key).to eq "0x0a0b0c0d0e0f10111213141516171819"
@@ -179,6 +181,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
 
     it "naps if the nics are locked" do
       nic.incr_lock
+      nic.update(state: "active")
       expect { nx.refresh_keys }.to nap(10)
     end
   end
@@ -190,6 +193,10 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
     let(:nx) {
       described_class.new(Strand.create(prog: "Vnet::SubnetNexus", label: "wait_inbound_setup", id: ps.id))
     }
+
+    before do
+      expect(nx).to receive(:get_locked_nics).and_return([nic])
+    end
 
     it "naps 5 if state creation is ongoing" do
       nic
@@ -213,7 +220,11 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       described_class.new(Strand.create(prog: "Vnet::SubnetNexus", label: "wait_outbound_setup", id: ps.id))
     }
 
-    it "naps if policy update is ongoing" do
+    before do
+      expect(nx).to receive(:get_locked_nics).and_return([nic])
+    end
+
+    it "donates if policy update is ongoing" do
       nic
       expect { nx.wait_outbound_setup }.to nap(5)
     end
@@ -234,6 +245,10 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
     let(:nx) {
       described_class.new(Strand.create(prog: "Vnet::SubnetNexus", label: "wait_old_state_drop", id: ps.id))
     }
+
+    before do
+      expect(nx).to receive(:get_locked_nics).and_return([nic])
+    end
 
     it "donates if policy update is ongoing" do
       nic
