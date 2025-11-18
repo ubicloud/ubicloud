@@ -22,12 +22,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       else
         # Create customer private subnet with customer firewall
         firewall_name = "#{ubid}-firewall"
-        firewall = Firewall.create(name: firewall_name, location_id:, project_id:)
-        DB.ignore_duplicate_queries do
-          ["0.0.0.0/0", "::/0"].each do |cidr|
-            FirewallRule.create(firewall_id: firewall.id, cidr: cidr, port_range: Sequel.pg_range(0..65535))
-          end
-        end
+        firewall = Firewall.create_with_open_rules(0..65535, name: firewall_name, location_id:, project_id:)
 
         Prog::Vnet::SubnetNexus.assemble(
           project_id,

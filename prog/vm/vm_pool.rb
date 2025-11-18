@@ -42,12 +42,7 @@ class Prog::Vm::VmPool < Prog::Base
     firewall_name = "vm-pool-#{location.name}-firewall"
     firewall = project.firewalls_dataset.first(location_id: vm_pool.location_id, name: firewall_name)
     unless firewall
-      firewall = Firewall.create(name: firewall_name, location_id: vm_pool.location_id, project_id: Config.vm_pool_project_id)
-      DB.ignore_duplicate_queries do
-        ["0.0.0.0/0", "::/0"].each do |cidr|
-          FirewallRule.create(firewall_id: firewall.id, cidr: cidr, port_range: Sequel.pg_range(22..22))
-        end
-      end
+      firewall = Firewall.create_with_open_rules(22..22, name: firewall_name, location_id: vm_pool.location_id, project_id: Config.vm_pool_project_id)
     end
 
     ps = Prog::Vnet::SubnetNexus.assemble(

@@ -179,12 +179,7 @@ class Project < Sequel::Model
     firewall_name = "#{name}-default"
     firewall = firewalls_dataset.first(location_id:, name: firewall_name)
     unless firewall
-      firewall = Firewall.create(name: firewall_name, location_id:, project_id: id)
-      DB.ignore_duplicate_queries do
-        ["0.0.0.0/0", "::/0"].each do |cidr|
-          FirewallRule.create(firewall_id: firewall.id, cidr: cidr, port_range: Sequel.pg_range(0..65535))
-        end
-      end
+      firewall = Firewall.create_with_open_rules(0..65535, name: firewall_name, location_id:, project_id: id)
     end
 
     Prog::Vnet::SubnetNexus.assemble(id, name:, location_id:, firewall_id: firewall.id).subject

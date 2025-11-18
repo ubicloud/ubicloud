@@ -70,12 +70,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     firewall_name = "github-runner-#{location.name}-firewall"
     firewall = project.firewalls_dataset.first(location_id:, name: firewall_name)
     unless firewall
-      firewall = Firewall.create(name: firewall_name, location_id:, project_id: Config.github_runner_service_project_id)
-      DB.ignore_duplicate_queries do
-        ["0.0.0.0/0", "::/0"].each do |cidr|
-          FirewallRule.create(firewall_id: firewall.id, cidr: cidr, port_range: Sequel.pg_range(22..22))
-        end
-      end
+      firewall = Firewall.create_with_open_rules(22..22, name: firewall_name, location_id:, project_id: Config.github_runner_service_project_id)
     end
 
     ps = Prog::Vnet::SubnetNexus.assemble(
