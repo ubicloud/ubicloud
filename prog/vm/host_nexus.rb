@@ -431,7 +431,9 @@ TIMER
   end
 
   def available?
-    vm_host.perform_health_checks(sshable.connect, test_file_suffix: "respirate")
+    session = sshable.connect
+    vm_host.check_last_boot_id(session)
+    vm_host.perform_health_checks(session, test_file_suffix: "respirate")
   rescue
     false
   end

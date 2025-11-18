@@ -658,12 +658,14 @@ RSpec.describe Prog::Vm::HostNexus do
   describe "#available?" do
     it "returns the available status when disks are healthy" do
       expect(sshable).to receive(:connect).and_return(nil)
+      expect(vm_host).to receive(:check_last_boot_id)
       expect(vm_host).to receive(:perform_health_checks).and_return(true)
       expect(nx.available?).to be true
     end
 
     it "returns the available status when disks are not healthy" do
       expect(sshable).to receive(:connect).and_return(nil)
+      expect(vm_host).to receive(:check_last_boot_id)
       allow(vm_host).to receive(:perform_health_checks).and_return(false)
       expect(nx.available?).to be false
     end
