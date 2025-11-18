@@ -327,6 +327,13 @@ class Prog::Vm::GithubRunner < Prog::Base
       COMMAND
     end
 
+    if !github_runner.label.include?("ubuntu")
+      message = "The default operating system for this runner will change to Ubuntu 24.04 on November 23, 2025. You can continue using Ubuntu 22.04 by explicitly specifying it. For more information: https://www.ubicloud.com/docs/github-actions-integration/runner-types#ubuntu-24-04-migration"
+      command += <<~COMMAND
+        echo "::notice::#{message}" | sudo -u runner tee /home/runner/actions-runner/.ubicloud_complete_message
+      COMMAND
+    end
+
     begin
       # Remove comments and empty lines before sending them to the machine
       vm.sshable.cmd(command.gsub(/^(\s*# .*)?\n/, ""))
