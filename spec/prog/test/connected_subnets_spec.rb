@@ -9,11 +9,13 @@ RSpec.describe Prog::Test::ConnectedSubnets do
   }
 
   let(:ps_multiple) {
-    Prog::Vnet::SubnetNexus.assemble(project.id, name: "ps-multiple", location_id: Location::HETZNER_FSN1_ID).subject
+    fw = Firewall.create(name: "ps-multiple-fw", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
+    Prog::Vnet::SubnetNexus.assemble(project.id, name: "ps-multiple", location_id: Location::HETZNER_FSN1_ID, firewall_id: fw.id).subject
   }
 
   let(:ps_single) {
-    Prog::Vnet::SubnetNexus.assemble(project.id, name: "ps-single", location_id: Location::HETZNER_FSN1_ID).subject
+    fw = Firewall.create(name: "ps-single-fw", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
+    Prog::Vnet::SubnetNexus.assemble(project.id, name: "ps-single", location_id: Location::HETZNER_FSN1_ID, firewall_id: fw.id).subject
   }
 
   let(:project) {

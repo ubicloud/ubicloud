@@ -172,7 +172,10 @@ RSpec.describe PrivateSubnet do
   describe "incr_destroy_if_only_used_internally" do
     let(:prj) { Project.create(name: "test-prj") }
 
-    let(:ps) { Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps1", location_id: Location::HETZNER_FSN1_ID).subject }
+    let(:ps) {
+      fw = Firewall.create(name: "test-fw", location_id: Location::HETZNER_FSN1_ID, project_id: prj.id)
+      Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps1", location_id: Location::HETZNER_FSN1_ID, firewall_id: fw.id).subject
+    }
 
     it "destroys associated firewalls in any project if name matches and firewall is not related to other subnets" do
       ubid = described_class.generate_ubid

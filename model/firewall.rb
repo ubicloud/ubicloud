@@ -14,6 +14,16 @@ class Firewall < Sequel::Model
 
   dataset_module Pagination
 
+  def self.create_with_open_rules(port_range, **kwargs)
+    firewall = create(**kwargs)
+    DB.ignore_duplicate_queries do
+      ["0.0.0.0/0", "::/0"].each do |cidr|
+        FirewallRule.create(firewall_id: firewall.id, cidr: cidr, port_range: Sequel.pg_range(port_range))
+      end
+    end
+    firewall
+  end
+
   def display_location
     location.display_name
   end
