@@ -53,8 +53,11 @@ end
 #  encryption_key    | text                     |
 #  name              | text                     | NOT NULL
 #  rekey_payload     | jsonb                    |
+#  state             | text                     |
 # Indexes:
 #  nic_pkey | PRIMARY KEY btree (id)
+# Check constraints:
+#  state | (state = ANY (ARRAY['initializing'::text, 'creating'::text, 'active'::text]))
 # Foreign key constraints:
 #  nic_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
 #  nic_vm_id_fkey             | (vm_id) REFERENCES vm(id)
