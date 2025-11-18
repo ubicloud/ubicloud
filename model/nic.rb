@@ -53,7 +53,7 @@ end
 #  encryption_key    | text                     |
 #  name              | text                     | NOT NULL
 #  rekey_payload     | jsonb                    |
-#  state             | text                     |
+#  state             | text                     | NOT NULL
 # Indexes:
 #  nic_pkey | PRIMARY KEY btree (id)
 # Check constraints:

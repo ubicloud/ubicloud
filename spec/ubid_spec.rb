@@ -282,7 +282,8 @@ RSpec.describe UBID do
       mac: "00:11:22:33:44:55",
       encryption_key: "0x30613961313636632d653765372d343434372d616232392d376561343432623562623065",
       private_subnet_id: subnet.id,
-      name: "def-nic"
+      name: "def-nic",
+      state: "initializing"
     )
     expect(nic.ubid).to start_with UBID::TYPE_NIC
     tun = IpsecTunnel.create(src_nic_id: nic.id, dst_nic_id: nic.id)
@@ -329,7 +330,7 @@ RSpec.describe UBID do
     ace = AccessControlEntry.create(project_id:, subject_id: st.id)
     a_type = ActionType.first
     subnet = PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id:)
-    nic = Nic.create(private_ipv6: "fd10:9b0b:6b4b:8fbb::/128", private_ipv4: "10.0.0.12/32", mac: "00:11:22:33:44:55", encryption_key: "0x30613961313636632d653765372d343434372d616232392d376561343432623562623065", private_subnet_id: subnet.id, name: "def-nic")
+    nic = Nic.create(private_ipv6: "fd10:9b0b:6b4b:8fbb::/128", private_ipv4: "10.0.0.12/32", mac: "00:11:22:33:44:55", encryption_key: "0x30613961313636632d653765372d343434372d616232392d376561343432623562623065", private_subnet_id: subnet.id, name: "def-nic", state: "initializing")
     tun = IpsecTunnel.create(src_nic_id: nic.id, dst_nic_id: nic.id)
     adr = Address.create(cidr: "192.168.1.0/24", routed_to_host_id: host.id)
     vm_adr = AssignedVmAddress.create(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)

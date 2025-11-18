@@ -20,7 +20,8 @@ RSpec.describe Nic do
         mac: "00:11:22:33:44:55",
         encryption_key: "0x30613961313636632d653765372d343434372d616232392d376561343432623562623065",
         private_subnet_id: subnet.id,
-        name: "def-nic"
+        name: "def-nic",
+        state: "initializing"
       )
       expect(nic).to receive(:ubid).and_return("nc09797qbpze6qx7k7rmfw74rc")
       expect(nic.ubid_to_tap_name).to eq "nc09797qbp"

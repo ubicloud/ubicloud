@@ -47,7 +47,8 @@ RSpec.describe Prog::Vm::Nexus do
       private_ipv4: "10.0.0.1",
       mac: "00:00:00:00:00:00",
       encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579",
-      name: "default-nic")
+      name: "default-nic",
+      state: "active")
   }
 
   describe ".assemble" do

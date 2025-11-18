@@ -112,9 +112,9 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       nic1 = Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject
       nic2 = Prog::Vnet::NicNexus.assemble(ps.id, name: "b").subject
       expect(nx.nics_to_rekey).to eq([])
-      nic1.strand.update(label: "wait")
+      nic1.update(state: "creating")
       expect(nx.nics_to_rekey.map(&:name)).to eq(["a"])
-      nic2.strand.update(label: "wait_setup")
+      nic2.update(state: "active")
       expect(nx.nics_to_rekey.map(&:name).sort).to eq(["a", "b"])
     end
   end
@@ -272,6 +272,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(nx).to receive(:gen_encryption_key).and_return("0x0a0b0c0d0e0f10111213141516171819")
       expect(nic.start_rekey_set?).to be false
       expect(nic.lock_set?).to be false
+      nic.update(state: "active")
       expect { nx.refresh_keys }.to hop("wait_inbound_setup")
       nic.refresh
       expect(nic.encryption_key).to eq "0x0a0b0c0d0e0f10111213141516171819"
@@ -282,6 +283,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
 
     it "naps if the nics are locked" do
       nic.incr_lock
+      nic.update(state: "active")
       expect { nx.refresh_keys }.to nap(10)
     end
   end
