@@ -21,7 +21,7 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
       encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579",
       name: "default-nic",
       rekey_payload: {"reqid" => 86879, "spi4" => "0xe2222222", "spi6" => "0xe3333333"},
-      vm_id: vm_src.id)
+      vm_id: vm_src.id, state: "active")
     n_dst = Nic.create(private_subnet_id: ps.id,
       private_ipv6: "fd10:9b0b:6b4b:8fbb:def::",
       private_ipv4: "10.0.0.2",
@@ -29,7 +29,7 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
       encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579",
       name: "default-nic",
       rekey_payload: {"reqid" => 14329, "spi4" => "0xe0000000", "spi6" => "0xe1111111"},
-      vm_id: vm_dst.id)
+      vm_id: vm_dst.id, state: "active")
     IpsecTunnel.create(src_nic_id: n_src.id, dst_nic_id: n_dst.id).tap { it.id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e" }
   }
 

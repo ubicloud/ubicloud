@@ -45,11 +45,12 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       private_subnet = instance_double(PrivateSubnet)
       nic = instance_double(Nic, private_subnet: private_subnet)
 
-      expect(nx).to receive(:nic).and_return(nic)
+      expect(nx).to receive(:nic).and_return(nic).at_least(:once)
       expect(nx).to receive(:decr_vm_allocated)
       expect(nx).to receive(:when_setup_nic_set?).and_yield
       expect(nx).to receive(:decr_setup_nic)
       expect(private_subnet).to receive(:incr_add_new_nic)
+      expect(nic).to receive(:update).with(state: "creating")
       expect { nx.wait_setup }.to nap(5)
     end
 
@@ -130,8 +131,21 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect { nx.wait_rekey_old_state_drop_trigger }.to nap(5)
     end
 
-    it "hops to wait if drop_old_state is completed" do
+    it "hops to wait if drop_old_state is completed, updates state and refreshes keys if it's not active yet" do
       expect(nx).to receive(:retval).and_return({"msg" => "drop_old_state is complete"})
+      expect(nic).to receive(:state).and_return("creating")
+      expect(nic).to receive(:update).with(state: "active")
+      expect(nic).to receive(:private_subnet).and_return(ps)
+      expect(ps).to receive(:incr_refresh_keys).and_return(true)
+      expect { nx.wait_rekey_old_state_drop_trigger }.to hop("wait")
+    end
+
+    it "hops to wait if drop_old_state is completed, doesn't update state and refreshes keys if it's already active" do
+      expect(nx).to receive(:retval).and_return({"msg" => "drop_old_state is complete"})
+      expect(nic).to receive(:state).and_return("active")
+      expect(nic).not_to receive(:update)
+      expect(nic).not_to receive(:private_subnet)
+      expect(ps).not_to receive(:incr_refresh_keys)
       expect { nx.wait_rekey_old_state_drop_trigger }.to hop("wait")
     end
   end

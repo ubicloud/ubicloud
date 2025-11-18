@@ -154,7 +154,7 @@ RSpec.describe Clover, "load-balancer" do
 
     describe "update" do
       let(:vm) {
-        nic = Nic.create(name: "nic-1", private_subnet_id: lb.private_subnet.id, mac: "00:00:00:00:00:01", private_ipv4: "1.1.1.1", private_ipv6: "2001:db8::1")
+        nic = Nic.create(name: "nic-1", private_subnet_id: lb.private_subnet.id, mac: "00:00:00:00:00:01", private_ipv4: "1.1.1.1", private_ipv6: "2001:db8::1", state: "active")
         vm = create_vm
         nic.update(vm_id: vm.id)
         vm.update(project_id: project.id)
@@ -246,7 +246,7 @@ RSpec.describe Clover, "load-balancer" do
 
     describe "attach-vm" do
       let(:vm) {
-        nic = Nic.create(name: "nic-1", private_subnet_id: lb.private_subnet.id, mac: "00:00:00:00:00:01", private_ipv4: "1.1.1.1", private_ipv6: "2001:db8::1")
+        nic = Nic.create(name: "nic-1", private_subnet_id: lb.private_subnet.id, mac: "00:00:00:00:00:01", private_ipv4: "1.1.1.1", private_ipv6: "2001:db8::1", state: "active")
         vm = create_vm
         nic.update(vm_id: vm.id)
         vm
@@ -275,7 +275,7 @@ RSpec.describe Clover, "load-balancer" do
 
     describe "detach-vm" do
       let(:vm) {
-        nic = Nic.create(name: "nic-1", private_subnet_id: lb.private_subnet.id, mac: "00:00:00:00:00:01", private_ipv4: "1.1.1.1", private_ipv6: "2001:db8::1")
+        nic = Nic.create(name: "nic-1", private_subnet_id: lb.private_subnet.id, mac: "00:00:00:00:00:01", private_ipv4: "1.1.1.1", private_ipv6: "2001:db8::1", state: "active")
         vm = create_vm
         nic.update(vm_id: vm.id)
         vm
