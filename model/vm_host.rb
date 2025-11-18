@@ -349,6 +349,14 @@ class VmHost < Sequel::Model
     error_count.empty?
   end
 
+  def check_last_boot_id(ssh_session)
+    boot_id = ssh_session.exec!("cat /proc/sys/kernel/random/boot_id")
+    fail "Failed to exec on session: #{boot_id}" unless boot_id.exitstatus.zero?
+    if boot_id.strip != last_boot_id
+      Prog::PageNexus.assemble("Recorded last_boot_id of #{ubid} in database differs from the actual boot_id", ["LastBootIDDiscrepancy", ubid], ubid, severity: "info")
+    end
+  end
+
   def init_health_monitor_session
     {
       ssh_session: sshable.start_fresh_session
