@@ -22,6 +22,7 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
       DB.transaction do
         decr_setup_nic
         nic.private_subnet.incr_add_new_nic
+        nic.update(state: "creating")
       end
     end
     when_start_rekey_set? do
@@ -68,6 +69,10 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
 
   label def wait_rekey_old_state_drop_trigger
     if retval&.dig("msg")&.include?("drop_old_state is complete")
+      unless nic.state == "active"
+        nic.update(state: "active")
+        nic.private_subnet.incr_refresh_keys
+      end
       hop_wait
     end
 
