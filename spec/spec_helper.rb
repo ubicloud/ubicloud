@@ -272,6 +272,41 @@ RSpec.configure do |config|
       Vm.create(**args)
     end
 
+    def create_vm_etc(project, private_subnet, name)
+      vm_host = create_vm_host(used_cores: 2, total_hugepages_1g: 375, used_hugepages_1g: 16)
+      vm = Vm.create(
+        name:,
+        unix_user: "ubi",
+        public_key: "ssh key",
+        boot_image: "ubuntu-jammy",
+        family: "standard",
+        cores: 1,
+        vcpus: 2,
+        cpu_percent_limit: 200,
+        cpu_burst_percent_limit: 0,
+        memory_gib: 8,
+        arch: "x64",
+        location:,
+        created_at: Time.now,
+        project: project,
+        vm_host: vm_host
+      )
+      Strand.create_with_id(vm.id, prog: "Vm::Nexus", label: "start")
+      Sshable.create_with_id(vm.id)
+      Nic.create(
+        name: "#{name}-nic",
+        private_subnet: private_subnet,
+        private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
+        private_ipv4: "10.0.0.1",
+        mac: "00:00:00:00:00:00",
+        vm:,
+        encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579",
+        state: "initializing"
+      )
+
+      vm
+    end
+
     def create_vm_from_size(size, arch, **args)
       vm_size = Validation.validate_vm_size(size, arch)
       args_from_size = {
