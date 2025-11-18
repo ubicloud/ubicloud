@@ -542,6 +542,28 @@ RSpec.describe VmHost do
     expect { vh.render_arch(arm64: "a", x64: "x") }.to raise_error RuntimeError, "BUG: inexhaustive render code"
   end
 
+  describe "#check_last_boot_id" do
+    let(:session) { instance_double(Net::SSH::Connection::Session) }
+
+    it "raises if command execution exits with non-zero status code" do
+      expect(session).to receive(:exec!).with("cat /proc/sys/kernel/random/boot_id").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("it didn't work", 1))
+      expect { vh.check_last_boot_id(session) }.to raise_error(RuntimeError, "Failed to exec on session: it didn't work")
+    end
+
+    it "does nothing if boot_id matches" do
+      expect(session).to receive(:exec!).with("cat /proc/sys/kernel/random/boot_id").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("boot-id", 0))
+      expect(vh).to receive(:last_boot_id).and_return("boot-id")
+      expect { vh.check_last_boot_id(session) }.not_to raise_error
+    end
+
+    it "assembles a page for it" do
+      expect(session).to receive(:exec!).with("cat /proc/sys/kernel/random/boot_id").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("another-boot-id", 0))
+      expect(vh).to receive(:last_boot_id).and_return("boot-id")
+      vh.check_last_boot_id(session)
+      expect(Page.first.summary).to eq("Recorded last_boot_id of #{vh.ubid} in database differs from the actual boot_id")
+    end
+  end
+
   describe "#spdk_cpu_count" do
     it "uses 2 cpus for AX161" do
       expect(vh).to receive(:total_cpus).and_return(64)
