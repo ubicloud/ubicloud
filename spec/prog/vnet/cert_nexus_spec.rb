@@ -209,9 +209,10 @@ RSpec.describe Prog::Vnet::CertNexus do
     end
 
     it "hops to start if restarted semaphore is set" do
+      nx.strand.stack.first["restarted"] = 0
       expect(nx).to receive(:when_restarted_set?).and_yield
       expect(nx).to receive(:decr_restarted)
-      expect(nx).to receive(:update_stack_restart_counter)
+      expect(nx).to receive(:update_stack)
       expect { nx.restart }.to hop("start")
     end
   end
@@ -313,18 +314,6 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(client).to receive(:revoke).and_raise(Acme::Client::Error::Unauthorized.new("The certificate is not authorized"))
 
       expect { nx.destroy }.to raise_error(Acme::Client::Error::Unauthorized)
-    end
-  end
-
-  describe "#update_stack_restart_counter" do
-    it "increments the restart counter" do
-      strand = instance_double(Strand, stack: [{"restarted" => 3}])
-      expect(nx).to receive(:strand).and_return(strand).at_least(:once)
-      expect(strand).to receive(:modified!).with(:stack)
-      expect(strand).to receive(:save_changes)
-
-      nx.update_stack_restart_counter
-      expect(strand.stack.first["restarted"]).to eq 4
     end
   end
 

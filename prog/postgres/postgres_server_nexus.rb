@@ -686,9 +686,6 @@ SQL
   end
 
   def update_stack_lsn(lsn)
-    current_frame = strand.stack.first
-    current_frame["lsn"] = lsn
-    strand.modified!(:stack)
-    strand.save_changes
+    update_stack({"lsn" => lsn})
   end
 end

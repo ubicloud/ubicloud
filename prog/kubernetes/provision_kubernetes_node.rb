@@ -69,9 +69,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     ).subject
     vm = node.vm
 
-    current_frame = strand.stack.first
-    current_frame["node_id"] = node.id
-    strand.modified!(:stack)
+    update_stack({"node_id" => node.id})
 
     unless kubernetes_nodepool
       kubernetes_cluster.api_server_lb.add_vm(vm)
