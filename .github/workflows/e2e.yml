@@ -140,6 +140,14 @@ jobs:
         echo "### Image downloaded in $download_time" >> $GITHUB_STEP_SUMMARY
         echo "DOWNLOAD_TIME=$download_time" >> $GITHUB_OUTPUT
 
+    - name: Extract last line
+      if: always()
+      id: extract_last
+      run: |
+        last_line="$(grep "e2e.1" foreman.log | tail -2 | head -1 | cut -d'|' -f2,4,5)"
+        echo "### Last line: $last_line" >> $GITHUB_STEP_SUMMARY
+        echo "LAST_LINE=$last_line" >> $GITHUB_OUTPUT
+
     - name: Extract vm provision times
       if: always()
       continue-on-error: true
@@ -188,3 +196,6 @@ jobs:
                 - title: "Download Time"
                   short: true
                   value: "${{ steps.extract_download.outputs.DOWNLOAD_TIME }}"
+                - title: "Last Line"
+                  short: false
+                  value: "${{ steps.extract_last.outputs.LAST_LINE }}"
