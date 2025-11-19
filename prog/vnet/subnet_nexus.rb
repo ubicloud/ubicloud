@@ -125,7 +125,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def add_new_nic
-    register_deadline("wait", 3 * 60)
+    register_deadline("wait", 5 * 60)
     nics_snap = nics_to_rekey
     nap 10 if nics_snap.any? { |nic| nic.lock_set? }
     locked_nics = []
