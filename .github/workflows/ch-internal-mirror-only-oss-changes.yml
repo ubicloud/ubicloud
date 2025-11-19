@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - clickhouse
+      - main
 
 env:
   OSS_CHANGES_BRANCH: oss-changes
@@ -13,6 +14,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          ref: clickhouse
       - name: Generate Token
         id: generate-token
         uses: actions/create-github-app-token@v1
