@@ -5,7 +5,7 @@ require_relative "../../model/spec_helper"
 RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
   subject(:prog) { described_class.new(st) }
 
-  let(:st) { Strand.new }
+  let(:st) { Strand.create(prog: "Kubernetes::UpgradeKubernetesNode", label: "start") }
 
   let(:project) {
     Project.create(name: "default")

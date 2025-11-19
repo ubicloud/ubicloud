@@ -105,7 +105,7 @@ class Prog::Vnet::CertNexus < Prog::Base
   label def restart
     when_restarted_set? do
       decr_restarted
-      update_stack_restart_counter
+      update_stack({"restarted" => strand.stack.first["restarted"] + 1})
       hop_start
     end
 
@@ -137,13 +137,6 @@ class Prog::Vnet::CertNexus < Prog::Base
     dns_zone.delete_record(record_name: dns_record_name) if dns_challenge
     cert.destroy
     pop "certificate revoked and destroyed"
-  end
-
-  def update_stack_restart_counter
-    current_frame = strand.stack.first
-    current_frame["restarted"] += 1
-    strand.modified!(:stack)
-    strand.save_changes
   end
 
   def acme_client
