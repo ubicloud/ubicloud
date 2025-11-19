@@ -3,3 +3,4 @@
 .github/scripts/mirror.include
 .github/scripts/mirror.exclude
 
+ch-internal/**
