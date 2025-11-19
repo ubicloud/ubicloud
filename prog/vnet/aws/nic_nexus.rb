@@ -33,25 +33,28 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
     # 3. AWS will fail the call if there's a conflict, and we can simply retry
     ipv_6_cidr_block = NetAddr::IPv6Net.parse(vpc_response.ipv_6_cidr_block_association_set[0].ipv_6_cidr_block).nth_subnet(64, SecureRandom.random_number(2**8))
     subnet_response = client.describe_subnets({filters: [{name: "tag:Name", values: [nic.name]}]})
-    subnet_id = if private_subnet.old_aws_subnet?
-      client.describe_subnets({filters: [{name: "vpc-id", values: [vpc_id]}]}).subnets[0].subnet_id
+    subnet_id, subnet_az = if private_subnet.old_aws_subnet?
+      subnet = client.describe_subnets({filters: [{name: "vpc-id", values: [vpc_id]}]}).subnets[0]
+      [subnet.subnet_id, subnet.availability_zone]
     elsif subnet_response.subnets.empty?
+      subnet_az = az_to_provision_subnet
       subnet_id = client.create_subnet({
         vpc_id:,
         cidr_block: NetAddr::IPv4Net.new(nic.private_ipv4.network, NetAddr::Mask32.new(24)).to_s,
         ipv_6_cidr_block: ipv_6_cidr_block.to_s,
-        availability_zone: private_subnet.location.name + az_to_provision_subnet,
+        availability_zone: private_subnet.location.name + subnet_az,
         tag_specifications: Util.aws_tag_specifications("subnet", nic.name)
       }).subnet.subnet_id
       client.modify_subnet_attribute({
         subnet_id:,
         assign_ipv_6_address_on_creation: {value: true}
       })
-      subnet_id
+      [subnet_id, subnet_az]
     else
-      subnet_response.subnets[0].subnet_id
+      subnet = subnet_response.subnets[0]
+      [subnet.subnet_id, subnet.availability_zone]
     end
-    nic.nic_aws_resource.update(subnet_id:, subnet_az: az_to_provision_subnet)
+    nic.nic_aws_resource.update(subnet_id:, subnet_az:)
 
     hop_wait_subnet_created
   end
