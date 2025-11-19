@@ -325,7 +325,18 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   end
 
   describe "#update_billing_records" do
+    it "skips to wait if project is not billable" do
+      non_billable_project = Project.create(name: "default", billable: false)
+      expect(postgres_resource).to receive(:project).and_return(non_billable_project).at_least(:once)
+      expect(postgres_resource.project.billable).to be false
+      expect(BillingRecord).not_to receive(:create)
+      expect { nx.update_billing_records }.to hop("wait")
+    end
+
     it "creates billing record for cores and storage then hops" do
+      billable_project = Project.create(name: "default", billable: true)
+      expect(postgres_resource).to receive(:project).and_return(billable_project).at_least(:once)
+      expect(postgres_resource.project.billable).to be true
       expect(postgres_resource).to receive(:flavor).and_return("standard")
       expect(postgres_resource.representative_server).to receive(:storage_size_gib).and_return(128)
       expect(postgres_resource).to receive(:target_server_count).and_return(2)

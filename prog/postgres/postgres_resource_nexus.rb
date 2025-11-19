@@ -183,6 +183,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def update_billing_records
+    hop_wait unless postgres_resource.project.billable
     decr_update_billing_records
 
     postgres_resource.active_billing_records.each(&:finalize)
