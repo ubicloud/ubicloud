@@ -35,9 +35,7 @@ ExecStart=nc -l 8080 -6
       update_firewall_rules(ps_multiple, ps_single, config: :perform_tests_public_blocked)
       update_firewall_rules(ps_single, ps_multiple, config: :perform_tests_public_blocked)
       ps_multiple.connect_subnet(ps_single)
-      update_stack({
-        "vm_to_be_connected_id" => vm_to_be_connected.id
-      })
+      update_stack({"vm_to_be_connected_id" => vm_to_be_connected.id})
     end
 
     unless ps_multiple.strand.label == "wait" && ps_single.strand.label == "wait" &&
@@ -64,9 +62,7 @@ ExecStart=nc -l 8080 -6
   label def perform_tests_private_ipv4
     unless frame["firewalls"] == "connected_private_ipv4"
       update_firewall_rules(ps_multiple, ps_single, config: :perform_connected_private_ipv4)
-      update_stack({
-        "firewalls" => "connected_private_ipv4"
-      })
+      update_stack({"firewalls" => "connected_private_ipv4"})
     end
 
     if ps_multiple.update_firewall_rules_set? || ps_multiple.vms.any? { |vm| vm.update_firewall_rules_set? }
@@ -83,9 +79,7 @@ ExecStart=nc -l 8080 -6
   label def perform_tests_private_ipv6
     unless frame["firewalls"] == "connected_private_ipv6"
       update_firewall_rules(ps_multiple, ps_single, config: :perform_connected_private_ipv6)
-      update_stack({
-        "firewalls" => "connected_private_ipv6"
-      })
+      update_stack({"firewalls" => "connected_private_ipv6"})
     end
 
     if ps_multiple.update_firewall_rules_set? || ps_multiple.vms.any? { |vm| vm.update_firewall_rules_set? }
@@ -103,9 +97,7 @@ ExecStart=nc -l 8080 -6
   label def perform_blocked_private_ipv4
     unless frame["firewalls"] == "blocked_private_ipv4"
       update_firewall_rules(ps_multiple, ps_multiple, config: :perform_blocked_private_ipv4)
-      update_stack({
-        "firewalls" => "blocked_private_ipv4"
-      })
+      update_stack({"firewalls" => "blocked_private_ipv4"})
     end
 
     if ps_multiple.update_firewall_rules_set? || ps_multiple.vms.any? { |vm| vm.update_firewall_rules_set? }
@@ -122,9 +114,7 @@ ExecStart=nc -l 8080 -6
   label def perform_blocked_private_ipv6
     unless frame["firewalls"] == "blocked_private_ipv6"
       update_firewall_rules(ps_multiple, ps_multiple, config: :perform_blocked_private_ipv6)
-      update_stack({
-        "firewalls" => "blocked_private_ipv6"
-      })
+      update_stack({"firewalls" => "blocked_private_ipv6"})
     end
 
     if ps_multiple.update_firewall_rules_set? || ps_multiple.vms.any? { |vm| vm.update_firewall_rules_set? }
