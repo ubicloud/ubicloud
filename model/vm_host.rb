@@ -318,7 +318,7 @@ class VmHost < Sequel::Model
     end
 
     all_mount_points.uniq.all? do |mount_point|
-      file_name = Shellwords.escape(File.join(mount_point, "test-file"))
+      file_name = Shellwords.escape(File.join(mount_point, "test-file-#{SecureRandom.hex(4)}"))
 
       write_result = ssh_session.exec!("sudo bash -c \"head -c 1M </dev/zero > #{file_name}\"")
       write_status = write_result.exitstatus == 0
