@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
-require_relative "../../model/spec_helper"
+require_relative "../../../model/spec_helper"
 require "netaddr"
 
-RSpec.describe Prog::Vm::Nexus do
+RSpec.describe Prog::Vm::Metal::Nexus do
   subject(:nx) {
     described_class.new(vm.strand).tap {
       it.instance_variable_set(:@vm, vm)
@@ -33,7 +33,7 @@ RSpec.describe Prog::Vm::Nexus do
       project_id: project.id,
       vm_host_id: vm_host.id
     )
-    Strand.create_with_id(vm.id, prog: "Vm::Nexus", label: "start")
+    Strand.create_with_id(vm.id, prog: "Vm::Metal::Nexus", label: "start")
     vm
   }
   let(:project) { Project.create(name: "default") }
@@ -50,178 +50,6 @@ RSpec.describe Prog::Vm::Nexus do
       name: "default-nic",
       state: "active")
   }
-
-  describe ".assemble" do
-    it "fails if there is no project" do
-      expect {
-        described_class.assemble("some_ssh key", "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
-      }.to raise_error RuntimeError, "No existing project"
-    end
-
-    it "fails if location doesn't exist" do
-      expect {
-        described_class.assemble("some_ssh key", project.id, location_id: nil)
-      }.to raise_error RuntimeError, "No existing location"
-    end
-
-    it "creates Subnet and Nic if not passed" do
-      expect {
-        described_class.assemble("some_ssh key", project.id)
-      }.to change(PrivateSubnet, :count).from(0).to(1)
-        .and change(Nic, :count).from(0).to(1)
-    end
-
-    it "creates Nic if only subnet_id is passed" do
-      expect {
-        described_class.assemble("some_ssh key", project.id, private_subnet_id: private_subnet.id)
-      }.to change(Nic, :count).from(0).to(1)
-      expect(PrivateSubnet.count).to eq(1)
-    end
-
-    it "adds the VM to a private subnet if nic_id is passed" do
-      expect(Prog::Vnet::SubnetNexus).not_to receive(:assemble)
-      expect(Prog::Vnet::NicNexus).not_to receive(:assemble)
-      described_class.assemble("some_ssh key", project.id, nic_id: nic.id, location_id: Location::HETZNER_FSN1_ID)
-    end
-
-    it "creates with default storage size from vm size" do
-      st = described_class.assemble("some_ssh key", project.id)
-      expect(st.stack.first["storage_volumes"].first["size_gib"]).to eq(Option::VmSizes.first.storage_size_options.first)
-    end
-
-    it "creates with custom storage size if provided" do
-      st = described_class.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 40}])
-      expect(st.stack.first["storage_volumes"].first["size_gib"]).to eq(40)
-    end
-
-    it "fails if given nic_id is not valid" do
-      expect {
-        described_class.assemble("some_ssh key", project.id, nic_id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
-      }.to raise_error RuntimeError, "Given nic doesn't exist with the id 0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"
-    end
-
-    it "fails if given subnet_id is not valid" do
-      expect {
-        described_class.assemble("some_ssh key", project.id, private_subnet_id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
-      }.to raise_error RuntimeError, "Given subnet doesn't exist with the id 0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"
-    end
-
-    it "fails if nic is assigned to a different vm" do
-      nic.update(vm_id: vm.id)
-      expect {
-        described_class.assemble("some_ssh key", project.id, nic_id: nic.id)
-      }.to raise_error RuntimeError, "Given nic is assigned to a VM already"
-    end
-
-    it "fails if nic subnet is in another location" do
-      private_subnet.update(location_id: Location::LEASEWEB_WDC02_ID)
-      expect {
-        described_class.assemble("some_ssh key", project.id, nic_id: nic.id)
-      }.to raise_error RuntimeError, "Given nic is created in a different location"
-    end
-
-    it "fails if subnet of nic belongs to another project" do
-      private_subnet.update(project_id: Project.create(name: "project-2").id)
-      expect {
-        described_class.assemble("some_ssh key", project.id, nic_id: nic.id)
-      }.to raise_error RuntimeError, "Given nic is not available in the given project"
-    end
-
-    it "fails if subnet belongs to another project" do
-      private_subnet.update(project_id: Project.create(name: "project-2").id)
-      expect {
-        described_class.assemble("some_ssh key", project.id, private_subnet_id: private_subnet.id)
-      }.to raise_error RuntimeError, "Given subnet is not available in the given project"
-    end
-
-    it "allows if subnet belongs to another project and allow_private_subnet_in_other_project argument is given" do
-      private_subnet.update(project_id: Project.create(name: "project-2").id)
-      vm = described_class.assemble("some_ssh key", project.id, private_subnet_id: private_subnet.id, allow_private_subnet_in_other_project: true).subject
-      expect(vm.private_subnets.map(&:id)).to eq [private_subnet.id]
-    end
-
-    it "creates arm64 vm with double core count and 3.2GB memory per core" do
-      st = described_class.assemble("some_ssh key", project.id, size: "standard-4", arch: "arm64")
-      expect(st.subject.vcpus).to eq(4)
-      expect(st.subject.memory_gib).to eq(12)
-    end
-
-    it "requests as many gpus as specified" do
-      st = described_class.assemble("some_ssh key", project.id, size: "standard-2", gpu_count: 2)
-      expect(st.stack.first["gpu_count"]).to eq(2)
-    end
-
-    it "requests at least a single gpu for standard-gpu-6" do
-      st = described_class.assemble("some_ssh key", project.id, size: "standard-gpu-6")
-      expect(st.stack.first["gpu_count"]).to eq(1)
-    end
-
-    it "requests no gpus by default" do
-      st = described_class.assemble("some_ssh key", project.id, size: "standard-2")
-      expect(st.stack.first["gpu_count"]).to eq(0)
-    end
-
-    it "creates correct number of storage volumes for storage optimized instance types" do
-      loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
-      storage_volumes = [
-        {encrypted: true, size_gib: 30},
-        {encrypted: true, size_gib: 7500}
-      ]
-
-      vm = described_class.assemble("some_ssh key", project.id, location_id: loc.id, size: "i8g.8xlarge", arch: "arm64", storage_volumes:).subject
-      expect(vm.vm_storage_volumes.count).to eq(3)
-    end
-
-    it "hops to start_aws if location is aws" do
-      loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
-      st = described_class.assemble("some_ssh key", project.id, location_id: loc.id)
-      expect(st.label).to eq("start")
-    end
-  end
-
-  describe ".assemble_with_sshable" do
-    it "calls .assemble with generated ssh key" do
-      st_id = "eb3dbcb3-2c90-8b74-8fb4-d62a244d7ae5"
-      expect(SshKey).to receive(:generate).and_return(instance_double(SshKey, public_key: "public", keypair: "pair"))
-      st = Strand.new(id: st_id)
-      expect(described_class).to receive(:assemble) do |public_key, project_id, **kwargs|
-        expect(public_key).to eq("public")
-        expect(project_id).to eq(project.id)
-        expect(kwargs[:name]).to be_nil
-        expect(kwargs[:size]).to eq("new_size")
-      end.and_return(st)
-      expect(Sshable).to receive(:create_with_id).with(st, host: "temp_#{st_id}", raw_private_key_1: "pair", unix_user: "rhizome")
-
-      described_class.assemble_with_sshable(project.id, size: "new_size")
-    end
-  end
-
-  describe "#start_aws" do
-    it "naps if vm nics are not in wait state" do
-      nic.update(vm_id: vm.id)
-      Strand.create_with_id(nic.id, prog: "Vnet::NicNexus", label: "start")
-      expect { nx.start_aws }.to nap(1)
-    end
-
-    it "hops to wait_aws_vm_started if vm nics are in wait state" do
-      st.stack = [{"alternative_families" => ["m7i", "m6a"]}]
-      nic.update(vm_id: vm.id)
-      Strand.create_with_id(nic.id, prog: "Vnet::NicNexus", label: "wait")
-      expect(nx).to receive(:bud).with(Prog::Aws::Instance, {"subject_id" => vm.id, "alternative_families" => ["m7i", "m6a"]}, :start)
-      expect { nx.start_aws }.to hop("wait_aws_vm_started")
-    end
-  end
-
-  describe "#wait_aws_vm_started" do
-    it "reaps and naps if not leaf" do
-      Strand.create(parent_id: st.id, prog: "Aws::Instance", label: "start", stack: [{}], lease: Time.now + 10)
-      expect { nx.wait_aws_vm_started }.to nap(3)
-    end
-
-    it "hops to wait_sshable if leaf" do
-      expect { nx.wait_aws_vm_started }.to hop("wait_sshable")
-    end
-  end
 
   describe "#create_unix_user" do
     it "runs adduser" do
@@ -623,13 +451,6 @@ RSpec.describe Prog::Vm::Nexus do
       expect { nx.start }.to hop("create_unix_user")
     end
 
-    it "fails if same host is forced and excluded" do
-      expect {
-        described_class.assemble("some_ssh key", project.id,
-          force_host_id: "some-vm-host-id", exclude_host_ids: ["some-vm-host-id"])
-      }.to raise_error RuntimeError, "Cannot force and exclude the same host"
-    end
-
     it "requests distinct storage devices" do
       st.stack = [{
         "distinct_storage_devices" => true,
@@ -759,28 +580,6 @@ RSpec.describe Prog::Vm::Nexus do
         .and change(BillingRecord, :count).from(0).to(2)
       expect(vm.active_billing_records.map { it.billing_rate["resource_type"] }.sort).to eq(["Gpu", "VmVCpu"])
     end
-
-    it "doesn't create additional billing records when the location provider is aws" do
-      vm.location.provider = "aws"
-      vm.ip4_enabled = true
-      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, skip_sync: false)
-      adr = Address.create(cidr: "192.168.1.0/24", routed_to_host_id: vm_host.id)
-      AssignedVmAddress.create(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
-      PciDevice.create(vm_id: vm.id, vm_host_id: vm_host.id, slot: "01:00.0", iommu_group: 23, device_class: "0302", vendor: "10de", device: "20b5")
-
-      expect { nx.create_billing_record }.to hop("wait")
-        .and change(BillingRecord, :count).from(0).to(1)
-      expect(vm.active_billing_records.first.billing_rate["resource_type"]).to eq("VmVCpu")
-    end
-
-    it "creates a billing record when host is nil" do
-      expect(nx).to receive(:host).and_return(nil)
-      vm.location.provider = "aws"
-      AwsInstance.create_with_id(vm.id, instance_id: "i-0123456789abcdefg")
-
-      expect { nx.create_billing_record }.to hop("wait")
-        .and change(BillingRecord, :count).from(0).to(1)
-    end
   end
 
   describe "#before_run" do
@@ -887,15 +686,12 @@ RSpec.describe Prog::Vm::Nexus do
   end
 
   describe "#update_firewall_rules" do
-    ["Aws", "Metal"].each do |provider|
-      it "hops to wait_firewall_rules" do
-        vm.incr_update_firewall_rules
-        expect(vm).to receive(:location).and_return(instance_double(Location, aws?: provider == "Aws"))
-        prog = (provider == "Aws") ? Prog::Vnet::Aws::UpdateFirewallRules : Prog::Vnet::Metal::UpdateFirewallRules
-        expect(nx).to receive(:push).with(prog, {}, :update_firewall_rules)
-        expect { nx.update_firewall_rules }
-          .to change { vm.reload.update_firewall_rules_set? }.from(true).to(false)
-      end
+    it "hops to wait_firewall_rules" do
+      vm.incr_update_firewall_rules
+      expect(vm).to receive(:location).and_return(instance_double(Location, aws?: false))
+      expect(nx).to receive(:push).with(Prog::Vnet::Metal::UpdateFirewallRules, {}, :update_firewall_rules)
+      expect { nx.update_firewall_rules }
+        .to change { vm.reload.update_firewall_rules_set? }.from(true).to(false)
     end
 
     it "hops to wait if firewall rules are applied" do
@@ -1081,17 +877,6 @@ RSpec.describe Prog::Vm::Nexus do
 
       expect { nx.destroy }.to hop("destroy_slice")
     end
-
-    it "hops to wait_aws_vm_destroyed if vm is in aws" do
-      location_id = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true).id
-      vm.update(location_id:)
-      st.update(prog: "Vm::Nexus", label: "destroy", stack: [{}])
-      child = Strand.create(parent_id: st.id, prog: "Aws::Instance", label: "start", stack: [{}])
-      expect(nx).to receive(:bud).with(Prog::Aws::Instance, {"subject_id" => vm.id}, :destroy)
-      expect { nx.destroy }.to hop("wait_aws_vm_destroyed")
-      expect(Semaphore[strand_id: child.id, name: "destroy"]).not_to be_nil
-      expect(vm.display_state).to eq("deleting")
-    end
   end
 
   describe "#destroy_slice" do
@@ -1132,20 +917,6 @@ RSpec.describe Prog::Vm::Nexus do
         .and change { nic.reload.destroy_set? }.from(false).to(true)
         .and change(nic, :vm_id).from(vm.id).to(nil)
       expect(vm.exists?).to be(false)
-    end
-  end
-
-  describe "#wait_aws_vm_destroyed" do
-    it "reaps and pops if leaf" do
-      st.update(prog: "Vm::Nexus", label: "wait_aws_vm_destroyed", stack: [{}])
-      expect(nx).to receive(:final_clean_up)
-      expect { nx.wait_aws_vm_destroyed }.to exit({"msg" => "vm deleted"})
-    end
-
-    it "naps if not leaf" do
-      st.update(prog: "Vm::Nexus", label: "wait_aws_vm_destroyed", stack: [{}])
-      Strand.create(parent_id: st.id, prog: "Aws::Instance", label: "start", stack: [{}], lease: Time.now + 10)
-      expect { nx.wait_aws_vm_destroyed }.to nap(10)
     end
   end
 

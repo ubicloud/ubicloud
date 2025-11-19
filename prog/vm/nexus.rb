@@ -131,7 +131,7 @@ class Prog::Vm::Nexus < Prog::Base
         gpu_device = "27b0"
       end
 
-      label = if location.aws?
+      prog = if location.aws?
         disk_index = 0
         storage_volumes.each do |volume|
           max_disk_size = (vm_size.family == "i8g") ? 3750.0 : 1900.0
@@ -149,14 +149,14 @@ class Prog::Vm::Nexus < Prog::Base
             disk_index += 1
           end
         end
-        "start_aws"
+        "Vm::Aws::Nexus"
       else
-        "start"
+        "Vm::Metal::Nexus"
       end
 
       Strand.create(
-        prog: "Vm::Nexus",
-        label:,
+        prog:,
+        label: "start",
         stack: [{
           "storage_volumes" => storage_volumes.map { |v| v.transform_keys(&:to_s) },
           "swap_size_bytes" => swap_size_bytes,
