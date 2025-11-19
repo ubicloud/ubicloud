@@ -78,21 +78,21 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
     it "reuses existing subnet" do
       expect(nic.private_subnet).to receive(:old_aws_subnet?).and_return(false)
       client.stub_responses(:describe_vpcs, vpcs: [{ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}], vpc_id: "vpc-0123456789abcdefg"}])
-      client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-existing"}])
+      client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-existing", availability_zone: "a"}])
       expect(client).not_to receive(:create_route_table)
       expect(nic.nic_aws_resource).to receive(:update).with(subnet_id: "subnet-existing", subnet_az: "a")
-      expect(nx).to receive(:az_to_provision_subnet).and_return("a")
+      expect(nx).not_to receive(:az_to_provision_subnet)
       expect { nx.create_subnet }.to hop("wait_subnet_created")
     end
 
     it "reuses existing subnet for old aws subnet" do
       expect(nic.private_subnet).to receive(:old_aws_subnet?).and_return(true)
       client.stub_responses(:describe_vpcs, vpcs: [{ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}], vpc_id: "vpc-0123456789abcdefg"}])
-      client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-existing"}])
+      client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-existing", availability_zone: "a"}])
       client.stub_responses(:modify_subnet_attribute)
       expect(client).not_to receive(:create_route_table)
       expect(nic.nic_aws_resource).to receive(:update).with(subnet_id: "subnet-existing", subnet_az: "a")
-      expect(nx).to receive(:az_to_provision_subnet).and_return("a")
+      expect(nx).not_to receive(:az_to_provision_subnet)
       expect { nx.create_subnet }.to hop("wait_subnet_created")
     end
   end
