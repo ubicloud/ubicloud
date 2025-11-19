@@ -85,7 +85,7 @@ class Clover
       dataset = dataset.where(location_id: @location.id) if @location
       paginated_result(dataset, Serializers::Postgres)
     else
-      @postgres_databases = dataset.all
+      @postgres_databases = dataset.order(:name).all
         .group_by { |r| r.read_replica? ? r[:parent_id] : r[:id] }
         .flat_map { |group_id, rs| rs.sort_by { |r| r[:created_at] } }
       view "postgres/index"
