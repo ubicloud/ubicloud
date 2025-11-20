@@ -11,7 +11,7 @@ RSpec.describe Prog::Test::GithubRunner do
     expect(Config).to receive(:github_runner_service_project_id).and_return("fabd95f8-d002-8ed2-9f4c-00625eb7f574")
     expect(Config).to receive(:vm_pool_project_id).and_return("c3fd495f-9888-82d2-8100-7fae94e87e27")
     expect(Config).to receive(:e2e_github_installation_id).and_return(123456).at_least(:once)
-    allow(Github).to receive(:installation_client).with(Config.e2e_github_installation_id).and_return(client)
+    allow(Github).to receive(:installation_client).with(Config.e2e_github_installation_id, auto_paginate: true).and_return(client)
   end
 
   describe "#start" do
