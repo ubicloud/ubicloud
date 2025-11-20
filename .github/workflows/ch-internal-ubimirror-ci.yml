@@ -1,0 +1,67 @@
+name: '[INTERNAL] CI'
+permissions:
+  contents: read
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - clickhouse
+  pull_request:
+jobs:
+  ruby-ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on: ["k8s-large"]
+    name: Ruby CI - ${{matrix.runs-on}}
+    runs-on: ${{matrix.runs-on}}
+    timeout-minutes: 25
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+      - name: Set up Clover
+        uses: ./.github/actions/setup-clover
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: "package.json"
+      - name: Install node packages
+        run: npm ci
+      - name: Run erb-formatter
+        run: bundle exec rake linter:erb_formatter
+      - name: Cache rubocop
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cache/rubocop_cache
+          key: ${{ matrix.runs-on }}-rubocop-cache-${{ hashFiles('Gemfile.lock', '.rubocop.yml') }}
+      - name: Run rubocop
+        run: bundle exec rake linter:rubocop
+      - name: Run brakeman
+        run: bundle exec rake linter:brakeman
+      - name: Run linter:openapi
+        run: bundle exec rake linter:openapi
+      - name: Run annotate
+        run: bundle exec rake annotate
+      - name: Refresh sequel caches
+        run: bundle exec rake refresh_sequel_caches
+      - name: Check that source code formatters and annotations make no changes
+        run: git diff --stat --exit-code
+      - name: Check production puma loads
+        env:
+          CLOVER_DATABASE_URL: postgres:///clover_test?user=clover
+        run: ruby bin/production_check
+      - name: Run controlplane tests
+        run: bundle exec rake
+      - name: Run dataplane tests
+        run: bundle exec rake rhizome_spec
+      - name: Run CSI tests
+        run: rake csi_spec
+      - name: Archive code coverage results
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: code-coverage-report-${{ matrix.runs-on }}
+          path: coverage/
+env:
+  LANG: en_US.UTF-8
+  LC_ALL: en_US.UTF-8

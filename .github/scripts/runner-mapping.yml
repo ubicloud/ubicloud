@@ -1,0 +1,8 @@
+# Mapping of ubicloud runner sizes to k8s runner sizes
+# Format: ubicloud-runner: k8s-runner
+mappings:
+  ubicloud: k8s-small
+  ubicloud-arm: k8s-small
+  ubicloud-standard-4: k8s-medium
+  ubicloud-standard-8: k8s-large
+  ubicloud-standard-8-arm: k8s-large

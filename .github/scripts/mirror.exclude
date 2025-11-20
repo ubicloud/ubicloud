@@ -2,5 +2,10 @@
 .github/scripts/mirror.sh
 .github/scripts/mirror.include
 .github/scripts/mirror.exclude
+.github/scripts/mirror-ci.include
+.github/scripts/mirror-ci.exclude
+.github/scripts/runner-mapping.yml
+.github/scripts/generate_ubi_ci.sh
 
 ch-internal/**
+

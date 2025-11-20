@@ -1,0 +1,54 @@
+name: '[INTERNAL] cli/ubi CI'
+permissions:
+  contents: read
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - clickhouse
+    paths:
+      - 'cli/**'
+      - 'bin/ubi'
+      - 'spec/cli_spec.rb'
+      - '.github/workflows/cli-ci.yml'
+      - '.github/actions/setup-clover/action.yml'
+  pull_request:
+    paths:
+      - 'cli/**'
+      - 'bin/ubi'
+      - 'spec/cli_spec.rb'
+      - '.github/workflows/cli-ci.yml'
+      - '.github/actions/setup-clover/action.yml'
+jobs:
+  cli-ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on: ["k8s-small"]
+    name: cli/ubi CI - ${{matrix.runs-on}}
+    runs-on: ${{matrix.runs-on}}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+      - name: Set up Clover
+        uses: ./.github/actions/setup-clover
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: 'cli/go.mod'
+      - name: Build cli/ubi
+        run: bundle exec rake ubi
+      - name: Run cli/ubi tests
+        env:
+          UBI_CMD: ./cli/ubi
+        run: bundle exec rspec spec/cli_spec.rb
+      - name: Run go fmt and check it makes no changes
+        run: "cd cli && go fmt && git diff --stat --exit-code"
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.1.5
+          working-directory: cli
+env:
+  LANG: en_US.UTF-8
+  LC_ALL: en_US.UTF-8

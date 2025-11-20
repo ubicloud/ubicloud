@@ -10,23 +10,59 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Setup PostgreSQL
+    - name: Setup tool cache directory
       shell: bash
       run: |
-        # Remove the default PostgreSQL cluster on the runner
-        sudo -u postgres pg_dropcluster 16 main --stop
+        sudo mkdir -p /opt/hostedtoolcache && sudo chown -R "$(whoami)":"$(whoami)" /opt/hostedtoolcache
+
+    - name: Install system dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libssl-dev libffi-dev libpq-dev build-essential locales
+
+        # Generate and set locale
+        sudo locale-gen en_US.UTF-8
+        sudo update-locale LANG=en_US.UTF-8
+
+    - name: Setup PostgreSQL
+      shell: bash
+      env:
+        LANG: en_US.UTF-8
+        LC_ALL: en_US.UTF-8
+      run: |
         # Install PostgreSQL
         sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
         wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
         sudo apt-get update
         sudo apt-get install -y postgresql-17 postgresql-client-17
-        # Allow runner user to access PostgreSQL
-        echo 'runner_map runner postgres
-        runner_map runner clover
-        runner_map runner clover_password' | sudo tee -a /etc/postgresql/17/main/pg_ident.conf > /dev/null
-        sudo sed -i '1i local   all   all   peer map=runner_map' /etc/postgresql/17/main/pg_hba.conf
-        sudo systemctl start postgresql
-        until pg_isready -q; do sleep 1; done
+
+        # Initialize a fresh data directory
+        export PGDATA="$HOME/pgdata"
+        mkdir -p "$PGDATA"
+        /usr/lib/postgresql/17/bin/initdb -D "$PGDATA" --auth=trust --locale=C.UTF-8
+
+        # Configure PostgreSQL to use home directory for socket
+        echo "unix_socket_directories = '$HOME'" >> "$PGDATA/postgresql.conf"
+
+        # Start PostgreSQL
+        /usr/lib/postgresql/17/bin/pg_ctl -D "$PGDATA" -l "$HOME/postgres.log" start
+
+        # Tail logs in background
+        tail -f "$HOME/postgres.log" &
+
+        # Wait for PostgreSQL to be ready
+        export PGHOST="$HOME"
+        for i in {1..30}; do
+          /usr/lib/postgresql/17/bin/pg_isready && break
+          sleep 1
+        done
+
+        # Create postgres role as alias to current user
+        createuser -s postgres || true
+
+        # Make PGHOST available to subsequent steps
+        echo "PGHOST=$HOME" >> $GITHUB_ENV
 
     - name: Set up Ruby
       uses: ruby/setup-ruby@v1
@@ -49,8 +85,8 @@ runs:
     - name: Setup clover database
       shell: bash
       run: |
-        createuser -U postgres clover
-        createuser -U postgres clover_password
+        createuser clover
+        createuser clover_password
         bundle exec rake setup_database\[test,true\]
 
     - name: Set up Node.js
