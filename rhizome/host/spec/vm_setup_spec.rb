@@ -276,7 +276,7 @@ RSpec.describe VmSetup do
         expect(content).to include("Slice=system.slice")
         expect(content).to include("NetworkNamespacePath=/var/run/netns/test")
 
-        expect(content).to include("ExecStart=/usr/bin/qemu-system-#{Arch.render(x64: "x86_64", arm64: "aarch64")}")
+        expect(content).to include("ExecStart=qemu-system-#{Arch.render(x64: "x86_64", arm64: "aarch64")}")
         %w[
           -bios /opt/fw/QEMU.fd
           -object memory-backend-memfd,id=mem0,size=2G,hugetlb=on,hugetlbsize=1G,prealloc=on,share=on
@@ -287,9 +287,9 @@ RSpec.describe VmSetup do
           -enable-kvm
           -machine accel=kvm,type=q35
           -drive if=none,file=/vm/test/cloudinit.img,format=raw,readonly=on,id=cidrive
-          -device virtio-blk-pci,drive=cidrive
+          -device virtio-blk-pci,drive=cidrive,romfile=
           -netdev tap,id=net0,ifname=tap0,script=no,downscript=no,queues=5,vhost=on
-          -device virtio-net-pci,mac=02:aa:bb:cc:dd:01,netdev=net0,mq=on
+          -device virtio-net-pci,mac=02:aa:bb:cc:dd:01,netdev=net0,mq=on,romfile=
           -serial file:/vm/test/serial.log
           -display none
           -no-reboot

@@ -826,18 +826,18 @@ DNSMASQ_SERVICE
       if vol.read_only
         [
           "-drive if=none,file=#{vol.image_path},format=raw,readonly=on,id=disk#{i}",
-          "-device virtio-blk-pci,drive=disk#{i}"
+          "-device virtio-blk-pci,drive=disk#{i},romfile="
         ]
       else
         [
           "-chardev socket,id=vhostblk#{i},path=#{vol.vhost_sock},server=off",
-          "-device vhost-user-blk-pci,chardev=vhostblk#{i},num-queues=#{vol.num_queues},queue-size=#{vol.queue_size}"
+          "-device vhost-user-blk-pci,chardev=vhostblk#{i},num-queues=#{vol.num_queues},queue-size=#{vol.queue_size},romfile="
         ]
       end
     end
     disk_parts += [
       "-drive if=none,file=#{vp.cloudinit_img},format=raw,readonly=on,id=cidrive",
-      "-device virtio-blk-pci,drive=cidrive"
+      "-device virtio-blk-pci,drive=cidrive,romfile="
     ]
 
     mem_parts =
@@ -862,14 +862,14 @@ DNSMASQ_SERVICE
     net_parts = nics.each_with_index.flat_map { |nic, i|
       [
         "-netdev tap,id=net#{i},ifname=#{nic.tap},script=no,downscript=no,queues=#{max_vcpus * 2 + 1},vhost=on",
-        "-device virtio-net-pci,mac=#{nic.mac},netdev=net#{i},mq=on"
+        "-device virtio-net-pci,mac=#{nic.mac},netdev=net#{i},mq=on,romfile="
       ]
     }
 
     pci_parts = pci_devices.map.with_index(1) do |(bdf), i|
       [
         "-device pcie-root-port,id=rp#{i},slot=#{i},chassis=#{i},bus=pcie.0,hotplug=off",
-        "-device vfio-pci,host=0000:#{bdf},bus=rp#{i},addr=0x0,x-no-mmap=true,rombar=0"
+        "-device vfio-pci,host=0000:#{bdf},bus=rp#{i},addr=0x0"
       ]
     end.flatten
 
@@ -890,7 +890,7 @@ DNSMASQ_SERVICE
   Slice=#{slice_name}
   NetworkNamespacePath=/var/run/netns/#{@vm_name}
 
-  ExecStart=/usr/bin/qemu-system-#{Arch.render(x64: "x86_64", arm64: "aarch64")} \\
+  ExecStart=qemu-system-#{Arch.render(x64: "x86_64", arm64: "aarch64")} \\
   #{(kernel_parts + mem_parts + cpu_parts + disk_parts + net_parts + pci_parts + serial_parts).join(" \\\n")}
 
   KillSignal=SIGTERM
