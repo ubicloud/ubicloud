@@ -1795,6 +1795,40 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  '/project/{project_id}/postgres/locations':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: getPostgresLocations
+      summary: List available locations for PostgreSQL resources
+      description: 'Returns all locations where PostgreSQL databases can be provisioned for this project, including available VM sizes and PostgreSQL versions.'
+      parameters:
+        - name: provider
+          in: query
+          description: 'Filter locations by provider name (e.g., "hetzner", "aws")'
+          required: false
+          schema:
+            type: string
+          example: hetzner
+      responses:
+        '200':
+          description: List of available PostgreSQL locations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PostgresLocation'
+                additionalProperties: false
+                required:
+                  - items
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Location
   '/project/{project_id}/private-location':
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -3020,6 +3054,123 @@ components:
         - name
         - node_count
         - node_size
+    PostgresLocation:
+      type: object
+      properties:
+        name:
+          description: Machine-readable location identifier
+          type: string
+          example: hetzner-fsn1
+        display_name:
+          description: Human-readable location name
+          type: string
+          example: Hetzner Falkenstein
+        ui_name:
+          description: UI-friendly location name
+          type: string
+          example: 'Falkenstein, DE'
+        provider:
+          description: Cloud provider name
+          type: string
+          example: hetzner
+        visible:
+          description: Whether this location is publicly visible
+          type: boolean
+          example: true
+        available_postgres_versions:
+          description: List of supported PostgreSQL versions
+          type: array
+          items:
+            type: string
+          example:
+            - '18'
+            - '17'
+            - '16'
+        available_vm_families:
+          description: Available VM families with their sizes
+          type: array
+          items:
+            $ref: '#/components/schemas/VmFamily'
+          example:
+            - name: standard
+              display_name: Dedicated CPU
+              category: general-purpose
+              sizes:
+                - name: standard-2
+                  vcpu: 2
+                  memory_gib: 8
+                  storage_size_gib: 256
+                - name: standard-4
+                  vcpu: 4
+                  memory_gib: 16
+                  storage_size_gib: 512
+            - name: burstable
+              display_name: Shared CPU
+              category: general-purpose
+              sizes:
+                - name: burstable-1
+                  vcpu: 1
+                  memory_gib: 2
+                  storage_size_gib: 64
+      additionalProperties: false
+      required:
+        - name
+        - display_name
+        - provider
+        - visible
+        - available_postgres_versions
+        - available_vm_families
+    VmFamily:
+      type: object
+      properties:
+        name:
+          description: 'Family identifier (e.g., standard, burstable, m8gd, i8g)'
+          type: string
+          example: standard
+        display_name:
+          description: Human-readable family description
+          type: string
+          example: Dedicated CPU
+        category:
+          description: 'VM family category (e.g., general-purpose, storage-optimized, compute-optimized)'
+          type: string
+          example: general-purpose
+        sizes:
+          description: Available VM sizes in this family
+          type: array
+          items:
+            $ref: '#/components/schemas/VmSize'
+      additionalProperties: false
+      required:
+        - name
+        - display_name
+        - category
+        - sizes
+    VmSize:
+      type: object
+      properties:
+        name:
+          description: VM size identifier
+          type: string
+          example: standard-2
+        vcpu:
+          description: Number of virtual CPUs
+          type: integer
+          example: 2
+        memory_gib:
+          description: Memory in GiB
+          type: integer
+          example: 4
+        storage_size_gib:
+          description: Storage capacity in GiB
+          type: integer
+          example: 128
+      additionalProperties: false
+      required:
+        - name
+        - vcpu
+        - memory_gib
+        - storage_size_gib
   responses:
     Delete:
       description: An empty response after successful resource delete
@@ -3582,6 +3733,8 @@ tags:
     name: Postgres Database
   - description: Postgres Firewall Rule Operations
     name: Postgres Firewall Rule
+  - description: Postgres Location Operations
+    name: Postgres Location
   - description: Postgres Metric Destination
     name: Postgres Metric Destination
   - description: Private Subnet Operations
