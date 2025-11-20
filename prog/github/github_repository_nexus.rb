@@ -30,10 +30,6 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   end
 
   def check_queued_jobs
-    unless github_repository.installation.project.active?
-      @polling_interval = 24 * 60 * 60
-      return
-    end
     queued_runs = client.repository_workflow_runs(github_repository.name, {status: "queued"})[:workflow_runs]
     Clog.emit("polled queued runs") { {polled_queued_runs: {repository_name: github_repository.name, count: queued_runs.count}} }
 
@@ -136,6 +132,14 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   end
 
   label def wait
+    unless github_repository.installation.project.active?
+      runners_ds = github_repository.runners_dataset.select(:id)
+      Semaphore.incr(runners_ds, "destroy")
+      Semaphore.incr(runners_ds, "skip_deregistration")
+      github_repository.incr_destroy
+      nap 0
+    end
+
     cleanup_cache if github_repository.access_key
     nap 15 * 60 if Time.now - github_repository.last_job_at > 6 * 60 * 60
 

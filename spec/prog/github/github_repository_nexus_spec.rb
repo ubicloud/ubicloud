@@ -92,12 +92,6 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       nx.check_queued_jobs
       expect(nx.polling_interval).to eq(15 * 60)
     end
-
-    it "does not poll jobs if the project is not active" do
-      installation.project.update(visible: false)
-      nx.check_queued_jobs
-      expect(nx.polling_interval).to eq(24 * 60 * 60)
-    end
   end
 
   describe ".cleanup_cache" do
@@ -216,6 +210,16 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(nx).to receive(:check_queued_jobs).and_raise(Octokit::NotFound)
       expect { nx.wait }.to nap(0)
       expect(repository.destroy_set?).to be(true)
+    end
+
+    it "destroys repository and runners if the project is not active" do
+      installation.project.update(visible: false)
+      runner = GithubRunner.create(installation_id: installation.id, repository_id: repository.id, repository_name: "ubicloud/ubicloud", label: "ubicloud")
+      Strand.create_with_id(runner, prog: "Vm::GithubRunner", label: "start")
+      expect { nx.wait }.to nap(0)
+      expect(repository.destroy_set?).to be(true)
+      expect(runner.destroy_set?).to be(true)
+      expect(runner.skip_deregistration_set?).to be(true)
     end
 
     it "does not poll if it is disabled" do
