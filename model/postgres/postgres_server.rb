@@ -330,7 +330,7 @@ class PostgresServer < Sequel::Model
   end
 
   def attach_s3_policy_if_needed
-    if timeline.aws? && vm.aws_instance.iam_role
+    if Config.aws_postgres_iam_access && timeline.aws? && vm.aws_instance.iam_role
       vm.location.location_credential.iam_client.attach_role_policy(role_name: vm.aws_instance.iam_role, policy_arn: s3_policy_arn)
     end
   end

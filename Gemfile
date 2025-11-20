@@ -12,7 +12,6 @@ gem "autoforme", ">= 1.14"
 gem "aws-sdk-ec2", "~> 1.512"
 gem "aws-sdk-iam"
 gem "aws-sdk-s3"
-gem "aws-sdk-sts", "~> 1.12"
 gem "bcrypt_pbkdf"
 gem "committee", ">= 5.5.4"
 gem "countries"
@@ -50,6 +49,10 @@ gem "stripe"
 gem "tilt", ">= 2.6.1"
 gem "warning"
 gem "webauthn"
+
+group :aws_sts do
+  gem "aws-sdk-sts", "~> 1.12"
+end
 
 group :development do
   gem "awesome_print"

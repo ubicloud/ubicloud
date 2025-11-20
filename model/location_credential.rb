@@ -3,7 +3,7 @@
 require_relative "../model"
 require "aws-sdk-ec2"
 require "aws-sdk-iam"
-require "aws-sdk-sts"
+require "aws-sdk-sts" if Config.test? ? ENV["CLOVER_FREEZE"] != "1" : Config.aws_postgres_iam_access
 
 class LocationCredential < Sequel::Model
   plugin ResourceMethods, encrypted_columns: [:access_key, :secret_key]

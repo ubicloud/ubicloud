@@ -470,6 +470,11 @@ RSpec.describe PostgresServer do
   end
 
   describe "#attach_s3_policy_if_needed" do
+    before do
+      skip unless ENV["CLOVER_FREEZE"] != "1"
+      allow(Config).to receive(:aws_postgres_iam_access).and_return(true)
+    end
+
     it "calls attach_role_policy when needs s3 policy attachment" do
       iam_client = Aws::IAM::Client.new(stub_responses: true)
       expect(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, aws?: true, aws_s3_policy_name: "policy-name")).at_least(:once)
