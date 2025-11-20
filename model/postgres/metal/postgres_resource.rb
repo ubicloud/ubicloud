@@ -2,6 +2,18 @@
 
 class PostgresResource < Sequel::Model
   module Metal
+    def self.available_families_and_sizes(_location, _project)
+      Set.new(
+        Option::POSTGRES_SIZE_OPTIONS.filter_map { |name, opt| [opt.family, name] if opt.family == "standard" || opt.family == "hobby" },
+      )
+    end
+
+    def self.storage_sizes(_location, family, vcpu_count)
+      min_storage = (vcpu_count >= 30) ? 1024 : vcpu_count * 32
+      min_storage /= 2 if family == "hobby"
+      [min_storage, min_storage * 2, min_storage * 4]
+    end
+
     private
 
     def metal_boot_image(pg_version, arch)

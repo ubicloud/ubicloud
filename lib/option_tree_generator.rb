@@ -59,4 +59,27 @@ class OptionTreeGenerator
 
     allowed_options
   end
+
+  def self.collect_valid_values(option_tree)
+    result = Hash.new { |h, k| h[k] = Set.new }
+    walk = lambda do |tree|
+      tree.each do |name, subtree|
+        next unless subtree
+        subtree.each do |value, children|
+          result[name] << value
+          walk.call(children)
+        end
+      end
+    end
+    walk.call(option_tree)
+    result
+  end
+
+  def self.stringify_tree(option_tree)
+    option_tree.each_with_object({}) do |(key, value), result|
+      next if value.nil?
+      serialized_key = key.is_a?(Location) ? key.name : key.to_s
+      result[serialized_key] = stringify_tree(value)
+    end
+  end
 end

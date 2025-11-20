@@ -604,6 +604,20 @@ usermod -L ubuntu
   end
 
   describe "#try_postgres_family_fallback" do
+    before do
+      # Decouple from config/instance_availability.yml
+      allow(OptionTreeFilter).to receive(:filter).with(provider: "aws", location: "us-west-2").and_return(
+        [
+          {family: "m6gd", size: "m6gd.large"},
+          {family: "m7gd", size: "m7gd.large"},
+          {family: "m8gd", size: "m8gd.large"},
+          {family: "r6gd", size: "r6gd.medium"},
+          {family: "r7gd", size: "r7gd.medium"},
+          {family: "r8gd", size: "r8gd.medium"},
+        ],
+      )
+    end
+
     it "returns false when there is no postgres_server for the vm" do
       expect(nx.try_postgres_family_fallback).to be false
     end
