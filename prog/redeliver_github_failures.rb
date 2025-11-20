@@ -3,14 +3,23 @@
 class Prog::RedeliverGithubFailures < Prog::Base
   label def wait
     last_check_time = Time.parse(frame["last_check_at"])
-    failed = failed_deliveries(last_check_time).each do |delivery|
-      Clog.emit("redelivering failed delivery") { {delivery: delivery.to_h} }
-      client.post("/app/hook/deliveries/#{delivery[:id]}/attempts")
-    end.count
-    Clog.emit("redelivered failed deliveries") { {deliveries: {failed:}} }
-    update_stack({"last_check_at" => Time.now})
+    nap 10 if Time.now - last_check_time < 2 * 60
+    failures = failed_deliveries(last_check_time)
+    failures.each_slice(50) do |deliveries|
+      bud Prog::RedeliverGithubFailures, {"delivery_ids" => deliveries.map { it[:id] }}, "redeliver"
+    end
+    update_stack({"last_check_at" => Time.now.to_s})
+    hop_wait_redelivers
+  end
 
-    nap 2 * 60
+  label def wait_redelivers
+    register_deadline("wait", 10 * 60)
+    reap(:wait)
+  end
+
+  label def redeliver
+    frame["delivery_ids"].each { client.post("/app/hook/deliveries/#{it}/attempts") }
+    pop "redelivered failures"
   end
 
   def client
@@ -21,21 +30,17 @@ class Prog::RedeliverGithubFailures < Prog::Base
     all_deliveries = client.get("/app/hook/deliveries?per_page=100")
     page = 1
     while (next_url = client.last_response.rels[:next]&.href) && (since < all_deliveries.last[:delivered_at])
-      if page >= max_page
-        Clog.emit("failed deliveries page limit reached") { {deliveries: {max_page:, since:}} }
-        break
-      end
+      break if page >= max_page
       page += 1
       all_deliveries += client.get(next_url)
     end
-
-    Clog.emit("fetched deliveries") { {deliveries: {total: all_deliveries.count, page:, since:}} }
-
-    all_deliveries
+    failures = all_deliveries
       .reject { it[:delivered_at] < since }
       .group_by { it[:guid] }
       .values
       .reject { |group| group.any? { it[:status] == "OK" } }
       .map { |group| group.max_by { it[:delivered_at] } }
+    Clog.emit("fetched github deliveries") { {fetched_github_deliveries: {total: all_deliveries.count, failed: failures.count, status: failures.map { it[:status] }.tally, page:, since:}} }
+    failures
   end
 end
