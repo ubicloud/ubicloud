@@ -2,6 +2,16 @@
 
 class PostgresResource < Sequel::Model
   module Gcp
+    def self.available_families_and_sizes(_location, _project)
+      Set.new(
+        Option::POSTGRES_SIZE_OPTIONS.filter_map { |name, opt| [opt.family, name] if Option::GCP_FAMILY_OPTIONS.include?(opt.family) },
+      )
+    end
+
+    def self.storage_sizes(_location, family, vcpu_count)
+      Option::GCP_STORAGE_SIZE_OPTIONS[family][vcpu_count]
+    end
+
     private
 
     def gcp_boot_image(pg_version, arch)

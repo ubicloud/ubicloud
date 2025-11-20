@@ -32,6 +32,27 @@ module ProviderDispatcher
         send(:"#{provider_dispatcher_group_name}_#{meth}", *a, **kw, &b)
       end
     end
+
+    class_methods = {}
+    PROVIDERS.each do |const|
+      implementation = model.const_get(const)
+      class_methods[const] = implementation.singleton_methods(false).sort
+    end
+
+    all_class_meths = class_methods.values.flatten.sort.uniq
+    class_methods.each do |const, meths|
+      # :nocov:
+      unless meths == all_class_meths
+        raise "Not all class methods implemented by all providers: #{const}, missing: #{(all_class_meths - meths).join(", ")}"
+      end
+      # :nocov:
+    end
+
+    all_class_meths.each do |meth|
+      model.define_singleton_method(meth) do |location, *a, **kw, &b|
+        const_get(location.provider_dispatcher_group_name.capitalize).send(meth, location, *a, **kw, &b)
+      end
+    end
   end
 
   module InstanceMethods

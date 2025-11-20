@@ -2,6 +2,22 @@
 
 class PostgresResource < Sequel::Model
   module Aws
+    def self.available_families_and_sizes(location, project)
+      postgres_families = Option::POSTGRES_FAMILY_OPTIONS.keys.to_set
+      Set.new(
+        OptionTreeFilter.filter(provider: "aws", location: location.name)
+          .filter_map { |e|
+            family = e[:family]
+            next unless postgres_families.include?(family)
+            [family, e[:size]] if ["m8gd", "i8g"].include?(family) || project.send(:"get_ff_enable_#{family}")
+          },
+      )
+    end
+
+    def self.storage_sizes(_location, family, vcpu_count)
+      Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpu_count]
+    end
+
     private
 
     def aws_boot_image(pg_version, arch)
