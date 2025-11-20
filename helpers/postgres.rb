@@ -108,6 +108,95 @@ class Clover
     end
   end
 
+  def generate_postgres_options(flavor: nil, location: nil)
+    options = OptionTreeGenerator.new
+
+    options.add_option(name: "name")
+
+    options.add_option(name: "flavor", values: flavor || postgres_flavors.keys)
+
+    options.add_option(name: "location", values: location || postgres_locations, parent: "flavor") do |flavor, location|
+      flavor == PostgresResource::Flavor::STANDARD || location.provider != "aws"
+    end
+
+    options.add_option(name: "family", values: Option::POSTGRES_FAMILY_OPTIONS.keys, parent: "location") do |flavor, location, family|
+      if location.aws?
+        ["m8gd", "i8g"].include?(family) || (Option::AWS_FAMILY_OPTIONS.include?(family) && @project.send(:"get_ff_enable_#{family}"))
+      else
+        family == "standard" || family == "hobby"
+      end
+    end
+
+    options.add_option(name: "size", values: Option::POSTGRES_SIZE_OPTIONS.keys, parent: "family") do |flavor, location, family, size|
+      Option::POSTGRES_SIZE_OPTIONS[size].family == family
+    end
+
+    storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS + Option::AWS_STORAGE_SIZE_OPTIONS.values.flat_map { |h| h.values.flatten }.uniq
+    options.add_option(name: "storage_size", values: storage_size_options, parent: "size") do |flavor, location, family, size, storage_size|
+      vcpu_count = Option::POSTGRES_SIZE_OPTIONS[size].vcpu_count
+
+      if location.aws?
+        Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpu_count].include?(storage_size)
+      else
+        min_storage = (vcpu_count >= 30) ? 1024 : vcpu_count * 32
+        min_storage /= 2 if family == "hobby"
+        [min_storage, min_storage * 2, min_storage * 4].include?(storage_size.to_i)
+      end
+    end
+
+    options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS.values.flatten.uniq, parent: "flavor") do |flavor, version|
+      Option::POSTGRES_VERSION_OPTIONS[flavor].include?(version)
+    end
+
+    options.add_option(name: "ha_type", values: Option::POSTGRES_HA_OPTIONS.keys, parent: "storage_size")
+
+    options.serialize
+  end
+
+  PostgresLocation = Struct.new(:location, :available_postgres_versions, :available_vm_families)
+  def vm_families_for_project(project)
+    locations = Location.visible_or_for_project(@project.id, @project.feature_flags["visible_locations"])
+    locations.map do |location|
+      PostgresLocation.new(
+        location:,
+        available_postgres_versions: Option::POSTGRES_VERSION_OPTIONS[PostgresResource::Flavor::STANDARD],
+        available_vm_families: vm_families_for_location(location),
+      )
+    end
+  end
+
+  def vm_families_for_location(location)
+    # Generate option tree for this location
+    option_tree, parents = generate_postgres_options(flavor: PostgresResource::Flavor::STANDARD, location:)
+
+    # Extract all valid family+size+storage combinations for this location
+    allowed_options = OptionTreeGenerator.generate_allowed_options("storage_size", option_tree, parents)
+
+    # Group by family and build size data
+    families_data = allowed_options.group_by { |opt| opt["family"] }.transform_values do |options|
+      options.map do |option_path|
+        size = Option::POSTGRES_SIZE_OPTIONS[option_path["size"]]
+        {
+          name: size.name,
+          vcpu: size.vcpu_count,
+          memory_gib: size.memory_gib,
+          storage_size_gib: option_path["storage_size"].to_i,
+        }
+      end
+    end
+
+    # Transform to the new structure with family metadata
+    families_data.map do |family_name, sizes|
+      family_option = Option::POSTGRES_FAMILY_OPTIONS[family_name]
+      {
+        name: family_name,
+        display_name: family_option.description,
+        category: family_option.category,
+        sizes:,
+      }
+    end
+  end
+
   def postgres_require_customer_firewall!
     unless (fw = @pg.customer_firewall)
       raise CloverError.new(400, "InvalidRequest", "PostgreSQL firewall was deleted, manage firewall rules using an appropriate firewall on the #{@pg.private_subnet.name} private subnet (id: #{@pg.private_subnet.ubid})")
