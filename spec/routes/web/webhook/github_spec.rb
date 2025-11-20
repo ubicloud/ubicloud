@@ -47,6 +47,15 @@ RSpec.describe Clover, "github" do
       expect(page.body).to eq({error: {message: "Unregistered installation"}}.to_json)
     end
 
+    it "fails if the project is inactive" do
+      account = create_account.update(suspended_at: Time.now)
+      account.add_project(installation.project)
+      send_webhook("installation", {action: "deleted", installation: {id: installation.installation_id}})
+
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "Inactive project"}}.to_json)
+    end
+
     it "destroys installation when receive deleted action" do
       expect(Prog::Github::DestroyGithubInstallation).to receive(:assemble).with(installation)
       send_webhook("installation", {action: "deleted", installation: {id: installation.installation_id}})
