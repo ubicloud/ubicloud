@@ -40,9 +40,8 @@ class Clover
     installation = GithubInstallation[installation_id: data["installation"]["id"]]
     case data["action"]
     when "deleted"
-      unless installation
-        return error("Unregistered installation")
-      end
+      return error("Unregistered installation") unless installation
+      return error("Inactive project") unless installation.project.active?
 
       Prog::Github::DestroyGithubInstallation.assemble(installation)
       return success("GithubInstallation[#{installation.ubid}] deleted")
