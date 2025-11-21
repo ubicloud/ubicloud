@@ -65,6 +65,14 @@ RSpec.describe Clover, "github" do
     end
 
     it "fails if label not matched" do
+      send_webhook("workflow_job", workflow_job_payload(action: "completed", workflow_job: workflow_job_object(label: "other")))
+
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "Unmatched label"}}.to_json)
+    end
+
+    it "fails if label not matched and logs if queued" do
+      expect(Clog).to receive(:emit).with("Unmatched label").and_call_original
       send_webhook("workflow_job", workflow_job_payload(action: "queued", workflow_job: workflow_job_object(label: "other")))
 
       expect(page.status_code).to eq(200)
