@@ -76,14 +76,14 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "uses the existing vm if pool can pick one" do
-      pool = VmPool.create(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64", storage_skip_sync: true)
+      pool = VmPool.create(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64", storage_skip_sync: true)
       vm = create_vm(pool_id: pool.id, display_state: "running")
       picked_vm = nx.pick_vm
       expect(vm.id).to eq(picked_vm.id)
     end
 
     it "uses the premium vm pool if the installation prefers premium runners" do
-      pool = VmPool.create(size: 2, vm_size: "premium-4", boot_image: "github-ubuntu-2204", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64", storage_skip_sync: true)
+      pool = VmPool.create(size: 2, vm_size: "premium-4", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64", storage_skip_sync: true)
       vm = create_vm(pool_id: pool.id, display_state: "running", family: "premium")
       expect(installation).to receive(:premium_runner_enabled?).and_return(true)
       picked_vm = nx.pick_vm
@@ -92,7 +92,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "uses the premium vm pool if a free premium upgrade is enabled" do
-      pool = VmPool.create(size: 2, vm_size: "premium-4", boot_image: "github-ubuntu-2204", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64", storage_skip_sync: true)
+      pool = VmPool.create(size: 2, vm_size: "premium-4", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64", storage_skip_sync: true)
       vm = create_vm(pool_id: pool.id, display_state: "running", family: "premium")
       expect(installation).to receive(:premium_runner_enabled?).and_return(false)
       expect(installation).to receive(:free_runner_upgrade?).and_return(true)
@@ -102,7 +102,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "skips pool if feature flag is enabled even when the pool has a vm" do
-      pool = VmPool.create(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64", storage_skip_sync: true)
+      pool = VmPool.create(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64", storage_skip_sync: true)
       vm = create_vm(pool_id: pool.id, display_state: "running")
       project.set_ff_skip_runner_pool(true)
       expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).and_call_original
@@ -119,7 +119,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       picked_vm = nx.pick_vm
       expect(picked_vm.family).to eq("m7a")
       expect(picked_vm.location.aws?).to be(true)
-      expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2204_aws_ami_version)
+      expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2404_aws_ami_version)
       expect(picked_vm.strand.stack.first["alternative_families"]).to eq(["m7i", "m6a"])
     end
 
@@ -130,7 +130,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       picked_vm = nx.pick_vm
       expect(picked_vm.family).to eq("m7a")
       expect(picked_vm.location.aws?).to be(true)
-      expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2204_aws_ami_version)
+      expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2404_aws_ami_version)
     end
   end
 
