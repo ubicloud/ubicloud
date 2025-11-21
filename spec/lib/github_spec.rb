@@ -59,9 +59,9 @@ RSpec.describe Github do
 
   it "can map alias to actual label" do
     labels = described_class.runner_labels
-    expect(labels["ubicloud"]).to eq(labels["ubicloud-standard-2-ubuntu-2204"])
-    expect(labels["ubicloud-standard-8"]).to eq(labels["ubicloud-standard-8-ubuntu-2204"])
-    expect(labels["ubicloud-standard-4-arm"]).to eq(labels["ubicloud-standard-4-arm-ubuntu-2204"])
+    expect(labels["ubicloud"]).to eq(labels["ubicloud-standard-2-ubuntu-2404"])
+    expect(labels["ubicloud-standard-8"]).to eq(labels["ubicloud-standard-8-ubuntu-2404"])
+    expect(labels["ubicloud-standard-4-arm"]).to eq(labels["ubicloud-standard-4-arm-ubuntu-2404"])
   end
 
   it "can map all aliases to actual tag" do
