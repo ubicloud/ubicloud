@@ -19,12 +19,17 @@ class PostgresTimeline < Sequel::Model
   end
 
   def generate_walg_config
+    walg_credentials = if access_key
+      <<-WALG_CONF
+AWS_ACCESS_KEY_ID=#{access_key}
+AWS_SECRET_ACCESS_KEY=#{secret_key}
+      WALG_CONF
+    end
     <<-WALG_CONF
 WALG_S3_PREFIX=s3://#{ubid}
 AWS_ENDPOINT=#{blob_storage_endpoint}
-AWS_ACCESS_KEY_ID=#{access_key}
-AWS_SECRET_ACCESS_KEY=#{secret_key}
-AWS_REGION: #{aws? ? location.name : "us-east-1"}
+#{walg_credentials}
+AWS_REGION=#{aws? ? location.name : "us-east-1"}
 AWS_S3_FORCE_PATH_STYLE=true
 PGHOST=/var/run/postgresql
     WALG_CONF
@@ -111,8 +116,7 @@ PGHOST=/var/run/postgresql
   def blob_storage_client
     @blob_storage_client ||= aws? ? Aws::S3::Client.new(
       region: location.name,
-      access_key_id: access_key,
-      secret_access_key: secret_key,
+      credentials: location.location_credential.credentials,
       endpoint: blob_storage_endpoint,
       force_path_style: true
     ) : Minio::Client.new(
@@ -171,6 +175,8 @@ PGHOST=/var/run/postgresql
       })
     : blob_storage_client.set_lifecycle_policy(ubid, ubid, BACKUP_BUCKET_EXPIRATION_DAYS)
   end
+
+  alias_method :aws_s3_policy_name, :ubid
 end
 
 # Table: postgres_timeline

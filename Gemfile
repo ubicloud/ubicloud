@@ -50,6 +50,10 @@ gem "tilt", ">= 2.6.1"
 gem "warning"
 gem "webauthn"
 
+group :aws_sts do
+  gem "aws-sdk-sts", "~> 1.12"
+end
+
 group :development do
   gem "awesome_print"
   gem "by", ">= 1.1.0"
