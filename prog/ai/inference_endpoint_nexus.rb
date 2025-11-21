@@ -112,7 +112,6 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
     register_deadline(nil, 5 * 60)
     decr_destroy
 
-    # strand.children.each(&:destroy)
     replicas.each(&:incr_destroy)
     load_balancer.incr_destroy
     private_subnet.incr_destroy
