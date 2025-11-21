@@ -227,8 +227,8 @@ RSpec.describe Clover, "github" do
       displayed_runner_rows = page.all("table.min-w-full tbody tr").map { |row| row.all("td").map(&:text) }
       expect(displayed_runner_rows).to eq [
         ["my-repo", "#{runner_with_job.ubid}\n4 vCPU\npremium\nx64\nubuntu-24", "test-workflow\ntest-job", "Running for 40s\nStarted in 20s", ""],
-        ["my-repo", "#{runner_waiting_job.ubid}\n2 vCPU\nstandard\nx64\nubuntu-22", "Waiting for GitHub to assign a job\nReady for 6m 40s", "", ""],
-        ["my-repo", "#{runner_not_created.ubid}\n2 vCPU\nstandard\narm64\nubuntu-22", "Provisioning an ephemeral virtual machine\nWaiting for 38s", "", ""],
+        ["my-repo", "#{runner_waiting_job.ubid}\n2 vCPU\nstandard\nx64\nubuntu-24", "Waiting for GitHub to assign a job\nReady for 6m 40s", "", ""],
+        ["my-repo", "#{runner_not_created.ubid}\n2 vCPU\nstandard\narm64\nubuntu-24", "Provisioning an ephemeral virtual machine\nWaiting for 38s", "", ""],
         ["my-repo", "#{runner_concurrency_limit.ubid}\n6 vCPU\nstandard-gpu\nx64\nubuntu-22", "Reached your concurrency limit\nWaiting for 3h 40m 48s", "", ""]
       ]
     end
