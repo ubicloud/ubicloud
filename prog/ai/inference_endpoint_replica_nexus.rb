@@ -43,7 +43,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      if strand.label != "destroy"
+      if !%w[destroy wait_children_destroyed].include?(strand.label)
         hop_destroy
       elsif strand.stack.count > 1
         pop "operation is cancelled due to the destruction of the inference endpoint replica"
@@ -129,13 +129,19 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
 
     resolve_page
     delete_runpod_pod
-    strand.children.each { it.destroy }
-    inference_endpoint.load_balancer.evacuate_vm(vm)
-    inference_endpoint.load_balancer.remove_vm(vm)
-    vm.incr_destroy
-    inference_endpoint_replica.destroy
+    Semaphore.incr(strand.children_dataset.select(:id), "destroy")
+    hop_wait_children_destroyed
+  end
 
-    pop "inference endpoint replica is deleted"
+  label def wait_children_destroyed
+    reap(nap: 5) do
+      inference_endpoint.load_balancer.evacuate_vm(vm)
+      inference_endpoint.load_balancer.remove_vm(vm)
+      vm.incr_destroy
+      inference_endpoint_replica.destroy
+
+      pop "inference endpoint replica is deleted"
+    end
   end
 
   label def unavailable
