@@ -4,6 +4,8 @@ updates:
     directory: '/'
     schedule:
       interval: 'daily'
+    cooldown:
+      default-days: 14
     versioning-strategy: lockfile-only
     allow:
       - dependency-type: "all"
@@ -16,6 +18,8 @@ updates:
     directory: '/'
     schedule:
       interval: 'weekly'
+    cooldown:
+      default-days: 14
     allow:
       - dependency-type: "all"
     groups:
@@ -26,6 +30,8 @@ updates:
     directory: '/'
     schedule:
       interval: 'weekly'
+    cooldown:
+      default-days: 14
     allow:
       - dependency-type: "all"
     groups:
@@ -36,6 +42,8 @@ updates:
     directory: '/'
     schedule:
       interval: 'weekly'
+    cooldown:
+      default-days: 14
     allow:
       - dependency-type: "all"
     groups:
