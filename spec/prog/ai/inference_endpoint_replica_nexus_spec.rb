@@ -94,6 +94,12 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
       expect { nx.before_run }.not_to hop("destroy")
     end
 
+    it "does not hop to destroy if already in the wait_children_destroyed state" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx.strand).to receive(:label).and_return("wait_children_destroyed")
+      expect { nx.before_run }.not_to hop("destroy")
+    end
+
     it "pops additional operations from stack" do
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect(nx.strand).to receive(:label).and_return("destroy")
@@ -379,23 +385,13 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
   end
 
   describe "#destroy" do
-    it "deletes resources and exits" do
-      lb = instance_double(LoadBalancer)
-      expect(inference_endpoint).to receive(:load_balancer).and_return(lb).twice
-      expect(lb).to receive(:evacuate_vm).with(vm)
-      expect(lb).to receive(:remove_vm).with(vm)
-
-      expect(vm).to receive(:incr_destroy)
-      expect(replica).to receive(:destroy)
-
-      expect { nx.destroy }.to exit({"msg" => "inference endpoint replica is deleted"})
+    it "adds destroy semaphore to children and hops to wait_children_destroyed" do
+      st = Strand.create(prog: "Prog::BootstrapRhizome", label: "start", parent_id: nx.strand.id)
+      expect { nx.destroy }.to hop("wait_children_destroyed")
+      expect(Semaphore.where(name: "destroy").select_order_map(:strand_id)).to eq [st.id]
     end
 
     it "deletes runpod pod if there is one" do
-      lb = instance_double(LoadBalancer)
-      expect(inference_endpoint).to receive(:load_balancer).and_return(lb).twice
-      expect(lb).to receive(:evacuate_vm).with(vm)
-      expect(lb).to receive(:remove_vm).with(vm)
       expect(replica).to receive(:external_state).and_return({"pod_id" => "thepodid"})
 
       stub_request(:post, "https://api.runpod.io/graphql")
@@ -411,10 +407,25 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
         .to_return(status: 200, body: "", headers: {})
 
       expect(replica).to receive(:update).with(external_state: "{}")
+
+      expect { nx.destroy }.to hop("wait_children_destroyed")
+    end
+  end
+
+  describe "#wait_children_destroyed" do
+    it "naps if children still exist" do
+      Strand.create(prog: "Prog::BootstrapRhizome", label: "start", parent_id: nx.strand.id)
+      expect { nx.wait_children_destroyed }.to nap(5)
+    end
+
+    it "exits and destroys resources if no children exist" do
+      lb = instance_double(LoadBalancer)
+      expect(inference_endpoint).to receive(:load_balancer).and_return(lb).twice
+      expect(lb).to receive(:evacuate_vm).with(vm)
+      expect(lb).to receive(:remove_vm).with(vm)
       expect(vm).to receive(:incr_destroy)
       expect(replica).to receive(:destroy)
-
-      expect { nx.destroy }.to exit({"msg" => "inference endpoint replica is deleted"})
+      expect { nx.wait_children_destroyed }.to exit({"msg" => "inference endpoint replica is deleted"})
     end
   end
 
