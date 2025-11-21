@@ -61,8 +61,14 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect { nx.before_run }.not_to hop("destroy")
     end
 
-    it "does not hop to destroy if already in the wait_destroy state" do
-      expect(nx.strand).to receive(:label).and_return("wait_destroy").at_least(:once)
+    it "does not hop to destroy if already in the wait_destroy_children state" do
+      expect(nx.strand).to receive(:label).and_return("wait_destroy_children").at_least(:once)
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect { nx.before_run }.not_to hop("destroy")
+    end
+
+    it "does not hop to destroy if already in the wait_all_vms_removed state" do
+      expect(nx.strand).to receive(:label).and_return("wait_all_vms_removed").at_least(:once)
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect { nx.before_run }.not_to hop("destroy")
     end
@@ -207,15 +213,31 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "test-vm#{it}", private_subnet_id: ps.id).subject }
       vms.each { st.subject.add_vm(it) }
       expect { nx.update_vm_load_balancers }.to hop("wait_update_vm_load_balancers")
-      st.children.map(&:destroy)
     end
 
-    it "decrements destroy and destroys all children" do
+    it "adds destroy semaphore to all children and hops to wait_destroy children" do
       expect(nx).to receive(:decr_destroy)
-      expect(st.children).to all(receive(:destroy))
-      expect { nx.destroy }.to hop("wait_all_vms_removed")
+      expect { nx.destroy }.to hop("wait_destroy_children")
 
-      expect(Strand.where(prog: "Vnet::LoadBalancerRemoveVm").count).to eq 3
+      expect(Semaphore.where(name: "destroy").select_order_map(:strand_id)).to eq st.children.map(&:id).sort
+    end
+  end
+
+  describe "#wait_destroy_children" do
+    before do
+      vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "test-vm#{it}", private_subnet_id: ps.id).subject }
+      vms.each { st.subject.add_vm(it) }
+      expect { nx.update_vm_load_balancers }.to hop("wait_update_vm_load_balancers")
+    end
+
+    it "naps 5 if reap is not a success" do
+      expect { nx.wait_destroy_children }.to nap(5)
+    end
+
+    it "creates LoadBalancerRemoveVm children and hops wait_all_vms_removed" do
+      st.children_dataset.destroy
+      expect { nx.wait_destroy_children }.to hop("wait_all_vms_removed")
+      expect(Strand.where(prog: "Vnet::LoadBalancerRemoveVm", parent_id: nx.strand.id).count).to eq 3
     end
   end
 
