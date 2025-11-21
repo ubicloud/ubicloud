@@ -80,6 +80,7 @@ module Config
   override :dispatcher_queue_size_ratio, 4, float
   override :recursive_tag_limit, 32, int
   override :root, File.expand_path(__dir__), string
+  override :clover_database_rds_iam_auth_enabled, false, bool
   optional :hetzner_user, string, clear: true
   optional :hetzner_password, string, clear: true
   override :hetzner_connection_string, "https://robot-ws.your-server.de", string
