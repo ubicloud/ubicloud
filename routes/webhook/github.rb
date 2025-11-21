@@ -70,12 +70,16 @@ class Clover
       label = custom_label.alias_for
     end
 
-    return error("Unmatched label") unless label
+    repository_name = data["repository"]["full_name"]
+    unless label
+      Clog.emit("Unmatched label") { {unmatched_label: {repository_name:, labels: job_labels}} } if data["action"] == "queued"
+      return error("Unmatched label")
+    end
 
     if data["action"] == "queued"
       st = Prog::Vm::GithubRunner.assemble(
         installation,
-        repository_name: data["repository"]["full_name"],
+        repository_name:,
         label:,
         actual_label:,
         default_branch: data["repository"]["default_branch"]
@@ -91,7 +95,7 @@ class Clover
 
     runner = GithubRunner.first(
       installation_id: installation.id,
-      repository_name: data["repository"]["full_name"],
+      repository_name:,
       runner_id:
     )
 
