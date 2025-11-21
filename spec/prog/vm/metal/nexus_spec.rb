@@ -51,6 +51,141 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       state: "active")
   }
 
+  describe ".assemble" do
+    it "fails if there is no project" do
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
+      }.to raise_error RuntimeError, "No existing project"
+    end
+
+    it "fails if location doesn't exist" do
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, location_id: nil)
+      }.to raise_error RuntimeError, "No existing location"
+    end
+
+    it "creates Subnet and Nic if not passed" do
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id)
+      }.to change(PrivateSubnet, :count).from(0).to(1)
+        .and change(Nic, :count).from(0).to(1)
+    end
+
+    it "creates Nic if only subnet_id is passed" do
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, private_subnet_id: private_subnet.id)
+      }.to change(Nic, :count).from(0).to(1)
+      expect(PrivateSubnet.count).to eq(1)
+    end
+
+    it "adds the VM to a private subnet if nic_id is passed" do
+      expect(Prog::Vnet::SubnetNexus).not_to receive(:assemble)
+      expect(Prog::Vnet::NicNexus).not_to receive(:assemble)
+      Prog::Vm::Nexus.assemble("some_ssh key", project.id, nic_id: nic.id, location_id: Location::HETZNER_FSN1_ID)
+    end
+
+    it "creates with default storage size from vm size" do
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id)
+      expect(st.stack.first["storage_volumes"].first["size_gib"]).to eq(Option::VmSizes.first.storage_size_options.first)
+    end
+
+    it "creates with custom storage size if provided" do
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 40}])
+      expect(st.stack.first["storage_volumes"].first["size_gib"]).to eq(40)
+    end
+
+    it "fails if given nic_id is not valid" do
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, nic_id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
+      }.to raise_error RuntimeError, "Given nic doesn't exist with the id 0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"
+    end
+
+    it "fails if given subnet_id is not valid" do
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, private_subnet_id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
+      }.to raise_error RuntimeError, "Given subnet doesn't exist with the id 0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"
+    end
+
+    it "fails if nic is assigned to a different vm" do
+      nic.update(vm_id: vm.id)
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, nic_id: nic.id)
+      }.to raise_error RuntimeError, "Given nic is assigned to a VM already"
+    end
+
+    it "fails if nic subnet is in another location" do
+      private_subnet.update(location_id: Location::LEASEWEB_WDC02_ID)
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, nic_id: nic.id)
+      }.to raise_error RuntimeError, "Given nic is created in a different location"
+    end
+
+    it "fails if subnet of nic belongs to another project" do
+      private_subnet.update(project_id: Project.create(name: "project-2").id)
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, nic_id: nic.id)
+      }.to raise_error RuntimeError, "Given nic is not available in the given project"
+    end
+
+    it "fails if subnet belongs to another project" do
+      private_subnet.update(project_id: Project.create(name: "project-2").id)
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, private_subnet_id: private_subnet.id)
+      }.to raise_error RuntimeError, "Given subnet is not available in the given project"
+    end
+
+    it "allows if subnet belongs to another project and allow_private_subnet_in_other_project argument is given" do
+      private_subnet.update(project_id: Project.create(name: "project-2").id)
+      vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, private_subnet_id: private_subnet.id, allow_private_subnet_in_other_project: true).subject
+      expect(vm.private_subnets.map(&:id)).to eq [private_subnet.id]
+    end
+
+    it "creates arm64 vm with double core count and 3.2GB memory per core" do
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, size: "standard-4", arch: "arm64")
+      expect(st.subject.vcpus).to eq(4)
+      expect(st.subject.memory_gib).to eq(12)
+    end
+
+    it "requests as many gpus as specified" do
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, size: "standard-2", gpu_count: 2)
+      expect(st.stack.first["gpu_count"]).to eq(2)
+    end
+
+    it "requests at least a single gpu for standard-gpu-6" do
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, size: "standard-gpu-6")
+      expect(st.stack.first["gpu_count"]).to eq(1)
+    end
+
+    it "requests no gpus by default" do
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, size: "standard-2")
+      expect(st.stack.first["gpu_count"]).to eq(0)
+    end
+
+    it "fails if same host is forced and excluded" do
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id,
+          force_host_id: "some-vm-host-id", exclude_host_ids: ["some-vm-host-id"])
+      }.to raise_error RuntimeError, "Cannot force and exclude the same host"
+    end
+  end
+
+  describe ".assemble_with_sshable" do
+    it "calls .assemble with generated ssh key" do
+      st_id = "eb3dbcb3-2c90-8b74-8fb4-d62a244d7ae5"
+      expect(SshKey).to receive(:generate).and_return(instance_double(SshKey, public_key: "public", keypair: "pair"))
+      st = Strand.new(id: st_id)
+      expect(Prog::Vm::Nexus).to receive(:assemble) do |public_key, project_id, **kwargs|
+        expect(public_key).to eq("public")
+        expect(project_id).to eq(project.id)
+        expect(kwargs[:name]).to be_nil
+        expect(kwargs[:size]).to eq("new_size")
+      end.and_return(st)
+      expect(Sshable).to receive(:create_with_id).with(st, host: "temp_#{st_id}", raw_private_key_1: "pair", unix_user: "rhizome")
+
+      Prog::Vm::Nexus.assemble_with_sshable(project.id, size: "new_size")
+    end
+  end
+
   describe "#create_unix_user" do
     it "runs adduser" do
       expect(nx).to receive(:rand).and_return(1111)
