@@ -36,10 +36,6 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     hop_create_role_policy
   end
 
-  label def wait_aws_vm_started
-    reap(:wait_sshable, nap: 3)
-  end
-
   label def create_role_policy
     policy_document = {
       Version: "2012-10-17",
@@ -319,13 +315,6 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     end
 
     hop_cleanup_roles
-  end
-
-  label def wait_aws_vm_destroyed
-    reap(nap: 10) do
-      final_clean_up
-      pop "vm deleted"
-    end
   end
 
   label def cleanup_roles
