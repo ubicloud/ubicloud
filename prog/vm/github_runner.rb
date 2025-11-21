@@ -177,6 +177,10 @@ class Prog::Vm::GithubRunner < Prog::Base
       github_runner.destroy
       pop "Could not provision a runner for inactive project"
     end
+    if github_runner.label.include?("gpu") && !github_runner.installation.project.get_ff_gpu_runner
+      github_runner.destroy
+      pop "Could not provision a GPU runner for this project"
+    end
     hop_wait_concurrency_limit unless quota_available?
     hop_apply_custom_label_quota if github_runner.custom_label
     hop_allocate_vm
