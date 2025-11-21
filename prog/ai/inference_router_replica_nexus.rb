@@ -41,7 +41,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      if strand.label != "destroy"
+      if !%w[destroy wait_children_destroyed].include?(strand.label)
         hop_destroy
       elsif strand.stack.count > 1
         pop "operation is cancelled due to the destruction of the inference router replica"
@@ -173,13 +173,19 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
     decr_destroy
 
     resolve_page
-    strand.children.each { it.destroy }
-    inference_router.load_balancer.evacuate_vm(vm)
-    inference_router.load_balancer.remove_vm(vm)
-    vm.incr_destroy
-    inference_router_replica.destroy
+    Semaphore.incr(strand.children_dataset.select(:id), "destroy")
+    hop_wait_children_destroyed
+  end
 
-    pop "inference router replica is deleted"
+  label def wait_children_destroyed
+    reap(nap: 5) do
+      inference_router.load_balancer.evacuate_vm(vm)
+      inference_router.load_balancer.remove_vm(vm)
+      vm.incr_destroy
+      inference_router_replica.destroy
+
+      pop "inference router replica is deleted"
+    end
   end
 
   label def unavailable
