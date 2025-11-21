@@ -8,6 +8,10 @@ class Prog::Vnet::CertServer < Prog::Base
   end
 
   label def before_run
+    when_destroy_set? do
+      pop "early exit due to destroy semaphore"
+    end
+
     pop "vm is destroyed" unless vm
   end
 
