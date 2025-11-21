@@ -391,8 +391,7 @@ RSpec.describe VmHost do
     allow(vh).to receive(:disk_device_names).and_return(["sda"])
     allow(session[:ssh_session]).to receive(:exec!).with("sudo smartctl -j -H /dev/sda -d scsi | jq .smart_status.passed").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("true\n", 0))
     allow(session[:ssh_session]).to receive(:exec!).with("lsblk --json").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new('{"blockdevices": [{"name": "fd0","maj:min": "2:0","rm": true,"size": "4K","ro": false,"type": "disk","mountpoints": [null]},{"name": "sda","maj:min": "8:0","rm": false,"size": "2.2G","ro": false,"type": "disk","mountpoints": [null],"children": [{"name": "sda1","maj:min": "8:1","rm": false,"size": "2.1G","ro": false,"type": "part","mountpoints": ["/"]},{"name": "sda14","maj:min": "8:14","rm": false,"size": "4M","ro": false,"type": "part","mountpoints": [null]}]}]}', 0))
-    expect(SecureRandom).to receive(:hex).with(4).and_return("a27f05af")
-    file_path = "/test-file-a27f05af"
+    file_path = "/test-file-monitor"
     allow(session[:ssh_session]).to receive(:exec!).with("sudo bash -c \"head -c 1M </dev/zero > #{file_path}\"").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
     allow(session[:ssh_session]).to receive(:exec!).with("sha256sum #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58  #{file_path}\n", 0))
     allow(session[:ssh_session]).to receive(:exec!).with("sudo rm #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
@@ -435,8 +434,7 @@ RSpec.describe VmHost do
 
     expect(vh).to receive(:check_storage_smartctl).and_return(true)
     expect(session[:ssh_session]).to receive(:exec!).with("lsblk --json").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new('{"blockdevices": [{"name": "fd0","maj:min": "2:0","rm": true,"size": "4K","ro": false,"type": "disk","mountpoints": [null]},{"name": "sda","maj:min": "8:0","rm": false,"size": "2.2G","ro": false,"type": "disk","mountpoints": [null],"children": [{"name": "sda1","maj:min": "8:1","rm": false,"size": "2.1G","ro": false,"type": "part","mountpoints": ["/"]},{"name": "sda14","maj:min": "8:14","rm": false,"size": "4M","ro": false,"type": "part","mountpoints": [null]}]}]}', 0))
-    expect(SecureRandom).to receive(:hex).with(4).and_return("a27f05af")
-    file_path = "/test-file-a27f05af"
+    file_path = "/test-file-monitor"
     expect(session[:ssh_session]).to receive(:exec!).with("sudo bash -c \"head -c 1M </dev/zero > #{file_path}\"").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("failed to write file", 1))
     expect(session[:ssh_session]).to receive(:exec!).with("sha256sum #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58  #{file_path}\n", 0))
     expect(session[:ssh_session]).to receive(:exec!).with("sudo rm #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("could not remove file", 1))
@@ -524,8 +522,7 @@ RSpec.describe VmHost do
     expect(vh).to receive(:check_storage_smartctl).and_return(true)
     expect(vh).to receive(:check_storage_nvme).and_return(true)
     allow(session[:ssh_session]).to receive(:exec!).with("lsblk --json").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new('{"blockdevices": [{"name": "fd0","maj:min": "2:0","rm": true,"size": "4K","ro": false,"type": "disk","mountpoints": [null]},{"name": "sda","maj:min": "8:0","rm": false,"size": "2.2G","ro": false,"type": "disk","mountpoints": [null],"children": [{"name": "sda1","maj:min": "8:1","rm": false,"size": "2.1G","ro": false,"type": "part","mountpoints": ["/random-mountpoint"]},{"name": "sda14","maj:min": "8:14","rm": false,"size": "4M","ro": false,"type": "part","mountpoints": [null]}]}]}', 0))
-    expect(SecureRandom).to receive(:hex).with(4).and_return("a27f05af")
-    file_path = "/random-mountpoint/test-file-a27f05af"
+    file_path = "/random-mountpoint/test-file-monitor"
     allow(session[:ssh_session]).to receive(:exec!).with("sudo bash -c \"head -c 1M </dev/zero > #{file_path}\"").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
     allow(session[:ssh_session]).to receive(:exec!).with("sha256sum #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("wrong-hash  /test-file\n", 0))
     allow(session[:ssh_session]).to receive(:exec!).with("sudo rm #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
