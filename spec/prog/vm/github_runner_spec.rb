@@ -328,6 +328,12 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect { nx.start }.to exit({"msg" => "Could not provision a runner for inactive project"})
       expect(GithubRunner[runner.id]).to be_nil
     end
+
+    it "pops if GPU runners not enabled for the project" do
+      runner.label = "ubicloud-gpu"
+      expect { nx.start }.to exit({"msg" => "Could not provision a GPU runner for this project"})
+      expect(GithubRunner[runner.id]).to be_nil
+    end
   end
 
   describe "#wait_concurrency_limit" do
@@ -598,6 +604,23 @@ RSpec.describe Prog::Vm::GithubRunner do
         jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{runner.ubid}\\nLabel: ubicloud-standard-4-ubuntu-2204\\nVM Family: standard\\nArch: x64\\nImage: github-ubuntu-2204\\nVM Host: #{vm.vm_host.ubid}\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: #{project.ubid}\\nConsole URL: http://localhost:9292/project/#{project.ubid}/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
         echo "UBICLOUD_RUNTIME_TOKEN=my_token
         UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment > /dev/null
+      COMMAND
+
+      expect { nx.setup_environment }.to hop("register_runner")
+    end
+
+    it "hops to register_runner with GPU deprecation warning" do
+      expect(vm).to receive(:runtime_token).and_return("my_token")
+      runner.label = "ubicloud-gpu"
+      installation.update(use_docker_mirror: false, cache_enabled: false)
+      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND)
+        set -ueo pipefail
+        echo "image version: $ImageVersion"
+        sudo usermod -a -G sudo,adm runneradmin
+        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{runner.ubid}\\nLabel: ubicloud-gpu\\nVM Family: standard\\nArch: x64\\nImage: github-ubuntu-2204\\nVM Host: #{vm.vm_host.ubid}\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: #{project.ubid}\\nConsole URL: http://localhost:9292/project/#{project.ubid}/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
+        echo "UBICLOUD_RUNTIME_TOKEN=my_token
+        UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment > /dev/null
+        echo "::warning::The GPU runners will be deprecated on December 31, 2025. All jobs using these runners should be migrated to other runner types." | sudo -u runner tee /home/runner/actions-runner/.ubicloud_complete_message
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")

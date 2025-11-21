@@ -177,6 +177,10 @@ class Prog::Vm::GithubRunner < Prog::Base
       github_runner.destroy
       pop "Could not provision a runner for inactive project"
     end
+    if github_runner.label.include?("gpu") && !github_runner.installation.project.get_ff_gpu_runner
+      github_runner.destroy
+      pop "Could not provision a GPU runner for this project"
+    end
     hop_wait_concurrency_limit unless quota_available?
     hop_apply_custom_label_quota if github_runner.custom_label
     hop_allocate_vm
@@ -327,7 +331,12 @@ class Prog::Vm::GithubRunner < Prog::Base
       COMMAND
     end
 
-    if !github_runner.label.include?("ubuntu")
+    if github_runner.label.include?("gpu")
+      message = "The GPU runners will be deprecated on December 31, 2025. All jobs using these runners should be migrated to other runner types."
+      command += <<~COMMAND
+        echo "::warning::#{message}" | sudo -u runner tee /home/runner/actions-runner/.ubicloud_complete_message
+      COMMAND
+    elsif !github_runner.label.include?("ubuntu")
       message = "The default operating system for this runner will change to Ubuntu 24.04 on November 23, 2025. You can continue using Ubuntu 22.04 by explicitly specifying it. For more information: https://www.ubicloud.com/docs/github-actions-integration/runner-types#ubuntu-24-04-migration"
       command += <<~COMMAND
         echo "::notice::#{message}" | sudo -u runner tee /home/runner/actions-runner/.ubicloud_complete_message
