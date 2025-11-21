@@ -328,6 +328,12 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect { nx.start }.to exit({"msg" => "Could not provision a runner for inactive project"})
       expect(GithubRunner[runner.id]).to be_nil
     end
+
+    it "pops if GPU runners not enabled for the project" do
+      runner.label = "ubicloud-gpu"
+      expect { nx.start }.to exit({"msg" => "Could not provision a GPU runner for this project"})
+      expect(GithubRunner[runner.id]).to be_nil
+    end
   end
 
   describe "#wait_concurrency_limit" do
