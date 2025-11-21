@@ -86,6 +86,10 @@ module Prog::VictoriaMetrics; end
 
 module Prog::Vm; end
 
+module Prog::Vm::Aws; end
+
+module Prog::Vm::Metal; end
+
 module Prog::Vnet; end
 
 module Prog::Vnet::Aws; end
@@ -221,6 +225,8 @@ def clover_freeze
     Prog::Storage,
     Prog::VictoriaMetrics,
     Prog::Vm,
+    Prog::Vm::Aws,
+    Prog::Vm::Metal,
     Prog::Vnet,
     Prog::Vnet::Aws,
     Prog::Vnet::Metal,

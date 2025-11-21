@@ -211,9 +211,9 @@ RSpec.describe CloverAdmin do
     click_link "Ubicloud Admin"
     click_link "Strand"
     click_link "Search"
-    fill_in "Prog", with: "Vm::Nexus"
+    fill_in "Prog", with: "Vm::Metal::Nexus"
     click_button "Search"
-    expect(page.all("#autoforme_content td").map(&:text)).to eq [vm.ubid, "Vm::Nexus", "start", vm.strand.schedule.to_s, "0"]
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [vm.ubid, "Vm::Metal::Nexus", "start", vm.strand.schedule.to_s, "0"]
   end
 
   it "handles basic pagination when browsing by class" do
