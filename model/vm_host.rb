@@ -306,7 +306,7 @@ class VmHost < Sequel::Model
     end.all?(true)
   end
 
-  def check_storage_read_write(ssh_session, devices)
+  def check_storage_read_write(ssh_session, devices, test_file_suffix:)
     lsblk_json_info = ssh_session.exec!("lsblk --json")
     devices_with_mount_points = devices.map { |device| SystemParser.get_device_mount_points_from_lsblk_json(lsblk_json_info, device) }
 
@@ -318,7 +318,7 @@ class VmHost < Sequel::Model
     end
 
     all_mount_points.uniq.all? do |mount_point|
-      file_name = Shellwords.escape(File.join(mount_point, "test-file-#{SecureRandom.hex(4)}"))
+      file_name = Shellwords.escape(File.join(mount_point, "test-file-#{test_file_suffix}"))
 
       write_result = ssh_session.exec!("sudo bash -c \"head -c 1M </dev/zero > #{file_name}\"")
       write_status = write_result.exitstatus == 0
@@ -374,11 +374,11 @@ class VmHost < Sequel::Model
     disk_device_ids.map { |id| ssh_session.exec!("readlink -f /dev/disk/by-id/#{id}").delete_prefix("/dev/").strip }
   end
 
-  def perform_health_checks(ssh_session)
+  def perform_health_checks(ssh_session, test_file_suffix: "monitor")
     device_names = disk_device_names(ssh_session)
     check_storage_smartctl(ssh_session, device_names) &&
       check_storage_nvme(ssh_session, device_names) &&
-      check_storage_read_write(ssh_session, device_names) &&
+      check_storage_read_write(ssh_session, device_names, test_file_suffix:) &&
       check_storage_kernel_logs(ssh_session, device_names)
   end
 
