@@ -96,6 +96,12 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       expect { nx.before_run }.not_to hop("destroy")
     end
 
+    it "does not hop to destroy if already in the wait_children_destroyed state" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx.strand).to receive(:label).and_return("wait_children_destroyed")
+      expect { nx.before_run }.not_to hop("destroy")
+    end
+
     it "pops additional operations from stack" do
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect(nx.strand).to receive(:label).and_return("destroy")
@@ -219,6 +225,19 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
   end
 
   describe "#destroy" do
+    it "adds destroy semaphore to children and hops to wait_children_destroyed" do
+      st = Strand.create(prog: "Prog::BootstrapRhizome", label: "start", parent_id: nx.strand.id)
+      expect { nx.destroy }.to hop("wait_children_destroyed")
+      expect(Semaphore.where(name: "destroy").select_order_map(:strand_id)).to eq [st.id]
+    end
+  end
+
+  describe "#wait_children_destroyed" do
+    it "naps if children still exist" do
+      Strand.create(prog: "Prog::BootstrapRhizome", label: "start", parent_id: nx.strand.id)
+      expect { nx.wait_children_destroyed }.to nap(5)
+    end
+
     it "deletes resources and exits" do
       lb = instance_double(LoadBalancer)
       expect(inference_router).to receive(:load_balancer).and_return(lb).twice
@@ -228,7 +247,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       expect(vm).to receive(:incr_destroy)
       expect(replica).to receive(:destroy)
 
-      expect { nx.destroy }.to exit({"msg" => "inference router replica is deleted"})
+      expect { nx.wait_children_destroyed }.to exit({"msg" => "inference router replica is deleted"})
     end
   end
 
