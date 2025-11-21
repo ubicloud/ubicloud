@@ -203,8 +203,8 @@ RSpec.describe Prog::Base do
   end
 
   it "calls before_run if it is available" do
-    st = Strand.create(prog: "Prog::Vm::Nexus", label: "wait")
-    prg = instance_double(Prog::Vm::Nexus)
+    st = Strand.create(prog: "Prog::Vm::Aws::Nexus", label: "wait")
+    prg = instance_double(Prog::Vm::Aws::Nexus)
     expect(st).to receive(:load).and_return(prg)
     expect(prg).to receive(:before_run)
     expect(prg).to receive(:wait).and_raise(Prog::Base::Nap.new(30))

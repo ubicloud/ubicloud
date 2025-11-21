@@ -54,6 +54,27 @@ usermod -L ubuntu
     allow(Aws::IAM::Client).to receive(:new).with(access_key_id: "test-access-key", secret_access_key: "test-secret-key", region: "us-west-2").and_return(iam_client)
   end
 
+  describe ".assemble" do
+    let(:project) { Project.create(name: "test-prj") }
+
+    it "creates correct number of storage volumes for storage optimized instance types" do
+      loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
+      storage_volumes = [
+        {encrypted: true, size_gib: 30},
+        {encrypted: true, size_gib: 7500}
+      ]
+
+      vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, location_id: loc.id, size: "i8g.8xlarge", arch: "arm64", storage_volumes:).subject
+      expect(vm.vm_storage_volumes.count).to eq(3)
+    end
+
+    it "hops to start_aws if location is aws" do
+      loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, location_id: loc.id)
+      expect(st.label).to eq("start")
+    end
+  end
+
   describe "#before_run" do
     it "hops to destroy when needed" do
       expect(nx).to receive(:when_destroy_set?).and_yield
