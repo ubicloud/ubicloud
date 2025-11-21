@@ -40,7 +40,12 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      if strand.label != "destroy"
+      label = strand.label
+      if label == "restart" && strand.parent_id
+        # child strand budded from parent strand unvailable, exit to
+        # avoid two strands in #destroy
+        pop "exiting early due to destroy semaphore"
+      elsif !%w[destroy wait_children_destroyed].include?(label)
         hop_destroy
       elsif strand.stack.count > 1
         pop "operation is cancelled due to the destruction of the VictoriaMetrics server"
@@ -192,11 +197,17 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
     register_deadline(nil, 10 * 60)
     decr_destroy
 
-    strand.children.each(&:destroy)
-    vm.incr_destroy
-    victoria_metrics_server.destroy
+    Semaphore.incr(strand.children_dataset.select(:id), "destroy")
+    hop_wait_children_destroyed
+  end
 
-    pop "victoria_metrics server destroyed"
+  label def wait_children_destroyed
+    reap(nap: 5) do
+      vm.incr_destroy
+      victoria_metrics_server.destroy
+
+      pop "victoria_metrics server destroyed"
+    end
   end
 
   def available?
