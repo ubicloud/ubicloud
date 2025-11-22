@@ -48,7 +48,7 @@ class Clover
         end
       end
 
-      r.rename firewall, perm: "Firewall:edit", serializer: Serializers::Firewall, template_prefix: "networking/firewall"
+      r.rename firewall, perm: "Firewall:edit", serializer: Serializers::Firewall, template: "networking/firewall/show"
 
       r.show_object(firewall, actions: %w[overview networking settings], perm: "Firewall:view", template: "networking/firewall/show")
 
