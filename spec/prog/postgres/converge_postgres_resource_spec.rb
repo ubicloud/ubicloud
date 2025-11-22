@@ -25,6 +25,11 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     allow(nx).to receive(:postgres_resource).and_return(postgres_resource)
   end
 
+  it "exits if destroy is set" do
+    expect(nx).to receive(:when_destroy_set?).and_yield
+    expect { nx.before_run }.to exit({"msg" => "exiting early due to destroy semaphore"})
+  end
+
   describe "#start" do
     it "naps if read replica parent is not ready" do
       parent = instance_double(PostgresResource, ready_for_read_replica?: false)

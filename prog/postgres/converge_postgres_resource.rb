@@ -5,6 +5,12 @@ require_relative "../../lib/util"
 class Prog::Postgres::ConvergePostgresResource < Prog::Base
   subject_is :postgres_resource
 
+  def before_run
+    when_destroy_set? do
+      pop "exiting early due to destroy semaphore"
+    end
+  end
+
   label def start
     nap 60 if postgres_resource.read_replica? && !postgres_resource.parent.ready_for_read_replica?
 
