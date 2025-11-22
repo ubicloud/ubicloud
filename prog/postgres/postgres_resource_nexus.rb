@@ -89,7 +89,14 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      if strand.label != "destroy"
+      case strand.label
+      when "trigger_pg_current_xact_id_on_parent"
+        # child strand budded from parent strand #start, exit to
+        # avoid two strands in #destroy
+        pop "exiting early due to destroy semaphore"
+      when "destroy", "wait_children_destroyed"
+        # nothing
+      else
         postgres_resource.active_billing_records.each(&:finalize)
         hop_destroy
       end
@@ -258,21 +265,26 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     decr_destroy
 
-    strand.children.each { it.destroy }
+    Semaphore.incr(strand.children_dataset.select(:id), "destroy")
+    hop_wait_children_destroyed
+  end
 
-    postgres_resource.private_subnet.incr_destroy_if_only_used_internally(
-      ubid: postgres_resource.ubid,
-      vm_ids: servers.map(&:vm_id)
-    )
+  label def wait_children_destroyed
+    reap(nap: 5) do
+      postgres_resource.private_subnet.incr_destroy_if_only_used_internally(
+        ubid: postgres_resource.ubid,
+        vm_ids: servers.map(&:vm_id)
+      )
 
-    postgres_resource.internal_firewall.destroy
+      postgres_resource.internal_firewall.destroy
 
-    servers.each(&:incr_destroy)
+      servers.each(&:incr_destroy)
 
-    postgres_resource.dns_zone&.delete_record(record_name: postgres_resource.hostname)
-    postgres_resource.destroy
+      postgres_resource.dns_zone&.delete_record(record_name: postgres_resource.hostname)
+      postgres_resource.destroy
 
-    pop "postgres resource is deleted"
+      pop "postgres resource is deleted"
+    end
   end
 
   def create_certificate

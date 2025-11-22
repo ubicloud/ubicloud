@@ -269,13 +269,27 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
   end
 
   describe "#destroy" do
-    it "destroys the victoria metrics server" do
-      expect(nx).to receive(:register_deadline).with(nil, 10 * 60)
+    it "adds destroy semaphore to children and hops to wait_children_destroyed" do
+      nx.strand.update(stack: {})
+      st = Strand.create(prog: "Prog::BootstrapRhizome", label: "start", parent_id: nx.strand.id)
       expect(nx).to receive(:decr_destroy)
-      expect(nx.strand).to receive(:children).and_return([])
+      expect(nx).to receive(:register_deadline).with(nil, 10 * 60)
+      expect { nx.destroy }.to hop("wait_children_destroyed")
+      expect(Semaphore.where(name: "destroy").select_order_map(:strand_id)).to eq [st.id]
+    end
+  end
+
+  describe "#wait_children_destroyed" do
+    it "naps if children still exist" do
+      nx.strand.update(stack: {})
+      Strand.create(prog: "Prog::BootstrapRhizome", label: "start", parent_id: nx.strand.id)
+      expect { nx.wait_children_destroyed }.to nap(5)
+    end
+
+    it "destroys the victoria metrics server" do
       expect(victoria_metrics_server.vm).to receive(:incr_destroy)
       expect(victoria_metrics_server).to receive(:destroy)
-      expect { nx.destroy }.to exit({"msg" => "victoria_metrics server destroyed"})
+      expect { nx.wait_children_destroyed }.to exit({"msg" => "victoria_metrics server destroyed"})
     end
   end
 
@@ -290,6 +304,25 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect(nx.strand).to receive(:label).and_return("destroy")
       expect { nx.before_run }.not_to hop("destroy")
+    end
+
+    it "does not hop to destroy if already in the wait_children_destroyed state" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx.strand).to receive(:label).and_return("wait_children_destroyed")
+      expect { nx.before_run }.not_to hop("destroy")
+    end
+
+    it "pops if in restart state and has a parent" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      nx.strand.parent_id = nx.strand.id
+      expect(nx.strand).to receive(:label).and_return("restart")
+      expect { nx.before_run }.to exit({"msg" => "exiting early due to destroy semaphore"})
+    end
+
+    it "hops to destroy if in restart state and does not have a parent" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx.strand).to receive(:label).and_return("restart").at_least(:once)
+      expect { nx.before_run }.to hop("destroy")
     end
 
     it "pops if destroy is set and stack has items" do
