@@ -102,7 +102,7 @@ module Ubicloud
       adapter.patch(_path("/config"), pg_config: values)[:pg_config]
     end
 
-    # Update configuration hash for the PostgreSQL database.
+    # Update pgbouncer configuration hash for the PostgreSQL database.
     def update_pgbouncer_config(**values)
       adapter.patch(_path("/config"), pgbouncer_config: values)[:pgbouncer_config]
     end

@@ -11,6 +11,8 @@ Options:
     -s, --size=size                  server size
     -S, --storage-size=size          storage size GB
     -v, --version=version            PostgreSQL version
+    -c, --pg-config=config           postgres config (e.g key1=value1,key2=value2)
+    -u, --pgbouncer-config=config    pgbouncer config (e.g. key1=value1,key2=value2)
     -t, --tags=tags                  tags (e.g. key1=value1,key2=value2)
     -R, --restrict-by-default        restrict access by default (add firewall rules to allow access)
 
