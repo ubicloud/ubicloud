@@ -5,6 +5,12 @@ require_relative "../../lib/util"
 class Prog::Postgres::ConvergePostgresResource < Prog::Base
   subject_is :postgres_resource
 
+  def before_run
+    when_destroy_set? do
+      pop "exiting early due to destroy semaphore"
+    end
+  end
+
   label def start
     register_deadline("wait_for_maintenance_window", 2 * 60 * 60)
     hop_provision_servers
