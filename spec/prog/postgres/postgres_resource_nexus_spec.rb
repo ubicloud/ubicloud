@@ -161,6 +161,18 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(nx.strand).to receive(:label).and_return("destroy")
       expect { nx.before_run }.not_to hop("destroy")
     end
+
+    it "does not hop to destroy if already in the wait_children_destroyed state" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx.strand).to receive(:label).and_return("wait_children_destroyed")
+      expect { nx.before_run }.not_to hop("destroy")
+    end
+
+    it "pops if in trigger_pg_current_xact_id_on_parent state and has a parent" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx.strand).to receive(:label).and_return("trigger_pg_current_xact_id_on_parent")
+      expect { nx.before_run }.to exit({"msg" => "exiting early due to destroy semaphore"})
+    end
   end
 
   describe "#start" do
@@ -421,6 +433,23 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   end
 
   describe "#destroy" do
+    it "adds destroy semaphore to children and hops to wait_children_destroyed" do
+      nx.strand.update(prog: "Postgres::PostgresResourceNexus", label: "destroy", stack: {})
+      st = Strand.create(prog: "Postgres::ConvergePostgresResource", label: "start", parent_id: nx.strand.id)
+      expect(nx).to receive(:decr_destroy)
+      expect(nx).to receive(:register_deadline).with(nil, 5 * 60)
+      expect { nx.destroy }.to hop("wait_children_destroyed")
+      expect(Semaphore.where(name: "destroy").select_order_map(:strand_id)).to eq [st.id]
+    end
+  end
+
+  describe "#wait_children_destroyed" do
+    it "naps if children still exist" do
+      nx.strand.update(prog: "Postgres::PostgresResourceNexus", label: "destroy", stack: {})
+      Strand.create(prog: "Postgres::ConvergePostgresResource", label: "start", parent_id: nx.strand.id)
+      expect { nx.wait_children_destroyed }.to nap(5)
+    end
+
     it "triggers server deletion and waits until it is deleted" do
       dns_zone = instance_double(DnsZone)
       expect(postgres_resource).to receive(:dns_zone).and_return(dns_zone)
@@ -437,7 +466,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         vm_ids: [postgres_resource.servers.first.vm_id]
       )
 
-      expect { nx.destroy }.to exit({"msg" => "postgres resource is deleted"})
+      expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
     end
 
     it "completes destroy even if dns zone is not configured" do
@@ -448,7 +477,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         vm_ids: []
       )
 
-      expect { nx.destroy }.to exit({"msg" => "postgres resource is deleted"})
+      expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
     end
   end
 end
