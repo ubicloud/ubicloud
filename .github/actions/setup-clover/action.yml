@@ -7,7 +7,7 @@ runs:
       shell: bash
       run: |
         # Remove the default PostgreSQL cluster on the runner
-        sudo -u postgres pg_dropcluster 14 main --stop
+        sudo -u postgres pg_dropcluster 16 main --stop
         # Install PostgreSQL
         sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
         wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
