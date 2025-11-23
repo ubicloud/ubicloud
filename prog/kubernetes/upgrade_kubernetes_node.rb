@@ -36,11 +36,9 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
     end
 
     reap(reaper:) do
-      current_frame = strand.stack.first
       # This will not work correctly if the strand has multiple children.
       # However, the strand has only has a single child created in start.
-      current_frame["new_node_id"] = node_id
-      strand.modified!(:stack)
+      update_stack({"new_node_id" => node_id})
 
       hop_drain_old_node
     end

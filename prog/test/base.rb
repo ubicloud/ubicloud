@@ -5,10 +5,4 @@ class Prog::Test::Base < Prog::Base
     strand.update(exitval: {msg: msg})
     hop_failed
   end
-
-  def update_stack(new_frame)
-    strand.stack.first.merge!(new_frame)
-    strand.modified!(:stack)
-    strand.save_changes
-  end
 end

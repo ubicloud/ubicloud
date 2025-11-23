@@ -34,9 +34,7 @@ ExecStart=nc -l 8080 -6
     vm1.sshable.cmd("sudo systemctl daemon-reload")
     vm1.sshable.cmd("sudo systemctl enable listening_ipv4.service")
     vm1.sshable.cmd("sudo systemctl enable listening_ipv6.service")
-    update_stack({
-      "vm_to_be_connected_id" => vm1.id
-    })
+    update_stack({"vm_to_be_connected_id" => vm1.id})
 
     hop_perform_tests_none
   end
@@ -44,9 +42,7 @@ ExecStart=nc -l 8080 -6
   label def perform_tests_none
     update_firewall_rules(config: :perform_tests_none) unless frame["firewalls"] == "none"
 
-    update_stack({
-      "firewalls" => "none"
-    })
+    update_stack({"firewalls" => "none"})
 
     if firewall.private_subnets.first.update_firewall_rules_set? || firewall.private_subnets.first.vms.any? { |vm| vm.update_firewall_rules_set? }
       nap 5
@@ -65,9 +61,7 @@ ExecStart=nc -l 8080 -6
   label def perform_tests_public_ipv4
     update_firewall_rules(config: :perform_tests_public_ipv4) unless frame["firewalls"] == "public_ipv4"
 
-    update_stack({
-      "firewalls" => "public_ipv4"
-    })
+    update_stack({"firewalls" => "public_ipv4"})
     if firewall.private_subnets.first.update_firewall_rules_set? || firewall.private_subnets.first.vms.any? { |vm| vm.update_firewall_rules_set? }
       nap 5
     end
@@ -81,9 +75,7 @@ ExecStart=nc -l 8080 -6
   label def perform_tests_public_ipv6
     update_firewall_rules(config: :perform_tests_public_ipv6) unless frame["firewalls"] == "public_ipv6"
 
-    update_stack({
-      "firewalls" => "public_ipv6"
-    })
+    update_stack({"firewalls" => "public_ipv6"})
     if firewall.private_subnets.first.update_firewall_rules_set? || firewall.private_subnets.first.vms.any? { |vm| vm.update_firewall_rules_set? }
       nap 5
     end
@@ -98,9 +90,7 @@ ExecStart=nc -l 8080 -6
   label def perform_tests_private_ipv4
     update_firewall_rules(config: :perform_tests_private_ipv4) unless frame["firewalls"] == "private_ipv4"
 
-    update_stack({
-      "firewalls" => "private_ipv4"
-    })
+    update_stack({"firewalls" => "private_ipv4"})
     if firewall.private_subnets.first.update_firewall_rules_set? || firewall.private_subnets.first.vms.any? { |vm| vm.update_firewall_rules_set? }
       nap 5
     end
@@ -115,9 +105,7 @@ ExecStart=nc -l 8080 -6
   label def perform_tests_private_ipv6
     update_firewall_rules(config: :perform_tests_private_ipv6) unless frame["firewalls"] == "private_ipv6"
 
-    update_stack({
-      "firewalls" => "private_ipv6"
-    })
+    update_stack({"firewalls" => "private_ipv6"})
     if firewall.private_subnets.first.update_firewall_rules_set? || firewall.private_subnets.first.vms.any? { |vm| vm.update_firewall_rules_set? }
       nap 5
     end
