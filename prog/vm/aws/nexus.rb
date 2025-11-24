@@ -197,7 +197,8 @@ class Prog::Vm::Aws::Nexus < Prog::Base
         end
         runner.provision_spare_runner
         runner.incr_destroy
-        pop "exiting due to insufficient instance capacity"
+        vm.incr_destroy
+        nap 0
       end
       raise
     end
