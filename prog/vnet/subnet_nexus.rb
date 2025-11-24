@@ -81,6 +81,18 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def wait
+    # :nocov:
+    when_migrate_set? do
+      if private_subnet.location.aws?
+        strand.update(prog: "Vnet::Aws::SubnetNexus", label: "wait")
+      else
+        strand.update(prog: "Vnet::Metal::SubnetNexus", label: "wait")
+      end
+      decr_migrate
+      nap 0
+    end
+    # :nocov:
+
     if private_subnet.location.aws?
       check_firewall_update
       private_subnet.semaphores.each(&:destroy)
