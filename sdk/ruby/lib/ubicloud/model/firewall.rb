@@ -71,7 +71,7 @@ module Ubicloud
     # Update the firewall description to the given description. Returns the
     # updated Firewall model instance.
     def update_description(description)
-      merge_into_values(adapter.post(_path("/update-description"), description:))
+      merge_into_values(adapter.patch(_path, description:))
     end
 
     # Attach the given private subnet to the firewall. Accepts either a PrivateSubnet instance
