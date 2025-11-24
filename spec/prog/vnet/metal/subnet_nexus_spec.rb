@@ -256,27 +256,34 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
   end
 
   describe "#destroy" do
+    let(:vm) {
+      vm = create_vm
+      Strand.create_with_id(vm.id, prog: "Vm::Nexus", label: "start")
+      vm
+    }
+
     let(:nic) {
-      instance_double(Nic, vm_id: nil)
+      Nic.create(private_subnet_id: ps.id,
+        private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
+        private_ipv4: "10.0.0.1",
+        mac: "00:00:00:00:00:00",
+        encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579",
+        name: "default-nic",
+        state: "active")
     }
 
     it "extends deadline if a vm prevents destroy" do
-      vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", location_id: Location::HETZNER_FSN1_ID).tap {
-        it.id = "788525ed-d6f0-4937-a844-323d4fd91946"
-      }
-      expect(ps).to receive(:nics).and_return([nic]).twice
-      expect(nic).to receive(:vm_id).and_return("vm-id")
-      expect(nic).to receive(:vm).and_return(vm)
-      expect(vm).to receive(:prevent_destroy_set?).and_return(true)
+      nic.update(vm_id: vm.id)
+      vm.incr_prevent_destroy
+      expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
       expect(nx).to receive(:register_deadline).with(nil, 10 * 60, allow_extension: true)
 
       expect { nx.destroy }.to nap(5)
     end
 
     it "fails if there are active resources" do
-      expect(ps).to receive(:nics).and_return([nic]).twice
-      expect(nic).to receive(:vm_id).and_return("vm-id")
-      expect(nic).to receive(:vm).and_return(nil)
+      expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
+      expect(nic).to receive(:vm_id).and_return("788525ed-d6f0-4937-a844-323d4fd91946").at_least(:once)
       expect(Clog).to receive(:emit).with("Cannot destroy subnet with active nics, first clean up the attached resources").and_call_original
 
       expect { nx.destroy }.to nap(5)
