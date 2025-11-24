@@ -83,7 +83,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   label def wait_inbound_setup
     nics = rekeying_nics
     if nics.all? { |nic| nic.strand.label == "wait_rekey_outbound_trigger" }
-      nics.each(&:incr_trigger_outbound_update)
+      Semaphore.incr(nics.map(&:id), "trigger_outbound_update")
       hop_wait_outbound_setup
     end
 
@@ -93,7 +93,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   label def wait_outbound_setup
     nics = rekeying_nics
     if nics.all? { |nic| nic.strand.label == "wait_rekey_old_state_drop_trigger" }
-      nics.each(&:incr_old_state_drop_trigger)
+      Semaphore.incr(nics.map(&:id), "old_state_drop_trigger")
       hop_wait_old_state_drop
     end
 
@@ -104,10 +104,10 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     nics = rekeying_nics
     if nics.all? { |nic| nic.strand.label == "wait" }
       private_subnet.update(state: "waiting", last_rekey_at: Time.now)
-      nics.each do |nic|
-        nic.update(encryption_key: nil, rekey_payload: nil)
-        nic.unlock
-      end
+
+      all_connected_nics.exclude(rekey_payload: nil).update(encryption_key: nil, rekey_payload: nil)
+      Semaphore.where(strand_id: nics.map(&:id), name: "lock").delete(force: true)
+
       hop_wait
     end
 
@@ -116,7 +116,9 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
 
   label def destroy
     if private_subnet.nics.any?(&:vm_id)
-      register_deadline(nil, 10 * 60, allow_extension: true) if private_subnet.nics.any? { |n| n.vm&.prevent_destroy_set? }
+      unless Semaphore.where(strand_id: private_subnet.nics.filter_map(&:vm_id), name: "prevent_destroy").empty?
+        register_deadline(nil, 10 * 60, allow_extension: true)
+      end
 
       Clog.emit("Cannot destroy subnet with active nics, first clean up the attached resources") { private_subnet }
 
@@ -124,7 +126,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     end
 
     decr_destroy
-    private_subnet.firewalls.map { it.disassociate_from_private_subnet(private_subnet, apply_firewalls: false) }
+    private_subnet.remove_all_firewalls
 
     private_subnet.connected_subnets.each do |subnet|
       private_subnet.disconnect_subnet(subnet)
