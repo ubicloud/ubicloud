@@ -200,7 +200,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         sudo usermod -a -G kvm #{nx.vm_name}
       COMMAND
 
-      expect { nx.create_unix_user }.to hop("prep")
+      expect { nx.create_unix_user }.to hop("create_billing_record")
     end
   end
 
@@ -650,17 +650,28 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.wait_sshable }.to nap(1)
     end
 
-    it "hops to create_billing_record if sshable" do
+    it "hops to wait if sshable and billing record created" do
       vm.incr_update_firewall_rules
       adr = Address.create(cidr: "10.0.0.0/24", routed_to_host_id: vm_host.id)
       AssignedVmAddress.create(ip: "10.0.0.1", address_id: adr.id, dst_vm_id: vm.id)
       expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
-      expect { nx.wait_sshable }.to hop("create_billing_record")
+      now = Time.now
+      expect(Time).to receive(:now).and_return(now).at_least(:once)
+      expect(vm).to receive(:update).with(display_state: "running", provisioned_at: now).and_return(true)
+      expect(Clog).to receive(:emit).with("vm provisioned").and_yield
+      allow(vm).to receive(:allocated_at).and_return(now - 100)
+      nx.strand.stack[-1]["create_billing_record_done"] = true
+      expect { nx.wait_sshable }.to hop("wait")
     end
 
     it "skips a check if ipv4 is not enabled" do
       vm.incr_update_firewall_rules
       expect(vm.ip4).to be_nil
+      now = Time.now
+      expect(Time).to receive(:now).and_return(now).at_least(:once)
+      expect(vm).to receive(:update).with(display_state: "running", provisioned_at: now).and_return(true)
+      expect(Clog).to receive(:emit).with("vm provisioned").and_yield
+      allow(vm).to receive(:allocated_at).and_return(now - 100)
       expect { nx.wait_sshable }.to hop("create_billing_record")
     end
   end
@@ -668,24 +679,16 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   describe "#create_billing_record" do
     let(:now) { Time.now }
 
-    before do
-      expect(Time).to receive(:now).and_return(now).at_least(:once)
-      vm.update(allocated_at: now - 100)
-      expect(Clog).to receive(:emit).with("vm provisioned").and_yield
-    end
-
     it "not create billing records when the project is not billable" do
       project.update(billable: false)
-      expect { nx.create_billing_record }.to hop("wait")
+      expect { nx.create_billing_record }.to hop("prep")
       expect(BillingRecord.count).to eq(0)
     end
 
     it "creates billing records for only vm" do
-      expect { nx.create_billing_record }.to hop("wait")
+      expect { nx.create_billing_record }.to hop("prep")
         .and change(BillingRecord, :count).from(0).to(1)
       expect(vm.active_billing_records.first.billing_rate["resource_type"]).to eq("VmVCpu")
-      expect(vm.display_state).to eq("running")
-      expect(vm.provisioned_at).to eq(now)
     end
 
     it "creates billing records when storage volumes are present" do
@@ -694,7 +697,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: it, use_bdev_ubi: false, skip_sync: false, storage_device_id: dev.id)
       }
 
-      expect { nx.create_billing_record }.to hop("wait")
+      expect { nx.create_billing_record }.to hop("prep")
         .and change(BillingRecord, :count).from(0).to(3)
       expect(vm.active_billing_records.map { it.billing_rate["resource_type"] }.sort).to eq(["VmStorage", "VmStorage", "VmVCpu"])
     end
@@ -703,6 +706,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       vm.ip4_enabled = true
       adr = Address.create(cidr: "192.168.1.0/24", routed_to_host_id: vm_host.id)
       AssignedVmAddress.create(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
+      nx.strand.stack[-1]["prep_done"] = true
       expect { nx.create_billing_record }.to hop("wait")
         .and change(BillingRecord, :count).from(0).to(2)
       expect(vm.active_billing_records.map { it.billing_rate["resource_type"] }.sort).to eq(["IPAddress", "VmVCpu"])
@@ -711,7 +715,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "creates billing records when gpu is present" do
       vm.location_id = Location[name: "latitude-ai"].id
       PciDevice.create(vm_id: vm.id, vm_host_id: vm_host.id, slot: "01:00.0", iommu_group: 23, device_class: "0302", vendor: "10de", device: "20b5")
-      expect { nx.create_billing_record }.to hop("wait")
+      expect { nx.create_billing_record }.to hop("prep")
         .and change(BillingRecord, :count).from(0).to(2)
       expect(vm.active_billing_records.map { it.billing_rate["resource_type"] }.sort).to eq(["Gpu", "VmVCpu"])
     end

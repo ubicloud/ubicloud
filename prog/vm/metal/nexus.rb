@@ -134,7 +134,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
     host.sshable.cmd(command, vm_name:, vm_home:, uid:)
 
-    hop_prep
+    hop_create_billing_record
   end
 
   label def prep
@@ -176,70 +176,82 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       # to reduce the amount of load on the control plane unnecessarily.
       nap 6
     end
-    addr = vm.ip4
-    hop_create_billing_record unless addr
 
-    begin
-      Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
-    rescue SystemCallError
-      nap 1
+    if (addr = vm.ip4_string)
+      begin
+        Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
+      rescue SystemCallError
+        nap 1
+      end
     end
 
-    hop_create_billing_record
+    vm.update(display_state: "running", provisioned_at: Time.now)
+    Clog.emit("vm provisioned") { [vm, {provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: (Time.now - vm.allocated_at).round(3)}}] }
+
+    # If the machine has already not gone through create billing record,
+    # create the billing record.
+    # This should only happen if the VM went through prep before the
+    # change to create billing records before prep.
+    hop_create_billing_record unless strand.stack[-1]["create_billing_record_done"]
+
+    hop_wait
   end
 
   label def create_billing_record
-    vm.update(display_state: "running", provisioned_at: Time.now)
-
-    Clog.emit("vm provisioned") { [vm, {provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: (Time.now - vm.allocated_at).round(3)}}] }
-
     project = vm.project
+
+    if project.billable && !strand.stack[-1]["create_billing_record_done"]
+      BillingRecord.create(
+        project_id: project.id,
+        resource_id: vm.id,
+        resource_name: vm.name,
+        billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
+        amount: vm.vcpus
+      )
+
+      vm.storage_volumes.each do |vol|
+        BillingRecord.create(
+          project_id: project.id,
+          resource_id: vm.id,
+          resource_name: "Disk ##{vol["disk_index"]} of #{vm.name}",
+          billing_rate_id: BillingRate.from_resource_properties("VmStorage", vm.family, vm.location.name)["id"],
+          amount: vol["size_gib"]
+        )
+      end
+
+      if vm.ip4_enabled
+        BillingRecord.create(
+          project_id: project.id,
+          resource_id: vm.id,
+          resource_name: vm.assigned_vm_address.ip,
+          billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location.name)["id"],
+          amount: 1
+        )
+      end
+
+      if vm.pci_devices.any? { |dev| dev.is_gpu }
+        gpu_count = vm.pci_devices.count { |dev| dev.is_gpu }
+        gpu = vm.pci_devices.find { |dev| dev.is_gpu }
+
+        BillingRecord.create(
+          project_id: project.id,
+          resource_id: vm.id,
+          resource_name: "GPUs of #{vm.name}",
+          billing_rate_id: BillingRate.from_resource_properties("Gpu", gpu.device, vm.location.name)["id"],
+          amount: gpu_count
+        )
+      end
+    end
+
     strand.stack[-1]["create_billing_record_done"] = true
     strand.modified!(:stack)
-    hop_wait unless project.billable
 
-    BillingRecord.create(
-      project_id: project.id,
-      resource_id: vm.id,
-      resource_name: vm.name,
-      billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
-      amount: vm.vcpus
-    )
+    # If the machine has already gone through prep, hop to wait.
+    # This should only happen if the VM went through prep before the
+    # change to create billing records before prep.
+    hop_wait if strand.stack[-1]["prep_done"]
 
-    vm.storage_volumes.each do |vol|
-      BillingRecord.create(
-        project_id: project.id,
-        resource_id: vm.id,
-        resource_name: "Disk ##{vol["disk_index"]} of #{vm.name}",
-        billing_rate_id: BillingRate.from_resource_properties("VmStorage", vm.family, vm.location.name)["id"],
-        amount: vol["size_gib"]
-      )
-    end
-
-    if vm.ip4_enabled
-      BillingRecord.create(
-        project_id: project.id,
-        resource_id: vm.id,
-        resource_name: vm.assigned_vm_address.ip,
-        billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location.name)["id"],
-        amount: 1
-      )
-    end
-
-    if vm.pci_devices.any? { |dev| dev.is_gpu }
-      gpu_count = vm.pci_devices.count { |dev| dev.is_gpu }
-      gpu = vm.pci_devices.find { |dev| dev.is_gpu }
-
-      BillingRecord.create(
-        project_id: project.id,
-        resource_id: vm.id,
-        resource_name: "GPUs of #{vm.name}",
-        billing_rate_id: BillingRate.from_resource_properties("Gpu", gpu.device, vm.location.name)["id"],
-        amount: gpu_count
-      )
-    end
-
-    hop_wait
+    hop_prep
   end
 
   label def wait
