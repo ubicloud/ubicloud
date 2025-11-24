@@ -234,7 +234,7 @@ RSpec.describe Clover, "vm" do
         expect(Vm.count).to eq(1)
         expect(Vm.first.project_id).to eq(project.id)
         expect(Vm.first.private_subnets.first.id).not_to be_nil
-        expect(Vm.first.init_script.script).to eq "foo bar"
+        expect(Vm.first.init_script.init_script).to eq "foo bar"
       end
 
       it "can create new virtual machine with public ipv4" do
