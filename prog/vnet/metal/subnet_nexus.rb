@@ -48,7 +48,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   end
 
   def gen_reqid
-    SecureRandom.random_number(100000) + 1
+    SecureRandom.random_number(1...100000)
   end
 
   label def add_new_nic

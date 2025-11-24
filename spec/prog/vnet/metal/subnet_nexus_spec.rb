@@ -30,8 +30,8 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
 
   describe ".gen_reqid" do
     it "generates a random reqid" do
-      expect(SecureRandom).to receive(:random_number).with(100000).and_return(10)
-      expect(nx.gen_reqid).to eq(11)
+      expect(SecureRandom).to receive(:random_number).with(1...100000).and_return(10)
+      expect(nx.gen_reqid).to eq(10)
     end
   end
 
