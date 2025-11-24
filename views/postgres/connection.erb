@@ -3,15 +3,15 @@
   password = URI.encode_uri_component(@pg.superuser_password)
 
   connection_infos = {
-    "url-5432" => "postgresql://postgres:#{password}@#{hostname}:5432/postgres",
-    "url-6432" => "postgresql://postgres:#{password}@#{hostname}:6432/postgres",
-    "psql-5432" => "psql postgresql://postgres:#{password}@#{hostname}:5432/postgres",
-    "psql-6432" => "psql postgresql://postgres:#{password}@#{hostname}:6432/postgres",
-    "env-5432" => "PGHOST=#{hostname}\nPGPORT=5432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres",
-    "env-6432" => "PGHOST=#{hostname}\nPGPORT=6432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres",
-    "yaml-5432" => "host: #{hostname}\nport: 5432\nuser: postgres\npassword: #{password}\ndatabase: postgres",
-    "yaml-6432" => "host: #{hostname}\nport: 6432\nuser: postgres\npassword: #{password}\ndatabase: postgres",
-    "jdbc-5432" => "jdbc:postgresql://#{hostname}:5432/postgres?user=postgres&password=#{password}&ssl=true",
+    "url-5432" => "postgresql://postgres:#{password}@#{hostname}:5432/postgres?channel_binding=require",
+    "url-6432" => "postgresql://postgres:#{password}@#{hostname}:6432/postgres?sslmode=require",
+    "psql-5432" => "psql postgresql://postgres:#{password}@#{hostname}:5432/postgres?channel_binding=require",
+    "psql-6432" => "psql postgresql://postgres:#{password}@#{hostname}:6432/postgres?sslmode=require",
+    "env-5432" => "PGHOST=#{hostname}\nPGPORT=5432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGCHANNELBINDING=require",
+    "env-6432" => "PGHOST=#{hostname}\nPGPORT=6432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGSSLMODE=require",
+    "yaml-5432" => "host: #{hostname}\nport: 5432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nchannel_binding: require",
+    "yaml-6432" => "host: #{hostname}\nport: 6432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nsslmode: require",
+    "jdbc-5432" => "jdbc:postgresql://#{hostname}:5432/postgres?user=postgres&password=#{password}&ssl=true&channelBinding=require",
     "jdbc-6432" => "jdbc:postgresql://#{hostname}:6432/postgres?user=postgres&password=#{password}&ssl=true"
   }
 
