@@ -172,7 +172,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   end
 
   def location
-    private_subnet.location
+    @location ||= private_subnet.location
   end
 
   def client
