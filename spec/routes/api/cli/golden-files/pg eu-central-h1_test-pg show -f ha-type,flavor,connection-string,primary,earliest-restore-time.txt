@@ -1,5 +1,5 @@
 ha_type: none
 flavor: standard
-connection_string: postgres://postgres:bar456FOO123@test-pg.pgvm1qb9gwct1mqmay7m54yma5.pg.example.com:5432/postgres?sslmode=require
+connection_string: postgres://postgres:bar456FOO123@test-pg.pgvm1qb9gwct1mqmay7m54yma5.pg.example.com:5432/postgres?channel_binding=require
 primary: true
 earliest_restore_time: 

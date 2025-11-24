@@ -78,7 +78,7 @@ class PostgresResource < Sequel::Model
       host: hn,
       port: 5432,
       path: "/postgres",
-      query: "sslmode=require"
+      query: "channel_binding=require"
     ).to_s
   end
 
