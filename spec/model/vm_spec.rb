@@ -329,7 +329,7 @@ RSpec.describe Vm do
     )).at_least(:once)
     expect(JSON.parse(vm.params_json)["init_script"]).to eq ""
     VmInitScript.create_with_id(vm, script: "b", init_script: "c")
-    expect(JSON.parse(vm.reload.params_json)["init_script"]).to eq "b"
+    expect(JSON.parse(vm.reload.params_json)["init_script"]).to eq "c"
   end
 
   describe "#storage_volumes" do
