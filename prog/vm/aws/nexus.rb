@@ -14,7 +14,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   label def start
-    nap 1 unless vm.nics.all? { |nic| nic.strand.label == "wait" }
+    nap 1 unless vm.nic.strand.label == "wait"
     # Cloudwatch is not needed for runner instances
     hop_create_instance if is_runner?
 
@@ -166,7 +166,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       ],
       network_interfaces: [
         {
-          network_interface_id: vm.nics.first.nic_aws_resource.network_interface_id,
+          network_interface_id: vm.nic.nic_aws_resource.network_interface_id,
           device_index: 0
         }
       ],
@@ -355,10 +355,8 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   def final_clean_up
-    vm.nics.map do |nic|
-      nic.update(vm_id: nil)
-      nic.incr_destroy
-    end
+    vm.nic.update(vm_id: nil)
+    vm.nic.incr_destroy
     vm.destroy
   end
 
