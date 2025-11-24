@@ -68,8 +68,16 @@ CONF
     r "sudo sysctl -w vm.overcommit_memory=2"
     r "echo 'vm.overcommit_memory=2' | sudo tee -a /etc/sysctl.conf"
 
-    r "sudo sysctl -w vm.overcommit_ratio=150"
-    r "echo 'vm.overcommit_ratio=150' | sudo tee -a /etc/sysctl.conf"
+    meminfo = File.read("/proc/meminfo")
+    mem_total_kb = Integer(meminfo[/^MemTotal:\s*(\d+)/, 1], 10)
+    hugepages_total, hugepage_size_kb = hugepage_info
+    hugepages_kb = hugepages_total * hugepage_size_kb
+
+    # Calculate overcommit_kbytes as 256 MiB + 1.75 * (MemTotal - HugePages)
+    overcommit_kbytes = (256 * 1024) + (1.75 * (mem_total_kb - hugepages_kb)).round
+
+    r "sudo sysctl -w vm.overcommit_kbytes=#{overcommit_kbytes}"
+    r "echo 'vm.overcommit_kbytes=#{overcommit_kbytes}' | sudo tee -a /etc/sysctl.conf"
   end
 
   def setup

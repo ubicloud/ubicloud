@@ -44,4 +44,29 @@ RSpec.describe VirtualMemorySetup do
       expect { virtual_memory_setup.setup_postgres_hugepages }.not_to raise_error
     end
   end
+
+  describe "#configure_memory_overcommit" do
+    before do
+      allow(File).to receive(:read).with("/proc/meminfo").and_return(<<~MEMINFO)
+        MemTotal:        8000000 kB
+        HugePages_Total:     512
+        Hugepagesize:     2048 kB
+        MemFree:         4000000 kB
+      MEMINFO
+    end
+
+    it "calculates and sets overcommit_kbytes correctly" do
+      # MemTotal: 8,000,000 kB
+      # HugePages: 512 * 2048 kB = 1,048,576 kB
+      # Calculation: 256 MiB (262144 kB) + 1.75 * (8,000,000 - 1,048,576) = 12427136 kB
+      expected_kbytes = 12_427_136
+
+      expect(virtual_memory_setup).to receive(:r).with("sudo sysctl -w vm.overcommit_memory=2")
+      expect(virtual_memory_setup).to receive(:r).with("echo 'vm.overcommit_memory=2' | sudo tee -a /etc/sysctl.conf")
+      expect(virtual_memory_setup).to receive(:r).with("sudo sysctl -w vm.overcommit_kbytes=#{expected_kbytes}")
+      expect(virtual_memory_setup).to receive(:r).with("echo 'vm.overcommit_kbytes=#{expected_kbytes}' | sudo tee -a /etc/sysctl.conf")
+
+      virtual_memory_setup.configure_memory_overcommit
+    end
+  end
 end
