@@ -140,6 +140,9 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   label def delete_internet_gateway
     ignore_invalid_id do
       client.detach_internet_gateway({internet_gateway_id: private_subnet.private_subnet_aws_resource.internet_gateway_id, vpc_id: private_subnet.private_subnet_aws_resource.vpc_id})
+    end
+
+    ignore_invalid_id do
       client.delete_internet_gateway({internet_gateway_id: private_subnet.private_subnet_aws_resource.internet_gateway_id})
     end
     hop_delete_vpc
