@@ -67,6 +67,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   end
 
   label def refresh_keys
+    register_deadline("wait", 5 * 60)
     nics = active_nics
     nap 10 if nics.any? { |nic| nic.lock_set? }
     nics.each do |nic|
