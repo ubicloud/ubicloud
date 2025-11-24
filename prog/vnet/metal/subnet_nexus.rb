@@ -67,7 +67,6 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   end
 
   label def refresh_keys
-    decr_refresh_keys
     nics = active_nics
     nap 10 if nics.any? { |nic| nic.lock_set? }
     nics.each do |nic|
@@ -76,6 +75,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
       nic.incr_lock
     end
 
+    decr_refresh_keys
     hop_wait_inbound_setup
   end
 
