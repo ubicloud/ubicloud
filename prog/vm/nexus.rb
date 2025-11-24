@@ -433,6 +433,15 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   label def wait
+    # :nocov:
+    when_migrate_to_separate_progs_set? do
+      prog = vm.location.aws? ? "Vm::Aws::Nexus" : "Vm::Metal::Nexus"
+      strand.update(prog:)
+      decr_migrate_to_separate_progs
+      hop_wait
+    end
+    # :nocov:
+
     when_start_after_host_reboot_set? do
       register_deadline("wait", 5 * 60)
       hop_start_after_host_reboot
