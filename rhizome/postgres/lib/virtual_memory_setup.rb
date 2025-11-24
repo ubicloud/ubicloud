@@ -3,7 +3,7 @@
 require_relative "../../common/lib/util"
 require "logger"
 
-class HugepagesSetup
+class VirtualMemorySetup
   def initialize(instance, logger)
     @version, @cluster = instance.split("-", 2)
     @logger = logger
@@ -64,10 +64,19 @@ CONF
     true
   end
 
+  def configure_memory_overcommit
+    r "sudo sysctl -w vm.overcommit_memory=2"
+    r "echo 'vm.overcommit_memory=2' | sudo tee -a /etc/sysctl.conf"
+
+    r "sudo sysctl -w vm.overcommit_ratio=150"
+    r "echo 'vm.overcommit_ratio=150' | sudo tee -a /etc/sysctl.conf"
+  end
+
   def setup
     unless postgres_running?
       stop_postgres_cluster
       setup_postgres_hugepages
     end
+    configure_memory_overcommit
   end
 end
