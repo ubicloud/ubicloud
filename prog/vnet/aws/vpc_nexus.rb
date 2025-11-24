@@ -1,13 +1,21 @@
 # frozen_string_literal: true
 
 require "aws-sdk-ec2"
-class Prog::Aws::Vpc < Prog::Base
+class Prog::Vnet::Aws::VpcNexus < Prog::Base
   subject_is :private_subnet
 
   def before_run
     when_destroy_set? do
-      pop "exiting early due to destroy semaphore"
+      when_destroying_set? { return }
+      incr_destroying
+      register_deadline(nil, 10 * 60)
+      hop_destroy
     end
+  end
+
+  label def start
+    PrivateSubnetAwsResource.create_with_id(private_subnet.id)
+    hop_create_vpc
   end
 
   label def create_vpc
@@ -97,10 +105,32 @@ class Prog::Aws::Vpc < Prog::Base
     rescue Aws::EC2::Errors::RouteAlreadyExists
     end
 
-    pop "subnet created"
+    hop_wait
+  end
+
+  label def wait
+    when_update_firewall_rules_set? do
+      private_subnet.vms.each(&:incr_update_firewall_rules)
+      decr_update_firewall_rules
+    end
+
+    nap 60 * 60 * 24 * 365
   end
 
   label def destroy
+    if private_subnet.nics.any? { |n| !n.vm_id.nil? }
+      register_deadline(nil, 10 * 60, allow_extension: true) if private_subnet.nics.any? { |n| n.vm&.prevent_destroy_set? }
+
+      Clog.emit("Cannot destroy subnet with active nics, first clean up the attached resources") { private_subnet }
+
+      nap 5
+    end
+
+    decr_destroy
+    private_subnet.nics.each(&:incr_destroy)
+    private_subnet.remove_all_firewalls
+    Semaphore.incr(strand.children_dataset.where(prog: "Aws::Vpc").select(:id), "destroy")
+
     ignore_invalid_id do
       client.delete_security_group({group_id: private_subnet.private_subnet_aws_resource.security_group_id})
     end
@@ -119,6 +149,10 @@ class Prog::Aws::Vpc < Prog::Base
     ignore_invalid_id do
       client.delete_vpc({vpc_id: private_subnet.private_subnet_aws_resource.vpc_id})
     end
+
+    nap 5 unless private_subnet.nics.empty?
+    private_subnet.private_subnet_aws_resource.destroy
+    private_subnet.destroy
     pop "vpc destroyed"
   end
 

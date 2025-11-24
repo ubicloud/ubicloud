@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe Prog::Vnet::SubnetNexus do
+RSpec.describe Prog::Vnet::Metal::SubnetNexus do
   subject(:nx) {
     described_class.new(st)
   }
@@ -19,71 +19,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
 
   before do
     nx.instance_variable_set(:@private_subnet, ps)
-  end
-
-  describe ".assemble" do
-    it "fails if project doesn't exist" do
-      expect {
-        described_class.assemble(nil)
-      }.to raise_error RuntimeError, "No existing project"
-    end
-
-    it "fails if location doesn't exist" do
-      expect {
-        described_class.assemble(prj.id, location_id: nil)
-      }.to raise_error RuntimeError, "No existing location"
-    end
-
-    it "uses ipv6_addr if passed and creates entities" do
-      expect(described_class).to receive(:random_private_ipv4).and_return("10.0.0.0/26")
-      ps = described_class.assemble(
-        prj.id,
-        name: "default-ps",
-        location_id: Location::HETZNER_FSN1_ID,
-        ipv6_range: "fd10:9b0b:6b4b:8fbb::/64"
-      )
-
-      expect(ps.subject.net6.to_s).to eq("fd10:9b0b:6b4b:8fbb::/64")
-    end
-
-    it "uses ipv4_addr if passed and creates entities" do
-      expect(described_class).to receive(:random_private_ipv6).and_return("fd10:9b0b:6b4b:8fbb::/64")
-      ps = described_class.assemble(
-        prj.id,
-        name: "default-ps",
-        location_id: Location::HETZNER_FSN1_ID,
-        ipv4_range: "10.0.0.0/26"
-      )
-
-      expect(ps.subject.net4.to_s).to eq("10.0.0.0/26")
-    end
-
-    it "uses firewall if provided" do
-      fw = Firewall.create(name: "default-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: prj.id)
-      ps = described_class.assemble(prj.id, firewall_id: fw.id)
-      expect(ps.subject.firewalls.count).to eq(1)
-      expect(ps.subject.firewalls.first).to eq(fw)
-    end
-
-    it "fails if provided firewall does not exist" do
-      expect {
-        described_class.assemble(prj.id, firewall_id: "550e8400-e29b-41d4-a716-446655440000")
-      }.to raise_error RuntimeError, "Firewall with id 550e8400-e29b-41d4-a716-446655440000 and location hetzner-fsn1 does not exist"
-    end
-
-    it "fails if firewall is not in the project" do
-      fw = Firewall.create(name: "default-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: Project.create(name: "t2").id)
-      expect {
-        described_class.assemble(prj.id, firewall_id: fw.id)
-      }.to raise_error RuntimeError, "Firewall with id #{fw.id} and location hetzner-fsn1 does not exist"
-    end
-
-    it "fails if both allow_only_ssh and firewall_id are specified" do
-      fw = Firewall.create(name: "default-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: prj.id)
-      expect {
-        described_class.assemble(prj.id, firewall_id: fw.id, allow_only_ssh: true)
-      }.to raise_error RuntimeError, "Cannot specify both allow_only_ssh and firewall_id"
-    end
   end
 
   describe ".gen_spi" do
@@ -139,49 +74,12 @@ RSpec.describe Prog::Vnet::SubnetNexus do
   end
 
   describe "#start" do
-    it "creates a vpc if location is aws and starts to wait for it" do
-      loc = Location.create(name: "aws-us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
-      expect(ps).to receive(:location).and_return(loc).at_least(:once)
-      expect(nx).to receive(:bud).with(Prog::Aws::Vpc, {"subject_id" => ps.id}, :create_vpc)
-      expect { nx.start }.to hop("wait_vpc_created")
-    end
-
-    it "does not create the PrivateSubnetAwsResource if it already exists" do
-      loc = Location.create(name: "aws-us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
-      expect(ps).to receive(:location).and_return(loc).at_least(:once)
-      expect(ps).to receive(:private_subnet_aws_resource).and_return(instance_double(PrivateSubnetAwsResource, id: "123")).at_least(:once)
-      expect(nx).to receive(:bud).with(Prog::Aws::Vpc, {"subject_id" => ps.id}, :create_vpc)
-      expect { nx.start }.to hop("wait_vpc_created")
-      expect(PrivateSubnetAwsResource.count).to eq(0)
-    end
-
     it "hops to wait if location is not aws" do
       expect { nx.start }.to hop("wait")
     end
   end
 
-  describe "#wait_vpc_created" do
-    it "reaps and hops to wait if leaf" do
-      st.update(prog: "Vnet::SubnetNexus", label: "wait_vpc_created", stack: [{}])
-      expect { nx.wait_vpc_created }.to hop("wait")
-    end
-
-    it "naps if not leaf" do
-      st.update(prog: "Vnet::SubnetNexus", label: "wait_vpc_created", stack: [{}])
-      Strand.create(parent_id: st.id, prog: "Aws::Vpc", label: "create_vpc", stack: [{}], lease: Time.now + 10)
-      # Cover case where reap without reaper argument has results in reapable children
-      Strand.create(parent_id: st.id, prog: "Aws::Vpc", label: "create_vpc", stack: [{}]).this.update(exitval: '"subnet created"')
-      expect { nx.wait_vpc_created }.to nap(2)
-    end
-  end
-
   describe "#wait" do
-    it "naps if location is aws" do
-      expect(ps.location).to receive(:aws?).and_return(true)
-      expect(ps).to receive(:semaphores).and_return([])
-      expect { nx.wait }.to nap(60 * 60 * 24 * 365)
-    end
-
     it "hops to refresh_keys if when_refresh_keys_set?" do
       expect(nx).to receive(:when_refresh_keys_set?).and_yield
       expect(ps).to receive(:update).with(state: "refreshing_keys").and_return(true)
@@ -298,7 +196,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect { nx.wait_inbound_setup }.to nap(5)
     end
 
-    it "hops to wait_policy_updated if state creation is done" do
+    it "hops to wait_outbound_setup if state creation is done" do
       nic.strand.update(label: "wait_rekey_outbound_trigger")
       expect(nic.trigger_outbound_update_set?).to be false
       expect { nx.wait_inbound_setup }.to hop("wait_outbound_setup")
@@ -315,7 +213,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       described_class.new(Strand.create(prog: "Vnet::SubnetNexus", label: "wait_outbound_setup", id: ps.id))
     }
 
-    it "donates if policy update is ongoing" do
+    it "naps if policy update is ongoing" do
       nic
       expect { nx.wait_outbound_setup }.to nap(5)
     end
@@ -357,54 +255,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
   end
 
-  describe ".random_private_ipv4" do
-    it "returns a random private ipv4 range" do
-      expect(described_class.random_private_ipv4(Location[name: "hetzner-fsn1"], prj)).to be_a NetAddr::IPv4Net
-    end
-
-    it "finds a new subnet if the one it found is taken" do
-      expect(PrivateSubnet).to receive(:random_subnet).and_return("10.0.0.0/8").at_least(:once)
-      project = Project.create(name: "test-project")
-      described_class.assemble(project.id, location_id: Location::HETZNER_FSN1_ID, name: "test-subnet", ipv4_range: "10.0.0.128/26")
-      allow(SecureRandom).to receive(:random_number).with(2**(26 - 8) - 1).and_return(1, 2)
-      expect(described_class.random_private_ipv4(Location[name: "hetzner-fsn1"], project).to_s).to eq("10.0.0.192/26")
-    end
-
-    it "finds a new subnet if the one it found is banned" do
-      expect(PrivateSubnet).to receive(:random_subnet).and_return("172.16.0.0/16", "10.0.0.0/8")
-      project = Project.create(name: "test-project")
-      allow(SecureRandom).to receive(:random_number).with(2**(26 - 16) - 1).and_return(1)
-      allow(SecureRandom).to receive(:random_number).with(2**(26 - 8) - 1).and_return(1)
-      expect(described_class.random_private_ipv4(Location[name: "hetzner-fsn1"], project).to_s).to eq("10.0.0.128/26")
-    end
-
-    it "finds a new subnet if the initial range is smaller than the requested cidr range" do
-      expect(PrivateSubnet).to receive(:random_subnet).and_return("172.16.0.0/16", "10.0.0.0/8")
-      project = Project.create(name: "test-project")
-      expect(SecureRandom).not_to receive(:random_number).with(2**(16 - 16) - 1)
-      allow(SecureRandom).to receive(:random_number).with(2**(16 - 8) - 1).and_return(15)
-      expect(described_class.random_private_ipv4(Location[name: "hetzner-fsn1"], project, 16).to_s).to eq("10.16.0.0/16")
-    end
-
-    it "raises an error when invalid CIDR is given" do
-      project = Project.create(name: "test-project")
-      expect { described_class.random_private_ipv4(Location[name: "hetzner-fsn1"], project, 33) }.to raise_error(ArgumentError)
-    end
-  end
-
-  describe ".random_private_ipv6" do
-    it "returns a random private ipv6 range" do
-      expect(described_class.random_private_ipv6(Location[name: "hetzner-fsn1"], prj)).to be_a NetAddr::IPv6Net
-    end
-
-    it "finds a new subnet if the one it found is taken" do
-      project = Project.create(name: "test-project")
-      described_class.assemble(project.id, location_id: Location::HETZNER_FSN1_ID, name: "test-subnet", ipv6_range: "fd61:6161:6161:6161::/64")
-      expect(SecureRandom).to receive(:bytes).with(7).and_return("a" * 7, "b" * 7)
-      expect(described_class.random_private_ipv6(Location[name: "hetzner-fsn1"], project).to_s).to eq("fd62:6262:6262:6262::/64")
-    end
-  end
-
   describe "#destroy" do
     let(:nic) {
       instance_double(Nic, vm_id: nil)
@@ -432,16 +282,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect { nx.destroy }.to nap(5)
     end
 
-    it "hops to wait_aws_vpc_destroyed if location is aws" do
-      location_id = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true).id
-      ps.update(project_id: prj.id, location_id:)
-      st.update(prog: "Vnet::SubnetNexus", label: "destroy", stack: [{}])
-      child = Strand.create(parent_id: st.id, prog: "Aws::Vpc", label: "start", stack: [{}])
-      expect(nx).to receive(:bud).with(Prog::Aws::Vpc, {"subject_id" => ps.id}, :destroy)
-      expect { nx.destroy }.to hop("wait_aws_vpc_destroyed")
-      expect(Semaphore[strand_id: child.id, name: "destroy"]).not_to be_nil
-    end
-
     it "increments the destroy semaphore of nics" do
       expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
       expect(nic).to receive(:incr_destroy).and_return(true)
@@ -457,8 +297,8 @@ RSpec.describe Prog::Vnet::SubnetNexus do
 
     it "disconnects all subnets" do
       prj = Project.create(name: "test-project")
-      ps1 = described_class.assemble(prj.id, name: "ps1").subject
-      ps2 = described_class.assemble(prj.id, name: "ps2").subject
+      ps1 = PrivateSubnet.create(name: "ps1", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "1.1.1.0/26", state: "waiting", project_id: prj.id)
+      ps2 = PrivateSubnet.create(name: "ps2", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "1.1.1.0/26", state: "waiting", project_id: prj.id)
       ps1.connect_subnet(ps2)
       expect(ps1.connected_subnets.map(&:id)).to eq [ps2.id]
       expect(ps2.connected_subnets.map(&:id)).to eq [ps1.id]
@@ -466,29 +306,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(nx).to receive(:private_subnet).and_return(ps1).at_least(:once)
       expect(ps1).to receive(:disconnect_subnet).with(ps2).and_call_original
       expect { nx.destroy }.to exit({"msg" => "subnet destroyed"})
-    end
-  end
-
-  describe "#wait_aws_vpc_destroyed" do
-    it "naps if there are nics" do
-      st.update(prog: "Vnet::SubnetNexus", label: "wait_aws_vpc_destroyed", stack: [{}])
-      expect(nx).to receive(:private_subnet).and_return(ps).at_least(:once)
-      expect(ps).to receive(:nics).and_return([1]).at_least(:once)
-      expect { nx.wait_aws_vpc_destroyed }.to nap(5)
-    end
-
-    it "deletes the vpc and pops if leaf" do
-      st.update(prog: "Vnet::SubnetNexus", label: "wait_aws_vpc_destroyed", stack: [{}])
-      expect(nx).to receive(:private_subnet).and_return(ps).at_least(:once)
-      expect(ps).to receive(:destroy).and_return(true)
-      expect(ps).to receive(:private_subnet_aws_resource).and_return(instance_double(PrivateSubnetAwsResource, id: "123", destroy: true))
-      expect { nx.wait_aws_vpc_destroyed }.to exit({"msg" => "vpc destroyed"})
-    end
-
-    it "naps if not leaf" do
-      st.update(prog: "Vnet::SubnetNexus", label: "wait_aws_vpc_destroyed", stack: [{}])
-      Strand.create(parent_id: st.id, prog: "Aws::Vpc", label: "destroy", stack: [{}])
-      expect { nx.wait_aws_vpc_destroyed }.to nap(10)
     end
   end
 end
