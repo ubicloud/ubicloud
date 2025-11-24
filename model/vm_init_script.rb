@@ -3,7 +3,12 @@
 require_relative "../model"
 
 class VmInitScript < Sequel::Model
-  plugin ResourceMethods, etc_type: true
+  plugin ResourceMethods, etc_type: true, encrypted_columns: :init_script
+
+  def validate
+    super
+    validates_max_length(2000, :init_script)
+  end
 end
 
 # Table: vm_init_script
