@@ -563,7 +563,7 @@ RSpec.describe Prog::Vm::GithubRunner do
         jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{runner.ubid}\\nLabel: ubicloud-standard-4\\nVM Family: standard\\nArch: x64\\nImage: github-ubuntu-2204\\nVM Host: #{vm.vm_host.ubid}\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: #{project.ubid}\\nConsole URL: http://localhost:9292/project/#{project.ubid}/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
         echo "UBICLOUD_RUNTIME_TOKEN=my_token
         UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment > /dev/null
-        echo "::notice::The default operating system for this runner will change to Ubuntu 24.04 on November 23, 2025. You can continue using Ubuntu 22.04 by explicitly specifying it. For more information: https://www.ubicloud.com/docs/github-actions-integration/runner-types#ubuntu-24-04-migration" | sudo -u runner tee /home/runner/actions-runner/.ubicloud_complete_message
+        echo "::notice::The default operating system for this runner has been changed to Ubuntu 24.04 on November 23, 2025. You can continue using Ubuntu 22.04 by explicitly specifying it. If you have any questions, feel free to reach out at support@ubicloud.com" | sudo -u runner tee /home/runner/actions-runner/.ubicloud_complete_message
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
@@ -581,7 +581,7 @@ RSpec.describe Prog::Vm::GithubRunner do
         echo "UBICLOUD_RUNTIME_TOKEN=my_token
         UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment > /dev/null
         echo "CUSTOM_ACTIONS_CACHE_URL=http://10.0.0.1:51123/random_token/" | sudo tee -a /etc/environment > /dev/null
-        echo "::notice::The default operating system for this runner will change to Ubuntu 24.04 on November 23, 2025. You can continue using Ubuntu 22.04 by explicitly specifying it. For more information: https://www.ubicloud.com/docs/github-actions-integration/runner-types#ubuntu-24-04-migration" | sudo -u runner tee /home/runner/actions-runner/.ubicloud_complete_message
+        echo "::notice::The default operating system for this runner has been changed to Ubuntu 24.04 on November 23, 2025. You can continue using Ubuntu 22.04 by explicitly specifying it. If you have any questions, feel free to reach out at support@ubicloud.com" | sudo -u runner tee /home/runner/actions-runner/.ubicloud_complete_message
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
