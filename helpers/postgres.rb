@@ -108,6 +108,10 @@ class Clover
     end
   end
 
+  def vm_families_for_project(project)
+    PostgresResource.vm_families_for_project(@project)
+  end
+
   def postgres_require_customer_firewall!
     unless (fw = @pg.customer_firewall)
       raise CloverError.new(400, "InvalidRequest", "PostgreSQL firewall was deleted, manage firewall rules using an appropriate firewall on the #{@pg.private_subnet.name} private subnet (id: #{@pg.private_subnet.ubid})")
