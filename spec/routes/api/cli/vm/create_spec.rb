@@ -38,7 +38,7 @@ RSpec.describe Clover, "cli vm create" do
     expect(ps).to be_a PrivateSubnet
     expect(vm.name).to eq "test-vm"
     expect(vm.public_key).to eq "a a"
-    expect(vm.init_script.script).to eq "vis"
+    expect(vm.init_script.init_script).to eq "vis"
     expect(vm.display_location).to eq "eu-central-h1"
     expect(vm.display_size).to eq "standard-2"
     expect(vm.boot_image).to eq Config.default_boot_image_name
