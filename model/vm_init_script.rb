@@ -8,8 +8,9 @@ end
 
 # Table: vm_init_script
 # Columns:
-#  id     | uuid                    | PRIMARY KEY
-#  script | character varying(2000) | NOT NULL
+#  id          | uuid                    | PRIMARY KEY
+#  script      | character varying(2000) | NOT NULL
+#  init_script | text                    |
 # Indexes:
 #  vm_init_script_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
