@@ -54,7 +54,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   label def add_new_nic
     register_deadline("wait", 3 * 60)
     nics_snap = nics_to_rekey
-    nap 10 if nics_snap.any? { |nic| nic.lock_set? }
+    nap 10 if nics_snap.any?(&:lock_set?)
     nics_snap.each do |nic|
       nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
       nic.incr_start_rekey
@@ -69,7 +69,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   label def refresh_keys
     register_deadline("wait", 5 * 60)
     nics = active_nics
-    nap 10 if nics.any? { |nic| nic.lock_set? }
+    nap 10 if nics.any?(&:lock_set?)
     nics.each do |nic|
       nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
       nic.incr_start_rekey
@@ -115,7 +115,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   end
 
   label def destroy
-    if private_subnet.nics.any? { |n| !n.vm_id.nil? }
+    if private_subnet.nics.any?(&:vm_id)
       register_deadline(nil, 10 * 60, allow_extension: true) if private_subnet.nics.any? { |n| n.vm&.prevent_destroy_set? }
 
       Clog.emit("Cannot destroy subnet with active nics, first clean up the attached resources") { private_subnet }
