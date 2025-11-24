@@ -5,12 +5,6 @@ require_relative "../model"
 class VmInitScript < Sequel::Model
   plugin ResourceMethods, etc_type: true, encrypted_columns: :init_script
 
-  def self.populate_encrypted_column
-    where_all(init_script: nil) do
-      it.update(init_script: it.script)
-    end
-  end
-
   def validate
     super
     validates_max_length(2000, :init_script)
