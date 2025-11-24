@@ -36,36 +36,36 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   label def wait_vpc_created
     vpc = client.describe_vpcs({filters: [{name: "vpc-id", values: [private_subnet.private_subnet_aws_resource.vpc_id]}]}).vpcs[0]
 
-    if vpc.state == "available"
-      client.modify_vpc_attribute({
-        vpc_id: vpc.vpc_id,
-        enable_dns_hostnames: {value: true}
+    nap 1 unless vpc.state == "available"
+
+    client.modify_vpc_attribute({
+      vpc_id: vpc.vpc_id,
+      enable_dns_hostnames: {value: true}
+    })
+
+    security_group_response = begin
+      client.create_security_group({
+        group_name: "aws-#{location.name}-#{private_subnet.ubid}",
+        description: "Security group for aws-#{location.name}-#{private_subnet.ubid}",
+        vpc_id: private_subnet.private_subnet_aws_resource.vpc_id,
+        tag_specifications: Util.aws_tag_specifications("security-group", private_subnet.name)
       })
-
-      security_group_response = begin
-        client.create_security_group({
-          group_name: "aws-#{location.name}-#{private_subnet.ubid}",
-          description: "Security group for aws-#{location.name}-#{private_subnet.ubid}",
-          vpc_id: private_subnet.private_subnet_aws_resource.vpc_id,
-          tag_specifications: Util.aws_tag_specifications("security-group", private_subnet.name)
-        })
-      rescue Aws::EC2::Errors::InvalidGroupDuplicate
-        client.describe_security_groups({filters: [{name: "group-name", values: ["aws-#{location.name}-#{private_subnet.ubid}"]}]}).security_groups[0]
-      end
-
-      private_subnet.private_subnet_aws_resource.update(security_group_id: security_group_response.group_id)
-
-      private_subnet.firewalls.flat_map(&:firewall_rules).each do |firewall_rule|
-        next if firewall_rule.ip6?
-        allow_ingress(security_group_response.group_id, firewall_rule.port_range.first, firewall_rule.port_range.last - 1, firewall_rule.cidr.to_s)
-      end
-
-      # Allow SSH ingress from the internet so that the controlplane can verify
-      # that the VM is running.
-      allow_ingress(security_group_response.group_id, 22, 22, "0.0.0.0/0")
-      hop_create_route_table
+    rescue Aws::EC2::Errors::InvalidGroupDuplicate
+      client.describe_security_groups({filters: [{name: "group-name", values: ["aws-#{location.name}-#{private_subnet.ubid}"]}]}).security_groups[0]
     end
-    nap 1
+
+    private_subnet.private_subnet_aws_resource.update(security_group_id: security_group_response.group_id)
+
+    private_subnet.firewalls(eager: :firewall_rules).flat_map(&:firewall_rules).each do |firewall_rule|
+      next if firewall_rule.ip6?
+      allow_ingress(security_group_response.group_id, firewall_rule.port_range.first, firewall_rule.port_range.last - 1, firewall_rule.cidr.to_s)
+    end
+
+    # Allow SSH ingress from the internet so that the controlplane can verify
+    # that the VM is running.
+    allow_ingress(security_group_response.group_id, 22, 22, "0.0.0.0/0")
+    hop_create_route_table
+
   end
 
   label def create_route_table
