@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
-RSpec.describe Prog::Aws::Vpc do
+RSpec.describe Prog::Vnet::Aws::VpcNexus do
   subject(:nx) {
     described_class.new(st)
   }
 
   let(:st) {
-    Strand.create(prog: "Aws::Vpc", stack: [{"subject_id" => ps.id}], label: "create_vpc")
+    Strand.create(prog: "Aws::Vnet::VpcNexus", stack: [{"subject_id" => ps.id}], label: "start")
   }
 
   let(:ps) {
@@ -27,10 +27,22 @@ RSpec.describe Prog::Aws::Vpc do
     allow(Aws::EC2::Client).to receive(:new).with(access_key_id: "test-access-key", secret_access_key: "test-secret-key", region: "us-west-2").and_return(client)
   end
 
-  it "exits if destroy is set" do
-    expect(nx.before_run).to be_nil
+  it "hops to destroy if when_destroy_set?" do
     expect(nx).to receive(:when_destroy_set?).and_yield
-    expect { nx.before_run }.to exit({"msg" => "exiting early due to destroy semaphore"})
+    expect { nx.before_run }.to hop("destroy")
+  end
+
+  it "does not hop to destroy if already destroying" do
+    expect(nx).to receive(:when_destroy_set?).and_yield
+    expect(nx).to receive(:when_destroying_set?).and_yield
+    expect { nx.before_run }.not_to hop("destroy")
+  end
+
+  describe "#start" do
+    it "creates PrivateSubnetAwsResource and hops to create_vpc" do
+      expect(PrivateSubnetAwsResource).to receive(:create_with_id).with(ps.id)
+      expect { nx.start }.to hop("create_vpc")
+    end
   end
 
   describe "#create_vpc" do
@@ -112,7 +124,7 @@ RSpec.describe Prog::Aws::Vpc do
       expect(client).to receive(:attach_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg", vpc_id: "vpc-0123456789abcdefg"}).and_call_original
       expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_ipv_6_cidr_block: "::/0", gateway_id: "igw-0123456789abcdefg"}).and_call_original
       expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_cidr_block: "0.0.0.0/0", gateway_id: "igw-0123456789abcdefg"}).and_call_original
-      expect { nx.create_route_table }.to exit({"msg" => "subnet created"})
+      expect { nx.create_route_table }.to hop("wait")
     end
 
     it "reuses existing internet gateway and attaches if needed" do
@@ -128,7 +140,7 @@ RSpec.describe Prog::Aws::Vpc do
       expect(client).to receive(:attach_internet_gateway).with({internet_gateway_id: "igw-existing", vpc_id: "vpc-0123456789abcdefg"}).and_call_original
       expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_ipv_6_cidr_block: "::/0", gateway_id: "igw-existing"}).and_call_original
       expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_cidr_block: "0.0.0.0/0", gateway_id: "igw-existing"}).and_call_original
-      expect { nx.create_route_table }.to exit({"msg" => "subnet created"})
+      expect { nx.create_route_table }.to hop("wait")
     end
 
     it "reuses existing internet gateway and skips attachment if already attached" do
@@ -143,7 +155,7 @@ RSpec.describe Prog::Aws::Vpc do
       expect(ps.private_subnet_aws_resource).to receive(:vpc_id).and_return("vpc-0123456789abcdefg").at_least(:once)
       expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_ipv_6_cidr_block: "::/0", gateway_id: "igw-existing"}).and_call_original
       expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_cidr_block: "0.0.0.0/0", gateway_id: "igw-existing"}).and_call_original
-      expect { nx.create_route_table }.to exit({"msg" => "subnet created"})
+      expect { nx.create_route_table }.to hop("wait")
     end
 
     it "omits if the route already exists" do
@@ -158,7 +170,7 @@ RSpec.describe Prog::Aws::Vpc do
       expect(ps.private_subnet_aws_resource).to receive(:vpc_id).and_return("vpc-0123456789abcdefg").at_least(:once)
       expect(client).to receive(:attach_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg", vpc_id: "vpc-0123456789abcdefg"}).and_call_original
       expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_ipv_6_cidr_block: "::/0", gateway_id: "igw-0123456789abcdefg"}).and_call_original
-      expect { nx.create_route_table }.to exit({"msg" => "subnet created"})
+      expect { nx.create_route_table }.to hop("wait")
     end
 
     it "skips route table association if already associated" do
@@ -174,7 +186,18 @@ RSpec.describe Prog::Aws::Vpc do
       expect(client).to receive(:attach_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg", vpc_id: "vpc-0123456789abcdefg"}).and_call_original
       expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_ipv_6_cidr_block: "::/0", gateway_id: "igw-0123456789abcdefg"}).and_call_original
       expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_cidr_block: "0.0.0.0/0", gateway_id: "igw-0123456789abcdefg"}).and_call_original
-      expect { nx.create_route_table }.to exit({"msg" => "subnet created"})
+      expect { nx.create_route_table }.to hop("wait")
+    end
+  end
+
+  describe "#wait" do
+    it "increments update_firewall_rules on vms if update_firewall_rules is set" do
+      expect(nx).to receive(:when_update_firewall_rules_set?).and_yield
+      expect(ps).to receive(:vms).and_return([instance_double(Vm)]).at_least(:once)
+      vm = ps.vms.first
+      expect(vm).to receive(:incr_update_firewall_rules)
+      expect(nx).to receive(:decr_update_firewall_rules)
+      expect { nx.wait }.to nap(60 * 60 * 24 * 365)
     end
   end
 
@@ -182,6 +205,32 @@ RSpec.describe Prog::Aws::Vpc do
     before do
       ps.private_subnet_aws_resource.update(security_group_id: "sg-0123456789abcdefg", internet_gateway_id: "igw-0123456789abcdefg")
       client.stub_responses(:describe_subnets, subnets: [{state: "available"}])
+    end
+
+    let(:nic) {
+      instance_double(Nic, vm_id: nil)
+    }
+
+    it "extends deadline if a vm prevents destroy" do
+      vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", location_id: Location::HETZNER_FSN1_ID).tap {
+        it.id = "788525ed-d6f0-4937-a844-323d4fd91946"
+      }
+      expect(ps).to receive(:nics).and_return([nic]).twice
+      expect(nic).to receive(:vm_id).and_return("vm-id")
+      expect(nic).to receive(:vm).and_return(vm)
+      expect(vm).to receive(:prevent_destroy_set?).and_return(true)
+      expect(nx).to receive(:register_deadline).with(nil, 10 * 60, allow_extension: true)
+
+      expect { nx.destroy }.to nap(5)
+    end
+
+    it "fails if there are active resources" do
+      expect(ps).to receive(:nics).and_return([nic]).twice
+      expect(nic).to receive(:vm_id).and_return("vm-id")
+      expect(nic).to receive(:vm).and_return(nil)
+      expect(Clog).to receive(:emit).with("Cannot destroy subnet with active nics, first clean up the attached resources").and_call_original
+
+      expect { nx.destroy }.to nap(5)
     end
 
     it "deletes the security group and hops to delete_internet_gateway" do
@@ -195,33 +244,43 @@ RSpec.describe Prog::Aws::Vpc do
       expect { nx.destroy }.to hop("delete_internet_gateway")
     end
 
-    it "deletes the internet gateway and hops to delete_vpc" do
-      client.stub_responses(:delete_internet_gateway)
-      client.stub_responses(:detach_internet_gateway)
-      expect(ps.private_subnet_aws_resource).to receive(:vpc_id).and_return("vpc-0123456789abcdefg")
-      expect(client).to receive(:delete_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg"}).and_call_original
-      expect(client).to receive(:detach_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg", vpc_id: "vpc-0123456789abcdefg"}).and_call_original
-      expect { nx.delete_internet_gateway }.to hop("delete_vpc")
+    describe "#delete_internet_gateway" do
+      it "deletes the internet gateway and hops to delete_vpc" do
+        client.stub_responses(:delete_internet_gateway)
+        client.stub_responses(:detach_internet_gateway)
+        expect(ps.private_subnet_aws_resource).to receive(:vpc_id).and_return("vpc-0123456789abcdefg")
+        expect(client).to receive(:delete_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg"}).and_call_original
+        expect(client).to receive(:detach_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg", vpc_id: "vpc-0123456789abcdefg"}).and_call_original
+        expect { nx.delete_internet_gateway }.to hop("delete_vpc")
+      end
+
+      it "hops to delete_vpc if internet gateway is not found" do
+        client.stub_responses(:delete_internet_gateway, Aws::EC2::Errors::InvalidInternetGatewayIDNotFound.new(nil, nil))
+        client.stub_responses(:detach_internet_gateway)
+        expect(ps.private_subnet_aws_resource).to receive(:vpc_id).and_return("vpc-0123456789abcdefg")
+        expect { nx.delete_internet_gateway }.to hop("delete_vpc")
+      end
     end
 
-    it "hops to delete_vpc if internet gateway is not found" do
-      client.stub_responses(:delete_internet_gateway, Aws::EC2::Errors::InvalidInternetGatewayIDNotFound.new(nil, nil))
-      client.stub_responses(:detach_internet_gateway)
-      expect(ps.private_subnet_aws_resource).to receive(:vpc_id).and_return("vpc-0123456789abcdefg")
-      expect { nx.delete_internet_gateway }.to hop("delete_vpc")
-    end
+    describe "#delete_vpc" do
+      it "deletes the vpc" do
+        client.stub_responses(:delete_vpc)
+        expect(ps.private_subnet_aws_resource).to receive(:vpc_id).and_return("vpc-0123456789abcdefg")
+        expect(client).to receive(:delete_vpc).with({vpc_id: "vpc-0123456789abcdefg"}).and_call_original
+        expect { nx.delete_vpc }.to exit({"msg" => "vpc destroyed"})
+      end
 
-    it "deletes the vpc" do
-      client.stub_responses(:delete_vpc)
-      expect(ps.private_subnet_aws_resource).to receive(:vpc_id).and_return("vpc-0123456789abcdefg")
-      expect(client).to receive(:delete_vpc).with({vpc_id: "vpc-0123456789abcdefg"}).and_call_original
-      expect { nx.delete_vpc }.to exit({"msg" => "vpc destroyed"})
-    end
+      it "naps if there are nics" do
+        expect(nx).to receive(:private_subnet).and_return(ps).at_least(:once)
+        expect(ps).to receive(:nics).and_return([1]).at_least(:once)
+        expect { nx.delete_vpc }.to nap(5)
+      end
 
-    it "pops if vpc is not found" do
-      client.stub_responses(:delete_vpc, Aws::EC2::Errors::InvalidVpcIDNotFound.new(nil, nil))
-      expect(ps.private_subnet_aws_resource).to receive(:vpc_id).and_return("vpc-0123456789abcdefg")
-      expect { nx.delete_vpc }.to exit({"msg" => "vpc destroyed"})
+      it "pops if vpc is not found" do
+        client.stub_responses(:delete_vpc, Aws::EC2::Errors::InvalidVpcIDNotFound.new(nil, nil))
+        expect(ps.private_subnet_aws_resource).to receive(:vpc_id).and_return("vpc-0123456789abcdefg")
+        expect { nx.delete_vpc }.to exit({"msg" => "vpc destroyed"})
+      end
     end
   end
 end
