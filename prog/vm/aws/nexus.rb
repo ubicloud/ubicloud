@@ -385,7 +385,8 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   def is_runner?
-    @is_runner ||= vm.unix_user == "runneradmin"
+    return @is_runner if defined?(@is_runner)
+    @is_runner = vm.unix_user == "runneradmin"
   end
 
   def ignore_invalid_entity
