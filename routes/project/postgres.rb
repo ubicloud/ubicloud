@@ -3,7 +3,8 @@
 class Clover
   hash_branch(:project_prefix, "postgres") do |r|
     r.get true do
-      postgres_list
+      tags_param = typecast_params.nonempty_str("tags")
+      postgres_list(tags_param:)
     end
 
     r.web do
