@@ -1031,6 +1031,21 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/backup':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    get:
+      operationId: listPostgresDatabaseBackups
+      summary: List backups for a specific Postgres database
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresBackups'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/ca-certificates':
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -2761,6 +2776,20 @@ components:
       additionalProperties: false
       required:
         - metrics
+    PostgresBackup:
+      type: object
+      properties:
+        key:
+          description: Backup key/identifier
+          type: string
+        last_modified:
+          description: Last modified timestamp of the backup
+          type: string
+          format: date-time
+      additionalProperties: false
+      required:
+        - key
+        - last_modified
     PostgresFirewallRule:
       type: object
       properties:
@@ -3370,6 +3399,23 @@ components:
                 type: array
                 items:
                   $ref: '#/components/schemas/PostgresFirewallRule'
+            additionalProperties: false
+            required:
+              - count
+              - items
+    PostgresBackups:
+      description: A list of Postgres Database Backups
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PostgresBackup'
             additionalProperties: false
             required:
               - count

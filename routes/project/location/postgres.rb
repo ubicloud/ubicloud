@@ -385,6 +385,22 @@ class Clover
         certs
       end
 
+      r.get api?, "backup" do
+        authorize("Postgres:view", pg)
+
+        backups = pg.timeline.backups.map do |backup|
+          {
+            key: backup.key,
+            last_modified: backup.last_modified.iso8601
+          }
+        end
+
+        {
+          items: backups,
+          count: backups.count
+        }
+      end
+
       r.get "metrics", r.accepts_json? do
         authorize("Postgres:view", pg)
 
