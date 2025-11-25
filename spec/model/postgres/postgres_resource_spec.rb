@@ -8,7 +8,8 @@ RSpec.describe PostgresResource do
       name: "pg-name",
       superuser_password: "dummy-password",
       ha_type: "none",
-      target_version: "17"
+      target_version: "17",
+      location_id: Location::HETZNER_FSN1_ID
     ) { it.id = "6181ddb3-0002-8ad0-9aeb-084832c9273b" }
   }
 
