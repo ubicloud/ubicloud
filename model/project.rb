@@ -172,7 +172,17 @@ class Project < Sequel::Model
     name = "default-#{location.display_name[0, 55]}"
     location_id = location.id
     ps = private_subnets_dataset.first(location_id:, name:)
-    ps || Prog::Vnet::SubnetNexus.assemble(id, name:, location_id:).subject
+    return ps if ps
+
+    # Create a default firewall with open rules for the default subnet
+    # This maintains backward compatibility for users learning the system
+    firewall_name = "#{name}-default"
+    firewall = firewalls_dataset.first(location_id:, name: firewall_name)
+    unless firewall
+      firewall = Firewall.create_with_open_rules(0..65535, name: firewall_name, location_id:, project_id: id)
+    end
+
+    Prog::Vnet::SubnetNexus.assemble(id, name:, location_id:, firewall_id: firewall.id).subject
   end
 
   def self.feature_flag(*flags, into: self)

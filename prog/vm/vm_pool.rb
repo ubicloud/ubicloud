@@ -36,10 +36,19 @@ class Prog::Vm::VmPool < Prog::Base
       encrypted: vm_pool.storage_encrypted,
       skip_sync: vm_pool.storage_skip_sync
     }
+    # Create a firewall with SSH-only access for VM pool
+    project = Project[Config.vm_pool_project_id]
+    location = Location[vm_pool.location_id]
+    firewall_name = "vm-pool-#{location.name}-firewall"
+    firewall = project.firewalls_dataset.first(location_id: vm_pool.location_id, name: firewall_name)
+    unless firewall
+      firewall = Firewall.create_with_open_rules(22..22, name: firewall_name, location_id: vm_pool.location_id, project_id: Config.vm_pool_project_id)
+    end
+
     ps = Prog::Vnet::SubnetNexus.assemble(
       Config.vm_pool_project_id,
       location_id: vm_pool.location_id,
-      allow_only_ssh: true
+      firewall_id: firewall.id
     ).subject
 
     Prog::Vm::Nexus.assemble_with_sshable(

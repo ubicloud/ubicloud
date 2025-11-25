@@ -152,9 +152,7 @@ RSpec.describe Clover, "private subnet" do
           ps.destroy
         end
 
-        expect(Firewall.where(name: "a123456789a123456789a123456789a123456789a123456789a1234-default")).not_to be_empty
-        expect(Firewall.count).to eq 2
-        expect(Firewall.get { sum(Sequel.char_length(:name)) }).to eq 126
+        expect(Firewall.count).to eq 0
       end
     end
 
@@ -235,18 +233,24 @@ RSpec.describe Clover, "private subnet" do
         private_subnet
         ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location_id: Location::HETZNER_FSN1_ID).subject
         private_subnet.connect_subnet(ps2)
+        fw = Firewall.create(project_id: project.id, name: "test-fw", location_id: Location::HETZNER_FSN1_ID)
+        fw.associate_with_private_subnet(private_subnet)
 
         visit "#{project.path}#{private_subnet.path}"
         within("#private-subnet-submenu") { click_link "Networking" }
 
         expect(page).to have_content ps2.name
         expect(page.all("a").map(&:text)).to include ps2.name
+        expect(page).to have_content fw.name
+        expect(page.all("a").map(&:text)).to include fw.name
 
         AccessControlEntry.dataset.destroy
         AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:view"], object_id: private_subnet.id)
         page.refresh
         expect(page).to have_content ps2.name
         expect(page.all("a").map(&:text)).not_to include ps2.name
+        expect(page).to have_content fw.name
+        expect(page.all("a").map(&:text)).not_to include fw.name
       end
 
       it "can disconnect connected subnet" do

@@ -51,8 +51,10 @@ RSpec.describe Clover, "cli" do
     PrivateSubnet.first(name: "#{pg.ubid}-subnet").update(net4: "10.147.205.0/26", net6: "fdab:de77:9a94:fa70::/64")
 
     expect(Firewall).to receive(:generate_uuid).and_return("e9843761-3af7-85fc-ba6a-1709852cf736")
+    cli(%w[fw eu-central-h1/test-ps-default create])
+    test_ps_fw = Firewall.first(name: "test-ps-default")
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("pshfgpzvs0t20gpezmz2kkk8e4"))
-    cli(%w[ps eu-central-h1/test-ps create])
+    cli(%W[ps eu-central-h1/test-ps create -f #{test_ps_fw.ubid}])
     PrivateSubnet["pshfgpzvs0t20gpezmz2kkk8e4"].update(net4: "10.147.204.0/26", net6: "fdab:de77:9a94:fa69::/64")
 
     expect(LoadBalancer).to receive(:generate_uuid).and_return("dd91e986-6ac4-882b-ac39-1d430f899d96")

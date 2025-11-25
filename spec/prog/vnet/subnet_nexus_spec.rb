@@ -77,13 +77,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
         described_class.assemble(prj.id, firewall_id: fw.id)
       }.to raise_error RuntimeError, "Firewall with id #{fw.id} and location hetzner-fsn1 does not exist"
     end
-
-    it "fails if both allow_only_ssh and firewall_id are specified" do
-      fw = Firewall.create(name: "default-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: prj.id)
-      expect {
-        described_class.assemble(prj.id, firewall_id: fw.id, allow_only_ssh: true)
-      }.to raise_error RuntimeError, "Cannot specify both allow_only_ssh and firewall_id"
-    end
   end
 
   describe ".gen_spi" do

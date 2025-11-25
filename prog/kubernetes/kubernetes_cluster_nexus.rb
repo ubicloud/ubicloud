@@ -20,12 +20,15 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       subnet = if private_subnet_id
         PrivateSubnet[id: private_subnet_id, project_id: project_id] || fail("Given subnet is not available in the project")
       else
-        # Will create customer private subnet with customer firewall
+        # Create customer private subnet with customer firewall
+        firewall_name = "#{ubid}-firewall"
+        firewall = Firewall.create_with_open_rules(0..65535, name: firewall_name, location_id:, project_id:)
+
         Prog::Vnet::SubnetNexus.assemble(
           project_id,
           name: "#{ubid}-subnet",
           location_id:,
-          firewall_name: "#{ubid}-firewall",
+          firewall_id: firewall.id,
           ipv4_range: Prog::Vnet::SubnetNexus.random_private_ipv4(Location[location_id], project, 18).to_s
         ).subject
       end
