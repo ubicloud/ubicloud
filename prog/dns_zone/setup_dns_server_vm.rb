@@ -3,7 +3,7 @@
 class Prog::DnsZone::SetupDnsServerVm < Prog::Base
   subject_is :vm, :sshable
 
-  def self.assemble(dns_server_id, name: nil, vm_size: "standard-2", storage_size_gib: 30, location_id: Location::HETZNER_FSN1_ID)
+  def self.assemble(dns_server_id, name: nil, vm_size: "standard-2", storage_size_gib: 30, location_id: Location::HETZNER_FSN1_ID, boot_image: "ubuntu-jammy")
     unless (dns_server = DnsServer[dns_server_id])
       fail "No existing Dns Server"
     end
@@ -32,7 +32,7 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
         storage_volumes: [
           {encrypted: true, size_gib: storage_size_gib}
         ],
-        boot_image: "ubuntu-jammy",
+        boot_image: boot_image,
         enable_ip4: true
       )
 
