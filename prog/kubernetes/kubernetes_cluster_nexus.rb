@@ -307,7 +307,11 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     dns_records = kubernetes_cluster.all_functional_nodes.flat_map { |n| ["#{n.vm.ip4} #{n.name}", "#{n.vm.ip6} #{n.name}"] }
 
     coredns_configmap = YAML.load(kubernetes_cluster.client.kubectl("-n kube-system get cm coredns -oyaml"))
-    corefile = coredns_configmap["data"]["Corefile"]
+    unless (corefile = coredns_configmap.dig("data", "Corefile"))
+      # Customers may have deleted this entry or have custom tunings.
+      # We will ignore such cases and return early.
+      hop_wait
+    end
 
     # Remove existing Ubicloud hosts block if present (matches full block with comments)
     # Example matched block (with ~8-space indent for contents):

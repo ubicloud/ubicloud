@@ -574,6 +574,18 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       allow(kubernetes_cluster).to receive(:sshable).and_return(sshable)
     end
 
+    it "returns early if Corefile is not found" do
+      get_cm = <<~YAML
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: coredns
+      namespace: kube-system
+      YAML
+      expect(client).to receive(:kubectl).with("-n kube-system get cm coredns -oyaml").and_return(get_cm)
+      expect { nx.sync_internal_dns_config }.to hop("wait")
+    end
+
     it "adds the ubicloud block and replaces the configmap" do
       nodes = kubernetes_cluster.functional_nodes
       expect(nodes.first.vm).to receive_messages(
