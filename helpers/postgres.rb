@@ -56,8 +56,21 @@ class Clover
     end
   end
 
-  def postgres_list
+  def postgres_list(tags_param: nil)
     dataset = dataset_authorize(@project.postgres_resources_dataset.eager(:timeline, representative_server: [:strand, vm: :vm_storage_volumes]), "Postgres:view").eager(:semaphores, :location, strand: :children)
+
+    if tags_param
+      tags_param = tags_param.split(",")
+      tags_param = tags_param.map! { |tag| tag.split(":", 2).map(&:strip) }
+      tags_param = tags_param.map! { |key, value| {key:, value:} }
+      tags_param.each do |tag|
+        unless tag[:value]
+          fail Validation::ValidationFailed.new({tags: "Invalid tag format. Expected format: key:value"})
+        end
+      end
+      dataset = dataset.where(Sequel.pg_jsonb_op(:tags).contains(tags_param))
+    end
+
     if api?
       dataset = dataset.where(location_id: @location.id) if @location
       paginated_result(dataset, Serializers::Postgres)

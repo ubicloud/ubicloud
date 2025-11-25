@@ -1757,6 +1757,7 @@ paths:
       summary: List visible Postgres Databases
       parameters:
         - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/tags'
         - $ref: '#/components/parameters/start_after'
         - $ref: '#/components/parameters/page_size'
         - $ref: '#/components/parameters/order_column'
@@ -2187,6 +2188,14 @@ components:
       required: false
       schema:
         type: string
+    tags:
+      description: 'Filter by tags in key:value format (comma-separated for multiple tags)'
+      in: query
+      name: tags
+      required: false
+      schema:
+        type: string
+        example: 'environment:production,team:backend'
     vm_reference:
       description: Virtual machine ID or name
       examples:
