@@ -26,7 +26,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
           Vm,
           family: "standard",
           vcpus: 2,
-          # vm_host: instance_double(VmHost, id: "dd9ef3e7-6d55-8371-947f-a8478b42a17d"),
           private_subnets: [instance_double(PrivateSubnet, id: "627a23ee-c1fb-86d9-a261-21cc48415916")],
           display_state: "running"
         )
