@@ -33,7 +33,8 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
           {encrypted: true, size_gib: storage_size_gib}
         ],
         boot_image: "ubuntu-jammy",
-        enable_ip4: true
+        enable_ip4: true,
+        new_private_subnet_name: "#{name}-dns-subnet"
       )
 
       Strand.create(prog: "DnsZone::SetupDnsServerVm", label: "start", stack: [{subject_id: vm_st.id, dns_server_id: dns_server_id}])
@@ -68,6 +69,14 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
   label def start
     nap 5 unless vm.strand.label == "wait"
     register_deadline(nil, 15 * 60)
+    if vm.location.aws?
+      # Add UDP port 53 for DNS queries on AWS
+      fw = Firewall.create(name: "#{vm.name}-udp53", location: vm.location, project_id: vm.project_id)
+      fw.add_firewall_rule(cidr: "0.0.0.0/0", port_range: 53..53, protocol: "udp")
+      fw.add_firewall_rule(cidr: "::/0", port_range: 53..53, protocol: "udp")
+      vm.add_vm_firewall(fw)
+      vm.incr_update_firewall_rules
+    end
     hop_prepare
   end
 
