@@ -98,6 +98,8 @@ RSpec.configure do |config|
     # a real object. This is generally recommended, and will default to
     # `true` in RSpec 4.
     mocks.verify_partial_doubles = true
+    # Prevents expect(nil).to receive(...) which is only a warning by default
+    mocks.allow_message_expectations_on_nil = false
   end
 
   # This option will default to `:apply_to_host_groups` in RSpec 4 (and will

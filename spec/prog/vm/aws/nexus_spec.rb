@@ -1,18 +1,21 @@
 # frozen_string_literal: true
 
-RSpec.describe Prog::Aws::Instance do
+RSpec.describe Prog::Vm::Aws::Nexus do
   subject(:nx) {
-    described_class.new(st)
+    described_class.new(vm.strand).tap {
+      it.instance_variable_set(:@vm, vm)
+      it.instance_variable_set(:@aws_instance, aws_instance)
+    }
   }
 
   let(:st) {
-    Strand.create(prog: "Aws::Instance", stack: [{"subject_id" => vm.id}], label: "start")
+    vm.strand
   }
 
   let(:vm) {
     prj = Project.create(name: "test-prj")
     loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
-    LocationCredential.create_with_id(loc.id, access_key: "test-access-key", secret_key: "test-secret-key")
+    LocationCredential.create_with_id(loc, access_key: "test-access-key", secret_key: "test-secret-key")
     storage_volumes = [
       {encrypted: true, size_gib: 30},
       {encrypted: true, size_gib: 3800}
@@ -20,7 +23,7 @@ RSpec.describe Prog::Aws::Instance do
     Prog::Vm::Nexus.assemble("dummy-public key", prj.id, location_id: loc.id, unix_user: "test-user-aws", boot_image: "ami-030c060f85668b37d", name: "testvm", size: "m6gd.large", arch: "arm64", storage_volumes:).subject
   }
 
-  let(:aws_instance) { AwsInstance.create_with_id(vm.id, instance_id: "i-0123456789abcdefg") }
+  let(:aws_instance) { AwsInstance.create_with_id(vm, instance_id: "i-0123456789abcdefg") }
 
   let(:client) { Aws::EC2::Client.new(stub_responses: true) }
 
@@ -51,14 +54,71 @@ usermod -L ubuntu
     allow(Aws::IAM::Client).to receive(:new).with(access_key_id: "test-access-key", secret_access_key: "test-secret-key", region: "us-west-2").and_return(iam_client)
   end
 
-  it "exits if destroy is set" do
-    expect(nx.before_run).to be_nil
-    expect(nx).to receive(:when_destroy_set?).and_yield
-    expect { nx.before_run }.to exit({"msg" => "exiting early due to destroy semaphore"})
+  describe ".assemble" do
+    let(:project) { Project.create(name: "test-prj") }
+
+    it "creates correct number of storage volumes for storage optimized instance types" do
+      loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
+      storage_volumes = [
+        {encrypted: true, size_gib: 30},
+        {encrypted: true, size_gib: 7500}
+      ]
+
+      vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, location_id: loc.id, size: "i8g.8xlarge", arch: "arm64", storage_volumes:).subject
+      expect(vm.vm_storage_volumes.count).to eq(3)
+    end
+
+    it "hops to start_aws if location is aws" do
+      loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, location_id: loc.id)
+      expect(st.label).to eq("start")
+    end
+  end
+
+  describe "#before_run" do
+    it "hops to destroy when needed" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect { nx.before_run }.to hop("destroy")
+    end
+
+    it "does not hop to destroy if already in the destroy state" do
+      ["destroy", "cleanup_roles"].each do |label|
+        expect(nx).to receive(:when_destroy_set?).and_yield
+        st.label = label
+        expect { nx.before_run }.not_to hop("destroy")
+      end
+    end
+
+    it "stops billing before hops to destroy" do
+      br = BillingRecord.create(
+        project_id: vm.project.id,
+        resource_id: vm.id,
+        resource_name: vm.name,
+        billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
+        amount: vm.vcpus
+      )
+
+      expect(vm).to receive(:active_billing_records).and_return([br])
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(br).to receive(:finalize)
+      expect { nx.before_run }.to hop("destroy")
+    end
+
+    it "hops to destroy if billing record is not found" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(vm.active_billing_records).to be_empty
+      expect { nx.before_run }.to hop("destroy")
+    end
   end
 
   describe "#start" do
+    it "naps if vm nics are not in wait state" do
+      vm.nics.first.strand.update(label: "start")
+      expect { nx.start }.to nap(1)
+    end
+
     it "creates a role for instance" do
+      vm.nics.first.strand.update(label: "wait")
       iam_client.stub_responses(:create_role, {})
       allow(nx).to receive(:iam_client).and_return(iam_client)
       iam_client.stub_responses(:create_role, {})
@@ -80,6 +140,7 @@ usermod -L ubuntu
     end
 
     it "hops to create_role_policy if role already exists" do
+      vm.nics.first.strand.update(label: "wait")
       allow(nx).to receive(:iam_client).and_return(iam_client)
       expect(iam_client).to receive(:create_role).with({role_name: vm.name, assume_role_policy_document: {
         Version: "2012-10-17",
@@ -95,6 +156,7 @@ usermod -L ubuntu
     end
 
     it "hops to create_instance if it's a runner instance" do
+      vm.nics.first.strand.update(label: "wait")
       vm.update(unix_user: "runneradmin")
       expect { nx.start }.to hop("create_instance")
     end
@@ -261,7 +323,7 @@ usermod -L ubuntu
         client_token: vm.id,
         instance_market_options: nil
       }).and_call_original
-      expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
+      expect(AwsInstance).to receive(:create_with_id).with(vm, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
     end
 
@@ -272,7 +334,7 @@ usermod -L ubuntu
       expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
       expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
       expect(client).to receive(:run_instances).with(hash_not_including(:iam_instance_profile)).and_call_original
-      expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
+      expect(AwsInstance).to receive(:create_with_id).with(vm, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
     end
 
@@ -301,7 +363,7 @@ usermod -L ubuntu
       new_data = user_data + "echo \"1.2.3.4 ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
       expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
       expect(client).to receive(:run_instances).with(hash_including(user_data: Base64.encode64(new_data))).and_call_original
-      expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
+      expect(AwsInstance).to receive(:create_with_id).with(vm, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
     end
 
@@ -318,7 +380,7 @@ usermod -L ubuntu
         user_data: Base64.encode64(new_data),
         instance_market_options: {market_type: "spot", spot_options: {instance_interruption_behavior: "terminate", spot_instance_type: "one-time"}}
       )).and_call_original
-      expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
+      expect(AwsInstance).to receive(:create_with_id).with(vm, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
     end
 
@@ -337,7 +399,7 @@ usermod -L ubuntu
         user_data: Base64.encode64(new_data),
         instance_market_options: {market_type: "spot", spot_options: {instance_interruption_behavior: "terminate", spot_instance_type: "one-time", max_price: "0.12"}}
       )).and_call_original
-      expect(AwsInstance).to receive(:create_with_id).with(vm.id, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
+      expect(AwsInstance).to receive(:create_with_id).with(vm, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
       expect { nx.create_instance }.to hop("wait_instance_created")
     end
 
@@ -403,7 +465,7 @@ usermod -L ubuntu
       expect(Time).to receive(:now).and_return(time).at_least(:once)
       expect(client).to receive(:describe_instances).with({filters: [{name: "instance-id", values: ["i-0123456789abcdefg"]}, {name: "tag:Ubicloud", values: ["true"]}]}).and_call_original
       expect(vm).to receive(:update).with(cores: 1, allocated_at: time, ephemeral_net6: "2a01:4f8:173:1ed3:aa7c::/79")
-      expect { nx.wait_instance_created }.to exit({"msg" => "vm created"})
+      expect { nx.wait_instance_created }.to hop("wait_sshable")
     end
 
     it "updates the vm with the instance id and updates ip according to the sshable" do
@@ -413,7 +475,7 @@ usermod -L ubuntu
       expect(vm).to receive(:sshable).and_return(sshable)
       expect(sshable).to receive(:update).with(host: "1.2.3.4")
       expect(vm).to receive(:update).with(cores: 1, allocated_at: time, ephemeral_net6: "2a01:4f8:173:1ed3:aa7c::/79")
-      expect { nx.wait_instance_created }.to exit({"msg" => "vm created"})
+      expect { nx.wait_instance_created }.to hop("wait_sshable")
     end
 
     it "naps if the instance is not running" do
@@ -422,7 +484,97 @@ usermod -L ubuntu
     end
   end
 
+  describe "#wait_sshable" do
+    it "naps 6 seconds if it's the first time we execute wait_sshable" do
+      expect { nx.wait_sshable }.to nap(6)
+        .and change { vm.reload.update_firewall_rules_set? }.from(false).to(true)
+    end
+
+    it "naps if not sshable" do
+      expect(vm).to receive(:ip4).and_return(NetAddr::IPv4.parse("10.0.0.1"))
+      vm.incr_update_firewall_rules
+      expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1).and_raise Errno::ECONNREFUSED
+      expect { nx.wait_sshable }.to nap(1)
+    end
+
+    it "hops to create_billing_record if sshable" do
+      vm.incr_update_firewall_rules
+      expect(vm).to receive(:ip4).and_return(NetAddr::IPv4.parse("10.0.0.1"))
+      expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
+      expect { nx.wait_sshable }.to hop("create_billing_record")
+    end
+
+    it "skips a check if ipv4 is not enabled" do
+      vm.incr_update_firewall_rules
+      expect(vm.ip4).to be_nil
+      expect { nx.wait_sshable }.to hop("create_billing_record")
+    end
+  end
+
+  describe "#create_billing_record" do
+    let(:now) { Time.now }
+
+    before do
+      expect(Time).to receive(:now).and_return(now).at_least(:once)
+      vm.update(allocated_at: now - 100)
+      expect(Clog).to receive(:emit).with("vm provisioned").and_yield
+    end
+
+    it "not create billing records when the project is not billable" do
+      vm.project.update(billable: false)
+      expect { nx.create_billing_record }.to hop("wait")
+      expect(BillingRecord.count).to eq(0)
+    end
+
+    it "creates billing records for only vm" do
+      expect { nx.create_billing_record }.to hop("wait")
+        .and change(BillingRecord, :count).from(0).to(1)
+      expect(vm.active_billing_records.first.billing_rate["resource_type"]).to eq("VmVCpu")
+      expect(vm.display_state).to eq("running")
+      expect(vm.provisioned_at).to eq(now)
+    end
+  end
+
+  describe "#wait" do
+    it "naps when nothing to do" do
+      expect { nx.wait }.to nap(6 * 60 * 60)
+    end
+
+    it "hops to update_firewall_rules when needed" do
+      expect(nx).to receive(:when_update_firewall_rules_set?).and_yield
+      expect { nx.wait }.to hop("update_firewall_rules")
+    end
+  end
+
+  describe "#update_firewall_rules" do
+    it "hops to wait_firewall_rules" do
+      vm.incr_update_firewall_rules
+      expect(vm).to receive(:location).and_return(instance_double(Location, aws?: true))
+      expect(nx).to receive(:push).with(Prog::Vnet::Aws::UpdateFirewallRules, {}, :update_firewall_rules)
+      expect(nx).to receive(:decr_update_firewall_rules).and_call_original
+      nx.update_firewall_rules
+    end
+
+    it "hops to wait if firewall rules are applied" do
+      expect(nx).to receive(:retval).and_return({"msg" => "firewall rule is added"})
+      expect { nx.update_firewall_rules }.to hop("wait")
+    end
+  end
+
+  describe "#prevent_destroy" do
+    it "registers a deadline and naps while preventing" do
+      expect(nx).to receive(:register_deadline)
+      expect { nx.prevent_destroy }.to nap(30)
+    end
+  end
+
   describe "#destroy" do
+    it "prevents destroy if the semaphore set" do
+      expect(nx).to receive(:when_prevent_destroy_set?).and_yield
+      expect(Clog).to receive(:emit).with("Destroy prevented by the semaphore").and_call_original
+      expect { nx.destroy }.to hop("prevent_destroy")
+    end
+
     it "deletes the instance" do
       expect(aws_instance).to receive(:destroy)
       expect(client).to receive(:terminate_instances).with({instance_ids: ["i-0123456789abcdefg"]})

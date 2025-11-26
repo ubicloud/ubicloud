@@ -15,17 +15,18 @@ class Prog::Vnet::NicNexus < Prog::Base
     ipv6_addr ||= subnet.random_private_ipv6.to_s
 
     DB.transaction do
-      prog, ipv4_addr, mac = if subnet.location.aws?
-        ["Aws::Vnet::NicNexus", (ipv4_addr || subnet.random_private_ipv4.nth_subnet(32, 4)).to_s, nil]
+      prog, ipv4_addr, mac, state = if subnet.location.aws?
+        ["Vnet::Aws::NicNexus", (ipv4_addr || subnet.random_private_ipv4.nth_subnet(32, 4) || subnet.random_private_ipv4).to_s, nil, "active"]
       else
-        ["Ubicloud::Vnet::NicNexus", (ipv4_addr || subnet.random_private_ipv4).to_s, gen_mac]
+        ["Vnet::Metal::NicNexus", (ipv4_addr || subnet.random_private_ipv4).to_s, gen_mac, "initializing"]
       end
 
-      Nic.create_with_id(id, private_ipv6: ipv6_addr, private_ipv4: ipv4_addr, mac:, name:, private_subnet_id:)
+      Nic.create_with_id(id, private_ipv6: ipv6_addr, private_ipv4: ipv4_addr, mac:, name:, private_subnet_id:, state:)
       Strand.create_with_id(id, prog:, label: "start", stack: [{"exclude_availability_zones" => exclude_availability_zones, "availability_zone" => availability_zone, "ipv4_addr" => ipv4_addr}])
     end
   end
 
+  # {{{ CONFLATION
   def before_run
     when_destroy_set? do
       hop_destroy if strand.label != "destroy"
@@ -155,6 +156,8 @@ class Prog::Vnet::NicNexus < Prog::Base
       pop "nic deleted"
     end
   end
+  # }}} CONFLATION
+
   # Generate a MAC with the "local" (generated, non-manufacturer) bit
   # set and the multicast bit cleared in the first octet.
   #

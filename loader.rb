@@ -80,11 +80,15 @@ module Prog::VictoriaMetrics; end
 
 module Prog::Vm; end
 
+module Prog::Vm::Aws; end
+
+module Prog::Vm::Metal; end
+
 module Prog::Vnet; end
 
 module Prog::Vnet::Aws; end
 
-module Prog::Vnet::Ubicloud; end
+module Prog::Vnet::Metal; end
 
 module Scheduling; end
 
@@ -197,8 +201,8 @@ def clover_freeze
     PostgresResource::Flavor,
     PostgresResource::HaType,
     Prog,
+    Prog::Ai,
     Prog::Aws,
-    Prog::Aws::Vnet,
     Prog::Base::Exit,
     Prog::Base::FlowControl,
     Prog::Base::Hop,
@@ -210,12 +214,15 @@ def clover_freeze
     Prog::Ubicloud::Vnet,
     Prog::VictoriaMetrics,
     Prog::Vm,
+    Prog::Vm::Aws,
+    Prog::Vm::Metal,
     Prog::Vnet,
     Prog::Vnet::Aws,
-    Prog::Vnet::Ubicloud,
+    Prog::Vnet::Metal,
     Prog::Vnet::RekeyNicTunnel::Xfrm,
     ResourceMethods,
     ResourceMethods::ClassMethods,
+    ResourceMethods::DatasetMethods,
     ResourceMethods::InstanceMethods,
     ResourceMethods::UbidTypeEtcMethods,
     SemaphoreMethods,

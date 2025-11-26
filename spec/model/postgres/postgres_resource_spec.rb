@@ -19,17 +19,17 @@ RSpec.describe PostgresResource do
   it "returns connection string without ubid qualifier" do
     expect(postgres_resource).to receive(:dns_zone).and_return("something").at_least(:once)
     expect(postgres_resource).to receive(:hostname_version).and_return("v1")
-    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.postgres.ubicloud.com:5432/postgres?sslmode=require")
+    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.postgres.ubicloud.com:5432/postgres?channel_binding=require")
   end
 
   it "returns connection string with ubid qualifier" do
     expect(postgres_resource).to receive(:dns_zone).and_return("something").at_least(:once)
-    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.pgc60xvcr00a5kbnggj1js4kkq.postgres.ubicloud.com:5432/postgres?sslmode=require")
+    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.pgc60xvcr00a5kbnggj1js4kkq.postgres.ubicloud.com:5432/postgres?channel_binding=require")
   end
 
   it "returns connection string with ip address if config is not set" do
     expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, vm: instance_double(Vm, ip4: "1.2.3.4", ip4_string: "1.2.3.4"))).at_least(:once)
-    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@1.2.3.4:5432/postgres?sslmode=require")
+    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@1.2.3.4:5432/postgres?channel_binding=require")
   end
 
   it "returns connection string as nil if there is no server" do

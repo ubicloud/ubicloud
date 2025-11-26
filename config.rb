@@ -89,6 +89,7 @@ module Config
   override :minimum_invoice_charge_threshold, 0.5, float
   optional :cloudflare_turnstile_site_key, string
   optional :cloudflare_turnstile_secret_key, string
+  override :allow_unspread_servers, !production?, bool
 
   # GitHub Runner App
   optional :github_app_name, string
@@ -124,6 +125,7 @@ module Config
   optional :victoria_metrics_service_project_id, string
   override :victoria_metrics_host_name, "metrics.ubicloud.com", string
   override :victoria_metrics_version, "v1.113.0"
+  optional :victoria_metrics_endpoint_override, string
 
   # Spdk
   override :spdk_version, "v23.09-ubi-0.3"
@@ -145,7 +147,6 @@ module Config
   optional :postgres_monitor_database_root_certs, string
   optional :postgres_paradedb_notification_email, string
   optional :postgres_lantern_notification_email, string
-  override :postgres_allow_servers_in_same_data_center, false, bool
 
   # Logging
   optional :database_logger_level, string
@@ -172,7 +173,7 @@ module Config
   override :github_gpu_ubuntu_2204_version, "20251017.1.0", string
   override :github_ubuntu_2204_aws_ami_version, "ami-04b5534ef1aed6bde", string
   override :github_ubuntu_2404_aws_ami_version, "ami-0908b850ff3e635a2", string
-  override :postgres_ubuntu_2204_version, "20251007.1.0", string
+  override :postgres_ubuntu_2204_version, "20251103.1.0", string
   override :postgres16_ubuntu_2204_version, "20250425.1.1", string
   override :postgres17_ubuntu_2204_version, "20250425.1.1", string
   override :postgres_paradedb_ubuntu_2204_version, "20250803.1.0", string
@@ -197,6 +198,8 @@ module Config
   override :e2e_hetzner_server_id, string
   optional :e2e_github_installation_id, string
   override :is_e2e, false, bool
+  optional :e2e_aws_access_key, string, clear: true
+  optional :e2e_aws_secret_key, string, clear: true
 
   # Load Balancer
   optional :load_balancer_service_project_id, string

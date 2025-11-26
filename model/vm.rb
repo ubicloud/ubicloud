@@ -37,7 +37,7 @@ class Vm < Sequel::Model
 
   plugin ResourceMethods, redacted_columns: :public_key
   plugin SemaphoreMethods, :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules,
-    :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started, :restart, :stop
+    :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started, :restart, :stop, :migrate_to_separate_progs
   include HealthMonitorMethods
 
   include ObjectTag::Cleanup
@@ -95,6 +95,10 @@ class Vm < Sequel::Model
 
   def firewalls(opts = {})
     private_subnet_firewalls(opts) + vm_firewalls(opts)
+  end
+
+  def firewall_rules
+    firewalls(eager: :firewall_rules).flat_map(&:firewall_rules)
   end
 
   def runtime_token
@@ -194,6 +198,12 @@ class Vm < Sequel::Model
   # happen on a single host, pushing into the allocation process.
   def self.ubid_to_name(id)
     id.to_s[0..7]
+  end
+
+  def update_firewall_rules_prog
+    prog = Prog::Vnet
+    prog = location.aws? ? prog::Aws : prog::Metal
+    prog::UpdateFirewallRules
   end
 
   def inhost_name

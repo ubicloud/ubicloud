@@ -26,7 +26,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
         secret_key: SecureRandom.hex(32),
         location_id: location.id
       )
-      Strand.create_with_id(postgres_timeline.id, prog: "Postgres::PostgresTimelineNexus", label: "start")
+      Strand.create_with_id(postgres_timeline, prog: "Postgres::PostgresTimelineNexus", label: "start")
     end
   end
 

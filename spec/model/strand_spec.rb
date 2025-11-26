@@ -22,6 +22,10 @@ RSpec.describe Strand do
       expect(did_it).to be :did_it
     end
 
+    it "create_with_id raises if given a nil id" do
+      expect { described_class.create_with_id(nil, prog: "Prog::Base", label: "start") }.to raise_error(RuntimeError)
+    end
+
     it "clears cached instance state" do
       st.save_changes
       st.set(label: "smoke_test_0")

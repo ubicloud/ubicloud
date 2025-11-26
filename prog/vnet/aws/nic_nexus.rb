@@ -1,39 +1,60 @@
 # frozen_string_literal: true
 
 require "aws-sdk-ec2"
-class Prog::Aws::Nic < Prog::Base
+
+class Prog::Vnet::Aws::NicNexus < Prog::Base
   subject_is :nic
 
   def before_run
     when_destroy_set? do
-      pop "exiting early due to destroy semaphore"
+      hop_destroy unless ["destroy", "release_eip", "delete_subnet", "destroy_entities"].include?(strand.label)
     end
   end
 
+  label def start
+    NicAwsResource.create_with_id(nic.id)
+    hop_create_subnet
+  end
+
   label def create_subnet
+    nap 2 unless private_subnet.strand.label == "wait"
+
     register_deadline("attach_eip_network_interface", 3 * 60)
-    vpc_response = client.describe_vpcs({filters: [{name: "vpc-id", values: [private_subnet.private_subnet_aws_resource.vpc_id]}]}).vpcs[0]
+    vpc_response = client.describe_vpcs({filters: [{name: "vpc-id", values: [vpc_id]}]}).vpcs[0]
+
+    # AWS VPCs use /56 prefix length for IPv6 CIDR blocks by default. We use /64
+    # subnets for consistency with Ubicloud's private subnet sizing, giving us
+    # 2^8 = 256 possible subnets to choose from.
+    #
+    # We randomly select a subnet rather than tracking allocations sequentially
+    # because:
+    # 1. Postgres on AWS typically provisions only up to 4 subnets concurrently
+    # 2. The collision probability is very low (4 out of 256)
+    # 3. AWS will fail the call if there's a conflict, and we can simply retry
     ipv_6_cidr_block = NetAddr::IPv6Net.parse(vpc_response.ipv_6_cidr_block_association_set[0].ipv_6_cidr_block).nth_subnet(64, SecureRandom.random_number(2**8))
     subnet_response = client.describe_subnets({filters: [{name: "tag:Name", values: [nic.name]}]})
-    subnet_id = if private_subnet.old_aws_subnet?
-      client.describe_subnets({filters: [{name: "vpc-id", values: [private_subnet.private_subnet_aws_resource.vpc_id]}]}).subnets[0].subnet_id
+    subnet_id, subnet_az = if private_subnet.old_aws_subnet?
+      subnet = client.describe_subnets({filters: [{name: "vpc-id", values: [vpc_id]}]}).subnets[0]
+      [subnet.subnet_id, subnet.availability_zone]
     elsif subnet_response.subnets.empty?
+      subnet_az = az_to_provision_subnet
       subnet_id = client.create_subnet({
-        vpc_id: private_subnet.private_subnet_aws_resource.vpc_id,
+        vpc_id:,
         cidr_block: NetAddr::IPv4Net.new(nic.private_ipv4.network, NetAddr::Mask32.new(24)).to_s,
         ipv_6_cidr_block: ipv_6_cidr_block.to_s,
-        availability_zone: private_subnet.location.name + az_to_provision_subnet,
+        availability_zone: private_subnet.location.name + subnet_az,
         tag_specifications: Util.aws_tag_specifications("subnet", nic.name)
       }).subnet.subnet_id
       client.modify_subnet_attribute({
         subnet_id:,
         assign_ipv_6_address_on_creation: {value: true}
       })
-      subnet_id
+      [subnet_id, subnet_az]
     else
-      subnet_response.subnets[0].subnet_id
+      subnet = subnet_response.subnets[0]
+      [subnet.subnet_id, subnet.availability_zone]
     end
-    nic.nic_aws_resource.update(subnet_id:, subnet_az: az_to_provision_subnet)
+    nic.nic_aws_resource.update(subnet_id:, subnet_az:)
 
     hop_wait_subnet_created
   end
@@ -46,7 +67,7 @@ class Prog::Aws::Nic < Prog::Base
     end
 
     if subnet_response.state == "available"
-      route_table_response = client.describe_route_tables({filters: [{name: "vpc-id", values: [private_subnet.private_subnet_aws_resource.vpc_id]}]})
+      route_table_response = client.describe_route_tables({filters: [{name: "vpc-id", values: [vpc_id]}]})
       route_table_id = route_table_response.route_tables[0].route_table_id
       route_table_details = client.describe_route_tables({route_table_ids: [route_table_id]}).route_tables.first
       if route_table_details.associations.empty?
@@ -66,7 +87,7 @@ class Prog::Aws::Nic < Prog::Base
       private_ip_address: nic.private_ipv4.network.to_s,
       ipv_6_prefix_count: 1,
       groups: [
-        nic.private_subnet.private_subnet_aws_resource.security_group_id
+        private_subnet.private_subnet_aws_resource.security_group_id
       ],
       tag_specifications: Util.aws_tag_specifications("network-interface", nic.name),
       client_token: nic.id
@@ -104,10 +125,14 @@ class Prog::Aws::Nic < Prog::Base
 
   label def attach_eip_network_interface
     eip_response = client.describe_addresses({filters: [{name: "allocation-id", values: [nic.nic_aws_resource.eip_allocation_id]}]})
-    if eip_response.addresses.first.network_interface_id.nil?
+    unless eip_response.addresses.first.network_interface_id
       client.associate_address({allocation_id: nic.nic_aws_resource.eip_allocation_id, network_interface_id: nic.nic_aws_resource.network_interface_id})
     end
-    pop "nic created"
+    hop_wait
+  end
+
+  label def wait
+    nap 1000000000
   end
 
   label def destroy
@@ -120,7 +145,7 @@ class Prog::Aws::Nic < Prog::Base
   label def release_eip
     ignore_invalid_nic do
       allocation_id = nic.nic_aws_resource&.eip_allocation_id
-      client.release_address({allocation_id: allocation_id}) if allocation_id
+      client.release_address({allocation_id:}) if allocation_id
     end
     hop_delete_subnet
   end
@@ -133,15 +158,26 @@ class Prog::Aws::Nic < Prog::Base
 
       Clog.emit("dependency violation for aws nic") { {ignored_aws_nic_failure: {exception: Util.exception_to_hash(e, backtrace: nil)}} }
     end
-    pop "nic destroyed"
+
+    hop_destroy_entities
+  end
+
+  label def destroy_entities
+    nic&.nic_aws_resource&.destroy
+    nic&.destroy
+    pop "nic deleted"
   end
 
   def client
-    @client ||= nic.private_subnet.location.location_credential.client
+    @client ||= private_subnet.location.location_credential.client
   end
 
   def private_subnet
     @private_subnet ||= nic.private_subnet
+  end
+
+  def vpc_id
+    @vpc_id ||= private_subnet.private_subnet_aws_resource.vpc_id
   end
 
   def az_to_provision_subnet

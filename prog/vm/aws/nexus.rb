@@ -1,15 +1,20 @@
 # frozen_string_literal: true
 
-class Prog::Aws::Instance < Prog::Base
+class Prog::Vm::Aws::Nexus < Prog::Base
   subject_is :vm, :aws_instance
 
   def before_run
     when_destroy_set? do
-      pop "exiting early due to destroy semaphore"
+      unless ["destroy", "cleanup_roles"].include? strand.label
+        vm.active_billing_records.each(&:finalize)
+        register_deadline(nil, 5 * 60)
+        hop_destroy
+      end
     end
   end
 
   label def start
+    nap 1 unless vm.nic.strand.label == "wait"
     # Cloudwatch is not needed for runner instances
     hop_create_instance if is_runner?
 
@@ -157,7 +162,7 @@ class Prog::Aws::Instance < Prog::Base
       ],
       network_interfaces: [
         {
-          network_interface_id: vm.nics.first.nic_aws_resource.network_interface_id,
+          network_interface_id: vm.nic.nic_aws_resource.network_interface_id,
           device_index: 0
         }
       ],
@@ -203,7 +208,7 @@ class Prog::Aws::Instance < Prog::Base
     az_id = subnet_response.subnets.first.availability_zone_id
     ipv4_dns_name = instance.public_dns_name
 
-    AwsInstance.create_with_id(vm.id, instance_id:, az_id:, ipv4_dns_name:)
+    AwsInstance.create_with_id(vm, instance_id:, az_id:, ipv4_dns_name:)
 
     hop_wait_instance_created
   end
@@ -218,10 +223,83 @@ class Prog::Aws::Instance < Prog::Base
     vm.sshable&.update(host: public_ipv4)
     vm.update(cores: vm.vcpus / 2, allocated_at: Time.now, ephemeral_net6: public_ipv6)
 
-    pop "vm created"
+    hop_wait_sshable
+  end
+
+  label def wait_sshable
+    unless vm.update_firewall_rules_set?
+      vm.incr_update_firewall_rules
+      # This is the first time we get into this state and we know that
+      # wait_sshable will take definitely more than 6 seconds. So, we nap here
+      # to reduce the amount of load on the control plane unnecessarily.
+      nap 6
+    end
+    addr = vm.ip4
+    hop_create_billing_record unless addr
+
+    begin
+      Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
+    rescue SystemCallError
+      nap 1
+    end
+
+    hop_create_billing_record
+  end
+
+  label def create_billing_record
+    vm.update(display_state: "running", provisioned_at: Time.now)
+
+    Clog.emit("vm provisioned") { [vm, {provision: {vm_ubid: vm.ubid, instance_id: vm.aws_instance.instance_id, duration: (Time.now - vm.allocated_at).round(3)}}] }
+
+    project = vm.project
+    strand.stack[-1]["create_billing_record_done"] = true
+    strand.modified!(:stack)
+    hop_wait unless project.billable
+
+    BillingRecord.create(
+      project_id: project.id,
+      resource_id: vm.id,
+      resource_name: vm.name,
+      billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
+      amount: vm.vcpus
+    )
+
+    hop_wait
+  end
+
+  label def wait
+    when_update_firewall_rules_set? do
+      register_deadline("wait", 5 * 60)
+      hop_update_firewall_rules
+    end
+
+    nap 6 * 60 * 60
+  end
+
+  label def update_firewall_rules
+    if retval&.dig("msg") == "firewall rule is added"
+      hop_wait
+    end
+
+    decr_update_firewall_rules
+    push vm.update_firewall_rules_prog, {}, :update_firewall_rules
+  end
+
+  label def prevent_destroy
+    register_deadline("destroy", 24 * 60 * 60)
+    nap 30
   end
 
   label def destroy
+    decr_destroy
+
+    when_prevent_destroy_set? do
+      Clog.emit("Destroy prevented by the semaphore")
+      hop_prevent_destroy
+    end
+
+    vm.update(display_state: "deleting")
+
     if aws_instance
       begin
         client.terminate_instances(instance_ids: [aws_instance.instance_id])
@@ -231,7 +309,10 @@ class Prog::Aws::Instance < Prog::Base
       aws_instance.destroy
     end
 
-    pop "vm destroyed" if is_runner?
+    if is_runner?
+      final_clean_up
+      pop "vm destroyed"
+    end
 
     hop_cleanup_roles
   end
@@ -258,7 +339,14 @@ class Prog::Aws::Instance < Prog::Base
       iam_client.delete_role({role_name:})
     end
 
+    final_clean_up
     pop "vm destroyed"
+  end
+
+  def final_clean_up
+    vm.nic.update(vm_id: nil)
+    vm.nic.incr_destroy
+    vm.destroy
   end
 
   def client
@@ -286,7 +374,8 @@ class Prog::Aws::Instance < Prog::Base
   end
 
   def is_runner?
-    @is_runner ||= vm.unix_user == "runneradmin"
+    return @is_runner if defined?(@is_runner)
+    @is_runner = vm.unix_user == "runneradmin"
   end
 
   def ignore_invalid_entity

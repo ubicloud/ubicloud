@@ -203,8 +203,8 @@ RSpec.describe Prog::Base do
   end
 
   it "calls before_run if it is available" do
-    st = Strand.create(prog: "Prog::Vm::Nexus", label: "wait")
-    prg = instance_double(Prog::Vm::Nexus)
+    st = Strand.create(prog: "Prog::Vm::Aws::Nexus", label: "wait")
+    prg = instance_double(Prog::Vm::Aws::Nexus)
     expect(st).to receive(:load).and_return(prg)
     expect(prg).to receive(:before_run)
     expect(prg).to receive(:wait).and_raise(Prog::Base::Nap.new(30))
@@ -361,7 +361,7 @@ RSpec.describe Prog::Base do
     end
 
     it "can create pages for progs that are not on the top of the stack" do
-      st = Strand.create(prog: "Test2", label: "pusher1")
+      st = Strand.create(prog: "Test::Test2", label: "pusher1")
       st.stack.first["deadline_target"] = "t1"
       st.stack.first["deadline_at"] = Time.now + 1
       st.unsynchronized_run
@@ -374,14 +374,14 @@ RSpec.describe Prog::Base do
       }.to change { Page.active.count }.from(0).to(2)
 
       expect(Page.all.map(&:summary)).to include(
-        "#{st.ubid} has an expired deadline! Test2.pusher2 did not reach t1 on time",
+        "#{st.ubid} has an expired deadline! Test::Test2.pusher2 did not reach t1 on time",
         "#{st.ubid} has an expired deadline! Test.pusher2 did not reach t2 on time"
       )
     end
 
     it "can create a page with extra data from a vm" do
       vm = create_vm
-      st = Strand.create_with_id(vm.id, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
+      st = Strand.create_with_id(vm, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
       st.unsynchronized_run
       page = Page.active.first
       expect(page).not_to be_nil
@@ -391,7 +391,7 @@ RSpec.describe Prog::Base do
 
     it "can create a page with extra data from a vm with a vm host" do
       vm = create_vm(vm_host: create_vm_host(data_center: "FSN1-DC1"))
-      st = Strand.create_with_id(vm.id, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
+      st = Strand.create_with_id(vm, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
       st.unsynchronized_run
       page = Page.active.first
       expect(page).not_to be_nil
@@ -402,7 +402,7 @@ RSpec.describe Prog::Base do
     it "can create a page with extra data from a vm host" do
       vmh = create_vm_host(data_center: "FSN1-DC1")
       create_vm(vm_host: vmh)
-      st = Strand.create_with_id(vmh.id, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
+      st = Strand.create_with_id(vmh, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
       st.unsynchronized_run
       page = Page.active.first
       expect(page).not_to be_nil
@@ -413,7 +413,7 @@ RSpec.describe Prog::Base do
     it "can create a page with extra data from a github runner" do
       installation = GithubInstallation.create(installation_id: 123, name: "test-user", type: "User", project: Project.create(name: "test-project"))
       runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "my-repo", installation:)
-      st = Strand.create_with_id(runner.id, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
+      st = Strand.create_with_id(runner, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
       st.unsynchronized_run
       page = Page.active.first
       expect(page).not_to be_nil
@@ -425,7 +425,7 @@ RSpec.describe Prog::Base do
       vm = create_vm(vm_host: create_vm_host(data_center: "FSN1-DC1"))
       installation = GithubInstallation.create(installation_id: 123, name: "test-user", type: "User", project: Project.create(name: "test-project"))
       runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "my-repo", vm_id: vm.id, installation:)
-      st = Strand.create_with_id(runner.id, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
+      st = Strand.create_with_id(runner, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
       st.unsynchronized_run
       page = Page.active.first
       expect(page).not_to be_nil

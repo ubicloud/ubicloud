@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
-RSpec.describe Prog::Aws::Nic do
+RSpec.describe Prog::Vnet::Aws::NicNexus do
   subject(:nx) {
     described_class.new(st)
   }
 
   let(:st) {
-    Strand.create(prog: "Aws::Nic", stack: [{"subject_id" => nic.id}], label: "create_network_interface")
+    Strand.create(prog: "Vnet::Aws::NicNexus", stack: [{"subject_id" => nic.id}], label: "start")
   }
 
   let(:nic) {
@@ -14,6 +14,7 @@ RSpec.describe Prog::Aws::Nic do
     loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
     LocationCredential.create_with_id(loc.id, access_key: "test-access-key", secret_key: "test-secret-key")
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps", location_id: loc.id).subject
+    ps.strand.update(label: "wait")
     PrivateSubnetAwsResource.create_with_id(ps.id, security_group_id: "sg-0123456789abcdefg", vpc_id: "vpc-0123456789abcdefg")
     nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "test-nic").subject
     NicAwsResource.create_with_id(nic.id, subnet_id: "subnet-0123456789abcdefg", subnet_az: "us-west-2a")
@@ -29,13 +30,39 @@ RSpec.describe Prog::Aws::Nic do
     allow(Aws::EC2::Client).to receive(:new).with(access_key_id: "test-access-key", secret_access_key: "test-secret-key", region: "us-west-2").and_return(client)
   end
 
-  it "exits if destroy is set" do
-    expect(nx.before_run).to be_nil
-    expect(nx).to receive(:when_destroy_set?).and_yield
-    expect { nx.before_run }.to exit({"msg" => "exiting early due to destroy semaphore"})
+  describe "#before_run" do
+    it "hops to destroy when needed" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect { nx.before_run }.to hop("destroy")
+    end
+
+    it "does not hop to destroy if already in the destroy state or one of the other destroying states" do
+      expect(nx).to receive(:when_destroy_set?).and_yield.at_least(:once)
+      expect(nx.strand).to receive(:label).and_return("destroy")
+      expect { nx.before_run }.not_to hop("destroy")
+      expect(nx.strand).to receive(:label).and_return("release_eip")
+      expect { nx.before_run }.not_to hop("destroy")
+      expect(nx.strand).to receive(:label).and_return("delete_subnet")
+      expect { nx.before_run }.not_to hop("destroy")
+      expect(nx.strand).to receive(:label).and_return("destroy_entities")
+      expect { nx.before_run }.not_to hop("destroy")
+    end
+  end
+
+  describe "#start" do
+    it "creates a nic aws resource" do
+      NicAwsResource[nic.id].destroy
+      expect { nx.start }.to hop("create_subnet")
+      expect(NicAwsResource[nic.id]).not_to be_nil
+    end
   end
 
   describe "#create_subnet" do
+    it "naps if subnet is not ready" do
+      nic.private_subnet.strand.update(label: "create_aws_vpc")
+      expect { nx.create_subnet }.to nap(2)
+    end
+
     it "creates a subnet and hops to wait_subnet_created" do
       expect(nic.private_subnet).to receive(:old_aws_subnet?).and_return(false)
       client.stub_responses(:describe_vpcs, vpcs: [{ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}], vpc_id: "vpc-0123456789abcdefg"}])
@@ -51,21 +78,21 @@ RSpec.describe Prog::Aws::Nic do
     it "reuses existing subnet" do
       expect(nic.private_subnet).to receive(:old_aws_subnet?).and_return(false)
       client.stub_responses(:describe_vpcs, vpcs: [{ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}], vpc_id: "vpc-0123456789abcdefg"}])
-      client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-existing"}])
+      client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-existing", availability_zone: "a"}])
       expect(client).not_to receive(:create_route_table)
       expect(nic.nic_aws_resource).to receive(:update).with(subnet_id: "subnet-existing", subnet_az: "a")
-      expect(nx).to receive(:az_to_provision_subnet).and_return("a")
+      expect(nx).not_to receive(:az_to_provision_subnet)
       expect { nx.create_subnet }.to hop("wait_subnet_created")
     end
 
     it "reuses existing subnet for old aws subnet" do
       expect(nic.private_subnet).to receive(:old_aws_subnet?).and_return(true)
       client.stub_responses(:describe_vpcs, vpcs: [{ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}], vpc_id: "vpc-0123456789abcdefg"}])
-      client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-existing"}])
+      client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-existing", availability_zone: "a"}])
       client.stub_responses(:modify_subnet_attribute)
       expect(client).not_to receive(:create_route_table)
       expect(nic.nic_aws_resource).to receive(:update).with(subnet_id: "subnet-existing", subnet_az: "a")
-      expect(nx).to receive(:az_to_provision_subnet).and_return("a")
+      expect(nx).not_to receive(:az_to_provision_subnet)
       expect { nx.create_subnet }.to hop("wait_subnet_created")
     end
   end
@@ -162,13 +189,19 @@ RSpec.describe Prog::Aws::Nic do
       client.stub_responses(:describe_addresses, addresses: [{allocation_id: "eip-0123456789abcdefg", network_interface_id: nil}])
       client.stub_responses(:associate_address)
       expect(client).to receive(:associate_address).with({allocation_id: "eip-0123456789abcdefg", network_interface_id: nic.nic_aws_resource.network_interface_id}).and_call_original
-      expect { nx.attach_eip_network_interface }.to exit({"msg" => "nic created"})
+      expect { nx.attach_eip_network_interface }.to hop("wait")
     end
 
     it "skips association if elastic ip is already associated" do
       client.stub_responses(:describe_addresses, addresses: [{allocation_id: "eip-0123456789abcdefg", network_interface_id: "eni-existing"}])
       expect(client).not_to receive(:associate_address)
-      expect { nx.attach_eip_network_interface }.to exit({"msg" => "nic created"})
+      expect { nx.attach_eip_network_interface }.to hop("wait")
+    end
+  end
+
+  describe "#wait" do
+    it "naps forever" do
+      expect { nx.wait }.to nap(1000000000)
     end
   end
 
@@ -229,13 +262,13 @@ RSpec.describe Prog::Aws::Nic do
     it "deletes the subnet" do
       client.stub_responses(:delete_subnet)
       expect(client).to receive(:delete_subnet).with({subnet_id: nic.nic_aws_resource.subnet_id}).and_call_original
-      expect { nx.delete_subnet }.to exit({"msg" => "nic destroyed"})
+      expect { nx.delete_subnet }.to hop("destroy_entities")
     end
 
     it "gracefully continues if the nic is not found" do
       client.stub_responses(:delete_subnet, Aws::EC2::Errors::InvalidSubnetIDNotFound.new(nil, "The subnet 'subnet-0123456789abcdefg' does not exist."))
       expect(nic.nic_aws_resource).to receive(:subnet_id).and_return(nil).at_least(:once)
-      expect { nx.delete_subnet }.to exit({"msg" => "nic destroyed"})
+      expect { nx.delete_subnet }.to hop("destroy_entities")
     end
 
     it "raises an error if the subnet could not be deleted but we are the only nic" do
@@ -247,7 +280,26 @@ RSpec.describe Prog::Aws::Nic do
     it "gracefully continues if the subnet could not be deleted but we are not the only nic" do
       client.stub_responses(:delete_subnet, Aws::EC2::Errors::DependencyViolation.new(nil, "The subnet 'subnet-0123456789abcdefg' could not be deleted because it is associated with the network interface 'eni-0123456789abcdefg'."))
       expect(nic.private_subnet).to receive(:nics).and_return([nic, instance_double(Nic)]).at_least(:once)
-      expect { nx.delete_subnet }.to exit({"msg" => "nic destroyed"})
+      expect { nx.delete_subnet }.to hop("destroy_entities")
+    end
+  end
+
+  describe "#destroy_entities" do
+    it "refreshes the keys and destroys the nic" do
+      expect(nic.nic_aws_resource).to receive(:destroy)
+      expect(nic).to receive(:destroy)
+      expect { nx.destroy_entities }.to exit({"msg" => "nic deleted"})
+    end
+
+    it "gracefully continues if the nic.nic_aws_resource is not found" do
+      expect(nic).to receive(:nic_aws_resource).and_return(nil).at_least(:once)
+      expect(nic).to receive(:destroy).and_return(true).once
+      expect { nx.destroy_entities }.to exit({"msg" => "nic deleted"})
+    end
+
+    it "gracefully continues if the nic is not found" do
+      expect(nx).to receive(:nic).and_return(nil).at_least(:once)
+      expect { nx.destroy_entities }.to exit({"msg" => "nic deleted"})
     end
   end
 

@@ -208,7 +208,7 @@ RSpec.describe Vm do
     end
 
     it "can update spdk version" do
-      spdk_installation = SpdkInstallation.create_with_id(vmh.id, version: "b", allocation_weight: 100, vm_host_id: vmh.id)
+      spdk_installation = SpdkInstallation.create_with_id(vmh, version: "b", allocation_weight: 100, vm_host_id: vmh.id)
       volume_dataset = instance_double(Sequel::Dataset)
       expect(vm).to receive(:vm_storage_volumes_dataset).and_return(volume_dataset)
       expect(volume_dataset).to receive(:update).with(spdk_installation_id: spdk_installation.id)
@@ -328,7 +328,7 @@ RSpec.describe Vm do
       accepts_slices: true
     )).at_least(:once)
     expect(JSON.parse(vm.params_json)["init_script"]).to eq ""
-    VmInitScript.create_with_id(vm.id, script: "b")
+    VmInitScript.create_with_id(vm, script: "b")
     expect(JSON.parse(vm.reload.params_json)["init_script"]).to eq "b"
   end
 
