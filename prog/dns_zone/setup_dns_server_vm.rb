@@ -68,6 +68,19 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
   label def start
     nap 5 unless vm.strand.label == "wait"
     register_deadline(nil, 15 * 60)
+    if vm.location.aws?
+      # Open UDP & TCP port 53 for DNS queries on AWS
+      fw = Firewall[name: "dns", project_id: Config.dns_service_project_id]
+      unless fw
+        fw = Firewall.create(name: "dns", location: vm.location, project_id: Config.dns_service_project_id)
+        fw.add_firewall_rule(cidr: "0.0.0.0/0", port_range: 53..53, protocol: "udp")
+        fw.add_firewall_rule(cidr: "::/0", port_range: 53..53, protocol: "udp")
+        fw.add_firewall_rule(cidr: "0.0.0.0/0", port_range: 53..53, protocol: "tcp")
+        fw.add_firewall_rule(cidr: "::/0", port_range: 53..53, protocol: "tcp")
+      end
+      vm.add_vm_firewall(fw)
+      vm.incr_update_firewall_rules
+    end
     hop_prepare
   end
 
