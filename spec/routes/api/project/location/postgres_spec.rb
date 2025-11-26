@@ -306,6 +306,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "read-replica" do
+        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
         expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
 
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
@@ -315,11 +316,11 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(200)
       end
 
-      it "fails read-replica creation if timeline doesn't have a backup yet" do
+      it "fails read-replica creation if the parent is not ready" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
         expect(project).to receive(:quota_available?).and_return(true)
-        expect(pg.timeline).to receive(:earliest_restore_time).and_return(nil)
+        expect(pg).to receive(:ready_for_read_replica?).and_return(false)
 
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
           name: "my-read-replica"

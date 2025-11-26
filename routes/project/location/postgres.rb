@@ -243,7 +243,7 @@ class Clover
         Validation.validate_name(name)
 
         Validation.validate_vcpu_quota(@project, "PostgresVCpu", Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size].vcpu_count)
-        if PostgresTimeline.earliest_restore_time(pg.timeline).nil?
+        unless pg.ready_for_read_replica?
           error_msg = "Parent server is not ready for read replicas. There are no backups, yet."
           fail CloverError.new(400, "InvalidRequest", error_msg)
         end
@@ -567,6 +567,7 @@ class Clover
 
           DB.transaction do
             pg.update(target_version: pg.version.to_i + 1)
+            pg.read_replicas_dataset.update(target_version: pg.target_version)
             audit_log(pg, "upgrade")
           end
 
