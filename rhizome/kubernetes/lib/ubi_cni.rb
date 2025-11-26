@@ -121,10 +121,19 @@ options ndots:5
       subnet_ipv6_obj = IPAddr.new(subnet_ipv6)
       subnet_ipv4_obj = IPAddr.new(subnet_ipv4)
 
+      network_int = subnet_ipv4_obj.to_i
+      reserved_ipv4_ips = [
+        (network_int + 0), # Network Address
+        (network_int + 1), # Gateway
+        (network_int + 2), # Reserved 2
+        (network_int + 3), # Reserved 3
+        (network_int + 4)  # Vm's IP
+      ].map { |ip_int| IPAddr.new(ip_int, Socket::AF_INET).to_s }
+
       container_ula_ipv6 = find_random_available_ip(allocated_ips, subnet_ula_ipv6_obj)
       container_ipv6 = find_random_available_ip(allocated_ips, subnet_ipv6_obj)
-      ipv4_container_ip = find_random_available_ip(allocated_ips, subnet_ipv4_obj)
-      ipv4_gateway_ip = find_random_available_ip(allocated_ips, subnet_ipv4_obj, reserved_ips: [ipv4_container_ip.to_s])
+      ipv4_container_ip = find_random_available_ip(allocated_ips, subnet_ipv4_obj, reserved_ips: reserved_ipv4_ips)
+      ipv4_gateway_ip = find_random_available_ip(allocated_ips, subnet_ipv4_obj, reserved_ips: reserved_ipv4_ips + [ipv4_container_ip.to_s])
 
       allocated_ips[container_id] = [
         ipv4_container_ip.to_s,
