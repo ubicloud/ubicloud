@@ -111,11 +111,38 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
       expect { prog.start }.to nap(5)
     end
 
-    it "hops to prepare when VM is ready" do
+    it "hops to prepare when VM is ready but not on AWS" do
+      expect(prog.vm.location).to receive(:aws?).and_return(false)
       prog.vm.strand.update(label: "wait")
       expect(prog.strand.stack.first["deadline_at"]).to be_nil
       expect { prog.start }.to hop("prepare")
       expect(prog.strand.stack.first["deadline_at"]).not_to be_nil
+    end
+
+    it "configures firewall when AWS VM is ready" do
+      expect(prog.vm.location).to receive(:aws?).and_return(true).at_least(:once)
+      prog.vm.strand.update(label: "wait")
+      expect(prog.strand.stack.first["deadline_at"]).to be_nil
+      expect { prog.start }.to hop("prepare")
+      expect(prog.vm.firewall_rules.filter { it.protocol == "udp" }.length).to eq(2)
+      expect(prog.strand.stack.first["deadline_at"]).not_to be_nil
+    end
+
+    it "reuses firewall when AWS VM is ready with existing firewall" do
+      fw = Firewall.create(name: "dns", location: prog.vm.location, project_id: Config.dns_service_project_id)
+      fw.add_firewall_rule(cidr: "0.0.0.0/0", port_range: 53..53, protocol: "udp")
+      fw.add_firewall_rule(cidr: "::/0", port_range: 53..53, protocol: "udp")
+      fw.add_firewall_rule(cidr: "0.0.0.0/0", port_range: 53..53, protocol: "tcp")
+      fw.add_firewall_rule(cidr: "::/0", port_range: 53..53, protocol: "tcp")
+
+      expect(prog.vm.location).to receive(:aws?).and_return(true).at_least(:once)
+      prog.vm.strand.update(label: "wait")
+      expect(prog.strand.stack.first["deadline_at"]).to be_nil
+      expect { prog.start }.to hop("prepare")
+      expect(prog.vm.firewall_rules.filter { it.protocol == "udp" }.length).to eq(2)
+      expect(prog.strand.stack.first["deadline_at"]).not_to be_nil
+
+      expect(prog.vm.firewalls.map(&:id)).to include(fw.id)
     end
   end
 
