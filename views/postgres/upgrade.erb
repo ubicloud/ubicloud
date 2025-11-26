@@ -102,7 +102,8 @@ end %>
       If a maintenance window is configured, the upgrade will take place during
       the first available maintenance window after the new server is ready.
       Otherwise, the upgrade will take place as soon as the new server becomes
-      ready.") %>
+      ready. After the upgrade is successful, any read replicas for this database will
+      be upgraded.") %>
 
       <div class="flex justify-end mt-6">
         <%== part("components/form/submit_button", text: "Start Upgrade", extra_class: "") if @edit_perm %>

@@ -309,4 +309,23 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.can_upgrade?).to be false
     end
   end
+
+  describe "#ready_for_read_replica?" do
+    it "returns true if the postgres resource is ready for read replica" do
+      allow(postgres_resource).to receive(:needs_convergence?).and_return(false)
+      allow(PostgresTimeline).to receive(:earliest_restore_time).with(postgres_resource.timeline).and_return(Time.now - 3600)
+      expect(postgres_resource.ready_for_read_replica?).to be true
+    end
+
+    it "returns false if the postgres resource needs convergence" do
+      allow(postgres_resource).to receive(:needs_convergence?).and_return(true)
+      expect(postgres_resource.ready_for_read_replica?).to be false
+    end
+
+    it "returns false if there is no earliest restore time" do
+      allow(postgres_resource).to receive(:needs_convergence?).and_return(false)
+      allow(PostgresTimeline).to receive(:earliest_restore_time).with(postgres_resource.timeline).and_return(nil)
+      expect(postgres_resource.ready_for_read_replica?).to be false
+    end
+  end
 end
