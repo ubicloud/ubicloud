@@ -38,6 +38,11 @@ class Clover < Roda
     "(_no_kw: nil)"
   end
 
+  # {{{ CONFLATION
+  def handle_validation_failure(*args, &blk)
+  end
+  # }}} CONFLATION
+
   plugin :all_verbs
   plugin :assets, js: "app.js", css: "app.css", css_opts: {style: :compressed, cache: false}, timestamp_paths: true
   plugin :disallow_file_uploads
