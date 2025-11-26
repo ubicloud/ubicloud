@@ -157,7 +157,7 @@ RSpec.describe Prog::DownloadBootImage do
     end
 
     it "generates R2 presigned URL for github-runners images if a custom_url not provided" do
-      allow(Config).to receive(:ubicloud_images_r2_bucket_name).and_return("images-bucket")
+      allow(Config).to receive_messages(ubicloud_images_r2_bucket_name: "images-bucket", ubicloud_images_blob_storage_certs: nil)
       url_presigner = instance_double(Aws::S3::Presigner)
       s3_client = instance_double(Aws::S3::Client)
       allow(Aws::S3::Presigner).to receive(:new).with(client: s3_client).and_return(url_presigner)
