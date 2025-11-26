@@ -16,7 +16,8 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       ],
       timeline: instance_double(PostgresTimeline, id: "timeline-id"),
       location: instance_double(Location, aws?: false),
-      target_version: "17"
+      target_version: "17",
+      read_replica?: false
     )
   }
 
@@ -25,8 +26,18 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
   end
 
   describe "#start" do
-    it "registers a deadline" do
+    it "naps if read replica parent is not ready" do
+      parent = instance_double(PostgresResource, ready_for_read_replica?: false)
+      allow(postgres_resource).to receive_messages(read_replica?: true, parent: parent)
+
+      expect { nx.start }.to nap(60)
+    end
+
+    it "registers a deadline and hops to provision_servers if read replica parent is ready" do
+      parent = instance_double(PostgresResource, ready_for_read_replica?: true)
       expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 2 * 60 * 60)
+      allow(postgres_resource).to receive_messages(read_replica?: true, parent: parent)
+
       expect { nx.start }.to hop("provision_servers")
     end
   end
@@ -49,7 +60,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.provision_servers }.to nap
     end
 
-    it "provisions a new server without excluding hosts when Config.allow_unspread_servers is true" do
+    it "provisions a new server without excluding hosts when Config.allow_unspread_servers is true for regular instances" do
       allow(Config).to receive(:allow_unspread_servers).and_return(true)
       expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::HETZNER_PROVIDER_NAME).at_least(:once)
       expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: []))
@@ -83,6 +94,24 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect(postgres_resource).to receive(:representative_server).and_return(postgres_resource.servers[0])
       expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(availability_zone: "a"))
       expect(postgres_resource).to receive(:use_different_az_set?).and_return(false)
+      expect { nx.provision_servers }.to nap
+    end
+
+    it "provisions a new server with the correct timeline for a regular instance" do
+      allow(Config).to receive(:allow_unspread_servers).and_return(true)
+      allow(postgres_resource).to receive(:read_replica?).and_return(false)
+      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::HETZNER_PROVIDER_NAME).at_least(:once)
+
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: "timeline-id"))
+      expect { nx.provision_servers }.to nap
+    end
+
+    it "provisions a new server with the correct timeline for a read replica" do
+      allow(Config).to receive(:allow_unspread_servers).and_return(true)
+      allow(postgres_resource).to receive_messages(read_replica?: true, parent: instance_double(PostgresResource, timeline: instance_double(PostgresTimeline, id: "rr-timeline-id")))
+      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::HETZNER_PROVIDER_NAME).at_least(:once)
+
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: "rr-timeline-id"))
       expect { nx.provision_servers }.to nap
     end
   end
@@ -149,15 +178,25 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.wait_for_maintenance_window }.to hop("recycle_representative_server")
     end
 
-    it "fences primary and hops to wait_fence_primary if in maintenance window and upgrading" do
+    it "fences primary and hops to wait_fence_primary if in maintenance window and upgrading for regular instances" do
       expect(postgres_resource).to receive(:in_maintenance_window?).and_return(true)
       expect(postgres_resource).to receive(:has_enough_fresh_servers?).and_return(true)
       expect(postgres_resource).to receive(:version).and_return("16")
       expect(postgres_resource).to receive(:target_version).and_return("17")
+      expect(postgres_resource).to receive(:read_replica?).and_return(false)
       primary = instance_double(PostgresServer, version: "16")
       expect(postgres_resource).to receive(:representative_server).and_return(primary)
       expect(primary).to receive(:incr_fence)
       expect { nx.wait_for_maintenance_window }.to hop("wait_fence_primary")
+    end
+
+    it "fences primary and hops to recycle_representative_server if in maintenance window and upgrading for read replicas" do
+      expect(postgres_resource).to receive(:in_maintenance_window?).and_return(true)
+      expect(postgres_resource).to receive(:has_enough_fresh_servers?).and_return(true)
+      expect(postgres_resource).to receive(:version).and_return("16")
+      expect(postgres_resource).to receive(:target_version).and_return("17")
+      expect(postgres_resource).to receive(:read_replica?).and_return(true)
+      expect { nx.wait_for_maintenance_window }.to hop("recycle_representative_server")
     end
 
     it "waits if not in maintenance window" do

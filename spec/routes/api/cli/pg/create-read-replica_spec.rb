@@ -16,7 +16,7 @@ RSpec.describe Clover, "cli pg create-read-replica" do
     expect(@project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
     expect(described_class).to receive(:authorized_project).with(@account, @project.id).and_return(@project)
     expect(@project).to receive(:quota_available?).and_return(true)
-    expect(pg.timeline).to receive(:earliest_restore_time).and_return(true)
+    expect(pg).to receive(:ready_for_read_replica?).and_return(true)
     body = cli(%w[pg eu-central-h1/test-pg create-read-replica test-pg-rr])
     pg = PostgresResource.first(name: "test-pg-rr")
     expect(pg.display_location).to eq "eu-central-h1"

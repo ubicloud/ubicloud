@@ -6,7 +6,10 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   subject_is :postgres_resource
 
   label def start
+    nap 60 if postgres_resource.read_replica? && !postgres_resource.parent.ready_for_read_replica?
+
     register_deadline("wait_for_maintenance_window", 2 * 60 * 60)
+
     hop_provision_servers
   end
 
@@ -30,7 +33,8 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
         end
       end
 
-      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: postgres_resource.timeline.id, timeline_access: "fetch", exclude_host_ids: exclude_host_ids, exclude_availability_zones: exclude_availability_zones, availability_zone: availability_zone)
+      timeline_id = postgres_resource.read_replica? ? postgres_resource.parent.timeline.id : postgres_resource.timeline.id
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access: "fetch", exclude_host_ids: exclude_host_ids, exclude_availability_zones: exclude_availability_zones, availability_zone: availability_zone)
     end
 
     nap 5
@@ -48,7 +52,10 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
 
     hop_provision_servers unless postgres_resource.has_enough_fresh_servers?
 
-    if postgres_resource.version != postgres_resource.target_version
+    # Read replicas skip the in-place upgrade process and directly
+    # recycle servers, which are provisioned at the target version instead of
+    # the current version.
+    if postgres_resource.version != postgres_resource.target_version && !postgres_resource.read_replica?
       postgres_resource.representative_server.incr_fence
       hop_wait_fence_primary
     end

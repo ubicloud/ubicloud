@@ -493,6 +493,7 @@ RSpec.describe Clover, "postgres" do
 
       it "can create a read replica of a PostgreSQL database" do
         pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
+        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
         visit "#{project.path}#{pg.path}/read-replica"
 
         fill_in "#{pg.name}-read-replica", with: "my-read-replica"
@@ -521,6 +522,7 @@ RSpec.describe Clover, "postgres" do
 
       it "can promote a read replica" do
         pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
+        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
         visit "#{project.path}#{pg.path}/read-replica"
 
         fill_in "#{pg.name}-read-replica", with: "my-read-replica"
@@ -538,6 +540,7 @@ RSpec.describe Clover, "postgres" do
 
       it "fails to promote if not a read replica" do
         pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
+        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
         visit "#{project.path}#{pg.path}/read-replica"
         expect(page).to have_content "Read Replicas"
 
