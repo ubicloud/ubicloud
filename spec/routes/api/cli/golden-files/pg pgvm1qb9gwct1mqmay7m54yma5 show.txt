@@ -12,7 +12,7 @@ ha_type: none
 flavor: standard
 connection_string: postgres://postgres:bar456FOO123@test-pg.pgvm1qb9gwct1mqmay7m54yma5.pg.example.com:5432/postgres?sslmode=require
 primary: true
-earliest_restore_time: 
+earliest_restore_time: 2025-11-21T10:27:32Z
 maintenance_window_start_at: 
 read_replica: false
 parent: 

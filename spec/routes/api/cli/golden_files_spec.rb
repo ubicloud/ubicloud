@@ -46,6 +46,10 @@ RSpec.describe Clover, "cli" do
     pg.pg_firewall_rules.find { it.ubid == "frpqgkgjd09y4pnjaq2pkeacam" }.update(description: "pg-fw-desc")
     pg.update(user_config: {allow_in_place_tablespaces: "on", max_connections: "1000"}, pgbouncer_user_config: {server_round_robin: "1", disable_pqexec: "1"})
     pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 64, disk_index: 0)
+    backup = Struct.new(:key, :last_modified)
+    expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
+    expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", Time.iso8601("2025-11-21T11:22:32+01:00"))])).at_least(:once)
+
     cli(%w[pg eu-central-h1/test-pg reset-superuser-password bar456FOO123])
     cli(%w[pg eu-central-h1/test-pg add-metric-destination foo bar https://baz.example.com])
     PrivateSubnet.first(name: "#{pg.ubid}-subnet").update(net4: "10.147.205.0/26", net6: "fdab:de77:9a94:fa70::/64")

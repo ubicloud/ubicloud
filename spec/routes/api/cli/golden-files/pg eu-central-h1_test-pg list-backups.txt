@@ -1,0 +1,2 @@
+key                                        last_modified            
+basebackups_005/backup_stop_sentinel.json  2025-11-21T11:22:32+01:00
