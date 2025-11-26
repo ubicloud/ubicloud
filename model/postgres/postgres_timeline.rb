@@ -100,7 +100,9 @@ PGHOST=/var/run/postgresql
     @blob_storage ||= if aws?
       S3BlobStorage.new("https://s3.#{location.name}.amazonaws.com")
     else
-      MinioCluster.first(project_id: Config.postgres_service_project_id, location_id: location.id) || MinioCluster.first(project_id: Config.minio_service_project_id, location_id: location.id)
+      DB.ignore_duplicate_queries do
+        MinioCluster[project_id: Config.postgres_service_project_id, location_id: location.id] || MinioCluster[project_id: Config.minio_service_project_id, location_id: location.id]
+      end
     end
   end
 
