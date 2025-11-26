@@ -64,8 +64,6 @@ module Prog::Ai; end
 
 module Prog::Aws; end
 
-module Prog::Aws::Vnet; end
-
 module Prog::Ubicloud; end
 
 module Prog::Ubicloud::Vnet; end
