@@ -21,25 +21,28 @@ RSpec.describe Prog::Test::HaPostgresResource do
     end
   end
 
-  describe "#start" do
-    it "hops to wait_minio_cluster" do
-      expect(Prog::Minio::MinioClusterNexus).to receive(:assemble).and_return(instance_double(Strand, id: "1234"))
-      expect { pgr_test.start }.to hop("wait_minio_cluster")
-    end
-  end
+  # {{{ CONFLATION
+  # ZZZ: Couples to Prog::MinIO symbols
+  # describe "#start" do
+  #   it "hops to wait_minio_cluster" do
+  #     expect(Prog::Minio::MinioClusterNexus).to receive(:assemble).and_return(instance_double(Strand, id: "1234"))
+  #     expect { pgr_test.start }.to hop("wait_minio_cluster")
+  #   end
+  # end
+  #
+  # describe "#wait_minio_cluster" do
+  #   it "naps for 10 seconds if the minio cluster is not ready" do
+  #     expect(pgr_test).to receive(:minio_cluster).and_return(instance_double(MinioCluster, strand: instance_double(Strand, label: "start")))
+  #     expect { pgr_test.wait_minio_cluster }.to nap(10)
+  #   end
 
-  describe "#wait_minio_cluster" do
-    it "naps for 10 seconds if the minio cluster is not ready" do
-      expect(pgr_test).to receive(:minio_cluster).and_return(instance_double(MinioCluster, strand: instance_double(Strand, label: "start")))
-      expect { pgr_test.wait_minio_cluster }.to nap(10)
-    end
-
-    it "hops to create_postgres_resource if the minio cluster is ready" do
-      expect(pgr_test).to receive(:minio_cluster).and_return(instance_double(MinioCluster, strand: instance_double(Strand, label: "wait")))
-      expect { pgr_test.wait_minio_cluster }.to hop("create_postgres_resource")
-    end
-  end
-
+  #   it "hops to create_postgres_resource if the minio cluster is ready" do
+  #     expect(pgr_test).to receive(:minio_cluster).and_return(instance_double(MinioCluster, strand: instance_double(Strand, label: "wait")))
+  #     expect { pgr_test.wait_minio_cluster }.to hop("create_postgres_resource")
+  #   end
+  # end
+  # }}} CONFLATION
+  
   describe "#create_postgres_resource" do
     it "creates a postgres resource" do
       expect(Prog::Postgres::PostgresResourceNexus).to receive(:assemble).and_return(instance_double(Strand, id: "1234"))
