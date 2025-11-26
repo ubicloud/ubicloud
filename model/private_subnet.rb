@@ -98,8 +98,8 @@ class PrivateSubnet < Sequel::Model
       random_offset = SecureRandom.random_number(total_hosts) + 4
     else
       # For bigger subnets like /16, use the full available range without subtracting reserved IPs.
-      total_hosts = 2**(cidr_size - net4.netmask.prefix_len)
-      random_offset = SecureRandom.random_number(total_hosts)
+      total_subnets = 2**(cidr_size - net4.netmask.prefix_len)
+      random_offset = SecureRandom.random_number(total_subnets)
     end
 
     addr = net4.nth_subnet(cidr_size, random_offset)

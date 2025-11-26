@@ -167,7 +167,6 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:prepare_gpus).with([], nil)
       expect(vs).to receive(:start_systemd_unit)
       expect(vs).to receive(:enable_bursting).with("some_slice.slice", 200)
-      expect(vs).to receive(:update_via_routes)
 
       vs.recreate_unpersisted(
         "gua", "ip4", "local_ip4", "nics", 4, false, "storage_params", "storage_secrets",
@@ -181,7 +180,6 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:storage).with("storage_params", "storage_secrets", false)
       expect(vs).to receive(:prepare_gpus).with(["dev"], 1)
       expect(vs).to receive(:start_systemd_unit)
-      expect(vs).to receive(:update_via_routes)
 
       vs.recreate_unpersisted(
         "gua", "ip4", "local_ip4", "nics", 4, false, "storage_params", "storage_secrets",

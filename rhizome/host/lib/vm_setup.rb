@@ -52,6 +52,26 @@ class VmSetup
     YAML.dump(s, line_width: -1)[4..-2]
   end
 
+  def needs_gateway?(net)
+    # we won't need a gateway for networks with /30, /31 or /32 prefix length
+    net.netmask.prefix_len < 30
+  end
+
+  def gateway_ip(net)
+    net.nth(1)
+  end
+
+  def target_ip(net)
+    # When CIDR is bigger, we deterministically pick the 4th index (The 5th IP)
+    # Index 0 = network address
+    # Index 1 = gateway
+    # Index 2 = reserved for future use
+    # Index 3 = reserved for future use
+    # Index 4 = first usable IP
+    # Check out model/private_subnet.rb random_private_ipv4 function for more info
+    needs_gateway?(net) ? net.nth(4) : net.nth(0)
+  end
+
   def vp
     @vp ||= VmPath.new(@vm_name)
   end
@@ -73,7 +93,6 @@ class VmSetup
     prepare_gpus(pci_devices, gpu_partition_id)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
     start_systemd_unit
-    update_via_routes(nics)
 
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
@@ -86,7 +105,6 @@ class VmSetup
     storage(storage_params, storage_secrets, false)
     prepare_gpus(pci_devices, gpu_partition_id)
     start_systemd_unit
-    update_via_routes(nics)
 
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
@@ -105,7 +123,6 @@ class VmSetup
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
-    update_via_routes(nics)
 
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
@@ -363,31 +380,11 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
       r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/vethi#{q_vm}/proxy_arp'"
       r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/#{nic.tap}/proxy_arp'"
-    end
-  end
 
-  def update_via_routes(nics)
-    return if NetAddr::IPv4Net.parse(nics.first.net4).netmask.prefix_len == 32
-
-    # we create tap devices in "interfaces" function in this file. but
-    # code execution happens faster than linux taking care of the device creation.
-    # that's why by the time we reach this function, we need to check whether the
-    # device is created or not and then proceed to modify the routes.
-    success = false
-    5.times do
-      if r("ip -n #{q_vm} link | grep -E '^[0-9]+: nc[^:]+:' | grep -q 'state UP' && echo UP || echo DOWN").chomp == "UP"
-        success = true
-        break
+      nic_net4 = NetAddr::IPv4Net.parse(nic.net4)
+      if needs_gateway?(nic_net4)
+        r "ip -n #{q_vm} addr replace #{gateway_ip(nic_net4)}/#{nic_net4.netmask.prefix_len} dev #{nic.tap}"
       end
-      sleep 0.5
-    end
-    unless success
-      raise "VM #{q_vm} tap device not ready after 5 retries."
-    end
-
-    nics.each do |nic|
-      local_ip4 = NetAddr::IPv4Net.parse(nic.net4)
-      r "ip -n #{q_vm} route replace #{local_ip4.to_s.shellescape} via #{local_ip4.nth(1).to_s.shellescape} dev #{nic.tap}" unless local_ip4.netmask.prefix_len == 32
     end
   end
 
@@ -401,8 +398,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     return unless ip4
 
     public_ipv4 = NetAddr::IPv4Net.parse(ip4).network.to_s
-    private_ipv4_addr = NetAddr::IPv4Net.parse(private_ip)
-    private_ipv4 = (private_ipv4_addr.netmask.prefix_len == 32) ? private_ipv4_addr.network.to_s : private_ipv4_addr.nth(1).to_s
+    private_ipv4 = target_ip(NetAddr::IPv4Net.parse(private_ip))
     <<~NAT4_RULES
     table ip nat {
       chain prerouting {
@@ -500,8 +496,12 @@ EOS
     private_ip_dhcp = nics.map do |nic|
       vm_sub_6 = NetAddr::IPv6Net.parse(nic.net6)
       vm_net4 = NetAddr::IPv4Net.parse(nic.net4)
-      vm_sub_4 = (vm_net4.netmask.prefix_len == 32) ? vm_net4.nth(0) : vm_net4.nth(1)
+      vm_sub_4 = target_ip(vm_net4)
+      conditional_gateway = if needs_gateway?(vm_net4)
+        "dhcp-option=3,#{gateway_ip(vm_net4)}"
+      end
       <<DHCP
+#{conditional_gateway}
 dhcp-range=#{nic.tap},#{vm_sub_4},#{vm_sub_4},6h
 dhcp-range=#{nic.tap},#{vm_sub_6.nth(2)},#{vm_sub_6.nth(2)},#{vm_sub_6.netmask.prefix_len}
 DHCP

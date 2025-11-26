@@ -257,7 +257,7 @@ RSpec.describe Vm do
 
       nic = instance_double(Nic, private_ipv4: NetAddr.parse_net("10.10.240.0/24"))
       expect(vm).to receive(:nics).and_return([nic])
-      expect(vm.private_ipv4.to_s).to eq("10.10.240.1")
+      expect(vm.private_ipv4.to_s).to eq("10.10.240.4")
     end
   end
 
