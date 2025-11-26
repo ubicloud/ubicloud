@@ -495,6 +495,7 @@ Post Commands:
     delete-firewall-rule               Delete a PostgreSQL firewall rule
     delete-metric-destination          Delete a PostgreSQL metric destination
     destroy                            Destroy a PostgreSQL database
+    list-backups                       List backups for a PostgreSQL database
     modify                             Modify a PostgreSQL database cluster
     modify-firewall-rule               Modify a PostgreSQL firewall rule
     pg_dump                            Dump a single PostgreSQL database using `pg_dump`
@@ -622,6 +623,15 @@ Usage:
 
 Options:
     -f, --force                      do not require confirmation
+
+
+List backups for a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) list-backups [options]
+
+Options:
+    -N, --no-headers                 do not show headers
 
 
 Modify a PostgreSQL firewall rule

@@ -102,6 +102,7 @@ pg eu-central-h1/test-pg add-metric-destination foo bar https://md.example.com
 pg eu-central-h1/test-pg delete-firewall-rule frpqgkgjd09y4pnjaq2pkeacam
 pg eu-central-h1/test-pg delete-metric-destination et2t1bswsqz21m7j7njfjbp901
 pg eu-central-h1/test-pg destroy -f
+pg eu-central-h1/test-pg list-backups
 pg eu-central-h1/test-pg reset-superuser-password foo123BAR456
 pg eu-central-h1/test-pg restart
 pg eu-central-h1/test-pg show

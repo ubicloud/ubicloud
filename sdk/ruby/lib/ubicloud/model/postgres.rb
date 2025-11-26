@@ -149,5 +149,9 @@ module Ubicloud
     def upgrade_status
       adapter.get(_path("/upgrade"))
     end
+
+    def backups
+      adapter.get(_path("/backup"))[:items]
+    end
   end
 end

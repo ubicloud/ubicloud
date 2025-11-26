@@ -62,6 +62,7 @@ ubi pg location/pg-name create [options]
 ubi pg (location/pg-name | pg-id) delete-firewall-rule rule-id
 ubi pg (location/pg-name | pg-id) delete-metric-destination md-id
 ubi pg (location/pg-name | pg-id) destroy [options]
+ubi pg (location/pg-name | pg-id) list-backups [options]
 ubi pg (location/pg-name | pg-id) modify-firewall-rule [options] rule-id
 ubi pg (location/pg-name | pg-id) modify [options]
 ubi pg (location/pg-name | pg-id) [options] pg_dump [pg_dump-options]
