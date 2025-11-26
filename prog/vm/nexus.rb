@@ -117,7 +117,7 @@ class Prog::Vm::Nexus < Prog::Base
       nic.update(vm_id: vm.id)
 
       if init_script && !init_script.empty?
-        VmInitScript.create_with_id(vm, script: init_script)
+        VmInitScript.create_with_id(vm, init_script:)
       end
 
       if vm_size.family == "standard-gpu"
