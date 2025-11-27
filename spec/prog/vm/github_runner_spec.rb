@@ -569,7 +569,6 @@ RSpec.describe Prog::Vm::GithubRunner do
         jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{runner.ubid}\\nLabel: ubicloud-standard-4\\nVM Family: standard\\nArch: x64\\nImage: github-ubuntu-2204\\nVM Host: #{vm.vm_host.ubid}\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: #{project.ubid}\\nConsole URL: http://localhost:9292/project/#{project.ubid}/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
         echo "UBICLOUD_RUNTIME_TOKEN=my_token
         UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment > /dev/null
-        echo "::notice::The default operating system for this runner has been changed to Ubuntu 24.04 on November 23, 2025. You can continue using Ubuntu 22.04 by explicitly specifying it. If you have any questions, feel free to reach out at support@ubicloud.com" | sudo -u runner tee /home/runner/actions-runner/.ubicloud_complete_message
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
@@ -587,23 +586,6 @@ RSpec.describe Prog::Vm::GithubRunner do
         echo "UBICLOUD_RUNTIME_TOKEN=my_token
         UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment > /dev/null
         echo "CUSTOM_ACTIONS_CACHE_URL=http://10.0.0.1:51123/random_token/" | sudo tee -a /etc/environment > /dev/null
-        echo "::notice::The default operating system for this runner has been changed to Ubuntu 24.04 on November 23, 2025. You can continue using Ubuntu 22.04 by explicitly specifying it. If you have any questions, feel free to reach out at support@ubicloud.com" | sudo -u runner tee /home/runner/actions-runner/.ubicloud_complete_message
-      COMMAND
-
-      expect { nx.setup_environment }.to hop("register_runner")
-    end
-
-    it "hops to register_runner without OS upgrade warning" do
-      expect(vm).to receive(:runtime_token).and_return("my_token")
-      installation.update(use_docker_mirror: false, cache_enabled: false)
-      runner.update(label: "ubicloud-standard-4-ubuntu-2204")
-      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND)
-        set -ueo pipefail
-        echo "image version: $ImageVersion"
-        sudo usermod -a -G sudo,adm runneradmin
-        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{runner.ubid}\\nLabel: ubicloud-standard-4-ubuntu-2204\\nVM Family: standard\\nArch: x64\\nImage: github-ubuntu-2204\\nVM Host: #{vm.vm_host.ubid}\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: #{project.ubid}\\nConsole URL: http://localhost:9292/project/#{project.ubid}/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
-        echo "UBICLOUD_RUNTIME_TOKEN=my_token
-        UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment > /dev/null
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
