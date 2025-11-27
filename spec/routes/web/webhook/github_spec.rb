@@ -99,7 +99,7 @@ RSpec.describe Clover, "github" do
     it "uses custom label if label is an existing custom label" do
       GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4")
       st = instance_double(Strand, id: runner.id)
-      expect(Prog::Vm::GithubRunner).to receive(:assemble).with(installation, repository_name: "my-repo", label: "ubicloud-standard-4", actual_label: "custom-label-1", default_branch: "main").and_return(st)
+      expect(Prog::Github::GithubRunnerNexus).to receive(:assemble).with(installation, repository_name: "my-repo", label: "ubicloud-standard-4", actual_label: "custom-label-1", default_branch: "main").and_return(st)
       send_webhook("workflow_job", workflow_job_payload(action: "queued", workflow_job: workflow_job_object(label: "custom-label-1")))
 
       expect(page.status_code).to eq(200)
@@ -108,7 +108,7 @@ RSpec.describe Clover, "github" do
 
     it "creates runner when receive queued action" do
       st = instance_double(Strand, id: runner.id)
-      expect(Prog::Vm::GithubRunner).to receive(:assemble).with(installation, repository_name: "my-repo", label: "ubicloud", actual_label: "ubicloud", default_branch: "main").and_return(st)
+      expect(Prog::Github::GithubRunnerNexus).to receive(:assemble).with(installation, repository_name: "my-repo", label: "ubicloud", actual_label: "ubicloud", default_branch: "main").and_return(st)
 
       send_webhook("workflow_job", workflow_job_payload(action: "queued"))
 
@@ -141,7 +141,7 @@ RSpec.describe Clover, "github" do
     end
 
     it "destroys runner when receive completed action" do
-      Strand.create_with_id(runner, prog: "Vm::GithubRunner", label: "start")
+      Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "start")
 
       send_webhook("workflow_job", workflow_job_payload(action: "completed", workflow_job: workflow_job_object(runner_id: runner.runner_id)))
 

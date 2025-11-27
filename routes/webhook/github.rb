@@ -76,7 +76,7 @@ class Clover
     end
 
     if data["action"] == "queued"
-      st = Prog::Vm::GithubRunner.assemble(
+      st = Prog::Github::GithubRunnerNexus.assemble(
         installation,
         repository_name:,
         label:,

@@ -36,7 +36,7 @@ RSpec.describe Page do
       expect(described_class.order(:tag).group_by_vm_host).to eq({nil => [p1, p2, p3], vmh.ubid => [p4, p5, p6]})
 
       gi = GithubInstallation.create(installation_id: 1, name: "t", type: "t")
-      gr = Prog::Vm::GithubRunner.assemble(gi, repository_name: "a", label: "ubicloud").subject
+      gr = Prog::Github::GithubRunnerNexus.assemble(gi, repository_name: "a", label: "ubicloud").subject
       p7 = described_class.create(tag: "g", details: {"related_resources" => [gr.ubid]})
       expect(described_class.order(:tag).group_by_vm_host).to eq({nil => [p1, p2, p3, p7], vmh.ubid => [p4, p5, p6]})
 
