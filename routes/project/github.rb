@@ -72,7 +72,7 @@ class Clover
       r.on web?, "runner" do
         r.get true do
           @runners = @installation.runners_dataset.eager(:vm).eager_graph(:strand)
-            .exclude(Sequel[:strand][:prog] => ["Vm::GithubRunner", "Github::GithubRunnerNexus"], Sequel[:strand][:label] => ["destroy", "wait_vm_destroy"])
+            .exclude(Sequel[:strand][:prog] => "Github::GithubRunnerNexus", Sequel[:strand][:label] => ["destroy", "wait_vm_destroy"])
             .reverse(Sequel[:github_runner][:created_at])
             .all
 
