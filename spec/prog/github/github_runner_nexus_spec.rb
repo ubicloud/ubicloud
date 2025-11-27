@@ -4,7 +4,7 @@ require_relative "../../model/spec_helper"
 require "netaddr"
 require "octokit"
 
-RSpec.describe Prog::Vm::GithubRunner do
+RSpec.describe Prog::Github::GithubRunnerNexus do
   subject(:nx) {
     described_class.new(runner.strand).tap { it.instance_variable_set(:@github_runner, runner) }
   }
@@ -16,7 +16,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     vm_id = create_vm(location_id: Location::GITHUB_RUNNERS_ID, project_id: runner_project.id, boot_image: "github-ubuntu-2204").id
     Sshable.create_with_id(vm_id)
     runner = GithubRunner.create(installation_id:, vm_id:, repository_name: "test-repo", label: "ubicloud-standard-4", actual_label: "ubicloud-standard-4", created_at: now, allocated_at: now + 10, ready_at: now + 20, workflow_job: {"id" => 123})
-    Strand.create_with_id(runner, prog: "Vm::GithubRunner", label: "start")
+    Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "start")
     runner
   end
   let(:vm) { runner.vm }

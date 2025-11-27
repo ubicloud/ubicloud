@@ -3,7 +3,7 @@
 require "forwardable"
 require "net/ssh"
 
-class Prog::Vm::GithubRunner < Prog::Base
+class Prog::Github::GithubRunnerNexus < Prog::Base
   subject_is :github_runner
 
   extend Forwardable
@@ -26,7 +26,7 @@ class Prog::Vm::GithubRunner < Prog::Base
         actual_label: actual_label || label
       )
 
-      Strand.create_with_id(github_runner, prog: "Vm::GithubRunner", label: "start")
+      Strand.create_with_id(github_runner, prog: "Github::GithubRunnerNexus", label: "start")
     end
   end
 

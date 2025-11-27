@@ -506,7 +506,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "do not upgrade to the premium runner if not allowed" do
       vm.location_id = Location::GITHUB_RUNNERS_ID
       installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: project.id, allocator_preferences: {"family_filter" => ["standard", "premium"]})
-      runner = Prog::Vm::GithubRunner.assemble(installation, repository_name: "ubicloud/test", label: "ubicloud-standard-2").subject.update(vm_id: vm.id)
+      runner = Prog::Github::GithubRunnerNexus.assemble(installation, repository_name: "ubicloud/test", label: "ubicloud-standard-2").subject.update(vm_id: vm.id)
       runner.incr_not_upgrade_premium
       expect(Scheduling::Allocator).to receive(:allocate).with(
         vm, storage_volumes,
