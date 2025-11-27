@@ -75,11 +75,11 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(github_repository.runners_dataset).to receive(:where).with(actual_label: "ubicloud-standard-8", workflow_job: nil).and_return([instance_double(GithubRunner)])
       expect(github_repository.runners_dataset).to receive(:where).with(actual_label: "custom-label-1", workflow_job: nil).and_return([instance_double(GithubRunner)])
       expect(github_repository.runners_dataset).to receive(:where).with(actual_label: "custom-label-2", workflow_job: nil).and_return([])
-      expect(Prog::Vm::GithubRunner).to receive(:assemble).with(github_repository.installation, repository_name: "ubicloud/ubicloud", label: "ubicloud", actual_label: "ubicloud").twice
-      expect(Prog::Vm::GithubRunner).to receive(:assemble).with(github_repository.installation, repository_name: "ubicloud/ubicloud", label: "ubicloud-standard-4", actual_label: "ubicloud-standard-4")
-      expect(Prog::Vm::GithubRunner).not_to receive(:assemble).with(github_repository.installation, repository_name: "ubicloud/ubicloud", label: "ubicloud-standard-8", actual_label: "ubicloud-standard-8")
-      expect(Prog::Vm::GithubRunner).not_to receive(:assemble).with(github_repository.installation, repository_name: "ubicloud/ubicloud", label: "ubicloud-standard-4", actual_label: "custom-label-1")
-      expect(Prog::Vm::GithubRunner).to receive(:assemble).with(github_repository.installation, repository_name: "ubicloud/ubicloud", label: "ubicloud-standard-8", actual_label: "custom-label-2")
+      expect(Prog::Github::GithubRunnerNexus).to receive(:assemble).with(github_repository.installation, repository_name: "ubicloud/ubicloud", label: "ubicloud", actual_label: "ubicloud").twice
+      expect(Prog::Github::GithubRunnerNexus).to receive(:assemble).with(github_repository.installation, repository_name: "ubicloud/ubicloud", label: "ubicloud-standard-4", actual_label: "ubicloud-standard-4")
+      expect(Prog::Github::GithubRunnerNexus).not_to receive(:assemble).with(github_repository.installation, repository_name: "ubicloud/ubicloud", label: "ubicloud-standard-8", actual_label: "ubicloud-standard-8")
+      expect(Prog::Github::GithubRunnerNexus).not_to receive(:assemble).with(github_repository.installation, repository_name: "ubicloud/ubicloud", label: "ubicloud-standard-4", actual_label: "custom-label-1")
+      expect(Prog::Github::GithubRunnerNexus).to receive(:assemble).with(github_repository.installation, repository_name: "ubicloud/ubicloud", label: "ubicloud-standard-8", actual_label: "custom-label-2")
       nx.check_queued_jobs
       expect(nx.polling_interval).to eq(5 * 60)
     end

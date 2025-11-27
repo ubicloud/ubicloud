@@ -200,8 +200,8 @@ RSpec.describe Clover, "github" do
     it "can list active runners" do
       now = Time.now
       expect(Time).to receive(:now).and_return(now).at_least(:once)
-      runner_deleted = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").update(label: "wait_vm_destroy")
-      runner_with_job = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud-standard-4-ubuntu-2404", repository_name: "my-repo").subject.update(
+      runner_deleted = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud", repository_name: "my-repo").update(label: "wait_vm_destroy")
+      runner_with_job = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud-standard-4-ubuntu-2404", repository_name: "my-repo").subject.update(
         created_at: now + 20,
         ready_at: now - 50,
         runner_id: 2,
@@ -215,9 +215,9 @@ RSpec.describe Clover, "github" do
           "started_at" => (now - 40).iso8601
         }
       )
-      runner_waiting_job = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject.update(ready_at: now - 400, created_at: now)
-      runner_not_created = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud-arm", repository_name: "my-repo").subject.update(created_at: now - 38)
-      runner_concurrency_limit = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud-gpu", repository_name: "my-repo").update(label: "wait_concurrency_limit").subject.update(created_at: now - 3.68 * 60 * 60)
+      runner_waiting_job = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject.update(ready_at: now - 400, created_at: now)
+      runner_not_created = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud-arm", repository_name: "my-repo").subject.update(created_at: now - 38)
+      runner_concurrency_limit = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud-gpu", repository_name: "my-repo").update(label: "wait_concurrency_limit").subject.update(created_at: now - 3.68 * 60 * 60)
 
       visit "#{project.path}/github/#{installation.ubid}/runner"
 
@@ -234,7 +234,7 @@ RSpec.describe Clover, "github" do
     end
 
     it "can terminate runner" do
-      runner = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject
+      runner = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject
 
       visit "#{project.path}/github/#{installation.ubid}/runner"
 
@@ -250,7 +250,7 @@ RSpec.describe Clover, "github" do
     end
 
     it "raises not found when runner not exists" do
-      runner = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject
+      runner = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject
       visit "#{project.path}/github/#{installation.ubid}/runner"
       runner.destroy
 
