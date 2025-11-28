@@ -310,7 +310,7 @@ RSpec.describe UBID do
 
   # useful for comparing objects having network values
   def string_kv(obj)
-    obj.to_hash.map { |k, v| [k.to_s, v.to_s] }.to_h
+    obj.to_hash.to_h { |k, v| [k.to_s, v.to_s] }
   end
 
   it "can decode ids" do

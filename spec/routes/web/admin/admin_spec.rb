@@ -4,7 +4,7 @@ require_relative "spec_helper"
 
 RSpec.describe CloverAdmin do
   def object_data
-    page.all(".object-table tbody tr").map { it.all("td").map(&:text) }.to_h.transform_keys(&:to_sym).except(:created_at)
+    page.all(".object-table tbody tr").to_h { it.all("td").map(&:text) }.transform_keys(&:to_sym).except(:created_at)
   end
 
   def page_data

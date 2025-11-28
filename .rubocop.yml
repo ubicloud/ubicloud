@@ -34,6 +34,9 @@ Rake:
 Sequel:
   Enabled: true
 
+Style/HashTransformKeys:
+  Enabled: true
+
 # Seems to be buggy and flags non-redundant line continuations as redundant
 Style/RedundantLineContinuation:
   Enabled: false
