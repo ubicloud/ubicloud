@@ -52,7 +52,8 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       end
       firewall.associate_with_private_subnet(ps, apply_firewalls: false)
 
-      Strand.create_with_id(id, prog: "Vnet::SubnetNexus", label: "start")
+      prog = location.aws? ? "Vnet::Aws::VpcNexus" : "Vnet::Ubicloud::SubnetNexus"
+      Strand.create_with_id(id, prog:, label: "start")
     end
   end
 
@@ -80,6 +81,18 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def wait
+    # :nocov:
+    when_migrate_set? do
+      if private_subnet.location.aws?
+        strand.update(prog: "Vnet::Aws::SubnetNexus", label: "wait")
+      else
+        strand.update(prog: "Vnet::Metal::SubnetNexus", label: "wait")
+      end
+      decr_migrate
+      nap 0
+    end
+    # :nocov:
+
     if private_subnet.location.aws?
       check_firewall_update
       private_subnet.semaphores.each(&:destroy)
