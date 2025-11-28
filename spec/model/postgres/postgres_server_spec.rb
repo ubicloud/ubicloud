@@ -4,85 +4,116 @@ require_relative "../spec_helper"
 
 RSpec.describe PostgresServer do
   subject(:postgres_server) {
-    described_class.new { it.id = "c068cac7-ed45-82db-bf38-a003582b36ee" }
-  }
-
-  let(:resource) {
-    instance_double(
-      PostgresResource,
-      representative_server: postgres_server,
-      identity: "pgubid.postgres.ubicloud.com",
-      ha_type: PostgresResource::HaType::NONE,
-      user_config: {},
-      pgbouncer_user_config: {},
-      location_id: "12b8ad7f-8178-4d27-a61d-e6dc396d69cc",
-      target_version: "16"
+    described_class.create(
+      timeline:, resource:, vm_id: vm.id, representative_at: Time.now,
+      synchronization_status: "ready", timeline_access: "push", version: "16"
     )
   }
 
-  let(:vm) {
-    instance_double(
-      Vm,
-      sshable: instance_double(Sshable),
-      vcpus: 4,
-      memory_gib: 8,
-      ip4: "1.2.3.4",
-      ip6: "fdfa:b5aa:14a3:4a3d::2",
-      private_subnets: [
-        instance_double(
-          PrivateSubnet,
-          net4: NetAddr::IPv4Net.parse("172.0.0.0/26"),
-          net6: NetAddr::IPv6Net.parse("fdfa:b5aa:14a3:4a3d::/64")
-        )
-      ],
-      nics: [
-        instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.70.205.205/32"))
-      ],
-      private_ipv4: NetAddr::IPv4Net.parse("10.70.205.205/32").network,
-      location: instance_double(Location, aws?: false)
+  let(:project) { Project.create(name: "postgres-server") }
+  let(:project_service) { Project.create(name: "postgres-service") }
+
+  let(:timeline) { PostgresTimeline.create(location:) }
+
+  let(:resource) {
+    PostgresResource.create(
+      name: "postgres-resource",
+      project:,
+      location:,
+      ha_type: PostgresResource::HaType::NONE,
+      user_config: {},
+      pgbouncer_user_config: {},
+      target_version: "16",
+      target_vm_size: "standard-2",
+      target_storage_size_gib: 64,
+      superuser_password: "super"
+    )
+  }
+
+  let(:private_subnet) {
+    PrivateSubnet.create(
+      name: "postgres-subnet", project:, location:,
+      net4: NetAddr::IPv4Net.parse("172.0.0.0/26"),
+      net6: NetAddr::IPv6Net.parse("fdfa:b5aa:14a3:4a3d::/64")
+    )
+  }
+
+  let(:vm) { create_hosted_vm(project, private_subnet, "dummy-vm") }
+
+  let(:location) {
+    Location.create(
+      name: "us-west-2",
+      project:,
+      display_name: "us-west-2",
+      ui_name: "us-west-2",
+      provider: "ubicloud",
+      visible: true
     )
   }
 
   before do
-    allow(postgres_server).to receive_messages(resource: resource, vm: vm, version: "16")
+    allow(Config).to receive(:postgres_service_project_id).and_return(project_service.id)
   end
 
   describe "#configure" do
     before do
-      allow(postgres_server).to receive_messages(timeline: instance_double(PostgresTimeline, blob_storage: "dummy-blob-storage", aws?: false), read_replica?: false)
-      allow(resource).to receive_messages(flavor: PostgresResource::Flavor::STANDARD, cert_auth_users: [])
+      resource.update(flavor: PostgresResource::Flavor::STANDARD, cert_auth_users: [])
+      MinioCluster.create(
+        project_id: Config.postgres_service_project_id, location:, name: "pgminio", admin_user: "root", admin_password: "root"
+      )
+    end
+
+    def create_standby_resource(suffix)
+      PostgresResource.create(
+        name: "postgres-standby-#{suffix}",
+        project:,
+        location:,
+        ha_type: PostgresResource::HaType::SYNC,
+        user_config: {},
+        pgbouncer_user_config: {},
+        target_version: "16",
+        target_vm_size: "standard-2",
+        target_storage_size_gib: 64,
+        superuser_password: "super"
+      )
     end
 
     it "does not set archival related configs if blob storage is not configured" do
-      expect(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, blob_storage: nil))
+      allow(Config).to receive(:postgres_service_project_id).and_return(nil)
       expect(postgres_server.configure_hash[:configs]).not_to include(:archive_mode, :archive_timeout, :archive_command, :synchronous_standby_names, :primary_conninfo, :recovery_target_time, :restore_command)
     end
 
     it "sets configs that are specific to primary" do
-      postgres_server.timeline_access = "push"
       expect(postgres_server.configure_hash[:configs]).to include(:archive_mode, :archive_timeout, :archive_command)
     end
 
     it "sets synchronous_standby_names for sync replication mode" do
-      postgres_server.timeline_access = "push"
-      expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
-      expect(resource).to receive(:servers).and_return([
-        postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", standby?: true, synchronization_status: "catching_up"),
-        instance_double(described_class, ubid: "pgubidstandby2", standby?: true, synchronization_status: "ready")
-      ])
+      postgres_server
+      resource.update(ha_type: PostgresResource::HaType::SYNC)
 
-      expect(postgres_server.configure_hash[:configs]).to include(synchronous_standby_names: "'ANY 1 (pgubidstandby2)'")
+      described_class.create(
+        timeline:, resource_id: resource.id, vm_id: create_hosted_vm(project, private_subnet, "standby1").id,
+        synchronization_status: "catching_up", timeline_access: "fetch", version: "16"
+      )
+      standby2 = described_class.create(
+        timeline:, resource_id: resource.id, vm_id: create_hosted_vm(project, private_subnet, "standby2").id,
+        synchronization_status: "ready", timeline_access: "fetch", version: "16"
+      )
+
+      expect(postgres_server.configure_hash[:configs]).to include(synchronous_standby_names: "'ANY 1 (#{standby2.ubid})'")
     end
 
     it "sets synchronous_standby_names as empty if there is no caught up standby" do
-      postgres_server.timeline_access = "push"
-      expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
-      expect(resource).to receive(:servers).and_return([
-        postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", standby?: true, synchronization_status: "catching_up"),
-        instance_double(described_class, ubid: "pgubidstandby2", standby?: true, synchronization_status: "catching_up")
-      ])
+      resource.update(ha_type: PostgresResource::HaType::SYNC)
+
+      described_class.create(
+        timeline:, resource: create_standby_resource("1"), vm_id: create_hosted_vm(project, private_subnet, "standby1").id, representative_at: Time.now,
+        synchronization_status: "catching_up", timeline_access: "fetch", version: "16"
+      )
+      described_class.create(
+        timeline:, resource: create_standby_resource("2"), vm_id: create_hosted_vm(project, private_subnet, "standby2").id, representative_at: Time.now,
+        synchronization_status: "catching_up", timeline_access: "fetch", version: "16"
+      )
 
       expect(postgres_server.configure_hash[:configs]).not_to include(:synchronous_standby_names)
     end
@@ -95,7 +126,7 @@ RSpec.describe PostgresServer do
     end
 
     it "sets configs that are specific to restoring servers" do
-      postgres_server.timeline_access = "fetch"
+      postgres_server.update(timeline_access: "fetch")
       expect(resource).to receive(:restore_target)
       expect(postgres_server.configure_hash[:configs]).to include(:recovery_target_time, :restore_command)
     end
@@ -113,7 +144,7 @@ RSpec.describe PostgresServer do
     end
 
     it "puts extra logging options for AWS" do
-      expect(postgres_server.timeline).to receive(:aws?).and_return(true)
+      location.update(provider: "aws")
       postgres_server.timeline_access = "push"
       expect(postgres_server.configure_hash[:configs]).to include(:log_line_prefix, :log_connections, :log_disconnections)
     end
@@ -134,8 +165,10 @@ RSpec.describe PostgresServer do
     end
 
     it "returns true only when failover is successfully triggered" do
-      standby = instance_double(described_class)
-      expect(postgres_server).to receive(:representative_at).and_return(Time.now)
+      standby = described_class.create(
+        timeline:, resource_id: resource.id, vm_id: create_hosted_vm(project, private_subnet, "standby").id,
+        synchronization_status: "ready", timeline_access: "fetch", version: "16"
+      )
       expect(postgres_server).to receive(:failover_target).and_return(standby)
       expect(standby).to receive(:incr_planned_take_over)
       expect(postgres_server.trigger_failover(mode: "planned")).to be true
@@ -239,60 +272,76 @@ RSpec.describe PostgresServer do
 
   describe "storage_size_gib" do
     it "returns the storage size in GiB" do
-      volume_dataset = instance_double(Sequel::Dataset)
-      expect(volume_dataset).to receive(:reject).and_return([instance_double(VmStorageVolume, boot: false, size_gib: 64)])
-      expect(vm).to receive(:vm_storage_volumes).and_return(volume_dataset)
+      VmStorageVolume.create(vm:, disk_index: 0, boot: false, size_gib: 64)
       expect(postgres_server.storage_size_gib).to eq(64)
     end
 
     it "returns nil if there is no storage volume" do
-      volume_dataset = instance_double(Sequel::Dataset)
-      expect(volume_dataset).to receive(:reject).and_return([])
-      expect(vm).to receive(:vm_storage_volumes).and_return(volume_dataset)
       expect(postgres_server.storage_size_gib).to be_zero
     end
   end
 
   describe "lsn_caught_up" do
-    let(:parent_resource) {
-      instance_double(PostgresResource, representative_server: instance_double(described_class, current_lsn: "F/F"))
-    }
-
     before do
-      allow(resource).to receive(:parent).and_return(parent_resource)
+      parent_resource = PostgresResource.create(
+        project:,
+        name: "postgres-resource-parent",
+        ha_type: PostgresResource::HaType::NONE,
+        user_config: {},
+        pgbouncer_user_config: {},
+        location:,
+        target_version: "16",
+        target_vm_size: "standard-2",
+        target_storage_size_gib: 64,
+        superuser_password: "super"
+      )
+      parent_vm = create_hosted_vm(project, private_subnet, "parent-vm")
+      described_class.create(
+        timeline:, resource: parent_resource, vm_id: parent_vm.id, representative_at: Time.now,
+        synchronization_status: "ready", timeline_access: "push", version: "16"
+      )
+
+      resource.update(parent: parent_resource)
+      postgres_server.update(timeline_access: "fetch")
+      allow(resource.parent.representative_server).to receive(:current_lsn).and_return("F/F")
     end
 
     it "returns true if the diff is less than 80MB" do
-      expect(postgres_server).to receive(:read_replica?).and_return(true)
       expect(postgres_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
       expect(postgres_server.lsn_caught_up).to be_truthy
     end
 
     it "returns true if read replica and the parent representative server is nil" do
-      expect(postgres_server).to receive(:read_replica?).and_return(true)
-      expect(parent_resource).to receive(:representative_server).and_return(nil)
-      expect(postgres_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F").twice
+      postgres_server.resource.representative_server.update(representative_at: nil)
+      postgres_server.resource.update(restore_target: Time.now)
+      expect(postgres_server.resource.representative_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
+      expect(postgres_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
       expect(postgres_server.lsn_caught_up).to be_truthy
     end
 
     it "returns true if read replica and the parent is nil" do
-      expect(postgres_server).to receive(:read_replica?).and_return(true)
-      expect(postgres_server.resource).to receive(:parent).and_return(nil)
-      expect(postgres_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F").twice
-      expect(postgres_server.lsn_caught_up).to be_truthy
+      postgres_server.resource.update(parent_id: PostgresResource.generate_ubid.to_uuid)
+      expect(postgres_server.read_replica?).to be(true)
+      expect(postgres_server.lsn_caught_up).to be(true)
     end
 
-    it "returns false if the diff is less than 80MB" do
-      expect(postgres_server).to receive(:read_replica?).and_return(true)
+    it "returns false if the diff is more than 80MB" do
       expect(postgres_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("1/00000000")
       expect(postgres_server.lsn_caught_up).to be_falsey
     end
 
     it "returns true if the diff is less than 80MB for not read replica and uses the main representative server" do
       expect(postgres_server).to receive(:read_replica?).and_return(false)
-      expect(resource).to receive(:representative_server).and_return(postgres_server)
-      expect(postgres_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F", "F/F")
+      resource.update(restore_target: Time.now)
+      expect(postgres_server.resource.representative_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
+      expect(postgres_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
       expect(postgres_server.lsn_caught_up).to be_truthy
+    end
+
+    it "returns true when no representative server" do
+      expect(postgres_server).to receive(:read_replica?).and_return(false)
+      postgres_server.update(representative_at: nil)
+      expect(postgres_server.lsn_caught_up).to be(true)
     end
   end
 
@@ -403,15 +452,19 @@ RSpec.describe PostgresServer do
   end
 
   it "returns the right storage_device_paths for AWS" do
-    expect(postgres_server.vm.location).to receive(:aws?).and_return(true)
-    expect(postgres_server.vm).to receive(:vm_storage_volumes).and_return([instance_double(VmStorageVolume, boot: true, device_path: "/dev/vda"), instance_double(VmStorageVolume, boot: false, device_path: "/dev/nvme1n1"), instance_double(VmStorageVolume, boot: false, device_path: "/dev/nvme2n1")])
+    vm # load before setting aws provider so test controls VmStorageVolume setup
+    location.update(provider: "aws")
+    VmStorageVolume.create(vm:, disk_index: 0, boot: true, size_gib: 64)
+    VmStorageVolume.create(vm:, disk_index: 1, boot: false, size_gib: 1024)
+    VmStorageVolume.create(vm:, disk_index: 2, boot: false, size_gib: 1024)
     expect(postgres_server.vm.sshable).to receive(:cmd).with("lsblk -b -d -o NAME,SIZE | sort -n -k2 | tail -n2 |  awk '{print \"/dev/\"$1}'").and_return("/dev/nvme1n1\n/dev/nvme2n1\n")
     expect(postgres_server.storage_device_paths).to eq(["/dev/nvme1n1", "/dev/nvme2n1"])
   end
 
   it "returns the right storage_device_paths for Hetzner" do
-    expect(postgres_server.vm).to receive(:vm_storage_volumes).and_return([instance_double(VmStorageVolume, boot: false, device_path: "/dev/vdb")])
-    expect(postgres_server.storage_device_paths).to eq(["/dev/vdb"])
+    VmStorageVolume.create(vm:, disk_index: 0, boot: true, size_gib: 64)
+    vsv = VmStorageVolume.create(vm:, disk_index: 1, boot: false, size_gib: 1024)
+    expect(postgres_server.storage_device_paths).to eq([vsv.device_path.shellescape])
   end
 
   describe "#taking_over?" do
@@ -428,7 +481,6 @@ RSpec.describe PostgresServer do
 
   describe "#switch_to_new_timeline" do
     it "switches to new timeline with current parent" do
-      expect(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, id: "12b8ad7f-8178-4d27-a61d-e6dc396d69cc"))
       expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(PostgresTimeline, id: "1ff21ff9-7534-4d28-820b-1da97199e39e"))
       expect(postgres_server).to receive(:update).with(timeline_id: "1ff21ff9-7534-4d28-820b-1da97199e39e", timeline_access: "push")
       expect(postgres_server).to receive(:refresh_walg_credentials)
@@ -445,26 +497,25 @@ RSpec.describe PostgresServer do
 
   describe "#refresh_walg_credentials" do
     it "does nothing if timeline has no blob storage" do
-      expect(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, blob_storage: nil))
+      expect(postgres_server.timeline.blob_storage).to be_nil
       expect(vm.sshable).not_to receive(:cmd)
       expect { postgres_server.refresh_walg_credentials }.not_to raise_error
     end
 
     it "refreshes walg credentials if timeline has blob storage not on aws" do
-      timeline = instance_double(PostgresTimeline, blob_storage: instance_double(MinioCluster, root_certs: "root_certs"), aws?: false)
-      expect(postgres_server).to receive(:timeline).at_least(:once).and_return(timeline)
+      expect(timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, root_certs: "root_certs")).at_least(:once)
       expect(timeline).to receive(:generate_walg_config).and_return("walg_config")
-      expect(vm.sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
-      expect(vm.sshable).to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
+      expect(postgres_server.vm.sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
+      expect(postgres_server.vm.sshable).to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
       expect { postgres_server.refresh_walg_credentials }.not_to raise_error
     end
 
     it "refreshes walg credentials if timeline has blob storage on aws" do
-      timeline = instance_double(PostgresTimeline, blob_storage: instance_double(MinioCluster, root_certs: "root_certs"), aws?: true)
-      expect(postgres_server).to receive(:timeline).at_least(:once).and_return(timeline)
+      location.update(provider: "aws")
+      expect(timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, root_certs: "root_certs")).at_least(:once)
       expect(timeline).to receive(:generate_walg_config).and_return("walg_config")
-      expect(vm.sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
-      expect(vm.sshable).not_to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
+      expect(postgres_server.vm.sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
+      expect(postgres_server.vm.sshable).not_to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
       expect { postgres_server.refresh_walg_credentials }.not_to raise_error
     end
   end

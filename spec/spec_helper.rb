@@ -272,6 +272,13 @@ RSpec.configure do |config|
       Vm.create(**args)
     end
 
+    def create_hosted_vm(project, private_subnet, name)
+      Prog::Vm::Nexus.assemble_with_sshable(
+        project.id, name:, private_subnet_id: private_subnet.id,
+        location_id: location.id, unix_user: "ubi"
+      ).subject
+    end
+
     def create_vm_from_size(size, arch, **args)
       vm_size = Validation.validate_vm_size(size, arch)
       args_from_size = {
