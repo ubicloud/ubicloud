@@ -11,7 +11,7 @@ class Prog::Vnet::Aws::UpdateFirewallRules < Prog::Base
     rules = vm.firewall_rules
     rules.select(&:port_range).map! do |rule|
       perm = {
-        ip_protocol: "tcp",
+        ip_protocol: rule.protocol,
         from_port: rule.port_range.begin,
         to_port: rule.port_range.end - 1
       }
@@ -45,20 +45,18 @@ class Prog::Vnet::Aws::UpdateFirewallRules < Prog::Base
 
     # Remove existing rules that aren't in our current rules list
     permissions_to_revoke = security_group.ip_permissions.filter_map do |permission|
-      next unless permission.ip_protocol == "tcp"
-
       ip_ranges_to_revoke = permission.ip_ranges.select do |ip_range|
-        ip4_rules.none? { |r| r.cidr.to_s == ip_range.cidr_ip && r.port_range.begin == permission.from_port && r.port_range.end - 1 == permission.to_port }
+        ip4_rules.none? { |r| r.protocol == permission.ip_protocol && r.cidr.to_s == ip_range.cidr_ip && r.port_range.begin == permission.from_port && r.port_range.end - 1 == permission.to_port }
       end
 
       ipv_6_ranges_to_revoke = permission.ipv_6_ranges.select do |ip_range|
-        ip6_rules.none? { |r| r.cidr.to_s == ip_range.cidr_ipv_6 && r.port_range.begin == permission.from_port && r.port_range.end - 1 == permission.to_port }
+        ip6_rules.none? { |r| r.protocol == permission.ip_protocol && r.cidr.to_s == ip_range.cidr_ipv_6 && r.port_range.begin == permission.from_port && r.port_range.end - 1 == permission.to_port }
       end
 
       next if ip_ranges_to_revoke.empty? && ipv_6_ranges_to_revoke.empty?
 
       perm = {
-        ip_protocol: "tcp",
+        ip_protocol: permission.ip_protocol,
         from_port: permission.from_port,
         to_port: permission.to_port
       }
