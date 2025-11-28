@@ -111,10 +111,20 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
       expect { prog.start }.to nap(5)
     end
 
-    it "hops to prepare when VM is ready" do
+    it "hops to prepare when VM is ready but not on AWS" do
+      expect(prog.vm.location).to receive(:aws?).and_return(false)
       prog.vm.strand.update(label: "wait")
       expect(prog.strand.stack.first["deadline_at"]).to be_nil
       expect { prog.start }.to hop("prepare")
+      expect(prog.strand.stack.first["deadline_at"]).not_to be_nil
+    end
+
+    it "configures firewall when AWS VM is ready" do
+      expect(prog.vm.location).to receive(:aws?).and_return(true)
+      prog.vm.strand.update(label: "wait")
+      expect(prog.strand.stack.first["deadline_at"]).to be_nil
+      expect { prog.start }.to hop("prepare")
+      expect(prog.vm.firewall_rules.filter { it.protocol == "udp" }.length).to eq(2)
       expect(prog.strand.stack.first["deadline_at"]).not_to be_nil
     end
   end
