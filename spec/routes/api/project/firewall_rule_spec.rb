@@ -56,7 +56,7 @@ RSpec.describe Clover, "firewall" do
         port_range: "80..5432"
       }.to_json
 
-      expect(last_response).to have_api_error(400, "cidr and port_range and firewall_id is already taken")
+      expect(last_response).to have_api_error(400, "cidr and port_range and firewall_id and protocol is already taken")
     end
 
     it "firewall rule no port range" do
