@@ -39,8 +39,8 @@ class Clover
     pgbouncer_errors = pgbouncer_validator.validation_errors(pgbouncer_user_config)
 
     if pg_errors.any? || pgbouncer_errors.any?
-      pg_errors = pg_errors.map { |key, value| ["pg_config.#{key}", value] }.to_h
-      pgbouncer_errors = pgbouncer_errors.map { |key, value| ["pgbouncer_config.#{key}", value] }.to_h
+      pg_errors = pg_errors.transform_keys { |key| "pg_config.#{key}" }
+      pgbouncer_errors = pgbouncer_errors.transform_keys { |key| "pgbouncer_config.#{key}" }
       raise Validation::ValidationFailed.new(pg_errors.merge(pgbouncer_errors))
     end
 

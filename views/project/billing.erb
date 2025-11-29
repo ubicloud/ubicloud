@@ -85,9 +85,7 @@ end
                         .all
                         .reject { Config.sanctioned_countries.include?(it.alpha2) }
                         .sort_by(&:common_name)
-                        .map { |c| [c.alpha2, c.common_name] }
-                        .to_h
-                        .to_a,
+                        .map { |c| [c.alpha2, c.common_name] },
                     attributes: {
                       required: true
                     }
