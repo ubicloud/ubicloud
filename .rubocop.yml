@@ -108,3 +108,6 @@ RSpec/IndexedLet:
 
 RSpec/NestedGroups:
   Enabled: false
+
+RSpec/LeakyLocalVariable:
+  Enabled: false
