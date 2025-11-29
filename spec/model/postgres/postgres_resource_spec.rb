@@ -182,6 +182,30 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.display_state).to eq("unavailable")
     end
 
+    it "returns 'restoring_backup' when representative server's strand label is 'initialize_database_from_backup'" do
+      expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait")).at_least(:once)
+      expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "initialize_database_from_backup"))).at_least(:once)
+      expect(postgres_resource.display_state).to eq("restoring_backup")
+    end
+
+    it "returns 'replaying_wal' when representative server's strand label is 'wait_catch_up'" do
+      expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait")).at_least(:once)
+      expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "wait_catch_up"))).at_least(:once)
+      expect(postgres_resource.display_state).to eq("replaying_wal")
+    end
+
+    it "returns 'replaying_wal' when representative server's strand label is 'wait_synchronization'" do
+      expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait")).at_least(:once)
+      expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "wait_synchronization"))).at_least(:once)
+      expect(postgres_resource.display_state).to eq("replaying_wal")
+    end
+
+    it "returns 'finalizing_restore' when representative server's strand label is 'wait_recovery_completion'" do
+      expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait")).at_least(:once)
+      expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "wait_recovery_completion"))).at_least(:once)
+      expect(postgres_resource.display_state).to eq("finalizing_restore")
+    end
+
     it "returns 'running' when strand label is 'wait' and has no children" do
       expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait", children: [])).at_least(:once)
       expect(postgres_resource.display_state).to eq("running")
