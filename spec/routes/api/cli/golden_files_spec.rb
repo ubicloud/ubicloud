@@ -4,6 +4,10 @@ require_relative "spec_helper"
 require "open3"
 
 RSpec.describe Clover, "cli" do
+  let(:now) { Time.utc(2025, 11, 21, 15, 22, 32) }
+
+  before { allow(Time).to receive(:now).and_return(now) }
+
   it "produces expected output for commands" do
     golden_file_dir = "spec/routes/api/cli/golden-files"
     output_dir = "spec/routes/api/cli/spec-output-files"
@@ -48,7 +52,7 @@ RSpec.describe Clover, "cli" do
     pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 64, disk_index: 0)
     backup = Struct.new(:key, :last_modified)
     expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
-    expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", Time.iso8601("2025-11-21T11:22:32+01:00"))])).at_least(:once)
+    expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", now - 5 * 60 * 60)])).at_least(:once)
 
     cli(%w[pg eu-central-h1/test-pg reset-superuser-password bar456FOO123])
     cli(%w[pg eu-central-h1/test-pg add-metric-destination foo bar https://baz.example.com])
