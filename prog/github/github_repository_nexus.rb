@@ -74,7 +74,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
       Clog.emit("extra runner needed") { {needed_extra_runner: {repository_name: github_repository.name, label: label, actual_label: actual_label, count: required_runner_count}} }
 
       required_runner_count.times do
-        Prog::Vm::GithubRunner.assemble(
+        Prog::Github::GithubRunnerNexus.assemble(
           github_repository.installation,
           repository_name: github_repository.name,
           label:,

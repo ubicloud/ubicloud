@@ -58,7 +58,7 @@ class GithubRunner < Sequel::Model
   end
 
   def provision_spare_runner
-    Prog::Vm::GithubRunner.assemble(installation, repository_name: repository_name, label: label).subject
+    Prog::Github::GithubRunnerNexus.assemble(installation, repository_name: repository_name, label: label).subject
   end
 
   def init_health_monitor_session

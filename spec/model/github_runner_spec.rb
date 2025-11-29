@@ -88,7 +88,7 @@ RSpec.describe GithubRunner do
   end
 
   it "provisions a spare runner" do
-    expect(Prog::Vm::GithubRunner).to receive(:assemble)
+    expect(Prog::Github::GithubRunnerNexus).to receive(:assemble)
       .with(github_runner.installation, repository_name: github_runner.repository_name, label: github_runner.label)
       .and_return(instance_double(Strand, subject: instance_double(described_class)))
     github_runner.provision_spare_runner
