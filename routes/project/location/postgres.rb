@@ -391,7 +391,7 @@ class Clover
         backups = pg.timeline.backups.map do |backup|
           {
             key: backup.key,
-            last_modified: backup.last_modified.iso8601
+            last_modified: backup.last_modified.utc.iso8601
           }
         end
 
