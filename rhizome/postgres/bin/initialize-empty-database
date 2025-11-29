@@ -12,7 +12,6 @@ v = ARGV[0]
 
 pg_setup = PostgresSetup.new(v)
 pg_setup.install_packages
-pg_setup.configure_memory_overcommit
 pg_setup.setup_data_directory
 pg_setup.create_cluster
 

@@ -13,7 +13,6 @@ backup_label = ARGV[1]
 
 pg_setup = PostgresSetup.new(v)
 pg_setup.install_packages
-pg_setup.configure_memory_overcommit
 pg_setup.setup_data_directory
 
 r "sudo -u postgres wal-g backup-fetch /dat/#{v}/data #{backup_label} --config /etc/postgresql/wal-g.env"

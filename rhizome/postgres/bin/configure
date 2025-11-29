@@ -110,13 +110,13 @@ PG_IDENT
 safe_write_to_file("/etc/postgresql/#{v}/main/pg_ident.conf", pg_ident_entries)
 
 # Create drop-in directory for postgresql@.service to override
-# the default systemd service file with a custom ExecStartPre to configure hugepages.
+# the default systemd service file with a custom ExecStartPre to configure virtual memory settings.
 r "mkdir -p /etc/systemd/system/postgresql@.service.d"
-execstartpre_hugepages_conf = <<-HUGEPAGES_CONF
+execstartpre_vm_conf = <<-VM_CONF
 [Service]
-ExecStartPre=/home/ubi/postgres/bin/configure-hugepages %i
-HUGEPAGES_CONF
-safe_write_to_file("/etc/systemd/system/postgresql@.service.d/hugepages.conf", execstartpre_hugepages_conf)
+ExecStartPre=/home/ubi/postgres/bin/configure-vmem %i
+VM_CONF
+safe_write_to_file("/etc/systemd/system/postgresql@.service.d/vmem.conf", execstartpre_vm_conf)
 
 # Reload the postmaster to apply changes
 r "pg_ctlcluster #{v} main reload || pg_ctlcluster #{v} main restart"
