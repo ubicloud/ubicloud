@@ -367,6 +367,13 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         expect { nx.wait_concurrency_limit }.to nap
       end
 
+      it "waits if reputation is limited" do
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        VmHost[arch: "x64", family: "standard"].update(used_cores: 8)
+        project.update(reputation: "limited")
+        expect { nx.wait_concurrency_limit }.to nap
+      end
+
       it "waits if utilization is high and spill over enabled but not waited enough" do
         expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
         project.set_ff_spill_to_alien_runners(true)
