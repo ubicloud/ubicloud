@@ -360,11 +360,11 @@ GEM
     sawyer (0.9.3)
       addressable (>= 2.3.5)
       faraday (>= 0.17.3, < 3)
-    sequel (5.98.0)
+    sequel (5.99.0)
       bigdecimal
     sequel-annotate (1.7.0)
       sequel (>= 4)
-    sequel_pg (1.17.2)
+    sequel_pg (1.18.0)
       pg (>= 0.18.0, != 1.2.0)
       sequel (>= 4.38.0)
     shellwords (0.2.2)
