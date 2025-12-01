@@ -118,7 +118,20 @@ class Prog::Vm::Nexus < Prog::Base
       prog = if location.aws?
         disk_index = 0
         storage_volumes.each do |volume|
-          max_disk_size = (vm_size.family == "i8g") ? 3750.0 : 1900.0
+          max_disk_size =
+            case vm_size.family
+            when "i8ge", "i7ie"
+              case vm_size.vcpus
+              when 2, 4, 8
+                2500.0
+              else
+                7500.0
+              end
+            when "i8g", "i7i"
+              3750.0
+            else
+              1900.0
+            end
           disk_count = (volume[:size_gib] / max_disk_size).ceil
 
           disk_count.times do
