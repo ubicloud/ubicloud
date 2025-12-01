@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "net/ssh"
+require_relative "../../lib/net_ssh"
 
 class Prog::Test::VmGroup < Prog::Test::Base
   def self.assemble(boot_images:, storage_encrypted: true, test_reboot: true, test_slices: false, verify_host_capacity: true)

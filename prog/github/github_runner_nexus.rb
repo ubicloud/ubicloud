@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require "forwardable"
-require "net/ssh"
+require_relative "../../lib/net_ssh"
 
 class Prog::Github::GithubRunnerNexus < Prog::Base
   subject_is :github_runner
