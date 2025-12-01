@@ -8,6 +8,8 @@ class Clover
 
     # getCacheEntry
     r.get "cache" do
+      next 204 unless repository.access_key
+
       keys, version = typecast_params.nonempty_str!(%w[keys version])
       keys = keys.split(",")
 
@@ -165,6 +167,8 @@ class Clover
 
       # commitCache
       r.post "commit" do
+        next 204 unless repository.access_key
+
         etags = typecast_params.array!(:nonempty_str, "etags")
         upload_id = typecast_params.nonempty_str!("uploadId")
         size = typecast_params.pos_int!("size")
