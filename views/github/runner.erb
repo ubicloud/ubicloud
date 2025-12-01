@@ -4,6 +4,15 @@
 
 <%== render("github/tabbar") %>
 
+<% if @installation.project.reputation == "limited" && !@installation.project.quota_available?("GithubRunnerVCpu", 0) %>
+  <div class="mb-3 -mt-2 rounded-md bg-red-50 p-4 flex items-center gap-3">
+    <%== part("components/icon", name: "hero-squares-plus", classes: "h-5 w-5 text-red-400") %>
+    <h3 class="text-sm font-medium text-red-800">
+      You've reached your vCPU concurrency limit. If you need higher limits, please contact our support team at support@ubicloud.com
+    </h3>
+  </div>
+<% end %>
+
 <div class="grid gap-6">
   <%
     free_upgrade_badge = if @installation.free_runner_upgrade?
