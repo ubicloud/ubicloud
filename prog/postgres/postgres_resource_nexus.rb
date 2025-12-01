@@ -203,7 +203,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
           project_id: postgres_resource.project_id,
           resource_id: postgres_resource.id,
           resource_name: postgres_resource.name,
-          billing_rate_id: BillingRate.from_resource_properties(brp[:resource_type], brp[:resource_family], Location[postgres_resource.location_id].name)["id"],
+          billing_rate_id: BillingRate.from_resource_properties(brp[:resource_type], brp[:resource_family], postgres_resource.location.name, postgres_resource.location.byoc)["id"],
           amount: brp[:amount]
         )
       end
