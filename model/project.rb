@@ -222,13 +222,14 @@ end
 #  created_at      | timestamp with time zone | NOT NULL DEFAULT now()
 #  feature_flags   | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 #  billable        | boolean                  | NOT NULL DEFAULT true
-#  reputation      | project_reputation       | NOT NULL DEFAULT 'new'::project_reputation
+#  reputation      | text                     | NOT NULL DEFAULT 'new'::text
 # Indexes:
 #  project_pkey                      | PRIMARY KEY btree (id)
 #  project_right(id::text, 10)_index | UNIQUE btree ("right"(id::text, 10))
 # Check constraints:
 #  max_discount_amount | (discount <= 100)
 #  min_credit_amount   | (credit >= 0::numeric)
+#  reputation_check    | (reputation = ANY (ARRAY['new'::text, 'verified'::text, 'limited'::text]))
 # Foreign key constraints:
 #  project_billing_info_id_fkey | (billing_info_id) REFERENCES billing_info(id)
 # Referenced By:
