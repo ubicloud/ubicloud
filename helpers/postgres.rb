@@ -108,6 +108,7 @@ class Clover
     end
   end
 
+  PostgresLocation = Struct.new(:location, :available_postgres_versions, :available_vm_families)
   def vm_families_for_project(project)
     PostgresResource.vm_families_for_project(@project)
   end
