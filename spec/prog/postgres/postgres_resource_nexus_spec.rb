@@ -12,6 +12,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       PostgresResource,
       ubid: "pgnjbsrja7ka4nk7ptcg03szg2",
       location_id: Location::HETZNER_FSN1_ID,
+      location: Location[Location::HETZNER_FSN1_ID],
       root_cert_1: "root cert 1",
       root_cert_key_1: nil,
       root_cert_2: "root cert 2",
@@ -344,7 +345,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         project_id: postgres_resource.project_id,
         resource_id: postgres_resource.id,
         resource_name: postgres_resource.name,
-        billing_rate_id: BillingRate.from_resource_properties("PostgresVCpu", "standard-standard", Location[postgres_resource.location_id].name)["id"],
+        billing_rate_id: BillingRate.from_resource_properties("PostgresVCpu", "standard-standard", Location[postgres_resource.location_id].name, Location[postgres_resource.location_id].byoc)["id"],
         amount: postgres_resource.representative_server.vm.vcpus
       )
 
@@ -352,7 +353,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         project_id: postgres_resource.project_id,
         resource_id: postgres_resource.id,
         resource_name: postgres_resource.name,
-        billing_rate_id: BillingRate.from_resource_properties("PostgresStandbyVCpu", "standard-standard", Location[postgres_resource.location_id].name)["id"],
+        billing_rate_id: BillingRate.from_resource_properties("PostgresStandbyVCpu", "standard-standard", Location[postgres_resource.location_id].name, Location[postgres_resource.location_id].byoc)["id"],
         amount: postgres_resource.representative_server.vm.vcpus
       )
 
@@ -360,7 +361,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         project_id: postgres_resource.project_id,
         resource_id: postgres_resource.id,
         resource_name: postgres_resource.name,
-        billing_rate_id: BillingRate.from_resource_properties("PostgresStorage", "standard", Location[postgres_resource.location_id].name)["id"],
+        billing_rate_id: BillingRate.from_resource_properties("PostgresStorage", "standard", Location[postgres_resource.location_id].name, Location[postgres_resource.location_id].byoc)["id"],
         amount: 128
       )
 
@@ -368,7 +369,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         project_id: postgres_resource.project_id,
         resource_id: postgres_resource.id,
         resource_name: postgres_resource.name,
-        billing_rate_id: BillingRate.from_resource_properties("PostgresStandbyStorage", "standard", Location[postgres_resource.location_id].name)["id"],
+        billing_rate_id: BillingRate.from_resource_properties("PostgresStandbyStorage", "standard", Location[postgres_resource.location_id].name, Location[postgres_resource.location_id].byoc)["id"],
         amount: 128
       )
 
