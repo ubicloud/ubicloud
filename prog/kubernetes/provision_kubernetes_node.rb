@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../../lib/net_ssh"
+
 class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   subject_is :kubernetes_cluster
 

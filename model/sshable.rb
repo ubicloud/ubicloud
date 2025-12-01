@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require "net/ssh"
 require_relative "../model"
+require_relative "../lib/net_ssh"
 
 class Sshable < Sequel::Model
   # We need to unrestrict primary key so Sshable.new(...).save_changes works

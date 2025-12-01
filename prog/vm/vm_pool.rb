@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "net/ssh"
+require_relative "../../lib/net_ssh"
 
 class Prog::Vm::VmPool < Prog::Base
   subject_is :vm_pool

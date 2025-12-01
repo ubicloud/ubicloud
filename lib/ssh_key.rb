@@ -4,7 +4,7 @@ require "base64"
 require "stringio"
 
 require "ed25519"
-require "net/ssh"
+require_relative "net_ssh"
 
 class SshKey
   def self.generate

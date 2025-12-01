@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "net/ssh"
+require_relative "net_ssh"
 require "openssl"
 require "erubi"
 require "tilt"
