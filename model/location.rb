@@ -64,6 +64,7 @@ end
 #  provider     | text    | NOT NULL
 #  project_id   | uuid    |
 #  dns_suffix   | text    |
+#  byoc         | boolean | NOT NULL DEFAULT false
 # Indexes:
 #  location_pkey                         | PRIMARY KEY btree (id)
 #  location_project_id_display_name_uidx | UNIQUE btree (project_id, display_name)
