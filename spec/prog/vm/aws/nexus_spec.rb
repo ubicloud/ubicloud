@@ -73,6 +73,27 @@ usermod -L ubuntu
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, location_id: loc.id)
       expect(st.label).to eq("start")
     end
+
+    it "gives correct max_disk_size for vm family" do
+      loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
+      vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, location_id: loc.id, size: "i7ie.24xlarge").subject
+      expect(vm.vm_storage_volumes.count).to eq(8)
+      expect(vm.vm_storage_volumes.sum { it.size_gib }).to eq(60000)
+    end
+
+    it "gives correct size even when volume size smaller than max disk size" do
+      loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
+      vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, location_id: loc.id, size: "i7ie.large").subject
+      expect(vm.vm_storage_volumes.count).to eq(1)
+      expect(vm.vm_storage_volumes.sum { it.size_gib }).to equal(1250)
+    end
+
+    it "gives correct max_disk_size for vm family with specialized disk size" do
+      loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
+      vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, location_id: loc.id, size: "i7ie.2xlarge").subject
+      expect(vm.vm_storage_volumes.count).to eq(2)
+      expect(vm.vm_storage_volumes.sum { it.size_gib }).to equal(5000)
+    end
   end
 
   describe "#before_run" do

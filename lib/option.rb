@@ -38,7 +38,7 @@ module Option
     [1, vcpus / 2].max
   end
 
-  AWS_FAMILY_OPTIONS = ["c6gd", "m6a", "m6id", "m6gd", "m7a", "m7i", "m8gd", "i8g"].freeze
+  AWS_FAMILY_OPTIONS = ["c6gd", "m6a", "m6id", "m6gd", "m7a", "m7i", "m8gd", "i8g", "i8ge", "i7i", "i7ie"].freeze
   non_storage_optimized_vm_storage_size_options = {2 => [118], 4 => [237], 8 => [474], 16 => [950], 32 => [1900], 64 => [3800]}
   AWS_STORAGE_SIZE_OPTIONS = {
     "c6gd" => non_storage_optimized_vm_storage_size_options,
@@ -48,7 +48,10 @@ module Option
     "m7a" => non_storage_optimized_vm_storage_size_options,
     "m7i" => non_storage_optimized_vm_storage_size_options,
     "m8gd" => non_storage_optimized_vm_storage_size_options,
-    "i8g" => {2 => [468], 4 => [937], 8 => [1875], 16 => [3750], 32 => [7500], 64 => [15000]}
+    "i8g" => {2 => [468], 4 => [937], 8 => [1875], 16 => [3750], 32 => [7500], 64 => [15000], 96 => [22500]},
+    "i8ge" => {2 => [1250], 4 => [2500], 8 => [5000], 12 => [7500], 24 => [15000], 48 => [30000], 72 => [45000], 96 => [60000]},
+    "i7i" => {2 => [468], 4 => [937], 8 => [1875], 16 => [3750], 32 => [7500], 48 => [11250], 64 => [15000], 96 => [22500]},
+    "i7ie" => {2 => [1250], 4 => [2500], 8 => [5000], 12 => [7500], 24 => [15000], 48 => [30000], 72 => [45000], 96 => [60000]}
   }.freeze
 
   BootImage = Struct.new(:name, :display_name)
@@ -98,11 +101,16 @@ module Option
     storage_size_options = [it * 10, it * 20]
     io_limits = IoLimits.new(it * 50, it * 50)
     VmSize.new("burstable-#{it}", "burstable", it, it * 50, it * 50, (it * 1.6).to_i, storage_size_options, io_limits, 1, false, "arm64")
-  }).concat(AWS_FAMILY_OPTIONS.product([2, 4, 8, 16, 32, 64]).map { |family, vcpu|
+  }).concat(AWS_FAMILY_OPTIONS.reject { |f| ["i8g", "i8ge", "i7i", "i7ie"].include?(f) }.product([2, 4, 8, 16, 32, 64]).map { |family, vcpu|
     memory_coefficient = (family == "c6gd") ? 2 : 4
-
     arch = ["m6a", "m6id", "m7a", "m7i"].include?(family) ? "x64" : "arm64"
     VmSize.new(aws_instance_type_name(family, vcpu), family, vcpu, vcpu * 100, 0, vcpu * memory_coefficient, AWS_STORAGE_SIZE_OPTIONS[family][vcpu], NO_IO_LIMITS, nil, false, arch)
+  }).concat(["i8g", "i7i"].product([2, 4, 8, 16, 32, 64, 96]).map { |family, vcpu|
+    arch = (family == "i8g") ? "arm64" : "x64"
+    VmSize.new(aws_instance_type_name(family, vcpu), family, vcpu, vcpu * 100, 0, vcpu * 8, AWS_STORAGE_SIZE_OPTIONS[family][vcpu], NO_IO_LIMITS, nil, false, arch)
+  }).concat(["i8ge", "i7ie"].product([2, 4, 8, 12, 24, 48, 72, 96]).map { |family, vcpu|
+    arch = (family == "i8ge") ? "arm64" : "x64"
+    VmSize.new(aws_instance_type_name(family, vcpu), family, vcpu, vcpu * 100, 0, vcpu * 8, AWS_STORAGE_SIZE_OPTIONS[family][vcpu], NO_IO_LIMITS, nil, false, arch)
   }).freeze
 
   # Postgres Global Options
@@ -119,6 +127,9 @@ module Option
     ["burstable", "Shared CPU"],
     ["m8gd", "General Purpose, Graviton3"],
     ["i8g", "Storage Optimized, Graviton4"],
+    ["i8ge", "Storage Optimized, Graviton4"],
+    ["i7i", "Storage Optimized, Intel Xeon"],
+    ["i7ie", "Storage Optimized, Intel Xeon"],
     ["c6gd", "Compute Optimized, Graviton2"],
     ["m6id", "General Purpose, Intel Xeon"],
     ["m6gd", "General Purpose, Graviton2"]
@@ -163,7 +174,32 @@ module Option
     ["i8g", 8, 64],
     ["i8g", 16, 128],
     ["i8g", 32, 256],
-    ["i8g", 64, 512]
+    ["i8g", 64, 512],
+    ["i8g", 96, 768],
+    ["i8ge", 2, 16],
+    ["i8ge", 4, 32],
+    ["i8ge", 8, 64],
+    ["i8ge", 12, 96],
+    ["i8ge", 24, 192],
+    ["i8ge", 48, 384],
+    ["i8ge", 72, 576],
+    ["i8ge", 96, 768],
+    ["i7i", 2, 16],
+    ["i7i", 4, 32],
+    ["i7i", 8, 64],
+    ["i7i", 16, 128],
+    ["i7i", 32, 256],
+    ["i7i", 48, 384],
+    ["i7i", 64, 512],
+    ["i7i", 96, 768],
+    ["i7ie", 2, 16],
+    ["i7ie", 4, 32],
+    ["i7ie", 8, 64],
+    ["i7ie", 12, 96],
+    ["i7ie", 24, 192],
+    ["i7ie", 48, 384],
+    ["i7ie", 72, 576],
+    ["i7ie", 96, 768]
   ].to_h do |args|
     name = if AWS_FAMILY_OPTIONS.include?(args[0])
       aws_instance_type_name(args[0], args[1])
