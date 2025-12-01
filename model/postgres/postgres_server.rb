@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require "net/ssh"
 require "uri"
 require_relative "../../model"
+require_relative "../../lib/net_ssh"
 
 class PostgresServer < Sequel::Model
   one_to_one :strand, key: :id
