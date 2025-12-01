@@ -211,8 +211,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       .select_append { round(sum(:used_cores) * 100.0 / sum(:total_cores), 2).cast(:float).as(:utilization) }
       .to_hash(:family, :utilization)
 
-    std_util = family_utilization["standard"]
-    prem_util = family_utilization["premium"]
+    std_util = family_utilization.fetch("standard", 100)
+    prem_util = family_utilization.fetch("premium", 100)
 
     is_high_util = if x64? && label_data["family"] == "standard" && installation.premium_runner_enabled?
       prem_util > 75 && std_util > 80
