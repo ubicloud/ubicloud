@@ -1,0 +1,72 @@
+# frozen_string_literal: true
+
+require_relative "../lib/virtual_memory_setup"
+
+RSpec.describe VirtualMemorySetup do
+  let(:logger) { instance_double(Logger, warn: nil) }
+  let(:virtual_memory_setup) { described_class.new("17-main", logger) }
+
+  describe "#setup_postgres_hugepages" do
+    it "calculates hugepages via overhead subtraction and rounding" do
+      # Mock hugepage info: 512 x 2MB hugepages = 1024MB total hugepage space
+      expect(virtual_memory_setup).to receive(:hugepage_info).and_return([512, 2048])
+
+      # shared_memory_size increases due to simulated overhead:
+      # 1024MB -> 1061MB (37MB overhead)
+      expect(virtual_memory_setup).to receive(:get_postgres_param)
+        .with("shared_memory_size").and_return(1061)
+
+      # Block size for rounding shared_buffers
+      expect(virtual_memory_setup).to receive(:get_postgres_param)
+        .with("block_size").and_return(8192)  # 8KB blocks
+
+      # First call: set shared_buffers to total hugepage space
+      # (1024MB = 1,048,576 KiB)
+      expect(virtual_memory_setup).to receive(:update_postgres_hugepages_conf)
+        .with(1_048_576)
+
+      # Second call: back off by overhead and round down to block boundary
+      # overhead = (1061 - 1024) * 1024 = 37,888 KiB
+      # target = 1,048,576 - 37,888 = 1,010,688 KiB
+      expected_shared_buffers = 1_010_688
+      expect(virtual_memory_setup).to receive(:update_postgres_hugepages_conf)
+        .with(expected_shared_buffers)
+      expect(expected_shared_buffers & 0b111).to eq(0)  # Divisible by 8
+
+      expect { virtual_memory_setup.setup_postgres_hugepages }.not_to raise_error
+    end
+
+    it "skips setup if no hugepages are configured" do
+      expect(virtual_memory_setup).to receive(:hugepage_info).and_return([0, 2048])
+      expect(virtual_memory_setup).not_to receive(:get_postgres_param)
+      expect(virtual_memory_setup).not_to receive(:update_postgres_hugepages_conf)
+      expect(logger).to receive(:warn).with("No hugepages configured, skipping setup.")
+      expect { virtual_memory_setup.setup_postgres_hugepages }.not_to raise_error
+    end
+  end
+
+  describe "#configure_memory_overcommit" do
+    before do
+      allow(File).to receive(:read).with("/proc/meminfo").and_return(<<~MEMINFO)
+        MemTotal:        8000000 kB
+        HugePages_Total:     512
+        Hugepagesize:     2048 kB
+        MemFree:         4000000 kB
+      MEMINFO
+    end
+
+    it "calculates and sets overcommit_kbytes correctly" do
+      # MemTotal: 8,000,000 kB
+      # HugePages: 512 * 2048 kB = 1,048,576 kB
+      # Calculation: 256 MiB (262144 kB) + 1.75 * (8,000,000 - 1,048,576) = 12427136 kB
+      expected_kbytes = 12_427_136
+
+      expect(virtual_memory_setup).to receive(:r).with("sudo sysctl -w vm.overcommit_memory=2")
+      expect(virtual_memory_setup).to receive(:r).with("echo 'vm.overcommit_memory=2' | sudo tee -a /etc/sysctl.conf")
+      expect(virtual_memory_setup).to receive(:r).with("sudo sysctl -w vm.overcommit_kbytes=#{expected_kbytes}")
+      expect(virtual_memory_setup).to receive(:r).with("echo 'vm.overcommit_kbytes=#{expected_kbytes}' | sudo tee -a /etc/sysctl.conf")
+
+      virtual_memory_setup.configure_memory_overcommit
+    end
+  end
+end

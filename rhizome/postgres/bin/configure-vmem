@@ -2,7 +2,7 @@
 
 # frozen_string_literal: true
 
-require_relative "../lib/hugepages_setup"
+require_relative "../lib/virtual_memory_setup"
 require "logger"
 
 if ARGV.count != 1
@@ -14,4 +14,4 @@ instance = ARGV[0]
 logger = Logger.new($stdout)
 logger.level = Logger::INFO
 
-HugepagesSetup.new(instance, logger).setup
+VirtualMemorySetup.new(instance, logger).setup
