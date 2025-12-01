@@ -119,7 +119,7 @@ when "reassign-ip6"
     local_ip4, max_vcpus, cpu_topology, mem_gib,
     ndp_needed, storage_volumes, storage_secrets,
     swap_size_bytes, pci_devices, boot_image, dns_ipv4,
-    slice_name, cpu_percent_limit, cpu_burst_percent_limit)
+    slice_name, cpu_percent_limit, cpu_burst_percent_limit, ipv6_disabled, init_script)
 when "restart"
   vm_setup.restart(slice_name, cpu_burst_percent_limit)
 else
