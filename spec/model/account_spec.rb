@@ -13,4 +13,24 @@ RSpec.describe Account do
     expect(tag.member_ids).to be_empty
     expect(ace).not_to be_exists
   end
+
+  describe ".create_project_with_default_policy" do
+    it "sets reputation new" do
+      project = account.create_project_with_default_policy("project-2")
+      expect(project.reputation).to eq("new")
+    end
+
+    it "sets reputation limited if the email is from gmail" do
+      account.email = "test@gmail.com"
+      project = account.create_project_with_default_policy("project-2")
+      expect(project.reputation).to eq("limited")
+    end
+
+    it "sets reputation new if the email is from gmail but has a verified project already" do
+      account.email = "test@gmail.com"
+      account.add_project(Project.create(name: "project-3", reputation: "verified"))
+      project = account.create_project_with_default_policy("project-2")
+      expect(project.reputation).to eq("new")
+    end
+  end
 end
