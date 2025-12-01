@@ -8,6 +8,8 @@ class Clover
 
     # getCacheEntry
     r.get "cache" do
+      next 204 unless repository.access_key
+
       keys, version = typecast_params.nonempty_str!(%w[keys version])
       keys = keys.split(",")
 
