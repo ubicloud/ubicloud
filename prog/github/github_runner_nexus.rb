@@ -205,6 +205,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       hop_allocate_vm
     end
 
+    if project.reputation == "limited"
+      Clog.emit("not allowed because of limited reputation") { {limited_reputation: {label: github_runner.label, repository_name: github_runner.repository_name}} }
+      nap rand(5..15)
+    end
+
     # check utilization, if it's high, wait for it to go down
     family_utilization = VmHost.where(allocation_state: "accepting", arch: label_data["arch"])
       .select_group(:family)
