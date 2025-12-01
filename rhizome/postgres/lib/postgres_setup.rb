@@ -18,11 +18,11 @@ class PostgresSetup
   end
 
   def configure_memory_overcommit
-    r "sudo sysctl -w vm.overcommit_memory=2"
-    r "echo 'vm.overcommit_memory=2' | sudo tee -a /etc/sysctl.conf"
+    # r "sudo sysctl -w vm.overcommit_memory=2"
+    # r "echo 'vm.overcommit_memory=2' | sudo tee -a /etc/sysctl.conf"
 
-    r "sudo sysctl -w vm.overcommit_ratio=150"
-    r "echo 'vm.overcommit_ratio=150' | sudo tee -a /etc/sysctl.conf"
+    # r "sudo sysctl -w vm.overcommit_ratio=150"
+    # r "echo 'vm.overcommit_ratio=150' | sudo tee -a /etc/sysctl.conf"
   end
 
   def setup_data_directory
