@@ -7,7 +7,8 @@ class Project < Sequel::Model
   one_to_many :subject_tags, order: :name
   one_to_many :action_tags, order: :name
   one_to_many :object_tags, order: :name
-  many_to_one :billing_info
+  # ZZZ No-op for thin aws mode
+  # many_to_one :billing_info
 
   many_to_many :accounts, join_table: :access_tag, right_key: :hyper_tag_id
   one_to_many :vms
@@ -49,6 +50,8 @@ class Project < Sequel::Model
   plugin ResourceMethods
 
   def has_valid_payment_method?
+    # ZZZ No-op for thin aws mode
+    return true
     return true unless Config.stripe_secret_key
     return true if discount == 100
 
@@ -137,7 +140,7 @@ class Project < Sequel::Model
   end
 
   def effective_quota_value(resource_type)
-    # ZZZ Effectivley no-op this since the resources are in a few megaprojects
+    # ZZZ Effectively no-op this since the resources are in a few megaprojects
     return 10**100
     # {{{ CONFLATED
     DB.ignore_duplicate_queries do
@@ -149,6 +152,8 @@ class Project < Sequel::Model
   end
 
   def quota_available?(resource_type, requested_additional_usage)
+    # ZZZ Effectively no-op as well
+    return true
     effective_quota_value(resource_type) >= current_resource_usage(resource_type) + requested_additional_usage
   end
 
