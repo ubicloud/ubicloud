@@ -47,6 +47,7 @@ class PostgresResource < Sequel::Model
     return "restoring_backup" if server_strand_label == "initialize_database_from_backup"
     return "replaying_wal" if ["wait_catch_up", "wait_synchronization"].include?(server_strand_label)
     return "finalizing_restore" if server_strand_label == "wait_recovery_completion"
+    return "stopped" if server_strand_label == "stopped"
     return "running" if ["wait", "refresh_certificates", "refresh_dns_record"].include?(strand.label) && !initial_provisioning_set?
 
     "creating"

@@ -744,6 +744,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.wait }.to hop("update_superuser_password")
     end
 
+    it "hops to stopped if stop is set" do
+      expect(nx).to receive(:when_stop_set?).and_yield
+      expect { nx.wait }.to hop("stopped")
+    end
+
     it "hops to unavailable if checkup is set and the server is not available" do
       expect(nx).to receive(:when_checkup_set?).and_yield
       expect(nx).to receive(:available?).and_return(false)
@@ -837,6 +842,21 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         expect(nx).to receive(:update_stack_lsn).with("1/A")
         expect { nx.wait }.to nap(900)
       end
+    end
+  end
+
+  describe "#stopped" do
+    it "naps after stopping the postgres server" do
+      expect(nx).to receive(:when_stop_set?).and_yield
+      expect(sshable).to receive(:cmd).with("sudo pg_ctlcluster #{postgres_server.version} main stop -m immediate")
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop pgbouncer@*.service")
+
+      expect { nx.stopped }.to nap(60 * 60)
+    end
+
+    it "does not stop if already stopped" do
+      expect(nx).to receive(:when_stop_set?)
+      expect { nx.stopped }.to nap(60 * 60)
     end
   end
 

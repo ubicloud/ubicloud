@@ -467,6 +467,10 @@ SQL
       hop_update_superuser_password
     end
 
+    when_stop_set? do
+      hop_stopped
+    end
+
     when_checkup_set? do
       hop_unavailable if !available?
       decr_checkup
@@ -524,6 +528,16 @@ SQL
     end
 
     nap 6 * 60 * 60
+  end
+
+  label def stopped
+    when_stop_set? do
+      vm.sshable.cmd("sudo pg_ctlcluster #{postgres_server.version} main stop -m immediate")
+      vm.sshable.cmd("sudo systemctl stop pgbouncer@*.service")
+    end
+    decr_stop
+
+    nap 60 * 60
   end
 
   label def unavailable

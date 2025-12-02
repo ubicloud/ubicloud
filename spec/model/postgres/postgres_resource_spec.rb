@@ -207,6 +207,12 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.display_state).to eq("finalizing_restore")
     end
 
+    it "returns 'stopped' when representative server's strand label is 'stopped'" do
+      expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait")).at_least(:once)
+      expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "stopped"))).at_least(:once)
+      expect(postgres_resource.display_state).to eq("stopped")
+    end
+
     it "returns 'running' when strand label is 'wait' and has no children" do
       expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait", children: [])).at_least(:once)
       expect(postgres_resource.display_state).to eq("running")
