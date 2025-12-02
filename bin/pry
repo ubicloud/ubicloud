@@ -36,7 +36,9 @@ def udec(*)
 end
 
 opts = Pry::CLI.parse_options
-Pry.config.prompt_name = if Config.production?
+Pry.config.prompt_name = if Config.staging
+  "clover-staging"
+elsif Config.production?
   "\e[41m⚠️ %s\e[0m" % "clover-#{Config.rack_env}"
 else
   "clover-#{Config.rack_env}"
