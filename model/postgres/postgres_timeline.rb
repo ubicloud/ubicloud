@@ -24,7 +24,7 @@ WALG_S3_PREFIX=s3://#{ubid}
 AWS_ENDPOINT=#{blob_storage_endpoint}
 AWS_ACCESS_KEY_ID=#{access_key}
 AWS_SECRET_ACCESS_KEY=#{secret_key}
-AWS_REGION: #{location.name}
+AWS_REGION: #{aws? ? location.name : "us-east-1"}
 AWS_S3_FORCE_PATH_STYLE=true
 PGHOST=/var/run/postgresql
     WALG_CONF
@@ -90,10 +90,14 @@ PGHOST=/var/run/postgresql
     Time.now
   end
 
+  def aws?
+    location&.aws?
+  end
+
   S3BlobStorage = Struct.new(:url)
 
   def blob_storage
-    # {{{ CONFLATION
+    # {{{ CONFLATED
     @blob_storage ||= if aws?
       S3BlobStorage.new("https://s3.#{location.name}.amazonaws.com")
     else
@@ -101,21 +105,28 @@ PGHOST=/var/run/postgresql
         MinioCluster[project_id: Config.postgres_service_project_id, location_id: location.id] || MinioCluster[project_id: Config.minio_service_project_id, location_id: location.id]
       end
     end
-    # }}} CONFLATION
+    # }}} CONFLATED
   end
 
   def blob_storage_endpoint
-    @blob_storage_endpoint ||= blob_storage.url
+    @blob_storage_endpoint ||= blob_storage.url || blob_storage.ip4_urls.sample
   end
 
   def blob_storage_client
-    @blob_storage_client ||= Aws::S3::Client.new(
+    # {{{ CONFLATED
+    @blob_storage_client ||= aws? ? Aws::S3::Client.new(
       region: location.name,
       access_key_id: access_key,
       secret_access_key: secret_key,
       endpoint: blob_storage_endpoint,
       force_path_style: true
+    ) : Minio::Client.new(
+      endpoint: blob_storage_endpoint,
+      access_key: access_key,
+      secret_key: secret_key,
+      ssl_ca_data: blob_storage.root_certs
     )
+    # }}} CONFLATED
   end
 
   def blob_storage_policy
@@ -123,6 +134,14 @@ PGHOST=/var/run/postgresql
   end
 
   def list_objects(prefix)
+    # {{{ CONFLATED
+    aws? ?
+    aws_list_objects(prefix)
+      : blob_storage_client.list_objects(ubid, prefix)
+    # }}} CONFLATED
+  end
+
+  def aws_list_objects(prefix)
     response = blob_storage_client.list_objects_v2(bucket: ubid, prefix: prefix)
     objects = response.contents
     while response.is_truncated
@@ -133,26 +152,36 @@ PGHOST=/var/run/postgresql
   end
 
   def create_bucket
+    # {{{ CONFLATED
+    aws? ? aws_create_bucket : blob_storage_client.create_bucket(ubid)
+    # }}} CONFLATED
+  end
+
+  def aws_create_bucket
     location_constraint = (location.name == "us-east-1") ? nil : {location_constraint: location.name}
     blob_storage_client.create_bucket(bucket: ubid, create_bucket_configuration: location_constraint)
   end
 
   def set_lifecycle_policy
-    blob_storage_client.put_bucket_lifecycle_configuration({
-      bucket: ubid,
-      lifecycle_configuration: {
-        rules: [
-          {
-            id: "DeleteOldBackups",
-            status: "Enabled",
-            expiration: {
-              days: BACKUP_BUCKET_EXPIRATION_DAYS
-            },
-            filter: {}
-          }
-        ]
-      }
-    })
+    # {{{ CONFLATED
+    aws? ?
+      blob_storage_client.put_bucket_lifecycle_configuration({
+        bucket: ubid,
+        lifecycle_configuration: {
+          rules: [
+            {
+              id: "DeleteOldBackups",
+              status: "Enabled",
+              expiration: {
+                days: BACKUP_BUCKET_EXPIRATION_DAYS
+              },
+              filter: {}
+            }
+          ]
+        }
+      })
+      : blob_storage_client.set_lifecycle_policy(ubid, ubid, BACKUP_BUCKET_EXPIRATION_DAYS)
+    # }}} CONFLATED
   end
 end
 
