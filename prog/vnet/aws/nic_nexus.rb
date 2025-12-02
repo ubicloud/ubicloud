@@ -12,6 +12,7 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
   end
 
   label def start
+    register_deadline("wait", 3 * 60)
     NicAwsResource.create_with_id(nic.id)
     hop_create_subnet
   end
