@@ -10,7 +10,9 @@ class MinioCluster < Sequel::Model
   # many_to_many :servers, join_table: :minio_pool, left_key: :cluster_id, right_key: :id, right_primary_key: :minio_pool_id, class: :MinioServer, order: :index
   one_to_one :strand, key: :id
   # many_to_one :private_subnet
-  # many_to_one :location, key: :location_id
+
+  # ZZZ: Needed for testing as well when in thin aws mode.
+  many_to_one :location, key: :location_id
 
   plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2],
     encrypted_columns: [:admin_password, :root_cert_key_1, :root_cert_key_2]

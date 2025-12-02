@@ -172,14 +172,14 @@ PGHOST=/var/run/postgresql
     end
 
     it "creates bucket" do
-      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2")).at_least(:once)
+      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2", aws?: true)).at_least(:once)
       s3_client.stub_responses(:create_bucket)
       expect(s3_client).to receive(:create_bucket).with({bucket: postgres_timeline.ubid, create_bucket_configuration: {location_constraint: "us-east-2"}}).and_return(true)
       expect(postgres_timeline.create_bucket).to be(true)
     end
 
     it "creates bucket in us-east-1" do
-      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-1")).at_least(:once)
+      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-1", aws?: true)).at_least(:once)
       s3_client.stub_responses(:create_bucket)
       expect(s3_client).to receive(:create_bucket).with({bucket: postgres_timeline.ubid, create_bucket_configuration: nil}).and_return(true)
       expect(postgres_timeline.create_bucket).to be(true)
