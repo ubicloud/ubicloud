@@ -14,6 +14,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   label def start
+    register_deadline("wait", 10 * 60)
     nap 1 unless vm.nic.strand.label == "wait"
     # Cloudwatch is not needed for runner instances
     hop_create_instance if is_runner?
