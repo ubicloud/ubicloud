@@ -58,6 +58,7 @@ autoload_normal = ->(subdirectory, include_first: false, flat: false) do
 end
 
 # Define empty modules instead of trying to have autoload_normal create them via metaprogramming
+module Minio; end
 module Prog; end
 
 module Prog::Ai; end
@@ -196,6 +197,9 @@ def clover_freeze
     Authorization,
     Authorization::Unauthorized,
     HealthMonitorMethods,
+    Minio,
+    Minio::Client::Blob,
+    Minio::Crypto::AesGcmCipherProvider,
     PostgresResource::Flavor,
     PostgresResource::HaType,
     Prog,
