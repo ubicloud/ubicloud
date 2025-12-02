@@ -417,13 +417,13 @@ usermod -L ubuntu
       it "recreates runner when alternative_families is not set" do
         expect(nx).to receive(:frame).and_return({}).at_least(:once)
         expect(Prog::Vm::GithubRunner).to receive(:assemble).and_call_original
-        expect { nx.create_instance }.to exit({"msg" => "exiting due to insufficient instance capacity"})
+        expect { nx.create_instance }.to nap(0)
       end
 
       it "recreates runner when alternative_families is empty" do
         expect(nx).to receive(:frame).and_return({"alternative_families" => []}).at_least(:once)
         expect(Prog::Vm::GithubRunner).to receive(:assemble).and_call_original
-        expect { nx.create_instance }.to exit({"msg" => "exiting due to insufficient instance capacity"})
+        expect { nx.create_instance }.to nap(0)
       end
 
       it "creates runner with the first alternative when current_family is the initial family" do
@@ -443,7 +443,7 @@ usermod -L ubuntu
         vm.update(family: "m6a")
         expect(nx).to receive(:frame).and_return({"alternative_families" => ["m7i", "m6a"]}).at_least(:once)
         expect(Prog::Vm::GithubRunner).to receive(:assemble).and_call_original
-        expect { nx.create_instance }.to exit({"msg" => "exiting due to insufficient instance capacity"})
+        expect { nx.create_instance }.to nap(0)
       end
     end
 

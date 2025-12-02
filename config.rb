@@ -80,6 +80,7 @@ module Config
   override :dispatcher_queue_size_ratio, 4, float
   override :recursive_tag_limit, 32, int
   override :root, File.expand_path(__dir__), string
+  override :clover_database_rds_iam_auth_enabled, false, bool
   optional :hetzner_user, string, clear: true
   optional :hetzner_password, string, clear: true
   override :hetzner_connection_string, "https://robot-ws.your-server.de", string
@@ -171,8 +172,8 @@ module Config
   override :github_ubuntu_2404_version, "20251105.1.0", string
   override :github_ubuntu_2204_version, "20251105.1.0", string
   override :github_gpu_ubuntu_2204_version, "20251017.1.0", string
-  override :github_ubuntu_2204_aws_ami_version, "ami-04b5534ef1aed6bde", string
-  override :github_ubuntu_2404_aws_ami_version, "ami-0908b850ff3e635a2", string
+  override :github_ubuntu_2204_aws_ami_version, "ami-06f02994ea7801a2d", string
+  override :github_ubuntu_2404_aws_ami_version, "ami-0b44ef7a91252a724", string
   override :postgres_ubuntu_2204_version, "20251103.1.0", string
   override :postgres16_ubuntu_2204_version, "20250425.1.1", string
   override :postgres17_ubuntu_2204_version, "20250425.1.1", string

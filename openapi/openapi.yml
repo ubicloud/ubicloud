@@ -971,6 +971,18 @@ paths:
                 restrict_by_default:
                   description: 'Whether to restrict access by default (if so, firewall rules must be added to access)'
                   type: boolean
+                pg_config:
+                  type: object
+                  example:
+                    max_connections: '100'
+                  additionalProperties:
+                    type: string
+                pgbouncer_config:
+                  type: object
+                  example:
+                    max_client_conn: '100'
+                  additionalProperties:
+                    type: string
                 tags:
                   description: Tags for the Postgres Database
                   type: array
@@ -1015,6 +1027,21 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/backup':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    get:
+      operationId: listPostgresDatabaseBackups
+      summary: List backups for a specific Postgres database
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresBackups'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1757,6 +1784,7 @@ paths:
       summary: List visible Postgres Databases
       parameters:
         - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/tags'
         - $ref: '#/components/parameters/start_after'
         - $ref: '#/components/parameters/page_size'
         - $ref: '#/components/parameters/order_column'
@@ -2187,6 +2215,14 @@ components:
       required: false
       schema:
         type: string
+    tags:
+      description: 'Filter by tags in key:value format (comma-separated for multiple tags)'
+      in: query
+      name: tags
+      required: false
+      schema:
+        type: string
+        example: 'environment:production,team:backend'
     vm_reference:
       description: Virtual machine ID or name
       examples:
@@ -2740,6 +2776,20 @@ components:
       additionalProperties: false
       required:
         - metrics
+    PostgresBackup:
+      type: object
+      properties:
+        key:
+          description: Backup key/identifier
+          type: string
+        last_modified:
+          description: Last modified timestamp of the backup
+          type: string
+          format: date-time
+      additionalProperties: false
+      required:
+        - key
+        - last_modified
     PostgresFirewallRule:
       type: object
       properties:
@@ -3349,6 +3399,23 @@ components:
                 type: array
                 items:
                   $ref: '#/components/schemas/PostgresFirewallRule'
+            additionalProperties: false
+            required:
+              - count
+              - items
+    PostgresBackups:
+      description: A list of Postgres Database Backups
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PostgresBackup'
             additionalProperties: false
             required:
               - count

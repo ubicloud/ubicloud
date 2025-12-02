@@ -296,6 +296,12 @@ end
     end
   end
 
+  def update_stack(new_frame)
+    strand.stack.first.merge!(new_frame)
+    strand.modified!(:stack)
+    strand.save_changes
+  end
+
   # A hop is a kind of jump, as in, like a jump instruction.
   private def dynamic_hop(label)
     fail "BUG: #hop only accepts a symbol" unless label.is_a? Symbol

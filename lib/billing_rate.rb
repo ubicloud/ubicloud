@@ -14,14 +14,14 @@ class BillingRate
     @rates ||= YAML.load_file("config/billing_rates.yml", permitted_classes: [Time])
   end
 
-  def self.from_resource_properties(resource_type, resource_family, location, active_at = Time.now)
+  def self.from_resource_properties(resource_type, resource_family, location, byoc = false, active_at = Time.now)
     rates.select {
-      it["resource_type"] == resource_type && it["resource_family"] == resource_family && it["location"] == location && it["active_from"] < active_at
+      it["resource_type"] == resource_type && it["resource_family"] == resource_family && it["location"] == location && it["byoc"] == byoc && it["active_from"] < active_at
     }.max_by { it["active_from"] }
   end
 
-  def self.unit_price_from_resource_properties(resource_type, resource_family, location, active_at = Time.now)
-    from_resource_properties(resource_type, resource_family, location, active_at)&.[]("unit_price")&.to_f
+  def self.unit_price_from_resource_properties(resource_type, resource_family, location, byoc = false, active_at = Time.now)
+    from_resource_properties(resource_type, resource_family, location, byoc, active_at)&.[]("unit_price")&.to_f
   end
 
   def self.from_resource_type(resource_type)

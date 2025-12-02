@@ -42,7 +42,7 @@ RSpec.describe Prog::Test::HaPostgresResource do
   #   end
   # end
   # }}} CONFLATION
-  
+
   describe "#create_postgres_resource" do
     it "creates a postgres resource" do
       expect(Prog::Postgres::PostgresResourceNexus).to receive(:assemble).and_return(instance_double(Strand, id: "1234"))

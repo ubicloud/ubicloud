@@ -32,7 +32,8 @@ class Clover
             ui_name: name,
             visible: true,
             provider: "aws",
-            project_id: @project.id
+            project_id: @project.id,
+            byoc: true
           )
           LocationCredential.create_with_id(loc, access_key:, secret_key:)
           audit_log(loc, "create")

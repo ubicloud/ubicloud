@@ -40,7 +40,8 @@ RSpec.describe Clover, "postgres" do
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/reset-superuser-password"],
         [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/ca-certificates"],
         [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics"],
-        [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade"]
+        [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade"],
+        [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/backup"]
       ].each do |method, path|
         send method, path
 
@@ -115,6 +116,25 @@ RSpec.describe Clover, "postgres" do
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq("test-postgres-sync")
+
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-config", {
+          size: "standard-2",
+          storage_size: "64",
+          ha_type: "none",
+          pg_config: {"wal_level" => "logical"}
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["name"]).to eq("test-postgres-config")
+
+        get "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-config"
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["name"]).to eq("test-postgres-config")
+
+        get "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-config/config"
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["pg_config"]).to eq({"wal_level" => "logical"})
       end
 
       it "sends mail to partners" do
@@ -177,6 +197,26 @@ RSpec.describe Clover, "postgres" do
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "Invalid size."})
+      end
+
+      it "invalid config values" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
+          size: "standard-2",
+          storage_size: "64",
+          pg_config: {"wal_level" => "invalid"}
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: pg_config.wal_level")
+      end
+
+      it "valid config values" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
+          size: "standard-2",
+          storage_size: "64",
+          pg_config: {"wal_level" => "logical"}
+        }.to_json
+
+        expect(last_response.status).to eq(200)
       end
 
       it "can set and update tags" do
@@ -855,6 +895,50 @@ RSpec.describe Clover, "postgres" do
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade"
 
         expect(last_response.status).to eq(400)
+      end
+    end
+
+    describe "backup" do
+      it "returns backups successfully" do
+        backup = Struct.new(:key, :last_modified)
+        backup_time = Time.now.utc
+        expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
+        expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [
+          backup.new("basebackups_005/backup1_backup_stop_sentinel.json", backup_time - 2 * 24 * 60 * 60),
+          backup.new("basebackups_005/backup2_backup_stop_sentinel.json", backup_time - 1 * 24 * 60 * 60)
+        ])).at_least(:once)
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/backup"
+
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["count"]).to eq(2)
+        expect(response_body["items"].length).to eq(2)
+        expect(response_body["items"][0]["key"]).to eq("basebackups_005/backup1_backup_stop_sentinel.json")
+        expect(response_body["items"][1]["key"]).to eq("basebackups_005/backup2_backup_stop_sentinel.json")
+      end
+
+      it "returns empty list when no backups exist" do
+        expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
+        expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [])).at_least(:once)
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/backup"
+
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["count"]).to eq(0)
+        expect(response_body["items"]).to eq([])
+      end
+
+      it "returns empty list when blob storage is not configured" do
+        expect(MinioCluster).to receive(:first).and_return(nil).at_least(:once)
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/backup"
+
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["count"]).to eq(0)
+        expect(response_body["items"]).to eq([])
       end
     end
   end

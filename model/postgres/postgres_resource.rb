@@ -41,14 +41,19 @@ class PostgresResource < Sequel::Model
 
   def display_state
     return "deleting" if destroy_set? || strand.nil? || strand.label == "destroy"
-    return "unavailable" if representative_server&.strand&.label == "unavailable"
+
+    server_strand_label = representative_server&.strand&.label
+    return "unavailable" if server_strand_label == "unavailable"
+    return "restoring_backup" if server_strand_label == "initialize_database_from_backup"
+    return "replaying_wal" if ["wait_catch_up", "wait_synchronization"].include?(server_strand_label)
+    return "finalizing_restore" if server_strand_label == "wait_recovery_completion"
     return "running" if ["wait", "refresh_certificates", "refresh_dns_record"].include?(strand.label) && !initial_provisioning_set?
 
     "creating"
   end
 
   def hostname_suffix
-    project&.get_ff_postgres_hostname_override || Config.postgres_service_hostname
+    project&.get_ff_postgres_hostname_override || [location.dns_suffix, Config.postgres_service_hostname].compact.join(".")
   end
 
   def dns_zone

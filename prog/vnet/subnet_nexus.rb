@@ -272,10 +272,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   def update_stack_locked_nics(locked_nics)
-    current_frame = strand.stack.first
-    current_frame["locked_nics"] = locked_nics
-    strand.modified!(:stack)
-    strand.save_changes
+    update_stack({"locked_nics" => locked_nics})
   end
 
   def get_locked_nics

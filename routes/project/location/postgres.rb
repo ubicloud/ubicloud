@@ -385,6 +385,22 @@ class Clover
         certs
       end
 
+      r.get api?, "backup" do
+        authorize("Postgres:view", pg)
+
+        backups = pg.timeline.backups.map do |backup|
+          {
+            key: backup.key,
+            last_modified: backup.last_modified.utc.iso8601
+          }
+        end
+
+        {
+          items: backups,
+          count: backups.count
+        }
+      end
+
       r.get "metrics", r.accepts_json? do
         authorize("Postgres:view", pg)
 
@@ -509,8 +525,8 @@ class Clover
           pgbouncer_errors = pgbouncer_validator.validation_errors(pgbouncer_config)
 
           if pg_errors.any? || pgbouncer_errors.any?
-            pg_errors = pg_errors.map { |key, value| ["pg_config.#{key}", value] }.to_h
-            pgbouncer_errors = pgbouncer_errors.map { |key, value| ["pgbouncer_config.#{key}", value] }.to_h
+            pg_errors = pg_errors.transform_keys { |key| "pg_config.#{key}" }
+            pgbouncer_errors = pgbouncer_errors.transform_keys { |key| "pgbouncer_config.#{key}" }
             raise Validation::ValidationFailed.new(pg_errors.merge(pgbouncer_errors))
           end
 

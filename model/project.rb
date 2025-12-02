@@ -185,6 +185,7 @@ class Project < Sequel::Model
     :enable_m6id,
     :enable_m6gd,
     :free_runner_upgrade_until,
+    :gpu_runner,
     :gpu_vm,
     :ipv6_disabled,
     :postgres_hostname_override,

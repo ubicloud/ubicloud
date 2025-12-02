@@ -13,7 +13,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,
     target_version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
-    ha_type: PostgresResource::HaType::NONE, parent_id: nil, restore_target: nil, with_firewall_rules: true)
+    ha_type: PostgresResource::HaType::NONE, parent_id: nil, restore_target: nil, with_firewall_rules: true, user_config: {}, pgbouncer_user_config: {})
 
     unless Project[project_id]
       fail "No existing project"
@@ -49,10 +49,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       end
 
       postgres_resource = PostgresResource.create(
-        project_id: project_id, location_id: location.id, name: name,
-        target_vm_size: target_vm_size, target_storage_size_gib: target_storage_size_gib,
-        superuser_password: superuser_password, ha_type: ha_type, target_version: target_version, flavor: flavor,
-        parent_id: parent_id, restore_target: restore_target, hostname_version: "v2"
+        project_id:, location_id: location.id, name:,
+        target_vm_size:, target_storage_size_gib:,
+        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, restore_target:, hostname_version: "v2", user_config:, pgbouncer_user_config:
       )
 
       # Customer firewall, will be attached to created customer subnet
@@ -185,27 +184,29 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   label def update_billing_records
     decr_update_billing_records
 
-    postgres_resource.active_billing_records.each(&:finalize)
+    if postgres_resource.project.billable
+      postgres_resource.active_billing_records.each(&:finalize)
 
-    flavor = postgres_resource.flavor
-    vm_family = representative_server.vm.family
-    vcpu_count = representative_server.vm.vcpus
-    storage_size_gib = representative_server.storage_size_gib
+      flavor = postgres_resource.flavor
+      vm_family = representative_server.vm.family
+      vcpu_count = representative_server.vm.vcpus
+      storage_size_gib = representative_server.storage_size_gib
 
-    billing_record_parts = []
-    postgres_resource.target_server_count.times do |index|
-      billing_record_parts.push({resource_type: index.zero? ? "PostgresVCpu" : "PostgresStandbyVCpu", resource_family: "#{flavor}-#{vm_family}", amount: vcpu_count})
-      billing_record_parts.push({resource_type: index.zero? ? "PostgresStorage" : "PostgresStandbyStorage", resource_family: flavor, amount: storage_size_gib})
-    end
+      billing_record_parts = []
+      postgres_resource.target_server_count.times do |index|
+        billing_record_parts.push({resource_type: index.zero? ? "PostgresVCpu" : "PostgresStandbyVCpu", resource_family: "#{flavor}-#{vm_family}", amount: vcpu_count})
+        billing_record_parts.push({resource_type: index.zero? ? "PostgresStorage" : "PostgresStandbyStorage", resource_family: flavor, amount: storage_size_gib})
+      end
 
-    billing_record_parts.each do |brp|
-      BillingRecord.create(
-        project_id: postgres_resource.project_id,
-        resource_id: postgres_resource.id,
-        resource_name: postgres_resource.name,
-        billing_rate_id: BillingRate.from_resource_properties(brp[:resource_type], brp[:resource_family], Location[postgres_resource.location_id].name)["id"],
-        amount: brp[:amount]
-      )
+      billing_record_parts.each do |brp|
+        BillingRecord.create(
+          project_id: postgres_resource.project_id,
+          resource_id: postgres_resource.id,
+          resource_name: postgres_resource.name,
+          billing_rate_id: BillingRate.from_resource_properties(brp[:resource_type], brp[:resource_family], postgres_resource.location.name, postgres_resource.location.byoc)["id"],
+          amount: brp[:amount]
+        )
+      end
     end
 
     decr_initial_provisioning
