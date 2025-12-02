@@ -64,6 +64,7 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
   it "writes params json" do
     expect(pr).to receive(:vm_host).and_return(vm_host).at_least(:once)
     expect(vm).to receive(:params_json).and_return("params_json")
+    expect(vm).to receive(:strand).and_return(instance_double(Strand, stack: [{"gpu_count" => 0, "hugepages" => true, "ch_version" => nil, "gpu_device" => nil, "hypervisor" => nil, "force_host_id" => nil, "swap_size_bytes" => nil, "exclude_host_ids" => [], "firmware_version" => nil, "alternative_families" => [], "last_label_changed_at" => "2025-11-24 11:30:57 +0000", "distinct_storage_devices" => true}]))
     expect(vm_host.sshable).to receive(:cmd).with("sudo rm /vm/test/prep.json")
     expect(vm_host.sshable).to receive(:cmd).with("sudo -u test tee /vm/test/prep.json", stdin: "params_json")
     pr.write_params_json
