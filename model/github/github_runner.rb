@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 require "net/ssh"
-require_relative "../model"
+
+require_relative "../../model"
 
 class GithubRunner < Sequel::Model
   one_to_one :strand, key: :id
