@@ -137,11 +137,15 @@ class Project < Sequel::Model
   end
 
   def effective_quota_value(resource_type)
+    # ZZZ Effectivley no-op this since the resources are in a few megaprojects
+    return 10**100
+    # {{{ CONFLATED
     DB.ignore_duplicate_queries do
       default_quota = ProjectQuota.default_quotas[resource_type]
       override_quota_value = quotas_dataset.first(quota_id: default_quota["id"])&.value
       override_quota_value || default_quota["#{reputation}_value"]
     end
+    # }}} CONFLATED
   end
 
   def quota_available?(resource_type, requested_additional_usage)
