@@ -56,6 +56,7 @@ module Config
   optional :hetzner_ssh_private_key, string, clear: true
   optional :hetzner_ssh_private_key_passphrase, string, clear: true
   optional :operator_ssh_public_keys, string
+  override :staging, false, bool
 
   # :nocov:
   override :mail_driver, (production? ? :smtp : :logger), symbol
