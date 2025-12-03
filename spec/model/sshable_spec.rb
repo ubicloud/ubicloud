@@ -154,7 +154,7 @@ LOCK
     end
 
     it "can reset caches even if session fails while closing" do
-      sess = instance_double(Net::SSH::Connection::Session)
+      sess = Net::SSH::Connection::Session.allocate
       expect(sess).to receive(:close).and_raise Sshable::SshError.new("bogus", "", "", nil, nil)
       expect(Net::SSH).to receive(:start).and_return sess
       sa.connect
@@ -165,7 +165,7 @@ LOCK
   end
 
   describe "#cmd" do
-    let(:session) { instance_double(Net::SSH::Connection::Session) }
+    let(:session) { Net::SSH::Connection::Session.allocate }
 
     before do
       expect(sa).to receive(:connect).and_return(session).at_least(:once)

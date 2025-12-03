@@ -14,7 +14,7 @@ RSpec.describe Kubernetes::Client do
       target_node_size: "standard-2"
     )
   }
-  let(:session) { instance_double(Net::SSH::Connection::Session) }
+  let(:session) { Net::SSH::Connection::Session.allocate }
   let(:kubernetes_client) { described_class.new(kubernetes_cluster, session) }
 
   describe "service_deleted?" do
@@ -198,13 +198,13 @@ RSpec.describe Kubernetes::Client do
   describe "kubectl" do
     it "runs kubectl command in the right format" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("", 0)
-      expect(session).to receive(:exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes").and_return(response)
       expect { kubernetes_client.kubectl("get nodes") }.not_to raise_error
     end
 
     it "raises an error" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("error happened", 1)
-      expect(session).to receive(:exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes").and_return(response)
       expect { kubernetes_client.kubectl("get nodes") }.to raise_error(RuntimeError, "error happened")
     end
   end
@@ -212,7 +212,7 @@ RSpec.describe Kubernetes::Client do
   describe "version" do
     it "runs a version command on kubectl" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("Client Version: v1.33.0\nKustomize Version: v5.6.0", 0)
-      expect(session).to receive(:exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf version --client").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf version --client").and_return(response)
       expect(kubernetes_client.version).to eq("v1.33")
     end
   end
@@ -220,7 +220,7 @@ RSpec.describe Kubernetes::Client do
   describe "delete_node" do
     it "deletes a node" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("node deleted", 0)
-      expect(session).to receive(:exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf delete node asdf").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf delete node asdf").and_return(response)
       kubernetes_client.delete_node("asdf")
     end
   end
@@ -341,7 +341,7 @@ RSpec.describe Kubernetes::Client do
     end
 
     it "raises error with non existing lb" do
-      kubernetes_client = described_class.new(instance_double(KubernetesCluster, services_lb: nil), instance_double(Net::SSH::Connection::Session))
+      kubernetes_client = described_class.new(instance_double(KubernetesCluster, services_lb: nil), Net::SSH::Connection::Session.allocate)
       allow(kubernetes_client).to receive(:kubectl).with("get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return({"items" => [{}]}.to_json)
       expect { kubernetes_client.sync_kubernetes_services }.to raise_error("services load balancer does not exist.")
     end

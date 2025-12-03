@@ -388,7 +388,7 @@ RSpec.describe Scheduling::Dispatcher do
       finish_queue = Queue.new
       current_strands = di.instance_variable_get(:@current_strands)
       current_strands[st.id] = true
-      session = instance_double(Net::SSH::Connection::Session)
+      session = Net::SSH::Connection::Session.allocate
       expect(session).to receive(:close).and_raise(RuntimeError)
       Thread.current[:clover_ssh_cache] = {nil => session}
       strand_queue.push(st)
