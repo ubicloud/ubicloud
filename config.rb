@@ -44,6 +44,7 @@ module Config
   mandatory :rack_env, string
 
   optional :clover_runtime_token_secret, base64, clear: true
+  optional :kms_decrypt_clover_column_encryption_key_with_arn, string
   optional :heartbeat_url, string
   optional :clover_database_root_certs, string
   override :max_health_monitor_threads, 32, int
