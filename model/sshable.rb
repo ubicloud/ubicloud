@@ -4,6 +4,8 @@ require_relative "../model"
 require_relative "../lib/net_ssh"
 
 class Sshable < Sequel::Model
+  prepend NetSsh::WarnUnsafe::Sshable
+
   # We need to unrestrict primary key so Sshable.new(...).save_changes works
   # in sshable_spec.rb.
   unrestrict_primary_key
