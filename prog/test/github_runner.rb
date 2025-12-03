@@ -7,12 +7,17 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   FAIL_CONCLUSIONS = ["action_required", "cancelled", "failure", "skipped", "stale", "timed_out"]
   IN_PROGRESS_CONCLUSIONS = ["in_progress", "queued", "requested", "waiting", "pending", "neutral"]
 
-  def self.assemble(test_cases)
+  def self.assemble(test_cases, provider: "metal")
     github_service_project = Project.create_with_id(Config.github_runner_service_project_id, name: "Github-Runner-Service-Project")
-
     vm_pool_service_project = Project.create_with_id(Config.vm_pool_project_id, name: "Vm-Pool-Service-Project")
-
     github_test_project = Project.create(name: "Github-Runner-Test-Project")
+
+    if provider == "aws"
+      github_test_project.set_ff_aws_alien_runners_ratio(1)
+      location = Location.create_with_id(Config.github_runner_aws_location_id, name: "eu-central-1", provider: "aws", project_id: github_test_project.id, display_name: "aws-e2e", ui_name: "aws-e2e", visible: true)
+      LocationCredential.create_with_id(location.id, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
+    end
+
     GithubInstallation.create(
       installation_id: Config.e2e_github_installation_id,
       name: "TestUser",
@@ -26,6 +31,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       label: "start",
       stack: [{
         "created_at" => Time.now.utc,
+        "provider" => provider,
         "test_cases" => test_cases,
         "github_service_project_id" => github_service_project.id,
         "vm_pool_service_project" => vm_pool_service_project.id,
@@ -35,6 +41,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   end
 
   label def start
+    hop_trigger_test_runs if frame["provider"] == "aws"
     hop_create_vm_pool
   end
 
@@ -101,17 +108,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       end
     end
 
-    hop_enable_alien_runners unless frame["github_runner_aws_location_id"]
     hop_clean_resources
-  end
-
-  label def enable_alien_runners
-    project = Project[frame["github_test_project_id"]]
-    project.set_ff_aws_alien_runners_ratio(1)
-    location = Location.create_with_id(Config.github_runner_aws_location_id, name: "eu-central-1", provider: "aws", project_id: project.id, display_name: "aws-e2e", ui_name: "aws-e2e", visible: true)
-    LocationCredential.create_with_id(location.id, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
-    update_stack({"github_runner_aws_location_id" => location.id})
-    hop_trigger_test_runs
   end
 
   label def clean_resources
@@ -140,7 +137,6 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       nap 15
     end
 
-    Location[frame["github_runner_aws_location_id"]]&.destroy
     Project[frame["github_service_project_id"]]&.destroy
     Project[frame["vm_pool_service_project"]]&.destroy
     Project[frame["github_test_project_id"]]&.destroy

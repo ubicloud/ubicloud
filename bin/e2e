@@ -8,14 +8,22 @@ require "optparse"
 @started_at = Time.now
 
 def main(options)
-  all_test_cases = YAML.load_file("config/e2e_test_cases.yml").to_h { [it["name"], it] }
-  boot_images = all_test_cases.values_at(*options[:test_cases]).flat_map { it["images"] }.uniq
+  test_cases = YAML.load_file("config/e2e_test_cases.yml").to_h { [it["name"], it] }
 
-  hetzner_server_st = Prog::Test::HetznerServer.assemble(vm_host_id: options[:vm_host_id], default_boot_images: boot_images)
+  ["metal", "aws"].each do |provider|
+    next unless options[:providers].include?(provider)
+    puts "Starting #{provider} tests"
+    send("test_#{provider}", options, test_cases)
+  end
+end
+
+def test_metal(options, test_cases)
+  default_boot_images = test_cases.values_at(*options[:test_cases]).flat_map { it["images"] }.uniq
+  hetzner_server_st = Prog::Test::HetznerServer.assemble(vm_host_id: options[:vm_host_id], default_boot_images:)
   wait_until(hetzner_server_st, "wait")
 
   tests_to_wait = []
-  if options[:test_cases].include?("vm") && (test_case = all_test_cases["vm"])
+  if options[:test_cases].include?("vm") && (test_case = test_cases["vm"])
     # Testing slices is not parallel with other tests as it requires a specific host state
 
     # This tests encrypted VMs with slices, which will create both standard and
@@ -36,7 +44,7 @@ def main(options)
     tests_to_wait << unencrypted_vms_st
   end
 
-  if (gh_test_cases = all_test_cases.values_at(*options[:test_cases].select { it.include?("github_runner") })).any?
+  if (gh_test_cases = test_cases.values_at(*options[:test_cases].select { it.include?("github_runner") })).any?
     tests_to_wait << Prog::Test::GithubRunner.assemble(gh_test_cases)
   end
 
@@ -58,6 +66,15 @@ def main(options)
 
   Semaphore.incr(hetzner_server_st.id, "verify_cleanup_and_destroy")
   wait_until(hetzner_server_st)
+end
+
+def test_aws(options, test_cases)
+  tests_to_wait = []
+  if (gh_test_cases = test_cases.values_at(*options[:test_cases].select { it.include?("github_runner") })).any?
+    tests_to_wait << Prog::Test::GithubRunner.assemble(gh_test_cases, provider: "aws")
+  end
+
+  tests_to_wait.each { |st| wait_until(st) }
 end
 
 def wait_until(st, label = nil)
@@ -90,6 +107,7 @@ end
 options = {test_cases: ["vm"]}
 OptionParser.new do |opts|
   opts.on("--vm-host-id VM_HOST_ID", "Use existing vm host") { |v| options[:vm_host_id] = (v.length == 26) ? UBID.to_uuid(v) : v }
+  opts.on("--providers PROVIDERS", Array, "List of providers to run separated by comma") { |v| options[:providers] = v }
   opts.on("--test-cases TEST_CASES", Array, "List of test cases to run separated by comma") { |v| options[:test_cases] = v }
 end.parse!
 
