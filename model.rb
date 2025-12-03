@@ -12,7 +12,15 @@ Sequel::Model.plugin :require_valid_schema
 Sequel::Model.plugin :singular_table_names
 Sequel::Model.plugin :subclasses unless ENV["RACK_ENV"] == "development"
 Sequel::Model.plugin :column_encryption do |enc|
-  enc.key 0, Config.clover_column_encryption_key
+  key = Config.clover_column_encryption_key
+  if Config.kms_decrypt_clover_column_encryption_key_with_arn
+    require "aws-sdk-kms"
+    kms_client = Aws::KMS::Client.new
+    ciphertext_blob = Base64.decode64(key)
+    response = kms_client.decrypt(ciphertext_blob:, key_id: Config.kms_decrypt_clover_column_encryption_key_with_arn)
+    key = response.plaintext
+  end
+  enc.key 0, key
 end
 Sequel::Model.plugin :many_through_many
 Sequel::Model.plugin :insert_conflict

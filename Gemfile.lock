@@ -449,6 +449,7 @@ DEPENDENCIES
   awesome_print
   aws-sdk-ec2 (~> 1.512)
   aws-sdk-iam
+  aws-sdk-kms
   aws-sdk-s3
   bcrypt_pbkdf
   brakeman
