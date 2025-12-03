@@ -74,6 +74,10 @@ def test_aws(options, test_cases)
     tests_to_wait << Prog::Test::GithubRunner.assemble(gh_test_cases, provider: "aws")
   end
 
+  if options[:test_cases].include?("postgres_standard")
+    tests_to_wait << Prog::Test::PostgresResource.assemble(provider: "aws")
+  end
+
   tests_to_wait.each { |st| wait_until(st) }
 end
 

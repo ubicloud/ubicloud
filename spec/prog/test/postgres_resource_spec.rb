@@ -5,13 +5,17 @@ require_relative "../../model/spec_helper"
 RSpec.describe Prog::Test::PostgresResource do
   subject(:pgr_test) { described_class.new(described_class.assemble) }
 
-  let(:postgres_service_project_id) { "546a1ed8-53e5-86d2-966c-fb782d2ae3ab" }
+  let(:test_project) { Project.create(name: "test-project") }
+  let(:service_project) { Project.create(name: "service-project") }
   let(:working_representative_server) { instance_double(PostgresServer, run_query: "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1") }
   let(:faulty_representative_server) { instance_double(PostgresServer, run_query: "") }
 
+  before do
+    allow(Config).to receive(:postgres_service_project_id).and_return(service_project.id)
+  end
+
   describe ".assemble" do
     it "creates a strand and service projects" do
-      expect(Config).to receive(:postgres_service_project_id).exactly(2).and_return(postgres_service_project_id)
       st = described_class.assemble
       expect(st).to be_a Strand
       expect(st.label).to eq("start")
@@ -19,9 +23,18 @@ RSpec.describe Prog::Test::PostgresResource do
   end
 
   describe "#start" do
-    it "hops to wait_postgres_resource" do
-      expect(Prog::Postgres::PostgresResourceNexus).to receive(:assemble).and_return(instance_double(Strand, id: "1234"))
+    it "creates resource on metal and hops to wait_postgres_resource" do
+      expect(pgr_test).to receive(:frame).and_return({"provider" => "metal", "postgres_test_project_id" => test_project.id}).at_least(:once)
       expect { pgr_test.start }.to hop("wait_postgres_resource")
+    end
+
+    it "creates resource on aws and hops to wait_postgres_resource" do
+      expect(Config).to receive(:e2e_aws_access_key).and_return("access_key")
+      expect(Config).to receive(:e2e_aws_secret_key).and_return("secret_key")
+      expect(pgr_test).to receive(:frame).and_return({"provider" => "aws", "postgres_test_project_id" => test_project.id}).at_least(:once)
+      expect { pgr_test.start }.to hop("wait_postgres_resource")
+      location = Location[provider: "aws", project_id: nil, name: "us-west-2"]
+      expect(LocationCredential[location.id].access_key).to eq("access_key")
     end
   end
 
@@ -62,6 +75,12 @@ RSpec.describe Prog::Test::PostgresResource do
   describe "#wait_resources_destroyed" do
     it "naps if the postgres resource isn't deleted yet" do
       expect(pgr_test).to receive(:postgres_resource).and_return(instance_double(PostgresResource))
+      expect { pgr_test.wait_resources_destroyed }.to nap(5)
+    end
+
+    it "naps if the private subnet isn't deleted yet" do
+      expect(pgr_test).to receive(:postgres_resource).and_return(nil)
+      expect(PrivateSubnet).to receive(:[]).and_return(instance_double(PrivateSubnet))
       expect { pgr_test.wait_resources_destroyed }.to nap(5)
     end
 
