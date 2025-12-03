@@ -19,8 +19,9 @@ class Account < Sequel::Model(:accounts)
     identities.map(&:provider).join(", ")
   end
 
-  def create_project_with_default_policy(name, default_policy: true)
-    project = Project.create(name: name)
+  def create_project_with_default_policy(name, reputation: "new", default_policy: true)
+    reputation = "limited" if email.end_with?("@gmail.com") && projects.none? { it.reputation == "verified" }
+    project = Project.create(name:, reputation:)
     add_project(project)
 
     if default_policy

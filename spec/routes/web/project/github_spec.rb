@@ -271,6 +271,17 @@ RSpec.describe Clover, "github" do
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - GitHub Runner Settings")
     end
+
+    it "shows concurrency warning for limited access accounts" do
+      installation.project.update(reputation: "limited")
+      Array.new(3).each {
+        runner = GithubRunner.create(installation_id: installation.id, repository_name: repository.name, label: "ubicloud-standard-60")
+        Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "wait")
+      }
+      visit "#{project.path}/github/#{installation.ubid}/runner"
+      expect(page.status_code).to eq(200)
+      expect(page).to have_content "You've reached your vCPU concurrency limit"
+    end
   end
 
   describe "cache" do

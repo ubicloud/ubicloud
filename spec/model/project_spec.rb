@@ -203,10 +203,16 @@ RSpec.describe Project do
     expect(project.effective_quota_value("GithubRunnerVCpu")).to eq 1000
     expect(project.effective_quota_value("PostgresVCpu")).to eq 128
 
-    expect(project).to receive(:reputation).and_return("verified").at_least(:once)
+    project.reputation = "verified"
     expect(project.effective_quota_value("VmVCpu")).to eq 256
     expect(project.effective_quota_value("GithubRunnerVCpu")).to eq 1000
     expect(project.effective_quota_value("PostgresVCpu")).to eq 256
+
+    project.reputation = "limited"
+    project.quotas_dataset.destroy
+    expect(project.effective_quota_value("VmVCpu")).to eq 16
+    expect(project.effective_quota_value("GithubRunnerVCpu")).to eq 128
+    expect(project.effective_quota_value("PostgresVCpu")).to eq 16
   end
 
   it "checks if quota is available" do
