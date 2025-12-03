@@ -43,7 +43,7 @@ RSpec.describe VictoriaMetricsServer do
       unix_server = instance_double(UNIXServer)
       forward = instance_double(Net::SSH::Service::Forward)
       session = Net::SSH::Connection::Session.allocate
-      sshable = instance_double(Sshable)
+      sshable = Sshable.new
       client = instance_double(VictoriaMetrics::Client)
 
       expect(FileUtils).to receive(:rm_rf).with(socket_path)

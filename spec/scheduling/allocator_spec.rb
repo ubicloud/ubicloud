@@ -994,7 +994,7 @@ RSpec.describe Al do
       expect(vm).to receive(:ip4_enabled).and_return(true).twice
       expect(AssignedVmAddress).to receive(:create).and_return(assigned_address)
       expect(vm).to receive(:assigned_vm_address).and_return(assigned_address)
-      expect(vm).to receive(:sshable).and_return(instance_double(Sshable)).at_least(:once)
+      expect(vm).to receive(:sshable).and_return(Sshable.new).at_least(:once)
       expect(vm.sshable).to receive(:update).with(host: "10.0.0.1")
       Al::Allocation.update_vm(vmh, vm)
     end

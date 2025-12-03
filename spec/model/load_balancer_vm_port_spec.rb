@@ -27,7 +27,7 @@ RSpec.describe LoadBalancerVmPort do
 
   describe "#health_probe" do
     let(:vmh) {
-      session = instance_double(Sshable, start_fresh_session: "session")
+      session = create_mock_sshable(start_fresh_session: "session")
       instance_double(VmHost, sshable: session)
     }
 
@@ -110,7 +110,7 @@ RSpec.describe LoadBalancerVmPort do
 
     describe "#check_pulse" do
       let(:session) {
-        {ssh_session: instance_double(Sshable)}
+        {ssh_session: Sshable.new}
       }
 
       it "doesn't perform update if the state is up and the pulse is also up" do

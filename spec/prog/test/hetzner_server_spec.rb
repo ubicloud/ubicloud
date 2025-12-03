@@ -89,7 +89,7 @@ RSpec.describe Prog::Test::HetznerServer do
 
     it "puts the image sizes if the vm host is downloading images" do
       expect(vm_host.strand).to receive(:label).and_return("wait_download_boot_images").at_least(:once)
-      expect(vm_host.sshable).to receive(:cmd).and_return("image_1\nimage_2\n")
+      expect(vm_host.sshable).to receive(:_cmd).and_return("image_1\nimage_2\n")
       expect(Clog).to receive(:emit).with("image_1\timage_2")
       expect { hs_test.wait_setup_host }.to nap(15)
     end
@@ -122,17 +122,17 @@ RSpec.describe Prog::Test::HetznerServer do
 
   describe "#verify_specs_installation" do
     it "succeeds when installed=false & not exists" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).and_return("0\n")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).and_return("0\n")
       expect { hs_test.verify_specs_installation(installed: false) }.not_to raise_error
     end
 
     it "succeeds when installed=true & exists" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).and_return("5\n")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).and_return("5\n")
       expect { hs_test.verify_specs_installation(installed: true) }.not_to raise_error
     end
 
     it "succeeds when installed=false & exists" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).and_return("5\n")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).and_return("5\n")
       expect(hs_test).to receive(:fail_test).with("verify_specs_installation(installed: false) failed")
       hs_test.verify_specs_installation(installed: false)
     end
@@ -141,12 +141,12 @@ RSpec.describe Prog::Test::HetznerServer do
   describe "#run_integration_specs" do
     it "hops to wait" do
       tmp_dir = "/var/storage/tests"
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo mkdir -p #{tmp_dir}")
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo chmod a+rw #{tmp_dir}")
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with(
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo mkdir -p #{tmp_dir}")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo chmod a+rw #{tmp_dir}")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with(
         "sudo RUN_E2E_TESTS=1 bundle exec rspec host/e2e"
       )
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo rm -rf #{tmp_dir}")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo rm -rf #{tmp_dir}")
       expect { hs_test.run_integration_specs }.to hop("wait")
     end
   end
@@ -187,12 +187,12 @@ RSpec.describe Prog::Test::HetznerServer do
 
   describe "#verify_vm_dir_purged" do
     it "doesn't fail if /vm is empty" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /vm").and_return("")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo ls -1 /vm").and_return("")
       expect { hs_test.verify_vm_dir_purged }.to hop("verify_storage_files_purged")
     end
 
     it "fails if /vm is not empty" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /vm").and_return("vm1\nvm2\n")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo ls -1 /vm").and_return("vm1\nvm2\n")
       expect(hs_test.strand).to receive(:update).with(exitval: {msg: "VM directory not empty: [\"vm1\", \"vm2\"]"})
       expect { hs_test.verify_vm_dir_purged }.to hop("failed")
     end
@@ -200,20 +200,20 @@ RSpec.describe Prog::Test::HetznerServer do
 
   describe "#verify_storage_files_purged" do
     it "succeeds if /var/storage and /var/storage/vhost are empty" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage").and_return("vhost\nimages\n")
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage/vhost").and_return("")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo ls -1 /var/storage").and_return("vhost\nimages\n")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo ls -1 /var/storage/vhost").and_return("")
       expect { hs_test.verify_storage_files_purged }.to hop("verify_resources_reclaimed")
     end
 
     it "fails if /var/storage has disks" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage").and_return("vhost\nimages\ndisk1\ndisk2\n")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo ls -1 /var/storage").and_return("vhost\nimages\ndisk1\ndisk2\n")
       expect(hs_test.strand).to receive(:update).with(exitval: {msg: "VM disks not empty: [\"disk1\", \"disk2\"]"})
       expect { hs_test.verify_storage_files_purged }.to hop("failed")
     end
 
     it "fails if /var/storage/vhost has files" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage").and_return("vhost\nimages\n")
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage/vhost").and_return("file1\nfile2\n")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo ls -1 /var/storage").and_return("vhost\nimages\n")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo ls -1 /var/storage/vhost").and_return("file1\nfile2\n")
       expect(hs_test.strand).to receive(:update).with(exitval: {msg: "vhost directory not empty: [\"file1\", \"file2\"]"})
       expect { hs_test.verify_storage_files_purged }.to hop("failed")
     end

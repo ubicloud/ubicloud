@@ -34,13 +34,13 @@ RSpec.describe Prog::RemoveBootImage do
 
   describe "#remove" do
     it "removes image and pops" do
-      expect(sshable).to receive(:cmd).with("sudo rm -rf /var/storage/images/ubuntu-jammy-20220202.raw")
+      expect(sshable).to receive(:_cmd).with("sudo rm -rf /var/storage/images/ubuntu-jammy-20220202.raw")
       expect { rbi.remove }.to hop("update_database")
     end
 
     it "can remove unversioned image" do
       boot_image.update(version: nil)
-      expect(sshable).to receive(:cmd).with("sudo rm -rf /var/storage/images/ubuntu-jammy.raw")
+      expect(sshable).to receive(:_cmd).with("sudo rm -rf /var/storage/images/ubuntu-jammy.raw")
       expect { rbi.remove }.to hop("update_database")
     end
   end

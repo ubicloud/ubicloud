@@ -9,8 +9,8 @@ RSpec.describe Prog::SetupSysstat do
 
   describe "#start" do
     it "Sets it up and pops" do
-      sshable = instance_double(Sshable)
-      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-sysstat")
+      sshable = Sshable.new
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-sysstat")
       expect(ss).to receive(:sshable).and_return(sshable)
       expect { ss.start }.to exit({"msg" => "Sysstat was setup"})
     end

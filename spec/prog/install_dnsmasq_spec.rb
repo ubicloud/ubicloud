@@ -33,8 +33,8 @@ RSpec.describe Prog::InstallDnsmasq do
 
   describe "#compile_and_install" do
     it "runs a compile command and pops" do
-      sshable = instance_double(Sshable)
-      expect(sshable).to receive(:cmd).with "(cd dnsmasq && make -sj$(nproc) && sudo make install)"
+      sshable = Sshable.new
+      expect(sshable).to receive(:_cmd).with "(cd dnsmasq && make -sj$(nproc) && sudo make install)"
       expect(idm).to receive(:sshable).and_return(sshable)
 
       expect { idm.compile_and_install }.to exit({"msg" => "compiled and installed dnsmasq"})
@@ -43,8 +43,8 @@ RSpec.describe Prog::InstallDnsmasq do
 
   describe "#install_build_dependencies" do
     it "installs dependencies and pops" do
-      sshable = instance_double(Sshable)
-      expect(sshable).to receive(:cmd).with "sudo apt-get -y install make gcc"
+      sshable = Sshable.new
+      expect(sshable).to receive(:_cmd).with "sudo apt-get -y install make gcc"
       expect(idm).to receive(:sshable).and_return(sshable)
 
       expect { idm.install_build_dependencies }.to exit({"msg" => "installed build dependencies"})
@@ -53,8 +53,8 @@ RSpec.describe Prog::InstallDnsmasq do
 
   describe "#git_clone_dnsmasq" do
     it "fetches a version and pops" do
-      sshable = instance_double(Sshable)
-      expect(sshable).to receive(:cmd).with <<CMD.rstrip
+      sshable = Sshable.new
+      expect(sshable).to receive(:_cmd).with <<CMD.rstrip
 git init dnsmasq && (cd dnsmasq &&   git fetch https://github.com/ubicloud/dnsmasq.git b6769234bca9b0eabfe4768832b88d2cdb187092 --depth=1 &&  git checkout b6769234bca9b0eabfe4768832b88d2cdb187092 &&  git fsck --full)
 CMD
       expect(idm).to receive(:sshable).and_return(sshable)

@@ -87,52 +87,52 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
 
   describe "wait_vm_stop" do
     it "naps if vm has not stopped yet" do
-      expect(vm.vm_host.sshable).to receive(:cmd).with("systemctl is-active #{vm.inhost_name}").and_return("")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name}").and_return("")
       expect { prog.wait_vm_stop }.to nap(5)
     end
 
     it "hops to remove_spdk_controller if vm is inactive" do
-      expect(vm.vm_host.sshable).to receive(:cmd).with("systemctl is-active #{vm.inhost_name}").and_raise(Sshable::SshError.new("cmd", "inactive\n", "stderr", 3, nil))
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name}").and_raise(Sshable::SshError.new("cmd", "inactive\n", "stderr", 3, nil))
       expect { prog.wait_vm_stop }.to hop("remove_spdk_controller")
     end
   end
 
   describe "#remove_spdk_controller" do
     it "stops the spdk controller" do
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo host/bin/spdk-migration-helper remove-spdk-controller", stdin: prog.migration_script_params)
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/spdk-migration-helper remove-spdk-controller", stdin: prog.migration_script_params)
       expect { prog.remove_spdk_controller }.to hop("generate_vhost_backend_conf")
     end
   end
 
   describe "#ready_migration" do
     it "readies the migration" do
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo mv /var/storage/#{vm.inhost_name}/0/disk.raw /var/storage/#{vm.inhost_name}/0/disk.raw.bk")
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo rm /var/storage/#{vm.inhost_name}/0/vhost.sock")
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo mkfifo /var/storage/#{vm.inhost_name}/0/kek.pipe")
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo chown #{vm.inhost_name}:#{vm.inhost_name} /var/storage/#{vm.inhost_name}/0/kek.pipe")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo mv /var/storage/#{vm.inhost_name}/0/disk.raw /var/storage/#{vm.inhost_name}/0/disk.raw.bk")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo rm /var/storage/#{vm.inhost_name}/0/vhost.sock")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo mkfifo /var/storage/#{vm.inhost_name}/0/kek.pipe")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo chown #{vm.inhost_name}:#{vm.inhost_name} /var/storage/#{vm.inhost_name}/0/kek.pipe")
       expect { prog.ready_migration }.to hop("download_migration_binaries")
     end
   end
 
   describe "#generate_vhost_backend_conf" do
     it "generates the vhost backend conf" do
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo host/bin/convert-encrypted-dek-to-vhost-backend-conf --encrypted-dek-file /var/storage/#{vm.inhost_name}/0/data_encryption_key.json --kek-file /dev/stdin --vhost-conf-output-file /var/storage/#{vm.inhost_name}/0/vhost-backend.conf --vm-name #{vm.inhost_name} --device nvme0", stdin: vm.storage_secrets.to_json)
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo chown #{vm.inhost_name}:#{vm.inhost_name} /var/storage/#{vm.inhost_name}/0/vhost-backend.conf")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/convert-encrypted-dek-to-vhost-backend-conf --encrypted-dek-file /var/storage/#{vm.inhost_name}/0/data_encryption_key.json --kek-file /dev/stdin --vhost-conf-output-file /var/storage/#{vm.inhost_name}/0/vhost-backend.conf --vm-name #{vm.inhost_name} --device nvme0", stdin: vm.storage_secrets.to_json)
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo chown #{vm.inhost_name}:#{vm.inhost_name} /var/storage/#{vm.inhost_name}/0/vhost-backend.conf")
       expect { prog.generate_vhost_backend_conf }.to hop("ready_migration")
     end
   end
 
   describe "#download_migration_binaries" do
     it "downloads the migration binary" do
-      expect(vm.vm_host.sshable).to receive(:cmd).with("curl -L -f -o /tmp/migrate https://github.com/ubicloud/ubiblk-migrate/releases/download/v0.2.0/migrate")
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sha256sum /tmp/migrate | cut -d' ' -f1").and_return("6a73c44ef6ab03ede17186a814f80a174cbe5ed9cc9f7ae6f5f639a7ec97c4ac\n")
-      expect(vm.vm_host.sshable).to receive(:cmd).with("chmod +x /tmp/migrate")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("curl -L -f -o /tmp/migrate https://github.com/ubicloud/ubiblk-migrate/releases/download/v0.2.0/migrate")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sha256sum /tmp/migrate | cut -d' ' -f1").and_return("6a73c44ef6ab03ede17186a814f80a174cbe5ed9cc9f7ae6f5f639a7ec97c4ac\n")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("chmod +x /tmp/migrate")
       expect { prog.download_migration_binaries }.to hop("migrate_from_spdk_to_ubiblk")
     end
 
     it "downloads the migration binary but sha256sum fails" do
-      expect(vm.vm_host.sshable).to receive(:cmd).with("curl -L -f -o /tmp/migrate https://github.com/ubicloud/ubiblk-migrate/releases/download/v0.2.0/migrate")
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sha256sum /tmp/migrate | cut -d' ' -f1").and_return("wronghash\n")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("curl -L -f -o /tmp/migrate https://github.com/ubicloud/ubiblk-migrate/releases/download/v0.2.0/migrate")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sha256sum /tmp/migrate | cut -d' ' -f1").and_return("wronghash\n")
       expect { prog.download_migration_binaries }.to nap(10)
     end
   end
@@ -143,7 +143,7 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
     it "starts the migration if not already" do
       expect(vm.vm_host.sshable).to receive(:d_check).with(unit_name).and_return("NotStarted")
       expect(vm.vm_host.sshable).to receive(:d_run).with(unit_name, "/tmp/migrate", "-base-image=/var/storage/images/ubuntu-noble-20220202.raw", "-overlay-image=/var/storage/#{vm.inhost_name}/0/disk.raw.bk", "-output-image=/var/storage/#{vm.inhost_name}/0/disk.raw", "-kek-file=/var/storage/#{vm.inhost_name}/0/kek.pipe", "-vhost-backend-conf-file=/var/storage/#{vm.inhost_name}/0/vhost-backend.conf")
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo tee /var/storage/#{vm.inhost_name}/0/kek.pipe > /dev/null", stdin: "---\nkey: key_1\ninit_vector: iv_1\nmethod: aes256-gcm\nauth_data: c29tZWRhdGE=\n", log: false)
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo tee /var/storage/#{vm.inhost_name}/0/kek.pipe > /dev/null", stdin: "---\nkey: key_1\ninit_vector: iv_1\nmethod: aes256-gcm\nauth_data: c29tZWRhdGE=\n", log: false)
       expect { prog.migrate_from_spdk_to_ubiblk }.to nap(5)
     end
 
@@ -171,8 +171,8 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
 
   describe "#create_ubiblk_systemd_unit" do
     it "creates the systemd unit and hops to the next label" do
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo chown #{vm.inhost_name}:#{vm.inhost_name} /var/storage/#{vm.inhost_name}/0/disk.raw")
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo host/bin/spdk-migration-helper create-vhost-backend-service-file", stdin: prog.migration_script_params)
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo chown #{vm.inhost_name}:#{vm.inhost_name} /var/storage/#{vm.inhost_name}/0/disk.raw")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/spdk-migration-helper create-vhost-backend-service-file", stdin: prog.migration_script_params)
       expect { prog.create_ubiblk_systemd_unit }.to hop("start_ubiblk_systemd_unit")
     end
   end
@@ -180,7 +180,7 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
   describe "#start_ubiblk_systemd_unit" do
     it "starts the ubiblk systemd unit and hops to the next stage" do
       unit_name = "#{vm.inhost_name}-0-storage.service"
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo systemctl start #{unit_name}")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo systemctl start #{unit_name}")
       expect(prog).to receive(:write_kek_pipe)
       expect { prog.start_ubiblk_systemd_unit }.to hop("update_vm_model")
     end
@@ -195,8 +195,8 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
 
   describe "#update_prep_json_file" do
     it "update the prep json file for proper cleanup of the vm later" do
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo cat /vm/#{vm.inhost_name}/prep.json").and_return({"storage_volumes" => [{"vhost_block_backend_version" => nil, "spdk_version" => "v.0.1.2"}]}.to_json)
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo tee /vm/#{vm.inhost_name}/prep.json >/dev/null", stdin: JSON.pretty_generate({"storage_volumes" => [{"vhost_block_backend_version" => "v0.2.1", "spdk_version" => nil}]}))
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo cat /vm/#{vm.inhost_name}/prep.json").and_return({"storage_volumes" => [{"vhost_block_backend_version" => nil, "spdk_version" => "v.0.1.2"}]}.to_json)
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo tee /vm/#{vm.inhost_name}/prep.json >/dev/null", stdin: JSON.pretty_generate({"storage_volumes" => [{"vhost_block_backend_version" => "v0.2.1", "spdk_version" => nil}]}))
       expect { prog.update_prep_json_file }.to hop("start_vm")
     end
   end
@@ -206,7 +206,7 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
       st = instance_double(Strand)
       expect(vm).to receive(:strand).and_return(st)
       expect(st).to receive(:update).with(label: "wait")
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo systemctl start #{vm.inhost_name}")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo systemctl start #{vm.inhost_name}")
       expect { prog.start_vm }.to exit({"msg" => "Vm successfully migrated to ubiblk"})
     end
   end

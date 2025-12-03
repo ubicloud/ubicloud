@@ -429,7 +429,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     let(:client) { instance_double(Kubernetes::Client) }
 
     before do
-      sshable0, sshable1 = instance_double(Sshable), instance_double(Sshable)
+      sshable0, sshable1 = Sshable.new, instance_double(Sshable)
       expect(first_node).to receive(:sshable).and_return(sshable0).at_least(:once)
       allow(second_node).to receive(:sshable).and_return(sshable1)
       allow(sshable0).to receive(:connect)
@@ -497,7 +497,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   end
 
   describe "#install_metrics_server" do
-    let(:sshable) { instance_double(Sshable) }
+    let(:sshable) { Sshable.new }
     let(:node) { KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
 
     before do
@@ -544,13 +544,13 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     end
 
     it "creates full mesh connectivity on cluster worker nodes" do
-      expect(kubernetes_cluster.worker_functional_nodes.first.vm.sshable).to receive(:cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: first_ssh_key.private_key)
+      expect(kubernetes_cluster.worker_functional_nodes.first.vm.sshable).to receive(:_cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: first_ssh_key.private_key)
       first_vm_authorized_keys = [first_vm.sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n") + "\n"
-      expect(kubernetes_cluster.worker_functional_nodes.first.vm.sshable).to receive(:cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: first_vm_authorized_keys)
+      expect(kubernetes_cluster.worker_functional_nodes.first.vm.sshable).to receive(:_cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: first_vm_authorized_keys)
 
-      expect(kubernetes_cluster.worker_functional_nodes.last.vm.sshable).to receive(:cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: second_ssh_key.private_key)
+      expect(kubernetes_cluster.worker_functional_nodes.last.vm.sshable).to receive(:_cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: second_ssh_key.private_key)
       second_vm_authorized_keys = [second_vm.sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n") + "\n"
-      expect(kubernetes_cluster.worker_functional_nodes.last.vm.sshable).to receive(:cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: second_vm_authorized_keys)
+      expect(kubernetes_cluster.worker_functional_nodes.last.vm.sshable).to receive(:_cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: second_vm_authorized_keys)
 
       expect { nx.sync_worker_mesh }.to hop("wait")
     end
@@ -567,7 +567,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
   describe "#sync_internal_dns_config" do
     let(:client) { instance_double(Kubernetes::Client) }
-    let(:sshable) { instance_double(Sshable) }
+    let(:sshable) { Sshable.new }
     let(:node) { KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
 
     before do
@@ -674,7 +674,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       YAML
 
       expect(client).to receive(:kubectl).with("-n kube-system get cm coredns -oyaml").and_return(get_cm)
-      expect(sshable).to receive(:cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf replace -f -", stdin: replace_cm)
+      expect(sshable).to receive(:_cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf replace -f -", stdin: replace_cm)
       expect { nx.sync_internal_dns_config }.to hop("wait")
     end
 

@@ -10,7 +10,7 @@ RSpec.describe IpsecTunnel do
     )
   }
 
-  let(:vm_host) { instance_double(VmHost, sshable: instance_double(Sshable)) }
+  let(:vm_host) { instance_double(VmHost, sshable: Sshable.new) }
   let(:src_vm) {
     instance_double(
       Vm,

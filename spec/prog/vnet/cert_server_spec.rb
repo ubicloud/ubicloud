@@ -25,7 +25,7 @@ RSpec.describe Prog::Vnet::CertServer do
   }
 
   let(:vm) {
-    vm_host = instance_double(VmHost, sshable: instance_double(Sshable))
+    vm_host = instance_double(VmHost, sshable: Sshable.new)
     instance_double(Vm, inhost_name: "test-vm", vm_host: vm_host, id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
   }
 
@@ -55,7 +55,7 @@ RSpec.describe Prog::Vnet::CertServer do
 
   describe "#put_certificate" do
     it "puts the certificate to vm and hops to start_certificate_server" do
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo host/bin/setup-cert-server put-certificate test-vm", stdin: JSON.generate({cert_payload: "cert", cert_key_payload: OpenSSL::PKey::EC.new(cert.csr_key).to_pem}))
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/setup-cert-server put-certificate test-vm", stdin: JSON.generate({cert_payload: "cert", cert_key_payload: OpenSSL::PKey::EC.new(cert.csr_key).to_pem}))
       expect { nx.put_certificate }.to exit({"msg" => "certificate server is setup"})
     end
 
@@ -67,14 +67,14 @@ RSpec.describe Prog::Vnet::CertServer do
 
   describe "#setup_cert_server" do
     it "starts the certificate server and pops" do
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo host/bin/setup-cert-server setup test-vm")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/setup-cert-server setup test-vm")
       expect { nx.setup_cert_server }.to hop("put_certificate")
     end
   end
 
   describe "#remove_cert_server" do
     it "removes the certificate files, server and hops to remove_load_balancer" do
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo host/bin/setup-cert-server stop_and_remove test-vm")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/setup-cert-server stop_and_remove test-vm")
 
       expect { nx.remove_cert_server }.to exit({"msg" => "certificate resources and server are removed"})
     end
