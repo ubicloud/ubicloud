@@ -348,21 +348,21 @@ RSpec.describe PostgresServer do
   it "initiates a new health monitor session" do
     forward = instance_double(Net::SSH::Service::Forward)
     expect(forward).to receive(:local_socket)
-    session = instance_double(Net::SSH::Connection::Session)
+    session = Net::SSH::Connection::Session.allocate
     expect(session).to receive(:forward).and_return(forward)
     expect(postgres_server.vm.sshable).to receive(:start_fresh_session).and_return(session)
     postgres_server.init_health_monitor_session
   end
 
   it "initiates a new metrics export session" do
-    session = instance_double(Net::SSH::Connection::Session)
+    session = Net::SSH::Connection::Session.allocate
     expect(postgres_server.vm.sshable).to receive(:start_fresh_session).and_return(session)
     postgres_server.init_metrics_export_session
   end
 
   it "checks pulse" do
     session = {
-      ssh_session: instance_double(Net::SSH::Connection::Session),
+      ssh_session: Net::SSH::Connection::Session.allocate,
       db_connection: DB
     }
     pulse = {
@@ -380,7 +380,7 @@ RSpec.describe PostgresServer do
 
   it "increments checkup semaphore if pulse is down for a while and the resource is not upgrading" do
     session = {
-      ssh_session: instance_double(Net::SSH::Connection::Session),
+      ssh_session: Net::SSH::Connection::Session.allocate,
       db_connection: instance_double(Sequel::Postgres::Database)
     }
     pulse = {
@@ -399,7 +399,7 @@ RSpec.describe PostgresServer do
 
   it "uses pg_current_wal_lsn to track lsn for primaries" do
     session = {
-      ssh_session: instance_double(Net::SSH::Connection::Session),
+      ssh_session: Net::SSH::Connection::Session.allocate,
       db_connection: instance_double(Sequel::Postgres::Database)
     }
     pulse = {
@@ -418,7 +418,7 @@ RSpec.describe PostgresServer do
 
   it "uses pg_last_wal_replay_lsn to track lsn for read replicas" do
     session = {
-      ssh_session: instance_double(Net::SSH::Connection::Session),
+      ssh_session: Net::SSH::Connection::Session.allocate,
       db_connection: instance_double(Sequel::Postgres::Database)
     }
     pulse = {

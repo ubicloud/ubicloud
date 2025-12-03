@@ -181,26 +181,26 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
   end
 
   describe "#available?" do
-    let(:session) { instance_double(Net::SSH::Connection::Session) }
+    let(:session) { Net::SSH::Connection::Session.allocate }
 
     before do
       expect(sshable).to receive(:start_fresh_session).and_yield(session)
-      expect(session).to receive(:exec!).with("systemctl is-active standard.slice").and_return("active\nactive\n").once
-      expect(session).to receive(:exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.effective").and_return("2-3\n").once
+      expect(session).to receive(:_exec!).with("systemctl is-active standard.slice").and_return("active\nactive\n").once
+      expect(session).to receive(:_exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.effective").and_return("2-3\n").once
     end
 
     it "succeeds if the partition status is root" do
-      expect(session).to receive(:exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.partition").and_return("root\n").once
+      expect(session).to receive(:_exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.partition").and_return("root\n").once
       expect(nx.available?).to be true
     end
 
     it "succeeds if the partition status is member" do
-      expect(session).to receive(:exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.partition").and_return("member\n").once
+      expect(session).to receive(:_exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.partition").and_return("member\n").once
       expect(nx.available?).to be true
     end
 
     it "fails on the incorrect partition status" do
-      expect(session).to receive(:exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.partition").and_return("isolated\n").once
+      expect(session).to receive(:_exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.partition").and_return("isolated\n").once
       expect(nx.available?).to be false
     end
   end

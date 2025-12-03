@@ -34,7 +34,7 @@ RSpec.describe KubernetesCluster do
 
   it "checks pulse" do
     session = {
-      ssh_session: instance_double(Net::SSH::Connection::Session)
+      ssh_session: Net::SSH::Connection::Session.allocate
     }
     pulse = {
       reading: "down",
@@ -52,7 +52,7 @@ RSpec.describe KubernetesCluster do
 
   it "checks pulse on with no changes to the internal services" do
     session = {
-      ssh_session: instance_double(Net::SSH::Connection::Session)
+      ssh_session: Net::SSH::Connection::Session.allocate
     }
     pulse = {
       reading: "up",
@@ -69,7 +69,7 @@ RSpec.describe KubernetesCluster do
 
   it "checks pulse and fails" do
     session = {
-      ssh_session: instance_double(Net::SSH::Connection::Session)
+      ssh_session: Net::SSH::Connection::Session.allocate
     }
     pulse = {
       reading: "down",
@@ -86,7 +86,7 @@ RSpec.describe KubernetesCluster do
 
   describe "#kubectl" do
     it "create a new client" do
-      session = instance_double(Net::SSH::Connection::Session)
+      session = Net::SSH::Connection::Session.allocate
       expect(kc.client(session: session)).to be_an_instance_of(Kubernetes::Client)
     end
   end

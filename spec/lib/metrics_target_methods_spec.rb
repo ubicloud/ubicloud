@@ -10,7 +10,7 @@ end
 
 RSpec.describe MetricsTargetMethods do
   let(:test_instance) { TestClass.new }
-  let(:mock_ssh_session) { instance_double(Net::SSH::Connection::Session) }
+  let(:mock_ssh_session) { Net::SSH::Connection::Session.allocate }
   let(:session) { {ssh_session: mock_ssh_session} }
   let(:mock_tsdb_client) { instance_double(VictoriaMetrics::Client) }
   let(:metrics_dir) { "/home/ubi/metrics" }
@@ -76,8 +76,8 @@ RSpec.describe MetricsTargetMethods do
     let(:status_hash) { {exit_code: 0} }
 
     before do
-      allow(mock_ssh_session).to receive(:exec!).with(/ls.*done/).and_return(file_list)
-      allow(mock_ssh_session).to receive(:exec!).with(/cat.*done/, status: anything) do |_, options|
+      allow(mock_ssh_session).to receive(:_exec!).with(/ls.*done/).and_return(file_list)
+      allow(mock_ssh_session).to receive(:_exec!).with(/cat.*done/, status: anything) do |_, options|
         options[:status][:exit_code] = status_hash[:exit_code]
         file_content
       end
@@ -111,7 +111,7 @@ RSpec.describe MetricsTargetMethods do
 
     it "executes the correct command to move files" do
       expected_command = "ls #{metrics_dir}/done | sort | awk '$0 <= \"#{time_marker}\"' | xargs -I{} rm #{metrics_dir}/done/{}"
-      expect(mock_ssh_session).to receive(:exec!).with(expected_command)
+      expect(mock_ssh_session).to receive(:_exec!).with(expected_command)
 
       test_instance.mark_pending_scrapes_as_done(session, time)
     end

@@ -101,7 +101,7 @@ RSpec.describe GithubRunner do
 
   it "checks pulse" do
     session = {
-      ssh_session: instance_double(Net::SSH::Connection::Session)
+      ssh_session: Net::SSH::Connection::Session.allocate
     }
     pulse = {
       reading: "up",
@@ -109,10 +109,10 @@ RSpec.describe GithubRunner do
       reading_chg: Time.now - 30
     }
 
-    expect(session[:ssh_session]).to receive(:exec!).with("awk '/MemAvailable/ {print $2}' /proc/meminfo").and_return("123\n")
+    expect(session[:ssh_session]).to receive(:_exec!).with("awk '/MemAvailable/ {print $2}' /proc/meminfo").and_return("123\n")
     github_runner.check_pulse(session: session, previous_pulse: pulse)
 
-    expect(session[:ssh_session]).to receive(:exec!).and_raise Sshable::SshError
+    expect(session[:ssh_session]).to receive(:_exec!).and_raise Sshable::SshError
     github_runner.check_pulse(session: session, previous_pulse: pulse)
   end
 end

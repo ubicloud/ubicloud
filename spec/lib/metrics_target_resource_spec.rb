@@ -125,7 +125,7 @@ RSpec.describe MetricsTargetResource do
     end
 
     it "closes the session and sets it to nil" do
-      session = instance_double(Net::SSH::Connection::Session)
+      session = Net::SSH::Connection::Session.allocate
       resource.instance_variable_set(:@session, {ssh_session: session})
       expect(session).to receive(:shutdown!)
       expect(session).to receive(:close)

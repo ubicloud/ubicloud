@@ -24,7 +24,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
   before do
     allow(nx).to receive_messages(vm_host: vm_host, sshable: sshable)
-    allow(sshable).to receive(:start_fresh_session).and_return(instance_double(Net::SSH::Connection::Session))
+    allow(sshable).to receive(:start_fresh_session).and_return(Net::SSH::Connection::Session.allocate)
   end
 
   describe ".assemble" do

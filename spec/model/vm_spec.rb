@@ -291,7 +291,7 @@ RSpec.describe Vm do
 
   it "checks pulse" do
     session = {
-      ssh_session: instance_double(Net::SSH::Connection::Session)
+      ssh_session: Net::SSH::Connection::Session.allocate
     }
     pulse = {
       reading: "down",
@@ -300,15 +300,15 @@ RSpec.describe Vm do
     }
 
     expect(vm).to receive(:inhost_name).and_return("vmxxxx").at_least(:once)
-    expect(session[:ssh_session]).to receive(:exec!).and_return("active\nactive\n")
+    expect(session[:ssh_session]).to receive(:_exec!).and_return("active\nactive\n")
     expect(vm.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("up")
 
-    expect(session[:ssh_session]).to receive(:exec!).and_return("active\ninactive\n")
+    expect(session[:ssh_session]).to receive(:_exec!).and_return("active\ninactive\n")
     expect(vm).to receive(:reload).and_return(vm)
     expect(vm).to receive(:incr_checkup)
     expect(vm.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
 
-    expect(session[:ssh_session]).to receive(:exec!).and_raise Sshable::SshError
+    expect(session[:ssh_session]).to receive(:_exec!).and_raise Sshable::SshError
     expect(vm).to receive(:reload).and_return(vm)
     expect(vm).to receive(:incr_checkup)
     expect(vm.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")

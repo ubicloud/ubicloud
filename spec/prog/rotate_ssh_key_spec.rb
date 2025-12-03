@@ -34,10 +34,10 @@ RSpec.describe Prog::RotateSshKey do
 
   describe "#retire_old_key_on_server" do
     it "retires old keys on server" do
-      sess = instance_double(Net::SSH::Connection::Session)
+      sess = Net::SSH::Connection::Session.allocate
       expect(sshable).to receive(:raw_private_key_2).and_return(SshKey.generate.keypair)
       expect(Net::SSH).to receive(:start).and_yield(sess)
-      expect(sess).to receive(:exec!).with(/.*mv ~\/.ssh\/authorized_keys2 ~\/.ssh\/authorized_keys.*/)
+      expect(sess).to receive(:_exec!).with(/.*mv ~\/.ssh\/authorized_keys2 ~\/.ssh\/authorized_keys.*/)
       expect { rsk.retire_old_key_on_server }.to hop("retire_old_key_in_database")
     end
   end
@@ -60,28 +60,28 @@ RSpec.describe Prog::RotateSshKey do
   end
 
   describe "#test_rotation" do
-    let(:sess) { instance_double(Net::SSH::Connection::Session) }
+    let(:sess) { Net::SSH::Connection::Session.allocate }
 
     before do
       expect(Net::SSH).to receive(:start).and_yield(sess)
     end
 
     it "can connect with new key" do
-      expect(sess).to receive(:exec!).with("echo key rotated successfully").and_return(
+      expect(sess).to receive(:_exec!).with("echo key rotated successfully").and_return(
         Net::SSH::Connection::Session::StringWithExitstatus.new("key rotated successfully\n", 0)
       )
       expect { rsk.test_rotation }.to exit({"msg" => "key rotated successfully"})
     end
 
     it "fails if exit status not zero" do
-      expect(sess).to receive(:exec!).with("echo key rotated successfully").and_return(
+      expect(sess).to receive(:_exec!).with("echo key rotated successfully").and_return(
         Net::SSH::Connection::Session::StringWithExitstatus.new("unknown error", 1)
       )
       expect { rsk.test_rotation }.to raise_error RuntimeError, "Unexpected exit status: 1"
     end
 
     it "fails if output not expected" do
-      expect(sess).to receive(:exec!).with("echo key rotated successfully").and_return(
+      expect(sess).to receive(:_exec!).with("echo key rotated successfully").and_return(
         Net::SSH::Connection::Session::StringWithExitstatus.new("wrong output", 0)
       )
       expect { rsk.test_rotation }.to raise_error RuntimeError, "Unexpected output message: wrong output"

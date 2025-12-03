@@ -72,7 +72,7 @@ RSpec.describe MinioServer do
   it "initiates a new health monitor session" do
     forward = instance_double(Net::SSH::Service::Forward)
     expect(forward).to receive(:local)
-    session = instance_double(Net::SSH::Connection::Session)
+    session = Net::SSH::Connection::Session.allocate
     expect(session).to receive(:forward).and_return(forward)
     sshable = instance_double(Sshable)
     expect(sshable).to receive(:start_fresh_session).and_return(session)
@@ -85,7 +85,7 @@ RSpec.describe MinioServer do
 
   it "checks pulse using endpoint for multiple servers" do
     session = {
-      ssh_session: instance_double(Net::SSH::Connection::Session),
+      ssh_session: Net::SSH::Connection::Session.allocate,
       minio_client: Minio::Client.new(endpoint: "https://1.2.3.4:9000", access_key: "dummy-key", secret_key: "dummy-secret", ssl_ca_data: "data")
     }
 
@@ -108,7 +108,7 @@ RSpec.describe MinioServer do
 
   it "checks pulse without endpoint for single server" do
     session = {
-      ssh_session: instance_double(Net::SSH::Connection::Session),
+      ssh_session: Net::SSH::Connection::Session.allocate,
       minio_client: Minio::Client.new(endpoint: "https://1.2.3.4:9000", access_key: "dummy-key", secret_key: "dummy-secret", ssl_ca_data: "data")
     }
 
@@ -127,7 +127,7 @@ RSpec.describe MinioServer do
 
   it "increments checkup semaphore if pulse is down for a while" do
     session = {
-      ssh_session: instance_double(Net::SSH::Connection::Session),
+      ssh_session: Net::SSH::Connection::Session.allocate,
       minio_client: instance_double(Minio::Client)
     }
 
