@@ -48,7 +48,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
     )
   }
 
-  let(:sshable) { instance_double(Sshable, host: "3.4.5.6") }
+  let(:sshable) { create_mock_sshable(host: "3.4.5.6") }
 
   before do
     allow(nx).to receive_messages(vm: vm, inference_endpoint: inference_endpoint, inference_endpoint_replica: replica)
@@ -135,7 +135,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   describe "#download_lb_cert" do
     it "downloads lb cert and hops to setup_external" do
-      expect(sshable).to receive(:cmd).with("sudo inference_endpoint/bin/download-lb-cert")
+      expect(sshable).to receive(:_cmd).with("sudo inference_endpoint/bin/download-lb-cert")
       expect { nx.download_lb_cert }.to hop("setup_external")
     end
   end
@@ -172,7 +172,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
         )
         .to_return(status: 200, body: {"data" => {"podFindAndDeployOnDemand" => {"id" => "thepodid"}}}.to_json, headers: {})
       expect(replica).to receive(:update).with(external_state: {"pod_id" => "thepodid"})
-      expect(sshable).to receive(:cmd).and_return("vm ssh key\n")
+      expect(sshable).to receive(:_cmd).and_return("vm ssh key\n")
       expect { nx.setup_external }.to nap(10)
     end
 
@@ -267,58 +267,58 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   describe "#setup" do
     it "triggers setup if setup command is not sent yet or failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"engine_start_cmd\":\"/opt/miniconda/envs/vllm/bin/vllm serve /ie/models/model --served-model-name llama --disable-log-requests --host 127.0.0.1 --some-params\",\"replica_ubid\":\"#{replica.ubid}\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"}).twice
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"engine_start_cmd\":\"/opt/miniconda/envs/vllm/bin/vllm serve /ie/models/model --served-model-name llama --disable-log-requests --host 127.0.0.1 --some-params\",\"replica_ubid\":\"#{replica.ubid}\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"}).twice
       expect(inference_endpoint).to receive(:gpu_count).and_return(1).twice
       expect(inference_endpoint).to receive(:engine).and_return("vllm").twice
       expect(inference_endpoint).to receive(:engine_params).and_return("--some-params").twice
       expect(inference_endpoint).to receive(:model_name).and_return("llama").twice
 
       # NotStarted
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
       expect { nx.setup }.to nap(5)
 
       # Failed
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("Failed")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check setup").and_return("Failed")
       expect { nx.setup }.to nap(5)
     end
 
     it "triggers setup for vllm with cpu if setup command is not sent yet or failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"engine_start_cmd\":\"/opt/miniconda/envs/vllm-cpu/bin/vllm serve /ie/models/model --served-model-name llama --disable-log-requests --host 127.0.0.1 --some-params\",\"replica_ubid\":\"#{replica.ubid}\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"})
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"engine_start_cmd\":\"/opt/miniconda/envs/vllm-cpu/bin/vllm serve /ie/models/model --served-model-name llama --disable-log-requests --host 127.0.0.1 --some-params\",\"replica_ubid\":\"#{replica.ubid}\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"})
       expect(inference_endpoint).to receive(:gpu_count).and_return(0)
       expect(inference_endpoint).to receive(:engine).and_return("vllm")
       expect(inference_endpoint).to receive(:engine_params).and_return("--some-params")
       expect(inference_endpoint).to receive(:model_name).and_return("llama")
 
       # NotStarted
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
       expect { nx.setup }.to nap(5)
     end
 
     it "triggers setup for runpod if setup command is not sent yet or failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"engine_start_cmd\":\"ssh -N -L 8000:localhost:8000 root@ -p  -i /ie/workdir/.ssh/runpod -o UserKnownHostsFile=/ie/workdir/.ssh/known_hosts -o StrictHostKeyChecking=accept-new\",\"replica_ubid\":\"#{replica.ubid}\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"}).twice
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"engine_start_cmd\":\"ssh -N -L 8000:localhost:8000 root@ -p  -i /ie/workdir/.ssh/runpod -o UserKnownHostsFile=/ie/workdir/.ssh/known_hosts -o StrictHostKeyChecking=accept-new\",\"replica_ubid\":\"#{replica.ubid}\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"}).twice
       expect(inference_endpoint).to receive(:engine).and_return("runpod").twice
 
       # NotStarted
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
       expect { nx.setup }.to nap(5)
 
       # Failed
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("Failed")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check setup").and_return("Failed")
       expect { nx.setup }.to nap(5)
     end
 
     it "hops to wait_endpoint_up if setup command has succeeded" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check setup").and_return("Succeeded")
       expect { nx.setup }.to hop("wait_endpoint_up")
     end
 
     it "naps if script return unknown status" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("Unknown")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check setup").and_return("Unknown")
       expect { nx.setup }.to nap(5)
     end
 
     it "fails if inference engine is unsupported" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
       expect(inference_endpoint).to receive(:engine).and_return("unsupported engine")
       expect { nx.setup }.to raise_error("BUG: unsupported inference engine")
     end
@@ -439,7 +439,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
         JSON.parse("[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]"),
         "output", "completion_token_count"
       )
-      expect(sshable).to receive(:cmd).with("sudo curl -m 10 --no-progress-meter -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", {stdin: "{\"replica_ubid\":\"#{replica.ubid}\",\"public_endpoint\":false,\"projects\":[{\"ubid\":\"#{projects.first.ubid}\",\"api_keys\":[\"#{Digest::SHA2.hexdigest(projects.first.api_keys.first.key)}\"],\"quota_rps\":100,\"quota_tps\":10000}]}"}).and_return("{\"inference_endpoint\":\"1eqhk4b9gfq27gc5agxkq84bhr\",\"replica\":\"1rvtmbhd8cne6jpz3xxat7rsnr\",\"projects\":[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]}")
+      expect(sshable).to receive(:_cmd).with("sudo curl -m 10 --no-progress-meter -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", {stdin: "{\"replica_ubid\":\"#{replica.ubid}\",\"public_endpoint\":false,\"projects\":[{\"ubid\":\"#{projects.first.ubid}\",\"api_keys\":[\"#{Digest::SHA2.hexdigest(projects.first.api_keys.first.key)}\"],\"quota_rps\":100,\"quota_tps\":10000}]}"}).and_return("{\"inference_endpoint\":\"1eqhk4b9gfq27gc5agxkq84bhr\",\"replica\":\"1rvtmbhd8cne6jpz3xxat7rsnr\",\"projects\":[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]}")
       nx.ping_gateway
     end
 
@@ -452,7 +452,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
         {"ubid" => projects.last.ubid, "api_keys" => [Digest::SHA2.hexdigest(projects.last.api_keys.first.key)], "quota_rps" => 100, "quota_tps" => 10000}
       ].sort_by { |p| p["ubid"] }
 
-      expect(sshable).to receive(:cmd) do |command, options|
+      expect(sshable).to receive(:_cmd) do |command, options|
         json_sent = JSON.parse(options[:stdin])
         projects_sent = json_sent["projects"].sort_by { |p| p["ubid"] }
         expect(projects_sent).to eq(expected_projects)

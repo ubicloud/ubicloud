@@ -89,7 +89,7 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
   end
 
   describe "#drain_old_node" do
-    let(:sshable) { instance_double(Sshable) }
+    let(:sshable) { Sshable.new }
     let(:old_node) { KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
 
     before do

@@ -48,7 +48,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
     )
   }
 
-  let(:sshable) { instance_double(Sshable, host: "3.4.5.6") }
+  let(:sshable) { create_mock_sshable(host: "3.4.5.6") }
 
   before do
     allow(nx).to receive_messages(vm: vm, inference_router: inference_router, inference_router_replica: replica)
@@ -139,26 +139,26 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       expect(nx).to receive(:update_config)
       expect(Config).to receive(:inference_router_access_token).and_return("dummy_access_token")
       expect(Config).to receive(:inference_router_release_tag).and_return("v0.1.0")
-      expect(sshable).to receive(:cmd).with(
+      expect(sshable).to receive(:_cmd).with(
         "id -u inference-router >/dev/null 2>&1 || sudo useradd --system --no-create-home --shell /usr/sbin/nologin inference-router"
       )
-      expect(sshable).to receive(:cmd).with(
+      expect(sshable).to receive(:_cmd).with(
         "sudo wget -O /ir/workdir/fetch_linux_amd64 https://github.com/gruntwork-io/fetch/releases/download/v0.4.6/fetch_linux_amd64"
       )
-      expect(sshable).to receive(:cmd).with("sudo chmod +x /ir/workdir/fetch_linux_amd64")
-      expect(sshable).to receive(:cmd).with(
+      expect(sshable).to receive(:_cmd).with("sudo chmod +x /ir/workdir/fetch_linux_amd64")
+      expect(sshable).to receive(:_cmd).with(
         "sudo /ir/workdir/fetch_linux_amd64 --github-oauth-token=\"dummy_access_token\" --repo=\"https://github.com/ubicloud/inference-router\" --tag=\"v0.1.0\" --release-asset=\"inference-router-*\" /ir/workdir/"
       )
-      expect(sshable).to receive(:cmd).with(
+      expect(sshable).to receive(:_cmd).with(
         "sudo tar -xzf /ir/workdir/inference-router-v0.1.0-x86_64-unknown-linux-gnu.tar.gz -C /ir/workdir"
       )
-      expect(sshable).to receive(:cmd).with(
+      expect(sshable).to receive(:_cmd).with(
         "sudo chown -R inference-router:inference-router /ir/workdir"
       )
-      expect(sshable).to receive(:cmd)
+      expect(sshable).to receive(:_cmd)
         .with(/sudo tee \/etc\/systemd\/system\/inference-router\.service > \/dev\/null << 'EOF'/)
-      expect(sshable).to receive(:cmd).with("sudo systemctl daemon-reload")
-      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now inference-router")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now inference-router")
       expect { nx.setup }.to hop("wait_router_up")
     end
   end
@@ -287,10 +287,10 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
           "api_keys" => [Digest::SHA2.hexdigest(p.api_keys.first.key)]
         }
       end.sort_by { |p| p["ubid"] }
-      expect(sshable).to receive(:cmd).with(
+      expect(sshable).to receive(:_cmd).with(
         "md5sum /ir/workdir/config.json | awk '{ print $1 }'"
       ).and_return("dummy_md5sum")
-      expect(sshable).to receive(:cmd).with(
+      expect(sshable).to receive(:_cmd).with(
         "sudo mkdir -p /ir/workdir && sudo tee /ir/workdir/config.json > /dev/null",
         hash_including(stdin: a_string_matching(/"projects":/))
       ) do |command, options|
@@ -351,7 +351,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
         projects_sent = json_sent["projects"].sort_by { |p| p["ubid"] }
         expect(projects_sent).to eq(expected_projects)
       end
-      expect(sshable).to receive(:cmd).with("sudo pkill -f -HUP inference-router")
+      expect(sshable).to receive(:_cmd).with("sudo pkill -f -HUP inference-router")
 
       usage = [{
         "ubid" => replica.ubid,
@@ -364,7 +364,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
         "prompt_token_count" => 0,
         "completion_token_count" => 0
       }]
-      expect(sshable).to receive(:cmd).with("curl -k -m 10 --no-progress-meter https://localhost:8080/usage").and_return(usage.to_json)
+      expect(sshable).to receive(:_cmd).with("curl -k -m 10 --no-progress-meter https://localhost:8080/usage").and_return(usage.to_json)
 
       expect(nx).to receive(:update_billing_records).with(
         usage, "prompt_billing_resource", "prompt_token_count"
@@ -386,11 +386,11 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
 
       p_allowed.set_ff_visible_locations ["tr-ist-u1-tom"]
 
-      expect(sshable).to receive(:cmd).with(
+      expect(sshable).to receive(:_cmd).with(
         "md5sum /ir/workdir/config.json | awk '{ print $1 }'"
       ).and_return("dummy_md5sum")
 
-      expect(sshable).to receive(:cmd).with(
+      expect(sshable).to receive(:_cmd).with(
         "sudo mkdir -p /ir/workdir && sudo tee /ir/workdir/config.json > /dev/null",
         hash_including(stdin: a_string_matching(/"projects":/))
       ) do |_, options|
@@ -409,9 +409,9 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
         expect(ubids).not_to include(p_blocked.ubid)
       end
 
-      expect(sshable).to receive(:cmd).with("sudo pkill -f -HUP inference-router")
+      expect(sshable).to receive(:_cmd).with("sudo pkill -f -HUP inference-router")
 
-      expect(sshable).to receive(:cmd)
+      expect(sshable).to receive(:_cmd)
         .with("curl -k -m 10 --no-progress-meter https://localhost:8080/usage")
         .and_return("[]")
 
@@ -420,15 +420,15 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
 
     it "skips config update when unchanged" do
       expect(inference_router).to receive(:ubid).and_return("irubid")
-      expect(sshable).to receive(:cmd).with(
+      expect(sshable).to receive(:_cmd).with(
         "md5sum /ir/workdir/config.json | awk '{ print $1 }'"
       ).and_return("dd8a549def177e5a6cbedeb511b55208") # md5sum of the test config.
-      expect(sshable).not_to receive(:cmd).with(
+      expect(sshable).not_to receive(:_cmd).with(
         "sudo mkdir -p /ir/workdir && sudo tee /ir/workdir/config.json > /dev/null",
         hash_including(stdin: a_string_matching(/"projects":/))
       )
-      expect(sshable).not_to receive(:cmd).with("sudo pkill -f -HUP inference-router")
-      expect(sshable).to receive(:cmd).with("curl -k -m 10 --no-progress-meter https://localhost:8080/usage").and_return("[]")
+      expect(sshable).not_to receive(:_cmd).with("sudo pkill -f -HUP inference-router")
+      expect(sshable).to receive(:_cmd).with("curl -k -m 10 --no-progress-meter https://localhost:8080/usage").and_return("[]")
       nx.ping_inference_router
     end
   end

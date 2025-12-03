@@ -57,20 +57,20 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
     end
 
     it "inbound_setup creates states and policies if not exist" do
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe2222222 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 sel src 0.0.0.0/0 dst 0.0.0.0/0", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579").and_return(true)
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe3333333 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 ", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579").and_return(true)
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm policy show src 10.0.0.1/32 dst 10.0.0.2/32 dir fwd").and_return("")
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm policy add src 10.0.0.1/32 dst 10.0.0.2/32 dir fwd tmpl src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp reqid 0 mode tunnel").and_return(true)
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm policy show src fd10:9b0b:6b4b:8fbb:abc::/128 dst fd10:9b0b:6b4b:8fbb:def::/128 dir fwd").and_return("")
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm policy add src fd10:9b0b:6b4b:8fbb:abc::/128 dst fd10:9b0b:6b4b:8fbb:def::/128 dir fwd tmpl src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp reqid 0 mode tunnel").and_return(true)
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe2222222 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 sel src 0.0.0.0/0 dst 0.0.0.0/0", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579").and_return(true)
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe3333333 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 ", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579").and_return(true)
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm policy show src 10.0.0.1/32 dst 10.0.0.2/32 dir fwd").and_return("")
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm policy add src 10.0.0.1/32 dst 10.0.0.2/32 dir fwd tmpl src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp reqid 0 mode tunnel").and_return(true)
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm policy show src fd10:9b0b:6b4b:8fbb:abc::/128 dst fd10:9b0b:6b4b:8fbb:def::/128 dir fwd").and_return("")
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm policy add src fd10:9b0b:6b4b:8fbb:abc::/128 dst fd10:9b0b:6b4b:8fbb:def::/128 dir fwd tmpl src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp reqid 0 mode tunnel").and_return(true)
       expect { nx.setup_inbound }.to exit({"msg" => "inbound_setup is complete"})
     end
 
     it "skips policies if they exist" do
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe2222222 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 sel src 0.0.0.0/0 dst 0.0.0.0/0", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579").and_return(true)
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe3333333 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 ", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579").and_return(true)
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm policy show src 10.0.0.1/32 dst 10.0.0.2/32 dir fwd").and_return("not_empty")
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm policy show src fd10:9b0b:6b4b:8fbb:abc::/128 dst fd10:9b0b:6b4b:8fbb:def::/128 dir fwd").and_return("not_empty")
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe2222222 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 sel src 0.0.0.0/0 dst 0.0.0.0/0", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579").and_return(true)
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe3333333 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 ", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579").and_return(true)
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm policy show src 10.0.0.1/32 dst 10.0.0.2/32 dir fwd").and_return("not_empty")
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm policy show src fd10:9b0b:6b4b:8fbb:abc::/128 dst fd10:9b0b:6b4b:8fbb:def::/128 dir fwd").and_return("not_empty")
       expect { nx.setup_inbound }.to exit({"msg" => "inbound_setup is complete"})
     end
 
@@ -88,21 +88,21 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
     end
 
     it "creates new state and policy for src" do
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe2222222 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 sel src 0.0.0.0/0 dst 0.0.0.0/0", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579")
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe2222222 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 sel src 0.0.0.0/0 dst 0.0.0.0/0", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579")
       # If state exists, silently skips
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe3333333 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 ", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579").and_raise Sshable::SshError.new("", "", "File exists", nil, nil)
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm policy show src 10.0.0.1/32 dst 10.0.0.2/32 dir out").and_return("non_empty")
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm policy update src 10.0.0.1/32 dst 10.0.0.2/32 dir out tmpl src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp reqid 86879 mode tunnel")
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm policy show src fd10:9b0b:6b4b:8fbb:abc::/128 dst fd10:9b0b:6b4b:8fbb:def::/128 dir out").and_return("non_empty")
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm policy update src fd10:9b0b:6b4b:8fbb:abc::/128 dst fd10:9b0b:6b4b:8fbb:def::/128 dir out tmpl src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp reqid 86879 mode tunnel")
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm route replace fd10:9b0b:6b4b:8fbb:def::/128 dev vethihellovm")
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm route replace 10.0.0.2/32 dev vethihellovm")
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe3333333 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 ", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579").and_raise Sshable::SshError.new("", "", "File exists", nil, nil)
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm policy show src 10.0.0.1/32 dst 10.0.0.2/32 dir out").and_return("non_empty")
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm policy update src 10.0.0.1/32 dst 10.0.0.2/32 dir out tmpl src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp reqid 86879 mode tunnel")
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm policy show src fd10:9b0b:6b4b:8fbb:abc::/128 dst fd10:9b0b:6b4b:8fbb:def::/128 dir out").and_return("non_empty")
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm policy update src fd10:9b0b:6b4b:8fbb:abc::/128 dst fd10:9b0b:6b4b:8fbb:def::/128 dir out tmpl src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp reqid 86879 mode tunnel")
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm route replace fd10:9b0b:6b4b:8fbb:def::/128 dev vethihellovm")
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm route replace 10.0.0.2/32 dev vethihellovm")
       expect { nx.setup_outbound }.to exit({"msg" => "outbound_setup is complete"})
     end
 
     it "raises error if state creation fails" do
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe2222222 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 sel src 0.0.0.0/0 dst 0.0.0.0/0", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579")
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe3333333 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 ", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579").and_raise Sshable::SshError.new("", "", "bogus", nil, nil)
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe2222222 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 sel src 0.0.0.0/0 dst 0.0.0.0/0", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579")
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe3333333 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 ", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579").and_raise Sshable::SshError.new("", "", "bogus", nil, nil)
       expect { nx.setup_outbound }.to raise_error(Sshable::SshError)
     end
 
@@ -146,16 +146,16 @@ sel src 0.0.0.0/0 dst 0.0.0.0/0"
 
     it "drops old states and pops" do
       expect(tunnel.src_nic).to receive(:dst_ipsec_tunnels).and_return([tunnel]).at_least(:once)
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm state").and_return(states_data)
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm state delete src 2a01:4f8:10a:128b:4919:: dst 2a01:4f8:10a:128b:7537:: proto esp spi 0x610a9eb5").and_return(true)
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm state delete src 2a01:4f8:10a:128b:4919:: dst 2a01:4f8:10a:128b:7537:: proto esp spi 0x059e11e6").and_return(true)
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm state").and_return(states_data)
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm state delete src 2a01:4f8:10a:128b:4919:: dst 2a01:4f8:10a:128b:7537:: proto esp spi 0x610a9eb5").and_return(true)
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm state delete src 2a01:4f8:10a:128b:4919:: dst 2a01:4f8:10a:128b:7537:: proto esp spi 0x059e11e6").and_return(true)
       expect { nx.drop_old_state }.to exit({"msg" => "drop_old_state is complete"})
     end
 
     it "skips if there is no tunnel" do
       expect(tunnel.src_nic).to receive(:src_ipsec_tunnels).and_return([])
       expect(tunnel.src_nic).to receive(:dst_ipsec_tunnels).and_return([])
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm state deleteall")
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm state deleteall")
       expect { nx.drop_old_state }.to exit({"msg" => "drop_old_state is complete early"})
     end
 
@@ -163,9 +163,9 @@ sel src 0.0.0.0/0 dst 0.0.0.0/0"
       src_nic = instance_double(Nic, rekey_payload: nil)
       not_rekeying_nic_tun = instance_double(IpsecTunnel, src_nic: src_nic)
       expect(tunnel.src_nic).to receive(:dst_ipsec_tunnels).and_return([not_rekeying_nic_tun])
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm state").and_return(states_data)
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm state delete src 2a01:4f8:10a:128b:4919:: dst 2a01:4f8:10a:128b:7537:: proto esp spi 0x610a9eb5").and_return(true)
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm state delete src 2a01:4f8:10a:128b:4919:: dst 2a01:4f8:10a:128b:7537:: proto esp spi 0x059e11e6").and_return(true)
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm state").and_return(states_data)
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm state delete src 2a01:4f8:10a:128b:4919:: dst 2a01:4f8:10a:128b:7537:: proto esp spi 0x610a9eb5").and_return(true)
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm state delete src 2a01:4f8:10a:128b:4919:: dst 2a01:4f8:10a:128b:7537:: proto esp spi 0x059e11e6").and_return(true)
       expect { nx.drop_old_state }.to exit({"msg" => "drop_old_state is complete"})
     end
   end

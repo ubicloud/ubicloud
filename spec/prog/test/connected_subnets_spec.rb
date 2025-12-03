@@ -21,7 +21,7 @@ RSpec.describe Prog::Test::ConnectedSubnets do
   }
 
   let(:sshable) {
-    instance_double(Sshable)
+    Sshable.new
   }
 
   before do
@@ -38,9 +38,9 @@ RSpec.describe Prog::Test::ConnectedSubnets do
       vm1 = instance_double(Vm, id: "1ae5f1c2-2f48-4eac-84e3-cfe35b2a9865", sshable: sshable, ip4: NetAddr::IPv4.parse("0.0.0.0"), boot_image: "debian-12")
       vm2 = instance_double(Vm, id: "3f2f4ed0-88b1-49c6-b66a-0d2ed4910ad0", sshable: sshable, boot_image: "almalinux-9")
       expect(ps_multiple).to receive(:vms).and_return([vm1, vm2]).at_least(:once)
-      expect(sshable).to receive(:cmd).with("sudo yum install -y nc")
-      expect(sshable).to receive(:cmd).with("sudo apt-get update && sudo apt-get install -y netcat-openbsd")
-      expect(sshable).to receive(:cmd).with("echo '[Unit]
+      expect(sshable).to receive(:_cmd).with("sudo yum install -y nc")
+      expect(sshable).to receive(:_cmd).with("sudo apt-get update && sudo apt-get install -y netcat-openbsd")
+      expect(sshable).to receive(:_cmd).with("echo '[Unit]
 Description=A lightweight port 8080 listener
 After=network.target
 
@@ -48,7 +48,7 @@ After=network.target
 Type=simple
 ExecStart=/usr/bin/nc -l 8080
 ' | sudo tee /etc/systemd/system/listening_ipv4.service > /dev/null")
-      expect(sshable).to receive(:cmd).with("echo '[Unit]
+      expect(sshable).to receive(:_cmd).with("echo '[Unit]
 Description=A lightweight port 8080 listener
 After=network.target
 
@@ -56,9 +56,9 @@ After=network.target
 Type=simple
 ExecStart=nc -l 8080 -6
 ' | sudo tee /etc/systemd/system/listening_ipv6.service > /dev/null")
-      expect(sshable).to receive(:cmd).with("sudo systemctl daemon-reload")
-      expect(sshable).to receive(:cmd).with("sudo systemctl enable listening_ipv4.service")
-      expect(sshable).to receive(:cmd).with("sudo systemctl enable listening_ipv6.service")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable listening_ipv4.service")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable listening_ipv6.service")
       expect(connected_subnets_test).to receive(:update_stack).with({"vm_to_be_connected_id" => vm1.id})
       expect { connected_subnets_test.start }.to nap(5)
     end
@@ -81,9 +81,9 @@ ExecStart=nc -l 8080 -6
       vm2 = instance_double(Vm, sshable: sshable)
       expect(ps_multiple).to receive(:vms).and_return([vm1, vm2]).at_least(:once)
       expect(ps_single).to receive(:vms).and_return([vm2]).at_least(:once)
-      expect(sshable).to receive(:cmd).with("ping -c 2 google.com").at_least(:once)
-      expect(sshable).to receive(:cmd).with("sudo systemctl start listening_ipv4.service")
-      expect(sshable).to receive(:cmd).with("sudo systemctl stop listening_ipv6.service")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 google.com").at_least(:once)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl start listening_ipv4.service")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop listening_ipv6.service")
       expect(connected_subnets_test).to receive(:test_connection).with(vm1.ip4, vm2, should_fail: true, ipv4: true)
 
       expect { connected_subnets_test.perform_tests_public_blocked }.to hop("perform_tests_private_ipv4")
@@ -109,8 +109,8 @@ ExecStart=nc -l 8080 -6
       expect(connected_subnets_test).to receive(:vm_to_connect).and_return(vm2).at_least(:once)
       expect(connected_subnets_test).to receive(:vm_to_connect_outside).and_return(vm2).at_least(:once)
 
-      expect(sshable).to receive(:cmd).with("sudo systemctl start listening_ipv4.service")
-      expect(sshable).to receive(:cmd).with("sudo systemctl stop listening_ipv6.service")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl start listening_ipv4.service")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop listening_ipv6.service")
       expect(connected_subnets_test).to receive(:test_connection).with(vm1.nics.first.private_ipv4.nth(0).to_s, vm2, should_fail: false, ipv4: true)
       expect(connected_subnets_test).to receive(:test_connection).with(vm1.nics.first.private_ipv4.nth(0).to_s, vm2, should_fail: true, ipv4: true)
 
@@ -135,8 +135,8 @@ ExecStart=nc -l 8080 -6
       expect(connected_subnets_test).to receive(:vm_to_connect).and_return(vm2).at_least(:once)
       expect(connected_subnets_test).to receive(:vm_to_connect_outside).and_return(vm2).at_least(:once)
 
-      expect(sshable).to receive(:cmd).with("sudo systemctl start listening_ipv6.service")
-      expect(sshable).to receive(:cmd).with("sudo systemctl stop listening_ipv4.service")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl start listening_ipv6.service")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop listening_ipv4.service")
       expect(connected_subnets_test).to receive(:test_connection).with(vm1.nics.first.private_ipv6.nth(2).to_s, vm2, should_fail: false, ipv4: false)
       expect(connected_subnets_test).to receive(:test_connection).with(vm1.nics.first.private_ipv6.nth(2).to_s, vm2, should_fail: true, ipv4: false)
 
@@ -161,8 +161,8 @@ ExecStart=nc -l 8080 -6
       expect(connected_subnets_test).to receive(:vm_to_connect).and_return(vm2).at_least(:once)
       expect(connected_subnets_test).to receive(:vm_to_connect_outside).and_return(vm2).at_least(:once)
 
-      expect(sshable).to receive(:cmd).with("sudo systemctl start listening_ipv4.service")
-      expect(sshable).to receive(:cmd).with("sudo systemctl stop listening_ipv6.service")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl start listening_ipv4.service")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop listening_ipv6.service")
       expect(connected_subnets_test).to receive(:test_connection).with(vm1.nics.first.private_ipv4.nth(0).to_s, vm2, should_fail: false, ipv4: true)
       expect(connected_subnets_test).to receive(:test_connection).with(vm1.nics.first.private_ipv4.nth(0).to_s, vm2, should_fail: true, ipv4: true)
 
@@ -187,8 +187,8 @@ ExecStart=nc -l 8080 -6
       expect(connected_subnets_test).to receive(:vm_to_connect).and_return(vm2).at_least(:once)
       expect(connected_subnets_test).to receive(:vm_to_connect_outside).and_return(vm2).at_least(:once)
 
-      expect(sshable).to receive(:cmd).with("sudo systemctl start listening_ipv6.service")
-      expect(sshable).to receive(:cmd).with("sudo systemctl stop listening_ipv4.service")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl start listening_ipv6.service")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop listening_ipv4.service")
       expect(connected_subnets_test).to receive(:test_connection).with(vm1.nics.first.private_ipv6.nth(2).to_s, vm2, should_fail: false, ipv4: false)
       expect(connected_subnets_test).to receive(:test_connection).with(vm1.nics.first.private_ipv6.nth(2).to_s, vm2, should_fail: true, ipv4: false)
 
@@ -285,32 +285,32 @@ ExecStart=nc -l 8080 -6
     it "tests the connection" do
       to_connect_ip = "1.1.1.1"
       connecting = instance_double(Vm, sshable: sshable, inhost_name: "connecting")
-      expect(sshable).to receive(:cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_return("success!")
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_return("success!")
       expect { connected_subnets_test.test_connection(to_connect_ip, connecting, should_fail: false, ipv4: true) }.not_to raise_error
 
-      expect(sshable).to receive(:cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_raise("error")
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_raise("error")
       expect(connected_subnets_test).to receive(:fail_test).with("connecting should be able to connect to 1.1.1.1 on port 8080")
       connected_subnets_test.test_connection(to_connect_ip, connecting, should_fail: false, ipv4: true)
 
-      expect(sshable).to receive(:cmd).with("nc -zvw 1 1.1.1.1 8080 -6").and_return("success!")
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 -6").and_return("success!")
       expect { connected_subnets_test.test_connection(to_connect_ip, connecting, should_fail: false, ipv4: false) }.not_to raise_error
 
-      expect(sshable).to receive(:cmd).with("nc -zvw 1 1.1.1.1 8080 -6").and_raise("error")
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 -6").and_raise("error")
       expect(connected_subnets_test).to receive(:fail_test).with("connecting should be able to connect to 1.1.1.1 on port 8080")
       connected_subnets_test.test_connection(to_connect_ip, connecting, should_fail: false, ipv4: false)
 
-      expect(sshable).to receive(:cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_return("success!")
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_return("success!")
       expect(connected_subnets_test).to receive(:fail_test).with("connecting should not be able to connect to 1.1.1.1 on port 8080")
       connected_subnets_test.test_connection(to_connect_ip, connecting, should_fail: true, ipv4: true)
 
-      expect(sshable).to receive(:cmd).with("nc -zvw 1 1.1.1.1 8080 -6").and_return("success!")
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 -6").and_return("success!")
       expect(connected_subnets_test).to receive(:fail_test).with("connecting should not be able to connect to 1.1.1.1 on port 8080")
       connected_subnets_test.test_connection(to_connect_ip, connecting, should_fail: true, ipv4: false)
 
-      expect(sshable).to receive(:cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_raise("error")
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_raise("error")
       expect(connected_subnets_test.test_connection(to_connect_ip, connecting, should_fail: true, ipv4: true)).to eq(0)
 
-      expect(sshable).to receive(:cmd).with("nc -zvw 1 1.1.1.1 8080 -6").and_raise("error")
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 -6").and_raise("error")
       expect(connected_subnets_test.test_connection(to_connect_ip, connecting, should_fail: true, ipv4: false)).to eq(0)
     end
   end

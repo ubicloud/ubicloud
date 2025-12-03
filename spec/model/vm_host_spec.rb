@@ -326,14 +326,14 @@ RSpec.describe VmHost do
   end
 
   it "initiates a new health monitor session" do
-    sshable = instance_double(Sshable)
+    sshable = Sshable.new
     expect(vh).to receive(:sshable).and_return(sshable)
     expect(sshable).to receive(:start_fresh_session)
     vh.init_health_monitor_session
   end
 
   it "initiates a new health monitor session for metrics exporter" do
-    sshable = instance_double(Sshable)
+    sshable = Sshable.new
     expect(vh).to receive(:sshable).and_return(sshable)
     expect(sshable).to receive(:start_fresh_session)
     vh.init_metrics_export_session
@@ -360,9 +360,9 @@ RSpec.describe VmHost do
 
   it "converts disk devices when StorageDevice has unix_device_list with the old formatting for SSD disks" do
     sd = StorageDevice.create(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["sda"])
-    sshable = instance_double(Sshable)
+    sshable = Sshable.new
     expect(sd).to receive(:vm_host).and_return(vh)
-    expect(sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'sda$' | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-random-id1")
+    expect(sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep 'sda$' | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-random-id1")
     expect(vh).to receive(:sshable).and_return(sshable)
     allow(vh).to receive(:storage_devices).and_return([sd])
     expect(vh.disk_device_ids).to eq(["wwn-random-id1"])
@@ -370,9 +370,9 @@ RSpec.describe VmHost do
 
   it "converts disk devices when StorageDevice has unix_device_list with the old formatting for NVMe disks" do
     sd = StorageDevice.create(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["nvme0n1"])
-    sshable = instance_double(Sshable)
+    sshable = Sshable.new
     expect(sd).to receive(:vm_host).and_return(vh)
-    expect(sshable).to receive(:cmd).with("ls -l /dev/disk/by-id/ | grep 'nvme0n1$' | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id")
+    expect(sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep 'nvme0n1$' | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id")
     expect(vh).to receive(:sshable).and_return(sshable)
     allow(vh).to receive(:storage_devices).and_return([sd])
     expect(vh.disk_device_ids).to eq(["nvme-eui.random-id"])

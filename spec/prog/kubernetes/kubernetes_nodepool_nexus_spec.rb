@@ -154,7 +154,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     let(:client) { instance_double(Kubernetes::Client) }
 
     before do
-      sshable0, sshable1 = instance_double(Sshable), instance_double(Sshable)
+      sshable0, sshable1 = Sshable.new, instance_double(Sshable)
       allow(first_node).to receive(:sshable).and_return(sshable0)
       allow(second_node).to receive(:sshable).and_return(sshable1)
       allow(sshable0).to receive(:connect)

@@ -205,7 +205,7 @@ RSpec.describe PostgresServer do
       expect(standby_server).to receive(:resource).and_return(resource)
       expect(standby_server).to receive(:representative_at).and_return(nil).at_least(:once)
       expect(standby_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
-      expect(standby_server).to receive(:vm).and_return(instance_double(Vm, display_size: "standard-4", sshable: instance_double(Sshable)))
+      expect(standby_server).to receive(:vm).and_return(instance_double(Vm, display_size: "standard-4", sshable: Sshable.new))
 
       expect(resource).to receive(:servers).and_return([postgres_server, standby_server]).at_least(:once)
       expect(resource).to receive(:target_vm_size).and_return("standard-2")
@@ -447,7 +447,7 @@ RSpec.describe PostgresServer do
   end
 
   it "runs query on vm" do
-    expect(postgres_server.vm.sshable).to receive(:cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: "SELECT 1").and_return("1\n")
+    expect(postgres_server.vm.sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: "SELECT 1").and_return("1\n")
     expect(postgres_server.run_query("SELECT 1")).to eq("1")
   end
 
@@ -457,7 +457,7 @@ RSpec.describe PostgresServer do
     VmStorageVolume.create(vm:, disk_index: 0, boot: true, size_gib: 64)
     VmStorageVolume.create(vm:, disk_index: 1, boot: false, size_gib: 1024)
     VmStorageVolume.create(vm:, disk_index: 2, boot: false, size_gib: 1024)
-    expect(postgres_server.vm.sshable).to receive(:cmd).with("lsblk -b -d -o NAME,SIZE | sort -n -k2 | tail -n2 |  awk '{print \"/dev/\"$1}'").and_return("/dev/nvme1n1\n/dev/nvme2n1\n")
+    expect(postgres_server.vm.sshable).to receive(:_cmd).with("lsblk -b -d -o NAME,SIZE | sort -n -k2 | tail -n2 |  awk '{print \"/dev/\"$1}'").and_return("/dev/nvme1n1\n/dev/nvme2n1\n")
     expect(postgres_server.storage_device_paths).to eq(["/dev/nvme1n1", "/dev/nvme2n1"])
   end
 
@@ -498,15 +498,15 @@ RSpec.describe PostgresServer do
   describe "#refresh_walg_credentials" do
     it "does nothing if timeline has no blob storage" do
       expect(postgres_server.timeline.blob_storage).to be_nil
-      expect(vm.sshable).not_to receive(:cmd)
+      expect(vm.sshable).not_to receive(:_cmd)
       expect { postgres_server.refresh_walg_credentials }.not_to raise_error
     end
 
     it "refreshes walg credentials if timeline has blob storage not on aws" do
       expect(timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, root_certs: "root_certs")).at_least(:once)
       expect(timeline).to receive(:generate_walg_config).and_return("walg_config")
-      expect(postgres_server.vm.sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
-      expect(postgres_server.vm.sshable).to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
       expect { postgres_server.refresh_walg_credentials }.not_to raise_error
     end
 
@@ -514,8 +514,8 @@ RSpec.describe PostgresServer do
       location.update(provider: "aws")
       expect(timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, root_certs: "root_certs")).at_least(:once)
       expect(timeline).to receive(:generate_walg_config).and_return("walg_config")
-      expect(postgres_server.vm.sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
-      expect(postgres_server.vm.sshable).not_to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
+      expect(postgres_server.vm.sshable).not_to receive(:_cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
       expect { postgres_server.refresh_walg_credentials }.not_to raise_error
     end
   end

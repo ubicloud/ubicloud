@@ -60,8 +60,8 @@ RSpec.describe Prog::Test::Kubernetes do
   end
 
   describe "#update_all_nodes_hosts_entries" do
-    let(:cp_sshable) { instance_double(Sshable) }
-    let(:worker_sshable) { instance_double(Sshable) }
+    let(:cp_sshable) { Sshable.new }
+    let(:worker_sshable) { Sshable.new }
 
     before do
       kubernetes_test.strand.update(label: "update_all_nodes_hosts_entries")
@@ -176,9 +176,9 @@ RSpec.describe Prog::Test::Kubernetes do
     end
 
     it "creates a statefulset for the following tests" do
-      sshable = instance_double(Sshable)
+      sshable = Sshable.new
       expect(kubernetes_cluster).to receive(:sshable).and_return(sshable)
-      expect(sshable).to receive(:cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f -", stdin: /apiVersion: apps/)
+      expect(sshable).to receive(:_cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f -", stdin: /apiVersion: apps/)
       expect { kubernetes_test.test_csi }.to hop("wait_for_statefulset")
     end
   end
@@ -405,25 +405,25 @@ RSpec.describe Prog::Test::Kubernetes do
   end
 
   describe "#ensure_hosts_entry" do
-    let(:sshable) { instance_double(Sshable) }
+    let(:sshable) { Sshable.new }
     let(:api_hostname) { "api.example.com" }
 
     before do
       expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
-      sshable = instance_double(Sshable, host: "first-api-server-ip")
+      sshable = create_mock_sshable(host: "first-api-server-ip")
       expect(kubernetes_cluster).to receive(:sshable).and_return(sshable)
     end
 
     it "adds host entry if not present" do
-      expect(sshable).to receive(:cmd).with("cat /etc/hosts").and_return("127.0.0.1 localhost")
-      expect(sshable).to receive(:cmd).with("echo first-api-server-ip\\ api.example.com | sudo tee -a /etc/hosts > /dev/null")
+      expect(sshable).to receive(:_cmd).with("cat /etc/hosts").and_return("127.0.0.1 localhost")
+      expect(sshable).to receive(:_cmd).with("echo first-api-server-ip\\ api.example.com | sudo tee -a /etc/hosts > /dev/null")
 
       kubernetes_test.ensure_hosts_entry(sshable, api_hostname)
     end
 
     it "does not add host entry if already present" do
-      expect(sshable).to receive(:cmd).with("cat /etc/hosts").and_return("127.0.0.1 localhost\nfirst-api-server-ip api.example.com")
-      expect(sshable).not_to receive(:cmd).with(/echo/)
+      expect(sshable).to receive(:_cmd).with("cat /etc/hosts").and_return("127.0.0.1 localhost\nfirst-api-server-ip api.example.com")
+      expect(sshable).not_to receive(:_cmd).with(/echo/)
 
       kubernetes_test.ensure_hosts_entry(sshable, api_hostname)
     end
@@ -436,17 +436,17 @@ RSpec.describe Prog::Test::Kubernetes do
 
     it "returns false if vm's sshable is not ready" do
       vm = create_vm
-      sshable = instance_double(Sshable)
+      sshable = Sshable.new
       expect(vm).to receive(:sshable).and_return(sshable)
-      expect(sshable).to receive(:cmd).with("uptime").and_raise("some error")
+      expect(sshable).to receive(:_cmd).with("uptime").and_raise("some error")
       expect(kubernetes_test.vm_ready?(vm)).to be false
     end
 
     it "returns true if vm's sshable is ready" do
       vm = create_vm
-      sshable = instance_double(Sshable)
+      sshable = Sshable.new
       expect(vm).to receive(:sshable).and_return(sshable)
-      expect(sshable).to receive(:cmd).with("uptime").and_return("up")
+      expect(sshable).to receive(:_cmd).with("uptime").and_return("up")
       expect(kubernetes_test.vm_ready?(vm)).to be true
     end
   end

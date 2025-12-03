@@ -38,8 +38,8 @@ JSON
 
   describe "#start" do
     it "exits, saving the ip6 address" do
-      sshable = instance_double(Sshable)
-      expect(sshable).to receive(:cmd).with("/usr/sbin/ip -j -6 addr show scope global").and_return(ip6_interface_output)
+      sshable = Sshable.new
+      expect(sshable).to receive(:_cmd).with("/usr/sbin/ip -j -6 addr show scope global").and_return(ip6_interface_output)
       vm_host = instance_double(VmHost)
       expect(vm_host).to receive(:update).with(ip6: "2a01:4f8:173:1ed3::2", net6: "2a01:4f8:173:1ed3::/64")
       expect(lm).to receive(:sshable).and_return(sshable)
@@ -87,8 +87,8 @@ JSON
     end
 
     it "pops if there is no global unique address prefix provided" do
-      sshable = instance_double(Sshable)
-      expect(sshable).to receive(:cmd).with("/usr/sbin/ip -j -6 addr show scope global").and_return("[]")
+      sshable = Sshable.new
+      expect(sshable).to receive(:_cmd).with("/usr/sbin/ip -j -6 addr show scope global").and_return("[]")
       expect(lm).to receive(:sshable).and_return(sshable)
       expect { lm.start }.to exit({"msg" => "learned network information"})
     end

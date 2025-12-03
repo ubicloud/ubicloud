@@ -26,7 +26,7 @@ RSpec.describe KubernetesCluster do
   end
 
   it "initiates a new health monitor session" do
-    sshable = instance_double(Sshable)
+    sshable = Sshable.new
     expect(kc).to receive(:sshable).and_return(sshable)
     expect(sshable).to receive(:start_fresh_session)
     kc.init_health_monitor_session
@@ -135,11 +135,11 @@ RSpec.describe KubernetesCluster do
     YAML
 
     it "removes client certificate and key data from users and adds an RBAC token to users" do
-      sshable = instance_double(Sshable)
+      sshable = Sshable.new
       KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id)
       expect(kc.cp_vms.first).to receive(:sshable).and_return(sshable).twice
-      expect(sshable).to receive(:cmd).with("kubectl --kubeconfig <(sudo cat /etc/kubernetes/admin.conf) -n kube-system get secret k8s-access -o jsonpath='{.data.token}' | base64 -d", log: false).and_return("mocked_rbac_token")
-      expect(sshable).to receive(:cmd).with("sudo cat /etc/kubernetes/admin.conf", log: false).and_return(kubeconfig)
+      expect(sshable).to receive(:_cmd).with("kubectl --kubeconfig <(sudo cat /etc/kubernetes/admin.conf) -n kube-system get secret k8s-access -o jsonpath='{.data.token}' | base64 -d", log: false).and_return("mocked_rbac_token")
+      expect(sshable).to receive(:_cmd).with("sudo cat /etc/kubernetes/admin.conf", log: false).and_return(kubeconfig)
       customer_config = kc.kubeconfig
       YAML.safe_load(customer_config)["users"].each do |user|
         expect(user["user"]).not_to have_key("client-certificate-data")
@@ -178,7 +178,7 @@ RSpec.describe KubernetesCluster do
 
   describe "#install_rhizome" do
     it "creates a strand for each control plane vm to update the contents of rhizome folder" do
-      sshable = instance_double(Sshable, id: "someid")
+      sshable = create_mock_sshable(id: "someid")
       KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id)
       expect(kc.cp_vms.first).to receive(:sshable).and_return(sshable).twice
       kc.cp_vms.each do |vm|

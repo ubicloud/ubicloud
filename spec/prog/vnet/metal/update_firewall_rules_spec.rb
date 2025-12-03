@@ -10,7 +10,7 @@ RSpec.describe Prog::Vnet::Metal::UpdateFirewallRules do
     instance_double(PrivateSubnet)
   }
   let(:vm) {
-    vmh = instance_double(VmHost, sshable: instance_double(Sshable, cmd: nil))
+    vmh = instance_double(VmHost, sshable: Sshable.new)
     nic = instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd00::1/128"), ubid_to_tap_name: "tap0")
     ephemeral_net6 = NetAddr::IPv6Net.parse("fd00::1/79")
     instance_double(Vm, project: instance_double(Project, get_ff_ipv6_disabled: false), private_subnets: [ps], vm_host: vmh, inhost_name: "x", nics: [nic], ephemeral_net6: ephemeral_net6, load_balancer: nil, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.0/32").network, location: Location[Location::HETZNER_FSN1_ID])
@@ -46,7 +46,7 @@ RSpec.describe Prog::Vnet::Metal::UpdateFirewallRules do
         instance_double(FirewallRule, ip6?: true, cidr: NetAddr::IPv6Net.parse("fd00::2/64"), port_range: Sequel.pg_range(80..10000))
       ])
 
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec x nft --file -", stdin: <<ADD_RULES)
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo ip netns exec x nft --file -", stdin: <<ADD_RULES)
 # An nftables idiom for idempotent re-create of a named entity: merge
 # in an empty table (a no-op if the table already exists) and then
 # delete, before creating with a new definition.
@@ -191,7 +191,7 @@ ADD_RULES
       lb = instance_double(LoadBalancer, name: "lb_table", ports: [port], vms: [vm, vm2])
       expect(vm).to receive(:load_balancer).and_return(lb).at_least(:once)
       allow(lb).to receive(:ports).and_return([{src_port: 443, dst_port: 8443}])
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec x nft --file -", stdin: <<ADD_RULES)
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo ip netns exec x nft --file -", stdin: <<ADD_RULES)
 # An nftables idiom for idempotent re-create of a named entity: merge
 # in an empty table (a no-op if the table already exists) and then
 # delete, before creating with a new definition.
@@ -343,7 +343,7 @@ ADD_RULES
       lb = instance_double(LoadBalancer, name: "lb_table", ports: [port], vms: [vm])
       allow(lb).to receive(:ports).and_return([{src_port: 443, dst_port: 8443}])
       expect(vm).to receive(:load_balancer).and_return(lb).at_least(:once)
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec x nft --file -", stdin: <<ADD_RULES)
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo ip netns exec x nft --file -", stdin: <<ADD_RULES)
 # An nftables idiom for idempotent re-create of a named entity: merge
 # in an empty table (a no-op if the table already exists) and then
 # delete, before creating with a new definition.
@@ -484,7 +484,7 @@ ADD_RULES
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
       expect(vm).to receive(:firewall_rules).and_return([])
       expect(vm.project).to receive(:get_ff_ipv6_disabled).and_return(true).at_least(:once)
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec x nft --file -", stdin: <<ADD_RULES)
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo ip netns exec x nft --file -", stdin: <<ADD_RULES)
 # An nftables idiom for idempotent re-create of a named entity: merge
 # in an empty table (a no-op if the table already exists) and then
 # delete, before creating with a new definition.
