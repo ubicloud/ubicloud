@@ -223,35 +223,35 @@ LOCK
             end
           end
           simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
-          expect(sa.cmd("echo hello", log: log_value, timeout: nil)).to eq("hello")
+          expect(sa.cmd("echo hello", log: log_value, timeout: nil, _skip_command_checking: true)).to eq("hello")
         end
       end
     end
 
     it "raises an SshError with a non-zero exit status" do
       simulate(cmd: "exit 1", exit_status: 1, exit_signal: 127, stderr: "", stdout: "")
-      expect { sa.cmd("exit 1", timeout: nil) }.to raise_error Sshable::SshError, "command exited with an error: exit 1"
+      expect { sa.cmd("exit 1", timeout: nil, _skip_command_checking: true) }.to raise_error Sshable::SshError, "command exited with an error: exit 1"
     end
 
     it "raises an SshError with a nil exit status" do
       simulate(cmd: "exit 1", exit_status: nil, exit_signal: nil, stderr: "", stdout: "")
-      expect { sa.cmd("exit 1", timeout: nil) }.to raise_error Sshable::SshTimeout, "command timed out: exit 1"
+      expect { sa.cmd("exit 1", timeout: nil, _skip_command_checking: true) }.to raise_error Sshable::SshTimeout, "command timed out: exit 1"
     end
 
     it "supports custom timeout" do
       simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
-      expect(sa.cmd("echo hello", log: false, timeout: 2)).to eq("hello")
+      expect(sa.cmd("echo hello", log: false, timeout: 2, _skip_command_checking: true)).to eq("hello")
     end
 
     it "suports default timeout" do
       simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
-      expect(sa.cmd("echo hello", log: false)).to eq("hello")
+      expect(sa.cmd("echo hello", log: false, _skip_command_checking: true)).to eq("hello")
     end
 
     it "supports default timeout based on thread apoptosis_at variable if no explicit timeout is given if variable is available" do
       Thread.current[:apoptosis_at] = Time.now + 60
       simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
-      expect(sa.cmd("echo hello", log: false)).to eq("hello")
+      expect(sa.cmd("echo hello", log: false, _skip_command_checking: true)).to eq("hello")
     ensure
       Thread.current[:apoptosis_at] = nil
     end
@@ -260,7 +260,7 @@ LOCK
       err = IOError.new("the party is over")
       expect(session).to receive(:open_channel).and_raise err
       expect(sa).to receive(:invalidate_cache_entry)
-      expect { sa.cmd("irrelevant") }.to raise_error err
+      expect { sa.cmd("irrelevant", _skip_command_checking: true) }.to raise_error err
     end
   end
 
