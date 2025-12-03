@@ -1,4 +1,5 @@
 name: E2E CI
+run-name: E2E ${{ github.event_name }} ${{ inputs.providers }}
 
 permissions:
   contents: read
@@ -11,6 +12,11 @@ on:
         required: true
         default: 'vm,github_runner_ubuntu_2404,github_runner_ubuntu_2204,postgres_standard,postgres_ha,kubernetes'
         type: string
+      providers:
+        description: 'Comma-separated list of providers (metal,aws)'
+        required: true
+        default: 'metal,aws'
+        type: string
 
   schedule:
     - cron:  '0 */2 * * *'
@@ -20,7 +26,7 @@ jobs:
     if: vars.RUN_E2E == 'true'
     runs-on: ubicloud-standard-4
     environment: E2E-CI
-    timeout-minutes: 65
+    timeout-minutes: 70
     concurrency: e2e_environment
 
     steps:
@@ -66,12 +72,16 @@ jobs:
 
     - name: Add e2e script to Procfile
       run: |
+        providers="metal,aws"
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.providers }}" ]]; then
+          providers="${{ inputs.providers }}"
+        fi
         test_cases="$(yq -r '[.[].name] | join(",")' config/e2e_test_cases.yml)"
         if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.test_cases }}" ]]; then
           test_cases="${{ inputs.test_cases }}"
         fi
-        echo "Running e2e test cases: $test_cases"
-        echo "e2e: bin/e2e --test-cases=$test_cases" >> Procfile
+        echo "Running e2e providers:$providers test cases:$test_cases"
+        echo "e2e: bin/e2e --providers=$providers --test-cases=$test_cases" >> Procfile
 
     - name: Run tests
       env:
@@ -126,7 +136,7 @@ jobs:
         VHOST_BLOCK_BACKEND_VERSION: v0.2.1
       run: |
         set -o pipefail
-        timeout 62m foreman start -m all=1,respirate=2 | tee foreman.log | grep --line-buffered -F "e2e.1"
+        timeout 68m foreman start -m all=1,respirate=2 | tee foreman.log | grep --line-buffered -F "e2e.1"
 
     - name: Print logs
       if: always()
