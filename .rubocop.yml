@@ -2,6 +2,7 @@
 require:
   - rubocop-capybara
   - standard
+  - ./rubocop/cop/custom/safe_shell_command.rb
 
 plugins:
   - rubocop-erb
@@ -111,3 +112,6 @@ RSpec/IndexedLet:
 
 RSpec/NestedGroups:
   Enabled: false
+
+Custom/SafeShellCommand:
+  Enabled: true

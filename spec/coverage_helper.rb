@@ -19,6 +19,11 @@ if (suite = ENV.delete("COVERAGE"))
       add_filter do |file|
         !LOCKED_FILES.include?(file.filename)
       end
+    elsif suite == "rubocop"
+      add_filter do |file|
+        path = file.filename.delete_prefix(File.dirname(__dir__))
+        !path.start_with?("/rubocop/")
+      end
     else
       add_filter do |file|
         path = file.filename.delete_prefix(File.dirname(__dir__))
