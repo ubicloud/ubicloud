@@ -61,7 +61,7 @@ RSpec.describe LoadBalancerVmPort do
 
     describe "#check_probe" do
       let(:session) {
-        {ssh_session: instance_double(Net::SSH::Connection::Session)}
+        {ssh_session: Net::SSH::Connection::Session.allocate}
       }
 
       it "raises an exception if health check type is not valid" do
@@ -81,7 +81,7 @@ RSpec.describe LoadBalancerVmPort do
       [IOError.new("closed stream"), Errno::ECONNRESET.new("recvfrom(2)")].each do |ex|
         it "reraises the exception for exception class: #{ex.class}" do
           expect(lb_vm_port).to receive(:health_check_cmd).and_return("healthcheck command").at_least(:once)
-          expect(session[:ssh_session]).to receive(:exec!).with("healthcheck command").and_raise(ex)
+          expect(session[:ssh_session]).to receive(:_exec!).with("healthcheck command").and_raise(ex)
           expect { lb_vm_port.check_probe(session, :ipv4) }.to raise_error(ex)
         end
       end
@@ -89,7 +89,7 @@ RSpec.describe LoadBalancerVmPort do
       ["ipv4", "ipv6"].each do |stack|
         it "runs the health check command and returns the result for #{stack}" do
           expect(lb_vm_port).to receive(:health_check_cmd).with(stack.to_sym).and_return("healthcheck command #{stack}").at_least(:once)
-          expect(session[:ssh_session]).to receive(:exec!).with("healthcheck command #{stack}").and_return("200").at_least(:once)
+          expect(session[:ssh_session]).to receive(:_exec!).with("healthcheck command #{stack}").and_return("200").at_least(:once)
 
           expect(lb_vm_port.check_probe(session, stack.to_sym)).to eq("up")
         end
@@ -97,13 +97,13 @@ RSpec.describe LoadBalancerVmPort do
 
       it "returns down if the health check command raises an exception" do
         expect(lb_vm_port).to receive(:health_check_cmd).and_return("healthcheck command").at_least(:once)
-        expect(session[:ssh_session]).to receive(:exec!).with("healthcheck command").and_raise("error").at_least(:once)
+        expect(session[:ssh_session]).to receive(:_exec!).with("healthcheck command").and_raise("error").at_least(:once)
         expect(lb_vm_port.check_probe(session, :ipv4)).to eq("down")
       end
 
       it "returns down if the health check command doesn't return 200" do
         expect(lb_vm_port).to receive(:health_check_cmd).and_return("healthcheck command").at_least(:once)
-        expect(session[:ssh_session]).to receive(:exec!).with("healthcheck command").and_return("400").at_least(:once)
+        expect(session[:ssh_session]).to receive(:_exec!).with("healthcheck command").and_return("400").at_least(:once)
         expect(lb_vm_port.check_probe(session, :ipv4)).to eq("down")
       end
     end
