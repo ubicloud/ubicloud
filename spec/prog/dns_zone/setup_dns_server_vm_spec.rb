@@ -75,18 +75,18 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
     end
 
     it "returns false if the command outputs are do not match" do
-      expect(vms[0].sshable).to receive(:cmd).and_return "foo"
-      expect(vms[1].sshable).to receive(:cmd).and_return "bar"
+      expect(vms[0].sshable).to receive(:_cmd).and_return "foo"
+      expect(vms[1].sshable).to receive(:_cmd).and_return "bar"
       expect(described_class.vms_in_sync?(vms)).to be false
     end
 
     it "returns true if the dns records match, irrespective of order" do
-      expect(vms[0].sshable).to receive(:cmd).and_return <<-DNS
+      expect(vms[0].sshable).to receive(:_cmd).and_return <<-DNS
 [zone1.] name1.zone1. 10 A 127.1.2.3
 [zone2.] zone2. 3600 NS zone2.
 [zone2.] zone2. 3600 SOA ns.zone2. zone2. 38 86400 7200 1209600 3600
       DNS
-      expect(vms[1].sshable).to receive(:cmd).and_return <<-DNS
+      expect(vms[1].sshable).to receive(:_cmd).and_return <<-DNS
 [zone2.] zone2. 3600 SOA ns.zone2. zone2. 38 86400 7200 1209600 3600
 [zone1.] name1.zone1. 10 A 127.1.2.3
 [zone2.] zone2. 3600 NS zone2.
@@ -95,10 +95,10 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
     end
 
     it "returns true even if the serial numbers of SOA records are different" do
-      expect(vms[0].sshable).to receive(:cmd).and_return <<-DNS
+      expect(vms[0].sshable).to receive(:_cmd).and_return <<-DNS
 [erentest2.ibicloud.com.] erentest2.ibicloud.com. 3600 SOA ns.erentest2.ibicloud.com. erentest2.ibicloud.com. 38 86400 7200 1209600 3600
       DNS
-      expect(vms[1].sshable).to receive(:cmd).and_return <<-DNS
+      expect(vms[1].sshable).to receive(:_cmd).and_return <<-DNS
 [erentest2.ibicloud.com.] erentest2.ibicloud.com. 3600 SOA ns.erentest2.ibicloud.com. erentest2.ibicloud.com. 56 86400 7200 1209600 3600
       DNS
       expect(described_class.vms_in_sync?(vms)).to be true
@@ -150,7 +150,7 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
     it "runs some commands to prepare vm for knot installation and restarts" do
       prog.vm.strand.update(label: "wait")
 
-      expect(prog.sshable).to receive(:cmd).with(/sudo ln -sf \/run\/systemd\/resolve\/resolv.conf \/etc\/resolv.conf[\S\s]*sudo systemctl reboot/)
+      expect(prog.sshable).to receive(:_cmd).with(/sudo ln -sf \/run\/systemd\/resolve\/resolv.conf \/etc\/resolv.conf[\S\s]*sudo systemctl reboot/)
 
       expect { prog.prepare }.to hop("setup_knot")
     end
@@ -158,12 +158,12 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
 
   describe "#setup_knot" do
     it "waits until the vm is ready to accept commands again" do
-      expect(prog.sshable).to receive(:cmd).and_raise(IOError)
+      expect(prog.sshable).to receive(:_cmd).and_raise(IOError)
       expect { prog.setup_knot }.to nap(5)
     end
 
     it "runs some commands to install and configure knot on the vm" do
-      expect(prog.sshable).to receive(:cmd).with("true").and_return(true)
+      expect(prog.sshable).to receive(:_cmd).with("true").and_return(true)
 
       zone_conf = <<-CONF
   - domain: "zone1.domain.io."
@@ -171,8 +171,8 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
       CONF
 
       expect(prog.ds).to receive(:dns_zones).and_return(dzs) # To ensure the order
-      expect(prog.sshable).to receive(:cmd).with(/sudo apt-get -y install knot/)
-      expect(prog.sshable).to receive(:cmd).with("sudo tee /etc/knot/knot.conf > /dev/null", stdin: /#{zone_conf}/)
+      expect(prog.sshable).to receive(:_cmd).with(/sudo apt-get -y install knot/)
+      expect(prog.sshable).to receive(:_cmd).with("sudo tee /etc/knot/knot.conf > /dev/null", stdin: /#{zone_conf}/)
 
       expect { prog.setup_knot }.to hop("sync_zones")
     end
@@ -200,11 +200,11 @@ k8s.ubicloud.com.          3600    SOA     ns.k8s.ubicloud.com. k8s.ubicloud.com
 k8s.ubicloud.com.          3600    NS      toruk.
       CONF
 
-      expect(prog.sshable).to receive(:cmd).with("sudo -u knot tee /var/lib/knot/zone1.domain.io.zone > /dev/null", stdin: f1)
-      expect(prog.sshable).to receive(:cmd).with("sudo -u knot tee /var/lib/knot/zone2.domain.io.zone > /dev/null", stdin: f2)
-      expect(prog.sshable).to receive(:cmd).with("sudo -u knot tee /var/lib/knot/k8s.ubicloud.com.zone > /dev/null", stdin: f3)
+      expect(prog.sshable).to receive(:_cmd).with("sudo -u knot tee /var/lib/knot/zone1.domain.io.zone > /dev/null", stdin: f1)
+      expect(prog.sshable).to receive(:_cmd).with("sudo -u knot tee /var/lib/knot/zone2.domain.io.zone > /dev/null", stdin: f2)
+      expect(prog.sshable).to receive(:_cmd).with("sudo -u knot tee /var/lib/knot/k8s.ubicloud.com.zone > /dev/null", stdin: f3)
 
-      expect(prog.sshable).to receive(:cmd).with("sudo systemctl restart knot")
+      expect(prog.sshable).to receive(:_cmd).with("sudo systemctl restart knot")
       expect(dzs).to all(receive(:purge_obsolete_records))
 
       knotc_input = <<-INPUT
@@ -227,7 +227,7 @@ zone-set k8s.ubicloud.com #{dzs[2].records.first.name} 10 A #{dzs[2].records.fir
 zone-commit k8s.ubicloud.com
 zone-flush k8s.ubicloud.com
       INPUT
-      expect(prog.sshable).to receive(:cmd).with("sudo -u knot knotc", stdin: /#{knotc_input.strip}/)
+      expect(prog.sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: /#{knotc_input.strip}/)
 
       expect(prog.ds).to receive(:dns_zones).at_least(:once).and_return(dzs) # To ensure the order
       expect { prog.sync_zones }.to hop("validate")
@@ -237,22 +237,22 @@ zone-flush k8s.ubicloud.com
   describe "#validate" do
     it "validates the setup by checking outputs from different vms" do
       dummy_vm = instance_double(Vm, id: Vm.generate_uuid)
-      dummy_sshable = instance_double(Sshable)
+      dummy_sshable = Sshable.new
       expect(prog.ds).to receive(:vms).thrice.and_return([dummy_vm])
       expect(dummy_vm).to receive(:sshable).twice.and_return(dummy_sshable)
 
-      expect(prog.vm.sshable).to receive(:cmd).twice
+      expect(prog.vm.sshable).to receive(:_cmd).twice
         .with("sudo -u knot knotc", stdin: "zone-read --")
         .and_return("line1\nline2")
 
-      expect(dummy_sshable).to receive(:cmd)
+      expect(dummy_sshable).to receive(:_cmd)
         .with("sudo -u knot knotc", stdin: "zone-read --")
         .and_return("line1\nline3")
 
       # Different outputs
       expect { prog.validate }.to hop("sync_zones")
 
-      expect(dummy_sshable).to receive(:cmd)
+      expect(dummy_sshable).to receive(:_cmd)
         .with("sudo -u knot knotc", stdin: "zone-read --")
         .and_return("line2\nline1")
 
@@ -264,12 +264,12 @@ zone-flush k8s.ubicloud.com
 
     it "doesn't add the same VM twice" do
       dummy_vm = instance_double(Vm, id: Vm.generate_uuid)
-      dummy_sshable = instance_double(Sshable)
+      dummy_sshable = Sshable.new
       expect(prog.ds).to receive(:vms).twice.and_return([dummy_vm, prog.vm])
       expect(dummy_vm).to receive(:sshable).and_return(dummy_sshable)
 
-      expect(prog.vm.sshable).to receive(:cmd).at_least(:once).and_return("l1\nl2")
-      expect(dummy_sshable).to receive(:cmd).and_return("l1\nl2")
+      expect(prog.vm.sshable).to receive(:_cmd).at_least(:once).and_return("l1\nl2")
+      expect(dummy_sshable).to receive(:_cmd).and_return("l1\nl2")
 
       expect(prog.ds).not_to receive(:add_vm)
 

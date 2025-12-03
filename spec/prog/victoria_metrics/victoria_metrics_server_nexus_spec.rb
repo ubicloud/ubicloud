@@ -14,7 +14,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
   let(:vm) {
     instance_double(Vm,
       id: "vm-id",
-      sshable: instance_double(Sshable),
+      sshable: Sshable.new,
       ip4: "1.1.1.1",
       ip6: IPAddr.new("2001:db8::1"),
       strand: instance_double(Strand, label: "wait"))
@@ -105,18 +105,18 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
 
   describe "#create_victoria_metrics_user" do
     it "creates victoria_metrics user and hops to install" do
-      expect(vm.sshable).to receive(:cmd).with("sudo groupadd -f --system victoria_metrics")
-      expect(vm.sshable).to receive(:cmd).with("sudo useradd --no-create-home --system -g victoria_metrics victoria_metrics")
+      expect(vm.sshable).to receive(:_cmd).with("sudo groupadd -f --system victoria_metrics")
+      expect(vm.sshable).to receive(:_cmd).with("sudo useradd --no-create-home --system -g victoria_metrics victoria_metrics")
       expect { nx.create_victoria_metrics_user }.to hop("install")
     end
 
     it "handles case where user already exists" do
-      expect(vm.sshable).to receive(:cmd).with("sudo groupadd -f --system victoria_metrics").and_raise(RuntimeError.new("already exists"))
+      expect(vm.sshable).to receive(:_cmd).with("sudo groupadd -f --system victoria_metrics").and_raise(RuntimeError.new("already exists"))
       expect { nx.create_victoria_metrics_user }.to hop("install")
     end
 
     it "raises any other error than already exists" do
-      expect(vm.sshable).to receive(:cmd).with("sudo groupadd -f --system victoria_metrics").and_raise(RuntimeError.new("some other error"))
+      expect(vm.sshable).to receive(:_cmd).with("sudo groupadd -f --system victoria_metrics").and_raise(RuntimeError.new("some other error"))
       expect { nx.create_victoria_metrics_user }.to raise_error(RuntimeError, "some other error")
     end
   end
@@ -160,10 +160,10 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
 
     it "mounts the disk and hops to configure if mount_data_disk is complete" do
       expect(vm.sshable).to receive(:d_check).with("format_victoria_metrics_disk").and_return("Succeeded")
-      expect(vm.sshable).to receive(:cmd).with("sudo mkdir -p /dat/victoria_metrics")
-      expect(vm.sshable).to receive(:cmd).with("sudo common/bin/add_to_fstab /dev/sdb /dat/victoria_metrics ext4 defaults 0 0")
-      expect(vm.sshable).to receive(:cmd).with("sudo mount /dev/sdb /dat/victoria_metrics")
-      expect(vm.sshable).to receive(:cmd).with("sudo chown -R victoria_metrics:victoria_metrics /dat/victoria_metrics")
+      expect(vm.sshable).to receive(:_cmd).with("sudo mkdir -p /dat/victoria_metrics")
+      expect(vm.sshable).to receive(:_cmd).with("sudo common/bin/add_to_fstab /dev/sdb /dat/victoria_metrics ext4 defaults 0 0")
+      expect(vm.sshable).to receive(:_cmd).with("sudo mount /dev/sdb /dat/victoria_metrics")
+      expect(vm.sshable).to receive(:_cmd).with("sudo chown -R victoria_metrics:victoria_metrics /dat/victoria_metrics")
       expect { nx.mount_data_disk }.to hop("configure")
     end
 

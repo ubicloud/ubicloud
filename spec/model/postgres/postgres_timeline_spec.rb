@@ -47,7 +47,7 @@ PGHOST=/var/run/postgresql
   end
 
   describe "#need_backup?" do
-    let(:sshable) { instance_double(Sshable) }
+    let(:sshable) { Sshable.new }
     let(:leader) {
       instance_double(
         PostgresServer,
@@ -73,7 +73,7 @@ PGHOST=/var/run/postgresql
 
     it "returns true as backup needed if there is no backup process or the last backup failed" do
       expect(postgres_timeline).to receive(:blob_storage).and_return("dummy-blob-storage").twice
-      expect(sshable).to receive(:cmd).and_return("NotStarted", "Failed")
+      expect(sshable).to receive(:_cmd).and_return("NotStarted", "Failed")
       expect(postgres_timeline.need_backup?).to be(true)
       expect(postgres_timeline.need_backup?).to be(true)
     end
@@ -81,20 +81,20 @@ PGHOST=/var/run/postgresql
     it "returns true as backup needed if previous backup started more than a day ago and is succeeded" do
       expect(postgres_timeline).to receive(:blob_storage).and_return("dummy-blob-storage")
       expect(postgres_timeline).to receive(:latest_backup_started_at).and_return(Time.now - 60 * 60 * 25).twice
-      expect(sshable).to receive(:cmd).and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).and_return("Succeeded")
       expect(postgres_timeline.need_backup?).to be(true)
     end
 
     it "returns false as backup needed if previous backup started less than a day ago" do
       expect(postgres_timeline).to receive(:blob_storage).and_return("dummy-blob-storage")
       expect(postgres_timeline).to receive(:latest_backup_started_at).and_return(Time.now - 60 * 60 * 23).twice
-      expect(sshable).to receive(:cmd).and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).and_return("Succeeded")
       expect(postgres_timeline.need_backup?).to be(false)
     end
 
     it "returns false as backup needed if previous backup started is in progress" do
       expect(postgres_timeline).to receive(:blob_storage).and_return("dummy-blob-storage")
-      expect(sshable).to receive(:cmd).and_return("InProgress")
+      expect(sshable).to receive(:_cmd).and_return("InProgress")
       expect(postgres_timeline.need_backup?).to be(false)
     end
   end

@@ -262,7 +262,7 @@ RSpec.describe Vm do
   end
 
   it "initiates a new health monitor session" do
-    vh = instance_double(VmHost, sshable: instance_double(Sshable))
+    vh = instance_double(VmHost, sshable: Sshable.new)
     expect(vm).to receive(:vm_host).and_return(vh).at_least(:once)
     expect(vh.sshable).to receive(:start_fresh_session)
     vm.init_health_monitor_session

@@ -141,12 +141,12 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     end
 
     it "enables kubelet and buds a bootstrap rhizome process" do
-      sshable = instance_double(Sshable)
+      sshable = Sshable.new
       st = instance_double(Strand, label: "wait")
       expect(prog.node.vm).to receive(:strand).and_return(st)
       expect(prog.vm).to receive(:sshable).and_return(sshable).thrice
-      expect(sshable).to receive(:cmd).with("sudo iptables-nft -t nat -A POSTROUTING -s 172.19.145.64/26 -o ens3 -j MASQUERADE")
-      expect(sshable).to receive(:cmd).with(
+      expect(sshable).to receive(:_cmd).with("sudo iptables-nft -t nat -A POSTROUTING -s 172.19.145.64/26 -o ens3 -j MASQUERADE")
+      expect(sshable).to receive(:_cmd).with(
         "sudo nft --file -",
         stdin: <<~TEMPLATE
 table ip6 pod_access;
@@ -169,7 +169,7 @@ table ip6 pod_access {
 }
         TEMPLATE
       )
-      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now kubelet")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now kubelet")
 
       expect(prog).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "kubernetes", "subject_id" => prog.node.vm.id, "user" => "ubi"})
       expect { prog.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
@@ -207,7 +207,7 @@ table ip6 pod_access {
   end
 
   describe "#init_cluster" do
-    before { allow(prog.vm).to receive(:sshable).and_return(instance_double(Sshable)) }
+    before { allow(prog.vm).to receive(:sshable).and_return(Sshable.new) }
 
     it "runs the init_cluster script if it's not started" do
       expect(prog.vm.sshable).to receive(:d_check).with("init_kubernetes_cluster").and_return("NotStarted")
@@ -241,16 +241,16 @@ table ip6 pod_access {
   end
 
   describe "#join_control_plane" do
-    before { allow(prog.vm).to receive(:sshable).and_return(instance_double(Sshable)) }
+    before { allow(prog.vm).to receive(:sshable).and_return(Sshable.new) }
 
     it "runs the join_control_plane script if it's not started" do
       expect(prog.vm.sshable).to receive(:d_check).with("join_control_plane").and_return("NotStarted")
 
-      sshable = instance_double(Sshable)
+      sshable = Sshable.new
       expect(kubernetes_cluster.functional_nodes.first).to receive(:sshable).and_return(sshable)
-      expect(sshable).to receive(:cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).and_return("jt\n")
-      expect(sshable).to receive(:cmd).with("sudo kubeadm init phase upload-certs --upload-certs", log: false).and_return("something\ncertificate key:\nck")
-      expect(sshable).to receive(:cmd).with("sudo kubeadm token create --print-join-command", log: false).and_return("discovery-token-ca-cert-hash dtcch")
+      expect(sshable).to receive(:_cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).and_return("jt\n")
+      expect(sshable).to receive(:_cmd).with("sudo kubeadm init phase upload-certs --upload-certs", log: false).and_return("something\ncertificate key:\nck")
+      expect(sshable).to receive(:_cmd).with("sudo kubeadm token create --print-join-command", log: false).and_return("discovery-token-ca-cert-hash dtcch")
       expect(prog.vm.sshable).to receive(:d_run).with(
         "join_control_plane", "kubernetes/bin/join-node",
         stdin: /{"is_control_plane":true,"node_name":"test-vm","endpoint":"somelb\..*:443","join_token":"jt","certificate_key":"ck","discovery_token_ca_cert_hash":"dtcch","node_ipv4":"172.19.145.65","node_ipv6":"2001:db8:85a3:73f2:1c4a::2"}/,
@@ -283,17 +283,17 @@ table ip6 pod_access {
 
   describe "#join_worker" do
     before {
-      allow(prog.vm).to receive(:sshable).and_return(instance_double(Sshable))
+      allow(prog.vm).to receive(:sshable).and_return(Sshable.new)
       allow(prog).to receive(:kubernetes_nodepool).and_return(kubernetes_nodepool)
     }
 
     it "runs the join-worker-node script if it's not started" do
       expect(prog.vm.sshable).to receive(:d_check).with("join_worker").and_return("NotStarted")
 
-      sshable = instance_double(Sshable)
+      sshable = Sshable.new
       expect(kubernetes_cluster.functional_nodes.first).to receive(:sshable).and_return(sshable)
-      expect(sshable).to receive(:cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).and_return("\njt\n")
-      expect(sshable).to receive(:cmd).with("sudo kubeadm token create --print-join-command", log: false).and_return("discovery-token-ca-cert-hash dtcch")
+      expect(sshable).to receive(:_cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).and_return("\njt\n")
+      expect(sshable).to receive(:_cmd).with("sudo kubeadm token create --print-join-command", log: false).and_return("discovery-token-ca-cert-hash dtcch")
       expect(prog.vm.sshable).to receive(:d_run).with(
         "join_worker", "kubernetes/bin/join-node",
         stdin: /{"is_control_plane":false,"node_name":"test-vm","endpoint":"somelb\..*:443","join_token":"jt","discovery_token_ca_cert_hash":"dtcch","node_ipv4":"172.19.145.65","node_ipv6":"2001:db8:85a3:73f2:1c4a::2"}/,
@@ -326,25 +326,25 @@ table ip6 pod_access {
 
   describe "#install_cni" do
     it "configures ubicni" do
-      sshable = instance_double(Sshable)
+      sshable = Sshable.new
       expect(prog.vm).to receive(:sshable).and_return(sshable)
       expect(prog.node.vm).to receive_messages(
         nics: [instance_double(Nic, private_ipv4: "10.0.0.37", private_ipv6: "0::1")],
         ephemeral_net6: NetAddr::IPv6Net.new(NetAddr::IPv6.parse("2001:db8::"), NetAddr::Mask128.new(64))
       )
 
-      expect(sshable).to receive(:cmd).with("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: /"type": "ubicni"/)
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: /"type": "ubicni"/)
       expect { prog.install_cni }.to hop("approve_new_csr")
     end
   end
 
   describe "#approve_new_csr" do
     it "approves the csr" do
-      sshable = instance_double(Sshable)
+      sshable = Sshable.new
       expect(kubernetes_cluster.functional_nodes.first).to receive(:sshable).and_return(sshable)
       expect(kubernetes_cluster).to receive(:incr_sync_internal_dns_config)
       expect(kubernetes_cluster).to receive(:incr_sync_worker_mesh)
-      expect(sshable).to receive(:cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf get csr | awk '/Pending/ && /kubelet-serving/ && /'\"#{node.name}\"'/ {print $1}' | xargs -r sudo kubectl --kubeconfig /etc/kubernetes/admin.conf certificate approve")
+      expect(sshable).to receive(:_cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf get csr | awk '/Pending/ && /kubelet-serving/ && /'\"#{node.name}\"'/ {print $1}' | xargs -r sudo kubectl --kubeconfig /etc/kubernetes/admin.conf certificate approve")
       expect { prog.approve_new_csr }.to exit({node_id: prog.node.id})
     end
   end

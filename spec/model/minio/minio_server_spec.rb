@@ -74,7 +74,7 @@ RSpec.describe MinioServer do
     expect(forward).to receive(:local)
     session = Net::SSH::Connection::Session.allocate
     expect(session).to receive(:forward).and_return(forward)
-    sshable = instance_double(Sshable)
+    sshable = Sshable.new
     expect(sshable).to receive(:start_fresh_session).and_return(session)
     expect(ms.vm).to receive(:sshable).and_return(sshable)
     expect(UNIXServer).to receive(:new)

@@ -283,7 +283,7 @@ usermod -L ubuntu
       client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
       client.stub_responses(:describe_subnets, subnets: [{availability_zone_id: "use1-az1"}])
       expect(vm).to receive(:vcpus).and_return(2)
-      expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
+      expect(vm).to receive(:sshable).and_return(create_mock_sshable(keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
 
       expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
       expect(client).to receive(:run_instances).with({
@@ -331,7 +331,7 @@ usermod -L ubuntu
       client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
       client.stub_responses(:describe_subnets, subnets: [{availability_zone_id: "use1-az1"}])
       vm.update(unix_user: "runneradmin")
-      expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
+      expect(vm).to receive(:sshable).and_return(create_mock_sshable(keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
       expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
       expect(client).to receive(:run_instances).with(hash_not_including(:iam_instance_profile)).and_call_original
       expect(AwsInstance).to receive(:create_with_id).with(vm, instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
@@ -341,7 +341,7 @@ usermod -L ubuntu
     it "naps until instance profile not propagated yet" do
       client.stub_responses(:run_instances, Aws::EC2::Errors::InvalidParameterValue.new(nil, "Invalid IAM Instance Profile name"))
       client.stub_responses(:describe_subnets, subnets: [{availability_zone_id: "use1-az1"}])
-      expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
+      expect(vm).to receive(:sshable).and_return(create_mock_sshable(keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
       expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
       expect { nx.create_instance }.to nap(1)
     end
@@ -349,7 +349,7 @@ usermod -L ubuntu
     it "raises exception if it's not for invalid instance profile" do
       client.stub_responses(:run_instances, Aws::EC2::Errors::InvalidParameterValue.new(nil, "Invalid instance name"))
       client.stub_responses(:describe_subnets, subnets: [{availability_zone_id: "use1-az1"}])
-      expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
+      expect(vm).to receive(:sshable).and_return(create_mock_sshable(keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
       expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
       expect { nx.create_instance }.to raise_error(Aws::EC2::Errors::InvalidParameterValue)
     end
@@ -359,7 +359,7 @@ usermod -L ubuntu
       client.stub_responses(:describe_subnets, subnets: [{availability_zone_id: "use1-az1"}])
       expect(vm).to receive(:private_ipv4).and_return("1.2.3.4")
       vm.update(unix_user: "runneradmin")
-      expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
+      expect(vm).to receive(:sshable).and_return(create_mock_sshable(keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
       new_data = user_data + "echo \"1.2.3.4 ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
       expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
       expect(client).to receive(:run_instances).with(hash_including(user_data: Base64.encode64(new_data))).and_call_original
@@ -373,7 +373,7 @@ usermod -L ubuntu
       client.stub_responses(:describe_subnets, subnets: [{availability_zone_id: "use1-az1"}])
       expect(vm).to receive(:private_ipv4).and_return("1.2.3.4")
       vm.update(unix_user: "runneradmin")
-      expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
+      expect(vm).to receive(:sshable).and_return(create_mock_sshable(keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
       new_data = user_data + "echo \"1.2.3.4 ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
       expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
       expect(client).to receive(:run_instances).with(hash_including(
@@ -392,7 +392,7 @@ usermod -L ubuntu
       client.stub_responses(:describe_subnets, subnets: [{availability_zone_id: "use1-az1"}])
       expect(vm).to receive(:private_ipv4).and_return("1.2.3.4")
       vm.update(unix_user: "runneradmin")
-      expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
+      expect(vm).to receive(:sshable).and_return(create_mock_sshable(keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
       new_data = user_data + "echo \"1.2.3.4 ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
       expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
       expect(client).to receive(:run_instances).with(hash_including(
@@ -409,7 +409,7 @@ usermod -L ubuntu
         vm.update(unix_user: "runneradmin")
         installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: vm.project_id)
         GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
-        expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
+        expect(vm).to receive(:sshable).and_return(create_mock_sshable(keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
         expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
         expect(Clog).to receive(:emit).with("insufficient instance capacity").and_call_original
       end
@@ -449,7 +449,7 @@ usermod -L ubuntu
 
     it "fails if not runner when encountering insufficient capacity error" do
       client.stub_responses(:run_instances, Aws::EC2::Errors::InsufficientInstanceCapacity.new(nil, "Insufficient capacity for instance type"))
-      expect(vm).to receive(:sshable).and_return(instance_double(Sshable, keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
+      expect(vm).to receive(:sshable).and_return(create_mock_sshable(keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
       expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
       expect { nx.create_instance }.to raise_error(Aws::EC2::Errors::InsufficientInstanceCapacity)
     end
@@ -471,7 +471,7 @@ usermod -L ubuntu
     it "updates the vm with the instance id and updates ip according to the sshable" do
       time = Time.now
       expect(Time).to receive(:now).and_return(time).at_least(:once)
-      sshable = instance_double(Sshable)
+      sshable = Sshable.new
       expect(vm).to receive(:sshable).and_return(sshable)
       expect(sshable).to receive(:update).with(host: "1.2.3.4")
       expect(vm).to receive(:update).with(cores: 1, allocated_at: time, ephemeral_net6: "2a01:4f8:173:1ed3:aa7c::/79")

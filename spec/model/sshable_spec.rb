@@ -65,12 +65,12 @@ LOCK
       end
 
       it "runs the session lock script if SSH_SESSION_LOCK_NAME is set" do
-        expect(sa).to receive(:cmd).with(lock_script, log: false)
+        expect(sa).to receive(:_cmd).with(lock_script, log: false)
         sa.connect
       end
 
       it "reports a failure to obtain a file descriptor with an obscure exit code" do
-        expect(sa).to receive(:cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 92, nil))
+        expect(sa).to receive(:_cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 92, nil))
         expect(Clog).to receive(:emit).with("session lock failure").and_wrap_original do |m, a, &b|
           expect(b.call.dig(:contended_session_lock, :session_fail_msg)).to eq("could not create session lock file for testlockname")
         end
@@ -79,7 +79,7 @@ LOCK
 
       it "reports lock conflicts when an obscure exit code is raised" do
         sa.id = "624ec0d1-95d9-8f31-bbaa-bcccb76fe98b"
-        expect(sa).to receive(:cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 124, nil))
+        expect(sa).to receive(:_cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 124, nil))
         expect(Clog).to receive(:emit).with("session lock failure").and_wrap_original do |m, a, &b|
           expect(b.call).to eq(contended_session_lock: {
             exit_code: 124,
@@ -92,7 +92,7 @@ LOCK
       end
 
       it "has a generic message for unrecognized errors" do
-        expect(sa).to receive(:cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 1, nil))
+        expect(sa).to receive(:_cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 1, nil))
         expect(Clog).to receive(:emit).with("session lock failure").and_wrap_original do |m, a, &b|
           expect(b.call.dig(:contended_session_lock, :session_fail_msg)).to eq("unknown SshError")
         end
@@ -270,27 +270,27 @@ LOCK
     let(:stdin_data) { "secret_data" }
 
     it "calls cmd with the correct check command" do
-      expect(sa).to receive(:cmd).with("common/bin/daemonizer2 check test_unit")
+      expect(sa).to receive(:_cmd).with("common/bin/daemonizer2 check test_unit")
       sa.d_check(unit_name)
     end
 
     it "calls cmd with the correct clean command" do
-      expect(sa).to receive(:cmd).with("common/bin/daemonizer2 clean test_unit")
+      expect(sa).to receive(:_cmd).with("common/bin/daemonizer2 clean test_unit")
       sa.d_clean(unit_name)
     end
 
     it "calls cmd with the correct restart command" do
-      expect(sa).to receive(:cmd).with("common/bin/daemonizer2 restart test_unit")
+      expect(sa).to receive(:_cmd).with("common/bin/daemonizer2 restart test_unit")
       sa.d_restart(unit_name)
     end
 
     it "calls cmd with the correct run command and no stdin" do
-      expect(sa).to receive(:cmd).with("common/bin/daemonizer2 run test_unit sudo\\ host/bin/setup-vm\\ prep\\ test_unit", stdin: nil, log: true)
+      expect(sa).to receive(:_cmd).with("common/bin/daemonizer2 run test_unit sudo\\ host/bin/setup-vm\\ prep\\ test_unit", stdin: nil, log: true)
       sa.d_run(unit_name, run_command)
     end
 
     it "calls cmd with the correct run command and passes stdin" do
-      expect(sa).to receive(:cmd).with("common/bin/daemonizer2 run test_unit sudo\\ host/bin/setup-vm\\ prep\\ test_unit", stdin: stdin_data, log: true)
+      expect(sa).to receive(:_cmd).with("common/bin/daemonizer2 run test_unit sudo\\ host/bin/setup-vm\\ prep\\ test_unit", stdin: stdin_data, log: true)
       sa.d_run(unit_name, run_command, stdin: stdin_data)
     end
   end

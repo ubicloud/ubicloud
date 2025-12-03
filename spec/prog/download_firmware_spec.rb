@@ -30,24 +30,24 @@ RSpec.describe Prog::DownloadFirmware do
 
   describe "#download" do
     it "starts to download firmware if not started" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_firmware_202405").and_return("NotStarted")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-firmware 202405 thesha' download_firmware_202405")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_firmware_202405").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'host/bin/download-firmware 202405 thesha' download_firmware_202405")
       expect { df.download }.to nap(15)
     end
 
     it "waits for manual intervention if failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_firmware_202405").and_return("Failed")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_firmware_202405").and_return("Failed")
       expect { df.download }.to raise_error RuntimeError, "Failed to download firmware version 202405 on VmHost[\"#{vm_host.ubid}\"]"
     end
 
     it "waits for the download to complete" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_firmware_202405").and_return("InProgess")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_firmware_202405").and_return("InProgess")
       expect { df.download }.to nap(15)
     end
 
     it "exits if succeeded" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_firmware_202405").and_return("Succeeded")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean download_firmware_202405")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_firmware_202405").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --clean download_firmware_202405")
       expect { df.download }.to exit({"msg" => "firmware downloaded", "version" => "202405", "sha256" => "thesha"})
     end
   end

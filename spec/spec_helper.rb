@@ -294,6 +294,15 @@ RSpec.configure do |config|
       create_vm(**args)
     end
 
+    def create_mock_sshable(**kw)
+      sshable = Sshable.new
+      kw.each do |k, v|
+        raise "Cannot mock Sshable#cmd as it would avoid security checks, mock #_cmd if you must" if k == :cmd
+        sshable.define_singleton_method(k) { v }
+      end
+      sshable
+    end
+
     def add_ipv4_to_vm(vm, ipv4)
       host = create_vm_host(total_cores: 10, used_cores: 3)
       cidr = IPAddr.new(ipv4)

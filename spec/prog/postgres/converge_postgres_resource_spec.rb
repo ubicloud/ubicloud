@@ -181,7 +181,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
   end
 
   describe "#upgrade_standby" do
-    let(:candidate) { instance_double(PostgresServer, vm: instance_double(Vm, sshable: instance_double(Sshable))) }
+    let(:candidate) { instance_double(PostgresServer, vm: instance_double(Vm, sshable: Sshable.new)) }
 
     before do
       allow(nx).to receive(:upgrade_candidate).and_return(candidate)
@@ -254,7 +254,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
   end
 
   describe "#upgrade_failed" do
-    let(:candidate) { instance_double(PostgresServer, vm: instance_double(Vm, sshable: instance_double(Sshable))) }
+    let(:candidate) { instance_double(PostgresServer, vm: instance_double(Vm, sshable: Sshable.new)) }
     let(:primary) { instance_double(PostgresServer, strand: instance_double(Strand, label: "wait_in_fence")) }
 
     before do
@@ -264,7 +264,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     it "logs failure, raises a page and destroys candidate server" do
       expect(candidate).to receive(:destroy_set?).and_return(false)
-      expect(candidate.vm.sshable).to receive(:cmd).with("sudo journalctl -u upgrade_postgres").and_return("log line 1\nlog line 2")
+      expect(candidate.vm.sshable).to receive(:_cmd).with("sudo journalctl -u upgrade_postgres").and_return("log line 1\nlog line 2")
       expect(Clog).to receive(:emit).with("Postgres resource upgrade failed").and_yield.twice
       expect(candidate).to receive(:incr_destroy)
       expect(primary).to receive(:incr_unfence)
@@ -276,7 +276,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     it "unfences primary if it is fenced" do
       allow(candidate).to receive(:destroy_set?).and_return(false)
-      allow(candidate.vm.sshable).to receive(:cmd).and_return("")
+      allow(candidate.vm.sshable).to receive(:_cmd).and_return("")
       allow(Clog).to receive(:emit)
       expect(candidate).to receive(:incr_destroy)
       expect(primary).to receive(:incr_unfence)
@@ -286,7 +286,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     it "does not unfence if primary is not fenced" do
       allow(primary).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
-      allow(candidate.vm.sshable).to receive(:cmd).and_return("")
+      allow(candidate.vm.sshable).to receive(:_cmd).and_return("")
       allow(candidate).to receive(:destroy_set?).and_return(false)
       allow(Clog).to receive(:emit)
       expect(candidate).to receive(:incr_destroy)

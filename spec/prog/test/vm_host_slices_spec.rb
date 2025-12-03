@@ -52,7 +52,7 @@ RSpec.describe Prog::Test::VmHostSlices do
 
   let(:vm_host) {
     instance_double(VmHost,
-      sshable: instance_double(Sshable, start_fresh_session: instance_double(Net::SSH::Connection::Session, shutdown!: nil, close: nil)))
+      sshable: create_mock_sshable(start_fresh_session: instance_double(Net::SSH::Connection::Session, shutdown!: nil, close: nil)))
   }
 
   let(:strand) {
@@ -99,7 +99,7 @@ RSpec.describe Prog::Test::VmHostSlices do
     before do
       allow(vm_host_slices).to receive_messages(slices: [slice1, slice2, slice3])
 
-      sshable = instance_double(Sshable)
+      sshable = Sshable.new
       session = instance_double(Net::SSH::Transport::Session)
       expect(vm_host).to receive_messages(sshable: sshable)
       expect(sshable).to receive(:start_fresh_session).and_yield(session).exactly(3).times

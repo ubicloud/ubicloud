@@ -17,8 +17,8 @@ EOS
 
   describe "#start" do
     it "exits, saving the number of memory" do
-      sshable = instance_double(Sshable)
-      expect(sshable).to receive(:cmd).with("sudo /usr/sbin/dmidecode -t memory | fgrep Size:").and_return(four_units)
+      sshable = Sshable.new
+      expect(sshable).to receive(:_cmd).with("sudo /usr/sbin/dmidecode -t memory | fgrep Size:").and_return(four_units)
       expect(lm).to receive(:sshable).and_return(sshable)
       expect { lm.start }.to exit({mem_gib: 64})
     end

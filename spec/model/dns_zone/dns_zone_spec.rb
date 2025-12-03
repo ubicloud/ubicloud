@@ -10,7 +10,7 @@ RSpec.describe DnsZone do
     )
   }
 
-  let(:sshable) { instance_double(Sshable) }
+  let(:sshable) { Sshable.new }
   let(:vm) { instance_double(Vm, sshable: sshable) }
   let(:dns_server) { instance_double(DnsServer, id: "00000000-0000-0000-0000-000000000000", vms: [vm]) }
 

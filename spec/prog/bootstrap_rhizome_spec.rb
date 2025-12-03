@@ -17,7 +17,7 @@ RSpec.describe Prog::BootstrapRhizome do
     before { br.strand.label = "start" }
 
     it "generates a keypair" do
-      sshable = instance_double(Sshable, raw_private_key_1: nil)
+      sshable = create_mock_sshable(raw_private_key_1: nil)
       expect(sshable).to receive(:update) do |**args|
         key = args[:raw_private_key_1]
         expect(key).to be_instance_of String
@@ -30,7 +30,7 @@ RSpec.describe Prog::BootstrapRhizome do
     end
 
     it "does not generate a keypair if there is already one" do
-      sshable = instance_double(Sshable, raw_private_key_1: "bogus")
+      sshable = create_mock_sshable(raw_private_key_1: "bogus")
       expect(sshable).not_to receive(:update)
       expect(br).to receive(:sshable).and_return(sshable)
       expect { br.start }.to hop("setup", "BootstrapRhizome")
@@ -41,7 +41,7 @@ RSpec.describe Prog::BootstrapRhizome do
     before { br.strand.label = "setup" }
 
     it "runs initializing shell with public keys" do
-      sshable = instance_double(Sshable, host: "hostname", keys: [instance_double(SshKey, public_key: "test key", private_key: "test private key")])
+      sshable = create_mock_sshable(host: "hostname", keys: [instance_double(SshKey, public_key: "test key", private_key: "test private key")])
       expect(br).to receive(:sshable).and_return(sshable).at_least(:once)
       expect(Util).to receive(:rootish_ssh).with "hostname", "root", ["test private key"], <<'FIXTURE'
 set -ueo pipefail

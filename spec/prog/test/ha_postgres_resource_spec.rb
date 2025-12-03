@@ -8,7 +8,7 @@ RSpec.describe Prog::Test::HaPostgresResource do
   let(:postgres_service_project_id) { "546a1ed8-53e5-86d2-966c-fb782d2ae3ab" }
   let(:working_representative_server) { instance_double(PostgresServer, run_query: "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1") }
   let(:faulty_representative_server) { instance_double(PostgresServer, run_query: "") }
-  let(:vm) { instance_double(Vm, sshable: instance_double(Sshable, cmd: "")) }
+  let(:vm) { instance_double(Vm, sshable: Sshable.new) }
   let(:servers) { [instance_double(PostgresServer, ubid: "1234", timeline_access: "push", vm: vm), instance_double(PostgresServer, ubid: "5678", timeline_access: "fetch", vm: vm)] }
   let(:servers_after_failover) { [instance_double(PostgresServer, ubid: "5678", timeline_access: "push", vm: vm), instance_double(PostgresServer, ubid: "9012", timeline_access: "fetch", vm: vm)] }
 

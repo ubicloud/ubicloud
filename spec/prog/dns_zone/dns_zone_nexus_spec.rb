@@ -8,7 +8,7 @@ RSpec.describe Prog::DnsZone::DnsZoneNexus do
   let(:dns_zone) { DnsZone.create(project_id: SecureRandom.uuid, name: "postgres.ubicloud.com") }
   let(:dns_server) { DnsServer.create(name: "ns.ubicloud.com") }
   let(:vm) { instance_double(Vm, id: "788525ed-d6f0-4937-a844-323d4fd91946") }
-  let(:sshable) { instance_double(Sshable) }
+  let(:sshable) { Sshable.new }
 
   before do
     allow(vm).to receive(:sshable).and_return(sshable)
@@ -49,7 +49,7 @@ RSpec.describe Prog::DnsZone::DnsZoneNexus do
     it "does not push anything if there is no unseen records" do
       DB[:seen_dns_records_by_dns_servers].insert(DB[:dns_record].select(:id, dns_server.id))
 
-      expect(sshable).not_to receive(:cmd)
+      expect(sshable).not_to receive(:_cmd)
       expect { nx.refresh_dns_servers }.to hop("wait")
     end
 
@@ -62,17 +62,17 @@ zone-unset postgres.ubicloud.com test-pg-3 10 A 9.10.11.12
 zone-commit postgres.ubicloud.com
 COMMANDS
 
-      expect(sshable).to receive(:cmd).with("sudo -u knot knotc", stdin: expected_commands.chomp).and_return("OK\nOK\nOK\nOK\nOK")
+      expect(sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: expected_commands.chomp).and_return("OK\nOK\nOK\nOK\nOK")
       expect { nx.refresh_dns_servers }.to hop("wait")
     end
 
     it "ignores unimportant errors" do
-      expect(sshable).to receive(:cmd).and_return("no active transaction\nOK\nsuch record already exists in zone\nno such record in zone found\nOK")
+      expect(sshable).to receive(:_cmd).and_return("no active transaction\nOK\nsuch record already exists in zone\nno such record in zone found\nOK")
       expect { nx.refresh_dns_servers }.to hop("wait")
     end
 
     it "raises an exception for unexpected failures" do
-      expect(sshable).to receive(:cmd).and_return("error in zone-abort\nOK\nOK\nOK\nOK")
+      expect(sshable).to receive(:_cmd).and_return("error in zone-abort\nOK\nOK\nOK\nOK")
 
       expect {
         nx.refresh_dns_servers

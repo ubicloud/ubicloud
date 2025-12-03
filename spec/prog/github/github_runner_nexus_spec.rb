@@ -562,7 +562,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "hops to register_runner" do
       expect(vm).to receive(:runtime_token).and_return("my_token")
       installation.update(use_docker_mirror: false, cache_enabled: false)
-      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND)
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND)
         set -ueo pipefail
         echo "image version: $ImageVersion"
         sudo usermod -a -G sudo,adm runneradmin
@@ -578,7 +578,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(vm).to receive(:runtime_token).and_return("my_token")
       installation.update(use_docker_mirror: false, cache_enabled: true)
       expect(vm).to receive(:nics).and_return([instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32"))]).at_least(:once)
-      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND)
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND)
         set -ueo pipefail
         echo "image version: $ImageVersion"
         sudo usermod -a -G sudo,adm runneradmin
@@ -595,7 +595,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(vm).to receive(:runtime_token).and_return("my_token")
       runner.label = "ubicloud-gpu"
       installation.update(use_docker_mirror: false, cache_enabled: false)
-      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND)
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND)
         set -ueo pipefail
         echo "image version: $ImageVersion"
         sudo usermod -a -G sudo,adm runneradmin
@@ -611,7 +611,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "naps if ssh authentication failed" do
       expect(vm).to receive(:runtime_token).and_return("my_token")
       expect(vm).to receive(:nics).and_return([instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32"))]).at_least(:once)
-      expect(vm.sshable).to receive(:cmd).and_raise(Net::SSH::AuthenticationFailed.new("Authentication failed for user runneradmin@1.2.3.4"))
+      expect(vm.sshable).to receive(:_cmd).and_raise(Net::SSH::AuthenticationFailed.new("Authentication failed for user runneradmin@1.2.3.4"))
       expect(Clog).to receive(:emit).with("ssh authentication failed").and_call_original
 
       expect { nx.setup_environment }.to nap(1)
@@ -621,7 +621,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   describe "#register_runner" do
     it "registers runner hops" do
       expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.label])).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC$"})
-      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND, stdin: "AABBCC$")
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, stdin: "AABBCC$")
         sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
         sudo systemctl start runner-script.service
       COMMAND
@@ -637,7 +637,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(client).to receive(:paginate)
         .and_yield({runners: [{name: runner.ubid.to_s, id: 123}]}, instance_double(Sawyer::Response, data: {runners: []}))
         .and_return({runners: [{name: runner.ubid.to_s, id: 123}]})
-      expect(vm.sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("dead")
+      expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("dead")
       expect(client).to receive(:delete).with("/repos/#{runner.repository_name}/actions/runners/123")
       expect(Clog).to receive(:emit).with("Deregistering runner because it already exists").and_call_original
       expect { nx.register_runner }.to nap(5)
@@ -650,7 +650,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(client).to receive(:paginate)
         .and_yield({runners: [{name: runner.ubid.to_s, id: 123}]}, instance_double(Sawyer::Response, data: {runners: []}))
         .and_return({runners: [{name: runner.ubid.to_s, id: 123}]})
-      expect(vm.sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
+      expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect { nx.register_runner }.to hop("wait")
       expect(runner.runner_id).to eq(123)
       expect(runner.ready_at).to eq(now)
@@ -674,7 +674,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "fails without a log if the ssh error doesn't match" do
       expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: runner.ubid.to_s, labels: [runner.label])).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC$"})
-      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND, stdin: "AABBCC$").and_raise Sshable::SshError.new("command", "", "unknown command", 123, nil)
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, stdin: "AABBCC$").and_raise Sshable::SshError.new("command", "", "unknown command", 123, nil)
         sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
         sudo systemctl start runner-script.service
       COMMAND
@@ -687,7 +687,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "does not destroy runner if it does not pick a job in five minutes, and busy" do
       runner.update(ready_at: now - 6 * 60, workflow_job: nil)
       expect(client).to receive(:get).and_return({busy: true})
-      expect(vm.sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
+      expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(nx).not_to receive(:register_deadline).with(nil, 7200)
 
       expect { nx.wait }.to nap(60)
@@ -697,7 +697,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "destroys runner if it does not pick a job in five minutes and not busy" do
       runner.update(ready_at: now - 6 * 60, workflow_job: nil)
       expect(client).to receive(:get).and_return({busy: false})
-      expect(vm.sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
+      expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(nx).to receive(:register_deadline).twice
       expect(Clog).to receive(:emit).with("The runner did not pick a job").and_call_original
 
@@ -708,7 +708,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "destroys runner if it does not pick a job in five minutes and already deleted" do
       runner.update(ready_at: now - 6 * 60, workflow_job: nil)
       expect(client).to receive(:get).and_raise(Octokit::NotFound)
-      expect(vm.sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
+      expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(nx).to receive(:register_deadline).twice
       expect(Clog).to receive(:emit).with("The runner did not pick a job").and_call_original
 
@@ -718,21 +718,21 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "does not destroy runner if it doesn not pick a job but two minutes not pass yet" do
       runner.update(ready_at: now - 60, workflow_job: nil)
-      expect(vm.sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
+      expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
 
       expect { nx.wait }.to nap(60)
       expect(runner.destroy_set?).to be(false)
     end
 
     it "destroys the runner if the runner-script is succeeded" do
-      expect(vm.sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("exited")
+      expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("exited")
 
       expect { nx.wait }.to nap(15)
       expect(runner.destroy_set?).to be(true)
     end
 
     it "provisions a spare runner and destroys the current one if the runner-script is failed" do
-      expect(vm.sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("failed")
+      expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("failed")
       expect(runner).to receive(:provision_spare_runner)
 
       expect { nx.wait }.to nap(0)
@@ -740,13 +740,13 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
 
     it "naps if the runner-script is running" do
-      expect(vm.sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
+      expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
 
       expect { nx.wait }.to nap(60)
     end
 
     it "raises ssh exception again for non-aws instance" do
-      expect(vm.sshable).to receive(:cmd).and_raise(Errno::ECONNRESET.new("connection failed"))
+      expect(vm.sshable).to receive(:_cmd).and_raise(Errno::ECONNRESET.new("connection failed"))
 
       expect { nx.wait }.to raise_error(Errno::ECONNRESET)
     end
@@ -758,7 +758,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       AwsInstance.create_with_id(vm, instance_id: "i-0123456789abcdefg")
       client = Aws::EC2::Client.new(stub_responses: true)
       expect(Aws::EC2::Client).to receive(:new).and_return(client).at_least(:once)
-      expect(vm.sshable).to receive(:cmd).and_raise(Errno::ECONNRESET.new("connection failed")).at_least(:once)
+      expect(vm.sshable).to receive(:_cmd).and_raise(Errno::ECONNRESET.new("connection failed")).at_least(:once)
 
       client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Client.UserInitiatedShutdown"}}]}])
       expect { nx.wait }.to raise_error(Errno::ECONNRESET)
@@ -778,7 +778,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       client = Aws::EC2::Client.new(stub_responses: true)
       expect(Aws::EC2::Client).to receive(:new).and_return(client)
       client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Server.SpotInstanceTermination"}}]}])
-      expect(vm.sshable).to receive(:cmd).and_raise(Errno::ECONNRESET.new("connection failed"))
+      expect(vm.sshable).to receive(:_cmd).and_raise(Errno::ECONNRESET.new("connection failed"))
       expect(Clog).to receive(:emit).with("Spot instance interrupted").and_call_original
       expect { nx.wait }.to nap
       expect(runner.destroy_set?).to be(true)
@@ -793,12 +793,12 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "collects vm logs but not serial.log if vm host is nil" do
       runner.update(workflow_job: nil)
       vm.update(vm_host_id: nil)
-      expect(vm.sshable).to receive(:cmd).with("journalctl -u runner-script -t 'run-withenv.sh' -t 'systemd' --no-pager | grep -Fv Started")
-      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND, log: false)
+      expect(vm.sshable).to receive(:_cmd).with("journalctl -u runner-script -t 'run-withenv.sh' -t 'systemd' --no-pager | grep -Fv Started")
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, log: false)
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
-      expect(vm.sshable).to receive(:cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReceived request - method: GET urlPath: foo\nGetCacheEntry  request failed with status code: 204\n")
+      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReceived request - method: GET urlPath: foo\nGetCacheEntry  request failed with status code: 204\n")
 
       expect(Clog).to receive(:emit).with("Cache proxy log line counts") do |&blk|
         expect(blk.call).to eq(cache_proxy_log_line_counts: {"Received request - method: GET urlPath: foo" => 2, "GetCacheEntry  request failed with status code: 204" => 1})
@@ -809,13 +809,13 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "Logs journalctl, docker limits, and cache proxy log if workflow_job is not successful" do
       runner.update(workflow_job: {"conclusion" => "failure"})
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ln /vm/#{vm.inhost_name}/serial.log /var/log/ubicloud/serials/#{runner.ubid}_serial.log")
-      expect(vm.sshable).to receive(:cmd).with("journalctl -u runner-script -t 'run-withenv.sh' -t 'systemd' --no-pager | grep -Fv Started")
-      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND, log: false)
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo ln /vm/#{vm.inhost_name}/serial.log /var/log/ubicloud/serials/#{runner.ubid}_serial.log")
+      expect(vm.sshable).to receive(:_cmd).with("journalctl -u runner-script -t 'run-withenv.sh' -t 'systemd' --no-pager | grep -Fv Started")
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, log: false)
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
-      expect(vm.sshable).to receive(:cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReceived request - method: GET urlPath: foo\nGetCacheEntry  request failed with status code: 204\n")
+      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReceived request - method: GET urlPath: foo\nGetCacheEntry  request failed with status code: 204\n")
       expect(Clog).to receive(:emit).with("Cache proxy log line counts") do |&blk|
         expect(blk.call).to eq(cache_proxy_log_line_counts: {"Received request - method: GET urlPath: foo" => 2, "GetCacheEntry  request failed with status code: 204" => 1})
       end
@@ -825,13 +825,13 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "Logs journalctl, docker limits, and cache proxy log if workflow_job is nil" do
       runner.update(workflow_job: nil)
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ln /vm/#{vm.inhost_name}/serial.log /var/log/ubicloud/serials/#{runner.ubid}_serial.log")
-      expect(vm.sshable).to receive(:cmd).with("journalctl -u runner-script -t 'run-withenv.sh' -t 'systemd' --no-pager | grep -Fv Started")
-      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND, log: false)
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo ln /vm/#{vm.inhost_name}/serial.log /var/log/ubicloud/serials/#{runner.ubid}_serial.log")
+      expect(vm.sshable).to receive(:_cmd).with("journalctl -u runner-script -t 'run-withenv.sh' -t 'systemd' --no-pager | grep -Fv Started")
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, log: false)
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
-      expect(vm.sshable).to receive(:cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReceived request - method: GET urlPath: foo\nGetCacheEntry  request failed with status code: 204\n")
+      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReceived request - method: GET urlPath: foo\nGetCacheEntry  request failed with status code: 204\n")
 
       expect(Clog).to receive(:emit).with("Cache proxy log line counts") do |&blk|
         expect(blk.call).to eq(cache_proxy_log_line_counts: {"Received request - method: GET urlPath: foo" => 2, "GetCacheEntry  request failed with status code: 204" => 1})
@@ -842,14 +842,14 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "Logs docker limits and cache proxy log if workflow_job is successful" do
       runner.update(workflow_job: {"conclusion" => "success"})
-      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND, log: false).and_return("ratelimit-limit: 100;w=21600\nratelimit-remaining: 98;w=21600\ndocker-ratelimit-source: 192.168.1.1\n")
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, log: false).and_return("ratelimit-limit: 100;w=21600\nratelimit-remaining: 98;w=21600\ndocker-ratelimit-source: 192.168.1.1\n")
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
       expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits") do |&blk|
         expect(blk.call).to eq(dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 98, remaining_window: 21600, source: "192.168.1.1"})
       end
-      expect(vm.sshable).to receive(:cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReceived request - method: GET urlPath: foo\nGetCacheEntry  request failed with status code: 204\n")
+      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReceived request - method: GET urlPath: foo\nGetCacheEntry  request failed with status code: 204\n")
 
       expect(Clog).to receive(:emit).with("Cache proxy log line counts") do |&blk|
         expect(blk.call).to eq(cache_proxy_log_line_counts: {"Received request - method: GET urlPath: foo" => 2, "GetCacheEntry  request failed with status code: 204" => 1})
@@ -860,14 +860,14 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "Logs docker limits and empty cache proxy log if workflow_job is successful" do
       runner.update(workflow_job: {"conclusion" => "success"})
-      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND, log: false).and_return("ratelimit-limit: 100;w=21600\nratelimit-remaining: 98;w=21600\ndocker-ratelimit-source: 192.168.1.1\n")
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, log: false).and_return("ratelimit-limit: 100;w=21600\nratelimit-remaining: 98;w=21600\ndocker-ratelimit-source: 192.168.1.1\n")
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
       expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits") do |&blk|
         expect(blk.call).to eq(dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 98, remaining_window: 21600, source: "192.168.1.1"})
       end
-      expect(vm.sshable).to receive(:cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("")
+      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("")
 
       expect(Clog).to receive(:emit).with("Cache proxy log line counts") do |&blk|
         expect(blk.call).to eq(cache_proxy_log_line_counts: {})
@@ -878,21 +878,21 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "Logs docker limits and nil cache proxy log if workflow_job is successful" do
       runner.update(workflow_job: {"conclusion" => "success"})
-      expect(vm.sshable).to receive(:cmd).with(<<~COMMAND, log: false).and_return("ratelimit-limit: 100;w=21600\nratelimit-remaining: 98;w=21600\ndocker-ratelimit-source: 192.168.1.1\n")
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, log: false).and_return("ratelimit-limit: 100;w=21600\nratelimit-remaining: 98;w=21600\ndocker-ratelimit-source: 192.168.1.1\n")
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
       expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits") do |&blk|
         expect(blk.call).to eq(dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 98, remaining_window: 21600, source: "192.168.1.1"})
       end
-      expect(vm.sshable).to receive(:cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return(nil)
+      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return(nil)
 
       nx.collect_final_telemetry
     end
 
     it "doesn't fail if it failed due to Sshable::SshError" do
       runner.update(workflow_job: {"conclusion" => "success"})
-      expect(vm.sshable).to receive(:cmd).and_raise Sshable::SshError.new("bogus", "", "", nil, nil)
+      expect(vm.sshable).to receive(:_cmd).and_raise Sshable::SshError.new("bogus", "", "", nil, nil)
       expect(Clog).to receive(:emit).with("Failed to collect final telemetry").and_call_original
 
       nx.collect_final_telemetry
@@ -900,7 +900,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "doesn't fail if it failed due to Net::SSH::ConnectionTimeout" do
       runner.update(workflow_job: {"conclusion" => "success"})
-      expect(vm.sshable).to receive(:cmd).and_raise Net::SSH::ConnectionTimeout
+      expect(vm.sshable).to receive(:_cmd).and_raise Net::SSH::ConnectionTimeout
       expect(Clog).to receive(:emit).with("Failed to collect final telemetry").and_call_original
 
       nx.collect_final_telemetry
