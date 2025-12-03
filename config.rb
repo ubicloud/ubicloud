@@ -38,13 +38,11 @@ module Config
     Config.rack_env == "test"
   end
 
-  # Mandatory -- exception is raised for these variables when missing.
   mandatory :clover_database_url, string, clear: true
   mandatory :clover_column_encryption_key, base64, clear: true
   mandatory :clover_session_secret, base64, clear: true
   mandatory :rack_env, string
 
-  # Optional -- value is returned or `nil` if it wasn't present.
   optional :clover_runtime_token_secret, base64, clear: true
   optional :heartbeat_url, string
   optional :clover_database_root_certs, string
@@ -70,7 +68,6 @@ module Config
   override :smtp_port, 587, int
   override :smtp_tls, true, bool
 
-  # Override -- value is returned or the set default.
   override :base_url, "http://localhost:9292", string
   override :database_timeout, 10, int
   override :db_pool, 5, int
