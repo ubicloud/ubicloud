@@ -8,7 +8,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   IN_PROGRESS_CONCLUSIONS = ["in_progress", "queued", "requested", "waiting", "pending", "neutral"]
 
   REPOSITORY_NAME = "ubicloud/github-e2e-test-workflows"
-  TEST_WORKFLOW_FILE = "test.yml"
+  WORKFLOW_NAME = "test.yml"
   BRANCH_NAME = "enes/simply-tests"
 
   def self.assemble(test_cases, provider: "metal")
