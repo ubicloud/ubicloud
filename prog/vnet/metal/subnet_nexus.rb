@@ -3,15 +3,6 @@
 class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   subject_is :private_subnet
 
-  def before_run
-    when_destroy_set? do
-      if strand.label != "destroy"
-        register_deadline(nil, 10 * 60)
-        hop_destroy
-      end
-    end
-  end
-
   label def start
     hop_wait
   end
@@ -106,7 +97,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
 
       nap 5
     end
-
+    register_deadline(nil, 10 * 60)
     decr_destroy
     private_subnet.remove_all_firewalls
 
