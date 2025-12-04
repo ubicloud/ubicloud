@@ -157,12 +157,12 @@ RSpec.describe Project do
   #   gr = gi.add_runner(label: "ubicloud", repository_name: "a/a")
   #   gr.update(vm_id: vm1.id)
   #   expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 0
-  #   grst = Strand.new(id: gr.id, label: "start", prog: "Prog::Vm::GithubRunner")
+  #   grst = Strand.new(id: gr.id, label: "start", prog: "Prog::Github::GithubRunnerNexus")
   #   expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 0
   #   grst.update(label: "wait_vm")
   #   expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 2
   #   gr2 = gi.add_runner(label: "ubicloud-standard-60", repository_name: "a/a")
-  #   grst2 = Strand.new(id: gr2.id, label: "wait_concurrency_limit", prog: "Prog::Vm::GithubRunner")
+  #   grst2 = Strand.new(id: gr2.id, label: "wait_concurrency_limit", prog: "Prog::Github::GithubRunnerNexus")
   #   expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 2
   #   grst2.update(label: "wait_vm")
   #   expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 62
