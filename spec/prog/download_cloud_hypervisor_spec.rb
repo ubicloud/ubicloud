@@ -38,7 +38,7 @@ RSpec.describe Prog::DownloadCloudHypervisor do
   describe "#download" do
     it "starts to download assets if not started" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_ch_35.1").and_return("NotStarted")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'host/bin/download-cloud-hypervisor 35.1 thesha anothersha' download_ch_35.1")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer host/bin/download-cloud-hypervisor\\ 35.1\\ thesha\\ anothersha download_ch_35.1")
       expect { df.download }.to nap(15)
     end
 
@@ -46,7 +46,7 @@ RSpec.describe Prog::DownloadCloudHypervisor do
       df = described_class.new(Strand.new(stack: [{"version" => "35.1", "sha256_ch_bin" => nil, "sha256_ch_remote" => nil}]))
       allow(df).to receive_messages(sshable: sshable, vm_host: vm_host)
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_ch_35.1").and_return("NotStarted")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'host/bin/download-cloud-hypervisor 35.1 e8426b0733248ed559bea64eb04d732ce8a471edc94807b5e2ecfdfc57136ab4 337bd88183f6886f1c7b533499826587360f23168eac5aabf38e6d6b977c93b0' download_ch_35.1")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer host/bin/download-cloud-hypervisor\\ 35.1\\ e8426b0733248ed559bea64eb04d732ce8a471edc94807b5e2ecfdfc57136ab4\\ 337bd88183f6886f1c7b533499826587360f23168eac5aabf38e6d6b977c93b0 download_ch_35.1")
       expect { df.download }.to nap(15)
     end
 
