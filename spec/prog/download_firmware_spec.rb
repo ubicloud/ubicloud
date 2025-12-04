@@ -31,7 +31,7 @@ RSpec.describe Prog::DownloadFirmware do
   describe "#download" do
     it "starts to download firmware if not started" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_firmware_202405").and_return("NotStarted")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'host/bin/download-firmware 202405 thesha' download_firmware_202405")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer host/bin/download-firmware\\ 202405\\ thesha download_firmware_202405")
       expect { df.download }.to nap(15)
     end
 

@@ -19,13 +19,14 @@ class Prog::DownloadFirmware < Prog::Base
   end
 
   label def download
-    q_daemon_name = "download_firmware_#{version}".shellescape
-    case sshable.cmd("common/bin/daemonizer --check #{q_daemon_name}")
+    daemon_name = "download_firmware_#{version}"
+    case sshable.cmd("common/bin/daemonizer --check :daemon_name", daemon_name:)
     when "Succeeded"
-      sshable.cmd("common/bin/daemonizer --clean #{q_daemon_name}")
+      sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
       pop({"msg" => "firmware downloaded", "version" => version, "sha256" => sha256})
     when "NotStarted"
-      sshable.cmd("common/bin/daemonizer 'host/bin/download-firmware #{version} #{sha256}' #{q_daemon_name}")
+      d_command = NetSsh.command("host/bin/download-firmware :version :sha256", version:, sha256:)
+      sshable.cmd("common/bin/daemonizer :d_command :daemon_name", daemon_name:, d_command:)
     when "Failed"
       fail "Failed to download firmware version #{version} on #{vm_host}"
     end
