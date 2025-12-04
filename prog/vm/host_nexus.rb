@@ -65,7 +65,7 @@ class Prog::Vm::HostNexus < Prog::Base
       public_keys = sshable.keys.first.public_key
       public_keys += "\n#{Config.operator_ssh_public_keys}" if Config.operator_ssh_public_keys
 
-      Util.rootish_ssh(sshable.host, "root", root_ssh_key.private_key, "echo '#{public_keys}' > ~/.ssh/authorized_keys")
+      Util.rootish_ssh(sshable.host, "root", root_ssh_key.private_key, "echo :public_keys > ~/.ssh/authorized_keys", public_keys:)
     end
 
     hop_bootstrap_rhizome
@@ -199,8 +199,8 @@ class Prog::Vm::HostNexus < Prog::Base
 
     nap 30 unless sshable.available?
 
-    q_last_boot_id = vm_host.last_boot_id.shellescape
-    new_boot_id = sshable.cmd("sudo host/bin/reboot-host #{q_last_boot_id}").strip
+    last_boot_id = vm_host.last_boot_id
+    new_boot_id = sshable.cmd("sudo host/bin/reboot-host :last_boot_id", last_boot_id:).strip
 
     # If we didn't get a valid new boot id, nap. This can happen if reboot-host
     # issues a reboot and returns without closing the ssh connection.
@@ -244,8 +244,8 @@ class Prog::Vm::HostNexus < Prog::Base
 
   label def verify_spdk
     vm_host.spdk_installations.each { |installation|
-      q_version = installation.version.shellescape
-      sshable.cmd("sudo host/bin/setup-spdk verify #{q_version}")
+      version = installation.version
+      sshable.cmd("sudo host/bin/setup-spdk verify :version", version:)
     }
 
     hop_verify_hugepages
@@ -326,8 +326,8 @@ class Prog::Vm::HostNexus < Prog::Base
 
   label def configure_metrics
     metrics_dir = vm_host.metrics_config[:metrics_dir]
-    sshable.cmd("mkdir -p #{metrics_dir}")
-    sshable.cmd("tee #{metrics_dir}/config.json > /dev/null", stdin: vm_host.metrics_config.to_json)
+    sshable.cmd("mkdir -p :metrics_dir", metrics_dir:)
+    sshable.cmd("tee :metrics_dir/config.json > /dev/null", metrics_dir:, stdin: vm_host.metrics_config.to_json)
 
     metrics_service = <<SERVICE
 [Unit]
