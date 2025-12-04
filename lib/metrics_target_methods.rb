@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "shellwords"
-
 module MetricsTargetMethods
   MAX_SCRAPE_FETCH_COUNT = 4
   FILENAME_FORMAT = "%Y-%m-%dT%H-%M-%S-%N"
@@ -49,14 +47,14 @@ module MetricsTargetMethods
   end
 
   def scrape_endpoints(session)
-    scrape_files = session[:ssh_session].exec!("ls #{metrics_dir}/done | sort | head -n #{MAX_SCRAPE_FETCH_COUNT}").split("\n")
+    scrape_files = session[:ssh_session].exec!("ls :metrics_dir/done | sort | head -n :fetch_count", metrics_dir:, fetch_count: MAX_SCRAPE_FETCH_COUNT).split("\n")
 
     scrape_files.filter_map do |file|
       time_str = file.split(".").first
       time = Time.strptime(time_str, FILENAME_FORMAT)
       status = {}
 
-      samples = session[:ssh_session].exec!("cat #{metrics_dir}/done/#{file.shellescape}", status: status)
+      samples = session[:ssh_session].exec!("cat :metrics_dir/done/:file", metrics_dir:, file:, status:)
 
       VictoriaMetrics::Client::Scrape.new(time:, samples:) if status[:exit_code] == 0
     end
@@ -64,10 +62,12 @@ module MetricsTargetMethods
 
   def mark_pending_scrapes_as_done(session, time)
     marker = time.strftime(FILENAME_FORMAT)
-    session[:ssh_session].exec!("ls #{metrics_dir}/done | sort | awk '$0 <= \"#{marker}\"' | xargs -I{} rm #{metrics_dir}/done/{}")
+    session[:ssh_session].exec!("ls :metrics_dir/done | sort | awk :awk_script | xargs -I{} rm :metrics_dir/done/{}", metrics_dir:, awk_script: "$0 <= \"#{marker}\"")
   end
 
+  private
+
   def metrics_dir
-    metrics_config[:metrics_dir].shellescape
+    metrics_config[:metrics_dir]
   end
 end
