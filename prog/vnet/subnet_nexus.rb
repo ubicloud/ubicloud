@@ -84,7 +84,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     # :nocov:
     when_migrate_set? do
       if private_subnet.location.aws?
-        strand.update(prog: "Vnet::Aws::SubnetNexus", label: "wait")
+        strand.update(prog: "Vnet::Aws::VpcNexus", label: "wait")
       else
         strand.update(prog: "Vnet::Metal::SubnetNexus", label: "wait")
       end
