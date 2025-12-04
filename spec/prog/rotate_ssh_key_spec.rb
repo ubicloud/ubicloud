@@ -27,7 +27,7 @@ RSpec.describe Prog::RotateSshKey do
         instance_double(SshKey, public_key: "key_1"),
         instance_double(SshKey, public_key: "key_2")
       ])
-      expect(sshable).to receive(:_cmd).with(/.*echo key_1'\n'key_2 > ~\/.ssh\/authorized_keys2/)
+      expect(sshable).to receive(:_cmd).with("set -ueo pipefail\necho key_1'\n'key_2 > ~/.ssh/authorized_keys2\n")
       expect { rsk.install }.to hop("retire_old_key_on_server")
     end
   end
