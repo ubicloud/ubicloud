@@ -33,7 +33,8 @@ class LoadBalancerVmPort < Sequel::Model
     end
 
     begin
-      (session[:ssh_session].exec!(health_check_cmd(type)).strip == "200") ? "up" : "down"
+      cmd, kw = health_check_cmd(type)
+      (session[:ssh_session].exec!(cmd, **kw).strip == "200") ? "up" : "down"
     rescue IOError, Errno::ECONNRESET
       raise
     rescue => e
@@ -44,11 +45,22 @@ class LoadBalancerVmPort < Sequel::Model
 
   def health_check_cmd(type)
     address = (type == :ipv4) ? vm.private_ipv4 : vm.ip6
-    if load_balancer.health_check_protocol == "tcp"
-      "sudo ip netns exec #{vm.inhost_name} nc -z -w #{load_balancer.health_check_timeout} #{address} #{load_balancer_port.dst_port} >/dev/null 2>&1 && echo 200 || echo 400"
+    kw = {
+      vm_name: vm.inhost_name,
+      timeout: load_balancer.health_check_timeout,
+      dst_port: load_balancer_port.dst_port
+    }
+
+    cmd = if load_balancer.health_check_protocol == "tcp"
+      kw[:address] = address.to_s
+      "sudo ip netns exec :vm_name nc -z -w :timeout :address :dst_port >/dev/null 2>&1 && echo 200 || echo 400"
     else
-      "sudo ip netns exec #{vm.inhost_name} curl --insecure --resolve #{load_balancer.hostname}:#{load_balancer_port.dst_port}:#{(address.version == 6) ? "[#{address}]" : address} --max-time #{load_balancer.health_check_timeout} --silent --output /dev/null --write-out '%{http_code}' #{load_balancer.health_check_url(use_endpoint: true).shellescape}"
+      kw[:address] = "#{load_balancer.hostname}:#{load_balancer_port.dst_port}:#{(address.version == 6) ? "[#{address}]" : address}"
+      kw[:health_check_url] = load_balancer.health_check_url(use_endpoint: true)
+      "sudo ip netns exec :vm_name curl --insecure --resolve :address --max-time :timeout --silent --output /dev/null --write-out '%{http_code}' :health_check_url"
     end
+
+    [cmd, kw]
   end
 
   def check_pulse(session:, previous_pulse:)
