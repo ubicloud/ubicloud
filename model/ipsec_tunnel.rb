@@ -9,7 +9,7 @@ class IpsecTunnel < Sequel::Model
   plugin ResourceMethods
 
   def vm_name(nic)
-    nic.vm.inhost_name.shellescape
+    nic.vm.inhost_name
   end
 end
 
