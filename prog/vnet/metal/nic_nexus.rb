@@ -3,12 +3,6 @@
 class Prog::Vnet::Metal::NicNexus < Prog::Base
   subject_is :nic
 
-  def before_run
-    when_destroy_set? do
-      hop_destroy if strand.label != "destroy"
-    end
-  end
-
   label def start
     when_vm_allocated_set? do
       hop_wait_setup
