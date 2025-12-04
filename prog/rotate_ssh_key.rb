@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "shellwords"
-
 class Prog::RotateSshKey < Prog::Base
   subject_is :sshable
 
@@ -13,9 +11,9 @@ class Prog::RotateSshKey < Prog::Base
   label def install
     public_keys = sshable.keys.map(&:public_key).join("\n")
 
-    sshable.cmd(<<SH)
+    sshable.cmd(<<SH, public_keys:)
 set -ueo pipefail
-echo #{public_keys.shellescape} > ~/.ssh/authorized_keys2
+echo :public_keys > ~/.ssh/authorized_keys2
 SH
     hop_retire_old_key_on_server
   end
