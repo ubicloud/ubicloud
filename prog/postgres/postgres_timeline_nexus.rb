@@ -63,7 +63,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
   label def wait
     leader = postgres_timeline.leader
-    backups = leader ? postgres_timeline.backups : []
+    backups = postgres_timeline.backups
     if leader.nil? && backups.empty? && Time.now - postgres_timeline.created_at > 10 * 24 * 60 * 60
       Clog.emit("Self-destructing timeline as no leader or backups are present and it is older than 10 days") { postgres_timeline }
       hop_destroy

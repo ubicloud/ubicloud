@@ -167,15 +167,6 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect { nx.wait }.to hop("destroy")
     end
 
-    it "avoids API calls backups if there is no leader" do
-      expect(postgres_timeline).to receive(:leader).and_return(nil)
-      expect(postgres_timeline).to receive(:created_at).and_return(Time.now - 6 * 24 * 60 * 60).twice
-      expect(postgres_timeline).not_to receive(:backups)
-      expect(postgres_timeline).to receive(:need_backup?).and_return(false)
-
-      expect { nx.wait }.to nap(20 * 60)
-    end
-
     it "hops to take_backup if backup is needed" do
       expect(postgres_timeline).to receive(:need_backup?).and_return(true)
       backup = Struct.new(:last_modified)
