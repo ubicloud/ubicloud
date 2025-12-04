@@ -46,20 +46,20 @@ class Prog::Storage::SetupSpdk < Prog::Base
   end
 
   label def install_spdk
-    q_version = frame["version"].shellescape
+    version = frame["version"]
     cpu_count = vm_host.spdk_cpu_count
     # YYY: drop the default value after updating production data
     os_version = vm_host.os_version || "ubuntu-22.04"
-    sshable.cmd("sudo host/bin/setup-spdk install #{q_version} #{cpu_count} #{os_version.shellescape}")
+    sshable.cmd("sudo host/bin/setup-spdk install :version :cpu_count :os_version", version:, cpu_count:, os_version:)
 
     hop_start_service
   end
 
   label def start_service
     if frame["start_service"]
-      q_version = frame["version"].shellescape
-      sshable.cmd("sudo host/bin/setup-spdk start #{q_version}")
-      sshable.cmd("sudo host/bin/setup-spdk verify #{q_version}")
+      version = frame["version"]
+      sshable.cmd("sudo host/bin/setup-spdk start :version", version:)
+      sshable.cmd("sudo host/bin/setup-spdk verify :version", version:)
     end
 
     hop_update_database
