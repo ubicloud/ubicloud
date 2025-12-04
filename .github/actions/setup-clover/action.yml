@@ -27,6 +27,14 @@ runs:
         ruby-version: .tool-versions
         bundler-cache: true
 
+    - name: Set up Ruby for CSI gems
+      uses: ruby/setup-ruby@v1
+      env:
+        BUNDLE_GEMFILE: kubernetes/csi/Gemfile
+      with:
+        ruby-version: .tool-versions
+        bundler-cache: true
+
     - name: Create .env.rb file
       shell: bash
       run: "bundle exec rake overwrite_envrb && echo '$stdout.sync = true' >> .env.rb"
@@ -37,7 +45,3 @@ runs:
         createuser -U postgres clover
         createuser -U postgres clover_password
         bundle exec rake setup_database\[test,true\]
-
-    - name: Install CSI gems
-      shell: bash
-      run: "cd kubernetes/csi && bundle install"
