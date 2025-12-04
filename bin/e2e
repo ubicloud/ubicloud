@@ -10,11 +10,14 @@ require "optparse"
 def main(options)
   test_cases = YAML.load_file("config/e2e_test_cases.yml").to_h { [it["name"], it] }
 
-  ["metal", "aws"].each do |provider|
-    next unless options[:providers].include?(provider)
-    puts "Starting #{provider} tests"
-    send("test_#{provider}", options, test_cases)
+  threads = ["metal", "aws"].select { options[:providers].include?(it) }.map do |provider|
+    Thread.new do
+      puts "Starting #{provider} tests"
+      send("test_#{provider}", options, test_cases)
+      puts "Finished #{provider} tests"
+    end
   end
+  threads.each(&:join)
 end
 
 def test_metal(options, test_cases)
