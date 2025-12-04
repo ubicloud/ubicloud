@@ -222,7 +222,7 @@ class Vm < Sequel::Model
 
   def check_pulse(session:, previous_pulse:)
     reading = begin
-      session[:ssh_session].exec!("systemctl is-active #{inhost_name} #{inhost_name}-dnsmasq").split("\n").all?("active") ? "up" : "down"
+      session[:ssh_session].exec!("systemctl is-active :inhost_name :inhost_name-dnsmasq", inhost_name:).split("\n").all?("active") ? "up" : "down"
     rescue
       "down"
     end
