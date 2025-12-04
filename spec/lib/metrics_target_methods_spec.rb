@@ -110,17 +110,16 @@ RSpec.describe MetricsTargetMethods do
     let(:time_marker) { "2023-01-01T12-00-00-000000000" }
 
     it "executes the correct command to move files" do
-      expected_command = "ls #{metrics_dir}/done | sort | awk '$0 <= \"#{time_marker}\"' | xargs -I{} rm #{metrics_dir}/done/{}"
-      expect(mock_ssh_session).to receive(:_exec!).with(expected_command)
+      expect(mock_ssh_session).to receive(:_exec!).with("ls /home/ubi/metrics/done | sort | awk \\$0\\ \\<\\=\\ \\\"2023-01-01T12-00-00-000000000\\\" | xargs -I{} rm /home/ubi/metrics/done/{}")
 
       test_instance.mark_pending_scrapes_as_done(session, time)
     end
   end
 
   describe "#metrics_dir" do
-    it "returns the escaped metrics directory path" do
+    it "returns the unescaped metrics directory path" do
       allow(test_instance).to receive(:metrics_config).and_return({metrics_dir: "/path with spaces"})
-      expect(test_instance.metrics_dir).to eq("/path\\ with\\ spaces")
+      expect(test_instance.send(:metrics_dir)).to eq("/path with spaces")
     end
   end
 end
