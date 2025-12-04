@@ -20,8 +20,9 @@ class Serializers::Vm < Serializers::Base
         firewalls: Serializers::Firewall.serialize(vm.firewalls, {include_path: true}),
         private_ipv4: vm.private_ipv4,
         private_ipv6: vm.private_ipv6,
-        subnet: vm.nics.first.private_subnet.name,
-        gpu: vm.display_gpu
+        subnet: vm.nics.first.private_subnet.name
+        # ZZZ: not needed for thin aws
+        # gpu: vm.display_gpu
       )
     end
 

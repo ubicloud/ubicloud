@@ -4,14 +4,18 @@ require_relative "../model"
 
 class VmStorageVolume < Sequel::Model
   many_to_one :vm
-  many_to_one :spdk_installation
-  many_to_one :vhost_block_backend
-  many_to_one :storage_device
-  many_to_one :key_encryption_key_1, class: :StorageKeyEncryptionKey
-  many_to_one :key_encryption_key_2, class: :StorageKeyEncryptionKey
-  many_to_one :boot_image
 
-  plugin :association_dependencies, key_encryption_key_1: :destroy, key_encryption_key_2: :destroy
+  # ZZZ: not needed for thin aws
+  # many_to_one :spdk_installation
+  # many_to_one :vhost_block_backend
+  many_to_one :storage_device
+
+  # ZZZ: not needed for thin aws
+  # many_to_one :key_encryption_key_1, class: :StorageKeyEncryptionKey
+  # many_to_one :key_encryption_key_2, class: :StorageKeyEncryptionKey
+  # many_to_one :boot_image
+
+  # plugin :association_dependencies, key_encryption_key_1: :destroy, key_encryption_key_2: :destroy
 
   plugin ResourceMethods
 
@@ -20,34 +24,37 @@ class VmStorageVolume < Sequel::Model
   end
 
   def device_path
+    # {{{ CONFLATED
     vm.location.aws? ? "/dev/nvme#{disk_index}n1" : "/dev/disk/by-id/virtio-#{device_id}"
+    # }}} CONFLATED
   end
 
-  def spdk_version
-    spdk_installation&.version
-  end
+  # ZZZ: not needed for thin aws
+  # def spdk_version
+  #   spdk_installation&.version
+  # end
 
-  def vhost_block_backend_version
-    vhost_block_backend&.version
-  end
+  # def vhost_block_backend_version
+  #   vhost_block_backend&.version
+  # end
 
-  def num_queues
-    @num_queues ||= if vhost_block_backend
-      vring_workers
-    else
-      # SPDK volumes
-      1
-    end
-  end
+  # def num_queues
+  #   @num_queues ||= if vhost_block_backend
+  #     vring_workers
+  #   else
+  #     # SPDK volumes
+  #     1
+  #   end
+  # end
 
-  def queue_size
-    @queue_size ||= if vhost_block_backend
-      64
-    else
-      # SPDK volumes
-      256
-    end
-  end
+  # def queue_size
+  #   @queue_size ||= if vhost_block_backend
+  #     64
+  #   else
+  #     # SPDK volumes
+  #     256
+  #   end
+  # end
 end
 
 # Table: vm_storage_volume

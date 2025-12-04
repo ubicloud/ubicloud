@@ -37,190 +37,191 @@ RSpec.describe Vm do
     end
   end
 
-  describe "#load_balancer_state" do
-    it "returns nil if there is related object" do
-      expect(vm.load_balancer_state).to be_nil
-    end
-  end
+  # ZZZ: not needed for thin aws
+  # describe "#load_balancer_state" do
+  #   it "returns nil if there is related object" do
+  #     expect(vm.load_balancer_state).to be_nil
+  #   end
+  # end
 
-  describe "#cloud_hypervisor_cpu_topology" do
-    it "scales a single-socket hyperthreaded system" do
-      vm.family = "standard"
-      vm.vcpus = 4
-      expect(vm).to receive(:vm_host).and_return(instance_double(
-        VmHost,
-        total_cpus: 12,
-        total_cores: 6,
-        total_dies: 1,
-        total_sockets: 1
-      )).at_least(:once)
-      expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("2:2:1:1")
-    end
+  # describe "#cloud_hypervisor_cpu_topology" do
+  #   it "scales a single-socket hyperthreaded system" do
+  #     vm.family = "standard"
+  #     vm.vcpus = 4
+  #     expect(vm).to receive(:vm_host).and_return(instance_double(
+  #       VmHost,
+  #       total_cpus: 12,
+  #       total_cores: 6,
+  #       total_dies: 1,
+  #       total_sockets: 1
+  #     )).at_least(:once)
+  #     expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("2:2:1:1")
+  #   end
 
-    it "scales a dual-socket hyperthreaded system" do
-      vm.family = "standard"
-      vm.vcpus = 4
-      expect(vm).to receive(:vm_host).and_return(instance_double(
-        VmHost,
-        total_cpus: 24,
-        total_cores: 12,
-        total_dies: 2,
-        total_sockets: 2
-      )).at_least(:once)
-      expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("2:2:1:1")
-    end
+  #   it "scales a dual-socket hyperthreaded system" do
+  #     vm.family = "standard"
+  #     vm.vcpus = 4
+  #     expect(vm).to receive(:vm_host).and_return(instance_double(
+  #       VmHost,
+  #       total_cpus: 24,
+  #       total_cores: 12,
+  #       total_dies: 2,
+  #       total_sockets: 2
+  #     )).at_least(:once)
+  #     expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("2:2:1:1")
+  #   end
 
-    it "crashes if total_cpus is not multiply of total_cores" do
-      expect(vm).to receive(:vm_host).and_return(instance_double(
-        VmHost,
-        total_cpus: 3,
-        total_cores: 2
-      )).at_least(:once)
+  #   it "crashes if total_cpus is not multiply of total_cores" do
+  #     expect(vm).to receive(:vm_host).and_return(instance_double(
+  #       VmHost,
+  #       total_cpus: 3,
+  #       total_cores: 2
+  #     )).at_least(:once)
 
-      expect { vm.cloud_hypervisor_cpu_topology }.to raise_error RuntimeError, "BUG"
-    end
+  #     expect { vm.cloud_hypervisor_cpu_topology }.to raise_error RuntimeError, "BUG"
+  #   end
 
-    it "crashes if total_dies is not a multiple of total_sockets" do
-      expect(vm).to receive(:vm_host).and_return(instance_double(
-        VmHost,
-        total_cpus: 24,
-        total_cores: 12,
-        total_dies: 3,
-        total_sockets: 2
-      )).at_least(:once)
+  #   it "crashes if total_dies is not a multiple of total_sockets" do
+  #     expect(vm).to receive(:vm_host).and_return(instance_double(
+  #       VmHost,
+  #       total_cpus: 24,
+  #       total_cores: 12,
+  #       total_dies: 3,
+  #       total_sockets: 2
+  #     )).at_least(:once)
 
-      expect { vm.cloud_hypervisor_cpu_topology }.to raise_error RuntimeError, "BUG"
-    end
+  #     expect { vm.cloud_hypervisor_cpu_topology }.to raise_error RuntimeError, "BUG"
+  #   end
 
-    it "crashes if cores allocated per die is not uniform number" do
-      vm.family = "standard"
-      vm.vcpus = 4
+  #   it "crashes if cores allocated per die is not uniform number" do
+  #     vm.family = "standard"
+  #     vm.vcpus = 4
 
-      expect(vm).to receive(:vm_host).and_return(instance_double(
-        VmHost,
-        total_cpus: 1,
-        total_cores: 1,
-        total_dies: 1,
-        total_sockets: 1
-      )).at_least(:once)
+  #     expect(vm).to receive(:vm_host).and_return(instance_double(
+  #       VmHost,
+  #       total_cpus: 1,
+  #       total_cores: 1,
+  #       total_dies: 1,
+  #       total_sockets: 1
+  #     )).at_least(:once)
 
-      expect { vm.cloud_hypervisor_cpu_topology }.to raise_error RuntimeError, "BUG: need uniform number of cores allocated per die"
-    end
+  #     expect { vm.cloud_hypervisor_cpu_topology }.to raise_error RuntimeError, "BUG: need uniform number of cores allocated per die"
+  #   end
 
-    it "crashes if the vcpus is an odd number" do
-      vm.family = "burstable"
-      vm.vcpus = 5
-      expect(vm).to receive(:vm_host).and_return(instance_double(
-        VmHost,
-        total_cpus: 12,
-        total_cores: 6,
-        total_dies: 1,
-        total_sockets: 1
-      )).at_least(:once)
+  #   it "crashes if the vcpus is an odd number" do
+  #     vm.family = "burstable"
+  #     vm.vcpus = 5
+  #     expect(vm).to receive(:vm_host).and_return(instance_double(
+  #       VmHost,
+  #       total_cpus: 12,
+  #       total_cores: 6,
+  #       total_dies: 1,
+  #       total_sockets: 1
+  #     )).at_least(:once)
 
-      expect { vm.cloud_hypervisor_cpu_topology }.to raise_error RuntimeError, "BUG: need uniform number of cores allocated per die"
-    end
+  #     expect { vm.cloud_hypervisor_cpu_topology }.to raise_error RuntimeError, "BUG: need uniform number of cores allocated per die"
+  #   end
 
-    it "scales a single-socket non-hyperthreaded system" do
-      vm.family = "standard"
-      vm.vcpus = 4
-      expect(vm).to receive(:vm_host).and_return(instance_double(
-        VmHost,
-        total_cpus: 12,
-        total_cores: 12,
-        total_dies: 1,
-        total_sockets: 1
-      )).at_least(:once)
-      expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:4:1:1")
-    end
+  #   it "scales a single-socket non-hyperthreaded system" do
+  #     vm.family = "standard"
+  #     vm.vcpus = 4
+  #     expect(vm).to receive(:vm_host).and_return(instance_double(
+  #       VmHost,
+  #       total_cpus: 12,
+  #       total_cores: 12,
+  #       total_dies: 1,
+  #       total_sockets: 1
+  #     )).at_least(:once)
+  #     expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:4:1:1")
+  #   end
 
-    it "scales a single-socket hyperthreaded system for burstable family for 2 vcpus" do
-      vm.family = "burstable"
-      vm.vcpus = 2
-      expect(vm).to receive(:vm_host).and_return(instance_double(
-        VmHost,
-        total_cpus: 12,
-        total_cores: 6,
-        total_dies: 1,
-        total_sockets: 1
-      )).at_least(:once)
-      expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("2:1:1:1")
-    end
+  #   it "scales a single-socket hyperthreaded system for burstable family for 2 vcpus" do
+  #     vm.family = "burstable"
+  #     vm.vcpus = 2
+  #     expect(vm).to receive(:vm_host).and_return(instance_double(
+  #       VmHost,
+  #       total_cpus: 12,
+  #       total_cores: 6,
+  #       total_dies: 1,
+  #       total_sockets: 1
+  #     )).at_least(:once)
+  #     expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("2:1:1:1")
+  #   end
 
-    it "scales a single-socket non-hyperthreaded system for burstable family for 2 vcpus" do
-      vm.family = "burstable"
-      vm.vcpus = 2
-      expect(vm).to receive(:vm_host).and_return(instance_double(
-        VmHost,
-        total_cpus: 12,
-        total_cores: 12,
-        total_dies: 1,
-        total_sockets: 1
-      )).at_least(:once)
-      expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:2:1:1")
-    end
+  #   it "scales a single-socket non-hyperthreaded system for burstable family for 2 vcpus" do
+  #     vm.family = "burstable"
+  #     vm.vcpus = 2
+  #     expect(vm).to receive(:vm_host).and_return(instance_double(
+  #       VmHost,
+  #       total_cpus: 12,
+  #       total_cores: 12,
+  #       total_dies: 1,
+  #       total_sockets: 1
+  #     )).at_least(:once)
+  #     expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:2:1:1")
+  #   end
 
-    it "scales a single-socket hyperthreaded system for burstable family for 1 vcpu" do
-      vm.family = "burstable"
-      vm.vcpus = 1
-      expect(vm).to receive(:vm_host).and_return(instance_double(
-        VmHost,
-        total_cpus: 12,
-        total_cores: 6,
-        total_dies: 1,
-        total_sockets: 1
-      )).at_least(:once)
-      expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:1:1:1")
-    end
+  #   it "scales a single-socket hyperthreaded system for burstable family for 1 vcpu" do
+  #     vm.family = "burstable"
+  #     vm.vcpus = 1
+  #     expect(vm).to receive(:vm_host).and_return(instance_double(
+  #       VmHost,
+  #       total_cpus: 12,
+  #       total_cores: 6,
+  #       total_dies: 1,
+  #       total_sockets: 1
+  #     )).at_least(:once)
+  #     expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:1:1:1")
+  #   end
 
-    it "scales a double-socket hyperthreaded system for burstable family for 1 vcpu" do
-      vm.family = "burstable"
-      vm.vcpus = 1
-      expect(vm).to receive(:vm_host).and_return(instance_double(
-        VmHost,
-        total_cpus: 24,
-        total_cores: 12,
-        total_dies: 2,
-        total_sockets: 2
-      )).at_least(:once)
-      expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:1:1:1")
-    end
+  #   it "scales a double-socket hyperthreaded system for burstable family for 1 vcpu" do
+  #     vm.family = "burstable"
+  #     vm.vcpus = 1
+  #     expect(vm).to receive(:vm_host).and_return(instance_double(
+  #       VmHost,
+  #       total_cpus: 24,
+  #       total_cores: 12,
+  #       total_dies: 2,
+  #       total_sockets: 2
+  #     )).at_least(:once)
+  #     expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:1:1:1")
+  #   end
 
-    it "scales a single-socket non-hyperthreaded system for burstable family for 1 vcpu" do
-      vm.family = "burstable"
-      vm.vcpus = 1
-      expect(vm).to receive(:vm_host).and_return(instance_double(
-        VmHost,
-        total_cpus: 12,
-        total_cores: 12,
-        total_dies: 1,
-        total_sockets: 1
-      )).at_least(:once)
-      expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:1:1:1")
-    end
-  end
+  #   it "scales a single-socket non-hyperthreaded system for burstable family for 1 vcpu" do
+  #     vm.family = "burstable"
+  #     vm.vcpus = 1
+  #     expect(vm).to receive(:vm_host).and_return(instance_double(
+  #       VmHost,
+  #       total_cpus: 12,
+  #       total_cores: 12,
+  #       total_dies: 1,
+  #       total_sockets: 1
+  #     )).at_least(:once)
+  #     expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:1:1:1")
+  #   end
+  # end
 
-  describe "#update_spdk_version" do
-    let(:vmh) { create_vm_host }
+  # describe "#update_spdk_version" do
+  #   let(:vmh) { create_vm_host }
 
-    before do
-      expect(vm).to receive(:vm_host).and_return(vmh)
-    end
+  #   before do
+  #     expect(vm).to receive(:vm_host).and_return(vmh)
+  #   end
 
-    it "can update spdk version" do
-      spdk_installation = SpdkInstallation.create_with_id(vmh, version: "b", allocation_weight: 100, vm_host_id: vmh.id)
-      volume_dataset = instance_double(Sequel::Dataset)
-      expect(vm).to receive(:vm_storage_volumes_dataset).and_return(volume_dataset)
-      expect(volume_dataset).to receive(:update).with(spdk_installation_id: spdk_installation.id)
-      expect(vm).to receive(:incr_update_spdk_dependency)
+  #   it "can update spdk version" do
+  #     spdk_installation = SpdkInstallation.create_with_id(vmh, version: "b", allocation_weight: 100, vm_host_id: vmh.id)
+  #     volume_dataset = instance_double(Sequel::Dataset)
+  #     expect(vm).to receive(:vm_storage_volumes_dataset).and_return(volume_dataset)
+  #     expect(volume_dataset).to receive(:update).with(spdk_installation_id: spdk_installation.id)
+  #     expect(vm).to receive(:incr_update_spdk_dependency)
 
-      vm.update_spdk_version("b")
-    end
+  #     vm.update_spdk_version("b")
+  #   end
 
-    it "fails if spdk installation not found" do
-      expect { vm.update_spdk_version("b") }.to raise_error RuntimeError, "SPDK version b not found on host"
-    end
-  end
+  #   it "fails if spdk installation not found" do
+  #     expect { vm.update_spdk_version("b") }.to raise_error RuntimeError, "SPDK version b not found on host"
+  #   end
+  # end
 
   describe "#utility functions" do
     it "can compute the ipv4 addresses" do
@@ -454,50 +455,50 @@ RSpec.describe Vm do
     end
   end
 
-  describe "#params_json" do
-    before do
-      allow(vm).to receive_messages(
-        cloud_hypervisor_cpu_topology: Vm::CloudHypervisorCpuTopo.new(1, 1, 1, 1),
-        project: instance_double(Project, get_ff_vm_public_ssh_keys: [], get_ff_ipv6_disabled: true),
-        nic: instance_double(
-          Nic,
-          private_subnet: instance_double(
-            PrivateSubnet,
-            net4: NetAddr::IPv4Net.parse("10.0.0.0/24"),
-            random_private_ipv6: NetAddr::IPv6Net.parse("fd00::/64")
-          )
-        ),
-        vm_host: instance_double(VmHost, ndp_needed: false, spdk_installations: [], accepts_slices: true),
-        gpu_partition: instance_double(GpuPartition, partition_id: 3)
-      )
-    end
+  # describe "#params_json" do
+  #   before do
+  #     allow(vm).to receive_messages(
+  #       cloud_hypervisor_cpu_topology: Vm::CloudHypervisorCpuTopo.new(1, 1, 1, 1),
+  #       project: instance_double(Project, get_ff_vm_public_ssh_keys: [], get_ff_ipv6_disabled: true),
+  #       nic: instance_double(
+  #         Nic,
+  #         private_subnet: instance_double(
+  #           PrivateSubnet,
+  #           net4: NetAddr::IPv4Net.parse("10.0.0.0/24"),
+  #           random_private_ipv6: NetAddr::IPv6Net.parse("fd00::/64")
+  #         )
+  #       ),
+  #       vm_host: instance_double(VmHost, ndp_needed: false, spdk_installations: [], accepts_slices: true),
+  #       gpu_partition: instance_double(GpuPartition, partition_id: 3)
+  #     )
+  #   end
 
-    it "sets hypervisor to 'qemu' when a B200 GPU (device 2901) is present" do
-      allow(vm).to receive(:pci_devices).and_return([instance_double(PciDevice, device: "2901", slot: "0000:00:00.0", iommu_group: "0")])
+  #   it "sets hypervisor to 'qemu' when a B200 GPU (device 2901) is present" do
+  #     allow(vm).to receive(:pci_devices).and_return([instance_double(PciDevice, device: "2901", slot: "0000:00:00.0", iommu_group: "0")])
 
-      json = JSON.parse(vm.params_json)
-      expect(json["hypervisor"]).to eq("qemu")
-    end
+  #     json = JSON.parse(vm.params_json)
+  #     expect(json["hypervisor"]).to eq("qemu")
+  #   end
 
-    it "defaults hypervisor to 'ch' when no B200 GPU is present" do
-      allow(vm).to receive(:pci_devices).and_return([instance_double(PciDevice, device: "1234", slot: "0000:00:00.0", iommu_group: "0")])
+  #   it "defaults hypervisor to 'ch' when no B200 GPU is present" do
+  #     allow(vm).to receive(:pci_devices).and_return([instance_double(PciDevice, device: "1234", slot: "0000:00:00.0", iommu_group: "0")])
 
-      json = JSON.parse(vm.params_json)
-      expect(json["hypervisor"]).to eq("ch")
-    end
+  #     json = JSON.parse(vm.params_json)
+  #     expect(json["hypervisor"]).to eq("ch")
+  #   end
 
-    it "respects an explicit hypervisor argument even if a B200 GPU is present" do
-      allow(vm).to receive(:pci_devices).and_return([instance_double(PciDevice, device: "2901", slot: "0000:00:00.0", iommu_group: "0")])
+  #   it "respects an explicit hypervisor argument even if a B200 GPU is present" do
+  #     allow(vm).to receive(:pci_devices).and_return([instance_double(PciDevice, device: "2901", slot: "0000:00:00.0", iommu_group: "0")])
 
-      json = JSON.parse(vm.params_json(hypervisor: "ch"))
-      expect(json["hypervisor"]).to eq("ch")
-    end
+  #     json = JSON.parse(vm.params_json(hypervisor: "ch"))
+  #     expect(json["hypervisor"]).to eq("ch")
+  #   end
 
-    it "includes the gpu partition id" do
-      allow(vm).to receive(:pci_devices).and_return([instance_double(PciDevice, device: "2901", slot: "0000:00:00.0", iommu_group: "0")])
+  #   it "includes the gpu partition id" do
+  #     allow(vm).to receive(:pci_devices).and_return([instance_double(PciDevice, device: "2901", slot: "0000:00:00.0", iommu_group: "0")])
 
-      json = JSON.parse(vm.params_json)
-      expect(json["gpu_partition_id"]).to eq(3)
-    end
-  end
+  #     json = JSON.parse(vm.params_json)
+  #     expect(json["gpu_partition_id"]).to eq(3)
+  #   end
+  # end
 end
