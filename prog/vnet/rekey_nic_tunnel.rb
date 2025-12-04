@@ -38,7 +38,7 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
 
   label def drop_old_state
     if nic.src_ipsec_tunnels.empty? && nic.dst_ipsec_tunnels.empty?
-      nic.vm.vm_host.sshable.cmd("sudo ip -n #{nic.vm.inhost_name.shellescape} xfrm state deleteall")
+      nic.vm.vm_host.sshable.cmd("sudo ip -n :vm_name xfrm state deleteall", vm_name: nic.vm.inhost_name)
       pop "drop_old_state is complete early"
     end
 
@@ -49,7 +49,8 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
       [tunnel.src_nic.rekey_payload["spi4"], tunnel.src_nic.rekey_payload["spi6"]]
     end.flatten
 
-    state_data = nic.vm.vm_host.sshable.cmd("sudo ip -n #{nic.src_ipsec_tunnels.first.vm_name(nic)} xfrm state")
+    vm_name = nic.src_ipsec_tunnels.first.vm_name(nic)
+    state_data = nic.vm.vm_host.sshable.cmd("sudo ip -n :vm_name xfrm state", vm_name:)
 
     # Extract SPIs along with src and dst from state data
     states = state_data.scan(/^src (\S+) dst (\S+).*?proto esp spi (0x[0-9a-f]+)/m)
@@ -57,7 +58,7 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
     # Identify which states to drop
     states_to_drop = states.reject { |(_, _, spi)| new_spis.include?(spi) }
     states_to_drop.each do |src, dst, spi|
-      nic.vm.vm_host.sshable.cmd("sudo ip -n #{nic.src_ipsec_tunnels.first.vm_name(nic)} xfrm state delete src #{src} dst #{dst} proto esp spi #{spi}")
+      nic.vm.vm_host.sshable.cmd("sudo ip -n :vm_name xfrm state delete src :src dst :dst proto esp spi :spi", vm_name:, src:, dst:, spi:)
     end
 
     pop "drop_old_state is complete"
@@ -89,7 +90,7 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
 
     def create_private_routes
       [@tunnel.dst_nic.private_ipv6, @tunnel.dst_nic.private_ipv4].each do |dst_ip|
-        @nic.vm.vm_host.sshable.cmd("sudo ip -n #{@namespace} route replace #{dst_ip.to_s.shellescape} dev vethi#{@namespace}")
+        @nic.vm.vm_host.sshable.cmd("sudo ip -n :namespace route replace :dst_ip dev vethi:namespace", namespace: @namespace, dst_ip:)
       end
     end
 
@@ -99,33 +100,38 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
       cmd = policy_exists?(src, dst) ? "update" : "add"
       return if cmd == "update" && @dir == FORWARD
 
-      @nic.vm.vm_host.sshable.cmd(form_command(src, dst, cmd))
+      cmd, kw = form_command(src, dst, cmd)
+      @nic.vm.vm_host.sshable.cmd(cmd, **kw)
     end
 
     def create_xfrm_state(src, dst, spi, is_ipv4)
       key = @tunnel.src_nic.encryption_key
       begin
-        @nic.vm.vm_host.sshable.cmd("sudo -- xargs -I {} -- ip -n #{@namespace} xfrm state add " \
-          "src #{src} dst #{dst} proto esp spi #{spi} reqid #{@reqid} mode tunnel " \
-          "aead 'rfc4106(gcm(aes))' {} 128 #{"sel src 0.0.0.0/0 dst 0.0.0.0/0" if is_ipv4}", stdin: key)
+        cmd = "sudo -- xargs -I {} -- ip -n :namespace xfrm state add src :src dst :dst proto esp spi :spi reqid :reqid mode tunnel aead 'rfc4106(gcm(aes))' {} 128"
+
+        cmd = NetSsh.combine(cmd, "sel src 0.0.0.0/0 dst 0.0.0.0/0") if is_ipv4
+
+        @nic.vm.vm_host.sshable.cmd(cmd, namespace: @namespace, src:, dst:, spi:, reqid: @reqid, stdin: key)
       rescue Sshable::SshError => e
         raise unless e.stderr.include?("File exists")
       end
     end
 
     def policy_exists?(src, dst)
-      !@nic.vm.vm_host.sshable.cmd(form_command(src, dst, "show")).empty?
+      cmd, kw = form_command(src, dst, "show")
+      !@nic.vm.vm_host.sshable.cmd(cmd, **kw).empty?
     end
 
     def form_command(src, dst, cmd)
-      base = "sudo ip -n #{@namespace} xfrm policy #{cmd} src #{src} dst #{dst} dir #{@dir}"
-      tmpl = if cmd == "show"
-        ""
-      else
-        "tmpl src #{@tmpl_src} dst #{@tmpl_dst} proto esp reqid #{(@dir == FORWARD) ? 0 : @reqid} mode tunnel"
+      kw = {namespace: @namespace, cmd:, src:, dst:, dir: @dir}
+      base = "sudo ip -n :namespace xfrm policy :cmd src :src dst :dst dir :dir"
+
+      unless cmd == "show"
+        kw.merge!(tmpl_src: @tmpl_src, tmpl_dst: @tmpl_dst, req_id: (@dir == FORWARD) ? 0 : @reqid)
+        base = NetSsh.combine(base, "tmpl src :tmpl_src dst :tmpl_dst proto esp reqid :req_id mode tunnel")
       end
 
-      "#{base} #{tmpl}".strip
+      [base, kw]
     end
 
     def subdivide_network(net)
