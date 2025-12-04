@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "shellwords"
 require "json"
 
 class Prog::RotateStorageKek < Prog::Base
@@ -30,38 +29,25 @@ class Prog::RotateStorageKek < Prog::Base
   end
 
   label def install
-    data_json = JSON.generate({
+    storage_key_tool("reencrypt", {
       old_key: vm_storage_volume.key_encryption_key_1.secret_key_material_hash,
       new_key: vm_storage_volume.key_encryption_key_2.secret_key_material_hash
     })
-
-    q_vm = vm.inhost_name.shellescape
-    disk_index = vm_storage_volume.disk_index
-    q_device = vm_storage_volume.storage_device.name.shellescape
-    sshable.cmd("sudo host/bin/storage-key-tool #{q_vm} #{q_device} #{disk_index} reencrypt", stdin: data_json)
 
     hop_test_keys_on_server
   end
 
   label def test_keys_on_server
-    data_json = JSON.generate({
+    storage_key_tool("test-keys", {
       old_key: vm_storage_volume.key_encryption_key_1.secret_key_material_hash,
       new_key: vm_storage_volume.key_encryption_key_2.secret_key_material_hash
     })
-
-    q_vm = vm.inhost_name.shellescape
-    disk_index = vm_storage_volume.disk_index
-    q_device = vm_storage_volume.storage_device.name.shellescape
-    sshable.cmd("sudo host/bin/storage-key-tool #{q_vm} #{q_device} #{disk_index} test-keys", stdin: data_json)
 
     hop_retire_old_key_on_server
   end
 
   label def retire_old_key_on_server
-    q_vm = vm.inhost_name.shellescape
-    disk_index = vm_storage_volume.disk_index
-    q_device = vm_storage_volume.storage_device.name.shellescape
-    sshable.cmd("sudo host/bin/storage-key-tool #{q_vm} #{q_device} #{disk_index} retire-old-key", stdin: "{}")
+    storage_key_tool("retire-old-key", {})
 
     hop_retire_old_key_in_database
   end
@@ -81,5 +67,14 @@ class Prog::RotateStorageKek < Prog::Base
 
   def sshable
     @sshable ||= vm.vm_host.sshable
+  end
+
+  private
+
+  def storage_key_tool(subcommand, json)
+    vm_name = vm.inhost_name
+    disk_index = vm_storage_volume.disk_index
+    device = vm_storage_volume.storage_device.name
+    sshable.cmd("sudo host/bin/storage-key-tool :vm_name :device :disk_index :subcommand", vm_name:, device:, disk_index:, subcommand:, stdin: JSON.generate(json))
   end
 end
