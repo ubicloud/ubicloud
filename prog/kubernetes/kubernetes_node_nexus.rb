@@ -32,14 +32,6 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      if strand.label != "destroy"
-        hop_destroy
-      end
-    end
-  end
-
   def cluster
     kubernetes_node.kubernetes_cluster
   end

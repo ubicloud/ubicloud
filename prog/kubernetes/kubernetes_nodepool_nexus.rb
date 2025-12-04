@@ -17,14 +17,6 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      if strand.label != "destroy"
-        hop_destroy
-      end
-    end
-  end
-
   label def start
     register_deadline("wait", 120 * 60)
     when_start_bootstrapping_set? do

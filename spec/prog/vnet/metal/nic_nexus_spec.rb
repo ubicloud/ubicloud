@@ -11,19 +11,6 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       net4: "10.0.0.0/26", state: "waiting", project_id: Project.create(name: "test").id).tap { it.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
   }
 
-  describe "#before_run" do
-    it "hops to destroy when needed" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "does not hop to destroy if already in the destroy state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-  end
-
   describe "#start" do
     it "naps if nothing to do" do
       expect { nx.start }.to nap(5)
