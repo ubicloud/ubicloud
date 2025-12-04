@@ -106,7 +106,7 @@ class VmSetup
     storage(storage_params, storage_secrets, false)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
     update_via_routes(nics)
-
+    start_systemd_unit
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
 

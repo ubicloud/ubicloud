@@ -35,8 +35,21 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
   end
 
   it "stops services and cleans up namespace" do
+    expect(vm).to receive(:load_balancer).and_return(true)
     expect(pr).to receive(:vm_host).and_return(vm_host).at_least(:once)
     expect(vm_host.sshable).to receive(:cmd).with("sudo systemctl stop test.service")
+    expect(vm_host.sshable).to receive(:cmd).with("sudo systemctl stop test-metadata-endpoint.service")
+    expect(vm_host.sshable).to receive(:cmd).with("sudo systemctl stop test-dnsmasq.service")
+    expect(vm_host.sshable).to receive(:cmd).with("sudo ip netns del test")
+    expect(pr).to receive(:hop_rewrite_persisted)
+    pr.start
+  end
+
+  it "does not stop metadata endpoint service if not load balancer" do
+    expect(vm).to receive(:load_balancer).and_return(false)
+    expect(pr).to receive(:vm_host).and_return(vm_host).at_least(:once)
+    expect(vm_host.sshable).to receive(:cmd).with("sudo systemctl stop test.service")
+    expect(vm_host.sshable).not_to receive(:cmd).with("sudo systemctl stop test-metadata-endpoint.service")
     expect(vm_host.sshable).to receive(:cmd).with("sudo systemctl stop test-dnsmasq.service")
     expect(vm_host.sshable).to receive(:cmd).with("sudo ip netns del test")
     expect(pr).to receive(:hop_rewrite_persisted)
@@ -53,10 +66,23 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
   end
 
   it "starts vm" do
+    expect(vm).to receive(:load_balancer).and_return(true)
     expect(pr).to receive(:vm_host).and_return(vm_host).at_least(:once)
     expect(vm_host.sshable).to receive(:cmd).with("sudo ip -n test addr replace 1.0.0.1/8 dev ubid_to_tap_name")
-    expect(vm_host.sshable).to receive(:cmd).with("sudo systemctl start test.service")
+    expect(vm_host.sshable).to receive(:cmd).with("sudo systemctl start test-metadata-endpoint.service")
     expect(vm).to receive(:incr_update_firewall_rules)
+    expect(vm).to receive(:private_subnets).and_return([instance_double(PrivateSubnet, incr_refresh_keys: nil)])
+    expect(pr).to receive(:pop).with("VM test updated")
+    pr.start_vm
+  end
+
+  it "does not start metadata endpoint service if not load balancer" do
+    expect(vm).to receive(:load_balancer).and_return(false)
+    expect(pr).to receive(:vm_host).and_return(vm_host).at_least(:once)
+    expect(vm_host.sshable).to receive(:cmd).with("sudo ip -n test addr replace 1.0.0.1/8 dev ubid_to_tap_name")
+    expect(vm_host.sshable).not_to receive(:cmd).with("sudo systemctl start test-metadata-endpoint.service")
+    expect(vm).to receive(:incr_update_firewall_rules)
+    expect(vm).to receive(:private_subnets).and_return([instance_double(PrivateSubnet, incr_refresh_keys: nil)])
     expect(pr).to receive(:pop).with("VM test updated")
     pr.start_vm
   end
