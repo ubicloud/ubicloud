@@ -538,8 +538,8 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     let(:second_ssh_key) { SshKey.generate }
 
     before do
-      KubernetesNode.create(vm_id: first_vm.id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_cluster.nodepools.first.id)
-      KubernetesNode.create(vm_id: second_vm.id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_cluster.nodepools.first.id)
+      KubernetesNode.create(vm_id: first_vm.id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_cluster.nodepools.first.id, created_at: Time.now - 1)
+      KubernetesNode.create(vm_id: second_vm.id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_cluster.nodepools.first.id, created_at: Time.now)
       expect(SshKey).to receive(:generate).and_return(first_ssh_key, second_ssh_key)
     end
 
