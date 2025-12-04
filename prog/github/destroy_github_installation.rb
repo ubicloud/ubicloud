@@ -36,10 +36,10 @@ class Prog::Github::DestroyGithubInstallation < Prog::Base
       runner.incr_skip_deregistration
       runner.incr_destroy
     end
-    hop_destroy
+    hop_wait_resource_destroy
   end
 
-  label def destroy
+  label def wait_resource_destroy
     nap 10 unless github_installation.runners_dataset.empty?
     nap 10 unless github_installation.repositories_dataset.empty?
 

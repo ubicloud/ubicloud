@@ -165,10 +165,10 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     fail_test "used_hugepages_1g is expected to be zero, actual: #{vm_host.used_hugepages_1g}" unless vm_host.used_hugepages_1g.zero?
     fail_test "available_storage_gib was not reclaimed as expected: #{frame["available_storage_gib"]}, actual: #{vm_host.available_storage_gib}" unless frame["available_storage_gib"] == vm_host.available_storage_gib
 
-    hop_destroy
+    hop_destroy_vm_host
   end
 
-  label def destroy
+  label def destroy_vm_host
     # don't destroy the vm_host if we didn't set it up.
     hop_finish unless frame["setup_host"]
 

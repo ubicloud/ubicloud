@@ -63,27 +63,27 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
       expect(github_installation).to receive(:repositories).and_return([repository])
       expect(github_installation).to receive(:runners).and_return([runner])
 
-      expect { dgi.destroy_resources }.to hop("destroy")
+      expect { dgi.destroy_resources }.to hop("wait_resource_destroy")
     end
   end
 
-  describe "#destroy" do
+  describe "#wait_resource_destroy" do
     it "naps if not all runners destroyed" do
       expect(github_installation).to receive(:runners_dataset).and_return(instance_double(Sequel::Dataset, empty?: false))
-      expect { dgi.destroy }.to nap(10)
+      expect { dgi.wait_resource_destroy }.to nap(10)
     end
 
     it "naps if not all repositories destroyed" do
       expect(github_installation).to receive(:runners_dataset).and_return(instance_double(Sequel::Dataset, empty?: true))
       expect(github_installation).to receive(:repositories_dataset).and_return(instance_double(Sequel::Dataset, empty?: false))
-      expect { dgi.destroy }.to nap(10)
+      expect { dgi.wait_resource_destroy }.to nap(10)
     end
 
     it "deletes resource and pops" do
       expect(github_installation).to receive(:runners_dataset).and_return(instance_double(Sequel::Dataset, empty?: true))
       expect(github_installation).to receive(:repositories_dataset).and_return(instance_double(Sequel::Dataset, empty?: true))
       expect(github_installation).to receive(:destroy)
-      expect { dgi.destroy }.to exit({"msg" => "github installation destroyed"})
+      expect { dgi.wait_resource_destroy }.to exit({"msg" => "github installation destroyed"})
     end
   end
 end
