@@ -31,7 +31,7 @@ class Prog::Storage::RemoveSpdk < Prog::Base
   label def remove_spdk
     version = spdk_installation.version
     sshable = spdk_installation.vm_host.sshable
-    sshable.cmd("sudo host/bin/setup-spdk remove #{version.shellescape}")
+    sshable.cmd("sudo host/bin/setup-spdk remove :version", version:)
 
     hop_update_database
   end
