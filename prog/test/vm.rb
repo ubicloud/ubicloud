@@ -38,7 +38,7 @@ class Prog::Test::Vm < Prog::Test::Base
   end
 
   def umount_if_mounted(mount_path)
-    sshable.cmd("sudo umount #{mount_path.shellescape}")
+    sshable.cmd("sudo umount :mount_path", mount_path:)
   rescue Sshable::SshError => e
     raise unless e.stderr.include?("not mounted")
   end
@@ -46,15 +46,16 @@ class Prog::Test::Vm < Prog::Test::Base
   label def verify_extra_disks
     vm.vm_storage_volumes[1..].each_with_index { |volume, disk_index|
       mount_path = "/home/ubi/mnt#{disk_index}"
-      sshable.cmd("mkdir -p #{mount_path.shellescape}")
+      sshable.cmd("mkdir -p :mount_path", mount_path:)
       # this might be a retry, so ensure the mount point is not already mounted
       umount_if_mounted(mount_path)
-      sshable.cmd("sudo mkfs.ext4 #{volume.device_path.shellescape}")
-      sshable.cmd("sudo mount #{volume.device_path.shellescape} #{mount_path.shellescape}")
-      sshable.cmd("sudo chown ubi #{mount_path.shellescape}")
+      device_path = volume.device_path
+      sshable.cmd("sudo mkfs.ext4 :device_path", device_path:)
+      sshable.cmd("sudo mount :device_path :mount_path", device_path:, mount_path:)
+      sshable.cmd("sudo chown ubi :mount_path", mount_path:)
       test_file = File.join(mount_path, "1.txt")
-      sshable.cmd("dd if=/dev/urandom of=#{test_file.shellescape} bs=512 count=10000")
-      sshable.cmd("sync #{test_file.shellescape}")
+      sshable.cmd("dd if=/dev/urandom of=:test_file bs=512 count=10000", test_file:)
+      sshable.cmd("sync :test_file", test_file:)
     }
 
     hop_ping_google
@@ -107,15 +108,15 @@ class Prog::Test::Vm < Prog::Test::Base
   label def ping_vms_in_subnet
     vms_with_same_subnet.each { |x|
       # ping public IPs
-      sshable.cmd("ping -c 2 #{x.ip4}")
-      sshable.cmd("ping -c 2 #{x.ip6}")
+      sshable.cmd("ping -c 2 :ip", ip: x.ip4)
+      sshable.cmd("ping -c 2 :ip", ip: x.ip6)
 
       # ping private IPs
       nic = x.nics.first
       private_ip6 = nic.private_ipv6.nth(2).to_s
       private_ip4 = nic.private_ipv4.network.to_s
-      sshable.cmd("ping -c 2 #{private_ip6}")
-      sshable.cmd("ping -c 2 #{private_ip4}")
+      sshable.cmd("ping -c 2 :ip", ip: private_ip6)
+      sshable.cmd("ping -c 2 :ip", ip: private_ip4)
     }
 
     hop_ping_vms_not_in_subnet
@@ -124,8 +125,8 @@ class Prog::Test::Vm < Prog::Test::Base
   label def ping_vms_not_in_subnet
     vms_with_different_subnet.each { |x|
       # ping public IPs should work
-      sshable.cmd("ping -c 2 #{x.ip4}")
-      sshable.cmd("ping -c 2 #{x.ip6}")
+      sshable.cmd("ping -c 2 :ip", ip: x.ip4)
+      sshable.cmd("ping -c 2 :ip", ip: x.ip6)
 
       # ping private IPs shouldn't work
       nic = x.nics.first
@@ -133,14 +134,14 @@ class Prog::Test::Vm < Prog::Test::Base
       private_ip4 = nic.private_ipv4.network.to_s
 
       begin
-        sshable.cmd("ping -c 2 #{private_ip6}")
+        sshable.cmd("ping -c 2 :ip", ip: private_ip6)
       rescue Sshable::SshError
       else
         raise "Unexpected successful ping to private ip6 of a vm in different subnet"
       end
 
       begin
-        sshable.cmd("ping -c 2 #{private_ip4}")
+        sshable.cmd("ping -c 2 :ip", ip: private_ip4)
       rescue Sshable::SshError
       else
         raise "Unexpected successful ping to private ip4 of a vm in different subnet"
