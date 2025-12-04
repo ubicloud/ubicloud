@@ -269,7 +269,7 @@ RSpec.describe VmHost do
     Sshable.create(host: "1.1.1.1")
     described_class.create_with_id(vh, location_id: Location::HETZNER_FSN1_ID, family: "standard")
 
-    expect(vh).to receive(:assigned_subnets).and_return([Address.new(cidr: NetAddr::IPv4Net.parse("1.1.1.0/30".shellescape))]).at_least(:once)
+    expect(vh).to receive(:assigned_subnets).and_return([Address.new(cidr: NetAddr::IPv4Net.parse("1.1.1.0/30"))]).at_least(:once)
     vh.create_addresses
     expect(Address.where(routed_to_host_id: vh.id).count).to eq(3)
   end

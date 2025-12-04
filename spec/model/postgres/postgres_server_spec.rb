@@ -464,7 +464,7 @@ RSpec.describe PostgresServer do
   it "returns the right storage_device_paths for Hetzner" do
     VmStorageVolume.create(vm:, disk_index: 0, boot: true, size_gib: 64)
     vsv = VmStorageVolume.create(vm:, disk_index: 1, boot: false, size_gib: 1024)
-    expect(postgres_server.storage_device_paths).to eq([vsv.device_path.shellescape])
+    expect(postgres_server.storage_device_paths).to eq([vsv.device_path])
   end
 
   describe "#taking_over?" do
