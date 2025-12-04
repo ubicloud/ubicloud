@@ -3,7 +3,7 @@
 # A no-operation prog for testing.
 class Prog::Test < Prog::Base
   subject_is :sshable
-  semaphore :test_semaphore
+  semaphore :test_semaphore, :destroy
 
   label def start
   end
@@ -169,6 +169,10 @@ class Prog::Test < Prog::Base
 
   def find_current_prog
     Base.current_prog
+  end
+
+  label def destroy
+    pop "destroyed"
   end
 
   class Test2 < self

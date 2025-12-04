@@ -28,12 +28,6 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
     @host ||= vm_host_slice.vm_host
   end
 
-  def before_run
-    when_destroy_set? do
-      hop_destroy if strand.label != "destroy"
-    end
-  end
-
   label def prep
     case host.sshable.cmd("common/bin/daemonizer --check prep_#{vm_host_slice.name}")
     when "Succeeded"
