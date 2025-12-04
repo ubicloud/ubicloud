@@ -12,7 +12,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
   let(:ps) {
     prj = Project.create(name: "test-prj")
     loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
-    LocationCredential.create_with_id(loc.id, access_key: "test-access-key", secret_key: "test-secret-key")
+    LocationCredential.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps", location_id: loc.id).subject
     PrivateSubnetAwsResource.create_with_id(ps.id)
     ps
@@ -24,7 +24,9 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
 
   before do
     allow(nx).to receive(:private_subnet).and_return(ps)
-    allow(Aws::EC2::Client).to receive(:new).with(access_key_id: "test-access-key", secret_access_key: "test-secret-key", region: "us-west-2").and_return(client)
+    aws_credentials = Aws::Credentials.new("stubbed-akid", "stubbed-secret")
+    allow(Aws::Credentials).to receive(:new).with("stubbed-akid", "stubbed-secret").and_return(aws_credentials)
+    allow(Aws::EC2::Client).to receive(:new).with(credentials: aws_credentials, region: "us-west-2").and_return(client)
   end
 
   it "hops to destroy if when_destroy_set?" do
