@@ -302,9 +302,9 @@ class PostgresServer < Sequel::Model
       # since the device path detected by the VmStorageVolume is not always
       # correct.
       storage_device_count = vm.vm_storage_volumes.count { it.boot == false }
-      vm.sshable.cmd("lsblk -b -d -o NAME,SIZE | sort -n -k2 | tail -n#{storage_device_count} |  awk '{print \"/dev/\"$1}'").strip.split
+      vm.sshable.cmd("lsblk -b -d -o NAME,SIZE | sort -n -k2 | tail -n:storage_device_count |  awk '{print \"/dev/\"$1}'", storage_device_count:).strip.split
     else
-      [vm.vm_storage_volumes.find { it.boot == false }.device_path.shellescape]
+      [vm.vm_storage_volumes.find { it.boot == false }.device_path]
     end
   end
 
