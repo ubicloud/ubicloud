@@ -124,7 +124,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
         chmod 700 /home/$custom_user/.ssh
         chmod 600 /home/$custom_user/.ssh/authorized_keys
       fi
-      echo #{public_keys.shellescape} > /home/$custom_user/.ssh/authorized_keys
+      echo #{NetSsh.command(":public_keys", public_keys:)} > /home/$custom_user/.ssh/authorized_keys
       usermod -L ubuntu
     USER_DATA
 
