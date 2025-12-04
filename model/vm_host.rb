@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "shellwords"
 require_relative "../model"
 require_relative "../lib/hosting/apis"
 require_relative "../lib/system_parser"
@@ -318,13 +317,14 @@ class VmHost < Sequel::Model
     end
 
     all_mount_points.uniq.all? do |mount_point|
-      file_name = Shellwords.escape(File.join(mount_point, "test-file-#{test_file_suffix}"))
+      file_name = File.join(mount_point, "test-file-#{test_file_suffix}")
 
-      write_result = ssh_session.exec!("sudo bash -c \"head -c 1M </dev/zero > #{file_name}\"")
+      command = NetSsh.command("head -c 1M </dev/zero > :file_name", file_name:)
+      write_result = ssh_session.exec!("sudo bash -c :command", command:)
       write_status = write_result.exitstatus == 0
-      hash_result = ssh_session.exec!("sha256sum #{file_name}")
+      hash_result = ssh_session.exec!("sha256sum :file_name", file_name:)
       hash_status = hash_result.strip == "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58  #{file_name}"
-      delete_result = ssh_session.exec!("sudo rm #{file_name}")
+      delete_result = ssh_session.exec!("sudo rm :file_name", file_name:)
       delete_status = delete_result.exitstatus == 0
 
       unless write_status && hash_status && delete_status
