@@ -30,8 +30,8 @@ class Kubernetes::Client
     svc.dig("status", "loadBalancer", "ingress")&.first&.dig("hostname").to_s.empty?
   end
 
-  def kubectl(cmd)
-    output = @session.exec!("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf #{cmd}")
+  def kubectl(cmd, **)
+    output = @session.exec!(NetSsh.combine("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf", cmd), **)
     raise output if output.exitstatus != 0
 
     output
@@ -42,7 +42,7 @@ class Kubernetes::Client
   end
 
   def delete_node(node_name)
-    kubectl("delete node #{node_name.shellescape}")
+    kubectl("delete node :node_name", node_name:)
   end
 
   def set_load_balancer_hostname(svc, hostname)
@@ -53,7 +53,10 @@ class Kubernetes::Client
         }
       }
     })
-    kubectl("-n #{svc.dig("metadata", "namespace")} patch service #{svc.dig("metadata", "name")} --type=merge -p '#{patch_data}' --subresource=status")
+    kubectl("-n :namespace patch service :service --type=merge -p :patch_data --subresource=status",
+      namespace: svc.dig("metadata", "namespace"),
+      service: svc.dig("metadata", "name"),
+      patch_data:)
   end
 
   def sync_kubernetes_services
