@@ -151,10 +151,10 @@ STS
   label def test_pod_data_migration
     client = kubernetes_cluster.client
     pod_node = client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
-    client.kubectl("cordon #{pod_node}")
+    client.kubectl("cordon :pod_node", pod_node:)
     # we need to uncordon other nodes each time so we won't run out of nodes accepting pods
     nodepool.nodes.reject { it.name == pod_node }.each { |node|
-      client.kubectl("uncordon #{node.name}")
+      client.kubectl("uncordon :name", name: node.name)
     }
     client.kubectl("delete pod ubuntu-statefulset-0 --wait=false")
     hop_verify_data_after_migration
