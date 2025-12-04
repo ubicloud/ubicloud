@@ -48,7 +48,7 @@ LOCK
       it "interlocks" do
         portable_pkill = lambda { system(%q(ps -eo pid,args | awk '$2=="session-lock-testlockname"{print $1}' | xargs -I {} sh -c 'test -n "{}" && kill {}')) }
         portable_pkill.call
-        q_lock_script = lock_script.shellescape
+        q_lock_script = NetSsh.command(":lock_script", lock_script:)
         expect([`bash -c #{q_lock_script}`, $?.exitstatus]).to eq(["", 0])
         expect([`bash -c #{q_lock_script}`, $?.exitstatus]).to eq(["Another session active:  testlockname\n", 124])
         expect(portable_pkill.call).to be true
