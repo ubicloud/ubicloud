@@ -244,20 +244,20 @@ RSpec.describe Prog::Test::HetznerServer do
 
     it "hops to destroy after resource verified" do
       expect(hs_test).to receive(:frame).and_return({"available_storage_gib" => 860}).at_least(:once)
-      expect { hs_test.verify_resources_reclaimed }.to hop("destroy")
+      expect { hs_test.verify_resources_reclaimed }.to hop("destroy_vm_host")
     end
   end
 
   describe "#destroy" do
     it "does not delete key and vm host if existing vm host used" do
       expect(hs_test).to receive(:frame).and_return({"destroy" => false})
-      expect { hs_test.destroy }.to hop("finish")
+      expect { hs_test.destroy_vm_host }.to hop("finish")
     end
 
     it "deletes vm host" do
       expect(hs_test).to receive(:frame).and_return({"setup_host" => true})
       expect(vm_host).to receive(:incr_destroy)
-      expect { hs_test.destroy }.to hop("wait_vm_host_destroyed")
+      expect { hs_test.destroy_vm_host }.to hop("wait_vm_host_destroyed")
     end
   end
 
