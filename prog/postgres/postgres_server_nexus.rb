@@ -121,8 +121,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       end
 
       vm.sshable.cmd("sudo mkdir -p /dat")
-      vm.sshable.cmd("sudo common/bin/add_to_fstab #{device_path} /dat ext4 defaults 0 0")
-      vm.sshable.cmd("sudo mount #{device_path} /dat")
+      vm.sshable.cmd("sudo common/bin/add_to_fstab :device_path /dat ext4 defaults 0 0", device_path:)
+      vm.sshable.cmd("sudo mount :device_path /dat", device_path:)
 
       hop_configure_walg_credentials
     when "Failed", "NotStarted"
@@ -130,7 +130,9 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       if storage_device_paths.count == 1
         vm.sshable.d_run("format_disk", "sudo", "mkfs", "--type", "ext4", storage_device_paths.first)
       else
-        vm.sshable.cmd("sudo mdadm --create --verbose /dev/md0 --level=0 --raid-devices=#{storage_device_paths.count} #{storage_device_paths.join(" ")}")
+        vm.sshable.cmd("sudo mdadm --create --verbose /dev/md0 --level=0 --raid-devices=:count :shelljoin_storage_device_paths",
+          count: storage_device_paths.count,
+          shelljoin_storage_device_paths: storage_device_paths)
         vm.sshable.d_run("format_disk", "sudo", "mkfs", "--type", "ext4", "/dev/md0")
       end
     end
@@ -194,7 +196,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       hop_configure_metrics
     end
 
-    vm.sshable.cmd("sudo -u postgres pg_ctlcluster #{postgres_server.version} main reload")
+    vm.sshable.cmd("sudo -u postgres pg_ctlcluster :version main reload", version:)
     vm.sshable.cmd("sudo systemctl reload pgbouncer@*.service")
     hop_wait
   end
@@ -240,8 +242,8 @@ CONFIG
 
     metrics_config = postgres_server.metrics_config
     metrics_dir = metrics_config[:metrics_dir]
-    vm.sshable.cmd("mkdir -p #{metrics_dir}")
-    vm.sshable.cmd("tee #{metrics_dir}/config.json > /dev/null", stdin: metrics_config.to_json)
+    vm.sshable.cmd("mkdir -p :metrics_dir", metrics_dir:)
+    vm.sshable.cmd("tee :metrics_dir/config.json > /dev/null", metrics_dir:, stdin: metrics_config.to_json)
 
     metrics_service = <<SERVICE
 [Unit]
@@ -319,9 +321,9 @@ TIMER
   }
 }
 CONFIG
-    vm.sshable.cmd("sudo mkdir -p #{filepath}")
-    vm.sshable.cmd("sudo tee #{filepath}/#{filename} > /dev/null", stdin: config)
-    vm.sshable.cmd("sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:#{filepath}/#{filename} -s")
+    vm.sshable.cmd("sudo mkdir -p :filepath", filepath:)
+    vm.sshable.cmd("sudo tee :filepath/:filename > /dev/null", filepath:, filename:, stdin: config)
+    vm.sshable.cmd("sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file::filepath/:filename -s", filepath:, filename:)
     hop_setup_hugepages
   end
 
@@ -567,8 +569,8 @@ SQL
     # minutes at worst) and increased WAL volume are accepted in order
     # to avoid stopping all workloads for a long shutdown checkpoint.
     postgres_server.run_query("CHECKPOINT; CHECKPOINT; CHECKPOINT;")
-    postgres_server.vm.sshable.cmd("sudo postgres/bin/lockout #{postgres_server.version}")
-    postgres_server.vm.sshable.cmd("sudo pg_ctlcluster #{postgres_server.version} main stop -m smart")
+    postgres_server.vm.sshable.cmd("sudo postgres/bin/lockout :version", version:)
+    postgres_server.vm.sshable.cmd("sudo pg_ctlcluster :version main stop -m smart", version:)
 
     hop_wait_in_fence
   end
@@ -590,7 +592,7 @@ SQL
     representative_server = postgres_server.resource.representative_server
 
     begin
-      representative_server.vm.sshable.cmd("sudo pg_ctlcluster #{postgres_server.version} main stop -m immediate")
+      representative_server.vm.sshable.cmd("sudo pg_ctlcluster :version main stop -m immediate", version:)
     rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
     end
 
@@ -660,7 +662,7 @@ SQL
 
     register_deadline("wait", 10 * 60)
 
-    vm.sshable.cmd("sudo postgres/bin/restart #{postgres_server.version}")
+    vm.sshable.cmd("sudo postgres/bin/restart :version", version:)
     vm.sshable.cmd("sudo systemctl restart pgbouncer@*.service")
     pop "postgres server is restarted"
   end
@@ -679,7 +681,7 @@ SQL
 
     # Do not declare unavailability if Postgres is in crash recovery
     begin
-      return true if vm.sshable.cmd("sudo tail -n 5 /dat/#{postgres_server.version}/data/pg_log/postgresql.log").include?("redo in progress")
+      return true if vm.sshable.cmd("sudo tail -n 5 /dat/:version/data/pg_log/postgresql.log", version:).include?("redo in progress")
     rescue
     end
 
@@ -688,5 +690,9 @@ SQL
 
   def update_stack_lsn(lsn)
     update_stack({"lsn" => lsn})
+  end
+
+  def version
+    postgres_server.version
   end
 end
