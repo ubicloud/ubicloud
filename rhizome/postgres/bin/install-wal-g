@@ -27,4 +27,24 @@ Dir.chdir("var/wal-g") do
   r "make deps"
   r "make pg_build"
   r "GOBIN=/usr/bin make pg_install"
+
+  # Compile and install walg-daemon-client
+  r "make build_client"
+  r "cp bin/walg-daemon-client /usr/bin/walg-daemon-client"
 end
+
+File.write("/etc/systemd/system/wal-g.service", <<WALG_SERVICE)
+[Unit]
+Description="WAL-G daemon"
+After=network.target
+
+[Service]
+Type=simple
+User=postgres
+ExecStart=/usr/bin/wal-g daemon --config /etc/postgresql/wal-g.env /tmp/wal-g
+
+[Install]
+WantedBy=multi-user.target
+WALG_SERVICE
+
+r "systemctl enable wal-g.service --now"
