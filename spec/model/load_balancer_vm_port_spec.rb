@@ -46,16 +46,41 @@ RSpec.describe LoadBalancerVmPort do
       it "returns the correct command" do
         lb = lb_vm_port.load_balancer_port.load_balancer
         lb.update(health_check_protocol: "http")
-        expect(lb_vm_port.health_check_cmd(:ipv4)).to eq("sudo ip netns exec #{vm.inhost_name} curl --insecure --resolve #{lb.hostname}:8080:192.168.1.1 --max-time 15 --silent --output /dev/null --write-out '%{http_code}' http://#{lb.hostname}:8080/up")
-        expect(lb_vm_port.health_check_cmd(:ipv6)).to eq("sudo ip netns exec #{vm.inhost_name} curl --insecure --resolve #{lb.hostname}:8080:[2a01:4f8:10a:128b:814c::2] --max-time 15 --silent --output /dev/null --write-out '%{http_code}' http://#{lb.hostname}:8080/up")
+        expect(lb_vm_port.health_check_cmd(:ipv4)).to eq(["sudo ip netns exec :vm_name curl --insecure --resolve :address --max-time :timeout --silent --output /dev/null --write-out '%{http_code}' :health_check_url",
+          {address: "#{lb.hostname}:8080:192.168.1.1",
+           dst_port: 8080,
+           health_check_url: "http://#{lb.hostname}:8080/up",
+           timeout: 15,
+           vm_name: vm.inhost_name}])
+        expect(lb_vm_port.health_check_cmd(:ipv6)).to eq(["sudo ip netns exec :vm_name curl --insecure --resolve :address --max-time :timeout --silent --output /dev/null --write-out '%{http_code}' :health_check_url",
+          {address: "#{lb.hostname}:8080:[2a01:4f8:10a:128b:814c::2]",
+           dst_port: 8080,
+           health_check_url: "http://#{lb.hostname}:8080/up",
+           timeout: 15,
+           vm_name: vm.inhost_name}])
 
         lb.update(health_check_protocol: "tcp")
-        expect(lb_vm_port.health_check_cmd(:ipv4)).to eq("sudo ip netns exec #{vm.inhost_name} nc -z -w 15 192.168.1.1 8080 >/dev/null 2>&1 && echo 200 || echo 400")
-        expect(lb_vm_port.health_check_cmd(:ipv6)).to eq("sudo ip netns exec #{vm.inhost_name} nc -z -w 15 2a01:4f8:10a:128b:814c::2 8080 >/dev/null 2>&1 && echo 200 || echo 400")
+        expect(lb_vm_port.health_check_cmd(:ipv4)).to eq(["sudo ip netns exec :vm_name nc -z -w :timeout :address :dst_port >/dev/null 2>&1 && echo 200 || echo 400",
+          {address: "192.168.1.1", dst_port: 8080, timeout: 15, vm_name: vm.inhost_name}])
+        expect(lb_vm_port.health_check_cmd(:ipv6)).to eq(["sudo ip netns exec :vm_name nc -z -w :timeout :address :dst_port >/dev/null 2>&1 && echo 200 || echo 400",
+          {address: "2a01:4f8:10a:128b:814c::2",
+           dst_port: 8080,
+           timeout: 15,
+           vm_name: vm.inhost_name}])
 
         lb.update(health_check_protocol: "https")
-        expect(lb_vm_port.health_check_cmd(:ipv4)).to eq("sudo ip netns exec #{vm.inhost_name} curl --insecure --resolve #{lb.hostname}:8080:192.168.1.1 --max-time 15 --silent --output /dev/null --write-out '%{http_code}' https://#{lb.hostname}:8080/up")
-        expect(lb_vm_port.health_check_cmd(:ipv6)).to eq("sudo ip netns exec #{vm.inhost_name} curl --insecure --resolve #{lb.hostname}:8080:[2a01:4f8:10a:128b:814c::2] --max-time 15 --silent --output /dev/null --write-out '%{http_code}' https://#{lb.hostname}:8080/up")
+        expect(lb_vm_port.health_check_cmd(:ipv4)).to eq(["sudo ip netns exec :vm_name curl --insecure --resolve :address --max-time :timeout --silent --output /dev/null --write-out '%{http_code}' :health_check_url",
+          {address: "#{lb.hostname}:8080:192.168.1.1",
+           dst_port: 8080,
+           health_check_url: "https://#{lb.hostname}:8080/up",
+           timeout: 15,
+           vm_name: vm.inhost_name}])
+        expect(lb_vm_port.health_check_cmd(:ipv6)).to eq(["sudo ip netns exec :vm_name curl --insecure --resolve :address --max-time :timeout --silent --output /dev/null --write-out '%{http_code}' :health_check_url",
+          {address: "#{lb.hostname}:8080:[2a01:4f8:10a:128b:814c::2]",
+           dst_port: 8080,
+           health_check_url: "https://#{lb.hostname}:8080/up",
+           timeout: 15,
+           vm_name: vm.inhost_name}])
       end
     end
 
@@ -88,7 +113,7 @@ RSpec.describe LoadBalancerVmPort do
 
       ["ipv4", "ipv6"].each do |stack|
         it "runs the health check command and returns the result for #{stack}" do
-          expect(lb_vm_port).to receive(:health_check_cmd).with(stack.to_sym).and_return("healthcheck command #{stack}").at_least(:once)
+          expect(lb_vm_port).to receive(:health_check_cmd).with(stack.to_sym).and_return("healthcheck command #{stack}".freeze).at_least(:once)
           expect(session[:ssh_session]).to receive(:_exec!).with("healthcheck command #{stack}").and_return("200").at_least(:once)
 
           expect(lb_vm_port.check_probe(session, stack.to_sym)).to eq("up")
