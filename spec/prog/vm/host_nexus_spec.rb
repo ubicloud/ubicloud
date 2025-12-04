@@ -127,7 +127,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "skips if private key is not set" do
       expect(Config).to receive(:hetzner_ssh_private_key).and_return(nil)
-      expect(Util).not_to receive(:rootish_ssh)
+      expect(Net::SSH).not_to receive(:start)
 
       expect { nx.setup_ssh_keys }.to hop("bootstrap_rhizome")
     end
@@ -141,7 +141,9 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(Config).to receive(:operator_ssh_public_keys).and_return(nil)
       expect(sshable).to receive(:keys).and_return([vmhost_key])
       expect(sshable).to receive(:host).and_return("127.0.0.1")
-      expect(Util).to receive(:rootish_ssh).with("127.0.0.1", "root", anything, "echo '#{test_public_keys}' > ~/.ssh/authorized_keys")
+      session = Net::SSH::Connection::Session.allocate
+      expect(Net::SSH).to receive(:start).and_yield(session)
+      expect(session).to receive(:_exec!).with("echo #{test_public_keys.gsub(" ", "\\ ")} > ~/.ssh/authorized_keys").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
 
       expect { nx.setup_ssh_keys }.to hop("bootstrap_rhizome")
     end
@@ -157,7 +159,9 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(Config).to receive(:operator_ssh_public_keys).exactly(2).and_return("#{operational_key_1.public_key}\n#{operational_key_2.public_key}")
       expect(sshable).to receive(:keys).and_return([vmhost_key])
       expect(sshable).to receive(:host).and_return("127.0.0.1")
-      expect(Util).to receive(:rootish_ssh).with("127.0.0.1", "root", anything, "echo '#{test_public_keys}' > ~/.ssh/authorized_keys")
+      session = Net::SSH::Connection::Session.allocate
+      expect(Net::SSH).to receive(:start).and_yield(session)
+      expect(session).to receive(:_exec!).with("echo #{test_public_keys.gsub(" ", "\\ ").gsub("\n", "'\n'")} > ~/.ssh/authorized_keys").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
 
       expect { nx.setup_ssh_keys }.to hop("bootstrap_rhizome")
     end
