@@ -22,7 +22,7 @@ module RuboCop
           "Avoid interpolation in shell commands. This structure (heredoc or mid-word concatenation) " \
           "cannot be safely autocorrected to `%W[]`. Please refactor manually."
 
-        def_node_matcher :cmd_call?, "(send !const :cmd $...)"
+        def_node_matcher :cmd_call?, "(send !const {:cmd :exec!} $...)"
 
         def_node_matcher :wrapped_shell_escape?, <<~PATTERN
           (begin
