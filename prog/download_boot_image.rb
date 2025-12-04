@@ -180,22 +180,22 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   label def download
-    q_daemon_name = "download_#{image_name}_#{version}".shellescape
-    case sshable.cmd("common/bin/daemonizer --check #{q_daemon_name}")
+    daemon_name = "download_#{image_name}_#{version}"
+    case sshable.cmd("common/bin/daemonizer --check :daemon_name", daemon_name:)
     when "Succeeded"
-      sshable.cmd("common/bin/daemonizer --clean #{q_daemon_name}")
+      sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
       hop_update_available_storage_space
     when "NotStarted"
       certs = download_from_blob_storage? ? Config.ubicloud_images_blob_storage_certs : nil
       params = {image_name:, url:, version:, sha256sum:, certs:, use_htcat: download_from_r2?}
-      sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image' #{q_daemon_name}", stdin: params.to_json)
+      sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image' :daemon_name", daemon_name:, stdin: params.to_json)
     when "Failed"
-      sshable.cmd("cat var/log/#{q_daemon_name}.stderr || true")
-      sshable.cmd("cat var/log/#{q_daemon_name}.stdout || true")
+      sshable.cmd("cat var/log/:daemon_name.stderr || true", daemon_name:)
+      sshable.cmd("cat var/log/:daemon_name.stdout || true", daemon_name:)
       if Config.production? && !Config.is_e2e
         BootImage.where(vm_host_id: vm_host.id, name: image_name, version: version).destroy
       else
-        sshable.cmd("common/bin/daemonizer --clean #{q_daemon_name}")
+        sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
       end
       fail "Failed to download '#{image_name}' image on #{vm_host}"
     end
@@ -205,7 +205,7 @@ class Prog::DownloadBootImage < Prog::Base
 
   label def update_available_storage_space
     image = BootImage[vm_host_id: vm_host.id, name: image_name, version: version]
-    image_size_bytes = sshable.cmd("stat -c %s #{image.path.shellescape}").to_i
+    image_size_bytes = sshable.cmd("stat -c %s :image_path", image_path: image.path).to_i
     image_size_gib = (image_size_bytes / 1024.0**3).ceil
     StorageDevice.where(vm_host_id: vm_host.id, name: "DEFAULT").update(
       available_storage_gib: Sequel[:available_storage_gib] - image_size_gib
