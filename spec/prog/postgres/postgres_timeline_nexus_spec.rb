@@ -154,14 +154,15 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
   describe "#wait" do
     it "naps if blob storage is not configured" do
-      expect(postgres_timeline).to receive(:leader).and_return("something")
+      expect(PostgresServer).to receive(:[]).and_return("something")
       expect(postgres_timeline).to receive(:backups).and_return([])
       expect(postgres_timeline).to receive(:blob_storage).and_return(nil)
       expect { nx.wait }.to nap(20 * 60)
     end
 
     it "self-destructs if there's no leader, no backups and the timeline is old enough" do
-      expect(postgres_timeline).to receive(:leader).and_return(nil)
+      expect(PostgresServer).to receive(:[]).and_return(nil)
+      expect(postgres_timeline).to receive(:backups).and_return([])
       expect(postgres_timeline).to receive(:created_at).and_return(Time.now - 11 * 24 * 60 * 60)
       expect(Clog).to receive(:emit).with(/Self-destructing timeline/)
       expect { nx.wait }.to hop("destroy")
