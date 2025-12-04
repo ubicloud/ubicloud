@@ -7,7 +7,6 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   def before_run
     when_destroy_set? do
       when_destroying_set? { return }
-      incr_destroying
       register_deadline(nil, 10 * 60)
       hop_destroy
     end

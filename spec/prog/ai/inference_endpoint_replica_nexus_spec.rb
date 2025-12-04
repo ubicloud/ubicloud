@@ -85,6 +85,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
   describe "#before_run" do
     it "hops to destroy when needed" do
       expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx).to receive(:incr_destroying)
       expect { nx.before_run }.to hop("destroy")
     end
 

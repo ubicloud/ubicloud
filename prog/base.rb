@@ -32,6 +32,7 @@ end
 
   def self.semaphore(*names)
     names.map!(&:intern)
+    names << :destroying if names.include?(:destroy)
     names.each do |name|
       define_method :"incr_#{name}" do
         @snap.incr(name)
@@ -58,8 +59,15 @@ end
   def self.label(label)
     (@labels ||= []) << label
 
-    define_method :"hop_#{label}" do
-      dynamic_hop label
+    if label == :destroy
+      define_method :"hop_#{label}" do
+        incr_destroying
+        dynamic_hop label
+      end
+    else
+      define_method :"hop_#{label}" do
+        dynamic_hop label
+      end
     end
   end
 
