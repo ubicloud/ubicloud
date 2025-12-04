@@ -202,6 +202,10 @@ RSpec.describe Kubernetes::Client do
       expect { kubernetes_client.kubectl("get nodes") }.not_to raise_error
     end
 
+    it "raises an error if passed a non-frozen string" do
+      expect { kubernetes_client.kubectl("get nodes".dup) }.to raise_error(NetSsh::PotentialInsecurity)
+    end
+
     it "raises an error" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("error happened", 1)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes").and_return(response)
@@ -233,7 +237,8 @@ RSpec.describe Kubernetes::Client do
           "name" => "test-svc"
         }
       }
-      expect(kubernetes_client).to receive(:kubectl).with("-n default patch service test-svc --type=merge -p '{\"status\":{\"loadBalancer\":{\"ingress\":[{\"hostname\":\"asdf.com\"}]}}}' --subresource=status")
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("node deleted", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf -n default patch service test-svc --type=merge -p \\{\\\"status\\\":\\{\\\"loadBalancer\\\":\\{\\\"ingress\\\":\\[\\{\\\"hostname\\\":\\\"asdf.com\\\"\\}\\]\\}\\}\\} --subresource=status").and_return(response)
       kubernetes_client.set_load_balancer_hostname(svc, "asdf.com")
     end
   end
@@ -245,7 +250,8 @@ RSpec.describe Kubernetes::Client do
       @response = {
         "items" => ["metadata" => {"name" => "svc", "namespace" => "default", "creationTimestamp" => "2024-01-03T00:00:00Z"}]
       }.to_json
-      allow(kubernetes_client).to receive(:kubectl).with("get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(@response)
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(@response, 0)
+      allow(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
       expect(kubernetes_client.instance_variable_get(:@kubernetes_cluster)).to receive(:reload).at_least(:once)
       expect(kubernetes_client.instance_variable_get(:@load_balancer)).to receive(:reload).at_least(:once)
     end
@@ -254,7 +260,8 @@ RSpec.describe Kubernetes::Client do
       response = {
         "items" => []
       }.to_json
-      expect(kubernetes_client).to receive(:kubectl).with("get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(response, 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
       expect(kubernetes_client.any_lb_services_modified?).to be(true)
     end
 
@@ -291,7 +298,8 @@ RSpec.describe Kubernetes::Client do
           }
         ]
       }.to_json
-      expect(kubernetes_client).to receive(:kubectl).with("get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(response, 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
 
       allow(kubernetes_cluster).to receive_messages(
         vm_diff_for_lb: [[], []],
@@ -310,7 +318,8 @@ RSpec.describe Kubernetes::Client do
           "metadata" => {"name" => "svc", "namespace" => "default", "creationTimestamp" => "2024-01-03T00:00:00Z"}
         ]
       }.to_json
-      allow(kubernetes_client).to receive(:kubectl).with("get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(@response)
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(@response, 0)
+      allow(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
     end
 
     it "reconciles with pre existing lb with not ready loadbalancer" do
@@ -341,8 +350,10 @@ RSpec.describe Kubernetes::Client do
     end
 
     it "raises error with non existing lb" do
-      kubernetes_client = described_class.new(instance_double(KubernetesCluster, services_lb: nil), Net::SSH::Connection::Session.allocate)
-      allow(kubernetes_client).to receive(:kubectl).with("get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return({"items" => [{}]}.to_json)
+      session = Net::SSH::Connection::Session.allocate
+      kubernetes_client = described_class.new(instance_double(KubernetesCluster, services_lb: nil), session)
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new({"items" => [{}]}.to_json, 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
       expect { kubernetes_client.sync_kubernetes_services }.to raise_error("services load balancer does not exist.")
     end
   end
