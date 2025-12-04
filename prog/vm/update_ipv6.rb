@@ -11,7 +11,7 @@ class Prog::Vm::UpdateIpv6 < Prog::Base
 
   label def start
     vm_host.sshable.cmd("sudo systemctl stop #{vm.inhost_name}.service")
-    vm_host.sshable.cmd("sudo systemctl stop #{vm.inhost_name}-metadata-endpoint.service") if vm.load_balancer
+    vm_host.sshable.cmd("sudo systemctl stop #{vm.inhost_name}-metadata-endpoint.service") if vm.load_balancer&.cert_enabled
     vm_host.sshable.cmd("sudo systemctl stop #{vm.inhost_name}-dnsmasq.service")
     vm_host.sshable.cmd("sudo ip netns del #{vm.inhost_name}")
     hop_rewrite_persisted
@@ -32,7 +32,7 @@ class Prog::Vm::UpdateIpv6 < Prog::Base
     addr = nic.private_subnet.net4.nth(1).to_s + nic.private_subnet.net4.netmask.to_s
 
     vm_host.sshable.cmd("sudo ip -n #{vm.inhost_name.shellescape} addr replace #{addr} dev #{nic.ubid_to_tap_name}")
-    vm_host.sshable.cmd("sudo systemctl start #{vm.inhost_name}-metadata-endpoint.service") if vm.load_balancer
+    vm_host.sshable.cmd("sudo systemctl start #{vm.inhost_name}-metadata-endpoint.service") if vm.load_balancer&.cert_enabled
     vm.incr_update_firewall_rules
     vm.private_subnets.first.incr_refresh_keys
     pop "VM #{vm.name} updated"
