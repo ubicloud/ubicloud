@@ -148,19 +148,19 @@ class Sshable < Sequel::Model
   end
 
   def d_check(unit_name)
-    cmd("common/bin/daemonizer2 check #{unit_name.shellescape}")
+    cmd("common/bin/daemonizer2 check :unit_name", unit_name:)
   end
 
   def d_clean(unit_name)
-    cmd("common/bin/daemonizer2 clean #{unit_name.shellescape}")
+    cmd("common/bin/daemonizer2 clean :unit_name", unit_name:)
   end
 
-  def d_run(unit_name, *run_command, stdin: nil, log: true)
-    cmd("common/bin/daemonizer2 run #{unit_name.shellescape} #{Shellwords.join(run_command)}", stdin:, log:)
+  def d_run(unit_name, *shelljoin_run_command, stdin: nil, log: true)
+    cmd("common/bin/daemonizer2 run :unit_name :shelljoin_run_command", unit_name:, shelljoin_run_command:, stdin:, log:)
   end
 
   def d_restart(unit_name)
-    cmd("common/bin/daemonizer2 restart #{unit_name}")
+    cmd("common/bin/daemonizer2 restart :unit_name", unit_name:)
   end
 
   # A huge number of settings are needed to isolate net-ssh from the
@@ -189,16 +189,16 @@ class Sshable < Sequel::Model
     @connect_duration = Time.now - start
     Thread.current[:clover_ssh_cache][[host, unix_user]] = sess
 
-    if (lock_name = maybe_ssh_session_lock_name&.shellescape)
+    if (lock_name = maybe_ssh_session_lock_name)
       lock_contents = <<LOCK
-exec 999>/dev/shm/session-lock-#{lock_name} || exit 92
-flock -xn 999 || { echo "Another session active: " #{lock_name}; exit 124; }
-exec -a session-lock-#{lock_name} sleep infinity </dev/null >/dev/null 2>&1 &
+exec 999>/dev/shm/session-lock-:lock_name || exit 92
+flock -xn 999 || { echo "Another session active: " :lock_name; exit 124; }
+exec -a session-lock-:lock_name sleep infinity </dev/null >/dev/null 2>&1 &
 disown
 LOCK
 
       begin
-        cmd(lock_contents, log: false)
+        cmd(lock_contents, lock_name:, log: false)
       rescue SshError => ex
         session_fail_msg = case (exit_code = ex.exit_code)
         when 92
