@@ -220,7 +220,7 @@ STS
     host_line = "#{kubernetes_cluster.sshable.host} #{api_hostname}"
     output = sshable.cmd("cat /etc/hosts")
     unless output.include?(host_line)
-      sshable.cmd("echo #{host_line.shellescape} | sudo tee -a /etc/hosts > /dev/null")
+      sshable.cmd("echo :host_line | sudo tee -a /etc/hosts > /dev/null", host_line:)
     end
   end
 
