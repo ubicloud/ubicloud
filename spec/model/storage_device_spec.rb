@@ -9,7 +9,7 @@ RSpec.describe StorageDevice do
       it "changes the unix_device_list to the device id and saves changes" do
         storage_device = described_class.create(vm_host_id: create_vm_host.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["sda"])
 
-        expect(storage_device.vm_host.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep 'sda$' | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-random-id")
+        expect(storage_device.vm_host.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep sda\\$ | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-random-id")
         expect(storage_device).to receive(:save_changes)
         storage_device.migrate_device_name_to_device_id
         expect(storage_device.unix_device_list).to(eq(["wwn-random-id"]))
@@ -20,7 +20,7 @@ RSpec.describe StorageDevice do
       it "changes the unix_device_list to the device id and saves changes" do
         storage_device = described_class.create(vm_host_id: create_vm_host.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["nvme0n1"])
 
-        expect(storage_device.vm_host.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep 'nvme0n1$' | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id")
+        expect(storage_device.vm_host.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme0n1\\$ | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id")
         expect(storage_device).to receive(:save_changes)
         storage_device.migrate_device_name_to_device_id
         expect(storage_device.unix_device_list).to(eq(["nvme-eui.random-id"]))
