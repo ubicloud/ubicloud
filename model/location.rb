@@ -65,6 +65,7 @@ end
 #  project_id   | uuid    |
 #  dns_suffix   | text    |
 #  byoc         | boolean | NOT NULL DEFAULT false
+#  azs          | jsonb   | NOT NULL DEFAULT '[]'::jsonb
 # Indexes:
 #  location_pkey                         | PRIMARY KEY btree (id)
 #  location_project_id_display_name_uidx | UNIQUE btree (project_id, display_name)
