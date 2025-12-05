@@ -107,10 +107,10 @@ class Prog::Test::HetznerServer < Prog::Test::Base
 
   label def run_integration_specs
     tmp_dir = "/var/storage/tests"
-    vm_host.sshable.cmd("sudo mkdir -p #{tmp_dir}")
-    vm_host.sshable.cmd("sudo chmod a+rw #{tmp_dir}")
+    vm_host.sshable.cmd("sudo mkdir -p :tmp_dir", tmp_dir:)
+    vm_host.sshable.cmd("sudo chmod a+rw :tmp_dir", tmp_dir:)
     vm_host.sshable.cmd("sudo RUN_E2E_TESTS=1 bundle exec rspec host/e2e")
-    vm_host.sshable.cmd("sudo rm -rf #{tmp_dir}")
+    vm_host.sshable.cmd("sudo rm -rf :tmp_dir", tmp_dir:)
 
     hop_wait
   end
