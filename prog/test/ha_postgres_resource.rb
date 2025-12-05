@@ -72,11 +72,12 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
   label def trigger_failover
     primary = postgres_resource.servers.find { it.timeline_access == "push" }
     update_stack({"primary_ubid" => primary.ubid})
+    version = postgres_resource.version
 
-    primary.vm.sshable.cmd("echo -e '\nfoobar' | sudo tee -a /etc/postgresql/#{postgres_resource.version}/main/conf.d/001-service.conf")
+    primary.vm.sshable.cmd("echo -e '\nfoobar' | sudo tee -a /etc/postgresql/:version/main/conf.d/001-service.conf", version:)
 
     # Get postgres pid and send SIGKILL
-    primary.vm.sshable.cmd("ps aux | grep -v grep | grep '/usr/lib/postgresql/#{postgres_resource.version}/bin/postgres' | awk '{print $2}' | xargs sudo kill -9")
+    primary.vm.sshable.cmd("ps aux | grep -v grep | grep '/usr/lib/postgresql/:version/bin/postgres' | awk '{print $2}' | xargs sudo kill -9", version:)
 
     hop_wait_failover
   end
