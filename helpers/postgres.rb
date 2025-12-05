@@ -159,6 +159,47 @@ class Clover
     options.serialize
   end
 
+  PostgresLocation = Data.new(:location, :available_postgres_versions, :available_vm_families)
+  def vm_families_for_project(project)
+    available_postgres_versions = Option::POSTGRES_VERSION_OPTIONS[PostgresResource::Flavor::STANDARD]
+    locations = Location.visible_or_for_project(@project.id, @project.feature_flags["visible_locations"])
+    locations.map do |location|
+      PostgresLocation.new(location:, available_postgres_versions:, available_vm_families: vm_families_for_location(location))
+    end
+  end
+
+  def vm_families_for_location(location)
+    # Generate option tree for this location
+    option_tree, parents = generate_postgres_options(flavor: PostgresResource::Flavor::STANDARD, location:)
+
+    # Extract all valid family+size+storage combinations for this location
+    allowed_options = OptionTreeGenerator.generate_allowed_options("storage_size", option_tree, parents)
+
+    # Group by family and build size data
+    families_data = allowed_options.group_by { |opt| opt["family"] }.transform_values do |options|
+      options.map do |option_path|
+        size = Option::POSTGRES_SIZE_OPTIONS[option_path["size"]]
+        {
+          name: size.name,
+          vcpu: size.vcpu_count,
+          memory_gib: size.memory_gib,
+          storage_size_gib: option_path["storage_size"].to_i
+        }
+      end
+    end
+
+    # Transform to the new structure with family metadata
+    families_data.map do |family_name, sizes|
+      family_option = Option::POSTGRES_FAMILY_OPTIONS[family_name]
+      {
+        name: family_name,
+        display_name: family_option.description,
+        category: family_option.category,
+        sizes:
+      }
+    end
+  end
+
   def postgres_flavors
     Option::POSTGRES_FLAVOR_OPTIONS.reject { |k, _| k == PostgresResource::Flavor::LANTERN && !@project.get_ff_postgres_lantern }
   end

@@ -7,6 +7,11 @@ class Clover
       postgres_list(tags_param:)
     end
 
+    r.get "locations" do
+      authorize("Postgres:view", @project)
+      {items: Serializers::PostgresLocation.serialize(vm_families_for_project(@project))}
+    end
+
     r.web do
       r.post true do
         handle_validation_failure("postgres/create")
