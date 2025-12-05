@@ -7,7 +7,7 @@ RSpec.describe Prog::LearnStorage do
     it "exits, saving StorageDevice model instances" do
       vmh = Prog::Vm::HostNexus.assemble("::1").subject
       ls = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}]))
-      expect(ls.sshable).to receive(:_cmd).with("df -B1 --output=source,target,size,avail ").and_return(<<EOS)
+      expect(ls.sshable).to receive(:_cmd).with("df -B1 --output=source,target,size,avail").and_return(<<EOS)
 Filesystem     Mounted on                   1B-blocks        Avail
 /dev/sda       /                            205520896     99571712
 /dev/sdb       /var/storage/devices/stor1   205520896     99571712
@@ -34,7 +34,7 @@ EOS
     it "exits, updating existing StorageDevice model instances" do
       vmh = Prog::Vm::HostNexus.assemble("::1").subject
       ls = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}]))
-      expect(ls.sshable).to receive(:_cmd).with("df -B1 --output=source,target,size,avail ").and_return(<<EOS)
+      expect(ls.sshable).to receive(:_cmd).with("df -B1 --output=source,target,size,avail").and_return(<<EOS)
 Filesystem     Mounted on                   1B-blocks        Avail
 /dev/nvme0n1   /                           6205520896     99571712
 /dev/nvme0n2   /var/storage/devices/stor1  6205520896   3099571712
@@ -83,7 +83,7 @@ EOS
     end
 
     it "can parse multiple file systems in /var/storage/NAME" do
-      expect(sshable).to receive(:_cmd).with("df -B1 --output=source,target,size,avail ").and_return(<<EOS)
+      expect(sshable).to receive(:_cmd).with("df -B1 --output=source,target,size,avail").and_return(<<EOS)
 Filesystem     Mounted on                   1B-blocks        Avail
 tmpfs          /run                        3331420160   3328692224
 /dev/sda       /                         452564664320 381456842752
@@ -110,7 +110,7 @@ EOS
       # First, the sshable is scanned for any file systems in
       # /var/storage/devices. Iff there are none, a second command is
       # sent to fill in the "DEFAULT" storage device.
-      expect(sshable).to receive(:_cmd).with("df -B1 --output=source,target,size,avail ").and_return(<<EOS)
+      expect(sshable).to receive(:_cmd).with("df -B1 --output=source,target,size,avail").and_return(<<EOS)
 Filesystem     Mounted on                   1B-blocks        Avail
 tmpfs          /run                        3331420160   3328692224
 /dev/sda       /                         452564664320 381456842752
@@ -130,7 +130,7 @@ EOS
     end
 
     it "can find underlying unix devices for raided disks" do
-      expect(sshable).to receive(:_cmd).with("df -B1 --output=source,target,size,avail ").and_return(<<EOS)
+      expect(sshable).to receive(:_cmd).with("df -B1 --output=source,target,size,avail").and_return(<<EOS)
 Filesystem     Mounted on                   1B-blocks        Avail
 tmpfs          /run                        3331420160   3328692224
 /dev/sda       /                         452564664320 381456842752

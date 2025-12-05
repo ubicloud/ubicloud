@@ -6,8 +6,8 @@ class Prog::LearnStorage < Prog::Base
   subject_is :sshable, :vm_host
 
   def make_model_instances
-    devices = SystemParser.extract_disk_info_from_df(sshable.cmd(SystemParser.df_command))
-    rec = SystemParser.extract_disk_info_from_df(sshable.cmd(SystemParser.df_command("/var/storage"))).first
+    devices = SystemParser.extract_disk_info_from_df(sshable.cmd("df -B1 --output=source,target,size,avail"))
+    rec = SystemParser.extract_disk_info_from_df(sshable.cmd("df -B1 --output=source,target,size,avail /var/storage")).first
     sds = [StorageDevice.new(
       vm_host_id: vm_host.id, name: "DEFAULT",
       # reserve 5G the host.
