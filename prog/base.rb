@@ -77,7 +77,10 @@ end
 
   def before_run
     if defined?(hop_destroy)
-      hop_destroy if destroy_set? && !destroying_set?
+      unless destroying_set?
+        fail "BUG: destroying semaphore not set on destroy label" if @strand.label == "destroy"
+        hop_destroy if destroy_set?
+      end
     end
   end
 
