@@ -135,7 +135,7 @@ ExecStart=nc -l 8080 -6
       expect(sshable).to receive(:_cmd).with("ping -c 2 google.com").twice
 
       expect(sshable).to receive(:_cmd).with("sudo systemctl start listening_ipv4.service")
-      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_raise("nc: connect to 1.1.1.1 port 8080 (tcp) timed out")
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080").and_raise("nc: connect to 1.1.1.1 port 8080 (tcp) timed out")
 
       expect { firewall_test.perform_tests_none }.to hop("perform_tests_public_ipv4")
     end
@@ -153,7 +153,7 @@ ExecStart=nc -l 8080 -6
       expect(sshable).to receive(:_cmd).with("ping -c 2 google.com").twice
 
       expect(sshable).to receive(:_cmd).with("sudo systemctl start listening_ipv4.service")
-      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_return("success!")
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080").and_return("success!")
 
       expect(firewall_test.strand).to receive(:update).with(exitval: {msg: "vm2 should not be able to connect to vm1 on port 8080"})
       expect { firewall_test.perform_tests_none }.to hop("failed")
@@ -190,7 +190,7 @@ ExecStart=nc -l 8080 -6
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.last).to receive(:update_firewall_rules_set?).and_return(false)
 
-      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_raise("nc: connect to 1.1.1.1 port 8080 (tcp) timed out")
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080").and_raise("nc: connect to 1.1.1.1 port 8080 (tcp) timed out")
       expect(firewall_test.strand).to receive(:update).with(exitval: {msg: "vm2 should be able to connect to 1.1.1.1 on port 8080"})
       expect { firewall_test.perform_tests_public_ipv4 }.to hop("failed")
     end
@@ -204,7 +204,7 @@ ExecStart=nc -l 8080 -6
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.last).to receive(:update_firewall_rules_set?).and_return(false)
 
-      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_return("success!").at_least(:once)
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080").and_return("success!").at_least(:once)
 
       vm_outside = instance_double(Vm, ip4: "1.1.1.3", inhost_name: "vm_outside", sshable: sshable)
       expect(firewall_test).to receive(:vm_outside).and_return(vm_outside).at_least(:once)
@@ -221,11 +221,11 @@ ExecStart=nc -l 8080 -6
       expect(firewall_test.firewall.private_subnets.first.vms.first).to receive(:update_firewall_rules_set?).and_return(false)
       expect(firewall_test.firewall.private_subnets.first.vms.last).to receive(:update_firewall_rules_set?).and_return(false)
 
-      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_return("success!").once
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080").and_return("success!").once
 
       vm_outside = instance_double(Vm, ip4: "1.1.1.3", inhost_name: "vm_outside", sshable: sshable)
       expect(firewall_test).to receive(:vm_outside).and_return(vm_outside).at_least(:once)
-      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_raise("nc: connect to 1.1.1.1 port 8080 (tcp) timed out")
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080").and_raise("nc: connect to 1.1.1.1 port 8080 (tcp) timed out")
 
       expect { firewall_test.perform_tests_public_ipv4 }.to hop("perform_tests_public_ipv6")
     end
@@ -340,7 +340,7 @@ ExecStart=nc -l 8080 -6
 
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop listening_ipv6.service")
       expect(sshable).to receive(:_cmd).with("sudo systemctl start listening_ipv4.service")
-      expect(sshable).to receive(:_cmd).with("nc -zvw 1 192.168.0.1 8080 ").and_raise("nc: connect to 192.168.0.1 port 8080 (tcp) timed out")
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 192.168.0.1 8080").and_raise("nc: connect to 192.168.0.1 port 8080 (tcp) timed out")
       expect(firewall_test.strand).to receive(:update).with(exitval: {msg: "vm2 should be able to connect to 192.168.0.1 on port 8080"})
       expect { firewall_test.perform_tests_private_ipv4 }.to hop("failed")
     end
@@ -356,11 +356,11 @@ ExecStart=nc -l 8080 -6
 
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop listening_ipv6.service")
       expect(sshable).to receive(:_cmd).with("sudo systemctl start listening_ipv4.service")
-      expect(sshable).to receive(:_cmd).with("nc -zvw 1 192.168.0.1 8080 ").and_return("success!").once
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 192.168.0.1 8080").and_return("success!").once
 
       vm_outside = instance_double(Vm, ephemeral_net4: "1.1.1.3", inhost_name: "vm_outside", sshable: sshable)
       expect(firewall_test).to receive(:vm_outside).and_return(vm_outside).at_least(:once)
-      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_raise("nc: connect to 1.1.1.1 port 8080 (tcp) timed out")
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080").and_raise("nc: connect to 1.1.1.1 port 8080 (tcp) timed out")
       expect { firewall_test.perform_tests_private_ipv4 }.to hop("perform_tests_private_ipv6")
     end
 
@@ -375,11 +375,11 @@ ExecStart=nc -l 8080 -6
 
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop listening_ipv6.service")
       expect(sshable).to receive(:_cmd).with("sudo systemctl start listening_ipv4.service")
-      expect(sshable).to receive(:_cmd).with("nc -zvw 1 192.168.0.1 8080 ").and_return("success!").once
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 192.168.0.1 8080").and_return("success!").once
 
       vm_outside = instance_double(Vm, ephemeral_net4: "1.1.1.3", inhost_name: "vm_outside", sshable: sshable)
       expect(firewall_test).to receive(:vm_outside).and_return(vm_outside).at_least(:once)
-      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_return("success!").once
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080").and_return("success!").once
       expect(firewall_test.strand).to receive(:update).with(exitval: {msg: "vm_outside should not be able to connect to 192.168.0.1 on port 8080"})
       expect { firewall_test.perform_tests_private_ipv4 }.to hop("failed")
     end

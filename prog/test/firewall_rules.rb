@@ -167,8 +167,12 @@ ExecStart=nc -l 8080 -6
   end
 
   def test_connection(to_connect_ip, connecting, should_fail: false, ipv4: true, hop_method_symbol: nil)
-    test_version_arg = ipv4 ? "" : "-6"
-    connecting.sshable.cmd("nc -zvw 1 #{to_connect_ip} 8080 #{test_version_arg}")
+    cmd_string = if ipv4
+      "nc -zvw 1 :to_connect_ip 8080"
+    else
+      "nc -zvw 1 :to_connect_ip 8080 -6"
+    end
+    connecting.sshable.cmd(cmd_string, to_connect_ip:)
   rescue
     send(hop_method_symbol) if should_fail
     fail_test "#{connecting.inhost_name} should be able to connect to #{to_connect_ip} on port 8080"
