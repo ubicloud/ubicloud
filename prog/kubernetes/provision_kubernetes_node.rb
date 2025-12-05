@@ -83,7 +83,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   label def bootstrap_rhizome
     nap 5 unless vm.strand.label == "wait"
 
-    vm.sshable.cmd "sudo iptables-nft -t nat -A POSTROUTING -s #{vm.nics.first.private_ipv4} -o ens3 -j MASQUERADE"
+    vm.sshable.cmd("sudo iptables-nft -t nat -A POSTROUTING -s :private_ipv4 -o ens3 -j MASQUERADE", private_ipv4: vm.nics.first.private_ipv4)
     vm.sshable.cmd("sudo nft --file -", stdin: <<TEMPLATE)
 table ip6 pod_access;
 delete table ip6 pod_access;
@@ -227,7 +227,7 @@ CONFIG
   end
 
   label def approve_new_csr
-    kubernetes_cluster.sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf get csr | awk '/Pending/ && /kubelet-serving/ && /'\"#{node.name}\"'/ {print $1}' | xargs -r sudo kubectl --kubeconfig /etc/kubernetes/admin.conf certificate approve")
+    kubernetes_cluster.sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf get csr | awk '/Pending/ && /kubelet-serving/ && /':name'/ {print $1}' | xargs -r sudo kubectl --kubeconfig /etc/kubernetes/admin.conf certificate approve", name: node.name)
     kubernetes_cluster.incr_sync_internal_dns_config
     kubernetes_cluster.incr_sync_worker_mesh
     pop({node_id: node.id})
