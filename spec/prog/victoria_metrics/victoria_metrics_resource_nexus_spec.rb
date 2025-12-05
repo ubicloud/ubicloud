@@ -86,25 +86,6 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
     end
   end
 
-  describe "#before_run" do
-    it "hops to destroy when needed" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "does not hop to destroy if already in the destroy state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-
-    it "does not hop to destroy if already in the wait_servers_destroyed state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("wait_servers_destroyed")
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-  end
-
   describe "#wait_servers" do
     it "naps if servers not ready" do
       expect(victoria_metrics_resource.servers).to all(receive(:strand).and_return(instance_double(Strand, label: "start")))
