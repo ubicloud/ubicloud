@@ -88,7 +88,7 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
   describe "#prep" do
     it "starts prep on NotStarted" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check prep_standard").and_return("NotStarted")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'sudo host/bin/setup-slice prep standard.slice \"2-3\"' prep_standard")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer sudo\\ host/bin/setup-slice\\ prep\\ standard.slice\\ 2-3 prep_standard")
       expect(vm_host_slice).to receive(:inhost_name).and_return("standard.slice")
 
       expect { nx.prep }.to nap(1)
@@ -96,7 +96,7 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
 
     it "starts prep on Failed" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check prep_standard").and_return("Failed")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'sudo host/bin/setup-slice prep standard.slice \"2-3\"' prep_standard")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer sudo\\ host/bin/setup-slice\\ prep\\ standard.slice\\ 2-3 prep_standard")
       expect(vm_host_slice).to receive(:inhost_name).and_return("standard.slice")
 
       expect { nx.prep }.to nap(1)
