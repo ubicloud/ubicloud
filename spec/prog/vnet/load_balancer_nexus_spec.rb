@@ -49,31 +49,6 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     end
   end
 
-  describe "#before_run" do
-    it "hops to destroy when needed" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "does not hop to destroy if already in the destroy state" do
-      expect(nx.strand).to receive(:label).and_return("destroy")
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-
-    it "does not hop to destroy if already in the wait_destroy_children state" do
-      expect(nx.strand).to receive(:label).and_return("wait_destroy_children").at_least(:once)
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-
-    it "does not hop to destroy if already in the wait_all_vms_removed state" do
-      expect(nx.strand).to receive(:label).and_return("wait_all_vms_removed").at_least(:once)
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-  end
-
   describe "#wait" do
     it "naps for 5 seconds if nothing to do" do
       expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)

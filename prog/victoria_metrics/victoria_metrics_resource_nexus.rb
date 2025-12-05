@@ -48,14 +48,6 @@ class Prog::VictoriaMetrics::VictoriaMetricsResourceNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      unless ["destroy", "wait_servers_destroyed"].include?(strand.label)
-        hop_destroy
-      end
-    end
-  end
-
   label def wait_servers
     register_deadline("wait", 10 * 60)
 

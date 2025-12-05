@@ -173,22 +173,4 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       expect(Semaphore.where(strand_id: private_subnet_id, name: "destroy").count).to eq(1)
     end
   end
-
-  describe "#before_run" do
-    it "hops to destroy if destroy is set" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "does not hop to destroy if destroy is not set" do
-      expect(nx).to receive(:when_destroy_set?).and_return(false)
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-
-    it "does not hop to destroy if strand label is destroy" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-  end
 end

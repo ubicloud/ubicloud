@@ -4,14 +4,6 @@ require "aws-sdk-ec2"
 class Prog::Vnet::Aws::VpcNexus < Prog::Base
   subject_is :private_subnet
 
-  def before_run
-    when_destroy_set? do
-      when_destroying_set? { return }
-      register_deadline(nil, 10 * 60)
-      hop_destroy
-    end
-  end
-
   label def start
     PrivateSubnetAwsResource.create_with_id(private_subnet.id)
     hop_create_vpc
@@ -124,7 +116,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
       nap 5
     end
-
+    register_deadline(nil, 10 * 60)
     decr_destroy
     private_subnet.nics.each(&:incr_destroy)
     private_subnet.remove_all_firewalls
