@@ -324,7 +324,7 @@ class PostgresServer < Sequel::Model
   def refresh_walg_credentials
     return if timeline.blob_storage.nil?
 
-    walg_config = timeline.generate_walg_config
+    walg_config = timeline.generate_walg_config(version)
     vm.sshable.cmd("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: walg_config)
     vm.sshable.cmd("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: timeline.blob_storage.root_certs) unless timeline.aws?
   end

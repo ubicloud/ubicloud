@@ -21,11 +21,12 @@ AWS_SECRET_ACCESS_KEY=dummy-secret-key
 AWS_REGION=us-east-1
 AWS_S3_FORCE_PATH_STYLE=true
 PGHOST=/var/run/postgresql
+PGDATA=/dat/18/data
     WALG_CONF
 
-    expect(postgres_timeline.generate_walg_config).to eq(walg_config)
+    expect(postgres_timeline.generate_walg_config(18)).to eq(walg_config)
     expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2", aws?: true)).at_least(:once)
-    expect(postgres_timeline.generate_walg_config).to eq(walg_config.sub("us-east-1", "us-east-2"))
+    expect(postgres_timeline.generate_walg_config(18)).to eq(walg_config.sub("us-east-1", "us-east-2"))
   end
 
   it "returns walg config without keys when vm has iam_role" do
@@ -39,11 +40,12 @@ AWS_ENDPOINT=https://blob-endpoint
 AWS_REGION=us-east-1
 AWS_S3_FORCE_PATH_STYLE=true
 PGHOST=/var/run/postgresql
+PGDATA=/dat/17/data
     WALG_CONF
 
-    expect(postgres_timeline.generate_walg_config).to eq(walg_config)
+    expect(postgres_timeline.generate_walg_config(17)).to eq(walg_config)
     expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2", aws?: true)).at_least(:once)
-    expect(postgres_timeline.generate_walg_config).to eq(walg_config.sub("us-east-1", "us-east-2"))
+    expect(postgres_timeline.generate_walg_config(17)).to eq(walg_config.sub("us-east-1", "us-east-2"))
   end
 
   describe "#need_backup?" do
