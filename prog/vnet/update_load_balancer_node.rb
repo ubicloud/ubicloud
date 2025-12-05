@@ -7,6 +7,10 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
     @load_balancer ||= LoadBalancer[frame.fetch("load_balancer_id")]
   end
 
+  def inhost_name
+    vm.inhost_name
+  end
+
   def before_run
     pop "VM is destroyed" unless vm
   end
@@ -20,12 +24,12 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
     # load balancing.
     hop_remove_load_balancer if load_balancer.active_vm_ports.count == 0
 
-    vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: generate_lb_based_nat_rules)
+    vm.vm_host.sshable.cmd("sudo ip netns exec :inhost_name nft --file -", inhost_name:, stdin: generate_lb_based_nat_rules)
     pop "load balancer is updated"
   end
 
   label def remove_load_balancer
-    vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: generate_nat_rules(vm.ip4_string, vm.private_ipv4.to_s))
+    vm.vm_host.sshable.cmd("sudo ip netns exec :inhost_name nft --file -", inhost_name:, stdin: generate_nat_rules(vm.ip4_string, vm.private_ipv4.to_s))
 
     pop "load balancer is removed"
   end
